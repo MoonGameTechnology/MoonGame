@@ -22,12 +22,13 @@
  * here decides what a build costs or whether it is legal.
  *
  * Same REFM shape as the other screens: the markup is pure (`yardBoxHtml`,
- * `loadoutPaneHtml`, `orderBarHtml`, `statBarHtml`, `bagText`) and the draft is a plain value
+ * `loadoutPaneHtml`, `orderBarHtml`, `slotLayerHtml`, `statBarHtml`, `bagText`) and the draft is a plain value
  * (`YardDraft`) normalised by a pure `normalizeDraft`; only `initShipyard(host)`
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
+import { slotCallouts, type SlotCallout } from '../../decisions/slotCallouts';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import { isPercentStat, isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
 import {
@@ -43,8 +44,9 @@ import { data } from './gameData';
 import { esc, displayUnit, cost as priceHtml, fmtDur, fmtEta } from './format';
 import { activeConstruction, hoursLeft } from './buildProgress';
 import { HOUR } from './time';
+import { motionOn } from './graphicsPrefs';
 import { unitIconHtml } from './icons';
-import { catalogPortraitHtml } from './shipArt';
+import { catalogPortraitHtml, portraitArt } from './shipArt';
 import { SECTOR_TYPES } from './map';
 import { worldName } from './planetName';
 import { originOf } from './arsenal';
@@ -306,8 +308,14 @@ export function loadoutPaneHtml(
     .join('');
   const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
   const portrait = catalogPortraitHtml('u', draft.hull, data);
+  // Слоты-выноски (шаг 2 переделки окна): точка на корпусе, плитка рядом, линия между ними.
+  // Нет точек у этого арта — отсеки остаются только списком под карточкой.
+  const callouts = portrait ? slotCallouts(portraitArt('u', draft.hull, data)?.key, m.slots) : null;
+  const art = callouts
+    ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts)}</div>`
+    : portrait;
   const hullCard =
-    `<div class="cn-hull${portrait ? ' with-art' : ''}">${portrait}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
+    `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
     `<div class="cn-hm">${m.hasSlots ? t('yard.slots.count', { n: String(m.slots.length) }) : t('yard.slots.none')}</div></div></div></div>`;
   const bays = m.slots
     .map((sl) => {
@@ -360,7 +368,7 @@ export function loadoutPaneHtml(
   })
     .map(
       ({ slot, ids }) =>
-        `<div class="cn-pg"><span aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</span> ${t(SLOT_KEY[slot] ?? slot)}</div>` +
+        `<div class="cn-pg" data-slot="${slot}"><span aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</span> ${t(SLOT_KEY[slot] ?? slot)}</div>` +
         ids.map((id) => paletteCard(option.get(id)!)).join(''),
     )
     .join('');
@@ -426,6 +434,46 @@ export function unitLaneAhead(
   const count = (active ? 1 : 0) + queued.length;
   if (count === 0) return null;
   return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
+}
+
+/**
+ * Слой выносок поверх арта корпуса: точка на корпусе, плитка слота рядом и линия между ними
+ * (форма «Выноска», решение владельца 2026-10-10). Координаты — проценты картинки
+ * (`decisions/slotCallouts.ts`), а слой лежит ровно на картинке, поэтому точка стоит на той
+ * же детали корабля и на телефоне, и на ПК. Плитка надетого модуля снимает его, как строка
+ * отсека под карточкой; пустая ведёт к модулям этого типа.
+ */
+export function slotLayerHtml(
+  slots: LoadoutModel['slots'],
+  callouts: readonly SlotCallout[],
+): string {
+  // Плитка не вылезает за картинку: центр не ближе половины плитки к краю.
+  const at = ([x, y]: readonly [number, number]): string =>
+    `left:clamp(22px,${x}%,calc(100% - 22px));top:clamp(22px,${y}%,calc(100% - 22px))`;
+  const lines = callouts
+    .map((c) => `<line x1="${c.a[0]}%" y1="${c.a[1]}%" x2="${c.t[0]}%" y2="${c.t[1]}%"/>`)
+    .join('');
+  const marks = slots
+    .map((sl, i) => {
+      const c = callouts[i]!;
+      const dot = `left:${c.a[0]}%;top:${c.a[1]}%`;
+      const kind = t(SLOT_KEY[sl.type] ?? sl.type);
+      if (sl.moduleId) {
+        const rar = data.modules[sl.moduleId]?.rarity;
+        const label = `${kind}: ${tData(sl.moduleName ?? sl.moduleId)}`;
+        return (
+          `<span class="cn-dot full" style="${dot}"></span>` +
+          `<button class="cn-tile filled" data-cnun="${sl.moduleId}" style="${at(c.t)}${rar ? `;--rar:var(--rar-${rar})` : ''}" aria-label="${esc(label)}" title="${esc(`${label} · ${t('yard.module.remove')}`)}">${moduleIcon(sl.moduleId)}</button>`
+        );
+      }
+      const label = `${kind}: ${t('yard.slot.empty')}`;
+      return (
+        `<span class="cn-dot" style="${dot}"></span>` +
+        `<button class="cn-tile empty" data-cnslot="${sl.type}" style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}">${SLOT_ICON[sl.type] ?? '＋'}</button>`
+      );
+    })
+    .join('');
+  return `<div class="cn-slots"><svg class="cn-lines" aria-hidden="true">${lines}</svg>${marks}</div>`;
 }
 
 /**
@@ -650,10 +698,23 @@ export function initShipyard(host: YardHost): {
       paint();
       return;
     }
-    const un = (tg.closest('.cn-bay.filled') as HTMLElement | null)?.dataset.cnun;
+    // Снять модуль — строкой отсека под карточкой или его плиткой на арте.
+    const un = ((tg.closest('.cn-bay.filled') ?? tg.closest('.cn-tile.filled')) as HTMLElement | null)
+      ?.dataset.cnun;
     if (un) {
       fit(un, true);
       paint();
+      return;
+    }
+    // Пустая плитка на арте ведёт к модулям своего типа; универсальному слоту годится любой
+    // модуль — к началу палитры.
+    const slot = (tg.closest('.cn-tile.empty') as HTMLElement | null)?.dataset.cnslot;
+    if (slot) {
+      const root = host.root();
+      const to =
+        root.querySelector(`#constructor .cn-pg[data-slot="${slot}"]`) ??
+        root.querySelector('#constructor .cn-ph');
+      to?.scrollIntoView({ block: 'start', behavior: motionOn() ? 'smooth' : 'auto' });
       return;
     }
     const step = (tg.closest('[data-cncount]') as HTMLElement | null)?.dataset.cncount;

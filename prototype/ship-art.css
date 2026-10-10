@@ -22,6 +22,21 @@
 .cn-hull-info{display:flex;align-items:center;gap:13px;min-width:0;}
 .cn-hull-info .cn-hic{flex:none;}
 .cn-hull .ship-art--portrait{border:0;margin-bottom:10px;}
+/* Slot callouts (production window step 2): the layer sits exactly on the 3:2 picture, which the portrait box letterboxes once max-height clamps it, so % points stay on the same hull detail on phone and PC. */
+.cn-art{position:relative;margin-bottom:10px;}
+.cn-art .ship-art--portrait{margin:0;}
+.cn-slots{position:absolute;top:0;left:50%;height:100%;max-width:100%;aspect-ratio:3/2;transform:translateX(-50%);}
+.cn-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.cn-lines line{stroke:var(--cyan);stroke-opacity:.6;stroke-width:1.5;}
+.cn-dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:2px solid var(--cyan);background:#071018;box-shadow:0 0 8px rgba(53,214,230,.55);pointer-events:none;}
+.cn-dot.full{background:var(--cyan);}
+.cn-tile{position:absolute;width:44px;height:44px;padding:0;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px dashed var(--cyan-dim);background:rgba(7,16,24,.9);color:var(--dim);font-size:19px;line-height:1;cursor:pointer;}
+.cn-tile.filled{border:1.5px solid var(--rar,var(--cyan));color:var(--rar,var(--cyan));box-shadow:0 0 10px color-mix(in srgb,var(--rar,var(--cyan)) 45%,transparent);}
+/* An empty bay shows its slot type in grey: the slot glyphs are colour emoji and would read as a fitted module. */
+.cn-tile.empty{filter:grayscale(1);}
+.cn-tile.empty:hover{filter:none;border-color:var(--cyan);color:var(--cyan);}
+.cn-tile.filled:hover{border-color:var(--red);}
+.cn-tile:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 @media(max-width:520px){
   .ship-art--portrait{max-height:190px;}
   .cn-hbtn.with-art{flex-basis:86px;}
