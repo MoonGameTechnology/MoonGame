@@ -41,7 +41,7 @@ export const TRIGGERED_MOMENTS = ['task', 'refuge', 'rescued', 'network', 'capti
 export type TriggeredMoment = (typeof TRIGGERED_MOMENTS)[number];
 
 /** Одна страница: картинка и необязательные подписи — КЛЮЧИ локали. У утверждённых
- *  страниц владельца русские реплики нарисованы внутри картинки. */
+ *  страниц владельца английские реплики нарисованы внутри картинки. */
 export interface ComicPanel {
   image: string;
   /** Английская версия страницы с нарисованными репликами, если уже подготовлена. */

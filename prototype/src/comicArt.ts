@@ -16,11 +16,9 @@
  */
 import type { ComicRegistry, ComicTriggers } from '../../decisions/chapterComics';
 import training1Intro1 from '../art/comics/training-1/intro-1.webp';
-import training1IntroEn1 from '../art/comics/training-1/intro-en-1.webp';
 import pve1Intro1 from '../art/comics/pve-1/intro-1.webp';
 import pve1Task1 from '../art/comics/pve-1/task-1.webp';
 import training1Outro1 from '../art/comics/training-1/outro-1.webp';
-import pve1Echo1 from '../art/comics/pve-1/echo-1.webp';
 import pve1EchoRecord1 from '../art/comics/pve-1/echo-record-1.webp';
 import pve1Outro1 from '../art/comics/pve-1/outro-1.webp';
 import pve2Intro1 from '../art/comics/pve-2/intro-1.webp';
@@ -33,18 +31,20 @@ import pve4Outro1 from '../art/comics/pve-4/outro-1.webp';
 import pve5Intro1 from '../art/comics/pve-5/intro-1.webp';
 import pve5Network1 from '../art/comics/pve-5/network-1.webp';
 import pve5Captive1 from '../art/comics/pve-5/captive-1.webp';
+import pve5Captive2 from '../art/comics/pve-5/captive-2.webp';
+import pve5Captive3 from '../art/comics/pve-5/captive-3.webp';
 import pve5Outro1 from '../art/comics/pve-5/outro-1.webp';
 import pve6Intro1 from '../art/comics/pve-6/intro-1.webp';
 import pve6Refuge1 from '../art/comics/pve-6/refuge-1.webp';
 import pve6Rescued1 from '../art/comics/pve-6/rescued-1.webp';
 import pve6Outro1 from '../art/comics/pve-6/outro-1.webp';
 
-// Реплики нарисованы на самих страницах. Пока английская версия есть только у
-// учебного вступления; остальные страницы используют русский оригинал.
+// Принятый владельцем набор: 23 страницы с английскими репликами внутри рисунка.
+// Он общий для всех локалей; старые русские изображения больше не используются.
 export const CHAPTER_COMICS: ComicRegistry = {
   // «Протокол допуска» — перед учебным полигоном.
   'training-1': {
-    intro: [{ image: training1Intro1, imageEn: training1IntroEn1 }],
+    intro: [{ image: training1Intro1 }],
     outro: [{ image: training1Outro1 }],
   },
   'pve-1': {
@@ -52,7 +52,8 @@ export const CHAPTER_COMICS: ComicRegistry = {
     intro: [{ image: pve1Intro1 }],
     // Отлёт с учёным — когда задача спасения впервые выполнена.
     task: [{ image: pve1Task1 }],
-    echo: [{ image: pve1Echo1 }],
+    // Утверждённая архивная запись подходит обоим состояниям колонии.
+    echo: [{ image: pve1EchoRecord1 }],
     'echo-record': [{ image: pve1EchoRecord1 }],
     outro: [{ image: pve1Outro1 }],
   },
@@ -68,8 +69,9 @@ export const CHAPTER_COMICS: ComicRegistry = {
     intro: [{ image: pve5Intro1 }],
     // Первый разрыв сети Роя — факт мира `net.cut` (`storyFacts`, §7.7).
     network: [{ image: pve5Network1 }],
-    // Пленный «Голос Единения» доставлен на базу.
-    captive: [{ image: pve5Captive1 }],
+    // Доставка пленного: разговор и его кинематографическое продолжение в колонии.
+    // Чтение не засчитывает контакт или договор: задача «Другой ответ» ещё не реализована.
+    captive: [{ image: pve5Captive1 }, { image: pve5Captive2 }, { image: pve5Captive3 }],
     outro: [{ image: pve5Outro1 }],
   },
   // Глава VI (§8.9–8.10): «Последний приют» и «Мы пришли за людьми» — по событиям главы,

@@ -1,332 +1,360 @@
 {
-  "version": 1,
-  "locale": "ru",
+  "version": 2,
+  "locale": "en",
+  "description": "Каталог принятых страниц. Точные реплики и композиция закреплены PNG; прежние русские раскадровки заменены утверждённым рисунком.",
+  "sources": [
+    "docs/sector-zero-roadmap.md",
+    "docs/sector-zero-map-concepts.md",
+    "docs/covenant-of-unity.md"
+  ],
   "pages": [
     {
-      "id": "training-outro",
+      "id": "training-1-intro",
+      "order": 1,
+      "originalPage": 1,
       "chapter": "training-1",
-      "moment": "outro",
-      "title": "Протокол допуска завершён",
-      "source": "docs/sector-zero-map-concepts.md §14.9",
-      "trigger": "First successful completion of the training simulation.",
-      "characters": [
-        "officer"
-      ],
-      "panels": [
-        "Wide high oblique view of the REAL training map fading gently from a green completed objective into transparent glass. Caption: «Протокол допуска завершён.» No enemy Swarm, no scientist.",
-        "Medium low eye-level view of the main officer fully upright beside the modern console, taking one slow breath. Small system balloon from the console: «Учебная задача выполнена. Допуск подтверждён.»",
-        "Medium final panel seen from inside the command bridge: the officer walks upright TOWARD CAMERA through the open doorway from the training room, framed from upper thigh upward so both THREE-bar shoulder boards are fully readable. A communications balloon: «Командование ожидает вашего доклада.»"
-      ]
+      "moment": "intro",
+      "panel": 1,
+      "title": "Протокол допуска",
+      "trigger": "intro",
+      "image": "training-intro-en.png",
+      "runtimeImage": "prototype/art/comics/training-1/intro-1.webp",
+      "sha256": "9a2de0081eff9ee1efda921e049a20d493df9dd1b4b34986e77eb96e6760e2e7",
+      "width": 1024,
+      "height": 1536
     },
     {
-      "id": "pve-1-echo",
+      "id": "training-1-outro",
+      "order": 2,
+      "originalPage": 2,
+      "chapter": "training-1",
+      "moment": "outro",
+      "panel": 1,
+      "title": "Допуск подтверждён",
+      "trigger": "outro",
+      "image": "training-outro-en.png",
+      "runtimeImage": "prototype/art/comics/training-1/outro-1.webp",
+      "sha256": "62c64e290f5a738c29c84f54b8fdf8eb2eb3e83e25e78b72b7981786420ae670",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pve-1-intro",
+      "order": 3,
+      "originalPage": 3,
       "chapter": "pve-1",
-      "moment": "scene",
-      "title": "Кто это?",
-      "source": "docs/covenant-of-unity.md §Страница «Кто это?»",
-      "trigger": "First arrival at home_b after confirmed scientist rescue, while Echo is still hostile.",
-      "characters": [
-        "officer",
-        "scientist",
-        "covenant"
-      ],
-      "panels": [
-        "Wide bridge shot, main officer in a clear three-quarter standing pose facing a LARGE VIDEO SCREEN, not a view of an entire planet. On the screen a human colony's docking facade occupied by armed HUMANS, with the exact supplied Covenant FLAG hanging visibly at plausible building scale. Officer: «Это ещё кто такие?»",
-        "Scientist in the bridge's internal video-call window; enlarged exact Covenant symbol on the adjacent monitor. Scientist: «Завет Единения. Последователи Роя. Они считают его не угрозой, а спасением.»",
-        "Video feed close view of two ordinary human armed occupiers, no monstrous anatomy: worn charcoal work clothes and scavenged armor. The exact SHIELD COAT OF ARMS mounted on the wall, flag behind. Scientist off-screen balloon: «Верят, что человечество должно присоединиться к нему. Эти захватили Эхо, чтобы дождаться Роя здесь.»",
-        "Main officer, composed and upright, near a cropped REAL pve-1 tactical map with Echo indicated. Officer: «Понял. Значит, сопротивление будет не только военным.»"
-      ]
+      "moment": "intro",
+      "panel": 1,
+      "title": "Инструктаж",
+      "trigger": "intro",
+      "image": "pve-1-intro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-1/intro-1.webp",
+      "sha256": "cbb3b699b8774c8e5843746aa0980b7fb469c4a77a0939e187d751f6b31a98a4",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pve-1-task",
+      "order": 4,
+      "originalPage": 4,
+      "chapter": "pve-1",
+      "moment": "task",
+      "panel": 1,
+      "title": "Спасти учёного",
+      "trigger": "mission.rescue-scientist",
+      "image": "pve-1-task-en.png",
+      "runtimeImage": "prototype/art/comics/pve-1/task-1.webp",
+      "sha256": "13f09220c320d5511f478b7d0b60e72076ab3a5380a9a09143421970cf42e646",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-1-echo-record",
+      "order": 5,
+      "originalPage": 24,
       "chapter": "pve-1",
-      "moment": "scene-variant",
+      "moment": "echo-record",
+      "panel": 1,
       "title": "Кто удерживал колонию?",
-      "source": "docs/covenant-of-unity.md §Последовательность и открытие задания",
-      "trigger": "The same introduction when Echo was already liberated before the scientist rescue; show a RECORDING, not live occupiers.",
-      "characters": [
-        "officer",
-        "scientist",
-        "covenant"
-      ],
-      "variantOf": "pve-1-echo",
-      "panels": [
-        "Use the exact pve-1-echo page and edit only the first and final officer balloons and the feed label. Add clear label «АРХИВНАЯ ЗАПИСЬ» on the video screen, consistently in footage panels.",
-        "First officer balloon becomes «Кто удерживал колонию?»",
-        "Scientist explanatory lines remain verbatim the same as the live-arrival page.",
-        "Final officer balloon becomes «Понял. Продолжаем операцию.»"
-      ]
+      "trigger": "echo-record",
+      "image": "pve-1-echo-record-en.png",
+      "runtimeImage": "prototype/art/comics/pve-1/echo-record-1.webp",
+      "sha256": "48aa2cc08ff07ee94c3db9be7441e774df5cdd2fe021d41f86483f43e1c60238",
+      "width": 1024,
+      "height": 1536,
+      "moments": ["echo", "echo-record"],
+      "note": "Одна принятая архивная запись для обоих состояний Эхо; общая отметка просмотра."
     },
     {
       "id": "pve-1-outro",
+      "order": 6,
+      "originalPage": 6,
       "chapter": "pve-1",
       "moment": "outro",
+      "panel": 1,
       "title": "Первый след",
-      "source": "docs/sector-zero-roadmap.md §3.1.3; docs/sector-zero-map-concepts.md §3",
-      "trigger": "First chapter I victory; a recovered fragment is examined aboard the flagship.",
-      "characters": [
-        "officer",
-        "scientist"
-      ],
-      "panels": [
-        "Wide quiet laboratory aboard the flagship. A retrieved inert fragment of Swarm armor rests inside a sealed transparent analysis chamber, its human-made electronic connector plainly visible. Caption: «После боя.» Officer and scientist stand on opposite sides, distinct silhouettes.",
-        "Close scientist in glasses examining the electronic connector without touching tissue. Scientist: «Это наш разъём. Но эта конструкция не входила в программу.» No glowing veins or infection reveal.",
-        "Officer, three shoulder bars clearly visible, asks: «Значит, система продолжила менять себя?» Scientist from off-frame: «После потери контроля. Уже без нас.»",
-        "Wide final frame: scientist quietly views a monitor showing the silent wreckage of the first expedition; officer stands beside him. Scientist: «Нужно узнать, что случилось с первой экспедицией.» No claim about optional civilians being saved."
-      ]
+      "trigger": "outro",
+      "image": "pve-1-outro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-1/outro-1.webp",
+      "sha256": "7d59f534294680979c4372a0678bea326d9a0ed2510470bfbc2565f8c77a16ba",
+      "width": 1086,
+      "height": 1448
     },
     {
       "id": "pve-2-intro",
+      "order": 7,
+      "originalPage": 7,
       "chapter": "pve-2",
       "moment": "intro",
+      "panel": 1,
       "title": "Кладбище экспедиции",
-      "source": "docs/sector-zero-map-concepts.md §4; docs/sector-zero-roadmap.md §3.1.3",
-      "trigger": "Before first chapter II run.",
-      "characters": [
-        "officer",
-        "scientist"
-      ],
-      "map": "pve-2",
-      "panels": [
-        "Wide exterior establishing shot of the wreckage of a HUMAN expedition: torn hulls and cold navigation lights in a coherent debris field, viewed from the flagship's bridge window edge. Caption: «Глава II. Кладбище экспедиции.» No gratuitous exploding planet.",
-        "Scientist at bridge window, reflected wreck silhouette in his glasses, genuine restrained grief. Scientist: «Это была первая экспедиция. Они пришли сюда за ответами.»",
-        "Dominant wide panel: the REAL supplied pve-2 province map displayed on a modern inclined tactical table. Preserve its dense grid, starting corner, debris pockets and multiple approaches. Officer points along two routes without touching a planet. Officer: «Начнём с плацдарма. Будем возвращать район по частям.» No supply convoys, no transport-of-resources mechanic.",
-        "Lower intimate eye-level shot, scientist and officer both upright, in separate visual planes. Scientist: «Если в обломках остались записи, я должен их увидеть.» Officer: «Доберёмся.»"
-      ]
+      "trigger": "intro",
+      "image": "pve-2-intro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-2/intro-1.webp",
+      "sha256": "b4703f4abb864ce13b4bdf04b3cbd39c1b6e1f508d723e0484d6091662c50cc1",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-2-outro",
+      "order": 8,
+      "originalPage": 8,
       "chapter": "pve-2",
       "moment": "outro",
+      "panel": 1,
       "title": "До аварии",
-      "source": "docs/sector-zero-roadmap.md §3.1.3; docs/sector-zero-map-concepts.md §4",
-      "trigger": "First chapter II victory; archive record of early interface activation.",
-      "characters": [
-        "officer",
-        "scientist"
-      ],
-      "panels": [
-        "Top wide panel: dim flagship laboratory, intact black expedition recorder in a sealed reader. Caption: «Записи первой экспедиции.» Scientist and officer stand, not slouch.",
-        "Screen detail, exceptionally clean minimal lettering: «АКТИВАЦИЯ ИНТЕРФЕЙСА» and beneath «ДО ОФИЦИАЛЬНОЙ АВАРИИ». No invented calendar dates, no subject name, no patient-zero label. Scientist off-frame: «Эта запись сделана ещё до потери контроля.»",
-        "Scientist thoughtful, worn human face, normal eyes, no sinister grin. Scientist: «Тогда мы считали испытание успешным.» Officer: «Сохраним оригинал. Разберёмся, что произошло дальше.»",
-        "Final wide frame: officer receives a brief command message while the scientist carefully closes the recorder case. Communications balloon: «Карантинному рубежу требуется подкрепление.» Visible civilians only if generic crew; do not assert optional rescue completed."
-      ]
+      "trigger": "outro",
+      "image": "pve-2-outro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-2/outro-1.webp",
+      "sha256": "1f2c3baf745639f1c48a63664b0f53242fad117bb514b16232f4ec1ebebc61fd",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-3-intro",
+      "order": 9,
+      "originalPage": 9,
       "chapter": "pve-3",
       "moment": "intro",
+      "panel": 1,
       "title": "Карантинный рубеж",
-      "source": "docs/sector-zero-map-concepts.md §5.2–5.3",
-      "trigger": "Before first chapter III run; first proper introduction of Guardian.",
-      "characters": [
-        "officer",
-        "scientist",
-        "guardian"
-      ],
-      "map": "pve-3",
-      "panels": [
-        "Wide station command post: battered but functioning quarantine architecture, external armored shutter, three distant approach beacons. The protagonist enters standing fully upright and is met by GUARDIAN, a distinct older broad-faced veteran with short steel-grey hair and close grey beard, worn dark olive tactical uniform and matte protective shoulder panels, NO main-officer silver rank boards. Caption: «Глава III. Карантинный рубеж.»",
-        "Medium Guardian facing the protagonist at equal eye level. Guardian: «На центральном проходе мы уже побеждали. Дважды.» Main officer: «Почему тогда отступили?» Keep balloon order left to right.",
-        "Large tactical-table panel using the EXACT supplied pve-3 map, central line plus west asteroid and east nebula approaches, visible cross-links and a reserve kept behind the line. Guardian: «Потому что оба раза остались без резерва.»",
-        "Bottom panel: main officer firmly upright beside the table, scientist studying the map behind him. Main officer: «Удерживаем проходы. Резерв оставляем подвижным.» No blue allied officer: that officer is introduced only in IV."
-      ]
+      "trigger": "intro",
+      "image": "pve-3-intro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-3/intro-1.webp",
+      "sha256": "1629e95120e31af72b4b615c0946633ad6c16d13b5d2a01300fa6ac604248c6e",
+      "width": 1199,
+      "height": 1312
     },
     {
       "id": "pve-3-outro",
+      "order": 10,
+      "originalPage": 10,
       "chapter": "pve-3",
       "moment": "outro",
+      "panel": 1,
       "title": "Журналы карантинной службы",
-      "source": "docs/sector-zero-map-concepts.md §5.9",
-      "trigger": "First chapter III victory; compulsory archive clue.",
-      "characters": [
-        "officer",
-        "scientist",
-        "guardian"
-      ],
-      "panels": [
-        "Wide quiet aftermath at the quarantine command post, intact defensive bulkhead and lit friendly approaches outside. Guardian returns to the table, exhausted but steady. Caption: «Рубеж удержан.» Guardian: «Мои люди готовы продолжить операцию.»",
-        "Scientist reads a recovered quarantine log: a small station thumbnail with the restrained label «РЕЗЕРВНЫЙ АРХИВ». Scientist: «Там хранились исходные модели. До того, как система начала изменять себя.»",
-        "Main officer in clear three-quarter portrait, three ranks fully visible on the nearer shoulder: «Они помогут её остановить?»",
-        "Bottom wide frame: scientist looking up from the reader with honest concern, the recovered log between both characters. Scientist: «Они помогут понять, что именно мы теперь пытаемся остановить.» No hidden infection clues."
-      ]
+      "trigger": "outro",
+      "image": "pve-3-outro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-3/outro-1.webp",
+      "sha256": "cb60ac351f8eef7ef429a22e0455df3acb483c09aabde307cc4bb0a591bf59e2",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pve-4-intro",
+      "order": 11,
+      "originalPage": 11,
+      "chapter": "pve-4",
+      "moment": "intro",
+      "panel": 1,
+      "title": "Архив без ответа",
+      "trigger": "intro",
+      "image": "pve-4-intro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-4/intro-1.webp",
+      "sha256": "cfee7324e6d53df4a3274da90d00976f6c29b53c71b04b68f515cfeb933e066d",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pve-4-task",
+      "order": 12,
+      "originalPage": 12,
+      "chapter": "pve-4",
+      "moment": "task",
+      "panel": 1,
+      "title": "Точка встречи",
+      "trigger": "chain.contact",
+      "image": "pve-4-task-en.png",
+      "runtimeImage": "prototype/art/comics/pve-4/task-1.webp",
+      "sha256": "91858d848cfb0a277b482d79cdbf3f7f87e598a590d3cbd36f5798db72b9e278",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-4-outro",
+      "order": 13,
+      "originalPage": 13,
       "chapter": "pve-4",
       "moment": "outro",
+      "panel": 1,
       "title": "То, что сохранилось",
-      "source": "docs/sector-zero-map-concepts.md §6.7; docs/sector-zero-roadmap.md §3.1.3",
-      "trigger": "Confirmed archive storage delivery to withdrawal zone, chapter IV victory.",
-      "characters": [
-        "officer",
-        "scientist",
-        "ally"
-      ],
-      "panels": [
-        "Wide clean flagship analysis room after return. A SINGLE physical black archive drive in a secured reader; protagonist, scientist, and same blue-trim allied officer standing around it. Caption: «Накопитель доставлен.»",
-        "Close reader interface with two crisp archive labels: «УСТОЙЧИВЫЙ НОСИТЕЛЬ» and «ИМЯ: НЕТ ДАННЫХ». No portrait or name that would identify the scientist. Scientist: «В ранних записях есть успешный носитель. Вероятно, лабораторный образец.»",
-        "Scientist points to an ARCHIVAL TECHNICAL NETWORK SCHEMATIC, explicitly label «АРХИВНАЯ СХЕМА»; biological hubs and thin connections, NOT a current all-seeing game map. Scientist: «Вот как узлы передавали друг другу накопленный опыт.»",
-        "Bottom wider composition: officer turns toward the allied officer, both fully upright. Officer: «Значит, следующим шагом разорвём их связь.» Ally: «Подготовим совместную операцию.» Do not show all Swarm memory erased."
-      ]
+      "trigger": "outro",
+      "image": "pve-4-outro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-4/outro-1.webp",
+      "sha256": "31cb32cb0fde1493e862308bc4fa2d33b0d2ab73158e12a862c316a37ae6087d",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-5-intro",
+      "order": 14,
+      "originalPage": 14,
       "chapter": "pve-5",
       "moment": "intro",
+      "panel": 1,
       "title": "Разорванная сеть",
-      "source": "docs/sector-zero-map-concepts.md §7.1",
-      "trigger": "Before first chapter V run (future game chapter).",
-      "characters": [
-        "officer",
-        "scientist",
-        "ally"
-      ],
-      "panels": [
-        "Wide bridge establishing shot with all three established characters; allied officer already works at a blue-accent station, no new handshake. Caption: «Глава V. Разорванная сеть.»",
-        "Scientist near a LOCAL RECON VIDEO of an observed biomechanical relay and a small archival schematic, no invented province map for a chapter with no committed map data. Scientist: «Они не получают все приказы из одного центра. Они передают друг другу то, чему научились.»",
-        "Ally, close-medium, blue-trim uniform and three silver bars. Ally: «Значит, одного удара по центру недостаточно.»",
-        "Main officer upright in a decisive three-quarter view, looking across the table to ally. Officer: «Тогда разделим операцию. Вы прикроете разрыв. Мы займёмся очагом.» Diagram limited to observed links, no whole-enemy reveal."
-      ]
+      "trigger": "intro",
+      "image": "pve-5-intro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-5/intro-1.webp",
+      "sha256": "e27cb470e373077b0686fcd06c3f29140da0e182d944d1d1f8c3482c9c36abee",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-5-network",
+      "order": 15,
+      "originalPage": 15,
       "chapter": "pve-5",
-      "moment": "scene",
+      "moment": "network",
+      "panel": 1,
       "title": "Связь прервана",
-      "source": "docs/sector-zero-map-concepts.md §7.7",
-      "trigger": "First saved fact of an actual split in a previously connected Swarm network, not any relay destruction.",
-      "characters": [
-        "officer",
-        "scientist",
-        "ally"
-      ],
-      "panels": [
-        "Wide top: damaged biomechanical relay in space, its snapped antenna array dim but the distant local defense ships still moving. Caption: «Связь прервана.» Small inset tactical SCHEMATIC with one confirmed line extinguished, other observed links remain; not a fabricated province map.",
-        "Allied officer on a modern blue-edged communication screen: «Передача прекратилась. Местные силы продолжают сопротивление.»",
-        "Scientist at the same table, normal appearance: «Они сохранили всё, что уже знали.»",
-        "Main officer at eye-level, confident posture with three fully visible silver bars on nearest board: «Но теперь не узнают, чему научатся остальные.» Through a small screen next to him the isolated Swarm keeps fighting. No instant mass shutdown."
-      ]
+      "trigger": "net.cut",
+      "image": "pve-5-network-en.png",
+      "runtimeImage": "prototype/art/comics/pve-5/network-1.webp",
+      "sha256": "3a7889637fb6c5990563ec34544b91c3c52c6d399c9a80716a51da4997d0a72f",
+      "width": 1024,
+      "height": 1536
     },
     {
-      "id": "pve-5-captive",
+      "id": "pve-5-captive-1",
+      "order": 16,
+      "originalPage": 16,
       "chapter": "pve-5",
-      "moment": "scene",
+      "moment": "captive",
+      "panel": 1,
       "title": "Голос Единения",
-      "source": "docs/covenant-of-unity.md §Страница после доставки",
-      "trigger": "Confirmed safe delivery of the living local preacher to expedition base, not initial capture.",
-      "characters": [
-        "officer",
-        "preacher",
-        "covenant"
-      ],
-      "panels": [
-        "Upper wide room-setting panel. Calm secure interview room, human guard by the closed door, protagonist deliberately SEATED upright across from a tired sincere middle-aged local preacher, not an evil wizard. Same Book of Voices case with exact supplied shield coat of arms centered on the table. Officer: «Почему вы защищали их ретранслятор?»",
-        "Large second panel, preacher's hands beside the Book. Preacher in charcoal plain civilian jacket with a modest exact Covenant emblem. Two neatly separated balloons: «В убежищах меня просили сохранить не золото. Голоса. Запись матери. Смех ребёнка.» and «Я переносил их с умирающих накопителей и думал: кто сделает это, когда не станет меня?»",
-        "Quiet portrait of preacher, greying close-cropped hair, short beard, no halo or theatrical evil grin. Preacher: «Вы спасаете людей от смерти. Мы хотим спасти их от исчезновения. От дня, когда уже некому вспомнить, кем они были.»",
-        "Large fourth panel showing human audio recordings in the open Book interface, simple waveforms and record tiles, no souls or Swarm consciousness. Preacher: «Мы верим: в Хоре пережитое одним станет памятью остальных. Человечеству не придётся снова учиться на той же боли. Мы хотим, чтобы ни один человек не пропал бесследно.»",
-        "Close officer maintaining calm eye contact, no threat or torture. Officer: «А тех, кто не хочет становиться частью вашего Хора, вы спросили?»",
-        "Preacher looks down at the closed Book. Preacher: «Они ещё не понимают, что теряют.» End on an uncomfortable human pause. Let dialogue panels occupy most of the page; all words readable."
-      ]
+      "trigger": "mission.voice-of-unity",
+      "image": "pve-5-captive-1-en.png",
+      "runtimeImage": "prototype/art/comics/pve-5/captive-1.webp",
+      "sha256": "cf3f000f0ac2092eb6132c98e691b0a57250363ecc373ba70dfb08cfaf27c5b8",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pve-5-captive-2",
+      "order": 17,
+      "originalPage": 17,
+      "chapter": "pve-5",
+      "moment": "captive",
+      "panel": 2,
+      "title": "Страх и память",
+      "trigger": "mission.voice-of-unity",
+      "image": "pve-5-captive-2-en.png",
+      "runtimeImage": "prototype/art/comics/pve-5/captive-2.webp",
+      "sha256": "4ffa5e2fbe2b0751294ba30644a48640f5977e53524c299182a896a4151ef01c",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pve-5-captive-3",
+      "order": 18,
+      "originalPage": 18,
+      "chapter": "pve-5",
+      "moment": "captive",
+      "panel": 3,
+      "title": "Другой ответ",
+      "trigger": "mission.voice-of-unity",
+      "image": "pve-5-captive-3-en.png",
+      "runtimeImage": "prototype/art/comics/pve-5/captive-3.webp",
+      "sha256": "dee56331f9fbef460c811eb8dba8ccf26a0cc3efcc09ea6ed278cfbf4e61769e",
+      "width": 1024,
+      "height": 1536,
+      "note": "Кинематографическое продолжение разговора с пленным. Не реализация и не засчёт игрового контракта «Другой ответ»."
     },
     {
       "id": "pve-5-outro",
+      "order": 19,
+      "originalPage": 19,
       "chapter": "pve-5",
       "moment": "outro",
+      "panel": 1,
       "title": "Память без узла",
-      "source": "docs/sector-zero-map-concepts.md §7.7; docs/sector-zero-roadmap.md §3.1.3",
-      "trigger": "First chapter V victory regardless of optional relay split or preacher mission.",
-      "characters": [
-        "officer",
-        "scientist",
-        "ally"
-      ],
-      "panels": [
-        "Wide bridge after a real local victory: cease-fire monitors, dim neutral/deactivated production structures on observed video feeds. Caption: «Район освобождён.» No claim that the entire Swarm everywhere is destroyed.",
-        "Archive close-up read by scientist. Single clear record line: «АДАПТИВНЫЙ ОПЫТ СОХРАНЯЕТСЯ В ЖИЗНЕСПОСОБНОМ НОСИТЕЛЕ». Do not show an identified host, a face, an infected arm or secret.",
-        "Scientist speaks sincerely, still in white and teal: «Внешнюю инфраструктуру можно потерять. Накопленный опыт остаётся в носителе.» Officer: «Где начиналась программа?»",
-        "Final wide panel, scientist points to an old architectural image of the ORIGINAL COMPLEX, not a newly invented strategic map. Scientist: «В Нулевом комплексе. Туда и нужно идти.» Ally already present quietly confirms with a nod; no compulsory preacher cameo."
-      ]
+      "trigger": "outro",
+      "image": "pve-5-outro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-5/outro-1.webp",
+      "sha256": "a486e4f843c85ab0470df2f562d6027e44e30ae566f125a8fb646920e024a651",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-6-intro",
+      "order": 20,
+      "originalPage": 20,
       "chapter": "pve-6",
       "moment": "intro",
+      "panel": 1,
       "title": "Нулевой комплекс",
-      "source": "docs/sector-zero-map-concepts.md §8.1–8.3",
-      "trigger": "Before first chapter VI run (future game chapter).",
-      "characters": [
-        "officer",
-        "scientist",
-        "ally"
-      ],
-      "panels": [
-        "Dominant establishing wide panel: massive old scientific complex in shadow with visible ACTIVE biomechanical industrial nests and functioning hostile defenses attached; honest destination still occupied, not an empty abandoned ruin. Caption: «Глава VI. Нулевой комплекс.»",
-        "Scientist in foreground at a bridge viewport looking toward the place where his project began. Scientist: «Здесь всё началось. И здесь мы должны остановить действующие очаги.» No malicious expression.",
-        "Allied officer at communications station; live human distress frequencies represented by a restrained waveform, not all enemy intelligence. Ally: «Прикроем общий тыл и подготовим эвакуацию.»",
-        "Main officer upright at the command table, scientist and ally in supporting positions. Officer: «Подавить производство. Обеспечить вывоз людей. Затем завершить операцию.» No magic global kill-switch; no final-secret revelation."
-      ]
+      "trigger": "intro",
+      "image": "pve-6-intro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-6/intro-1.webp",
+      "sha256": "d68c1e59be183f999fe462199d7abf3c1517e05808413142a6412ece2ec95c19",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-6-refuge",
+      "order": 21,
+      "originalPage": 21,
       "chapter": "pve-6",
-      "moment": "scene",
+      "moment": "refuge",
+      "panel": 1,
       "title": "Последний приют",
-      "source": "docs/sector-zero-map-concepts.md §8.4–8.5, §8.9",
-      "trigger": "Receive actual recording and live distress call after discovery of quarantine docks; before rescue.",
-      "characters": [
-        "officer",
-        "scientist",
-        "ally",
-        "keeper",
-        "covenant",
-        "swarm"
-      ],
-      "panels": [
-        "Top left: a clearly framed recorded security feed labelled «ЗАПИСЬ ДО НАЧАЛА ОПЕРАЦИИ». Older civilian keeper beneath exact Covenant flag has opened the human dock defenses. Keeper: «Мы сохранили имена. Мы принесли голоса. Мы готовы.» No reply from the Swarm.",
-        "Top right: CONTINUATION OF RECORDING, label «ЗАПИСЬ». Supplied Swarm lander creature designs occupy technical compartments; humans try to close a door toward living quarters, falling Covenant banner. No gore, no religious judgment, no living present-day allied fleet passively watching.",
-        "Wide third panel: recording ends on sealed emergency bulkhead; distinct current signal panel brightens with label «ПРЯМОЙ СИГНАЛ». A scared human voice: «Говорит карантинный док. Здесь ещё есть люди. Нам нужна эвакуация.» Clear visual separation between past and present.",
-        "Middle wide: allied officer on bridge with scientist, dialogue in order. Ally: «Они сами открыли ему станцию. Почему он атаковал их?» Scientist: «Они сняли оборону. Для Роя это был доступ, не приглашение.»",
-        "Next two-shot officer and scientist. Officer: «Он вообще различает, кто в него верит?» Scientist: «Их вера ничего не меняет в его решениях.»",
-        "Bottom commanding portrait of protagonist standing, nearest board has THREE fully visible silver bars. Officer: «Прикройте доки. Выводим людей.» No outcome of rescue claimed yet."
-      ]
+      "trigger": "chain.docks",
+      "image": "pve-6-refuge-en.png",
+      "runtimeImage": "prototype/art/comics/pve-6/refuge-1.webp",
+      "sha256": "87490a9c575f161acf157f98111a4c6c98d689a0ef7de12be751717d43cd1f5e",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-6-rescued",
+      "order": 22,
+      "originalPage": 22,
       "chapter": "pve-6",
-      "moment": "scene",
+      "moment": "rescued",
+      "panel": 1,
       "title": "Мы пришли за людьми",
-      "source": "docs/sector-zero-map-concepts.md §8.9 Страница B",
-      "trigger": "Confirmed MAIN civilian evacuation, independent of optional Book rescue.",
-      "characters": [
-        "officer",
-        "keeper",
-        "covenant"
-      ],
-      "panels": [
-        "Wide evacuation transport medical bay; same worn keeper from the refuge page sits among living rescued civilians, same Covenant symbol on modest civilian clothing. He looks up at the upright main officer. Keeper: «Вы знаете, кто мы?» No Book of Voices anywhere: optional rescue must not be invented.",
-        "Medium close main officer, standing straight, tired compassion rather than contempt, same exact black uniform, three visible silver bars. Officer: «Знаю.»",
-        "Close keeper, still wearing his symbol, no forced renunciation: «И всё равно забрали нас?»",
-        "Large final panel: officer beside the keeper while a human medic tends an evacuee in the background; foreground trust and real help. Officer: «Мы пришли за людьми.» No sermon, halo or humiliating kneeling."
-      ]
+      "trigger": "chain.evacuate",
+      "image": "pve-6-rescued-en.png",
+      "runtimeImage": "prototype/art/comics/pve-6/rescued-1.webp",
+      "sha256": "f1c7afb5222c8482f31ec3e974551e2538f7f7b41f7a73180067015311713de1",
+      "width": 1024,
+      "height": 1536
     },
     {
       "id": "pve-6-outro",
+      "order": 23,
+      "originalPage": 23,
       "chapter": "pve-6",
       "moment": "outro",
+      "panel": 1,
       "title": "После победы",
-      "source": "docs/sector-zero-map-concepts.md §8.9–8.10; docs/sector-zero-roadmap.md §3.1.4",
-      "trigger": "AFTER authoritative campaign victory, never before; five-panel epilogue.",
-      "characters": [
-        "scientist"
-      ],
-      "panels": [
-        "Wide first panel confirms REAL victory. Calm operational report monitor and rescued people disembarking safely in the background. Exactly three report lines in a restrained cream caption: «Производящие очаги в районе операции ликвидированы.» «Организованное сопротивление прекращено.» «Эвакуация завершена.» No all-galaxy claim, no new attack, no ally dialogue requiring a particular survivor.",
-        "Scientist ALONE in the medical bay, same face and glasses and white-teal outfit. He gently removes an ordinary diagnostic wrist bracelet. A small screen reads «ПОКАЗАТЕЛИ СТАБИЛЬНЫ». He breathes out with genuine tired relief, no villain smile.",
-        "Close-up of his wrist at the OLD healed interface contact site, just a tiny faint glow UNDER the intact skin. No needle, bite, new implant or infection happening now.",
-        "Poetic restrained MICROSCOPIC visualization, not a bloody dissection: living tissue fibers intertwined with a fine electronic conductor in the same functional organic pattern as previously seen Swarm organs. Mostly dark, silver grey, extremely faint cool pulse. No letters or explanatory label.",
-        "Final narrow bottom panel fades into near-black. ONE weak pulse traveling along a single tiny filament, then darkness. No text, no patient-zero title, no monster transformation, no new fleet, no implication that the victory was fake."
-      ]
+      "trigger": "outro",
+      "image": "pve-6-outro-en.png",
+      "runtimeImage": "prototype/art/comics/pve-6/outro-1.webp",
+      "sha256": "94f6daf2ff07a80f965a3ea2f5130c78b04434482e254c131f1098318ed144d3",
+      "width": 1024,
+      "height": 1536
     }
   ]
 }

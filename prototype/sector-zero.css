@@ -603,8 +603,8 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
 .sz-codex-empty { margin: 0; padding: 10px; border: 1px dashed #3a4a52; border-radius: 9px; color: #9fb6bc; font-size: 12px; }
 
 /* Комикс главы (prototype/src/comicPlayer.ts): панель за панелью. Панель вписывается в
-   экран целиком (contain), подпись — текст локали под ней. Движение — наезд и проявление,
-   только CSS; при reduced motion его нет. */
+   экран целиком (contain), подпись — текст локали под ней. Только проявление:
+   масштабирование обрезало края принятых страниц внутри overflow:hidden. */
 #comic { font-family: system-ui, sans-serif; color: #e1f4f4; gap: 14px; }
 #comic .comic-panel { margin: 0; flex: 1; min-height: 0; width: min(1200px, 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; overflow: hidden; }
 #comic-img { flex: 1 1 0; min-height: 0; width: 100%; object-fit: contain; }
@@ -618,9 +618,8 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
 #comic-next { color: #b3f1e9; border-color: #75b6b6; }
 #comic-skip { position: absolute; z-index: 1; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
 #comic button:focus-visible { outline: 2px solid #e6b777; outline-offset: 4px; }
-#comic.comic-in #comic-img { animation: comic-fade .35s ease-out both, comic-drift 9s ease-out both; }
+#comic.comic-in #comic-img { animation: comic-fade .35s ease-out both; }
 @keyframes comic-fade { from { opacity: 0; } }
-@keyframes comic-drift { from { transform: scale(1.04); } }
 @media (prefers-reduced-motion: reduce) {
   #comic.comic-in #comic-img { animation: none; }
 }
