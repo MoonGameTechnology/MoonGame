@@ -17,13 +17,14 @@ import {
 } from './harnessKit.mjs';
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 
-const hooks = `window.__mobileTest = {
+const hooks = `import { moveFleet as __moveFleet } from './game';
+window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
   ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
-  destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
+  destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
   notices: () => noticeFlashes.length,
   emit: events => handleEvents(events),
   motion: on => setMotion(on)

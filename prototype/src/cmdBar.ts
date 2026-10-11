@@ -4,8 +4,8 @@
  *
  * Ряд собирается каждый кадр, но DOM трогается, только когда строка разметки поменялась:
  * кэш `lastCmdHtml` живёт здесь, а чужие зоны сбивают его дверью `invalidateCmdBar()`, не
- * присваиванием. Нажатия по ряду и мобильный черновик приказа — следующий кирпич
- * (REFM-227); пока они в `main.ts`, ряд спрашивает их хуками.
+ * присваиванием. Нажатия по ряду и мобильный черновик приказа живут в `cmdActions.ts`
+ * (REFM-227); черновик ряд спрашивает хуками: прямой импорт замкнул бы круг модулей.
  */
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
 import { isOrdnanceFleet, rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
@@ -69,7 +69,7 @@ import { mobileDraftMatches, type MobileOrderKind, type MobileOrderTarget } from
 import { barStays, popoverLife } from './popoverLife';
 import { troopsMenuHtml, troopsModel, type TroopsInput } from './troopsMenu';
 
-/** Что ряду нужно от игры. Окно флота, тип сектора и мобильный черновик пока в `main.ts`. */
+/** Что ряду нужно от игры. Мобильный черновик main.ts берёт у `cmdActions.ts` и отдаёт сюда. */
 export interface CmdBarHost {
   /** Мир на экране. */
   world(): GameState;
@@ -87,11 +87,11 @@ export interface CmdBarHost {
   capturable(id: string): boolean;
   /** Имя места для шапки окна. */
   placeName(id: string): string;
-  /** Какой приказ взведён на телефоне (REFM-227). */
+  /** Какой приказ взведён на телефоне. */
   mobileOrderKind(): MobileOrderKind | null;
-  /** Цель черновика ещё годится для приказа (REFM-227). */
+  /** Цель черновика ещё годится для приказа. */
   mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind): boolean;
-  /** Подпись цели черновика (REFM-227). */
+  /** Подпись цели черновика. */
   mobileTargetLabel(target: MobileOrderTarget): string;
 }
 

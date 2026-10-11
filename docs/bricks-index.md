@@ -66,7 +66,7 @@
 | REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
 | REFM-225 | ⏳ | proto | `docs/backlog.md` | Хозяин боковой панели |
 | REFM-226 | ✅ | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
-| REFM-227 | ⏳ | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
+| REFM-227 | ✅ | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
 | REFM-228 | ✅ | proto | `docs/backlog.md` | Приказы группе |
 | REFM-229 | ✅ | proto | `docs/backlog.md` | Композер цепочек «Приказ» |
 | REFM-230 | ⏳ | proto | `docs/backlog.md` | Реакция на события мира и лента |

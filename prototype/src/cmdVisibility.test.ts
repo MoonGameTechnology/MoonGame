@@ -64,14 +64,16 @@ describe('CMD-VIS — проба, на которой стоит кнопка «
 describe('CMD-VIS — кнопка и обработчик подключены к пробе', () => {
   it('ряд решает видимость «Стопа», а обработчик — рассылку в группе через canOrder', () => {
     // DOM-входы без юнит-харнеса; правило держится, только если ОБА места спрашивают ядро,
-    // а не свой if: сборка ряда (`cmdBar.ts`, REFM-226) и обработчик клика (`main.ts`).
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    // а не свой if: сборка ряда (`cmdBar.ts`, REFM-226) и обработчик клика (`cmdActions.ts`,
+    // REFM-227 — там мир читается заново после каждого приказа группе).
     const bar = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
-    const probe = /canOrder\(s, stopFleet\(ME, /g;
-    expect((bar.match(probe) ?? []).length).toBeGreaterThanOrEqual(1);
-    expect((src.match(probe) ?? []).length).toBeGreaterThanOrEqual(1);
+    const click = readFileSync(new URL('./cmdActions.ts', import.meta.url), 'utf8');
+    expect((bar.match(/canOrder\(s, stopFleet\(ME, /g) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect(
+      (click.match(/canOrder\(game\.world\(\), stopFleet\(ME, /g) ?? []).length,
+    ).toBeGreaterThanOrEqual(1);
     // Рукописного предиката «а движется ли флот» у стопа больше нет.
-    expect(src).not.toContain('if (s.fleets[id]?.movement) playerOrder(stopFleet');
+    expect(click).not.toMatch(/fleets\[id\]\?\.movement\) playerOrder\(stopFleet/);
   });
 });
 

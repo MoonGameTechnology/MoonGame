@@ -53,6 +53,7 @@ async function toggleTools() {
 // Меню каста флагмана живёт у композера «Приказ» (`chainComposer.ts`, REFM-229) — робот
 // берёт его своим импортом: в `main.ts` этого имени больше нет.
 const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chainComposer';
+import { moveFleet as __moveFleet } from './game';
 window.__szTest = {
   run: () => isSectorZeroRun(),
   home: () => Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null,
@@ -117,7 +118,7 @@ window.__szTest = {
     const cruiser = main.units.find((u) => u.unit === 'cruiser');
     playerOrder(splitFleet(ME, main.id, [{ unit: 'cruiser', count: 2, ...(cruiser?.modules?.length ? { modules: cruiser.modules } : {}) }]));
     const part = Object.keys(s.fleets).find((id) => !before.has(id)) ?? main.id;
-    playerOrder(moveFleet(ME, part, 'pirate_den'));
+    playerOrder(__moveFleet(ME, part, 'pirate_den'));
   },
   skip: (min) => { apply(advance(s, s.time + min * 60000)); },
   battles: () => Object.keys(s.battles).length,
