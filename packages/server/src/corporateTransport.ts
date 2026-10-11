@@ -57,7 +57,8 @@ export function corporateRequest(
   }
   return guard.run(
     () => sendCorporateRequest(endpoint, method, path, body, who, ip),
-    (result) => result.status === 429 || result.status >= 500,
+    // Authenticated client rate limits prove peer availability, not an outage.
+    (result) => result.status >= 500,
   );
 }
 

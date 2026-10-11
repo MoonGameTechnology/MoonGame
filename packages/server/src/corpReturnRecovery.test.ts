@@ -25,9 +25,11 @@ beforeAll(async () => {
   if (!sourceUrl) return;
   admin = new Pool({ connectionString: sourceUrl });
   await admin.query(`CREATE DATABASE "${database}"`);
-  const isolated = new URL(sourceUrl);
-  isolated.pathname = `/${database}`;
-  url = isolated.toString();
+  // Preserve pg's empty-host Unix-socket URLs, which WHATWG URL rejects.
+  const queryAt = sourceUrl.indexOf('?');
+  const connection = queryAt < 0 ? sourceUrl : sourceUrl.slice(0, queryAt);
+  const query = queryAt < 0 ? '' : sourceUrl.slice(queryAt);
+  url = connection.replace(/\/[^/]*$/, `/${database}`) + query;
   const pool = new Pool({ connectionString: url });
   try {
     await migrate(pool);

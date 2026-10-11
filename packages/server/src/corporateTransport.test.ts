@@ -151,6 +151,44 @@ it('stops repeatedly calling an unavailable signed peer without retrying writes'
   }
 });
 
+it('does not let one rate-limited caller open the corporate circuit for other users', async () => {
+  const peer = Fastify();
+  const identify = corporateIdentity(peer, key);
+  peer.post('/corps', async (request, reply) => {
+    const who = await identify(request);
+    if (who?.accountId === 'limited') return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    return { ok: true };
+  });
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    for (let i = 0; i < 6; i++)
+      expect(
+        (
+          await corporateRequest(
+            endpoint,
+            'POST',
+            '/corps',
+            {},
+            { accountId: 'limited', login: 'Limited' },
+          )
+        ).status,
+      ).toBe(429);
+    expect(
+      (
+        await corporateRequest(
+          endpoint,
+          'POST',
+          '/corps',
+          {},
+          { accountId: 'other', login: 'Other' },
+        )
+      ).status,
+    ).toBe(200);
+  } finally {
+    await peer.close();
+  }
+});
+
 it('caps hanging corporate calls while independent game routes remain available', async () => {
   const peer = Fastify(),
     game = Fastify();
