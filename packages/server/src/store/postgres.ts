@@ -106,6 +106,7 @@ const SCHEMA_SQL = `
     -- recovery emails are unique case-insensitively WHEN present (the reset lookup key)
     CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users (lower(email)) WHERE email IS NOT NULL;
 
+    CREATE TABLE IF NOT EXISTS corp_gateway_nonces (nonce text PRIMARY KEY, expires_at bigint NOT NULL);
     CREATE TABLE IF NOT EXISTS corps (
       id         text PRIMARY KEY,
       name       text NOT NULL,
@@ -141,6 +142,8 @@ const SCHEMA_SQL = `
       target  text,
       detail  text
     );
+    ALTER TABLE corp_audit ADD COLUMN IF NOT EXISTS event_id text;
+    CREATE UNIQUE INDEX IF NOT EXISTS corp_audit_event_idx ON corp_audit(event_id);
     CREATE INDEX IF NOT EXISTS corp_audit_corp_idx ON corp_audit (corp_id);
 
     -- AvA readiness (AVA-3). Corp-flag: the corp is in the ready pool (head-set).
@@ -219,6 +222,11 @@ const SCHEMA_SQL = `
 
     -- AvA public feed (AVA-9): append-only, read newest-first. PUBLIC facts only (corp
     -- names + winner), snapshotted at publish — no private roster ever enters this table.
+    CREATE TABLE IF NOT EXISTS ava_result_delivery (match_id text PRIMARY KEY, delivered boolean NOT NULL DEFAULT false, attempts integer NOT NULL DEFAULT 0, retry_at bigint NOT NULL DEFAULT 0);
+    ALTER TABLE ava_result_delivery ADD COLUMN IF NOT EXISTS delivered boolean NOT NULL DEFAULT false;
+    ALTER TABLE ava_result_delivery ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+    ALTER TABLE ava_result_delivery ADD COLUMN IF NOT EXISTS retry_at bigint NOT NULL DEFAULT 0;
+
     CREATE TABLE IF NOT EXISTS ava_feed (
       id              text PRIMARY KEY,
       at              bigint NOT NULL,
@@ -270,6 +278,9 @@ const SCHEMA_SQL = `
       matchup_id  text NOT NULL,
       account_id  text NOT NULL,
       rented_at   bigint NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS corp_return_audit (
+      event_id text PRIMARY KEY, matchup_id text NOT NULL, entry jsonb NOT NULL, delivered boolean NOT NULL DEFAULT false
     );
     CREATE INDEX IF NOT EXISTS corp_arsenal_rent_matchup_idx ON corp_arsenal_rent (matchup_id);
 
@@ -1057,8 +1068,8 @@ export class PostgresCorpStore implements CorpStore {
 
   async appendAudit(entry: CorpAuditEntry): Promise<void> {
     await this.pool.query(
-      `INSERT INTO corp_audit (corp_id, at, actor, action, target, detail)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO corp_audit (corp_id, at, actor, action, target, detail, event_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT(event_id) DO NOTHING`,
       [
         entry.corpId,
         entry.at,
@@ -1066,6 +1077,7 @@ export class PostgresCorpStore implements CorpStore {
         entry.action,
         entry.target ?? null,
         entry.detail ?? null,
+        entry.eventId ?? null,
       ],
     );
   }
@@ -1163,26 +1175,21 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
   async createChallenge(
     challenge: AvaChallenge,
   ): Promise<{ ok: true } | { ok: false; code: 'E_ALREADY_CHALLENGED' }> {
-    try {
-      await this.pool.query(
-        `INSERT INTO ava_challenges
-           (id, challenger_corp, target_corp, cost, status, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          challenge.id,
-          challenge.challengerCorp,
-          challenge.targetCorp,
-          challenge.cost,
-          challenge.status,
-          challenge.createdAt,
-          challenge.expiresAt,
-        ],
-      );
-      return { ok: true };
-    } catch {
-      // The partial unique index (challenger, target) WHERE pending rejected it.
-      return { ok: false, code: 'E_ALREADY_CHALLENGED' };
-    }
+    const inserted = await this.pool.query(
+      `INSERT INTO ava_challenges
+         (id, challenger_corp, target_corp, cost, status, created_at, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id`,
+      [
+        challenge.id,
+        challenge.challengerCorp,
+        challenge.targetCorp,
+        challenge.cost,
+        challenge.status,
+        challenge.createdAt,
+        challenge.expiresAt,
+      ],
+    );
+    return inserted.rowCount ? { ok: true } : { ok: false, code: 'E_ALREADY_CHALLENGED' };
   }
 
   async getChallenge(id: string): Promise<AvaChallenge | null> {
@@ -1581,6 +1588,21 @@ const SESSION_COLS = 'match_id, matchup_id, map_id, seats, at, war_at, war_decla
  *  `create` atomically one-per-matchup and one-per-instance; a duplicate raises the
  *  insert conflict → `E_SESSION_EXISTS` (the orchestrator treats that as "already built"). */
 export class PostgresAvaSessionStore implements AvaSessionStore {
+  async pendingResults(limit = 100): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>> {
+    const result = await this.pool.query<{ match_id: string; matchup_id: string; winner: string | null }>(
+      `SELECT s.match_id,s.matchup_id,m.state->'match'->>'winner' AS winner
+       FROM ava_sessions s JOIN matches m ON m.id=s.match_id
+       LEFT JOIN ava_result_delivery d ON d.match_id=s.match_id
+       WHERE m.status='ended' AND (d.match_id IS NULL OR (NOT d.delivered AND d.retry_at<=$2)) ORDER BY COALESCE(d.attempts,0),s.at,s.match_id LIMIT $1`, [limit, Date.now()]);
+    return result.rows.map((r) => ({ matchId: r.match_id, matchupId: r.matchup_id, winner: r.winner }));
+  }
+  async markResultRetry(matchId: string): Promise<void> {
+    await this.pool.query('INSERT INTO ava_result_delivery(match_id,attempts,retry_at) VALUES($1,1,$2) ON CONFLICT(match_id) DO UPDATE SET attempts=ava_result_delivery.attempts+1,retry_at=$2', [matchId, Date.now()+5000]);
+  }
+  async markResultDelivered(matchId: string): Promise<void> {
+    await this.pool.query('INSERT INTO ava_result_delivery(match_id,delivered) VALUES($1,true) ON CONFLICT(match_id) DO UPDATE SET delivered=true', [matchId]);
+  }
+
   constructor(private readonly pool: Pool) {}
 
   async create(
@@ -1786,6 +1808,31 @@ export class PostgresArsenalStore implements ArsenalStore {
 }
 
 export class PostgresCorpRentStore implements CorpRentStore {
+  async completeReturn(matchupId: string, itemId: string, at: number): Promise<boolean> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      const removed = await db.query<CorpRentRow>('DELETE FROM corp_arsenal_rent WHERE matchup_id=$1 AND item_id=$2 RETURNING *', [matchupId, itemId]);
+      const row = removed.rows[0];
+      if (!row) { await db.query('COMMIT'); return false; }
+      const updated = await db.query('UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-1) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id', [itemId, row.corp_id]);
+      if (updated.rowCount !== 1) throw Error('E_CORP_ITEM_MISSING');
+      const eventId = JSON.stringify(['rent_return', matchupId, itemId]);
+      const entry: CorpAuditEntry = { eventId, corpId: row.corp_id, at, actor: 'system', action: 'rent_return', target: row.account_id, detail: itemId };
+      await db.query('INSERT INTO corp_return_audit(event_id,matchup_id,entry) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING', [eventId, matchupId, JSON.stringify(entry)]);
+      await db.query('COMMIT');
+      return true;
+    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { db.release(); }
+  }
+  async pendingReturnAudits(matchupId: string): Promise<CorpAuditEntry[]> {
+    const result = await this.pool.query<{ entry: CorpAuditEntry }>('SELECT entry FROM corp_return_audit WHERE matchup_id=$1 AND NOT delivered ORDER BY event_id', [matchupId]);
+    return result.rows.map((row) => row.entry);
+  }
+  async markReturnAudited(eventId: string): Promise<void> {
+    await this.pool.query('UPDATE corp_return_audit SET delivered=true WHERE event_id=$1', [eventId]);
+  }
+
   constructor(private readonly pool: Pool) {}
 
   async rent(entry: CorpRent): Promise<boolean> {

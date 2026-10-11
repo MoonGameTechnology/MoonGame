@@ -1,0 +1,9 @@
+# Use the same verified application image; start its independent corporation entrypoint.
+services:
+  corporations:
+    image: ${VOID_IMAGE:?set VOID_IMAGE to the verified digest ref}
+    pull_policy: always
+    environment:
+      DATABASE_URL: postgres://${CORP_RUNTIME_USER:?set a provisioned corporate runtime role}:${CORP_RUNTIME_PASSWORD:?set its runtime password}@corporations-db:5432/corporations
+      DB_AUTO_MIGRATE: '0'
+      DB_REQUIRE_LEAST_PRIVILEGE: '1'

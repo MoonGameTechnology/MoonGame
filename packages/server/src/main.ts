@@ -1,3 +1,9 @@
+import {
+  corporateEndpoint,
+  registerCorporateGateway,
+  registerCorporateMaintenance,
+} from './corporateTransport';
+import { useRemoteCorporations } from './corporateRemote';
 import { securityAuditFromEnv } from './securityAudit';
 import rateLimit from '@fastify/rate-limit';
 import { registerProfileApi } from './profileApi';
@@ -17,11 +23,7 @@ import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
-import {
-  creditCommanderXp,
-  ordinaryMatchExtras,
-  type SeatAccounts,
-} from './commanderCredit';
+import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { newMatchId } from './matchId';
 import {
   registerMatchApi,
@@ -54,7 +56,9 @@ import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry } from './roomRegistry';
 import { buildVersion } from './buildVersion';
 
-export async function startServer({ sendRecoveryMail }: { sendRecoveryMail?: RecoveryMailer } = {}): Promise<void> {
+export async function startServer({
+  sendRecoveryMail,
+}: { sendRecoveryMail?: RecoveryMailer } = {}): Promise<void> {
 /**
  * Runnable server entrypoint on the real simulation core. Hosts MANY matches from one
  * process via a LazyRoomRegistry (SV-4.0): each match is loaded from the store on the
@@ -120,6 +124,10 @@ const starterArsenal = loadStarterArsenal(data);
 // ARS-4: the F2P drop loop — chances/pool/pity/salvage are data, validated at boot.
 const dropTables = loadDropTables(data);
 const stores = await createStores();
+  const corporationsEndpoint = corporateEndpoint(process.env);
+  const remoteAva = corporationsEndpoint
+    ? useRemoteCorporations(stores, corporationsEndpoint)
+    : undefined;
 const securityAudit = securityAuditFromEnv(process.env);
 
 // The registry's match loader — the persist/observe/driver wiring lives in
@@ -132,7 +140,10 @@ const loadMatch = createMatchLoader({
     if (!auth || !signSession) return;
     const session = await stores.sessionStore.byMatch(matchId);
     const seats = session
-      ? async () => Object.fromEntries(Object.entries(session.seats).map(([account, player]) => [player, account]))
+        ? async () =>
+            Object.fromEntries(
+              Object.entries(session.seats).map(([account, player]) => [player, account]),
+            )
       : nickSeatAccounts(stores.accountStore, stores.userStore, matchId);
     await creditProfileMatch(stores.profileStore, seats, matchId, state);
   },
@@ -194,18 +205,9 @@ const loadMatch = createMatchLoader({
           });
         }
       },
-      onEnd: (winner: string | null, rewards) => {
-        void avaOrchestrator.onMatchEnded(matchId, winner).catch((err) => {
-          process.stderr.write(
-            `ava settlement failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
-          );
-        });
-        // ARS-6: every corp-arsenal item on rent for this war returns to storage
-        // exactly once (durability sink) — win or lose, no burn-on-loss (ARS-0.3).
-        void corpArsenalService.returnWar(avaSession.matchupId).catch((err) => {
-          process.stderr.write(
-            `corp-arsenal return failed for ${avaSession.matchupId} — ${err instanceof Error ? err.message : String(err)}\n`,
-          );
+        onEnd: (_winner: string | null, rewards) => {
+          void deliverAvaResults().catch((err: unknown) => {
+            process.stderr.write(`ava result delivery failed: ${String(err)}\n`);
         });
         // ARS-4 drop roll: place-weighted, pity-guarded, exactly-once per
         // (match, account); one telemetry JSONL line per rolled account.
@@ -225,7 +227,8 @@ const loadMatch = createMatchLoader({
               arsenal: stores.arsenalStore,
               tables: dropTables,
               now: Date.now(),
-              log: (record) => process.stdout.write(`${JSON.stringify({ t: 'drop', ...record })}\n`),
+                log: (record) =>
+                  process.stdout.write(`${JSON.stringify({ t: 'drop', ...record })}\n`),
             },
             matchId,
             entries,
@@ -294,6 +297,7 @@ const avaOrchestrator = new AvaOrchestrator({
   // wakes), submit the system declarations via the server-action path (past the wire
   // deny — the orchestrator owns the stances). Deterministic action ids make a
   // re-submitted batch idempotent; false on any transient failure → the sweep retries.
+    isMatchEnded: async (matchId) => (await stores.store.load(matchId))?.status === 'ended',
   escalateWar: async (matchId) => {
     const room = await registry.resolve?.(matchId);
     if (!room) return false; // snapshot missing/unloadable — retry next sweep
@@ -312,7 +316,8 @@ const avaOrchestrator = new AvaOrchestrator({
   // only what it owned at the lock (GDD §2); later purchases wait for LARS-1.
   arsenalOf: async (accountId) => arsenalSnapshotOf(await stores.arsenalStore.listOf(accountId)),
   // ARS-6: whatever the corp rented this account for THIS war rides in too.
-  corpRentalOf: (accountId, matchupId) => corpArsenalService.rentedArsenalOf(accountId, matchupId),
+    corpRentalOf: (accountId, matchupId) =>
+      corpArsenalService.rentedArsenalOf(accountId, matchupId),
 });
 
 // Identity gate (SE-1.x): resolve the caller from the session token. Shared by the
@@ -347,7 +352,10 @@ const matchApi: MatchApiDeps = {
   // широкой сигнатурой, поэтому TypeScript такое пропускает. Прототипный хост
   // (`prototype/netserver.ts`) BF-30 реализовывал, канонический — нет, и разъезд не
   // проявлялся ровно потому, что играли на прототипном.
-  join: async (matchId, { nick, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
+    join: async (
+      matchId,
+      { nick, accountId, preferredSlot, preferredFaction, preferredScientists },
+    ) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
     if (!signToken) return { error: 'E_AUTH_DISABLED' }; // no token auth configured
@@ -372,7 +380,9 @@ const matchApi: MatchApiDeps = {
       resolved,
       // Возврат решает состояние, а не хранилище: бронь без заявки — это всё ещё первый
       // захват (правило 6 в joinSeat.ts).
-      claimed: resolved ? snap.state.players[resolved.playerId]?.claimedAt !== undefined : undefined,
+        claimed: resolved
+          ? snap.state.players[resolved.playerId]?.claimedAt !== undefined
+          : undefined,
       preferredFaction,
       // Дома ЭТОГО матча — ровно то, что сервер отдаёт в `/matches/:id/seats` и из чего
       // клиент рисует выбор. Проверять по каталогу данных было бы шире предложенного
@@ -394,7 +404,8 @@ const matchApi: MatchApiDeps = {
       room,
       scientists: preferredScientists,
     });
-    if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
+      if (!seat.ok)
+        return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
     if (room) await stores.store.save(snapshotOf(room));
     return {
       playerId: seat.playerId,
@@ -416,7 +427,10 @@ if (auth && !allowedOrigins) {
 // AvA service (AVA-2/3/4/6/8): readiness pool + challenge state machine + roster window
 // + settlement over the durable stores. One instance is shared by the HTTP API and the
 // sweeps.
-const avaService = new AvaService({
+  const avaService =
+    remoteAva ??
+    stores.corporateServices?.ava ??
+    new AvaService({
   corpStore: stores.corpStore,
   challengeStore: stores.challengeStore,
   rosterStore: stores.rosterStore,
@@ -427,7 +441,9 @@ const avaService = new AvaService({
 // Medals (MED-1, corporations.md §3): objective, server-checked corp achievements from the
 // AvA match history. The catalog is fixed data (`data/medals.json`), validated once at boot;
 // the service authorizes the head/officer manual-grant path over the durable stores.
-const medalService = new MedalService({
+  const medalService =
+    stores.corporateServices?.medals ??
+    new MedalService({
   corpStore: stores.corpStore,
   resultStore: stores.resultStore,
   medalStore: stores.medalStore,
@@ -519,7 +535,12 @@ const server = createMultiplayerServer({
           // item ids + first-write-wins grant), so a crashed grant re-runs safely.
           onRegistered: async (accountId) => {
             try {
-              await grantStarterArsenal(stores.arsenalStore, accountId, starterArsenal, Date.now());
+                await grantStarterArsenal(
+                  stores.arsenalStore,
+                  accountId,
+                  starterArsenal,
+                  Date.now(),
+                );
             } catch (err) {
               process.stderr.write(
                 `starter arsenal grant failed for ${accountId} — ${err instanceof Error ? err.message : String(err)}\n`,
@@ -531,17 +552,26 @@ const server = createMultiplayerServer({
         // Corporations (CORP-0) — session-gated on every route: the acting identity
         // comes from the session, so the API only exists where sessions do.
         if (identify) {
+            registerCorporateMaintenance(scope, process.env.CORPORATIONS_MAINTENANCE === '1');
+            if (corporationsEndpoint) {
+              registerCorporateGateway(scope, corporationsEndpoint, identify);
+            } else {
           registerCorpApi(scope, {
-            service: new CorpService({ store: stores.corpStore }),
+                service:
+                  stores.corporateServices?.corp ?? new CorpService({ store: stores.corpStore }),
             identify,
           });
-          // AvA readiness + challenges (AVA-2/3/4) — the same session gate.
           registerAvaApi(scope, { service: avaService, identify });
-          // Medals (MED-1) — head/officer grant + read, session-gated like the corp API.
           registerMedalApi(scope, { service: medalService, identify });
+            }
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
-          registerProfileApi(scope, { profiles: stores.profileStore, users: stores.userStore, commanders: stores.commanderStore, identify });
+            registerProfileApi(scope, {
+              profiles: stores.profileStore,
+              users: stores.userStore,
+              commanders: stores.commanderStore,
+              identify,
+            });
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с
           // атомарной передачей и сжиганием комиссии. Пишущие маршруты под per-IP
           // лимитом (EC-0.3 wash-trading), фаусет по умолчанию выключен.
@@ -609,7 +639,9 @@ const server = createMultiplayerServer({
                 // No entry window on this host (SES-2.3 lives on the playtest one):
                 // a newcomer can take a freed chair while the match runs and has room.
                 entryOpen: !ended && occupied < MATCH_CAPACITY,
-                seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => ({
+                  seats: Object.values(room.state.players)
+                    .filter((p) => !p.npc)
+                    .map((p) => ({
                   playerId: p.id,
                   name: p.name,
                   faction: p.faction,
@@ -621,10 +653,7 @@ const server = createMultiplayerServer({
             },
             kick: async (matchId, nick) => {
               const room = registry.get(matchId) ?? (await registry.resolve?.(matchId));
-              const out = await kickSeat(
-                { matchId, room, accounts: stores.accountStore },
-                nick,
-              );
+                const out = await kickSeat({ matchId, room, accounts: stores.accountStore }, nick);
               // The freed chair has to survive a restart: without this the room could
               // hibernate (or the process die) with the kick living only in memory,
               // and the player would come back to a seat the store no longer gives
@@ -657,7 +686,41 @@ keeper?.start(30_000);
 // the roster window (AVA-6, lock a full roster / cancel+refund a short one) — the same
 // no-client-needed model as the offline scheduler. Unref'd so it never holds the
 // process open; errors are swallowed so one bad sweep can't crash the server.
+  let deliveringResults = false;
+  async function deliverAvaResults(): Promise<void> {
+    if (
+      process.env.CORPORATIONS_MAINTENANCE === '1' ||
+      deliveringResults ||
+      !stores.sessionStore.pendingResults
+    )
+      return;
+    deliveringResults = true;
+    try {
+      for (const result of await stores.sessionStore.pendingResults()) {
+        try {
+          // Inventory returns commit locally; their remote audit remains retryable.
+          await corpArsenalService.returnWar(result.matchupId);
+          await avaOrchestrator.onMatchEnded(result.matchId, result.winner);
+          if (!(await stores.resultStore.get(result.matchupId)))
+            throw Error('E_AVA_RESULT_PENDING');
+          await stores.sessionStore.markResultDelivered?.(result.matchId);
+        } catch (error) {
+          await stores.sessionStore.markResultRetry?.(result.matchId);
+          process.stderr.write(`ava result ${result.matchId} pending: ${String(error)}\n`);
+        }
+      }
+    } finally {
+      deliveringResults = false;
+    }
+  }
 const avaSweep = setInterval(() => {
+    void deliverAvaResults().catch((err: unknown) => {
+      process.stderr.write(`ava result retry pending: ${String(err)}\n`);
+    });
+    void avaOrchestrator.sweepWar().catch((err: unknown) => {
+      process.stderr.write(`ava war clock failed: ${String(err)}\n`);
+    });
+    if (process.env.CORPORATIONS_MAINTENANCE === '1') return;
   void avaService.sweepExpired().catch((err) => {
     process.stderr.write(
       `ava expiry sweep failed — ${err instanceof Error ? err.message : String(err)}\n`,
@@ -669,12 +732,6 @@ const avaSweep = setInterval(() => {
       // Raise a live session for every freshly-locked matchup (AVA-7) — after the roster
       // sweep in the same tick, so a lock and its session land together.
       avaOrchestrator.sweep(),
-    )
-    .then(() =>
-      // AVA-8 (S6): open the war on every session whose peace period lapsed — chained
-      // after the session sweep so a freshly-raised session gets its timer in the same
-      // world the escalation will read.
-      avaOrchestrator.sweepWar(),
     )
     .catch((err) => {
       process.stderr.write(

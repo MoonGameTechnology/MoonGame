@@ -126,6 +126,15 @@ export class CorpArsenalService {
    *  with no rentals (no-op) and safe to replay (each item closes at most once). */
   async returnWar(matchupId: string): Promise<number> {
     const rows = await this.rentals.activeForMatchup(matchupId);
+    if (this.rentals.completeReturn && this.rentals.pendingReturnAudits && this.rentals.markReturnAudited) {
+      let returned = 0;
+      for (const row of rows) if (await this.rentals.completeReturn(matchupId, row.itemId, this.now())) returned++;
+      for (const entry of await this.rentals.pendingReturnAudits(matchupId)) {
+        await this.corps.appendAudit(entry);
+        await this.rentals.markReturnAudited(entry.eventId!);
+      }
+      return returned;
+    }
     let returned = 0;
     for (const row of rows) {
       if (!(await this.rentals.closeRent(matchupId, row.itemId))) continue; // already closed (replay)

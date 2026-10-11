@@ -1,3 +1,4 @@
+import { createCorporateServices } from './corporateTransactions';
 import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
@@ -67,6 +68,7 @@ import {
  * creates tables on boot unless DB_AUTO_MIGRATE=0 selects the separate migration job. See `docs/infra-sizing-roadmap.md`, blocker #1.
  */
 export interface Stores {
+  corporateServices?: ReturnType<typeof createCorporateServices>;
   profileStore: ProfileStore;
   store: MatchStore;
   receiptStore: ReceiptStore;
@@ -117,11 +119,12 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   // так тесты задают его явно, а прод по умолчанию получает 0 (ARS-0 anti-RMT).
   const faucet = Number(env.META_MARKET_FAUCET ?? 0) || 0;
   const memoryArsenal = new MemoryArsenalStore();
+  const memoryMatches = new MemoryMatchStore();
   const url = env.DATABASE_URL;
   if (!url) {
     return {
       profileStore: new MemoryProfileStore(),
-      store: new MemoryMatchStore(),
+      store: memoryMatches,
       receiptStore: new MemoryReceiptStore(),
       accountStore: new MemoryAccountStore(),
       userStore: new MemoryUserStore(),
@@ -131,7 +134,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       rosterStore: new MemoryAvaRosterStore(),
       resultStore: new MemoryAvaResultStore(),
       feedStore: new MemoryAvaFeedStore(),
-      sessionStore: new MemoryAvaSessionStore(),
+      sessionStore: new MemoryAvaSessionStore(memoryMatches),
       medalStore: new MemoryMedalStore(),
       arsenalStore: memoryArsenal,
       metaMarket: new MemoryMetaMarket(memoryArsenal, undefined, faucet),
@@ -149,6 +152,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const pool = new Pool({ connectionString: url });
   await prepareRuntimeDatabase(pool, env);
   return {
+    corporateServices: createCorporateServices(pool),
     profileStore: new PostgresProfileStore(pool),
     store: new PostgresMatchStore(pool),
     receiptStore: new PostgresReceiptStore(pool),

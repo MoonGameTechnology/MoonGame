@@ -1,3 +1,7 @@
+import { registerArsenalApi } from '../packages/server/src/arsenalApi';
+import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/store';
+import { corporateEndpoint, registerCorporateGateway, registerCorporateMaintenance } from '../packages/server/src/corporateTransport';
+import { corporateRemote } from '../packages/server/src/corporateRemote';
 import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
 import { recoveryMailer } from './src/recoveryMailer';
 import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
@@ -234,8 +238,10 @@ let corpStore: CorpStore;
 // EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
 // из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
 // на аккаунт превращает регистрацию в монетный двор (ARS-0 anti-RMT).
+const corporationsEndpoint = corporateEndpoint(process.env);
 const metaFaucet = Number(process.env.META_MARKET_FAUCET ?? 0) || 0;
 let metaMarket: MetaMarket;
+let arsenalStore: ArsenalStore;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   await prepareRuntimeDatabase(pool, process.env);
@@ -247,6 +253,7 @@ if (DATABASE_URL) {
   commanderStore = new PostgresCommanderStore(pool);
   profileStore = new PostgresProfileStore(pool);
   corpStore = new PostgresCorpStore(pool);
+  arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
 } else {
   matchStore = new MemoryMatchStore();
@@ -257,8 +264,11 @@ if (DATABASE_URL) {
   commanderStore = new MemoryCommanderStore();
   profileStore = new MemoryProfileStore();
   corpStore = new MemoryCorpStore();
-  metaMarket = new MemoryMetaMarket(new MemoryArsenalStore(), undefined, metaFaucet);
+  arsenalStore = new MemoryArsenalStore();
+  metaMarket = new MemoryMetaMarket(arsenalStore, undefined, metaFaucet);
 }
+
+if (corporationsEndpoint) corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
 
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
  *  seat, deterministic). At match end, map each seat's nick → account and bank the XP
@@ -1042,15 +1052,21 @@ const server = createMultiplayerServer({
           },
         },
       });
+      registerCorporateMaintenance(app, process.env.CORPORATIONS_MAINTENANCE === '1');
       // The playable host shares the same corporation authority and durable storage.
       // AvA orchestration/medals are not mounted here; the cabinet reads capabilities.
-      registerCorpApi(app, {
-        service: new CorpService({ store: corpStore }),
-        identify: identifySession,
-        features: { ava: false, medals: false },
-      });
+      if (corporationsEndpoint) {
+        registerCorporateGateway(app, corporationsEndpoint, identifySession, { ava: false, medals: false });
+      } else {
+        registerCorpApi(app, {
+          service: new CorpService({ store: corpStore }),
+          identify: identifySession,
+          features: { ava: false, medals: false },
+        });
+      }
       // MetaMarket (EC-3) — тот же слайс аукциона, что в проде: прото-хост не заводит
       // свою торговлю. Фаусет — из окружения, по умолчанию выключен.
+      registerArsenalApi(app, { store: arsenalStore, identify: identifySession });
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession });
       registerProfileApi(app, { profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
       registerLeaderboardApi(app, {

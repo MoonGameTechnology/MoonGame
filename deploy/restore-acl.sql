@@ -2,7 +2,7 @@
 -- Roles/passwords are cluster state: provision them first on a replacement cluster.
 DO $restore_acl$
 DECLARE
-  app_tables text[] := ARRAY['matches', 'seats', 'receipts', 'users', 'corps', 'corp_members', 'corp_audit', 'corp_ready', 'player_ready', 'ava_challenges', 'ava_roster', 'ava_results', 'ava_sessions', 'ava_feed', 'medals', 'arsenal', 'corp_arsenal_rent', 'meta_wallets', 'meta_market_listings', 'meta_market_ledger', 'drop_claims', 'drop_meta', 'commander_xp', 'commander_credits', 'player_profiles', 'profile_progress', 'profile_credits', 'push_subscriptions', 'friend_edges'];
+  app_tables text[] := ARRAY['matches', 'seats', 'receipts', 'users', 'corps', 'corp_members', 'corp_audit', 'corp_gateway_nonces', 'corp_ready', 'player_ready', 'ava_challenges', 'ava_roster', 'ava_results', 'ava_sessions', 'ava_result_delivery', 'ava_feed', 'medals', 'arsenal', 'corp_arsenal_rent', 'corp_return_audit', 'meta_wallets', 'meta_market_listings', 'meta_market_ledger', 'drop_claims', 'drop_meta', 'commander_xp', 'commander_credits', 'player_profiles', 'profile_progress', 'profile_credits', 'push_subscriptions', 'friend_edges'];
   item record;
 BEGIN
   IF to_regclass('public.vd_schema_revision') IS NULL THEN RETURN; END IF;

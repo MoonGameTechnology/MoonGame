@@ -64,6 +64,8 @@ export interface AvaOrchestratorDeps {
    *  declaration landed (the sweep then stamps the war exactly-once); false = a
    *  transient failure, retried on the next sweep. Absent ⇒ the war sweep idles. */
   escalateWar?: (matchId: string) => Promise<boolean>;
+  /** The game owns active match status; no corporate call on the war-clock path. */
+  isMatchEnded?: (matchId: string) => Promise<boolean>;
   /** AVA-8 (S7): settle the ended war — `AvaService.settleMatch` (archive + record +
    *  award influence, exactly-once by the matchup's locked→ended transition).
    *  Absent ⇒ `onMatchEnded` observes nothing. */
@@ -139,6 +141,7 @@ export class AvaOrchestrator {
   private readonly sessions: AvaSessionStore;
   private readonly data: GameData;
   private readonly maps: readonly MatchMap[];
+  private readonly isMatchEnded?: (matchId: string) => Promise<boolean>;
   private readonly createRoom: (spec: AvaSessionSpec) => Promise<void>;
   private readonly now: () => number;
   private readonly peaceMs: number;
@@ -148,6 +151,7 @@ export class AvaOrchestrator {
   private readonly corpRentalOf?: (accountId: string, matchupId: string) => Promise<PlayerArsenal>;
 
   constructor(deps: AvaOrchestratorDeps) {
+    this.isMatchEnded = deps.isMatchEnded;
     this.challenges = deps.challengeStore;
     this.roster = deps.rosterStore;
     this.sessions = deps.sessionStore;
@@ -273,8 +277,9 @@ export class AvaOrchestrator {
     if (!this.escalateWar) return { declared: 0 };
     let declared = 0;
     for (const session of await this.sessions.dueWar(now)) {
-      const matchup = await this.challenges.getChallenge(session.matchupId);
-      if (matchup && matchup.status !== 'locked') {
+      const matchup = this.isMatchEnded ? null : await this.challenges.getChallenge(session.matchupId);
+      const ended = this.isMatchEnded ? await this.isMatchEnded(session.matchId) : !!matchup && matchup.status !== 'locked';
+      if (ended) {
         await this.sessions.markWarDeclared(session.matchId, this.now()); // purge the queue
         continue;
       }
