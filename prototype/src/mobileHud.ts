@@ -207,7 +207,7 @@ export function initMobileHud(host: MobileHudHost) {
       const html = list
         .map(
           (c, i) =>
-            `<button type="button" data-mobile="choose" data-index="${i}"><i aria-hidden="true">${c.kind === 'fleet' ? '△' : '◎'}</i><span><b>${esc(c.title)}</b><small>${esc(c.sub)}</small></span><i aria-hidden="true">›</i></button>`,
+            `<button type="button" data-mobile="choose" data-index="${i}"><i aria-hidden="true">${c.kind === 'strike' ? '✳' : c.kind === 'fleet' ? '△' : '◎'}</i><span><b>${esc(c.title)}</b><small>${esc(c.sub)}</small></span><i aria-hidden="true">›</i></button>`,
         )
         .join('');
       if (html !== choicesHtml) {

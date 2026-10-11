@@ -10,6 +10,7 @@ import {
 
 const флот = (id: string): TapPick => ({ kind: 'fleet', id });
 const мир = (id: string): TapPick => ({ kind: 'planet', id });
+const эскадра = (id: string): TapPick => ({ kind: 'strike', id });
 
 describe('тап по карте — из чего выбираем', () => {
   it('МИР ИДЁТ ПОСЛЕ ФЛОТОВ, НО ИДЁТ: иначе флот на орбите навсегда закроет свой мир', () => {
@@ -97,5 +98,28 @@ describe('телефон — второй тап по выбранной про�
     expect(retapsSelectedWorld('p1', флот('p1'))).toBe(false);
     expect(retapsSelectedWorld(null, мир('p1'))).toBe(false);
     expect(retapsSelectedWorld('p1', null)).toBe(false);
+  });
+});
+
+describe('эскадра в воздухе под тапом (SHU-6.14, правило 7)', () => {
+  it('СВОЯ ЭСКАДРА В ВОЗДУХЕ — ВЕРХ СТОПКИ: только что взлетевшую не закрывают флоты на орбите', () => {
+    expect(tapCandidates(['f1'], 'p1', ['st1'])).toEqual([эскадра('st1'), флот('f1'), мир('p1')]);
+  });
+
+  it('повторный тап на ПК идёт от эскадры к флоту, затем к миру', () => {
+    const cands = tapCandidates(['f1'], 'p1', ['st1']);
+    expect(nextPick(cands, null)).toEqual(эскадра('st1'));
+    expect(nextPick(cands, эскадра('st1'))).toEqual(флот('f1'));
+    expect(nextPick(cands, флот('f1'))).toEqual(мир('p1'));
+    expect(nextPick(cands, мир('p1'))).toBeNull();
+  });
+
+  it('одна выбранная эскадра под тапом остаётся выбранной', () => {
+    expect(nextPick(tapCandidates([], null, ['st1']), эскадра('st1'))).toEqual(эскадра('st1'));
+  });
+
+  it('планшет: эскадра под пальцем важнее флота и мира', () => {
+    expect(touchPick('f1', 'p1', null, 'st1')).toEqual(эскадра('st1'));
+    expect(touchPick('f1', 'p1', null, null)).toEqual(флот('f1'));
   });
 });

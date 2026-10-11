@@ -262,3 +262,21 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+
+      # Эскадра в воздухе (SHU-6.14): выбор тапом по значку, делёж, новая точка патруля и
+      # цель удара, «Вернуть». Поза та же, что у перелёта: не блокирует, сбой — аннотацией.
+      - name: Aloft smoke (non-blocking)
+        run: |
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Aloft smoke::смоук не смог установиться (Chromium недоступен) — эскадра в воздухе НЕ проверялась"
+            exit 1
+          fi
+          if [ ! -f prototype/dist/void-dominion.html ] && ! pnpm run prototype; then
+            echo "::error title=Aloft smoke::сборка прототипа упала — смотри лог шага"
+            exit 1
+          fi
+          if ! pnpm run smoke:aloft; then
+            echo "::error title=Aloft smoke::робот нашёл ошибку у эскадры в воздухе — смотри лог шага"
+            exit 1
+          fi
+        continue-on-error: true

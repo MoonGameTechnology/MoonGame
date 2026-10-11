@@ -10,6 +10,10 @@ describe('что следует из выбора', () => {
     expect(pickEffect({ kind: 'fleet', id: 'f1' })).toEqual({ kind: 'fleet', id: 'f1' });
   });
 
+  it('эскадра в воздухе — своё выделение (SHU-6.14)', () => {
+    expect(pickEffect({ kind: 'strike', id: 'st1' })).toEqual({ kind: 'strike', id: 'st1' });
+  });
+
   it('мир — выбор мира', () => {
     expect(pickEffect({ kind: 'planet', id: 'N1' })).toEqual({ kind: 'planet', id: 'N1' });
   });

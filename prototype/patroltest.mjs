@@ -163,6 +163,15 @@ try {
       const page = await context.newPage();
       page.setDefaultTimeout(15000);
       const press = (locator) => (phone ? locator.tap() : locator.click());
+      // Ввод меняет состояние сразу, а прячет панель под прицел игра в своём кадре (PT-03):
+      // прочитать экран раньше — увидеть кнопку окна базы над точкой патруля.
+      const frame = () =>
+        page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)),
+            ),
+        );
       await withDiagnostics(page, `patrol-${kind}-${viewport.width}`, async () => {
         await page.goto(site.url + '/');
         await enterSkirmish(page, { tap: phone });
@@ -174,6 +183,7 @@ try {
 
         // Кнопка у эскадры, и она ВЗВОДИТ прицел патруля, а не удар.
         await press(page.locator('[data-act="wingpatrol"]'));
+        await frame();
         const armed = await page.evaluate(() => window.__patrolTest.armed());
         assert.equal(armed?.patrol, true, 'прицел взведён как патруль');
         assert.deepEqual(armed?.from, kind === 'port' ? { planetId: id } : { fleetId: id });

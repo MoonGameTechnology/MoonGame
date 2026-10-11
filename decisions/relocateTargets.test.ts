@@ -17,6 +17,7 @@ import {
   type GameData,
   type GameState,
   type Planet,
+  type ShuttleStrike,
   type Squadron,
   type StrikeBase,
 } from '../packages/shared-core/src/index';
@@ -35,7 +36,16 @@ const data: GameData = parseGameData({
     },
     frigate: { faction: 'x', stats: { attack: 5, defense: 5, speed: 30, hp: 40 } },
     // Радиус удара 180 — перелёт 360.
-    interceptor: shuttle({ attack: 4, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 3 }),
+    interceptor: shuttle({
+      attack: 4,
+      defense: 3,
+      speed: 100,
+      hp: 10,
+      strikeRange: 180,
+      fuel: 3,
+      patrolHours: 4,
+      patrolRadius: 90,
+    }),
     // Тяжёлый: два места на борт.
     heavy: shuttle({
       attack: 9,
@@ -296,5 +306,111 @@ describe('SHU-6.5 — сторож зеркала: предложено ⇔ яд
     const s = world([]);
     s.fleets.F = ship('F', 'D', { hangar: [IX] });
     mirror(s, { kind: 'fleet', id: 'F' }, IX);
+  });
+});
+
+describe('SHU-6.14 — перелёт из воздуха (правило 7)', () => {
+  const flight = (over: Partial<ShuttleStrike> = {}): ShuttleStrike => ({
+    id: 'st:a',
+    owner: 'p1',
+    base: HOME,
+    squadronId: 'sq:i',
+    units: [{ unit: 'interceptor', count: 2 }],
+    target: { kind: 'point' },
+    to: { x: 100, y: 0 },
+    departedAt: 0,
+    arrivesAt: 1000,
+    leg: 'out',
+    ...over,
+  });
+  const aloft = (s: GameState, at: { x: number; y: number }, returning = false) =>
+    ids(
+      relocateTargets(s, {
+        me: 'p1',
+        from: HOME,
+        squadron: IX,
+        data,
+        pos: posIn(s),
+        aloft: { at, returning },
+      }),
+    );
+
+  it('ДАЛЬНОСТЬ — ОТ ЭСКАДРЫ, А НЕ ОТ БАЗЫ: из точки 700 дотягивается до C(1000), а до B(300) уже нет', () => {
+    const s = world([]);
+    s.strikes = [flight()];
+    expect(aloft(s, { x: 700, y: 0 })).toEqual(['planet:C']);
+  });
+
+  it('СВОЯ БАЗА: пока эскадра летит от неё — предлагается, возвращается туда сама — нет', () => {
+    const s = world([]);
+    s.strikes = [flight()];
+    expect(aloft(s, { x: 100, y: 0 })).toContain('planet:A');
+    expect(aloft(s, { x: 100, y: 0 }, true)).not.toContain('planet:A');
+  });
+
+  it('СВОЁ МЕСТО В ТРЮМЕ НЕ ПОМЕХА: эскадра с корабля держит его сама', () => {
+    const s = world([]);
+    const four: Squadron = wing('sq:4', 'interceptor', 4);
+    s.strikes = [flight({ base: { kind: 'fleet', id: 'F' }, squadronId: 'sq:4', units: four.units })];
+    const list = relocateTargets(s, {
+      me: 'p1',
+      from: { kind: 'fleet', id: 'F' },
+      squadron: four,
+      data,
+      pos: posIn(s),
+      aloft: { at: { x: 150, y: 0 }, returning: false },
+    });
+    expect(ids(list)).toContain('fleet:F');
+  });
+
+  it('СТОРОЖ ЗЕРКАЛА: из висящего патруля предложено ⇔ ядро примет перелёт по id вылета', () => {
+    const s0 = world();
+    const up = kernel.applyAction(
+      s0,
+      {
+        id: 'a:patrol',
+        type: 'shuttle.patrol',
+        playerId: 'p1',
+        payload: { planetId: 'A', squadronId: 'sq:i', at: { x: 100, y: 0 } },
+        issuedAt: 0,
+      },
+      { now: s0.time, data },
+    );
+    expect(up.ok).toBe(true);
+    if (!up.ok) return;
+    const launched = up.state.strikes![0]!;
+    const done = kernel.advanceTo(up.state, { now: launched.arrivesAt + 1, data });
+    if (!done.ok) throw new Error(`время не пошло: ${done.code}`);
+    const s = done.state;
+    const strike = s.strikes![0]!;
+    expect(strike.leg).toBe('patrol');
+    const offered = new Set(aloft(s, strike.to));
+    const bases: StrikeBase[] = [
+      ...Object.values(s.planets)
+        .filter((p) => p.owner === 'p1')
+        .map((p): StrikeBase => ({ kind: 'planet', id: p.id })),
+      ...Object.values(s.fleets)
+        .filter((f) => f.owner === 'p1')
+        .map((f): StrikeBase => ({ kind: 'fleet', id: f.id })),
+    ];
+    for (const b of bases) {
+      const r = kernel.applyAction(
+        s,
+        {
+          id: `a:${b.id}`,
+          type: 'shuttle.relocate',
+          playerId: 'p1',
+          payload: {
+            strikeId: strike.id,
+            ...(b.kind === 'planet' ? { toPlanetId: b.id } : { toFleetId: b.id }),
+          },
+          issuedAt: s.time,
+        },
+        { now: s.time, data },
+      );
+      const key = `${b.kind}:${b.id}`;
+      expect(r.ok, `${key}: ядро ${r.ok ? 'приняло' : `отбило ${r.code}`}`).toBe(offered.has(key));
+    }
+    expect(offered.has('planet:A')).toBe(true);
   });
 });
