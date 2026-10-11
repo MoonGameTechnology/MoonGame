@@ -135,17 +135,15 @@ describe('три стиля кнопок (UIX-11.1)', () => {
   });
 
   it('ряд приказов: «Курс» — главная, остальные — вторичные, состояние добавляется к стилю', () => {
-    const main = read('./main.ts');
-    const fn = main.slice(
-      main.indexOf('function cmdBtn('),
-      main.indexOf('function mobileOrderKind('),
-    );
+    // Ряд команд живёт у своего владельца (`cmdBar.ts`, REFM-226).
+    const bar = read('./cmdBar.ts');
+    const fn = bar.slice(bar.indexOf('function cmdBtn('), bar.indexOf('function renderChainBar('));
     expect(fn).toContain("cmd === 'move' ? 'btn-main' : 'btn-second'");
     expect(
       [...fn.matchAll(/<button data-cmd="\$\{cmd\}" class="([^"]*)"/g)].map((m) => m[1]),
     ).toEqual(['${look}', '${look}']);
-    expect(main).toMatch(/data-cmd="castdo" class="btn-second"/);
-    expect(main).toMatch(
+    expect(bar).toMatch(/data-cmd="castdo" class="btn-second"/);
+    expect(bar).toMatch(
       /data-cmd="retrset" data-at="\$\{at\}" class="btn-second\$\{on \? ' on' : ''\}"/,
     );
   });
@@ -326,10 +324,15 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       'menu:btn-second',
       'board:btn-quiet',
     ]);
-    const ran = endScreenHtml(newGame(), 'p1', { ...end, runReward: 12, runSummary: run }, {
-      ...view,
-      double: { research: 12, warrants: 40 },
-    });
+    const ran = endScreenHtml(
+      newGame(),
+      'p1',
+      { ...end, runReward: 12, runSummary: run },
+      {
+        ...view,
+        double: { research: 12, warrants: 40 },
+      },
+    );
     expect(looks(ran)).toEqual([
       'double:ad',
       'replay:btn-main',
@@ -340,9 +343,14 @@ describe('три стиля кнопок (UIX-11.1)', () => {
   });
 
   it('вход: одна главная на шаг, «назад» и восстановление — тихие', () => {
-    const markup = BUILD.slice(BUILD.indexOf('<div id="connect">'), BUILD.indexOf('<div class="cfoot">'));
+    const markup = BUILD.slice(
+      BUILD.indexOf('<div id="connect">'),
+      BUILD.indexOf('<div class="cfoot">'),
+    );
     const tags = [
-      ...markup.matchAll(/<button id="([\w-]+)"[^>]*class="(cnew|cbtn|mbtn|cback|clink)\b([^"]*)"/g),
+      ...markup.matchAll(
+        /<button id="([\w-]+)"[^>]*class="(cnew|cbtn|mbtn|cback|clink)\b([^"]*)"/g,
+      ),
     ].map((m) => `${m[1]}:${STYLES.find((c) => m[3]!.includes(c)) ?? '—'}`);
     expect(tags.sort()).toEqual(
       [

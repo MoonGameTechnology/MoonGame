@@ -268,8 +268,12 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   const count = (needle: string): number => main.split(needle).length - 1;
 
   it('every row of the table has a caller: a dead row would be a lie', () => {
+    // Ряд команд гасит прицелы у своего владельца (`cmdBar.ts`, REFM-226).
+    const bar = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
+    const callers = (needle: string): number => count(needle) + bar.split(needle).length - 1;
     for (const reason of Object.keys(DISARMED_BY) as Reason[]) {
-      const used = count(`disarm('${reason}', MOBILE)`) + count(`anyArmed('${reason}', MOBILE)`);
+      const used =
+        callers(`disarm('${reason}', MOBILE)`) + callers(`anyArmed('${reason}', MOBILE)`);
       expect({ reason, used: used > 0 }).toEqual({ reason, used: true });
     }
   });
