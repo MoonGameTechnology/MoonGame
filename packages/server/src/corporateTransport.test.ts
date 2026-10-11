@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import {
@@ -186,6 +187,46 @@ it('does not let one rate-limited caller open the corporate circuit for other us
     ).toBe(200);
   } finally {
     await peer.close();
+  }
+});
+
+it('rejects paths changed by URL normalization before they can poison the shared circuit', async () => {
+  const peer = Fastify(),
+    game = Fastify();
+  corporateIdentity(peer, key);
+  let calls = 0;
+  peer.get('/health', async () => {
+    calls++;
+    return { ok: true };
+  });
+  peer.get('/corps/me', async () => {
+    calls++;
+    return { ok: true };
+  });
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    registerCorporateGateway(game, endpoint, async () => ({ accountId: 'pilot', login: 'Pilot' }));
+    const address = new URL(await game.listen({ host: '127.0.0.1', port: 0 }));
+    // fetch/app.inject normalize this attack before it reaches Game; raw HTTP does not.
+    const raw = (path: string) =>
+      new Promise<number | undefined>((resolve, reject) => {
+        const request = httpRequest(
+          { hostname: address.hostname, port: address.port, path },
+          (response) => {
+            response.resume();
+            response.on('end', () => resolve(response.statusCode));
+          },
+        );
+        request.on('error', reject);
+        request.end();
+      });
+    for (const path of ['/corps/%2e%2e/health', '/corps/%2E./health', '/corps/../health'])
+      expect(await raw(path)).toBe(400);
+    expect(calls).toBe(0);
+    expect(await raw('/corps/me')).toBe(200);
+    expect(calls).toBe(1);
+  } finally {
+    await Promise.all([game.close(), peer.close()]);
   }
 });
 

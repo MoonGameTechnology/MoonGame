@@ -50,7 +50,10 @@ async function toggleTools() {
   if (await toggle.isVisible()) await toggle.click();
 }
 
-const hooks = `window.__szTest = {
+// Меню каста флагмана живёт у композера «Приказ» (`chainComposer.ts`, REFM-229) — робот
+// берёт его своим импортом: в `main.ts` этого имени больше нет.
+const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chainComposer';
+window.__szTest = {
   run: () => isSectorZeroRun(),
   home: () => Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null,
   // Id всех узлов карты — для проверки, что игрок их не видит (SZ-map-ids).
@@ -101,7 +104,7 @@ const hooks = `window.__szTest = {
   },
   remembered: (id) => Boolean(s.fog?.[ME]?.[id]),
   // Меню каста флагмана и что герой носит — меню обязано быть из надетого.
-  casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
+  casts: () => __chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
   worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
   // Бой с пиратами до конца — промоткой часов, как их двигает игра (apply(advance)).
   // Стартовые флоты главы слиты в один вокруг героя (decisions/startFleets.ts). Весь этот

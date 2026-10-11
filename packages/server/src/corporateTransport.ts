@@ -50,6 +50,20 @@ export function corporateRequest(
   who?: Identity,
   ip = '127.0.0.1',
 ): Promise<{ status: number; body: unknown }> {
+  // A client-controlled path must not change between signing and HTTP dispatch.
+  // Reject normalization/origin changes before touching the shared dependency guard.
+  try {
+    const target = new URL(path, endpoint.url);
+    if (
+      !path.startsWith('/') ||
+      target.origin !== new URL(endpoint.url).origin ||
+      target.hash ||
+      target.pathname + target.search !== path
+    )
+      return Promise.reject(Error('E_CORPORATIONS_PATH'));
+  } catch {
+    return Promise.reject(Error('E_CORPORATIONS_PATH'));
+  }
   let guard = guards.get(endpoint);
   if (!guard) {
     guard = new DependencyGuard();
@@ -221,7 +235,9 @@ export function registerCorporateGateway(
       if (request.url === '/corps/me' && result.status === 200)
         return reply.send({ ...(result.body as object), features });
       return reply.code(result.status).send(result.body);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === 'E_CORPORATIONS_PATH')
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
       return reply.code(503).send({ error: 'E_CORPORATIONS_UNAVAILABLE' });
     }
   };
