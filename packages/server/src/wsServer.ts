@@ -281,6 +281,12 @@ export function createMultiplayerServer(
   // the match API) must return a stable code with NO internal detail — Fastify's default
   // handler would echo err.message on the wire. The detail stays in the logs.
   app.setErrorHandler((error, request, reply) => {
+    const status = (error as { statusCode?: number }).statusCode;
+    // Parser/size/rate failures are client errors, not outages. Keep details private.
+    if (status && Number.isInteger(status) && status >= 400 && status < 500) {
+      void reply.code(status).send({ error: status === 429 ? 'E_RATE_LIMIT' : 'E_BAD_REQUEST' });
+      return;
+    }
     request.log.error(error);
     void reply.code(500).send({ error: 'E_INTERNAL' });
   });

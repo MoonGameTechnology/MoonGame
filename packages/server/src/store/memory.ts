@@ -251,6 +251,16 @@ export class MemoryUserStore implements UserStore {
     return Promise.resolve();
   }
 
+  setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean> {
+    for (const rec of this.byLogin.values()) {
+      if (rec.userId === userId && rec.passHash === expectedHash) {
+        rec.passHash = passHash;
+        return Promise.resolve(true);
+      }
+    }
+    return Promise.resolve(false);
+  }
+
   private byEmail(mail: string): UserRecord | null {
     for (const rec of this.byLogin.values()) if (rec.email === mail) return rec;
     return null;

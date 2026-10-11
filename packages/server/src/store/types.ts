@@ -5,12 +5,21 @@ import type { ArsenalItem, GameState, PlayerId } from '@void/shared-core';
  *  server restart. `state` is the JSON-serializable `GameState` (the core invariant
  *  that makes JSONB storage trivial); `seq` is the room's action counter, used for
  *  optimistic concurrency (never overwrite a newer snapshot with an older one). */
+export interface MatchClock {
+  wallTime: number;
+  gameTime: number;
+  timeScale: number;
+  running: boolean;
+}
+
 export interface MatchSnapshot {
   matchId: string;
   dataVersion: string;
   seq: number;
   status: 'ongoing' | 'ended';
   state: GameState;
+  /** Absent on legacy snapshots and rooms using absolute wall time. */
+  clock?: MatchClock;
 }
 
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
@@ -160,6 +169,8 @@ export interface UserStore {
   loginsOf(userIds: readonly string[]): Promise<Record<string, string>>;
   /** Set a new password hash (the /auth/reset endpoint). No-op if the account is gone. */
   setPassword(userId: string, passHash: string): Promise<void>;
+  /** Atomic single-use reset: update only while the hash is still the one verified. */
+  setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean>;
   close?(): Promise<void>;
 }
 

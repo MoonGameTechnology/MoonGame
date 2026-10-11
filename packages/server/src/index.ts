@@ -180,3 +180,5 @@ export {
   PostgresReceiptStore,
   PostgresUserStore,
 } from './store';
+
+export { mailerFromEnv } from './mailer';

@@ -80,6 +80,8 @@ export interface MatchRoomOptions {
    *  `timeScale` applies. Omit both flags ⇒ the clock is raw wall time (the
    *  production entry seeds `initialState.time = Date.now()` instead). */
   initiallyStarted?: boolean;
+  /** Durable anchor for a scaled/lobby clock; absent on legacy snapshots. */
+  initialClock?: MatchSnapshot['clock'];
   /** Attach `hashState(view)` to snapshots so the client can detect desync: every full
    *  snapshot (welcome, resync) and one delta per player every `STATE_HASH_EVERY_MS`.
    *  Default: on when `NODE_ENV=production` (see the constructor). */
@@ -466,6 +468,8 @@ export class MatchRoom {
   /** Lobby gate (null = run freely). The world clock only accrues while all these
    *  players are connected. */
   private readonly waitFor: ReadonlySet<PlayerId> | null;
+  private clockAnchored = false;
+  private clockFloor = 0;
   private lobbyAccrued = 0; // game-ms accrued while running
   private lobbyRunningSince: number | null = null; // raw ms when running began, else null
   /** Manual-start lobby (host presses Start). `host` = first player to connect. */
@@ -591,7 +595,21 @@ export class MatchRoom {
         ? new Set(options.waitForPlayers)
         : null;
     this.manualStart = options.manualStart ?? false;
-    if (options.initiallyStarted) {
+    const anchor = options.initialClock;
+    this.clockAnchored = !!(anchor || options.initiallyStarted || this.manualStart || this.waitFor);
+    if (anchor && (!Number.isFinite(anchor.wallTime) || !Number.isFinite(anchor.gameTime) ||
+        anchor.gameTime < 0 || !Number.isFinite(anchor.timeScale) || anchor.timeScale <= 0 ||
+        typeof anchor.running !== 'boolean')) throw new Error('E_CLOCK_SNAPSHOT');
+    this.clockFloor = options.initialState.time;
+    if (anchor) {
+      const wall = this.now();
+      // A wait-for-players room is paused while its peers are absent.
+      const running = anchor.running && !this.waitFor;
+      this.started = options.initiallyStarted === true || (this.manualStart && running);
+      this.lobbyAccrued = Math.max(options.initialState.time, anchor.gameTime +
+        (running ? Math.max(0, wall - anchor.wallTime) * anchor.timeScale : 0));
+      this.lobbyRunningSince = running ? wall : null;
+    } else if (options.initiallyStarted) {
       // Born running: anchor the clock at the initial game time (a fresh world's 0,
       // a restored snapshot's saved instant) and accrue scaled time from now. With
       // manualStart this resumes past the lobby; without it, it IS the no-lobby
@@ -634,7 +652,7 @@ export class MatchRoom {
     this.actionRateMax = options.actionRateMax ?? ACTION_RATE_MAX_DEFAULT;
     this.actionRateWindowMs = options.actionRateWindowMs ?? ACTION_RATE_WINDOW_MS_DEFAULT;
     this.actionWindow = new PerKeyWindow(this.actionRateMax, this.actionRateWindowMs);
-    this.timeScale = options.timeScale && options.timeScale > 0 ? options.timeScale : 1;
+    this.timeScale = options.timeScale && Number.isFinite(options.timeScale) && options.timeScale > 0 ? options.timeScale : 1;
     if (options.initialReceipts) {
       // Rehydration must respect the cap — seed only the most recent `maxReceipts`.
       for (const r of options.initialReceipts.slice(-this.maxReceipts)) {
@@ -717,10 +735,27 @@ export class MatchRoom {
    *  lobby gate (waitForPlayers / manualStart) accrues only while running, and an
    *  auto-started room (`initiallyStarted`, no lobby) accrues scaled time from
    *  its anchor at `initialState.time` (SES-2.1). */
-  private clock(): number {
-    if (!this.waitFor && !this.manualStart && this.lobbyRunningSince === null) return this.now();
-    const elapsed = this.lobbyRunningSince === null ? 0 : this.now() - this.lobbyRunningSince;
-    return this.lobbyAccrued + elapsed * this.timeScale;
+  private clock(wall = this.now()): number {
+    const raw = !this.clockAnchored
+      ? wall
+      : this.lobbyAccrued + (this.lobbyRunningSince === null ? 0 : Math.max(0, wall - this.lobbyRunningSince)) * this.timeScale;
+    const floor = Math.max(this.clockFloor, this.stateValue.time);
+    if (this.clockAnchored && raw < floor) {
+      // Rebase the live anchor too: saving (new wall, old floor) while the live
+      // clock still uses the previous wall anchor would charge the gap on restart.
+      this.lobbyAccrued = floor;
+      if (this.lobbyRunningSince !== null) this.lobbyRunningSince = wall;
+    }
+    this.clockFloor = Math.max(floor, raw);
+    return this.clockFloor;
+  }
+
+  /** Capture once so the persisted wall/game pair cannot drift between reads. */
+  get clockSnapshot(): MatchSnapshot['clock'] {
+    if (!this.clockAnchored) return undefined;
+    const wallTime = this.now();
+    return { wallTime, gameTime: this.clock(wallTime), timeScale: this.timeScale,
+      running: this.isClockRunning && this.stateValue.match.status !== 'ended' };
   }
 
   /** Re-evaluate running/paused after a connection change: freeze or resume the
@@ -734,7 +769,7 @@ export class MatchRoom {
       return true;
     }
     if (!running && this.lobbyRunningSince !== null) {
-      this.lobbyAccrued += (this.now() - this.lobbyRunningSince) * this.timeScale; // freeze
+      this.lobbyAccrued = this.clock(); // freeze, including a possible backward wall correction
       this.lobbyRunningSince = null;
       this.observe?.({ kind: 'lobby', waiting: true });
       return true;
@@ -789,7 +824,7 @@ export class MatchRoom {
    *  room — a frozen lobby has no live clock to keep on-screen, and its "due" events
    *  must not fire (which would also trip the driver's stall guard). */
   get isClockRunning(): boolean {
-    return (!this.waitFor && !this.manualStart) || this.lobbyRunningSince !== null;
+    return !this.clockAnchored || this.lobbyRunningSince !== null;
   }
 
   /** Number of connected sockets across all seats — 0 means the match is unwatched
@@ -1623,12 +1658,14 @@ export class MatchRoom {
   /** Builds a durable snapshot of a specific `(state, seq)` — used by the committed
    *  path to persist a prospective result BEFORE committing it. */
   private snapshot(state: GameState, seq: number): MatchSnapshot {
+    const clock = this.clockSnapshot;
     return {
       matchId: this.id,
       dataVersion: state.version.data,
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
       state,
+      ...(clock ? { clock: { ...clock, running: clock.running && state.match.status !== 'ended' } } : {}),
     };
   }
 

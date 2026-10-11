@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -15,6 +19,12 @@ it('requires an explicit DML grant decision when a migration introduces a table'
   const sql = readFileSync(new URL('./store/postgres.ts', import.meta.url), 'utf8');
   const names = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
   expect([...APP_TABLES].sort()).toEqual(names.sort());
+});
+
+it('restore ACL allowlist tracks the application tables', () => {
+  const sql = readFileSync('deploy/restore-acl.sql', 'utf8');
+  const list = sql.match(/app_tables text\[\] := ARRAY\[([^\]]+)\]/)![1]!;
+  expect([...list.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()).toEqual([...APP_TABLES].sort());
 });
 
 it('rejects injectable role names and non-hex credentials before connecting', async () => {
@@ -99,6 +109,23 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     // vd_schema/vd_runtime are shared group roles, owned by the deployment, not this test.
     await root.end();
   });
+
+  it('backup/restore retains data and runtime DML while refusing schema ownership', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'restore-acl-'));
+    const run = promisify(execFile);
+    const env = { ...process.env, DATABASE_URL: url(), BACKUP_DIR: dir, BACKUP_PLAINTEXT: '1' };
+    try {
+      await run('bash', ['deploy/backup.sh'], { env });
+      const archive = join(dir, readdirSync(dir).find((name) => name.endsWith('.sql.gz'))!);
+      await admin.query("DELETE FROM users WHERE login='existing'");
+      await run('bash', ['deploy/restore.sh', archive], { env });
+      const runtime = connect(app, pass);
+      await prepareRuntimeDatabase(runtime, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' });
+      expect(await new PostgresUserStore(runtime).findUser('existing')).toMatchObject({ passHash: 'hash' });
+      await expect(runtime.query('ALTER TABLE users ADD COLUMN forbidden_restore int')).rejects.toMatchObject({ code: '42501' });
+      await expect(runtime.query('SET ROLE vd_schema')).rejects.toMatchObject({ code: '42501' });
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 30_000);
 
   it('serves durable users with DML only and rejects DDL, role escalation and truncation', async () => {
     const runtime = connect(app, pass);

@@ -15,6 +15,24 @@ function httpBase(wsUrl: string): string {
 }
 
 describe('SV-0.1 · HTTP app', () => {
+  it('returns stable 4xx for parser failures and hides unexpected server errors', async () => {
+    const server = createMultiplayerServer({ room: createDevMatch(data), httpRoutes(app) {
+      app.post('/parse', async () => ({ ok: true }));
+      app.get('/fault', async () => { throw new Error('private database detail'); });
+    } });
+    const base = httpBase(await server.listen());
+    try {
+      for (const [body, status] of [['{', 400], ['{"__proto__":{"admin":true}}', 400], ['"' + 'x'.repeat(1_100_000) + '"', 413]] as const) {
+        const r = await fetch(base + '/parse', { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+        expect(r.status).toBe(status);
+        expect(await r.json()).toEqual({ error: 'E_BAD_REQUEST' });
+      }
+      const fault = await fetch(base + '/fault');
+      expect(fault.status).toBe(500);
+      expect(await fault.json()).toEqual({ error: 'E_INTERNAL' });
+    } finally { await server.close(); }
+  });
+
   it('/health is contentless — no match id or seq leak (F-13)', async () => {
     const server = createMultiplayerServer({ room: createDevMatch(data) });
     const url = await server.listen();

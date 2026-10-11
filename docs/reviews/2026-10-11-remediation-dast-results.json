@@ -1,0 +1,500 @@
+{
+  "results": [
+    {
+      "name": "three synthetic accounts register and log in",
+      "status": "pass",
+      "detail": {
+        "accounts": 3
+      }
+    },
+    {
+      "name": "native HTTPS Docker healthcheck is healthy",
+      "status": "pass",
+      "detail": {
+        "health": "healthy"
+      }
+    },
+    {
+      "name": "real SMTP recovery delivers only the known account and keeps uniform HTTP replies",
+      "status": "pass",
+      "detail": {
+        "known": 200,
+        "unknown": 200,
+        "delivered": 1
+      }
+    },
+    {
+      "name": "two rounds of three-way password reset races have exactly one winner",
+      "status": "pass",
+      "detail": {
+        "rounds": [
+          [
+            200,
+            401,
+            401
+          ],
+          [
+            401,
+            200,
+            401
+          ]
+        ],
+        "oldSession": 401
+      }
+    },
+    {
+      "name": "anonymous access to private APIs and operator routes is refused",
+      "status": "pass",
+      "detail": [
+        {
+          "path": "/admin/whoami",
+          "status": 404
+        },
+        {
+          "path": "/admin/matches/proto/roster",
+          "status": 404
+        },
+        {
+          "path": "/corps/me",
+          "status": 401
+        },
+        {
+          "path": "/meta-market",
+          "status": 401
+        },
+        {
+          "path": "/matches/proto/join",
+          "status": 401
+        },
+        {
+          "path": "/metrics/summary",
+          "status": 404
+        }
+      ]
+    },
+    {
+      "name": "regular player cannot invoke admin kick or spoof role in payload",
+      "status": "pass",
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "name": "JWT corruption, none algorithm and session-as-join token are refused",
+      "status": "pass",
+      "detail": {
+        "variants": 3
+      }
+    },
+    {
+      "name": "cross-match token and hostile WebSocket Origin are refused with positive controls",
+      "status": "pass",
+      "detail": {
+        "room": "m-28526db1-f179-43a2-aa1a-5d7f795a2fce",
+        "positiveWelcome": true,
+        "crossMatch": true,
+        "crossOrigin": true
+      }
+    },
+    {
+      "name": "SQL-like and malformed login fields never bypass authentication or leak errors",
+      "status": "pass",
+      "detail": {
+        "cases": 7,
+        "statuses": [
+          400,
+          400,
+          400,
+          400,
+          400,
+          400,
+          400
+        ]
+      }
+    },
+    {
+      "name": "sensitive file traversal and configuration paths disclose no private bytes",
+      "status": "pass",
+      "detail": [
+        {
+          "path": "/.env",
+          "status": 404
+        },
+        {
+          "path": "/server.env",
+          "status": 404
+        },
+        {
+          "path": "/deploy/server.env",
+          "status": 404
+        },
+        {
+          "path": "/../../etc/passwd",
+          "status": 404
+        },
+        {
+          "path": "/%2e%2e/%2e%2e/etc/passwd",
+          "status": 404
+        },
+        {
+          "path": "/.git/config",
+          "status": 404
+        },
+        {
+          "path": "/packages/server/src/main.ts",
+          "status": 404
+        },
+        {
+          "path": "/certs/server.key",
+          "status": 404
+        },
+        {
+          "path": "/node_modules/.pnpm/lock.yaml",
+          "status": 404
+        }
+      ]
+    },
+    {
+      "name": "corporation role escalation and forged actor identity are denied",
+      "status": "pass",
+      "detail": [
+        {
+          "intent": "role",
+          "status": 403
+        },
+        {
+          "intent": "transfer",
+          "status": 403
+        },
+        {
+          "intent": "kick",
+          "status": 403
+        },
+        {
+          "intent": "disband",
+          "status": 403
+        }
+      ]
+    },
+    {
+      "name": "auction data setup: independent wallets and transferable synthetic item",
+      "status": "pass",
+      "detail": {
+        "wallets": 2,
+        "warrantsEach": 100,
+        "itemCount": 1
+      }
+    },
+    {
+      "name": "auction cannot sell another account item or use invalid prices",
+      "status": "pass",
+      "detail": {
+        "ownershipDenied": 409,
+        "prices": [
+          409,
+          409,
+          409,
+          409,
+          400,
+          400,
+          400,
+          400
+        ]
+      }
+    },
+    {
+      "name": "concurrent double buy transfers item once and charges one purchase",
+      "status": "pass",
+      "detail": {
+        "statuses": [
+          200,
+          404,
+          404,
+          404,
+          404,
+          404
+        ],
+        "buyerWarrants": 0,
+        "negativeLedgerRows": 1
+      }
+    },
+    {
+      "name": "valid forged-player action reaches authorization and is denied",
+      "status": "pass",
+      "detail": {
+        "code": "E_FORBIDDEN"
+      }
+    },
+    {
+      "name": "malformed quantities and unknown actions cannot mutate owned fleets",
+      "status": "pass",
+      "detail": {
+        "cases": 9,
+        "codes": [
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD",
+          "E_BAD_PAYLOAD"
+        ],
+        "fleetBytesUnchanged": true
+      }
+    },
+    {
+      "name": "raw WebSocket flood is bounded and the service remains responsive",
+      "status": "pass",
+      "detail": {
+        "sent": 220,
+        "parseErrors": 41
+      }
+    },
+    {
+      "name": "oversized compressed WebSocket frame closes at 1009",
+      "status": "pass",
+      "detail": {
+        "bytes": 120000,
+        "closeCode": 1009
+      }
+    },
+    {
+      "name": "wall clock survives a graceful restart with idle elapsed time plus downtime",
+      "status": "pass",
+      "detail": {
+        "before": {
+          "game": 55656,
+          "wall": 1791696017074
+        },
+        "after": {
+          "game": 204552,
+          "wall": 1791696023332
+        },
+        "timeScale": 24,
+        "expectedAdvance": 150192,
+        "actualAdvance": 148896
+      }
+    },
+    {
+      "name": "auth limit cannot be bypassed by rotating X-Forwarded-For",
+      "status": "pass",
+      "detail": {
+        "attempts": 43,
+        "throttled": 3
+      }
+    },
+    {
+      "name": "reset bearer never appears in container stdout/stderr",
+      "status": "pass",
+      "detail": {
+        "mailMessages": 2,
+        "leakedTokens": 0
+      }
+    },
+    {
+      "name": "readiness and database integrity survive adversarial sequence",
+      "status": "pass",
+      "detail": {
+        "users": "3",
+        "matches": "6",
+        "negative_wallets": "0"
+      }
+    },
+    {
+      "name": "malformed JSON, prototype keys and excessive JSON body are bounded",
+      "status": "pass",
+      "evidence": {
+        "cases": 4,
+        "codes": [
+          400,
+          400,
+          400,
+          413
+        ]
+      }
+    },
+    {
+      "name": "HTTP Content-Length plus Transfer-Encoding ambiguity rejected and connection closed",
+      "status": "pass",
+      "evidence": {
+        "status": 400,
+        "canaryExecuted": false
+      }
+    },
+    {
+      "name": "readiness stays available after parser abuse",
+      "status": "pass",
+      "evidence": {
+        "status": 200
+      }
+    },
+    {
+      "name": "eight simulated game hours: scheduled research completes once after restart",
+      "status": "pass",
+      "evidence": {
+        "method": "subtract 8h/timeScale from wallTime with server stopped; no state/schedule/seq edits",
+        "beforeSeq": 3,
+        "afterSeq": 3,
+        "completedCount": 1,
+        "hashErrors": 0
+      }
+    },
+    {
+      "name": "real PID1 SIGKILL: automatic restart preserves clock and research effect",
+      "status": "pass",
+      "evidence": {
+        "before": {
+          "game": 28938144,
+          "wall": 1791696555190,
+          "seq": 3
+        },
+        "after": {
+          "game": 29235864,
+          "wall": 1791696567605,
+          "seq": 3
+        },
+        "restartCount": 1,
+        "completedCount": 1
+      }
+    },
+    {
+      "name": "actual age-encrypted backup -> destructive synthetic data drill -> restore -> runtime readiness",
+      "status": "pass",
+      "evidence": {
+        "before": {
+          "tables": 30,
+          "rows": 29,
+          "hash": "1176ec0fb914c05fb42faf5d4de120d414e0bfa1ecf833d8d068df9fecb63c21"
+        },
+        "after": {
+          "tables": 30,
+          "rows": 29,
+          "hash": "1176ec0fb914c05fb42faf5d4de120d414e0bfa1ecf833d8d068df9fecb63c21"
+        },
+        "restoreAndReadinessMs": 3337,
+        "runtimeReadWrite": true,
+        "ddlAndEscalationDenied": true,
+        "ready": 200
+      }
+    },
+    {
+      "name": "SMTP STARTTLS downgrade rejected before credentials or recovery message",
+      "status": "pass",
+      "evidence": {
+        "commands": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "authSent": false,
+        "mailSent": false
+      }
+    }
+  ],
+  "harnessCorrections": [
+    "201 registration/creation status instead of 200",
+    "isolated Postgres bridge address instead of inaccessible published port",
+    "admin endpoint first configured and proven with admin session",
+    "auction non-owner returns E_NOT_TRADABLE (409), not 404",
+    "failed prerequisites were rerun with the corrected fixtures; original attempts retained outside repository"
+  ],
+  "baseCommit": "34bc2e30",
+  "serverBundleSha256": "0d44e459872395f91282efdc98b56dfb858e5db3979b995d64dc94580dccd12b",
+  "gate": {
+    "passed": 10880,
+    "skipped": 0,
+    "files": 891
+  },
+  "browser": {
+    "certificateHandling": "explicit pin of temporary server SPKI for UI automation; cryptographic certificate checks are separate verified-CA Node probes",
+    "results": [
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "status": "pass",
+        "errors": [],
+        "lobbyOverflow": false,
+        "overflow": false,
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "csp": [
+          {
+            "directive": "script-src",
+            "blocked": "eval"
+          }
+        ],
+        "gameJoined": true,
+        "gameUrl": "https://localhost:18888/game/m-f2ace29a-9491-4d69-bc41-764827578082"
+      },
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "status": "pass",
+        "errors": [],
+        "lobbyOverflow": false,
+        "overflow": false,
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "csp": [
+          {
+            "directive": "script-src",
+            "blocked": "eval"
+          }
+        ],
+        "gameJoined": true,
+        "gameUrl": "https://localhost:18888/game/m-28526db1-f179-43a2-aa1a-5d7f795a2fce"
+      }
+    ]
+  },
+  "sectorZeroSmoke": "passed",
+  "dependencyAudit": "pnpm audit --prod --audit-level=moderate: no known vulnerabilities",
+  "reviewFollowup": {
+    "serverBundleSha256": "a85dbd664669005d663a05442f79666cc35b35eae392ac5705d9992678091f13",
+    "results": [
+      {
+        "name": "review: HTTPS recovery finishes before a 2-second SMTP greeting for known and unknown email",
+        "status": "pass",
+        "evidence": {
+          "known": 200,
+          "unknown": 200,
+          "knownMs": 2,
+          "unknownMs": 1,
+          "smtpGreetingDelayMs": 2000,
+          "delivered": 1,
+          "tokenLeaked": false
+        }
+      },
+      {
+        "name": "review: async-delivered recovery token wins one of three resets and new session joins WSS",
+        "status": "pass",
+        "evidence": {
+          "resetStatuses": [
+            401,
+            200,
+            401
+          ],
+          "oldSession": 401,
+          "newSession": 200,
+          "hashErrors": 0,
+          "readiness": 200
+        }
+      }
+    ],
+    "clockRegression": {
+      "before": {
+        "live": 240000,
+        "restored": 264000
+      },
+      "after": {
+        "live": 264000,
+        "restored": 264000
+      },
+      "timeScale": 24
+    },
+    "temporaryRuntimeCleaned": true
+  }
+}
