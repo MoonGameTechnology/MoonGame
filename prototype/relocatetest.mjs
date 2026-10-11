@@ -25,8 +25,9 @@ import {
   withDiagnostics,
 } from './harnessKit.mjs';
 
-const hooks = `window.__relocateTest = {
-  prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+window.__relocateTest = {
+  prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Эскадра из двух перехватчиков (перелёт 360) стоит в порту своего мира ('port') или в
   // трюме своего «Носителя» у него ('hold'). Вокруг три базы: подходящая — свой носитель
   // у ближнего мира (для 'port') или порт этого мира (для 'hold'); носитель с полным

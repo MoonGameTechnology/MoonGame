@@ -27,8 +27,9 @@ import {
 } from './harnessKit.mjs';
 
 const hooks = `import { patrolShuttle as __patrolShuttle } from '../../decisions/actions';
+import { mapWasEntered as __mapWasEntered } from './mapLoading';
 window.__aloftTest = {
-  prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+  prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Свой мир с целым портом и эскадрой из трёх перехватчиков. Эскадра уходит в патруль к
   // точке восточнее мира и останавливается на полпути: она в воздухе, выбора нет, карта
   // смотрит на её значок.

@@ -10,8 +10,9 @@ import {
 } from './harnessKit.mjs';
 
 // Test-only access to the actual host. No debug exports enter the player build.
-const hooks = `window.__minesTest = {
-  prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+window.__minesTest = {
+  prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   prepare: () => {
     speed = 0;
     s = structuredClone(s);

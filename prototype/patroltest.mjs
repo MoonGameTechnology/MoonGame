@@ -31,8 +31,9 @@ import {
   withDiagnostics,
 } from './harnessKit.mjs';
 
-const hooks = `window.__patrolTest = {
-  prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+window.__patrolTest = {
+  prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // База — свой мир с целым портом или свой «Носитель» у него; в ангаре два перехватчика.
   // База выбрана и стоит в центре экрана. Ждать постройки на живой карте значило бы
   // проверять экономику, а не кнопку.

@@ -289,7 +289,7 @@ import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
 import { drawSpaceBackdrop, spaceBackdropReady, prepareSpaceBackdrop } from '../../packages/client/src/spaceBackdrop';
-import { MapPreparation, type PreparationJob } from './mapPreparation';
+import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
 import { drawHolographicBattle, drawHolographicPing } from './holographicEffects';
 import { holoIcon, skinIcon } from './holographicIcons';
 import { drawProvinceSelection, insideProvince, selectionPulse, type ProvincePolygon } from '../../packages/client/src/provinceSelection';
@@ -1154,7 +1154,7 @@ initNetSession({
   },
   resolveServer,
   enter: (playerId, fanfare) => {
-    if (fanfare) mapNeedsPreparation = true;
+    if (fanfare) needMapPreparation();
     if (fanfare) snd.play('start');
     ME = playerId ?? ME;
     disarm('match', MOBILE); // как в соло: выбор, прицелы и окна старой сессии гаснут одной строкой
@@ -1831,7 +1831,7 @@ function installMapGeometry(state: GameState): void {
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   frameMap(MAP);
-  mapNeedsPreparation = true;
+  needMapPreparation();
   for (const p of Object.values(state.players)) if (p.npc) COLOR[p.id] = p.npc === 'pirate' ? '#f17457' : '#b79bea';
 }
 /** Sector-type def of a node. SECTOR_OF is total for the generated MAP, but the type
@@ -4943,93 +4943,35 @@ function blitStaticLayer(now: number): void {
   cx.restore();
 }
 
-const mapPreparation = new MapPreparation();
-const mapLoadingEl = $('maploading');
-const mapLoadingBar = $('maploading-progress') as HTMLProgressElement;
-const mapLoadingStatus = $('maploading-status');
-const mapLoadingPercent = $('maploading-percent');
-const mapLoadingQuote = $('maploading-quote');
-const mapLoadingCancel = $('maploading-cancel');
-let mapNeedsPreparation = true;
-let mapWasEntered = false;
-let mapLoadingViewport = '';
-let mapQuoteIndex = 0;
-
-function hideMapLoading(): void {
-  mapPreparation.cancel();
-  mapLoadingEl.style.display = 'none';
-  canvas.removeAttribute('aria-busy');
-  if (document.activeElement === mapLoadingCancel) canvas.focus({ preventScroll: true });
-}
-function leaveLoadingMap(): void {
-  hideMapLoading();
-  $('tomenu').click(); // the same intentional leave/solo pause as the HUD button
-}
-mapLoadingCancel.addEventListener('click', leaveLoadingMap);
-window.addEventListener('keydown', e => {
-  if (!mapPreparation.active || e.key === 'Escape') return;
-  // The focused exit button stays usable; no map shortcuts reach the hidden HUD.
-  if ((e.key === 'Enter' || e.key === ' ') && e.target === mapLoadingCancel) {
-    e.stopImmediatePropagation();
-    return; // retain the native button activation, but no map shortcut
-  }
-  e.preventDefault();
-  e.stopImmediatePropagation();
-}, true);
-
-/** Begin only after admission and the viewport adapters have framed the real map. */
-function prepareEnteringMap(): boolean {
-  const entered = inMatch() && (!NET || netAdmitted);
-  if (!entered) {
-    if (mapPreparation.active) hideMapLoading();
-    mapWasEntered = false;
-    return false;
-  }
-  const viewport = `${VW}:${VH}:${DPR}:${holographicMapOn()}`;
-  if (!mapWasEntered || mapNeedsPreparation || (mapPreparation.active && viewport !== mapLoadingViewport)) {
-    const restarting = mapPreparation.active;
-    mapWasEntered = true;
-    mapNeedsPreparation = false;
-    mapLoadingViewport = viewport;
-    mapLoadingEl.style.display = 'flex';
-    canvas.setAttribute('aria-busy', 'true');
-    if (!restarting) {
-      const quotes = [t('map-loading.quote.fleet'), t('map-loading.quote.frontier'), t('map-loading.quote.silence')];
-      mapLoadingQuote.textContent = quotes[mapQuoteIndex++ % quotes.length]!;
-      mapLoadingCancel.focus({ preventScroll: true });
-    }
-    const jobs: PreparationJob[] = [
-      { label: t('map-loading.background'), run: () => starfieldOn() ? prepareSpaceBackdrop(holographicMapOn()) : undefined },
-      { label: t('map-loading.geometry'), run: () => {
-        terrainRaster.beginFrame(Infinity);
-        bakeMapLayer(mapLayerSignature(), false, true);
-        // The borders' detail by zoom is weighed once per shape: here, not on the first zoom out.
-        if (holographicMapOn() && provinceGeometry) territoryGeometry.weighBorders(provinceGeometry.shape);
-      } },
-      ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
-        // Prepare known geometry beyond the first screen, in cooperative loading
-        // slices. Unexplored provinces never enter either terrain cache.
-        const poly = provincePolygon(n.id);
-        if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain),
-          sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
-        const field = terrainFields.find(f => f.id === n.id);
-        if (field) terrainRaster.prepare(field, DPR);
-      } })),
-      { label: t('map-loading.ready'), run: () => { bakeMapLayer(mapLayerSignature(), false); bgComposite = ''; } },
-    ];
-    void mapPreparation.start(jobs, (done, total, label) => {
-      mapLoadingBar.max = total;
-      mapLoadingBar.value = done;
-      mapLoadingPercent.textContent = t('map-loading.progress', { n: Math.round(done * 100 / total) });
-      if (mapLoadingStatus.textContent !== label) mapLoadingStatus.textContent = label;
-    }).catch(error => {
-      console.warn('map preparation failed', error);
-      mapLayerContent = '';
-      hideMapLoading(); // ordinary rendering retains its existing error handling
-    });
-  }
-  return mapPreparation.active && !mapPreparation.ready;
-}
+// Заставка входа в карту — `mapLoading.ts` (REFM-241). Рецепт подготовки остаётся здесь,
+// у рисования карты: фон, выпечка, местность.
+initMapLoading({
+  entered: () => inMatch() && (!NET || netAdmitted),
+  viewport: () => `${VW}:${VH}:${DPR}:${holographicMapOn()}`,
+  jobs: () => [
+    { label: t('map-loading.background'), run: () => starfieldOn() ? prepareSpaceBackdrop(holographicMapOn()) : undefined },
+    { label: t('map-loading.geometry'), run: () => {
+      terrainRaster.beginFrame(Infinity);
+      bakeMapLayer(mapLayerSignature(), false, true);
+      // The borders' detail by zoom is weighed once per shape: here, not on the first zoom out.
+      if (holographicMapOn() && provinceGeometry) territoryGeometry.weighBorders(provinceGeometry.shape);
+    } },
+    ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
+      // Prepare known geometry beyond the first screen, in cooperative loading
+      // slices. Unexplored provinces never enter either terrain cache.
+      const poly = provincePolygon(n.id);
+      if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain),
+        sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
+      const field = terrainFields.find(f => f.id === n.id);
+      if (field) terrainRaster.prepare(field, DPR);
+    } })),
+    { label: t('map-loading.ready'), run: () => { bakeMapLayer(mapLayerSignature(), false); bgComposite = ''; } },
+  ],
+  failed: () => {
+    mapLayerContent = '';
+  },
+  leave: () => $('tomenu').click(), // the same intentional leave/solo pause as the HUD button
+});
 
 /**
  * The living province borders over the map (M2.11): they live in {@link borderLayer}, drawn
@@ -10466,7 +10408,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   leaveSolo();
   forgetAutoAssault();
   leaveRun();
-  mapNeedsPreparation = true;
+  needMapPreparation();
   // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
   // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
   // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.

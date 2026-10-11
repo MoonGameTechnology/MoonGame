@@ -80,7 +80,7 @@
 | REFM-238 | ✅ | proto | `docs/backlog.md` | Геометрия флотов на карте |
 | REFM-239 | ✅ | proto | `docs/backlog.md` | Радар |
 | REFM-240 | ✅ | proto | `docs/backlog.md` | Конвейер приказа |
-| REFM-241 | ⏳ | proto | `docs/backlog.md` | Экран загрузки карты |
+| REFM-241 | ✅ | proto | `docs/backlog.md` | Экран загрузки карты |
 | REFM-242 | ✅ | proto | `docs/backlog.md` | Запросы к миру и очередь стройки |
 | REFM-243 | ⏳ | proto | `docs/backlog.md` | Остатки Sector Zero |
 | REFM-244 | 🔒 | proto | `docs/backlog.md` | Точка сборки |
