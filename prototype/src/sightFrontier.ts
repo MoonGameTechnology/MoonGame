@@ -43,6 +43,14 @@
  *    партии, а не невозможность. Инвариант «тир видим» теперь заперт тестом по
  *    `SIGHT_TIERS`: он падает на сборке, тогда как гейт молчал бы в кадре вечно. Отсюда и
  *    перечень тиров — третий тир попадёт под проверку сам, а гейт пропустил бы его молча.
+ * 9. **Обратные клипы — плитками вдоль кромки, а не во весь экран.** Холст строит маску
+ *    каждого клипа на всю его площадь, и полноэкранный прямоугольник без диска обходился
+ *    в маску экрана на каждый круг: 24 мира на телефоне стоили около 10 мс растра на
+ *    обзоре и около 24 мс у дома. Поэтому контур рисуется плитками
+ *    ({@link frontierTiles}): каждая вычитает только задевшие её диски и заливает только
+ *    задевшие её круги, а плитка без кругов или целиком внутри одного диска пропускается.
+ *    Края плиток стоят на целых физических пикселях, так что каждый пиксель рисуется
+ *    ровно один раз и швов нет. Объединение целиком за экраном — рисовать нечего.
  */
 
 /**
@@ -113,6 +121,123 @@ export function unionArcs(circles: readonly ScreenCircle[], inset: number): Scre
     if (r > 0) out.push({ x: c.x, y: c.y, r }); // правило 3
   }
   return out;
+}
+
+/** Поле коробки за краем кругов (правило 9): сглаживание края при любой плотности экрана. */
+const FRONTIER_MARGIN = 4;
+
+/** Сторона плитки контура в физических пикселях (правило 9). */
+const FRONTIER_TILE = 64;
+
+/**
+ * Коробка объединения (правило 9): круги `circles` с полем {@link FRONTIER_MARGIN}, в целых
+ * единицах, обрезанная по экрану `width × height` с запасом в единицу.
+ * `null` — ни один круг не заходит на экран.
+ */
+export function frontierBox(
+  circles: readonly ScreenCircle[],
+  width: number,
+  height: number,
+): { x: number; y: number; width: number; height: number } | null {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const c of circles) {
+    if (c.r <= 0) continue;
+    x0 = Math.min(x0, c.x - c.r);
+    y0 = Math.min(y0, c.y - c.r);
+    x1 = Math.max(x1, c.x + c.r);
+    y1 = Math.max(y1, c.y + c.r);
+  }
+  const left = Math.max(-1, Math.floor(x0) - FRONTIER_MARGIN);
+  const top = Math.max(-1, Math.floor(y0) - FRONTIER_MARGIN);
+  const right = Math.min(width + 1, Math.ceil(x1) + FRONTIER_MARGIN);
+  const bottom = Math.min(height + 1, Math.ceil(y1) + FRONTIER_MARGIN);
+  if (right <= left || bottom <= top) return null;
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/** Плитка контура (правило 9) в единицах экрана. */
+export interface FrontierTile {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Номера внешних кругов, задевших плитку: плитка заливает их объединение. */
+  fill: number[];
+  /** Номера внутренних кругов, задевших плитку: плитка вычитает их диски. */
+  cut: number[];
+}
+
+/** Задевает ли круг прямоугольник, считая поле `margin` под сглаживание. */
+function touches(
+  c: ScreenCircle,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  margin: number,
+): boolean {
+  const dx = Math.max(x - c.x, 0, c.x - x - w);
+  const dy = Math.max(y - c.y, 0, c.y - y - h);
+  return dx * dx + dy * dy < (c.r + margin) ** 2;
+}
+
+/** Лежит ли прямоугольник внутри круга целиком, с полем `margin` от его края. */
+function inside(
+  c: ScreenCircle,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  margin: number,
+): boolean {
+  const dx = Math.max(Math.abs(x - c.x), Math.abs(x + w - c.x));
+  const dy = Math.max(Math.abs(y - c.y), Math.abs(y + h - c.y));
+  return c.r > margin && dx * dx + dy * dy <= (c.r - margin) ** 2;
+}
+
+/**
+ * Плитки контура (правило 9): сетка со стороной {@link FRONTIER_TILE} физических пикселей
+ * по коробке внешних кругов `outer`, без плиток, которых не задел ни один внешний круг или
+ * которые целиком лежат в одном из внутренних `inner`. Плотность экрана `dpr` ставит края
+ * плиток на целые физические пиксели. Номера в `fill` и `cut` — по порядку `outer` и `inner`.
+ */
+export function frontierTiles(
+  outer: readonly ScreenCircle[],
+  inner: readonly ScreenCircle[],
+  width: number,
+  height: number,
+  dpr: number,
+): FrontierTile[] {
+  const box = frontierBox(outer, width, height);
+  if (!box) return [];
+  const margin = Math.max(1, 1 / dpr); // сглаживание края — не уже физического пикселя
+  const left = Math.max(0, Math.floor(box.x * dpr));
+  const top = Math.max(0, Math.floor(box.y * dpr));
+  const right = Math.ceil((box.x + box.width) * dpr);
+  const bottom = Math.ceil((box.y + box.height) * dpr);
+  const tiles: FrontierTile[] = [];
+  for (let ty = top; ty < bottom; ty += FRONTIER_TILE) {
+    for (let tx = left; tx < right; tx += FRONTIER_TILE) {
+      const x = tx / dpr;
+      const y = ty / dpr;
+      const w = Math.min(tx + FRONTIER_TILE, right) / dpr - x;
+      const h = Math.min(ty + FRONTIER_TILE, bottom) / dpr - y;
+      const fill: number[] = [];
+      outer.forEach((c, i) => {
+        if (touches(c, x, y, w, h, margin)) fill.push(i);
+      });
+      if (!fill.length || inner.some((c) => inside(c, x, y, w, h, margin))) continue;
+      const cut: number[] = [];
+      inner.forEach((c, i) => {
+        if (touches(c, x, y, w, h, margin)) cut.push(i);
+      });
+      tiles.push({ x, y, width: w, height: h, fill, cut });
+    }
+  }
+  return tiles;
 }
 
 /** Есть ли что рисовать в тире (правило 4). */
