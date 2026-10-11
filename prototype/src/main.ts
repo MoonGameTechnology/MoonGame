@@ -93,7 +93,6 @@ import {
   netDesync,
   netDesyncCount,
   netView,
-  reconnecting,
   rttEma,
 } from './netSession';
 import {
@@ -168,7 +167,6 @@ import {
   RETREAT_THRESHOLDS,
   isInhabited,
   type SetupConfig,
-  type StepOut,
   orderAuto,
   setHoldPoint,
   MAX_STEWARD_HOLD_POINTS,
@@ -699,6 +697,7 @@ import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCame
 import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
 import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, forkFortressAt, forkMarkAt, initFleetGeometry, laneAim, nearestLanePoint, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, planetRadar, setSweepOpacity, sweepGlow, sweepOn, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { apply, initOrderPipeline, playerOrder, tellBuild, tellHero, tellSteward } from './orderPipeline';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
@@ -723,9 +722,7 @@ import { battleAtTap, battleBadgePoint } from '../../decisions/battleTap';
 import {
   initSteward,
   stewFmtDur,
-  stewMetrics,
   stewardTechDone,
-  type StewardMetrics,
 } from './stewardScreen';
 import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
@@ -744,7 +741,6 @@ import {
   resetSandboxConfig,
   resetSandboxRuntime,
   enforceSandbox,
-  isBuildAction,
   initSandbox,
   setSandboxButton,
 } from './sandbox';
@@ -807,7 +803,7 @@ import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenTail } from './eventVisibility';
 import { recordLoss, tallyDeath } from './warTally';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
-import { heroDiedNews, heroRespawnedNews, type HeroNews } from './heroNews';
+import { heroDiedNews, heroRespawnedNews } from './heroNews';
 import {
   declineHeard,
   diploConcernsMe,
@@ -962,30 +958,20 @@ import {
 } from '../../decisions/roadNetwork';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
-import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
 import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
-import {
-  decisionsField,
-  diffFields,
-  stewardMine,
-  stewardReport,
-  type StewardEvent,
-} from './stewardLog';
+import { stewardMine } from './stewardLog';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import { autoStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
-import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded } from './noteLog';
-import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { assaultSteps } from '../../decisions/assaultOrder';
-import { orderPlan } from '../../decisions/orderRoute';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
@@ -2300,87 +2286,27 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
   cx.restore();
 }
 
-// SANDBOX — fenced hook. In a sandboxed solo match with "free build" on, a build
-// order's resource spend is refunded. `order()` advances to `s.time` first (a no-op,
-// so no production/upkeep runs), leaving the paid cost as the only resource change —
-// snapshotting the treasury before and restoring it after makes the build free.
-// Leading `__PLAYER_BUILD__` guard keeps the sandbox tree-shaken from the player bundle.
-function sandboxBuildSnapshot(type: string): Record<string, number> | null {
-  // Когда песочница возвращает ресурсы — `freeBuild.ts` (REFM-104).
-  const armed = snapshotWallet(
-    __PLAYER_BUILD__,
-    sandboxConfig.enabled,
-    sandboxConfig.freeBuild,
-    isBuildAction(type),
-  );
-  return armed ? { ...(s.players[ME]?.resources ?? {}) } : null;
-}
-function sandboxBuildRestore(snap: Record<string, number> | null, ok: boolean): void {
-  const me = s.players[ME];
-  if (me && restoresWallet(!!snap, ok)) me.resources = snap!;
-}
-
-function apply(out: StepOut) {
-  s = out.state;
-  // Что теряет силу вместе с флотом — владелец выбора (`interaction.ts`, REFM-208) по
-  // правилам `selectionPrune.ts`: одиночная ссылка спрашивает только «существует ли», а
-  // группа чистится дважды — живые И свои. Тот же вызов стоит в снимке сервера.
-  pruneSelection(s.fleets, ME, s.strikes);
-  // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
-  // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
-  handleEvents(out.events);
-}
-
-/** Apply a player-issued order and surface a rejection in the log (so a denied
- *  click — wrong orbit, no capacity, can't afford — isn't silently swallowed). */
-// Имя отказа — `decisions/refusalText.ts` (MIG-2). Правило «ключ выводится из кода»
-// осталось тем же, но живёт оно теперь в общей папке: тот же отказ обязан читаться
-// одинаково в прототипе и в `packages/client`, а две копии этого не гарантируют.
-function playerOrder(action: Action): boolean {
-  // Возврат — «приказ не ОТВЕРГНУТ сейчас»: в соло это честный исход редьюсера,
-  // в сети и при реконнекте — true (исход асинхронный). Нужен вызывающим, которые
-  // повторяют приказ, — чтобы выбросить отвергнутый, а не пережимать его каждый кадр
-  // (бесконечные тосты отказа, живой плейтест).
-  // Куда уходит приказ — `orderRoute.ts` (REFM-147): в сети клиент шлёт НАМЕРЕНИЕ и не
-  // трогает локальный редьюсер (иначе следующий снимок сотрёт «принятый» приказ), при
-  // оборванной связи приказ честно отвергается (сервер о нём не узнает), а обучение
-  // учится в сети на намерении, в соло — только на принятом приказе.
-  const plan = orderPlan({ net: NET, hasClient: !!netClient, reconnecting });
-  if (plan.route === 'send' || plan.route === 'queue') {
-    // Один и тот же вызов: живой провод отправляет сразу, оборванный — кладёт в очередь
-    // транспорта (NETA2-5), и она уйдёт на реконнектном welcome. Разница только в том,
-    // что игроку про очередь говорят — иначе он не поймёт, почему исполнения ещё нет.
-    netClient?.sendAction(action); // server is authoritative — await its broadcast
-    if (plan.tour === 'now') activeTour?.notifyAction(action.type); // ответ сервера асинхронен
-    if (plan.route === 'queue') note('⏳ ' + t('net.queued-order'));
-    return true;
-  }
-  if (plan.route === 'refuse') {
-    note('⟳ ' + t('net.reconnecting-order'));
-    return true;
-  }
-  const before = sandboxBuildSnapshot(action.type);
-  const out = order(s, action, s.time);
-  apply(out);
-  sandboxBuildRestore(before, !out.error);
-  if (out.error) {
-    snd.play('error'); // тёмный сбой — отказ слышен, не только виден
-    note('✖ ' + errText(out.error));
-    return false;
-  }
-  else {
-    // an accepted intent advances `action` steps
-    if (plan.tour === 'on-accept') activeTour?.notifyAction(action.type);
-    // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
-    // `introTrigger.ts` (REFM-100).
-    const intro = introFor(action.type, !!activeTour?.active, NET);
-    if (intro) maybeIntro(intro);
-  }
-  return true;
-}
+// Конвейер приказа — у владельца, `orderPipeline.ts` (REFM-240): шаг мира, приказ игрока
+// и рассказы ленты о вахте, герое и стройке. Отсюда — то, что принадлежит игре: мир и его
+// замена шагом, своё место, разбор событий, лента, имя места, звук отказа, тур обучения,
+// вставки и окно вахты.
+initOrderPipeline({
+  world: () => s,
+  setWorld: (state) => {
+    s = state;
+  },
+  me: () => ME,
+  handleEvents,
+  note,
+  placeName,
+  refusalSound: () => snd.play('error'),
+  tour: () => activeTour,
+  intro: maybeIntro,
+  steward: () => steward,
+});
 
 // --- ONB-1 guide-mark launcher ------------------------------------------------
-// One tour at a time; `playerOrder` above notifies it of accepted actions so a
+// One tour at a time; `playerOrder` (`orderPipeline.ts`) notifies it of accepted actions so a
 // step's `advance: { on: 'action' }` fires on the real order. Exposed on `window`
 // as the reusable seam ONB-0/ONB-2 (auto-offer, «Ещё → Обучение») and headless
 // e2e drive — starting a HUD tour needs an active match, which those own.
@@ -3039,52 +2965,6 @@ function mergeGroup(ids: string[]) {
   );
 }
 
-/** Рассказать игроку о событии вахты — правила в `stewardLog.ts` (REFM-176). */
-function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
-  const r = stewardReport(kind, (p as { posture?: string }).posture);
-  const base = stewSnapshot;
-  stewSnapshot = r.snapshot === 'take' ? stewMetrics(s, ME) : null;
-  if (kind === 'expired') {
-    const d = diffFields(base, stewMetrics(s, ME), TECH_CUR);
-    const dec = decisionsField(s.players[ME]?.stewardLog?.length ?? 0);
-    note(
-      t(r.key) +
-        (d ? ' ' + t('log.steward.diff', d) : '') +
-        (dec ? ' ' + t('log.steward.decisions', dec) : ''),
-    );
-  } else {
-    note(t(r.key));
-  }
-  if (steward?.isOpen()) steward.repaint();
-}
-
-/** Рассказать игроку о СВОЁМ герое — правила в `heroNews.ts` (AUD-16): гибель со сроком
- *  попытки возрождения и возвращение в строй. Имя — то же, что в штабе героев. */
-function tellHero(news: HeroNews | null): void {
-  if (!news) return;
-  const hero = s.heroes?.[news.heroId];
-  const who = hero ? heroDisplayName(hero) : news.heroId;
-  const text =
-    news.key === 'log.hero.died'
-      ? t(news.key, { who, h: fmtHrs(news.leftMs / HOUR) })
-      : news.key === 'log.hero.died.bare'
-        ? t(news.key, { who })
-        : t(news.key, { who, at: news.at !== undefined ? placeName(news.at) : '' });
-  note(text, news.at);
-}
-
-/** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
-function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
-  const line = buildLogLine(kind);
-  const b = buildingName(data.buildings[p.building as string]?.name, p.building as string);
-  const at = p.planetId as string;
-  const where = placeName(at);
-  const text = line.needsLevel
-    ? t(line.key, { b, lvl: String(p.level), at: where })
-    : t(line.key, { b, at: where });
-  if (line.anchored) note(text, at);
-  else note(text);
-}
 function handleEvents(events: DomainEvent[]) {
   // Бои, начавшиеся и кончившиеся в этом пакете: в `s` их уже нет, и «мой ли он» отвечают
   // стороны из самих событий — тем же правилом, что сервер раздаёт их (замечание Codex на
@@ -11383,8 +11263,6 @@ const comicPlayer = initComicPlayer({
 });
 const comicArt: { registry: ComicRegistry } = { registry: CHAPTER_COMICS };
 const comicQueue = createComicQueue();
-// Snapshot of my standing at delegation time, diffed on expiry for the morning report.
-let stewSnapshot: StewardMetrics | null = null;
 
 
 // --- heroes («штаб героев») ---------------------------------------------------

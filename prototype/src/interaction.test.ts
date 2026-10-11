@@ -295,7 +295,12 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   // Ход локального мира и снимок сервера чистят выбор одним вызовом: у снимка была своя
   // копия правил, и она не закрывала окно деления и ⇅-меню погибшего флота.
   it('the local world and the server snapshot prune the selection with one call', () => {
-    expect(count('pruneSelection(s.fleets, ME, s.strikes);')).toBe(2);
+    // Шаг локального мира живёт у конвейера приказа (`orderPipeline.ts`, REFM-240).
+    const pipe = readFileSync(new URL('./orderPipeline.ts', import.meta.url), 'utf8');
+    expect(count('pruneSelection(s.fleets, ME, s.strikes);')).toBe(1);
+    expect(
+      pipe.match(/pruneSelection\(out\.state\.fleets, game\.me\(\), out\.state\.strikes\);/g),
+    ).toHaveLength(1);
     expect(main).not.toMatch(/\b(keepFocus|keepGroup|refSurvives|pruneGroup)\(/);
   });
 });
