@@ -53,6 +53,7 @@ async function toggleTools() {
 // Меню каста флагмана живёт у композера «Приказ» (`chainComposer.ts`, REFM-229) — робот
 // берёт его своим импортом: в `main.ts` этого имени больше нет.
 const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chainComposer';
+import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { moveFleet as __moveFleet } from './game';
 window.__szTest = {
   run: () => isSectorZeroRun(),
@@ -75,7 +76,7 @@ window.__szTest = {
   layers: () => BACK_LAYERS.filter((l) => l.isOpen()).map((l) => l.id),
   speed: () => speed,
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
-  prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+  prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Захват Роем провинции игрока — тем же путём событий, что в игре (handleEvents).
   farthestWorld: () => {
     const home = Object.values(s.planets).find((p) => p.owner === ME && p.kind === 'planet');
