@@ -14,15 +14,14 @@
  * 2. **Контур — это заливка МИНУС её сжатая копия.** Так контур обводит только внешний
  *    край объединения: круг, целиком лежащий внутри другого, не даёт своего кольца —
  *    «граница видимости» ровно одна, а не по кольцу на источник. `drawSightFrontier`
- *    пересекает обратные клипы внутренних кругов и рисует контур прямо на карте;
- *    полноэкранная оффскрин-канва больше не нужна.
+ *    рисует контур прямо на карте (правило 9); полноэкранная оффскрин-канва не нужна.
  * 3. **Сжатие не может съесть круг целиком.** Круг тоньше линии контура при сжатии
  *    ушёл бы в неположительный радиус; такая дуга не исчезает, а выворачивается и
  *    выедает дыру в уже собранной заливке — дыра посреди зоны обзора читалась бы как
  *    слепое пятно, которого нет.
  * 4. **Пустой набор — в отрисовку не заходим.** Это не защита от невозможного: игрок
- *    без единого радара — обычное начало партии, а этап контура требует отдельных
- *    клипов; пустой набор не должен создавать их каждый кадр.
+ *    без единого радара — обычное начало партии, а этап контура строит пути и заливки;
+ *    пустой набор не должен делать это каждый кадр.
  * 5. **Внутренний тир читается СИЛЬНЕЕ внешнего по ВСЕМ трём признакам** — заливка,
  *    контур, толщина линии. Внешний край — дальность засечки (там контакт виден
  *    пятном), внутренний — дальность опознания (там видно, ЧТО это). Сравняй их — и
@@ -43,14 +42,17 @@
  *    партии, а не невозможность. Инвариант «тир видим» теперь заперт тестом по
  *    `SIGHT_TIERS`: он падает на сборке, тогда как гейт молчал бы в кадре вечно. Отсюда и
  *    перечень тиров — третий тир попадёт под проверку сам, а гейт пропустил бы его молча.
- * 9. **Обратные клипы — плитками вдоль кромки, а не во весь экран.** Холст строит маску
- *    каждого клипа на всю его площадь, и полноэкранный прямоугольник без диска обходился
- *    в маску экрана на каждый круг: 24 мира на телефоне стоили около 10 мс растра на
- *    обзоре и около 24 мс у дома. Поэтому контур рисуется плитками
- *    ({@link frontierTiles}): каждая вычитает только задевшие её диски и заливает только
- *    задевшие её круги, а плитка без кругов или целиком внутри одного диска пропускается.
- *    Края плиток стоят на целых физических пикселях, так что каждый пиксель рисуется
- *    ровно один раз и швов нет. Объединение целиком за экраном — рисовать нечего.
+ * 9. **Контур — одна заливка между двумя краями, без клипов.** Полоса контура (правило 2) —
+ *    объединение кругов без объединения их сжатых копий. Её граница — край первого и край
+ *    второго: дуги, не накрытые другими кругами того же объединения, сцепленные в замкнутые
+ *    петли ({@link unionLoops}). Петли обоих краёв идут в один путь, и заливка по правилу
+ *    чёт-нечет закрашивает ровно полосу: точку внутри сжатого объединения обходит чётное
+ *    число петель, точку полосы — нечётное. Раньше сжатые диски вычитались клипами, а холст
+ *    строит маску каждого клипа на всю его площадь: во весь экран это стоило около 24 мс у
+ *    дома на телефоне, плитками вдоль кромки — всё ещё около 5 мс. Обводка видимых дуг
+ *    вместо заливки тоже дешева, но не точна: где круги почти касаются, линия на стыке
+ *    толще или рвётся. Круг целиком за экраном в отрисовку не идёт ({@link frontierOnScreen}):
+ *    на экране он ничего не меняет, а петли считаются по парам кругов.
  */
 
 /**
@@ -123,121 +125,160 @@ export function unionArcs(circles: readonly ScreenCircle[], inset: number): Scre
   return out;
 }
 
-/** Поле коробки за краем кругов (правило 9): сглаживание края при любой плотности экрана. */
+/** Поле за краем экрана (правило 9): сглаживание края при любой плотности экрана. */
 const FRONTIER_MARGIN = 4;
 
-/** Сторона плитки контура в физических пикселях (правило 9). */
-const FRONTIER_TILE = 64;
-
 /**
- * Коробка объединения (правило 9): круги `circles` с полем {@link FRONTIER_MARGIN}, в целых
- * единицах, обрезанная по экрану `width × height` с запасом в единицу.
- * `null` — ни один круг не заходит на экран.
+ * Круги, задевающие экран `width × height` с полем {@link FRONTIER_MARGIN} (правило 9).
+ * Диск остальных лежит за экраном целиком, и ни заливка, ни край на экране без них не меняются.
  */
-export function frontierBox(
+export function frontierOnScreen(
   circles: readonly ScreenCircle[],
   width: number,
   height: number,
-): { x: number; y: number; width: number; height: number } | null {
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const c of circles) {
-    if (c.r <= 0) continue;
-    x0 = Math.min(x0, c.x - c.r);
-    y0 = Math.min(y0, c.y - c.r);
-    x1 = Math.max(x1, c.x + c.r);
-    y1 = Math.max(y1, c.y + c.r);
-  }
-  const left = Math.max(-1, Math.floor(x0) - FRONTIER_MARGIN);
-  const top = Math.max(-1, Math.floor(y0) - FRONTIER_MARGIN);
-  const right = Math.min(width + 1, Math.ceil(x1) + FRONTIER_MARGIN);
-  const bottom = Math.min(height + 1, Math.ceil(y1) + FRONTIER_MARGIN);
-  if (right <= left || bottom <= top) return null;
-  return { x: left, y: top, width: right - left, height: bottom - top };
+): ScreenCircle[] {
+  const m = FRONTIER_MARGIN;
+  return circles.filter(
+    (c) => c.x + c.r > -m && c.x - c.r < width + m && c.y + c.r > -m && c.y - c.r < height + m,
+  );
 }
 
-/** Плитка контура (правило 9) в единицах экрана. */
-export interface FrontierTile {
+const TAU = Math.PI * 2;
+
+/** Дуга края (правило 9): окружность от угла `from` до `to` по возрастанию угла, в радианах.
+ *  Углы могут уходить за 2π: дуга, идущая через нулевой угол, остаётся одной. */
+export interface FrontierArc {
   x: number;
   y: number;
-  width: number;
-  height: number;
-  /** Номера внешних кругов, задевших плитку: плитка заливает их объединение. */
-  fill: number[];
-  /** Номера внутренних кругов, задевших плитку: плитка вычитает их диски. */
-  cut: number[];
+  r: number;
+  from: number;
+  to: number;
 }
 
-/** Задевает ли круг прямоугольник, считая поле `margin` под сглаживание. */
-function touches(
-  c: ScreenCircle,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  margin: number,
-): boolean {
-  const dx = Math.max(x - c.x, 0, c.x - x - w);
-  const dy = Math.max(y - c.y, 0, c.y - y - h);
-  return dx * dx + dy * dy < (c.r + margin) ** 2;
+/** Дуга края и её соседи: номер своего круга и кругов, с края которых она начинается и на
+ *  краю которых кончается; `-1` — соседа нет, дуга — весь круг. */
+interface EdgeArc extends FrontierArc {
+  circle: number;
+  startBy: number;
+  endBy: number;
 }
 
-/** Лежит ли прямоугольник внутри круга целиком, с полем `margin` от его края. */
-function inside(
-  c: ScreenCircle,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  margin: number,
-): boolean {
-  const dx = Math.max(Math.abs(x - c.x), Math.abs(x + w - c.x));
-  const dy = Math.max(Math.abs(y - c.y), Math.abs(y + h - c.y));
-  return c.r > margin && dx * dx + dy * dy <= (c.r - margin) ** 2;
+/** Кусок окружности, накрытый соседом (или подряд несколькими): первый и последний из них. */
+interface Covered {
+  from: number;
+  to: number;
+  startBy: number;
+  endBy: number;
 }
 
 /**
- * Плитки контура (правило 9): сетка со стороной {@link FRONTIER_TILE} физических пикселей
- * по коробке внешних кругов `outer`, без плиток, которых не задел ни один внешний круг или
- * которые целиком лежат в одном из внутренних `inner`. Плотность экрана `dpr` ставит края
- * плиток на целые физические пиксели. Номера в `fill` и `cut` — по порядку `outer` и `inner`.
+ * Край объединения кругов (правило 9): замкнутые петли из дуг, не накрытых другими кругами.
+ * В петле дуги идут подряд: каждая кончается там, где начинается следующая, последняя — там,
+ * где начинается первая. Круг внутри другого края не даёт, из совпадающих его даёт первый.
  */
-export function frontierTiles(
-  outer: readonly ScreenCircle[],
-  inner: readonly ScreenCircle[],
-  width: number,
-  height: number,
-  dpr: number,
-): FrontierTile[] {
-  const box = frontierBox(outer, width, height);
-  if (!box) return [];
-  const margin = Math.max(1, 1 / dpr); // сглаживание края — не уже физического пикселя
-  const left = Math.max(0, Math.floor(box.x * dpr));
-  const top = Math.max(0, Math.floor(box.y * dpr));
-  const right = Math.ceil((box.x + box.width) * dpr);
-  const bottom = Math.ceil((box.y + box.height) * dpr);
-  const tiles: FrontierTile[] = [];
-  for (let ty = top; ty < bottom; ty += FRONTIER_TILE) {
-    for (let tx = left; tx < right; tx += FRONTIER_TILE) {
-      const x = tx / dpr;
-      const y = ty / dpr;
-      const w = Math.min(tx + FRONTIER_TILE, right) / dpr - x;
-      const h = Math.min(ty + FRONTIER_TILE, bottom) / dpr - y;
-      const fill: number[] = [];
-      outer.forEach((c, i) => {
-        if (touches(c, x, y, w, h, margin)) fill.push(i);
-      });
-      if (!fill.length || inner.some((c) => inside(c, x, y, w, h, margin))) continue;
-      const cut: number[] = [];
-      inner.forEach((c, i) => {
-        if (touches(c, x, y, w, h, margin)) cut.push(i);
-      });
-      tiles.push({ x, y, width: w, height: h, fill, cut });
+export function unionLoops(circles: readonly ScreenCircle[]): FrontierArc[][] {
+  const arcs: EdgeArc[] = [];
+  const onCircle: number[][] = circles.map(() => []);
+  for (let i = 0; i < circles.length; i++) {
+    for (const arc of edgeArcs(circles, i)) {
+      onCircle[i]!.push(arcs.length);
+      arcs.push(arc);
     }
   }
-  return tiles;
+  const used = arcs.map(() => false);
+  const loops: FrontierArc[][] = [];
+  for (let first = 0; first < arcs.length; first++) {
+    const loop: FrontierArc[] = [];
+    for (let i = first; i >= 0 && !used[i]; i = nextArc(arcs, onCircle, i)) {
+      used[i] = true;
+      const { x, y, r, from, to } = arcs[i]!;
+      loop.push({ x, y, r, from, to });
+    }
+    if (loop.length) loops.push(loop);
+  }
+  return loops;
+}
+
+/** Дуги круга `i`, не накрытые другими кругами, с соседями на концах. */
+function edgeArcs(circles: readonly ScreenCircle[], i: number): EdgeArc[] {
+  const c = circles[i]!;
+  const spans: Covered[] = [];
+  for (let j = 0; j < circles.length; j++) {
+    if (j === i) continue;
+    const o = circles[j]!;
+    const d = Math.hypot(o.x - c.x, o.y - c.y);
+    if (d + c.r <= o.r && (d + o.r > c.r || j < i)) return [];
+    if (d >= c.r + o.r || d + o.r <= c.r) continue; // порознь, или сосед внутри круга
+    const at = Math.atan2(o.y - c.y, o.x - c.x);
+    const half = Math.acos(
+      Math.min(1, Math.max(-1, (d * d + c.r * c.r - o.r * o.r) / (2 * d * c.r))),
+    );
+    const from = (((at - half) % TAU) + TAU) % TAU;
+    spans.push({ from, to: from + 2 * half, startBy: j, endBy: j });
+  }
+  if (!spans.length) {
+    return [{ x: c.x, y: c.y, r: c.r, from: 0, to: TAU, circle: i, startBy: -1, endBy: -1 }];
+  }
+  spans.sort((p, q) => p.from - q.from);
+  const runs: Covered[] = [];
+  for (const s of spans) {
+    const run = runs[runs.length - 1];
+    if (!run || s.from > run.to) runs.push({ ...s });
+    else if (s.to > run.to) {
+      run.to = s.to;
+      run.endBy = s.endBy;
+    }
+  }
+  // Последний накрытый кусок может перейти через нулевой угол и накрыть первые.
+  const last = runs[runs.length - 1]!;
+  while (runs.length > 1 && runs[0]!.from + TAU <= last.to) {
+    const run = runs.shift()!;
+    if (run.to + TAU > last.to) {
+      last.to = run.to + TAU;
+      last.endBy = run.endBy;
+    }
+  }
+  if (last.to - last.from >= TAU) return []; // соседи накрыли весь круг
+  return runs.map((run, k) => {
+    const next = k + 1 < runs.length ? runs[k + 1]! : { ...runs[0]!, from: runs[0]!.from + TAU };
+    return {
+      x: c.x,
+      y: c.y,
+      r: c.r,
+      from: run.to,
+      to: next.from,
+      circle: i,
+      startBy: run.endBy,
+      endBy: next.startBy,
+    };
+  });
+}
+
+/** Дальше какого разрыва петля не сцепляется наугад: короткая перемычка незаметна, длинная
+ *  закрасила бы хорду. */
+const LOOP_GAP = 0.5;
+
+/**
+ * Следующая дуга петли после дуги `i`: на круге, в который она входит, — дуга, выходящая из
+ * её круга, ближайшая к её концу. Если такой нет (три круга сошлись в одной точке и счёт
+ * разошёлся в последнем знаке) — ближайшая из всех, но не дальше {@link LOOP_GAP}.
+ * `-1` — петля кончилась: дуга — весь круг, или продолжить нечем.
+ */
+function nextArc(arcs: readonly EdgeArc[], onCircle: readonly number[][], i: number): number {
+  const a = arcs[i]!;
+  if (a.endBy < 0) return -1;
+  const x = a.x + a.r * Math.cos(a.to);
+  const y = a.y + a.r * Math.sin(a.to);
+  const gap = (k: number): number => {
+    const b = arcs[k]!;
+    return Math.hypot(b.x + b.r * Math.cos(b.from) - x, b.y + b.r * Math.sin(b.from) - y);
+  };
+  const nearest = (ks: readonly number[]): number =>
+    ks.reduce((best, k) => (best < 0 || gap(k) < gap(best) ? k : best), -1);
+  const next = nearest(onCircle[a.endBy]!.filter((k) => arcs[k]!.startBy === a.circle));
+  if (next >= 0) return next;
+  const any = nearest(arcs.map((_, k) => k));
+  return gap(any) < LOOP_GAP ? any : -1;
 }
 
 /** Есть ли что рисовать в тире (правило 4). */
