@@ -47,6 +47,9 @@ export interface Armed {
     squadronId: string;
     patrol?: true;
     relocate?: true;
+    /** Эскадра В ВОЗДУХЕ (SHU-6.14): прицел меняет приказ вылета, а не поднимает её из
+     *  ангара. `from` тогда — база вылета: от неё ядро меряет радиус удара и патруля. */
+    strikeId?: string;
   };
   allyAim: AllyOrderKind;
   squadMerge: { from: string };
@@ -118,6 +121,9 @@ export let selPlanet: string | null = null;
  *  номер её тропы. Исключает и мир, и флоты: у развилки своя карточка. Развилка, на которой
  *  крепость уже стоит, сюда не попадает — тап выбирает саму крепость, как мир. */
 export let selFork: { province: string; trail: number } | null = null;
+/** Своя эскадра В ВОЗДУХЕ (SHU-6.14) — id вылета: адрес её приказов. Исключает флоты, мир
+ *  и развилку: у неё своя карточка. */
+export let selStrike: string | null = null;
 /** Группа своих флотов: рамка, Ctrl-клик, набор. */
 export let selFleets: ReadonlySet<string> = new Set();
 /** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
@@ -216,6 +222,7 @@ export function disarmForCommand(cmd: string | undefined, phone: boolean): void 
 /** Забыть выбор целиком. */
 function forget(): void {
   selFleet = null;
+  selStrike = null;
   selPlanet = null;
   selFork = null;
   selFleets = new Set();
@@ -236,6 +243,7 @@ export function pickFleets(ids: readonly string[], mine: (id: string) => boolean
   selFleets = new Set(sel.picked);
   selFleet = sel.single;
   inspectFleet = sel.inspect;
+  selStrike = null;
   selPlanet = null;
   selFork = null;
   mobileDraft = null;
@@ -248,6 +256,7 @@ export function pickFleets(ids: readonly string[], mine: (id: string) => boolean
  */
 export function pickWorld(id: string): void {
   selPlanet = id;
+  selStrike = null;
   selFork = null;
   selFleet = null;
   selFleets = new Set();
@@ -256,14 +265,31 @@ export function pickWorld(id: string): void {
 /** Выбрать развилку (FORT-6.1): мир и флоты гаснут, как при выборе мира. */
 export function pickFork(fork: { province: string; trail: number }): void {
   selFork = fork;
+  selStrike = null;
   selPlanet = null;
   selFleet = null;
   selFleets = new Set();
 }
 
 /**
- * Выбрано ли хоть что-то, о чём рассказывает лист: флот, группа, осмотр чужого флота, мир
- * или развилка. Один ответ на «открыт ли лист» и «закрывает ли его Escape»: каждый держал
+ * Выбрать свою эскадру в воздухе (SHU-6.14): флоты, мир и развилка гаснут, как при выборе
+ * флота; осмотр чужого флота тоже — панель одна. Мобильная цель и список «флот или мир»
+ * относились к прежнему выбору.
+ */
+export function pickStrike(id: string): void {
+  selStrike = id;
+  selFleet = null;
+  selFleets = new Set();
+  inspectFleet = null;
+  selPlanet = null;
+  selFork = null;
+  mobileDraft = null;
+  mobileChoices = [];
+}
+
+/**
+ * Выбрано ли хоть что-то, о чём рассказывает лист: флот, группа, осмотр чужого флота, мир,
+ * развилка или эскадра в воздухе. Один ответ на «открыт ли лист» и «закрывает ли его Escape»: каждый держал
  * свою копию списка, и в обеих развилки не было — её выбор не открывал лист с кнопкой
  * крепости (сообщение владельца 2026-10-03: «развилка выделилась, а кнопки нет»).
  */
@@ -273,7 +299,8 @@ export function hasSelection(): boolean {
     selFleets.size > 0 ||
     inspectFleet !== null ||
     selPlanet !== null ||
-    selFork !== null
+    selFork !== null ||
+    selStrike !== null
   );
 }
 
@@ -288,12 +315,16 @@ export function deselectFleets(): void {
  * Что теряет силу, когда сменился мир: одна чистка для хода локального мира и для снимка
  * сервера. Правила — `selectionPrune.ts`: одиночные ссылки (выбранный флот, осмотр, окно
  * деления, ⇅-меню) держатся, пока флот существует, а группа — пока флот жив и свой.
+ * Выбранная эскадра в воздухе — пока жив её вылет.
  */
 export function pruneSelection(
   fleets: Readonly<Record<string, { readonly owner: string } | undefined>>,
   me: string,
+  strikes: readonly { readonly id: string }[] = [],
 ): void {
   const exists = (id: string): boolean => !!fleets[id];
+  // Эскадра села или сбита — вылета больше нет, и карточке не о ком рассказывать.
+  if (!refSurvives(selStrike, (id) => strikes.some((st) => st.id === id))) selStrike = null;
   if (!refSurvives(selFleet, exists)) selFleet = null;
   if (!refSurvives(inspectFleet, exists)) inspectFleet = null;
   if (splitState && !refSurvives(splitState.fleetId, exists)) drop('splitState');

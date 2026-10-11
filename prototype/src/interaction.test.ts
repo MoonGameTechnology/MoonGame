@@ -225,6 +225,26 @@ describe('interaction — владелец выбора (REFM-208)', () => {
     expect(I.hasSelection()).toBe(false);
   });
 
+  // SHU-6.14: эскадра в воздухе — свой выбор. Он гасит флоты и мир, они гасят его, и он
+  // держится, пока жив вылет.
+  it('an airborne squadron is its own pick: exclusive with fleets and worlds, alive while its flight is', () => {
+    I.pickFleets(['my1'], mine);
+    I.pickStrike('st1');
+    expect(I.selStrike).toBe('st1');
+    expect(I.selFleet).toBeNull();
+    expect(I.hasSelection()).toBe(true);
+    I.pickWorld('w1');
+    expect(I.selStrike).toBeNull();
+    I.pickStrike('st1');
+    I.pruneSelection({}, 'p1', [{ id: 'st1' }]);
+    expect(I.selStrike).toBe('st1');
+    I.pruneSelection({}, 'p1', []);
+    expect(I.selStrike).toBeNull();
+    I.pickStrike('st1');
+    I.disarm('match', false);
+    expect(I.selStrike).toBeNull();
+  });
+
   // Правило 16: выбор забывают смена матча, пустое выделение и ✕, остальные поводы его держат.
   it('a reason forgets the whole selection exactly when the table says so', () => {
     for (const reason of Object.keys(DISARMED_BY) as Reason[])
@@ -275,7 +295,7 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   // Ход локального мира и снимок сервера чистят выбор одним вызовом: у снимка была своя
   // копия правил, и она не закрывала окно деления и ⇅-меню погибшего флота.
   it('the local world and the server snapshot prune the selection with one call', () => {
-    expect(count('pruneSelection(s.fleets, ME);')).toBe(2);
+    expect(count('pruneSelection(s.fleets, ME, s.strikes);')).toBe(2);
     expect(main).not.toMatch(/\b(keepFocus|keepGroup|refSurvives|pruneGroup)\(/);
   });
 });

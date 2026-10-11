@@ -39,6 +39,11 @@ import {
  * 6. **Порядок — ближе раньше, при равной дистанции мир раньше корабля, дальше по id**:
  *    то же правило, что у запасной посадки ядра (`nearestBase`), поэтому список у двух
  *    клиентов один и тот же.
+ * 7. **Из воздуха** (SHU-6.14, приказ ядра SHU-6.13) дальность меряется от точки, где
+ *    эскадра сейчас (`aloft.at`): лететь ей оттуда. Своя база (`from`) предлагается, пока
+ *    эскадра летит от неё, и не предлагается, когда она уже возвращается туда сама
+ *    (`E_BAD_PAYLOAD`). Место в трюме своего корабля эскадра держит с взлёта, поэтому
+ *    своё же место ей не помеха.
  */
 
 /** Точка на карте (мировые координаты). */
@@ -53,11 +58,12 @@ export interface RelocateTarget {
   base: StrikeBase;
   /** Где база сейчас (правило 5). */
   at: XY;
-  /** Расстояние от базы, где эскадра стоит. */
+  /** Расстояние от базы, где эскадра стоит, — или от эскадры в воздухе (правило 7). */
   distance: number;
 }
 
-/** Базы, на которые эскадра `squadron` с базы `from` перелетит прямо сейчас (правила 1–6). */
+/** Базы, на которые эскадра `squadron` с базы `from` перелетит прямо сейчас (правила 1–6).
+ *  С `aloft` эскадра в воздухе, а `from` — база её вылета (правило 7). */
 export function relocateTargets(
   state: GameState,
   opts: {
@@ -66,13 +72,17 @@ export function relocateTargets(
     squadron: Pick<Squadron, 'units'>;
     data: GameData;
     pos: (base: StrikeBase) => XY | null;
+    aloft?: { at: XY; returning: boolean };
   },
 ): RelocateTarget[] {
-  const { me, from, squadron, data, pos } = opts;
+  const { me, from, squadron, data, pos, aloft } = opts;
   const range = squadronFerryRange(squadron, data);
-  const origin = pos(from);
+  const origin = aloft ? aloft.at : pos(from);
   if (!(range > 0) || !origin) return [];
   const need = stacksSize(squadron.units, data);
+  // Своё место в трюме корабля вылета эскадра держит сама (правило 7).
+  const own = (id: string): number => (aloft && from.kind === 'fleet' && from.id === id ? need : 0);
+  const home = (b: StrikeBase): boolean => b.kind === from.kind && b.id === from.id;
   const bases: StrikeBase[] = [];
   for (const id of Object.keys(state.planets).sort()) {
     const p = state.planets[id]!;
@@ -81,11 +91,11 @@ export function relocateTargets(
   for (const id of Object.keys(state.fleets).sort()) {
     const f = state.fleets[id]!;
     if (f.owner !== me || fleetShuttleBay(f, data) <= 0) continue;
-    if (fleetHoldFree(state, f, data) >= need) bases.push({ kind: 'fleet', id });
+    if (fleetHoldFree(state, f, data) + own(id) >= need) bases.push({ kind: 'fleet', id });
   }
   const out: RelocateTarget[] = [];
   for (const base of bases) {
-    if (base.kind === from.kind && base.id === from.id) continue; // правило 1
+    if (home(base) && (!aloft || aloft.returning)) continue; // правила 1 и 7
     const at = pos(base);
     if (!at) continue;
     const distance = Math.hypot(at.x - origin.x, at.y - origin.y);

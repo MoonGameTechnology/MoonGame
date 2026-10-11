@@ -746,7 +746,7 @@ describe('REFM-216 — стык с main.ts', () => {
     // Зрение переписывает дверь тумана (`mapFog.ts`, REFM-231).
     expect(snap).toMatch(/s = snap\.state;[\s\S]*refreshVision\(\);/);
     expect(snap).toContain('netSignatures = [...radarContacts(snap.signatures)];');
-    expect(snap).toContain('pruneSelection(s.fleets, ME);');
+    expect(snap).toContain('pruneSelection(s.fleets, ME, s.strikes);');
     expect(snap).toContain('invalidatePanel();');
   });
 

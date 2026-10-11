@@ -5,11 +5,15 @@ import {
   holdPatrol,
   patrolShuttle,
   recallPatrol,
+  redirectSquadron,
   releaseHold,
+  relocateAloft,
   relocateShuttle,
   retreatBattle,
   setRocketMineMode,
+  splitAloft,
 } from '../../decisions/actions';
+import { aloftCard, type AloftCard } from '../../decisions/aloftCard';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
@@ -290,6 +294,7 @@ import {
   fleetRadarReach,
   abilityRange,
   type Squadron,
+  type ShuttleStrike,
   type StrikeBase,
   type PausedConstructionSite,
   missingHull,
@@ -873,6 +878,7 @@ import {
   pickFleets,
   pickMode,
   pickFork,
+  pickStrike,
   pickWorld,
   pruneSelection,
   retreatAim,
@@ -881,6 +887,7 @@ import {
   selFleets,
   selFork,
   selPlanet,
+  selStrike,
   splitState,
   squadMerge,
   stageDraft,
@@ -1330,7 +1337,7 @@ initNetSession({
     if (changedMap && plan.fanfare) defaultView();
     // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
-    pruneSelection(s.fleets, ME);
+    pruneSelection(s.fleets, ME, s.strikes);
     invalidatePanel();
   },
   events: handleEvents,
@@ -1721,12 +1728,15 @@ const holographic = initHolographicUi({
   details: () => {
     side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
   },
-  selectionKey: () => selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
+  selectionKey: () =>
+    (selStrike ? `strike:${selStrike}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
   selectionAnchor: () => {
     const fid = panelFleet();
     const fleet = fid && s.fleets[fid];
     const planet = selPlanet && s.planets[selPlanet];
-    const at = fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null;
+    // Эскадра в воздухе (SHU-6.14) — её значок на трассе: нить окна идёт к нему.
+    const aloft = selStrike ? strikeWorldPos(selStrike) : null;
+    const at = aloft ? world(aloft) : fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null;
     return at ? toScreen(at, canvas.getBoundingClientRect(), VW, VH) : null;
   },
 });
@@ -1740,7 +1750,10 @@ const mobileHud = initMobileHud({
   choose: (pick) => {
     offerChoices([]);
     if (pick.kind === 'fleet') setFleetSelection([pick.id]);
-    else {
+    else if (pick.kind === 'strike') {
+      pickStrike(pick.id);
+      invalidatePanel();
+    } else {
       clearSelection();
       pickWorld(pick.id);
       selectionStarted = lastReal;
@@ -2552,7 +2565,7 @@ function apply(out: StepOut) {
   // Что теряет силу вместе с флотом — владелец выбора (`interaction.ts`, REFM-208) по
   // правилам `selectionPrune.ts`: одиночная ссылка спрашивает только «существует ли», а
   // группа чистится дважды — живые И свои. Тот же вызов стоит в снимке сервера.
-  pruneSelection(s.fleets, ME);
+  pruneSelection(s.fleets, ME, s.strikes);
   // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
   // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
   handleEvents(out.events);
@@ -4234,7 +4247,7 @@ function drawFleetRoutes() {
  * волен отменить, а вылет уже в воздухе и отменить его нельзя. Отсюда сплошная линия
  * вместо пунктира плана и цвет крыла (`R_WING`), а не цвет захвата.
  */
-function drawStrikeTrails(): void {
+function drawStrikeTrails(now: number): void {
   const trails = strikeTrails(s.strikes, { me: ME, now: mapNow(), basePos: strikeBasePos });
   if (!trails.length) return;
   cx.save();
@@ -4245,7 +4258,9 @@ function drawStrikeTrails(): void {
     if (!visible(a, 160) && !visible(b, 160)) continue;
     // Обратная нога БЛЕДНЕЕ: удар уже случился, и путь домой не требует внимания так,
     // как путь к цели, — иначе возвращающееся звено кричало бы громче летящего в бой.
-    const alpha = tr.leg === 'back' ? 0.3 : 0.55;
+    // Выбранная эскадра (SHU-6.14) ярче любой ноги: игрок смотрит на её курс.
+    const picked = tr.id === selStrike;
+    const alpha = picked ? 0.85 : tr.leg === 'back' ? 0.3 : 0.55;
     cx.strokeStyle = rgba(R_WING, alpha);
     cx.lineWidth = 1.1;
     cx.setLineDash([]);
@@ -4283,6 +4298,8 @@ function drawStrikeTrails(): void {
       cx.fillText(`${squadronCallsignOf(tr.squadronId)} ·${tr.machines}`, m.x, m.y - 9);
       cx.textAlign = 'start';
     }
+    // Рамка выбора — та же, что у выбранного флота: эскадра в воздухе выделяется как он.
+    if (picked) targetBrackets(m.x, m.y, 13, now);
   }
   cx.restore();
 }
@@ -4559,11 +4576,15 @@ function drawCombatRanges(): void {
   // что это тот же вопрос «докуда дотянется», только про конкретное звено и здесь и
   // сейчас. Дальность — `squadronReach` ядра, та самая, по которой оно отобьёт промах;
   // у перелёта (SHU-6.5) — `squadronFerryRange`, по которой ядро отбивает его.
-  const aiming = strikeAim ? squadronAt(strikeAim.squadronId) : null;
+  // Эскадра в воздухе (SHU-6.14) меряет удар и патруль от той же базы — ядро держит
+  // радиус от неё, — а перелёт от себя: лететь ей оттуда, где она сейчас.
+  const aiming = aimSquadron();
   const aimAt = aiming
-    ? 'planetId' in aiming.base
-      ? (s.planets[aiming.base.planetId]?.position ?? null)
-      : ((f) => (f ? fleetPos(f) : null))(s.fleets[aiming.base.fleetId])
+    ? aiming.aloft && strikeAim?.relocate
+      ? strikeWorldPos(aiming.aloft.id)
+      : 'planetId' in aiming.base
+        ? (s.planets[aiming.base.planetId]?.position ?? null)
+        : ((f) => (f ? fleetPos(f) : null))(s.fleets[aiming.base.fleetId])
     : null;
   const aim =
     aiming && aimAt
@@ -4639,7 +4660,7 @@ function drawCastAim(): void {
  */
 function drawPatrolAim(): void {
   if (!strikeAim?.patrol || !aimPointer) return;
-  const found = squadronAt(strikeAim.squadronId);
+  const found = aimSquadron();
   if (!found) return;
   const home = strikeBasePos(
     'planetId' in found.base
@@ -4649,7 +4670,8 @@ function drawPatrolAim(): void {
   if (!home) return;
   const at = unworld(aimPointer);
   const far = Math.hypot(at.x - home.x, at.y - home.y) > squadronReach(found.sq, data);
-  const rPx = worldDist(squadronPatrol(found.sq, data).radius);
+  // Перенесённый патруль держит круг, снятый на вылете (SHU-6.13) — его и рисуем.
+  const rPx = worldDist(found.aloft?.patrol?.radius ?? squadronPatrol(found.sq, data).radius);
   drawPatrolCircle(aimPointer, rPx, 'aim', far ? CAST_FAR : R_WING);
 }
 
@@ -4671,19 +4693,30 @@ function drawRelocateTargets(now: number): void {
  *  с которой взведён прицел: с неё же уйдёт приказ. */
 function relocateSpots(): RelocateTarget[] {
   if (!strikeAim?.relocate) return [];
-  const found = squadronAt(strikeAim.squadronId);
-  return found ? squadronRelocateSpots(found.sq, strikeAim.from) : [];
+  const found = aimSquadron();
+  return found ? squadronRelocateSpots(found.sq, found.base, found.aloft) : [];
 }
 
 /** Свои базы, куда эскадра перелетит с базы `from` (`relocateTargets.ts`). Позиции — та
- *  же `strikeBasePos`, что у трассы: идущий корабль стоит там, где его рисует карта. */
+ *  же `strikeBasePos`, что у трассы: идущий корабль стоит там, где его рисует карта. У
+ *  эскадры в воздухе (`aloft`, SHU-6.14) дальность — от её значка на трассе. */
 function squadronRelocateSpots(
   sq: Squadron,
   from: { planetId: string } | { fleetId: string },
+  aloft: ShuttleStrike | null = null,
 ): RelocateTarget[] {
   const base: StrikeBase =
     'planetId' in from ? { kind: 'planet', id: from.planetId } : { kind: 'fleet', id: from.fleetId };
-  return relocateTargets(s, { me: ME, from: base, squadron: sq, data, pos: strikeBasePos });
+  const at = aloft ? strikeWorldPos(aloft.id) : null;
+  if (aloft && !at) return [];
+  return relocateTargets(s, {
+    me: ME,
+    from: base,
+    squadron: sq,
+    data,
+    pos: strikeBasePos,
+    ...(aloft && at ? { aloft: { at, returning: aloft.leg === 'back' } } : {}),
+  });
 }
 
 /** Где база на ЭКРАНЕ — там, куда тапают: мир в своей точке, корабль у шеврона. */
@@ -6170,7 +6203,7 @@ function render(now: number) {
   drawFleetRoutes();
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
-  drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
+  drawStrikeTrails(now); // остаток SHU-3.1: вылет в воздухе виден на карте
   drawOrdnance(cx, mineView(), ME, world, cam.scale);
   drawMissiles(); // SM-3.7b: летящая ракета — отряд, но рисуется стрелкой с курсом
   mineControls.refresh();
@@ -7335,6 +7368,131 @@ function squadronAt(id: string): { sq: Squadron; base: { planetId: string } | { 
   const host = 'planetId' in base ? s.planets[base.planetId] : s.fleets[base.fleetId];
   const sq = (host?.hangar ?? []).find((q) => q.id === id);
   return sq ? { sq, base } : null;
+}
+
+/** СВОЙ вылет по id (SHU-6.14) — эскадра в воздухе. Чужой — `null`: соло видит полное
+ *  состояние и обязано само повторить туман сети (`strikeTrail.ts`, правило 1). */
+function ownStrike(id: string): ShuttleStrike | null {
+  const st = (s.strikes ?? []).find((x) => x.id === id);
+  return st && st.owner === ME ? st : null;
+}
+
+/** Эскадра вылета той же формы, что в ангаре: правила дальности, патруля и дележа меряют
+ *  её теми же функциями, что и эскадру дома. */
+function strikeSquadron(st: ShuttleStrike): Squadron {
+  return {
+    id: st.squadronId,
+    units: st.units,
+    ...(st.cargo ? { cargo: st.cargo } : {}),
+    ...(st.damage ? { damage: st.damage } : {}),
+  };
+}
+
+/** База вылета размеченным адресом — как у прицела из ангара. */
+function strikeFrom(st: ShuttleStrike): { planetId: string } | { fleetId: string } {
+  return st.base.kind === 'planet' ? { planetId: st.base.id } : { fleetId: st.base.id };
+}
+
+/** Эскадра взведённого прицела удара: из ангара или в воздухе (`strikeAim.strikeId`). */
+function aimSquadron(): {
+  sq: Squadron;
+  base: { planetId: string } | { fleetId: string };
+  aloft: ShuttleStrike | null;
+} | null {
+  if (!strikeAim) return null;
+  if (strikeAim.strikeId) {
+    const st = ownStrike(strikeAim.strikeId);
+    return st ? { sq: strikeSquadron(st), base: strikeFrom(st), aloft: st } : null;
+  }
+  const found = squadronAt(strikeAim.squadronId);
+  return found ? { ...found, aloft: null } : null;
+}
+
+/** Имя эскадры в воздухе — тот же позывной, что у её карточки в ангаре и над значком. */
+function strikeTitle(st: ShuttleStrike): string {
+  return `${t(SQUADRON_KIND_KEY)} «${squadronCallsignOf(st.squadronId)}»`;
+}
+
+/** Имя базы в строке приказа: мир — по имени места, корабль — по имени флота. */
+function strikeBaseName(base: StrikeBase): string {
+  return base.kind === 'planet' ? placeName(base.id) : fleetTitleOf(base.id);
+}
+
+/** Чем занята эскадра (`aloftCard.ts`, правило 7) и что отсчитывает таймер. Ключи стоят
+ *  литералами в каждой ветке: разбор гейта локализации видит только литеральные ключи. */
+function aloftOrderText(card: AloftCard): { what: string; until: string } {
+  const o = card.order;
+  if (o.kind === 'fleet')
+    return { what: t('side.aloft.order.strike', { name: fleetTitleOf(o.id) }), until: t('side.aloft.until.target') };
+  if (o.kind === 'planet')
+    return { what: t('side.aloft.order.strike', { name: placeName(o.id) }), until: t('side.aloft.until.target') };
+  if (o.kind === 'land')
+    return { what: t('side.aloft.order.land', { name: placeName(o.id) }), until: t('side.aloft.until.target') };
+  if (o.kind === 'patrol-out')
+    return { what: t('side.aloft.order.patrol-out'), until: t('side.aloft.until.point') };
+  if (o.kind === 'patrol') return { what: t('side.aloft.order.patrol'), until: t('side.aloft.until.patrol') };
+  if (o.kind === 'relocate')
+    return { what: t('side.aloft.order.relocate', { name: strikeBaseName(o.base) }), until: t('side.aloft.until.land') };
+  return { what: t('side.aloft.order.home', { name: strikeBaseName(o.base) }), until: t('side.aloft.until.land') };
+}
+
+/**
+ * КАРТОЧКА ЭСКАДРЫ В ВОЗДУХЕ (SHU-6.14) — заказ владельца 2026-10-11: «такие же космические
+ * юниты: выделив, их можно разделить и изменить приказ». Что предлагать — `aloftCard.ts`;
+ * здесь разметка. Кнопки те же, что у карточки в ангаре, и называются так же: игрок
+ * узнаёт приказ по слову, а не по месту. Адрес — id вылета.
+ */
+function aloftPanelHtml(st: ShuttleStrike): string {
+  const sq = strikeSquadron(st);
+  const card = aloftCard(st, {
+    me: ME,
+    data,
+    relocate: squadronRelocateSpots(sq, strikeFrom(st), st).length > 0,
+    split: splitOne(sq) !== null,
+  });
+  if (!card) return `<div class="hint">${t('side.empty')}</div>`;
+  const cargo = card.cargo.reduce((n, c) => n + c.count, 0);
+  const notes = [
+    t('side.aloft.sub'),
+    ...(cargo > 0 ? [t('side.wing.cargo', { n: cargo })] : []),
+    ...(card.hull !== null ? [t('side.wing.hull', { p: card.hull })] : []),
+  ];
+  const text = aloftOrderText(card);
+  // Отсчёт патчит `updatePanelLive` (`.pn-timer`): в разметке только срок, и панель не
+  // перестраивается каждый кадр под пальцем.
+  const timer = `<span class="pn-timer" data-at="${card.until}">${esc(timeLeft(card.until))}</span>`;
+  let h = cardHeader(ownerColor(ME), strikeTitle(st), notes.join(' · '));
+  h += `<div class="row"><b>${esc(text.what)}</b></div>`;
+  h += `<div class="row dim">${esc(text.until)} ${timer}</div>`;
+  h += unitRows(card.stacks);
+  // Повернувшая домой бить снова не может (правило 3): без строки игрок искал бы кнопку.
+  if (card.returning) h += `<div class="row dim">${esc(t('side.aloft.returning'))}</div>`;
+  const buttons =
+    (card.canStrike ? btn('aloftstrike', card.strikeId, t('side.wing.strike'), true) : '') +
+    (card.canPatrol ? btn('aloftpatrol', card.strikeId, t('side.wing.patrol'), true) : '') +
+    (card.canRelocate ? btn('aloftrelocate', card.strikeId, t('side.wing.relocate'), true) : '') +
+    (card.canSplit ? btn('aloftsplit', card.strikeId, t('side.wing.split'), true) : '') +
+    (card.hold !== null
+      ? btn('wingkeep', card.strikeId, card.hold ? t('side.wing.keep.off') : t('side.wing.keep'), true)
+      : '') +
+    (card.canRecall ? btn('wingrecall', card.strikeId, t('side.wing.recall'), true) : '');
+  return buttons ? `${h}<div class="row">${buttons}</div>` : h;
+}
+
+/** Свои эскадры в воздухе под тапом, ближайшая первой (SHU-6.14): тот же отбор, что у
+ *  флотов (`tapTargets.ts`), точка — значок на трассе (`strikeWorldPos`). */
+function strikesUnderTap(mx: number, my: number, r: number): string[] {
+  return fleetsUnderTap(
+    (s.strikes ?? [])
+      .filter((st) => st.owner === ME)
+      .map((st) => {
+        const at = strikeWorldPos(st.id);
+        return { id: st.id, mine: true, visible: true, anchor: at ? world(at) : null };
+      }),
+    mx,
+    my,
+    r,
+  );
 }
 
 function unitRows(stacks: Array<UnitStack>): string {
@@ -8655,6 +8813,9 @@ function forkPanelHtml(fork: { province: string; trail: number }): string {
 /** The side-panel dispatcher: task group → single fleet → unknown world → known world. */
 function panelHtml(): string {
   if (selFork) return forkPanelHtml(selFork);
+  // Эскадра в воздухе (SHU-6.14): села или сбита — вылета нет, и панель идёт дальше.
+  const aloft = selStrike ? ownStrike(selStrike) : null;
+  if (aloft) return aloftPanelHtml(aloft);
   // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
   // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
   const pick = pickPanel({ fleets: selFleets, fleet: panelFleet(), planet: selPlanet }, s, seesDetails);
@@ -9296,10 +9457,21 @@ function updateMobileHud(): void {
   const fid = panelFleet();
   const f = fid ? s.fleets[fid] : null;
   const inspectable = f && fleetSeen(f);
-  const key = selPlanet && s.planets[selPlanet] ? `planet:${selPlanet}` : inspectable ? `fleet:${fid}` : selectedFleetIds().join('|');
+  const key = selStrike
+    ? `strike:${selStrike}`
+    : selPlanet && s.planets[selPlanet]
+      ? `planet:${selPlanet}`
+      : inspectable
+        ? `fleet:${fid}`
+        : selectedFleetIds().join('|');
   const choices: MobileChoice[] = [];
   for (const pick of mobileChoices) {
-    if (pick.kind === 'fleet') {
+    if (pick.kind === 'strike') {
+      // Своя эскадра в воздухе (SHU-6.14): имя — тот же позывной, что над её значком.
+      const st = ownStrike(pick.id);
+      if (!st) continue;
+      choices.push({ ...pick, title: strikeTitle(st), sub: t('side.aloft.sub') });
+    } else if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
       if (!f || !fleetSeen(f)) continue;
       choices.push({ ...pick, title: fleetTitleOf(f.id), sub: NAME[f.owner] ?? f.owner });
@@ -9955,6 +10127,31 @@ side.addEventListener('click', (ev) => {
       arm('strikeAim', { from: found.base, squadronId: arg, relocate: true });
       note(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(found.sq, data)) }));
     }
+  } else if (act === 'aloftstrike' || act === 'aloftpatrol' || act === 'aloftrelocate') {
+    // SHU-6.14 — тот же прицел, что у карточки в ангаре, но для вылета `arg`: тап по карте
+    // меняет его приказ (`aloftAimTap`). База прицела — база вылета: от неё ядро меряет
+    // радиус удара и патруля, а круг перелёта рисуется от самой эскадры.
+    const st = ownStrike(arg);
+    if (st) {
+      const aim = { from: strikeFrom(st), squadronId: st.squadronId, strikeId: st.id };
+      if (act === 'aloftpatrol') {
+        arm('strikeAim', { ...aim, patrol: true });
+        if (MOBILE) aimPointer = null; // круг появится с первым касанием, как у ангара
+        note(t('hint.aloft-patrol-aim'));
+      } else if (act === 'aloftrelocate') {
+        arm('strikeAim', { ...aim, relocate: true });
+        note(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(st, data)) }));
+      } else {
+        arm('strikeAim', aim);
+        note(t('hint.wing-aim'));
+      }
+    }
+  } else if (act === 'aloftsplit') {
+    // Делёж в воздухе (SHU-6.14) — по одной машине, как в ангаре (`splitOne`): отделённая
+    // часть летит своим вылетом с тем же приказом, выбор остаётся на этой.
+    const st = ownStrike(arg);
+    const take = st ? splitOne(strikeSquadron(st)) : null;
+    if (st && take) playerOrder(splitAloft(ME, st.id, [take]));
   } else if (act === 'wingrecall') {
     // `arg` — id ВЫЛЕТА: патруль уже не в ангаре, и адресуется он так же, как его
     // принимает ядро (`shuttle.recall { strikeId }`).
@@ -10460,6 +10657,51 @@ cmdbar.addEventListener('click', onCommandClick);
  *  по нему проходит со второго тапа (`captiveAtRisk`). Любой другой тап прицела сбрасывает. */
 let captiveWarned: string | null = null;
 
+/**
+ * Тап взведённого прицела ЭСКАДРЫ В ВОЗДУХЕ (SHU-6.14): цели те же, что у взлёта из ангара
+ * (чужой видимый флот, иначе мир; точка патруля; подсвеченная база перелёта), но приказ
+ * меняет курс вылета — `shuttle.redirect` или перелёт по id вылета. Годится ли цель,
+ * решает ядро: отказ приходит объяснением (`errText`), промах снимает прицел.
+ */
+function aloftAimTap(
+  strikeId: string,
+  patrol: boolean,
+  relocate: boolean,
+  mx: number,
+  my: number,
+  rFleet: number,
+  rNode: number,
+): void {
+  const st = ownStrike(strikeId);
+  if (!st) {
+    note(t('hint.aloft-gone')); // села или сбита между наводкой и тапом
+    return;
+  }
+  if (patrol) {
+    playerOrder(redirectSquadron(ME, strikeId, { at: unworld({ x: mx, y: my }) }));
+    return;
+  }
+  if (relocate) {
+    const spots = squadronRelocateSpots(strikeSquadron(st), strikeFrom(st), st);
+    const hit = nearestHit(spots, (spot) => relocateSpotPx(spot.base), mx, my, rNode);
+    if (!hit) note(t('hint.wing-relocate-cancelled'));
+    else
+      playerOrder(
+        relocateAloft(
+          ME,
+          strikeId,
+          hit.base.kind === 'planet' ? { toPlanetId: hit.base.id } : { toFleetId: hit.base.id },
+        ),
+      );
+    return;
+  }
+  const foe = nearestHit(hostileFleets(Object.values(s.fleets).filter(fleetSeen), ME), fleetAnchor, mx, my, rFleet);
+  const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  if (foe) playerOrder(redirectSquadron(ME, strikeId, { targetFleetId: foe.id }));
+  else if (node) playerOrder(redirectSquadron(ME, strikeId, { targetPlanetId: node.id }));
+  else note(t('hint.wing-cancelled'));
+}
+
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
 function selectAt(mx: number, my: number) {
   pings?.closePop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
@@ -10548,8 +10790,14 @@ function selectAt(mx: number, my: number) {
   // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
   // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
-    const { from, squadronId, patrol, relocate } = strikeAim;
+    const { from, squadronId, patrol, relocate, strikeId } = strikeAim;
     drop('strikeAim');
+    // SHU-6.14 — прицел ЭСКАДРЫ В ВОЗДУХЕ: цели те же, но приказ — новый для вылета.
+    if (strikeId) {
+      aloftAimTap(strikeId, !!patrol, !!relocate, mx, my, rFleet, rNode);
+      invalidatePanel();
+      return;
+    }
     // SHU-6.3 — ПАТРУЛЬ: тап и есть точка. Дальность ядро меряет от живой позиции базы
     // (`E_OUT_OF_RANGE`), поэтому тап мимо круга приходит отказом, а не тишиной.
     if (patrol) {
@@ -10819,6 +11067,8 @@ function selectAt(mx: number, my: number) {
     my,
     rFleet,
   );
+  // Свои эскадры в воздухе (SHU-6.14) — верх стопки (`tapCycle.ts`, правило 7).
+  const strikeIds = strikesUnderTap(mx, my, rFleet);
   // Что следует из выбора — `pickApply.ts` (REFM-166): пустой тап это «отменить», и он
   // гасит НЕ только выделение, но и незавершённые намерения (слияние, деление, десант) —
   // иначе они применились бы к следующему выбранному флоту, молча. Выбор мира гасит
@@ -10833,6 +11083,11 @@ function selectAt(mx: number, my: number) {
       setFleetSelection([effect.id]); // (clears any selected planet)
       return;
     }
+    if (effect.kind === 'strike') {
+      pickStrike(effect.id);
+      invalidatePanel();
+      return;
+    }
     pickWorld(effect.id);
     selectionStarted = lastReal;
     invalidatePanel();
@@ -10840,7 +11095,7 @@ function selectAt(mx: number, my: number) {
   // FORT-6.1: пустая развилка — МЕСТО, где можно поставить крепость (ромб на дороге). Флот
   // на развилке (засада) и мир под пальцем важнее: их выбирают как прежде. Иначе тап по
   // ромбу открывает карточку развилки, а не провинцию вокруг неё.
-  if (fleetIds.length === 0 && !direct && !fortress && !additive) {
+  if (fleetIds.length === 0 && strikeIds.length === 0 && !direct && !fortress && !additive) {
     const mark = forkMarkAt(mx, my, Math.max(12, rNode * 0.6));
     if (mark) {
       pickFork({ province: mark.province, trail: mark.trail });
@@ -10868,12 +11123,14 @@ function selectAt(mx: number, my: number) {
         applyPick(null);
         return;
       }
-      const choices = tapCandidates(fleetIds, n?.id ?? null);
+      const choices = tapCandidates(fleetIds, n?.id ?? null, strikeIds);
       offerChoices(choices.length > 1 ? choices : []);
       if (mobileChoices.length) return;
     }
     // Второй тап по выбранной провинции снимает выбор (`tapCycle.ts`, правило 6).
-    applyPick(touchPick(hit, n?.id ?? null, selPlanet ? { kind: 'planet', id: selPlanet } : null));
+    applyPick(
+      touchPick(hit, n?.id ?? null, selPlanet ? { kind: 'planet', id: selPlanet } : null, strikeIds[0] ?? null),
+    );
     return;
   }
   // PC — RimWorld-style cycling: gather EVERY selectable object under the tap — your
@@ -10885,12 +11142,14 @@ function selectAt(mx: number, my: number) {
     if (fleetIds[0]) toggleFleetInSelection(fleetIds[0]);
     return;
   }
-  const cands = tapCandidates(fleetIds, n?.id ?? null);
-  const current: TapPick | null = selFleet
-    ? { kind: 'fleet', id: selFleet }
-    : selPlanet
-      ? { kind: 'planet', id: selPlanet }
-      : null;
+  const cands = tapCandidates(fleetIds, n?.id ?? null, strikeIds);
+  const current: TapPick | null = selStrike
+    ? { kind: 'strike', id: selStrike }
+    : selFleet
+      ? { kind: 'fleet', id: selFleet }
+      : selPlanet
+        ? { kind: 'planet', id: selPlanet }
+        : null;
   applyPick(nextPick(cands, current));
 }
 
