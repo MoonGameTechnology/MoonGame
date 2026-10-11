@@ -187,9 +187,17 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     at: z.object({ x: z.number().finite(), y: z.number().finite() }),
     hold: z.boolean().optional(),
   }),
-  // Отзыв патруля домой раньше срока (SHU-6.2) — по id вылета: эскадры в ангаре нет, она
-  // в воздухе.
+  // «Домой» эскадре в воздухе (SHU-6.2 — патруль, SHU-6.13 — любой вылет на пути туда) —
+  // по id вылета: эскадры в ангаре нет, она в воздухе.
   'shuttle.recall': z.object({ strikeId: id }),
+  // НОВАЯ ЦЕЛЬ или НОВАЯ ТОЧКА ПАТРУЛЯ эскадре в воздухе (SHU-6.13). Ровно одна из трёх
+  // целей — «одна и только одна» схема не выражает, это гейт обработчика, как и радиус.
+  'shuttle.redirect': z.object({
+    strikeId: id,
+    targetFleetId: id.optional(),
+    targetPlanetId: id.optional(),
+    at: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
+  }),
   // «ДЕРЖАТЬ ПАТРУЛЬ» (SHU-6.6): у патруля в воздухе — по id вылета, у эскадры, ждущей
   // дома, — по базе и эскадре (там удержание можно только снять). Какая из двух форм и
   // «ровно одна база», схема не выражает — это гейт обработчика.
@@ -202,25 +210,33 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   }),
   // ПЕРЕЛЁТ на другую свою базу (SHU-6.4). И откуда, и куда — ровно одна база из двух
   // (мир или корабль): «обе или ни одной» схема не выражает, это гейт обработчика, как и
-  // дальность перелёта.
-  'shuttle.relocate': z.object({
-    planetId: id.optional(),
-    fleetId: id.optional(),
-    squadronId: id,
-    toPlanetId: id.optional(),
-    toFleetId: id.optional(),
-  }),
+  // дальность перелёта. Две формы: эскадра ангара (база + `squadronId`) или эскадра в
+  // воздухе (SHU-6.13) — по `strikeId`, как у «Домой».
+  'shuttle.relocate': z.union([
+    z.object({
+      planetId: id.optional(),
+      fleetId: id.optional(),
+      squadronId: id,
+      toPlanetId: id.optional(),
+      toFleetId: id.optional(),
+    }),
+    z.object({ strikeId: id, toPlanetId: id.optional(), toFleetId: id.optional() }),
+  ]),
   // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
   'shuttle.load': z.object({ fleetId: id, squadronId: id }),
   'shuttle.unload': z.object({ fleetId: id, squadronId: id }),
   // Пересборка ангара (SHU-4.2). База — мир ИЛИ носитель, ровно одна из двух: как и у
-  // вылета, «обе или ни одной» схема не выражает, это гейт обработчика.
-  'shuttle.split': z.object({
-    planetId: id.optional(),
-    fleetId: id.optional(),
-    squadronId: id,
-    units: z.array(z.object({ unit: id, count })).min(1),
-  }),
+  // вылета, «обе или ни одной» схема не выражает, это гейт обработчика. Эскадру в воздухе
+  // (SHU-6.13) делят по `strikeId` вместо базы и эскадры ангара.
+  'shuttle.split': z.union([
+    z.object({
+      planetId: id.optional(),
+      fleetId: id.optional(),
+      squadronId: id,
+      units: z.array(z.object({ unit: id, count })).min(1),
+    }),
+    z.object({ strikeId: id, units: z.array(z.object({ unit: id, count })).min(1) }),
+  ]),
   'shuttle.merge': z.object({
     planetId: id.optional(),
     fleetId: id.optional(),

@@ -2396,6 +2396,7 @@ export const ru: Record<string, string> = {
   'err.under-assault': 'на этом мире уже идёт наземный бой',
   'err.research-slots-full': 'все исследовательские слоты заняты',
   'err.respawn-cooldown': 'герой ещё восстанавливается',
+  'err.returning': 'эскадра уже возвращается',
   'err.same-location': 'флот уже здесь',
   'err.tech-locked': 'нужна технология',
   'err.too-early': 'слишком рано',

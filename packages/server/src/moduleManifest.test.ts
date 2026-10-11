@@ -105,7 +105,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 74: порядок тот же; fleet-ops 1.9.0 — ревью #1417.
 // 75: порядок тот же; rocketMines 2.0.0, minefield 2.2.0 — ракетная мина — отряд во `fleets` (SM-3.7a).
 // 76: порядок тот же; rocketMines 3.0.0, victory 1.7.0, shuttle 1.9.0, fleet-ops 1.10.0 — ракета — отряд во `fleets` (SM-3.7b).
-const PINNED_FOR_VERSION = '76';
+// 77: порядок тот же; shuttle 1.10.0 — эскадра в воздухе: новая цель, «Домой», перелёт и делёж (SHU-6.13).
+const PINNED_FOR_VERSION = '77';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

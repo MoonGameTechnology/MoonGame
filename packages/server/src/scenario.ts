@@ -248,7 +248,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '76'; // SM-3.7b: ракета — отряд. Членство и порядок
+export const MODULE_MANIFEST_VERSION = '77'; // SHU-6.13: эскадра в воздухе. Членство и
+// порядок не тронуты; `shuttle` 1.10.0 — приказ `shuttle.redirect` (новая цель или точка
+// патруля в воздухе), «Домой» у любого вылета на пути туда, перелёт и делёж по `strikeId`; у
+// вылета новое поле `orderSeq`, и события прежнего приказа гаснут. Партия на 76 не знает
+// приказов в воздухе.
+// export const MODULE_MANIFEST_VERSION = '76'; // SM-3.7b: ракета — отряд. Членство и порядок
 // не тронуты; `rocketMines` 3.0.0 пускает ракету отрядом во `fleets` (юнит `missile`, полёт
 // по прямой — `Fleet.flight`), её боевую часть кладёт в `ordnance.warheads`; из
 // `state.ordnance` ушёл список `missiles` — партия на 75 не знает ракет-отрядов. `victory`

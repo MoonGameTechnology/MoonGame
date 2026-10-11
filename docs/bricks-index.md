@@ -1409,6 +1409,8 @@
 | SHU-6.8 | ✅ | proto | `docs/shuttles-roadmap.md` | Бот: патруль и перелёт |
 | SHU-6.9 | ✅ | data | `docs/shuttles-roadmap.md` | Баланс фазы 6 |
 | SHU-6.11 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар шаттлов на карте и в журнале |
+| SHU-6.13 | ✅ | core | `docs/shuttles-roadmap.md` | Эскадра в воздухе: приказы |
+| SHU-6.14 | ⏳ | proto | `docs/shuttles-roadmap.md` | Эскадра в воздухе: выделение и карточка |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md` | Поза «Активная оборона» — контрудар при приемлемых потерях |

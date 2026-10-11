@@ -58,6 +58,7 @@ const CLIENT_ACTION_TYPES = [
   'shuttle.merge',
   'shuttle.patrol',
   'shuttle.recall',
+  'shuttle.redirect',
   'shuttle.relocate',
   'shuttle.split',
   'shuttle.strike',
@@ -161,16 +162,23 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.patrol', { fleetId: 'f1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 } }],
       ['shuttle.recall', { strikeId: 'strike:p1:0:1' }],
       // SHU-6.6: «Держать патруль» — флагом при вылете, у вылета и снятие у эскадры дома.
-      [
-        'shuttle.patrol',
-        { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 }, hold: true },
-      ],
+      ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 }, hold: true }],
       ['shuttle.hold', { strikeId: 'strike:p1:0:1', on: true }],
       ['shuttle.hold', { planetId: 'p1', squadronId: 'sq:p1:1', on: false }],
       ['shuttle.hold', { fleetId: 'f1', squadronId: 'sq:p1:1', on: false }],
       // SHU-6.4: перелёт — с мира на корабль и с корабля на мир.
       ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toFleetId: 'f1' }],
       ['shuttle.relocate', { fleetId: 'f1', squadronId: 'sq:p1:1', toPlanetId: 'p2' }],
+      // SHU-6.13: эскадра в воздухе — новая цель, новая точка, перелёт и делёж по id вылета.
+      ['shuttle.redirect', { strikeId: 'strike:p1:0:1', targetFleetId: 'f2' }],
+      ['shuttle.redirect', { strikeId: 'strike:p1:0:1', targetPlanetId: 'p2' }],
+      ['shuttle.redirect', { strikeId: 'strike:p1:0:1', at: { x: 12, y: -3.5 } }],
+      ['shuttle.relocate', { strikeId: 'strike:p1:0:1', toPlanetId: 'p2' }],
+      ['shuttle.split', { strikeId: 'strike:p1:0:1', units: [{ unit: 'interceptor', count: 1 }] }],
+      [
+        'shuttle.split',
+        { planetId: 'p1', squadronId: 'sq:p1:1', units: [{ unit: 'x', count: 2 }] },
+      ],
     ];
     for (const [type, payload] of valid) {
       expect(isValidActionPayload(type, payload), `${type}: ${JSON.stringify(payload)}`).toBe(true);
@@ -240,6 +248,12 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.hold', { strikeId: 'strike:p1:0:1', on: 'yes' }], // `on` не булев
       ['shuttle.relocate', { planetId: 'p1', toPlanetId: 'p2' }], // SHU-6.4: missing squadronId
       ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toPlanetId: 7 }], // not an id
+      // SHU-6.13: без id вылета эскадры в воздухе нет; точка — целиком и конечная.
+      ['shuttle.redirect', { targetPlanetId: 'p2' }], // missing strikeId
+      ['shuttle.redirect', { strikeId: 'strike:p1:0:1', at: { x: Infinity, y: 0 } }],
+      ['shuttle.relocate', { toPlanetId: 'p2' }], // neither squadronId nor strikeId
+      ['shuttle.split', { strikeId: 'strike:p1:0:1', units: [] }], // nothing to take
+      ['shuttle.split', { planetId: 'p1', units: [{ unit: 'x', count: 1 }] }], // no squadron
     ];
     for (const [type, payload] of bad) {
       expect(isValidActionPayload(type, payload), `${type}: ${JSON.stringify(payload)}`).toBe(

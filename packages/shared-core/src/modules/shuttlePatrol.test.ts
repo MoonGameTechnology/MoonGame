@@ -575,7 +575,7 @@ describe('SHU-6.2 — отзыв патруля', () => {
     expect(ashore(later)).toBe(2);
   });
 
-  it('ОТОЗВАТЬ МОЖНО ТОЛЬКО СВОЙ ПАТРУЛЬ, и только пока он не летит домой', () => {
+  it('ОТОЗВАТЬ МОЖНО ТОЛЬКО СВОЙ ВЫЛЕТ, и только пока он не летит домой', () => {
     const s = withFleet(
       world([sq('sq:i', 'interceptor', 2), sq('sq:b', 'bomber', 2)]),
       'E1',
@@ -592,10 +592,10 @@ describe('SHU-6.2 — отзыв патруля', () => {
     const patrolId = patrolOf(flying)!.id;
     const strikeId = (flying.strikes ?? []).find((st) => st.target.kind === 'fleet')!.id;
 
-    expect(code(flying, recall(strikeId))).toBe('E_NOT_PATROLLING'); // удар — не патруль
+    expect(code(flying, recall(strikeId))).toBeNull(); // с SHU-6.13 «Домой» есть и у удара
     expect(code(flying, recall(patrolId, 'p2'))).toBe('E_NO_STRIKE'); // чужой — как несуществующий
     expect(code(flying, recall('strike:nope'))).toBe('E_NO_STRIKE');
     const home = apply(flying, recall(patrolId));
-    expect(code(home, recall(patrolId))).toBe('E_NOT_PATROLLING'); // уже летит домой
+    expect(code(home, recall(patrolId))).toBe('E_RETURNING'); // уже летит домой
   });
 });

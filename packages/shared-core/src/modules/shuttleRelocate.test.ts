@@ -339,9 +339,9 @@ describe('SHU-6.4 — приказ перелёта', () => {
     ]);
   });
 
-  it('ПЕРЕЛЁТ НЕ ОТЗЫВАЕТСЯ: у него нет патруля', () => {
+  it('ПЕРЕЛЁТ НЕ ОТЗЫВАЕТСЯ: он уже летит садиться (SHU-6.13 — «Домой» только на пути туда)', () => {
     const s = apply(world([sq('sq:i', 'interceptor', 2)]), relocate('sq:i', { toPlanetId: 'B' }));
-    expect(code(s, act('shuttle.recall', { strikeId: flight(s)!.id }))).toBe('E_NOT_PATROLLING');
+    expect(code(s, act('shuttle.recall', { strikeId: flight(s)!.id }))).toBe('E_RETURNING');
   });
 });
 
