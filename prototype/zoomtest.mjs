@@ -17,15 +17,18 @@ const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json
   'playwright-core',
 );
 const bridge = `
-// A map-layer bake starts by clearing that canvas: count those — the expensive paint.
+// Count the bakes that paint the whole map within one frame — the expensive paint. A bake a
+// zoom needs only for sharpness goes to the background, a band a frame (rule 7 of
+// decisions/mapLayerView.ts), and is not one of them.
 let zoomBakes = 0;
-const zoomClear = mapLayerX.clearRect.bind(mapLayerX);
-mapLayerX.clearRect = (...args) => { zoomBakes++; zoomClear(...args); };
+const zoomBake = bakeMapLayer;
+bakeMapLayer = (...args) => { zoomBakes++; return zoomBake(...args); };
 window.__zoomTest = {
   settings() { settings.open(); },
   report() { return mapRenderingReport(); },
   scene(scale) { speed=0; clearSelection(); const b=mapBounds(); centerOn({x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2},scale); },
   resetBakes() { zoomBakes=0; },
+  sharp() { return mapView.k === 1 && !bakeJob; },
   read() { return { camera:{...cam}, bakes:zoomBakes, pointers:pointers.size, pointerIds:[...pointers.keys()],
     width:canvas.width, height:canvas.height, state:JSON.stringify(s), selected:[selPlanet,selFleet] }; },
 };`;
@@ -168,6 +171,9 @@ try {
         assert(returned.bakes <= 1, 'at most one map bake after the final scale settles');
         assert.equal(returned.state, before.state, 'camera gestures preserve the game');
         assert.deepEqual(returned.selected, before.selected, 'pinch release does not select');
+        // At rest the map sharpens through the background bake, not a bake within one frame.
+        await page.waitForFunction(() => window.__zoomTest.sharp(), null, { timeout: 10000 });
+        assert((await read()).bakes <= 1, 'the settled map sharpens in the background');
 
         await page.evaluate(() => window.__zoomTest.scene(6));
         await settle();

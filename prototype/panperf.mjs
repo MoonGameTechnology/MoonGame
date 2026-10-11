@@ -28,9 +28,12 @@ render = function(now) { const at = performance.now(); try { originalRender(now)
 const originalBake = bakeMapLayer;
 bakeMapLayer = function(...args) { const at = performance.now(); try { originalBake(...args); }
   finally { panSamples.bake.push(performance.now() - at); } };
+let panSwaps = 0;
+const originalSwap = swapBakeJob;
+swapBakeJob = function(...args) { panSwaps++; return originalSwap(...args); };
 const panSettle = async () => {
   await new Promise((resolve) => setTimeout(resolve, SETTLE_MS + 100));
-  for (let i = 0; i < 2 || (terrainRefine >= 0 && i < 600); i++) await new Promise(requestAnimationFrame);
+  for (let i = 0; i < 2 || ((terrainRefine >= 0 || bakeJob) && i < 600); i++) await new Promise(requestAnimationFrame);
   await new Promise((resolve) => setTimeout(resolve, SETTLE_MS + 100));
   await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
 };
@@ -62,6 +65,10 @@ window.__panBenchmark = {
     const read = (c) => c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     const diff = (a, b) => { let max = 0; for (let i = 0; i < a.length; i++) max = Math.max(max, Math.abs(a[i] - b[i])); return max; };
     const surface = () => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; return c; };
+    // Steps 1-5 judge the pan paths against bakes within one frame: a bake in the background
+    // (rule 7) paints the map in bands, and step 6 judges that on its own.
+    const inBackground = startBakeJob;
+    startBakeJob = () => false;
     Object.assign(cam, {x: 0, y: 0, scale: 1.8});
     await panSettle();
     // 1. Culling to the painted view never changes a pixel.
@@ -105,7 +112,30 @@ window.__panBenchmark = {
     const moved = read(bg);
     invalidateMapSurfaces();
     await panSettle();
-    return { cull: diff(read(culled), read(wide)), still, reused, pan, snapped, scrolled, scroll: diff(moved, read(bg)) };
+    const scroll = diff(moved, read(bg));
+    // 6. A zoom at rest sharpens the map through bakes in the background, a band a frame. They
+    //    leave the picture a bake within one frame does, but for the anti-aliasing of the
+    //    outlines a band boundary cuts (the rasterizer takes a clipped path another way): a few
+    //    levels, on few pixels. A lost or doubled band would differ on whole rows.
+    startBakeJob = inBackground;
+    const swaps = panSwaps;
+    cam.scale = 2.2;
+    await panSettle();
+    const banded = read(bg);
+    const swapped = panSwaps - swaps;
+    startBakeJob = () => false;
+    invalidateMapSurfaces();
+    await panSettle();
+    const fresh = read(bg);
+    startBakeJob = inBackground;
+    let edge = 0, worst = 0;
+    for (let i = 0; i < fresh.length; i += 4) {
+      let d = 0;
+      for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(banded[i + c] - fresh[i + c]));
+      if (d) { edge++; worst = Math.max(worst, d); }
+    }
+    const background = { swapped, max: worst, share: edge / (fresh.length / 4) };
+    return { cull: diff(read(culled), read(wide)), still, reused, pan, snapped, scrolled, scroll, background };
   },
   async capture() {
     Object.assign(cam, {x: 119.25, y: -51.75, scale: 1.8});
@@ -218,6 +248,11 @@ try {
     assert(paths.snapped, 'a pan at rest between pixels snaps the camera, not bakes the map');
     assert(paths.scrolled, 'a pan past the margin moves the bake, not bakes it');
     assert(paths.scroll <= 4, `moved bake matches a fresh one (dither only): ${paths.scroll}`);
+    assert(paths.background.swapped > 0, 'a zoom at rest sharpens the map in the background');
+    assert(
+      paths.background.share <= 0.01 && paths.background.max <= 32,
+      `a bake in the background matches one within a frame (edge anti-aliasing only): ${JSON.stringify(paths.background)}`,
+    );
     const png = await page.evaluate(() => window.__panBenchmark.capture());
     writeFileSync(prefix + '-' + name + '.png', Buffer.from(png.split(',')[1], 'base64'));
   }
