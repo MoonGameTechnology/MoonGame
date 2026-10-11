@@ -8,6 +8,8 @@ const src = (path: string): string => readFileSync(new URL(path, import.meta.url
 const main = src('../prototype/src/main.ts');
 const build = src('../prototype/build.mjs');
 const hotkeys = src('../prototype/src/pcHotkeys.ts');
+// Жесты карты (перетаскивание, колесо, двойной клик, щипок) — у ввода на холсте (REFM-236).
+const input = src('../prototype/src/mapInput.ts');
 const press = (over: Partial<PressInput>): PressInput => ({
   touch: false,
   shift: false,
@@ -32,14 +34,14 @@ const key = (id: string, action: HotkeyAction, codes: string[], button?: string)
 
 /** Чем в игре подтверждается каждая строка таблицы. Нет проверки — строке не место в разделе. */
 const PROOF: Record<string, () => void> = {
-  drag: () => expect(main).toContain('drag-pan'),
-  'touch-drag': () => expect(main).toContain('drag-pan'),
-  wheel: () => expect(main).toMatch(/'wheel',/),
+  drag: () => expect(input).toContain('drag-pan'),
+  'touch-drag': () => expect(input).toContain('drag-pan'),
+  wheel: () => expect(input).toMatch(/'wheel',/),
   dblclick: () =>
-    expect(main).toContain("canvas.addEventListener('dblclick', () => defaultView())"),
+    expect(input).toContain("canvas.addEventListener('dblclick', () => defaultView())"),
   'double-tap': () =>
-    expect(main).toContain("canvas.addEventListener('dblclick', () => defaultView())"),
-  pinch: () => expect(main).toContain('camPinchAt'),
+    expect(input).toContain("canvas.addEventListener('dblclick', () => defaultView())"),
+  pinch: () => expect(input).toContain('camPinchAt'),
   box: () => {
     expect(pressIntent(press({ shift: true })).boxSelect).toBe(true);
     // Над своим флотом Shift — добор, а не рамка: таблица обещает рамку с ПУСТОГО места.

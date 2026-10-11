@@ -192,7 +192,9 @@ const click = async id => {
 };
 
 // Test-only access to selection; clicks still go through the shipped side-panel delegate.
+// Тап по карте — у ввода (`mapInput.ts`, REFM-236): мост берёт его своим импортом.
 const bridge = `
+import { selectAt as __selectAt } from './mapInput';
 module.exports = {
   battleFixture: () => {
     const before = s;
@@ -209,11 +211,11 @@ module.exports = {
     const oldVision = vision; __fog.vision = null;
     clearSelection();
     const badge = battleBadgePoint(world(battleAnchor(s.battles['ui-battle'])));
-    selectAt(badge.x, badge.y);
+    __selectAt(badge.x, badge.y);
     return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
   },
   links: (id) => [...(s.planets[id].links ?? [])],
-  tapWorld: (id) => { const p = world(s.planets[id].position); selectAt(p.x, p.y); },
+  tapWorld: (id) => { const p = world(s.planets[id].position); __selectAt(p.x, p.y); },
   cards: () => ({
     planet: Object.values(s.planets).find(p => p.owner === ME).id,
     fleet: Object.values(s.fleets).find(f => f.owner === ME).id,

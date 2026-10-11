@@ -42,9 +42,12 @@ describe('проводка «Атаки» в прототипе', () => {
   // Сторож: прицел ATK-1 не рисовал ничего, и кнопка читалась сломанной. Цели в уголках,
   // путь в превью и нажатие обязаны идти через одно правило цели.
   const main = readFileSync(new URL('../prototype/src/main.ts', import.meta.url), 'utf8');
+  // Нажатие по карте — у ввода на холсте (REFM-236).
+  const input = readFileSync(new URL('../prototype/src/mapInput.ts', import.meta.url), 'utf8');
   it('цели рисуются в кадре, превью и нажатие спрашивают engageFoeAt', () => {
     expect(main).toContain('drawEngageTargets(lastReal);');
     expect(main).toContain('if (!(aiming || assaultAim || engageAim)) return;');
-    expect(main.match(/engageFoeAt\(/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(main).toMatch(/engageFoeAt\(/); // превью
+    expect(input).toMatch(/engageFoeAt\(/); // нажатие
   });
 });

@@ -277,6 +277,8 @@ describe('REFM-231 — переходы к миру', () => {
 describe('REFM-231 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const CAMERA = readFileSync(new URL('./mapCamera.ts', import.meta.url), 'utf8');
+  // Ввод на холсте (щипок, протяжка) уехал из `main.ts` в `mapInput.ts` (REFM-236).
+  const INPUT = readFileSync(new URL('./mapInput.ts', import.meta.url), 'utf8');
   const init = /initMapCamera\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
   it('хуки камеры — экран, раскладка, мир, своё место и побочные действия перехода', () => {
@@ -297,19 +299,23 @@ describe('REFM-231 — стык с main.ts', () => {
   });
 
   it('камеру и рамку меняют только двери владельца', () => {
-    expect(MAIN).not.toMatch(/\bcam\.(scale|x|y)\s*[-+]?=[^=]/);
-    expect(MAIN).not.toContain('Object.assign(cam');
-    expect(MAIN).not.toMatch(/\b(MINX|MAXX|MINY|MAXY)\b/);
-    expect(MAIN).not.toMatch(
-      /\bfunction (insets|world|unworld|worldDist|visible|panelSlack|pirateIntroRect|zoomAt|clampCam|centerOn|defaultView|jumpTo|focusWorld|jumpToPing)\(/,
-    );
+    for (const src of [MAIN, INPUT]) {
+      expect(src).not.toMatch(/\bcam\.(scale|x|y)\s*[-+]?=[^=]/);
+      expect(src).not.toContain('Object.assign(cam');
+      expect(src).not.toMatch(/\b(MINX|MAXX|MINY|MAXY)\b/);
+      expect(src).not.toMatch(
+        /\bfunction (insets|world|unworld|worldDist|visible|panelSlack|pirateIntroRect|zoomAt|clampCam|centerOn|defaultView|jumpTo|focusWorld|jumpToPing)\(/,
+      );
+    }
     // Рамку ставят старт и смена карты; камеру целиком — щипок и подгонка под новое окно.
     expect(MAIN.match(/\bframeMap\(MAP\);/g)).toHaveLength(2);
-    expect(MAIN).toContain('setView(camPinchAt(');
+    expect(INPUT).toMatch(/\bsetView\(\s*camPinchAt\(/);
     expect(MAIN).toContain(
       'setView(reframePresentation(cam, previousViewport, insets(), mapBounds()));',
     );
-    expect(MAIN.match(/\bpanBy\(/g)).toHaveLength(3);
+    // Протяжку пальцем двигает ввод, остальные два сдвига — `main.ts`.
+    expect(MAIN.match(/\bpanBy\(/g)).toHaveLength(2);
+    expect(INPUT.match(/\bpanBy\(/g)).toHaveLength(1);
   });
 
   it('модуль не тянет `main.ts`', () => {
