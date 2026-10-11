@@ -732,10 +732,32 @@ export function createMultiplayerServer(
           // место не закрепляется никогда (см. `seatConfirmAction`).
           detach(
             'подтверждение места',
-            room.submitServerAction(
-              playerId,
-              seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
-            ),
+            (async () => {
+              let refusalCode = 'E_RATE_LIMIT';
+              // This is a one-shot handshake side effect, unlike periodic drivers.
+              // Retry transient admission failures while this socket is live. Keep
+              // the deterministic claim-generation id, so a retry cannot double-apply.
+              for (let attempt = 0; attempt < 40 && ws.readyState === WebSocket.OPEN; attempt += 1) {
+                const current = room.state.players[playerId];
+                if (current?.seated) return;
+                if (current?.claimedAt !== claimedAt) { refusalCode = 'E_FORBIDDEN'; break; }
+                const result = await room.submitServerAction(
+                  playerId,
+                  seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
+                );
+                if (result.ok) return;
+                refusalCode = result.code ?? 'E_INTERNAL';
+                if (refusalCode !== 'E_RATE_LIMIT' && refusalCode !== 'E_INTERNAL') break;
+                await new Promise<void>((resolve) => {
+                  const done = () => { clearTimeout(timer); ws.off('close', done); resolve(); };
+                  const timer = setTimeout(done, 250);
+                  ws.once('close', done);
+                });
+              }
+              // Do not leave an apparently connected player on an unconfirmed seat.
+              // 1013 asks the client to reconnect when the service can admit the work.
+              if (ws.readyState === WebSocket.OPEN) ws.close(1013, refusalCode);
+            })(),
           );
         }
       }

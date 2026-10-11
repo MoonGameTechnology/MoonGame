@@ -72,7 +72,10 @@ if [ "${SRC%.age}" != "$SRC" ]; then
   SRC="$WORK/dump.sql.gz"
   echo "[✓] Расшифровано"
 fi
-gunzip -c "$SRC" > "$WORK/dump.sql"
+# Invalidate any destination-only marker in the same SQL transaction. Prefix while
+# decompressing: making a second uncompressed copy can exhaust a recovery disk.
+cat "$DEPLOY_DIR/restore-marker.sql" > "$WORK/dump.sql"
+gunzip -c "$SRC" >> "$WORK/dump.sql"
 
 # ---- 2. полнота дампа ----
 if ! tail -c 200 "$WORK/dump.sql" | grep -q 'PostgreSQL database dump complete'; then
@@ -81,11 +84,6 @@ if ! tail -c 200 "$WORK/dump.sql" | grep -q 'PostgreSQL database dump complete';
   exit 1
 fi
 echo "[✓] Дамп полный"
-
-# Invalidate a marker LEFT OVER from provisioning before applying the dump. A current
-# dump replaces it with its own revision; a legacy dump cannot inherit false readiness.
-cat "$DEPLOY_DIR/restore-marker.sql" "$WORK/dump.sql" > "$WORK/restore.sql"
-mv "$WORK/restore.sql" "$WORK/dump.sql"
 
 # ACLs were intentionally omitted by pg_dump. Restore the dedicated runtime grants
 # atomically with the data; an absent/unsafe role aborts the entire transaction.

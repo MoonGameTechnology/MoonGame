@@ -1,0 +1,22 @@
+{
+  "reviewedHead": "fc6f57e1498b263f0e23c2bb6becde05e70881c4",
+  "serverBundleSHA256": "d77be2cc7bdb9789e7855082f5c9de13440e9fdfa44a004e784f569dda8074b3",
+  "transport": "real WebSocket; saturated persistence is a blocked async test adapter",
+  "checks": [
+    {
+      "name": "createMultiplayerServer closes a joined but unconfirmed seat after a permanent confirmation refusal",
+      "status": "passed",
+      "durationMs": 198.16848499999992
+    },
+    {
+      "name": "createMultiplayerServer retries a saturated seat confirmation only while connected (disconnect=false)",
+      "status": "passed",
+      "durationMs": 311.02979600000003
+    },
+    {
+      "name": "createMultiplayerServer retries a saturated seat confirmation only while connected (disconnect=true)",
+      "status": "passed",
+      "durationMs": 373.6249599999999
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "mg-stress-server": {
+    "samples": 244,
+    "memoryMiB": {
+      "min": 311.6,
+      "max": 351.8,
+      "first60sMedian": 316.6,
+      "last60sMedian": 333.25
+    },
+    "cpuPercentMedian": 74.295
+  },
+  "mg-stress-pg": {
+    "samples": 244,
+    "memoryMiB": {
+      "min": 73.18,
+      "max": 95.19,
+      "first60sMedian": 82.15,
+      "last60sMedian": 77.63
+    },
+    "cpuPercentMedian": 11.89
+  },
+  "mg-stress-edge": {
+    "samples": 244,
+    "memoryMiB": {
+      "min": 43.45,
+      "max": 90.07,
+      "first60sMedian": 44.394999999999996,
+      "last60sMedian": 48.145
+    },
+    "cpuPercentMedian": 2.38
+  }
+}

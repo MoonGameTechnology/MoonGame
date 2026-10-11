@@ -9,7 +9,7 @@
   },
   "gate.json": {
     "bytes": 370,
-    "sha256": "63f76dd2faac6f5d09ef453b8fcf2e6c6051902e54fa5a5d53723f925e73ff5a"
+    "sha256": "04e4ea16872184337952f399985cadcd45cbbcd83f3b127f7da02eb7f6bbe6c5"
   },
   "node-heap-oom.txt": {
     "bytes": 2664,
@@ -19,9 +19,17 @@
     "bytes": 1653,
     "sha256": "3d7d4afdb16e304c001a545b9ffce39551ea7935d00ecf5c6bb9e74807d56e2b"
   },
+  "restore-space.json": {
+    "bytes": 869,
+    "sha256": "af4c45bb108d78855f94acc4656ff681ec6194b5e1aab9e592a121de07d74168"
+  },
   "results.json": {
     "bytes": 104172,
     "sha256": "3d51dce755a99baa76d101b66fb27b5ad8448b843fe286dc1370f347bf6d24b6"
+  },
+  "review-regressions.json": {
+    "bytes": 850,
+    "sha256": "4649fba4d7a1123f50645bbb6c7a31070dea879c5518c2481ddb6dd39dccb64f"
   },
   "scenarios.txt": {
     "bytes": 6742,
@@ -30,6 +38,10 @@
   "sector-zero-mobile.png": {
     "bytes": 235337,
     "sha256": "95adf13a5d08afb0a62fa5f2fa3f05841ff9b5bf7fd5e6dc17aceccca2be19fa"
+  },
+  "soak-resources.json": {
+    "bytes": 626,
+    "sha256": "7378d69cefd701a90a4bf885deaf2bf9e84be8850b601f9819e99c20e9d58b06"
   },
   "void-dominion-desktop.png": {
     "bytes": 1071653,

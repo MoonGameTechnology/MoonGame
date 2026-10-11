@@ -1,0 +1,24 @@
+{
+  "status": "pass",
+  "scope": "isolated SQL assembly disk footprint; real PostgreSQL restore is separately covered by databaseSecurity and backup tests",
+  "tempVolumeMiB": 64,
+  "assembledBytes": 41947022,
+  "expectedSHA256": "387ffb855e6a9dee89ec5052885b781575381aad174ca24726435bb697d9cd1b",
+  "results": [
+    {
+      "version": "before",
+      "exit": 1,
+      "seconds": 5.839,
+      "stdout": "",
+      "stderr": "cat: write error: No space left on device\n"
+    },
+    {
+      "version": "after",
+      "exit": 0,
+      "seconds": 4.233,
+      "stdout": "387ffb855e6a9dee89ec5052885b781575381aad174ca24726435bb697d9cd1b  /work/dump.sql\n41947022 /work/dump.sql\n",
+      "stderr": ""
+    }
+  ],
+  "excludedPreparation": "Full restore in Alpine was stopped at GNU-only sha256sum --status; those attempts are not product failures or completed restore tests."
+}
