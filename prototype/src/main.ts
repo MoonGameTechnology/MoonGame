@@ -315,6 +315,7 @@ import { rgba, clearHolographicSprites } from '../../packages/client/src/holoDra
 import { drawTerritory, strokeBorders, type BorderSegment, type ClassifiedBorders, type TerritoryCell, type TerritoryPalette } from '../../packages/client/src/territory';
 import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
+import { borderTolerance } from '../../packages/client/src/territoryLod';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -4569,10 +4570,6 @@ let camMovedAt = -Infinity;
  *  ({@link publishMapGeometry}), polygons through {@link provincePolygon} and
  *  {@link provinceAt}. `null` — no bake yet. */
 let provinceGeometry: MapLayerGeometry | null = null;
-/** M2.11: границы провинций с последней выпечки — рисуются КАЖДЫЙ кадр живыми, а не
- *  запекаются. Они в координатах мозаики: на место их ставит `provinceGeometry.place`.
- *  `null` — плоская карта: там граница стоит в статичном слое, как и рамка. */
-let provinceBorders: ClassifiedBorders | null = null;
 /** M2.11 at rest (`decisions/livingBorderLayer.ts`): the living borders in a layer of their own,
  *  the canvas's size, that the frame refreshes a band at a time while the camera rests. Only
  *  the glass's pixels of it are drawn and shown; it keeps its pixels between rests, so a stop
@@ -4834,10 +4831,23 @@ function measureMapLayer(): MapLayerGeometry {
 /** Hand a bake's geometry to the frame and input: they read the provinces in its space. */
 function publishMapGeometry(geo: MapLayerGeometry): void {
   provinceGeometry = geo;
-  // Классы границ зависят только от владельцев: выпечка с того же места или после жеста
-  // камеры берёт прежние (`territoryGeometry.borders`).
-  provinceBorders = holographicMapOn() ? territoryGeometry.borders(geo.shape, geo.seeds) : null;
   holographicFrame = geo.frame;
+}
+
+/**
+ * M2.11: the province borders of the last bake, which the frame strokes living rather than
+ * baking them. They are in the mosaic's coordinates: `provinceGeometry.place` puts them in
+ * place. Their classes depend only on the owners, so a bake from the same place or after a
+ * camera gesture takes the same ones (`territoryGeometry.borders`). Far out they keep only
+ * the points the screen can show (`territoryLod.ts`): the level is the bake's own, or a finer
+ * one while a zoom-in stretches it, so a line never strays by more than a quarter pixel.
+ * `null` — the flat map: its borders stand in the static layer, as its frame does.
+ */
+function livingBorders(): ClassifiedBorders | null {
+  const geo = provinceGeometry;
+  if (!geo || !holographicMapOn()) return null;
+  const pxPerUnit = DPR * Math.max(1, mapView.k) * geo.place.scale;
+  return territoryGeometry.borders(geo.shape, geo.seeds, borderTolerance(pxPerUnit, provinceWave().segment));
 }
 
 /** `shape.cells[i]` of `geo` in its bake's space, placed once per bake when first needed. */
@@ -5521,6 +5531,8 @@ function prepareEnteringMap(): boolean {
       { label: t('map-loading.geometry'), run: () => {
         terrainRaster.beginFrame(Infinity);
         bakeMapLayer(mapLayerSignature(), false, true);
+        // The borders' detail by zoom is weighed once per shape: here, not on the first zoom out.
+        if (holographicMapOn() && provinceGeometry) territoryGeometry.weighBorders(provinceGeometry.shape);
       } },
       ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
         // Prepare known geometry beyond the first screen, in cooperative loading
@@ -5554,10 +5566,9 @@ function prepareEnteringMap(): boolean {
  * transform. `false` — no layer this frame: the caller strokes them straight into the frame,
  * inside the glass clip it sets for the rest of the map anyway.
  */
-function blitBorderLayer(detail: number): boolean {
-  const borders = provinceBorders;
+function blitBorderLayer(detail: number, borders: ClassifiedBorders): boolean {
   const geo = provinceGeometry;
-  if (!borders || !geo) return false;
+  if (!geo) return false;
   // Rule 3: a moving camera, or no layer to draw into — the frame strokes them itself. So
   // does a camera at rest over a stretched bake: the sharp one replacing it moves the
   // borders' transform, and the layer waits for it rather than being drawn twice.
@@ -5676,11 +5687,12 @@ function render(now: number) {
     // M2.11: границы провинций — живые, как рамка карты, и на тех же часах голограммы
     // (под reduced motion стоят — линия замирает видимой). Сразу над заливкой, чтобы
     // порядок слоёв остался прежним, когда граница жила в выпечке.
-    const layered = blitBorderLayer(lod.provinceDetail);
+    const borders = livingBorders();
+    const layered = borders !== null && blitBorderLayer(lod.provinceDetail, borders);
     cx.save();
     clipGlassSurface(cx, holographicFrame);
-    if (!layered && provinceBorders && provinceGeometry) {
-      drawLivingBorders(cx, provinceBorders, {
+    if (!layered && borders && provinceGeometry) {
+      drawLivingBorders(cx, borders, {
         ownerColor,
         hideOwnedInner: true,
         provinceDetail: lod.provinceDetail,
