@@ -103,9 +103,21 @@ export const patrolShuttle = (
     at: { x: at.x, y: at.y },
     ...(hold ? { hold: true } : {}),
   });
-/** Вернуть патруль домой раньше срока (SHU-6.2) — по id вылета: эскадра в воздухе. */
+/** «Домой» эскадре в воздухе — по id вылета: патрулю раньше срока (SHU-6.2), любому
+ *  вылету на пути туда (SHU-6.13). Уже повернувшую домой ядро отобьёт `E_RETURNING`. */
 export const recallPatrol = (playerId: string, strikeId: string) =>
   act(playerId, 'shuttle.recall', { strikeId });
+/** НОВЫЙ ПРИКАЗ эскадре в воздухе (SHU-6.13) — по id вылета: другой флот или мир для
+ *  удара, либо точка патруля. Радиус считается от базы, второго вылета приказ не стоит. */
+export const redirectSquadron = (
+  playerId: string,
+  strikeId: string,
+  target: { targetFleetId: string } | { targetPlanetId: string } | { at: { x: number; y: number } },
+) =>
+  act(playerId, 'shuttle.redirect', {
+    strikeId,
+    ...('at' in target ? { at: { x: target.at.x, y: target.at.y } } : target),
+  });
 /** «Держать патруль» у патруля в воздухе (SHU-6.6) — по id вылета. Включить можно, пока
  *  патруль не повернул домой, снять — всегда. */
 export const holdPatrol = (playerId: string, strikeId: string, on: boolean) =>
@@ -125,6 +137,13 @@ export const relocateShuttle = (
   squadronId: string,
   dest: { toPlanetId: string } | { toFleetId: string },
 ) => act(playerId, 'shuttle.relocate', { ...base, squadronId, ...dest });
+/** ПЕРЕЛЁТ эскадры прямо из воздуха (SHU-6.13) — по id вылета, дальность от точки, где
+ *  эскадра сейчас. */
+export const relocateAloft = (
+  playerId: string,
+  strikeId: string,
+  dest: { toPlanetId: string } | { toFleetId: string },
+) => act(playerId, 'shuttle.relocate', { strikeId, ...dest });
 /** Перегрузка ЭСКАДРЫ между космопортом мира и стоящим там носителем (SHU-2.1):
  *  `load` — с мира на борт, `unload` — с борта на мир. Соединение едет целиком. */
 export const loadShuttle = (playerId: string, fleetId: string, squadronId: string) =>
@@ -138,6 +157,13 @@ export const splitSquadron = (
   squadronId: string,
   units: Array<{ unit: string; count: number }>,
 ) => act(playerId, 'shuttle.split', { ...base, squadronId, units });
+/** Делёж эскадры В ВОЗДУХЕ (SHU-6.13) — по id вылета: отделённая часть летит своим вылетом
+ *  с тем же приказом. */
+export const splitAloft = (
+  playerId: string,
+  strikeId: string,
+  units: Array<{ unit: string; count: number }>,
+) => act(playerId, 'shuttle.split', { strikeId, units });
 export const mergeSquadron = (
   playerId: string,
   base: { planetId: string } | { fleetId: string },

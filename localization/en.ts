@@ -2388,6 +2388,7 @@ export const en: Record<string, string> = {
   'err.under-assault': 'a ground battle is already raging on this world',
   'err.research-slots-full': 'all research slots are full',
   'err.respawn-cooldown': 'the hero is still recovering',
+  'err.returning': 'the squadron is already heading back',
   'err.same-location': 'fleet is already here',
   'err.tech-locked': 'requires a technology',
   'err.too-early': 'too early',
