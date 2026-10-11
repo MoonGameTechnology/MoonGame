@@ -118,7 +118,7 @@ try {
           mask.g.fillStyle = color(look.strokeAlpha);
           mask.g.fillRect(0, 0, width, height);
           expected.g.drawImage(mask.c, 0, 0, width, height);
-          drawSightFrontier(actual.g, circles, tier, '#72e0d5', width, height);
+          drawSightFrontier(actual.g, circles, tier, '#72e0d5', width, height, dpr);
           const a = actual.g.getImageData(0, 0, width * dpr, height * dpr).data;
           const e = expected.g.getImageData(0, 0, width * dpr, height * dpr).data;
           let maxInterior = 0,

@@ -55,6 +55,8 @@ export interface MapRadarHost {
   vw(): number;
   /** Высота экрана в CSS-пикселях. */
   vh(): number;
+  /** Плотность экрана: края плиток границы обзора встают на целые физические пиксели. */
+  dpr(): number;
   /** Свои источники развёртки с дальностью — из кэша кадра (`perWorld`), раз на мир. */
   sources(): RadarSources;
   /** Круги обзора блока зрения — из кэша кадра, те же, по которым ядро считает туман. */
@@ -355,7 +357,7 @@ function drawSignatureAt(
  */
 /** One frontier for overlapping sources, painted directly without a screen-sized mask. */
 function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier: SightTier): void {
-  drawSightFrontier(game.ctx(), circles, tier, LOCK, game.vw(), game.vh());
+  drawSightFrontier(game.ctx(), circles, tier, LOCK, game.vw(), game.vh(), game.dpr());
 }
 
 export function drawRadarCoverage() {
