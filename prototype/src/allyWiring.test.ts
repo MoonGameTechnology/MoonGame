@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Тап по карте — у ввода на холсте (REFM-236).
+const INPUT = readFileSync(new URL('./mapInput.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 
 describe('глава IV — проводка интерфейса', () => {
@@ -27,9 +29,9 @@ describe('глава IV — проводка интерфейса', () => {
   });
 
   it('взведённый приказ забирает тап по карте и уходит в ядро как `ally.order`', () => {
-    expect(MAIN).toMatch(/allyAim: !!allyAim,/);
-    expect(MAIN).toMatch(/if \(owner === 'ally-order' && allyAim\) \{/);
-    expect(MAIN).toMatch(
+    expect(INPUT).toMatch(/allyAim: !!allyAim,/);
+    expect(INPUT).toMatch(/if \(owner === 'ally-order' && allyAim\) \{/);
+    expect(INPUT).toMatch(
       /playerOrder\(allyOrder\(ME, ally, kind, hit \? \{ fleet: hit\.id \} : \{ planet: node!\.id \}\)\)/,
     );
   });

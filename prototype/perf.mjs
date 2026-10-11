@@ -181,9 +181,11 @@ globalThis.requestAnimationFrame = (cb) => {
 };
 
 // A benchmark-only bridge; it is absent from both shipped profiles.
-// Лучи развёртки — у радара (`mapRadar.ts`, REFM-239): мост берёт их своим импортом.
+// Лучи развёртки — у радара (`mapRadar.ts`, REFM-239), тап по карте — у ввода (`mapInput.ts`,
+// REFM-236): мост берёт их своим импортом.
 const bridge = `
 import { sweepArms as __sweepArms } from './mapRadar';
+import { selectAt as __selectAt } from './mapInput';
 let perfPaints = 0;
 const perfRender = render;
 render = function(now) { perfPaints++; perfRender(now); };
@@ -222,7 +224,7 @@ module.exports = {
     const expected = MAP.filter(n => s.planets[n.id] && visible(world(n), 10))
       .map(n => { const p = world(n); return [p.x, p.y, lod.markerRadius]; });
     const a = fleetAnchor(fleet);
-    selectAt(a.x, a.y); // same map-tap path as pointer/touch input
+    __selectAt(a.x, a.y); // same map-tap path as pointer/touch input
     return { lod, spheres: globalThis.__perfSpheres, terrain: terrainFields.length,
       allMarkers: JSON.stringify(rings) === JSON.stringify(expected), questions,
       pickedFleet: selFleet === fleet.id || selFleets.has(fleet.id),

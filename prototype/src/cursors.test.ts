@@ -23,10 +23,10 @@ describe('игровой курсор', () => {
     expect(out).toBe('.a{cursor:var(--cur-hot);}.b{cursor:var(--cur-hot)}.c{cursor:not-allowed}.d{cursor:grab}');
   });
 
-  it('карта нагревается классом, который ставит main.ts', () => {
+  it('карта нагревается классом, который ставит ввод на холсте', () => {
     expect(cursorCss()).toContain('#map.cur-hot{cursor:var(--cur-hot);}');
-    const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-    expect(main).toContain("classList.toggle('cur-hot'");
+    const input = readFileSync(new URL('./mapInput.ts', import.meta.url), 'utf8');
+    expect(input).toContain("classList.toggle('cur-hot'");
   });
 
   it('сборка ставит лист курсоров первым и греет все листы', () => {

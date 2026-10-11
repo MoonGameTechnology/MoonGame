@@ -26,7 +26,8 @@ import {
   withDiagnostics,
 } from './harnessKit.mjs';
 
-const hooks = `window.__aloftTest = {
+const hooks = `import { patrolShuttle as __patrolShuttle } from '../../decisions/actions';
+window.__aloftTest = {
   prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
   // Свой мир с целым портом и эскадрой из трёх перехватчиков. Эскадра уходит в патруль к
   // точке восточнее мира и останавливается на полпути: она в воздухе, выбора нет, карта
@@ -41,7 +42,7 @@ const hooks = `window.__aloftTest = {
     home.hangar = [{ id: sq, units: [{ unit: 'interceptor', count: 3 }] }];
     delete home.sortie;
     const ok = playerOrder(
-      patrolShuttle(ME, { planetId: home.id }, sq, { x: home.position.x + 140, y: home.position.y }),
+      __patrolShuttle(ME, { planetId: home.id }, sq, { x: home.position.x + 140, y: home.position.y }),
     );
     if (!ok) return null;
     const st = s.strikes.find((x) => x.squadronId === sq);
