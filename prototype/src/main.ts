@@ -919,6 +919,10 @@ import { netViewAt } from '../../decisions/netViewClock';
 import {
   NO_SCROLL,
   SETTLE_MS,
+  bakeBudgetMs,
+  bakeJobFate,
+  bakeWork,
+  bandRows,
   exactOffset,
   exposedStrips,
   gridNudge,
@@ -931,6 +935,8 @@ import {
   visibleInBake,
   type LayerScroll,
   type LayerTransform,
+  type MapLayerAction,
+  type MapLayerFrame,
   type MapProjection,
   type Overscan,
   type PixelRect,
@@ -4879,13 +4885,19 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
 // transparent canvas with a margin beyond the screen: while the camera moves it is shown
 // under one scale + shift instead of being repainted, and it is re-baked only when its
 // content changes, it stops covering the screen, or the camera settles off its pixel
-// grid (after a zoom). The SKY under it (backdrop art, grid, stars) keeps its own bounded
-// parallax, so moving frames paint it live — it is cheap. A settled camera composes sky
-// and map into `bg` once, and idle frames are one 1:1 blit.
+// grid (after a zoom). A bake wanted for sharpness alone (after a zoom) is painted in bands
+// into a spare canvas over a few frames while the frame keeps showing the old one, and
+// the two canvases then trade places (rule 7). The SKY under it (backdrop art, grid, stars)
+// keeps its own bounded parallax, so moving frames paint it live — it is cheap. A settled
+// camera composes sky and map into `bg` once, and idle frames are one 1:1 blit.
 const bg = document.createElement('canvas');
 const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
-const mapLayer = document.createElement('canvas');
-const mapLayerX = (mapContextOptions ? mapLayer.getContext('2d', mapContextOptions) : mapLayer.getContext('2d')) as CanvasRenderingContext2D;
+let mapLayer = document.createElement('canvas');
+let mapLayerX = (mapContextOptions ? mapLayer.getContext('2d', mapContextOptions) : mapLayer.getContext('2d')) as CanvasRenderingContext2D;
+/** Rule 7: the canvas the next bake is painted into in the background. It gives its pixels
+ *  back once the camera has rested with nothing to bake ({@link SPARE_KEEP_MS}). */
+let mapSpare = document.createElement('canvas');
+let mapSpareX = (mapContextOptions ? mapSpare.getContext('2d', mapContextOptions) : mapSpare.getContext('2d')) as CanvasRenderingContext2D;
 const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
 const terrainGeometry = new TerrainGeometryCache();
 const mapContextEvents = { lost: 0, restored: 0 };
@@ -4905,6 +4917,39 @@ let terrainRefine = -1;
 let terrainOwed: PixelRect[] | null = [];
 /** Past this many strips owing terrain, one bake of the map is cheaper than repainting them. */
 const MAX_OWED_STRIPS = 8;
+/** The spare canvas keeps its pixels while the camera rested less than this, or a bake is due:
+ *  a fresh backing store costs the first band of a bake 9–18 ms on a phone. */
+const SPARE_KEEP_MS = 5000;
+/** Rule 7: the map layer's next bake, painted into {@link mapSpare} a band a frame. */
+interface BakeJob {
+  readonly content: string;
+  readonly geo: MapLayerGeometry;
+  readonly margin: Overscan;
+  /** Where the bake's point (0, 0) lies on its canvas, in device pixels. */
+  readonly offset: { x: number; y: number };
+  readonly width: number;
+  readonly height: number;
+  readonly zooming: boolean;
+  /** The last bake of a terrain refinement ({@link terrainRefine}), at the scale on the screen. */
+  readonly final: boolean;
+  /** Its share of a frame, ms. */
+  readonly budget: number;
+  /** What starting it cost (the province geometry), ms. */
+  readonly startMs: number;
+  /** The terrain fields its bands met, once each: `met` holds their ids. */
+  readonly fields: TerrainField[];
+  readonly met: Set<string>;
+  /** The work of its rows, a running total: bands are measured by it, not by rows. */
+  readonly work: Float64Array;
+  /** Rows painted from the top, what they cost, and the rows and cost of the last band. */
+  done: number;
+  paintedMs: number;
+  lastRows: number;
+  lastMs: number;
+  /** A band met terrain the frame budget could not raster yet. */
+  pending: boolean;
+}
+let bakeJob: BakeJob | null = null;
 let bgComposite = ''; // what `bg` holds: which map bake, at which offset, over which sky
 let camSeen = ''; // projection of the previous frame, to notice the camera moving
 let camMovedAt = -Infinity;
@@ -4923,6 +4968,8 @@ let selectionStarted = 0;
 
 /** WebView can restore contexts without changing canvas dimensions or camera state. */
 function invalidateMapSurfaces(): void {
+  cancelBakeJob();
+  releaseMapSpare();
   mapLayerContent = '';
   bgComposite = '';
   terrainRefine = -1;
@@ -4935,12 +4982,18 @@ canvas.addEventListener('contextrestored', () => { mapContextEvents.restored++; 
 // through document, so observe the actual cached surfaces.
 bg.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; bgComposite = ''; });
 bg.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; bgComposite = ''; });
-for (const type of ['contextlost', 'contextrestored'] as const)
-  mapLayer.addEventListener?.(type, () => {
-    backgroundContextEvents[type === 'contextlost' ? 'lost' : 'restored']++;
-    mapLayerContent = '';
-    bgComposite = '';
-  });
+// The two map canvases trade places (rule 7): an event concerns the role its canvas holds now.
+for (const surface of [mapLayer, mapSpare])
+  for (const type of ['contextlost', 'contextrestored'] as const)
+    surface.addEventListener?.(type, () => {
+      backgroundContextEvents[type === 'contextlost' ? 'lost' : 'restored']++;
+      if (surface !== mapLayer) {
+        cancelBakeJob();
+        return;
+      }
+      mapLayerContent = '';
+      bgComposite = '';
+    });
 
 /** The owner of node `id` AS THE VIEWER MAY KNOW IT: live when identified (or fog
  *  off), last-known from memory when only remembered, unknown otherwise. The
@@ -5364,14 +5417,20 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   return fields;
 }
 
-/** Bake the map layer at the current camera, with its margin beyond the screen. */
-function bakeMapLayer(content: string, zooming: boolean, preparing = false): void {
-  if (mapLayerX.isContextLost?.()) return;
+/** A bake's size at the current screen: its margin beyond the screen, where the bake's point
+ *  (0, 0) lies on its canvas, and the canvas, all but the margin in device pixels. */
+function mapLayerSize(): { margin: Overscan; ox: number; oy: number; width: number; height: number } {
   const margin = overscanFor(VW, VH, DPR);
   const ox = Math.round(margin.x * DPR);
   const oy = Math.round(margin.y * DPR);
-  const width = Math.round(VW * DPR) + 2 * ox;
-  const height = Math.round(VH * DPR) + 2 * oy;
+  return { margin, ox, oy, width: Math.round(VW * DPR) + 2 * ox, height: Math.round(VH * DPR) + 2 * oy };
+}
+
+/** Bake the map layer at the current camera, with its margin beyond the screen. */
+function bakeMapLayer(content: string, zooming: boolean, preparing = false): void {
+  cancelBakeJob(); // this bake supersedes it
+  if (mapLayerX.isContextLost?.()) return;
+  const { margin, ox, oy, width, height } = mapLayerSize();
   mapLayerContent = ''; // publish the signature only after a complete paint
   // Preserve the allocation when only the scene changed.
   if (mapLayer.width !== width) mapLayer.width = width;
@@ -5405,12 +5464,11 @@ function mapLayerOffset(): { x: number; y: number } {
   };
 }
 
-/** Paint the canvas rect `r` of the map layer afresh from the bake's geometry; the terrain
- *  fields it meets join `fields` (once: `met` holds their ids). */
+/** Paint the canvas rect `r` of the map layer (or of `g`, where the bake's point (0, 0) lies at
+ *  `o`) afresh from the bake's geometry; the terrain fields it meets join `fields` (once: `met`
+ *  holds their ids). */
 function paintMapLayerRect(r: PixelRect, geo: MapLayerGeometry, zooming: boolean, fields: TerrainField[],
-  met: Set<string>): void {
-  const g = mapLayerX;
-  const o = mapLayerOffset();
+  met: Set<string>, g = mapLayerX, o = mapLayerOffset()): void {
   g.save();
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(r.x, r.y, r.width, r.height);
@@ -5484,6 +5542,81 @@ function repaintOwedTerrain(owed: PixelRect[]): void {
   mapLayerBakes++;
 }
 
+/** Give back the spare canvas's pixels; the next bake into it allocates them again. */
+function releaseMapSpare(): void {
+  if (mapSpare.width) mapSpare.width = 0;
+  if (mapSpare.height) mapSpare.height = 0;
+}
+
+/** Drop the bake in the background, if any. */
+function cancelBakeJob(): void {
+  bakeJob = null;
+}
+
+/** Rule 7: start the next bake in the spare canvas at the current camera. `false` — the spare
+ *  is unusable, and the caller bakes at once. */
+function startBakeJob(content: string, zooming: boolean, final: boolean): boolean {
+  if (mapSpareX.isContextLost?.()) return false;
+  const at = performance.now();
+  const { margin, ox, oy, width, height } = mapLayerSize();
+  if (mapSpare.width !== width) mapSpare.width = width;
+  if (mapSpare.height !== height) mapSpare.height = height;
+  const geo = measureMapLayer();
+  const work = bakeWork(geo.boxes, width, height, DPR, { x: ox, y: oy });
+  bakeJob = { content, geo, margin, offset: { x: ox, y: oy }, width, height, zooming, final,
+    budget: bakeBudgetMs(fpsEma), startMs: performance.now() - at, fields: [], met: new Set(), work,
+    done: 0, paintedMs: 0, lastRows: 0, lastMs: 0, pending: false };
+  return true;
+}
+
+/**
+ * Paint the next `rows` of the bake in the background. `flush` rasters them in this frame:
+ * Chromium records a canvas's paint and rasters it only when the canvas is next drawn from,
+ * so without it the raster of every band would land at once on the frame that shows the bake.
+ */
+function paintBakeBand(job: BakeJob, rows: number, flush: boolean): void {
+  const at = performance.now();
+  const owed = terrainRaster.pending;
+  // A refinement's bake makes the last rasters the cache owes: never leave one owed again.
+  if (job.final) terrainRaster.beginFrame(Infinity);
+  terrainRaster.pending = false;
+  paintMapLayerRect({ x: 0, y: job.done, width: job.width, height: rows }, job.geo, job.zooming, job.fields,
+    job.met, mapSpareX, job.offset);
+  job.pending ||= terrainRaster.pending;
+  terrainRaster.pending = owed;
+  if (flush) {
+    // One pixel drawn into the frame, which paints over it before it is shown.
+    cx.save();
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.globalAlpha = 1;
+    cx.globalCompositeOperation = 'source-over';
+    cx.drawImage(mapSpare, 0, 0, 1, 1, 0, 0, 1, 1);
+    cx.restore();
+  }
+  job.done += rows;
+  job.lastRows = rows;
+  job.lastMs = performance.now() - at;
+  job.paintedMs += job.lastMs;
+}
+
+/** Rule 7: the bake in the background is complete, and it becomes the map layer. */
+function swapBakeJob(job: BakeJob): void {
+  [mapLayer, mapSpare] = [mapSpare, mapLayer];
+  [mapLayerX, mapSpareX] = [mapSpareX, mapLayerX];
+  bakeJob = null;
+  publishMapGeometry(job.geo);
+  mapLayerGeometry = job.geo;
+  terrainFields = job.fields;
+  mapLayerAt = job.geo.at;
+  mapLayerMargin = job.margin;
+  mapLayerScroll = NO_SCROLL;
+  mapLayerBakes++;
+  mapLayerContent = mapLayerX.isContextLost?.() ? '' : job.content;
+  // As after a bake: the terrain its bands could not afford is sharpened next.
+  terrainRefine = job.pending ? 0 : -1;
+  terrainOwed = terrainRefine < 0 ? [] : null;
+}
+
 /** Draw the map layer into `g` under `view` (bake space → screen). */
 function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform): void {
   const { x: ox, y: oy } = mapLayerOffset();
@@ -5519,6 +5652,7 @@ function blitStaticLayer(now: number): void {
   const content = mapLayerSignature();
   if (mapLayerX.isContextLost?.()) {
     // No offscreen map to reuse: paint it straight into the frame.
+    cancelBakeJob();
     cx.save();
     paintSky(cx);
     const geo = measureMapLayer();
@@ -5530,7 +5664,7 @@ function blitStaticLayer(now: number): void {
     return;
   }
   let view = layerTransform(mapLayerAt, here);
-  const decide = (): ReturnType<typeof mapLayerAction> => mapLayerAction({
+  const frameNow = (): MapLayerFrame => ({
     fresh: mapLayerContent === content,
     transform: view,
     width: VW,
@@ -5540,6 +5674,7 @@ function blitStaticLayer(now: number): void {
     scroll: mapLayerScroll,
     settled,
   });
+  const decide = (): MapLayerAction => mapLayerAction(frameNow());
   let action = decide();
   if (action === 'snap') {
     // Rule 4: a pan that came to rest between device pixels (a finger on a phone moves
@@ -5554,6 +5689,26 @@ function blitStaticLayer(now: number): void {
     action = decide();
     if (action === 'snap') action = 'rebake'; // the grid is out of reach: never chase it
   }
+  // Rule 7: the bake in the background, judged against the one on the screen.
+  const job = bakeJob;
+  if (job) {
+    const fate = mapSpareX.isContextLost?.() ? 'drop' : bakeJobFate(frameNow(), action, {
+      fresh: job.content === content,
+      transform: layerTransform(job.geo.at, here),
+      margin: job.margin,
+      final: job.final,
+    });
+    if (fate === 'drop') cancelBakeJob();
+    else if (fate === 'finish') {
+      // The screen cannot wait for it, and its rows left cost less than a whole bake.
+      paintBakeBand(job, job.height - job.done, false);
+      swapBakeJob(job);
+      view = layerTransform(mapLayerAt, here);
+      action = decide();
+      // A bake is enough for this frame: the next one snaps or starts the next bake.
+      if (action === 'snap' || action === 'refresh') action = 'show';
+    }
+  }
   if (action === 'rebake') {
     // A bake inside a gesture reuses terrain art at its last scale; a settled one
     // sharpens it.
@@ -5561,10 +5716,15 @@ function blitStaticLayer(now: number): void {
     view = { k: 1, tx: 0, ty: 0 };
   } else {
     if (action === 'scroll') scrollMapLayer(recentredScroll(view, DPR), !settled);
-    if (terrainRefine >= 0 && view.k === 1) {
+    // Rule 7: a bake for sharpness alone goes to the background; without a spare, at once.
+    if (action === 'refresh' && !bakeJob && !startBakeJob(content, !settled, false)) {
+      bakeMapLayer(content, !settled);
+      view = { k: 1, tx: 0, ty: 0 };
+    }
+    if (terrainRefine >= 0 && view.k === 1 && !bakeJob) {
       // Sharpen the terrain the last bake or move could not afford, two rasters a frame,
       // without repainting the map; once all are sharp, paint what owes it one last time:
-      // the strips a move left without it, or the whole bake.
+      // the strips a move left without it, or the whole bake, in the background.
       while (terrainRefine < terrainFields.length) {
         terrainRaster.prepare(terrainFields[terrainRefine]!, DPR);
         if (terrainRaster.pending) break;
@@ -5577,20 +5737,33 @@ function blitStaticLayer(now: number): void {
           repaintOwedTerrain(terrainOwed);
           terrainRefine = -1;
           terrainOwed = [];
-        } else {
+        } else if (!startBakeJob(content, false, true)) {
           bakeMapLayer(content, false);
           view = { k: 1, tx: 0, ty: 0 };
         }
       }
     }
+    const next = bakeJob;
+    if (next) {
+      // One band a frame; a bake started in this frame has already spent its start.
+      const rows = bandRows({ work: next.work, done: next.done, paintedMs: next.paintedMs,
+        lastRows: next.lastRows, lastMs: next.lastMs, budgetMs: next.budget,
+        spentMs: next === job ? 0 : next.startMs });
+      if (rows > 0) paintBakeBand(next, rows, true);
+      if (next.done >= next.height) {
+        swapBakeJob(next);
+        view = layerTransform(mapLayerAt, here);
+      }
+    }
   }
+  if (!bakeJob && terrainRefine < 0 && now - camMovedAt >= SPARE_KEEP_MS) releaseMapSpare();
   // In motion a pan moves the layer by whole device pixels — a copy, not a resample;
   // what is drawn from bake geometry follows the same rounded transform.
   mapView = onPixelGrid(view, DPR);
-  const exact = settled ? exactOffset(view, DPR) : null;
-  if (exact && !bgx.isContextLost?.()) {
-    // Settled: compose sky + map once, then every idle frame is one 1:1 blit.
-    const key = `${mapLayerBakes}|${exact.x},${exact.y}|${VW}x${VH}:${DPR}|` +
+  if (settled && !bgx.isContextLost?.()) {
+    // Settled: compose sky + map once, then every idle frame is one 1:1 blit — also while
+    // the sharp bake paints in the background under the stretched one (rule 7).
+    const key = `${mapLayerBakes}|${mapView.k},${mapView.tx},${mapView.ty}|${VW}x${VH}:${DPR}|` +
       `${starfieldOn()}:${spaceBackdropReady(holographicMapOn())}:${holographicMapOn()}|${cam.x},${cam.y},${cam.scale}`;
     if (bgComposite !== key) {
       bgComposite = '';
@@ -5599,7 +5772,7 @@ function blitStaticLayer(now: number): void {
       if (bg.width !== width) bg.width = width;
       if (bg.height !== height) bg.height = height;
       paintSky(bgx);
-      showMapLayer(bgx, view);
+      showMapLayer(bgx, mapView);
       if (!bgx.isContextLost?.()) bgComposite = key;
     }
     cx.save();
