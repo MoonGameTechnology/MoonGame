@@ -49,14 +49,17 @@ import {
 import { featuredOffer } from '../../decisions/shopFeatured';
 import { HERO_MAX_STARS, heroStarCost, heroTokenGoal, heroTokenUse } from '../../decisions/heroTokens';
 import { esc, displayUnit } from './format';
-import { catalogPortraitHtml } from './shipArt';
+import { catalogPortraitHtml, portraitArt } from './shipArt';
 import { unitDamageHtml } from './unitDamageView';
 import { unitDamageProfile } from '../../decisions/unitDamage';
 import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { splitSupport } from '../../decisions/supportShips';
 import { heroChapter } from '../../decisions/heroRecruits';
 import { romanChapter } from '../../decisions/chapterRoute';
-import { SLOT_ICON } from './moduleIcons';
+import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
+import { selectedBay, slotLayerHtml } from './shipyard';
+import { slotCallouts } from '../../decisions/slotCallouts';
+import type { LoadoutSlotView } from '../../packages/client/src/loadoutEditor';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import { upgradeFx, type UpgradeFx } from '../../decisions/upgradeFx';
 import { skillNodeState, skillTreeLayout } from '../../decisions/skillTreeLayout';
@@ -171,6 +174,16 @@ export function initSectorZeroPreparation(h: PreparationHost) {
   /** Во вкладке «Корабли» открыт корабль ЭТОГО героя, а не корпус флота (PVR-6.24). У
    *  каждого героя свой корабль со своим набором — полка «Корабли героев». */
   let shipHero: string | null = null;
+  /** Открытый отсек корабля (переделка по окну производства): индекс в раскладке
+   *  `loadoutBays`. Сбрасывается сменой корабля — у другого корабля другие отсеки. */
+  let bay: number | undefined;
+  /** Модуль и тип открытого отсека на момент перерисовки: «Заменить» ставит модуль вместо
+   *  него, снятие освобождает отсек этого типа. */
+  let bayModule: string | null = null;
+  let bayType: string | null = null;
+  /** Куда перевести отсек после правки, как в окне производства: модуль встал — следующий
+   *  пустой отсек (пустых нет — отсек с ним), модуль снят — освободившийся отсек его типа. */
+  let focus: { put: string } | { freed: string } | null = null;
   let message = '';
   /** Отклик на улучшение (`upgradeFx.ts`): живёт ровно одну перерисовку — следующая
    *  (вкладка, другой корпус) не проигрывает вспышку заново. */
@@ -248,27 +261,67 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         .map(([key, tiles]) => shelf(key, tiles))
         .join('') +
       `</div>`;
-    // Слоты — плитками (решение владельца 2026-09-26): по плитке на слот, в ней модуль или
-    // пустое место. Раскладка — та же, что считает гейт верфи (`loadoutBays`): модуль, которому
-    // не хватило слота своего типа, стоит в универсальном. Слоты, открытые звёздами корабля, —
-    // последние слоты своего типа, они помечены звездой.
+    // Отсеки корабля (переделка «Кораблей» по окну производства, заказ владельца 2026-10-11):
+    // раскладка — та же, что считает гейт верфи (`loadoutBays`): модуль, которому не хватило
+    // слота своего типа, стоит в универсальном. Открыт один отсек, рядом — его модули, как в
+    // окне производства (`selectedBay`: выбранный, иначе первый пустой, иначе первый).
     const hullStarred = onHero ? [] : (p.hullStars[hull] ?? []);
     // Слот, только что открытый звездой корабля: плитки за звёзды стоят последними в своём
     // типе, значит новая — последняя плитка этого типа.
     const newSlot = fx?.kind === 'slot' && !onHero && fx.hull === hull ? fx.slot : null;
     const slots: ShipSlots = def.slots;
+    const layout = loadoutBays(slots, selected, data).filter((b) => !b.extra);
+    if (focus) {
+      const to = focus;
+      const empty = layout.findIndex((b) => !b.module && ('put' in to || b.type === to.freed));
+      const at = 'put' in to && empty < 0 ? layout.findIndex((b) => b.module === to.put) : empty;
+      if (at >= 0) bay = at;
+      focus = null;
+    }
+    const sel = selectedBay(layout.map((b) => (b.module ? { moduleId: b.module } : {})), bay);
+    const open = layout[sel];
+    bayModule = open?.module ?? null;
+    bayType = open?.type ?? null;
+    // Плитки отсеков — языком окна производства: модуль в цвете своей редкости и с «★N» в
+    // углу, пустой отсек — серым типом слота.
+    const tiles: LoadoutSlotView[] = layout.map((b) =>
+      b.module
+        ? {
+            type: b.type,
+            moduleId: b.module,
+            moduleName: data.modules[b.module]!.name,
+            rarity: profileRarity(p, b.module, data),
+            star: p.stars[b.module] ?? 0,
+          }
+        : { type: b.type },
+    );
+    const portrait = catalogPortraitHtml('u', unit, data);
+    const callouts = portrait ? slotCallouts(portraitArt('u', unit, data)?.key, layout) : null;
+    const bayAttr = (i: number, sl: { type: string }): string =>
+      `data-prep="bay" data-id="${i}" data-slot="${esc(sl.type)}"`;
+    const art = callouts
+      ? `<div class="cn-art">${portrait}${slotLayerHtml(tiles, callouts, sel, bayAttr)}</div>`
+      : portrait;
+    // Нет точек у арта или отсеков больше, чем точек (звёзды корабля), — отсеки плитками под
+    // артом. Слоты, открытые звёздами корабля, — последние своего типа, они помечены звездой.
     const nth: Partial<Record<string, number>> = {};
-    const bays = loadoutBays(slots, selected, data)
-      .filter((bay) => !bay.extra)
-      .map(({ type, module: id }) => {
-        const i = (nth[type] = (nth[type] ?? -1) + 1);
-        const n = slots[type] ?? 0;
-        const starred = hullStarred.filter((x) => x === type).length;
-        const star = i >= n - starred ? ' star' : '';
-        const fresh = type === newSlot && i === n - 1 ? ' sz-fx-new' : '';
-        return `<div class="sz-slot${id ? ' full' : ''}${star}${fresh}" title="${esc(t(`yard.slot.${type}`))}"><i aria-hidden="true">${SLOT_ICON[type] ?? '＋'}</i><b>${id ? esc(tData(data.modules[id]!.name)) : t('hero.slot.empty')}</b><span>${t(`yard.slot.${type}`)}</span></div>`;
-      })
-      .join('');
+    const bays = callouts
+      ? ''
+      : layout
+          .map(({ type, module: id }, k) => {
+            const i = (nth[type] = (nth[type] ?? -1) + 1);
+            const n = slots[type] ?? 0;
+            const starred = hullStarred.filter((x) => x === type).length;
+            const star = i >= n - starred ? ' star' : '';
+            const fresh = type === newSlot && i === n - 1 ? ' sz-fx-new' : '';
+            const on = k === sel;
+            const kind = t(SLOT_KEY[type] ?? type);
+            const grade = id
+              ? `<span class="sz-slot-grade r-${profileRarity(p, id, data)}">${t(`rarity.${profileRarity(p, id, data)}`)}${(p.stars[id] ?? 0) > 0 ? ` ${'★'.repeat(p.stars[id]!)}` : ''}</span>`
+              : '';
+            return `<button type="button" class="sz-slot${id ? ' full' : ''}${star}${fresh}${on ? ' selected' : ''}" ${bayAttr(k, { type })} aria-pressed="${on ? 'true' : 'false'}" title="${esc(kind)}"><i aria-hidden="true">${id ? moduleIcon(id) : (SLOT_ICON[type] ?? '＋')}</i><b>${id ? esc(tData(data.modules[id]!.name)) : t('hero.slot.empty')}</b><span>${kind}</span>${grade}</button>`;
+          })
+          .join('');
     // Звезда корабля: плитка «+ слот» с выбором типа и ценой (решение владельца 2026-09-26:
     // Варранты, без броска, тип выбирает игрок). Цена видна всегда — `EC-2.3`.
     const starCost = onHero ? null : hullStarCost(hull, p, data);
@@ -286,51 +339,62 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // Улучшение живёт в карточке модуля (решение владельца 2026-09-25): надел и тут же
     // прокачал — отдельной вкладки «Мастерская» больше нет.
     const forge = new Map(workshopRows(p, data).map((row) => [row.id, row] as const));
+    const fitAction = onHero ? 'fit-hero' : 'fit';
     const card = (id: string): string => {
       const module = data.modules[id]!;
       const owned = p.modules.includes(id);
       const fitted = selected.includes(id);
       const fits = canEquip(unit, def, selected, id, data).ok;
+      // Отсек занят другим модулем — этот встаёт ВМЕСТО него, как в окне производства.
+      const swap = owned && !fitted && bayModule !== null;
       const label = !owned
         ? t('sector-zero.prep.unlock', { n: MODULE_UNLOCK_COST })
         : fitted
           ? t('sector-zero.prep.equipped')
-          : !fits
-            ? t('sector-zero.prep.full')
-            : t('sector-zero.prep.equip');
+          : swap
+            ? t('sector-zero.prep.swap')
+            : !fits
+              ? t('sector-zero.prep.full')
+              : t('sector-zero.prep.equip');
       const head = itemHead(id, p, fx?.kind === 'star' && fx.id === id);
-      // Что станет с ЭТИМ корпусом: надетый — если снять, ненадетый — если надеть.
-      // Слот занят — сравнивать не с чем, строки нет.
-      const compare =
-        fitted || fits
-          ? deltaHtml(
-              statDeltas(
-                statsNow,
-                statsWith(fitted ? selected.filter((m) => m !== id) : [...selected, id]),
-                STAT_ORDER,
-              ),
-            )
-          : '';
+      // Что станет с ЭТИМ корпусом: надетый — если снять, ненадетый — если надеть или
+      // поставить вместо модуля отсека. Ставить некуда — сравнивать не с чем, строки нет.
+      const after = fitted
+        ? selected.filter((m) => m !== id)
+        : swap
+          ? [...selected.filter((m) => m !== bayModule), id]
+          : [...selected, id];
+      const compare = fitted || fits || swap ? deltaHtml(statDeltas(statsNow, statsWith(after), STAT_ORDER)) : '';
       const row = owned ? forge.get(id) : undefined;
       // Отклик на улучшение ЭТОГО модуля: звезда, промах кузни или новая редкость.
       const hit =
         (fx?.kind === 'star' || fx?.kind === 'miss' || fx?.kind === 'rarity') && fx.id === id
           ? ` sz-fx-${fx.kind}`
           : '';
-      return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}${hit}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? (onHero ? 'fit-hero' : 'fit') : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
+      const act = !owned ? 'unlock-module' : swap ? `${fitAction}:swap` : fitAction;
+      const off = owned ? !fits && !fitted && !swap : p.research < MODULE_UNLOCK_COST;
+      return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}${hit}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(act, id, label, off, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
     };
-    // Только то, что встаёт на ЭТОТ корпус (решение владельца 2026-09-25): карточка
-    // «не подходит» занимала место и звала открыть то, что сюда не встанет никогда.
-    // Группами по типу слота (заказ владельца 2026-09-26, `moduleGroups.ts`): оружие, защита,
-    // система — в порядке плиток слотов; в заголовке — сколько слотов этого типа занято.
-    // `--n` — число карточек: на ПК группы встают в ряд шириной по своим карточкам.
-    const modules = moduleGroups(sectorModulesFor(unit, selected, data), data, {
-      rarity: (id) => profileRarity(p, id, data),
-    })
-      .map(({ slot, ids }) => {
-        const used = selected.filter((id) => data.modules[id]?.slot === slot).length;
-        return `<section class="sz-modgroup" style="--n:${ids.length}"><p class="sz-tier"><i aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</i>${t(`yard.slot.${slot}`)}<span>${used}/${def.slots[slot] ?? 0}</span></p><div class="sz-cards sz-mods">${ids.map(card).join('')}</div></section>`;
-      })
+    // Модули ОТКРЫТОГО отсека: его типа (универсальному — всех типов, группами), только то,
+    // что встаёт на этот корпус (решение владельца 2026-09-25), без надетых в других отсеках.
+    // Модуль отсека — первым: его улучшение под рукой. Порядок групп и редкость —
+    // `moduleGroups.ts` (заказ владельца 2026-09-26).
+    const ofBay = (id: string): boolean =>
+      open !== undefined && (open.type === 'universal' || data.modules[id]?.slot === open.type);
+    const pool = sectorModulesFor(unit, selected, data).filter(
+      (id) => ofBay(id) && (!selected.includes(id) || id === bayModule),
+    );
+    const bayGroups = moduleGroups(pool, data, { rarity: (id) => profileRarity(p, id, data) }).map(({ slot, ids }) => ({
+      slot,
+      ids: bayModule !== null && ids.includes(bayModule) ? [bayModule, ...ids.filter((id) => id !== bayModule)] : ids,
+    }));
+    const modules = bayGroups
+      .map(
+        ({ slot, ids }) =>
+          (open?.type === 'universal'
+            ? `<p class="sz-tier"><i aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</i>${t(`yard.slot.${slot}`)}</p>`
+            : '') + `<div class="sz-cards sz-mods">${ids.map(card).join('')}</div>`,
+      )
       .join('');
     // Правило кузни одно на все карточки — строкой над ними (PVR-6.6), чертежи — только когда
     // они есть: без чертежа путь к редкости закрыт, и счёт «0 · 0 · 0» был бы шумом.
@@ -353,7 +417,20 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const hint = onHero
       ? `${t('sector-zero.prep.hero-ship.hint')}${nextSlot ? ` ${t('sector-zero.prep.hero-ship.next', { n: captain.level + 1, slot: t(`yard.slot.${nextSlot}`).toLocaleLowerCase() })}` : ''}${offRun}`
       : t('sector-zero.prep.ship-hint');
-    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', unit, data)}<div><h2>${title}</h2><p class="sz-sub">${hint}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(base, statsNow))}<div class="sz-slots">${bays}${addSlot}</div></div></div>${forgeNote}<div class="sz-modgroups">${modules}</div>`;
+    const ship =
+      `<div class="sz-ship">${art}<h2>${title}</h2><p class="sz-sub">${hint}</p>` +
+      `<div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>` +
+      `${unitDamageHtml(unitDamageProfile(base, statsNow))}${bays || addSlot ? `<div class="sz-slots">${bays}${addSlot}</div>` : ''}</div>`;
+    // Колонка открытого отсека: что в нём, «Снять» и модули его типа.
+    const bayHead = open
+      ? `<div class="sz-bayhead"><p class="sz-tier"><i aria-hidden="true">${SLOT_ICON[open.type] ?? '＋'}</i>${t('yard.modules.for-slot', { s: t(SLOT_KEY[open.type] ?? open.type) })}</p>${bayModule !== null ? button(fitAction, bayModule, t('yard.module.take-off')) : ''}</div>`
+      : '';
+    const column = open
+      ? `<div class="sz-baycol">${bayHead}${forgeNote}${modules || `<p class="sz-sub">${t('yard.modules.none')}</p>`}</div>`
+      : '';
+    // Раскладка как у окна производства: на ПК три колонки — корпуса, корабль, модули
+    // отсека; на телефоне одна в том же порядке, корпуса — одной лентой.
+    return `<div class="sz-yard"><div class="sz-grid${column ? ' sz-g3' : ''}">${hulls}${ship}${column}</div></div>`;
   }
 
   /**
@@ -690,6 +767,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const active = document.activeElement as HTMLElement | null;
     const focusAction = active?.dataset.prep;
     const focusId = active?.dataset.id;
+    // Лента корпусов на телефоне прокручивается вбок: перерисовка не возвращает её в начало,
+    // иначе выбранный корабль справа уезжал бы за край после каждого нажатия.
+    const shelvesLeft = panel.querySelector('.sz-shelves')?.scrollLeft ?? 0;
     // Двойная награда за забег (`YAG-3.2`) — рядом с самой наградой, и на кнопке видно,
     // СКОЛЬКО придёт (п. 4.5.1: и что будет реклама, и что игрок получит).
     const twice = doubleReward(p, h.platform);
@@ -709,6 +789,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // сколько у меня ресурсов для прокачки»): цена стоит у кнопки внизу, а запас — всегда на виду.
     panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}</div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: lastRunWarrants(p) })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-stick"><div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div><div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div></div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
     fx = null; // отклик отыгран — следующая перерисовка его не повторит
+    const shelves = panel.querySelector('.sz-shelves');
+    if (shelves) shelves.scrollLeft = shelvesLeft;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
@@ -764,7 +846,11 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     else if (kind === 'hull') {
       hull = id;
       shipHero = null;
-    } else if (kind === 'hero-ship') shipHero = id;
+      bay = undefined;
+    } else if (kind === 'hero-ship') {
+      shipHero = id;
+      bay = undefined;
+    } else if (kind === 'bay') bay = Number(id);
     else if (kind === 'hero') {
       heroId = id;
       skillSel = null;
@@ -850,8 +936,11 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         render();
         return;
       }
-      if (kind === 'fit') action = { kind, hull, id };
-      else if (kind === 'fit-hero') action = { kind, hero: shipHero ?? h.progress().selectedHero, id };
+      // «Заменить» (`fit:swap`) ставит модуль на место модуля открытого отсека.
+      const replace = kind?.endsWith(':swap') && bayModule !== null ? { replace: bayModule } : {};
+      if (kind === 'fit' || kind === 'fit:swap') action = { kind: 'fit', hull, id, ...replace };
+      else if (kind === 'fit-hero' || kind === 'fit-hero:swap')
+        action = { kind: 'fit-hero', hero: shipHero ?? h.progress().selectedHero, id, ...replace };
       else if (kind?.startsWith('hull-star:'))
         action = { kind: 'hull-star', hull: id, slot: kind.slice('hull-star:'.length) as ShipSlot };
       else if (kind === 'skill' || kind === 'ability') action = { kind, hero: heroId, id };
@@ -868,6 +957,12 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         const before = h.progress();
         const ok = h.change(action);
         if (ok) fx = upgradeFx(action, before, h.progress(), h.data);
+        if (ok && (action.kind === 'fit' || action.kind === 'fit-hero')) {
+          const now = h.progress();
+          const fitted =
+            action.kind === 'fit' ? (now.loadouts[action.hull] ?? []) : (now.heroes[action.hero]?.ship ?? []);
+          focus = fitted.includes(action.id) ? { put: action.id } : bayType !== null ? { freed: bayType } : null;
+        }
         message = t(ok ? 'sector-zero.prep.saved' : 'sector-zero.prep.unavailable');
       }
     }

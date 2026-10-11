@@ -67,6 +67,23 @@ describe('Sector Zero persistent preparation', () => {
     expect(p.loadouts.cruiser).toEqual(['cargo_bay']);
   });
 
+  it('замена из отсека ставит модуль на место снятого, а не в конец набора', () => {
+    let p = fresh();
+    p.modules.push('repair_bay', 'ablative_plating', 'shield_booster');
+    p = change(p, { kind: 'fit', hull: 'frigate', id: 'cargo_bay' });
+    p = change(p, { kind: 'fit', hull: 'frigate', id: 'ion_engine' });
+    expect(change(p, { kind: 'fit', hull: 'frigate', id: 'repair_bay', replace: 'cargo_bay' }).loadouts.frigate).toEqual([
+      'repair_bay',
+      'ion_engine',
+    ]);
+    // Не надет, уже надет, не встаёт и без снятого — профиль не меняется.
+    expect(changeSectorZeroProgress(p, { kind: 'fit', hull: 'frigate', id: 'repair_bay', replace: 'radar_module' }, data)).toBeNull();
+    expect(changeSectorZeroProgress(p, { kind: 'fit', hull: 'frigate', id: 'ion_engine', replace: 'cargo_bay' }, data)).toBeNull();
+    let c = change(p, { kind: 'fit', hull: 'cruiser', id: 'ion_engine' });
+    c = change(c, { kind: 'fit', hull: 'cruiser', id: 'ablative_plating' });
+    expect(changeSectorZeroProgress(c, { kind: 'fit', hull: 'cruiser', id: 'shield_booster', replace: 'ion_engine' }, data)).toBeNull();
+  });
+
   it('persists a hero upgrade and skill chain, rejecting missing prerequisites', () => {
     // Звезда героя стоит его жетоны (`heroTokens.ts`): 10 за ★2.
     let p: SectorZeroProgress = { ...fresh(), research: 40, heroTokens: { commander: 12 } };
@@ -657,6 +674,13 @@ describe('PVR-6.24 — корабль героя: модули и слоты з�
     expect(on.heroes.commander!.ship).toEqual(['ablative_plating']);
     const off = change(on, { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
     expect(off.heroes.commander!.ship).toEqual([]);
+  });
+
+  it('на корабле героя замена встаёт в занятый слот, когда второго такого нет', () => {
+    const one = change(armed(1), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    expect(
+      change(one, { kind: 'fit-hero', hero: 'commander', id: 'shield_booster', replace: 'ablative_plating' }).heroes.commander!.ship,
+    ).toEqual(['shield_booster']);
   });
 
   it('второй модуль защиты встаёт только со второй звездой', () => {

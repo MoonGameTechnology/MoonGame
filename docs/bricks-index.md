@@ -1249,6 +1249,7 @@
 | PVR-6.36 | ✅ | proto | `docs/sector-zero-roadmap.md` | Вкладка «Флот» — орбита, без наземных частей |
 | PVR-6.37 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Торговец в экспедиции: живой курс |
 | PVR-6.38 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда экспедиции — за волны, а не за сам забег |
+| PVR-6.39 | ✅ | proto | `docs/sector-zero-roadmap.md` | «Корабли» подготовки — по окну производства |
 | PVR-7.1 | ✅ | data | `docs/sector-zero-roadmap.md` | Карта главы IV |
 | PVR-7.2 | ✅ | core data | `docs/sector-zero-roadmap.md` | Сценарный союзник: контакт, союз, общий обзор |
 | PVR-7.3 | ✅ | core data | `docs/sector-zero-roadmap.md` | Накопитель: извлечение, носитель, победа доставкой |
