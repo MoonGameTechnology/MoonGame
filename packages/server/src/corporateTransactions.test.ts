@@ -1,14 +1,41 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { migrate } from './store';
 import { createCorporateServices } from './corporateTransactions';
 
-const url = process.env.DATABASE_URL;
+const sourceUrl = process.env.DATABASE_URL;
+let url: string | undefined = sourceUrl;
+let admin: Pool | undefined;
+const database = `corp_fault_${crypto.randomUUID().replaceAll('-', '')}`;
+// DDL and failure triggers must never lock another test file's live tables.
+beforeAll(async () => {
+  if (!sourceUrl) return;
+  admin = new Pool({ connectionString: sourceUrl });
+  await admin.query(`CREATE DATABASE "${database}"`);
+  // Preserve pg's empty-host Unix-socket URLs, which WHATWG URL rejects.
+  const queryAt = sourceUrl.indexOf('?');
+  const connection = queryAt < 0 ? sourceUrl : sourceUrl.slice(0, queryAt);
+  const query = queryAt < 0 ? '' : sourceUrl.slice(queryAt);
+  url = connection.replace(/\/[^/]*$/, `/${database}`) + query;
+  const pool = new Pool({ connectionString: url });
+  try {
+    await migrate(pool);
+  } finally {
+    await pool.end();
+  }
+});
+afterAll(async () => {
+  if (!admin) return;
+  try {
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
+  } finally {
+    await admin.end();
+  }
+});
 describe.skipIf(!url)('corporate service transactions', () => {
   it('rolls back a funded challenge when recording it fails', async () => {
     const pool = new Pool({ connectionString: url });
     try {
-      await migrate(pool);
       const services = createCorporateServices(pool);
       const suffix = crypto.randomUUID();
       const a = { accountId: `a-${suffix}`, login: 'Alpha' };
@@ -53,7 +80,6 @@ describe.skipIf(!url)('corporate settlement recovery', () => {
   it('rolls back the end marker, outcome and reward together, then retries once', async () => {
     const pool = new Pool({ connectionString: url });
     try {
-      await migrate(pool);
       const services = createCorporateServices(pool);
       const id = crypto.randomUUID();
       const a = await services.corp.create(

@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   migrate,
   PostgresArsenalStore,
@@ -16,16 +16,43 @@ import { createCorporationServer } from './corporationServer';
 import { CorpArsenalService } from './corpArsenalService';
 import { PostgresMatchStore } from './store';
 
-const url = process.env.DATABASE_URL;
+const sourceUrl = process.env.DATABASE_URL;
+let url: string | undefined = sourceUrl;
+let admin: Pool | undefined;
+const database = `corp_fault_${crypto.randomUUID().replaceAll('-', '')}`;
+// DDL and failure triggers must never lock another test file's live tables.
+beforeAll(async () => {
+  if (!sourceUrl) return;
+  admin = new Pool({ connectionString: sourceUrl });
+  await admin.query(`CREATE DATABASE "${database}"`);
+  // Preserve pg's empty-host Unix-socket URLs, which WHATWG URL rejects.
+  const queryAt = sourceUrl.indexOf('?');
+  const connection = queryAt < 0 ? sourceUrl : sourceUrl.slice(0, queryAt);
+  const query = queryAt < 0 ? '' : sourceUrl.slice(queryAt);
+  url = connection.replace(/\/[^/]*$/, `/${database}`) + query;
+  const pool = new Pool({ connectionString: url });
+  try {
+    await migrate(pool);
+  } finally {
+    await pool.end();
+  }
+});
+afterAll(async () => {
+  if (!admin) return;
+  try {
+    await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
+  } finally {
+    await admin.end();
+  }
+});
 describe.skipIf(!url)('durable corporate handoff', () => {
   it('rejects a signed request replayed after the corporate process restarts', async () => {
     const pool = new Pool({ connectionString: url });
     const key = 'synthetic-corporate-restart-key-32-characters';
-    await migrate(pool);
     const claims = JSON.stringify({
       at: Date.now(),
       nonce: randomUUID(),
-      who: {accountId: 'restart-probe', login: 'Synthetic Pilot'},
+      who: { accountId: 'restart-probe', login: 'Synthetic Pilot' },
       ip: '127.0.0.1',
     });
     const headers = {
@@ -48,7 +75,6 @@ describe.skipIf(!url)('durable corporate handoff', () => {
   it('keeps the rental active on wear failure and queues a deduplicated return audit', async () => {
     const pool = new Pool({ connectionString: url });
     try {
-      await migrate(pool);
       const id = randomUUID(),
         itemId = `item-${id}`,
         corpId = `corp-${id}`;
@@ -117,7 +143,6 @@ describe.skipIf(!url)('durable corporate handoff', () => {
   it('recovers an ended match after restart without relying on an enqueue hook', async () => {
     const pool = new Pool({ connectionString: url });
     try {
-      await migrate(pool);
       const id = randomUUID(),
         matchId = `ava-delivery-${id}`;
       const room = createDevMatch(loadShippedData(), { id: matchId });

@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import {
@@ -125,5 +126,142 @@ it('accepts only a response authenticated by the corporate peer', async () => {
     );
   } finally {
     await Promise.all([signedPeer.close(), fakePeer.close()]);
+  }
+});
+
+it('stops repeatedly calling an unavailable signed peer without retrying writes', async () => {
+  const peer = Fastify();
+  corporateIdentity(peer, key);
+  let calls = 0;
+  peer.post('/corps', async (_request, reply) => {
+    calls++;
+    return reply.code(503).send({ error: 'E_CORPORATIONS_UNAVAILABLE' });
+  });
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    for (let i = 0; i < 3; i++)
+      expect((await corporateRequest(endpoint, 'POST', '/corps', { name: 'test' })).status).toBe(
+        503,
+      );
+    await expect(corporateRequest(endpoint, 'POST', '/corps', { name: 'test' })).rejects.toThrow(
+      'E_DEPENDENCY_OPEN',
+    );
+    expect(calls).toBe(3);
+  } finally {
+    await peer.close();
+  }
+});
+
+it('does not let one rate-limited caller open the corporate circuit for other users', async () => {
+  const peer = Fastify();
+  const identify = corporateIdentity(peer, key);
+  peer.post('/corps', async (request, reply) => {
+    const who = await identify(request);
+    if (who?.accountId === 'limited') return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    return { ok: true };
+  });
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    for (let i = 0; i < 6; i++)
+      expect(
+        (
+          await corporateRequest(
+            endpoint,
+            'POST',
+            '/corps',
+            {},
+            { accountId: 'limited', login: 'Limited' },
+          )
+        ).status,
+      ).toBe(429);
+    expect(
+      (
+        await corporateRequest(
+          endpoint,
+          'POST',
+          '/corps',
+          {},
+          { accountId: 'other', login: 'Other' },
+        )
+      ).status,
+    ).toBe(200);
+  } finally {
+    await peer.close();
+  }
+});
+
+it('rejects paths changed by URL normalization before they can poison the shared circuit', async () => {
+  const peer = Fastify(),
+    game = Fastify();
+  corporateIdentity(peer, key);
+  let calls = 0;
+  peer.get('/health', async () => {
+    calls++;
+    return { ok: true };
+  });
+  peer.get('/corps/me', async () => {
+    calls++;
+    return { ok: true };
+  });
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    registerCorporateGateway(game, endpoint, async () => ({ accountId: 'pilot', login: 'Pilot' }));
+    const address = new URL(await game.listen({ host: '127.0.0.1', port: 0 }));
+    // fetch/app.inject normalize this attack before it reaches Game; raw HTTP does not.
+    const raw = (path: string) =>
+      new Promise<number | undefined>((resolve, reject) => {
+        const request = httpRequest(
+          { hostname: address.hostname, port: address.port, path },
+          (response) => {
+            response.resume();
+            response.on('end', () => resolve(response.statusCode));
+          },
+        );
+        request.on('error', reject);
+        request.end();
+      });
+    for (const path of ['/corps/%2e%2e/health', '/corps/%2E./health', '/corps/../health'])
+      expect(await raw(path)).toBe(400);
+    expect(calls).toBe(0);
+    expect(await raw('/corps/me')).toBe(200);
+    expect(calls).toBe(1);
+  } finally {
+    await Promise.all([game.close(), peer.close()]);
+  }
+});
+
+it('caps hanging corporate calls while independent game routes remain available', async () => {
+  const peer = Fastify(),
+    game = Fastify();
+  corporateIdentity(peer, key);
+  let release!: () => void, admitted!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const full = new Promise<void>((resolve) => {
+    admitted = resolve;
+  });
+  let calls = 0;
+  peer.get('/corps', async () => {
+    if (++calls === 16) admitted();
+    await held;
+    return { ok: true };
+  });
+  game.get('/matches', async () => ({ matches: ['active'] }));
+  let requests: Promise<unknown>[] = [];
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    requests = Array.from({ length: 16 }, () => corporateRequest(endpoint, 'GET', '/corps'));
+    await full;
+    await expect(corporateRequest(endpoint, 'GET', '/corps')).rejects.toThrow('E_DEPENDENCY_BUSY');
+    expect((await game.inject('/matches')).statusCode).toBe(200);
+    release();
+    await Promise.all(requests);
+    expect((await corporateRequest(endpoint, 'GET', '/corps')).status).toBe(200);
+    expect(calls).toBe(17);
+  } finally {
+    release();
+    await Promise.allSettled(requests);
+    await Promise.all([peer.close(), game.close()]);
   }
 });

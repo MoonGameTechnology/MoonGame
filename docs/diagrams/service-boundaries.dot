@@ -1,0 +1,37 @@
+digraph services {
+  graph [rankdir=TB, bgcolor="#f6f8fc", fontname="DejaVu Sans", fontsize=18, pad=0.4, nodesep=0.4, ranksep=0.65, labelloc=t, label="VOID DOMINION / MOONGAME\nГраницы отказа — целевая архитектура\nПунктир: предстоит реализовать. Зелёный: Corp уже поддерживается кодом."];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#a3afc3", fillcolor="white", margin="0.18,0.12"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#52627a", arrowsize=0.75];
+  now [label="СЕЙЧАС\nGame: матчи + Auth + Inventory + MetaMarket / одна Game DB\nCorp: опциональный отдельный процесс и PostgreSQL\nФундамент: 16 вызовов, timeout 2s; 3 сбоя → пауза 5s → одна проба", fillcolor="#e8efff", color="#607ec5"];
+  browser [label="Игрок / браузер\nHTTPS и WSS", fillcolor="#e8efff"];
+  api [label="API / Auth / Lobby\nПока роль Game; отделяется с workers", style="rounded,filled,dashed", fillcolor="#e8efff"];
+  now -> browser [style=invis];
+  browser -> api;
+  subgraph cluster_domains {
+    label="САМОСТОЯТЕЛЬНЫЕ ДОМЕНЫ / ограниченные CPU, RAM, пулы, таймауты";
+    color="#c9d3e3"; style=rounded; fontsize=12;
+    workers [label="MATCH WORKERS\nНесколько комнат на worker\nБой + движение + экономика\nPinned версии и loadout", style="rounded,filled,dashed", fillcolor="#e8efff"];
+    inventory [label="INVENTORY + SETTLEMENT\nПредметы / аренда / резервы\nКошельки + ledger + receipts\nОдна локальная транзакция", style="rounded,filled,dashed", fillcolor="#fff2d9"];
+    auction [label="AUCTION\nЛоты / цены / tradeId\nВитрина и reconciliation\nНе пишет чужие таблицы", style="rounded,filled,dashed", fillcolor="#fff2d9"];
+    corp [label="CORPORATIONS\nЧленство / роли / влияние\nСтроительство / AvA / аудит\nДо боя: закрепление; после: итог", fillcolor="#e3f5e9", color="#3e9362"];
+    {rank=same; workers; inventory; auction; corp;}
+    gameDB [shape=cylinder, label="Game DB\nСнимки / receipts / итог\nДолговечная доставка", style="filled,dashed", fillcolor="#e8efff"];
+    inventoryDB [shape=cylinder,label="Inventory DB\nВладение и расчёты",style="filled,dashed",fillcolor="#fff2d9"];
+    auctionDB [shape=cylinder,label="Auction DB\nЛоты и workflow",style="filled,dashed",fillcolor="#fff2d9"];
+    corpDB [shape=cylinder,label="Corp DB\nСостояние и nonce",fillcolor="#e3f5e9",color="#3e9362"];
+    {rank=same; gameDB; inventoryDB; auctionDB; corpDB;}
+    workers -> gameDB; inventory -> inventoryDB; auction -> auctionDB; corp -> corpDB;
+  }
+  api -> workers [label="маршрут / join-token"];
+  browser -> workers [label="WSS: отдельный ingress",constraint=false];
+  api -> inventory [label="личный инвентарь"];
+  api -> auction [label="торговля"];
+  api -> corp [label="управление"];
+  auction -> inventory [label="резерв / settlement\nтот же tradeId",constraint=false,color="#b7791f"];
+  workers -> inventory [label="до старта: loadout\nпосле: выдача по receipt",style=dashed,constraint=false];
+  
+  background [label="ФОНОВЫЕ ПОТРЕБИТЕЛИ — по потребности\nПрофиль / статистика / уведомления\nПроекции; не блокируют бой",style="rounded,filled,dashed",fillcolor="#f0eaff"];
+  gameDB -> background [label="долговечные события",color="#8862ba"];
+  rule [shape=note,label="ПРИ ОТКАЗЕ\nAuction → торговля ждёт; инвентарь работает\nCorp → корпоративные операции ждут; бой работает\nInventory → новые операции ждут; начатый бой работает\nWorker → восстанавливаются его комнаты; соседи работают\nОбщий хост / PG / сеть всё ещё требуют отдельной HA/DR-проверки",fillcolor="white"];
+  background -> rule [style=invis];
+}
