@@ -13,8 +13,11 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+// Ряд команд с его кэшем уехал к владельцу (`cmdBar.ts`, REFM-226).
+const BAR = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
+const bodyIn = (src: string, name: string): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
+const body = (name: string): string => bodyIn(SRC, name);
 const count = (text: string, re: RegExp): number => text.match(re)?.length ?? 0;
 
 describe('REFM-206 — перерисовка по имени', () => {
@@ -30,12 +33,15 @@ describe('REFM-206 — перерисовка по имени', () => {
   });
 
   it('кэш ряда команд сбрасывает только дверь, а нарисованное помнит только разметка ряда', () => {
-    expect(body('invalidateCmdBar')).toContain("lastCmdHtml = '';");
-    expect(count(SRC, /(?<!let )\blastCmdHtml = '';/g)).toBe(1);
+    expect(bodyIn(BAR, 'invalidateCmdBar')).toContain("lastCmdHtml = '';");
+    expect(count(BAR, /(?<!let )\blastCmdHtml = '';/g)).toBe(1);
     // Полоска «Приказ», мобильная полоска приказа и сам ряд: кэш общий, пишут его только они.
     const drawn = /\blastCmdHtml = html;/g;
-    const own = count(body('renderChainBar'), drawn) + count(body('renderCmdBar'), drawn);
+    const own =
+      count(bodyIn(BAR, 'renderChainBar'), drawn) + count(bodyIn(BAR, 'renderCmdBar'), drawn);
     expect(own).toBeGreaterThan(0);
-    expect(count(SRC, /(?<!let )\blastCmdHtml = /g)).toBe(1 + own);
+    expect(count(BAR, /(?<!let )\blastCmdHtml = /g)).toBe(1 + own);
+    // У `main.ts` кэша больше нет: перерисовку он заказывает только дверью.
+    expect(SRC).not.toMatch(/\blastCmdHtml\b/);
   });
 });

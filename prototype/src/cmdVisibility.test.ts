@@ -62,12 +62,14 @@ describe('CMD-VIS — проба, на которой стоит кнопка «
 });
 
 describe('CMD-VIS — кнопка и обработчик подключены к пробе', () => {
-  it('main.ts решает и видимость «Стопа», и рассылку в группе через canOrder', () => {
-    // main.ts — DOM-вход без юнит-харнеса; правило держится, только если ОБА места
-    // (сборка ряда команд и обработчик клика) спрашивают ядро, а не свой if.
+  it('ряд решает видимость «Стопа», а обработчик — рассылку в группе через canOrder', () => {
+    // DOM-входы без юнит-харнеса; правило держится, только если ОБА места спрашивают ядро,
+    // а не свой if: сборка ряда (`cmdBar.ts`, REFM-226) и обработчик клика (`main.ts`).
     const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-    const probes = src.match(/canOrder\(s, stopFleet\(ME, /g) ?? [];
-    expect(probes.length).toBeGreaterThanOrEqual(2);
+    const bar = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
+    const probe = /canOrder\(s, stopFleet\(ME, /g;
+    expect((bar.match(probe) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect((src.match(probe) ?? []).length).toBeGreaterThanOrEqual(1);
     // Рукописного предиката «а движется ли флот» у стопа больше нет.
     expect(src).not.toContain('if (s.fleets[id]?.movement) playerOrder(stopFleet');
   });
@@ -95,8 +97,8 @@ describe('CMD-VIS — штурм спрашивает десант, а не ко
     expect(canAssaultAim([total(withTroops.landing)])).toBe(true);
   });
 
-  it('main.ts даёт кнопке ряда именно ДЕСАНТ выделения и прячет её без него', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  it('ряд команд даёт кнопке именно ДЕСАНТ выделения и прячет её без него', () => {
+    const src = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
     expect(src).toContain('troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? [])))');
     expect(src).toContain('shown.assault');
     // Прежний предикат считал КОРАБЛИ — с ним кнопка горела у эскадры без десанта.
@@ -107,8 +109,8 @@ describe('CMD-VIS — штурм спрашивает десант, а не ко
 // CMD-VIS-3 (заказ владельца 2026-09-24): «Если сливать нечего, то и кнопки "слить" не
 // должно отображаться», «то же самое с кнопкой десант».
 describe('CMD-VIS-3 — «Слить» и «Десант» по составу', () => {
-  it('main.ts прячет «Слить» без напарника и «Десант» без меню, а не гасит их', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  it('ряд команд прячет «Слить» без напарника и «Десант» без меню, а не гасит их', () => {
+    const src = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
     expect(src).toContain('mergeable: mergeOk,');
     expect(src).toContain('troopsMenu: !!troopsIn,');
     expect(src).toMatch(/\(shown\.merge\s*\?\s*cmdBtn\(\s*'merge'/);

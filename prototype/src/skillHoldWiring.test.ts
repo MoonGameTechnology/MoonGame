@@ -13,10 +13,12 @@ import { readFileSync } from 'node:fs';
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 // Меню точки «Приказа» живёт у композера цепочек (REFM-229).
 const CHAIN = readFileSync(new URL('./chainComposer.ts', import.meta.url), 'utf8');
+// Поповер ✨ живёт у ряда команд (REFM-226).
+const BAR = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
 
 describe('навык в меню приказов: удержание открывает описание', () => {
   it('кнопка навыка ✨ несёт ключ сводки ab: и подсказку-описание', () => {
-    expect(MAIN).toMatch(/data-cmd="castdo"[^`]*data-desc="ab:\$\{opt\.id\}"\$\{hint\}/);
+    expect(BAR).toMatch(/data-cmd="castdo"[^`]*data-desc="ab:\$\{opt\.id\}"\$\{hint\}/);
   });
 
   it('навык — цель удержания', () => {

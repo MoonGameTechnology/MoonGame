@@ -23,7 +23,7 @@ const hooks = `window.__minesTest = {
     f.location = null; f.movement = null; f.battleId = null; f.edge = { from: a.id, to: b, t: 0.5 };
     s.players[ME].resources.metal = 1000; s.players[ME].resources.microelectronics = 1000;
     setFleetSelection([f.id]);
-    lastPanelHtml = ''; lastCmdHtml = ''; renderPanel(); renderCmdBar();
+    lastPanelHtml = ''; invalidateCmdBar(); renderPanel(); renderCmdBar();
   },
   ord: () => s.ordnance,
   // SM-3.7a: the standing rocket mine is a fleet; its doctrine lives in \`ordnance.controls\`.
