@@ -1,3 +1,4 @@
+import { boundedReadiness } from './readiness';
 import type { SecurityAudit } from './securityAudit';
 import { playablePlayerIds } from '@void/shared-core';
 import { seatConfirmAction } from './joinSeat';
@@ -245,7 +246,7 @@ export function createMultiplayerServer(
   });
 
   const indexHtml = options.indexHtml;
-  const ready = options.ready;
+  const ready = options.ready ? boundedReadiness(options.ready) : undefined;
   let draining = false; // flips at close() so /ready reports 503 during graceful drain
 
   // SV-0.1: Fastify owns HTTP routing (health/ready now, match create/join later) and
@@ -400,7 +401,11 @@ export function createMultiplayerServer(
     // на сборку документа: политика не может разъехаться с тем, что уходит игроку, а на
     // запрос ничего не считается.
     const inline = inlineHashes(html);
-    return async (request: FastifyRequest, reply: FastifyReply): Promise<string> => {
+    // Encode the large self-contained document once. Writing the same Unicode
+    // string concurrently makes Node flatten a fresh two-byte string per socket;
+    // a login-page burst can exhaust the V8 heap before the container memory cap.
+    const body = Buffer.from(html, 'utf8');
+    return async (request: FastifyRequest, reply: FastifyReply): Promise<Buffer> => {
       void reply.header('content-type', 'text/html; charset=utf-8');
       void reply.header('cache-control', 'no-store, must-revalidate');
       const headers = securityHeaders({
@@ -409,7 +414,7 @@ export function createMultiplayerServer(
         ...(options.frameAncestors ? { frameAncestors: options.frameAncestors } : {}),
       });
       for (const [name, value] of Object.entries(headers)) void reply.header(name, value);
-      return html;
+      return body;
     };
   };
   for (const doc of options.documents ?? []) {
@@ -727,10 +732,34 @@ export function createMultiplayerServer(
           // место не закрепляется никогда (см. `seatConfirmAction`).
           detach(
             'подтверждение места',
-            room.submitServerAction(
-              playerId,
-              seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
-            ),
+            (async () => {
+              let refusalCode = 'E_RATE_LIMIT';
+              // This is a one-shot handshake side effect, unlike periodic drivers.
+              // Retry transient admission failures while this socket is live. Keep
+              // the deterministic claim-generation id, so a retry cannot double-apply.
+              for (let attempt = 0; attempt < 40 && ws.readyState === WebSocket.OPEN; attempt += 1) {
+                const current = room.state.players[playerId];
+                if (current?.seated) return;
+                if (current?.claimedAt !== claimedAt) { refusalCode = 'E_FORBIDDEN'; break; }
+                const result = await room.submitServerAction(
+                  playerId,
+                  seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
+                  () => ws.readyState === WebSocket.OPEN
+                    && room.state.players[playerId]?.claimedAt === claimedAt,
+                );
+                if (result.ok) return;
+                refusalCode = result.code ?? 'E_INTERNAL';
+                if (refusalCode !== 'E_RATE_LIMIT' && refusalCode !== 'E_INTERNAL') break;
+                await new Promise<void>((resolve) => {
+                  const done = () => { clearTimeout(timer); ws.off('close', done); resolve(); };
+                  const timer = setTimeout(done, 250);
+                  ws.once('close', done);
+                });
+              }
+              // Do not leave an apparently connected player on an unconfirmed seat.
+              // 1013 asks the client to reconnect when the service can admit the work.
+              if (ws.readyState === WebSocket.OPEN) ws.close(1013, refusalCode);
+            })(),
           );
         }
       }

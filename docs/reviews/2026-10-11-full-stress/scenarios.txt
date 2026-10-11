@@ -1,0 +1,104 @@
+2026-10-11 / execution recipe and interpretation
+
+Target: disposable copies of MoonGame only; local Docker networks and synthetic data.
+Versions/source/resource profiles and outcome tables are in ../2026-10-11-full-stress.md.
+The runtime fixture credentials and private keys are intentionally not published.
+
+Preparation
+  Build prototype/build.mjs and prototype/bundle-netserver.mjs with Node 22.
+  Use the production Docker runtime, real PostgreSQL 16, provision distinct runtime
+  and migration roles, apply migrations explicitly, disable runtime auto-migration.
+  Enable PROD, GATE, SEAT_LOCK, TIME_SCALE=1, 16 initial Nexus matches.
+  Generate a temporary CA and localhost certificate; use verified HTTPS/WSS through
+  Caddy. Allow only the localhost test origin; block the operator path at the edge.
+  Seed 180 synthetic accounts with production-format password hashes and session JWTs.
+  Record container image digests, resource constraints and database receipts first.
+
+HTTP steps (fully consume every body; save each status/error and wall latency)
+  /health: keepalive concurrency 1,4,16,64,128,256,512, each 15 seconds.
+  /matches: concurrency 1,16,64,128, each 15 seconds.
+  /: concurrency 1,16,64,128, each 15 seconds; payload ~15.4 MB.
+  /ready: concurrency 1,16,64, each 10 seconds after the crash series.
+  /health: fresh TLS handshakes, concurrency 8,32,128, each 10 seconds.
+  /health: HTTP/2, concurrency 1,64,256, each 15 seconds.
+  After Buffer fix: / at 16,64,128; gzip at 1,16,64; health at 128.
+  After resource-profile B: / at 128, gzip at 64, health at 128.
+  Quantiles include failed requests in failing series: do not compare those p95/rps
+  to useful throughput. Generator CPU/event-loop lag is recorded in results.json.
+
+Minimal Node OOM isolation
+  Read the built HTML as UTF-8. Serve it with node:http using res.end(html).
+  Repeat with one shared Buffer.from(html), same image/body/CPU/memory.
+  Wait for a positive health response before a 16-concurrent 15-second download run.
+  Record process exit and native stderr. A refused connection after exit is not a
+  completed page download. node-heap-oom.txt captures the string-version crash.
+
+Game workload
+  Seat 10 accounts per Nexus room with real authenticated join requests.
+  In this local NAT fixture, batch seating uses the trusted upstream with controlled
+  synthetic XFF; all actual WSS connections and actions traverse verified edge TLS.
+  On welcome retain sessionId/playerId and initial state; construct action.v1 envelopes
+  with monotonic clientSeq and stable actionId. Apply every delta and compare hashState
+  against the server hash. Use fleet.orbit near for an owned stationary fleet.
+  Baseline: 10,40,80 clients at 0.5 actions/s each for 30 seconds;
+  160 at 0.5/s for 45 seconds, 2/s for 30 seconds, 10/s for 20 seconds.
+  Fixed: 80,160 at 0.5/s for 30 seconds; 160 at 2/s for 20s and 10/s for 10s.
+  After each series wait 5 seconds and query receipts for that batch's actionIds.
+  These overload steps intentionally have no retry; sequence-gap rejections are not
+  evidence of acknowledged data loss. Save cumulative rejection counters as cumulative.
+
+Bounded queue regression
+  Fresh room and two peers. Hold SELECT ... FOR UPDATE on its matches row in a
+  separate transaction. Send 50 valid frames per peer, interleaved (100 total).
+  Observe 36 E_RATE_LIMIT and zero receipts before releasing the lock.
+  After release, expect 64 receipts; retry missing original envelopes in sequence,
+  ~130ms apart, then expect 100 unique successful receipts and no hash mismatch.
+
+Real-time soak
+  160 WSS clients / 16 rooms, one round-robin action every 125ms for 1,200 seconds.
+  Repeat the same envelope every 200 actions. Probe readiness every 10 seconds.
+  Halfway through, pause sends, reconnect all clients in groups of 20 with fresh joins,
+  then resume. Allow 10-second drain and compare all unique actionIds with receipts.
+  Keep pre-reconnect clients' hash-error counters as well as the replacement clients'.
+
+Accelerated game week (separate empty PostgreSQL database)
+  DATABASE_URL=<private disposable DB> PLAYERS=10 GAME_HOURS=168
+  BOT_ACTIONS_PER_HOUR=20 HIBERNATE=1 NETWORK_TROUBLE=1 TIMEOUT_MS=30000
+  node --max-old-space-size=2048 prototype/rehearsal.mjs
+  This is simulated time. Record the printed offline-advance value separately.
+
+Fault injection
+  Before each crash compare durable receipt identity/sequence/result sets afterwards.
+  Kill only the verified PID of the named disposable container; validate PID change
+  and restart counter. A failed attempt to kill namespace PID 1 is not a crash test.
+  Independently: freeze PostgreSQL 8s; row-lock 10 actions; disconnect its private network;
+  crash game, PostgreSQL, Caddy; limit game to 0.1 CPU for 20s then restore 2 CPU;
+  limit game to 96 MiB for 3s then restore 1 GiB. Verify readiness and fresh commands.
+  Always undo pause/network/resource changes in finally, even if an assertion fails.
+  For ENOSPC, use a separate 192 MiB tmpfs volume held mounted by a keeper container.
+  Insert 1,000 baseline rows, fingerprint them, fill only that volume, try INSERT,
+  remove filler, verify fingerprint and INSERT a new row. Never fill the host disk.
+
+Protocol pressure
+  Negotiate TLS1.0/1.1/1.2/1.3 with CA verification; send wrong SNI separately.
+  Hold 1,024 TLS connections with incomplete headers for 20s, readiness every 2s.
+  Create/reset HTTP/2 streams for 10s, readiness every 1s; report resets and responses
+  independently, since one stream can be represented in both counts.
+  Check HTTP/3 via verified CA and direct private UDP address. Do not infer external
+  UDP reachability from this check.
+  Attempt 50 invalid logins with rotating external XFF values; expect the same IP budget.
+  Probe game/DB from an unrelated Docker network and from the permitted network.
+
+Data race and browser stress
+  List one synthetic item at price 100, give 64 buyers 100 each, race purchases with
+  real account authentication. Inspect ownership, all ledger entries and wallet minima.
+  Chromium desktop/mobile: actual login, match join and visible map for Void Dominion.
+  Sector Zero: 10 desktop + 6 mobile menu/game cycles, 2 corrupted-storage cycles,
+  2 quota-exception cycles, 2 brief offline cycles after entering a run.
+  Use the visible phone navigation on mobile; hidden desktop buttons are not defects.
+  Record page errors, overflow and CDP heap/DOM samples; a short run cannot rule out leaks.
+
+Completion
+  Run pnpm run check with real PostgreSQL and age; record zero skips explicitly.
+  Publish sanitized JSON/screenshots/native failure trace and exact build hashes.
+  Stop and remove only the test's containers/networks/volumes and private fixture material.

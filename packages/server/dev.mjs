@@ -10,7 +10,7 @@ const outfile = 'packages/server/dist/dev-server.mjs';
 mkdirSync('packages/server/dist', { recursive: true });
 
 await build({
-  entryPoints: ['packages/server/src/main.ts'],
+  entryPoints: ['scripts/server.ts'],
   outfile,
   bundle: true,
   format: 'esm',

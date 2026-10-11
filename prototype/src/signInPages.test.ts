@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { t } from '../../localization/runtime';
+import { t, LOCALE } from '../../localization/runtime';
 import { readSession } from '../../decisions/sessionStore';
 
 const BASE = 'ws://srv.test:8080';
@@ -478,7 +478,7 @@ describe('REFM-218 — восстановление доступа', () => {
     server['/auth/recover'] = () => reply(204);
     enter('crecmail');
     await settle();
-    expect(posted('/auth/recover')[0]!.body).toEqual({ email: 'me@mail.test' });
+    expect(posted('/auth/recover')[0]!.body).toEqual({ email: 'me@mail.test', locale: LOCALE });
     const answered = env.status.at(-1);
     delete server['/auth/recover'];
     click('crecgo');

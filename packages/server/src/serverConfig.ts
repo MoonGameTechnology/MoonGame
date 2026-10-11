@@ -13,7 +13,7 @@ import {
 
 /**
  * The server's security composition, derived from the environment — extracted from the
- * `main.ts` entrypoint (which boots on import) so it is unit-testable. All three switches
+ * `main.ts` startup function so it is unit-testable. All three switches
  * are OFF by default, so a bare `pnpm dev:server` is the insecure dev harness:
  *
  *   AUTH_JWT_SECRET  → require a verified join token at the handshake (+ mint tokens for

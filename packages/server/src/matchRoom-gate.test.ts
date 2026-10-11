@@ -5,7 +5,7 @@ import {
 } from '@void/action-layer';
 import { isValidActionPayload } from '@void/shared-core';
 import { createDevMatch, loadShippedData } from './scenario';
-import type { RoomPeer } from './matchRoom';
+import { MAX_PENDING_COMMITS, type RoomPeer } from './matchRoom';
 import type { ServerMessage } from './protocol';
 
 // SV-1.1 — the `@void/action-layer` front door wired into MatchRoom. When a room is
@@ -302,4 +302,63 @@ describe('MatchRoom · action-layer gate (SV-1.1)', () => {
     expect(room.sequence).toBe(2);
     expect(room.state.fleets.green_1?.orbit).toBe('near');
   });
+});
+
+
+it('bounds a stalled durable mailbox before reserving sequence and permits a refused retry', async () => {
+  let release!: () => void;
+  const stalled = new Promise<void>((resolve) => { release = resolve; });
+  let writes = 0;
+  const room = gatedRoom(() => 1000, {
+    actionRateMax: 1000,
+    persist: async () => { writes += 1; if (writes === 1) await stalled; },
+  });
+  const peer = new MemoryPeer();
+  room.addPeer('green', peer);
+  const pending = Array.from({ length: MAX_PENDING_COMMITS }, (_, i) =>
+    room.receive('green', peer, wire(orbitEnvelope(i + 1)), SESSION.sessionId));
+  try {
+    const excess = orbitEnvelope(MAX_PENDING_COMMITS + 1);
+    await room.receive('green', peer, wire(excess), SESSION.sessionId);
+    expect(peer.last()).toMatchObject({ type: 'rejection', actionId: excess.actionId, code: 'E_RATE_LIMIT' });
+    expect(room.sequence).toBe(0);
+    expect(writes).toBe(1);
+    // Host controls and internal drivers share the same bounded queue.
+    await room.receive('green', peer, JSON.stringify({ type: 'start' }), SESSION.sessionId);
+    expect(peer.last()).toMatchObject({ type: 'error', code: 'E_RATE_LIMIT' });
+    expect(await room.submitServerAction('green', excess.action)).toEqual({ ok: false, code: 'E_RATE_LIMIT' });
+    release();
+    await Promise.all(pending);
+    expect(room.sequence).toBe(MAX_PENDING_COMMITS);
+    await room.receive('green', peer, wire(excess), SESSION.sessionId);
+    expect(room.sequence).toBe(MAX_PENDING_COMMITS + 1);
+    await room.receive('green', peer, wire(excess), SESSION.sessionId);
+    expect(room.sequence).toBe(MAX_PENDING_COMMITS + 1);
+  } finally { release(); await Promise.all(pending); }
+});
+
+
+it('does not execute queued intents from a peer superseded during a durable write', async () => {
+  let release!: () => void;
+  let began!: () => void;
+  const started = new Promise<void>((resolve) => { began = resolve; });
+  const stalled = new Promise<void>((resolve) => { release = resolve; });
+  const ids: string[] = [];
+  const room = gatedRoom(() => 1000, { persist: async (_snapshot: unknown, receipt: { actionId: string }) => {
+    ids.push(receipt.actionId);
+    if (ids.length === 1) { began(); await stalled; }
+  } });
+  const old = new MemoryPeer();
+  room.addPeer('green', old, SESSION.sessionId, undefined, 'account', true);
+  const first = room.receive('green', old, wire(orbitEnvelope(1)), SESSION.sessionId);
+  await started;
+  const stale = orbitEnvelope(2);
+  const queued = room.receive('green', old, wire(stale), SESSION.sessionId);
+  const replacement = new MemoryPeer();
+  room.removePeer('green', old);
+  room.addPeer('green', replacement, 'replacement', undefined, 'account', true);
+  release();
+  await Promise.all([first, queued]);
+  expect(ids).toEqual([orbitEnvelope(1).actionId]);
+  expect(room.sequence).toBe(1);
 });

@@ -58,9 +58,8 @@ const coreModuleFiles = (): string[] =>
  *  виду литерала однозначно понятно, ключ это или мост. */
 const KEY_RE = /^[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+$/;
 
-/** Every `/localization` consumer's source — prototype (`prototype/src`) and, since
- *  LOC-3, the PWA client (`packages/client/src`). Both read the same shared pool, so
- *  the orphan/leak checks below must see both or a client-only key reads as dead. */
+/** Every `/localization` consumer's source: prototype, PWA and host email adapter.
+ *  They read the same catalogs; orphan/leak checks must include all consumers. */
 const srcFiles = (): string[] => [
   ...readdirSync(path.join(repoRoot, 'prototype/src'))
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))

@@ -1,0 +1,15 @@
+{
+  "command": "pnpm run check",
+  "node": "22.23.3",
+  "postgres": "16",
+  "age": "real executable, encrypted backup round-trip tested",
+  "tests": 10891,
+  "passed": 10891,
+  "failed": 0,
+  "skipped": 0,
+  "files": 892,
+  "lint": "pass",
+  "typecheck": "pass",
+  "docsCheck": "pass",
+  "logSHA256": "948bb9ce14003fbac7dfd6d1e8d413b22315a4a80fd11f2e293c489192ea836d"
+}

@@ -1,4 +1,5 @@
 import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
+import { recoveryMailer } from './src/recoveryMailer';
 import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
@@ -870,6 +871,7 @@ const server = createMultiplayerServer({
   // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
   // This host is what the image runs, so it is the one that has to report it.
   version: buildVersion(process.env.GIT_SHA),
+  ready: () => matchStore.ping?.() ?? Promise.resolve(true),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
@@ -1006,7 +1008,7 @@ const server = createMultiplayerServer({
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
         users: userStore,
-        sendMail: mailerFromEnv(),
+        sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
         // Плейтест на десять человек часто приходит с ОДНОГО адреса (общий Wi-Fi, NAT
         // оператора), а первый вход стоит двух запросов — поэтому потолок задаётся

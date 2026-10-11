@@ -1,5 +1,6 @@
-import { randomBytes } from 'node:crypto';
-import { readFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -125,6 +126,28 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       await expect(runtime.query('ALTER TABLE users ADD COLUMN forbidden_restore int')).rejects.toMatchObject({ code: '42501' });
       await expect(runtime.query('SET ROLE vd_schema')).rejects.toMatchObject({ code: '42501' });
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it('legacy restore cannot inherit a current marker from a provisioned destination', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'restore-legacy-'));
+    const run = promisify(execFile);
+    try {
+      await admin.query('ALTER TABLE matches DROP COLUMN clock');
+      const { stdout } = await run('pg_dump', ['--no-owner', '--no-acl', '--clean', '--if-exists', '--exclude-table=public.vd_schema_revision', '-d', url()]);
+      const bytes = gzipSync(stdout);
+      const archive = join(dir, 'legacy.sql.gz');
+      writeFileSync(archive, bytes);
+      writeFileSync(archive + '.sha256', createHash('sha256').update(bytes).digest('hex') + '  legacy.sql.gz\n');
+      // The destination is current before the OLD archive is applied.
+      await migrateDatabase(admin);
+      await run('bash', ['deploy/restore.sh', archive], { env: { ...process.env, DATABASE_URL: url() } });
+      const runtime = connect(app, pass);
+      await expect(prepareRuntimeDatabase(runtime, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' })).rejects.toThrow('E_DB_BOOT');
+      pools.pop(); // fail-closed boot already closed it
+      await migrateDatabase(admin);
+      await prepareRuntimeDatabase(connect(app, pass), { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' });
+      expect((await admin.query("SELECT column_name FROM information_schema.columns WHERE table_name='matches' AND column_name='clock'")).rows).toHaveLength(1);
+    } finally { await migrateDatabase(admin); rmSync(dir, { recursive: true, force: true }); }
   }, 30_000);
 
   it('serves durable users with DML only and rejects DDL, role escalation and truncation', async () => {

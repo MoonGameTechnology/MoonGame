@@ -13,7 +13,10 @@ import {
   type GameModule,
   type Player,
 } from '@void/shared-core';
-import { MatchRoom } from './matchRoom';
+import { MatchRoom, MAX_PENDING_COMMITS } from './matchRoom';
+import { createDevMatch, loadShippedData } from './scenario';
+import { seatClaimAction } from './joinSeat';
+import { expiredSeatClaims } from './seatExpiry';
 import type { RoomRegistry } from './roomRegistry';
 import { createMultiplayerServer } from './wsServer';
 import { inlineHashes } from './securityHeaders';
@@ -62,6 +65,124 @@ function nextMessage(ws: WebSocket): Promise<ServerMessage> {
 }
 
 describe('createMultiplayerServer', () => {
+  it('closes a joined but unconfirmed seat after a permanent confirmation refusal', async () => {
+    const room = createDevMatch(loadShippedData(), { now: () => 1000, time: 1000 });
+    await room.submitServerAction('green', seatClaimAction(room.id, 'green', 1000, {}));
+    const submit = vi.spyOn(room, 'submitServerAction').mockResolvedValue({ ok: false, code: 'E_FORBIDDEN' });
+    const server = createMultiplayerServer({ room });
+    const url = await server.listen();
+    const ws = new WebSocket(`${url}?player=green`);
+    try {
+      const [code, reason] = await once(ws, 'close');
+      expect(code).toBe(1013);
+      expect(String(reason)).toBe('E_FORBIDDEN');
+      expect(room.state.players.green?.seated).not.toBe(true);
+      expect(submit).toHaveBeenCalledTimes(1);
+    } finally { ws.terminate(); await server.close(); submit.mockRestore(); }
+  });
+
+  it.each([false, true])('retries a saturated seat confirmation only while connected (disconnect=%s)', async (disconnect) => {
+    let blocked = false;
+    let release!: () => void;
+    const stalled = new Promise<void>((resolve) => { release = resolve; });
+    const confirmations: string[] = [];
+    const room = createDevMatch(loadShippedData(), {
+      now: () => 1000, time: 1000, actionRateMax: 1000,
+      persist: async (_snapshot, receipt) => {
+        if (blocked) await stalled;
+        if (receipt.actionId.startsWith('seat-confirm:')) confirmations.push(receipt.actionId);
+      },
+    });
+    expect((await room.submitServerAction('green', seatClaimAction(room.id, 'green', 1000, {}))).ok).toBe(true);
+    blocked = true;
+    const pending = Array.from({ length: MAX_PENDING_COMMITS }, (_, n) => room.submitServerAction('green', {
+      id: `load-${n}`, type: 'fleet.orbit', playerId: 'green', issuedAt: 1000,
+      payload: { fleetId: 'green_1', orbit: 'near' },
+    }));
+    const submit = vi.spyOn(room, 'submitServerAction');
+    const server = createMultiplayerServer({ room });
+    const url = await server.listen();
+    const ws = new WebSocket(`${url}?player=green`);
+    try {
+      expect(await nextMessage(ws)).toMatchObject({ type: 'welcome' });
+      await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+      expect(confirmations).toHaveLength(0);
+      if (disconnect) {
+        const closed = once(ws, 'close'); ws.terminate(); await closed;
+        await vi.waitFor(() => expect(room.peerCount).toBe(0));
+      }
+      release();
+      await Promise.all(pending);
+      if (disconnect) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        expect(room.state.players.green?.seated).not.toBe(true);
+        expect(confirmations).toHaveLength(0);
+      } else {
+        await vi.waitFor(() => expect(room.state.players.green?.seated).toBe(true));
+        expect(confirmations).toHaveLength(1);
+        expect(room.sequence).toBe(MAX_PENDING_COMMITS + 2); // claim + load + one confirm
+        const later = { ...room.state, time: room.state.time + 25 * 60 * 60 * 1000 };
+        expect(expiredSeatClaims(later, 1).some((seat) => seat.playerId === 'green')).toBe(false);
+      }
+    } finally {
+      release(); await Promise.all(pending); ws.terminate(); await server.close(); submit.mockRestore();
+    }
+  });
+
+  it('cancels a seat confirmation queued before disconnect and permits a reconnect to confirm', async () => {
+    let releaseFirst!: () => void;
+    let releaseRest!: () => void;
+    const first = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const rest = new Promise<void>((resolve) => { releaseRest = resolve; });
+    const confirmations: string[] = [];
+    const room = createDevMatch(loadShippedData(), {
+      now: () => 1000, time: 1000, actionRateMax: 1000,
+      persist: async (_snapshot, receipt) => {
+        if (receipt.actionId === 'load-0') await first;
+        else if (receipt.actionId.startsWith('load-')) await rest;
+        if (receipt.actionId.startsWith('seat-confirm:')) confirmations.push(receipt.actionId);
+      },
+    });
+    expect((await room.submitServerAction('green', seatClaimAction(room.id, 'green', 1000, {}))).ok).toBe(true);
+    const pending = Array.from({ length: MAX_PENDING_COMMITS }, (_, n) => room.submitServerAction('green', {
+      id: `load-${n}`, type: 'fleet.orbit', playerId: 'green', issuedAt: 1000,
+      payload: { fleetId: 'green_1', orbit: 'near' },
+    }));
+    const submit = vi.spyOn(room, 'submitServerAction');
+    const server = createMultiplayerServer({ room });
+    const url = await server.listen();
+    const ws = new WebSocket(`${url}?player=green`);
+    let reconnected: WebSocket | undefined;
+    try {
+      expect(await nextMessage(ws)).toMatchObject({ type: 'welcome' });
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+      await expect(submit.mock.results[0]!.value).resolves.toMatchObject({ code: 'E_RATE_LIMIT' });
+      // Free exactly one mailbox slot. The retry is accepted behind the other
+      // blocked writes, so checking only before enqueue cannot prevent this race.
+      releaseFirst();
+      await pending[0];
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+      const queuedConfirmation = submit.mock.results[1]!.value;
+      const closed = once(ws, 'close'); ws.terminate(); await closed;
+      await vi.waitFor(() => expect(room.peerCount).toBe(0));
+      releaseRest();
+      await Promise.all(pending);
+      await expect(queuedConfirmation).resolves.toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(room.state.players.green?.seated).not.toBe(true);
+      expect(confirmations).toHaveLength(0);
+      expect(room.sequence).toBe(MAX_PENDING_COMMITS + 1);
+      // Cancellation must not cache a rejection for the deterministic action id.
+      reconnected = new WebSocket(`${url}?player=green`);
+      expect(await nextMessage(reconnected)).toMatchObject({ type: 'welcome' });
+      await vi.waitFor(() => expect(room.state.players.green?.seated).toBe(true));
+      expect(confirmations).toHaveLength(1);
+      expect(room.sequence).toBe(MAX_PENDING_COMMITS + 2);
+    } finally {
+      releaseFirst(); releaseRest(); await Promise.all(pending);
+      ws.terminate(); reconnected?.terminate(); await server.close(); submit.mockRestore();
+    }
+  });
+
   it('accepts two players and broadcasts authoritative action results', async () => {
     const server = createMultiplayerServer({ room: makeRoom() });
     const url = await server.listen();

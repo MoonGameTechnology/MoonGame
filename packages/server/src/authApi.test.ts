@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { registerAuthApi, liveSession, pwFingerprint, authRateFromEnv } from './authApi';
+import { registerAuthApi, liveSession, pwFingerprint, authRateFromEnv, type RecoveryMail } from './authApi';
 import {
   signSessionToken,
   verifySessionToken,
@@ -334,10 +334,10 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     delivery?: () => Promise<void>,
   ): {
     server: FastifyInstance;
-    sent: Array<{ to: string; text: string }>;
+    sent: RecoveryMail[];
     users: MemoryUserStore;
   } {
-    const sent: Array<{ to: string; text: string }> = [];
+    const sent: RecoveryMail[] = [];
     const users = new MemoryUserStore();
     app = Fastify();
     registerAuthApi(app, {
@@ -351,8 +351,8 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
         return r.ok ? r.claim : null;
       },
       resetBaseUrl,
-      sendMail: (msg) => {
-        sent.push({ to: msg.to, text: msg.text });
+      sendRecoveryMail: (msg) => {
+        sent.push(msg);
         return delivery?.() ?? Promise.resolve();
       },
       scryptParams: FAST,
@@ -458,7 +458,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     expect(rec.json()).toEqual({ ok: true });
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe('zoe@example.com');
-    const token = tokenFrom(sent[0]!.text);
+    const token = tokenFrom(sent[0]!.params.link);
 
     const reset = await post(server, '/auth/reset', { token, password: 'brandnewpass' });
     expect(reset.statusCode).toBe(200);
@@ -489,7 +489,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       await barrier;
       return user;
     };
-    const token = tokenFrom(sent[0]!.text);
+    const token = tokenFrom(sent[0]!.params.link);
     const passwords = ['concurrent-one', 'concurrent-two'];
     const results = await Promise.all(passwords.map((password) => post(server, '/auth/reset', { token, password })));
     expect(results.map((r) => r.statusCode).sort()).toEqual([200, 401]);
@@ -508,7 +508,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     });
     await post(server, '/auth/recover', { email: 'ana@example.com' });
     await vi.waitFor(() => expect(sent).toHaveLength(1));
-    const token = tokenFrom(sent[0]!.text);
+    const token = tokenFrom(sent[0]!.params.link);
     expect((await post(server, '/auth/reset', { token, password: 'secondpass1' })).statusCode).toBe(
       200,
     );
@@ -516,6 +516,31 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const again = await post(server, '/auth/reset', { token, password: 'thirdpass12' });
     expect(again.statusCode).toBe(401);
     expect(again.json()).toEqual({ error: 'E_AUTH' });
+  });
+
+  it('passes bounded recipient metadata and a structural reset link to the host adapter', async () => {
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const { server, sent } = recoverApp('https://play.example', {}, () => blocked);
+    await post(server, '/auth/register', { login: 'locale', password: 'longenough', email: 'locale@example.com' });
+    try {
+      for (const locale of ['en', 'ru', 'unsupported', { language: 'en' }, 'x'.repeat(65)])
+        await post(server, '/auth/recover', { email: 'locale@example.com', locale });
+      await vi.waitFor(() => expect(sent).toHaveLength(1));
+      release();
+      await vi.waitFor(() => expect(sent).toHaveLength(5));
+      expect(sent.map((msg) => msg.locale)).toEqual(['en', 'ru', 'unsupported', undefined, undefined]);
+      for (const msg of sent) {
+        expect(msg).toEqual({
+          to: 'locale@example.com',
+          template: 'password-reset',
+          locale: msg.locale,
+          params: { link: expect.stringMatching(/^https:\/\/play\.example\/\?reset=/) },
+        });
+        expect((await post(server, '/auth/reset', { token: tokenFrom(msg.params.link), password: 'changedpass' })).statusCode)
+          .toBe(sent.indexOf(msg) === 0 ? 200 : 401);
+      }
+    } finally { release(); }
   });
 
   it('recover is anti-enumeration: an unknown email still 200s and sends nothing', async () => {
@@ -583,7 +608,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     await post(server, '/auth/recover', { email: 'dan@example.com' });
     await vi.waitFor(() => expect(sent).toHaveLength(1));
     const reset = await post(server, '/auth/reset', {
-      token: tokenFrom(sent[0]!.text),
+      token: tokenFrom(sent[0]!.params.link),
       password: 'brandnewpass',
     });
     const postToken = (reset.json() as { token: string }).token;
@@ -606,8 +631,8 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     });
     await post(server, '/auth/recover', { email: 'liv@example.com' });
     await vi.waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0]!.text).toContain('https://play.example/?reset=');
-    expect(sent[0]!.text).not.toContain('https://play.example//?reset=');
+    expect(sent[0]!.params.link).toContain('https://play.example/?reset=');
+    expect(sent[0]!.params.link).not.toContain('https://play.example//?reset=');
   });
 
   it('liveSession rejects a session for an unknown/deleted account', async () => {

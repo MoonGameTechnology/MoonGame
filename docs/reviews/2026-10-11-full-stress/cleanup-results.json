@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-11T07:47:13.961Z",
+  "removed": [
+    "mg-stress-server",
+    "mg-stress-pg",
+    "mg-stress-edge",
+    "mg-stress-mini",
+    "network:mg-stress-edge",
+    "network:mg-stress-private",
+    "network:mg-stress-untrusted",
+    "volume:mg-stress-data",
+    "volume:mg-stress-logs",
+    "volume:mg-stress-caddy-data",
+    "volume:mg-stress-caddy-config"
+  ],
+  "remaining": []
+}

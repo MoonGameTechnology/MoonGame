@@ -343,6 +343,9 @@ type FrontDecision =
   | { kind: 'pass' };
 
 const OPEN = 1;
+/** Includes the active write; excess work gets a transient refusal, never a receipt. */
+export const MAX_PENDING_COMMITS = 64;
+
 /** Backpressure cap: drop a peer whose unflushed outbound buffer exceeds this (it
  *  isn't draining — a fast sender outrunning a slow receiver). Deltas are KB-sized,
  *  so 1 MiB is hundreds of un-acked updates — a genuinely stuck client, not a blip.
@@ -516,6 +519,7 @@ export class MatchRoom {
    *  anyway; `tick` uses the `committing` flag rather than the mailbox (skip ≡ defer for
    *  a recomputable advance, and skip is cheaper). */
   private mailbox: Promise<void> = Promise.resolve();
+  private pendingCommits = 0;
   /** True during a committed submit's critical section (incl. its persist await) so a
    *  concurrent `tick()` skips instead of mutating the world under the submit, and
    *  `msUntilNextEvent()` reports null so a wakeup driver idles (rather than firing skipped
@@ -1065,7 +1069,10 @@ export class MatchRoom {
       // Serialize the lobby release through the mailbox in committed mode, so its
       // broadcast can't interleave with an in-flight action's persist await. (`start`
       // itself is synchronous and host-only; ignored otherwise.)
-      if (this.persist) await this.enqueue(() => this.start(playerId));
+      if (this.persist) await this.enqueue(
+        () => this.start(playerId),
+        () => this.send(peer, { type: 'error', matchId: this.id, code: 'E_RATE_LIMIT' }),
+      );
       else this.start(playerId);
       return;
     }
@@ -1185,6 +1192,7 @@ export class MatchRoom {
             /* peer gone */
           }
         }),
+        () => this.sendReject(peer, envelopeActionId(envelope), 'E_RATE_LIMIT'),
       );
       return;
     }
@@ -1208,6 +1216,9 @@ export class MatchRoom {
     envelope: unknown,
     sessionId: string,
   ): Promise<void> {
+    // A queued intent may outlive its connection or be superseded by a reconnect.
+    // Check again at execution time, before reserving a cursor or touching the store.
+    if (!this.peers.get(playerId)?.has(peer)) return;
     const accepted = this.admitDecision(playerId, peer, envelope, sessionId);
     if (!accepted) return;
     await this.maybeSyncArsenal(playerId, accepted.action);
@@ -1284,13 +1295,22 @@ export class MatchRoom {
   async submitServerAction(
     playerId: PlayerId,
     action: Action,
+    /** Connection-bound work may expire while queued. Check at execution, before
+     *  dedup/rate admission or persistence; never cancel a write already started. */
+    isCurrent?: () => boolean,
   ): Promise<{ ok: boolean; code?: string }> {
     if (!this.persist) {
+      if (isCurrent && !isCurrent()) return { ok: false, code: 'E_FORBIDDEN' };
       const r = this.submitAction(playerId, action);
       return { ok: r.ok, ...(r.code !== undefined ? { code: r.code } : {}) };
     }
     let out: { ok: boolean; code?: string } = { ok: false, code: 'E_INTERNAL' };
     await this.enqueue(async () => {
+      if (isCurrent && !isCurrent()) {
+        // No receipt: a reconnect may reuse this action id with a live connection.
+        out = { ok: false, code: 'E_FORBIDDEN' };
+        return;
+      }
       const front = this.frontGate(playerId, action.id); // без пира: у драйвера нет сокета
       if (front.kind === 'cached') {
         const { receipt } = front;
@@ -1303,7 +1323,7 @@ export class MatchRoom {
       }
       const verdict = await this.commitApply(playerId, action);
       out = verdict.ok ? { ok: true } : { ok: false, code: verdict.code ?? 'E_INTERNAL' };
-    }).catch(() => {
+    }, () => { out = { ok: false, code: 'E_RATE_LIMIT' }; }).catch(() => {
       out = { ok: false, code: 'E_INTERNAL' };
     });
     return out;
@@ -1674,8 +1694,16 @@ export class MatchRoom {
    *  rejected promise: `.then` on a rejected upstream skips its callback, which would
    *  silently stop EVERY future task on this room. Tasks own their error handling; this
    *  is the backstop. */
-  private enqueue(task: () => void | Promise<void>): Promise<void> {
-    const run = this.mailbox.then(task);
+  private enqueue(task: () => void | Promise<void>, onFull: () => void): Promise<void> {
+    // Bound admission BEFORE retaining an envelope or waiting for PostgreSQL. The
+    // per-player rate check runs inside this mailbox and cannot bound a stalled tail.
+    // Refusal reserves no sequence and writes no receipt: retry after backoff is safe.
+    if (this.pendingCommits >= MAX_PENDING_COMMITS) {
+      onFull();
+      return Promise.resolve();
+    }
+    this.pendingCommits += 1;
+    const run = this.mailbox.then(task).finally(() => { this.pendingCommits -= 1; });
     this.mailbox = run.catch(() => undefined);
     return run;
   }
@@ -1702,6 +1730,7 @@ export class MatchRoom {
           /* peer gone */
         }
       }),
+      () => { if (peer) this.sendReject(peer, action.id, 'E_RATE_LIMIT'); },
     );
   }
 
@@ -1710,6 +1739,7 @@ export class MatchRoom {
     action: Action,
     peer?: RoomPeer,
   ): Promise<void> {
+    if (peer && !this.peers.get(playerId)?.has(peer)) return;
     if (this.frontGate(playerId, action.id, peer).kind !== 'pass') return;
     await this.maybeSyncArsenal(playerId, action);
     await this.commitApply(playerId, action, peer);

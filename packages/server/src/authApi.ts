@@ -22,6 +22,15 @@ import { slidingWindowIpLimiter } from './rateLimit';
 /** Delivery seam: production hosts wire the verified SMTP transport. */
 export type Mailer = (msg: { to: string; subject: string; text: string }) => Promise<void>;
 
+/** Auth supplies structural data; the host owns recipient-localized presentation. */
+export interface RecoveryMail {
+  to: string;
+  template: 'password-reset';
+  locale?: string;
+  params: { link: string };
+}
+export type RecoveryMailer = (msg: RecoveryMail) => Promise<void>;
+
 /** Password fingerprint: a short digest of the password hash. When the password changes
  *  the hash — and thus this fingerprint — changes. Two consumers: single-use reset tokens
  *  (a spent/stale token stops matching → dead, no token store needed) and session freshness
@@ -58,7 +67,7 @@ export interface AuthApiDeps {
   /** Client origin the emailed reset link points at: `${resetBaseUrl}/?reset=<token>`. */
   resetBaseUrl?: string;
   /** Required when recovery is enabled. Never logs reset bearers. */
-  sendMail?: Mailer;
+  sendRecoveryMail?: RecoveryMailer;
   /** Post-registration hook (e.g. the starter-arsenal grant, ARS-2), awaited before
    *  the 201 so the account's first read sees its grant. MUST be resilient: a throw
    *  is swallowed here (registration already succeeded — never fail it for a
@@ -250,13 +259,13 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     let baseEnd = base.length;
     while (baseEnd > 0 && base[baseEnd - 1] === '/') baseEnd -= 1;
     const resetBaseUrl = base.slice(0, baseEnd);
-    if (!deps.sendMail) throw new Error('E_MAIL_CONFIG');
-    const sendMail = deps.sendMail;
+    if (!deps.sendRecoveryMail) throw new Error('E_MAIL_CONFIG');
+    const sendRecoveryMail = deps.sendRecoveryMail;
     // Queue BOTH known and unknown addresses before any lookup/signing/SMTP work.
     // The response therefore cannot expose SMTP latency (or transport failures).
     // One worker and at most 64 waiting requests bound work during an SMTP outage.
     // This is best-effort process-local delivery; shutdown/full queue requires retry.
-    const recoveryQueue: string[] = [];
+    const recoveryQueue: Array<{ email: string; locale?: string }> = [];
     let recovering = false;
     let recoveryClosed = false;
     app.addHook('onClose', async () => {
@@ -266,16 +275,17 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     const deliverRecovery = async () => {
       try {
         while (!recoveryClosed && recoveryQueue.length > 0) {
-          const email = recoveryQueue.shift()!;
+          const { email, locale } = recoveryQueue.shift()!;
           try {
             const user = await deps.users.findUserByEmail(email);
             if (!user?.email || recoveryClosed) continue;
             const token = await signReset(user.userId, pwFingerprint(user.passHash));
             const link = `${resetBaseUrl}/?reset=${encodeURIComponent(token)}`;
-            await sendMail({
+            await sendRecoveryMail({
               to: user.email,
-              subject: 'Void Dominion — сброс пароля',
-              text: `Ссылка для сброса пароля (действует 15 минут):\n${link}\n\nЕсли вы не запрашивали сброс — проигнорируйте это письмо.`,
+              template: 'password-reset',
+              locale,
+              params: { link },
             });
           } catch {
             /* keep the worker alive; never expose lookup/delivery failures or bearers */
@@ -297,7 +307,10 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
         return { error: 'E_BAD_CREDENTIALS' as const };
       }
       if (!recoveryClosed && recoveryQueue.length < 64) {
-        recoveryQueue.push(email);
+        const requested = (request.body as { locale?: unknown }).locale;
+        // Bound presentation metadata; supported locales and fallback belong to the host.
+        const locale = typeof requested === 'string' && requested.length <= 64 ? requested : undefined;
+        recoveryQueue.push({ email, locale });
         if (!recovering) {
           recovering = true;
           setImmediate(() => { deliverRecovery().catch(() => {}); });

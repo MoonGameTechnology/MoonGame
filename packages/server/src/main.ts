@@ -29,8 +29,7 @@ import {
   type MatchApiDeps,
   type CreatedMatch,
 } from './matchApi';
-import { registerAuthApi, liveSession, authRateFromEnv } from './authApi';
-import { mailerFromEnv } from './mailer';
+import { registerAuthApi, liveSession, authRateFromEnv, type RecoveryMailer } from './authApi';
 import { registerAdminApi, adminLoginsFromEnv } from './adminApi';
 import { kickSeat } from './seatKick';
 import { registerCorpApi } from './corpApi';
@@ -53,13 +52,9 @@ import { loadMedalCatalog } from './medalCatalog';
 import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry } from './roomRegistry';
-import { installFatalHandlers } from './fatal';
 import { buildVersion } from './buildVersion';
 
-// RESIL-3 — ДО всего остального: от сюда и ниже любое падение обязано оставить в логе
-// строку с именем причины, а не молчаливый перезапуск контейнера.
-installFatalHandlers();
-
+export async function startServer({ sendRecoveryMail }: { sendRecoveryMail?: RecoveryMailer } = {}): Promise<void> {
 /**
  * Runnable server entrypoint on the real simulation core. Hosts MANY matches from one
  * process via a LazyRoomRegistry (SV-4.0): each match is loaded from the store on the
@@ -508,7 +503,7 @@ const server = createMultiplayerServer({
         await scope.register(rateLimit, { max: 100, timeWindow: '1 minute' });
         registerAuthApi(scope, {
           users: stores.userStore,
-          sendMail: mailerFromEnv(),
+          sendRecoveryMail,
           signSession,
           // Retunable per deployment (`AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS`): behind a
           // proxy every player shares one source address, so the default budget — sized
@@ -739,3 +734,4 @@ const shutdown = (): void => {
 };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+}

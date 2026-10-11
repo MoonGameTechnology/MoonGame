@@ -36,6 +36,7 @@ export interface VisibilityFields {
 
 export type ServerErrorCode =
   | 'E_BAD_MESSAGE'
+  | 'E_RATE_LIMIT'
   | 'E_FORBIDDEN'
   | 'E_PAYLOAD_TOO_LARGE'
   | 'E_SLOT_TAKEN'
