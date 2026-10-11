@@ -237,7 +237,9 @@ describe('UI-RES2 — сторож: ресурс не печатается сл�
     // была РУССКОЙ ПРОЗОЙ прямо в main.ts — англоязычный игрок читал её по-русски.
     // Тост идёт textContent (в ленту попадает и чужой текст), HTML-чип невозможен,
     // поэтому ресурс несёт свой глиф; сама фраза уехала в локаль.
-    const src = read('main.ts');
+    // Доклад вахты живёт у конвейера приказа (`orderPipeline.ts`, REFM-240).
+    const src = read('orderPipeline.ts');
+    expect(read('main.ts')).not.toContain('Пока вы спали');
     expect(src).not.toContain('Пока вы спали');
     expect(src).toContain("t('log.steward.diff'");
   });
