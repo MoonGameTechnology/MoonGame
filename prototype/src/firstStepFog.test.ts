@@ -55,7 +55,7 @@ describe('зрение журнала на первом шаге партии (F
     const fresh = main.indexOf("refreshVision(); // every snapshot: its delta's events follow");
     expect(fresh).toBeGreaterThan(main.indexOf('if (snap.playerId) ME = snap.playerId;'));
     expect(fresh).toBeGreaterThan(
-      main.indexOf('netSignatures = [...radarContacts(snap.signatures)];'),
+      main.indexOf('takeNetSignatures(radarContacts(snap.signatures));'),
     );
     expect(main).not.toContain('if (changedMap) refreshVision();');
   });

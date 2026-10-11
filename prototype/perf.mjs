@@ -181,7 +181,9 @@ globalThis.requestAnimationFrame = (cb) => {
 };
 
 // A benchmark-only bridge; it is absent from both shipped profiles.
+// Лучи развёртки — у радара (`mapRadar.ts`, REFM-239): мост берёт их своим импортом.
 const bridge = `
+import { sweepArms as __sweepArms } from './mapRadar';
 let perfPaints = 0;
 const perfRender = render;
 render = function(now) { perfPaints++; perfRender(now); };
@@ -224,7 +226,7 @@ module.exports = {
     return { lod, spheres: globalThis.__perfSpheres, terrain: terrainFields.length,
       allMarkers: JSON.stringify(rings) === JSON.stringify(expected), questions,
       pickedFleet: selFleet === fleet.id || selFleets.has(fleet.id),
-      sensing: sweepOn && sweepArms.length > 0,
+      sensing: sweepOn && __sweepArms.length > 0,
       known: MAP.filter(n => known(n.id)).length,
       stateUnchanged: JSON.stringify(s) === before };
   },
