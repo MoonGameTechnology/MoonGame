@@ -29,6 +29,7 @@ import {
   STAT_KEY,
   selectedBay,
   repeatOrderHtml,
+  moduleGradeHtml,
   type YardDraft,
   type YardHost,
 } from './shipyard';
@@ -141,6 +142,12 @@ describe('верфь — цена и полоса характеристики',
     expect(html).toContain('10');
     expect(html).toContain('<b>14</b>');
     expect(html).toContain('+4');
+  });
+
+  it('дробный прирост от звёзд модуля — до десятых', () => {
+    const html = statBarHtml({ stat: 'attack', label: 'атака', base: 16, effective: 21.4, delta: 21.4 - 16 }, 30);
+    expect(html).toContain('<b>21.4</b>');
+    expect(html).toContain('+5.4</span>');
   });
 
   it('без прироста показывается только итог — без стрелки', () => {
@@ -913,7 +920,7 @@ describe('производство — слоты-выноски на арте (
     // Плитки идут в порядке отсеков: оружие, защита, система; открыт первый пустой отсек.
     expect(html).toContain('class="cn-tile filled" data-cnsel="2" aria-pressed="false"');
     expect(html).toContain(`--rar:var(--rar-${mod.rarity})`);
-    expect(html).toContain(`aria-label="${t('yard.slot.utility')}: ${tData(mod.name)}"`);
+    expect(html).toContain(`aria-label="${t('yard.slot.utility')}: ${tData(mod.name)} (${t(`rarity.${mod.rarity}`)})"`);
     expect(html).toContain('class="cn-tile empty sel" data-cnsel="0" aria-pressed="true"');
     expect(html).toContain('class="cn-tile empty" data-cnsel="1" aria-pressed="false"');
     expect(html).toContain(`aria-label="${t('yard.slot.weapon')}: ${t('yard.slot.empty')}"`);
@@ -938,7 +945,7 @@ describe('производство — модули открытого отсе�
     loadoutPaneHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(over), YARD_HULLS), YARD_HULLS, view);
   /** Модули, которые можно поставить в открытый отсек (без свёрнутых неподходящих). */
   const offered = (html: string): string[] =>
-    [...html.matchAll(/<button class="cn-mod" data-cnmod="([a-z_]+)"/g)].map((x) => x[1]!);
+    [...html.matchAll(/<button class="cn-mod[^"]*" data-cnmod="([a-z_]+)"/g)].map((x) => x[1]!);
 
   it('открыт выбранный отсек, пока он есть; иначе первый пустой; все заняты — первый', () => {
     const bays = [{ moduleId: 'a' }, {}, {}];
@@ -1103,5 +1110,68 @@ describe('производство — «Как в прошлый раз» (UIX-
     expect(html).not.toContain('data-cnagain');
     win.fire(click('[data-cnbuild]'));
     expect(sent.map((a) => (a.payload as { count: number }).count)).toEqual([2, 2]);
+  });
+});
+
+describe('производство — редкость и уровень прокачки модулей', () => {
+  /** Место забега Сектора Зеро: снимок арсенала со звёздами и поднятой редкостью. */
+  function seat(stars: Record<string, number>, rarity: Record<string, string> = {}): GameState {
+    const s = rich();
+    s.players.p1!.arsenal = {
+      hulls: Object.keys(data.units).sort(),
+      modules: Object.keys(data.modules).sort(),
+      stars,
+      rarity,
+    };
+    return s;
+  }
+  const card = (html: string, id: string): string =>
+    html.match(new RegExp(`<button class="cn-mod[^"]*" data-cnmod="${id}">.*?</button>`))?.[0] ?? '';
+
+  it('ступень — словом её цветом, звёзды — только горящие', () => {
+    expect(moduleGradeHtml('unique', 0)).toBe(`<span class="cn-mr r-unique"><span class="cn-rw">${t('rarity.unique')}</span></span>`);
+    const lit = moduleGradeHtml('mythic', 3);
+    expect(lit).toContain('★★★</span>');
+    expect(lit).toContain(`aria-label="${t('shipcard.stars', { n: 3 })}"`);
+  });
+
+  it('обычная партия: карточка в рамке ступени из каталога, звёзд нет нигде', () => {
+    const s = rich();
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: ['ion_engine'] }), YARD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    expect(html).toContain(moduleGradeHtml(data.modules.ion_engine!.rarity ?? 'simple', 0));
+    // Отсек системы открыт — в его колонке карточка трюма.
+    const open = loadoutPaneHtml(s, 'p1', { ...d, modules: [], slot: 2 }, YARD_HULLS, view);
+    const rar = data.modules.cargo_bay!.rarity ?? 'simple';
+    expect(card(open, 'cargo_bay')).toContain(`class="cn-mod r-${rar}"`);
+    expect(card(open, 'cargo_bay')).toContain(t(`rarity.${rar}`));
+    for (const h of [html, open]) {
+      expect(h).not.toContain('class="cn-st"');
+      expect(h).not.toContain('class="cn-tst"');
+    }
+  });
+
+  it('забег: звёзды и поднятая ступень на плитке, в строке отсека и в числах', () => {
+    const s = seat({ ion_engine: 2 }, { ion_engine: 'unique' });
+    // Открыт отсек двигателя: его строка видна вместе с плиткой.
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: ['ion_engine'], slot: 2 }), YARD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    expect(html).toContain('--rar:var(--rar-unique)');
+    expect(html).toContain('<span class="cn-tst" aria-hidden="true">★2</span>');
+    expect(html).toContain(`(${t('rarity.unique')}, ${t('shipcard.stars', { n: 2 })})"`);
+    expect(html).toContain(moduleGradeHtml('unique', 2));
+    // ★2 = ×1.2 на вклад модуля и на параметр уникальной ступени: +2.4 скорости, +1.2 защиты.
+    expect(html).toContain(`+2.4 ${t(STAT_KEY.speed!)}`);
+    expect(html).toContain(`+1.2 ${t(STAT_KEY.defense!)}`);
+  });
+
+  it('забег: карточка звёздного модуля в колонке отсека — с его звёздами и числом', () => {
+    const s = seat({ cargo_bay: 1 });
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: [], slot: 2 }), YARD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    const c = card(html, 'cargo_bay');
+    expect(c).toContain('★</span>');
+    const cargo = data.modules.cargo_bay!.effects.stats.cargoCapacity!;
+    expect(c).toContain(`+${Math.round(cargo * 1.1 * 10) / 10} `);
   });
 });
