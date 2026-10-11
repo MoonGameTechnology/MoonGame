@@ -1,3 +1,4 @@
+import { boundedReadiness } from './readiness';
 import type { SecurityAudit } from './securityAudit';
 import { playablePlayerIds } from '@void/shared-core';
 import { seatConfirmAction } from './joinSeat';
@@ -245,7 +246,7 @@ export function createMultiplayerServer(
   });
 
   const indexHtml = options.indexHtml;
-  const ready = options.ready;
+  const ready = options.ready ? boundedReadiness(options.ready) : undefined;
   let draining = false; // flips at close() so /ready reports 503 during graceful drain
 
   // SV-0.1: Fastify owns HTTP routing (health/ready now, match create/join later) and
@@ -400,7 +401,11 @@ export function createMultiplayerServer(
     // на сборку документа: политика не может разъехаться с тем, что уходит игроку, а на
     // запрос ничего не считается.
     const inline = inlineHashes(html);
-    return async (request: FastifyRequest, reply: FastifyReply): Promise<string> => {
+    // Encode the large self-contained document once. Writing the same Unicode
+    // string concurrently makes Node flatten a fresh two-byte string per socket;
+    // a login-page burst can exhaust the V8 heap before the container memory cap.
+    const body = Buffer.from(html, 'utf8');
+    return async (request: FastifyRequest, reply: FastifyReply): Promise<Buffer> => {
       void reply.header('content-type', 'text/html; charset=utf-8');
       void reply.header('cache-control', 'no-store, must-revalidate');
       const headers = securityHeaders({
@@ -409,7 +414,7 @@ export function createMultiplayerServer(
         ...(options.frameAncestors ? { frameAncestors: options.frameAncestors } : {}),
       });
       for (const [name, value] of Object.entries(headers)) void reply.header(name, value);
-      return html;
+      return body;
     };
   };
   for (const doc of options.documents ?? []) {

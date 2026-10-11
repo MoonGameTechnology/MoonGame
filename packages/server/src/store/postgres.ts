@@ -390,7 +390,11 @@ export class PostgresMatchStore implements MatchStore {
 
   async ping(): Promise<boolean> {
     try {
-      await this.pool.query('SELECT 1');
+      // This query is read-only: a client deadline can safely discard its response.
+      // pg supports per-query deadlines, although @types/pg declares this option
+      // only on ClientConfig. Keep the structural value rather than widening all queries.
+      const probe = { text: 'SELECT 1', query_timeout: 1000 };
+      await this.pool.query(probe);
       return true;
     } catch {
       return false; // pool exhausted / DB unreachable → not ready

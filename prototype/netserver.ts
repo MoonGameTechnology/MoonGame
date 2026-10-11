@@ -870,6 +870,7 @@ const server = createMultiplayerServer({
   // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
   // This host is what the image runs, so it is the one that has to report it.
   version: buildVersion(process.env.GIT_SHA),
+  ready: () => matchStore.ping?.() ?? Promise.resolve(true),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the

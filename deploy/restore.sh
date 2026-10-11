@@ -82,6 +82,11 @@ if ! tail -c 200 "$WORK/dump.sql" | grep -q 'PostgreSQL database dump complete';
 fi
 echo "[✓] Дамп полный"
 
+# Invalidate a marker LEFT OVER from provisioning before applying the dump. A current
+# dump replaces it with its own revision; a legacy dump cannot inherit false readiness.
+cat "$DEPLOY_DIR/restore-marker.sql" "$WORK/dump.sql" > "$WORK/restore.sql"
+mv "$WORK/restore.sql" "$WORK/dump.sql"
+
 # ACLs were intentionally omitted by pg_dump. Restore the dedicated runtime grants
 # atomically with the data; an absent/unsafe role aborts the entire transaction.
 cat "$DEPLOY_DIR/restore-acl.sql" >> "$WORK/dump.sql"

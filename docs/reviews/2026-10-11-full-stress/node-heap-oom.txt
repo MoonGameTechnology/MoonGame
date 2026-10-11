@@ -1,0 +1,29 @@
+{"mode":"string","bytes":15437358,"node":"v22.23.2"}
+
+<--- Last few GCs --->
+
+[1:0xa4c3000]     1506 ms: Mark-Compact 268.1 (271.3) -> 238.7 (242.1) MB, pooled: 1 MB, 3.02 / 0.00 ms  (average mu = 0.953, current mu = 0.953) allocation failure; scavenge might not succeed
+[1:0xa4c3000]     1562 ms: Mark-Compact 268.1 (271.5) -> 268.1 (271.3) MB, pooled: 1 MB, 2.92 / 0.00 ms  (average mu = 0.950, current mu = 0.948) allocation failure; scavenge might not succeed
+
+
+<--- JS stacktrace --->
+
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0xe46bbe node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/nodejs/bin/node]
+ 2: 0x1244310 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/nodejs/bin/node]
+ 3: 0x12445e7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/nodejs/bin/node]
+ 4: 0x14734f5  [/nodejs/bin/node]
+ 5: 0x148cd89 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [/nodejs/bin/node]
+ 6: 0x1461488 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [/nodejs/bin/node]
+ 7: 0x14623b5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [/nodejs/bin/node]
+ 8: 0x143a6de v8::internal::Factory::AllocateRaw(int, v8::internal::AllocationType, v8::internal::AllocationAlignment) [/nodejs/bin/node]
+ 9: 0x1429514 v8::internal::FactoryBase<v8::internal::Factory>::AllocateRawWithImmortalMap(int, v8::internal::AllocationType, v8::internal::Tagged<v8::internal::Map>, v8::internal::AllocationAlignment) [/nodejs/bin/node]
+10: 0x142b46f v8::internal::FactoryBase<v8::internal::Factory>::NewRawTwoByteString(int, v8::internal::AllocationType) [/nodejs/bin/node]
+11: 0x1780d35 v8::internal::String::SlowFlatten(v8::internal::Isolate*, v8::internal::Handle<v8::internal::ConsString>, v8::internal::AllocationType) [/nodejs/bin/node]
+12: 0x125bfd3 v8::String::Utf8Length(v8::Isolate*) const [/nodejs/bin/node]
+13: 0x11305bd node::StringBytes::Size(v8::Isolate*, v8::Local<v8::Value>, node::encoding) [/nodejs/bin/node]
+14: 0x112589b node::StreamBase::Writev(v8::FunctionCallbackInfo<v8::Value> const&) [/nodejs/bin/node]
+15: 0x1129a71 void node::StreamBase::JSMethod<&node::StreamBase::Writev>(v8::FunctionCallbackInfo<v8::Value> const&) [/nodejs/bin/node]
+16: 0x1d605e2  [/nodejs/bin/node]

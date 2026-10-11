@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { DEFAULT_LOCALE, isLocaleId, type LocaleId } from '../../../localization';
+import { recoveryMessage } from './recoveryMessage';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { SessionClaim } from './auth';
 import { hashPassword, verifyPassword, decoyHash, type ScryptParams } from './password';
@@ -256,7 +258,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     // The response therefore cannot expose SMTP latency (or transport failures).
     // One worker and at most 64 waiting requests bound work during an SMTP outage.
     // This is best-effort process-local delivery; shutdown/full queue requires retry.
-    const recoveryQueue: string[] = [];
+    const recoveryQueue: Array<{ email: string; locale: LocaleId }> = [];
     let recovering = false;
     let recoveryClosed = false;
     app.addHook('onClose', async () => {
@@ -266,7 +268,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     const deliverRecovery = async () => {
       try {
         while (!recoveryClosed && recoveryQueue.length > 0) {
-          const email = recoveryQueue.shift()!;
+          const { email, locale } = recoveryQueue.shift()!;
           try {
             const user = await deps.users.findUserByEmail(email);
             if (!user?.email || recoveryClosed) continue;
@@ -274,8 +276,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
             const link = `${resetBaseUrl}/?reset=${encodeURIComponent(token)}`;
             await sendMail({
               to: user.email,
-              subject: 'Void Dominion — сброс пароля',
-              text: `Ссылка для сброса пароля (действует 15 минут):\n${link}\n\nЕсли вы не запрашивали сброс — проигнорируйте это письмо.`,
+              ...recoveryMessage(locale, link),
             });
           } catch {
             /* keep the worker alive; never expose lookup/delivery failures or bearers */
@@ -297,7 +298,8 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
         return { error: 'E_BAD_CREDENTIALS' as const };
       }
       if (!recoveryClosed && recoveryQueue.length < 64) {
-        recoveryQueue.push(email);
+        const requested = (request.body as { locale?: unknown }).locale;
+        recoveryQueue.push({ email, locale: isLocaleId(requested) ? requested : DEFAULT_LOCALE });
         if (!recovering) {
           recovering = true;
           setImmediate(() => { deliverRecovery().catch(() => {}); });

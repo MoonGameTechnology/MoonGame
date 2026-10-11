@@ -4,6 +4,8 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  'auth.recovery-mail.subject': 'Void Dominion — password reset',
+  'auth.recovery-mail.text': 'Password reset link (valid for 15 minutes):\n{link}\n\nIf you did not request a reset, ignore this email.',
   "setup.network.create": "Create online game",
   "setup.network.creating": "Creating…",
   "setup.network.failed": "Could not create game",

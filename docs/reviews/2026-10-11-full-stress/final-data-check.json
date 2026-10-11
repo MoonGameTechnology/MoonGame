@@ -1,0 +1,43 @@
+{
+  "at": "2026-10-11T07:47:11.458Z",
+  "receiptCount": 29728,
+  "receiptDigestSHA256": "a5d497ca3199709fa83f3179d60fc327553de1dfc1d059720b9954c9e82b3224",
+  "containers": [
+    {
+      "name": "mg-stress-server",
+      "image": "sha256:1e05277ca53d4b716c43cc0e61cc03eca60233e4879b7aff57c3f3ba85ae4d6c",
+      "restarts": 0,
+      "running": true,
+      "oom": false,
+      "cpu": 2000000000,
+      "memory": 1073741824
+    },
+    {
+      "name": "mg-stress-pg",
+      "image": "sha256:81bd698b4594e751a3269e4dcd3e03a4a0ec0daf7b72e7aa1abd43cce9887542",
+      "restarts": 2,
+      "running": true,
+      "oom": false,
+      "cpu": 1000000000,
+      "memory": 536870912
+    },
+    {
+      "name": "mg-stress-edge",
+      "image": "sha256:e2ff47b10d198b0f9f3238cdf87cdffad20265909e3f476fc10a311367b0b21e",
+      "restarts": 0,
+      "running": true,
+      "oom": false,
+      "cpu": 1000000000,
+      "memory": 536870912
+    },
+    {
+      "name": "mg-stress-mini",
+      "image": "sha256:5cb20f0e5f5aa0c4ca1ab79267e7e7ee565f9e15eb350deaf92dd0a7fc3d5840",
+      "restarts": 0,
+      "running": true,
+      "oom": false,
+      "cpu": 1000000000,
+      "memory": 536870912
+    }
+  ]
+}

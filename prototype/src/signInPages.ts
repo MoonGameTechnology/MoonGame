@@ -13,7 +13,7 @@
  * подключения и вход в партию живут в `main.ts`; модуль получает их хуками
  * {@link initSignInPages} — импорт оттуда был бы циклом.
  */
-import { t } from '../../localization/runtime';
+import { t, LOCALE } from '../../localization/runtime';
 import { httpBase } from '../../decisions/matchQuery';
 import { resolveBase } from '../../decisions/serverAddress';
 import { saveSession } from '../../decisions/sessionStore';
@@ -263,7 +263,7 @@ async function submitRecover(): Promise<void> {
     await fetch(`${httpBase(base)}/auth/recover`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: step.email }),
+      body: JSON.stringify({ email: step.email, locale: LOCALE }),
     });
   } catch {
     outcome = 'unreachable'; // и это НИЧЕГО не меняет — правило 1

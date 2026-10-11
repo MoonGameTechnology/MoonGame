@@ -7,6 +7,8 @@
 // НЕ добавляй сюда русский текст, который уже лежит в коде строкой — сначала
 // заведи ключ, потом замени строку в коде на t('ключ').
 export const ru: Record<string, string> = {
+  'auth.recovery-mail.subject': 'Void Dominion — сброс пароля',
+  'auth.recovery-mail.text': 'Ссылка для сброса пароля (действует 15 минут):\n{link}\n\nЕсли вы не запрашивали сброс — проигнорируйте это письмо.',
   "setup.network.create": "Создать сетевую игру",
   "setup.network.creating": "Создание…",
   "setup.network.failed": "Не удалось создать игру",

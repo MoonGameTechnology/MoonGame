@@ -1,0 +1,4148 @@
+{
+  "http-load-results.json": [
+    {
+      "at": "2026-10-11T06:31:27.802Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 1,
+      "targetSeconds": 15,
+      "durationSeconds": 15.006,
+      "requests": 12772,
+      "rps": 851.1,
+      "statuses": {
+        "200": 12772
+      },
+      "errors": {},
+      "bytes": 459792,
+      "p50": 0.53,
+      "p95": 2.58,
+      "p99": 8,
+      "max": 86.2576740000004,
+      "generatorCPUpercent": 21.8,
+      "generatorEventLoopP99ms": 22.2
+    },
+    {
+      "at": "2026-10-11T06:31:42.838Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 4,
+      "targetSeconds": 15,
+      "durationSeconds": 15.034,
+      "requests": 18503,
+      "rps": 1230.8,
+      "statuses": {
+        "200": 18503
+      },
+      "errors": {},
+      "bytes": 666108,
+      "p50": 0.71,
+      "p95": 5.34,
+      "p99": 74.76,
+      "max": 126.58452600000055,
+      "generatorCPUpercent": 23.5,
+      "generatorEventLoopP99ms": 23.4
+    },
+    {
+      "at": "2026-10-11T06:31:57.855Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 16,
+      "targetSeconds": 15,
+      "durationSeconds": 15.016,
+      "requests": 21598,
+      "rps": 1438.3,
+      "statuses": {
+        "200": 21598
+      },
+      "errors": {},
+      "bytes": 777528,
+      "p50": 3.03,
+      "p95": 74.35,
+      "p99": 83.53,
+      "max": 200.21068599999853,
+      "generatorCPUpercent": 32.9,
+      "generatorEventLoopP99ms": 37.2
+    },
+    {
+      "at": "2026-10-11T06:32:12.943Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 64,
+      "targetSeconds": 15,
+      "durationSeconds": 15.087,
+      "requests": 20606,
+      "rps": 1365.8,
+      "statuses": {
+        "200": 20606
+      },
+      "errors": {},
+      "bytes": 741816,
+      "p50": 17.72,
+      "p95": 106.31,
+      "p99": 192.78,
+      "max": 378.2146270000012,
+      "generatorCPUpercent": 23.6,
+      "generatorEventLoopP99ms": 44.9
+    },
+    {
+      "at": "2026-10-11T06:32:28.165Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 15,
+      "durationSeconds": 15.22,
+      "requests": 14492,
+      "rps": 952.1,
+      "statuses": {
+        "200": 14492
+      },
+      "errors": {},
+      "bytes": 521712,
+      "p50": 102.86,
+      "p95": 283.02,
+      "p99": 701.72,
+      "max": 1604.2833520000058,
+      "generatorCPUpercent": 24.6,
+      "generatorEventLoopP99ms": 59.8
+    },
+    {
+      "at": "2026-10-11T06:32:43.859Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 256,
+      "targetSeconds": 15,
+      "durationSeconds": 15.692,
+      "requests": 12678,
+      "rps": 807.9,
+      "statuses": {
+        "200": 12678
+      },
+      "errors": {},
+      "bytes": 456408,
+      "p50": 203.22,
+      "p95": 1099.03,
+      "p99": 2202.09,
+      "max": 2333.8709240000026,
+      "generatorCPUpercent": 21.3,
+      "generatorEventLoopP99ms": 48.5
+    },
+    {
+      "at": "2026-10-11T06:32:59.749Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 512,
+      "targetSeconds": 15,
+      "durationSeconds": 15.889,
+      "requests": 2829,
+      "rps": 178,
+      "statuses": {
+        "200": 2803
+      },
+      "errors": {
+        "timeout": 26
+      },
+      "bytes": 100908,
+      "p50": 2438.55,
+      "p95": 6400.64,
+      "p99": 6506.78,
+      "max": 6652.382006,
+      "generatorCPUpercent": 13.5,
+      "generatorEventLoopP99ms": 30.5
+    },
+    {
+      "at": "2026-10-11T06:33:14.753Z",
+      "path": "/matches",
+      "mode": "keepalive",
+      "concurrency": 1,
+      "targetSeconds": 15,
+      "durationSeconds": 15.003,
+      "requests": 3201,
+      "rps": 213.4,
+      "statuses": {
+        "200": 3201
+      },
+      "errors": {},
+      "bytes": 11754072,
+      "p50": 3.75,
+      "p95": 9.11,
+      "p99": 26.42,
+      "max": 87.29734499999904,
+      "generatorCPUpercent": 8.1,
+      "generatorEventLoopP99ms": 22.2
+    },
+    {
+      "at": "2026-10-11T06:33:29.848Z",
+      "path": "/matches",
+      "mode": "keepalive",
+      "concurrency": 16,
+      "targetSeconds": 15,
+      "durationSeconds": 15.094,
+      "requests": 3111,
+      "rps": 206.1,
+      "statuses": {
+        "200": 3111
+      },
+      "errors": {},
+      "bytes": 11423592,
+      "p50": 90.27,
+      "p95": 111.46,
+      "p99": 198.16,
+      "max": 295.3607970000012,
+      "generatorCPUpercent": 8.6,
+      "generatorEventLoopP99ms": 22.8
+    },
+    {
+      "at": "2026-10-11T06:33:45.052Z",
+      "path": "/matches",
+      "mode": "keepalive",
+      "concurrency": 64,
+      "targetSeconds": 15,
+      "durationSeconds": 15.203,
+      "requests": 3089,
+      "rps": 203.2,
+      "statuses": {
+        "200": 3089
+      },
+      "errors": {},
+      "bytes": 11342808,
+      "p50": 299.1,
+      "p95": 411,
+      "p99": 896.51,
+      "max": 992.675080999994,
+      "generatorCPUpercent": 8.7,
+      "generatorEventLoopP99ms": 23
+    },
+    {
+      "at": "2026-10-11T06:34:00.350Z",
+      "path": "/matches",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 15,
+      "durationSeconds": 15.296,
+      "requests": 3174,
+      "rps": 207.5,
+      "statuses": {
+        "200": 3174
+      },
+      "errors": {},
+      "bytes": 11654928,
+      "p50": 591.8,
+      "p95": 752.07,
+      "p99": 1515.91,
+      "max": 1585.9942270000174,
+      "generatorCPUpercent": 12.2,
+      "generatorEventLoopP99ms": 29.4
+    },
+    {
+      "at": "2026-10-11T06:34:15.397Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 1,
+      "targetSeconds": 15,
+      "durationSeconds": 15.045,
+      "requests": 148,
+      "rps": 9.8,
+      "statuses": {
+        "200": 148
+      },
+      "errors": {},
+      "bytes": 2284728984,
+      "p50": 80.73,
+      "p95": 213.39,
+      "p99": 258.14,
+      "max": 291.12231900001643,
+      "generatorCPUpercent": 25.8,
+      "generatorEventLoopP99ms": 36.2
+    },
+    {
+      "at": "2026-10-11T06:34:32.542Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 16,
+      "targetSeconds": 15,
+      "durationSeconds": 17.145,
+      "requests": 1081,
+      "rps": 63.1,
+      "statuses": {
+        "200": 50,
+        "502": 992
+      },
+      "errors": {
+        "ECONNRESET": 36,
+        "timeout": 3
+      },
+      "bytes": 876085612,
+      "p50": 13.87,
+      "p95": 1385.02,
+      "p99": 3819.56,
+      "max": 5876.178003999987,
+      "generatorCPUpercent": 14,
+      "generatorEventLoopP99ms": 35.9
+    },
+    {
+      "at": "2026-10-11T06:34:48.711Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 64,
+      "targetSeconds": 15,
+      "durationSeconds": 16.167,
+      "requests": 10335,
+      "rps": 639.3,
+      "statuses": {
+        "200": 6,
+        "502": 10269
+      },
+      "errors": {
+        "ECONNRESET": 54,
+        "timeout": 6
+      },
+      "bytes": 187195708,
+      "p50": 19.59,
+      "p95": 201.15,
+      "p99": 2246.08,
+      "max": 7467.625786999997,
+      "generatorCPUpercent": 19.6,
+      "generatorEventLoopP99ms": 44.8
+    },
+    {
+      "at": "2026-10-11T06:35:03.757Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 15,
+      "durationSeconds": 15.04,
+      "requests": 21797,
+      "rps": 1449.3,
+      "statuses": {
+        "502": 21782
+      },
+      "errors": {
+        "ECONNRESET": 15
+      },
+      "bytes": 3106568,
+      "p50": 80.53,
+      "p95": 161.88,
+      "p99": 627.08,
+      "max": 3300.5371040000173,
+      "generatorCPUpercent": 24.6,
+      "generatorEventLoopP99ms": 54.7
+    },
+    {
+      "at": "2026-10-11T06:35:13.760Z",
+      "path": "/ready",
+      "mode": "keepalive",
+      "concurrency": 1,
+      "targetSeconds": 10,
+      "durationSeconds": 10.001,
+      "requests": 1706,
+      "rps": 170.6,
+      "statuses": {
+        "200": 981,
+        "502": 725
+      },
+      "errors": {},
+      "bytes": 13734,
+      "p50": 0.78,
+      "p95": 17.72,
+      "p99": 26.74,
+      "max": 1023.4462059999933,
+      "generatorCPUpercent": 4.2,
+      "generatorEventLoopP99ms": 21.4
+    },
+    {
+      "at": "2026-10-11T06:35:23.836Z",
+      "path": "/ready",
+      "mode": "keepalive",
+      "concurrency": 16,
+      "targetSeconds": 10,
+      "durationSeconds": 10.076,
+      "requests": 12986,
+      "rps": 1288.8,
+      "statuses": {
+        "200": 12986
+      },
+      "errors": {},
+      "bytes": 181804,
+      "p50": 3.42,
+      "p95": 75.51,
+      "p99": 85.5,
+      "max": 108.5775319999957,
+      "generatorCPUpercent": 27.4,
+      "generatorEventLoopP99ms": 40.7
+    },
+    {
+      "at": "2026-10-11T06:35:33.857Z",
+      "path": "/ready",
+      "mode": "keepalive",
+      "concurrency": 64,
+      "targetSeconds": 10,
+      "durationSeconds": 10.02,
+      "requests": 11957,
+      "rps": 1193.3,
+      "statuses": {
+        "200": 11957
+      },
+      "errors": {},
+      "bytes": 167398,
+      "p50": 21.78,
+      "p95": 110.81,
+      "p99": 202.06,
+      "max": 520.6415890000062,
+      "generatorCPUpercent": 12.4,
+      "generatorEventLoopP99ms": 22.4
+    },
+    {
+      "at": "2026-10-11T06:35:43.951Z",
+      "path": "/health",
+      "mode": "tls-churn",
+      "concurrency": 8,
+      "targetSeconds": 10,
+      "durationSeconds": 10.093,
+      "requests": 2550,
+      "rps": 252.7,
+      "statuses": {
+        "200": 2550
+      },
+      "errors": {},
+      "bytes": 91800,
+      "p50": 6.13,
+      "p95": 99.31,
+      "p99": 183.19,
+      "max": 291.7950370000326,
+      "generatorCPUpercent": 28,
+      "generatorEventLoopP99ms": 28.7
+    },
+    {
+      "at": "2026-10-11T06:35:54.039Z",
+      "path": "/health",
+      "mode": "tls-churn",
+      "concurrency": 32,
+      "targetSeconds": 10,
+      "durationSeconds": 10.085,
+      "requests": 4262,
+      "rps": 422.6,
+      "statuses": {
+        "200": 4262
+      },
+      "errors": {},
+      "bytes": 153432,
+      "p50": 86.73,
+      "p95": 193.85,
+      "p99": 411.21,
+      "max": 602.4961659999681,
+      "generatorCPUpercent": 27.6,
+      "generatorEventLoopP99ms": 32.7
+    },
+    {
+      "at": "2026-10-11T06:36:04.151Z",
+      "path": "/health",
+      "mode": "tls-churn",
+      "concurrency": 128,
+      "targetSeconds": 10,
+      "durationSeconds": 10.111,
+      "requests": 4416,
+      "rps": 436.7,
+      "statuses": {
+        "200": 4416
+      },
+      "errors": {},
+      "bytes": 158976,
+      "p50": 213.41,
+      "p95": 694.92,
+      "p99": 1282.02,
+      "max": 1506.537203999993,
+      "generatorCPUpercent": 32.9,
+      "generatorEventLoopP99ms": 54.4
+    },
+    {
+      "at": "2026-10-11T06:36:19.156Z",
+      "path": "/health",
+      "mode": "h2",
+      "concurrency": 1,
+      "targetSeconds": 15,
+      "durationSeconds": 15.004,
+      "requests": 7249,
+      "rps": 483.2,
+      "statuses": {
+        "200": 7249
+      },
+      "errors": {},
+      "bytes": 260964,
+      "p50": 0.83,
+      "p95": 4.55,
+      "p99": 34.41,
+      "max": 245.82858900004067,
+      "generatorCPUpercent": 22.5,
+      "generatorEventLoopP99ms": 24.1
+    },
+    {
+      "at": "2026-10-11T06:36:34.244Z",
+      "path": "/health",
+      "mode": "h2",
+      "concurrency": 64,
+      "targetSeconds": 15,
+      "durationSeconds": 15.087,
+      "requests": 15833,
+      "rps": 1049.4,
+      "statuses": {
+        "200": 15833
+      },
+      "errors": {},
+      "bytes": 569988,
+      "p50": 67.77,
+      "p95": 179.04,
+      "p99": 210.04,
+      "max": 389.45016200002283,
+      "generatorCPUpercent": 21.7,
+      "generatorEventLoopP99ms": 34.4
+    },
+    {
+      "at": "2026-10-11T06:36:49.349Z",
+      "path": "/health",
+      "mode": "h2",
+      "concurrency": 256,
+      "targetSeconds": 15,
+      "durationSeconds": 15.103,
+      "requests": 12239,
+      "rps": 810.3,
+      "statuses": {
+        "200": 12239
+      },
+      "errors": {},
+      "bytes": 440604,
+      "p50": 292.8,
+      "p95": 605.42,
+      "p99": 793.69,
+      "max": 1190.1293169999844,
+      "generatorCPUpercent": 12.4,
+      "generatorEventLoopP99ms": 27.5
+    }
+  ],
+  "http-fixed-results.json": [
+    {
+      "at": "2026-10-11T06:59:22.807Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 16,
+      "targetSeconds": 15,
+      "durationSeconds": 16.104,
+      "requests": 167,
+      "rps": 10.4,
+      "statuses": {
+        "200": 167
+      },
+      "errors": {},
+      "bytes": 2585470787,
+      "p50": 1406.6,
+      "p95": 2675.19,
+      "p99": 3116.81,
+      "max": 3675.408939,
+      "generatorCPUpercent": 27.2,
+      "generatorEventLoopP99ms": 44.6
+    },
+    {
+      "at": "2026-10-11T06:59:42.098Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 64,
+      "targetSeconds": 15,
+      "durationSeconds": 19.289,
+      "requests": 169,
+      "rps": 8.8,
+      "statuses": {
+        "200": 169
+      },
+      "errors": {},
+      "bytes": 2616434509,
+      "p50": 6181.32,
+      "p95": 12208.34,
+      "p99": 18779.32,
+      "max": 18779.968375999997,
+      "generatorCPUpercent": 20.8,
+      "generatorEventLoopP99ms": 34.7
+    },
+    {
+      "at": "2026-10-11T06:59:57.175Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 15,
+      "durationSeconds": 15.073,
+      "requests": 3977,
+      "rps": 263.8,
+      "statuses": {
+        "200": 3
+      },
+      "errors": {
+        "ECONNRESET": 1248,
+        "ECONNREFUSED": 2726
+      },
+      "bytes": 818660205,
+      "p50": 96.19,
+      "p95": 3154.87,
+      "p99": 3559.45,
+      "max": 3596.6257760000008,
+      "generatorCPUpercent": 55.2,
+      "generatorEventLoopP99ms": 118.3
+    },
+    {
+      "at": "2026-10-11T07:00:07.294Z",
+      "path": "/",
+      "mode": "gzip",
+      "concurrency": 1,
+      "targetSeconds": 10,
+      "durationSeconds": 10.118,
+      "requests": 570,
+      "rps": 56.3,
+      "statuses": {
+        "200": 33
+      },
+      "errors": {
+        "ECONNREFUSED": 503,
+        "ECONNRESET": 34
+      },
+      "bytes": 428711613,
+      "p50": 0.84,
+      "p95": 204.8,
+      "p99": 382.01,
+      "max": 497.31176499999856,
+      "generatorCPUpercent": 30.3,
+      "generatorEventLoopP99ms": 31.5
+    },
+    {
+      "at": "2026-10-11T07:00:19.206Z",
+      "path": "/",
+      "mode": "gzip",
+      "concurrency": 16,
+      "targetSeconds": 10,
+      "durationSeconds": 11.91,
+      "requests": 38,
+      "rps": 3.2,
+      "statuses": {
+        "200": 38
+      },
+      "errors": {},
+      "bytes": 493667918,
+      "p50": 4886.3,
+      "p95": 6178.8,
+      "p99": 7196.11,
+      "max": 7196.114415000004,
+      "generatorCPUpercent": 19.5,
+      "generatorEventLoopP99ms": 28.5
+    },
+    {
+      "at": "2026-10-11T07:00:40.494Z",
+      "path": "/",
+      "mode": "gzip",
+      "concurrency": 64,
+      "targetSeconds": 10,
+      "durationSeconds": 21.286,
+      "requests": 77,
+      "rps": 3.6,
+      "statuses": {
+        "200": 58
+      },
+      "errors": {
+        "timeout": 19
+      },
+      "bytes": 753493138,
+      "p50": 15963.15,
+      "p95": 21255.88,
+      "p99": 21267.93,
+      "max": 21267.926389,
+      "generatorCPUpercent": 17.5,
+      "generatorEventLoopP99ms": 26.5
+    },
+    {
+      "at": "2026-10-11T07:00:50.894Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 10,
+      "durationSeconds": 10.399,
+      "requests": 9325,
+      "rps": 896.7,
+      "statuses": {
+        "200": 9325
+      },
+      "errors": {},
+      "bytes": 102575,
+      "p50": 105.31,
+      "p95": 301.68,
+      "p99": 685.71,
+      "max": 798.6509579999984,
+      "generatorCPUpercent": 28.3,
+      "generatorEventLoopP99ms": 56.9
+    }
+  ],
+  "http-balanced-results.json": [
+    {
+      "at": "2026-10-11T07:06:48.676Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 15,
+      "durationSeconds": 17.352,
+      "requests": 863,
+      "rps": 49.7,
+      "statuses": {
+        "200": 863
+      },
+      "errors": {},
+      "bytes": 13360846043,
+      "p50": 2303.71,
+      "p95": 4204.01,
+      "p99": 4953.27,
+      "max": 5796.485506999999,
+      "generatorCPUpercent": 87.9,
+      "generatorEventLoopP99ms": 71.4
+    },
+    {
+      "at": "2026-10-11T07:07:07.602Z",
+      "path": "/",
+      "mode": "gzip",
+      "concurrency": 64,
+      "targetSeconds": 15,
+      "durationSeconds": 18.922,
+      "requests": 214,
+      "rps": 11.3,
+      "statuses": {
+        "200": 214
+      },
+      "errors": {},
+      "bytes": 2780129854,
+      "p50": 5197.19,
+      "p95": 7902.3,
+      "p99": 9653.48,
+      "max": 10659.160016000002,
+      "generatorCPUpercent": 43.1,
+      "generatorEventLoopP99ms": 80.7
+    },
+    {
+      "at": "2026-10-11T07:07:17.626Z",
+      "path": "/health",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 10,
+      "durationSeconds": 10.023,
+      "requests": 34889,
+      "rps": 3481,
+      "statuses": {
+        "200": 34889
+      },
+      "errors": {},
+      "bytes": 383779,
+      "p50": 25.29,
+      "p95": 103.75,
+      "p99": 200.57,
+      "max": 592.3221479999993,
+      "generatorCPUpercent": 64.1,
+      "generatorEventLoopP99ms": 100.8
+    }
+  ],
+  "ws-load-results.json": [
+    {
+      "at": "2026-10-11T06:39:37.257Z",
+      "clients": 10,
+      "actionsPerClientPerSecond": 0.5,
+      "activeSeconds": 30.000296658000003,
+      "drainSeconds": 5,
+      "sent": 140,
+      "durableOk": 140,
+      "durableRejected": {},
+      "notDurableAfterDrain": 0,
+      "rejectionsCumulative": {},
+      "open": 10,
+      "closed": [],
+      "hashChecks": 116,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 930886,
+      "readyP95ms": 15.323964999999589,
+      "httpErrors": {},
+      "generatorCPUpercent": 2.3789512647164486,
+      "generatorEventLoopP99ms": 23.052287,
+      "metrics": {
+        "joins": 40,
+        "leaves": 30,
+        "actions": {
+          "total": 340,
+          "ok": 340,
+          "rejected": 0,
+          "byType": {
+            "seat.claim": 30,
+            "seat.confirm": 30,
+            "fleet.orbit": 280
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "seat.claimed": 30,
+          "seat.seated": 30,
+          "fleet.orbit": 280
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 340,
+          "total": 15357.057524999866,
+          "max": 347.87771699999576,
+          "avg": 45.1678162499996
+        },
+        "advanceMs": {
+          "count": 44,
+          "total": 1501.130587000138,
+          "max": 93.76508000001195,
+          "avg": 34.116604250003135
+        },
+        "broadcastMs": {
+          "count": 381,
+          "total": 9855.317198999983,
+          "max": 154.23803499998758,
+          "avg": 25.866974275590508
+        },
+        "deltaBytes": {
+          "count": 3533,
+          "total": 1309307,
+          "max": 575,
+          "avg": 370.59354656099634
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T06:40:13.744Z",
+      "clients": 40,
+      "actionsPerClientPerSecond": 0.5,
+      "activeSeconds": 30.000385318999992,
+      "drainSeconds": 5,
+      "sent": 560,
+      "durableOk": 560,
+      "durableRejected": {},
+      "notDurableAfterDrain": 0,
+      "rejectionsCumulative": {},
+      "open": 40,
+      "closed": [],
+      "hashChecks": 464,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 3484678,
+      "readyP95ms": 216.7293009999994,
+      "httpErrors": {},
+      "generatorCPUpercent": 6.041824913430464,
+      "generatorEventLoopP99ms": 26.263551,
+      "metrics": {
+        "joins": 70,
+        "leaves": 30,
+        "actions": {
+          "total": 920,
+          "ok": 920,
+          "rejected": 0,
+          "byType": {
+            "seat.claim": 40,
+            "seat.confirm": 40,
+            "fleet.orbit": 840
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "seat.claimed": 40,
+          "seat.seated": 40,
+          "fleet.orbit": 840
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 920,
+          "total": 91639.39734300008,
+          "max": 420.5555490000406,
+          "avg": 99.60804059021747
+        },
+        "advanceMs": {
+          "count": 83,
+          "total": 2619.1587840001157,
+          "max": 93.76508000001195,
+          "avg": 31.556129927712238
+        },
+        "broadcastMs": {
+          "count": 999,
+          "total": 26675.595916999388,
+          "max": 160.15922400000272,
+          "avg": 26.7022982152146
+        },
+        "deltaBytes": {
+          "count": 9623,
+          "total": 3521835,
+          "max": 582,
+          "avg": 365.9809830614154
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T06:40:53.844Z",
+      "clients": 80,
+      "actionsPerClientPerSecond": 0.5,
+      "activeSeconds": 30.00152010899999,
+      "drainSeconds": 5,
+      "sent": 1120,
+      "durableOk": 838,
+      "durableRejected": {},
+      "notDurableAfterDrain": 282,
+      "rejectionsCumulative": {},
+      "open": 80,
+      "closed": [],
+      "hashChecks": 947,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 5006288,
+      "readyP95ms": 345.57593600000837,
+      "httpErrors": {},
+      "generatorCPUpercent": 10.319011827921411,
+      "generatorEventLoopP99ms": 34.078719,
+      "metrics": {
+        "joins": 110,
+        "leaves": 30,
+        "actions": {
+          "total": 1841,
+          "ok": 1841,
+          "rejected": 0,
+          "byType": {
+            "seat.claim": 80,
+            "seat.confirm": 80,
+            "fleet.orbit": 1681
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "seat.claimed": 80,
+          "seat.seated": 80,
+          "fleet.orbit": 1681
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 1841,
+          "total": 357853.4999530008,
+          "max": 1109.832063000009,
+          "avg": 194.3799565198266
+        },
+        "advanceMs": {
+          "count": 124,
+          "total": 4261.181566000305,
+          "max": 106.0139270000509,
+          "avg": 34.364367467744394
+        },
+        "broadcastMs": {
+          "count": 1957,
+          "total": 55591.54387299967,
+          "max": 258.9435480000102,
+          "avg": 28.40651194328036
+        },
+        "deltaBytes": {
+          "count": 18843,
+          "total": 6901040,
+          "max": 582,
+          "avg": 366.238921615454
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T06:42:00.714Z",
+      "clients": 160,
+      "actionsPerClientPerSecond": 0.5,
+      "activeSeconds": 45.010800115,
+      "drainSeconds": 5,
+      "sent": 3520,
+      "durableOk": 1613,
+      "durableRejected": {},
+      "notDurableAfterDrain": 1907,
+      "rejectionsCumulative": {},
+      "open": 160,
+      "closed": [],
+      "hashChecks": 2695,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 9662656,
+      "readyP95ms": 234.07202600000892,
+      "httpErrors": {},
+      "generatorCPUpercent": 16.640793550319305,
+      "generatorEventLoopP99ms": 30.212095,
+      "metrics": {
+        "joins": 190,
+        "leaves": 30,
+        "actions": {
+          "total": 3897,
+          "ok": 3897,
+          "rejected": 0,
+          "byType": {
+            "seat.claim": 160,
+            "seat.confirm": 160,
+            "fleet.orbit": 3577
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "seat.claimed": 160,
+          "seat.seated": 160,
+          "fleet.orbit": 3577
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 3897,
+          "total": 1186872.037173002,
+          "max": 1457.4663719999953,
+          "avg": 304.56044063972337
+        },
+        "advanceMs": {
+          "count": 249,
+          "total": 8148.918164000002,
+          "max": 149.08496800001012,
+          "avg": 32.72657897188756
+        },
+        "broadcastMs": {
+          "count": 4130,
+          "total": 105207.66934200044,
+          "max": 558.0890280000167,
+          "avg": 25.474011947215605
+        },
+        "deltaBytes": {
+          "count": 39853,
+          "total": 14584139,
+          "max": 583,
+          "avg": 365.94833513160864
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T06:42:36.070Z",
+      "clients": 160,
+      "actionsPerClientPerSecond": 2,
+      "activeSeconds": 30.000300266000007,
+      "drainSeconds": 5,
+      "sent": 9440,
+      "durableOk": 0,
+      "durableRejected": {},
+      "notDurableAfterDrain": 9440,
+      "rejectionsCumulative": {},
+      "open": 160,
+      "closed": [],
+      "hashChecks": 1891,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 5682988,
+      "readyP95ms": 348.1768949999823,
+      "httpErrors": {},
+      "generatorCPUpercent": 18.74808201681157,
+      "generatorEventLoopP99ms": 31.866879,
+      "metrics": {
+        "joins": 190,
+        "leaves": 30,
+        "actions": {
+          "total": 4871,
+          "ok": 4871,
+          "rejected": 0,
+          "byType": {
+            "seat.claim": 160,
+            "seat.confirm": 160,
+            "fleet.orbit": 4551
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "seat.claimed": 160,
+          "seat.seated": 160,
+          "fleet.orbit": 4551
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 4871,
+          "total": 1751737.3393690016,
+          "max": 1457.4663719999953,
+          "avg": 359.6258138716899
+        },
+        "advanceMs": {
+          "count": 249,
+          "total": 8148.918164000002,
+          "max": 149.08496800001012,
+          "avg": 32.72657897188756
+        },
+        "broadcastMs": {
+          "count": 5104,
+          "total": 133061.62499200023,
+          "max": 558.0890280000167,
+          "avg": 26.070067592476533
+        },
+        "deltaBytes": {
+          "count": 49593,
+          "total": 18098865,
+          "max": 583,
+          "avg": 364.9479765289456
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T06:43:01.483Z",
+      "clients": 160,
+      "actionsPerClientPerSecond": 10,
+      "activeSeconds": 20.002038858999992,
+      "drainSeconds": 5,
+      "sent": 30240,
+      "durableOk": 0,
+      "durableRejected": {},
+      "notDurableAfterDrain": 30240,
+      "rejectionsCumulative": {},
+      "open": 160,
+      "closed": [],
+      "hashChecks": 1339,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 2358164,
+      "readyP95ms": 1135.3596970000071,
+      "httpErrors": {},
+      "generatorCPUpercent": 45.7857979685496,
+      "generatorEventLoopP99ms": 78.512127,
+      "metrics": {
+        "joins": 190,
+        "leaves": 30,
+        "actions": {
+          "total": 5273,
+          "ok": 5273,
+          "rejected": 0,
+          "byType": {
+            "seat.claim": 160,
+            "seat.confirm": 160,
+            "fleet.orbit": 4953
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "seat.claimed": 160,
+          "seat.seated": 160,
+          "fleet.orbit": 4953
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 5273,
+          "total": 2154375.1252910024,
+          "max": 2256.089290999982,
+          "avg": 408.56725304210175
+        },
+        "advanceMs": {
+          "count": 249,
+          "total": 8148.918164000002,
+          "max": 149.08496800001012,
+          "avg": 32.72657897188756
+        },
+        "broadcastMs": {
+          "count": 5506,
+          "total": 153215.74163099995,
+          "max": 558.0890280000167,
+          "avg": 27.82705078659643
+        },
+        "deltaBytes": {
+          "count": 53613,
+          "total": 19548675,
+          "max": 583,
+          "avg": 364.6256504952157
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    }
+  ],
+  "ws-fixed-results.json": [
+    {
+      "at": "2026-10-11T07:07:54.850Z",
+      "clients": 80,
+      "actionsPerClientPerSecond": 0.5,
+      "activeSeconds": 30.000742334,
+      "drainSeconds": 5,
+      "sent": 1120,
+      "durableOk": 1120,
+      "durableRejected": {},
+      "notDurableAfterDrain": 0,
+      "rejectionsCumulative": {},
+      "open": 80,
+      "closed": [],
+      "hashChecks": 927,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 6753909,
+      "readyP95ms": 451.2064129999999,
+      "httpErrors": {},
+      "generatorCPUpercent": 11.95586070737422,
+      "generatorEventLoopP99ms": 33.030143,
+      "metrics": {
+        "joins": 81,
+        "leaves": 1,
+        "actions": {
+          "total": 1120,
+          "ok": 1120,
+          "rejected": 0,
+          "byType": {
+            "fleet.orbit": 1120
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "fleet.orbit": 1120
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 1120,
+          "total": 243238.61180599974,
+          "max": 821.8006560000067,
+          "avg": 217.17733196964264
+        },
+        "advanceMs": {
+          "count": 32,
+          "total": 1072.907465000084,
+          "max": 71.90458000000217,
+          "avg": 33.52835828125262
+        },
+        "broadcastMs": {
+          "count": 1152,
+          "total": 26120.627246000164,
+          "max": 305.9445990000095,
+          "avg": 22.674155595486255
+        },
+        "deltaBytes": {
+          "count": 11520,
+          "total": 4170844,
+          "max": 370,
+          "avg": 362.05243055555553
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T07:08:33.021Z",
+      "clients": 160,
+      "actionsPerClientPerSecond": 0.5,
+      "activeSeconds": 30.000834604999998,
+      "drainSeconds": 5,
+      "sent": 2240,
+      "durableOk": 968,
+      "durableRejected": {},
+      "notDurableAfterDrain": 1272,
+      "rejectionsCumulative": {
+        "E_RATE_LIMIT": 386
+      },
+      "open": 160,
+      "closed": [],
+      "hashChecks": 1912,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 6314770,
+      "readyP95ms": 801.0364759999939,
+      "httpErrors": {},
+      "generatorCPUpercent": 18.274007097780178,
+      "generatorEventLoopP99ms": 34.406399,
+      "metrics": {
+        "joins": 161,
+        "leaves": 1,
+        "actions": {
+          "total": 2094,
+          "ok": 2094,
+          "rejected": 0,
+          "byType": {
+            "fleet.orbit": 2094
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "fleet.orbit": 2094
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 2094,
+          "total": 698853.2989730008,
+          "max": 1187.271120999998,
+          "avg": 333.74083045511026
+        },
+        "advanceMs": {
+          "count": 149,
+          "total": 5336.758468999964,
+          "max": 154.60378200002015,
+          "avg": 35.817170932885666
+        },
+        "broadcastMs": {
+          "count": 2243,
+          "total": 55362.49804000073,
+          "max": 305.9445990000095,
+          "avg": 24.682344199732828
+        },
+        "deltaBytes": {
+          "count": 22430,
+          "total": 8121061,
+          "max": 370,
+          "avg": 362.0624609897459
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T07:08:58.601Z",
+      "clients": 160,
+      "actionsPerClientPerSecond": 2,
+      "activeSeconds": 20.000132502000007,
+      "drainSeconds": 5,
+      "sent": 6240,
+      "durableOk": 0,
+      "durableRejected": {},
+      "notDurableAfterDrain": 6240,
+      "rejectionsCumulative": {
+        "E_RATE_LIMIT": 3595,
+        "E_OUT_OF_ORDER": 244
+      },
+      "open": 160,
+      "closed": [],
+      "hashChecks": 1357,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 4724352,
+      "readyP95ms": 1225.268510000009,
+      "httpErrors": {},
+      "generatorCPUpercent": 20.333180232518107,
+      "generatorEventLoopP99ms": 66.355199,
+      "metrics": {
+        "joins": 161,
+        "leaves": 1,
+        "actions": {
+          "total": 2804,
+          "ok": 2804,
+          "rejected": 0,
+          "byType": {
+            "fleet.orbit": 2804
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "fleet.orbit": 2804
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 2804,
+          "total": 1106830.773540001,
+          "max": 1922.3171110000112,
+          "avg": 394.73280083452244
+        },
+        "advanceMs": {
+          "count": 149,
+          "total": 5336.758468999964,
+          "max": 154.60378200002015,
+          "avg": 35.817170932885666
+        },
+        "broadcastMs": {
+          "count": 2953,
+          "total": 75518.31600000069,
+          "max": 360.92304300004616,
+          "avg": 25.573422282424886
+        },
+        "deltaBytes": {
+          "count": 29530,
+          "total": 10690930,
+          "max": 370,
+          "avg": 362.0362343379614
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    },
+    {
+      "at": "2026-10-11T07:09:13.683Z",
+      "clients": 160,
+      "actionsPerClientPerSecond": 10,
+      "activeSeconds": 10.000578853999992,
+      "drainSeconds": 5,
+      "sent": 15680,
+      "durableOk": 0,
+      "durableRejected": {},
+      "notDurableAfterDrain": 15680,
+      "rejectionsCumulative": {
+        "E_RATE_LIMIT": 5969,
+        "E_OUT_OF_ORDER": 16487
+      },
+      "open": 160,
+      "closed": [],
+      "hashChecks": 804,
+      "hashErrorsCumulative": 0,
+      "bytesReceived": 4363978,
+      "readyP95ms": 239.79568400001153,
+      "httpErrors": {},
+      "generatorCPUpercent": 26.903341792866005,
+      "generatorEventLoopP99ms": 38.469631,
+      "metrics": {
+        "joins": 161,
+        "leaves": 1,
+        "actions": {
+          "total": 2824,
+          "ok": 2824,
+          "rejected": 0,
+          "byType": {
+            "fleet.orbit": 2824
+          },
+          "rejectByCode": {}
+        },
+        "eventsByType": {
+          "fleet.orbit": 2824
+        },
+        "battles": 0,
+        "captures": 0,
+        "desyncs": 0,
+        "deadLetters": 0,
+        "advanceOverflows": 0,
+        "submitMs": {
+          "count": 2824,
+          "total": 1119765.3476240013,
+          "max": 1922.3171110000112,
+          "avg": 396.51747437110527
+        },
+        "advanceMs": {
+          "count": 365,
+          "total": 11857.206049,
+          "max": 167.238245000015,
+          "avg": 32.485496024657536
+        },
+        "broadcastMs": {
+          "count": 3189,
+          "total": 82310.02403500112,
+          "max": 360.92304300004616,
+          "avg": 25.810606470680813
+        },
+        "deltaBytes": {
+          "count": 31890,
+          "total": 11545384,
+          "max": 370,
+          "avg": 362.03775478206336
+        },
+        "clientFps": null,
+        "clientRttMs": null,
+        "economy": null,
+        "end": null
+      }
+    }
+  ],
+  "drain-results.json": [
+    {
+      "at": "2026-10-11T06:43:47.553Z",
+      "receipts": 6624,
+      "ok": 6624,
+      "last_write": "2026-10-11T06:43:46.340Z"
+    },
+    {
+      "at": "2026-10-11T06:43:59.333Z",
+      "receipts": 7111,
+      "ok": 7111,
+      "last_write": "2026-10-11T06:43:57.851Z"
+    },
+    {
+      "at": "2026-10-11T06:44:10.341Z",
+      "receipts": 7564,
+      "ok": 7564,
+      "last_write": "2026-10-11T06:44:09.404Z"
+    },
+    {
+      "at": "2026-10-11T06:44:21.936Z",
+      "receipts": 8068,
+      "ok": 8068,
+      "last_write": "2026-10-11T06:44:20.438Z"
+    },
+    {
+      "at": "2026-10-11T06:44:33.347Z",
+      "receipts": 8582,
+      "ok": 8582,
+      "last_write": "2026-10-11T06:44:31.931Z"
+    },
+    {
+      "at": "2026-10-11T06:44:45.936Z",
+      "receipts": 9051,
+      "ok": 9051,
+      "last_write": "2026-10-11T06:44:43.735Z"
+    },
+    {
+      "at": "2026-10-11T06:44:59.035Z",
+      "receipts": 9548,
+      "ok": 9548,
+      "last_write": "2026-10-11T06:44:56.037Z"
+    }
+  ],
+  "chaos-fixed-results.json": [
+    {
+      "name": "kill game with overloaded queue and preserve durable receipts",
+      "at": "2026-10-11T07:02:21.548Z",
+      "status": "pass",
+      "before": 16956,
+      "after": 16956,
+      "missingDurable": 0,
+      "recoveryMs": 794.9024790000003,
+      "crashEvidence": {
+        "beforePid": 99456,
+        "afterPid": 101831,
+        "restartsBefore": 0,
+        "restartsAfter": 1,
+        "processRecoveryMs": 2139.768279
+      },
+      "note": "Unacknowledged overload queue intentionally interrupted; this checks only committed receipts."
+    },
+    {
+      "name": "pause PostgreSQL for 8 seconds during live action",
+      "at": "2026-10-11T07:02:29.842Z",
+      "status": "pass",
+      "health": {
+        "status": 200,
+        "ms": 2.047512000000097
+      },
+      "readiness": {
+        "status": 503,
+        "ms": 1010.8615709999999
+      },
+      "pauseMs": 8042.247423000001,
+      "noPrematureDelta": true,
+      "durableAfterRecovery": true,
+      "recoveryMs": 27.8735429999997
+    },
+    {
+      "name": "exclusive database row lock bounds acknowledgement and resumes",
+      "at": "2026-10-11T07:02:32.392Z",
+      "status": "pass",
+      "sent": 10,
+      "committedBeforeUnlock": 0,
+      "committedAfterUnlock": 10,
+      "rejected": 0,
+      "health": {
+        "status": 200,
+        "ms": 2.8429740000010497
+      },
+      "recoveryMs": 209.38167799999974
+    },
+    {
+      "name": "disconnect database network for 10 seconds",
+      "at": "2026-10-11T07:02:45.763Z",
+      "status": "pass",
+      "health": {
+        "status": 200,
+        "ms": 1.646493999998711
+      },
+      "readiness": {
+        "status": 503,
+        "ms": 1005.1222780000007
+      },
+      "recoveryMs": 15.160011000003578,
+      "actionPersisted": true
+    },
+    {
+      "name": "kill PostgreSQL and recover from WAL",
+      "at": "2026-10-11T07:02:49.368Z",
+      "status": "pass",
+      "before": 16969,
+      "after": 16969,
+      "missingDurable": 0,
+      "recoveryMs": 20.23816699999952,
+      "crashEvidence": {
+        "beforePid": 95192,
+        "afterPid": 102263,
+        "restartsBefore": 1,
+        "restartsAfter": 2,
+        "processRecoveryMs": 2311.9620539999996
+      },
+      "newAction": true
+    },
+    {
+      "name": "kill HTTPS proxy while room remains durable",
+      "at": "2026-10-11T07:02:51.886Z",
+      "status": "pass",
+      "recoveryMs": 45.25702099999762,
+      "durableBefore": 16970,
+      "durableAfter": 16971,
+      "reconnect": true,
+      "crashEvidence": {
+        "beforePid": 100797,
+        "afterPid": 102608,
+        "restartsBefore": 5,
+        "restartsAfter": 6,
+        "processRecoveryMs": 2280.887931000001
+      }
+    },
+    {
+      "name": "CPU throttle game to 0.1 CPU for 20 seconds",
+      "at": "2026-10-11T07:03:15.200Z",
+      "status": "pass",
+      "sent": 40,
+      "durable": 40,
+      "health": [
+        {
+          "status": 200,
+          "ms": 1.797219000000041
+        },
+        {
+          "status": 200,
+          "ms": 2.078519000002416
+        },
+        {
+          "status": 200,
+          "ms": 3.982149000003119
+        },
+        {
+          "status": 200,
+          "ms": 3.3093169999992824
+        },
+        {
+          "status": 200,
+          "ms": 26.0810399999973
+        },
+        {
+          "status": 200,
+          "ms": 2.2672979999988456
+        },
+        {
+          "status": 200,
+          "ms": 4.489012999998522
+        },
+        {
+          "status": 200,
+          "ms": 2.8251779999991413
+        },
+        {
+          "status": 200,
+          "ms": 3.005238999998255
+        },
+        {
+          "status": 200,
+          "ms": 2.8948549999986426
+        },
+        {
+          "status": 200,
+          "ms": 2.115272000002733
+        },
+        {
+          "status": 200,
+          "ms": 2.1666410000034375
+        },
+        {
+          "status": 200,
+          "ms": 2.7976089999938267
+        },
+        {
+          "status": 200,
+          "ms": 2.2609359999987646
+        },
+        {
+          "status": 200,
+          "ms": 2.4308280000041123
+        },
+        {
+          "status": 200,
+          "ms": 2.2567979999948875
+        },
+        {
+          "status": 200,
+          "ms": 2.44217899999785
+        },
+        {
+          "status": 200,
+          "ms": 2.480106999995769
+        },
+        {
+          "status": 200,
+          "ms": 3.6935490000032587
+        },
+        {
+          "status": 200,
+          "ms": 13.610337999998592
+        },
+        {
+          "status": 200,
+          "ms": 3.5800129999988712
+        },
+        {
+          "status": 200,
+          "ms": 16.04840200000035
+        },
+        {
+          "status": 200,
+          "ms": 23.564554000004136
+        },
+        {
+          "status": 200,
+          "ms": 2.208356000002823
+        },
+        {
+          "status": 200,
+          "ms": 2.7471720000030473
+        },
+        {
+          "status": 200,
+          "ms": 2.969046000005619
+        },
+        {
+          "status": 200,
+          "ms": 2.817350000004808
+        },
+        {
+          "status": 200,
+          "ms": 2.74012099999527
+        },
+        {
+          "status": 200,
+          "ms": 2.7156990000003134
+        },
+        {
+          "status": 200,
+          "ms": 2.5951270000005024
+        },
+        {
+          "status": 200,
+          "ms": 2.967795999997179
+        },
+        {
+          "status": 200,
+          "ms": 2.7871129999984987
+        },
+        {
+          "status": 200,
+          "ms": 3.317267999998876
+        },
+        {
+          "status": 200,
+          "ms": 2.584404999994149
+        },
+        {
+          "status": 200,
+          "ms": 2.7126229999994393
+        },
+        {
+          "status": 200,
+          "ms": 2.5807690000001458
+        },
+        {
+          "status": 200,
+          "ms": 2.5808000000033644
+        },
+        {
+          "status": 200,
+          "ms": 2.418342000004486
+        },
+        {
+          "status": 200,
+          "ms": 2.7287349999969592
+        },
+        {
+          "status": 200,
+          "ms": 3.1558959999965737
+        }
+      ],
+      "recoveryMs": 2.8853869999948074
+    },
+    {
+      "name": "force container memory exhaustion and restore limit",
+      "at": "2026-10-11T07:03:19.991Z",
+      "status": "pass",
+      "restartBefore": 2,
+      "restartAfter": 6,
+      "observedState": {
+        "status": "restarting",
+        "OOMKilled": true,
+        "exit": 137
+      },
+      "missingDurable": 0,
+      "recoveryMs": 1591.9256509999977
+    }
+  ],
+  "queue-retry-two-results.json": {
+    "name": "two peers fill durable mailbox below per-socket flood limit, then retry original envelopes",
+    "earlyRateRefusals": 36,
+    "refusalObservationMs": 1502.952159,
+    "prematureDurable": 0,
+    "initialDurable": 64,
+    "retried": 36,
+    "finalDurable": 100,
+    "ok": 100,
+    "hashErrors": 0,
+    "status": "pass"
+  },
+  "market-race-results.json": {
+    "name": "64 distinct synthetic accounts race to buy one item through trusted upstream",
+    "statuses": {
+      "200": 1,
+      "404": 63
+    },
+    "winners": 1,
+    "ownerIsWinningBuyer": true,
+    "ledger": [
+      {
+        "winner": true,
+        "seller": false,
+        "delta": -100
+      },
+      {
+        "winner": false,
+        "seller": true,
+        "delta": 92
+      },
+      {
+        "winner": false,
+        "seller": false,
+        "delta": 8
+      }
+    ],
+    "negativeWallets": 0,
+    "status": "pass"
+  },
+  "protocol-pressure-results.json": [
+    {
+      "name": "TLS protocol boundaries and certificate hostname",
+      "probes": [
+        {
+          "requested": "TLSv1",
+          "accepted": false,
+          "error": "ERR_SSL_TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        {
+          "requested": "TLSv1.1",
+          "accepted": false,
+          "error": "ERR_SSL_TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        {
+          "requested": "TLSv1.2",
+          "accepted": true,
+          "version": "TLSv1.2",
+          "cipher": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+          "alpn": "h2"
+        },
+        {
+          "requested": "TLSv1.3",
+          "accepted": true,
+          "version": "TLSv1.3",
+          "cipher": "TLS_AES_128_GCM_SHA256",
+          "alpn": "h2"
+        }
+      ],
+      "wrongHostname": "ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR"
+    },
+    {
+      "name": "1024 incomplete HTTPS request headers held for 20 seconds",
+      "opened": 1024,
+      "stillOpenAfter20s": 1024,
+      "handshakeErrors": {},
+      "ready": [
+        {
+          "status": 200,
+          "ms": 52.317857000000004
+        },
+        {
+          "status": 200,
+          "ms": 2.7432390000012674
+        },
+        {
+          "status": 200,
+          "ms": 7.557217000001401
+        },
+        {
+          "status": 200,
+          "ms": 39.698340999999346
+        },
+        {
+          "status": 200,
+          "ms": 53.39511400000083
+        },
+        {
+          "status": 200,
+          "ms": 32.45369500000015
+        },
+        {
+          "status": 200,
+          "ms": 84.46829299999808
+        },
+        {
+          "status": 200,
+          "ms": 6.1991090000010445
+        },
+        {
+          "status": 200,
+          "ms": 15.250596999998379
+        },
+        {
+          "status": 200,
+          "ms": 37.085839999999735
+        }
+      ],
+      "recovered": {
+        "status": 200,
+        "ms": 39.81387099999847
+      }
+    },
+    {
+      "name": "HTTP2 stream reset burst for 10 seconds",
+      "attempted": 25200,
+      "responses": 6274,
+      "resets": 25150,
+      "errors": {},
+      "ready": [
+        {
+          "status": 200,
+          "ms": 25.854316000000836
+        },
+        {
+          "status": 200,
+          "ms": 107.17607599999974
+        },
+        {
+          "status": 200,
+          "ms": 61.770393999999214
+        },
+        {
+          "status": 200,
+          "ms": 10.099256999998033
+        },
+        {
+          "status": 200,
+          "ms": 5.923167000000831
+        },
+        {
+          "status": 200,
+          "ms": 21.340786999997363
+        },
+        {
+          "status": 200,
+          "ms": 13.317168000001402
+        },
+        {
+          "status": 200,
+          "ms": 64.46904900000663
+        },
+        {
+          "status": 200,
+          "ms": 38.34350500000437
+        },
+        {
+          "status": 200,
+          "ms": 17.071730999996362
+        }
+      ],
+      "recovered": {
+        "status": 200,
+        "ms": 5.913344000000507
+      }
+    },
+    {
+      "name": "edge operator blocking and spoofed forwarded auth addresses",
+      "operator": 404,
+      "statuses": [
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        401,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429
+      ],
+      "limited": 10,
+      "healthy": {
+        "status": 200,
+        "ms": 2.785089999997581
+      }
+    }
+  ],
+  "http3-result.json": {
+    "exit": 0,
+    "stdout": "{\"ok\":true} protocol=3",
+    "stderr": ""
+  },
+  "isolation-results.json": [
+    {
+      "network": "mg-stress-untrusted",
+      "targets": [
+        {
+          "name": "database",
+          "connected": false,
+          "reason": "ENETUNREACH"
+        },
+        {
+          "name": "game",
+          "connected": false,
+          "reason": "ENETUNREACH"
+        }
+      ]
+    },
+    {
+      "network": "mg-stress-private",
+      "targets": [
+        {
+          "name": "database",
+          "connected": true
+        },
+        {
+          "name": "game",
+          "connected": true
+        }
+      ]
+    }
+  ],
+  "disk-full-results.json": {
+    "profile": "192 MiB dedicated tmpfs volume, held mounted by an independent keeper; synthetic PostgreSQL only",
+    "before": "1000:9d8d0c4fd8532ab746d46dd9260e52c4",
+    "fillError": "dd: error writing '/data/pressure': No space left on device\n147+0 records in\n146+0 records out\n153374720 bytes (146.3MB) copied, 2.201333 seconds, 66.4MB/s\n",
+    "diskFull": "Filesystem           1K-blocks      Used Available Use% Mounted on\ntmpfs                   196608    196608         0 100% /data",
+    "writeSucceeded": false,
+    "writeError": "ERROR:  could not extend file \"base/16384/16385\": No space left on device\nHINT:  Check free disk space.\n",
+    "recoveryMs": 77.72775100000035,
+    "after": "1000:9d8d0c4fd8532ab746d46dd9260e52c4",
+    "newWrite": "INSERT 0 1\n1001",
+    "enospcEvidence": [
+      "2026-10-11 07:13:18.147 UTC [70] LOG:  database system is ready to accept connections"
+    ],
+    "status": "pass"
+  },
+  "mini-string.json": {
+    "name": "mini-string",
+    "port": 19879,
+    "concurrency": 16,
+    "seconds": 15,
+    "durationMs": 15000.558997999999,
+    "requests": 281353,
+    "statuses": {
+      "200": 17
+    },
+    "errors": {
+      "ECONNRESET": 359,
+      "ECONNREFUSED": 280982
+    },
+    "bytes": 210979323
+  },
+  "mini-buffer-warm.json": {
+    "name": "mini-buffer-warm",
+    "port": 19879,
+    "concurrency": 16,
+    "seconds": 15,
+    "durationMs": 15073.938774,
+    "requests": 1535,
+    "statuses": {
+      "200": 1535
+    },
+    "errors": {},
+    "bytes": 23696344530
+  },
+  "soak-results.json": {
+    "at": "2026-10-11T07:30:04.823Z",
+    "targetSeconds": 1200,
+    "actualSeconds": 1219.01891509,
+    "clients": 160,
+    "sentUnique": 9579,
+    "duplicatesInjected": 47,
+    "durableOk": 9579,
+    "durableRejected": 0,
+    "notDurable": 0,
+    "open": 160,
+    "hashChecks": 65438,
+    "hashErrors": 0,
+    "faults": [],
+    "samples": [
+      {
+        "at": "2026-10-11T07:09:55.818Z",
+        "elapsedSeconds": 10.014298538999999,
+        "sent": 79,
+        "open": 160,
+        "hashes": 801,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 30.08553699999902
+      },
+      {
+        "at": "2026-10-11T07:10:05.862Z",
+        "elapsedSeconds": 20.057884882,
+        "sent": 158,
+        "open": 160,
+        "hashes": 1327,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 14.635936000002403
+      },
+      {
+        "at": "2026-10-11T07:10:15.878Z",
+        "elapsedSeconds": 30.073519507000004,
+        "sent": 237,
+        "open": 160,
+        "hashes": 1860,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 34.13397899999836
+      },
+      {
+        "at": "2026-10-11T07:10:25.912Z",
+        "elapsedSeconds": 40.107757325,
+        "sent": 317,
+        "open": 160,
+        "hashes": 2394,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.871757000000798
+      },
+      {
+        "at": "2026-10-11T07:10:35.919Z",
+        "elapsedSeconds": 50.114987035,
+        "sent": 396,
+        "open": 160,
+        "hashes": 2934,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 14.70237300000008
+      },
+      {
+        "at": "2026-10-11T07:10:45.937Z",
+        "elapsedSeconds": 60.132715791,
+        "sent": 476,
+        "open": 160,
+        "hashes": 3475,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.826465000005555
+      },
+      {
+        "at": "2026-10-11T07:10:55.947Z",
+        "elapsedSeconds": 70.14256833399999,
+        "sent": 555,
+        "open": 160,
+        "hashes": 3997,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 10.084199999997509
+      },
+      {
+        "at": "2026-10-11T07:11:05.957Z",
+        "elapsedSeconds": 80.152925457,
+        "sent": 635,
+        "open": 160,
+        "hashes": 4535,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 189.81357900000876
+      },
+      {
+        "at": "2026-10-11T07:11:16.147Z",
+        "elapsedSeconds": 90.34313841,
+        "sent": 716,
+        "open": 160,
+        "hashes": 5071,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 38.07597299999907
+      },
+      {
+        "at": "2026-10-11T07:11:26.186Z",
+        "elapsedSeconds": 100.382126457,
+        "sent": 796,
+        "open": 160,
+        "hashes": 5616,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 24.255197999998927
+      },
+      {
+        "at": "2026-10-11T07:11:36.211Z",
+        "elapsedSeconds": 110.40680495999999,
+        "sent": 872,
+        "open": 160,
+        "hashes": 6150,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 53.0641009999963
+      },
+      {
+        "at": "2026-10-11T07:11:46.264Z",
+        "elapsedSeconds": 120.460301589,
+        "sent": 952,
+        "open": 160,
+        "hashes": 6686,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 13.16081000000122
+      },
+      {
+        "at": "2026-10-11T07:11:56.278Z",
+        "elapsedSeconds": 130.47418993899998,
+        "sent": 1032,
+        "open": 160,
+        "hashes": 7225,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 37.80334400001448
+      },
+      {
+        "at": "2026-10-11T07:12:06.318Z",
+        "elapsedSeconds": 140.513687749,
+        "sent": 1112,
+        "open": 160,
+        "hashes": 7756,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 21.911571000004187
+      },
+      {
+        "at": "2026-10-11T07:12:16.340Z",
+        "elapsedSeconds": 150.535687262,
+        "sent": 1192,
+        "open": 160,
+        "hashes": 8288,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 40.10250899998937
+      },
+      {
+        "at": "2026-10-11T07:12:26.381Z",
+        "elapsedSeconds": 160.57659468,
+        "sent": 1272,
+        "open": 160,
+        "hashes": 8823,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 7.183038999995915
+      },
+      {
+        "at": "2026-10-11T07:12:36.388Z",
+        "elapsedSeconds": 170.583684335,
+        "sent": 1352,
+        "open": 160,
+        "hashes": 9366,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 26.948892999993404
+      },
+      {
+        "at": "2026-10-11T07:12:46.416Z",
+        "elapsedSeconds": 180.611481688,
+        "sent": 1432,
+        "open": 160,
+        "hashes": 9900,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.426919999998063
+      },
+      {
+        "at": "2026-10-11T07:12:56.422Z",
+        "elapsedSeconds": 190.61823158,
+        "sent": 1512,
+        "open": 160,
+        "hashes": 10431,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 9.875494000007166
+      },
+      {
+        "at": "2026-10-11T07:13:06.434Z",
+        "elapsedSeconds": 200.63032655300003,
+        "sent": 1592,
+        "open": 160,
+        "hashes": 10963,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.118511999986367
+      },
+      {
+        "at": "2026-10-11T07:13:16.441Z",
+        "elapsedSeconds": 210.63690193300002,
+        "sent": 1671,
+        "open": 160,
+        "hashes": 11505,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 9.7835699999996
+      },
+      {
+        "at": "2026-10-11T07:13:26.452Z",
+        "elapsedSeconds": 220.648463431,
+        "sent": 1751,
+        "open": 160,
+        "hashes": 12035,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.011338999989675
+      },
+      {
+        "at": "2026-10-11T07:13:36.461Z",
+        "elapsedSeconds": 230.657301986,
+        "sent": 1831,
+        "open": 160,
+        "hashes": 12568,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 11.919617999985348
+      },
+      {
+        "at": "2026-10-11T07:13:46.474Z",
+        "elapsedSeconds": 240.67010963400003,
+        "sent": 1911,
+        "open": 160,
+        "hashes": 13105,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 20.64248700000462
+      },
+      {
+        "at": "2026-10-11T07:13:56.497Z",
+        "elapsedSeconds": 250.692829345,
+        "sent": 1991,
+        "open": 160,
+        "hashes": 13640,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.346197000006214
+      },
+      {
+        "at": "2026-10-11T07:14:06.506Z",
+        "elapsedSeconds": 260.702392611,
+        "sent": 2071,
+        "open": 160,
+        "hashes": 14174,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 10.626946000033058
+      },
+      {
+        "at": "2026-10-11T07:14:16.518Z",
+        "elapsedSeconds": 270.71401505,
+        "sent": 2151,
+        "open": 160,
+        "hashes": 14706,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 20.131684999971185
+      },
+      {
+        "at": "2026-10-11T07:14:26.539Z",
+        "elapsedSeconds": 280.735274442,
+        "sent": 2231,
+        "open": 160,
+        "hashes": 15244,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 12.511814999976195
+      },
+      {
+        "at": "2026-10-11T07:14:36.555Z",
+        "elapsedSeconds": 290.75066763899997,
+        "sent": 2311,
+        "open": 160,
+        "hashes": 15774,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.24060499999905
+      },
+      {
+        "at": "2026-10-11T07:14:46.563Z",
+        "elapsedSeconds": 300.75908640499995,
+        "sent": 2390,
+        "open": 160,
+        "hashes": 16313,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 32.45831100002397
+      },
+      {
+        "at": "2026-10-11T07:14:56.596Z",
+        "elapsedSeconds": 310.791897503,
+        "sent": 2470,
+        "open": 160,
+        "hashes": 16850,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 40.092014000052586
+      },
+      {
+        "at": "2026-10-11T07:15:06.637Z",
+        "elapsedSeconds": 320.833067346,
+        "sent": 2550,
+        "open": 160,
+        "hashes": 17384,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 35.402916999999434
+      },
+      {
+        "at": "2026-10-11T07:15:16.673Z",
+        "elapsedSeconds": 330.868825201,
+        "sent": 2631,
+        "open": 160,
+        "hashes": 17916,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 23.12921500002267
+      },
+      {
+        "at": "2026-10-11T07:15:26.697Z",
+        "elapsedSeconds": 340.89301176199996,
+        "sent": 2711,
+        "open": 160,
+        "hashes": 18457,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 17.17792400001781
+      },
+      {
+        "at": "2026-10-11T07:15:36.716Z",
+        "elapsedSeconds": 350.91211575299997,
+        "sent": 2791,
+        "open": 160,
+        "hashes": 18992,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 65.01853300002404
+      },
+      {
+        "at": "2026-10-11T07:15:46.784Z",
+        "elapsedSeconds": 360.98006323799996,
+        "sent": 2871,
+        "open": 160,
+        "hashes": 19530,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.09076200000709
+      },
+      {
+        "at": "2026-10-11T07:15:56.793Z",
+        "elapsedSeconds": 370.98941133899996,
+        "sent": 2951,
+        "open": 160,
+        "hashes": 20059,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 10.59328499995172
+      },
+      {
+        "at": "2026-10-11T07:16:06.806Z",
+        "elapsedSeconds": 381.00200548,
+        "sent": 3031,
+        "open": 160,
+        "hashes": 20596,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 20.1355770000373
+      },
+      {
+        "at": "2026-10-11T07:16:16.827Z",
+        "elapsedSeconds": 391.023124334,
+        "sent": 3111,
+        "open": 160,
+        "hashes": 21138,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 9.388945000013337
+      },
+      {
+        "at": "2026-10-11T07:16:26.837Z",
+        "elapsedSeconds": 401.03288870299997,
+        "sent": 3191,
+        "open": 160,
+        "hashes": 21663,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 30.589626999979373
+      },
+      {
+        "at": "2026-10-11T07:16:36.871Z",
+        "elapsedSeconds": 411.06666526,
+        "sent": 3271,
+        "open": 160,
+        "hashes": 22204,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 20.127495000022464
+      },
+      {
+        "at": "2026-10-11T07:16:46.891Z",
+        "elapsedSeconds": 421.086685113,
+        "sent": 3351,
+        "open": 160,
+        "hashes": 22737,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.692200999998022
+      },
+      {
+        "at": "2026-10-11T07:16:56.898Z",
+        "elapsedSeconds": 431.094329134,
+        "sent": 3431,
+        "open": 160,
+        "hashes": 23267,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 20.116175000031944
+      },
+      {
+        "at": "2026-10-11T07:17:06.919Z",
+        "elapsedSeconds": 441.114999226,
+        "sent": 3511,
+        "open": 160,
+        "hashes": 23802,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 29.893460000050254
+      },
+      {
+        "at": "2026-10-11T07:17:16.951Z",
+        "elapsedSeconds": 451.147045783,
+        "sent": 3591,
+        "open": 160,
+        "hashes": 24335,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 17.57828400004655
+      },
+      {
+        "at": "2026-10-11T07:17:26.969Z",
+        "elapsedSeconds": 461.165001321,
+        "sent": 3669,
+        "open": 160,
+        "hashes": 24865,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 80.7593469999847
+      },
+      {
+        "at": "2026-10-11T07:17:37.052Z",
+        "elapsedSeconds": 471.247883298,
+        "sent": 3749,
+        "open": 160,
+        "hashes": 25403,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 70.92239700001664
+      },
+      {
+        "at": "2026-10-11T07:17:47.124Z",
+        "elapsedSeconds": 481.32002470199996,
+        "sent": 3828,
+        "open": 160,
+        "hashes": 25944,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 19.19048200000543
+      },
+      {
+        "at": "2026-10-11T07:17:57.144Z",
+        "elapsedSeconds": 491.34016658699994,
+        "sent": 3908,
+        "open": 160,
+        "hashes": 26483,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.809542000002693
+      },
+      {
+        "at": "2026-10-11T07:18:07.152Z",
+        "elapsedSeconds": 501.348447828,
+        "sent": 3988,
+        "open": 160,
+        "hashes": 27024,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 18.446850000007544
+      },
+      {
+        "at": "2026-10-11T07:18:17.172Z",
+        "elapsedSeconds": 511.367487708,
+        "sent": 4068,
+        "open": 160,
+        "hashes": 27558,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.22804700001143
+      },
+      {
+        "at": "2026-10-11T07:18:27.181Z",
+        "elapsedSeconds": 521.3771043209999,
+        "sent": 4147,
+        "open": 160,
+        "hashes": 28087,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.54817299998831
+      },
+      {
+        "at": "2026-10-11T07:18:37.188Z",
+        "elapsedSeconds": 531.383584334,
+        "sent": 4227,
+        "open": 160,
+        "hashes": 28612,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 21.30107200006023
+      },
+      {
+        "at": "2026-10-11T07:18:47.209Z",
+        "elapsedSeconds": 541.404916243,
+        "sent": 4307,
+        "open": 160,
+        "hashes": 29157,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 14.99750000005588
+      },
+      {
+        "at": "2026-10-11T07:18:57.225Z",
+        "elapsedSeconds": 551.420786475,
+        "sent": 4387,
+        "open": 160,
+        "hashes": 29691,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 13.363899999996647
+      },
+      {
+        "at": "2026-10-11T07:19:07.244Z",
+        "elapsedSeconds": 561.439648833,
+        "sent": 4467,
+        "open": 160,
+        "hashes": 30222,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 30.537156999926083
+      },
+      {
+        "at": "2026-10-11T07:19:17.276Z",
+        "elapsedSeconds": 571.472247317,
+        "sent": 4547,
+        "open": 160,
+        "hashes": 30754,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 23.15638099994976
+      },
+      {
+        "at": "2026-10-11T07:19:27.300Z",
+        "elapsedSeconds": 581.495871851,
+        "sent": 4627,
+        "open": 160,
+        "hashes": 31299,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.078341000014916
+      },
+      {
+        "at": "2026-10-11T07:19:37.309Z",
+        "elapsedSeconds": 591.504985392,
+        "sent": 4707,
+        "open": 160,
+        "hashes": 31831,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 27.9590479999315
+      },
+      {
+        "at": "2026-10-11T07:19:47.338Z",
+        "elapsedSeconds": 601.534419603,
+        "sent": 4787,
+        "open": 160,
+        "hashes": 32362,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 56.70426800008863
+      },
+      {
+        "at": "2026-10-11T07:19:51.164Z",
+        "kind": "controlled reconnect",
+        "clients": 160,
+        "durationMs": 1768.2880209999857,
+        "failures": 0
+      },
+      {
+        "at": "2026-10-11T07:20:01.164Z",
+        "elapsedSeconds": 615.360176748,
+        "sent": 4868,
+        "open": 160,
+        "hashes": 33226,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 33.11162500001956
+      },
+      {
+        "at": "2026-10-11T07:20:11.201Z",
+        "elapsedSeconds": 625.396913458,
+        "sent": 4948,
+        "open": 160,
+        "hashes": 33753,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 70.5997539999662
+      },
+      {
+        "at": "2026-10-11T07:20:21.272Z",
+        "elapsedSeconds": 635.467839993,
+        "sent": 5028,
+        "open": 160,
+        "hashes": 34294,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 8.644459999981336
+      },
+      {
+        "at": "2026-10-11T07:20:31.281Z",
+        "elapsedSeconds": 645.477347367,
+        "sent": 5108,
+        "open": 160,
+        "hashes": 34832,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 14.642969999928027
+      },
+      {
+        "at": "2026-10-11T07:20:41.297Z",
+        "elapsedSeconds": 655.493256984,
+        "sent": 5188,
+        "open": 160,
+        "hashes": 35362,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 12.263694999972358
+      },
+      {
+        "at": "2026-10-11T07:20:51.310Z",
+        "elapsedSeconds": 665.506056857,
+        "sent": 5268,
+        "open": 160,
+        "hashes": 35900,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 13.366022999980487
+      },
+      {
+        "at": "2026-10-11T07:21:01.325Z",
+        "elapsedSeconds": 675.521419985,
+        "sent": 5348,
+        "open": 160,
+        "hashes": 36433,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 12.001383000053465
+      },
+      {
+        "at": "2026-10-11T07:21:11.339Z",
+        "elapsedSeconds": 685.534487341,
+        "sent": 5428,
+        "open": 160,
+        "hashes": 36969,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 10.82309499999974
+      },
+      {
+        "at": "2026-10-11T07:21:21.350Z",
+        "elapsedSeconds": 695.5463680729999,
+        "sent": 5508,
+        "open": 160,
+        "hashes": 37498,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 29.558286999934353
+      },
+      {
+        "at": "2026-10-11T07:21:31.381Z",
+        "elapsedSeconds": 705.577458354,
+        "sent": 5588,
+        "open": 160,
+        "hashes": 38041,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 13.148128999979235
+      },
+      {
+        "at": "2026-10-11T07:21:41.397Z",
+        "elapsedSeconds": 715.592706048,
+        "sent": 5668,
+        "open": 160,
+        "hashes": 38572,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 19.859045999939553
+      },
+      {
+        "at": "2026-10-11T07:21:51.417Z",
+        "elapsedSeconds": 725.61314883,
+        "sent": 5748,
+        "open": 160,
+        "hashes": 39110,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.961420999956317
+      },
+      {
+        "at": "2026-10-11T07:22:01.426Z",
+        "elapsedSeconds": 735.621821362,
+        "sent": 5828,
+        "open": 160,
+        "hashes": 39642,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 32.996103000012226
+      },
+      {
+        "at": "2026-10-11T07:22:11.460Z",
+        "elapsedSeconds": 745.656290239,
+        "sent": 5908,
+        "open": 160,
+        "hashes": 40181,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 12.826148000080138
+      },
+      {
+        "at": "2026-10-11T07:22:21.474Z",
+        "elapsedSeconds": 755.6704167759999,
+        "sent": 5988,
+        "open": 160,
+        "hashes": 40712,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.268612000043504
+      },
+      {
+        "at": "2026-10-11T07:22:31.483Z",
+        "elapsedSeconds": 765.678601812,
+        "sent": 6068,
+        "open": 160,
+        "hashes": 41250,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 20.61777299991809
+      },
+      {
+        "at": "2026-10-11T07:22:41.504Z",
+        "elapsedSeconds": 775.6997829759999,
+        "sent": 6148,
+        "open": 160,
+        "hashes": 41782,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 7.526643999968655
+      },
+      {
+        "at": "2026-10-11T07:22:51.513Z",
+        "elapsedSeconds": 785.708909624,
+        "sent": 6228,
+        "open": 160,
+        "hashes": 42315,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 62.729468000005
+      },
+      {
+        "at": "2026-10-11T07:23:01.579Z",
+        "elapsedSeconds": 795.774921696,
+        "sent": 6308,
+        "open": 160,
+        "hashes": 42851,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 31.054933000006713
+      },
+      {
+        "at": "2026-10-11T07:23:11.611Z",
+        "elapsedSeconds": 805.807258315,
+        "sent": 6388,
+        "open": 160,
+        "hashes": 43381,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 77.05447600001935
+      },
+      {
+        "at": "2026-10-11T07:23:21.695Z",
+        "elapsedSeconds": 815.890877784,
+        "sent": 6463,
+        "open": 160,
+        "hashes": 43919,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 461.38526100001764
+      },
+      {
+        "at": "2026-10-11T07:23:32.160Z",
+        "elapsedSeconds": 826.355499156,
+        "sent": 6544,
+        "open": 160,
+        "hashes": 44472,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 123.83104299998377
+      },
+      {
+        "at": "2026-10-11T07:23:42.285Z",
+        "elapsedSeconds": 836.4809396659999,
+        "sent": 6621,
+        "open": 160,
+        "hashes": 45028,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 10.067465999978594
+      },
+      {
+        "at": "2026-10-11T07:23:52.297Z",
+        "elapsedSeconds": 846.492559696,
+        "sent": 6701,
+        "open": 160,
+        "hashes": 45559,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 18.483537000021897
+      },
+      {
+        "at": "2026-10-11T07:24:02.318Z",
+        "elapsedSeconds": 856.513538011,
+        "sent": 6781,
+        "open": 160,
+        "hashes": 46090,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 39.265669999993406
+      },
+      {
+        "at": "2026-10-11T07:24:12.359Z",
+        "elapsedSeconds": 866.5549864159999,
+        "sent": 6861,
+        "open": 160,
+        "hashes": 46635,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 5.866455000010319
+      },
+      {
+        "at": "2026-10-11T07:24:22.365Z",
+        "elapsedSeconds": 876.560884195,
+        "sent": 6941,
+        "open": 160,
+        "hashes": 47165,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 11.839966000057757
+      },
+      {
+        "at": "2026-10-11T07:24:32.377Z",
+        "elapsedSeconds": 886.572987027,
+        "sent": 7021,
+        "open": 160,
+        "hashes": 47699,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 15.737262999988161
+      },
+      {
+        "at": "2026-10-11T07:24:42.394Z",
+        "elapsedSeconds": 896.590279677,
+        "sent": 7101,
+        "open": 160,
+        "hashes": 48235,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.195783999981359
+      },
+      {
+        "at": "2026-10-11T07:24:52.401Z",
+        "elapsedSeconds": 906.597260703,
+        "sent": 7181,
+        "open": 160,
+        "hashes": 48771,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 7.741823000018485
+      },
+      {
+        "at": "2026-10-11T07:25:02.410Z",
+        "elapsedSeconds": 916.606219604,
+        "sent": 7261,
+        "open": 160,
+        "hashes": 49300,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 24.941445000004023
+      },
+      {
+        "at": "2026-10-11T07:25:12.437Z",
+        "elapsedSeconds": 926.6327128429999,
+        "sent": 7341,
+        "open": 160,
+        "hashes": 49841,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.564416999928653
+      },
+      {
+        "at": "2026-10-11T07:25:22.445Z",
+        "elapsedSeconds": 936.641197774,
+        "sent": 7421,
+        "open": 160,
+        "hashes": 50370,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 14.476734000025317
+      },
+      {
+        "at": "2026-10-11T07:25:32.462Z",
+        "elapsedSeconds": 946.6576509349999,
+        "sent": 7501,
+        "open": 160,
+        "hashes": 50905,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 7.136917000054382
+      },
+      {
+        "at": "2026-10-11T07:25:42.469Z",
+        "elapsedSeconds": 956.6655031879999,
+        "sent": 7579,
+        "open": 160,
+        "hashes": 51405,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 557.6028180000139
+      },
+      {
+        "at": "2026-10-11T07:25:53.030Z",
+        "elapsedSeconds": 967.2256818799999,
+        "sent": 7661,
+        "open": 160,
+        "hashes": 52003,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 33.792972999974154
+      },
+      {
+        "at": "2026-10-11T07:26:03.068Z",
+        "elapsedSeconds": 977.2636505679999,
+        "sent": 7741,
+        "open": 160,
+        "hashes": 52532,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 35.26813300000504
+      },
+      {
+        "at": "2026-10-11T07:26:13.105Z",
+        "elapsedSeconds": 987.3006496809999,
+        "sent": 7821,
+        "open": 160,
+        "hashes": 53075,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 27.35163599997759
+      },
+      {
+        "at": "2026-10-11T07:26:23.133Z",
+        "elapsedSeconds": 997.328794335,
+        "sent": 7901,
+        "open": 160,
+        "hashes": 53605,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 22.362025000038557
+      },
+      {
+        "at": "2026-10-11T07:26:33.159Z",
+        "elapsedSeconds": 1007.354678009,
+        "sent": 7981,
+        "open": 160,
+        "hashes": 54146,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 24.162798999925144
+      },
+      {
+        "at": "2026-10-11T07:26:43.184Z",
+        "elapsedSeconds": 1017.379717491,
+        "sent": 8061,
+        "open": 160,
+        "hashes": 54684,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 39.94297400000505
+      },
+      {
+        "at": "2026-10-11T07:26:53.225Z",
+        "elapsedSeconds": 1027.421021476,
+        "sent": 8141,
+        "open": 160,
+        "hashes": 55217,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 23.522624999983236
+      },
+      {
+        "at": "2026-10-11T07:27:03.262Z",
+        "elapsedSeconds": 1037.458096106,
+        "sent": 8221,
+        "open": 160,
+        "hashes": 55743,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 71.11932599998545
+      },
+      {
+        "at": "2026-10-11T07:27:13.334Z",
+        "elapsedSeconds": 1047.530049386,
+        "sent": 8301,
+        "open": 160,
+        "hashes": 56293,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 14.162440999876708
+      },
+      {
+        "at": "2026-10-11T07:27:23.349Z",
+        "elapsedSeconds": 1057.545280602,
+        "sent": 8380,
+        "open": 160,
+        "hashes": 56818,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 70.4558520000428
+      },
+      {
+        "at": "2026-10-11T07:27:33.426Z",
+        "elapsedSeconds": 1067.622603323,
+        "sent": 8460,
+        "open": 160,
+        "hashes": 57361,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 29.73471300001256
+      },
+      {
+        "at": "2026-10-11T07:27:43.460Z",
+        "elapsedSeconds": 1077.655787831,
+        "sent": 8540,
+        "open": 160,
+        "hashes": 57897,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 11.112502000061795
+      },
+      {
+        "at": "2026-10-11T07:27:53.473Z",
+        "elapsedSeconds": 1087.669116834,
+        "sent": 8617,
+        "open": 160,
+        "hashes": 58420,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 110.20817500003614
+      },
+      {
+        "at": "2026-10-11T07:28:03.586Z",
+        "elapsedSeconds": 1097.782306753,
+        "sent": 8697,
+        "open": 160,
+        "hashes": 58967,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 44.3951240000315
+      },
+      {
+        "at": "2026-10-11T07:28:13.632Z",
+        "elapsedSeconds": 1107.828634773,
+        "sent": 8777,
+        "open": 160,
+        "hashes": 59506,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 49.98618800006807
+      },
+      {
+        "at": "2026-10-11T07:28:23.687Z",
+        "elapsedSeconds": 1117.882996057,
+        "sent": 8857,
+        "open": 160,
+        "hashes": 60041,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 36.562908000079915
+      },
+      {
+        "at": "2026-10-11T07:28:33.725Z",
+        "elapsedSeconds": 1127.920942815,
+        "sent": 8934,
+        "open": 160,
+        "hashes": 60582,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 37.795055999886245
+      },
+      {
+        "at": "2026-10-11T07:28:43.810Z",
+        "elapsedSeconds": 1138.005754413,
+        "sent": 9013,
+        "open": 160,
+        "hashes": 61115,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 642.400939000072
+      },
+      {
+        "at": "2026-10-11T07:28:54.501Z",
+        "elapsedSeconds": 1148.69726505,
+        "sent": 9098,
+        "open": 160,
+        "hashes": 61686,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 7.4255269998684525
+      },
+      {
+        "at": "2026-10-11T07:29:04.510Z",
+        "elapsedSeconds": 1158.70551462,
+        "sent": 9178,
+        "open": 160,
+        "hashes": 62223,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 132.7209299998358
+      },
+      {
+        "at": "2026-10-11T07:29:14.643Z",
+        "elapsedSeconds": 1168.838632853,
+        "sent": 9259,
+        "open": 160,
+        "hashes": 62762,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 24.919228000100702
+      },
+      {
+        "at": "2026-10-11T07:29:24.668Z",
+        "elapsedSeconds": 1178.8636441009999,
+        "sent": 9339,
+        "open": 160,
+        "hashes": 63301,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 7.553464000113308
+      },
+      {
+        "at": "2026-10-11T07:29:34.677Z",
+        "elapsedSeconds": 1188.87298235,
+        "sent": 9419,
+        "open": 160,
+        "hashes": 63835,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 37.082408000016585
+      },
+      {
+        "at": "2026-10-11T07:29:44.715Z",
+        "elapsedSeconds": 1198.9109275,
+        "sent": 9499,
+        "open": 160,
+        "hashes": 64363,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 22.485060999868438
+      },
+      {
+        "at": "2026-10-11T07:29:54.738Z",
+        "elapsedSeconds": 1208.933667521,
+        "sent": 9579,
+        "open": 160,
+        "hashes": 64905,
+        "hashErrors": 0,
+        "rejections": {},
+        "readyStatus": 200,
+        "readyMs": 6.664032000117004
+      }
+    ],
+    "generatorCPUpercent": 12.271895468410783,
+    "generatorEventLoopP99ms": 25.903103
+  },
+  "browser-results.json": {
+    "certificateHandling": "explicit pin of temporary server SPKI for UI automation; cryptographic certificate checks are separate verified-CA Node probes",
+    "results": [
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "status": "pass",
+        "errors": [],
+        "lobbyOverflow": false,
+        "overflow": false,
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "csp": [
+          {
+            "directive": "script-src",
+            "blocked": "eval"
+          }
+        ],
+        "gameJoined": true,
+        "gameUrl": "https://localhost:19443/game/m-3ee68a1b-5535-45bf-a851-fb6f8a005a36"
+      },
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "status": "pass",
+        "errors": [],
+        "lobbyOverflow": false,
+        "overflow": false,
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "csp": [
+          {
+            "directive": "script-src",
+            "blocked": "eval"
+          }
+        ],
+        "gameJoined": true,
+        "gameUrl": "https://localhost:19443/game/m-3ee68a1b-5535-45bf-a851-fb6f8a005a36"
+      }
+    ]
+  },
+  "final-smoke-results.json": {
+    "image": "moongame-stress:final",
+    "checks": [
+      {
+        "name": "final build boots against retained durable data",
+        "status": "pass"
+      },
+      {
+        "name": "frozen database readiness",
+        "status": "pass",
+        "httpStatus": 503,
+        "ms": 1143.718692999999
+      },
+      {
+        "name": "two locale requests delivered through verified local SMTPS",
+        "status": "pass",
+        "delivered": 2
+      }
+    ],
+    "imageDigest": "sha256:1e05277ca53d4b716c43cc0e61cc03eca60233e4879b7aff57c3f3ba85ae4d6c",
+    "status": "pass",
+    "mailContentChecks": [
+      {
+        "subject": "Void Dominion — password reset",
+        "hasResetLink": true,
+        "english": true,
+        "russian": false
+      },
+      {
+        "subject": "Void Dominion — сброс пароля",
+        "hasResetLink": true,
+        "english": false,
+        "russian": true
+      }
+    ]
+  },
+  "queue-final-results.json": {
+    "name": "two peers fill durable mailbox below per-socket flood limit, then retry original envelopes",
+    "earlyRateRefusals": 36,
+    "refusalObservationMs": 1501.9905460000002,
+    "prematureDurable": 0,
+    "initialDurable": 41,
+    "retried": 59,
+    "finalDurable": 100,
+    "ok": 100,
+    "hashErrors": 0,
+    "status": "pass"
+  },
+  "http-final-results.json": [
+    {
+      "at": "2026-10-11T07:41:30.700Z",
+      "path": "/",
+      "mode": "keepalive",
+      "concurrency": 128,
+      "targetSeconds": 15,
+      "durationSeconds": 16.569,
+      "requests": 789,
+      "rps": 47.6,
+      "statuses": {
+        "200": 789
+      },
+      "errors": {},
+      "bytes": 12181161915,
+      "p50": 2294.93,
+      "p95": 4955.71,
+      "p99": 6558.87,
+      "max": 9126.314632,
+      "generatorCPUpercent": 76,
+      "generatorEventLoopP99ms": 46.2
+    }
+  ],
+  "sector-zero-browser-results.json": [
+    {
+      "name": "desktop-repeat",
+      "status": "pass",
+      "completed": 10,
+      "errors": [],
+      "samples": [
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 30447880,
+          "nodes": 3966
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 30558228,
+          "nodes": 5282
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 31737824,
+          "nodes": 6483
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 32990848,
+          "nodes": 7583
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 32482884,
+          "nodes": 2143
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 31952872,
+          "nodes": 3285
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 30354024,
+          "nodes": 2524
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 31089520,
+          "nodes": 3663
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 32266568,
+          "nodes": 3225
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 33199392,
+          "nodes": 2708
+        }
+      ],
+      "seconds": 41.749860629000004
+    },
+    {
+      "name": "corrupt-storage",
+      "status": "pass",
+      "completed": 2,
+      "errors": [],
+      "samples": [
+        {
+          "overflow": false,
+          "storageKeys": [
+            "sector-zero.run.v1",
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 31206620,
+          "nodes": 4031
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "sector-zero.run.v1",
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 36480316,
+          "nodes": 5359
+        }
+      ],
+      "seconds": 14.05479277
+    },
+    {
+      "name": "offline-running",
+      "status": "pass",
+      "completed": 2,
+      "errors": [],
+      "samples": [
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 34380256,
+          "nodes": 3983
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 32849416,
+          "nodes": 5266
+        }
+      ],
+      "seconds": 14.940680664
+    },
+    {
+      "name": "mobile-repeat",
+      "status": "pass",
+      "completed": 6,
+      "errors": [],
+      "samples": [
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 31927056,
+          "nodes": 3028
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 35701392,
+          "nodes": 4062
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 32001424,
+          "nodes": 4952
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 36219756,
+          "nodes": 5630
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 37848320,
+          "nodes": 6497
+        },
+        {
+          "overflow": false,
+          "storageKeys": [
+            "void.run.portable.v1",
+            "sector-zero.progress.shadow.v1",
+            "sector-zero.progress.v1",
+            "void.run.v1",
+            "sector-zero.cloud.v1",
+            "sector-zero.tab.v1"
+          ],
+          "canvases": 1,
+          "heapBytes": 33215456,
+          "nodes": 7345
+        }
+      ],
+      "seconds": 30.615683817
+    },
+    {
+      "name": "storage-quota",
+      "status": "pass",
+      "completed": 2,
+      "errors": [],
+      "samples": [
+        {
+          "overflow": false,
+          "storageKeys": [],
+          "canvases": 1,
+          "heapBytes": 34654344,
+          "nodes": 3189
+        },
+        {
+          "overflow": false,
+          "storageKeys": [],
+          "canvases": 1,
+          "heapBytes": 35203680,
+          "nodes": 4052
+        }
+      ],
+      "seconds": 14.949248550999997
+    }
+  ],
+  "rehearsal-result.json": {
+    "exit": 0,
+    "seconds": 93.37175307400048,
+    "gameHours": 168,
+    "players": 10,
+    "botActionsPerHour": 20,
+    "hibernation": true,
+    "networkTrouble": true,
+    "store": "PostgreSQL16"
+  },
+  "stress-build.json": {
+    "exit": 0,
+    "files": {
+      "proto-server.mjs": "94e6090d1aa03c47ae78429b338240848e6825b8ae4566faa52d74b6462aef2d",
+      "void-dominion-player.html": "dd7b5d99bd8264c28b2bce55a87a776503ed84ccc6588c1e4243259785f6583f",
+      "void-dominion.html": "65069239bbc0ce21630f88aec7fd8fb5f242ae09b81310c0ce319ca394dd255a",
+      "sector-zero.html": "e77c09a293c61743f38dc670f6c16910e43f12ef487b30ed5b8de53ad603b743",
+      "sector-zero-dev.html": "0212211b89608bc5d73bfe3eae2b324e5230c35ed06078f6dc0a6710966bb3d9"
+    },
+    "base": "0fbdf68d",
+    "source": "working tree test/full-stress-2026-10-11"
+  },
+  "final-build.json": {
+    "exit": 0,
+    "files": {
+      "proto-server.mjs": "91d5dc908168fb7e05af53127fe788f64006540d472f7fbbfec861c91c089196",
+      "void-dominion-player.html": "7ef9d866a09691ef7217f4dda0ccbc8afc90fd64f38fa92b414bc69006b78115",
+      "void-dominion.html": "3d298b27110f018e4b388ef62dbd8d9124236f36661be4f73266caaa22686bf0",
+      "sector-zero.html": "b02436dccad618e0b3a7d8acb197f1ad40a61dae13d4bc52c4d38e856eb4b34b",
+      "sector-zero-dev.html": "cae7ba20dc76785a10edb4407a2bdbef27ea6173120f88377f264d99bd2adc58"
+    },
+    "base": "0fbdf68d",
+    "source": "working tree test/full-stress-2026-10-11"
+  },
+  "server-failure-events.jsonl": [
+    {
+      "unixSeconds": 1791700460,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700460,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700462,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700463,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700467,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700468,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700474,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700475,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700478,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700479,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700482,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700486,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700488,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    },
+    {
+      "unixSeconds": 1791700495,
+      "action": "start",
+      "container": "mg-stress-server",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791700498,
+      "action": "die",
+      "container": "mg-stress-server",
+      "exitCode": "139"
+    }
+  ],
+  "mg-stress-edge-fixed-events.jsonl": [
+    {
+      "unixSeconds": 1791701985,
+      "action": "oom",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701985,
+      "action": "die",
+      "container": "mg-stress-edge",
+      "exitCode": "137"
+    },
+    {
+      "unixSeconds": 1791701986,
+      "action": "start",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701989,
+      "action": "oom",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701990,
+      "action": "die",
+      "container": "mg-stress-edge",
+      "exitCode": "137"
+    },
+    {
+      "unixSeconds": 1791701990,
+      "action": "start",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701993,
+      "action": "oom",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701993,
+      "action": "die",
+      "container": "mg-stress-edge",
+      "exitCode": "137"
+    },
+    {
+      "unixSeconds": 1791701993,
+      "action": "start",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701996,
+      "action": "oom",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791701997,
+      "action": "die",
+      "container": "mg-stress-edge",
+      "exitCode": "137"
+    },
+    {
+      "unixSeconds": 1791701997,
+      "action": "start",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    },
+    {
+      "unixSeconds": 1791702171,
+      "action": "die",
+      "container": "mg-stress-edge",
+      "exitCode": "137"
+    },
+    {
+      "unixSeconds": 1791702171,
+      "action": "start",
+      "container": "mg-stress-edge",
+      "exitCode": null
+    }
+  ],
+  "source": {
+    "base": "0fbdf68d2c9c30df541e2df0a315245ae871ac94",
+    "baseTree": "298861f8bd017ca713e2c4adaedb3702e8aae53a",
+    "baselineCommit": "65bb6d2b626e03f1844c6011c9039e52549761eb",
+    "baselineTree": "ad77a32f87933a50bf6bdb5e56aba124b786c2f9",
+    "baselineServerBundleSHA256": "a85dbd664669005d663a05442f79666cc35b35eae392ac5705d9992678091f13",
+    "fixedStressServerBundleSHA256": "94e6090d1aa03c47ae78429b338240848e6825b8ae4566faa52d74b6462aef2d",
+    "note": "Stress ran on the working-tree image. Subsequent changes separate mail templates from browser localization, add a readiness cleanup catch and adjust TypeScript declarations. Final build and focused regressions are recorded separately."
+  }
+}

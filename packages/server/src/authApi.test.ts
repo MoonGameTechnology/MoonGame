@@ -334,10 +334,10 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     delivery?: () => Promise<void>,
   ): {
     server: FastifyInstance;
-    sent: Array<{ to: string; text: string }>;
+    sent: Array<{ to: string; text: string; subject: string }>;
     users: MemoryUserStore;
   } {
-    const sent: Array<{ to: string; text: string }> = [];
+    const sent: Array<{ to: string; text: string; subject: string }> = [];
     const users = new MemoryUserStore();
     app = Fastify();
     registerAuthApi(app, {
@@ -352,7 +352,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       },
       resetBaseUrl,
       sendMail: (msg) => {
-        sent.push({ to: msg.to, text: msg.text });
+        sent.push({ to: msg.to, text: msg.text, subject: msg.subject });
         return delivery?.() ?? Promise.resolve();
       },
       scryptParams: FAST,
@@ -516,6 +516,19 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const again = await post(server, '/auth/reset', { token, password: 'thirdpass12' });
     expect(again.statusCode).toBe(401);
     expect(again.json()).toEqual({ error: 'E_AUTH' });
+  });
+
+  it('keeps each queued recovery email in the requesting locale', async () => {
+    const { server, sent } = recoverApp();
+    await post(server, '/auth/register', { login: 'locale', password: 'longenough', email: 'locale@example.com' });
+    for (const locale of ['en', 'ru', 'unsupported'])
+      await post(server, '/auth/recover', { email: 'locale@example.com', locale });
+    await vi.waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent[0]!.subject).toBe('Void Dominion — password reset');
+    expect(sent[0]!.text).toContain('valid for 15 minutes');
+    expect(sent[1]!.subject).toBe('Void Dominion — сброс пароля');
+    expect(sent[2]!.subject).toBe(sent[1]!.subject);
+    for (const message of sent) expect(message.text).toContain('https://play.example/?reset=');
   });
 
   it('recover is anti-enumeration: an unknown email still 200s and sends nothing', async () => {

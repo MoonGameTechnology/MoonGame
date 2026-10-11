@@ -1,0 +1,38 @@
+{
+  "cleanup-results.json": {
+    "bytes": 392,
+    "sha256": "758dbf12c798fdad15c775b102388102ca9450bb0e8307eff2d8744231ffbe21"
+  },
+  "final-data-check.json": {
+    "bytes": 1179,
+    "sha256": "eee73d2db148851cac3624fd45eff9a5576ea5b27344c0c59157719998489164"
+  },
+  "gate.json": {
+    "bytes": 370,
+    "sha256": "63f76dd2faac6f5d09ef453b8fcf2e6c6051902e54fa5a5d53723f925e73ff5a"
+  },
+  "node-heap-oom.txt": {
+    "bytes": 2664,
+    "sha256": "605b60ee009f209a4b440acba03e84685c74460c453fe98690bd08613cf819eb"
+  },
+  "rehearsal.txt": {
+    "bytes": 1653,
+    "sha256": "3d7d4afdb16e304c001a545b9ffce39551ea7935d00ecf5c6bb9e74807d56e2b"
+  },
+  "results.json": {
+    "bytes": 104172,
+    "sha256": "3d51dce755a99baa76d101b66fb27b5ad8448b843fe286dc1370f347bf6d24b6"
+  },
+  "scenarios.txt": {
+    "bytes": 6742,
+    "sha256": "f3564d3a375468726fcbd995a715caa3a54386bb9b06a5aeeb9d4eddb15eadb0"
+  },
+  "sector-zero-mobile.png": {
+    "bytes": 235337,
+    "sha256": "95adf13a5d08afb0a62fa5f2fa3f05841ff9b5bf7fd5e6dc17aceccca2be19fa"
+  },
+  "void-dominion-desktop.png": {
+    "bytes": 1071653,
+    "sha256": "06e8940556e252f5a62407089083a518ce6d252a0205b4eeb466900ea2b7b919"
+  }
+}
