@@ -163,8 +163,21 @@ const effectChip = (k: string, v: number): string =>
       ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) })
       : isPercentStat(k)
         ? t('loadout.stat.percent', { n: perHourPercent(v) })
-        : v
+        : Math.round(v * 10) / 10
   } ${t(STAT_KEY[k] ?? k)}`;
+
+/**
+ * Редкость и звёзды модуля — языком карточек Сектора Зеро: слово ступени её цветом и горящие
+ * звёзды (★ — уровень прокачки). Нет звёзд (★0 или обычный матч без кузни) — ряда звёзд нет,
+ * как в карточке корабля: пустые звёзды звали бы к кузне, которой в этой партии нет.
+ */
+export function moduleGradeHtml(rarity: string, star: number): string {
+  const stars =
+    star > 0
+      ? ` <span class="cn-st" role="img" aria-label="${esc(t('shipcard.stars', { n: star }))}">${'★'.repeat(star)}</span>`
+      : '';
+  return `<span class="cn-mr r-${esc(rarity)}"><span class="cn-rw">${t(`rarity.${rarity}`)}</span>${stars}</span>`;
+}
 
 /** The order being composed: which hull, what is bolted on, how many, where. Plain
  *  data, so the pane can be rendered (and asserted) without a window. */
@@ -211,10 +224,12 @@ const STAT_TERM: Record<string, string> = {
 export function statBarHtml(line: LoadoutStatLine, max: number): string {
   const basePct = max > 0 ? Math.min(100, (line.base / max) * 100) : 0;
   const deltaPct = max > 0 ? Math.min(100 - basePct, (Math.max(0, line.delta) / max) * 100) : 0;
+  // Звёзды модулей дают дробный вклад (×1.1): число — до десятых, иначе «+5.3999999999».
+  const r = (v: number): number => Math.round(v * 10) / 10;
   const val =
     line.delta !== 0
-      ? `${line.base} <span class="dim">→</span> <b>${line.effective}</b> <span class="cn-up">${line.delta > 0 ? '+' : ''}${line.delta}</span>`
-      : `<b>${line.effective}</b>`;
+      ? `${r(line.base)} <span class="dim">→</span> <b>${r(line.effective)}</b> <span class="cn-up">${line.delta > 0 ? '+' : ''}${r(line.delta)}</span>`
+      : `<b>${r(line.effective)}</b>`;
   return (
     `<div class="cn-stat"><div class="cn-srow"><span class="cn-snm">${STAT_TERM[line.stat] ? termHtml(STAT_TERM[line.stat]!, line.label) : esc(line.label)}</span><span class="cn-sval">${val}</span></div>` +
     `<div class="cn-strack"><span class="cn-sbar" style="width:${basePct}%"></span><span class="cn-sdelta" style="width:${deltaPct}%"></span></div></div>`
@@ -305,10 +320,14 @@ export function loadoutPaneHtml(
   const ownedModules = snap ? new Set(snap.modules) : undefined;
   if (!ownedHulls.length) return `<div class="cn-soon">${t('yard.hull.none')}</div>`;
   const res = state.players[me]?.resources ?? {};
+  // Звёзды и поднятая редкость места (снимок арсенала забега Сектора Зеро): с ними числа
+  // карточек и характеристик — те, что получит построенный корабль.
+  const boosts = { moduleStars: snap?.stars, moduleRarity: snap?.rarity };
   const ed: LoadoutEditorResult = createLoadoutEditor(draft.hull, data, res, {
     modules: draft.modules,
     count: draft.count,
     ownedModules,
+    ...boosts,
   });
   if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
   const m: LoadoutModel = ed;
@@ -336,14 +355,15 @@ export function loadoutPaneHtml(
       const on = i === sel ? ' sel' : '';
       if (sl.moduleId) {
         const md = data.modules[sl.moduleId];
+        const own = m.palette.find((o) => o.id === sl.moduleId)?.effect ?? md?.effects.stats ?? {};
         const eff = md
-          ? Object.entries(md.effects.stats)
+          ? Object.entries(own)
               .map(([k, v]) => effectChip(k, v))
               .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
           `<div class="cn-bay filled${on}" data-cnsel="${i}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
-          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
+          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div></div>`
         );
       }
       return (
@@ -358,8 +378,8 @@ export function loadoutPaneHtml(
       .join(' ');
     if (o.installable) {
       return (
-        `<button class="cn-mod" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span><span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
+        `<button class="cn-mod r-${o.rarity}" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
+        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
       );
     }
     // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
@@ -370,8 +390,8 @@ export function loadoutPaneHtml(
         ? t('yard.module.not-allowed')
         : t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) });
     return (
-      `<div class="cn-mod locked"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-      `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
+      `<div class="cn-mod locked r-${o.rarity}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
+      `<span class="cn-mn">${esc(tData(o.name))}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
     );
   };
   // LARS-4: the palette already reads the LIVE arsenal snapshot (a module bought
@@ -389,6 +409,7 @@ export function loadoutPaneHtml(
           modules: m.modules.filter((id) => id !== cur),
           count: draft.count,
           ownedModules,
+          ...boosts,
         })
       : ed;
     // Модуль уже стоит в другом отсеке (ядро не даёт два одинаковых) — он виден на арте и в
@@ -435,7 +456,18 @@ export function loadoutPaneHtml(
   const hullDef = data.units[m.unit];
   const damage = hullDef
     ? unitDamageHtml(
-        unitDamageProfile(hullDef, effectiveStats(hullDef, { modules: m.modules }, data)),
+        unitDamageProfile(
+          hullDef,
+          effectiveStats(
+            hullDef,
+            {
+              modules: m.modules,
+              ...(snap?.stars ? { moduleStars: snap.stars } : {}),
+              ...(snap?.rarity ? { moduleRarity: snap.rarity } : {}),
+            },
+            data,
+          ),
+        ),
       )
     : '';
   // ДЕСАНТНЫЙ ЧЕЛНОК (SHU-5.2) строится с бойцом внутри: выбор бойца — здесь, его цена и
@@ -506,11 +538,16 @@ export function slotLayerHtml(
       const on = i === sel;
       const pressed = ` aria-pressed="${on ? 'true' : 'false'}"`;
       if (sl.moduleId) {
-        const rar = data.modules[sl.moduleId]?.rarity;
-        const label = `${kind}: ${tData(sl.moduleName ?? sl.moduleId)}`;
+        // Плитка несёт ступень цветом рамки и уровень прокачки значком «★2» в углу; словом
+        // то же самое — в подписи для диктора и подсказке.
+        const rar = sl.rarity ?? 'simple';
+        const star = sl.star ?? 0;
+        const grade = [t(`rarity.${rar}`), ...(star > 0 ? [t('shipcard.stars', { n: star })] : [])].join(', ');
+        const label = `${kind}: ${tData(sl.moduleName ?? sl.moduleId)} (${grade})`;
+        const badge = star > 0 ? `<span class="cn-tst" aria-hidden="true">★${star}</span>` : '';
         return (
           `<span class="cn-dot full" style="${dot}"></span>` +
-          `<button class="cn-tile filled${on ? ' sel' : ''}" data-cnsel="${i}"${pressed} style="${at(c.t)}${rar ? `;--rar:var(--rar-${rar})` : ''}" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}</button>`
+          `<button class="cn-tile filled${on ? ' sel' : ''}" data-cnsel="${i}"${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}</button>`
         );
       }
       const label = `${kind}: ${t('yard.slot.empty')}`;

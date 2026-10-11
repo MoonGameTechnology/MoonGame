@@ -2313,6 +2313,16 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cn-mod.locked{opacity:.42;cursor:not-allowed;background:rgba(255,255,255,.015);}
 .cn-mod.locked .cn-mic,.cn-mod.locked .cn-mn{color:var(--dim);}
 .cn-mod.locked .cn-me{color:var(--dim);}
+/* rarity and stars of a module — the Sector Zero card language: the rarity is the FRAME (edge and
+   a top stripe in its colour), its word in that colour, lit stars = upgrade level */
+#constructor .r-simple{--rar:var(--rar-simple);}
+#constructor .r-unique{--rar:var(--rar-unique);}
+#constructor .r-mythic{--rar:var(--rar-mythic);}
+#constructor .r-legendary{--rar:var(--rar-legendary);}
+#constructor .cn-mod[class*=" r-"]{border-color:color-mix(in srgb,var(--rar) 50%,var(--line-hi));border-top:3px solid var(--rar);}
+.cn-mr{display:block;font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--rar,var(--dim));}
+.cn-mr .cn-st{text-shadow:0 0 6px color-mix(in srgb,var(--rar,var(--cyan)) 60%,transparent);}
+.cn-bay .cn-mr{margin-top:2px;}
 /* LARS-4: origin tag on a bay/palette card ("fresh from a drop/craft/auction") */
 .cn-mo,.cn-bay .cn-mo{margin-left:6px;padding:1px 6px;border-radius:8px;border:1px solid var(--amber-dim,var(--line-hi));
   color:var(--amber,var(--cyan));font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;vertical-align:middle;}
