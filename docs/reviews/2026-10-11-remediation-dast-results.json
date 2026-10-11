@@ -401,7 +401,7 @@
   "baseCommit": "34bc2e30",
   "serverBundleSha256": "0d44e459872395f91282efdc98b56dfb858e5db3979b995d64dc94580dccd12b",
   "gate": {
-    "passed": 10877,
+    "passed": 10880,
     "skipped": 0,
     "files": 891
   },
@@ -451,5 +451,50 @@
     ]
   },
   "sectorZeroSmoke": "passed",
-  "dependencyAudit": "pnpm audit --prod --audit-level=moderate: no known vulnerabilities"
+  "dependencyAudit": "pnpm audit --prod --audit-level=moderate: no known vulnerabilities",
+  "reviewFollowup": {
+    "serverBundleSha256": "a85dbd664669005d663a05442f79666cc35b35eae392ac5705d9992678091f13",
+    "results": [
+      {
+        "name": "review: HTTPS recovery finishes before a 2-second SMTP greeting for known and unknown email",
+        "status": "pass",
+        "evidence": {
+          "known": 200,
+          "unknown": 200,
+          "knownMs": 2,
+          "unknownMs": 1,
+          "smtpGreetingDelayMs": 2000,
+          "delivered": 1,
+          "tokenLeaked": false
+        }
+      },
+      {
+        "name": "review: async-delivered recovery token wins one of three resets and new session joins WSS",
+        "status": "pass",
+        "evidence": {
+          "resetStatuses": [
+            401,
+            200,
+            401
+          ],
+          "oldSession": 401,
+          "newSession": 200,
+          "hashErrors": 0,
+          "readiness": 200
+        }
+      }
+    ],
+    "clockRegression": {
+      "before": {
+        "live": 240000,
+        "restored": 264000
+      },
+      "after": {
+        "live": 264000,
+        "restored": 264000
+      },
+      "timeScale": 24
+    },
+    "temporaryRuntimeCleaned": true
+  }
 }

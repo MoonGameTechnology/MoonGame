@@ -19,6 +19,8 @@ it('refuses incomplete delivery and plaintext/invalid configurations', () => {
     { SMTP_TLS_MODE: 'none' },
     { SMTP_USER: 'u' },
     { SMTP_FROM: 'a@example.test,b@example.test' },
+    { SMTP_FROM: 'reset@' + 'example.'.repeat(1000) + 'test' },
+    { SMTP_FROM: '!@!.' + '!.'.repeat(1000) + '\n' },
     { PROD: '1', RESET_BASE_URL: 'http://play.example' },
   ]) {
     expect(() => mailerFromEnv({ ...env, ...bad })).toThrow('E_MAIL_CONFIG');
@@ -105,9 +107,17 @@ describe('real local SMTP over verified TLS', () => {
       await expect(mailerFromEnv({ ...env, SMTP_CA_FILE: undefined })!(msg)).rejects.toThrow(
         'E_MAIL_DELIVERY',
       );
-      await expect(
-        mailerFromEnv(env)!({ ...msg, to: 'a@example.test\r\nBcc: b@example.test' }),
-      ).rejects.toThrow('E_MAIL_ADDRESS');
+      for (const to of [
+        'a@example.test\r\nBcc: b@example.test',
+        'a@@example.test',
+        'a@example',
+        'a@.test',
+        'a@example.test.',
+        'a@' + 'example.'.repeat(1000) + 'test',
+        '!@!.' + '!.'.repeat(1000) + '\n',
+      ]) {
+        await expect(mailerFromEnv(env)!({ ...msg, to })).rejects.toThrow('E_MAIL_ADDRESS');
+      }
       expect(delivered).toHaveLength(1);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

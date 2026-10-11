@@ -39,6 +39,27 @@ const initial = () => ({
 });
 
 describe('durable room clock', () => {
+  it('keeps live and restored clocks equal after a backward wall-clock correction', () => {
+    let wall = 100_000;
+    const make = (snap?: MatchSnapshot) => new MatchRoom({
+      id: 'clock', initialState: snap?.state ?? initial(), kernel: createKernel([]), data,
+      now: () => wall, initiallyStarted: true, timeScale: 24, initialClock: snap?.clock,
+    });
+    const live = make();
+    wall += 10_000;
+    expect(snapshotOf(live).clock?.gameTime).toBe(240_000);
+    wall -= 5000;
+    const corrected = snapshotOf(live);
+    expect(corrected.clock?.gameTime).toBe(240_000);
+    wall += 1000;
+    const restarted = make(corrected);
+    expect(snapshotOf(live).clock?.gameTime).toBe(snapshotOf(restarted).clock?.gameTime);
+    expect(snapshotOf(live).clock?.gameTime).toBe(264_000);
+    wall += 1000;
+    expect(snapshotOf(live).clock?.gameTime).toBe(snapshotOf(restarted).clock?.gameTime);
+    expect(snapshotOf(live).clock?.gameTime).toBe(288_000);
+  });
+
   it('keeps idle elapsed time and downtime at the saved scale, then uses the new scale', () => {
     let wall = 100_000;
     const make = (snap?: MatchSnapshot, scale = 24) =>

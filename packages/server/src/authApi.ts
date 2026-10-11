@@ -252,6 +252,39 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     const resetBaseUrl = base.slice(0, baseEnd);
     if (!deps.sendMail) throw new Error('E_MAIL_CONFIG');
     const sendMail = deps.sendMail;
+    // Queue BOTH known and unknown addresses before any lookup/signing/SMTP work.
+    // The response therefore cannot expose SMTP latency (or transport failures).
+    // One worker and at most 64 waiting requests bound work during an SMTP outage.
+    // This is best-effort process-local delivery; shutdown/full queue requires retry.
+    const recoveryQueue: string[] = [];
+    let recovering = false;
+    let recoveryClosed = false;
+    app.addHook('onClose', async () => {
+      recoveryClosed = true;
+      recoveryQueue.length = 0;
+    });
+    const deliverRecovery = async () => {
+      try {
+        while (!recoveryClosed && recoveryQueue.length > 0) {
+          const email = recoveryQueue.shift()!;
+          try {
+            const user = await deps.users.findUserByEmail(email);
+            if (!user?.email || recoveryClosed) continue;
+            const token = await signReset(user.userId, pwFingerprint(user.passHash));
+            const link = `${resetBaseUrl}/?reset=${encodeURIComponent(token)}`;
+            await sendMail({
+              to: user.email,
+              subject: 'Void Dominion — сброс пароля',
+              text: `Ссылка для сброса пароля (действует 15 минут):\n${link}\n\nЕсли вы не запрашивали сброс — проигнорируйте это письмо.`,
+            });
+          } catch {
+            /* keep the worker alive; never expose lookup/delivery failures or bearers */
+          }
+        }
+      } finally {
+        recovering = false;
+      }
+    };
 
     app.post('/auth/recover', async (request: FastifyRequest, reply: FastifyReply) => {
       if (rateLimited(request.ip)) {
@@ -263,20 +296,11 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
         void reply.code(400);
         return { error: 'E_BAD_CREDENTIALS' as const };
       }
-      // Anti-enumeration: the response is identical whether or not the email is on file —
-      // only a real match actually mints + mails a link.
-      const user = await deps.users.findUserByEmail(email);
-      if (user?.email) {
-        const token = await signReset(user.userId, pwFingerprint(user.passHash));
-        const link = `${resetBaseUrl}/?reset=${encodeURIComponent(token)}`;
-        try {
-          await sendMail({
-            to: user.email,
-            subject: 'Void Dominion — сброс пароля',
-            text: `Ссылка для сброса пароля (действует 15 минут):\n${link}\n\nЕсли вы не запрашивали сброс — проигнорируйте это письмо.`,
-          });
-        } catch {
-          /* never surface a delivery failure to the caller (no oracle, no 500) */
+      if (!recoveryClosed && recoveryQueue.length < 64) {
+        recoveryQueue.push(email);
+        if (!recovering) {
+          recovering = true;
+          setImmediate(() => { deliverRecovery().catch(() => {}); });
         }
       }
       return { ok: true as const };

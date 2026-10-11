@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import nodemailer from 'nodemailer';
 import type { Mailer } from './authApi';
 
-const address = /^[^\s<>,;@]+@[^\s<>,;@]+\.[^\s<>,;@]+$/;
+/** Bound untrusted addresses and scan delimiters without regex backtracking. */
+function isAddress(value: string): boolean {
+  if (value.length > 254 || /[\s<>,;]/.test(value)) return false;
+  const at = value.indexOf('@');
+  const dot = value.lastIndexOf('.');
+  return at > 0 && at === value.lastIndexOf('@') && dot > at + 1 && dot < value.length - 1;
+}
 
 /** Recovery is opt-in, but enabling it without a delivery transport is a startup error. */
 export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer | undefined {
@@ -14,7 +20,7 @@ export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer | un
   if (
     !host ||
     !from ||
-    !address.test(from) ||
+    !isAddress(from) ||
     !['implicit', 'starttls'].includes(mode) ||
     !Number.isInteger(port) ||
     port < 1 ||
@@ -58,7 +64,7 @@ export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer | un
     disableUrlAccess: true,
   });
   return async (msg) => {
-    if (!address.test(msg.to)) throw new Error('E_MAIL_ADDRESS');
+    if (!isAddress(msg.to)) throw new Error('E_MAIL_ADDRESS');
     try {
       await transport.sendMail({
         from,

@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerAuthApi, liveSession, pwFingerprint, authRateFromEnv } from './authApi';
 import {
@@ -331,6 +331,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
   function recoverApp(
     resetBaseUrl = 'https://play.example',
     rate: { rateMax?: number; rateWindowMs?: number } = {},
+    delivery?: () => Promise<void>,
   ): {
     server: FastifyInstance;
     sent: Array<{ to: string; text: string }>;
@@ -352,7 +353,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       resetBaseUrl,
       sendMail: (msg) => {
         sent.push({ to: msg.to, text: msg.text });
-        return Promise.resolve();
+        return delivery?.() ?? Promise.resolve();
       },
       scryptParams: FAST,
       ...rate,
@@ -392,6 +393,57 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
 
   const tokenFrom = (text: string): string => decodeURIComponent(text.match(/\?reset=(\S+)/)![1]!);
 
+  it('answers recovery before a stalled SMTP send finishes, including an unknown address', async () => {
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const { server, sent } = recoverApp('https://play.example', {}, () => blocked);
+    await post(server, '/auth/register', { login: 'timing', password: 'longenough', email: 'timing@example.com' });
+    let status: number | undefined;
+    const response = post(server, '/auth/recover', { email: 'timing@example.com' }).then((r) => {
+      status = r.statusCode;
+      return r;
+    });
+    try {
+      await vi.waitFor(() => expect(sent).toHaveLength(1));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(status).toBe(200); // The SMTP promise is deliberately still unresolved.
+      const unknown = await post(server, '/auth/recover', { email: 'missing@example.com' });
+      expect(unknown.statusCode).toBe(200);
+      expect(unknown.json()).toEqual((await response).json());
+    } finally {
+      release();
+      await response;
+    }
+  });
+
+  it('bounds recovery backlog during a delivery outage and continues after a failed send', async () => {
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    let attempts = 0;
+    const { server, sent } = recoverApp('https://play.example', { rateMax: 200 }, async () => {
+      if (++attempts === 1) {
+        await blocked;
+        throw new Error('synthetic SMTP outage');
+      }
+    });
+    await post(server, '/auth/register', { login: 'queue', password: 'longenough', email: 'queue@example.com' });
+    try {
+      await post(server, '/auth/recover', { email: 'queue@example.com' });
+      await vi.waitFor(() => expect(sent).toHaveLength(1));
+      const replies = await Promise.all(Array.from({ length: 70 }, () =>
+        post(server, '/auth/recover', { email: 'queue@example.com' })));
+      for (const r of replies) {
+        expect(r.statusCode).toBe(200);
+        expect(r.json()).toEqual({ ok: true });
+      }
+      expect(sent).toHaveLength(1); // At most one active SMTP send.
+      release();
+      await vi.waitFor(() => expect(sent).toHaveLength(65)); // One active + 64 waiting.
+    } finally {
+      release();
+    }
+  });
+
   it('registers with an email, recovers via the mailed link, and sets a new password', async () => {
     const { server, sent } = recoverApp();
     await post(server, '/auth/register', {
@@ -401,6 +453,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     });
 
     const rec = await post(server, '/auth/recover', { email: 'zoe@example.com' });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     expect(rec.statusCode).toBe(200);
     expect(rec.json()).toEqual({ ok: true });
     expect(sent).toHaveLength(1);
@@ -424,6 +477,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server, sent, users } = recoverApp();
     await post(server, '/auth/register', { login: 'race', password: 'original-pass', email: 'race@example.com' });
     await post(server, '/auth/recover', { email: 'race@example.com' });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     // Force both requests past the initial read, including a store that returns live records.
     const find = users.findById.bind(users);
     let release!: () => void;
@@ -453,6 +507,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       email: 'ana@example.com',
     });
     await post(server, '/auth/recover', { email: 'ana@example.com' });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const token = tokenFrom(sent[0]!.text);
     expect((await post(server, '/auth/reset', { token, password: 'secondpass1' })).statusCode).toBe(
       200,
@@ -526,6 +581,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     if (preClaim.ok) expect(await liveSession(preClaim.claim, users)).not.toBeNull();
 
     await post(server, '/auth/recover', { email: 'dan@example.com' });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const reset = await post(server, '/auth/reset', {
       token: tokenFrom(sent[0]!.text),
       password: 'brandnewpass',
@@ -549,6 +605,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       email: 'liv@example.com',
     });
     await post(server, '/auth/recover', { email: 'liv@example.com' });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]!.text).toContain('https://play.example/?reset=');
     expect(sent[0]!.text).not.toContain('https://play.example//?reset=');
   });

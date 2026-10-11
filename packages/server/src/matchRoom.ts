@@ -739,7 +739,14 @@ export class MatchRoom {
     const raw = !this.clockAnchored
       ? wall
       : this.lobbyAccrued + (this.lobbyRunningSince === null ? 0 : Math.max(0, wall - this.lobbyRunningSince)) * this.timeScale;
-    this.clockFloor = Math.max(this.clockFloor, this.stateValue.time, raw);
+    const floor = Math.max(this.clockFloor, this.stateValue.time);
+    if (this.clockAnchored && raw < floor) {
+      // Rebase the live anchor too: saving (new wall, old floor) while the live
+      // clock still uses the previous wall anchor would charge the gap on restart.
+      this.lobbyAccrued = floor;
+      if (this.lobbyRunningSince !== null) this.lobbyRunningSince = wall;
+    }
+    this.clockFloor = Math.max(floor, raw);
     return this.clockFloor;
   }
 
@@ -762,7 +769,7 @@ export class MatchRoom {
       return true;
     }
     if (!running && this.lobbyRunningSince !== null) {
-      this.lobbyAccrued += (this.now() - this.lobbyRunningSince) * this.timeScale; // freeze
+      this.lobbyAccrued = this.clock(); // freeze, including a possible backward wall correction
       this.lobbyRunningSince = null;
       this.observe?.({ kind: 'lobby', waiting: true });
       return true;
