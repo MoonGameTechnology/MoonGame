@@ -25,6 +25,7 @@
 | B4 | 🗑 |  | `docs/backlog.md` | вырезано: |
 | G2 | 🗑 |  | `docs/backlog.md` | Skia-рендер карты (зум / скролл / culling) — RN-вариант, снят вместе с RN. |
 | H4 | 🗑 |  | `docs/backlog.md` | Конструктор наземной армии: пехота в 3 вариантах (militia — дешёвое мясо, |
+| MSVC-0 | ✅ | srv | `docs/backlog.md` | Фундамент межсервисных вызовов. |
 | CORP-SVC-1 | ✅ | srv | `docs/backlog.md` | Независимый сервис корпораций. |
 | LARS-2 | 🔒 | srv | `docs/backlog.md` | (EC-1.2, EC-2/EC-3 — economy-roadmap.md) Цепочка валют → фронт |
 | CON-3 | 🗑 | proto | `docs/backlog.md` | Армия |
@@ -1340,6 +1341,12 @@
 | SV-3.1 | ✅ | srv | `docs/server-roadmap.md` | Фильтр видимости перед broadcast |
 | SV-3.2 | ⏳ | srv | `docs/server-roadmap.md` | Interest management при масштабе |
 | SV-4.1 | ⏳ | srv | `docs/server-roadmap.md` | Фан-аут между инстансами |
+| MSVC-0 | ✅ | srv | `docs/service-resilience-roadmap.md` | Фундамент исходящих вызовов |
+| MSVC-1 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Контракт Inventory/settlement и совместимость |
+| MSVC-2 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Inventory/settlement |
+| MSVC-3 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Auction |
+| MSVC-4 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Фоновые потребители по измеренной нагрузке |
+| MSVC-5 | ⏳ | ops | `docs/service-resilience-roadmap.md` | Автоматизированное учение отказов |
 | SH-0.1 | ✅ | data core | `docs/shields-roadmap.md` | Стат shield + двойной пул в UnitStack |
 | SH-0.2 | ✅ | core | `docs/shields-roadmap.md` | applyDamage двухслойно |
 | SH-1.1 | ✅ | core | `docs/shields-roadmap.md` | Реген щита на time.advanced |

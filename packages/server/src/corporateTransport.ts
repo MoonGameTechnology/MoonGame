@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Identity } from './matchApi';
+import { DependencyGuard } from './dependencyGuard';
 
 export interface CorporateEndpoint {
   url: string;
@@ -39,7 +40,28 @@ function signature(
     .update(`${claims}\n${method}\n${path}\n${digest(body)}`)
     .digest('hex');
 }
-export async function corporateRequest(
+const guards = new WeakMap<CorporateEndpoint, DependencyGuard>();
+
+export function corporateRequest(
+  endpoint: CorporateEndpoint,
+  method: string,
+  path: string,
+  body?: unknown,
+  who?: Identity,
+  ip = '127.0.0.1',
+): Promise<{ status: number; body: unknown }> {
+  let guard = guards.get(endpoint);
+  if (!guard) {
+    guard = new DependencyGuard();
+    guards.set(endpoint, guard);
+  }
+  return guard.run(
+    () => sendCorporateRequest(endpoint, method, path, body, who, ip),
+    (result) => result.status === 429 || result.status >= 500,
+  );
+}
+
+async function sendCorporateRequest(
   endpoint: CorporateEndpoint,
   method: string,
   path: string,

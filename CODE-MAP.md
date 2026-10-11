@@ -307,6 +307,7 @@ Recovery-письма обоих хостов форматирует `prototype/
 | `corpApi.ts` / `corpService.ts` | corp API/service | корпорации и инфраструктура; оба серверных входа |
 | `corporationMain.ts` / `corporationServer.ts` | самостоятельный corporate entrypoint | бандл `corporation-server.mjs`, отдельная PostgreSQL; [карта](docs/corporation-service.md) |
 | `corporateTransport.ts` / `corporateRemote.ts` | signed gateway / RPC | оба игровых входа, проверка личности в Game, подпись ответов и durable nonce |
+| `dependencyGuard.ts` | ограничение нагрузки / circuit breaker | общий исходящий предохранитель; применяется к Corp HTTP/RPC, без очереди и автоповтора; [роадмап](docs/service-resilience-roadmap.md) |
 | `corporateTransactions.ts` | `createCorporateServices` | SERIALIZABLE операция: права, изменение, аудит; savepoints стора |
 | `corporateMigration.ts` / `corporateMigrationMain.ts` | `CORPORATE_TABLES`, dry run / apply | перенос десяти корпоративных таблиц без игровых данных |
 | `corpConstruction.ts` | каталог и атомарный переход инфраструктуры | `data/corpBuildings.json`, очередь, влияние, аудит; Memory/Postgres |

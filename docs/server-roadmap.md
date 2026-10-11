@@ -32,6 +32,10 @@
 **Нет:** per-player очереди (concurrency=1, SV-2.3), масштаба на >1 инстанс/мульти-процесс
 (SV-4.1), внешнего OIDC, pg-boss.
 
+Границы самостоятельных доменов и проверки отказов —
+[роадмап сервисов](service-resilience-roadmap.md). Corp уже поддерживает отдельный
+процесс/БД; Inventory/settlement и Auction ещё находятся в Game.
+
 ## Зависимости
 
 `@void/action-layer` (готов каркас) · `persistence-roadmap.md` (F2/F3) · `core` (`visibleState`) ·
@@ -116,6 +120,11 @@
 **Цель:** WS на >1 инстанс без поломки auth/видимости.
 **Подзадачи:** шардинг по матчу (match-actor); fan-out через Redis pub/sub или sticky-сессии; presence; сохранить per-player authz/туман. (Подробнее — `operations-roadmap.md`.)
 **Готово, когда:** матчи разнесены по инстансам; авторизация/туман целы.
+Для изоляции отказов (решение 2026-10-11) дополнительно нужны ограниченные workers,
+единственный writer через lease с fencing epoch в атомарном persist/receipt,
+отказ stale writer и его рассылки, reconnect/drain и закреплённые версии/loadout.
+SIGKILL/OOM одного worker не останавливает другой; снимки и квитанции восстанавливаются.
+[Контракт и пределы гарантии](service-resilience-roadmap.md).
 
 ---
 

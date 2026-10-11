@@ -127,3 +127,62 @@ it('accepts only a response authenticated by the corporate peer', async () => {
     await Promise.all([signedPeer.close(), fakePeer.close()]);
   }
 });
+
+it('stops repeatedly calling an unavailable signed peer without retrying writes', async () => {
+  const peer = Fastify();
+  corporateIdentity(peer, key);
+  let calls = 0;
+  peer.post('/corps', async (_request, reply) => {
+    calls++;
+    return reply.code(503).send({ error: 'E_CORPORATIONS_UNAVAILABLE' });
+  });
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    for (let i = 0; i < 3; i++)
+      expect((await corporateRequest(endpoint, 'POST', '/corps', { name: 'test' })).status).toBe(
+        503,
+      );
+    await expect(corporateRequest(endpoint, 'POST', '/corps', { name: 'test' })).rejects.toThrow(
+      'E_DEPENDENCY_OPEN',
+    );
+    expect(calls).toBe(3);
+  } finally {
+    await peer.close();
+  }
+});
+
+it('caps hanging corporate calls while independent game routes remain available', async () => {
+  const peer = Fastify(),
+    game = Fastify();
+  corporateIdentity(peer, key);
+  let release!: () => void, admitted!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const full = new Promise<void>((resolve) => {
+    admitted = resolve;
+  });
+  let calls = 0;
+  peer.get('/corps', async () => {
+    if (++calls === 16) admitted();
+    await held;
+    return { ok: true };
+  });
+  game.get('/matches', async () => ({ matches: ['active'] }));
+  let requests: Promise<unknown>[] = [];
+  try {
+    const endpoint = { url: await peer.listen({ host: '127.0.0.1', port: 0 }), key };
+    requests = Array.from({ length: 16 }, () => corporateRequest(endpoint, 'GET', '/corps'));
+    await full;
+    await expect(corporateRequest(endpoint, 'GET', '/corps')).rejects.toThrow('E_DEPENDENCY_BUSY');
+    expect((await game.inject('/matches')).statusCode).toBe(200);
+    release();
+    await Promise.all(requests);
+    expect((await corporateRequest(endpoint, 'GET', '/corps')).status).toBe(200);
+    expect(calls).toBe(17);
+  } finally {
+    release();
+    await Promise.allSettled(requests);
+    await Promise.all([peer.close(), game.close()]);
+  }
+});
