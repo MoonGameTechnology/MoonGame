@@ -1,8 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // Server email templates share the pure locale catalogs at the repository root.
-    "rootDir": "../..",
+    "rootDir": "src",
     "noEmit": true
   },
   "include": ["src/**/*.ts"]

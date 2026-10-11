@@ -87,6 +87,8 @@ export {
   authRateFromEnv,
   type AuthApiDeps,
   type Mailer,
+  type RecoveryMail,
+  type RecoveryMailer,
 } from './authApi';
 // EC-3 · MetaMarket — аукцион мета-предметов. Экспортируется, чтобы прото-хост монтировал
 // ТОТ ЖЕ слой, что прод (одна реализация торговли, а не две — как у friends/corp).

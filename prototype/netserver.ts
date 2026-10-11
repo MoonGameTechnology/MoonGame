@@ -1,4 +1,5 @@
 import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
+import { recoveryMailer } from './src/recoveryMailer';
 import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
@@ -1007,7 +1008,7 @@ const server = createMultiplayerServer({
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
         users: userStore,
-        sendMail: mailerFromEnv(),
+        sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
         // Плейтест на десять человек часто приходит с ОДНОГО адреса (общий Wi-Fi, NAT
         // оператора), а первый вход стоит двух запросов — поэтому потолок задаётся

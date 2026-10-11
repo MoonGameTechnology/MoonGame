@@ -58,7 +58,7 @@ const coreModuleFiles = (): string[] =>
  *  виду литерала однозначно понятно, ключ это или мост. */
 const KEY_RE = /^[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+$/;
 
-/** Every `/localization` consumer's source: prototype, PWA and server email templates.
+/** Every `/localization` consumer's source: prototype, PWA and host email adapter.
  *  They read the same catalogs; orphan/leak checks must include all consumers. */
 const srcFiles = (): string[] => [
   ...readdirSync(path.join(repoRoot, 'prototype/src'))
@@ -67,9 +67,6 @@ const srcFiles = (): string[] => [
   ...readdirSync(path.join(repoRoot, 'packages/client/src'))
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => `packages/client/src/${f}`),
-  ...readdirSync(path.join(repoRoot, 'packages/server/src'))
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => `packages/server/src/${f}`),
   // Общие решения обоих клиентов (`decisions/README.md`): текста они не хранят, но
   // ключи `t(...)` в них законны — значит папка обязана быть видна и проверке на
   // русские литералы, и учёту используемых ключей, иначе ключ отсюда прочтётся как

@@ -30,7 +30,7 @@
 | `packages/server/dist/proto-server.mjs` | **прод**: `Dockerfile` `CMD`; собирается на этапе build из `prototype/netserver.ts` (`RUN node prototype/bundle-netserver.mjs`, `Dockerfile:62`) | контейнер, `moongame`/compose |
 | `prototype/netserver.mjs` | тот же хост для разработки: собирает бандл и запускает его | `pnpm dev:proto-server` |
 | `prototype/host.mjs` | одной командой для живого теста: собирает HTML, поднимает хост на 0.0.0.0 и печатает LAN-адрес для друзей | `pnpm host` |
-| `packages/server/src/main.ts` | **канонический** сервер пакета (Fastify + WS + persist + clockDriver). В проде пока НЕ запускается | `pnpm dev:server` |
+| `scripts/server.ts` → `packages/server/src/main.ts:startServer` | **канонический** сервер пакета (Fastify + WS + persist + clockDriver); `packages/server/dev.mjs` собирает внешний entry, который инъецирует почтовый адаптер. В проде пока НЕ запускается | `pnpm dev:server` |
 | `prototype/build.mjs` | сборка играбельного клиента в один HTML (`prototype/dist/*.html`) | `pnpm prototype` |
 | `packages/client` (Vite) | PWA-оболочка: welcome + живая карта + `?join=` | `pnpm --filter @void/client dev` |
 
@@ -38,6 +38,10 @@
 игроков, кладут в `prototype/netserver.ts` (или в общий код `packages/server/src/**`,
 который он импортирует напрямую по относительному пути). Правка ТОЛЬКО в
 `packages/server/src/main.ts` до прода сегодня не доезжает.
+
+Recovery-письма обоих хостов форматирует `prototype/src/recoveryMailer.ts` под локаль
+получателя. Серверный `authApi` передаёт структурный `RecoveryMail`, а `mailer.ts`
+отвечает за SMTP/TLS; каталогов локализации в графе серверного пакета нет.
 
 ---
 
@@ -275,7 +279,7 @@
 
 | файл | экспорт | назначение |
 |---|---|---|
-| `main.ts` | `main()` | точка входа: Fastify + WS + persist + clockDriver |
+| `main.ts` | `startServer({sendRecoveryMail})` | запуск сервера: Fastify + WS + persist + clockDriver; адаптеры и fatal handlers подключает внешний `scripts/server.ts` |
 | `matchRoom.ts` | `MatchRoom` | advance → applyAction → per-player fog deltas; durable persist |
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
 | `matchRegistry.ts` | `LazyRoomRegistry` | multi-match registry + hibernation |
