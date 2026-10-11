@@ -15,16 +15,15 @@ import {
 /** Existing stores sometimes open their own transaction. Inside a service operation
  * those boundaries become savepoints; they must never commit the outer operation. */
 function scopedPool(client: PoolClient): Pool {
-  let next = 0;
   const connection = {
     query: async (sql: string, values?: unknown[]) => {
       const command = sql.trim().toUpperCase();
-      if (command === 'BEGIN') return client.query(`SAVEPOINT corp_nested_${++next}`);
-      if (command === 'COMMIT') return client.query(`RELEASE SAVEPOINT corp_nested_${next--}`);
+      if (command === 'BEGIN') return client.query('SAVEPOINT corporate_operation');
+      if (command === 'COMMIT') return client.query('RELEASE SAVEPOINT corporate_operation');
       if (command === 'ROLLBACK') {
-        const name = `corp_nested_${next--}`;
-        await client.query(`ROLLBACK TO SAVEPOINT ${name}`);
-        return client.query(`RELEASE SAVEPOINT ${name}`);
+        // PostgreSQL resolves the most recent savepoint with this fixed name.
+        await client.query('ROLLBACK TO SAVEPOINT corporate_operation');
+        return client.query('RELEASE SAVEPOINT corporate_operation');
       }
       return client.query(sql, values);
     },

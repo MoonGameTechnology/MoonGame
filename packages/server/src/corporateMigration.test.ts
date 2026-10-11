@@ -21,7 +21,8 @@ describe.skipIf(!url)('corporate database cutover', () => {
       target = new Pool({ connectionString: targetUrl.toString() });
       await migrate(source);
       const corps = new PostgresCorpStore(source);
-      const created = await corps.createCorp('Migration Corp', 'head', 'Pilot');
+      const name = "Migration'); DROP TABLE corps;--";
+      const created = await corps.createCorp(name, 'head', 'Pilot');
       if (!created.ok) throw Error('fixture');
       await corps.appendAudit({ corpId: created.corpId, at: 10, actor: 'head', action: 'create' });
       await source.query(
@@ -37,6 +38,7 @@ describe.skipIf(!url)('corporate database cutover', () => {
         created.corpId,
       );
       expect(await new PostgresCorpStore(target).auditOf(created.corpId)).toHaveLength(1);
+      expect((await new PostgresCorpStore(target).getCorp(created.corpId))?.name).toBe(name);
       expect((await target.query('SELECT count(*) AS n FROM matches')).rows[0].n).toBe('0');
       await expect(migrateCorporations(source, target, true)).rejects.toThrow(
         'E_CORPORATIONS_TARGET_NOT_EMPTY',

@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import {
@@ -8,7 +8,7 @@ import {
   registerCorporateGateway,
 } from './corporateTransport';
 
-const key = 'synthetic-corporations-test-key-32-bytes';
+const key = randomBytes(32).toString('hex');
 function signed(path: string, body: unknown, at = Date.now()) {
   const claims = JSON.stringify({
     at,
