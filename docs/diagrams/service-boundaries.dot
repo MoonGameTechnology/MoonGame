@@ -22,7 +22,8 @@ digraph services {
     {rank=same; gameDB; inventoryDB; auctionDB; corpDB;}
     workers -> gameDB; inventory -> inventoryDB; auction -> auctionDB; corp -> corpDB;
   }
-  api -> workers [label="вход / WSS"];
+  api -> workers [label="маршрут / join-token"];
+  browser -> workers [label="WSS: отдельный ingress",constraint=false];
   api -> inventory [label="личный инвентарь"];
   api -> auction [label="торговля"];
   api -> corp [label="управление"];
