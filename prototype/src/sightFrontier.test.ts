@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   SIGHT_TIERS,
-  frontierBox,
   frontierLook,
+  frontierOnScreen,
   frontierShown,
-  frontierTiles,
   ownRingLook,
   ownRingShown,
   unionArcs,
+  unionLoops,
+  type FrontierArc,
   type ScreenCircle,
 } from './sightFrontier';
 
@@ -48,119 +49,153 @@ describe('граница видимости — из чего собираетс
   });
 });
 
-describe('граница видимости — коробка обратных клипов', () => {
-  it('КОРОБКА ОБНИМАЕТ ВСЕ КРУГИ С ПОЛЕМ: за её краем заливка пуста, сглаживание края внутри', () => {
-    expect(frontierBox([круг(100, 100, 10), круг(150, 120, 5)], 1000, 1000)).toEqual({
-      x: 86,
-      y: 86,
-      width: 73,
-      height: 43,
-    });
+describe('граница видимости — какие круги рисовать', () => {
+  it('круг на экране остаётся, круг целиком за любым краем уходит', () => {
+    const shown = [круг(100, 100, 10)];
+    const away = [круг(-30, 100, 20), круг(430, 100, 20), круг(100, -30, 20), круг(100, 330, 20)];
+    expect(frontierOnScreen([...shown, ...away], 390, 300)).toEqual(shown);
   });
 
-  it('дробные края округляются наружу: коробка не срезает пиксель края', () => {
-    expect(frontierBox([круг(10.5, 20.25, 3.1)], 1000, 1000)).toEqual({
-      x: 3,
-      y: 13,
-      width: 15,
-      height: 15,
-    });
+  it('КРУГ ШИРЕ ЭКРАНА ОСТАЁТСЯ: его заливка накрывает экран целиком', () => {
+    expect(frontierOnScreen([круг(200, 150, 5000)], 390, 300)).toEqual([круг(200, 150, 5000)]);
   });
 
-  it('КОРОБКА НЕ ШИРЕ ПРЕЖНЕГО КЛИПА: большой круг обрезается по экрану с запасом в единицу', () => {
-    expect(frontierBox([круг(200, 150, 5000)], 390, 300)).toEqual({
-      x: -1,
-      y: -1,
-      width: 392,
-      height: 302,
-    });
-  });
-
-  it('ВСЁ ЗА ЭКРАНОМ — РИСОВАТЬ НЕЧЕГО: иначе вышла бы коробка отрицательной площади', () => {
-    expect(frontierBox([круг(-100, 50, 20)], 390, 300)).toBeNull();
-    expect(frontierBox([круг(50, 500, 20)], 390, 300)).toBeNull();
-  });
-
-  it('круги без площади коробку не растят', () => {
-    expect(frontierBox([круг(0, 0, 0), круг(300, 300, -2)], 1000, 1000)).toBeNull();
-    expect(frontierBox([круг(50, 50, 0), круг(100, 100, 10)], 1000, 1000)).toEqual({
-      x: 86,
-      y: 86,
-      width: 28,
-      height: 28,
-    });
+  it('ПОЛЕ ЗА КРАЕМ ЭКРАНА: сглаживание края круга чуть за экраном ещё ложится на экран', () => {
+    expect(frontierOnScreen([круг(-13, 100, 10)], 390, 300)).toHaveLength(1);
+    expect(frontierOnScreen([круг(-15, 100, 10)], 390, 300)).toEqual([]);
   });
 });
 
-describe('граница видимости — плитки контура', () => {
-  const целое = (v: number): boolean => Math.abs(v - Math.round(v)) < 1e-9;
-
-  it('КРАЯ ПЛИТОК НА ЦЕЛЫХ ФИЗИЧЕСКИХ ПИКСЕЛЯХ: иначе пиксель шва закрасился бы дважды', () => {
-    const dpr = 2.625;
-    const tiles = frontierTiles([круг(150.3, 120.7, 90)], [круг(150.3, 120.7, 89)], 390, 844, dpr);
-    expect(tiles.length).toBeGreaterThan(0);
-    for (const t of tiles) {
-      expect([t.x, t.y, t.x + t.width, t.y + t.height].every((v) => целое(v * dpr))).toBe(true);
+describe('граница видимости — край объединения', () => {
+  const TAU = Math.PI * 2;
+  const начало = (a: FrontierArc): [number, number] => [
+    a.x + a.r * Math.cos(a.from),
+    a.y + a.r * Math.sin(a.from),
+  ];
+  const конец = (a: FrontierArc): [number, number] => [
+    a.x + a.r * Math.cos(a.to),
+    a.y + a.r * Math.sin(a.to),
+  ];
+  const разрыв = (p: [number, number], q: [number, number]): number =>
+    Math.hypot(p[0] - q[0], p[1] - q[1]);
+  // Петля замкнута: каждая дуга кончается там, где начинается следующая.
+  const замкнута = (loop: FrontierArc[]): boolean =>
+    loop.every((a, k) => разрыв(конец(a), начало(loop[(k + 1) % loop.length]!)) < 1e-6);
+  // Лежит ли точка внутри петли: петля — многоугольник по частым точкам дуг.
+  const внутри = (loop: FrontierArc[], x: number, y: number): boolean => {
+    const pts: Array<[number, number]> = [];
+    for (const a of loop) {
+      const n = Math.max(2, Math.ceil(((a.to - a.from) / TAU) * 2048));
+      for (let k = 0; k < n; k++) {
+        const t = a.from + ((a.to - a.from) * k) / n;
+        pts.push([a.x + a.r * Math.cos(t), a.y + a.r * Math.sin(t)]);
+      }
     }
+    let inside = false;
+    for (let k = 0, j = pts.length - 1; k < pts.length; j = k++) {
+      const [xi, yi] = pts[k]!;
+      const [xj, yj] = pts[j]!;
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  // Детерминированный разброс: тест не меняется от прогона к прогону.
+  const разброс = (seed: number): (() => number) => {
+    let v = seed;
+    return () => {
+      v = (v * 1103515245 + 12345) % 2147483648;
+      return v / 2147483648;
+    };
+  };
+
+  it('одинокий круг — одна петля из целого круга', () => {
+    expect(unionLoops([круг(10, 20, 30)])).toEqual([[{ x: 10, y: 20, r: 30, from: 0, to: TAU }]]);
   });
 
-  it('КАЖДАЯ ТОЧКА КРОМКИ — РОВНО В ОДНОЙ ПЛИТКЕ: без щелей и без двойной заливки', () => {
-    const tiles = frontierTiles([круг(300, 300, 200)], [круг(300, 300, 199)], 1000, 1000, 1);
-    for (let k = 0; k < 360; k++) {
-      const a = (k * Math.PI) / 180;
-      const x = 300 + 199.5 * Math.cos(a);
-      const y = 300 + 199.5 * Math.sin(a);
-      const holders = tiles.filter(
-        (t) => x >= t.x && x < t.x + t.width && y >= t.y && y < t.y + t.height,
+  it('КРУГ ВНУТРИ СОСЕДА КРАЯ НЕ ДАЁТ: граница видимости одна, а не по кольцу на источник', () => {
+    expect(unionLoops([круг(0, 0, 100), круг(30, 0, 40)])).toEqual([
+      [{ x: 0, y: 0, r: 100, from: 0, to: TAU }],
+    ]);
+  });
+
+  it('СОВПАДАЮЩИЕ КРУГИ — ОДИН КРАЙ: иначе они спрятали бы друг друга и граница пропала', () => {
+    expect(unionLoops([круг(5, 5, 10), круг(5, 5, 10)])).toEqual([
+      [{ x: 5, y: 5, r: 10, from: 0, to: TAU }],
+    ]);
+  });
+
+  it('два пересёкшихся круга — одна петля из двух дуг, сцепленных концами', () => {
+    const loops = unionLoops([круг(0, 0, 50), круг(60, 10, 40)]);
+    expect(loops).toHaveLength(1);
+    expect(loops[0]).toHaveLength(2);
+    expect(замкнута(loops[0]!)).toBe(true);
+  });
+
+  it('ДУГА ЧЕРЕЗ НУЛЕВОЙ УГОЛ ОСТАЁТСЯ ОДНОЙ: петля не рвётся на стыке углов', () => {
+    const loops = unionLoops([круг(0, 0, 50), круг(-60, 0, 30)]);
+    const own = loops.flat().filter((a) => a.x === 0);
+    expect(own).toHaveLength(1);
+    expect(own[0]!.from).toBeLessThan(TAU);
+    expect(own[0]!.to).toBeGreaterThan(TAU);
+  });
+
+  it('ДЫРА МЕЖДУ ТРЕМЯ КРУГАМИ — СВОЯ ПЕТЛЯ: слепое пятно посреди обзора обведено', () => {
+    // Центры в 57,7 от середины, круги по 52: попарно пересекаются, а середину не накрывают.
+    const h = 50 / Math.sqrt(3);
+    const loops = unionLoops([круг(0, -2 * h, 52), круг(50, h, 52), круг(-50, h, 52)]);
+    expect(loops).toHaveLength(2);
+    for (const loop of loops) expect(замкнута(loop)).toBe(true);
+  });
+
+  it('круг, накрытый соседями вместе, но ни одним целиком, края не даёт', () => {
+    const соседи = [0, 1, 2].map((k) =>
+      круг(15 * Math.cos((k * TAU) / 3), 15 * Math.sin((k * TAU) / 3), 20),
+    );
+    const loops = unionLoops([круг(0, 0, 10), ...соседи]);
+    expect(loops.flat().every((a) => a.r === 20)).toBe(true);
+  });
+
+  it('ТРИ КРУГА ЧЕРЕЗ ОДНУ ТОЧКУ НА КРАЮ: петля всё равно замкнута', () => {
+    // Все три проходят через (0, 0), и (0, 0) лежит на краю объединения: центры веером в 90°.
+    const loops = unionLoops(
+      [0, 1, 2].map((k) => круг(40 * Math.cos((k * TAU) / 8), 40 * Math.sin((k * TAU) / 8), 40)),
+    );
+    expect(loops.length).toBeGreaterThan(0);
+    for (const loop of loops) expect(замкнута(loop)).toBe(true);
+  });
+
+  it('ПОЛОСА — РОВНО ТО, ЧТО ОБХОДИТ НЕЧЁТНОЕ ЧИСЛО ПЕТЕЛЬ ОБОИХ КРАЁВ (правило 9)', () => {
+    const rnd = разброс(7);
+    for (let trial = 0; trial < 12; trial++) {
+      const circles = Array.from({ length: 2 + (trial % 9) }, () =>
+        круг(rnd() * 200, rnd() * 200, 4 + rnd() * 60),
       );
-      expect(holders).toHaveLength(1);
+      const inset = 3;
+      const outer = unionArcs(circles, 0);
+      const inner = unionArcs(circles, inset);
+      const loops = [...unionLoops(outer), ...unionLoops(inner)];
+      for (const loop of loops) expect(замкнута(loop)).toBe(true);
+      for (let k = 0; k < 150; k++) {
+        const x = rnd() * 260 - 30;
+        const y = rnd() * 260 - 30;
+        // Точки у самой окружности многоугольник петли решает неточно — их пропускаем.
+        const уКрая = [...outer, ...inner].some(
+          (c) => Math.abs(Math.hypot(x - c.x, y - c.y) - c.r) < 0.05,
+        );
+        if (уКрая) continue;
+        const в = (cs: ScreenCircle[]): boolean =>
+          cs.some((c) => Math.hypot(x - c.x, y - c.y) < c.r);
+        const нечётно = loops.filter((loop) => внутри(loop, x, y)).length % 2 === 1;
+        expect(нечётно).toBe(в(outer) && !в(inner));
+      }
     }
   });
 
-  it('ПЛИТКА ВНУТРИ ДИСКА ПРОПУСКАЕТСЯ: контура в ней нет, а маска стоила бы её площади', () => {
-    const tiles = frontierTiles([круг(500, 500, 300)], [круг(500, 500, 299)], 1000, 1000, 1);
-    expect(
-      tiles.some((t) => t.x <= 500 && 500 < t.x + t.width && t.y <= 500 && 500 < t.y + t.height),
-    ).toBe(false);
-  });
-
-  it('плитка, которой не задел ни один круг, пропускается', () => {
-    const tiles = frontierTiles(
-      [круг(20, 20, 10), круг(900, 900, 10)],
-      [круг(20, 20, 9), круг(900, 900, 9)],
-      1000,
-      1000,
-      1,
-    );
-    expect(tiles.length).toBeGreaterThan(0);
-    expect(tiles.length).toBeLessThanOrEqual(8);
-    for (const t of tiles) expect(t.fill.length).toBeGreaterThan(0);
-  });
-
-  it('ПЛИТКА ВЫЧИТАЕТ ТОЛЬКО ЗАДЕВШИЕ ЕЁ ДИСКИ: дальний радар не тратит маску', () => {
-    const tiles = frontierTiles(
-      [круг(20, 20, 10), круг(900, 900, 10)],
-      [круг(20, 20, 9), круг(900, 900, 9)],
-      1000,
-      1000,
-      1,
-    );
-    for (const t of tiles) expect(t.cut).toEqual(t.x < 500 ? [0] : [1]);
-  });
-
-  it('номера заливки — по внешним кругам, вычитания — по внутренним: сжатие выбрасывает мелкие', () => {
-    const outer = [круг(30, 30, 0.5), круг(30, 30, 20)];
-    const inner = unionArcs(outer, 1);
-    const tiles = frontierTiles(outer, inner, 1000, 1000, 1);
-    expect(tiles.length).toBeGreaterThan(0);
-    for (const t of tiles) {
-      expect(t.fill).toContain(1);
-      expect(t.cut).toEqual([0]);
-    }
-  });
-
-  it('всё за экраном — плиток нет', () => {
-    expect(frontierTiles([круг(-100, 50, 20)], [круг(-100, 50, 19)], 390, 300, 2)).toEqual([]);
+  it('вход не меняется', () => {
+    const circles = [круг(0, 0, 50), круг(60, 0, 30)];
+    const copy = structuredClone(circles);
+    unionLoops(circles);
+    expect(circles).toEqual(copy);
   });
 });
 

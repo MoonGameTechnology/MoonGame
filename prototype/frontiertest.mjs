@@ -66,6 +66,16 @@ try {
         { x: 90, y: 90, r: 0.5 },
         { x: 100, y: 90, r: 0 },
       ],
+      // Nearly tangent radar circles, outside and inside: a stroke along the visible arcs
+      // would break or thicken the outline here, the band fill must not.
+      [
+        { x: 80, y: 100, r: 50 },
+        { x: 179, y: 100, r: 50 },
+      ],
+      [
+        { x: 120, y: 100, r: 70 },
+        { x: 160.5, y: 100, r: 30 },
+      ],
       // A hole enclosed by three intersecting radar regions must remain empty.
       [
         { x: 90, y: 65, r: 46 },
@@ -118,7 +128,7 @@ try {
           mask.g.fillStyle = color(look.strokeAlpha);
           mask.g.fillRect(0, 0, width, height);
           expected.g.drawImage(mask.c, 0, 0, width, height);
-          drawSightFrontier(actual.g, circles, tier, '#72e0d5', width, height, dpr);
+          drawSightFrontier(actual.g, circles, tier, '#72e0d5', width, height);
           const a = actual.g.getImageData(0, 0, width * dpr, height * dpr).data;
           const e = expected.g.getImageData(0, 0, width * dpr, height * dpr).data;
           let maxInterior = 0,
@@ -165,6 +175,9 @@ try {
       'the same union and holes away from antialiasing: ' + JSON.stringify(r),
     );
     assert(r.mean < 0.5, 'no broad appearance change: ' + JSON.stringify(r));
+    // The outline itself, junctions included: only antialiasing may differ, never a line
+    // pixel missing or painted twice (that is the stroke alpha, 36 to 66 levels).
+    assert(r.max <= 40, 'the outline matches the subtraction at junctions: ' + JSON.stringify(r));
     assert(r.clipRestored, 'subsequent layers retain the full viewport');
   }
   console.log(
@@ -173,6 +186,8 @@ try {
     'raster comparisons at DPR 1/2/3;',
     'maximum mean alpha difference',
     Math.max(...report.map((r) => r.mean)),
+    'maximum pixel difference',
+    Math.max(...report.map((r) => r.max)),
   );
 } finally {
   await browser.close();

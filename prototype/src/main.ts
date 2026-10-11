@@ -1739,7 +1739,6 @@ initMapRadar({
   ctx: () => cx,
   vw: () => VW,
   vh: () => VH,
-  dpr: () => DPR,
   sources: () => perWorld('radar', ownRadarSources),
   sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
   note,
