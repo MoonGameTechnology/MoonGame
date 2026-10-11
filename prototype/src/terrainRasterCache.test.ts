@@ -96,6 +96,29 @@ describe('province raster cache', () => {
     expect(f.strokes).not.toHaveBeenCalled();
   });
 
+  it('tells the pixels a sharp raster still owes without making one', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    expect(cache.owed(field(), 2)).toBe(248 * 188);
+    expect(f.created).toHaveLength(0);
+    expect(cache.prepare(field(), 2)?.pixels).toBe(248 * 188);
+    expect(cache.owed(field(), 2)).toBe(0);
+    expect(cache.owed(field(178.273, -57.199), 2)).toBe(0);
+    // The same shape at another scale is shown stretched until its own raster is made.
+    const doubled: TerrainField = {
+      ...field(),
+      box: { x: 0, y: 0, width: 240, height: 180 },
+      poly: field().poly.map(([x, y]) => [x * 2, y * 2]),
+      marker: { x: 62.42, y: 94.26 },
+    };
+    expect(cache.owed(doubled, 2)).toBe(488 * 368);
+    // Lost pixels are owed again; worlds and oversized provinces keep no raster to owe.
+    f.created[0]!.dispatchEvent(new Event('contextlost'));
+    expect(cache.owed(field(), 2)).toBe(248 * 188);
+    expect(cache.owed({ ...field(), kind: 'planet' }, 2)).toBe(0);
+    expect(new TerrainRasterCache(100).owed(field(), 2)).toBe(0);
+  });
+
   it('keeps lazy and rebuilt terrain on the requested context policy', () => {
     const f = surfaces();
     const cache = new TerrainRasterCache(undefined, { willReadFrequently: true });

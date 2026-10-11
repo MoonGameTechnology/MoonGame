@@ -37,6 +37,15 @@ function signature(field: TerrainField, dpr: number): string {
   ].join('/');
 }
 
+/** A sharp raster of `field` in device pixels; `null` — it keeps none: real worlds keep their
+ *  own wire renderers, and an oversized province is painted as vector instead. */
+function rasterSize(field: TerrainField, dpr: number, maxPixels: number): { width: number; height: number } | null {
+  if (field.kind === 'planet' || field.kind === 'empty' || field.kind === 'void_station') return null;
+  const width = Math.ceil((field.box.width + PAD * 2) * dpr);
+  const height = Math.ceil((field.box.height + PAD * 2) * dpr);
+  return width * height > maxPixels || width > 4096 || height > 4096 ? null : { width, height };
+}
+
 export class TerrainRasterCache {
   private entries = new Map<string, Entry>();
   private pixels = 0;
@@ -69,15 +78,21 @@ export class TerrainRasterCache {
     entry.surface.height = 0;
   }
 
+  /** The pixels of the sharp raster `field` still owes at `dpr`: 0 — it is here, or none is kept. */
+  owed(field: TerrainField, dpr: number): number {
+    const size = rasterSize(field, dpr, this.maxPixels);
+    if (!size) return 0;
+    const entry = this.entries.get(field.id);
+    const sharp = entry?.key === signature(field, dpr) && entry.width === size.width && entry.height === size.height;
+    return sharp ? 0 : size.width * size.height;
+  }
+
   prepare(field: TerrainField, dpr: number, reuseScale = false): Entry | undefined {
-    if (field.kind === 'planet' || field.kind === 'empty' || field.kind === 'void_station') return;
+    const size = rasterSize(field, dpr, this.maxPixels);
+    if (!size) return;
     const b = field.box;
-    const width = Math.ceil((b.width + PAD * 2) * dpr);
-    const height = Math.ceil((b.height + PAD * 2) * dpr);
+    const { width, height } = size;
     const pixels = width * height;
-    if (pixels > this.maxPixels || width > 4096 || height > 4096) {
-      return;
-    }
     const key = signature(field, dpr);
     let entry = this.entries.get(field.id);
     const sameShape = entry?.key === key;
