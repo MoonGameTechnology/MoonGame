@@ -5,6 +5,7 @@ import {
   type TerritoryCell,
   type TerritorySeed,
 } from './territory';
+import { borderWeights, simplifyBorderCells } from './territoryLod';
 import { waveCells, type WaveConfig } from './territoryWave';
 
 /** A cell of the cached shape: its polygon and per-edge neighbour tags in the cache's local
@@ -67,11 +68,17 @@ function boxesOf(cells: readonly ShapeCell[]): Float64Array {
 export class TerritoryGeometryCache {
   private signature = '';
   private current: TerritoryShape = { cells: [], boxes: new Float64Array(0) };
-  private classified: {
-    shape: TerritoryShape;
-    owners: Array<string | null>;
-    borders: ClassifiedBorders;
-  } | null = null;
+  /** Classified borders per tolerance (0 — every point), for {@link classifiedShape}. */
+  private classified = new Map<
+    number,
+    { owners: Array<string | null>; borders: ClassifiedBorders }
+  >();
+  private classifiedShape: TerritoryShape | null = null;
+  /** The border detail of {@link detailShape} (`territoryLod.ts`): its points' weights, and
+   *  its cells simplified per tolerance. */
+  private detail: { weights: Float64Array[]; levels: Map<number, readonly ShapeCell[]> } | null =
+    null;
+  private detailShape: TerritoryShape | null = null;
 
   /**
    * The shape of these seeds in local space, and where it lands among them.
@@ -140,23 +147,58 @@ export class TerritoryGeometryCache {
    * shape's local space: whoever strokes them places their points as {@link placePoly} does.
    * The classes depend on nothing but the owners, so a camera move reuses them, and they are
    * classified again only when the shape or an owner changes.
+   *
+   * `tolerance` (local units, `territoryLod.ts`): the borders keep only the points that move
+   * the line by more than that, the same ones on both sides of each border. 0 — every point.
+   * Each tolerance keeps its own classes; the shape's weights are computed once
+   * ({@link weighBorders}).
    */
-  borders(shape: TerritoryShape, seeds: readonly TerritorySeed[]): ClassifiedBorders {
-    const memo = this.classified;
+  borders(
+    shape: TerritoryShape,
+    seeds: readonly TerritorySeed[],
+    tolerance = 0,
+  ): ClassifiedBorders {
+    if (this.classifiedShape !== shape) {
+      this.classified.clear();
+      this.classifiedShape = shape;
+    }
+    const memo = this.classified.get(tolerance);
     if (
       memo &&
-      memo.shape === shape &&
       memo.owners.length === seeds.length &&
       seeds.every((s, i) => s.owner === memo.owners[i])
     )
       return memo.borders;
-    const cells: TerritoryCell[] = shape.cells.map((cell) => ({
+    const source = tolerance > 0 ? this.simplified(shape, tolerance) : shape.cells;
+    const cells: TerritoryCell[] = source.map((cell) => ({
       ...cell,
       owner: seeds[cell.idx]!.owner,
       kind: seeds[cell.idx]!.kind,
     }));
     const borders = classifyBorders(cells, seeds);
-    this.classified = { shape, owners: seeds.map((s) => s.owner), borders };
+    this.classified.set(tolerance, { owners: seeds.map((s) => s.owner), borders });
     return borders;
+  }
+
+  /**
+   * Weigh the border points of `shape` for {@link borders} at a tolerance — once per shape,
+   * the price of a full walk over its points. A caller that knows a far zoom is coming (the
+   * map's loading) calls it ahead, so the first zoom out does not pay it mid-gesture.
+   */
+  weighBorders(shape: TerritoryShape): Float64Array[] {
+    if (this.detailShape !== shape || !this.detail) {
+      this.detail = { weights: borderWeights(shape.cells), levels: new Map() };
+      this.detailShape = shape;
+    }
+    return this.detail.weights;
+  }
+
+  private simplified(shape: TerritoryShape, tolerance: number): readonly ShapeCell[] {
+    const weights = this.weighBorders(shape);
+    const levels = this.detail!.levels;
+    let cells = levels.get(tolerance);
+    if (!cells)
+      levels.set(tolerance, (cells = simplifyBorderCells(shape.cells, weights, tolerance)));
+    return cells;
   }
 }
