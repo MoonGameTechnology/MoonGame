@@ -69,6 +69,15 @@ export const SLOT_ANCHORS: Readonly<Record<string, readonly SlotAnchor[]>> = {
   fighter: [{ type: 'weapon', a: [84, 12], t: [88, 42] }],
   strikeCraft: [{ type: 'weapon', a: [38, 64], t: [20, 90] }],
   heavyStriker: [{ type: 'weapon', a: [35, 63], t: [19, 90] }],
+  // Корабль героя (подготовка Сектора Зеро, 2026-10-11): пять точек — на 1★ три отсека,
+  // звёзды героя добавляют защиту и оружие (`HERO_SHIP_STAR_SLOTS`).
+  dreadnought: [
+    { type: 'weapon', a: [67, 15], t: [40, 8] },
+    { type: 'weapon', a: [81, 36], t: [93, 14] },
+    { type: 'defense', a: [58, 66], t: [72, 88] },
+    { type: 'defense', a: [41, 80], t: [50, 96] },
+    { type: 'utility', a: [45, 31], t: [18, 18] },
+  ],
 };
 
 /**

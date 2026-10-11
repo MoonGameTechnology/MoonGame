@@ -3242,6 +3242,7 @@ export const ru: Record<string, string> = {
   'sector-zero.prep.doubled': 'Награда удвоена: +{n} данных · +{m} ⌖.',
   'sector-zero.prep.earn': 'Данные приходят за волны, задачи и победу — и при поражении тоже.',
   'sector-zero.prep.equip': 'Установить',
+  'sector-zero.prep.swap': 'Заменить',
   'sector-zero.prep.equipped': 'Установлено · снять',
   'sector-zero.prep.full': 'Нет свободного слота',
   'sector-zero.prep.hero-level': 'Звёзды {n}★ · слотов навыков: {slots}',

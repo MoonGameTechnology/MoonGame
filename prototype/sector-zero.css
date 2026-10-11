@@ -246,22 +246,53 @@
 .sz-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 20px; }
 /* Имена из `data.*` строчные — они встают и в середину фраз; на кнопке нужна заглавная. */
 .sz-picker button::first-letter { text-transform: uppercase; }
-/* Корпус (PVR-6.6): выбор — плитки с артом; выбранный — крупным портретом рядом со
-   статами и отсеками. */
+/* Корпус (PVR-6.6): выбор — плитки с артом. */
 #sz-workshop .sz-hulls button { flex: none; display: grid; justify-items: center; gap: 6px; padding: 8px 10px; min-width: 96px; }
 .sz-hulls span:not(.ship-art) { display: block; }
 .sz-hulls span:not(.ship-art)::first-letter { text-transform: uppercase; }
 .sz-hulls .ship-art--thumb { width: 84px; height: 56px; border: 0; }
-.sz-hull { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; align-items: start; margin: 8px 0 22px; }
-.sz-hull .ship-art--portrait { margin: 0; }
-.sz-hull h2 { margin: 0 0 4px; color: #e1f4f4; }
-.sz-hull h2::first-letter { text-transform: uppercase; }
-/* Полки корпусов по две в ряд (решение владельца 2026-09-26): корабли | корабли героев,
-   поддержка | шаттлы. На узком экране — столбцом. */
-.sz-shelves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; margin-bottom: 8px; }
+/* «Корабли» по окну производства (заказ владельца 2026-10-11): корпуса, корабль с отсеками
+   на арте, модули открытого отсека. Колонки — по ширине самой вкладки (контейнер), а не окна:
+   на ПК три колонки, уже — корпуса строкой сверху, на телефоне одна колонка в том же порядке. */
+.sz-yard { container-type: inline-size; }
+.sz-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px 24px; align-items: start; margin: 8px 0 22px; }
+.sz-ship .ship-art--portrait { margin: 0; }
+.sz-ship .cn-art { margin-bottom: 0; }
+.sz-ship h2 { margin: 12px 0 4px; color: #e1f4f4; }
+.sz-ship h2::first-letter { text-transform: uppercase; }
+/* Плитки отсеков на арте — общие с окном производства (`ship-art.css`); общая кнопка экрана
+   их не перекрашивает. */
+#sz-workshop .cn-tile { min-height: 0; padding: 0; border: 1px dashed var(--cyan-dim); border-radius: 10px; background: rgba(7, 16, 24, .9); color: var(--dim); font-size: 19px; }
+#sz-workshop .cn-tile.filled { border: 1.5px solid var(--rar, var(--cyan)); color: var(--rar, var(--cyan)); }
+#sz-workshop .cn-tile.sel { border-style: solid; }
+#sz-workshop .cn-tile.empty.sel { border-color: var(--cyan); }
+/* Колонка открытого отсека: что в нём, «Снять» и модули его типа. */
+.sz-bayhead { display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; }
+.sz-bayhead .sz-tier { flex: 1; min-width: 0; margin: 0; }
+.sz-baycol .sz-tier i { font-style: normal; margin-right: 6px; }
+#sz-workshop .sz-bayhead button { flex: none; min-height: 36px; padding: 6px 12px; }
+.sz-baycol .sz-forge-rule { margin: 0 0 8px; }
+.sz-baycol .sz-mods { margin-bottom: 10px; }
+@container (min-width: 700px) {
+  .sz-grid.sz-g3 { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); }
+  .sz-grid .sz-shelves { grid-column: 1 / -1; }
+}
+@container (min-width: 1000px) {
+  .sz-grid.sz-g3 { grid-template-columns: minmax(170px, 200px) minmax(0, 1fr) minmax(300px, 360px); }
+  .sz-grid:not(.sz-g3) { grid-template-columns: minmax(170px, 200px) minmax(0, 1fr); }
+  .sz-grid .sz-shelves { grid-column: auto; flex-direction: column; flex-wrap: nowrap; }
+  /* Корпуса — столбцом строк: картинка рядом с именем, как в окне производства на ПК. */
+  .sz-grid .sz-hulls { flex-direction: column; flex-wrap: nowrap; margin-bottom: 14px; }
+  #sz-workshop .sz-grid .sz-hulls button { display: flex; align-items: center; justify-items: start; gap: 8px; width: 100%; min-width: 0; padding: 5px 8px 5px 5px; text-align: left; }
+  .sz-grid .sz-hulls .ship-art--thumb { width: 64px; height: 43px; flex: none; }
+  .sz-baycol .sz-mods { grid-template-columns: minmax(0, 1fr); }
+}
+/* Полки корпусов: корабли, корабли героев, поддержка, шаттлы. */
+.sz-shelves { display: flex; flex-wrap: wrap; column-gap: 28px; margin-bottom: 8px; }
 .sz-shelf { min-width: 0; }
 .sz-shelf .sz-picker { margin-bottom: 12px; }
-/* Слоты — плитками: по плитке на слот; слот за звезду корабля помечен ★ в углу. */
+/* Отсеки под артом — когда точек на арте нет или отсеков больше, чем точек (звёзды корабля):
+   по плитке на отсек, плитка открывает отсек; слот за звезду корабля помечен ★ в углу. */
 .sz-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 18px 0; align-items: start; }
 .sz-slot { position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; min-height: 92px;
   padding: 10px 8px; border: 1px dashed #2f5560; border-radius: 10px; background: #081822; text-align: center; }
@@ -272,6 +303,14 @@
 .sz-slot.full i { opacity: 1; }
 .sz-slot.full b { color: #e1f4f4; }
 .sz-slot.star::after { content: '★'; position: absolute; top: 4px; right: 6px; color: #f0c86b; font-size: 11px; }
+#sz-workshop button.sz-slot { min-height: 92px; padding: 10px 8px; border: 1px dashed #2f5560; background: #081822; color: inherit; }
+#sz-workshop button.sz-slot.full { border-style: solid; border-color: #4f8b8f; background: #0b2330; }
+#sz-workshop button.sz-slot.selected { border-color: var(--sf-accent); box-shadow: inset 0 0 0 1px var(--sf-accent); }
+.sz-slot-grade { font-size: 12px; font-weight: 600; line-height: 1.3; color: var(--rar); }
+.sz-slot-grade.r-simple { --rar: var(--rar-simple); }
+.sz-slot-grade.r-unique { --rar: var(--rar-unique); }
+.sz-slot-grade.r-mythic { --rar: var(--rar-mythic); }
+.sz-slot-grade.r-legendary { --rar: var(--rar-legendary); }
 .sz-slot-add { border-color: #6b5a2c; background: #14140c; }
 .sz-slot-add b { color: #f0c86b; }
 .sz-slot-add.done { opacity: .7; }
@@ -347,19 +386,6 @@
 .sz-mods .sz-card .sz-upgrade p.sz-upgrade-title { margin-bottom: 4px; font-size: 12px; }
 .sz-mods .sz-odds { margin-bottom: 8px; }
 #sz-workshop .sz-mods .sz-card button { padding: 6px 8px; font-size: 12px; }
-/* Модули группами по типу слота (заказ владельца 2026-09-26, `moduleGroups.ts`): заголовок
-   группы — значок и имя слота, как у плиток слотов, и сколько слотов этого типа занято.
-   На ПК группы встают в ряд, каждая шириной по своим карточкам (`--n`), — иначе группа из
-   двух карточек занимала бы целую строку широкого экрана и список вырастал на ряд. Лишнее
-   место делится пропорционально карточкам, чтобы карточки разных групп были одной ширины;
-   потолок не даёт одинокой группе растянуть карточки на весь экран. */
-.sz-modgroups { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 20px; }
-.sz-modgroup { --n: 1; flex: var(--n) 1 calc(var(--n) * 198px - 8px); max-width: calc(var(--n) * 268px); min-width: 0; }
-.sz-modgroup .sz-mods { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
-.sz-modgroup .sz-tier { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 6px; }
-.sz-modgroup .sz-tier i { font-style: normal; font-size: 14px; letter-spacing: 0; }
-.sz-modgroup .sz-tier span { color: var(--sf-dim); font-weight: 400; }
-.sz-modgroup .sz-mods { margin-bottom: 4px; }
 /* Отклик на улучшение (заказ владельца 2026-09-26, `upgradeFx.ts`) — движение В ОТВЕТ на
    нажатие, один раз: класс живёт одну перерисовку. Звезда и новая редкость — средний
    отклик (кольцо цвета редкости + вспышка звезды), промах кузни — малый (красная кромка
@@ -518,13 +544,12 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   /* Телефон: полоса во всю ширину, чтобы лента корпусов не выглядывала из-под неё сбоку. */
   .sz-stick { top: calc(env(safe-area-inset-top, 0px) - max(20px, env(safe-area-inset-top, 0px))); margin-inline: -22px; padding-inline: 22px; border-radius: 0; }
   #sz-workshop .sz-tabs button { font-size: 12px; padding: 8px 2px; }
-  .sz-hull { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .sz-shelves { grid-template-columns: minmax(0, 1fr); }
+  /* Телефон: все полки корпусов — одной лентой с прокруткой, а не четырьмя рядами. */
+  .sz-shelves { flex-wrap: nowrap; gap: 18px; overflow-x: auto; margin-inline: -22px; padding-inline: 22px; scrollbar-width: none; touch-action: pan-x pan-y; }
+  .sz-shelf { flex: none; }
+  .sz-shelf .sz-hulls { overflow: visible; margin-inline: 0; padding-inline: 0; }
   .sz-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sz-mods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* Телефон: группа — во всю ширину, карточки по две в ряд, как до группировки. */
-  .sz-modgroup { flex-basis: 100%; max-width: none; }
-  .sz-modgroup .sz-mods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Две плитки в ряд — строка сравнения переносится, а не вылезает за край. */
   .sz-mods .sz-delta li { display: flex; flex-wrap: wrap; gap: 0 6px; }
   .sz-mods .sz-delta li span { flex-basis: 100%; }

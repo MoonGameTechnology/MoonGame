@@ -396,6 +396,19 @@ export function sectorHeroShipSlots(id: string, hero: SectorHero, data: GameData
   }
   return out;
 }
+/** Набор, где `id` стоит на месте `out`, или `null`, если `out` не надет, `id` уже надет или
+ *  не встаёт без `out`. Место сохраняется: отсеки одного типа заполняются в порядке набора
+ *  (`loadoutBays`), и модуль, добавленный в конец, ушёл бы в последний отсек. */
+function replaceModule(
+  fitted: readonly string[],
+  out: string,
+  id: string,
+  fits: (rest: string[]) => boolean,
+): string[] | null {
+  const at = fitted.indexOf(out);
+  if (at < 0 || fitted.includes(id) || !fits(fitted.filter((_, i) => i !== at))) return null;
+  return fitted.map((m, i) => (i === at ? id : m));
+}
 /** Встаёт ли `module` на корабль героя поверх `fitted` — те же правила, что у корпусов
  *  (`canEquip`), только со слотами за звёзды. */
 function heroShipFits(id: string, hero: SectorHero, fitted: readonly string[], module: string, data: GameData): boolean {
@@ -627,11 +640,14 @@ export type SectorProgressAction =
   | { kind: 'forge'; id: string }
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
-  | { kind: 'fit'; hull: string; id: string }
+  /** Модуль на корпус — или снять, если уже стоит. `replace` — надетый модуль, вместо
+   *  которого встаёт этот (замена из открытого отсека, как в окне производства). */
+  | { kind: 'fit'; hull: string; id: string; replace?: string }
   /** Звезда корабля: открыть корпусу ещё один слот выбранного типа за Варранты. */
   | { kind: 'hull-star'; hull: string; slot: ShipSlot }
-  /** Модуль на корабль героя `hero` — или снять, если уже стоит (PVR-6.24). */
-  | { kind: 'fit-hero'; hero: string; id: string }
+  /** Модуль на корабль героя `hero` — или снять, если уже стоит (PVR-6.24); `replace` —
+   *  как у `fit`. */
+  | { kind: 'fit-hero'; hero: string; id: string; replace?: string }
   | { kind: 'unlock-hero'; id: string }
   | { kind: 'select-hero'; id: string }
   | { kind: 'upgrade-hero'; id: string }
@@ -795,11 +811,16 @@ export function changeSectorZeroProgress(
       if (!sectorHullIds(data).includes(action.hull) || !next.modules.includes(action.id))
         return null;
       const equipped = next.loadouts[action.hull] ?? [];
-      if (equipped.includes(action.id))
+      const hull = withBonusSlots(data.units[action.hull]!, sectorHullBonus(action.hull, next));
+      const fits = (rest: string[]): boolean => canEquip(action.hull, hull, rest, action.id, data).ok;
+      if (action.replace !== undefined) {
+        const swapped = replaceModule(equipped, action.replace, action.id, fits);
+        if (!swapped) return null;
+        next.loadouts[action.hull] = swapped;
+      } else if (equipped.includes(action.id))
         next.loadouts[action.hull] = equipped.filter((id) => id !== action.id);
       else {
-        const hull = withBonusSlots(data.units[action.hull]!, sectorHullBonus(action.hull, next));
-        if (!canEquip(action.hull, hull, equipped, action.id, data).ok) return null;
+        if (!fits(equipped)) return null;
         next.loadouts[action.hull] = [...equipped, action.id];
       }
       break;
@@ -817,9 +838,14 @@ export function changeSectorZeroProgress(
       const hero = own(next.heroes, action.hero);
       if (!hero || !next.modules.includes(action.id)) return null;
       const ship = hero.ship ?? [];
-      if (ship.includes(action.id)) hero.ship = ship.filter((id) => id !== action.id);
+      const fits = (rest: string[]): boolean => heroShipFits(action.hero, hero, rest, action.id, data);
+      if (action.replace !== undefined) {
+        const swapped = replaceModule(ship, action.replace, action.id, fits);
+        if (!swapped) return null;
+        hero.ship = swapped;
+      } else if (ship.includes(action.id)) hero.ship = ship.filter((id) => id !== action.id);
       else {
-        if (!heroShipFits(action.hero, hero, ship, action.id, data)) return null;
+        if (!fits(ship)) return null;
         hero.ship = [...ship, action.id];
       }
       break;

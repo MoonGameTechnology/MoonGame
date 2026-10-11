@@ -3233,6 +3233,7 @@ export const en: Record<string, string> = {
   'sector-zero.prep.doubled': 'Reward doubled: +{n} data · +{m} ⌖.',
   'sector-zero.prep.earn': 'Data comes from waves, objectives and victory — defeats pay too.',
   'sector-zero.prep.equip': 'Equip',
+  'sector-zero.prep.swap': 'Swap',
   'sector-zero.prep.equipped': 'Equipped · remove',
   'sector-zero.prep.full': 'No free slot',
   'sector-zero.prep.hero-level': 'Stars {n}★ · skill slots: {slots}',

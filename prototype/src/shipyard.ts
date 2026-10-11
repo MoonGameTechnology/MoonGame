@@ -523,6 +523,9 @@ export function slotLayerHtml(
   slots: LoadoutModel['slots'],
   callouts: readonly SlotCallout[],
   sel: number,
+  // Чем плитка сообщает о себе по клику: верфь ловит `data-cnsel`, подготовка Сектора Зеро —
+  // свои `data-prep`.
+  attr: (i: number, sl: LoadoutModel['slots'][number]) => string = (i) => `data-cnsel="${i}"`,
 ): string {
   // Плитка не вылезает за картинку: центр не ближе половины плитки к краю.
   const at = ([x, y]: readonly [number, number]): string =>
@@ -547,13 +550,13 @@ export function slotLayerHtml(
         const badge = star > 0 ? `<span class="cn-tst" aria-hidden="true">★${star}</span>` : '';
         return (
           `<span class="cn-dot full" style="${dot}"></span>` +
-          `<button class="cn-tile filled${on ? ' sel' : ''}" data-cnsel="${i}"${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}</button>`
+          `<button class="cn-tile filled${on ? ' sel' : ''}" ${attr(i, sl)}${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}</button>`
         );
       }
       const label = `${kind}: ${t('yard.slot.empty')}`;
       return (
         `<span class="cn-dot" style="${dot}"></span>` +
-        `<button class="cn-tile empty${on ? ' sel' : ''}" data-cnsel="${i}"${pressed} style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}"><span class="cn-ti">${SLOT_ICON[sl.type] ?? '＋'}</span></button>`
+        `<button class="cn-tile empty${on ? ' sel' : ''}" ${attr(i, sl)}${pressed} style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}"><span class="cn-ti">${SLOT_ICON[sl.type] ?? '＋'}</span></button>`
       );
     })
     .join('');
