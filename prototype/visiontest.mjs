@@ -30,6 +30,7 @@ import {
 
 const hooks = `
 import { snapshotOf as __snapshotOf } from './scanMemory';
+import { moveFleet as __moveFleet } from './game';
 window.__visionTest = (() => {
   const P = { on: false, calls: 0, frames: 0, bad: [] };
   const fresh = __fog.computeVision;
@@ -76,7 +77,7 @@ window.__visionTest = (() => {
       const to = f && s.planets[f.location]?.links?.find((id) => s.planets[id]);
       if (!to) return false;
       const before = s;
-      playerOrder(moveFleet(ME, f.id, to));
+      playerOrder(__moveFleet(ME, f.id, to));
       return s !== before;
     },
     sandboxFogOff() { sandboxConfig.enabled = true; sandboxConfig.fog = false; },

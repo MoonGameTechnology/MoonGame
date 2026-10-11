@@ -268,12 +268,18 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   const count = (needle: string): number => main.split(needle).length - 1;
 
   it('every row of the table has a caller: a dead row would be a lie', () => {
-    // Ряд команд гасит прицелы у своего владельца (`cmdBar.ts`, REFM-226).
-    const bar = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
-    const callers = (needle: string): number => count(needle) + bar.split(needle).length - 1;
+    // Ряд команд гасит прицелы у своего владельца (`cmdBar.ts`, REFM-226), а отмену
+    // мобильного черновика — модуль нажатий (`cmdActions.ts`, REFM-227).
+    const owners = ['./cmdBar.ts', './cmdActions.ts'].map((f) =>
+      readFileSync(new URL(f, import.meta.url), 'utf8'),
+    );
+    const callers = (needle: string): number =>
+      owners.reduce((n, src) => n + src.split(needle).length - 1, count(needle));
     for (const reason of Object.keys(DISARMED_BY) as Reason[]) {
       const used =
-        callers(`disarm('${reason}', MOBILE)`) + callers(`anyArmed('${reason}', MOBILE)`);
+        callers(`disarm('${reason}', MOBILE)`) +
+        callers(`disarm('${reason}', game.mobile())`) +
+        callers(`anyArmed('${reason}', MOBILE)`);
       expect({ reason, used: used > 0 }).toEqual({ reason, used: true });
     }
   });
@@ -284,8 +290,12 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   });
 
   it('the row buttons go through the table, not a hand-written preamble', () => {
-    expect(count('disarmForCommand(cmd, MOBILE);')).toBe(1);
+    // Нажатия ряда живут в `cmdActions.ts` (REFM-227).
+    const click = readFileSync(new URL('./cmdActions.ts', import.meta.url), 'utf8');
+    expect(click.split('disarmForCommand(cmd, MOBILE);').length - 1).toBe(1);
+    expect(count('disarmForCommand(')).toBe(0);
     expect(main).not.toMatch(/\bdisarms\(/);
+    expect(click).not.toMatch(/\bdisarms\(/);
   });
 
   // Лист и его Escape спрашивают «выбрано ли что-то» у владельца, а не своей копией списка:

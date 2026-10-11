@@ -133,15 +133,11 @@ import {
   HOUR,
   DAY,
   hpOfLevel,
-  moveFleet,
   spyOn,
-  stopFleet,
   assaultFleet,
   bombardFleet,
   deployStation,
   engageFleet,
-  loadArmy,
-  unloadArmy,
   // SHU-3.1 — челноки: перегрузка порт ⇄ носитель и сам вылет.
   loadShuttle,
   unloadShuttle,
@@ -156,18 +152,14 @@ import {
   resumeConstruction,
   netIncome,
   retreatFleet,
-  orderRetreat,
   designateCapital,
   capitalOf,
-  RETREAT_THRESHOLDS,
   isInhabited,
   type SetupConfig,
   setHoldPoint,
   MAX_STEWARD_HOLD_POINTS,
   castHeroAbility,
   spawnHero,
-  orderChain,
-  forceMarchFleet,
   FORCED_MARCH_MULT,
   instantRepairFleet,
   layMinesFleet,
@@ -178,7 +170,6 @@ import {
   repairFleet,
   dockRepairCost,
   fleetAtOwnDock,
-  MAX_CHAIN_STEPS,
   type AiProfile,
   type ChainStep,
 } from './game';
@@ -286,7 +277,6 @@ import {
   squadronReach,
   traderOf,
   extractionNeedMs,
-  shipsEngaged,
   type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import { createBattleModel } from '../../packages/client/src/index';
@@ -352,7 +342,6 @@ import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
-import { engageOrders } from '../../decisions/engageOrders';
 import { engageRoster } from '../../decisions/engageRoster';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
@@ -463,7 +452,6 @@ import { initPcHotkeys } from './pcHotkeys';
 import { HOTKEY_SILENT_LAYERS, cycledFleets, homeTarget, nextFleet } from '../../decisions/hotkeys';
 import { initPurseFloats } from './purseFloats';
 import type { PurseReading } from '../../decisions/purseDelta';
-import { mobileDraftMatches, mobileTargetPoint, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { arrivalHours, restRouteHours } from './travelEta';
 import { fromScreen, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, noticeRing, waveRadius } from './flashFx';
@@ -620,13 +608,6 @@ import { captiveAtRisk, captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
-// GRND-1 — меню десанта: чистая модель «кого и сколько» + разметка поповера.
-import {
-  maxPlan,
-  planOrders,
-  stepPlan,
-  troopsModel,
-} from './troopsMenu';
 // SND-1 — синтезированные звуки интерфейса (тёмный космос + космическая опера).
 import { initSound } from './sound';
 // REFM-16 — клиентские настройки: одно правило чтения/записи на весь клиент вместо
@@ -681,9 +662,20 @@ import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, in
 import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, forkFortressAt, forkMarkAt, initFleetGeometry, laneAim, nearestLanePoint, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, planetRadar, setSweepOpacity, sweepGlow, sweepOn, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder, tellBuild, tellHero, tellSteward } from './orderPipeline';
-import { autoRetreatAt, cancelWarPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, isAutoAssault, mergeGroup, orderMerge, restoreAutoAssault, setAutoAssault, soloAutoAssault, troopsInputFor, troopsLiftable, tryAssaultGroup, tryMoveEdgeGroup, tryMoveGroup, warPrompt } from './groupOrders';
+import { autoRetreatAt, cancelWarPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, orderMerge, restoreAutoAssault, soloAutoAssault, troopsInputFor, tryAssaultGroup, tryMoveEdgeGroup, tryMoveGroup, warPrompt } from './groupOrders';
+import {
+  cancelMobileOrder,
+  engageTarget,
+  initCmdActions,
+  mobileDraftPoint,
+  mobileOrderKind,
+  mobileTargetAvailable,
+  mobileTargetLabel,
+  onCommandClick,
+  stageMobileTarget,
+} from './cmdActions';
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
-import { chainAbilityHoldH, chainMapTap, chainMenuAnchor, chainMode, chainRoute, chainStart, chainStepsOf, chainTravelH, dropChainMenu, enterChainMode, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged, nearestOwnWorld, renderChainMenu, setChainDraft } from './chainComposer';
+import { chainAbilityHoldH, chainMapTap, chainMenuAnchor, chainMode, chainRoute, chainStart, chainStepsOf, chainTravelH, dropChainMenu, enterChainMode, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged } from './chainComposer';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
@@ -691,7 +683,6 @@ import {
   draftFinish,
   stepGlyph,
   stepHours,
-  undoGesture,
 } from './chainPlanner';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
@@ -813,7 +804,6 @@ import {
   cmdMore,
   deselectFleets,
   disarm,
-  disarmForCommand,
   drop,
   engageAim,
   hasSelection,
@@ -840,7 +830,6 @@ import {
   squadMerge,
   stageDraft,
   strikeAim,
-  toggle,
   troopsPlan,
 } from './interaction';
 import {
@@ -8486,83 +8475,6 @@ function updatePanelLive(): void {
   }
 }
 
-function mobileOrderKind(): MobileOrderKind | null {
-  if (!MOBILE) return null;
-  if (merging) return 'merge';
-  if (assaultAim) return 'assault';
-  if (engageAim) return 'engage';
-  return aiming ? 'move' : null;
-}
-
-function stageMobileTarget(order: MobileOrderKind, target: MobileOrderTarget | null): void {
-  stageDraft(target ? { order, fleetIds: [...selectedFleetIds()], target } : null);
-  invalidateCmdBar();
-}
-
-function mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind): boolean {
-  if (target.kind === 'lane') return order === 'move' && !!s.planets[target.from]?.links?.includes(target.to);
-  if (target.kind === 'planet') {
-    const p = s.planets[target.id];
-    return !!p && (order === 'move' || (order === 'assault' &&
-      assaultTargetOk(p.owner, !!sectorTypeOf(p.id)?.capturable, ME)));
-  }
-  const f = s.fleets[target.id];
-  if (!f) return false;
-  if (order === 'merge') return f.owner === ME && !selectedFleetIds().includes(f.id);
-  return order === 'engage' && f.owner !== ME && sumUnits(f.units) > 0 &&
-    fleetSeen(f);
-}
-
-function mobileDraftPoint(): { x: number; y: number } | null {
-  if (!mobileDraft) return null;
-  return mobileTargetPoint(mobileDraft.target,
-    (id) => s.planets[id] ? world(s.planets[id]!.position) : null,
-    (id) => s.fleets[id] ? fleetAnchor(s.fleets[id]!) : null);
-}
-
-function mobileTargetLabel(target: MobileOrderTarget): string {
-  if (target.kind === 'planet') return placeName(target.id);
-  if (target.kind === 'fleet') return fleetTitleOf(target.id);
-  return t('hud.mobile.lane', { from: placeName(target.from), to: placeName(target.to) });
-}
-
-/** Same existing engage/march actions for mouse and confirmed phone targeting. Кому какой
- *  приказ — `engageOrders.ts` (ATK-3): у цели приказ получает один флот, остальных втянет бой. */
-function engageTarget(target: Fleet): void {
-  const fleets = selectedFleetIds().flatMap((id) => {
-    const f = s.fleets[id];
-    return f ? [{ id, location: f.location ?? null, engaged: shipsEngaged(s, f) }] : [];
-  });
-  const plan = engageOrders(fleets, target.location ?? null);
-  for (const id of plan.engage) if (playerOrder(engageFleet(ME, id, target.id))) break;
-  for (const id of plan.march) playerOrder(moveFleet(ME, id, target.location!));
-  if (plan.adrift) note(t('hint.engage-in-flight'));
-}
-
-function cancelMobileOrder(): void {
-  stageDraft(null);
-  disarm('mobile-cancel', MOBILE);
-  invalidateCmdBar();
-  invalidatePanel();
-}
-
-function sendMobileOrder(): void {
-  const order = mobileOrderKind();
-  const ids = selectedFleetIds();
-  if (!mobileDraftMatches(mobileDraft, order, ids) || !mobileTargetAvailable(mobileDraft.target, mobileDraft.order)) {
-    stageDraft(null);
-    note(t('hud.mobile.target-stale'));
-    return;
-  }
-  const target = mobileDraft.target;
-  cancelMobileOrder();
-  if (order === 'move' && target.kind === 'planet') tryMoveGroup(ids, target.id);
-  else if (order === 'move' && target.kind === 'lane') tryMoveEdgeGroup(ids, target);
-  else if (order === 'assault' && target.kind === 'planet') tryAssaultGroup(ids, target.id);
-  else if (order === 'engage' && target.kind === 'fleet') engageTarget(s.fleets[target.id]!);
-  else if (order === 'merge' && target.kind === 'fleet') orderMerge(ids, target.id);
-}
-
 function updateMobileHud(): void {
   if (!MOBILE) return;
   const fid = panelFleet();
@@ -8596,7 +8508,7 @@ function updateMobileHud(): void {
 
 // Ряд команд — разметка, поповеры, полоска «Приказ» и кэш разметки — живёт в `cmdBar.ts`
 // (REFM-226). Здесь только хуки: мир, своё место, раскладка, окно флота, тип сектора, имя
-// места и мобильный черновик приказа, который пока в `main.ts` (REFM-227).
+// места и мобильный черновик приказа из `cmdActions.ts` (REFM-227).
 initCmdBar({
   world: () => s,
   me: () => ME,
@@ -9195,209 +9107,23 @@ document.addEventListener?.('click', (ev) => {
   if (b && !(b as HTMLButtonElement).disabled) snd.play('tap');
 });
 
-/** Нажатие командной кнопки (`data-cmd`). Слушает ряд команд, а окно флота на ПК
- *  зовёт сюда же кнопки своей колонки «Десант» — ⇅-меню живёт в ней, а не в ряду. */
-function onCommandClick(ev: MouseEvent): void {
-  const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
-  if (!bEl || bEl.disabled) return;
-  // Серая кнопка с причиной (`cmdBtn`, `why`): приказа нет — есть объяснение.
-  if (bEl.getAttribute('aria-disabled') === 'true') {
-    if (bEl.dataset.why) note(t(bEl.dataset.why));
-    return;
-  }
-  const cmd = bEl.dataset.cmd;
-  const ids = selectedFleetIds();
-  if (MOBILE && (cmd === 'mobile-send' || cmd === 'mobile-cancel')) {
-    if (cmd === 'mobile-send') sendMobileOrder();
-    else cancelMobileOrder();
-    renderPanel();
-    renderCmdBar();
-    return;
-  }
-  if (MOBILE && cmd !== 'more') stageDraft(null);
-  // Что гаснет от СОСЕДНЕЙ команды — `armDisarm.ts` (REFM-195, REFM-207): у каждого
-  // взводимого состояния свой список «своих» команд, и в нём же подкоманды поповера (иначе
-  // ⇅-меню закрывалось бы от собственной кнопки «+1»); кнопка без команды гасит ВСЁ;
-  // прицелы из окон гаснут от любой; «Курс» — от нового намерения; ☰ на телефоне
-  // сворачивается выбором приказа. `chainMode` в таблицу не входит намеренно — в режиме
-  // цепочки полоска ЗАМЕНЯЕТ ряд, других команд там физически нет, и выход только своими
-  // кнопками (chexit/chsend), Back и Escape. Ниже ветки только взводят и переключают своё.
-  disarmForCommand(cmd, MOBILE);
-  if (cmd === 'rocket-mine' && ids.length === 1) {
-    mineControls.openFleet(ids[0]!);
-  } else if (cmd === 'engage') {
-    toggle('engageAim'); // arm / disarm the attack order
-    if (engageAim && !MOBILE) note(t('hint.pick-engage'));
-  } else if (cmd === 'move') {
-    toggle('aiming'); // arm / disarm the move order
-    // Подсказка только на тач: там один палец занят прицелом, и жест камеры надо
-    // назвать вслух. На PC мышь и так возит камеру перетаскиванием.
-    if (aiming && !pcUi() && !MOBILE) note(t('hint.aim-armed'));
-  } else if (cmd === 'merge') {
-    if (ids.length >= 2) mergeGroup(ids);
-    else {
-      toggle('merging'); // lone fleet → arm: next friendly-fleet tap is the anchor
-      if (merging && !MOBILE) note(t('hint.pick-merge'));
-    }
-  } else if (cmd === 'stop') {
-    // Без тостов: в группе стоп уходит только тем, кому ядро его РАЗРЕШАЕТ (та же
-    // проба, что показала кнопку) — флот в коридоре просто доезжает, отказа не видно.
-    for (const id of ids) if (canOrder(s, stopFleet(ME, id)) === null) playerOrder(stopFleet(ME, id));
-  } else if (cmd === 'attack') {
-    if (pcUi() || MOBILE) {
-      // PC: ШТУРМ aims like «Курс» — the next click on someone else's world sends
-      // the fleet there and it storms on arrival (valid targets ring up on the map).
-      toggle('assaultAim');
-      if (assaultAim && !MOBILE) note(t('hint.pick-assault'));
-    } else {
-      for (const id of ids) if (s.fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
-    }
-  } else if (cmd === 'split') {
-    const id = ids[0];
-    if (id) {
-      // toggle the dialog
-      if (splitState) drop('splitState');
-      else arm('splitState', { fleetId: id, take: {} });
-      renderSplitDialog();
-    }
-  } else if (cmd === 'troops') {
-    const id = ids[0];
-    if (id) {
-      // toggle the popover
-      if (troopsPlan) drop('troopsPlan');
-      else arm('troopsPlan', { fleetId: id, plan: {} });
-    }
-  } else if (cmd === 'tstep' || cmd === 'tmax') {
-    // Набор количества. Шаг КЛАМПИТСЯ моделью, а не блокируется — как «+10» в
-    // диалоге разделения флота: «+5» при трёх доступных даст +3, а не откажет.
-    const inp = troopsPlan ? troopsInputFor(troopsPlan.fleetId) : null;
-    if (troopsPlan && inp) {
-      const unit = bEl.dataset.unit ?? '';
-      troopsPlan.plan =
-        cmd === 'tmax'
-          ? maxPlan(inp, unit, Number(bEl.dataset.dir) > 0 ? 1 : -1)
-          : stepPlan(inp, unit, Number(bEl.dataset.n));
-    }
-  } else if (cmd === 'tok') {
-    const st = troopsPlan;
-    const inp = st ? troopsInputFor(st.fleetId) : null;
-    const at = st ? s.fleets[st.fleetId]?.location : undefined;
-    if (st && inp && at) {
-      const { load, unload } = planOrders(troopsModel(inp));
-      // Выгрузка мгновенна и уходит в ядро ОДНИМ действием на тип (count оно
-      // принимает атомарно). Погрузка ложится в часовую очередь БЕЗ повторной
-      // проверки места: модель уже посчитала её ровно на тот трюм, который
-      // освободит эта выгрузка, а реальный `army.load` уйдёт лишь через игровой
-      // час — к тому времени выгрузка применена и в соло, и по сети.
-      for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count));
-      // ALLY-LAND. Идущий наземный бой запирает ТОЛЬКО погрузку (ядро: `E_UNDER_ASSAULT`
-      // на `army.load` — иначе защитник уплыл бы небитым). Высадку он не запирает, и
-      // раньше один общий гейт резал обе половины: подкрепить осаждённый мир было
-      // нельзя — ровно то, ради чего союзная высадка и нужна.
-      if (load.length && troopsLiftable(at)) {
-        for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count));
-      }
-    }
-    drop('troopsPlan');
-  } else if (cmd === 'target') {
-    // CHAIN-UX: вход в режим «Приказ» — карта становится рабочей поверхностью,
-    // тапы по точкам собирают план (CC-1 цепочка), полоска заменяет ряд команд.
-    enterChainMode(ids);
-  } else if (cmd === 'chundo') {
-    if (chainMode) {
-      const d = undoGesture({ steps: chainMode.steps, gestures: chainMode.gestures });
-      setChainDraft(d);
-      invalidateCmdBar();
-      if (chainMode.menu) renderChainMenu(); // серость пунктов могла измениться
-    }
-  } else if (cmd === 'chhome') {
-    if (chainMode) {
-      const f0 = s.fleets[chainMode.fleetIds[0]!];
-      const finish = f0 ? draftFinish(chainMode.steps, chainStart(f0).fromId) : null;
-      const home = finish ? nearestOwnWorld(finish) : null;
-      if (home && chainMode.steps.length < MAX_CHAIN_STEPS) {
-        setChainDraft({
-          steps: [...chainMode.steps, { kind: 'move', to: home }],
-          gestures: [...chainMode.gestures, 1],
-        });
-        invalidateCmdBar();
-      }
-    }
-  } else if (cmd === 'chsend') {
-    if (chainMode) {
-      // Пустой черновик при живых планах — это «снять приказ»: order.chain []
-      // атомарно удаляет план каждого флота.
-      for (const id of chainMode.fleetIds) playerOrder(orderChain(ME, id, chainMode.steps));
-      snd.play('send'); // квинты-арпеджио: план ушёл — маленький оперный жест
-      note(t('tgt.placed'));
-      exitChainMode();
-    }
-  } else if (cmd === 'chexit') {
-    exitChainMode(); // выход без отправки — живые планы не тронуты
-  } else if (cmd === 'more') {
-    toggle('cmdMore'); // ☰ — show/hide the extras row
-  } else if (cmd === 'cast') {
-    toggle('castMenu'); // ✨ — открыть/закрыть меню способностей героя-флагмана
-  } else if (cmd === 'castdo') {
-    // Cast a hero ability from the row: ranged → arm the map (next world tap = target,
-    // via the shared heroAim flow); self/aura → fire in place immediately.
-    const heroId = bEl.dataset.hero ?? '';
-    const abilityId = bEl.dataset.ab ?? '';
-    drop('castMenu');
-    if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
-      arm('heroAim', { heroId, abilityId });
-      note(t('yard.pick.target'));
-    } else {
-      playerOrder(castHeroAbility(ME, heroId, abilityId));
-    }
-  } else if (cmd === 'boost') {
-    // BOOST-1 форс-марш: toggle for the whole selection — ON unless everyone
-    // already marches. Wear only bites while actually flying.
-    const on = !ids.every((id) => marchFlagged(id));
-    for (const id of ids) if (marchFlagged(id) !== on) playerOrder(forceMarchFleet(ME, id, on));
-    if (on) note(t('hint.forced-march'));
-  } else if (cmd === 'qauto') {
-    // SO-UI: the CC-2 auto-storm stance, group-uniform (moved off the bottom sheet).
-    const on = !ids.every((id) => isAutoAssault(id));
-    setAutoAssault(ids, on);
-    if (on) note(t('hint.auto-assault'));
-  } else if (cmd === 'qretr') {
-    // RETR-2: авто-отход. Кнопка открывает окошко с порогами (заказ владельца 2026-09-23;
-    // раньше она обходила ступени по кругу, и нужный порог приходилось «прощёлкивать»).
-    toggle('retreatMenu');
-  } else if (cmd === 'retrset') {
-    // Группой единообразно: вся группа снимается с места на одной отметке.
-    //
-    // Точка отхода: ВЫБРАННЫЙ свой мир, иначе столица. Выбор игроку оставлен (владелец
-    // просил именно его), но без выбора приказ всё равно осмыслен — столица есть всегда,
-    // пока она назначена. Нет ни того, ни другого — приказ не ставится, и игроку
-    // говорят, чего не хватает, а не молчат.
-    const raw = Number(bEl.dataset.at);
-    const at = RETREAT_THRESHOLDS.find((x) => Math.abs(x - raw) < 1e-9) ?? null;
-    if (at === null) {
-      for (const id of ids) playerOrder(orderRetreat(ME, id, false));
-      note(t('hint.auto-retreat.off'));
-    } else {
-      const picked = selPlanet && s.planets[selPlanet]?.owner === ME ? selPlanet : null;
-      const to = picked ?? capitalOf(s, ME) ?? null;
-      if (to === null) note(t('hint.auto-retreat.nowhere'));
-      else {
-        for (const id of ids) playerOrder(orderRetreat(ME, id, true, at, to));
-        note(t('hint.auto-retreat', { n: Math.round(at * 100), at: placeName(to) }));
-      }
-    }
-    drop('retreatMenu');
-  } else if (cmd === 'pick') {
-    // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
-    toggle('pickMode');
-    if (pickMode && !MOBILE) note(t('hint.multiselect'));
-  }
-  invalidateCmdBar();
-  invalidatePanel();
-  renderCmdBar();
-  renderPanel();
-}
-cmdbar.addEventListener('click', onCommandClick);
+// Нажатия ряда команд и мобильный черновик приказа живут в `cmdActions.ts` (REFM-227):
+// делегат вешает на `#cmdbar` сам модуль. Здесь только хуки: мир, своё место, раскладка,
+// лента, имена, тип сектора, панель, окно деления, мины заградителя и звук отправки.
+initCmdActions({
+  world: () => s,
+  me: () => ME,
+  mobile: () => MOBILE,
+  note,
+  placeName,
+  fleetTitleOf,
+  capturable: (id) => !!sectorTypeOf(id)?.capturable,
+  renderPanel,
+  invalidatePanel,
+  renderSplitDialog,
+  openMineFleet: (id) => mineControls.openFleet(id),
+  sentSound: () => snd.play('send'),
+});
 
 // --- canvas input ------------------------------------------------------------
 
