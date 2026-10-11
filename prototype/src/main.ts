@@ -286,12 +286,8 @@ import {
   engagementOf,
   flashBattles,
   inVisionBloc,
-  type SignatureContact,
   sightCircles,
   type SightCircle,
-  sightRulesOf,
-  worldRadarReach,
-  fleetRadarReach,
   abilityRange,
   type Squadron,
   type ShuttleStrike,
@@ -468,18 +464,7 @@ import { bakeSignature, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds, type ProvinceSeed } from './provinceMap';
 import { frontierOutline } from './frontierOutline';
 import { nodeView } from './fogView';
-import {
-  mergeArms,
-  radarShown,
-  rangeRings,
-  sweepChromeShown,
-} from './radarSources';
-import {
-  ownRingLook,
-  ownRingShown,
-  type SightTier,
-} from './sightFrontier';
-import { drawSightFrontier } from './drawSightFrontier';
+import { radarShown } from './radarSources';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { tapOwner, tapRadius } from '../../decisions/tapPriority';
@@ -537,7 +522,7 @@ import {
 } from '../../decisions/pointerPick';
 import { laneOf } from './buildOrders';
 import { barPct } from './buildProgress';
-import { contactAlpha, contactLost, hourBucket, paintedThisFrame } from './alerts';
+import { hourBucket } from './alerts';
 import { threatAlerts, threatScanDue, threatsHeard, type ThreatSighting } from './threatAlerts';
 import { SPY_COST } from './intel';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
@@ -665,7 +650,7 @@ import {
 import { initSound } from './sound';
 // REFM-16 — клиентские настройки: одно правило чтения/записи на весь клиент вместо
 // восьми рукописных копий «нет ключа ⇒ умолчание» + try/catch вокруг setItem.
-import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
+import { prefStore, readBool, readRaw, writeBool, writeRaw } from './prefs';
 // AIM-PAN — «коммитит ли отпускание вооружённый приказ»: правило со сторожем.
 import { releaseCommits } from '../../decisions/aimGesture';
 // REFM-199: что означает ЕДУЩИЙ палец — брат `aimGesture.ts` (тот про отпускание).
@@ -713,6 +698,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, panelSlack, pirateIntroRect, setView, unworld, visible, world, worldDist, zoomAt } from './mapCamera';
 import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
 import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, forkFortressAt, forkMarkAt, initFleetGeometry, laneAim, nearestLanePoint, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, planetRadar, setSweepOpacity, sweepGlow, sweepOn, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
@@ -976,7 +962,6 @@ import {
 } from '../../decisions/roadNetwork';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
-import { netContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
@@ -989,7 +974,6 @@ import {
   type StewardEvent,
 } from './stewardLog';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import { planetRadar as corePlanetRadar } from './sensorScale';
 import { autoStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
@@ -1023,7 +1007,7 @@ import {
   flakTier,
   type FlakTier,
 } from './flakTiers';
-import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
+import { sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
 import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
@@ -1324,7 +1308,7 @@ initNetSession({
     // Что снимок делает с миром — `snapshotIngest.ts` (REFM-146): контакты живут
     // ровно один снимок (иначе на карте остаётся призрак), а выбор чистится
     // по-разному для одиночного и группового.
-    netSignatures = [...radarContacts(snap.signatures)];
+    takeNetSignatures(radarContacts(snap.signatures));
     // Re-render the open roster only NOW — the new state is in place, so the
     // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
     if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
@@ -1816,28 +1800,6 @@ function resize() {
 if (typeof window !== 'undefined') window.addEventListener('resize', resize);
 resize();
 
-// The backdrop (deep-space + nebulae + radar grid + star ticks) is part of the cached
-// static layer (see paintSky / blitStaticLayer). This is the only live backdrop bit:
-// a slow radar sweep across the plotting table — console chrome that follows the
-// HARDWARE: one rotating arm per OWN radar source (planet array / radar ship),
-// pivoted on the source and clipped to ITS reach; co-located sources collapse into
-// one arm showing only the farthest radius. All arms share one rotation phase; map
-// blips light up as an arm crosses them (radar "ping" afterglow). sweepOn guards
-// engines without conic gradients (no visible sweep → no ping).
-type SweepArm = { x: number; y: number; r: number }; // screen-space pivot + reach
-let sweepArms: SweepArm[] = [];
-let sweepAng = 0;
-let sweepOn = false;
-let sweepPrevAng = -1; // previous frame's arm angle, for "did the arm cross X" tests
-// Player display preference (client-only, localStorage): the sweep's VISUAL opacity 0..1.
-// 0 hides the wedge + arm entirely; any value only dims the CHROME — the radar MECHANIC
-// (contact snapshots + blip afterglow) is computed before the visual gate, so it is
-// unaffected at every setting. Absent key ⇒ full (1); a stored 0 must NOT be read as absent.
-let sweepOpacity = readNum('void.sweepOpacity', 1, 0, 1);
-function setSweepOpacity(v: number): void {
-  sweepOpacity = Math.min(1, Math.max(0, v));
-  writeRaw('void.sweepOpacity', String(sweepOpacity));
-}
 // Player display preference (client-only, localStorage): show YOUR OWN ping markers
 // on the map. Purely visual — the ping itself (chat line, allies' view, the server
 // relay) is untouched; allies' pins are always drawn. Default on.
@@ -1863,109 +1825,21 @@ function setDevSpeedControl(v: boolean): void {
   devSpeedControl = v;
   writeBool('void.devSpeed', v);
 }
-const SWEEP_DIV = 1600; // sweep angular rate: ang = now / SWEEP_DIV
-const SWEEP_PERIOD = TAU * SWEEP_DIV; // ms for a full rotation (~10s) — the radar refresh tick
-/** Radar contacts as PAINTED BY THE SWEEP: a signature is refreshed only as the arm
- *  crosses it, then lingers at that last-swept spot (a dim ghost) until the next
- *  pass repaints it — so radar gives periodic snapshots, never a live feed. */
-const radarMemory = new Map<string, { node: string; size: 'S' | 'M' | 'L'; at: number; position?: { x: number; y: number } }>();
-/** NET radar picture (BF-18): the server's per-frame contact list. In a network
- *  match the fogged state carries NO radar-only enemy fleets, so the sweep paints
- *  these server-sent contacts instead of scanning `s.fleets`. */
-let netSignatures: SignatureContact[] = [];
-
-/** How brightly a contact at screen-point `c` is lit by the sweep: 1 the instant
- *  the arm crosses it, fading linearly back to 0 just before the next pass (so the
- *  imprint lingers a whole rotation). 0 when the sweep is inactive. */
-function sweepGlow(c: { x: number; y: number }): number {
-  // Сама засветка (угол отставания, приведение знака, кривая, максимум по лучам) —
-  // `sweepFx.ts` (REFM-113). Здесь остаётся только «есть ли развёртка вообще».
-  return sweepOn ? armsGlow(sweepArms, c, sweepAng, TAU) : 0;
-}
-
-/** Свои источники радарной развёртки с дальностью: миры и флоты, у которых радар есть. */
-interface RadarSources {
-  worlds: Array<{ at: { x: number; y: number }; reach: number }>;
-  fleets: Array<{ fleet: Fleet; reach: number }>;
-}
-function ownRadarSources(): RadarSources {
-  const worlds: RadarSources['worlds'] = [];
-  for (const p of Object.values(s.planets)) {
-    if (p.owner !== ME) continue;
-    const reach = planetRadar(p);
-    if (reach > 0) worlds.push({ at: p.position, reach });
-  }
-  const fleets: RadarSources['fleets'] = [];
-  for (const f of Object.values(s.fleets)) {
-    if (f.owner !== ME) continue;
-    const reach = fleetRadar(f);
-    if (reach > 0) fleets.push({ fleet: f, reach });
-  }
-  return { worlds, fleets };
-}
-
-function drawScanSweep(now: number) {
-  sweepArms = [];
-  sweepOn = false;
-  if (!cx.createConicGradient) return; // graceful: skip on engines without it
-  // One arm per OWN radar source, pivoted on the array / the ship itself (a moving
-  // ship carries its arm along). Sources sharing a pivot (a radar world with a
-  // radar ship docked) merge — only the farthest radius is shown.
-  const raw: SweepArm[] = [];
-  const add = (at: { x: number; y: number }, reach: number): void => {
-    const c = world(at);
-    const r = worldDist(reach); // uniform projection ⇒ true circle (`mapRadius.ts`)
-    raw.push({ x: c.x, y: c.y, r });
-  };
-  // Дальности — из памяти по миру (шаг 9 плавности), а положение флота — каждым кадром.
-  const radar = perWorld('radar', ownRadarSources);
-  for (const w of radar.worlds) add(w.at, w.reach);
-  for (const { fleet, reach } of radar.fleets) {
-    const pos = fleetPos(fleet);
-    if (pos) add(pos, reach);
-  }
-  // Слияние совпавших по месту источников (остаётся ДАЛЬНИЙ) — `radarSources.ts`
-  // (REFM-119): радарный корабль у радарного мира иначе дал бы два луча из одной точки.
-  sweepArms = mergeArms(raw);
-  sweepAng = (now / SWEEP_DIV) % TAU;
-  sweepOn = sweepArms.length > 0;
-  if (!sweepOn) return;
-  // Visual gate (player preference). Everything above — arms, angle, sweepOn — is the
-  // MECHANIC and always runs; only the chrome below is skipped/dimmed. At 0 the sweep is
-  // invisible yet still snapshots contacts and lights blips exactly as before.
-  // Механика (лучи, угол, `sweepOn`) уже посчитана выше и от настройки не зависит —
-  // прозрачность гасит только ХРОМ (`radarSources.ts`, правило 10).
-  const op = sweepOpacity;
-  if (!sweepChromeShown(op)) return;
-  cx.save();
-  cx.globalCompositeOperation = 'lighter';
-  for (const a of sweepArms) {
-    if (!visible(a, a.r + 40)) continue; // draw-cull; the arm still paints contacts
-    // subtle trailing wedge, clipped to this source's reach — reads as a slow
-    // rotating radar sweep (fades over ~0.4 turn behind the leading edge). Alpha is
-    // scaled by the player's opacity preference so it can be dimmed toward invisible.
-    const grd = cx.createConicGradient(sweepAng, a.x, a.y);
-    grd.addColorStop(0, `rgba(53,214,230,${0.05 * op})`);
-    grd.addColorStop(0.16, `rgba(53,214,230,${0.012 * op})`);
-    grd.addColorStop(0.4, 'rgba(53,214,230,0)');
-    grd.addColorStop(1, 'rgba(53,214,230,0)');
-    cx.save();
-    cx.beginPath();
-    cx.arc(a.x, a.y, a.r, 0, TAU);
-    cx.clip();
-    cx.fillStyle = grd;
-    cx.fillRect(a.x - a.r, a.y - a.r, a.r * 2, a.r * 2);
-    cx.restore();
-    // the leading edge — the visible radar arm itself
-    cx.strokeStyle = `rgba(53,214,230,${0.26 * op})`;
-    cx.lineWidth = 1;
-    cx.beginPath();
-    cx.moveTo(a.x, a.y);
-    cx.lineTo(a.x + Math.cos(sweepAng) * a.r, a.y + Math.sin(sweepAng) * a.r);
-    cx.stroke();
-  }
-  cx.restore();
-}
+// Радар — у владельца, `mapRadar.ts` (REFM-239): развёртка, контакты и обе картины
+// дальности. Отсюда — то, что принадлежит игре: мир, своё место, канвас, экран, кэш кадра,
+// лента, имя места и звук засечки.
+initMapRadar({
+  world: () => s,
+  me: () => ME,
+  ctx: () => cx,
+  vw: () => VW,
+  vh: () => VH,
+  sources: () => perWorld('radar', ownRadarSources),
+  sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
+  note,
+  placeName,
+  ping: () => snd.play('radar'),
+});
 
 // --- threat alert (THREAT-HUD): «враг у ваших рубежей» ------------------------
 // The same fog-honest node-threat tripwire the Steward keys off (ST-3.1,
@@ -2012,60 +1886,6 @@ function updateThreatAlerts(): void {
   if (toRefuge.length > 0) {
     note(t('refuge.threat'), toRefuge[0]!.at);
     allyPulseUntil = performance.now() + 12_000;
-  }
-}
-
-/** Refresh radar contacts the arm crossed this frame: snapshot each radar-only enemy
- *  fleet's spot + coarse size when the sweep paints it. Runs every frame. */
-function updateRadarContacts(now: number): void {
-  if (!sweepOn) return;
-  if (vision) {
-    // Both modes consume the same core projection: sensitivity and grouping are
-    // decided before a sweep paints the anonymous contact.
-    const contacts = netContacts(vision.signatures, known);
-    let hit = false; // засекла ли рука хоть кого-то в ЭТОМ кадре
-    for (const c of contacts) {
-      const node = s.planets[c.node];
-      if (!node) continue;
-      const pos = world(c.position ?? node.position);
-      // painted only by an arm whose radar disc actually covers the blip
-      // Красит только рука, чей радарный диск реально накрывает отметку (`alerts.ts`).
-      if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
-        hit = true;
-        if (!radarMemory.has(c.key))
-          note(t('threat.contact', { size: c.size, at: placeName(c.node) }), c.node);
-        radarMemory.set(c.key, { node: c.node, size: c.size, at: now, ...(c.position ? { position: { ...c.position } } : {}) });
-      }
-    }
-    // Пинг гидролокатора в момент засечки. ОДИН на кадр, а не на контакт: рука
-    // пересекает несколько целей разом, и «пачка» звучала бы как сбой, а не как радар
-    // (анти-трель зазор в `SOUND_MIN_GAP` прореживает и сами кадры).
-    //
-    // Звук намеренно НЕ смотрит на `sweepOpacity`: тот гасит только хром развёртки, а
-    // засечка — событие механики, у него своя ручка (общий выключатель звука).
-    if (hit) snd.play('radar');
-  }
-  sweepPrevAng = sweepAng;
-}
-
-/** Draw the remembered radar contacts: a bright flash when freshly swept, settling
- *  to a dim last-known ghost held until the next pass repaints it; dropped once a full
- *  rotation passes with no repaint (the contact has moved on / is gone). */
-function drawRadarContacts(now: number): void {
-  for (const [id, m] of radarMemory) {
-    const age = now - m.at;
-    if (contactLost(age, SWEEP_PERIOD)) {
-      radarMemory.delete(id); // a whole turn with no repaint → contact lost
-      continue;
-    }
-    const node = s.planets[m.node];
-    if (!node) {
-      radarMemory.delete(id);
-      continue;
-    }
-    const pos = world(m.position ?? node.position);
-    if (!visible(pos, 120)) continue;
-    drawSignatureAt(pos, m.size, contactAlpha(age), now);
   }
 }
 
@@ -2333,34 +2153,6 @@ function saveWarning(failing: boolean): void {
   host.prepend(bar);
 }
 
-// --- radar / signatures ------------------------------------------------------
-// Radar reach + per-unit "loudness" are DATA, read straight from the content
-// (`data.buildings[t].radarRange`, `data.units[u].radarRange`/`signature`) — the
-// SAME source the core fog (`visibility.ts`) reads, so single-player and the
-// networked view agree by construction, with no mirrored constants to drift. The
-// reach values themselves (and why a radar must clear your border to the next ring
-// of worlds to yield any signature) are tuned in the content, next to the data.
-// A radar projects two concentric ranges: signatures out to its full reach, and
-// full identification within the inner half (mirrors shared-core visibility).
-const IDENTIFY_REACH_FRACTION = 0.5;
-
-/** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
- *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarReach` — не своя копия правила: когда копия
- *  тут читала только `data.units[u].radarRange`, установленный радар-модуль на карте
- *  не считался, хотя игрок за него платил. С масштабом режима и множителем владельца —
- *  тот же радиус, что считает туман. */
-function fleetRadar(f: Fleet): number {
-  return fleetRadarReach(s, f, data);
-}
-/** Слух мира: лучший из его массивов и по УРОВНЮ — правила 5–6 в `sensorScale.ts`. Своему
- *  миру — ровно то, что считает туман (масштаб режима, технологии, блэкаут); чужому —
- *  только масштаб режима: его технологии — не наша разведка. */
-function planetRadar(p: Planet): number {
-  return p.owner === ME
-    ? worldRadarReach(s, p, data)
-    : corePlanetRadar(p.buildings, (t) => data.buildings[t]) * sightRulesOf(s).radarScale;
-}
-
 // Туман карты — у владельца, `mapFog.ts` (REFM-231). Отсюда — то, что принадлежит игре:
 // мир, своё место, сеть, контакты радара и круги обзора из кэша кадра.
 initMapFog({
@@ -2508,38 +2300,6 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
   cx.restore();
 }
 
-/** Draw a coarse amber signature blip (size bucket S/M/L) at a screen point, no
- *  identity. `fade` (0..1) dims it — radar contacts are painted by the sweep and
- *  fade between passes (see drawRadarContacts). */
-function drawSignatureAt(
-  pos: { x: number; y: number },
-  cls: 'S' | 'M' | 'L',
-  fade: number,
-  now: number,
-): void {
-  const r = cls === 'L' ? 9 : cls === 'M' ? 7 : 5;
-  // Дыхание слоя — `pulseFx.ts` (REFM-137): фаза от места контакта, иначе все метки
-  // мигают в такт и читаются как один щёлкающий слой.
-  const pulse = fxBreath(now, { period: 200, base: 0.5, amp: 0.5, phase: pos.x * 0.05 });
-  cx.save();
-  cx.translate(pos.x, pos.y);
-  cx.strokeStyle = rgba('#ffb43a', (0.5 + 0.3 * pulse) * fade); // amber = unidentified contact
-  cx.fillStyle = rgba('#ffb43a', (0.1 + 0.08 * pulse) * fade);
-  cx.lineWidth = 1.3;
-  cx.beginPath(); // diamond
-  cx.moveTo(0, -r);
-  cx.lineTo(r, 0);
-  cx.lineTo(0, r);
-  cx.lineTo(-r, 0);
-  cx.closePath();
-  cx.fill();
-  cx.stroke();
-  cx.fillStyle = rgba('#ffd98a', 0.92 * fade);
-  cx.font = '700 9px ui-monospace,Menlo,monospace';
-  cx.textAlign = 'center';
-  cx.fillText('◆' + cls, 0, r + 12);
-  cx.restore();
-}
 // SANDBOX — fenced hook. In a sandboxed solo match with "free build" on, a build
 // order's resource spend is refunded. `order()` advances to `s.time` first (a no-op,
 // so no production/upkeep runs), leaving the paid cost as the only resource change —
@@ -4108,19 +3868,6 @@ function drawBattlePulse(
 }
 
 /**
- * Rings for my own radar reach (planet arrays + radar-ships). Each radar projects
- * TWO concentric ranges (matching shared-core visibility): an OUTER signature ring
- * (full reach — enemy fleets show as coarse blips in fog) and an INNER full-reveal
- * ring (half the reach — contacts fully identified). The reach is a Euclidean
- * distance in MAP units; the projection is uniform so they read as true circles.
- * Only meaningful with fog on.
- */
-/** One frontier for overlapping sources, painted directly without a screen-sized mask. */
-function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier: SightTier): void {
-  drawSightFrontier(cx, circles, tier, LOCK, VW, VH);
-}
-
-/**
  * Сеть Роя на карте (`docs/swarm-behavior.md`): круги связи центров данных и
  * ретрансляторов, которые игрок видит, и линии между сошедшимися кругами. Что и как
  * показывать — `decisions/swarmNetMarks.ts`: только разведанное, без питания и знания.
@@ -4150,56 +3897,6 @@ function drawSwarmNet(): void {
     cx.arc(at[i]!.x, at[i]!.y, worldDist(n.r), 0, TAU);
     cx.stroke();
   });
-  cx.restore();
-}
-
-function drawRadarCoverage() {
-  // Граница обзора — из ТЕХ ЖЕ кругов, по которым ядро считает туман (`sightCircles`,
-  // решение владельца 2026-09-24: «круги везде»): видно ровно то, что внутри неё. Круги
-  // свои и союзные (блок зрения); у мира и флота есть базовый круг обзора и без радара.
-  // Раньше граница собиралась из радаров одного игрока без множителя технологий, а туман
-  // считался иначе — мир светился за нарисованной границей.
-  const circles = perWorld('sight', () => sightCircles(s, ME, data));
-  if (circles.length === 0) return;
-  const selFleetSet = new Set(selectedFleetIds());
-  // Project map circles to screen circles (uniform projection ⇒ true circles) — радиус
-  // считает `worldDist`, а не проекция смещённой точки: это тот же множитель окольным
-  // путём (`mapRadius.ts`, правило 3).
-  const screen = (x: number, y: number, rr: number): { x: number; y: number; r: number } => {
-    const c = world({ x, y });
-    return { x: c.x, y: c.y, r: worldDist(rr) };
-  };
-  const outer = circles.map((v) => screen(v.x, v.y, v.signature));
-  const inner = circles.map((v) => screen(v.x, v.y, v.identify));
-  cx.save();
-  // The unified visibility frontier: outer (signatures) then inner (full reveal).
-  drawUnionTier(outer, 'signature');
-  drawUnionTier(inner, 'reveal');
-  // A selected planet/fleet additionally shows ITS OWN two rings — crisp + dashed —
-  // so you can read one entity's exact reach out of the merged whole.
-  for (const v of circles) {
-    const selected =
-      v.owner === ME &&
-      ((v.source.kind === 'world' && v.source.id === selPlanet) ||
-        (v.source.kind === 'fleet' && selFleetSet.has(v.source.id)));
-    if (!selected) continue;
-    const c = world({ x: v.x, y: v.y });
-    // Пунктир внешнего и сплошная внутреннего — `sightFrontier.ts` (REFM-120, правило 6).
-    const ring = (rr: number, tier: SightTier): void => {
-      const r = worldDist(rr);
-      if (!ownRingShown(r)) return;
-      const look = ownRingLook(tier);
-      cx.beginPath();
-      cx.arc(c.x, c.y, r, 0, TAU);
-      cx.setLineDash([...look.dash]);
-      cx.lineWidth = 1.3;
-      cx.strokeStyle = rgba(LOCK, look.alpha);
-      cx.stroke();
-    };
-    ring(v.signature, 'signature'); // outer — signatures
-    ring(v.identify, 'reveal'); // inner — full reveal
-  }
-  cx.setLineDash([]);
   cx.restore();
 }
 
@@ -5967,67 +5664,6 @@ function prepareEnteringMap(): boolean {
     });
   }
   return mapPreparation.active && !mapPreparation.ready;
-}
-
-/** Draw the radar ranges of the selected sector: the OUTER signature radius (full
- *  reach, animated dashed) and the INNER full-reveal radius (half the reach, solid)
- *  — the two concentric ranges from shared-core visibility. The reach is a physical
- *  distance in map units; the projection is uniform so they read as true circles.
- *  Nothing is drawn for a sector with no radar. (Complements `drawRadarCoverage` —
- *  that shows ALL my sources persistently; this labels the selected one on tap.) */
-function drawRadarRange(now: number): void {
-  // Слой крепится к ВЫБРАННОМУ миру — нет выбора, нет и дальномера (REFM-109, правило 5).
-  const p = selPlanet ? s.planets[selPlanet] : undefined;
-  if (!p) return;
-  // Рисовать ли слой и с какими радиусами — `radarSources.ts`, там же причина гейта
-  // тумана: `planetRadar` читает ПОСТРОЙКИ мира, и без гейта тап по чужой
-  // неисследованной системе был бы мгновенной разведкой одним касанием.
-  const rings = rangeRings(
-    { detailed: seesDetails(p), reach: planetRadar(p) },
-    IDENTIFY_REACH_FRACTION,
-  );
-  if (rings.do !== 'draw') return;
-  const reach = rings.signature;
-  const c = world(p.position);
-  const pulse = 0.5 + 0.5 * Math.sin(now / 600);
-  // Радиус — ОДНО число, а не пара полуосей: проекция равномерна по осям, это обещание
-  // камеры (`mapRadius.ts`, правило 2). Эллипс здесь обещал неравномерность, которой нет.
-  const radiusPx = (rr: number): number => worldDist(rr);
-  cx.save();
-  cx.shadowColor = '#5ff0c0';
-  cx.textAlign = 'left';
-  cx.font = '700 10px ui-monospace,Menlo,monospace';
-
-  // outer — signature reach (coarse blips in fog): «засечка», как в досье радара
-  const o = radiusPx(reach);
-  cx.fillStyle = rgba('#5ff0c0', 0.012);
-  cx.beginPath();
-  cx.arc(c.x, c.y, o, 0, TAU);
-  cx.fill();
-  cx.setLineDash([6, 7]);
-  cx.lineDashOffset = -now / 60;
-  cx.strokeStyle = rgba('#5ff0c0', 0.3 + 0.12 * pulse);
-  cx.lineWidth = 0.8;
-  cx.shadowBlur = fxBlur(2);
-  cx.stroke();
-  cx.fillStyle = rgba('#aef6e6', 0.85);
-  cx.fillText(t('map.radar.detect', { n: reach }), c.x + o + 7, c.y + 3);
-
-  // inner — full-reveal reach (contacts fully identified): «опознание»
-  const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
-  const i = radiusPx(inner);
-  cx.fillStyle = rgba('#5ff0c0', 0.02);
-  cx.beginPath();
-  cx.arc(c.x, c.y, i, 0, TAU);
-  cx.fill();
-  cx.setLineDash([]);
-  cx.strokeStyle = rgba('#7df0d0', 0.5 + 0.12 * pulse);
-  cx.lineWidth = 1;
-  cx.shadowBlur = fxBlur(3);
-  cx.stroke();
-  cx.fillStyle = rgba('#aef6e6', 0.9);
-  cx.fillText(t('map.radar.identify', { n: Math.round(inner) }), c.x + i + 7, c.y - 7);
-  cx.restore();
 }
 
 /**
@@ -12755,7 +12391,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
   worldMemo = null;
-  radarMemory.clear();
+  forgetRadarContacts();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
   threatScanAt = -1;
   refugeReported.clear(); // id флотов карты повторяются от забега к забегу

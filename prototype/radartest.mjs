@@ -10,7 +10,10 @@ import {
 } from './harnessKit.mjs';
 
 // Exercise the actual solo projection AND sweep painter in the shipped client.
-const hooks = `window.__radarTest = {
+// Радар живёт у своего владельца (`mapRadar.ts`, REFM-239): память контактов снаружи
+// только для чтения, а угол руки задают часы развёртки — робот берёт их своим импортом.
+const hooks = `import { paintedContacts as __painted, SWEEP_DIV as __SWEEP_DIV, SWEEP_PERIOD as __SWEEP_PERIOD } from './mapRadar';
+window.__radarTest = {
   stage(level, grouped = false) {
     const nodes = Object.values(s.planets);
     const home = nodes.find(p => p.owner === ME);
@@ -30,25 +33,28 @@ const hooks = `window.__radarTest = {
       units: [{ unit: 'scout', count }], traits: [] });
     s.fleets = { a: make('a', a.id, grouped ? 3 : 1) };
     if (grouped) s.fleets.b = make('b', b.id, 2);
-    radarMemory.clear();
+    forgetRadarContacts();
     this.paint();
     return this.read();
   },
   paint() {
     __fog.vision = __fog.computeVision();
-    drawScanSweep(performance.now());
-    // Targets are due east: one real sweep crossing, without a ten-second sleep.
-    sweepPrevAng = TAU - 0.01; sweepAng = 0.01;
-    updateRadarContacts(performance.now());
+    // Targets are due east: one real sweep crossing, without a ten-second sleep — the
+    // sweep clock puts the arm just short of east, then just past it.
+    const turn = Math.ceil(performance.now() / __SWEEP_PERIOD) * __SWEEP_PERIOD;
+    for (const now of [turn - 0.01 * __SWEEP_DIV, turn + 0.01 * __SWEEP_DIV]) {
+      drawScanSweep(now);
+      updateRadarContacts(now);
+    }
   },
   disperse() {
     const b = s.planets[s.fleets.b.location];
     b.position.x += 60;
     this.paint();
-    drawRadarContacts(performance.now() + 2 * SWEEP_PERIOD);
+    drawRadarContacts(performance.now() + 3 * __SWEEP_PERIOD);
     return this.read();
   },
-  read() { return { contacts: vision.signatures, painted: [...radarMemory.values()] }; },
+  read() { return { contacts: vision.signatures, painted: [...__painted.values()] }; },
 };`;
 
 const site = await serve(await instrumentedGame(hooks));

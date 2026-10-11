@@ -13,11 +13,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Подписи радара (метка сигнатуры, кольца дальномера) живут у его владельца (REFM-239).
+const RADAR = readFileSync(new URL('./mapRadar.ts', import.meta.url), 'utf8');
 
 describe('SZ-map-ids — места называются именами', () => {
   it('ни одна подпись холста не пишет сырой id узла', () => {
     // `fillText(n.id …)`, `fillText(p.id …)`, `fillText(id, …)` — прежние формы подписи.
-    expect(MAIN.match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
+    expect((MAIN + RADAR).match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
     // Четыре подписи: метка тумана, схема, поле астероидов, выноска мира.
     expect(MAIN.match(/fillText\(placeName\(/g)?.length).toBe(4);
   });
@@ -36,7 +38,7 @@ describe('UIX-5.3 — надписи холста словами языка иг
   it('литерал в `fillText` несёт значок и число, но не английское слово', () => {
     // «◌ SIGNATURE 240» и «● REVEAL 120» у колец радара стояли на обоих языках: литерал
     // холста гейт локализации не видит, он ищет `t('…')`. Слово — только через ключ.
-    const literals = [...MAIN.matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
+    const literals = [...(MAIN + RADAR).matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
       m[2]!.replace(/\$\{[^}]*\}/g, ''),
     );
     expect(literals.length).toBeGreaterThan(5); // разбор не должен молча опустеть
@@ -51,7 +53,7 @@ describe('UIX-5.3 — надписи холста словами языка иг
   });
 
   it('кольца радара выбранного мира подписаны ключами', () => {
-    expect(MAIN).toContain("t('map.radar.detect'");
-    expect(MAIN).toContain("t('map.radar.identify'");
+    expect(RADAR).toContain("t('map.radar.detect'");
+    expect(RADAR).toContain("t('map.radar.identify'");
   });
 });

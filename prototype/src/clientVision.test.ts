@@ -139,13 +139,17 @@ describe('круги везде — граница обзора на карте 
   it('drawRadarCoverage рисует `sightCircles` ядра, а не собирает радары сам', () => {
     // Граница собиралась из своих радаров без множителя технологий и без базового обзора
     // мира, а туман считался иначе — мир светился за нарисованной границей.
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    // Граница живёт у радара (`mapRadar.ts`, REFM-239), круги ей кладёт кэш кадра хуком.
+    const src = readFileSync(new URL('./mapRadar.ts', import.meta.url), 'utf8');
     const body = src.slice(src.indexOf('function drawRadarCoverage('));
     const fn = body.slice(0, body.indexOf('\n}\n') + 3);
-    expect(fn).toContain('sightCircles(s, ME, data)');
+    expect(fn).toContain('const circles = game.sight();');
     for (const reDerived of ['planetRadar(', 'fleetRadar(', 'IDENTIFY_REACH_FRACTION']) {
       expect(fn).not.toContain(reDerived);
     }
+    const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const init = /initMapRadar\(\{([\s\S]*?)\n\}\);/.exec(main)?.[1] ?? '';
+    expect(init).toContain("sight: () => perWorld('sight', () => sightCircles(s, ME, data)),");
   });
 });
 
