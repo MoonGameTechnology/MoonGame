@@ -10,8 +10,16 @@
  * a stable code only, never a throw. All stat maths route through the core's
  * `effectiveStats` so the preview matches what the built ship will actually carry.
  */
-import type { GameData, ResourceBag, ShipBayType, ShipSlotType, UnitDef } from '@void/shared-core';
-import { canEquip, effectiveStats, loadoutBays, loadoutCost } from '@void/shared-core';
+import type { GameData, Rarity, ResourceBag, ShipBayType, ShipSlotType, UnitDef } from '@void/shared-core';
+import {
+  canEquip,
+  effectiveStats,
+  loadoutBays,
+  loadoutCost,
+  moduleRarityBonus,
+  moduleStarMultiplier,
+  RARITIES,
+} from '@void/shared-core';
 import { t } from '../../../localization/core';
 
 /** One capacity slot on the hull — its category and the module in it (if any).
@@ -20,6 +28,9 @@ export interface LoadoutSlotView {
   type: ShipBayType;
   moduleId?: string;
   moduleName?: string;
+  /** The fitted module's rarity and stars (see {@link LoadoutOption.rarity}). */
+  rarity?: Rarity;
+  star?: number;
 }
 
 /** A module offered in the palette, with whether it can go on this hull right now. */
@@ -28,8 +39,13 @@ export interface LoadoutOption {
   name: string;
   slot: ShipSlotType;
   tag: 'horizontal' | 'vertical';
-  /** Flat additive stat deltas the module applies (per ship). */
+  /** Flat additive stat deltas the module applies (per ship) — with its stars and raised
+   *  rarity (SZE-1.1/5.1) when the editor was given them, i.e. what the built ship carries. */
   effect: Record<string, number>;
+  /** The module's rarity: the catalog one, or the seat's raised one when higher. */
+  rarity: Rarity;
+  /** The seat's stars on this module (0 = none / no star snapshot). */
+  star: number;
   cost: ResourceBag;
   installable: boolean;
   /** Why it can't be installed, when `installable` is false (stable code). */
@@ -66,6 +82,11 @@ export interface LoadoutModel {
    *  means no arsenal snapshot was available — the palette stays unrestricted
    *  (graceful degradation, mirroring the core build gate). */
   ownedModules?: string[];
+  /** The seat's module stars and raised rarity this model was built with (the match's
+   *  `Player.arsenal` snapshot), carried through the reducer like `ownedModules`. Absent =
+   *  ★0 and catalog rarity for every module (regular matches). */
+  moduleStars?: Record<string, number>;
+  moduleRarity?: Record<string, string>;
   /** Live per-ship stats: base vs with the current modules. */
   preview: LoadoutStatLine[];
   /** Per-order costs (×count): hull, modules, and their sum. */
@@ -122,6 +143,34 @@ function addBags(a: ResourceBag, b: ResourceBag): ResourceBag {
   return out;
 }
 
+/** Stars and raised rarity of the seat's modules (`Player.arsenal.stars` / `.rarity`). */
+export interface ModuleBoosts {
+  moduleStars?: Readonly<Record<string, number>>;
+  moduleRarity?: Readonly<Record<string, string>>;
+}
+
+/** A module's rarity on this seat: the raised one when it outranks the catalog one. */
+function rarityOn(id: string, data: GameData, boosts: ModuleBoosts): Rarity {
+  const base: Rarity = data.modules[id]?.rarity ?? 'simple';
+  const raised = boosts.moduleRarity?.[id] as Rarity | undefined;
+  return raised !== undefined && RARITIES.indexOf(raised) > RARITIES.indexOf(base) ? raised : base;
+}
+
+/** What one module adds to a ship on this seat — the same sum `effectiveStats` makes:
+ *  catalog deltas plus raised-rarity parameters, both times the star multiplier. */
+function contributionOn(id: string, data: GameData, boosts: ModuleBoosts): Record<string, number> {
+  const m = data.modules[id];
+  if (!m) return {};
+  const star = boosts.moduleStars?.[id] ?? 0;
+  const mult = star > 0 ? moduleStarMultiplier(star, data) : 1;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(m.effects.stats)) out[k] = v * mult;
+  const raised = boosts.moduleRarity?.[id];
+  if (raised !== undefined)
+    for (const [k, v] of Object.entries(moduleRarityBonus(m, raised))) out[k] = (out[k] ?? 0) + v * mult;
+  return out;
+}
+
 function affordable(cost: ResourceBag, resources: ResourceBag): boolean {
   return Object.entries(cost).every(([res, amt]) => (resources[res] ?? 0) >= amt);
 }
@@ -136,9 +185,11 @@ function buildModel(
   data: GameData,
   resources: ResourceBag,
   ownedModules?: ReadonlySet<string>,
+  boosts: ModuleBoosts = {},
 ): LoadoutModel | null {
   const def: UnitDef | undefined = data.units[unit];
   if (!def) return null;
+  const starOf = (id: string): number => boosts.moduleStars?.[id] ?? 0;
 
   // One slot view per capacity, laid out by the core's `loadoutBays` — the same count the
   // build gate makes: a module fills a bay of its own type, and a universal bay takes the
@@ -147,7 +198,17 @@ function buildModel(
   for (const bay of loadoutBays(def.slots, modules, data)) {
     if (bay.extra) continue;
     const m = bay.module ? data.modules[bay.module] : undefined;
-    slots.push(bay.module && m ? { type: bay.type, moduleId: bay.module, moduleName: m.name } : { type: bay.type });
+    slots.push(
+      bay.module && m
+        ? {
+            type: bay.type,
+            moduleId: bay.module,
+            moduleName: m.name,
+            rarity: rarityOn(bay.module, data, boosts),
+            star: starOf(bay.module),
+          }
+        : { type: bay.type },
+    );
   }
 
   const palette: LoadoutOption[] = Object.entries(data.modules)
@@ -159,7 +220,9 @@ function buildModel(
         name: m.name,
         slot: m.slot,
         tag: m.tag,
-        effect: m.effects.stats,
+        effect: contributionOn(id, data, boosts),
+        rarity: rarityOn(id, data, boosts),
+        star: starOf(id),
         cost: m.cost,
         installable: check.ok,
         ...(check.ok ? {} : { code: check.code }),
@@ -167,7 +230,17 @@ function buildModel(
     });
 
   const base = effectiveStats(def, {}, data);
-  const eff = effectiveStats(def, { modules }, data);
+  // Stars and raised rarity multiply the modules' own contribution, exactly as on the built
+  // stack (the core stamps the same snapshot on it), so the preview is what the ship carries.
+  const eff = effectiveStats(
+    def,
+    {
+      modules,
+      ...(boosts.moduleStars ? { moduleStars: { ...boosts.moduleStars } } : {}),
+      ...(boosts.moduleRarity ? { moduleRarity: { ...boosts.moduleRarity } } : {}),
+    },
+    data,
+  );
   const preview: LoadoutStatLine[] = [];
   for (const stat of PREVIEW_STATS) {
     const b = base[stat] ?? 0;
@@ -194,18 +267,24 @@ function buildModel(
     count,
     affordable: affordable(totalCost, resources),
     ...(ownedModules ? { ownedModules: [...ownedModules] } : {}),
+    ...(boosts.moduleStars ? { moduleStars: { ...boosts.moduleStars } } : {}),
+    ...(boosts.moduleRarity ? { moduleRarity: { ...boosts.moduleRarity } } : {}),
   };
 }
 
 /** Open the editor for a hull. `opts.modules` seeds a draft loadout (default
- *  empty), `opts.count` the order size (default 1). Fail-secure on an unknown unit. */
+ *  empty), `opts.count` the order size (default 1); `moduleStars`/`moduleRarity` are the
+ *  seat's arsenal snapshot (Sector Zero runs). Fail-secure on an unknown unit. */
 export function createLoadoutEditor(
   unit: string,
   data: GameData,
   resources: ResourceBag,
-  opts?: { modules?: string[]; count?: number; ownedModules?: ReadonlySet<string> },
+  opts?: { modules?: string[]; count?: number; ownedModules?: ReadonlySet<string> } & ModuleBoosts,
 ): LoadoutEditorResult {
-  const model = buildModel(unit, opts?.modules ?? [], opts?.count ?? 1, data, resources, opts?.ownedModules);
+  const model = buildModel(unit, opts?.modules ?? [], opts?.count ?? 1, data, resources, opts?.ownedModules, {
+    ...(opts?.moduleStars ? { moduleStars: opts.moduleStars } : {}),
+    ...(opts?.moduleRarity ? { moduleRarity: opts.moduleRarity } : {}),
+  });
   if (!model) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...model };
 }
@@ -260,6 +339,10 @@ export function applyLoadoutAction(
     data,
     resources,
     model.ownedModules ? new Set(model.ownedModules) : undefined,
+    {
+      ...(model.moduleStars ? { moduleStars: model.moduleStars } : {}),
+      ...(model.moduleRarity ? { moduleRarity: model.moduleRarity } : {}),
+    },
   );
   if (!next) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...next };

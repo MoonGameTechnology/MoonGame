@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 10880 зелёных** (0 skip; 891 файл; прогон 2026-10-11, Node 22 + PostgreSQL 16.15 + настоящий age). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 10890 зелёных** (0 skip; 891 файл; прогон 2026-10-11, Node 22 + PostgreSQL 16.15 + настоящий age). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
 
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
@@ -5282,7 +5282,7 @@ instantRepair, fleetRepair, effects, seatClaim, visibility])` (40 модулей
   Здание `shipyard` при этом осталось «Орбитальной верфью» — переименован экран, а не
   постройка (сторож в `shipyard.test.ts`).
   Окно целиком живёт в `prototype/src/shipyard.ts` (REFM-13, `initShipyard(host)`):
-  разметка чистая (`yardBoxHtml`/`loadoutPaneHtml`/`orderBarHtml`/`slotLayerHtml`/`repeatOrderHtml`/`statBarHtml`/`bagText`/
+  разметка чистая (`yardBoxHtml`/`loadoutPaneHtml`/`orderBarHtml`/`slotLayerHtml`/`repeatOrderHtml`/`moduleGradeHtml`/`statBarHtml`/`bagText`/
   `originTagHtml`/`ownedHullsOf`/`unitLaneAhead`), черновик заказа — значение `YardDraft` с чистой
   `normalizeDraft`, DOM трогает только проводка; `main.ts` отдаёт ему состояние хуками.
   Панели **Корабли** и **Эскадрильи** рендерят один framework-agnostic view-model
@@ -5294,7 +5294,14 @@ instantRepair, fleetRepair, effects, seatClaim, visibility])` (40 модулей
   владельца): точка на детали корабля, плитка слота рядом, линия между ними; слой лежит ровно
   на картинке 3:2, точки — проценты картинки из `decisions/slotCallouts.ts` по ключу арта
   (`portraitArt` в `shipArt.ts`), разметка — `slotLayerHtml`. Плитка надетого модуля в цвете
-  его редкости, пустая — серая, с типом слота. Плитка, как и строка отсека, открывает свой
+  его редкости и со значком «★2» в углу, когда модуль прокачан; пустая — серая, с типом слота.
+  Редкость и звёзды модуля — языком карточек Sector Zero (`moduleGradeHtml`): у карточки
+  модуля рамка и полоса сверху цветом ступени, слово ступени её цветом, горящие звёзды; то же
+  в строке отсека. Ступень — поднятая из снимка арсенала места (`Player.arsenal.rarity`), если
+  она выше каталожной; звёзды — `Player.arsenal.stars`. Без звёзд (обычная партия) ряда звёзд
+  нет. Снимок передаётся в `createLoadoutEditor` (`moduleStars`/`moduleRarity`), поэтому числа
+  карточек, строки отсека и «Итога с модулями» уже со звёздами и параметром ступени — те, что
+  получит построенный корабль; дробные числа — до десятых. Плитка, как и строка отсека, открывает свой
   отсек (шаг 3; `YardDraft.slot`, без выбора — первый пустой, `selectedBay`): рядом стоят
   модули только его типа, без надетых в других отсеках, а не встающие на корпус свёрнуты в
   строку «Ещё N не подходят» (`YardDraft.unfit`). Модуль в занятом отсеке встаёт на место

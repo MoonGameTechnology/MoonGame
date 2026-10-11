@@ -193,8 +193,8 @@ const loadout: LoadoutModel = {
   slots: [{ type: 'weapon' }, { type: 'defense', moduleId: 'plating', moduleName: 'Plating' }],
   modules: ['plating'],
   palette: [
-    { id: 'railgun', name: 'Railgun', slot: 'weapon', tag: 'horizontal', effect: {}, cost: {}, installable: true },
-    { id: 'plating', name: 'Plating', slot: 'defense', tag: 'vertical', effect: {}, cost: {}, installable: false, code: 'E_SLOT_FULL' },
+    { id: 'railgun', name: 'Railgun', slot: 'weapon', tag: 'horizontal', effect: {}, rarity: 'simple', star: 0, cost: {}, installable: true },
+    { id: 'plating', name: 'Plating', slot: 'defense', tag: 'vertical', effect: {}, rarity: 'simple', star: 0, cost: {}, installable: false, code: 'E_SLOT_FULL' },
   ],
   preview: [{ stat: 'attack', label: 'Атака', base: 4, effective: 6, delta: 2 }],
   hullCost: { metal: 10 },

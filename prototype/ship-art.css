@@ -43,6 +43,8 @@
 .cn-tile.empty.sel{border-color:var(--cyan);}
 .cn-tile.filled.sel{box-shadow:0 0 0 2px #071018,0 0 0 4px var(--cyan),0 0 14px color-mix(in srgb,var(--rar,var(--cyan)) 45%,transparent);}
 .cn-tile:focus-visible{outline:2px solid var(--cyan);outline-offset:6px;}
+/* Upgrade level of the fitted module: «★2» in the tile's corner, in its rarity colour. */
+.cn-tst{position:absolute;right:-8px;bottom:-8px;padding:0 4px;border-radius:7px;border:1px solid var(--rar,var(--cyan));background:#071018;color:var(--rar,var(--cyan));font:700 var(--fs-caption)/16px var(--sf-font);font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;}
 /* PC window: the hull list is a column of rows, a small picture beside the name. */
 @container (min-width:820px){
   body:not(.mobile-ui) .cn-hulls .cn-hbtn.with-art{flex:none;max-width:none;flex-direction:row;gap:8px;padding:5px 8px 5px 5px;}

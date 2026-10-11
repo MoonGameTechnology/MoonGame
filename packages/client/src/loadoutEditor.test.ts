@@ -220,8 +220,8 @@ describe('loadout editor — universal bays (reinforced cruiser)', () => {
     // The core's layout: the weapon overflow first, then the defense one — install order
     // does not move a module between bays.
     expect(m2.slots).toEqual([
-      { type: 'universal', moduleId: 'targeting', moduleName: 'Наведение' },
-      { type: 'universal', moduleId: 'shield', moduleName: 'Щит' },
+      { type: 'universal', moduleId: 'targeting', moduleName: 'Наведение', rarity: 'simple', star: 0 },
+      { type: 'universal', moduleId: 'shield', moduleName: 'Щит', rarity: 'simple', star: 0 },
     ]);
   });
 
@@ -231,5 +231,75 @@ describe('loadout editor — universal bays (reinforced cruiser)', () => {
     expect(err(applyLoadoutAction({ kind: 'equip', moduleId: 'cargo' }, m, data, rich))).toBe('E_NO_SLOT');
     const freed = ok(applyLoadoutAction({ kind: 'unequip', moduleId: 'targeting' }, m, data, rich));
     expect(freed.palette.find((p) => p.id === 'cargo')?.installable).toBe(true);
+  });
+});
+
+describe('loadout editor — module stars and rarity (Sector Zero arsenal snapshot)', () => {
+  // A star ladder (+10% per step) and a module that gains a parameter at «unique».
+  const boosted: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: {
+      cruiser: {
+        faction: 'x',
+        stats: { attack: 10, defense: 8, speed: 6, hp: 40 },
+        cost: { metal: 220 },
+        slots: { weapon: 1, defense: 1 },
+      },
+    },
+    factions: {},
+    buildings: {},
+    events: {},
+    modules: {
+      targeting: {
+        name: 'Наведение',
+        slot: 'weapon',
+        tag: 'vertical',
+        effects: { stats: { attack: 10 } },
+        cost: { metal: 60 },
+        rarityBonus: { unique: { hp: 5 } },
+      },
+      shield: { name: 'Щит', slot: 'defense', tag: 'vertical', rarity: 'mythic', effects: { stats: { defense: 4 } }, cost: { metal: 80 } },
+    },
+    sectorZeroStars: {
+      cap: 3,
+      guaranteed: 3,
+      steps: [
+        { chance: 1, warrants: 20, bonus: 0.1, pity: 0 },
+        { chance: 1, warrants: 45, bonus: 0.1, pity: 0 },
+      ],
+    },
+  });
+  const boosts = { moduleStars: { targeting: 2 }, moduleRarity: { targeting: 'unique' } };
+
+  it('no snapshot ⇒ catalog numbers, catalog rarity and no stars', () => {
+    const m = ok(createLoadoutEditor('cruiser', boosted, rich, { modules: ['targeting'] }));
+    expect(m.palette.find((p) => p.id === 'targeting')).toMatchObject({ effect: { attack: 10 }, rarity: 'simple', star: 0 });
+    expect(m.palette.find((p) => p.id === 'shield')).toMatchObject({ rarity: 'mythic', star: 0 });
+    expect(m.preview.find((l) => l.stat === 'attack')?.effective).toBe(20);
+  });
+
+  it('stars and raised rarity reach the palette, the bay and the preview — the built ship’s numbers', () => {
+    const m = ok(createLoadoutEditor('cruiser', boosted, rich, { modules: ['targeting'], ...boosts }));
+    // ★2 = ×1.2 on the module's own deltas AND on its unique-step parameter.
+    const opt = m.palette.find((p) => p.id === 'targeting')!;
+    expect(opt).toMatchObject({ rarity: 'unique', star: 2 });
+    expect(opt.effect.attack).toBeCloseTo(12);
+    expect(opt.effect.hp).toBeCloseTo(6);
+    expect(m.slots[0]).toMatchObject({ moduleId: 'targeting', rarity: 'unique', star: 2 });
+    expect(m.preview.find((l) => l.stat === 'attack')?.effective).toBe(22);
+    expect(m.preview.find((l) => l.stat === 'hp')?.effective).toBe(46);
+  });
+
+  it('a raised rarity below the catalog one does not lower the module', () => {
+    const m = ok(createLoadoutEditor('cruiser', boosted, rich, { moduleRarity: { shield: 'unique' } }));
+    expect(m.palette.find((p) => p.id === 'shield')?.rarity).toBe('mythic');
+  });
+
+  it('the snapshot survives the reducer round-trip', () => {
+    const m0 = ok(createLoadoutEditor('cruiser', boosted, rich, boosts));
+    const m1 = ok(applyLoadoutAction({ kind: 'equip', moduleId: 'targeting' }, m0, boosted, rich));
+    expect(m1.slots[0]).toMatchObject({ rarity: 'unique', star: 2 });
+    expect(m1.preview.find((l) => l.stat === 'attack')?.effective).toBe(22);
   });
 });
