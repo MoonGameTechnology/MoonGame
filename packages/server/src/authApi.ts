@@ -19,25 +19,8 @@ import { slidingWindowIpLimiter } from './rateLimit';
  *    a bounded map, evicted FIFO, so an address-spraying client can't grow memory.
  */
 
-/** Deliver a message (today: the password-reset link). Kept behind an interface so the
- *  transport is swappable — the default (see `logMailer`) just logs the link, and a real
- *  SMTP/API mailer is wired via config when the deployment has one. */
+/** Delivery seam: production hosts wire the verified SMTP transport. */
 export type Mailer = (msg: { to: string; subject: string; text: string }) => Promise<void>;
-
-/** The default mailer: write to stderr. The message BODY carries a live reset link (a
- *  15-minute account-takeover token), so by default we log only metadata (to/subject) —
- *  enabling recovery without a real transport must not spill takeover tokens into the
- *  logs. A playtest admin who genuinely needs the link opts in with `MAILER_LOG_BODY=1`;
- *  production wires a real transport instead (there is otherwise no way to deliver mail
- *  from this repo). */
-const logMailer: Mailer = (msg) => {
-  const body =
-    process.env.MAILER_LOG_BODY === '1'
-      ? `\n  ${msg.text}`
-      : ' (body hidden — set MAILER_LOG_BODY=1 to log it, or wire a real mailer)';
-  process.stderr.write(`[mail] to=${msg.to} · ${msg.subject}${body}\n`);
-  return Promise.resolve();
-};
 
 /** Password fingerprint: a short digest of the password hash. When the password changes
  *  the hash — and thus this fingerprint — changes. Two consumers: single-use reset tokens
@@ -74,7 +57,7 @@ export interface AuthApiDeps {
   verifyReset?(token: string): Promise<{ accountId: string; pwfp: string } | null>;
   /** Client origin the emailed reset link points at: `${resetBaseUrl}/?reset=<token>`. */
   resetBaseUrl?: string;
-  /** Reset-link transport. Omitted ⇒ `logMailer` (logs the link). */
+  /** Required when recovery is enabled. Never logs reset bearers. */
   sendMail?: Mailer;
   /** Post-registration hook (e.g. the starter-arsenal grant, ARS-2), awaited before
    *  the 201 so the account's first read sees its grant. MUST be resilient: a throw
@@ -267,7 +250,8 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     let baseEnd = base.length;
     while (baseEnd > 0 && base[baseEnd - 1] === '/') baseEnd -= 1;
     const resetBaseUrl = base.slice(0, baseEnd);
-    const sendMail = deps.sendMail ?? logMailer;
+    if (!deps.sendMail) throw new Error('E_MAIL_CONFIG');
+    const sendMail = deps.sendMail;
 
     app.post('/auth/recover', async (request: FastifyRequest, reply: FastifyReply) => {
       if (rateLimited(request.ip)) {
@@ -323,8 +307,13 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
+      // Capture before scrypt yields: the memory adapter can return a live record.
+      const expectedHash = user.passHash;
       const passHash = await hashPassword(password, deps.scryptParams);
-      await deps.users.setPassword(user.userId, passHash);
+      if (!(await deps.users.setPasswordIfCurrent(user.userId, expectedHash, passHash))) {
+        void reply.code(401);
+        return { error: 'E_AUTH' as const };
+      }
       // Reset IS a login: hand back a fresh session (stamped with the NEW password's
       // fingerprint, so it survives while every pre-reset session is now revoked).
       const sessionToken = await deps.signSession(user.userId, user.login, pwFingerprint(passHash));

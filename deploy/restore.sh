@@ -82,6 +82,10 @@ if ! tail -c 200 "$WORK/dump.sql" | grep -q 'PostgreSQL database dump complete';
 fi
 echo "[✓] Дамп полный"
 
+# ACLs were intentionally omitted by pg_dump. Restore the dedicated runtime grants
+# atomically with the data; an absent/unsafe role aborts the entire transaction.
+cat "$DEPLOY_DIR/restore-acl.sql" >> "$WORK/dump.sql"
+
 # ---- 3. применение одной транзакцией ----
 echo "[*] Восстанавливаем базу «$DB_LABEL»..."
 if [ -n "${DATABASE_URL:-}" ]; then

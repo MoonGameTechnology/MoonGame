@@ -178,11 +178,13 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
  *  a new object), so this captured reference won't change under a pending write. */
 export function snapshotOf(room: MatchRoom): MatchSnapshot {
   const state = room.state;
+  const clock = room.clockSnapshot;
   return {
     matchId: room.id,
     dataVersion: state.version.data,
     seq: room.sequence,
     status: state.match.status,
     state,
+    ...(clock ? { clock } : {}),
   };
 }

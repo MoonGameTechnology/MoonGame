@@ -74,10 +74,12 @@ function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: stri
       const store = make();
       const s = state();
       s.time = 4242;
-      await store.save(snap(uniq('m1'), 5, s));
+      const clock = { wallTime: 10000, gameTime: 4242, timeScale: 24, running: true };
+      await store.save({ ...snap(uniq('m1'), 5, s), clock });
       const loaded = await store.load(uniq('m1'));
       expect(loaded?.seq).toBe(5);
       expect(loaded?.state.time).toBe(4242);
+      expect(loaded?.clock).toEqual(clock);
       expect(loaded?.state).toEqual(s);
     });
 
@@ -328,6 +330,16 @@ function receiptStoreContract(name: string, make: () => ReceiptStore, uniq: (p: 
 /** SE-1.x — login+password accounts, run against BOTH adapters. */
 function userStoreContract(name: string, make: () => UserStore, uniq: (p: string) => string): void {
   describe(`UserStore — ${name}`, () => {
+    it('atomically consumes the expected password hash once', async () => {
+      const store = make();
+      const created = await store.createUser(uniq('reset-race'), 'old');
+      if (!created.ok) throw new Error('expected account');
+      const results = await Promise.all(['a', 'b', 'c'].map((hash) =>
+        store.setPasswordIfCurrent(created.userId, 'old', hash)));
+      expect(results.filter(Boolean)).toHaveLength(1);
+      expect((await store.findById(created.userId))?.passHash).toBe(['a', 'b', 'c'][results.indexOf(true)]);
+      expect(await store.setPasswordIfCurrent(uniq('missing'), 'old', 'new')).toBe(false);
+    });
     it('creates an account and finds it case-insensitively', async () => {
       const store = make();
       const login = uniq('Ada');

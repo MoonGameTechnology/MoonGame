@@ -57,6 +57,7 @@ import {
   PostgresFriendStore,
   PostgresUserStore,
   registerAuthApi,
+  mailerFromEnv,
   authRateFromEnv,
   registerAdminApi,
   adminLoginsFromEnv,
@@ -507,8 +508,9 @@ async function createHostedMatch(
     data,
     now: () => Date.now(),
     // Born running: the clock anchors at the initial game time (fresh world: Day 1
-    // now; restored snapshot: its saved instant) and TIME_SCALE applies from here.
+    // now; restored snapshot: its durable anchor) and TIME_SCALE applies from here.
     initiallyStarted: true,
+    initialClock: restoredSnap?.clock,
     singlePeerPerPlayer: true, // one live connection per chair — no two people command one empire
     emitStateHash: true, // attach hashState(view) so the client overlay can flag desync
     // Bot favour (`approval`) is a prototype key the core fog passes through whole:
@@ -583,6 +585,7 @@ async function createHostedMatch(
         seq: room.sequence,
         status: room.state.match.status === 'ended' ? 'ended' : 'ongoing',
         state: room.state,
+        clock: room.clockSnapshot,
       });
     } catch (e) {
       process.stderr.write(`snapshot save failed (${id}): ${(e as Error)?.message ?? String(e)}\n`);
@@ -594,9 +597,9 @@ async function createHostedMatch(
   // driver bodies its onTick calls) runs the world 24/7 — it arms one timer for the
   // soonest scheduled event, ticks the room when it fires (advance + broadcast the
   // arrivals/battles/captures that came due), and re-arms; the live-player HEARTBEAT_MS
-  // beat keeps a watched room's clock moving on-screen even with an empty schedule. NO
-  // downtime catch-up — the room resumes at the saved `state.time` (initiallyStarted), so
-  // a gap while the process was down is skipped, not replayed. The distributed evolution
+  // beat keeps a watched room's clock moving on-screen even with an empty schedule.
+  // The durable clock anchor includes downtime; advanceTo processes due events through
+  // the normal deterministic scheduler. Legacy snapshots resume at their saved state.time. The distributed evolution
   // is a Postgres job queue (pg-boss): one shared "wake match X at T" job across processes
   // instead of one in-memory timer per room — see docs/persistence-accounts-roadmap.md.
   // `driversBusy` guards re-entrancy: on a DURABLE room a driver pass awaits the room's
@@ -1003,14 +1006,14 @@ const server = createMultiplayerServer({
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
         users: userStore,
+        sendMail: mailerFromEnv(),
         signSession: authCfg.signSession!,
         // Плейтест на десять человек часто приходит с ОДНОГО адреса (общий Wi-Fi, NAT
         // оператора), а первый вход стоит двух запросов — поэтому потолок задаётся
         // окружением, а не только дефолтом (`AUTH_RATE_MAX`/`AUTH_RATE_WINDOW_MS`).
         ...authRateFromEnv(process.env),
         // Recovery (/auth/recover + /auth/reset) mounts only when RESET_BASE_URL points the
-        // emailed link at this deployment's origin. No mailer wired → the default logs the
-        // link to stderr (a playtest admin can read it; a real transport is a later env).
+        // emailed link at this deployment's origin, with verified SMTP delivery.
         ...(authCfg.signReset && authCfg.verifyReset && authCfg.resetBaseUrl
           ? {
               signReset: authCfg.signReset,

@@ -82,6 +82,17 @@ services:
       # (anyone who knows a nick can take a seat). The server logs a stderr warning
       # if HOST=0.0.0.0 and AUTH_JWT_SECRET is empty.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      RESET_BASE_URL: ${RESET_BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_TLS_MODE: ${SMTP_TLS_MODE:-implicit}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_CA_FILE: ${SMTP_CA_FILE:-}
+      SMTP_TLS_SERVERNAME: ${SMTP_TLS_SERVERNAME:-}
+      HEALTHCHECK_CA_FILE: ${HEALTHCHECK_CA_FILE:-}
+      HEALTHCHECK_TLS_SERVERNAME: ${HEALTHCHECK_TLS_SERVERNAME:-localhost}
       AUTH_JWT_PREVIOUS_SECRET: ${AUTH_JWT_PREVIOUS_SECRET:-}
       AUTH_JWT_PREVIOUS_UNTIL: ${AUTH_JWT_PREVIOUS_UNTIL:-}
       # Origin-allowlist против CSWSH — ОБЯЗАТЕЛЕН под PROD=1 (сервер откажется

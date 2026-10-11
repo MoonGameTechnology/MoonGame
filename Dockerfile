@@ -135,7 +135,7 @@ EXPOSE 8788
 # exec-form node hitting the server's own contentless GET /health. It reads $PORT the
 # same way the server does, so a platform-injected PORT moves both together.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-  CMD ["/nodejs/bin/node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT||8788}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  CMD ["/nodejs/bin/node", "deploy/healthcheck.mjs"]
 # distroless/nodejs ENTRYPOINT is already ["/nodejs/bin/node"], so CMD is just the script.
 # Runs the PRE-BUILT bundle, not prototype/netserver.mjs: that one bundles on startup and
 # therefore needs esbuild, which no longer ships in this image. The bundle reads $PORT the

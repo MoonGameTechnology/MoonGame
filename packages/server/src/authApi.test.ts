@@ -420,6 +420,31 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     ).toBe(401);
   });
 
+  it('two concurrent resets spend the token once and only the winning password works', async () => {
+    const { server, sent, users } = recoverApp();
+    await post(server, '/auth/register', { login: 'race', password: 'original-pass', email: 'race@example.com' });
+    await post(server, '/auth/recover', { email: 'race@example.com' });
+    // Force both requests past the initial read, including a store that returns live records.
+    const find = users.findById.bind(users);
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
+    let reads = 0;
+    users.findById = async (id) => {
+      const user = await find(id);
+      if (++reads === 2) release();
+      await barrier;
+      return user;
+    };
+    const token = tokenFrom(sent[0]!.text);
+    const passwords = ['concurrent-one', 'concurrent-two'];
+    const results = await Promise.all(passwords.map((password) => post(server, '/auth/reset', { token, password })));
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 401]);
+    for (let i = 0; i < passwords.length; i++) {
+      expect((await post(server, '/auth/login', { login: 'race', password: passwords[i] })).statusCode)
+        .toBe(results[i]!.statusCode === 200 ? 200 : 401);
+    }
+  });
+
   it('a reset token is single-use: the second reset with the same token is refused', async () => {
     const { server, sent } = recoverApp();
     await post(server, '/auth/register', {

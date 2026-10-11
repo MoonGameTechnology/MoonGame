@@ -146,6 +146,7 @@
 | `docs/reviews/2026-10-10-encryption-protocols.md` | Шифрование и протоколы — аудит 2026-10-10 | Проверены обе игры: Void Dominion и Averion: Sector Zero, общий сервер, shipping entry |
 | `docs/reviews/2026-10-10-full-stack.md` | Полный тестовый стенд — проверка 2026-10-10 | Стенд поднят, проверки выполнены для Void Dominion и Averion: Sector Zero. |
 | `docs/reviews/2026-10-10-zta.md` | ZTA и защита в глубину — проверка 2026-10-10 | Проверен свежий main 87af555fcee9fa027eff4b1b23bf8a7b89b31658 и подготовленные |
+| `docs/reviews/2026-10-11-remediation-dast.md` | Исправления full-stack аудита и активный DAST — 2026-10-11 | Итог: устранены пять подтверждённых дефектов из аудита 2026-10-10 |
 | `docs/reviews/README.md` | Журнал ревью и аудитов | Постоянная папка, куда складываются находки роли «поиск багов / стандартизация / |
 
 ## docs/security/

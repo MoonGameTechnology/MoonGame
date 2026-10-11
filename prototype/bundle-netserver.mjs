@@ -31,7 +31,7 @@ export async function bundleNetserver() {
     // `ws`, `pg` и `fastify` тащат нативные/опциональные части и динамические require
     // (avvio/find-my-way/pino) — оставляем их Node на рантайм. Всё остальное (@void/*
     // TS-исходники и игра) вбандливается. Зеркалит packages/server/dev.mjs.
-    external: ['ws', 'pg', 'fastify'],
+    external: ['nodemailer', 'ws', 'pg', 'fastify'],
   });
   await build({
     entryPoints: ['packages/server/src/databaseAdmin.ts'],

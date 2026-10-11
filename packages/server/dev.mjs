@@ -22,7 +22,7 @@ await build({
   // esbuild's CJS-in-ESM shim can't resolve — ELIFECYCLE at boot otherwise); leave them
   // for Node to resolve at runtime. Everything else (incl. the @void/shared-core TS
   // source) is bundled. `pg` only loads with DATABASE_URL.
-  external: ['ws', 'pg', 'fastify', '@fastify/rate-limit', 'web-push'],
+  external: ['nodemailer', 'ws', 'pg', 'fastify', '@fastify/rate-limit', 'web-push'],
 });
 
 await import(pathToFileURL(outfile).href);

@@ -30,6 +30,7 @@ import {
   type CreatedMatch,
 } from './matchApi';
 import { registerAuthApi, liveSession, authRateFromEnv } from './authApi';
+import { mailerFromEnv } from './mailer';
 import { registerAdminApi, adminLoginsFromEnv } from './adminApi';
 import { kickSeat } from './seatKick';
 import { registerCorpApi } from './corpApi';
@@ -507,14 +508,14 @@ const server = createMultiplayerServer({
         await scope.register(rateLimit, { max: 100, timeWindow: '1 minute' });
         registerAuthApi(scope, {
           users: stores.userStore,
+          sendMail: mailerFromEnv(),
           signSession,
           // Retunable per deployment (`AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS`): behind a
           // proxy every player shares one source address, so the default budget — sized
           // for one lobby — is the thing a bigger deployment raises first.
           ...authRateFromEnv(process.env),
           // Recovery (SE-1.x): mounts /auth/recover + /auth/reset only when RESET_BASE_URL
-          // is set. No mailer wired here → the default logs the reset link (a real SMTP/API
-          // transport is a `sendMail` the deployment injects when it has one).
+          // and the SMTP transport is configured; missing transport refuses startup.
           ...(signReset && verifyReset && resetBaseUrl
             ? { signReset, verifyReset, resetBaseUrl }
             : {}),

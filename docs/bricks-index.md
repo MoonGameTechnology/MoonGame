@@ -1104,7 +1104,7 @@
 | PA-3.2 | 🔒 | srv sec | `docs/persistence-accounts-roadmap.md` | (= accounts-roadmap) |
 | PA-3.3 | ⏳ | srv core | `docs/persistence-accounts-roadmap.md` | Семантика возврата и offline |
 | PA-4.1 | ✅ | srv | `docs/persistence-accounts-roadmap.md` | v1 (одно-процессная) |
-| PA-4.2 | ⏳ | core srv | `docs/persistence-accounts-roadmap.md` | (= PE-2.2) |
+| PA-4.2 | 🔶 | core srv | `docs/persistence-accounts-roadmap.md` | (= PE-2.2) |
 | PA-5.1 | ✅ | ops | `docs/persistence-accounts-roadmap.md` | Self-hosted Postgres на VPS — реализовано |
 | PA-5.2 | 🔒 | ops srv | `docs/persistence-accounts-roadmap.md` | (↔ metrics-roadmap) |
 | PE-0.1 | ✅ | srv | `docs/persistence-roadmap.md` | Схема и load/save GameState |
@@ -1113,7 +1113,7 @@
 | PE-1.1 | ⏳ | srv | `docs/persistence-roadmap.md` | Журнал действий + снапшоты |
 | PE-1.2 | 🔒 | srv data | `docs/persistence-roadmap.md` | Миграция сейв-формата в хранилище |
 | PE-2.1 | ✅ | srv | `docs/persistence-roadmap.md` | Будилка по scheduled-событиям — v1 (одно-процессная), v2 |
-| PE-2.2 | ⏳ | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
+| PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
 | PVE-0.1 | ✅ | core data | `docs/pve-team-modes-roadmap.md` | GameModeDef zod-схема + modes в GameData |
@@ -1295,7 +1295,7 @@
 | SE-8.1 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Структурное аудит-логирование |
 | SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md` | Алерты на аномалии |
 | SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | Метрики и трекинг ошибок |
-| SE-9.1 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Переживание рестарта посреди матча |
+| SE-9.1 | 🔶 | srv | `docs/secure-environment-roadmap.md` | Переживание рестарта посреди матча |
 | SE-9.2 | 🔒 | docs sec | `docs/secure-environment-roadmap.md` | DR: RTO/RPO, runbooks, kill-switch |
 | SE-10.1 | 🔒 | docs | `docs/secure-environment-roadmap.md` | Минимизация данных и GDPR-база |
 | SD-0.1 | ⏳ | docs sec | `docs/secure-sdlc-roadmap.md` | Цель ASVS L2 + threat-model-кадэнс |

@@ -65,6 +65,7 @@ const SCHEMA_SQL = `
       created_at    timestamptz NOT NULL DEFAULT now(),
       updated_at    timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS clock jsonb;
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
 
     CREATE TABLE IF NOT EXISTS seats (
@@ -381,6 +382,7 @@ interface MatchRow {
   seq: number;
   status: string;
   state: MatchSnapshot['state'];
+  clock: MatchSnapshot['clock'] | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
@@ -397,7 +399,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -408,6 +410,7 @@ export class PostgresMatchStore implements MatchStore {
       seq: row.seq,
       status: row.status === 'ended' ? 'ended' : 'ongoing',
       state: row.state, // pg parses jsonb → JS object
+      ...(row.clock ? { clock: row.clock } : {}),
     };
   }
 
@@ -415,16 +418,17 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     await this.pool.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, updated_at)
-       VALUES ($1, $2, $3, $4, $5, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
          status       = EXCLUDED.status,
          state        = EXCLUDED.state,
+         clock        = EXCLUDED.clock,
          updated_at   = now()
        WHERE matches.seq <= EXCLUDED.seq`,
-      [snapshot.matchId, snapshot.dataVersion, snapshot.seq, snapshot.status, snapshot.state],
+      [snapshot.matchId, snapshot.dataVersion, snapshot.seq, snapshot.status, snapshot.state, snapshot.clock ?? null],
     );
   }
 
@@ -700,6 +704,13 @@ export class PostgresUserStore implements UserStore {
 
   async setPassword(userId: string, passHash: string): Promise<void> {
     await this.pool.query(`UPDATE users SET pass_hash = $2 WHERE id = $1`, [userId, passHash]);
+  }
+  async setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE users SET pass_hash = $3 WHERE id = $1 AND pass_hash = $2`,
+      [userId, expectedHash, passHash],
+    );
+    return result.rowCount === 1;
   }
 }
 
