@@ -5241,7 +5241,8 @@ function provinceAt(x: number, y: number): string | undefined {
 
 /**
  * The political map in the space of `geo` (by default, the current camera): glass,
- * provinces, terrain art, roads and the board edge, culled to `view` in that space.
+ * provinces, terrain art, roads, the board edge and the overview's node rings, culled to
+ * `view` in that space.
  * Returns the terrain fields it met there: the frame draws their live glints.
  */
 function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: boolean, preparing: boolean,
@@ -5413,6 +5414,20 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     g.stroke();
   } else if (!holographicMapOn()) {
     g.strokeRect(geo.frame.x, geo.frame.y, geo.frame.width, geo.frame.height);
+  }
+  // The overview's node rings belong to the map, not to the moment: every province the same
+  // neutral ring (`drawSchematicNode`), fading as the node art comes in. Baked on top of the
+  // roads they end, since a frame stroking 1675 of them spent half its raster on them.
+  if (lod.art < 1) {
+    g.save();
+    g.globalAlpha *= 1 - lod.art;
+    const reach = lod.markerRadius + 1;
+    for (const n of geo.nodes) {
+      const c = inBake(n);
+      if (c.x < view.x0 - reach || c.x > view.x1 + reach || c.y < view.y0 - reach || c.y > view.y1 + reach) continue;
+      drawSchematicNode(g, c, lod.markerRadius);
+    }
+    g.restore();
   }
   return fields;
 }
@@ -6163,19 +6178,17 @@ function render(now: number) {
   const ns = artScale(detail); // node scale: schematic → detail (тот же закон, что у залпа)
   const R = 13 * ns;
   if (lod.art < 1) {
+    // The rings themselves are in the map layer (`paintMapLayer`); my worlds' names stay live.
     cx.save();
     cx.globalAlpha *= 1 - lod.art;
     for (const n of MAP) {
       const p = s.planets[n.id];
-      if (!p) continue;
+      if (!p || p.owner !== ME || !known(n.id) || n.sector !== 'planet') continue;
       const c = world(n);
       if (!visible(c, 10)) continue;
-      drawSchematicNode(cx, c, lod.markerRadius);
-      if (p.owner === ME && known(n.id) && n.sector === 'planet') {
-        cx.fillStyle = ownerColor(ME);
-        cx.font = '700 12px ui-monospace,Menlo,monospace';
-        cx.fillText(placeName(n.id), c.x + lod.markerRadius + 6, c.y - 1);
-      }
+      cx.fillStyle = ownerColor(ME);
+      cx.font = '700 12px ui-monospace,Menlo,monospace';
+      cx.fillText(placeName(n.id), c.x + lod.markerRadius + 6, c.y - 1);
     }
     cx.restore();
   }
