@@ -1,0 +1,32 @@
+digraph architecture {
+ graph [rankdir=LR, bgcolor="#f6f8fb", pad="0.4", nodesep="0.5", ranksep="0.8", fontname="DejaVu Sans", label="MoonGame · Корпорации и независимость матча\nСплошные блоки: реализовано в ветке · пунктир: следующие этапы", labelloc=t, fontsize=19];
+ node [shape=box, style="rounded,filled", fillcolor="white", color="#34445a", fontname="DejaVu Sans", fontsize=12, margin="0.18,0.13"];
+ edge [fontname="DejaVu Sans", fontsize=10, color="#53667e"];
+ player [label="Браузер игрока"];
+ subgraph cluster_game {label="Игровой стенд · работает при отказе корпораций"; color="#3e83cb"; style=rounded;
+ game [label="Game API + WebSocket\nАккаунты, авторизация, матчи\nЛичный инвентарь + MetaMarket\nАренда предметов корпорации", fillcolor="#e4f0ff"];
+ game_db [shape=cylinder, label="Game PostgreSQL\nМатчи, места, предметы, кошельки\nАренда + очередь возвратов\nОчередь результатов AvA"];
+ game -> game_db [label="только игровые данные"];
+ }
+ subgraph cluster_corp {label="Отдельный корпоративный стенд"; color="#2c9273"; style=rounded;
+ corp [label="Corporation Service\nЧленство, роли, влияние\nПостройки и их сроки\nВызовы AvA, ростеры, результаты\nМедали и аудит", fillcolor="#def4eb"];
+ corp_db [shape=cylinder, label="Corporate PostgreSQL\nСобственные данные и credentials\nNonce / защита от повторов"];
+ corp -> corp_db [label="атомарные операции"];
+ }
+ player -> game [label="HTTPS / WSS"];
+ game -> corp [label="подписанные запросы и ответы\nтаймаут · закрытый API\nмежду хостами: HTTPS"];
+ game_db -> corp [label="доставка результата / аудита\nповтор до подтверждения", color="#b77716"];
+ subgraph cluster_future {label="Следующие этапы · ещё не выделены"; color="#aab4c3"; style="rounded,dashed";
+ inventory [label="Inventory Service + Ledger\nЛичные и корпоративные предметы\nВладение, резервы, аренда", style="rounded,filled,dashed", fillcolor="#fff5db"];
+ auction [label="Auction Service\nЛоты, сделки, комиссия\nРезерв через Inventory", style="rounded,filled,dashed", fillcolor="#fff5db"];
+ inventory_db [shape=cylinder, label="Inventory DB", style="filled,dashed"];
+ auction_db [shape=cylinder, label="Auction DB", style="filled,dashed"];
+ inventory -> inventory_db [style=dashed]; auction -> auction_db [style=dashed];
+ auction -> inventory [label="идемпотентный резерв / расчёт", style=dashed];
+ }
+ game -> inventory [label="будущий API инвентаря", style=dashed];
+ game -> auction [label="будущий API аукциона", style=dashed];
+ corp -> inventory [label="будущие разрешения аренды", style=dashed];
+ note [shape=note, label="При отказе Corporation Service:\nкорпоративные команды → 503\nобычные матчи и личный инвентарь работают\nAvA с закреплёнными местами продолжает бой\nнаграды и аудит доставляются после восстановления\n\nРазные процессы на одном хосте ≠ защита от потери хоста", fillcolor="#fff5db"];
+ game -> note [style=dotted, arrowhead=none];
+}

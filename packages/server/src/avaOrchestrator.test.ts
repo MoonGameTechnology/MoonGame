@@ -421,3 +421,18 @@ describe('AvaOrchestrator.onMatchEnded (AVA-8, S7) — the settlement hook', () 
     expect(winnerSideOf(duel, 'ghost')).toBeNull();
   });
 });
+
+it('keeps the game war clock and fixed seating independent of corporate availability', async () => {
+  const h = harness();
+  await lockedMatchup(h, 'independent', ['acc-a'], ['acc-b']);
+  await h.orch.orchestrate('independent');
+  h.challenges.getChallenge = async () => { throw Error('corporations offline'); };
+  let opened = 0;
+  const game = new AvaOrchestrator({ challengeStore: h.challenges, rosterStore: h.roster, sessionStore: h.sessions,
+    data, maps, createRoom: async () => undefined, isMatchEnded: async () => false,
+    escalateWar: async () => { opened++; return true; } });
+  expect(await game.resolveAvaSeat('ava-independent', 'acc-a')).toEqual({ ok: true, playerId: 'slot_a' });
+  expect(await game.resolveAvaSeat('ava-independent', 'outsider')).toEqual({ ok: false, code: 'E_NOT_ROSTERED' });
+  expect(await game.sweepWar(Number.MAX_SAFE_INTEGER)).toEqual({ declared: 1 });
+  expect(opened).toBe(1);
+});

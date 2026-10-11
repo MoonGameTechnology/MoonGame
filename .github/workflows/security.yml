@@ -915,9 +915,15 @@ jobs:
             docker-compose.yml docker-compose.tls.yml \
             docker-compose.release.yml docker-compose.release-tls.yml
 
+          gen base+corporations docker-compose.yml docker-compose.corporations.yml
+          gen base+tls+corporations docker-compose.yml docker-compose.tls.yml docker-compose.corporations.yml
+          gen release+corporations docker-compose.yml docker-compose.tls.yml \
+            docker-compose.release.yml docker-compose.release-tls.yml \
+            docker-compose.corporations.yml docker-compose.corporations-release.yml
+
           n=$(find kics-src -name '*.yaml' -size +0 | wc -l)
           echo "copied=$n" >> "$GITHUB_OUTPUT"
-          echo "expected=4" >> "$GITHUB_OUTPUT"
+          echo "expected=7" >> "$GITHUB_OUTPUT"
           ls -l kics-src
       - name: kics
         id: scan
@@ -945,7 +951,7 @@ jobs:
           # "0". Сравнение вырождалось в `[ 0 -ge 0 ]` и ПРОХОДИЛО: ноль просканированных
           # compose-файлов уходил как «✅ просканировано». Поэтому число целей
           # проверяется ОТДЕЛЬНО и раньше, а не через дефолт подстановки.
-          [ "${COPIED:-0}" -ge "${EXPECTED:-4}" ] || ok=false
+          [ "${COPIED:-0}" -ge "${EXPECTED:-7}" ] || ok=false
           [ "$scanned" -ge "${COPIED:-1}" ] || ok=false
           echo "{\"key\":\"kics\",\"ok\":$ok,\"exit\":$rc,\"scanned\":$scanned}" > status-kics.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
@@ -998,8 +1004,8 @@ jobs:
           # «Целей не нашлось» — отдельный случай, и раньше он проваливался мимо гейта по
           # той же причине, что и сентинел: `${COPIED:-1}` не защищает от строки "0".
           # Сообщение тоже своё: тут виноват не KICS, а исчезнувший glob.
-          if [ "${COPIED:-0}" -lt "${EXPECTED:-4}" ]; then
-            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-4} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
+          if [ "${COPIED:-0}" -lt "${EXPECTED:-7}" ]; then
+            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-7} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
             exit 1
           fi
           if [ "$SCANNED" -lt "$COPIED" ]; then

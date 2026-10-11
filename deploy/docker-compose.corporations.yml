@@ -1,0 +1,74 @@
+# Optional independent corporate service. The game has no startup dependency on it.
+# compose -f deploy/docker-compose.yml -f deploy/docker-compose.corporations.yml up -d
+services:
+  server:
+    environment:
+      CORPORATIONS_URL: http://corporations:8789
+      CORPORATIONS_KEY: ${CORPORATIONS_KEY:?Set a separate gateway key of at least 32 characters}
+    networks:
+      - default
+      - corp-api
+
+  corporations:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ['packages/server/dist/corporation-server.mjs']
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8789
+      CORPORATIONS_KEY: ${CORPORATIONS_KEY:?Set a separate gateway key of at least 32 characters}
+      DATABASE_URL: postgres://${CORP_RUNTIME_USER:-corp}:${CORP_RUNTIME_PASSWORD:-${CORP_POSTGRES_PASSWORD:?Set a corporate database password}}@corporations-db:5432/corporations
+      DB_AUTO_MIGRATE: ${CORP_DB_AUTO_MIGRATE:-1}
+      DB_REQUIRE_LEAST_PRIVILEGE: ${CORP_DB_REQUIRE_LEAST_PRIVILEGE:-0}
+    depends_on:
+      corporations-db:
+        condition: service_healthy
+    networks: [corp-api, corp-data]
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    mem_limit: 256m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/nodejs/bin/node',
+          '-e',
+          "fetch('http://127.0.0.1:8789/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  corporations-db:
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: corp
+      POSTGRES_PASSWORD: ${CORP_POSTGRES_PASSWORD:?Set a corporate database password}
+      POSTGRES_DB: corporations
+    volumes: [corp-pgdata:/var/lib/postgresql/data]
+    networks: [corp-data]
+    security_opt: ['no-new-privileges:true']
+    mem_limit: 512m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U corp -d corporations']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  corp-api: { internal: true }
+  corp-data: { internal: true }
+volumes:
+  corp-pgdata:

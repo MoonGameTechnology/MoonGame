@@ -451,7 +451,7 @@ export class MemoryCorpStore implements CorpStore {
   }
 
   appendAudit(entry: CorpAuditEntry): Promise<void> {
-    this.audit.push({ ...entry });
+    if (!entry.eventId || !this.audit.some((row) => row.eventId === entry.eventId)) this.audit.push({ ...entry });
     return Promise.resolve();
   }
 
@@ -643,6 +643,21 @@ export class MemoryAvaFeedStore implements AvaFeedStore {
 /** In-memory AvA session store (AVA-7) — `matchId → session`, with a secondary index by
  *  matchup so `create` can enforce one session per matchup as well as per match. */
 export class MemoryAvaSessionStore implements AvaSessionStore {
+  private readonly delivered = new Set<string>();
+  constructor(private readonly matches?: MatchStore) {}
+  async pendingResults(limit = 100): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>> {
+    const pending: Array<{ matchId: string; matchupId: string; winner: string | null }> = [];
+    if (!this.matches) return pending;
+    for (const session of this.byMatchId.values()) {
+      if (this.delivered.has(session.matchId)) continue;
+      const snap = await this.matches.load(session.matchId);
+      if (snap?.status === 'ended') pending.push({ matchId: session.matchId, matchupId: session.matchupId, winner: snap.state.match.winner ?? null });
+      if (pending.length >= limit) break;
+    }
+    return pending;
+  }
+  markResultDelivered(matchId: string): Promise<void> { this.delivered.add(matchId); return Promise.resolve(); }
+
   private readonly byMatchId = new Map<string, AvaSession>();
   private readonly byMatchupId = new Map<string, AvaSession>();
 

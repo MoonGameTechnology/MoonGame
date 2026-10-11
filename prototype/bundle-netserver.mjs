@@ -38,6 +38,17 @@ export async function bundleNetserver() {
     outfile: 'packages/server/dist/database-admin.mjs',
     bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
   });
+  await build({
+    entryPoints: ['packages/server/src/corporationMain.ts'],
+    outfile: 'packages/server/dist/corporation-server.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22',
+    external: ['nodemailer', 'ws', 'pg', 'fastify', '@fastify/rate-limit', 'web-push'],
+  });
+  await build({
+    entryPoints: ['packages/server/src/corporateMigrationMain.ts'],
+    outfile: 'packages/server/dist/corporation-migrate.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
+  });
   return outfile;
 }
 

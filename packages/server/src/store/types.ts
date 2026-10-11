@@ -207,6 +207,8 @@ export interface CorpSummary extends CorpRecord {
  *  `at` is the service clock in ms — injectable for deterministic tests. Audit rows
  *  outlive the corp (they survive a disband — the record is the point). */
 export interface CorpAuditEntry {
+  /** Stable delivery id: retries across services append this event at most once. */
+  eventId?: string;
   corpId: string;
   at: number;
   /** Acting account id. */
@@ -486,6 +488,10 @@ export interface AvaSession {
  *  instance (PK `matchId`) — the orchestrator raises exactly one session per locked matchup;
  *  `create` fails atomically if either already exists so a re-run never double-builds. */
 export interface AvaSessionStore {
+  /** Durable ended snapshots are the outbox: a crash before enqueue cannot lose a result. */
+  pendingResults?(limit?: number): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>>;
+  markResultDelivered?(matchId: string): Promise<void>;
+  markResultRetry?(matchId: string): Promise<void>;
   create(
     session: AvaSession,
   ): Promise<{ ok: true } | { ok: false; code: 'E_SESSION_EXISTS' }>;
@@ -600,6 +606,10 @@ export interface CorpRent {
  *  `AvaChallengeStore.endMatchup` — the caller must not apply the durability sink
  *  twice on a replayed match-end). */
 export interface CorpRentStore {
+  /** Production return: close, wear and queue audit in one inventory transaction. */
+  completeReturn?(matchupId: string, itemId: string, at: number): Promise<boolean>;
+  pendingReturnAudits?(matchupId: string): Promise<CorpAuditEntry[]>;
+  markReturnAudited?(eventId: string): Promise<void>;
   /** Atomic: creates the row only if this item has no currently-active rental
    *  anywhere (including other matchups) — false = already on rent, nothing
    *  changed. */
