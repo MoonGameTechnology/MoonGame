@@ -313,7 +313,7 @@ import {
   projection as camProjection,
 } from '../../packages/client/src/camera';
 import { rgba, clearHolographicSprites } from '../../packages/client/src/holoDraw';
-import { drawTerritory, strokeBorders, type ClassifiedBorders, type TerritoryCell, type TerritoryPalette } from '../../packages/client/src/territory';
+import { drawTerritory, strokeBorders, type BorderSegment, type ClassifiedBorders, type TerritoryCell, type TerritoryPalette } from '../../packages/client/src/territory';
 import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
@@ -941,6 +941,7 @@ import {
   type Overscan,
   type PixelRect,
 } from '../../decisions/mapLayerView';
+import { LIVING_BANDS, MIN_LAYER_SEGMENTS, bandEdges, glassPixels, staleBand } from '../../decisions/livingBorderLayer';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
@@ -4961,6 +4962,20 @@ let provinceGeometry: MapLayerGeometry | null = null;
  *  запекаются. Они в координатах мозаики: на место их ставит `provinceGeometry.place`.
  *  `null` — плоская карта: там граница стоит в статичном слое, как и рамка. */
 let provinceBorders: ClassifiedBorders | null = null;
+/** M2.11 at rest (`decisions/livingBorderLayer.ts`): the living borders in a layer of their own,
+ *  the canvas's size, that the frame refreshes a band at a time while the camera rests. Only
+ *  the glass's pixels of it are drawn and shown; it keeps its pixels between rests, so a stop
+ *  of the camera costs no new backing store. */
+const borderLayer = document.createElement('canvas');
+const borderLayerX = (mapContextOptions ? borderLayer.getContext('2d', mapContextOptions) : borderLayer.getContext('2d')) as CanvasRenderingContext2D;
+let borderScene = ''; // the scene the layer holds ('' — none): transform, screen, detail, placement, glass, colours
+let borderSource: ClassifiedBorders | null = null; // the borders it was drawn from
+let borderRect: PixelRect = { x: 0, y: 0, width: 0, height: 0 }; // the glass on it, device px
+let borderEdges: number[] = []; // its bands' rows from the glass's top; `[]` — the frame draws them
+let borderClocks: number[] = []; // the hologram time each band was drawn at
+let borderNext = 0; // the band to refresh next
+/** The camera has rested `SETTLE_MS` (as {@link blitStaticLayer} judged this frame). */
+let mapSettled = false;
 let terrainFields: TerrainField[] = [];
 let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 let paintedSelection: string | null = null;
@@ -4972,6 +4987,7 @@ function invalidateMapSurfaces(): void {
   releaseMapSpare();
   mapLayerContent = '';
   bgComposite = '';
+  borderScene = '';
   terrainRefine = -1;
   terrainRaster.clear();
   clearHolographicSprites();
@@ -4982,6 +4998,8 @@ canvas.addEventListener('contextrestored', () => { mapContextEvents.restored++; 
 // through document, so observe the actual cached surfaces.
 bg.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; bgComposite = ''; });
 bg.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; bgComposite = ''; });
+borderLayer.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; borderScene = ''; });
+borderLayer.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; borderScene = ''; });
 // The two map canvases trade places (rule 7): an event concerns the role its canvas holds now.
 for (const surface of [mapLayer, mapSpare])
   for (const type of ['contextlost', 'contextrestored'] as const)
@@ -5668,9 +5686,11 @@ function blitStaticLayer(now: number): void {
   }
   // A pinch stays open while its fingers pause: no bake at each intermediate scale.
   const settled = pinchStart === null && now - camMovedAt >= SETTLE_MS;
+  mapSettled = settled;
   const content = mapLayerSignature();
   if (mapLayerX.isContextLost?.()) {
     // No offscreen map to reuse: paint it straight into the frame.
+    mapSettled = false;
     cancelBakeJob();
     cx.save();
     paintSky(cx);
@@ -5977,6 +5997,113 @@ function drawRadarRange(now: number): void {
   cx.restore();
 }
 
+/**
+ * The living province borders over the map (M2.11) while the camera rests: they live in
+ * {@link borderLayer}, drawn whole once and then a band a frame, and the frame lays it down in
+ * one blit (`decisions/livingBorderLayer.ts`). Called in the bake's space: `cx` holds its
+ * transform. `false` — no layer this frame: the caller strokes them straight into the frame,
+ * inside the glass clip it sets for the rest of the map anyway.
+ */
+function blitBorderLayer(detail: number): boolean {
+  const borders = provinceBorders;
+  const geo = provinceGeometry;
+  if (!borders || !geo) return false;
+  // Rule 3: a moving camera, or no layer to draw into — the frame strokes them itself. So
+  // does a camera at rest over a stretched bake: the sharp one replacing it moves the
+  // borders' transform, and the layer waits for it rather than being drawn twice.
+  if (!mapSettled || mapView.k !== 1 || borderLayerX.isContextLost?.()) {
+    borderScene = '';
+    return false;
+  }
+  const palette = { ownerColor, hideOwnedInner: true, provinceDetail: detail };
+  // Owner colours follow diplomacy, not the bake: a declared war recolours the frontier now.
+  let tints = '';
+  for (const owner of borders.ownedFront.keys()) tints += ownerColor(owner) + ',';
+  const { place } = geo;
+  const f = holographicFrame;
+  const scene = `${mapView.k},${mapView.tx},${mapView.ty}|${VW}x${VH}:${DPR}|${detail}|` +
+    `${place.scale},${place.x},${place.y}|${f.x},${f.y},${f.width},${f.height}|${tints}`;
+  if (scene !== borderScene || borders !== borderSource) {
+    borderScene = scene;
+    borderSource = borders;
+    const rect = glassPixels(holographicFrame, mapView, DPR, canvas.width, canvas.height);
+    borderEdges = rect ? borderBands(borders, detail, geo.place, rect) : [];
+    // Rule 4: few borders, seen up close — the frame strokes them on time.
+    if (!rect || !borderEdges.length) return false;
+    borderRect = rect;
+    if (borderLayer.width !== canvas.width) borderLayer.width = canvas.width;
+    if (borderLayer.height !== canvas.height) borderLayer.height = canvas.height;
+    paintBorderBand(borders, palette, geo.place, 0, rect.height);
+    borderClocks = borderEdges.slice(1).map(() => hologramTime);
+    borderNext = 0;
+  } else if (!borderEdges.length) {
+    return false;
+  } else {
+    // Rule 2: one band a frame, at the hologram's time now; none while that clock stands.
+    const band = staleBand(borderClocks, borderNext, hologramTime);
+    if (band >= 0) {
+      paintBorderBand(borders, palette, geo.place, borderEdges[band]!, borderEdges[band + 1]!);
+      borderClocks[band] = hologramTime;
+      borderNext = band + 1;
+    }
+  }
+  const r = borderRect;
+  cx.save();
+  cx.setTransform(1, 0, 0, 1, 0, 0);
+  cx.drawImage(borderLayer, r.x, r.y, r.width, r.height, r.x, r.y, r.width, r.height);
+  cx.restore();
+  return true;
+}
+
+/** Rule 2: the border layer's bands at `rect` — even shares of the segments the frame strokes,
+ *  counted by the row of their middle; `[]` when they are few (rule 4). */
+function borderBands(borders: ClassifiedBorders, detail: number, place: ShapePlacement, rect: PixelRect): number[] {
+  const work = new Float64Array(rect.height);
+  const s = DPR * mapView.k;
+  const k = place.scale * s;
+  const ox = place.x * s + DPR * mapView.tx - rect.x;
+  const oy = place.y * s + DPR * mapView.ty - rect.y;
+  let total = 0;
+  const count = (segs: readonly BorderSegment[]): void => {
+    for (const sg of segs) {
+      const x = ((sg[0] + sg[2]) / 2) * k + ox;
+      const y = Math.floor(((sg[1] + sg[3]) / 2) * k + oy);
+      if (x < 0 || x >= rect.width || y < 0 || y >= rect.height) continue;
+      work[y]!++;
+      total++;
+    }
+  };
+  for (const segs of borders.ownedFront.values()) count(segs);
+  if (detail > 0) count(borders.neutralEdge);
+  return total < MIN_LAYER_SEGMENTS ? [] : bandEdges(work, LIVING_BANDS);
+}
+
+/** Repaint rows [`y0`, `y1`) of the glass on {@link borderLayer}, counted from its top, at the
+ *  hologram's time now: the same strokes, transform and glass clip as the frame. */
+function paintBorderBand(
+  borders: ClassifiedBorders,
+  palette: Pick<TerritoryPalette, 'ownerColor' | 'hideOwnedInner' | 'provinceDetail'>,
+  place: ShapePlacement,
+  y0: number,
+  y1: number,
+): void {
+  const g = borderLayerX;
+  const r = borderRect;
+  const s = DPR * mapView.k;
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(r.x, r.y + y0, r.width, y1 - y0);
+  g.beginPath();
+  g.rect(r.x, r.y + y0, r.width, y1 - y0);
+  g.clip();
+  g.setTransform(s, 0, 0, s, DPR * mapView.tx, DPR * mapView.ty);
+  clipGlassSurface(g, holographicFrame);
+  // The band in the bake's space: what the strokes are culled by.
+  const band = { x: (r.x / DPR - mapView.tx) / mapView.k, y: ((r.y + y0) / DPR - mapView.ty) / mapView.k, width: r.width / s, height: (y1 - y0) / s };
+  drawLivingBorders(g, borders, palette, holographicFrame, hologramTime, band, place);
+  g.restore();
+}
+
 function render(now: number) {
   if (cx.isContextLost?.()) return;
   cx.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS pixels, crisp on hi-DPI
@@ -5996,12 +6123,13 @@ function render(now: number) {
   cx.save();
   cx.setTransform(DPR * mapView.k, 0, 0, DPR * mapView.k, DPR * mapView.tx, DPR * mapView.ty);
   if (holographicMapOn()) {
-    cx.save();
-    clipGlassSurface(cx, holographicFrame);
     // M2.11: границы провинций — живые, как рамка карты, и на тех же часах голограммы
     // (под reduced motion стоят — линия замирает видимой). Сразу над заливкой, чтобы
     // порядок слоёв остался прежним, когда граница жила в выпечке.
-    if (provinceBorders && provinceGeometry) {
+    const layered = blitBorderLayer(lod.provinceDetail);
+    cx.save();
+    clipGlassSurface(cx, holographicFrame);
+    if (!layered && provinceBorders && provinceGeometry) {
       drawLivingBorders(cx, provinceBorders, {
         ownerColor,
         hideOwnedInner: true,
