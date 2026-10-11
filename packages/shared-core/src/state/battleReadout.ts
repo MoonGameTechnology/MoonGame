@@ -67,6 +67,7 @@ export function inspectBattle(
       attacker: a.owner,
       defender: b.owner,
       ...(a.ref.kind === 'fleet' ? { attackerFleet: a.ref.fleetId } : {}),
+      ...(b.ref.kind === 'fleet' ? { defenderFleet: b.ref.fleetId } : {}),
     };
     queries.push(
       { name: 'combat.damage', base, args },

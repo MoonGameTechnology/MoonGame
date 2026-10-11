@@ -14,7 +14,7 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { PlanetId } from '../state/gameState';
-import { fleetSideTakingHit, heroNode } from '../state/heroes';
+import { heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isAllied, isHostile } from '../util/combat';
 import type { HeroEffect } from './hero';
@@ -255,7 +255,7 @@ function revealZoneFactor(h: HandlerContext, taking: string, at: PlanetId): numb
 
 export const heroEffectsModule: GameModule = {
   id: 'heroEffects',
-  version: '1.2.0', // CORE-DMG-3: аура — во всех каналах, где стреляет флот, а не только в бою
+  version: '1.3.0', // CORE-DMG-4: пси-зона — во всех каналах, где бьют по флоту, а не только в бою
   setup(api) {
     api.provideCapability<HeroEffect>('hero.effect.recall', recall);
     api.provideCapability<HeroEffect>('hero.effect.aura', aura);
@@ -292,11 +292,20 @@ export const heroEffectsModule: GameModule = {
     // standing in a lit zone. A separate registrant from the aura hook above on purpose
     // — different side, different question; ×-factors commute, so the two compose in
     // any order.
+    //
+    // CORE-DMG-4: читается `defenderFleet` + `location`, а не `battleId` — зеркало
+    // CORE-DMG-3. Зона освещена ПОЗИЦИОННО, и флот в ней одинаково уязвим, кто бы его
+    // ни бил: ближний бой, ПВО мира, челноки, ракета. Бьют не флот (мир, гарнизон,
+    // вылет челноков) — поля нет, лестница молчит: она про флоты, как и раньше.
     api.hook<number>('combat.damage', (base, args, h) => {
-      const { battleId, defender } = (args ?? {}) as { battleId?: string; defender?: string };
-      const hit = fleetSideTakingHit(h.state, battleId, defender);
-      if (!hit || typeof defender !== 'string') return base;
-      const factor = revealZoneFactor(h, defender, hit.battle.location);
+      const { defender, defenderFleet, location } = (args ?? {}) as {
+        defender?: string | null;
+        defenderFleet?: string;
+        location?: string;
+      };
+      if (typeof defender !== 'string' || typeof defenderFleet !== 'string') return base;
+      if (typeof location !== 'string' || location === '') return base;
+      const factor = revealZoneFactor(h, defender, location);
       return factor !== 1 ? base * factor : base;
     });
   },

@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '77'; // SHU-6.13: эскадра в воздухе. Членство и
+export const MODULE_MANIFEST_VERSION = '78'; // CORE-DMG-4: пси-зона героя — на каждый удар
+// по флоту. Членство и порядок не тронуты; `heroEffects` 1.3.0 — лестница `scan` ищет флот
+// под ударом по `defenderFleet` + `location`, а не по `battleId`, и действует вне боя: ПВО
+// мира, челноки, ракета. Партия на 77 посреди игры молча получила бы другой урон.
+// export const MODULE_MANIFEST_VERSION = '77'; // SHU-6.13: эскадра в воздухе. Членство и
 // порядок не тронуты; `shuttle` 1.10.0 — приказ `shuttle.redirect` (новая цель или точка
 // патруля в воздухе), «Домой» у любого вылета на пути туда, перелёт и делёж по `strikeId`; у
 // вылета новое поле `orderSeq`, и события прежнего приказа гаснут. Партия на 76 не знает

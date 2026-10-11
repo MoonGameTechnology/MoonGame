@@ -61,7 +61,15 @@ const data: GameData = parseGameData({
     // (ROS-1.5 отказывает безоружному вылету ещё на приказе).
     wing: {
       faction: 'x',
-      stats: { attack: 8, defense: 0, speed: 120, hp: 300, shuttleDamage: 30, fuel: 3, strikeRange: 500 },
+      stats: {
+        attack: 8,
+        defense: 0,
+        speed: 120,
+        hp: 300,
+        shuttleDamage: 30,
+        fuel: 3,
+        strikeRange: 500,
+      },
       line: 'front',
       traits: ['shuttle'],
     },
@@ -339,5 +347,121 @@ describe('CORE-DMG-3 — бонус героя доходит до НЕБЛИЖ�
     const plain = bombard();
     expect(bombard(auraHero('p2', 'P'))).toBeCloseTo(plain, 6); // герой ОБОРОНЯЮЩЕГОСЯ
     expect(hullOf(stateWith([], []), 'x', 'y')).toBeUndefined(); // sanity на хелпер
+  });
+});
+
+const W = 0.5; // `weakPoints` — враг в зоне получает ×(1 + W)
+const E = 0.25; // `evasion` — свой в зоне получает ÷(1 + E)
+
+/** Герой со ЖИВОЙ пси-зоной (лестница `scan`) над узлом `center`. Радиус щедрый по той
+ *  же причине, что у `auraHero`: мерим доставку, а не геометрию. */
+function scanHero(
+  owner: string,
+  center: string,
+  step: { weakPoints?: number; evasion?: number },
+): Hero {
+  return {
+    id: `hero:${owner}`,
+    owner,
+    location: center,
+    cooldowns: {},
+    alive: true,
+    activeReveals: [{ center, radius: 10_000, until: 100 * HOUR, ...step }],
+  };
+}
+
+/**
+ * CORE-DMG-4 — зеркало CORE-DMG-3 для ПОЛУЧАЮЩЕЙ стороны. Лестница `scan` искала флот
+ * под ударом через `battleId` и потому работала только в ближнем бою: тот же флот в той
+ * же освещённой зоне под ПВО мира, под челноками или ракетой её не чувствовал. Теперь
+ * хук читает `defenderFleet` + `location`, и правило держится в обе стороны:
+ *  · зона действует в КАЖДОМ канале, где удар ложится на флот;
+ *  · зона молчит там, где бьют не флот — мир под обстрелом, вылет челноков под ответкой.
+ */
+describe('CORE-DMG-4 — пси-зона героя доходит до каждого удара по флоту', () => {
+  const melee = (hero?: Hero): number => {
+    const kernel = createKernel([orbitalModule, combatModule, arrivalModule, ...HERO_MODULES]);
+    const st = stateWith(
+      [planet('P', null)],
+      [fleet('A', 'p1', 'P', [['cruiser', 1]]), fleet('D', 'p2', 'P', [['hulk', 1]])],
+      hero,
+    );
+    const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR)));
+    const round = r.events.find((e) => e.type === 'combat.round');
+    expect(round).toBeDefined();
+    return (round?.payload as { dmgToDefender: number }).dmgToDefender;
+  };
+  const aa = (hero?: Hero): number => {
+    const kernel = createKernel([orbitalModule, ...HERO_MODULES]);
+    const st = stateWith(
+      [planet('P', 'p2', { buildings: [['flak', 1]] })],
+      [fleet('R', 'p1', 'P', [['hulk', 1]], { orbit: 'near' })],
+      hero,
+    );
+    const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+    const fired = r.events.filter((e) => e.type === 'aa.fired');
+    expect(fired.length).toBeGreaterThan(0);
+    return fired.reduce((sum, e) => sum + (e.payload as { damage: number }).damage, 0);
+  };
+
+  it('ближний бой — как было', () => {
+    const plain = melee();
+    expect(plain).toBeGreaterThan(0);
+    expect(melee(scanHero('p1', 'P', { weakPoints: W }))).toBeCloseTo(plain * (1 + W), 6);
+    expect(melee(scanHero('p2', 'P', { evasion: E }))).toBeCloseTo(plain / (1 + E), 6);
+  });
+
+  it('ПВО МИРА по флоту на орбите — зона доходит (раньше молчала: боя нет)', () => {
+    const plain = aa();
+    expect(plain).toBeGreaterThan(0);
+    // Слабые места подсвечивает хозяин ПВО…
+    expect(aa(scanHero('p2', 'P', { weakPoints: W }))).toBeCloseTo(plain * (1 + W), 6);
+    // …а уклонение — хозяин флота под огнём.
+    expect(aa(scanHero('p1', 'P', { evasion: E }))).toBeCloseTo(plain / (1 + E), 6);
+  });
+
+  it('УДАР ЧЕЛНОКОВ по флоту — зона доходит', () => {
+    const plain = carrierStrike();
+    expect(plain.hit).toBeGreaterThan(0);
+    expect(carrierStrike(scanHero('p1', 'B', { weakPoints: W })).hit).toBeCloseTo(
+      plain.hit * (1 + W),
+      6,
+    );
+    expect(carrierStrike(scanHero('p2', 'B', { evasion: E })).hit).toBeCloseTo(
+      plain.hit / (1 + E),
+      6,
+    );
+  });
+
+  it('ОТВЕТКА по вылету — зона НЕ доходит: под огнём челноки, а не флот', () => {
+    const plain = carrierStrike();
+    expect(plain.repelled).toBeGreaterThan(0);
+    expect(carrierStrike(scanHero('p2', 'B', { weakPoints: W })).repelled).toBeCloseTo(
+      plain.repelled,
+      6,
+    );
+    expect(carrierStrike(scanHero('p1', 'B', { evasion: E })).repelled).toBeCloseTo(
+      plain.repelled,
+      6,
+    );
+  });
+
+  it('ОБСТРЕЛ МИРА — зона НЕ доходит: под огнём мир, а не флот', () => {
+    const bombard = (hero?: Hero): number => {
+      const kernel = createKernel([orbitalModule, ...HERO_MODULES]);
+      const st = stateWith(
+        [planet('P', 'p2', { buildings: [['flak', 1]] })],
+        [fleet('Z', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
+        hero,
+      );
+      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+      return r.events
+        .filter((e) => e.type === 'planet.bombarded')
+        .reduce((sum, e) => sum + (e.payload as { power: number }).power, 0);
+    };
+    const plain = bombard();
+    expect(plain).toBeGreaterThan(0);
+    expect(bombard(scanHero('p1', 'P', { weakPoints: W }))).toBeCloseTo(plain, 6);
   });
 });
