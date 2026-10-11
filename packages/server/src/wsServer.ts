@@ -744,6 +744,8 @@ export function createMultiplayerServer(
                 const result = await room.submitServerAction(
                   playerId,
                   seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
+                  () => ws.readyState === WebSocket.OPEN
+                    && room.state.players[playerId]?.claimedAt === claimedAt,
                 );
                 if (result.ok) return;
                 refusalCode = result.code ?? 'E_INTERNAL';

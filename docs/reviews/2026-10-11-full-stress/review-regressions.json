@@ -1,22 +1,42 @@
 {
-  "reviewedHead": "fc6f57e1498b263f0e23c2bb6becde05e70881c4",
-  "serverBundleSHA256": "d77be2cc7bdb9789e7855082f5c9de13440e9fdfa44a004e784f569dda8074b3",
+  "reviewedHeads": [
+    "fc6f57e1498b263f0e23c2bb6becde05e70881c4",
+    "1663e3d1e9767916cae295455a1df331b86038ea"
+  ],
+  "serverBundleSHA256": "7c4c8fbb90440f21a9c01c2a902b336c57f8f9900df60ebe31dd3cbf3a5f6fbe",
   "transport": "real WebSocket; saturated persistence is a blocked async test adapter",
+  "beforeFix": {
+    "head": "1663e3d1e9767916cae295455a1df331b86038ea",
+    "test": "cancels a seat confirmation queued before disconnect and permits a reconnect to confirm",
+    "status": "failed",
+    "expected": {
+      "ok": false,
+      "code": "E_FORBIDDEN"
+    },
+    "observed": {
+      "ok": true
+    }
+  },
   "checks": [
     {
       "name": "createMultiplayerServer closes a joined but unconfirmed seat after a permanent confirmation refusal",
       "status": "passed",
-      "durationMs": 198.16848499999992
+      "durationMs": 118.35553099999993
     },
     {
       "name": "createMultiplayerServer retries a saturated seat confirmation only while connected (disconnect=false)",
       "status": "passed",
-      "durationMs": 311.02979600000003
+      "durationMs": 279.154766
     },
     {
       "name": "createMultiplayerServer retries a saturated seat confirmation only while connected (disconnect=true)",
       "status": "passed",
-      "durationMs": 373.6249599999999
+      "durationMs": 387.840822
+    },
+    {
+      "name": "createMultiplayerServer cancels a seat confirmation queued before disconnect and permits a reconnect to confirm",
+      "status": "passed",
+      "durationMs": 290.729292
     }
   ]
 }

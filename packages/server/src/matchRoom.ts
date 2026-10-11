@@ -1295,13 +1295,22 @@ export class MatchRoom {
   async submitServerAction(
     playerId: PlayerId,
     action: Action,
+    /** Connection-bound work may expire while queued. Check at execution, before
+     *  dedup/rate admission or persistence; never cancel a write already started. */
+    isCurrent?: () => boolean,
   ): Promise<{ ok: boolean; code?: string }> {
     if (!this.persist) {
+      if (isCurrent && !isCurrent()) return { ok: false, code: 'E_FORBIDDEN' };
       const r = this.submitAction(playerId, action);
       return { ok: r.ok, ...(r.code !== undefined ? { code: r.code } : {}) };
     }
     let out: { ok: boolean; code?: string } = { ok: false, code: 'E_INTERNAL' };
     await this.enqueue(async () => {
+      if (isCurrent && !isCurrent()) {
+        // No receipt: a reconnect may reuse this action id with a live connection.
+        out = { ok: false, code: 'E_FORBIDDEN' };
+        return;
+      }
       const front = this.frontGate(playerId, action.id); // без пира: у драйвера нет сокета
       if (front.kind === 'cached') {
         const { receipt } = front;
