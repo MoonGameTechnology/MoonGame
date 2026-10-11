@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Меню точки «Приказа» живёт у композера цепочек (REFM-229).
+const CHAIN = readFileSync(new URL('./chainComposer.ts', import.meta.url), 'utf8');
 
 describe('навык в меню приказов: удержание открывает описание', () => {
   it('кнопка навыка ✨ несёт ключ сводки ab: и подсказку-описание', () => {
@@ -22,6 +24,6 @@ describe('навык в меню приказов: удержание откры
   });
 
   it('пункт навыка меню точки «Приказа» получает описание из каталога', () => {
-    expect(MAIN).toMatch(/ad\.description \? \{ desc: t\(ad\.description\) \}/);
+    expect(CHAIN).toMatch(/ad\.description \? \{ desc: t\(ad\.description\) \}/);
   });
 });

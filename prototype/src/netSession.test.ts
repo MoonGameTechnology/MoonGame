@@ -732,7 +732,8 @@ describe('REFM-216 — стык с main.ts', () => {
       'endScreen = null;',
       'matchEnd.reset();',
       'if (chainMode) exitChainMode();',
-      'chainRouteCache.clear();',
+      // Маршруты цепочек — у композера «Приказа» (`chainComposer.ts`, REFM-229).
+      'forgetChainRoutes();',
       'showConnect(false);',
       'showHub(false);',
       "setupEl.style.display = 'none';",
