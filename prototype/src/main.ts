@@ -5578,25 +5578,29 @@ function paintBakeBand(job: BakeJob, rows: number, flush: boolean): void {
   const at = performance.now();
   const owed = terrainRaster.pending;
   // A refinement's bake makes the last rasters the cache owes: never leave one owed again.
-  if (job.final) terrainRaster.beginFrame(Infinity);
-  terrainRaster.pending = false;
+  // Any other band makes none: a raster costs a slow phone more than a band's whole share
+  // of the frame, and the refinement makes them after the bake, in a budget of its own.
+  terrainRaster.beginFrame(job.final ? Infinity : 0);
   paintMapLayerRect({ x: 0, y: job.done, width: job.width, height: rows }, job.geo, job.zooming, job.fields,
     job.met, mapSpareX, job.offset);
   job.pending ||= terrainRaster.pending;
   terrainRaster.pending = owed;
-  if (flush) {
-    // One pixel drawn into the frame, which paints over it before it is shown.
-    cx.save();
-    cx.setTransform(1, 0, 0, 1, 0, 0);
-    cx.globalAlpha = 1;
-    cx.globalCompositeOperation = 'source-over';
-    cx.drawImage(mapSpare, 0, 0, 1, 1, 0, 0, 1, 1);
-    cx.restore();
-  }
+  if (flush) flushRaster(mapSpare);
   job.done += rows;
   job.lastRows = rows;
   job.lastMs = performance.now() - at;
   job.paintedMs += job.lastMs;
+}
+
+/** Raster now what was painted into `source` since it was last drawn from: one pixel drawn
+ *  into the frame, which paints over it before it is shown. */
+function flushRaster(source: HTMLCanvasElement): void {
+  cx.save();
+  cx.setTransform(1, 0, 0, 1, 0, 0);
+  cx.globalAlpha = 1;
+  cx.globalCompositeOperation = 'source-over';
+  cx.drawImage(source, 0, 0, 1, 1, 0, 0, 1, 1);
+  cx.restore();
 }
 
 /** Rule 7: the bake in the background is complete, and it becomes the map layer. */
@@ -5715,6 +5719,7 @@ function blitStaticLayer(now: number): void {
     bakeMapLayer(content, !settled);
     view = { k: 1, tx: 0, ty: 0 };
   } else {
+    let refineMs = 0;
     if (action === 'scroll') scrollMapLayer(recentredScroll(view, DPR), !settled);
     // Rule 7: a bake for sharpness alone goes to the background; without a spare, at once.
     if (action === 'refresh' && !bakeJob && !startBakeJob(content, !settled, false)) {
@@ -5722,14 +5727,32 @@ function blitStaticLayer(now: number): void {
       view = { k: 1, tx: 0, ty: 0 };
     }
     if (terrainRefine >= 0 && view.k === 1 && !bakeJob) {
-      // Sharpen the terrain the last bake or move could not afford, two rasters a frame,
-      // without repainting the map; once all are sharp, paint what owes it one last time:
-      // the strips a move left without it, or the whole bake, in the background.
+      // Sharpen the terrain the last bake or move could not afford, without repainting the
+      // map: at rest in the share of the frame a bake in the background gets, in motion one
+      // raster a frame, since the frames of a gesture are the player's. Once all are sharp,
+      // paint what owes it one last time: the strips a move left without it, or the whole
+      // bake, in the background. Each raster is made here to the last pixel (`flushRaster`),
+      // not by the band that first draws it.
+      const at = performance.now();
+      const budget = settled ? bakeBudgetMs(fpsEma) : 0;
+      let pixels = 0;
+      terrainRaster.beginFrame(Infinity);
       while (terrainRefine < terrainFields.length) {
-        terrainRaster.prepare(terrainFields[terrainRefine]!, DPR);
-        if (terrainRaster.pending) break;
+        const field = terrainFields[terrainRefine]!;
+        const owed = terrainRaster.owed(field, DPR);
+        if (owed && pixels) {
+          // A raster costs about its pixels at the rate of the ones made so far: one that
+          // would overrun the budget waits for the next frame.
+          const spent = performance.now() - at;
+          if (spent + (spent / pixels) * owed > budget) break;
+        }
+        const raster = owed ? terrainRaster.prepare(field, DPR) : undefined;
+        if (raster) flushRaster(raster.surface);
+        pixels += owed;
         terrainRefine++;
       }
+      terrainRaster.beginFrame(0);
+      refineMs = performance.now() - at;
       if (terrainRefine >= terrainFields.length && settled) {
         // Room for whatever the raster cache evicted meanwhile: never loop on it.
         terrainRaster.beginFrame(Infinity);
@@ -5745,10 +5768,11 @@ function blitStaticLayer(now: number): void {
     }
     const next = bakeJob;
     if (next) {
-      // One band a frame; a bake started in this frame has already spent its start.
+      // One band a frame; a bake started in this frame has already spent its start, and the
+      // refinement that started it its rasters.
       const rows = bandRows({ work: next.work, done: next.done, paintedMs: next.paintedMs,
         lastRows: next.lastRows, lastMs: next.lastMs, budgetMs: next.budget,
-        spentMs: next === job ? 0 : next.startMs });
+        spentMs: next === job ? 0 : next.startMs + refineMs });
       if (rows > 0) paintBakeBand(next, rows, true);
       if (next.done >= next.height) {
         swapBakeJob(next);
