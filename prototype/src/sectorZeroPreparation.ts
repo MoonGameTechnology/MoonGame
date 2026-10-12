@@ -282,19 +282,30 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const open = layout[sel];
     bayModule = open?.module ?? null;
     bayType = open?.type ?? null;
+    // Слоты, открытые звёздами (корабля или героя), — последние в своём типе: отсек типа
+    // с номером от числа слотов каталога и дальше куплен. Только что открытый звездой корабля
+    // слот — последний отсек своего типа, он один раз вспыхивает.
+    const nth: Partial<Record<string, number>> = {};
+    const marks = layout.map(({ type }) => {
+      const i = (nth[type] = (nth[type] ?? -1) + 1);
+      const catalog = type === 'universal' ? Infinity : (base.slots[type] ?? 0);
+      return { bonus: i >= catalog, fresh: type === newSlot && i === (slots[type] ?? 0) - 1 };
+    });
     // Плитки отсеков — языком окна производства: модуль в цвете своей редкости и с «★N» в
     // углу, пустой отсек — серым типом слота.
-    const tiles: LoadoutSlotView[] = layout.map((b) =>
-      b.module
+    const tiles: (LoadoutSlotView & { fresh?: boolean })[] = layout.map((b, k) => ({
+      type: b.type,
+      ...(b.module
         ? {
-            type: b.type,
             moduleId: b.module,
             moduleName: data.modules[b.module]!.name,
             rarity: profileRarity(p, b.module, data),
             star: p.stars[b.module] ?? 0,
           }
-        : { type: b.type },
-    );
+        : {}),
+      ...(marks[k]!.bonus ? { bonus: true as const } : {}),
+      ...(marks[k]!.fresh ? { fresh: true } : {}),
+    }));
     const portrait = catalogPortraitHtml('u', unit, data);
     const callouts = portrait ? slotCallouts(portraitArt('u', unit, data)?.key, layout) : null;
     const bayAttr = (i: number, sl: { type: string }): string =>
@@ -302,18 +313,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const art = callouts
       ? `<div class="cn-art">${portrait}${slotLayerHtml(tiles, callouts, sel, bayAttr)}</div>`
       : portrait;
-    // Нет точек у арта или отсеков больше, чем точек (звёзды корабля), — отсеки плитками под
-    // артом. Слоты, открытые звёздами корабля, — последние своего типа, они помечены звездой.
-    const nth: Partial<Record<string, number>> = {};
+    // Нет у корпуса арта с точками — отсеки плитками под артом, купленные помечены звездой.
+    // У корпусов игрока точек хватает на все слоты (сторож — `slotCallouts.test.ts`).
     const bays = callouts
       ? ''
       : layout
           .map(({ type, module: id }, k) => {
-            const i = (nth[type] = (nth[type] ?? -1) + 1);
-            const n = slots[type] ?? 0;
-            const starred = hullStarred.filter((x) => x === type).length;
-            const star = i >= n - starred ? ' star' : '';
-            const fresh = type === newSlot && i === n - 1 ? ' sz-fx-new' : '';
+            const star = marks[k]!.bonus ? ' star' : '';
+            const fresh = marks[k]!.fresh ? ' sz-fx-new' : '';
             const on = k === sel;
             const kind = t(SLOT_KEY[type] ?? type);
             const grade = id

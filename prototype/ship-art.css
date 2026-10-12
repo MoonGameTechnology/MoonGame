@@ -56,3 +56,10 @@
   .cn-hull-info{gap:9px;}
   .cn-hull .cn-hn{font-size:14px;overflow-wrap:anywhere;}
 }
+/* A bay bought with a ship star (Sector Zero): a gold ★ inside the tile's top corner — outside it a tile at the picture's top edge would lose it — in the same gold as the star slot in the bay list. The bay just bought flashes once. */
+.cn-bbuy{color:#f0c86b;}
+.cn-tbuy{position:absolute;left:3px;top:2px;color:#f0c86b;font:700 var(--fs-caption)/1 var(--sf-font);pointer-events:none;}
+.cn-tile.fresh{animation:cn-fresh 1.1s ease-out;}
+@media (prefers-reduced-motion:no-preference){.cn-tile.fresh{animation:cn-fresh 1.1s ease-out,cn-rise .45s cubic-bezier(.2,1.4,.4,1);}}
+@keyframes cn-fresh{from{border-color:#f0c86b;box-shadow:0 0 20px color-mix(in srgb,#f0c86b 55%,transparent),inset 0 0 14px color-mix(in srgb,#f0c86b 30%,transparent);}}
+@keyframes cn-rise{from{transform:translate(-50%,-50%) scale(.8);opacity:.3;}}

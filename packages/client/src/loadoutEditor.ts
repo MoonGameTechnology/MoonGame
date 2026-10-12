@@ -10,7 +10,15 @@
  * a stable code only, never a throw. All stat maths route through the core's
  * `effectiveStats` so the preview matches what the built ship will actually carry.
  */
-import type { GameData, Rarity, ResourceBag, ShipBayType, ShipSlotType, UnitDef } from '@void/shared-core';
+import type {
+  GameData,
+  Rarity,
+  ResourceBag,
+  ShipBayType,
+  ShipSlotType,
+  SlotCounts,
+  UnitDef,
+} from '@void/shared-core';
 import {
   canEquip,
   effectiveStats,
@@ -19,6 +27,7 @@ import {
   moduleRarityBonus,
   moduleStarMultiplier,
   RARITIES,
+  withBonusSlots,
 } from '@void/shared-core';
 import { t } from '../../../localization/core';
 
@@ -31,6 +40,9 @@ export interface LoadoutSlotView {
   /** The fitted module's rarity and stars (see {@link LoadoutOption.rarity}). */
   rarity?: Rarity;
   star?: number;
+  /** The bay is one of the seat's extra hull slots (Sector Zero ship stars), not the
+   *  catalog's. Extra bays come last within their type, as the core lays them out. */
+  bonus?: true;
 }
 
 /** A module offered in the palette, with whether it can go on this hull right now. */
@@ -87,6 +99,9 @@ export interface LoadoutModel {
    *  ★0 and catalog rarity for every module (regular matches). */
   moduleStars?: Record<string, number>;
   moduleRarity?: Record<string, string>;
+  /** The seat's extra slots on this hull (`Player.arsenal.slots[unit]`), carried through the
+   *  reducer like `ownedModules`. Absent = the catalog's slots (regular matches). */
+  bonusSlots?: Partial<SlotCounts>;
   /** Live per-ship stats: base vs with the current modules. */
   preview: LoadoutStatLine[];
   /** Per-order costs (×count): hull, modules, and their sum. */
@@ -143,10 +158,22 @@ function addBags(a: ResourceBag, b: ResourceBag): ResourceBag {
   return out;
 }
 
-/** Stars and raised rarity of the seat's modules (`Player.arsenal.stars` / `.rarity`). */
+/** Stars and raised rarity of the seat's modules (`Player.arsenal.stars` / `.rarity`) and
+ *  its extra slots on the hull being fitted (`Player.arsenal.slots[unit]`) — the same
+ *  slots the core's build gate counts, so a bought slot can be filled here too. */
 export interface ModuleBoosts {
   moduleStars?: Readonly<Record<string, number>>;
   moduleRarity?: Readonly<Record<string, string>>;
+  bonusSlots?: Readonly<Partial<SlotCounts>>;
+}
+
+/** Only the boosts the caller actually passed — absent keys stay absent in the model. */
+function boostsOf(src: ModuleBoosts | undefined): ModuleBoosts {
+  return {
+    ...(src?.moduleStars ? { moduleStars: src.moduleStars } : {}),
+    ...(src?.moduleRarity ? { moduleRarity: src.moduleRarity } : {}),
+    ...(src?.bonusSlots ? { bonusSlots: src.bonusSlots } : {}),
+  };
 }
 
 /** A module's rarity on this seat: the raised one when it outranks the catalog one. */
@@ -189,14 +216,21 @@ function buildModel(
 ): LoadoutModel | null {
   const def: UnitDef | undefined = data.units[unit];
   if (!def) return null;
+  // The hull as the build gate sees it on this seat: catalog slots plus the bought ones.
+  const hull = withBonusSlots(def, boosts.bonusSlots);
   const starOf = (id: string): number => boosts.moduleStars?.[id] ?? 0;
 
   // One slot view per capacity, laid out by the core's `loadoutBays` — the same count the
   // build gate makes: a module fills a bay of its own type, and a universal bay takes the
   // overflow. The editor can't assemble anything over capacity, so extras never show here.
+  // Bought bays come after the catalog ones of their type, so the n-th bay of a type is
+  // bought once n reaches the catalog's count.
   const slots: LoadoutSlotView[] = [];
-  for (const bay of loadoutBays(def.slots, modules, data)) {
+  const seen: Partial<Record<ShipBayType, number>> = {};
+  for (const bay of loadoutBays(hull.slots, modules, data)) {
     if (bay.extra) continue;
+    const nth = (seen[bay.type] = (seen[bay.type] ?? -1) + 1);
+    const bonus = bay.type !== 'universal' && nth >= (def.slots[bay.type] ?? 0) ? { bonus: true as const } : {};
     const m = bay.module ? data.modules[bay.module] : undefined;
     slots.push(
       bay.module && m
@@ -206,15 +240,16 @@ function buildModel(
             moduleName: m.name,
             rarity: rarityOn(bay.module, data, boosts),
             star: starOf(bay.module),
+            ...bonus,
           }
-        : { type: bay.type },
+        : { type: bay.type, ...bonus },
     );
   }
 
   const palette: LoadoutOption[] = Object.entries(data.modules)
     .filter(([id]) => !ownedModules || ownedModules.has(id))
     .map(([id, m]) => {
-      const check = canEquip(unit, def, modules, id, data);
+      const check = canEquip(unit, hull, modules, id, data);
       return {
         id,
         name: m.name,
@@ -269,22 +304,28 @@ function buildModel(
     ...(ownedModules ? { ownedModules: [...ownedModules] } : {}),
     ...(boosts.moduleStars ? { moduleStars: { ...boosts.moduleStars } } : {}),
     ...(boosts.moduleRarity ? { moduleRarity: { ...boosts.moduleRarity } } : {}),
+    ...(boosts.bonusSlots ? { bonusSlots: { ...boosts.bonusSlots } } : {}),
   };
 }
 
 /** Open the editor for a hull. `opts.modules` seeds a draft loadout (default
- *  empty), `opts.count` the order size (default 1); `moduleStars`/`moduleRarity` are the
- *  seat's arsenal snapshot (Sector Zero runs). Fail-secure on an unknown unit. */
+ *  empty), `opts.count` the order size (default 1); `moduleStars`/`moduleRarity`/`bonusSlots`
+ *  are the seat's arsenal snapshot (Sector Zero runs). Fail-secure on an unknown unit. */
 export function createLoadoutEditor(
   unit: string,
   data: GameData,
   resources: ResourceBag,
   opts?: { modules?: string[]; count?: number; ownedModules?: ReadonlySet<string> } & ModuleBoosts,
 ): LoadoutEditorResult {
-  const model = buildModel(unit, opts?.modules ?? [], opts?.count ?? 1, data, resources, opts?.ownedModules, {
-    ...(opts?.moduleStars ? { moduleStars: opts.moduleStars } : {}),
-    ...(opts?.moduleRarity ? { moduleRarity: opts.moduleRarity } : {}),
-  });
+  const model = buildModel(
+    unit,
+    opts?.modules ?? [],
+    opts?.count ?? 1,
+    data,
+    resources,
+    opts?.ownedModules,
+    boostsOf(opts),
+  );
   if (!model) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...model };
 }
@@ -314,7 +355,7 @@ export function applyLoadoutAction(
       if (model.ownedModules && !model.ownedModules.includes(action.moduleId)) {
         return { ok: false, code: 'E_NOT_OWNED' };
       }
-      const check = canEquip(model.unit, def, model.modules, action.moduleId, data);
+      const check = canEquip(model.unit, withBonusSlots(def, model.bonusSlots), model.modules, action.moduleId, data);
       if (!check.ok) return { ok: false, code: check.code };
       modules = [...model.modules, action.moduleId];
       break;
@@ -339,10 +380,7 @@ export function applyLoadoutAction(
     data,
     resources,
     model.ownedModules ? new Set(model.ownedModules) : undefined,
-    {
-      ...(model.moduleStars ? { moduleStars: model.moduleStars } : {}),
-      ...(model.moduleRarity ? { moduleRarity: model.moduleRarity } : {}),
-    },
+    boostsOf(model),
   );
   if (!next) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...next };

@@ -585,7 +585,9 @@ try {
   await waitForApp(tabA);
   await ready(tabA);
   await tabA.locator('#sz-prep').click();
-  await tabA.locator('[data-prep="fit"][data-id="ion_engine"]').first().click();
+  // Модули показывает открытый отсек (PVR-6.39): сначала плитка системного отсека.
+  await tabA.locator('[data-prep="bay"][data-slot="utility"]').first().click();
+  await tabA.locator('#sz-workshop .sz-cards [data-prep="fit"][data-id="ion_engine"]').click();
   await tabB.goto(origin + '/');
   await waitForApp(tabB);
   await ready(tabB);
@@ -599,7 +601,8 @@ try {
   // Другой корпус, чем у вкладки A (там ионный двигатель занял слот системы крейсера). По
   // id, а не по месту в ряду: ряды меняются вместе с данными (фрегат переехал в «Корабли»).
   await tabB.locator('[data-prep="hull"][data-id="shuttle_carrier"]').click();
-  await tabB.locator('[data-prep="fit"][data-id="cargo_bay"]').first().click();
+  await tabB.locator('[data-prep="bay"][data-slot="utility"]').first().click();
+  await tabB.locator('#sz-workshop .sz-cards [data-prep="fit"][data-id="cargo_bay"]').click();
   // Вытесненная вкладка уходит со страницы — раньше здесь она писала свою копию поверх.
   await tabA.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   const both = Object.values(await loadouts(tabB)).flat();

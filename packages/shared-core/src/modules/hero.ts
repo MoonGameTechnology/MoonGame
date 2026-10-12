@@ -405,15 +405,17 @@ export function heroSkillSlots(hero: Hero, data: HandlerContext['ctx']['data']):
  *  (empty designer slots) are not abilities and never count. */
 /** Module bays the hero's SHIP offers: the hull's own typed slots plus the grade's
  *  `moduleSlots` bonus (§0.38 — hardware is equal across heroes, and only the main hero,
- *  the player's personal flagship, carries one bay more). Unknown hull or grade ⇒ the
- *  part that IS known still counts; nothing here can crash a match (modulesystem.md). */
-export function heroModuleSlots(hero: Hero, unit: string, data: HandlerContext['ctx']['data']): SlotCounts {
+ *  the player's personal flagship, carries one bay more) plus the hero's own snapshot
+ *  (`Hero.moduleSlots`, the Sector Zero hero stars). Unknown hull or grade ⇒ the part that
+ *  IS known still counts; nothing here can crash a match (modulesystem.md). */
+export function heroModuleSlots(hero: Hero, unit: string, data: GameData): SlotCounts {
   const hull = data.units[unit]?.slots;
   const bonus = hero.grade !== undefined ? data.heroGrades[hero.grade]?.moduleSlots : undefined;
+  const own = hero.moduleSlots;
   return {
-    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0),
-    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0),
-    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0),
+    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0) + (own?.weapon ?? 0),
+    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0) + (own?.defense ?? 0),
+    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0) + (own?.utility ?? 0),
   };
 }
 

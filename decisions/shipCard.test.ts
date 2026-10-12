@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
-import { effectiveStats } from '../packages/shared-core/src/index';
-import { shipCardModel } from './shipCard';
+import { pveState } from '../packages/client/src/gameData';
+import { effectiveStats, type GameState } from '../packages/shared-core/src/index';
+import { shipCardModel, stackBonusSlots } from './shipCard';
 
 const data = shippedGameData();
 
@@ -27,6 +28,25 @@ describe('карточка корабля — отсеки (заказ влад�
     expect(defense.map((b) => b.module)).toEqual(['shield_booster', 'ablative_plating']);
     expect(defense[0]!.extra).toBeUndefined();
     expect(defense[1]!.extra).toBe(true);
+  });
+
+  it('слот, купленный звездой корабля, — отсек, а не лишний модуль', () => {
+    // Крейсер забега со звездой «защита» (`Player.arsenal.slots.cruiser`): второй модуль
+    // защиты стоит в купленном отсеке, а не «лишним».
+    const stack = { unit: 'cruiser', count: 1, modules: ['shield_booster', 'ablative_plating'] };
+    const m = shipCardModel(stack, data, { defense: 1 })!;
+    expect(m.bays.map((b) => [b.type, b.module, b.bonus ?? false, b.extra ?? false])).toEqual([
+      ['weapon', null, false, false],
+      ['defense', 'shield_booster', false, false],
+      ['defense', 'ablative_plating', true, false],
+      ['utility', null, false, false],
+    ]);
+    // Пустой купленный отсек виден пустым — как и слоты каталога.
+    expect(shipCardModel({ unit: 'cruiser', count: 1 }, data, { weapon: 1 })!.bays[1]).toMatchObject({
+      type: 'weapon',
+      module: null,
+      bonus: true,
+    });
   });
 
   it('вклад отсека — то, что модуль добавляет одному кораблю', () => {
@@ -90,5 +110,30 @@ describe('карточка корабля — характеристики (пр
     const m = shipCardModel({ unit: 'cruiser', count: 1, modules: ['repair_bay'] }, data)!;
     expect(m.stats.find((s) => s.stat === 'hullRepair')).toMatchObject({ base: 0, effective: 0.05 });
     expect(m.bays.find((b) => b.module === 'repair_bay')!.effect).toEqual({ hullRepair: 0.05 });
+  });
+});
+
+describe('карточка корабля — прибавка слотов владельца', () => {
+  const base = (): GameState => pveState(data);
+  const fleetOf = (s: GameState): string => Object.keys(s.fleets).find((id) => s.fleets[id]!.owner === 'p1')!;
+
+  it('купленные звёздами корабля слоты — из арсенала владельца, по корпусу', () => {
+    const s = base();
+    s.players.p1!.arsenal = { hulls: [], modules: [], slots: { cruiser: { defense: 1 } } };
+    const fleet = fleetOf(s);
+    expect(stackBonusSlots(s, fleet, { unit: 'cruiser' }, data)).toEqual({ defense: 1 });
+    expect(stackBonusSlots(s, fleet, { unit: 'frigate' }, data)).toBeUndefined();
+    expect(stackBonusSlots(s, 'no-such-fleet', { unit: 'cruiser' }, data)).toBeUndefined();
+  });
+
+  it('корабль героя — отсеки ступени и звёзд героя, а не арсенал', () => {
+    const s = base();
+    const fleet = fleetOf(s);
+    s.heroes = {
+      h: { id: 'h', owner: 'p1', location: 'x', cooldowns: {}, fleetId: fleet, grade: 'main', moduleSlots: { weapon: 1 } },
+    };
+    expect(stackBonusSlots(s, fleet, { unit: 'hero' }, data)).toEqual({ weapon: 1, defense: 0, utility: 1 });
+    // Другой стек того же флота — обычный корабль, прибавка героя его не касается.
+    expect(stackBonusSlots(s, fleet, { unit: 'cruiser' }, data)).toBeUndefined();
   });
 });

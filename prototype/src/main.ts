@@ -299,7 +299,7 @@ import { initMatchEnd } from './matchEnd';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct, stackPools } from './fleetSummary';
-import { shipCardModel } from '../../decisions/shipCard';
+import { shipCardModel, stackBonusSlots } from '../../decisions/shipCard';
 import { shipCardHtml } from './shipCard';
 import { moduleIcon } from './moduleIcons';
 import { catalogPortraitHtml } from './shipArt';
@@ -7951,7 +7951,7 @@ function openShipCard(fleetId: string, index: number): void {
   const f = s.fleets[fleetId];
   const stack = f?.units[index];
   if (!el || !f || !stack) return;
-  const model = shipCardModel(stack, data);
+  const model = shipCardModel(stack, data, stackBonusSlots(s, fleetId, stack, data));
   if (!model) return;
   const faction = s.players[f.owner]?.faction;
   const html = shipCardHtml(

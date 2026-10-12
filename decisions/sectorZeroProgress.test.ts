@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { pveState, pveModeId } from '../packages/client/src/gameData';
-import { effectiveStats, hashState, moduleAllowed } from '../packages/shared-core/src/index';
+import { effectiveStats, hashState, heroModuleSlots, moduleAllowed } from '../packages/shared-core/src/index';
 import type { GameState } from '../packages/shared-core/src/index';
 import {
   changeSectorZeroProgress,
@@ -10,6 +10,7 @@ import {
   prepareSectorZeroRun,
   settleSectorZeroRun,
   sectorHeroShipSlots,
+  sectorHeroShipUnit,
   sectorHeroSlots,
   sectorHullIds,
   sectorHullSlots,
@@ -723,6 +724,20 @@ describe('PVR-6.24 — корабль героя: модули и слоты з�
     expect(s.heroes!['sector-zero:hero']!.modules).toEqual(['ablative_plating']);
     const hp = (st: typeof s) => effectiveStats(data.units.hero!, st.fleets['sector-zero:flagship']!.units[0]!, data).hp!;
     expect(hp(s)).toBeGreaterThan(hp(prepareSectorZeroRun(pveState(data), armed(2), data)));
+  });
+
+  it('отсеки за звёзды героя едут в забег: ядро считает их отсеками корабля', () => {
+    // Раньше ядро про них не знало: карточка корабля называла модули в них лишними, а снятый
+    // после гибели модуль было не поставить обратно.
+    const one = change(armed(3), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    const p = change(one, { kind: 'fit-hero', hero: 'commander', id: 'shield_booster' });
+    const hero = prepareSectorZeroRun(pveState(data), p, data).heroes!['sector-zero:hero']!;
+    expect(hero.moduleSlots).toEqual({ defense: 1, weapon: 1 });
+    expect(heroModuleSlots(hero, sectorHeroShipUnit('commander', data), data)).toEqual(
+      sectorHeroShipSlots('commander', p.heroes.commander!, data),
+    );
+    // 1★ — слотов за звёзды нет, и поля нет.
+    expect(prepareSectorZeroRun(pveState(data), armed(1), data).heroes!['sector-zero:hero']!.moduleSlots).toBeUndefined();
   });
 
   it('без набора флагман выходит голым, как раньше, — поле стека не заводится', () => {
