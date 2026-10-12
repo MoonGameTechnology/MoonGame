@@ -13,8 +13,10 @@
 import { mosaicFrame, SEED_WEIGHT, type GameState } from '../packages/shared-core/src/index';
 import { computePowerCells } from '../packages/client/src/territory';
 
-/** Кому принадлежит опознанная провинция — глазами игрока на старте главы. */
-export type ChapterCellSide = 'you' | 'hostile' | 'neutral';
+/** Опознанная провинция: стартовый мир игрока (`you`) или любая другая (`other`). Чья
+ *  она, карта не говорит (заказ владельца 2026-10-12): карта в меню чистая, как перед
+ *  новым забегом, — без закраса противника, который читался как итог прошлой попытки. */
+export type ChapterCellSide = 'you' | 'other';
 
 export interface ChapterMapCell {
   id: string;
@@ -159,7 +161,7 @@ export function chapterMapView(
       y: p.position.y,
       known,
       kind: known ? (p.kind ?? 'planet') : null,
-      side: !known ? null : p.owner === player ? 'you' : p.owner ? 'hostile' : 'neutral',
+      side: !known ? null : p.owner === player ? 'you' : 'other',
       objective: targets.active.includes(p.id)
         ? 'active'
         : targets.later.includes(p.id)

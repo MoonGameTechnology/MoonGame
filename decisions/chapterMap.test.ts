@@ -35,7 +35,7 @@ describe('карта главы в меню — что игрок уже зна�
     }
   });
 
-  it('разведанное показывает вид, сторону, проходы и цели задач', () => {
+  it('разведанное показывает вид, проходы и цели задач, но не хозяина', () => {
     const s = pveState(data, 1);
     const all = Object.keys(s.planets);
     const targets = pveChapter(1).objectives.flatMap((o) =>
@@ -44,7 +44,9 @@ describe('карта главы в меню — что игрок уже зна�
     const view = chapterMapView(s, all, 'p1', { active: targets, later: [] });
     expect(view.known).toBe(all.length);
     expect(view.lanes.length).toBeGreaterThan(0);
-    expect(view.cells.some((c) => c.side === 'hostile')).toBe(true);
+    // Чья провинция, карта не говорит (заказ владельца 2026-10-12): свой — только старт игрока.
+    for (const c of view.cells) expect(c.side).toBe(s.planets[c.id]!.owner === 'p1' ? 'you' : 'other');
+    expect(Object.values(s.planets).some((p) => p.owner === 'swarm')).toBe(true);
     expect(
       view.cells
         .filter((c) => c.objective === 'active')

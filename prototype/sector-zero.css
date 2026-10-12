@@ -133,7 +133,6 @@
 .sz-map-body .fog-out { stop-color: #060d13; }
 .sz-map-body polygon.known { fill: #0f2a33; stroke: #3f8f96; }
 .sz-map-body polygon.known.side-you { fill: #104048; stroke: #90e2dd; filter: drop-shadow(0 0 6px #90e2dd59); }
-.sz-map-body polygon.known.side-hostile { fill: #3a1418; stroke: #ff6f63; filter: drop-shadow(0 0 5px #ff6f634d); }
 .sz-map-body polygon.known.kind-asteroid, .sz-map-body polygon.known.kind-asteroid_cluster { fill: #2a2418; }
 .sz-map-body polygon.known.kind-dense_nebula { fill: #241a36; }
 .sz-map-body polygon.known.kind-ion_storm { fill: #14263f; }
@@ -155,7 +154,6 @@
 .sz-map-body .lanes line { vector-effect: non-scaling-stroke; stroke: #79dfdf; stroke-width: 1.2; stroke-dasharray: 4 4; opacity: .7; }
 .sz-map-body .home { fill: #90e2dd; filter: drop-shadow(0 0 6px #90e2dd); }
 .sz-map-body .dot { fill: #9fc6cc; }
-.sz-map-body .dot.side-hostile { fill: #ff6f63; }
 /* Цели задач главы: активная (следующий забег) — мятная, как метка в забеге; «позже» —
    приглушённый пунктир. Мята, а не золото: золото занято Суверенами. */
 .sz-map-body .target { fill: none; stroke: #8ff5c8; vector-effect: non-scaling-stroke; stroke-width: 1.8; stroke-dasharray: 4 3; }
@@ -178,7 +176,6 @@
 .sz-map-foot b { color: #e1f4f4; font-weight: 600; margin-right: auto; }
 .sz-map-foot .lg::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
 .sz-map-foot .lg.you::before { background: #104048; border-color: #90e2dd; }
-.sz-map-foot .lg.hostile::before { background: #3a1418; border-color: #ff6f63; }
 .sz-map-foot .lg.target::before { border: 1.5px dashed #8ff5c8; border-radius: 50%; }
 .sz-map-foot .lg.target-later::before { border: 1px dotted rgba(143, 245, 200, 0.55); border-radius: 50%; }
 .sz-map-foot .lg.fog::before { background: radial-gradient(circle at 50% 42%, #0d2029, #060d13); border-color: #1d3844; }

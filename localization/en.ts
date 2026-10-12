@@ -3176,7 +3176,6 @@ export const en: Record<string, string> = {
   'sector-zero.loading': 'Checking saved run…',
   'sector-zero.map.close': 'Close map',
   'sector-zero.map.fog': 'Unscouted',
-  'sector-zero.map.hostile': 'Enemy',
   'sector-zero.map.lost': 'No contact with the district — map unavailable',
   'sector-zero.map.scouted': 'Scouted: {n} of {m}',
   'sector-zero.map.target': 'Run objective',

@@ -166,8 +166,8 @@ const pts = (poly: ReadonlyArray<[number, number]>): string =>
 
 /**
  * Карта главы в стиле игровой: мозаика провинций, линии проходов, туман над неопознанным.
- * Опознанное красится стороной (вы / противник / ничьё) и видом сектора, цели задач —
- * кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`). Размера у SVG нет —
+ * Опознанное красится видом сектора, стартовые миры игрока — своим цветом; чья прочая
+ * провинция, карта не говорит (заказ владельца 2026-10-12). Цели задач — кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`). Размера у SVG нет —
  * только `viewBox`: высоту панель берёт из его пропорций, и карта не обрастает полосами.
  */
 export function chapterMapSvg(view: ChapterMapView): string {
@@ -353,7 +353,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     showTasks(null);
     el('sz-map-foot').innerHTML = view
       ? `<b>${t('sector-zero.map.scouted', { n: view.known, m: view.total })}</b>` +
-        `<span class="lg you">${t('sector-zero.map.you')}</span><span class="lg hostile">${t('sector-zero.map.hostile')}</span>` +
+        `<span class="lg you">${t('sector-zero.map.you')}</span>` +
         `<span class="lg target">${t('sector-zero.map.target')}</span><span class="lg target-later">${t('sector-zero.map.target.later')}</span><span class="lg fog">${t('sector-zero.map.fog')}</span>`
       : '';
   }

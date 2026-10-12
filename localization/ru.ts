@@ -3185,7 +3185,6 @@ export const ru: Record<string, string> = {
   'sector-zero.loading': 'Проверяем сохранение…',
   'sector-zero.map.close': 'Закрыть карту',
   'sector-zero.map.fog': 'Не разведано',
-  'sector-zero.map.hostile': 'Противник',
   'sector-zero.map.lost': 'Связи с районом нет — карта недоступна',
   'sector-zero.map.scouted': 'Разведано: {n} из {m}',
   'sector-zero.map.target': 'Задача экспедиции',

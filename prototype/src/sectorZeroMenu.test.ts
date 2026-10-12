@@ -22,7 +22,7 @@ const view: ChapterMapView = {
   cells: [
     { id: 'home', poly: square(0, 0), x: 5, y: 5, known: true, kind: 'planet', side: 'you', objective: null, tasks: [] },
     { id: 'rift', poly: square(10, 0), x: 15, y: 5, known: false, kind: null, side: null, objective: 'active', tasks: ['mission.rift'] },
-    { id: 'nest', poly: square(20, 0), x: 25, y: 5, known: true, kind: 'pirate_base', side: 'hostile', objective: 'later', tasks: ['mission.nest'] },
+    { id: 'nest', poly: square(20, 0), x: 25, y: 5, known: true, kind: 'pirate_base', side: 'other', objective: 'later', tasks: ['mission.nest'] },
   ],
   lanes: [[5, 5, 25, 5]],
   known: 2,
@@ -35,7 +35,7 @@ describe('карта главы — разметка (PVR-6.15)', () => {
     const fog = svg.match(/<polygon class="([^"]*)" points="10,0 20,0 20,10 10,10"\/>/);
     expect(fog?.[1]).toBe('fog');
     expect(svg).toContain('<radialGradient id="sz-fog"');
-    expect(svg).toContain('class="known side-hostile kind-pirate_base"');
+    expect(svg).toContain('class="known side-other kind-pirate_base"');
   });
 
   it('у SVG нет своего размера — высоту панель берёт из пропорций viewBox', () => {
