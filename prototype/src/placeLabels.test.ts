@@ -17,11 +17,13 @@ const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const RADAR = readFileSync(new URL('./mapRadar.ts', import.meta.url), 'utf8');
 // Подписи наложений (позывной вылета, борта патруля, срок коридора) — у них (REFM-233).
 const OVERLAYS = readFileSync(new URL('./mapOverlays.ts', import.meta.url), 'utf8');
+// Подписи прицелов (прогноз боя у цели «Атаки», часы хода) — у них же (REFM-233, часть 2).
+const AIM = readFileSync(new URL('./mapAim.ts', import.meta.url), 'utf8');
 
 describe('SZ-map-ids — места называются именами', () => {
   it('ни одна подпись холста не пишет сырой id узла', () => {
     // `fillText(n.id …)`, `fillText(p.id …)`, `fillText(id, …)` — прежние формы подписи.
-    expect((MAIN + RADAR + OVERLAYS).match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
+    expect((MAIN + RADAR + OVERLAYS + AIM).match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
     // Четыре подписи: метка тумана, схема, поле астероидов, выноска мира.
     expect(MAIN.match(/fillText\(placeName\(/g)?.length).toBe(4);
   });
@@ -40,7 +42,7 @@ describe('UIX-5.3 — надписи холста словами языка иг
   it('литерал в `fillText` несёт значок и число, но не английское слово', () => {
     // «◌ SIGNATURE 240» и «● REVEAL 120» у колец радара стояли на обоих языках: литерал
     // холста гейт локализации не видит, он ищет `t('…')`. Слово — только через ключ.
-    const literals = [...(MAIN + RADAR + OVERLAYS).matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
+    const literals = [...(MAIN + RADAR + OVERLAYS + AIM).matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
       m[2]!.replace(/\$\{[^}]*\}/g, ''),
     );
     expect(literals.length).toBeGreaterThan(5); // разбор не должен молча опустеть

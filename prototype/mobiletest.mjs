@@ -18,10 +18,12 @@ import {
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 
 const hooks = `import { moveFleet as __moveFleet } from './game';
+// Черновик приказа читают прицелы (REFM-233); \`main.ts\` сам его не держит.
+import { mobileDraft as __mobileDraft } from './interaction';
 window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
-  ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
+  ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: __mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),

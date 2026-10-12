@@ -28,6 +28,8 @@ import {
 
 const hooks = `import { patrolShuttle as __patrolShuttle } from '../../decisions/actions';
 import { mapWasEntered as __mapWasEntered } from './mapLoading';
+// Дальность удара считают прицелы (REFM-233); \`main.ts\` сам её не зовёт.
+import { squadronReach as __squadronReach } from '../../packages/shared-core/src/index';
 window.__aloftTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Свой мир с целым портом и эскадрой из трёх перехватчиков. Эскадра уходит в патруль к
@@ -68,7 +70,7 @@ window.__aloftTest = {
   target: (planetId) => {
     const home = s.planets[planetId];
     const sq = (s.strikes ?? []).find((x) => x.owner === ME);
-    const reach = squadronReach(sq, data);
+    const reach = __squadronReach(sq, data);
     const gap = (p) => Math.hypot(p.position.x - home.position.x, p.position.y - home.position.y);
     const p = Object.values(s.planets)
       .filter((x) => x.owner === null && gap(x) <= reach * 0.9)

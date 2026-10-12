@@ -8,7 +8,8 @@
  * `patrolMarks.ts`, `corridorView.ts` и соседи), здесь только холст. Мир, своё место,
  * контекст кадра, часы карты, кольца ПКО из кэша кадра и эскадру взведённого прицела
  * модуль получает хуками {@link initMapOverlays}: они живут в `main.ts`, и импорт оттуда
- * был бы циклом. Зовёт его кадр `render()`.
+ * был бы циклом. Зовут его кадр `render()` и прицелы `mapAim.ts`: круги и уголки у них
+ * те же.
  */
 import type { GameState, ShuttleStrike, Squadron } from '../../packages/shared-core/src/index';
 import { legT, roadAhead } from '../../packages/shared-core/src/index';

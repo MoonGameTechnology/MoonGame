@@ -26,6 +26,8 @@ import {
 } from './harnessKit.mjs';
 
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+// Базы прицела — у прицелов (REFM-233); \`main.ts\` сам их не зовёт.
+import { relocateSpots as __relocateSpots } from './mapAim';
 window.__relocateTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Эскадра из двух перехватчиков (перелёт 360) стоит в порту своего мира ('port') или в
@@ -110,7 +112,7 @@ window.__relocateTest = {
   },
   armed: () => strikeAim,
   // Базы в уголках — ровно то, что прицел предлагает.
-  spots: () => relocateSpots().map((t) => t.base.kind + ':' + t.base.id),
+  spots: () => __relocateSpots().map((t) => t.base.kind + ':' + t.base.id),
   // Где база на странице: мир — в своей точке, корабль — у шеврона.
   at: (base) => {
     const p = relocateSpotPx(base);
