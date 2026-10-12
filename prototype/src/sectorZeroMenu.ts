@@ -11,11 +11,14 @@ import {
 import type { RunPreview } from '../../decisions/sectorZeroMenu';
 import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapterRoute';
 import type { ChapterMapView } from '../../decisions/chapterMap';
+import { SWARM_LORE_KEYS } from '../../decisions/swarmLore';
 import type { ProfileNumbers } from '../../decisions/cloudSync';
 import { missionLabelN, type MissionBrief } from '../../decisions/missionView';
 
 /** Досье Роя для меню: каталог с отметкой «известно», имена уже переведены хостом. */
 export interface SwarmCodexRows {
+  /** Знает ли игрок природу Роя (`swarmLoreKnown`): её рассказывает учёный после главы I. */
+  lore: boolean;
   known: number;
   total: number;
   units: Array<{
@@ -29,7 +32,9 @@ export interface SwarmCodexRows {
   buildings: Array<{ name: string; known: boolean }>;
 }
 
-/** Разметка досье Роя: известное — карточками, неизвестное — «?». */
+/** Разметка досье Роя: сначала текст «О Рое» (заказ владельца 2026-10-12: «у досье о рое в
+ *  главном меню должно открываться описание текстовое о рое») — те же подписи, что в досье
+ *  забега и в комиксе учёного; затем известное — карточками, неизвестное — «?». */
 export function swarmCodexHtml(c: SwarmCodexRows): string {
   const unknown = `<article class="sz-codex-card unknown"><b aria-hidden="true">?</b><small>${esc(t('sector-zero.codex.unknown'))}</small></article>`;
   const units = c.units
@@ -55,7 +60,14 @@ export function swarmCodexHtml(c: SwarmCodexRows): string {
     .join('');
   const section = (key: string, cards: string): string =>
     cards ? `<h4>${esc(t(key))}</h4><div class="sz-codex-grid">${cards}</div>` : '';
+  const about =
+    `<section class="sz-codex-lore"><h4>${esc(t('swarm.intel.about'))}</h4>` +
+    (c.lore
+      ? SWARM_LORE_KEYS.map((key) => `<p>${esc(t(key))}</p>`).join('')
+      : `<p class="sz-codex-empty">${esc(t('sector-zero.codex.lore.locked'))}</p>`) +
+    `</section>`;
   return (
+    about +
     `<p class="sz-codex-sum">${t('sector-zero.codex.progress', { n: `<b>${c.known}</b>`, m: c.total })}</p>` +
     (c.known === 0 ? `<p class="sz-codex-empty">${esc(t('sector-zero.codex.empty'))}</p>` : '') +
     section('sector-zero.codex.units', units) +
@@ -166,8 +178,8 @@ const pts = (poly: ReadonlyArray<[number, number]>): string =>
 
 /**
  * Карта главы в стиле игровой: мозаика провинций, линии проходов, туман над неопознанным.
- * Опознанное красится стороной (вы / противник / ничьё) и видом сектора, цели задач —
- * кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`). Размера у SVG нет —
+ * Опознанное красится видом сектора, стартовые миры игрока — своим цветом; чья прочая
+ * провинция, карта не говорит (заказ владельца 2026-10-12). Цели задач — кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`). Размера у SVG нет —
  * только `viewBox`: высоту панель берёт из его пропорций, и карта не обрастает полосами.
  */
 export function chapterMapSvg(view: ChapterMapView): string {
@@ -353,7 +365,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     showTasks(null);
     el('sz-map-foot').innerHTML = view
       ? `<b>${t('sector-zero.map.scouted', { n: view.known, m: view.total })}</b>` +
-        `<span class="lg you">${t('sector-zero.map.you')}</span><span class="lg hostile">${t('sector-zero.map.hostile')}</span>` +
+        `<span class="lg you">${t('sector-zero.map.you')}</span>` +
         `<span class="lg target">${t('sector-zero.map.target')}</span><span class="lg target-later">${t('sector-zero.map.target.later')}</span><span class="lg fog">${t('sector-zero.map.fog')}</span>`
       : '';
   }

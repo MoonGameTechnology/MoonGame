@@ -3122,6 +3122,7 @@ export const ru: Record<string, string> = {
   'sector-zero.codex.brood.seen': 'Выводит десант: вы видели высадку',
   'sector-zero.codex.building.seen': 'Видели на мирах Роя',
   'sector-zero.codex.empty': 'Пока пусто. Опознайте силы Роя в экспедиции — досье запомнит их после итогов.',
+  'sector-zero.codex.lore.locked': 'О природе Роя расскажет учёный после главы I.',
   'sector-zero.continue': 'Продолжить',
   'sector-zero.difficulty': 'Сложность новой экспедиции',
   'sector-zero.difficulty.about.strong':
@@ -3185,7 +3186,6 @@ export const ru: Record<string, string> = {
   'sector-zero.loading': 'Проверяем сохранение…',
   'sector-zero.map.close': 'Закрыть карту',
   'sector-zero.map.fog': 'Не разведано',
-  'sector-zero.map.hostile': 'Противник',
   'sector-zero.map.lost': 'Связи с районом нет — карта недоступна',
   'sector-zero.map.scouted': 'Разведано: {n} из {m}',
   'sector-zero.map.target': 'Задача экспедиции',

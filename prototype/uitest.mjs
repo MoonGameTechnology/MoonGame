@@ -572,6 +572,9 @@ assert.equal(getEl('sz-codex-screen').hidden, false, 'the dossier opens its own 
 assert.equal(getEl('sz-home').hidden, true, 'the menu steps aside, as for preparation');
 assert.ok(getEl('sz-codex-screen').innerHTML.includes('data-codex="back"'));
 assert.ok(getEl('sz-codex-screen').innerHTML.includes('sz-codex-sum'), 'the dossier content is on the screen');
+// «О Рое» (заказ владельца 2026-10-12): у нового профиля глава I не пройдена — текст расскажет
+// учёный, и раздел говорит об этом, а не стоит пустым.
+assert.ok(getEl('sz-codex-screen').innerHTML.includes('sz-codex-lore'), 'the dossier opens with the Swarm text section');
 for (const handle of (listeners.get(getEl('sz-codex-screen')) ?? {}).click ?? [])
   handle({ target: { closest: (sel) => (sel === '[data-codex="back"]' ? {} : null) } });
 assert.equal(getEl('sz-codex-screen').hidden, true);

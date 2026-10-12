@@ -47,6 +47,7 @@ import {
 } from '../../decisions/sectorZeroShop';
 import { REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD } from '../../decisions/sectorZeroProgress';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
+import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { COMIC_TRIGGERS } from './comicArt';
 import type { ComicPlayer } from './comicPlayer';
 import type { createComicQueue } from './comicQueue';
@@ -244,6 +245,7 @@ export function initSectorZeroShell(hooks: SectorZeroShellHost): void {
         data,
       );
       return {
+        lore: swarmLoreKnown(sectorProgress, true),
         known: view.known,
         total: view.total,
         units: view.units.map((u) => {

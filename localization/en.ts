@@ -3113,6 +3113,7 @@ export const en: Record<string, string> = {
   'sector-zero.codex.brood.seen': 'Spawns landers: you saw a landing',
   'sector-zero.codex.building.seen': 'Seen on Swarm worlds',
   'sector-zero.codex.empty': 'Nothing yet. Identify Swarm forces in a run — the dossier keeps them after the results.',
+  'sector-zero.codex.lore.locked': 'The scientist will explain the nature of the Swarm after Chapter I.',
   'sector-zero.continue': 'Continue',
   'sector-zero.difficulty': 'New run difficulty',
   'sector-zero.difficulty.about.strong':
@@ -3176,7 +3177,6 @@ export const en: Record<string, string> = {
   'sector-zero.loading': 'Checking saved run…',
   'sector-zero.map.close': 'Close map',
   'sector-zero.map.fog': 'Unscouted',
-  'sector-zero.map.hostile': 'Enemy',
   'sector-zero.map.lost': 'No contact with the district — map unavailable',
   'sector-zero.map.scouted': 'Scouted: {n} of {m}',
   'sector-zero.map.target': 'Run objective',
