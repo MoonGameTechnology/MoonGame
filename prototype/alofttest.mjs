@@ -28,6 +28,8 @@ import {
 
 const hooks = `import { patrolShuttle as __patrolShuttle } from '../../decisions/actions';
 import { mapWasEntered as __mapWasEntered } from './mapLoading';
+// Прочность постройки по уровню — у миров карты (REFM-235); \`main.ts\` сам её не зовёт.
+import { hpOfLevel as __hpOfLevel } from './game';
 // Дальность удара считают прицелы (REFM-233); \`main.ts\` сам её не зовёт.
 import { squadronReach as __squadronReach } from '../../packages/shared-core/src/index';
 window.__aloftTest = {
@@ -40,7 +42,7 @@ window.__aloftTest = {
     s = structuredClone(s);
     const home = Object.values(s.planets).find((p) => p.owner === ME);
     home.buildings = home.buildings.filter((b) => b.type !== 'spaceport');
-    home.buildings.push({ type: 'spaceport', level: 1, hp: hpOfLevel('spaceport', 1) });
+    home.buildings.push({ type: 'spaceport', level: 1, hp: __hpOfLevel('spaceport', 1) });
     const sq = 'sq:' + ME + ':aloft';
     home.hangar = [{ id: sq, units: [{ unit: 'interceptor', count: 3 }] }];
     delete home.sortie;

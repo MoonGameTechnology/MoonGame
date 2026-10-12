@@ -21,13 +21,15 @@ const OVERLAYS = readFileSync(new URL('./mapOverlays.ts', import.meta.url), 'utf
 const AIM = readFileSync(new URL('./mapAim.ts', import.meta.url), 'utf8');
 // Подписи меток (отсчёт осады, знак носителя, заряды мин, часы цепочек) — у них (REFM-234).
 const MARKS = readFileSync(new URL('./mapMarks.ts', import.meta.url), 'utf8');
+// Подписи миров (метка тумана, имена на схеме, поле астероидов, выноска мира) — у них (REFM-235).
+const WORLDS = readFileSync(new URL('./mapWorlds.ts', import.meta.url), 'utf8');
 
 describe('SZ-map-ids — места называются именами', () => {
   it('ни одна подпись холста не пишет сырой id узла', () => {
     // `fillText(n.id …)`, `fillText(p.id …)`, `fillText(id, …)` — прежние формы подписи.
-    expect((MAIN + RADAR + OVERLAYS + AIM + MARKS).match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
+    expect((MAIN + RADAR + OVERLAYS + AIM + MARKS + WORLDS).match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
     // Четыре подписи: метка тумана, схема, поле астероидов, выноска мира.
-    expect(MAIN.match(/fillText\(placeName\(/g)?.length).toBe(4);
+    expect(WORLDS.match(/fillText\(placeName\(/g)?.length).toBe(4);
   });
 
   it('заголовок карточки мира — имя, а не id узла (UIX-5.2)', () => {
@@ -36,7 +38,7 @@ describe('SZ-map-ids — места называются именами', () => 
   });
 
   it('вид сектора под полем астероидов — из данных, а не зашитой строкой', () => {
-    expect(MAIN).not.toContain("'asteroid field'");
+    expect(MAIN + WORLDS).not.toContain("'asteroid field'");
   });
 });
 
@@ -44,7 +46,7 @@ describe('UIX-5.3 — надписи холста словами языка иг
   it('литерал в `fillText` несёт значок и число, но не английское слово', () => {
     // «◌ SIGNATURE 240» и «● REVEAL 120» у колец радара стояли на обоих языках: литерал
     // холста гейт локализации не видит, он ищет `t('…')`. Слово — только через ключ.
-    const literals = [...(MAIN + RADAR + OVERLAYS + AIM + MARKS).matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
+    const literals = [...(MAIN + RADAR + OVERLAYS + AIM + MARKS + WORLDS).matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
       m[2]!.replace(/\$\{[^}]*\}/g, ''),
     );
     expect(literals.length).toBeGreaterThan(5); // разбор не должен молча опустеть
@@ -54,8 +56,8 @@ describe('UIX-5.3 — надписи холста словами языка иг
   });
 
   it('гарнизон и старые данные на холсте подписаны ключами (UIX-5.4)', () => {
-    expect(MAIN.match(/t\('map\.callout\.garrison'/g)?.length).toBe(2);
-    expect(MAIN).toContain("t('map.fog.old')");
+    expect(WORLDS.match(/t\('map\.callout\.garrison'/g)?.length).toBe(2);
+    expect(WORLDS).toContain("t('map.fog.old')");
   });
 
   it('кольца радара выбранного мира подписаны ключами', () => {

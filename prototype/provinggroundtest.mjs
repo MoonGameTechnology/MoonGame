@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import { instrumentedGame, launchBrowser, serve, waitForApp, withDiagnostics } from './harnessKit.mjs';
 
 // Test-only access to the actual host. No debug exports enter the player build.
-const hooks = `window.__pgTest = {
+const hooks = `// Имена областей рисуют миры карты (REFM-235); \`main.ts\` сам их не зовёт.
+import { mapRegions as __mapRegions } from '../../packages/client/src/gameData';
+import { regionLabelAlpha as __regionLabelAlpha, regionLabels as __regionLabels } from '../../decisions/regionName';
+window.__pgTest = {
   facts: () => {
     const capital = Object.values(s.planets).find((p) => p.owner === ME && p.kind === 'planet');
     return {
@@ -18,8 +21,8 @@ const hooks = `window.__pgTest = {
     };
   },
   labels: () => ({
-    count: regionLabels(s.mapId, mapRegions(s.mapId), (id) => s.planets[id]?.position).length,
-    alpha: regionLabelAlpha(currentMapLod().provinceDetail),
+    count: __regionLabels(s.mapId, __mapRegions(s.mapId), (id) => s.planets[id]?.position).length,
+    alpha: __regionLabelAlpha(currentMapLod().provinceDetail),
   }),
   zoomOut: () => {
     cam.scale = 1; // вся карта на экране — как вид по умолчанию на простом ПК
