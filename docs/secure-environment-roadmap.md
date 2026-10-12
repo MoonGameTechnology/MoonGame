@@ -32,7 +32,10 @@
   видимости на отправке** — `MatchRoom.broadcastState` диффит per-player дельту против
   `visibleState(playerId)` (`matchRoom.ts`), так что скрытое физически не уходит.
 - **Не реализовано** (явные пробелы): per-player очередь, секрет-менеджмент,
-  мониторинг/алёртинг (structured-логи pino и `/metrics` уже есть), бэкапы.
+  центральный сбор/маршрутизация алертов, SIEM и runtime-response.
+  Structured-логи pino, `/metrics`, security JSONL/локальный alert и зашифрованные
+  backup/restore скрипты доступны; независимые контуры —
+  [операционный security-роадмап](security-operations-roadmap.md).
   JWT/авторизация — ✅ сделано (SE-0.1 ниже: join-токен, `?player=` игнорируется при
   включённом auth); персистентность — ✅ opt-in (Postgres по `DATABASE_URL`).
 
@@ -172,6 +175,17 @@ crontab в `README.md`, из которой ни разу не восстана�
 pgaudit. Ротация бэкапов есть (`BACKUP_KEEP_DAYS`), выноса архивов за пределы хоста —
 нет: сейчас они лежат на той же машине, что и база.
 
+### SE-3.5 · Независимый backup repository и restore-площадка `[ops][sec]` ⏳ — M
+
+Отдельные job identities/data ACL, off-host versioned/immutable repository,
+раздельные write/retention/delete/restore права, ключ вне runtime; authenticated
+manifest, freshness/restore мониторинг и изолированный restore/forensic lab.
+Это размещение поверх имеющихся скриптов; PITR/backup/restore остаются SE-3.4,
+междоменная сверка/RTO/RPO — SE-9.2.
+**Готово, когда:** runtime/backup-writer credentials не удаляют старые копии и
+не читают ключ; потеря игрового хоста переживается проверенным восстановлением
+в отдельной среде. [Контракт и учение](security-operations-roadmap.md).
+
 ---
 
 ## Фаза 4 · Redis-хардненинг `[A05]`
@@ -305,6 +319,28 @@ HTTP и WS складываются, семплинг логов не умень
 
 **Подзадачи:** метрики (Prometheus/Grafana): соединения/матч, исходящие байты/клиент, dropped/slow-клиенты, FPS-телеметрия позже; трекинг ошибок (Sentry, без PII).
 **Готово, когда:** есть дашборд состояния и поток ошибок.
+
+### SE-8.4 · SIEM в отдельном security-контуре `[sec][ops]` 🔒(SE-8.1) — M
+
+Authenticated ingest, incident store, корреляции auth/staff/network/backup и
+проверка heartbeat/spoof/replay/false positives. Collector/log store — SE-8.1/OPS-0.1;
+SIEM не получает игровые write/management credentials.
+**Готово, когда:** события дают объяснимые incidents, benign-сценарии не запускают
+опасную реакцию, выключение SIEM не останавливает игру.
+[Границы потоков](security-operations-roadmap.md).
+
+### SE-8.5 · Независимое incident admission и scoped-реагирование `[sec][ops]` ⏳ — M
+
+Отдельный response executor, собственные incident/runbook policy/epochs, scoped
+credentials, approval/receipt/status/аудит и проверенные остановка/откат.
+Ручной management-путь MSVC-8 не зависит от Staff/SIEM; автоматические триггеры
+подключаются после проверки SIEM SE-8.4. Никакого общего shell/SQL у detector
+и игровых модераторов.
+**Готово, когда:** spoofed alert не даёт произвольную команду; разрешённый runbook
+исполняется в своей области без повторного эффекта при поддержке target receipt/status,
+неизвестный исход без такого контракта сверяет оператор; опасные действия требуют одобрения по
+policy; отказ Staff/игрового хоста не уничтожает incident journal.
+[Модель принятия и отказов](security-operations-roadmap.md), DR/RTO/RPO — SE-9.2.
 
 ---
 

@@ -1,0 +1,52 @@
+digraph security_ops {
+  graph [rankdir=TB, bgcolor="#f7f9fd", fontname="DejaVu Sans", fontsize=18, pad=0.3, nodesep=0.4, ranksep=0.65, labelloc=t, label="VOID DOMINION / MOONGAME\nНезависимые операционные контуры — ЦЕЛЕВАЯ архитектура\nСтрелки: инициаторы ограниченных соединений / роль вызывающего.\nBackup/restore и локальный audit частично готовы; off-host / SIEM / response ещё в плане."];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#9babc5", fillcolor="white", margin="0.16,0.12"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#536783", arrowsize=0.7];
+  domains [label="Игровые и служебные домены\nGame/Auth / Inventory / Auction / Corp / Staff\nОбычный бой не вызывает SIEM/response", fillcolor="#e8efff"];
+  sources [shape=cylinder, label="Собственные первичные stores\nАтомарные receipts / audit / outbox", fillcolor="#e8efff"];
+  domains -> sources [label="свои роли / данные"];
+  subgraph cluster_logs {
+    label="ОТДЕЛЬНАЯ СРЕДА НАБЛЮДАЕМОСТИ"; color="#ad89c3"; style="rounded,dashed"; fontsize=13;
+    collector [label="Collector / bounded spool\nAuthenticated ingest / dedup", fillcolor="#f0eaff"];
+    logs [shape=cylinder, label="Log / append-only audit store\nНезависимый retention / read ACL", fillcolor="#f0eaff"];
+    collector -> logs [label="append своего потока"];
+  }
+  subgraph cluster_siem {
+    label="ОТДЕЛЬНЫЙ SECURITY-КОНТУР"; color="#ad89c3"; style="rounded,dashed"; fontsize=13;
+    siem [label="SIEM / detections / incidents\nRead / correlation\nНет общего shell или game-write", fillcolor="#f0eaff"];
+  }
+  subgraph cluster_response {
+    label="ОТДЕЛЬНЫЙ RESPONSE-КОНТУР"; color="#ce8c98"; style="rounded,dashed"; fontsize=13;
+    admission [label="Incident / runbook admission\nPolicy / approval / scope / epochs", fillcolor="#ffe9ee"];
+    journal [shape=cylinder, label="Собственный incident/action journal\nНе зависит от Staff или SIEM DB", fillcolor="#ffe9ee"];
+    executor [label="Ограниченный executor\nНазначенный actionId / lease\nUnknown: сверка, не blind retry", fillcolor="#ffe9ee"];
+    admission -> journal [label="accepted / durable outcome"];
+    executor -> admission [label="claim / receipt / status"];
+  }
+  operator [label="Инфраструктурный оператор\nManagement gateway / своя MFA identity", fillcolor="#ffe9ee"];
+  target [label="Разрешённый control endpoint ресурса\nТочный scope / runbook / status\nНет общей команды из произвольного alert", fillcolor="#e8efff"];
+  subgraph cluster_backup {
+    label="ОТДЕЛЬНЫЙ BACKUP-КОНТУР"; color="#d4b16c"; style="rounded,dashed"; fontsize=13;
+    backup [label="Доменные backup jobs\nRead/WAL роли / расписание\nБез restore-key / deletion", fillcolor="#fff2d9"];
+    repository [shape=cylinder, label="Off-host encrypted repository\nVersioning / immutable retention\nДругие write/delete/restore роли", fillcolor="#fff2d9"];
+    backup -> repository [label="новые ciphertext + manifest"];
+  }
+  subgraph cluster_lab {
+    label="ОТДЕЛЬНАЯ RESTORE / FORENSIC СРЕДА"; color="#d4b16c"; style="rounded,dashed"; fontsize=13;
+    restore [label="Изолированный restore target\nСхема/ACL / receipts / ledger\nRecovery plan / RPO / RTO", fillcolor="#fff2d9"];
+    keys [label="Авторизованный key-release\nOffline/KMS custody / аудит\nКлюч не в game/пультах/backup job", fillcolor="#fff2d9"];
+    restore -> keys [label="отдельно одобренный release"];
+  }
+  staff [label="Staff/Support\nТолько async incident/case correlation\nОтказ не блокирует response / backup", fillcolor="#f0eaff", style="rounded,filled,dashed"];
+  domains -> collector [label="async события / свой namespace"];
+  backup -> sources [label="свой read / WAL endpoint", color="#b7791f"];
+  siem -> logs [label="read разрешённых security-потоков", color="#8862ba"];
+  siem -> admission [label="ограниченный trigger / incident", color="#8862ba"];
+  operator -> admission [label="ручной runbook / полномочия"];
+  executor -> target [label="только accepted action / ресурс", color="#b14e69"];
+  restore -> repository [label="выбранный ciphertext / manifest", color="#b7791f"];
+  admission -> staff [label="через свою durable delivery роль\nasync корреляция", style=dashed, color="#8862ba"];
+  policy [shape=note, label="РЕАЛЬНАЯ ИЗОЛЯЦИЯ\nДругие hosts/storage/identities; отдельный контейнер на том же хосте недостаточен\nWrite != delete != restore; ingest != SIEM policy-admin != response\nProducer/сотрудник не стирают историю; роль игры не получает restore-key\nНеобязательный контур не останавливает бой; backlog/RPO/heartbeat измеряются\nАвтоматика: только проверенные idempotent/status операции; sensitive — approval\nОбщие cloud/root/DNS остаются общей точкой риска до отдельного учения", fillcolor="white"];
+  logs -> policy [style=invis];
+  target -> policy [style=invis];
+}

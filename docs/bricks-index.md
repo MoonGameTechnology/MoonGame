@@ -1094,6 +1094,9 @@
 | OPS-3.3 | 🔒 | docs core | `docs/operations-roadmap.md` | Тулинг баланса экономики |
 | OPS-4.1 | ⏳ | srv sec | `docs/operations-roadmap.md` | Модерация и анти-абьюз |
 | OPS-4.2 | ⏳ | srv sec | `docs/operations-roadmap.md` | Транзакционная почта/коммуникации |
+| OPS-4.3 | ⏳ | srv cli sec | `docs/operations-roadmap.md` | Сервис заявок и два служебных пульта |
+| OPS-4.4 | 🔒 | srv sec | `docs/operations-roadmap.md` | Временные полномочия по делу |
+| OPS-4.5 | 🔒 | srv sec ops | `docs/operations-roadmap.md` | Аудит и проверки злоупотреблений сотрудников |
 | PA-0.1 | 🔒 | sec srv | `docs/persistence-accounts-roadmap.md` | Честная аутентификация (ник → JWT/сессии) |
 | PA-0.3 | 🔒 | sec ops | `docs/persistence-accounts-roadmap.md` | (= SE-3) |
 | PA-0.4 | 🔒 | sec ops | `docs/persistence-accounts-roadmap.md` | (= PE-3.1 / SE-9) |
@@ -1286,6 +1289,7 @@
 | SE-3.2 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Шифрование at-rest + in-transit [A02] |
 | SE-3.3 | ⏳ | srv | `docs/secure-environment-roadmap.md` | RLS как defense-in-depth |
 | SE-3.4 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Бэкапы + PITR + проверенный restore |
+| SE-3.5 | ⏳ | ops sec | `docs/secure-environment-roadmap.md` | Независимый backup repository и restore-площадка |
 | SE-4.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | ACL / TLS / приватный bind |
 | SE-5.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | Минимальный non-root read-only образ |
 | SE-5.2 | ✅ | sec | `docs/secure-environment-roadmap.md` | Сканирование образа сервера |
@@ -1299,6 +1303,8 @@
 | SE-8.1 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Структурное аудит-логирование |
 | SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md` | Алерты на аномалии |
 | SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | Метрики и трекинг ошибок |
+| SE-8.4 | 🔒 | sec ops | `docs/secure-environment-roadmap.md` | SIEM в отдельном security-контуре |
+| SE-8.5 | ⏳ | sec ops | `docs/secure-environment-roadmap.md` | Независимое incident admission и scoped-реагирование |
 | SE-9.1 | 🔶 | srv | `docs/secure-environment-roadmap.md` | Переживание рестарта посреди матча |
 | SE-9.2 | 🔒 | docs sec | `docs/secure-environment-roadmap.md` | DR: RTO/RPO, runbooks, kill-switch |
 | SE-10.1 | 🔒 | docs | `docs/secure-environment-roadmap.md` | Минимизация данных и GDPR-база |
