@@ -54,6 +54,7 @@ async function toggleTools() {
 // берёт его своим импортом: в `main.ts` этого имени больше нет.
 const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chainComposer';
 import { mapWasEntered as __mapWasEntered } from './mapLoading';
+import { knownOwner as __knownOwner } from './mapLayer';
 import { moveFleet as __moveFleet } from './game';
 window.__szTest = {
   run: () => isSectorZeroRun(),
@@ -92,7 +93,7 @@ window.__szTest = {
     handleEvents([{ type: 'planet.captured', payload: { planetId: id, owner } }]);
     return owner;
   },
-  knownOwner: (id) => knownOwner(id),
+  knownOwner: (id) => __knownOwner(id),
   identified: (id) => known(id),
   // Разведка честным путём: флот игрока встаёт на провинцию, которой он не видит, — её
   // опознаёт круг зрения флота, а память тумана ядра (\`visibilityModule\`) запишет.

@@ -13,6 +13,7 @@ import { build } from 'esbuild';
 import { resolveChromium } from '../scripts/chromium.mjs';
 import { LIFT_BOOT_VEIL } from './harnessKit.mjs';
 import { checkMapLoading } from './mapLoadingTest.mjs';
+import { mapLayerBridge } from './mapLayerBridge.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json'))(
@@ -21,20 +22,23 @@ const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json
 const bridge = `
 // Фаза орбит живёт у геометрии флотов (REFM-238): импорт не присвоить, обнуляет её дверь.
 import { orbitPhase as __orbitPhase } from './fleetGeometry';
+// Выпечка карты живёт в слое карты (REFM-232): её ручки дописывает в модуль mapLayerBridge.
+import { SETTLE_MS as __SETTLE_MS } from '../../decisions/mapLayerView';
+const __ml = globalThis.__mapLayer;
 const panSamples = { frame: [], bake: [] };
 const originalRender = render;
 render = function(now) { const at = performance.now(); try { originalRender(now); }
   finally { panSamples.frame.push(performance.now() - at); } };
-const originalBake = bakeMapLayer;
-bakeMapLayer = function(...args) { const at = performance.now(); try { originalBake(...args); }
+const originalBake = __ml.bakeMapLayer;
+__ml.bakeMapLayer = function(...args) { const at = performance.now(); try { originalBake(...args); }
   finally { panSamples.bake.push(performance.now() - at); } };
 let panSwaps = 0;
-const originalSwap = swapBakeJob;
-swapBakeJob = function(...args) { panSwaps++; return originalSwap(...args); };
+const originalSwap = __ml.swapBakeJob;
+__ml.swapBakeJob = function(...args) { panSwaps++; return originalSwap(...args); };
 const panSettle = async () => {
-  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS + 100));
-  for (let i = 0; i < 2 || ((terrainRefine >= 0 || bakeJob) && i < 600); i++) await new Promise(requestAnimationFrame);
-  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS + 100));
+  await new Promise((resolve) => setTimeout(resolve, __SETTLE_MS + 100));
+  for (let i = 0; i < 2 || ((__ml.terrainRefine >= 0 || __ml.bakeJob) && i < 600); i++) await new Promise(requestAnimationFrame);
+  await new Promise((resolve) => setTimeout(resolve, __SETTLE_MS + 100));
   await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
 };
 window.__panBenchmark = {
@@ -67,67 +71,67 @@ window.__panBenchmark = {
     const surface = () => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; return c; };
     // Steps 1-5 judge the pan paths against bakes within one frame: a bake in the background
     // (rule 7) paints the map in bands, and step 6 judges that on its own.
-    const inBackground = startBakeJob;
-    startBakeJob = () => false;
+    const inBackground = __ml.startBakeJob;
+    __ml.startBakeJob = () => false;
     Object.assign(cam, {x: 0, y: 0, scale: 1.8});
     await panSettle();
     // 1. Culling to the painted view never changes a pixel.
-    terrainRaster.beginFrame(Infinity);
+    __ml.terrainRaster.beginFrame(Infinity);
     const culled = surface(); const wide = surface();
     for (const [c, view] of [[culled, {x0: 0, y0: 0, x1: VW, y1: VH}], [wide, {x0: -1e7, y0: -1e7, x1: 1e7, y1: 1e7}]]) {
       const g = c.getContext('2d');
-      paintSky(g);
+      __ml.paintSky(g);
       g.setTransform(DPR, 0, 0, DPR, 0, 0);
-      paintMapLayer(g, view, false, false);
+      __ml.paintMapLayer(g, view, false, false);
     }
     // 2. A moving frame shows exactly the settled picture at the same camera.
     const live = surface();
-    paintSky(live.getContext('2d'));
-    showMapLayer(live.getContext('2d'), mapView);
-    const still = diff(read(live), read(bg));
+    __ml.paintSky(live.getContext('2d'));
+    __ml.showMapLayer(live.getContext('2d'), mapView);
+    const still = diff(read(live), read(__ml.bg));
     // 3. After a whole-pixel pan the bake is reused, and it matches a fresh bake there;
     //    gradient dithering follows the canvas pixel grid, hence the few levels.
-    const bakes = mapLayerBakes;
+    const bakes = __ml.mapLayerBakes;
     cam.x += 37; cam.y -= 21;
     await panSettle();
-    const reused = mapLayerBakes === bakes;
-    const kept = read(bg);
-    invalidateMapSurfaces();
+    const reused = __ml.mapLayerBakes === bakes;
+    const kept = read(__ml.bg);
+    __ml.invalidateMapSurfaces();
     await panSettle();
-    const pan = diff(kept, read(bg));
+    const pan = diff(kept, read(__ml.bg));
     // 4. A pan that comes to rest between device pixels puts the camera on the bake's grid,
     //    by less than half a pixel, instead of baking the map again.
-    const before = mapLayerBakes;
+    const before = __ml.mapLayerBakes;
     const x = cam.x + 10.3;
     cam.x = x;
     await panSettle();
-    const snapped = mapLayerBakes === before && Math.abs(cam.x - x) <= 0.5 / DPR && cam.x !== x;
+    const snapped = __ml.mapLayerBakes === before && Math.abs(cam.x - x) <= 0.5 / DPR && cam.x !== x;
     // 5. A pan past the margin moves the bake's window: no province is measured again, and
     //    the strips it paints match a fresh bake.
-    const geometry = mapLayerGeometry;
+    const geometry = __ml.mapLayerGeometry;
     cam.x -= Math.round(VW * 0.6);
     cam.y += Math.round(VH * 0.4);
     await panSettle();
-    const scrolled = mapLayerGeometry === geometry && mapLayerScroll.x !== 0 && mapLayerScroll.y !== 0;
-    const moved = read(bg);
-    invalidateMapSurfaces();
+    const scrolled = __ml.mapLayerGeometry === geometry && __ml.mapLayerScroll.x !== 0 && __ml.mapLayerScroll.y !== 0;
+    const moved = read(__ml.bg);
+    __ml.invalidateMapSurfaces();
     await panSettle();
-    const scroll = diff(moved, read(bg));
+    const scroll = diff(moved, read(__ml.bg));
     // 6. A zoom at rest sharpens the map through bakes in the background, a band a frame. They
     //    leave the picture a bake within one frame does, but for the anti-aliasing of the
     //    outlines a band boundary cuts (the rasterizer takes a clipped path another way): a few
     //    levels, on few pixels. A lost or doubled band would differ on whole rows.
-    startBakeJob = inBackground;
+    __ml.startBakeJob = inBackground;
     const swaps = panSwaps;
     cam.scale = 2.2;
     await panSettle();
-    const banded = read(bg);
+    const banded = read(__ml.bg);
     const swapped = panSwaps - swaps;
-    startBakeJob = () => false;
-    invalidateMapSurfaces();
+    __ml.startBakeJob = () => false;
+    __ml.invalidateMapSurfaces();
     await panSettle();
-    const fresh = read(bg);
-    startBakeJob = inBackground;
+    const fresh = read(__ml.bg);
+    __ml.startBakeJob = inBackground;
     let edge = 0, worst = 0;
     for (let i = 0; i < fresh.length; i += 4) {
       let d = 0;
@@ -144,7 +148,7 @@ window.__panBenchmark = {
     await new Promise(requestAnimationFrame);
     Object.assign(cam, {x: 123.25, y: -51.75, scale: 1.8});
     await panSettle();
-    return bg.toDataURL();
+    return __ml.bg.toDataURL();
   }
 };`;
 const bundle = await build({
@@ -154,6 +158,7 @@ const bundle = await build({
     loader: 'ts',
   },
   bundle: true,
+  plugins: [mapLayerBridge],
   write: false,
   format: 'iife',
   platform: 'browser',

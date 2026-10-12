@@ -18,12 +18,14 @@ const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json
   'playwright-core',
 );
 const bridge = `
+// Сброс поверхностей карты — дверь слоя карты (REFM-232).
+import { invalidateMapSurfaces as __invalidateMapSurfaces } from './mapLayer';
 let frozenRecoveryTime = null;
 const originalRecoveryFrame = frame;
 frame = (now) => originalRecoveryFrame(frozenRecoveryTime ?? now);
 window.__canvasRecovery = {
   freeze() { frozenRecoveryTime = performance.now(); },
-  repaint() { invalidateMapSurfaces(); },
+  repaint() { __invalidateMapSurfaces(); },
   state() { return JSON.stringify(s); },
 };`;
 const responses = new Map();
