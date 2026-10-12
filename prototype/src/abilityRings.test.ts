@@ -91,13 +91,15 @@ describe('радиусы способностей — что попадает н
 // Проводка живёт в main.ts без юнит-обвязки — сканом исходника, как в cmdVisibility.test.ts.
 describe('радиусы способностей — подключение к main.ts', () => {
   const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  // Цвет — у палитры карты (REFM-237), рисовалка и живые круги — у наложений (REFM-233).
+  // Цвет — у палитры карты (REFM-237), рисовалка и живые круги — у наложений, прицел
+  // каста — у прицелов (REFM-233).
   const palette = readFileSync(new URL('./mapPalette.ts', import.meta.url), 'utf8');
   const overlays = readFileSync(new URL('./mapOverlays.ts', import.meta.url), 'utf8');
+  const aim = readFileSync(new URL('./mapAim.ts', import.meta.url), 'utf8');
 
   it('цвет один и он фиолетовый, а линия — пунктир', () => {
     expect(palette).toMatch(/export const ABILITY_RING = '#b78cff';/);
-    expect(src + overlays).not.toMatch(/const ABILITY_RING\b/);
+    expect(src + overlays + aim).not.toMatch(/const ABILITY_RING\b/);
     const at = overlays.indexOf('function drawAbilityCircle');
     expect(at).toBeGreaterThan(-1);
     const body = overlays.slice(at, at + 600);
@@ -106,9 +108,9 @@ describe('радиусы способностей — подключение к 
   });
 
   it('и прицел, и живые эффекты идут через ОДНУ рисовалку — двух видов радиуса нет', () => {
-    expect(src).toContain('if (aoe > 0) drawAbilityCircle(');
+    expect(aim).toContain('if (aoe > 0) drawAbilityCircle(');
     expect(overlays).toContain('for (const r of rings) drawAbilityCircle(');
-    expect(src + overlays).not.toContain('CAST_AREA'); // прежний сплошной голубой круг убран целиком
+    expect(src + overlays + aim).not.toContain('CAST_AREA'); // прежний сплошной голубой круг убран целиком
   });
 
   it('кадр рисует живые круги', () => {

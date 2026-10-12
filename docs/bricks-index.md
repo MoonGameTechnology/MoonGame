@@ -72,7 +72,7 @@
 | REFM-230 | ⏳ | proto | `docs/backlog.md` | Реакция на события мира и лента |
 | REFM-231 | ✅ | proto | `docs/backlog.md` | Камера и туман |
 | REFM-232 | ✅ | proto | `docs/backlog.md` | Статический голографический слой |
-| REFM-233 | 🔶 | proto | `docs/backlog.md` | Наложения |
+| REFM-233 | ✅ | proto | `docs/backlog.md` | Наложения |
 | REFM-234 | ⏳ | proto | `docs/backlog.md` | Эффекты и метки |
 | REFM-235 | 🔒 | proto | `docs/backlog.md` | render() по слоям |
 | REFM-236 | ✅ | proto | `docs/backlog.md` | Ввод на канвасе |
