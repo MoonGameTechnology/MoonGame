@@ -602,6 +602,27 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
 .sz-codex-card.unknown b { color: #6f5a5e; font-size: 18px; }
 .sz-codex-empty { margin: 0; padding: 10px; border: 1px dashed #3a4a52; border-radius: 9px; color: #9fb6bc; font-size: 12px; }
 
+/* Альбом комиксов (заказ владельца 2026-10-12): отдельный экран, как Досье. Открытая
+   страница — обложкой эпизода, закрытая — пунктирным «?». Нажатие открывает эпизод в
+   проигрывателе комикса. */
+#sz-album-screen { padding: 28px 0 40px; flex: 1; }
+#sz-album-screen h1 { font-size: clamp(22px, 4vw, 32px); color: var(--sf-hi); font-weight: 450; margin: 24px 0 8px; }
+#sz-album-screen .sz-workhead button { min-height: 44px; padding: 10px 14px; background: var(--sf-card); border: 1px solid var(--sf-edge); border-radius: 10px; color: var(--sf-text); font-size: 12px; cursor: pointer; }
+#sz-album-screen .sz-workhead button:hover { border-color: var(--sf-edge-hi); }
+.sz-album-body { display: grid; gap: 10px; margin-top: 18px; }
+.sz-album-sum { margin: 0; color: #b0c7ce; font-size: 12px; }
+.sz-album-sum b { color: var(--sf-hi); }
+.sz-album-body h4 { margin: 8px 0 0; color: var(--sf-hi); font-size: 14px; font-weight: 600; }
+.sz-album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.sz-album-card { position: relative; display: grid; place-items: center; aspect-ratio: 3 / 4; padding: 0; overflow: hidden; border: 1px solid var(--sf-edge); border-radius: 9px; background: #060d12; cursor: pointer; touch-action: manipulation; }
+.sz-album-card:hover { border-color: var(--sf-edge-hi); }
+.sz-album-card:focus-visible { outline: 2px solid #e6b777; outline-offset: 2px; }
+.sz-album-card img { width: 100%; height: 100%; object-fit: cover; }
+.sz-album-card small { position: absolute; right: 6px; bottom: 6px; padding: 2px 6px; border-radius: 6px; background: #000c; color: #d5e9e9; font-size: 12px; }
+.sz-album-card.locked { border-style: dashed; border-color: #2c3d45; background: #070b0ecc; cursor: default; }
+.sz-album-card.locked b { color: #4f646c; font-size: 28px; font-weight: 400; }
+.sz-album-empty { margin: 0; padding: 10px; border: 1px dashed #3a4a52; border-radius: 9px; color: #9fb6bc; font-size: 12px; }
+
 /* Комикс главы (prototype/src/comicPlayer.ts): панель за панелью. Панель вписывается в
    экран целиком (contain), подпись — текст локали под ней. Только проявление:
    масштабирование обрезало края принятых страниц внутри overflow:hidden. */

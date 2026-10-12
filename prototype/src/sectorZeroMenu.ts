@@ -65,6 +65,39 @@ export function swarmCodexHtml(c: SwarmCodexRows): string {
 }
 import { detach } from './detach';
 
+/** Альбом комиксов для меню (заказ владельца 2026-10-12): главы уже с заголовками, у эпизода —
+ *  обложка (первая страница) и число страниц. Закрытый эпизод картинки не несёт. */
+export interface ComicAlbumRows {
+  open: number;
+  total: number;
+  chapters: Array<{
+    title: string;
+    episodes: Array<{ id: string; open: boolean; cover: string; pages: number }>;
+  }>;
+}
+
+/** Разметка альбома: открытые страницы — кнопками с обложкой, закрытые — «?». */
+export function comicAlbumHtml(a: ComicAlbumRows): string {
+  const locked = `<div class="sz-album-card locked" role="img" aria-label="${esc(t('sector-zero.album.locked'))}"><b aria-hidden="true">?</b></div>`;
+  const chapters = a.chapters
+    .map((c) => {
+      const cards = c.episodes
+        .map((e) =>
+          e.open
+            ? `<button type="button" class="sz-album-card" data-album="${esc(e.id)}" aria-label="${esc(t('sector-zero.album.view', { chapter: c.title }))}"><img src="${esc(e.cover)}" alt="" loading="lazy" decoding="async">${e.pages > 1 ? `<small>${esc(t('sector-zero.album.pages', { n: e.pages }))}</small>` : ''}</button>`
+            : locked,
+        )
+        .join('');
+      return `<h4>${esc(c.title)}</h4><div class="sz-album-grid">${cards}</div>`;
+    })
+    .join('');
+  return (
+    `<p class="sz-album-sum">${t('sector-zero.album.progress', { n: `<b>${a.open}</b>`, m: a.total })}</p>` +
+    (a.open === 0 ? `<p class="sz-album-empty">${esc(t('sector-zero.album.empty'))}</p>` : '') +
+    chapters
+  );
+}
+
 /** Вход площадки и облако профиля (`YAG-1.4`). Нет — площадка без облака: ни кнопки
  *  входа, ни развилки. */
 export interface SectorZeroAccount {
@@ -105,6 +138,10 @@ export interface SectorZeroMenuHooks {
   chapterMap(index: number): ChapterMapView | null;
   /** Досье Роя из профиля (`swarmCodex.ts`) — строки уже с именами из данных. */
   swarmCodex(): SwarmCodexRows;
+  /** Альбом комиксов из профиля (`comicAlbum.ts`) — заголовки глав уже переведены. */
+  comicAlbum(): ComicAlbumRows;
+  /** Показать открытый эпизод альбома; промис — когда игрок его закрыл. */
+  playAlbum(id: string): Promise<void>;
   start(): void;
   /** Учебный полигон «Протокол допуска» (§14) — не глава и не забег: свой мир, без профиля. */
   startTraining(): void;
@@ -409,6 +446,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     h.root.style.display = 'flex';
     h.preparation.close();
     if (codexOpen()) closeCodex();
+    if (albumOpen()) closeAlbum();
     document.body.classList.add('sector-zero-home');
     confirmation.hidden = true;
     resetConfirm.hidden = true;
@@ -566,6 +604,41 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   codexScreen.addEventListener('click', (event) => {
     if ((event.target as Element).closest('[data-codex="back"]')) closeCodex();
   });
+  // Альбом комиксов (заказ владельца 2026-10-12) — тоже своё окно, как досье.
+  const albumScreen = el('sz-album-screen');
+  function albumOpen(): boolean {
+    return !albumScreen.hidden;
+  }
+  function openAlbum(): void {
+    albumScreen.innerHTML =
+      `<div class="sz-workhead"><button type="button" data-album-back="1">${esc(t('sector-zero.prep.back'))}</button></div>` +
+      `<h1>${esc(t('sector-zero.album.open'))}</h1>` +
+      `<div class="sz-album-body">${comicAlbumHtml(h.comicAlbum())}</div>`;
+    home.hidden = true;
+    albumScreen.hidden = false;
+    // Кнопка альбома на ПК ниже края экрана: без сброса альбом открылся бы с середины.
+    h.root.scrollTop = 0;
+    albumScreen.querySelector<HTMLButtonElement>('[data-album-back]')?.focus({ preventScroll: true });
+  }
+  function closeAlbum(): void {
+    albumScreen.hidden = true;
+    home.hidden = false;
+    el('sz-album').focus(); // и прокрутка обратно к ней
+  }
+  el('sz-album').addEventListener('click', openAlbum);
+  albumScreen.addEventListener('click', (event) => {
+    const target = event.target as Element;
+    if (target.closest('[data-album-back]')) {
+      closeAlbum();
+      return;
+    }
+    const card = target.closest<HTMLButtonElement>('[data-album]');
+    if (card)
+      detach(
+        'Sector Zero: альбом комиксов',
+        h.playAlbum(card.dataset.album ?? '').then(() => card.focus({ preventScroll: true })),
+      );
+  });
   el('sz-back').addEventListener('click', () => {
     hide();
     h.back();
@@ -582,10 +655,11 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     // then returns to the shared hub only when this menu was opened from there.
     canGoBack: (): boolean =>
       h.root.style.display === 'flex' &&
-      (h.preparation.isOpen() || codexOpen() || !confirmation.hidden || !resetConfirm.hidden || !h.standalone),
+      (h.preparation.isOpen() || codexOpen() || albumOpen() || !confirmation.hidden || !resetConfirm.hidden || !h.standalone),
     back: (): void => {
       if (h.preparation.isOpen()) h.preparation.close();
       else if (codexOpen()) closeCodex();
+      else if (albumOpen()) closeAlbum();
       else if (!confirmation.hidden) cancel();
       else if (!resetConfirm.hidden) cancelReset();
       else if (!h.standalone) {

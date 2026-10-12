@@ -11,6 +11,10 @@
  * Каждая страница висит {@link COMIC_HOLD_MS} (решение владельца 2026-09-27): кнопки
  * «Дальше» и «Пропустить» появляются только потом, а нажатие по панели до этого ничего не
  * листает — страницу успевают прочитать. «Назад»/Escape закрывают комикс и во время паузы.
+ *
+ * Альбом меню (заказ владельца 2026-10-12) показывает уже открытые страницы тем же
+ * проигрывателем, но без паузы: страницу игрок видел, кнопки нужны сразу. «Пропустить»
+ * там — «Закрыть», а на последней странице «Дальше» нет: листать некуда.
  */
 import { LOCALE, t } from '../../localization/runtime';
 import type { ComicPanel } from '../../decisions/chapterComics';
@@ -19,8 +23,8 @@ import type { ComicPanel } from '../../decisions/chapterComics';
 export const COMIC_HOLD_MS = 5000;
 
 /** Чем кончается комикс: перед забегом — «В бой», после победы — «К итогам», посреди
- *  забега — «Продолжить». */
-export type ComicFinish = 'battle' | 'results' | 'resume';
+ *  забега — «Продолжить»; `album` — повтор из альбома меню. */
+export type ComicFinish = 'battle' | 'results' | 'resume' | 'album';
 
 export interface ComicPlayer {
   /** Показать панели; промис разрешается, когда игрок комикс закрыл (досмотрел или
@@ -99,12 +103,18 @@ export function initComicPlayer({
     // Перезапуск проявления: класс снимается и ставится в следующем кадре раскладки.
     void root.offsetWidth;
     root.classList.add('comic-in');
-    hold(true);
     clearTimeout(holdTimer);
-    holdTimer = setTimeout(() => {
+    if (finish === 'album') {
       hold(false);
-      next.focus({ preventScroll: true });
-    }, COMIC_HOLD_MS);
+      next.hidden = last;
+      (last ? skip : next).focus({ preventScroll: true });
+    } else {
+      hold(true);
+      holdTimer = setTimeout(() => {
+        hold(false);
+        next.focus({ preventScroll: true });
+      }, COMIC_HOLD_MS);
+    }
     const upcoming = panels[i + 1];
     if (upcoming)
       new Image().src = LOCALE === 'en' && upcoming.imageEn ? upcoming.imageEn : upcoming.image;
@@ -139,10 +149,11 @@ export function initComicPlayer({
       if (done || list.length === 0) return Promise.resolve();
       panels = list;
       finish = how;
+      skip.textContent = t(how === 'album' ? 'sector-zero.comic.close' : 'sector-zero.comic.skip');
       const closed = new Promise<void>((resolve) => (done = resolve));
       root.style.display = 'flex';
       show(0);
-      root.focus({ preventScroll: true });
+      if (how !== 'album') root.focus({ preventScroll: true });
       return closed;
     },
     isOpen: () => done !== null,

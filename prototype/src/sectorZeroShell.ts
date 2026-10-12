@@ -14,7 +14,7 @@
  * Площадку модуль берёт через `getPlatform()` в момент вызова или инициализации, а не при
  * импорте: дев-сборка и смоуки ставят её телом `main.ts`, уже после импорта модуля.
  */
-import { t, tData } from '../../localization/runtime';
+import { LOCALE, t, tData } from '../../localization/runtime';
 import {
   PVE_MISSION_COUNT,
   pveChapter,
@@ -35,6 +35,8 @@ import {
   type ComicRegistry,
 } from '../../decisions/chapterComics';
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
+import { CHAPTER_KEYS } from '../../decisions/chapterRoute';
+import { albumEpisode, comicAlbum } from '../../decisions/comicAlbum';
 import { chapterHero } from '../../decisions/heroRecruits';
 import { missionBriefs, type MissionRow } from '../../decisions/missionView';
 import {
@@ -275,6 +277,31 @@ export function initSectorZeroShell(hooks: SectorZeroShellHost): void {
         })),
       };
     },
+    comicAlbum: () => {
+      const view = sectorComicAlbum();
+      return {
+        open: view.open,
+        total: view.total,
+        chapters: view.chapters.map((c) => {
+          const index = sectorChapterIds().indexOf(c.chapter);
+          const key = CHAPTER_KEYS[index]?.name;
+          return {
+            title:
+              c.chapter === 'training-1' ? t('sector-zero.training') : key ? t(key) : c.chapter,
+            episodes: c.episodes.map((e) => ({
+              id: e.id,
+              open: e.open,
+              cover: e.open ? albumImage(e.panels[0]!) : '',
+              pages: e.panels.length,
+            })),
+          };
+        }),
+      };
+    },
+    playAlbum: (id) => {
+      const panels = albumEpisode(sectorComicAlbum(), id);
+      return panels ? game.comics.player.play(panels, 'album') : Promise.resolve();
+    },
     setMission: chooseMission,
     start: () => launchSectorRun(),
     startTraining: () => playChapterComic('training-1', 'intro', () => game.startTraining()),
@@ -285,6 +312,19 @@ export function initSectorZeroShell(hooks: SectorZeroShellHost): void {
     settings: () => game.openSettings(),
     back: () => game.back(),
   });
+}
+
+/** Альбом комиксов профиля: полигон, затем главы по маршруту (`decisions/comicAlbum.ts`). */
+function sectorComicAlbum() {
+  return comicAlbum(sectorProgress, game.comics.art.registry, [
+    'training-1',
+    ...sectorChapterIds(),
+  ]);
+}
+
+/** Обложка эпизода — его первая страница в языке игрока, как её покажет проигрыватель. */
+function albumImage(panel: { image: string; imageEn?: string }): string {
+  return LOCALE === 'en' && panel.imageEn ? panel.imageEn : panel.image;
 }
 
 /** Герой-награда главы для карточки на маршруте: кто придёт и пришёл ли уже. */
