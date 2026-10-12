@@ -20,6 +20,8 @@ import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 const hooks = `import { moveFleet as __moveFleet } from './game';
 // Черновик приказа читают прицелы (REFM-233); \`main.ts\` сам его не держит.
 import { mobileDraft as __mobileDraft } from './interaction';
+// Малые вспышки — у владельца вспышек (REFM-234).
+import { noticeFlashes as __noticeFlashes } from './mapEffects';
 window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
@@ -27,7 +29,7 @@ window.__mobileTest = {
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
-  notices: () => noticeFlashes.length,
+  notices: () => __noticeFlashes.length,
   emit: events => handleEvents(events),
   motion: on => setMotion(on)
 };`;
