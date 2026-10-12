@@ -242,7 +242,7 @@ describe('REFM-234 — метки забега', () => {
   });
 
   it('союзник: пунктирное кольцо и эмблема у цели его операции, приглушённое у своей; знак ◈ над носителем, пока груз в пути', async () => {
-    const { marks, sides, env, frame, own, next, at, patch } = await boot();
+    const { marks, sides, geo, env, frame, own, next, at, patch } = await boot();
     const { ALLY_EMBLEM } = await import('./allyScreen');
     env.ally = { op: { source: 'order', planet: next.id } };
     marks.drawAllyMarks();
@@ -275,7 +275,12 @@ describe('REFM-234 — метки забега', () => {
       patch(extra);
       marks.drawAllyMarks();
       expect(carrierMarks(), JSON.stringify(extra)).toHaveLength(shown);
-      if (shown) expect(carrierMarks()[0]!.fill).toBe('#ffb43a');
+      if (shown) {
+        // Знак — над значком носителя на кольце орбиты: `fleetAnchor` уже экранная точка.
+        const anchor = geo.fleetAnchor(own)!;
+        expect(carrierMarks()[0]!.args).toEqual(['◈', anchor.x, anchor.y - 20]);
+        expect(carrierMarks()[0]!.fill).toBe('#ffb43a');
+      }
     }
     // Вне забега — ничего.
     frame.calls.length = 0;

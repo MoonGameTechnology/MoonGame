@@ -176,10 +176,10 @@ export function drawAllyMarks(): void {
   ];
   for (const id of carriers) {
     const carrier = id ? s.fleets[id] : undefined;
-    const pos = carrier ? fleetAnchor(carrier) : null;
-    if (!pos) continue;
-    const c = world(pos);
-    if (!visible(c, 40)) continue;
+    // `fleetAnchor` — уже точка экрана (значок на кольце орбиты): второй перевод `world()`
+    // уводил знак от носителя тем дальше, чем крупнее карта.
+    const c = carrier ? fleetAnchor(carrier) : null;
+    if (!c || !visible(c, 40)) continue;
     cx.fillStyle = '#ffb43a';
     cx.strokeStyle = 'rgba(4,10,12,.9)';
     cx.lineWidth = 3;
