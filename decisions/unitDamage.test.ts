@@ -17,15 +17,27 @@ const profile = (unit: string): Record<string, number> => {
 };
 
 describe('урон юнита по целям', () => {
-  it('корабль: атака по кораблям, половина её по зданиям, ПРО по авиации, по земле — ничего', () => {
+  it('корабль: атака по кораблям, половина её по зданиям, ПРО по авиации, десятая по войскам', () => {
     const st = data.units.cruiser!.stats;
     expect(profile('cruiser')).toEqual({
       ships: st.attack,
       buildings: st.attack * 0.5,
       air: st.pointDefense ?? 0,
-      vehicles: 0,
-      infantry: 0,
+      vehicles: st.attack * 0.1,
+      infantry: st.attack * 0.1,
     });
+  });
+
+  it('по войскам шаттл бьёт сильнее корабля той же атаки (ROS-1.6)', () => {
+    const bomber = data.units.bomber!.stats;
+    expect(profile('bomber').infantry).toBe(bomber.attack * 0.25);
+    expect(profile('bomber').vehicles).toBe(bomber.attack * 0.25);
+    // Безоружный десантный челнок по войскам не бьёт.
+    expect(profile('landing_shuttle').infantry).toBe(0);
+    const same = { attack: 20 };
+    const ship = unitDamageProfile(data.units.cruiser!, same).find((r) => r.target === 'infantry')!;
+    const wing = unitDamageProfile(data.units.bomber!, same).find((r) => r.target === 'infantry')!;
+    expect(wing.value).toBeGreaterThan(ship.value);
   });
 
   it('осадный урон корабля заменяет долю атаки по зданиям', () => {
@@ -41,7 +53,6 @@ describe('урон юнита по целям', () => {
     expect(profile('bomber').buildings).toBe(bomber.siegeDamage);
     expect(profile('bomber').ships).toBe(bomber.attack);
     expect(profile('interceptor').air).toBe(data.units.interceptor!.stats.shuttleDamage);
-    expect(profile('interceptor').vehicles).toBe(0);
   });
 
   it('шаттл без осадного урона бьёт мир полной атакой', () => {

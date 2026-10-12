@@ -3503,7 +3503,7 @@ export const en: Record<string, string> = {
   'side.strike.forecast.hint':
     'Forecast from visible compositions only — terrain, fortification and technology bonuses are not included; the real battle may differ.',
   'side.strike.hint':
-    "In orbit you can bombard (wears buildings and freezes their output), but the garrison's interdiction reaches you. Assault lands your troops against the garrison.",
+    "In orbit you can bombard (wears buildings, freezes their output and lightly hits troops except the last one), but the garrison's interdiction reaches you. Assault lands your troops against the garrison.",
   'side.strike.title': 'Strike',
   'side.summary.attack': 'Attack',
   'side.summary.back': '‹ Back to the card',

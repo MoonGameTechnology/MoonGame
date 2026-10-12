@@ -107,7 +107,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 76: порядок тот же; rocketMines 3.0.0, victory 1.7.0, shuttle 1.9.0, fleet-ops 1.10.0 — ракета — отряд во `fleets` (SM-3.7b).
 // 77: порядок тот же; shuttle 1.10.0 — эскадра в воздухе: новая цель, «Домой», перелёт и делёж (SHU-6.13).
 // 78: порядок тот же; heroEffects 1.3.0 — пси-зона героя на каждый удар по флоту (CORE-DMG-4).
-const PINNED_FOR_VERSION = '78';
+// 79: порядок тот же; orbital 1.3.0, shuttle 1.11.0 — обстрел и удар шаттлов бьют войска мира (ROS-1.6).
+const PINNED_FOR_VERSION = '79';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

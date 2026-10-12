@@ -587,6 +587,14 @@ export function addHooked(a: HookedDamage, b: HookedDamage): HookedDamage {
   return (a + b) as HookedDamage;
 }
 
+/** Cap an already-hooked amount from above (never below zero). Sound for the same reason
+ *  as {@link addHooked}: the input must itself be hooked, and lowering it cannot turn raw
+ *  damage into hooked damage. The floor of orbital and air fire on troops (ROS-1.6) cuts
+ *  what the hook let through, not what went into it. */
+export function capHooked(d: HookedDamage, max: number): HookedDamage {
+  return Math.min(d, Math.max(0, max)) as HookedDamage;
+}
+
 export function applyDamageToSide(
   h: HandlerContext,
   ref: CombatantRef,

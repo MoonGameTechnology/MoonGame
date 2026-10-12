@@ -87,6 +87,7 @@ import {
   type HookedDamage,
 } from '../util/combat';
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
+import { fireOnGarrison, shuttleGroundDamage } from '../util/groundFire';
 import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -601,6 +602,14 @@ function strikePower(
       const siege = stats.siegeDamage ?? 0;
       return siege > 0 ? siege : (stats.attack ?? 0);
     }) * share
+  );
+}
+
+/** Огонь вылета по ВОЙСКАМ мира за удар (ROS-1.6): той же линией огня и в той же доле
+ *  живого корпуса, что и удар по постройкам. */
+function strikeGroundPower(strike: ShuttleStrike, data: GameData): number {
+  return (
+    cappedUnitStat(strike.units, data, shuttleGroundDamage) * hullShare(strike.units, strike.damage, data)
   );
 }
 
@@ -1568,6 +1577,20 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               owner: target.owner,
             });
           }
+          // ROS-1.6: удар задевает и войска мира — сильнее обстрела с орбиты, но без
+          // последнего бойца (`util/groundFire.ts`). Только у врага или ничейного мира:
+          // по чужим, но не враждебным войскам огонь не идёт.
+          const troops = strikeGroundPower(strike, h.ctx.data);
+          if (troops > 0 && (target.owner === null || isHostile(h, strike.owner, target.owner))) {
+            const toTroops = hookedDamage(h, troops, {
+              phase: 'shuttle',
+              location: target.id,
+              attacker: strike.owner,
+              defender: target.owner ?? '',
+              ...strikeAttackerFleet(strike),
+            });
+            fireOnGarrison(h, target, toTroops, strike.owner);
+          }
           repelStrike(h, strike, answer, {
             kind: 'planet',
             id: target.id,
@@ -1805,7 +1828,8 @@ export const shuttleModule: GameModule = {
   //        отработавшей (`spent`) со своей строкой `shuttle.missileDowned`.
   // 1.10.0: эскадра в воздухе (SHU-6.13) — `shuttle.redirect`, «Домой» у любого вылета,
   //         перелёт и делёж по `strikeId`; номер приказа `orderSeq` гасит события прежнего.
-  version: '1.10.0',
+  // 1.11.0: удар по миру задевает и его войска, без последнего бойца (ROS-1.6).
+  version: '1.11.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`

@@ -513,6 +513,12 @@ export {
   type FireRole,
 } from './util/groundTargets';
 export {
+  SHIP_GROUND_FRACTION,
+  SHUTTLE_GROUND_FRACTION,
+  shipGroundDamage,
+  shuttleGroundDamage,
+} from './util/groundFire';
+export {
   findHealthyStack,
   addUnits,
   sumUnitStat,
