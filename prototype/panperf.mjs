@@ -24,10 +24,12 @@ const bridge = `
 import { orbitPhase as __orbitPhase } from './fleetGeometry';
 // Выпечка карты живёт в слое карты (REFM-232): её ручки дописывает в модуль mapLayerBridge.
 import { SETTLE_MS as __SETTLE_MS } from '../../decisions/mapLayerView';
+// Перенос выпечки — у слоя карты; \`main.ts\` его больше не читает (REFM-235).
+import { mapView as __mapView } from './mapLayer';
 const __ml = globalThis.__mapLayer;
 const panSamples = { frame: [], bake: [] };
-const originalRender = render;
-render = function(now) { const at = performance.now(); try { originalRender(now); }
+const originalRender = renderMap;
+renderMap = function(now) { const at = performance.now(); try { originalRender(now); }
   finally { panSamples.frame.push(performance.now() - at); } };
 const originalBake = __ml.bakeMapLayer;
 __ml.bakeMapLayer = function(...args) { const at = performance.now(); try { originalBake(...args); }
@@ -52,7 +54,7 @@ window.__panBenchmark = {
   async run(mode) {
     panSamples.frame = []; panSamples.bake = [];
     const state = JSON.stringify(s);
-    // render() alone misses the raster work Chromium defers past the callback: the
+    // renderMap() alone misses the raster work Chromium defers past the callback: the
     // interval between animation frames is what the player sees.
     const ticks = [];
     for (let i = 0; i < 90; i++) {
@@ -87,7 +89,7 @@ window.__panBenchmark = {
     // 2. A moving frame shows exactly the settled picture at the same camera.
     const live = surface();
     __ml.paintSky(live.getContext('2d'));
-    __ml.showMapLayer(live.getContext('2d'), mapView);
+    __ml.showMapLayer(live.getContext('2d'), __mapView);
     const still = diff(read(live), read(__ml.bg));
     // 3. After a whole-pixel pan the bake is reused, and it matches a fresh bake there;
     //    gradient dithering follows the canvas pixel grid, hence the few levels.

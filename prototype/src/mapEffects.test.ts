@@ -293,8 +293,10 @@ describe('REFM-234 — стык вспышек с main.ts', () => {
   });
 
   it('кадр зовёт рисовалки модуля', () => {
+    // Волна захвата ложится на поверхность карты в пространстве выпечки (`mapSurface.ts`, REFM-235).
+    const surface = readFileSync(new URL('./mapSurface.ts', import.meta.url), 'utf8');
+    expect(surface).toContain('drawCaptureFlashes(now);');
     for (const call of [
-      'drawCaptureFlashes(now);',
       'drawGoFlash(now);',
       'drawNoticeFlashes(now);',
       'drawFlak();',

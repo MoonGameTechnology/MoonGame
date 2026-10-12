@@ -10,7 +10,7 @@
  * булавок и ◎-бейджей планов: кадр их пересобирает, тап по карте (`mapInput.ts`) по ним
  * ищет цель. Мир, своё место, контекст кадра, часы голограммы, вид карты, метки коалиции и
  * задачи с цепочкой главы модуль получает хуками {@link initMapMarks}: они живут в
- * `main.ts`, и импорт оттуда был бы циклом. Рисовалки зовёт кадр `render()`.
+ * `main.ts`, и импорт оттуда был бы циклом. Рисовалки зовёт кадр `renderMap()`.
  */
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';

@@ -8,7 +8,7 @@
  * `patrolMarks.ts`, `corridorView.ts` и соседи), здесь только холст. Мир, своё место,
  * контекст кадра, часы карты, кольца ПКО из кэша кадра и эскадру взведённого прицела
  * модуль получает хуками {@link initMapOverlays}: они живут в `main.ts`, и импорт оттуда
- * был бы циклом. Зовут его кадр `render()` и прицелы `mapAim.ts`: круги и уголки у них
+ * был бы циклом. Зовут его кадр `renderMap()` и прицелы `mapAim.ts`: круги и уголки у них
  * те же.
  */
 import type { GameState, ShuttleStrike, Squadron } from '../../packages/shared-core/src/index';
@@ -63,6 +63,24 @@ let game: MapOverlaysHost;
 /** Подключить наложения к игре. Зовётся из `main.ts` один раз, до первого кадра. */
 export function initMapOverlays(host: MapOverlaysHost): void {
   game = host;
+}
+
+/** Рамка выделения флотов протяжкой по карте; `null` — рамки нет. */
+export function drawSelectionBox(selectionBox: { x1: number; y1: number; x2: number; y2: number } | null): void {
+  if (!selectionBox) return;
+  const cx = game.ctx();
+  const x = Math.min(selectionBox.x1, selectionBox.x2);
+  const y = Math.min(selectionBox.y1, selectionBox.y2);
+  const w = Math.abs(selectionBox.x2 - selectionBox.x1);
+  const h = Math.abs(selectionBox.y2 - selectionBox.y1);
+  cx.save();
+  cx.fillStyle = 'rgba(53,214,230,.08)';
+  cx.strokeStyle = LOCK;
+  cx.setLineDash([5, 4]);
+  cx.lineWidth = 1.2;
+  cx.fillRect(x, y, w, h);
+  cx.strokeRect(x, y, w, h);
+  cx.restore();
 }
 
 /** Stable corner brackets keep the picked object's position unambiguous. */
