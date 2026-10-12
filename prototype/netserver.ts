@@ -3,7 +3,7 @@ import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/
 import { corporateEndpoint, registerCorporateGateway, registerCorporateMaintenance } from '../packages/server/src/corporateTransport';
 import { corporateRemote } from '../packages/server/src/corporateRemote';
 import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
-import { recoveryMailer } from './src/recoveryMailer';
+import { recoveryMailer } from '../scripts/recoveryMailer';
 import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';

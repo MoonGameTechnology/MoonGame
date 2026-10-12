@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import type { Pool } from 'pg';
 import { corporateIdentity } from './corporateTransport';
+import { TLS_POLICY } from './wsServer';
 import { createCorporateServices } from './corporateTransactions';
 import { registerCorpApi } from './corpApi';
 import { registerAvaApi } from './avaApi';
@@ -20,12 +21,24 @@ export function createCorporationServer(
   tls?: { key: Buffer; cert: Buffer },
 ) {
   if (key.length < 32) throw Error('E_CORPORATIONS_CONFIG');
-  const app = Fastify({ logger: true, bodyLimit: 1_048_576, ...(tls ? { https: tls } : {}) });
+  const app = Fastify({
+    logger: true,
+    bodyLimit: 1_048_576,
+    ...(tls ? { https: { ...TLS_POLICY, ...tls } } : {}),
+  });
   app.addHook('onRequest', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
     reply.header('x-content-type-options', 'nosniff');
   });
   app.setErrorHandler((error, request, reply) => {
+    // A client error (bad body, size, rate) is not an outage: answered as 5xx it would
+    // count toward the gateway's shared circuit, so one user could close corporations
+    // for everyone. Same mapping as the game server's handler; details stay private.
+    const status = (error as { statusCode?: number }).statusCode;
+    if (status && Number.isInteger(status) && status >= 400 && status < 500) {
+      void reply.code(status).send({ error: status === 429 ? 'E_RATE_LIMIT' : 'E_BAD_REQUEST' });
+      return;
+    }
     request.log.error(error);
     void reply.code(503).send({ error: 'E_CORPORATIONS_UNAVAILABLE' });
   });

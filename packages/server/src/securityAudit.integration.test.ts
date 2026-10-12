@@ -14,7 +14,7 @@ const data = parseGameData({
   sectors: {},
   planetTypes: {},
 });
-function makeRoom(audit: SecurityAudit): MatchRoom {
+function makeRoom(audit: SecurityAudit, actionRateMax?: number): MatchRoom {
   const state = createInitialState({ seed: 'audit', version: { data: 'test', manifest: 'test' } });
   state.players.p1 = {
     id: 'p1',
@@ -29,6 +29,7 @@ function makeRoom(audit: SecurityAudit): MatchRoom {
     kernel: createKernel([]),
     data,
     securityAudit: audit,
+    ...(actionRateMax ? { actionRateMax } : {}),
   });
 }
 
@@ -75,5 +76,24 @@ describe('security audit is wired to actual HTTP and game refusals', () => {
       expect.objectContaining({ kind: 'security.alert', category: 'actions' }),
     );
     expect(lines.join('')).not.toMatch(/private-match|private-login|private malformed/);
+  });
+  it('leaves ordinary game-rule refusals out of the security stream', async () => {
+    const lines: string[] = [];
+    const audit = new SecurityAudit(
+      (line) => lines.push(line),
+      () => 0,
+    );
+    const room = makeRoom(audit, 1_000); // the room's own throttle is a separate signal
+    const sent: { type: string; code?: string }[] = [];
+    const peer: RoomPeer = { send: (raw) => sent.push(JSON.parse(raw)) };
+    room.addPeer('p1', peer);
+    // Well-formed intents the rules refuse (this kernel handles no action type) — the
+    // everyday «can't do that» of play, not an attack.
+    for (let i = 0; i < 25; i++) {
+      const action = { id: `a${i}`, type: 'fleet.orbit', playerId: 'p1', payload: {}, issuedAt: 0 };
+      await room.receive('p1', peer, JSON.stringify({ type: 'action', action }));
+    }
+    expect(sent.filter((m) => m.type === 'rejection')).toHaveLength(25);
+    expect(lines).toEqual([]);
   });
 });

@@ -74,6 +74,9 @@ const srcFiles = (): string[] => [
   ...readdirSync(path.join(repoRoot, 'decisions'))
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => `decisions/${f}`),
+  // Почтовый адаптер хостов (письмо сброса пароля) живёт рядом с точкой входа сервера:
+  // это слой хоста, а не прототипа, но ключи `auth.recovery-mail.*` читает он.
+  'scripts/recoveryMailer.ts',
 ];
 
 /** Шипнутый каталог — ВТОРОЙ источник живых ключей, наравне с исходниками (CONV-12c).

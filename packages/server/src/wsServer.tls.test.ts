@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import tls from 'node:tls';
 import { describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import {
@@ -103,6 +104,45 @@ describe('createMultiplayerServer — native TLS (RS-5.1)', () => {
       } finally {
         ws.close();
       }
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+// Encryption audit 2026-10-10, ECP-04: TLS 1.2 stays for old Android WebViews, but only
+// with forward-secret AEAD suites; CBC and pre-1.2 handshakes are refused.
+describe('native TLS policy', () => {
+  /** Handshake outcome for one client offer: the negotiated protocol, or 'refused'. */
+  function offer(port: number, options: tls.ConnectionOptions): Promise<string> {
+    return new Promise((resolve) => {
+      // Self-signed test cert: the subject here is the server's protocol/cipher policy,
+      // not the trust chain (verified with a real CA in deploy/healthcheck tests).
+      // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification
+      const socket = tls.connect({ host: '127.0.0.1', port, rejectUnauthorized: false, ...options });
+      socket.once('secureConnect', () => {
+        resolve(socket.getProtocol() ?? 'unknown');
+        socket.destroy();
+      });
+      socket.once('error', () => resolve('refused'));
+    });
+  }
+
+  it.skipIf(!certs)('accepts TLS 1.3 and AEAD TLS 1.2, refuses CBC and TLS 1.1', async () => {
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      tls: { key: certs!.key, cert: certs!.cert },
+    });
+    try {
+      const port = Number(new URL(await server.listen()).port);
+      expect(await offer(port, {})).toBe('TLSv1.3');
+      expect(
+        await offer(port, { maxVersion: 'TLSv1.2', ciphers: 'ECDHE-RSA-AES128-GCM-SHA256' }),
+      ).toBe('TLSv1.2');
+      expect(
+        await offer(port, { maxVersion: 'TLSv1.2', ciphers: 'ECDHE-RSA-AES128-SHA256:AES128-SHA' }),
+      ).toBe('refused');
+      expect(await offer(port, { minVersion: 'TLSv1.1', maxVersion: 'TLSv1.1' })).toBe('refused');
     } finally {
       await server.close();
     }

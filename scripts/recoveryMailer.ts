@@ -1,6 +1,6 @@
-import { LOCALE_SOURCES } from '../../localization/bundles';
-import { DEFAULT_LOCALE, isLocaleId } from '../../localization';
-import type { Mailer, RecoveryMailer } from '../../packages/server/src/authApi';
+import { LOCALE_SOURCES } from '../localization/bundles';
+import { DEFAULT_LOCALE, isLocaleId } from '../localization';
+import type { Mailer, RecoveryMailer } from '../packages/server/src/authApi';
 
 /** Host presentation adapter: each delivery selects its own locale, without global state. */
 export function recoveryMailer(sendMail: Mailer | undefined): RecoveryMailer | undefined {
