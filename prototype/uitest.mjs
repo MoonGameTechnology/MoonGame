@@ -576,6 +576,17 @@ for (const handle of (listeners.get(getEl('sz-codex-screen')) ?? {}).click ?? []
   handle({ target: { closest: (sel) => (sel === '[data-codex="back"]' ? {} : null) } });
 assert.equal(getEl('sz-codex-screen').hidden, true);
 assert.equal(getEl('sz-home').hidden, false, 'back returns to the menu');
+// Альбом комиксов (заказ владельца 2026-10-12) — такой же отдельный экран. Новый профиль
+// ещё ничего не видел: страницы закрыты, обложек нет.
+await click('sz-album');
+assert.equal(getEl('sz-album-screen').hidden, false, 'the album opens its own screen');
+assert.equal(getEl('sz-home').hidden, true);
+assert.ok(getEl('sz-album-screen').innerHTML.includes('sz-album-empty'), 'a fresh profile has no pages yet');
+assert.ok(!getEl('sz-album-screen').innerHTML.includes('data-album="'), 'locked pages are not buttons');
+for (const handle of (listeners.get(getEl('sz-album-screen')) ?? {}).click ?? [])
+  handle({ target: { closest: (sel) => (sel === '[data-album-back]' ? {} : null) } });
+assert.equal(getEl('sz-album-screen').hidden, true);
+assert.equal(getEl('sz-home').hidden, false, 'back returns to the menu');
 await click('sz-strong');
 await click('sz-new');
 // Первый забег главы I открывает её комикс (инструктаж); «Пропустить» ведёт в бой.

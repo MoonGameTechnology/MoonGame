@@ -4158,6 +4158,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
             <button id="sz-codex" class="sz-action" type="button" data-i18n="sector-zero.codex.open"></button>
+            <button id="sz-album" class="sz-action" type="button" data-i18n="sector-zero.album.open"></button>
           </div>
           <p id="sz-signin-row" class="sz-signin" hidden><button id="sz-signin" type="button" data-i18n="sector-zero.signin"></button><span data-i18n="sector-zero.signin.why"></span></p>
           <fieldset class="sz-difficulty sz-route-box">
@@ -4226,6 +4227,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <!-- Досье Роя — своё окно, как «Подготовка» (заказ владельца 2026-09-24): всё, что игрок
          узнал о Рое за прошлые экспедиции (swarmCodex.ts) -->
     <div id="sz-codex-screen" hidden></div>
+    <!-- Альбом комиксов — своё окно, как досье (заказ владельца 2026-10-12): страницы, которые
+         игрок уже видел (decisions/comicAlbum.ts) -->
+    <div id="sz-album-screen" hidden></div>
     <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>
   </div>
 </section>
