@@ -297,7 +297,8 @@ describe('REFM-231 — стык с main.ts', () => {
     }
     // Переход с выбором сбрасывает кэш разметки панели (правило 4 `mapJump.ts`).
     expect(init).toMatch(/select: \(id\) => \{\s*pickWorld\(id\);\s*invalidatePanel\(\);\s*\}/);
-    expect(init).toMatch(/ring: \(id\) => \{\s*goFlash = \{ id, at: performance\.now\(\) \};\s*\}/);
+    // Кольцо над миром перехода ставит владелец вспышек (REFM-234).
+    expect(init).toContain('ring: flashGo,');
   });
 
   it('камеру и рамку меняют только двери владельца', () => {

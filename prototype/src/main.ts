@@ -15,10 +15,9 @@ import { mineCard } from '../../decisions/mineCard';
 import { rocketMineCard } from '../../decisions/rocketMineCard';
 import { missileCard } from '../../decisions/missileCard';
 import { isEmplacementFleet } from '../../decisions/emplacement';
-import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { isMissileFleet, isOrdnanceFleet, isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
-import { drawMissile, drawOrdnance } from '../../packages/client/src/ordnanceView';
+import { drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { HINT_KEY, MINE_MODES, MODE_KEY, rocketMinesUi } from './rocketMinesUi';
 import type { SoloSave } from '../../decisions/soloSave';
 import {
@@ -161,7 +160,6 @@ import {
   dockRepairCost,
   fleetAtOwnDock,
   type AiProfile,
-  type ChainStep,
 } from './game';
 import {
   dominantUnit,
@@ -175,7 +173,7 @@ import {
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { worldName } from './planetName';
-import { minelayerOffer, ownInstallations } from '../../decisions/minefields';
+import { minelayerOffer } from '../../decisions/minefields';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
@@ -281,8 +279,10 @@ import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMa
 import { blitBorderLayer, forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawBattlePulse, drawCombatRanges, drawCorridors, drawFleetRoutes, drawPatrolRings, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays, targetBrackets } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
+import { addFlak, clearFlak, drawCaptureFlashes, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashMines, flashProvince, initMapEffects, noticeFlash } from './mapEffects';
+import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
 import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, holographicFrame, initMapLayer, livingBorders, mapContextEvents, mapLayerForInput, mapPreparationJobs, mapView, provinceAt, provinceGeometry, provincePolygon, roadDrawingOf, terrainFields } from './mapLayer';
-import { drawHolographicBattle, drawHolographicPing } from './holographicEffects';
+import { drawHolographicBattle } from './holographicEffects';
 import { holoIcon, skinIcon } from './holographicIcons';
 import { drawProvinceSelection, selectionPulse } from '../../packages/client/src/provinceSelection';
 import { initPingUi } from './pingUi';
@@ -332,7 +332,6 @@ import { devourSieges } from '../../decisions/devourSiege';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
-import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { tileHp } from '../../decisions/unitTile';
@@ -429,26 +428,6 @@ import { initPurseFloats } from './purseFloats';
 import type { PurseReading } from '../../decisions/purseDelta';
 import { arrivalHours, restRouteHours } from './travelEta';
 import { toScreen } from './screenAnchor';
-import { fadeOf, flashDone, flashProgress, growRadius, noticeRing, waveRadius } from './flashFx';
-import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
-import {
-  BADGE_DY,
-  badgeCount,
-  badgePulse,
-  groupByAnchor,
-  shownOrders,
-  type AnchoredOrder,
-} from './chainBadges';
-import {
-  RING_OFFSETS,
-  dropInAlpha,
-  pinPulse,
-  pingPhase,
-  ringAlpha,
-  ringProgress,
-  ringRadius,
-  ringWidth,
-} from './pingPulse';
 import { pickHome } from './openingView';
 import type { Snapshot } from './scanMemory';
 import { houseDisplayName, seatAiProfile } from './setupSeats';
@@ -593,7 +572,6 @@ import {
   blitGlow,
   blitSphere,
   CARDINAL,
-  HOSTILE,
   initMapPalette,
   LOCK,
   neutralColor,
@@ -622,15 +600,8 @@ import {
 } from './cmdActions';
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { flushPinch, forgetAdditive, forgetAimPointer, initMapInput, pointers, selectionBox, tapByTouch } from './mapInput';
-import { chainAbilityHoldH, chainMenuAnchor, chainMode, chainRoute, chainStart, chainStepsOf, chainTravelH, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged } from './chainComposer';
+import { chainMode, chainStepsOf, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged } from './chainComposer';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
-// CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
-import {
-  chainTimeline,
-  draftFinish,
-  stepGlyph,
-  stepHours,
-} from './chainPlanner';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
@@ -793,10 +764,7 @@ import {
 } from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { netViewAt } from '../../decisions/netViewClock';
-import {
-  toBake,
-  visibleInBake,
-} from '../../decisions/mapLayerView';
+import { visibleInBake } from '../../decisions/mapLayerView';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
@@ -813,7 +781,7 @@ import { ringShown } from './orbitRing';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark } from '../../packages/client/src/forkMark';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
-import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
+import { aaImpact } from './fireEffects';
 import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
 import { stewardMine } from './stewardLog';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
@@ -830,14 +798,7 @@ import { toggleInSelection } from '../../decisions/fleetSelection';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
 import { radarContacts } from './snapshotIngest';
-import {
-  FLAK_LIFE_MS,
-  flakBurstRadius,
-  flakDashOffset,
-  flakLook,
-  flakTier,
-  type FlakTier,
-} from './flakTiers';
+import { flakTier } from './flakTiers';
 import { sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
 import { GOTO_MIN_ZOOM } from './mapJump';
@@ -967,10 +928,8 @@ let endScreen: MatchEnd | null = null;
 // владельца — `pick*`, `arm`/`drop`, `disarm(повод)`.
 /** Чей раскол ждёт события, чтобы выделить отделённую часть (`splitSelectTarget`). */
 let splitAwait: string | null = null;
-// Хитбоксы ◎-бейджей отправленных планов (тап вне режима = редактирование плана).
 let heroPortraitHits: PortraitHit[] = [];
 let lastHeroCardRefresh = 0;
-let chainHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }> = [];
 /** До какого момента (ms, `performance.now`) чип союзника мигает после встречи. */
 let allyPulseUntil = 0;
 
@@ -1050,9 +1009,6 @@ initDiploWindow({
   openProfile: (login) => profile?.open(login),
   refreshChat: () => chatWin?.refreshIfVisible(),
 });
-
-// Screen hit-boxes for the on-map ping markers, rebuilt every frame by drawPings().
-let pingHits: Array<{ loc: string; x: number; y: number }> = [];
 
 // --- multiplayer (net mode) --------------------------------------------------
 // Сетевой жизненный цикл — `netSession.ts` (REFM-216): признак сети, сокет, клиент места,
@@ -1158,26 +1114,6 @@ let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
 // the AI's fights elsewhere don't inflate your tally.
 let killStats = { destroyed: 0, lost: 0 };
 const myBattleLocs = new Set<string>();
-// Orbital-AA volleys to visualize (H2): map-space endpoints captured at event time
-// (the target may die in that very volley), drawn as a fading flak burst ~0.7s.
-const aaShots: Array<{
-  from: { x: number; y: number };
-  to: { x: number; y: number };
-  at: number;
-  // ТИР, а не «ближняя ли это зенитка»: с остатком SHU-3.1 сюда же встаёт ВСТРЕЧНЫЙ
-  // ПЕРЕХВАТ (`shuttle.intercepted`), а с AUD-17 — КОРАБЕЛЬНОЕ ПВО (`pd.fired`); признака
-  // «ближний/орбитальный» у них нет вовсе. Очередь и кадр отрисовки у всех тиров один —
-  // расходится только вид (`flakTiers.ts`), поэтому второй копии этого блока не заводим.
-  tier: FlakTier;
-}> = [];
-// Capture flashes: a province that changed hands lights up in its NEW owner's colour —
-// a wave sweeps across its cell and the frontier ignites, fading over ~1.5s, so a
-// silent capture (previously only a toast) reads on the map at a glance. Fog-gated at
-// push time (a hidden flip never flashes). Keyed by node so a re-capture restarts it.
-const captureFlashes = new Map<string, { owner: string; at: number }>();
-// SM-3.5: вспышка срабатывания мин — узел → момент (performance.now). Ставится, только
-// если мины задели меня или сработало моё поле.
-const mineFlashes = new Map<string, { at: number; position?: { x: number; y: number } }>();
 // Casualties per contested location (owner → unit → count), accumulated from
 // unit.died while a battle runs and paid out as a result note on battle.resolved.
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
@@ -1700,9 +1636,7 @@ initMapCamera({
     invalidatePanel();
   },
   closeDiplo: () => closeDiplo(),
-  ring: (id) => {
-    goFlash = { id, at: performance.now() };
-  },
+  ring: flashGo,
 });
 frameMap(MAP);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -2503,10 +2437,7 @@ function handleEvents(events: DomainEvent[]) {
         if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
           // light the flipped province up in its new owner's colour (fog-gated: only
           // a capture we may see flashes) — re-capture restarts the wave.
-          captureFlashes.set(p.planetId as string, {
-            owner: p.owner as string,
-            at: performance.now(),
-          });
+          flashProvince(p.planetId as string, p.owner as string);
           // Захват, который игрок ВИДЕЛ, — это знание: записать его в память разведки.
           // Иначе потерянная провинция тем же кадром уходила в туман, заливка брала
           // владельца из снимка кадром раньше, и мир Роя оставался цвета игрока
@@ -2691,13 +2622,12 @@ function handleEvents(events: DomainEvent[]) {
         // ЭТИМ же залпом (ядро издаёт событие после урона), и тогда вспышка встаёт над
         // своей орбитой — беззвучно пропавший залп читался бы как «ПКО не сработало».
         const target = s.fleets[p.fleetId as string];
-        aaShots.push({
+        addFlak({
           from: { ...planet.position },
           to: aaImpact(target && fleetPos(target), planet.position),
           at: performance.now(),
           tier: flakTier(p.tier === 'close'),
         });
-        capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
       // ВСТРЕЧНЫЙ ПЕРЕХВАТ (SHU-1.3) — база подняла дежурное звено навстречу чужому
@@ -2716,13 +2646,12 @@ function handleEvents(events: DomainEvent[]) {
         const carrier = base.kind === 'fleet' ? s.fleets[base.id] : undefined;
         const node = base.kind === 'planet' ? base.id : carrier ? fleetNode(carrier) : null;
         if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(node))) break;
-        aaShots.push({
+        addFlak({
           from: { ...home },
           to: aaImpact(strikeWorldPos(p.strikeId as string), home),
           at: performance.now(),
           tier: 'intercept',
         });
-        capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
       // КОРАБЕЛЬНОЕ ПВО (AUD-17) — четвёртый тир огня (`flakTiers.ts`, правило 6). Ядро
@@ -2737,13 +2666,12 @@ function handleEvents(events: DomainEvent[]) {
         if (!ship || !from) break;
         if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), fleetKnown(ship)))
           break;
-        aaShots.push({
+        addFlak({
           from: { ...from },
           to: aaImpact(strikeWorldPos(p.strikeId as string), from),
           at: performance.now(),
           tier: 'pointDefense',
         });
-        capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
       // УДАР ШАТТЛОВ ПО ЦЕЛИ (SHU-6.11, `decisions/shuttleHit.ts`) — и налёт по прибытии, и
@@ -2783,13 +2711,12 @@ function handleEvents(events: DomainEvent[]) {
             hit.owner === ME
               ? strikeWorldPos(hit.strikeId)
               : seenPatrolOver(vision?.seenPatrols ?? [], hit.owner, to);
-          aaShots.push({
+          addFlak({
             from: { ...(from ?? to) },
             to: { ...to },
             at: performance.now(),
             tier: 'strike',
           });
-          capShots(aaShots, AA_SHOTS_MAX);
         }
         if (view.journal) {
           announcedHits.add(hitKey(hit));
@@ -2969,7 +2896,7 @@ function handleEvents(events: DomainEvent[]) {
         const victim = p.owner === ME;
         if (!victim && !(p.by as string[] | undefined)?.includes(ME)) break;
         note(t(victim ? 'log.mines.hit' : 'log.mines.triggered', { n: Number(p.lost) || 0 }), at);
-        mineFlashes.set(at, { at: performance.now(), position: p.position as { x: number; y: number } | undefined });
+        flashMines(at, p.position as { x: number; y: number } | undefined);
         break;
       }
       case 'unit.died': {
@@ -3067,6 +2994,28 @@ initMapAim({
   mobile: () => MOBILE,
   capturable: (id) => sectorTypeOf(id)?.capturable ?? false,
   aimSquadron,
+});
+
+// Вспышки и залпы — огонь ПКО и шаттлов, волна захвата, мины, кольцо перехода и малая
+// вспышка — живут в `mapEffects.ts` (REFM-234). Мир и кадр они получают хуками.
+initMapEffects({
+  world: () => s,
+  ctx: () => cx,
+});
+
+// Метки — цели задач, союзник, ракеты, мины, осада, метки коалиции и цепочки «Приказ» —
+// живут в `mapMarks.ts` (REFM-234). Мир, кадр, часы и вид голограммы, метки коалиции и
+// задачи забега они получают хуками.
+initMapMarks({
+  world: () => s,
+  me: () => ME,
+  ctx: () => cx,
+  clock: () => hologramTime,
+  holographic: holographicMapOn,
+  ownPings: () => showOwnPings,
+  pings: () => pings?.drawable() ?? [],
+  missionRows: runMissionRows,
+  chain: runChain,
 });
 
 // Статический слой карты — небо и политическая карта, выпеченные под камерой, — живёт в
@@ -3247,45 +3196,7 @@ function render(now: number) {
     }
   }
 
-  // orbital-AA flak (H2): a dashed ground-to-orbit tracer with a burst at the
-  // target end, fading out — a fleet under AA fire no longer melts silently.
-  if (aaShots.length) {
-    const nowMs = performance.now();
-    cx.save();
-    for (let i = aaShots.length - 1; i >= 0; i--) {
-      const shot = aaShots[i]!;
-      // Жизнь и затухание трассы — `flashFx.ts` (REFM-70): своей шкалы у неё нет.
-      if (flashDone(nowMs, shot.at, FLAK_LIFE_MS)) {
-        aaShots.splice(i, 1);
-        continue;
-      }
-      const a = world(shot.from);
-      const b = world(shot.to);
-      if (!visible(a, 160) && !visible(b, 160)) continue;
-      const k = flashProgress(nowMs, shot.at, FLAK_LIFE_MS);
-      const fade = fadeOf(k);
-      // Тир — весь вид разом, таблицей в `flakTiers.ts` (REFM-112): часовой ОРБИТАЛЬНЫЙ
-      // залп тяжелее и заметнее 15-минутной БЛИЖНЕЙ зенитки по всем осям сразу, а
-      // ВСТРЕЧНЫЙ ПЕРЕХВАТ отличается от обоих — это не выстрел с земли.
-      const look = flakLook(shot.tier);
-      cx.strokeStyle = rgba(look.color, look.alpha * fade);
-      cx.lineWidth = look.width;
-      cx.setLineDash([...look.dash]);
-      cx.lineDashOffset = flakDashOffset(nowMs - shot.at); // трасса ползёт от поверхности
-      cx.shadowColor = look.color;
-      cx.shadowBlur = fxBlur(look.blur);
-      cx.beginPath();
-      cx.moveTo(a.x, a.y);
-      cx.lineTo(b.x, b.y);
-      cx.stroke();
-      cx.setLineDash([]);
-      cx.fillStyle = rgba(look.burstColor, 0.8 * fade);
-      cx.beginPath();
-      cx.arc(b.x, b.y, flakBurstRadius(look, k), 0, TAU);
-      cx.fill();
-    }
-    cx.restore();
-  }
+  drawFlak(); // H2: трассы огня ПКО, перехвата, корабельного ПВО и ударов шаттлов
 
   // selected sector: its radar detection radius (a physical circle in map space →
   // an axis-aligned ellipse on screen because the fit projection is non-uniform).
@@ -4099,7 +4010,8 @@ function render(now: number) {
   drawEngageTargets(lastReal);
   drawMissionTargets();
   drawAllyMarks(); // глава IV: цель операции союзника и носитель накопителя
-  drawMinefields(now); // SM-3.5: свои минные поля «💣 ×заряд» и вспышка срабатывания
+  drawMineFlashes(now); // SM-3.5: вспышка срабатывания мин
+  drawMinefields(); // SM-3.5: свои минные поля «💣 ×заряд» и установки
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
@@ -8400,7 +8312,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   threatScanAt = -1;
   refugeReported.clear(); // id флотов карты повторяются от забега к забегу
   battleLosses.clear();
-  aaShots.length = 0;
+  clearFlak();
   logLines.length = 0; // fresh log — drop notes from the menu-background match
   eventLog.length = 0; // ONB-5: the return digest belongs to THIS match only
   awayFromGameTime = null; // reset the away-window baseline for the new match
@@ -8713,7 +8625,7 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
     // Preview the capture wave over a province without staging a real ground battle.
     flashCapture(node: string, owner: string): boolean {
       if (!s.planets[node]) return false;
-      captureFlashes.set(node, { owner, at: performance.now() });
+      flashProvince(node, owner);
       return true;
     },
     // Force the match to a terminal state so the end screen can be previewed without
@@ -9244,229 +9156,6 @@ function fleetLabelOf(fleetId: string): string {
 function runChain(): ChapterStep[] | null {
   if (!sectorRunActive) return null;
   return chapterChain(s, ME, extractionNeedMs(s, ctx(s.time, s)), data);
-}
-
-/** Метки целей задач на карте: дышащее мятное кольцо и флажок над миром. Выполненная
- *  задача меток не держит (`missionView.ts`, правило 3). Текущий шаг главной цепочки главы
- *  (точка встречи, архив, зона вывода) метится так же — это тоже цель. */
-function drawMissionTargets(): void {
-  if (!sectorRunActive) return;
-  const chainAt = runChain()?.find((st) => st.active)?.target;
-  const ids = new Set([...runMissionRows().flatMap(r => r.targets), ...(chainAt ? [chainAt] : [])]);
-  if (ids.size === 0) return;
-  cx.save();
-  for (const id of ids) {
-    const p = s.planets[id];
-    if (!p) continue;
-    const c = world(p.position);
-    if (!visible(c, 60)) continue;
-    // `hologramTime` — визуальные часы карты: стоят на паузе и при отключённой анимации.
-    // Ритм кольца (пунктир уходит волнами, как сонар метки, бежит и дышит) и своя фаза
-    // цели — `decisions/missionRing.ts`.
-    const { breath, dashOffset, waves } = missionRingFrame(hologramTime, motionOn(), missionRingPhase(p.position));
-    cx.shadowColor = '#8ff5c8';
-    cx.shadowBlur = fxBlur(4);
-    for (const w of waves) {
-      cx.strokeStyle = `rgba(143,245,200,${w.alpha})`;
-      cx.lineWidth = w.width;
-      cx.setLineDash([6 * w.scale, 5 * w.scale]);
-      cx.lineDashOffset = dashOffset * w.scale;
-      cx.beginPath();
-      cx.arc(c.x, c.y, w.r, 0, TAU);
-      cx.stroke();
-    }
-    cx.strokeStyle = `rgba(143,245,200,${0.55 + 0.35 * breath})`;
-    cx.lineWidth = RING_W;
-    cx.setLineDash([6, 5]);
-    cx.lineDashOffset = dashOffset;
-    cx.shadowBlur = fxBlur(6 + 6 * breath);
-    cx.beginPath();
-    cx.arc(c.x, c.y, RING_R, 0, TAU);
-    cx.stroke();
-    cx.setLineDash([]);
-    cx.lineDashOffset = 0;
-    // флажок над миром: древко и полотнище
-    const x = c.x + 17;
-    const y = c.y - 34;
-    cx.strokeStyle = 'rgba(4,10,12,.9)';
-    cx.fillStyle = '#8ff5c8';
-    cx.lineWidth = 1.4;
-    cx.beginPath();
-    cx.moveTo(x, y + 20);
-    cx.lineTo(x, y);
-    cx.lineTo(x + 15, y + 5);
-    cx.lineTo(x, y + 10);
-    cx.closePath();
-    cx.fill();
-    cx.stroke();
-  }
-  cx.restore();
-}
-
-/** Глава IV (PVR-7.5): синяя метка цели операции союзника с его эмблемой (§6.5) и знак
- *  накопителя над флотом-носителем (§6.7). Принадлежность различается не только цветом:
- *  у союзной метки эмблема, у носителя — свой знак. */
-function drawAllyMarks(): void {
-  if (!sectorRunActive) return;
-  cx.save();
-  const view = allyPanelView(s, ME, data);
-  const op = view?.op;
-  const at = op
-    ? (op.planet ?? (op.fleet ? (s.fleets[op.fleet]?.location ?? undefined) : undefined))
-    : undefined;
-  const target = at ? s.planets[at] : undefined;
-  if (target) {
-    const c = world(target.position);
-    if (visible(c, 60)) {
-      const own = op!.source === 'own';
-      cx.strokeStyle = own ? 'rgba(74,140,255,.45)' : COLOR.ally!;
-      cx.lineWidth = 2;
-      cx.setLineDash([4, 4]);
-      cx.beginPath();
-      cx.arc(c.x, c.y, RING_R + 6, 0, TAU);
-      cx.stroke();
-      cx.setLineDash([]);
-      cx.fillStyle = COLOR.ally!;
-      cx.font = '700 13px ui-monospace,monospace';
-      cx.textAlign = 'center';
-      cx.fillText(ALLY_EMBLEM, c.x - RING_R - 4, c.y - RING_R - 2);
-    }
-  }
-  // Носитель — накопителя главы IV или пленного главы V (PVR-9.5): тот же янтарный ◈.
-  const carriers = [
-    s.extraction?.deliveredAt === undefined ? s.extraction?.carrier : undefined,
-    s.captive?.deliveredAt === undefined && s.captive?.lostAt === undefined ? s.captive?.carrier : undefined,
-  ];
-  for (const id of carriers) {
-    const carrier = id ? s.fleets[id] : undefined;
-    const pos = carrier ? fleetAnchor(carrier) : null;
-    if (!pos) continue;
-    const c = world(pos);
-    if (!visible(c, 40)) continue;
-    cx.fillStyle = '#ffb43a';
-    cx.strokeStyle = 'rgba(4,10,12,.9)';
-    cx.lineWidth = 3;
-    cx.font = '700 15px ui-monospace,monospace';
-    cx.textAlign = 'center';
-    cx.strokeText('◈', c.x, c.y - 20);
-    cx.fillText('◈', c.x, c.y - 20);
-  }
-  cx.restore();
-}
-
-/** Осада «Поглощения мира» над своим миром (PVR-4.7): красное кольцо-часы — дуга тает к
- *  гибели мира — и отсчёт над ним в тех же часах, что у волн (`decisions/devourSiege.ts`).
- *  Текста нет: знак и время, поэтому и локали не нужно. */
-/** Летящие ракеты (SM-3.7b) — отряды, но не корабли: стрелка по курсу и пунктир к точке
- *  цели в цвете владельца (`drawMissile`), без корпуса и счётчика. Видна по обычному туману
- *  (`fleetSeen`); чужую подписывает «Входящая ракета», когда карта крупна для подписи. */
-function drawMissiles(): void {
-  for (const f of Object.values(s.fleets)) {
-    if (!f.flight || !isMissileFleet(f, data) || !fleetSeen(f)) continue;
-    const at = fleetPos(f);
-    if (!at) continue;
-    const c = world(at);
-    if (!visible(c, 120)) continue;
-    const label = f.owner !== ME && cam.scale >= 0.8 ? t('mine.incoming') : undefined;
-    drawMissile(cx, c, world(f.flight.to), ownerColor(f.owner), label);
-  }
-}
-
-const MINE_FLASH_MS = 1200;
-function drawMinefields(now: number): void {
-  for (const [node, flash] of mineFlashes) {
-    const { at } = flash;
-    if (flashDone(now, at, MINE_FLASH_MS)) {
-      mineFlashes.delete(node);
-      continue;
-    }
-    const position = flash.position ?? s.planets[node]?.position;
-    if (!position) continue;
-    const c = world(position);
-    if (!visible(c, 80)) continue;
-    const k = flashProgress(now, at, MINE_FLASH_MS);
-    cx.save();
-    cx.strokeStyle = `rgba(255,179,71,${0.9 * fadeOf(k)})`;
-    cx.lineWidth = 3;
-    cx.beginPath();
-    cx.arc(c.x, c.y, waveRadius(k, 60, 1), 0, TAU);
-    cx.stroke();
-    cx.restore();
-  }
-  // Установки — свои, по месту носителя; мины (SM-3.6) — отряды во `fleets`, чужие только
-  // вблизи (`fleetSeen`). Мина стоит там же, куда смотрит палец (`fleetAnchor`: на дороге —
-  // в своей точке, на узле — на кольце орбиты), иначе тап по знаку промахивался бы мимо неё.
-  // Знак один: сфера мины, у установки — пунктиром и «◷».
-  const marks: Array<{ c: { x: number; y: number }; owner: string; label: string; installing: boolean }> = [];
-  // Носитель — по ключу среза (`ownInstallations`): сравнение по ссылке не находило его,
-  // и дорожная установка теряла знак (ревью #1411).
-  for (const { layer, job } of ownInstallations(s, ME)) {
-    const at = layer ? fleetPos(layer) : job.location ? s.planets[job.location]?.position : null;
-    if (!at) continue;
-    const c = world(at);
-    marks.push({ c: job.location === null ? c : { x: c.x, y: c.y - 44 }, owner: job.owner, label: '◷', installing: true });
-  }
-  for (const f of Object.values(s.fleets)) {
-    if (!isMineFleet(f, data) || !fleetSeen(f)) continue;
-    const c = fleetAnchor(f);
-    // Ракетная мина — один заряд, счётчик ей ни к чему (SM-3.7a).
-    const label = isRocketMineFleet(f, data) ? '' : `×${mineCard(f, data).charges}`;
-    if (c) marks.push({ c, owner: f.owner, label, installing: false });
-  }
-  for (const m of marks) {
-    if (!visible(m.c, 40)) continue;
-    cx.save(); cx.translate(m.c.x - 12, m.c.y - 12);
-    cx.strokeStyle = m.owner === ME ? '#60dbe8' : '#ffac62';
-    cx.fillStyle = 'rgba(4,10,12,.85)'; cx.lineWidth = 1.2;
-    cx.setLineDash(m.installing ? [2, 2] : []);
-    drawMineShape(cx, cam.scale >= 0.9);
-    cx.setLineDash([]);
-    cx.fillStyle = cx.strokeStyle; cx.font = '11px ui-monospace, monospace';
-    cx.textAlign = 'left'; cx.fillText(m.label, 26, 15);
-    cx.restore();
-  }
-}
-
-function drawDevourSieges(): void {
-  const marks = devourSieges(s, ME);
-  if (marks.length === 0) return;
-  const R = 31;
-  cx.save();
-  cx.textAlign = 'center';
-  cx.textBaseline = 'top';
-  cx.font = '700 12px ui-monospace, monospace';
-  for (const m of marks) {
-    const p = s.planets[m.target];
-    if (!p) continue;
-    const c = world(p.position);
-    if (!visible(c, 60)) continue;
-    cx.lineWidth = 4;
-    cx.strokeStyle = 'rgba(255,90,77,.22)';
-    cx.beginPath();
-    cx.arc(c.x, c.y, R, 0, TAU);
-    cx.stroke();
-    cx.strokeStyle = HOSTILE;
-    cx.shadowColor = HOSTILE;
-    cx.shadowBlur = fxBlur(8);
-    cx.beginPath();
-    cx.arc(c.x, c.y, R, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - m.progress));
-    cx.stroke();
-    cx.shadowBlur = 0;
-    // Отсчёт — на тёмной плашке: у дома тесно (плашки флотов, портрет героя), и голый
-    // текст тонул бы в них. Плашку не заслоняет ничего — слой рисуется поверх флотов.
-    const label = `☠ ${countdownHMS(m.leftMs)}`;
-    const w = Math.ceil(cx.measureText(label).width) + 12;
-    const top = Math.round(c.y + R + 5);
-    const left = Math.round(c.x - w / 2);
-    cx.fillStyle = 'rgba(4,10,12,.9)';
-    cx.fillRect(left, top, w, 17);
-    cx.lineWidth = 1;
-    cx.strokeStyle = HOSTILE;
-    cx.strokeRect(left + 0.5, top + 0.5, w - 1, 16);
-    cx.fillStyle = HOSTILE;
-    cx.fillText(label, c.x, top + 3);
-  }
-  cx.restore();
 }
 
 // Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
@@ -10128,353 +9817,6 @@ initChainComposer({
   invalidateCmdBar,
   invalidatePanel,
 });
-/** Draw a pin per active coalition ping (owner-coloured), recording screen hit-boxes
- *  for tap detection. Pins float just above the node, tip pointing at it. Two sonar
- *  rings expand from the marked node (half a period apart) and the pin head breathes
- *  an owner-coloured glow — a "look here" you can catch from across the map. Your
- *  own pins can be hidden with the settings switch (allies' are always drawn). */
-function drawPings(now: number): void {
-  pingHits = [];
-  for (const m of pings?.drawable() ?? []) {
-    // `drawable()` уже отбросил спрятанные ЛОКАЛЬНО (у союзника метка цела).
-    if (m.from === ME && !showOwnPings) continue; // hidden by «Свои метки» switch
-    const pl = s.planets[m.ping!];
-    if (!pl) continue;
-    const c = world(pl.position);
-    if (!visible(c, 40)) continue;
-    const x = c.x;
-    const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
-    const col = ownerColor(m.from);
-    if (holographicMapOn()) {
-      drawHolographicPing(cx, c.x, c.y, col, hologramTime, pingPhase(x), glowOn());
-      pingHits.push({ loc: m.ping!, x, y: y - 1 });
-      continue;
-    }
-    // Фазы, дыхание и жизнь колец — `pingPulse.ts` (REFM-72).
-    const phase = pingPhase(x);
-    const pulse = pinPulse(now, phase);
-    cx.save();
-    // sonar waves: rings born at the node, growing and thinning out as they fade;
-    // a newborn ring flashes a soft filled core so each wave visibly "drops in"
-    cx.shadowColor = rgba(col, 0.7);
-    for (const off of RING_OFFSETS) {
-      const k = ringProgress(now, phase, off);
-      const rr = ringRadius(k);
-      const drop = dropInAlpha(k);
-      if (drop > 0) {
-        cx.fillStyle = rgba(col, drop); // the drop-in flash
-        cx.beginPath();
-        cx.arc(c.x, c.y, rr, 0, TAU);
-        cx.fill();
-      }
-      cx.shadowBlur = fxBlur(6 * (1 - k));
-      cx.strokeStyle = rgba(col, ringAlpha(k));
-      cx.lineWidth = ringWidth(k);
-      cx.beginPath();
-      cx.arc(c.x, c.y, rr, 0, TAU);
-      cx.stroke();
-    }
-    // the pin itself, breathing an owner-coloured glow (the dark stroke keeps contrast)
-    cx.shadowColor = rgba(col, 0.85);
-    cx.shadowBlur = fxBlur(4 + 8 * pulse);
-    cx.fillStyle = rgba(col, pulse);
-    cx.strokeStyle = 'rgba(4,10,12,.85)';
-    cx.lineWidth = 1.4;
-    cx.beginPath(); // teardrop pin: head + tip toward the node
-    cx.moveTo(x, y + 14);
-    cx.lineTo(x - 6.5, y);
-    cx.arc(x, y - 1, 7, Math.PI, 0);
-    cx.lineTo(x, y + 14);
-    cx.fill();
-    cx.stroke();
-    cx.shadowBlur = 0;
-    cx.fillStyle = 'rgba(6,18,22,.95)';
-    cx.beginPath();
-    cx.arc(x, y - 1, 2.7, 0, TAU);
-    cx.fill();
-    cx.fillStyle = rgba(col, pulse); // a blinking ember in the pin's eye
-    cx.beginPath();
-    cx.arc(x, y - 1, 1.4, 0, TAU);
-    cx.fill();
-    cx.restore();
-    pingHits.push({ loc: m.ping!, x, y: y - 1 });
-  }
-}
-
-/** TGT-1: standing order markers — a breathing crosshair on every world an OWN
- *  chained fleet is planned against (last move leg; a legless plan anchors at the
- *  fleet's spot). The ◎ badge above the ring is the tap handle (screen hit-boxes,
- *  like pings) — tapping it re-opens the composer with the live plan. */
-/** CHAIN-UX: полилиния + капсулы шагов + накопленное «~T» для ОДНОЙ цепочки.
- *  Времена — клиентская оценка (авторитетны только arrivesAt/waitUntil головы),
- *  поэтому всегда с «~». Рисуется без LOD-затухания: план — то, ради чего смотрят. */
-function drawChainPath(
-  f: Fleet,
-  steps: ChainStep[],
-  fromId: string | null,
-  baseH: number,
-  headRemH: number | undefined,
-  alpha: number,
-): void {
-  if (!steps.length || !fromId) return;
-  const start = fleetOriginPx(f);
-  if (!start) return;
-  const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
-  // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).
-  const pts: Array<{ x: number; y: number }> = [start];
-  for (const hop of chainPathNodes(steps, fromId, chainRoute)) {
-    const pl = s.planets[hop];
-    if (pl) pts.push(world(pl.position));
-  }
-  cx.save();
-  cx.globalAlpha = alpha;
-  if (pts.length > 1) {
-    cx.setLineDash([4, 6]);
-    cx.strokeStyle = rgba(LOCK, 0.75);
-    cx.lineWidth = 1.4;
-    cx.shadowColor = LOCK;
-    cx.shadowBlur = fxBlur(3);
-    cx.beginPath();
-    cx.moveTo(pts[0]!.x, pts[0]!.y);
-    for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
-    cx.stroke();
-    cx.setLineDash([]);
-    cx.shadowBlur = 0;
-  }
-  // Капсулы шагов: стопка вправо от точки; «~T» — под последней капсулой точки.
-  // Стопка капсул и место подписи «~T» — правила в `chainPathLayout.ts` (REFM-71).
-  const stack = stackIndexes(tl.map((r) => r.pointId));
-  const lastAt = lastStepAtPoint(tl.map((r) => r.pointId));
-  const last = new Map<string, { x: number; y: number; endH: number | null }>();
-  cx.textAlign = 'center';
-  for (let i = 0; i < steps.length; i++) {
-    const pid = tl[i]!.pointId;
-    const pl = pid ? s.planets[pid] : undefined;
-    const k = stack[i];
-    if (!pid || !pl || k === null || k === undefined) continue;
-    const c = world(pl.position);
-    if (!visible(c)) continue;
-    const { x: bx, y: by } = capsuleAt(c, k);
-    cx.fillStyle = 'rgba(6,18,22,.92)';
-    cx.strokeStyle = rgba(LOCK, 0.85);
-    cx.lineWidth = 1.2;
-    cx.beginPath();
-    cx.arc(bx, by, 9, 0, TAU);
-    cx.fill();
-    cx.stroke();
-    cx.fillStyle = rgba(LOCK, 0.95);
-    cx.font = '700 10px ui-monospace,Menlo,monospace';
-    cx.fillText(stepGlyph(steps[i]!), bx, by + 3.5);
-    const hrs = stepHours(steps[i]!);
-    if (hrs) {
-      cx.font = '600 8px ui-monospace,Menlo,monospace';
-      cx.fillText(hrs, bx, by - 12);
-    }
-    // «~T» — под ПОСЛЕДНЕЙ капсулой точки: время точки это когда она отработана целиком.
-    if (lastAt.get(pid) === i) last.set(pid, { x: bx, y: by, endH: tl[i]!.endH });
-  }
-  cx.font = '600 9px ui-monospace,Menlo,monospace';
-  for (const p of last.values()) {
-    if (p.endH === null) continue;
-    cx.shadowColor = 'rgba(0,0,0,0.85)';
-    cx.shadowBlur = fxBlur(3);
-    cx.fillStyle = rgba(LOCK, 0.95);
-    cx.fillText(`~${fmtEta(p.endH)}`, p.x, p.y + 20);
-    cx.shadowBlur = 0;
-  }
-  cx.restore();
-}
-/** CHAIN-UX: слой цепочек — отправленные планы всех своих флотов (голова
- *  авторитетна: летящий — по arrivesAt, взведённая задержка — по waitUntil) и
- *  черновик открытого режима поверх. ◎-бейдж на якоре плана — хэндл: тап вне
- *  режима открывает редактирование. */
-function drawChainOverlay(now: number): void {
-  chainHits = [];
-  const col = ownerColor(ME);
-  // Отбор, группировка и счётчик бейджа — `chainBadges.ts` (REFM-73).
-  const pulse = badgePulse(now);
-  const orders = (s as { orders?: Record<string, { steps: ChainStep[]; waitUntil?: number }> })
-    .orders;
-  const editing = new Set(chainMode?.fleetIds ?? []);
-  // Порядок обхода — по id флота: бейджи не должны переставляться между кадрами.
-  const own: Array<{ fleetId: string; owner: string | null; fleet: Fleet }> = [];
-  for (const fid of Object.keys(orders ?? {}).sort()) {
-    const f = s.fleets[fid];
-    if (f) own.push({ fleetId: fid, owner: f.owner, fleet: f });
-  }
-  // Якорь считается только для показываемых планов — чужие кадр не нагружают.
-  const anchored: AnchoredOrder[] = shownOrders(own, ME, editing).map((e) => {
-    const chain = orders![e.fleetId]!;
-    const st = chainStart(e.fleet);
-    const headRem =
-      chain.waitUntil !== undefined ? Math.max(0, (chain.waitUntil - s.time) / HOUR) : undefined;
-    drawChainPath(e.fleet, chain.steps, st.fromId, st.baseH, headRem, 0.5);
-    const anchor = draftFinish(chain.steps, st.fromId);
-    return { fleetId: e.fleetId, anchor: anchor && s.planets[anchor] ? anchor : null };
-  });
-  const byWorld = groupByAnchor(anchored);
-  for (const [wid, fids] of byWorld) {
-    const c = world(s.planets[wid]!.position);
-    if (!visible(c)) continue;
-    const bx = c.x;
-    const by = c.y + BADGE_DY;
-    cx.save();
-    cx.shadowColor = rgba(col, 0.8);
-    cx.shadowBlur = fxBlur(3 + 6 * pulse);
-    cx.fillStyle = 'rgba(6,18,22,.92)';
-    cx.strokeStyle = rgba(col, 0.9);
-    cx.lineWidth = 1.4;
-    cx.beginPath();
-    cx.arc(bx, by, 7.5, 0, TAU);
-    cx.fill();
-    cx.stroke();
-    cx.shadowBlur = 0;
-    cx.beginPath();
-    cx.arc(bx, by, 2.6, 0, TAU);
-    cx.stroke();
-    const count = badgeCount(fids.length);
-    if (count) {
-      cx.fillStyle = rgba(col, 0.95);
-      cx.font = '700 8px ui-monospace,monospace';
-      cx.textAlign = 'center';
-      cx.fillText(count, bx + 11, by - 5);
-    }
-    cx.restore();
-    chainHits.push({ target: wid, fleetIds: fids, x: bx, y: by });
-  }
-  // Черновик открытого режима — ярче отправленных; точка меню подсвечена кольцом.
-  if (chainMode) {
-    const f0 = s.fleets[chainMode.fleetIds[0]!];
-    if (f0) {
-      const st = chainStart(f0);
-      drawChainPath(f0, chainMode.steps, st.fromId, st.baseH, undefined, 0.95);
-    }
-    const a = chainMenuAnchor();
-    if (a) {
-      cx.save();
-      cx.strokeStyle = rgba(LOCK, 0.5 + 0.4 * pulse);
-      cx.lineWidth = 1.6;
-      cx.setLineDash([5, 4]);
-      cx.lineDashOffset = -(now / 50) % 9;
-      cx.beginPath();
-      cx.arc(a.x, a.y, 17, 0, TAU);
-      cx.stroke();
-      cx.restore();
-    }
-  }
-}
-const GO_FLASH_MS = 1600;
-let goFlash: { id: string; at: number } | null = null;
-function drawGoFlash(now: number): void {
-  if (!goFlash) return;
-  if (flashDone(now, goFlash.at, GO_FLASH_MS)) {
-    goFlash = null;
-    return;
-  }
-  const pl = s.planets[goFlash.id];
-  if (!pl) return;
-  const c = world(pl.position);
-  // Шкала одна на обе вспышки (`flashFx.ts`): прогресс 0→1, затухание — он же наоборот.
-  const k = fadeOf(flashProgress(now, goFlash.at, GO_FLASH_MS));
-  cx.save();
-  cx.strokeStyle = rgba(LOCK, 0.25 + 0.55 * k);
-  cx.lineWidth = 1.6;
-  cx.setLineDash([4, 4]);
-  cx.beginPath();
-  cx.arc(c.x, c.y, growRadius(14, 10, 1 - k), 0, TAU);
-  cx.stroke();
-  cx.restore();
-}
-/** Малая вспышка (UIX-4.1, скилл `mobile-game-feel`): своя постройка готова, свой флот
- *  дошёл. Одно кольцо на 200 мс — малый тир; размер и затухание — `noticeRing`. */
-const NOTICE_FLASH_MS = 200;
-const NOTICE_FLASHES_MAX = 16;
-const noticeFlashes: { at: { x: number; y: number }; t: number }[] = [];
-function noticeFlash(at: { x: number; y: number } | null | undefined): void {
-  if (!at) return;
-  noticeFlashes.push({ at: { x: at.x, y: at.y }, t: performance.now() });
-  capShots(noticeFlashes, NOTICE_FLASHES_MAX);
-}
-function drawNoticeFlashes(now: number): void {
-  for (let i = noticeFlashes.length - 1; i >= 0; i--) {
-    const f = noticeFlashes[i]!;
-    if (flashDone(now, f.t, NOTICE_FLASH_MS)) {
-      noticeFlashes.splice(i, 1);
-      continue;
-    }
-    const c = world(f.at);
-    if (!visible(c, 30)) continue;
-    const ring = noticeRing(flashProgress(now, f.t, NOTICE_FLASH_MS), motionOn(), 12, 10);
-    cx.save();
-    cx.strokeStyle = rgba(LOCK, 0.9 * ring.alpha);
-    cx.lineWidth = 2;
-    cx.beginPath();
-    cx.arc(c.x, c.y, ring.r, 0, TAU);
-    cx.stroke();
-    cx.restore();
-  }
-}
-const CAPTURE_FLASH_MS = 1500;
-/** Capture waves use the exact projected polygons just painted by blitStaticLayer.
- * No per-flash weight clamp or n² geometry pass, including while the camera moves. */
-function drawCaptureFlashes(now: number): void {
-  if (captureFlashes.size === 0) return;
-  const trace = (poly: readonly (readonly [number, number])[]): void => {
-    cx.beginPath();
-    cx.moveTo(poly[0]![0], poly[0]![1]);
-    for (let i = 1; i < poly.length; i++) cx.lineTo(poly[i]![0], poly[i]![1]);
-    cx.closePath();
-  };
-  for (const [node, flash] of captureFlashes) {
-    if (flashDone(now, flash.at, CAPTURE_FLASH_MS)) {
-      captureFlashes.delete(node);
-      continue;
-    }
-    const poly = provincePolygon(node);
-    const planet = s.planets[node];
-    if (!poly || !planet) continue;
-    const cell = { poly };
-    // The cell comes from the map layer's bake — its centre goes into the same space.
-    const at = world(planet.position);
-    const c = toBake(mapView, at.x, at.y);
-    // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
-    // постановку вспышки, а отрицательный радиус роняет cx.arc().
-    const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1
-    const fade = fadeOf(k);
-    const col = ownerColor(flash.owner);
-    // cell radius (centre → farthest vertex) sets how far the wave travels
-    let maxR = 0;
-    for (const [px, py] of cell.poly) maxR = Math.max(maxR, Math.hypot(px - c.x, py - c.y));
-    cx.save();
-    // 1) colour wash of the whole cell, fading — the province "flips" to the new hue
-    trace(cell.poly);
-    cx.fillStyle = rgba(col, 0.3 * fade);
-    cx.fill();
-    // 2) the wave: a bright ring expanding from the centre, CLIPPED to the cell so it
-    //    reads as energy sweeping across the province out to its border
-    trace(cell.poly);
-    cx.clip();
-    cx.globalCompositeOperation = 'lighter';
-    const rr = waveRadius(k, maxR, 1.25);
-    cx.strokeStyle = rgba(col, 0.85 * fade);
-    cx.lineWidth = 3 + 5 * fade;
-    cx.shadowColor = col;
-    cx.shadowBlur = fxBlur(12 * fade);
-    cx.beginPath();
-    cx.arc(c.x, c.y, rr, 0, TAU);
-    cx.stroke();
-    cx.restore();
-    // 3) the frontier igniting — the cell outline pulses bright then settles
-    cx.save();
-    trace(cell.poly);
-    cx.strokeStyle = rgba(col, 0.9 * fade);
-    cx.lineWidth = 1.5 + 2.5 * fade;
-    cx.shadowColor = col;
-    cx.shadowBlur = fxBlur(8 * fade);
-    cx.stroke();
-    cx.restore();
-  }
-}
 
 requestAnimationFrame(frameLoop);
 
