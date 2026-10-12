@@ -406,7 +406,8 @@ describe('REFM-232 — стык с main.ts', () => {
       'lod: currentMapLod,',
     ])
       expect(init, hook).toContain(hook);
-    expect(init).toMatch(/surfacesLost: \(\) => \{\s*borderHeld = '';\s*\}/);
+    // Слой живых границ забывает картинку своей дверью (`borderLayer.ts`, часть 2).
+    expect(init).toContain('surfacesLost: forgetBorderLayer,');
   });
 
   it('выпечка, её холсты и кэши живут только в модуле', () => {
