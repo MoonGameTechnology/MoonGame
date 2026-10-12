@@ -32,6 +32,8 @@ import {
 } from './harnessKit.mjs';
 
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+// Прочность постройки по уровню — у миров карты (REFM-235); \`main.ts\` сам её не зовёт.
+import { hpOfLevel as __hpOfLevel } from './game';
 window.__patrolTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // База — свой мир с целым портом или свой «Носитель» у него; в ангаре два перехватчика.
@@ -45,7 +47,7 @@ window.__patrolTest = {
     let id = home.id;
     if (kind === 'port') {
       home.buildings = home.buildings.filter((b) => b.type !== 'spaceport');
-      home.buildings.push({ type: 'spaceport', level: 1, hp: hpOfLevel('spaceport', 1) });
+      home.buildings.push({ type: 'spaceport', level: 1, hp: __hpOfLevel('spaceport', 1) });
       home.hangar = deck;
       delete home.sortie;
       pickWorld(home.id);

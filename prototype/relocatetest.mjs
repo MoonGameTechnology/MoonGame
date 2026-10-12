@@ -26,6 +26,8 @@ import {
 } from './harnessKit.mjs';
 
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+// Прочность постройки по уровню — у миров карты (REFM-235); \`main.ts\` сам её не зовёт.
+import { hpOfLevel as __hpOfLevel } from './game';
 // Базы прицела — у прицелов (REFM-233); \`main.ts\` сам их не зовёт.
 import { relocateSpots as __relocateSpots } from './mapAim';
 window.__relocateTest = {
@@ -47,7 +49,7 @@ window.__relocateTest = {
     const far = nodes.find((p) => gap(p, home) > 420);
     const port = (p) => {
       p.buildings = p.buildings.filter((b) => b.type !== 'spaceport');
-      p.buildings.push({ type: 'spaceport', level: 1, hp: hpOfLevel('spaceport', 1) });
+      p.buildings.push({ type: 'spaceport', level: 1, hp: __hpOfLevel('spaceport', 1) });
       delete p.sortie;
     };
     const ship = (id, at, hangar) => ({
