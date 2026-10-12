@@ -586,6 +586,9 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
 #sz-codex-screen .sz-workhead button:hover { border-color: var(--sf-edge-hi); }
 .sz-codex-body { display: grid; gap: 10px; margin-top: 18px; }
 .sz-codex-sum { margin: 0; color: #b0c7ce; font-size: 12px; }
+/* «О Рое» — текст, который читают: основной размер и строка не шире 72 знаков. */
+.sz-codex-lore { display: grid; gap: 8px; max-width: 72ch; margin-bottom: 8px; }
+.sz-codex-lore p { margin: 0; color: #d6b8b4; font-size: 14px; line-height: 1.55; }
 .sz-codex-sum b { color: #ff9a8f; }
 .sz-codex-body h4 { margin: 4px 0 0; color: #ff9a8f; font-size: 14px; font-weight: 600; }
 .sz-codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }

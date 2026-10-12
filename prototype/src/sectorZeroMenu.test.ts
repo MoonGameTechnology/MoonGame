@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chapterMapSvg } from './sectorZeroMenu';
+import { chapterMapSvg, swarmCodexHtml, type SwarmCodexRows } from './sectorZeroMenu';
+import { esc } from './format';
 import type { ChapterMapView } from '../../decisions/chapterMap';
 import { WAVE_MS, WAVE_OFFSETS } from '../../decisions/missionRing';
+import { SWARM_LORE_KEYS } from '../../decisions/swarmLore';
+import { t } from '../../localization/runtime';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(path.join(here, '../sector-zero.css'), 'utf8');
@@ -115,5 +118,23 @@ describe('меню Sector Zero в палитре хаба (UIX-15.4)', () => {
   it('текст не мельче 12 px; мельче — только значки ✓ и ★ в углу', () => {
     const tiny = rules.filter((r) => /(?:font-size:|font:[^;]*?)\s(?:\d|1[01])(?:\.\d+)?px/.test(r.body));
     expect(tiny.map((r) => r.sel)).toEqual(['#sector-zero .sz-node.sz-passed::before', '.sz-slot.star::after']);
+  });
+});
+
+describe('досье Роя в меню — текст «О Рое» (заказ владельца 2026-10-12)', () => {
+  const rows = (lore: boolean): SwarmCodexRows => ({ lore, known: 0, total: 1, units: [], modules: [], buildings: [{ name: 'hive', known: false }] });
+
+  it('после главы I досье открывается текстом о Рое — теми же подписями, что в забеге', () => {
+    const html = swarmCodexHtml(rows(true));
+    expect(html.startsWith('<section class="sz-codex-lore">')).toBe(true);
+    expect(html).toContain(`<h4>${esc(t('swarm.intel.about'))}</h4>`);
+    for (const key of SWARM_LORE_KEYS) expect(html).toContain(`<p>${esc(t(key))}</p>`);
+    expect(html.indexOf(esc(t('swarm.intel.about')))).toBeLessThan(html.indexOf('sz-codex-sum'));
+  });
+
+  it('до главы I текста нет — раздел говорит, кто и когда расскажет', () => {
+    const html = swarmCodexHtml(rows(false));
+    expect(html).toContain(esc(t('sector-zero.codex.lore.locked')));
+    for (const key of SWARM_LORE_KEYS) expect(html).not.toContain(esc(t(key)));
   });
 });
