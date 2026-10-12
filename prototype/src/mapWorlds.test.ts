@@ -32,6 +32,7 @@ interface Call {
   font: unknown;
   dash: unknown;
   offset: unknown;
+  comp: unknown;
 }
 
 /** Холст, чей контекст записывает каждый вызов с цветом, шириной, прозрачностью и шрифтом.
@@ -46,6 +47,7 @@ function fakeCanvas() {
     fillStyle: '#000',
     font: '',
     lineDashOffset: 0,
+    globalCompositeOperation: 'source-over',
   };
   let dash: unknown = [];
   const stack: Array<[Record<string, unknown>, unknown]> = [];
@@ -74,6 +76,7 @@ function fakeCanvas() {
           font: target.font,
           dash,
           offset: target.lineDashOffset,
+          comp: target.globalCompositeOperation,
         });
         if (name.startsWith('create')) return { addColorStop() {} };
         if (name === 'measureText') return { width: 40 };
@@ -662,18 +665,88 @@ describe('REFM-235 — стык миров с main.ts', () => {
       expect(init, hook).toContain(hook);
   });
 
-  it('миры живут только в модуле; кадр зовёт их между дальномером радара и орбитами флотов', () => {
+  it('миры живут только в модуле; кадр зовёт засветку и миры между дальномером радара и орбитами флотов', () => {
     expect(MAIN).not.toMatch(/\bfunction (poly|drawFogMarker|drawRegionLabels)\(/);
     expect(MAIN).not.toMatch(/\bconst (drawStationArt|fortressUnits)\b/);
+    expect(MAIN).not.toMatch(/sweepPaint|sweepShows/);
     const range = MAIN.indexOf('drawRadarRange(now);');
+    const glow = MAIN.indexOf('drawSweepAfterglow(lod);');
     const worlds = MAIN.indexOf('drawWorlds(now, lod);');
-    const orbits = MAIN.indexOf('const stationed: Record<string, Fleet[]> = {};');
+    const orbits = MAIN.indexOf('drawOrbitRings(now, detail);');
     expect(range).toBeGreaterThan(-1);
-    expect(worlds).toBeGreaterThan(range);
+    expect(glow).toBeGreaterThan(range);
+    expect(worlds).toBeGreaterThan(glow);
     expect(orbits).toBeGreaterThan(worlds);
   });
 
   it('модуль не тянет `main.ts`', () => {
     expect(SRC).not.toMatch(/from '\.\/main'/);
+  });
+});
+
+describe('REFM-235 — засветка развёртки', () => {
+  // Развёртку крутит радар (`mapRadar.ts`): здесь её заменяет ручка теста — идёт ли луч и
+  // насколько он сейчас светит в точке узла.
+  const sweep = { on: true, glow: 0.5 };
+  beforeEach(() => {
+    sweep.on = true;
+    sweep.glow = 0.5;
+    vi.doMock('./mapRadar', async (orig) => ({
+      ...(await orig<object>()),
+      get sweepOn() {
+        return sweep.on;
+      },
+      sweepGlow: () => sweep.glow,
+    }));
+  });
+  afterEach(() => {
+    vi.doUnmock('./mapRadar');
+  });
+
+  it('луч зажигает опознанный мир цветом владельца, помнимый — нейтрально, невиданный — никак', async () => {
+    const { worlds, env, fog, palette, frame, home, next, node, at, patchPlanet } = await boot();
+    const dark = env.nodes.filter((n) => !fog.known(n.id) && n.sector === 'planet');
+    const remembered = dark[0]!;
+    const unseen = dark[1]!;
+    // И опознанный сосед, и помнимый мир — чужие: цвет владельца выдаёт только опознанный.
+    patchPlanet(next.id, { owner: 'p2' });
+    patchPlanet(remembered.id, { owner: 'p2' });
+    fog.rememberScan([remembered.id]);
+    worlds.drawSweepAfterglow(LOD());
+    /** Спрайт свечения цвета `col` — тот же кэш, что у карты. */
+    const sprite = (col: string) => {
+      palette.blitGlow(col, 0, 0, 24, 1);
+      return frame.named('drawImage').at(-1)!.args[0];
+    };
+    const own = glowAt(frame.calls, at(node(home.id)), 24)!;
+    const foe = glowAt(frame.calls, at(node(next.id)), 24)!;
+    const memory = glowAt(frame.calls, at(node(remembered.id)), 24)!;
+    expect([own.alpha, own.comp]).toEqual([0.42 * 0.5, 'lighter']);
+    expect(glowAt(frame.calls, at(node(unseen.id)), 24)).toBeUndefined();
+    expect(own.args[0]).toBe(sprite(palette.ownerColor('p1')));
+    expect(foe.args[0]).toBe(sprite(palette.ownerColor('p2')));
+    expect(memory.args[0]).toBe(sprite('#6f8a93'));
+    expect(palette.ownerColor('p2')).not.toBe('#6f8a93');
+  });
+
+  it('без развёртки, на схеме, без света в точке и за экраном — засветки нет', async () => {
+    const { worlds, camera, frame } = await boot();
+    const glows = () => frame.named('drawImage').length;
+    sweep.on = false;
+    worlds.drawSweepAfterglow(LOD());
+    expect(glows()).toBe(0);
+    sweep.on = true;
+    worlds.drawSweepAfterglow(LOD({ art: 0 }));
+    expect(glows()).toBe(0);
+    sweep.glow = 0.02; // слабее порога засветки
+    worlds.drawSweepAfterglow(LOD());
+    expect(glows()).toBe(0);
+    sweep.glow = 0.5;
+    camera.setView({ scale: 1, x: 100_000, y: 100_000 });
+    worlds.drawSweepAfterglow(LOD());
+    expect(glows()).toBe(0);
+    camera.setView({ scale: 1, x: 0, y: 0 });
+    worlds.drawSweepAfterglow(LOD());
+    expect(glows()).toBeGreaterThan(0);
   });
 });

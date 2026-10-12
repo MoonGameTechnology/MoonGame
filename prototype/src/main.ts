@@ -16,7 +16,7 @@ import { rocketMineCard } from '../../decisions/rocketMineCard';
 import { missileCard } from '../../decisions/missileCard';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
-import { isMissileFleet, isOrdnanceFleet, isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
+import { isMissileFleet, isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { HINT_KEY, MINE_MODES, MODE_KEY, rocketMinesUi } from './rocketMinesUi';
 import type { SoloSave } from '../../decisions/soloSave';
@@ -161,15 +161,8 @@ import {
   type AiProfile,
 } from './game';
 import {
-  dominantUnit,
-  glyphHalo,
-  glyphScale,
-  unitArchetype,
   unitGlyphSvg,
-  unitShape,
-  unitSizeClass,
 } from './unitGlyphs';
-import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { worldName } from './planetName';
 import { minelayerOffer } from '../../decisions/minefields';
@@ -178,8 +171,6 @@ import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation'
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
 import { initHeroStaff, heroDisplayName } from './heroStaff';
-import { drawHeroPortrait } from '../../packages/client/src/heroPortraits';
-import { mapHeroes, type PortraitHit } from '../../decisions/heroIdentity';
 import {
   COALITION,
   CH_SESSION,
@@ -217,8 +208,8 @@ import {
   type VitalView,
 } from './fleetConsole';
 import { initTermTips, termBody } from './termTip';
-import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
-import { veteranMark, fleetVeteranGrade } from '../../decisions/veteranMark';
+import { fleetHoldsHtml } from './fleetHoldView';
+import { veteranMark } from '../../decisions/veteranMark';
 import { veteranTag } from './veteranChevrons';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
@@ -268,22 +259,20 @@ import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeI
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
-import { rgba } from '../../packages/client/src/holoDraw';
-import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
-import { blitBorderLayer, forgetBorderLayer, initBorderLayer } from './borderLayer';
-import { drawAbilityRings, drawBattlePulse, drawCombatRanges, drawCorridors, drawFleetRoutes, drawPatrolRings, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays, targetBrackets } from './mapOverlays';
+import { forgetBorderLayer, initBorderLayer } from './borderLayer';
+import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
-import { addFlak, clearFlak, drawCaptureFlashes, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashMines, flashProvince, initMapEffects, noticeFlash } from './mapEffects';
+import { addFlak, clearFlak, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashMines, flashProvince, initMapEffects, noticeFlash } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
-import { drawWorlds, initMapWorlds } from './mapWorlds';
-import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, holographicFrame, initMapLayer, livingBorders, mapContextEvents, mapLayerForInput, mapPreparationJobs, mapView, provinceAt, provinceGeometry, provincePolygon, roadDrawingOf, terrainFields } from './mapLayer';
-import { drawHolographicBattle } from './holographicEffects';
+import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
+import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
+import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
+import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { holoIcon, skinIcon } from './holographicIcons';
-import { drawProvinceSelection, selectionPulse } from '../../packages/client/src/provinceSelection';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
@@ -411,7 +400,6 @@ import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import { syncCommanderXp } from './commanderSync';
 import { cardCovers } from './panelSlack';
 import { frontierOutline } from './frontierOutline';
-import { nodeView } from './fogView';
 import { initMobileHud, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
 import type { PhoneItemId } from '../../decisions/phoneNav';
@@ -501,7 +489,6 @@ import { initTechTree } from './techTree';
 import { initBuildScreen, type UnitCatalogTab } from './buildScreen';
 import { initEndScreen, type MatchEnd } from './endScreen';
 import {
-  fxBlur,
   pcUi,
   glowOn,
   setGlowFx,
@@ -511,7 +498,6 @@ import {
   setShowFps,
   motionOn,
   setMotion,
-  fxBreath,
   setWindowOpacity,
   windowAlpha,
   windowOpacityPct,
@@ -523,7 +509,6 @@ import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatib
 import { initHolographicUi } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
-import { clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField } from './holographicSurface';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 import { PORTRAITS } from './profileArt';
@@ -562,23 +547,19 @@ import {
 import { COLOR } from './sideColors';
 // REFM-237 — цвета сторон, места матча и константы карты: у владельца, `mapPalette.ts`.
 import {
-  blitGlow,
   initMapPalette,
-  LOCK,
   neutralColor,
-  ORBIT_COLOR,
   ownerColor,
   rivalPaletteId,
   SEAT_META,
   setSideColors,
   stanceCol,
-  TAU,
   youColor,
 } from './mapPalette';
-import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, pirateIntroRect, setView, unworld, visible, world, worldDist } from './mapCamera';
-import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
-import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepGlow, sweepOn, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, pirateIntroRect, setView, unworld, world, worldDist } from './mapCamera';
+import { admits, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
+import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder, tellBuild, tellHero, tellSteward } from './orderPipeline';
 import { autoRetreatAt, cancelWarPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, restoreAutoAssault, soloAutoAssault, troopsInputFor, warPrompt } from './groupOrders';
 import {
@@ -591,13 +572,12 @@ import {
 } from './cmdActions';
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { flushPinch, forgetAdditive, forgetAimPointer, initMapInput, pointers, selectionBox, tapByTouch } from './mapInput';
-import { chainMode, chainStepsOf, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged } from './chainComposer';
+import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged } from './chainComposer';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
 import { battleRetreats, initBattleWindow } from './battleScreen';
-import { battleBadgePoint } from '../../decisions/battleTap';
 import {
   initSteward,
   stewFmtDur,
@@ -755,21 +735,14 @@ import {
 } from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { netViewAt } from '../../decisions/netViewClock';
-import { visibleInBake } from '../../decisions/mapLayerView';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { mountLocaleMenu } from './localeMenu';
-import { chevronAlpha } from './semanticZoom';
 import { mapLod, mapSpacing, type MapLod } from '../../packages/client/src/mapLod';
-import {
-  battleMark,
-} from './battleMark';
-import { ringShown } from './orbitRing';
 import { ambushOf } from '../../decisions/forkAmbush';
-import { drawAmbushMark } from '../../packages/client/src/forkMark';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import { aaImpact } from './fireEffects';
 import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
@@ -777,7 +750,6 @@ import { stewardMine } from './stewardLog';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded } from './noteLog';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
-import { phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
@@ -789,8 +761,6 @@ import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
 import { radarContacts } from './snapshotIngest';
 import { flakTier } from './flakTiers';
-import { sweepPaint, sweepShows } from './sweepFx';
-import { emblemTally } from './fleetTally';
 import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
@@ -812,7 +782,6 @@ import {
 import type {
   GameState,
   Fleet,
-  Battle,
   Planet,
   DiplomaticStance,
   DomainEvent,
@@ -917,7 +886,6 @@ let endScreen: MatchEnd | null = null;
 // владельца — `pick*`, `arm`/`drop`, `disarm(повод)`.
 /** Чей раскол ждёт события, чтобы выделить отделённую часть (`splitSelectTarget`). */
 let splitAwait: string | null = null;
-let heroPortraitHits: PortraitHit[] = [];
 let lastHeroCardRefresh = 0;
 /** До какого момента (ms, `performance.now`) чип союзника мигает после встречи. */
 let allyPulseUntil = 0;
@@ -1462,7 +1430,7 @@ const mobileHud = initMobileHud({
     } else {
       clearSelection();
       pickWorld(pick.id);
-      selectionStarted = lastReal;
+      markSelection(lastReal);
     }
   },
   ping: () => side.querySelector<HTMLButtonElement>('[data-act="ping"]')?.click(),
@@ -1713,16 +1681,6 @@ initFleetGeometry({
   orbits: () => perWorld('orbits', () => orbitSeats(Object.values(s.fleets), (g) => isEmplacementFleet(g, data))),
 });
 
-/** Последняя секунда перед раундом: кольцо значка стягивается к центру (эффект
- *  `drawHolographicBattle`). Считается ИЗ состояния, без своей памяти о кадрах, —
- *  поэтому вспышка не может разъехаться с тем же отсчётом в подписи и в окне боя. */
-const ROUND_FLASH_MS = 1200;
-function roundFlash(b: Battle): number {
-  if (typeof b.nextRoundAt !== 'number') return 0;
-  const left = b.nextRoundAt - s.time;
-  return left > 0 && left < ROUND_FLASH_MS ? 1 - left / ROUND_FLASH_MS : 0;
-}
-
 /** Имя соединения в карточке и списках: «Флот «ПОЗЫВНОЙ»», а крепость зовётся
  *  крепостью — она сооружение, а не флот (`emplacement.ts`). */
 function fleetTitleOf(id: string): string {
@@ -1737,44 +1695,6 @@ function fleetTitleOf(id: string): string {
  *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
 
 let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
-/** Трассы огня между строями боя (заказ владельца 2026-09-23): от каждого флота к ближайшему
- *  флоту другой стороны — пунктир цвета стрелка, бегущий к цели, пока бой идёт. При
- *  выключенном движении пунктир стоит. Только видимые флоты: трасса к невидимому выдала бы
- *  его место. */
-function drawBattleTracers(now: number): void {
-  for (const b of Object.values(s.battles)) {
-    const sides = Object.values(s.fleets)
-      .filter((f) => f.battleId === b.id && !f.movement && fleetSeen(f))
-      .map((f) => ({ f, a: fleetAnchor(f) }))
-      .filter((x): x is { f: Fleet; a: { x: number; y: number; ang: number } } => !!x.a);
-    for (const { f, a } of sides) {
-      let best: { x: number; y: number } | null = null;
-      let bestD = Infinity;
-      for (const o of sides) {
-        if (o.f.owner === f.owner) continue;
-        const d = Math.hypot(o.a.x - a.x, o.a.y - a.y);
-        if (d < bestD) {
-          bestD = d;
-          best = o.a;
-        }
-      }
-      if (!best || !visible(a, 120)) continue;
-      const col = ownerColor(f.owner);
-      cx.save();
-      cx.strokeStyle = rgba(col, 0.55);
-      cx.lineWidth = 1.4;
-      cx.setLineDash([6, 9]);
-      cx.lineDashOffset = motionOn() ? -now / 40 : 0;
-      cx.shadowColor = col;
-      cx.shadowBlur = fxBlur(8);
-      cx.beginPath();
-      cx.moveTo(a.x, a.y);
-      cx.lineTo(best.x, best.y);
-      cx.stroke();
-      cx.restore();
-    }
-  }
-}
 
 // ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
 const eventLog: RecapEvent[] = [];
@@ -2931,6 +2851,18 @@ initMapWorlds({
   sectorType: sectorTypeOf,
 });
 
+// Флоты карты и их бои — значок боя, орбиты, трассы огня, корпуса, трюм и портреты героев —
+// живут в `mapFleets.ts` (REFM-235). Мир, место, кадр, часы и вид голограммы и тип сектора
+// они получают хуками.
+initMapFleets({
+  world: () => s,
+  me: () => ME,
+  ctx: () => cx,
+  clock: () => hologramTime,
+  holographic: holographicMapOn,
+  sectorType: sectorTypeOf,
+});
+
 // Статический слой карты — небо и политическая карта, выпеченные под камерой, — живёт в
 // `mapLayer.ts` (REFM-232). Мир, кадр, экран и режимы карты он получает хуками.
 initMapLayer({
@@ -2961,8 +2893,17 @@ initBorderLayer({
   clock: () => hologramTime,
 });
 
-let paintedSelection: string | null = null;
-let selectionStarted = 0;
+// Поверхность карты — живые границы, стекло, блики, выделение провинции и волна захвата —
+// живёт в `mapSurface.ts` (REFM-235). Контекст кадра, экран, часы и вид голограммы она
+// получает хуками.
+initMapSurface({
+  ctx: () => cx,
+  vw: () => VW,
+  vh: () => VH,
+  dpr: () => DPR,
+  clock: () => hologramTime,
+  holographic: holographicMapOn,
+});
 
 /** Подпись карты в списках партий и на двери «Продолжить» хаба. Обе карты Фронтира
  *  показываются одним именем — раньше это был тернарник, скопированный в два места, и два
@@ -2986,70 +2927,36 @@ initMapLoading({
   leave: () => $('tomenu').click(), // the same intentional leave/solo pause as the HUD button
 });
 
-function render(now: number) {
+/**
+ * Кадр карты — слои снизу вверх (REFM-235). Порядок вызовов и есть картинка: каждый слой
+ * ложится поверх предыдущих, поэтому слой переставляют только вместе с решением, что должно
+ * его закрывать. Слои живут у своих владельцев; здесь только их порядок.
+ *
+ * Semantic zoom (LOD): zoomed far out the map turns SCHEMATIC — holo type badges, callout
+ * text, fleet pyramids/cargo/counts, orbit rings and battle timers dissolve with screen
+ * density and the whole-map camera overview, leaving territories, uniform rings, fleet
+ * chevrons, battle pulses and pings. Skipping those draws over the widest views — where the
+ * most nodes are on screen at once — is also the frame-time win. Сам закон и его следствия —
+ * `semanticZoom.ts` (REFM-93).
+ */
+function renderMap(now: number) {
   if (cx.isContextLost?.()) return;
   cx.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS pixels, crisp on hi-DPI
-  // Semantic zoom (LOD): zoomed far out the map turns SCHEMATIC — holo type
-  // badges, callout text, fleet pyramids/cargo/counts, orbit rings and battle
-  // timers dissolve with screen density and the whole-map camera overview,
-  // leaving territories, uniform rings, fleet chevrons, battle
-  // pulses and pings. Skipping those draws over the widest views — where the
-  // most nodes are on screen at once — is also the frame-time win.
-  // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
   const lod = currentMapLod();
   const detail = lod.detail;
+
+  // 1. Поверхность: небо и политическая карта из выпечки, над ними стекло и выделение.
   blitStaticLayer(now); // sky + political map (a cached bake, moved with the camera)
-  // Everything drawn from the bake's province geometry lives in its space: the same
-  // transform that placed the map layer places the glass, borders, glints and waves.
-  const sight = visibleInBake(mapView, VW, VH);
-  cx.save();
-  cx.setTransform(DPR * mapView.k, 0, 0, DPR * mapView.k, DPR * mapView.tx, DPR * mapView.ty);
-  if (holographicMapOn()) {
-    // M2.11: границы провинций — живые, как рамка карты, и на тех же часах голограммы
-    // (под reduced motion стоят — линия замирает видимой). Сразу над заливкой, чтобы
-    // порядок слоёв остался прежним, когда граница жила в выпечке.
-    const borders = livingBorders();
-    const layered = borders !== null && blitBorderLayer(lod.provinceDetail, borders);
-    cx.save();
-    clipGlassSurface(cx, holographicFrame);
-    if (!layered && borders && provinceGeometry) {
-      drawLivingBorders(cx, borders, {
-        ownerColor,
-        hideOwnedInner: true,
-        provinceDetail: lod.provinceDetail,
-      }, holographicFrame, hologramTime, sight, provinceGeometry.place);
-    }
-    if (detail > 0) {
-      cx.save(); cx.globalAlpha *= detail;
-      // The bake holds fields beyond the screen too (its margin): glints only where seen.
-      for (const field of terrainFields) {
-        const b = field.box;
-        if (b.x > sight.x + sight.width || b.y > sight.y + sight.height ||
-          b.x + b.width < sight.x || b.y + b.height < sight.y) continue;
-        drawTerrainField(cx, field, hologramTime, true);
-      }
-      cx.restore();
-    }
-    drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
-  }
-  if (paintedSelection !== selPlanet) {
-    paintedSelection = selPlanet;
-    selectionStarted = now;
-  }
-  const selectedPoly = selPlanet ? provincePolygon(selPlanet) : undefined;
-  if (selectedPoly) drawProvinceSelection(cx, selectedPoly, selectionPulse(now - selectionStarted, motionOn()), LOCK);
-  drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
-  if (holographicMapOn()) {
-    cx.restore();
-    drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
-  }
-  cx.restore(); // back to screen space
+  drawMapSurface(now, lod); // в пространстве выпечки: живые границы, стекло, блики, выделение провинции, волна захвата
+
+  // 2. Радар: развёртка, её контакты и покрытие.
   drawScanSweep(now); // slow radar sweep — pure console chrome
   updateRadarContacts(now); // the arm paints enemy signatures as it crosses them
   updateThreatAlerts(); // «враг у ваших рубежей» — once per game step
   drawRadarCoverage(); // my sensor reach (radar arrays + ships)
-  drawSwarmNet(); // сеть Роя: круги связи разведанных узлов
 
+  // 3. Наложения под мирами: сеть Роя, маршруты, патрули, вылеты, мины и ракеты, вспышки.
+  drawSwarmNet(); // сеть Роя: круги связи разведанных узлов
   drawFleetRoutes();
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
@@ -3060,319 +2967,25 @@ function render(now: number) {
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
   drawNoticeFlashes(now); // UIX-4.1: своя постройка готова, свой флот дошёл
 
-  // battles — pulsing red contact ring at the actual clash point (an engaged
-  // fleet's position, so a mid-lane intercept shows where it really happens) with a
-  // live countdown to the next hourly damage round (the battle timer).
-  const wave = (now / 900) % 1;
-  for (const b of Object.values(s.battles)) {
-    const anchor = battleAnchor(b);
-    // Показывать ли бой и его таймер — `battleMark.ts` (REFM-118): под туманом отметки
-    // нет вовсе, а отсчёт живёт только по назначенному ядром раунду.
-    const roundAt = typeof b.nextRoundAt === 'number' ? b.nextRoundAt : undefined;
-    const mark = battleMark({
-      identified: battleKnown(b),
-      hasPoint: !!anchor,
-      detail,
-      nextRoundAt: roundAt,
-    });
-    if (mark.do !== 'draw' || !anchor) continue;
-    // Значок висит НАД точкой схватки (`battleBadgePoint`) — одна точка на рисование и
-    // на тап: кольцо поверх самих кораблей воровало бы у них тап, а разъехавшись с
-    // целью тапа, оно отправляло бы палец мимо того, что видно.
-    const c = battleBadgePoint(world(anchor));
-    if (!visible(c, 120)) continue;
-    if (holographicMapOn())
-      drawHolographicBattle(
-        cx,
-        c.x,
-        c.y,
-        hologramTime,
-        b.phase ?? 'orbital',
-        glowOn(),
-        detail,
-        roundFlash(b),
-      );
-    else drawBattlePulse(c.x, c.y, wave, b.phase);
-    if (mark.timer) {
-      // `mark.timer` истинно только при назначенном раунде — отсюда и `!` ниже.
-      cx.save();
-      cx.globalAlpha = detail; // LOD: the timer text dissolves on the schematic view
-      cx.font = '700 10px ui-monospace,Menlo,monospace';
-      cx.textAlign = 'center';
-      cx.fillStyle = b.phase === 'ground' ? '#f5cf6b' : '#ff8a7d';
-      cx.fillText(
-        `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(roundAt!)}`,
-        c.x,
-        c.y - (holographicMapOn() ? 51 : 28),
-      );
-      cx.restore();
-    }
-  }
-
+  // 4. Бои и огонь.
+  drawBattles(now, detail); // значок боя над схваткой с отсчётом до раунда
   drawFlak(); // H2: трассы огня ПКО, перехвата, корабельного ПВО и ударов шаттлов
 
+  // 5. Миры: дальномер выбранного, засветка развёртки под метками, сами узлы.
   // selected sector: its radar detection radius (a physical circle in map space →
   // an axis-aligned ellipse on screen because the fit projection is non-uniform).
   drawRadarRange(now);
-
-  // radar ping afterglow: as the sweep arm crosses a contact it flares, then the
-  // imprint lingers (fading) until the arm comes back round — drawn behind the
-  // blips so it reads as the contact glowing, not an overlay. Skips void nodes and
-  // anything still fully unexplored.
-  if (sweepOn && lod.art > 0) {
-    cx.save();
-    cx.globalCompositeOperation = 'lighter';
-    for (const n of MAP) {
-      const p = s.planets[n.id];
-      if (!p) continue;
-      const c = world(n);
-      if (!visible(c, 60)) continue;
-      // Кого подсвечивать и каким цветом — `sweepFx.ts` (REFM-113) поверх вида узла из
-      // `fogView.ts`: помнимый горит НЕЙТРАЛЬНО, потому что владелец в памяти может быть
-      // устаревшим, а никогда не виденный не выдаёт себя засветкой вовсе.
-      const paint = sweepPaint(
-        nodeView({ sector: n.sector, identified: known(n.id), remembered: memory.has(n.id) }),
-      );
-      if (paint.do !== 'paint') continue;
-      const g = sweepGlow(c);
-      if (!sweepShows(g)) continue;
-      const col = paint.ownerColored ? ownerColor(p.owner) : '#6f8a93';
-      blitGlow(col, c.x, c.y, 24, 0.42 * g); // cached glow disc (no per-node gradient)
-    }
-    cx.restore();
-  }
-
+  drawSweepAfterglow(lod); // засветка узлов там, где прошёл луч развёртки
   drawWorlds(now, lod); // миры: имена своих на схеме, области, узлы, туман, подписи, крепости развилок
 
-  // the orbit ring around any CITY that holds a stationed fleet (a single orbit).
-  // Asteroid-field junctions have no orbits, so they are skipped.
-  const stationed: Record<string, Fleet[]> = {};
-  for (const f of Object.values(s.fleets))
-    if (f.location && !f.movement) {
-      if (!fleetSeen(f)) continue; // hidden enemy orbit (no identify, no intel window)
-      (stationed[f.location] ??= []).push(f);
-    }
-  for (const pid of Object.keys(stationed)) {
-    const pl = s.planets[pid];
-    if (!pl) continue;
-    // У кого кольцо ЕСТЬ — `orbitRing.ts` (REFM-114), там же и его геометрия: город имеет
-    // орбиту по типу, а узел-развязка получает её только УКРЕПЛЁННЫМ (крепость или живой
-    // гарнизон) — такой узел приходится штурмовать, а штурм идёт с орбиты.
-    const shown = ringShown(
-      {
-        typeHasOrbit: !!sectorTypeOf(pid)?.orbit,
-        starfort: pl.buildings.some((b) => b.type === 'starfort'),
-        garrison: pl.garrison ?? [],
-        parked: stationed[pid]?.length ?? 0,
-      },
-      detail,
-    );
-    if (!shown) continue;
-    const pc = world(pl.position);
-    if (!visible(pc, 80)) continue;
-    // A single orbit ring (GDD §7.4) — one orbit, so no N/F labels cluttering the map.
-    const rr = orbitRingRadius(pl);
-    cx.save();
-    cx.globalAlpha = detail;
-    cx.setLineDash([2, 5]);
-    cx.lineDashOffset = now / 200;
-    cx.strokeStyle = rgba(ORBIT_COLOR, 0.4);
-    cx.lineWidth = 1.3;
-    cx.beginPath();
-    cx.arc(pc.x, pc.y, rr, 0, TAU);
-    cx.stroke();
-    cx.restore();
-  }
-
-  drawBattleTracers(now);
-
-  // Portraits are resolved only from our own roster, even in full-state solo games.
-  const heroesByFleet = mapHeroes(s, ME);
-  heroPortraitHits = [];
-  // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
-  cx.textAlign = 'center';
-  for (const f of Object.values(s.fleets)) {
-    // Мину рисует `drawMinefields` своим знаком (SM-3.6), ракету — `drawMissiles` (SM-3.7b).
-    if (isOrdnanceFleet(f, data)) continue;
-    if (!fleetSeen(f)) {
-      // not identified and no intel window: a radar contact is shown only as a
-      // swept signature (drawRadarContacts), painted by the arm — never live here.
-      continue;
-    }
-    const A = fleetAnchor(f);
-    if (!A || !visible(A, 120)) continue;
-    const col = ownerColor(f.owner);
-    // ROADS-4: флот на развилке — засада (`ambushOf` спрашивает у ядра, стоит ли он РОВНО на
-    // ней): пунктирный ромб цвета владельца под корпусом.
-    if (ambushOf(s, f)) drawAmbushMark(cx, A.x, A.y, rgba(col, 0.85));
-    // Aircraft aboard never inflate the combat hull count.
-    const { ships } = emblemTally(f.units, [], isShuttle);
-    // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
-    // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
-    const engine = fxBreath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
-
-    // bombardment beam down to the planet
-    if (f.bombarding && f.location) {
-      const target = s.planets[f.location];
-      if (target) {
-        const pc = world(target.position);
-        const spark = fxBreath(now, { period: 90, base: 0.45, amp: 0.55, phase: phaseOfId(f.id) });
-        cx.save();
-        cx.strokeStyle = rgba('#ffb15f', 0.3 + 0.3 * spark);
-        cx.lineWidth = 1.2 + spark;
-        cx.shadowColor = '#ffb15f';
-        cx.shadowBlur = fxBlur(12);
-        cx.beginPath();
-        cx.moveTo(A.x, A.y);
-        cx.lineTo(pc.x, pc.y);
-        cx.stroke();
-        cx.restore();
-      }
-    }
-
-    // contact trail while moving
-    if (f.movement) {
-      for (let i = 1; i <= 4; i++) {
-        cx.fillStyle = rgba(col, 0.33 - 0.055 * i);
-        cx.beginPath();
-        cx.arc(
-          A.x - Math.cos(A.ang) * i * (8 + engine * 2),
-          A.y - Math.sin(A.ang) * i * (8 + engine * 2),
-          2.8 - 0.35 * i,
-          0,
-          TAU,
-        );
-        cx.fill();
-      }
-    }
-
-    const dom = dominantUnit(f.units, data);
-    const shape = (dom && unitShape(dom.def, dom.unit, s.players[f.owner]?.faction)) || 'cruiser';
-    const arch = dom ? unitArchetype(dom.def) : 'combat';
-    const domK = glyphScale(dom ? unitSizeClass(dom.def.stats.hp ?? 0) : 'S');
-    // На удалении остаётся внешний контур ТОГО ЖЕ корпуса. Внутренняя детализация,
-    // карго и счёт плавно исчезают, но фрегат не превращается в общий треугольник.
-    if (detail < 1) {
-      cx.save();
-      cx.globalAlpha = chevronAlpha(detail);
-      cx.translate(A.x, A.y);
-      cx.rotate(A.ang + Math.PI / 2);
-      cx.shadowColor = col;
-      cx.shadowBlur = fxBlur(5 + 4 * engine);
-      cx.scale(domK * 0.8, domK * 0.8);
-      cx.translate(-12, -12);
-      cx.fillStyle = rgba(col, 0.28);
-      cx.strokeStyle = rgba(col, 0.95);
-      drawShipShape(cx, shape, false);
-      cx.restore();
-    }
-    // Крепость — одно сооружение: счёт «×N» у неё читался бы как N крепостей.
-    const emplacement = isEmplacementFleet(f, data);
-    if (detail === 0) {
-      if (!emplacement) drawFleetHoldBadge(cx, A, null, ships, [], false, col, fleetVeteranGrade(f.units, data));
-      // selection still reads on the schematic view; the rest of the kit is gone
-      if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 12, now);
-      continue;
-    }
-    cx.globalAlpha = detail; // full detail fades back in toward 1.45
-
-    // Fleet emblem (постер «Типы кораблей»): ОДИН силуэт ДОМИНАНТА — сильнейшего
-    // корабля флота — вместо пирамиды треугольников; количество несёт счётчик
-    // «×N» в горизонтальном бейдже («флот на карте = доминант + счёт», полный состав — в
-    // панели выделения). Размер S/M/L по hp доминанта, гало-кольцо при щите
-    // (у флагмана — всегда), нос по курсу — heading от fleetAnchor, как раньше;
-    // шкалы вместимости и счётчик остаются горизонтальными.
-    // Размер — из ЕДИНОЙ таблицы постера (`unitGlyphs.ts`, правило 1). Здесь стояла
-    // своя (S 0.62 · M 0.8), и один и тот же разведчик был в панели заметно крупнее,
-    // чем на карте: «размер = hp» переставал быть шкалой ровно там, где ею пользуются.
-    const domStack = dom ? f.units.find((st) => st.unit === dom.unit && st.count > 0) : undefined;
-    const domShield =
-      dom && domStack ? (effectiveStats(dom.def, domStack, data).shield ?? 0) > 0 : false;
-    cx.save();
-    cx.translate(A.x, A.y);
-    cx.rotate(A.ang + Math.PI / 2);
-    cx.shadowColor = col;
-    cx.shadowBlur = fxBlur(6 + 6 * engine);
-    if (glyphHalo(arch, domShield)) {
-      // Модификатор «есть щит» (у флагмана — всегда): пунктирная орбита вокруг силуэта.
-      // Само правило — в `unitGlyphs.ts` (правило 2); РАДИУС здесь свой и намеренно:
-      // на карте бокса нет, кольцо обязано ехать за силуэтом (правило 3).
-      cx.strokeStyle = rgba(col, 0.7);
-      cx.lineWidth = 1.1;
-      cx.setLineDash([2.6, 2.8]);
-      cx.beginPath();
-      cx.arc(0, 0, 12.5 * domK + 2, 0, TAU);
-      cx.stroke();
-      cx.setLineDash([]);
-    }
-    cx.scale(domK, domK);
-    cx.translate(-12, -12);
-    cx.fillStyle = rgba(col, 0.24);
-    cx.strokeStyle = rgba(col, 0.95);
-    drawShipShape(cx, shape, true);
-    cx.restore();
-
-    if (f.owner === ME && chainStepsOf(f.id)) {
-      // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
-      // one glance tells which fleets are already "spoken for".
-      const pu = fxBreath(now, { period: 300, base: 0.5, amp: 0.5, phase: phaseOfId(f.id) });
-      cx.save();
-      cx.strokeStyle = rgba(ownerColor(ME), 0.3 + 0.4 * pu);
-      cx.lineWidth = 1.3;
-      cx.setLineDash([4, 4]);
-      cx.beginPath();
-      cx.arc(A.x, A.y, 12.5, 0, TAU);
-      cx.stroke();
-      cx.restore();
-    }
-    // Радиус артиллерии и линию огня рисует слой RANGE-UX (`drawCombatRanges` поверх
-    // `combatRanges.ts`) — ровно для тех же выбранных флотов. Здесь стояла ВТОРАЯ копия
-    // того же кольца, другим цветом и пунктиром: два кольца одного радиуса каждый кадр
-    // (REFM-123). Осталась только рамка выбора.
-    if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 15, now);
-
-    cx.globalAlpha = 1; // Counts remain readable throughout the LOD cross-fade.
-    // Own hold occupancy is read from the snapshot; foreign manifests stay private.
-    // The badge remains horizontal and outside the orbit even as heading changes.
-    const dock = !f.movement && f.location ? s.planets[f.location] : null;
-    if (!emplacement) drawFleetHoldBadge(
-      cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
-      f.owner === ME ? fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)) : [],
-      selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
-      col,
-      fleetVeteranGrade(f.units, data),
-    );
-
-    cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
-  }
-
-  // Draw portraits after hulls, in screen pixels; they never rotate with the ships.
-  for (const [fleetId, hero] of heroesByFleet) {
-    const selected = selFleet === fleetId || selFleets.has(fleetId);
-    if (detail < 0.45 && !selected) continue;
-    const f = s.fleets[fleetId]!;
-    const anchor = fleetAnchor(f);
-    if (!anchor || !visible(anchor, 120)) continue;
-    const hit = drawHeroPortrait(cx, hero, anchor, ownerColor(f.owner), heroPortraitHits);
-    if (hit) heroPortraitHits.push(hit);
-  }
-
+  // 6. Флоты: орбиты, трассы огня между строями, корпуса и портреты; контакты радара поверх.
+  drawOrbitRings(now, detail); // кольцо орбиты у мира со стоящим флотом
+  drawBattleTracers(now); // трассы огня между строями боя
+  drawFleets(now, lod); // флоты: корпус доминанта, счёт, трюм, рамка выбора, портреты героев
   drawRadarContacts(now); // swept enemy signatures — last-known ghosts until repainted
 
-  if (selectionBox) {
-    const x = Math.min(selectionBox.x1, selectionBox.x2);
-    const y = Math.min(selectionBox.y1, selectionBox.y2);
-    const w = Math.abs(selectionBox.x2 - selectionBox.x1);
-    const h = Math.abs(selectionBox.y2 - selectionBox.y1);
-    cx.save();
-    cx.fillStyle = 'rgba(53,214,230,.08)';
-    cx.strokeStyle = LOCK;
-    cx.setLineDash([5, 4]);
-    cx.lineWidth = 1.2;
-    cx.fillRect(x, y, w, h);
-    cx.strokeRect(x, y, w, h);
-    cx.restore();
-  }
+  // 7. Верхний слой: рамка выделения, метки, цели, радиусы и прицелы.
+  drawSelectionBox(selectionBox); // рамка выделения флотов протяжкой
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
@@ -6290,7 +5903,7 @@ initMapInput({
     battleRetreatAim = null;
   },
   markSelection: () => {
-    selectionStarted = lastReal;
+    markSelection(lastReal);
   },
   clearSelection,
   setFleetSelection,
@@ -8674,7 +8287,7 @@ function frame(nowReal: number) {
     !(NET && !netAdmitted) &&
     !preparingMap
   ) {
-    render(nowReal);
+    renderMap(nowReal);
     renderPanel();
     renderCmdBar();
     renderSplitDialog();

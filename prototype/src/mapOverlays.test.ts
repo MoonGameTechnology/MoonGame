@@ -386,6 +386,24 @@ describe('REFM-233 — наложения на карте', () => {
   });
 });
 
+describe('REFM-235 — рамка выделения', () => {
+  it('протяжка в любую сторону — прозрачная заливка и пунктир цвета захвата; без протяжки — ничего', async () => {
+    const { ov, palette, frame } = await boot();
+    ov.drawSelectionBox(null);
+    expect(frame.calls).toEqual([]);
+    ov.drawSelectionBox({ x1: 300, y1: 200, x2: 100, y2: 260 });
+    expect(frame.calls.map((c) => c.name)).toEqual(['save', 'setLineDash', 'fillRect', 'strokeRect', 'restore']);
+    expect(frame.named('setLineDash')[0]!.args).toEqual([[5, 4]]);
+    const fill = frame.named('fillRect')[0]!;
+    expect([fill.args, fill.fill]).toEqual([[100, 200, 200, 60], 'rgba(53,214,230,.08)']);
+    const rim = frame.named('strokeRect')[0]!;
+    expect([rim.args, rim.stroke, rim.width]).toEqual([[100, 200, 200, 60], palette.LOCK, 1.2]);
+    frame.calls.length = 0;
+    ov.drawSelectionBox({ x1: 100, y1: 260, x2: 300, y2: 200 });
+    expect(frame.named('strokeRect')[0]!.args).toEqual([100, 200, 200, 60]);
+  });
+});
+
 describe('REFM-233 — стык наложений с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const SRC = readFileSync(new URL('./mapOverlays.ts', import.meta.url), 'utf8');
@@ -405,10 +423,10 @@ describe('REFM-233 — стык наложений с main.ts', () => {
 
   it('рисовалки живут только в модуле, кадр зовёт их оттуда', () => {
     expect(MAIN).not.toMatch(
-      /\bfunction (targetBrackets|drawBattlePulse|drawSwarmNet|drawFleetRoutes|drawStrikeTrails|drawPatrolRings|drawPatrolCircle|drawSeenPatrols|drawCorridors|drawCombatRanges|drawAbilityCircle|drawAbilityRings)\(/,
+      /\bfunction (targetBrackets|drawBattlePulse|drawSelectionBox|drawSwarmNet|drawFleetRoutes|drawStrikeTrails|drawPatrolRings|drawPatrolCircle|drawSeenPatrols|drawCorridors|drawCombatRanges|drawAbilityCircle|drawAbilityRings)\(/,
     );
     expect(MAIN).not.toContain('const PATROL_LOOK');
-    for (const call of ['drawSwarmNet();', 'drawFleetRoutes();', 'drawPatrolRings();', 'drawSeenPatrols();', 'drawCombatRanges();', 'drawAbilityRings();'])
+    for (const call of ['drawSelectionBox(selectionBox);', 'drawSwarmNet();', 'drawFleetRoutes();', 'drawPatrolRings();', 'drawSeenPatrols();', 'drawCombatRanges();', 'drawAbilityRings();'])
       expect(MAIN, call).toContain(call);
   });
 

@@ -195,6 +195,9 @@ const click = async id => {
 // Тап по карте — у ввода (`mapInput.ts`, REFM-236): мост берёт его своим импортом.
 const bridge = `
 import { selectAt as __selectAt } from './mapInput';
+// Точка значка боя — у флотов карты (REFM-235); \`main.ts\` сам её не считает.
+import { battleAnchor as __battleAnchor } from './fleetGeometry';
+import { battleBadgePoint as __battleBadgePoint } from '../../decisions/battleTap';
 module.exports = {
   battleFixture: () => {
     const before = s;
@@ -210,7 +213,7 @@ module.exports = {
       ] };
     const oldVision = vision; __fog.vision = null;
     clearSelection();
-    const badge = battleBadgePoint(world(battleAnchor(s.battles['ui-battle'])));
+    const badge = __battleBadgePoint(world(__battleAnchor(s.battles['ui-battle'])));
     __selectAt(badge.x, badge.y);
     return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
   },

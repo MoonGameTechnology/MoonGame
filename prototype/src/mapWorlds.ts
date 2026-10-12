@@ -1,14 +1,14 @@
 /**
- * Миры карты (REFM-235, часть 1): всё, что кадр рисует на самих узлах, — имена своих миров
- * на схеме, имена областей, искусство узла по типу сектора (сфера мира, поле астероидов,
- * туманность, буря, кладбище, мёртвый мир, станции и крепости), его бейдж типа, кольцо
- * радара, ряд построек и подпись, метки тумана и крепости на развилках дорог.
+ * Миры карты (REFM-235): всё, что кадр рисует на самих узлах, — засветка под лучом развёртки,
+ * имена своих миров на схеме, имена областей, искусство узла по типу сектора (сфера мира,
+ * поле астероидов, туманность, буря, кладбище, мёртвый мир, станции и крепости), его бейдж
+ * типа, кольцо радара, ряд построек и подпись, метки тумана и крепости на развилках дорог.
  *
- * Что показать, решают чистые модели (`fogView.ts`, `kindBadge.ts`, `buildChips.ts`,
- * `nodeCallout.ts`, `semanticZoom.ts`, `radarSources.ts`, `decisions/regionName.ts`); здесь
- * только холст. Мир, своё место, узлы карты, контекст кадра, часы и вид голограммы и тип
- * сектора модуль получает хуками {@link initMapWorlds}: они живут в `main.ts`, и импорт
- * оттуда был бы циклом. Слой зовёт кадр `render()`.
+ * Что показать, решают чистые модели (`fogView.ts`, `sweepFx.ts`, `kindBadge.ts`,
+ * `buildChips.ts`, `nodeCallout.ts`, `semanticZoom.ts`, `radarSources.ts`,
+ * `decisions/regionName.ts`); здесь только холст. Мир, своё место, узлы карты, контекст
+ * кадра, часы и вид голограммы и тип сектора модуль получает хуками {@link initMapWorlds}:
+ * они живут в `main.ts`, и импорт оттуда был бы циклом. Слои зовёт кадр `renderMap()`.
  */
 import type { BuildingInstance, GameState } from '../../packages/shared-core/src/index';
 import { isForkSite } from '../../packages/shared-core/src/index';
@@ -33,7 +33,7 @@ import { fleetSeen, known, memory, seesDetails } from './mapFog';
 import { roadDrawingOf } from './mapLayer';
 import { targetBrackets } from './mapOverlays';
 import { CARDINAL, TAU, blitGlow, blitSphere, ownerColor } from './mapPalette';
-import { planetRadar } from './mapRadar';
+import { planetRadar, sweepGlow, sweepOn } from './mapRadar';
 import { asteroidsFor, polyPoints } from './mapShapes';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
 import { worldName } from './planetName';
@@ -42,6 +42,7 @@ import { radarShown } from './radarSources';
 import type { Snapshot } from './scanMemory';
 import { artScale, calloutAlpha, sphereBloom } from './semanticZoom';
 import { VOID_COLOR } from './sideColors';
+import { sweepPaint, sweepShows } from './sweepFx';
 
 /** Что мирам карты нужно от игры. */
 export interface MapWorldsHost {
@@ -165,6 +166,39 @@ function poly(x: number, y: number, r: number, sides: number, rot = 0) {
     else cx.moveTo(p.x, p.y);
   });
   cx.closePath();
+}
+
+/**
+ * Засветка развёртки: луч, проходя контакт, вспыхивает на нём, и отпечаток гаснет до
+ * следующего прохода. Рисуется под метками узлов, чтобы читаться свечением самого контакта,
+ * а не наложением. Пустоты и никогда не виденные узлы не светятся.
+ */
+export function drawSweepAfterglow(lod: MapLod): void {
+  const s = game.world();
+  const cx = game.ctx();
+  const MAP = game.nodes();
+  if (sweepOn && lod.art > 0) {
+    cx.save();
+    cx.globalCompositeOperation = 'lighter';
+    for (const n of MAP) {
+      const p = s.planets[n.id];
+      if (!p) continue;
+      const c = world(n);
+      if (!visible(c, 60)) continue;
+      // Кого подсвечивать и каким цветом — `sweepFx.ts` (REFM-113) поверх вида узла из
+      // `fogView.ts`: помнимый горит НЕЙТРАЛЬНО, потому что владелец в памяти может быть
+      // устаревшим, а никогда не виденный не выдаёт себя засветкой вовсе.
+      const paint = sweepPaint(
+        nodeView({ sector: n.sector, identified: known(n.id), remembered: memory.has(n.id) }),
+      );
+      if (paint.do !== 'paint') continue;
+      const g = sweepGlow(c);
+      if (!sweepShows(g)) continue;
+      const col = paint.ownerColored ? ownerColor(p.owner) : '#6f8a93';
+      blitGlow(col, c.x, c.y, 24, 0.42 * g); // cached glow disc (no per-node gradient)
+    }
+    cx.restore();
+  }
 }
 
 /**

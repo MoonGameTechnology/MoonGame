@@ -9,7 +9,7 @@
  * партии очищает залпы. Жизнь, затухание и радиусы — `flashFx.ts`, вид залпа по тиру —
  * `flakTiers.ts`; здесь только очереди и холст. Мир и контекст кадра модуль получает
  * хуками {@link initMapEffects}: они живут в `main.ts`, и импорт оттуда был бы циклом.
- * Рисовалки зовёт кадр `render()`.
+ * Рисовалки зовёт кадр `renderMap()`.
  */
 import type { GameState } from '../../packages/shared-core/src/index';
 import { rgba } from '../../packages/client/src/holoDraw';

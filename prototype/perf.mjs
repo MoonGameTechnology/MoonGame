@@ -186,9 +186,13 @@ globalThis.requestAnimationFrame = (cb) => {
 const bridge = `
 import { sweepArms as __sweepArms } from './mapRadar';
 import { selectAt as __selectAt } from './mapInput';
+// Видимость, блики рельефа и признак развёртки читают слои карты (REFM-235); \`main.ts\` сам их не держит.
+import { visible as __visible } from './mapCamera';
+import { terrainFields as __terrainFields } from './mapLayer';
+import { sweepOn as __sweepOn } from './mapRadar';
 let perfPaints = 0;
-const perfRender = render;
-render = function(now) { perfPaints++; perfRender(now); };
+const perfRender = renderMap;
+renderMap = function(now) { perfPaints++; perfRender(now); };
 module.exports = {
   ready: () => !mapPreparation.active || mapPreparation.ready,
   paints: () => perfPaints,
@@ -205,7 +209,7 @@ module.exports = {
     __fog.scans.clear();
     if (vision) __fog.updateMemory(vision.identify);
     clearSelection(); pickWorld(home.id);
-    render(2000); // warm static layers and atlases at this density
+    renderMap(2000); // warm static layers and atlases at this density
     globalThis.__perfSpheres = 0;
     const rings = [];
     let questions = 0;
@@ -218,17 +222,17 @@ module.exports = {
       if (label === '?') questions++;
       return fillText.call(cx, label, ...rest);
     };
-    render(2000);
+    renderMap(2000);
     cx.arc = arc; cx.fillText = fillText;
     const lod = currentMapLod();
-    const expected = MAP.filter(n => s.planets[n.id] && visible(world(n), 10))
+    const expected = MAP.filter(n => s.planets[n.id] && __visible(world(n), 10))
       .map(n => { const p = world(n); return [p.x, p.y, lod.markerRadius]; });
     const a = fleetAnchor(fleet);
     __selectAt(a.x, a.y); // same map-tap path as pointer/touch input
-    return { lod, spheres: globalThis.__perfSpheres, terrain: terrainFields.length,
+    return { lod, spheres: globalThis.__perfSpheres, terrain: __terrainFields.length,
       allMarkers: JSON.stringify(rings) === JSON.stringify(expected), questions,
       pickedFleet: selFleet === fleet.id || selFleets.has(fleet.id),
-      sensing: sweepOn && __sweepArms.length > 0,
+      sensing: __sweepOn && __sweepArms.length > 0,
       known: MAP.filter(n => known(n.id)).length,
       stateUnchanged: JSON.stringify(s) === before };
   },

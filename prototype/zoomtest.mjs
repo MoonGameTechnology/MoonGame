@@ -22,6 +22,8 @@ const bridge = `
 // zoom needs only for sharpness goes to the background, a band a frame (rule 7 of
 // decisions/mapLayerView.ts), and is not one of them.
 // The bake lives in the map layer (REFM-232): mapLayerBridge appends its handles there.
+// Перенос выпечки — у слоя карты (REFM-232); \`main.ts\` его больше не читает (REFM-235).
+import { mapView as __mapView } from './mapLayer';
 let zoomBakes = 0;
 const zoomBake = globalThis.__mapLayer.bakeMapLayer;
 globalThis.__mapLayer.bakeMapLayer = (...args) => { zoomBakes++; return zoomBake(...args); };
@@ -30,7 +32,7 @@ window.__zoomTest = {
   report() { return mapRenderingReport(); },
   scene(scale) { speed=0; clearSelection(); const b=mapBounds(); centerOn({x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2},scale); },
   resetBakes() { zoomBakes=0; },
-  sharp() { return mapView.k === 1 && !globalThis.__mapLayer.bakeJob; },
+  sharp() { return __mapView.k === 1 && !globalThis.__mapLayer.bakeJob; },
   read() { return { camera:{...cam}, bakes:zoomBakes, pointers:pointers.size, pointerIds:[...pointers.keys()],
     width:canvas.width, height:canvas.height, state:JSON.stringify(s), selected:[selPlanet,selFleet] }; },
 };`;

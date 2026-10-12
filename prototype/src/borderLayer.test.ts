@@ -455,13 +455,15 @@ describe('REFM-232 — слой живых границ', () => {
 describe('REFM-232 — стык слоя живых границ с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const SRC = readFileSync(new URL('./borderLayer.ts', import.meta.url), 'utf8');
+  const SURFACE = readFileSync(new URL('./mapSurface.ts', import.meta.url), 'utf8');
   const init = /initBorderLayer\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
   it('хуки — кадр, экран и часы голограммы; сброс — дверью из слоя карты', () => {
     for (const hook of ['ctx: () => cx,', 'vw: () => VW,', 'vh: () => VH,', 'dpr: () => DPR,', 'clock: () => hologramTime,'])
       expect(init, hook).toContain(hook);
     expect(MAIN).toContain('surfacesLost: forgetBorderLayer,');
-    expect(MAIN).toContain('blitBorderLayer(lod.provinceDetail, borders)');
+    // Кадр кладёт слой из поверхности карты (`mapSurface.ts`, REFM-235).
+    expect(SURFACE).toContain('blitBorderLayer(lod.provinceDetail, borders)');
   });
 
   it('холст слоя и его память живут только в модуле', () => {
