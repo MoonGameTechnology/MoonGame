@@ -546,6 +546,35 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
     }
   });
 
+  it('картинки клиента уходят файлами с годовым кэшем, документ — по-прежнему без кэша', async () => {
+    // Однофайловый документ с `no-store` перекачивался целиком при каждом открытии, вместе
+    // с 16 МБ base64-арта. Вынесенная картинка названа по хешу и не меняется никогда.
+    const webp = Buffer.from('RIFF\0\0\0\0WEBPVP8 ');
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      indexHtml: CLIENT,
+      assets: new Map([['fighter-DYTR3J73.webp', webp]]),
+    });
+    const base = httpBase(await server.listen());
+    try {
+      const art = await fetch(`${base}/assets/fighter-DYTR3J73.webp`);
+      expect(art.status).toBe(200);
+      expect(Buffer.from(await art.arrayBuffer())).toEqual(webp);
+      expect(art.headers.get('content-type')).toBe('image/webp');
+      expect(art.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+      // Политика API остаётся: открытый напрямую файл ничего не исполнит.
+      expect(art.headers.get('content-security-policy')).toContain("default-src 'none'");
+      expect(art.headers.get('x-content-type-options')).toBe('nosniff');
+      // Имя ищется в карте, путём на диске оно не становится.
+      for (const path of ['/assets/missing.webp', '/assets/..%2Fpackage.json', '/assets/']) {
+        expect([path, (await fetch(`${base}${path}`)).status]).toEqual([path, 404]);
+      }
+      expect((await fetch(`${base}/`)).headers.get('cache-control')).toBe('no-store, must-revalidate');
+    } finally {
+      await server.close();
+    }
+  });
+
   it('площадке-порталу встраивание разрешается параметром, а не снятием заголовка', async () => {
     const server = createMultiplayerServer({
       room: makeRoom(),

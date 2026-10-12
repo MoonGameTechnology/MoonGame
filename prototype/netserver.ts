@@ -3,6 +3,7 @@ import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/
 import { corporateEndpoint, registerCorporateGateway, registerCorporateMaintenance } from '../packages/server/src/corporateTransport';
 import { corporateRemote } from '../packages/server/src/corporateRemote';
 import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
+import { readAssetDir } from '../packages/server/src/staticAssets';
 import { recoveryMailer } from '../scripts/recoveryMailer';
 import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
 import { registerCorpApi } from '../packages/server/src/corpApi';
@@ -189,8 +190,16 @@ const TIME_SCALE = Math.max(1, Number(process.env.TIME_SCALE ?? 1) || 1);
 // get the PLAYER client at `/` (no test mode / single-player / time controls — see
 // build.mjs); the full dev client stays one step away at `/dev` for the host. If the
 // player artifact hasn't been built yet (stale dist), `/` falls back to the dev client.
-const devHtmlPath = 'prototype/dist/void-dominion.html';
-const playerHtmlPath = 'prototype/dist/void-dominion-player.html';
+// Предпочитаем сборку для сервера (`dist/served/`): картинки в ней — отдельные файлы с
+// хешем в имени и годовым кэшем, а документ легче в шесть раз. Без её `assets/` берём
+// однофайловые: документ со ссылками на картинки, которых нет, хуже тяжёлого.
+const servedAssetsDir = 'prototype/dist/served/assets';
+const served = existsSync(servedAssetsDir);
+const devHtmlPath = served ? 'prototype/dist/served/dev.html' : 'prototype/dist/void-dominion.html';
+const playerHtmlPath = served
+  ? 'prototype/dist/served/player.html'
+  : 'prototype/dist/void-dominion-player.html';
+const assets = served ? readAssetDir(servedAssetsDir) : undefined;
 const devHtml = existsSync(devHtmlPath) ? readFileSync(devHtmlPath, 'utf8') : undefined;
 const playerHtml = existsSync(playerHtmlPath) ? readFileSync(playerHtmlPath, 'utf8') : undefined;
 const indexHtml = playerHtml ?? devHtml;
@@ -863,6 +872,7 @@ const server = createMultiplayerServer({
   host,
   port,
   indexHtml,
+  ...(assets ? { assets } : {}),
   accountStore, // `?nick=` WS login resolves its seat here
   seatLock: SEAT_LOCK, // REL-5: nick+ticket identity; `?player=` refused when on
   // Accounts (SES-2.5): with AUTH on, the WS handshake requires a verified join token
