@@ -373,15 +373,13 @@ describe('REFM-241 — стык с main.ts', () => {
   const SRC = readFileSync(new URL('./mapLoading.ts', import.meta.url), 'utf8');
   const init = /initMapLoading\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
-  it('хуки — вход после допуска, ключ окна, рецепт, сброс выпечки, уход кнопкой HUD', () => {
+  it('хуки — вход после допуска, ключ окна, рецепт и сброс выпечки слоя карты, уход кнопкой HUD', () => {
     for (const hook of [
       'entered: () => inMatch() && (!NET || netAdmitted),',
       'viewport: () => `${VW}:${VH}:${DPR}:${holographicMapOn()}`,',
-      "label: t('map-loading.background')",
-      "label: t('map-loading.geometry')",
-      "label: t('map-loading.terrain')",
-      "label: t('map-loading.ready')",
-      "mapLayerContent = '';",
+      // Рецепт и сброс выпечки — у слоя карты (`mapLayer.ts`, REFM-232).
+      'jobs: mapPreparationJobs,',
+      'failed: forgetMapBake,',
       "leave: () => $('tomenu').click(),",
     ])
       expect(init).toContain(hook);

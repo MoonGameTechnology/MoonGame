@@ -279,6 +279,8 @@ describe('REFM-231 — стык с main.ts', () => {
   const CAMERA = readFileSync(new URL('./mapCamera.ts', import.meta.url), 'utf8');
   // Ввод на холсте (щипок, протяжка) уехал из `main.ts` в `mapInput.ts` (REFM-236).
   const INPUT = readFileSync(new URL('./mapInput.ts', import.meta.url), 'utf8');
+  // Привязку покоя к сетке выпечки делает слой карты (REFM-232).
+  const LAYER = readFileSync(new URL('./mapLayer.ts', import.meta.url), 'utf8');
   const init = /initMapCamera\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
   it('хуки камеры — экран, раскладка, мир, своё место и побочные действия перехода', () => {
@@ -299,7 +301,7 @@ describe('REFM-231 — стык с main.ts', () => {
   });
 
   it('камеру и рамку меняют только двери владельца', () => {
-    for (const src of [MAIN, INPUT]) {
+    for (const src of [MAIN, INPUT, LAYER]) {
       expect(src).not.toMatch(/\bcam\.(scale|x|y)\s*[-+]?=[^=]/);
       expect(src).not.toContain('Object.assign(cam');
       expect(src).not.toMatch(/\b(MINX|MAXX|MINY|MAXY)\b/);
@@ -313,9 +315,11 @@ describe('REFM-231 — стык с main.ts', () => {
     expect(MAIN).toContain(
       'setView(reframePresentation(cam, previousViewport, insets(), mapBounds()));',
     );
-    // Протяжку пальцем двигает ввод, остальные два сдвига — `main.ts`.
-    expect(MAIN.match(/\bpanBy\(/g)).toHaveLength(2);
+    // Протяжку пальцем двигает ввод, покой на сетку выпечки ставит слой карты, третий сдвиг —
+    // `main.ts`.
+    expect(MAIN.match(/\bpanBy\(/g)).toHaveLength(1);
     expect(INPUT.match(/\bpanBy\(/g)).toHaveLength(1);
+    expect(LAYER.match(/\bpanBy\(/g)).toHaveLength(1);
   });
 
   it('модуль не тянет `main.ts`', () => {
