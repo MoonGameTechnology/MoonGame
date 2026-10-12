@@ -1,60 +1,43 @@
 /**
- * Нижняя панель телефона в партии (UIX-3.1): разметка, нажатия и подсветка.
+ * Нижняя панель телефона в партии (UIX-3.1, своя раскладка — UIX-3.3): разметка, нажатия,
+ * подсветка и запись раскладки.
  *
  * Что стоит в панели и в «Ещё», что подсвечено и куда ведёт нажатие, решает
- * `decisions/phoneNav.ts`; здесь только DOM. Пункты нажимают НАСТОЯЩИЕ кнопки рельсы: она на
- * телефоне спрятана, но окна, вводные «впервые» и выход с вопросом в забеге остаются её.
+ * `decisions/phoneNav.ts`; здесь только DOM и хранилище. Пункты нажимают НАСТОЯЩИЕ кнопки
+ * рельсы: она на телефоне спрятана, но окна, вводные «впервые» и выход с вопросом в забеге
+ * остаются её.
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { phoneIcon } from './phoneIcons';
+import { readRaw, writeRaw } from './prefs';
 import {
   activePhoneTab,
-  PHONE_MORE,
-  PHONE_TABS,
+  parsePhoneBar,
   phoneBadges,
+  phoneItem,
   phoneMoreItems,
+  phoneSectionLabel,
   phoneTabs,
   phoneTabTap,
+  phoneTileBadge,
+  serializePhoneBar,
+  type PhoneBar,
+  type PhoneCounts,
+  type PhoneItemId,
   type PhoneMoreId,
   type PhoneSection,
 } from '../../decisions/phoneNav';
 
+/** Раскладка панели игрока (`serializePhoneBar`). */
+const BAR_KEY = 'void.phone.bar';
+
 interface PhoneNavHost {
   /** Убрать окна над картой; выделение, обучение и сама партия остаются. */
   toMap(): void;
-  /** Открыто ли окно раздела. */
-  windowOpen(tab: 'production' | 'science' | 'events'): boolean;
+  /** Открыто ли окно пункта. */
+  windowOpen(id: PhoneItemId): boolean;
 }
-
-/** Линейные значки разделов, 24×24, цветом подписи. */
-const ICON: Record<PhoneSection, string> = {
-  map: '<path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5V4l-6 2.5L9 4Z"/><path d="M9 4v13M15 6.5v13"/>',
-  production:
-    '<path d="M4 20h16M6 20V10l4 2.5V10l4 2.5V10l4 2.5V20"/><path d="M8 16h1.5M12 16h1.5M16 16h1.5"/>',
-  science:
-    '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/>' +
-    '<ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/>' +
-    '<ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/>',
-  events: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
-  more: '<circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/>',
-};
-
-/** Знак плитки «Ещё» — одноцветный символ, как у кнопок рельсы. */
-const GLYPH: Record<PhoneMoreId, string> = {
-  diplomacy: '⬡',
-  mail: '✉',
-  pings: '⌖',
-  market: '⇄',
-  trader: '⚖',
-  corporation: '⬢',
-  steward: '☾',
-  dossier: '☣',
-  codex: '?',
-  settings: '⚙',
-  save: '⤓',
-  abandon: '⚑',
-  exit: '⌂',
-};
 
 /** Есть ли кнопка сейчас: игра прячет недоступные инлайновым `display:none`. */
 function present(selector: string): boolean {
@@ -66,12 +49,6 @@ export function initPhoneNav(host: PhoneNavHost) {
   const nav = document.createElement('nav');
   nav.id = 'phone-nav';
   nav.setAttribute('aria-label', t('hud.sections'));
-  nav.innerHTML = PHONE_TABS.map(
-    (tab) =>
-      `<button type="button" data-phone-tab="${tab.id}">` +
-      `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[tab.id]}</svg>` +
-      `<span>${esc(t(tab.label))}</span><b class="phone-badge" hidden></b></button>`,
-  ).join('');
   const more = document.createElement('section');
   more.id = 'phone-more';
   more.hidden = true;
@@ -80,29 +57,31 @@ export function initPhoneNav(host: PhoneNavHost) {
   document.body.appendChild(nav);
   document.body.appendChild(more);
 
-  const buttons = new Map<PhoneSection, HTMLElement>();
-  for (const b of Array.from(nav.querySelectorAll<HTMLElement>('[data-phone-tab]')))
-    buttons.set(b.dataset.phoneTab as PhoneSection, b);
+  let bar: PhoneBar = parsePhoneBar(readRaw(BAR_KEY));
+  let buttons = new Map<PhoneSection, HTMLElement>();
   let enabled = false;
   let shownTabs = '';
   let active: PhoneSection | null = null;
-  let unread = 0;
+  let counts: PhoneCounts = {};
   const badgeText = new Map<PhoneSection, string>();
 
   const open = (tab: PhoneSection): boolean =>
     tab === 'more' ? !more.hidden : tab !== 'map' && host.windowOpen(tab);
 
   const renderMore = (): void => {
-    const mail = unread > 0 ? `<b class="phone-badge">${esc(String(unread))}</b>` : '';
+    const badge = (id: PhoneMoreId): string => {
+      const text = phoneTileBadge(counts, id);
+      return text ? `<b class="phone-badge">${esc(text)}</b>` : '';
+    };
     more.innerHTML =
       `<div class="phone-more-panel"><div class="phone-more-head"><b>${esc(t('hud.tools'))}</b>` +
       `<button type="button" class="btn-x" data-phone-close="1" aria-label="${esc(t('card.close'))}">×</button></div>` +
       `<div class="phone-more-grid">` +
-      phoneMoreItems(present)
+      phoneMoreItems(bar, present)
         .map(
           (item) =>
-            `<button type="button" data-phone-more="${item.id}"><i aria-hidden="true">${GLYPH[item.id]}</i>` +
-            `<span>${esc(t(item.label))}</span>${item.id === 'mail' ? mail : ''}</button>`,
+            `<button type="button" data-phone-more="${item.id}">${phoneIcon(item.id)}` +
+            `<span>${esc(t(item.label))}</span>${badge(item.id)}</button>`,
         )
         .join('') +
       `</div></div>`;
@@ -118,13 +97,13 @@ export function initPhoneNav(host: PhoneNavHost) {
     const tab = (ev.target as Element).closest<HTMLElement>('[data-phone-tab]')?.dataset
       .phoneTab as PhoneSection | undefined;
     if (!tab) return;
-    const next = phoneTabTap(tab, activePhoneTab(open));
+    const next = phoneTabTap(tab, activePhoneTab(bar, open));
     closeMore();
     host.toMap();
     if (next === 'more') {
       renderMore();
       more.hidden = false;
-    } else if (next) press(PHONE_TABS.find((x) => x.id === next)?.opens);
+    } else if (next && next !== 'map') press(phoneItem(next).opens);
     sync(enabled);
   });
   more.addEventListener('click', (ev) => {
@@ -136,7 +115,7 @@ export function initPhoneNav(host: PhoneNavHost) {
       return;
     }
     const id = target.closest<HTMLElement>('[data-phone-more]')?.dataset.phoneMore;
-    const item = PHONE_MORE.find((x) => x.id === id);
+    const item = phoneMoreItems(bar, () => true).find((x) => x.id === id);
     if (!item) return;
     closeMore();
     host.toMap();
@@ -144,13 +123,18 @@ export function initPhoneNav(host: PhoneNavHost) {
     sync(enabled);
   });
 
-  const setBadge = (tab: PhoneSection, text: string): void => {
-    if (badgeText.get(tab) === text) return;
-    badgeText.set(tab, text);
-    const badge = buttons.get(tab)?.querySelector<HTMLElement>('.phone-badge');
-    if (!badge) return;
-    badge.textContent = text;
-    badge.hidden = !text;
+  /** Значки разделов по числам и раскладке; меняет только то, что изменилось. */
+  const applyBadges = (): void => {
+    const text = phoneBadges(bar, counts, !more.hidden);
+    for (const [tab, button] of buttons) {
+      const next = text[tab] ?? '';
+      if (badgeText.get(tab) === next) continue;
+      badgeText.set(tab, next);
+      const badge = button.querySelector<HTMLElement>('.phone-badge');
+      if (!badge) continue;
+      badge.textContent = next;
+      badge.hidden = !next;
+    }
   };
 
   /** Кадр: включена ли панель (телефон в партии), какие разделы есть и какой подсвечен. */
@@ -160,14 +144,28 @@ export function initPhoneNav(host: PhoneNavHost) {
       closeMore();
       return;
     }
-    const tabs = phoneTabs(present).map((tab) => tab.id);
+    const tabs = phoneTabs(bar, present);
     const key = tabs.join('|');
     if (key !== shownTabs) {
       shownTabs = key;
-      for (const [id, b] of buttons) b.hidden = !tabs.includes(id);
-      nav.dataset.tabs = String(tabs.length);
+      nav.innerHTML = tabs
+        .map(
+          (tab) =>
+            `<button type="button" data-phone-tab="${tab}">${phoneIcon(tab)}` +
+            `<span>${esc(t(phoneSectionLabel(tab)))}</span><b class="phone-badge" hidden></b></button>`,
+        )
+        .join('');
+      buttons = new Map(
+        Array.from(nav.querySelectorAll<HTMLElement>('[data-phone-tab]')).map((b) => [
+          b.dataset.phoneTab as PhoneSection,
+          b,
+        ]),
+      );
+      active = null;
+      badgeText.clear();
+      applyBadges();
     }
-    const now = activePhoneTab(open);
+    const now = activePhoneTab(bar, open);
     if (now !== active) {
       active = now;
       for (const [id, b] of buttons) {
@@ -182,12 +180,19 @@ export function initPhoneNav(host: PhoneNavHost) {
     sync,
     /** Числа значков: бои и непрочитанные письма — те же, что у кнопок рельсы. */
     badges(battles: number, letters: number): void {
-      const changed = letters !== unread;
-      unread = letters;
-      const text = phoneBadges(battles, letters, !more.hidden);
-      setBadge('events', text.events);
-      setBadge('more', text.more);
+      const changed = battles !== counts.events || letters !== counts.mail;
+      counts = { events: battles, mail: letters };
+      applyBadges();
       if (changed && !more.hidden) renderMore();
+    },
+    /** Раскладка панели — её показывает и меняет редактор в настройках. */
+    bar: (): PhoneBar => bar,
+    /** Новая раскладка: панель перестраивается сразу, запись переживает перезагрузку. */
+    setBar(next: PhoneBar): void {
+      bar = parsePhoneBar(serializePhoneBar(next));
+      writeRaw(BAR_KEY, serializePhoneBar(bar));
+      if (!more.hidden) renderMore();
+      sync(enabled);
     },
     /** Открыт ли лист «Ещё» — ступень лестницы «Назад». */
     moreOpen: (): boolean => !more.hidden,

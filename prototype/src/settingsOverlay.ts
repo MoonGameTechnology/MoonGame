@@ -12,6 +12,14 @@
  */
 import { t } from '../../localization/runtime';
 import { controlsFor } from '../../decisions/controls';
+import {
+  DEFAULT_PHONE_BAR,
+  PHONE_PINNABLE,
+  phoneItem,
+  placeInBar,
+  type PhoneItemId,
+} from '../../decisions/phoneNav';
+import { phoneIcon } from './phoneIcons';
 
 /** Снимок всех настроек на момент отрисовки. */
 export interface SettingsView {
@@ -46,6 +54,8 @@ export interface SettingsView {
   /** «Размер интерфейса» ПК (UIX-2.2), доля 0,8..1,5. Нет — нет и ползунка: масштаб есть
    *  только у ПК с мышью. */
   uiScale?: number;
+  /** Окна на местах нижней панели телефона (UIX-3.3). Нет — нет и редактора: у ПК панели нет. */
+  phoneBar?: readonly PhoneItemId[];
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -117,11 +127,48 @@ function tabOf(id: string | undefined): SettingsTab {
 }
 
 /** «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож —
- *  `decisions/controls.ts`. */
-function controlsHtml(view: SettingsView): string {
-  return `<dl class="set-keys">${controlsFor(!!view.touchOnly, !!view.speedKeys)
+ *  `decisions/controls.ts`. На телефоне сверху — редактор нижней панели (UIX-3.3), и тогда у
+ *  таблицы свой заголовок. */
+function controlsHtml(view: SettingsView, barSlot: number): string {
+  const keys = `<dl class="set-keys">${controlsFor(!!view.touchOnly, !!view.speedKeys)
     .map((row) => `<div><dt>${t(row.keys)}</dt><dd>${t(row.does)}</dd></div>`)
     .join('')}</dl>`;
+  if (!view.phoneBar) return keys;
+  const title = view.touchOnly ? t('settings.controls.gestures') : t('settings.controls.keys');
+  return phoneBarHtml(view.phoneBar, barSlot) + `<div class="pc-sec">${title}</div>` + keys;
+}
+
+/** «Нижняя панель» телефона (UIX-3.3, правила 7–8 `decisions/phoneNav.ts`): три места между
+ *  Картой и «Ещё» слева направо и окна, которые на них ставят. Нажатое место подсвечено, окно
+ *  на нём — тоже; окно с другого места несёт номер своего места. Края панели в ряд не входят:
+ *  в окне настроек телефона пять столбцов режут «Производство», а нажать края всё равно нельзя. */
+export function phoneBarHtml(bar: readonly PhoneItemId[], slot: number): string {
+  const name = (id: PhoneItemId): string => t(phoneItem(id).label);
+  const slots = bar
+    .map(
+      (id, i) =>
+        `<button type="button" class="set-bar-slot${i === slot ? ' on' : ''}" data-barslot="${i}"` +
+        ` aria-pressed="${i === slot}" aria-label="${t('settings.bar.slot', { n: i + 1, name: name(id) })}">` +
+        `${phoneIcon(id)}<span>${name(id)}</span><b class="set-bar-at">${i + 1}</b></button>`,
+    )
+    .join('');
+  const picks = PHONE_PINNABLE.map((id) => {
+    const at = bar.indexOf(id);
+    const mark = at >= 0 && at !== slot ? `<b class="set-bar-at">${at + 1}</b>` : '';
+    const aria = at >= 0 ? ` aria-label="${t('settings.bar.pick-at', { n: at + 1, name: name(id) })}"` : '';
+    return (
+      `<button type="button" class="set-bar-pick${at === slot ? ' on' : ''}" data-baritem="${id}"` +
+      ` aria-pressed="${at === slot}"${aria}>${phoneIcon(id)}<span>${name(id)}</span>${mark}</button>`
+    );
+  }).join('');
+  const changed = bar.join(',') !== DEFAULT_PHONE_BAR.join(',');
+  return (
+    `<div class="pc-sec">${t('settings.bar.title')}</div>` +
+    `<p class="set-bar-hint">${t('settings.bar.hint')}</p>` +
+    `<div class="set-bar" role="group" aria-label="${t('settings.bar.title')}">${slots}</div>` +
+    `<div class="set-bar-picks" role="group" aria-label="${t('settings.bar.picks')}">${picks}</div>` +
+    `<button type="button" class="btn-quiet set-bar-reset" id="set-bar-reset"${changed ? '' : ' disabled'}>${t('settings.bar.reset')}</button>`
+  );
 }
 
 /** Окно настроек целиком. Чистая функция от снимка — ни DOM, ни хранилища. */
@@ -129,6 +176,7 @@ export function settingsBoxHtml(
   view: SettingsView,
   renderingReportAvailable = false,
   tab: SettingsTab = DEFAULT_TAB,
+  barSlot = 0,
 ): string {
   // Кнопки вкладок — по образцу WAI-ARIA «tabs»: в Tab-обходе только выбранная
   // (остальные — стрелками), панель подписана своей вкладкой.
@@ -141,13 +189,18 @@ export function settingsBoxHtml(
     `<div class="setbox">` +
     `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
     `<div class="set-tabs" role="tablist" aria-label="${t('settings.title')}">${tabs}</div>` +
-    `<div class="set-panel" id="set-panel" role="tabpanel" aria-labelledby="set-tab-${tab}">${tabHtml(view, tab, renderingReportAvailable)}</div>` +
+    `<div class="set-panel" id="set-panel" role="tabpanel" aria-labelledby="set-tab-${tab}">${tabHtml(view, tab, renderingReportAvailable, barSlot)}</div>` +
     `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
     `</div>`
   );
 }
 
-function tabHtml(view: SettingsView, tab: SettingsTab, renderingReportAvailable: boolean): string {
+function tabHtml(
+  view: SettingsView,
+  tab: SettingsTab,
+  renderingReportAvailable: boolean,
+  barSlot: number,
+): string {
   switch (tab) {
     case 'sound':
       return soundHtml(view);
@@ -156,7 +209,7 @@ function tabHtml(view: SettingsView, tab: SettingsTab, renderingReportAvailable:
     case 'map':
       return mapHtml(view);
     case 'controls':
-      return controlsHtml(view);
+      return controlsHtml(view, barSlot);
   }
 }
 
@@ -276,6 +329,8 @@ export interface SettingsHost {
   setColors(you: string, neutral: string, palette: string): void;
   /** Вернуть цвета к заводским. */
   resetColors(): void;
+  /** Новая раскладка нижней панели телефона (есть там, где есть {@link SettingsView.phoneBar}). */
+  setPhoneBar?(bar: readonly PhoneItemId[]): void;
 }
 
 /** Собрать оверлей. `open()` зовут и хаб, и рельса матча. */
@@ -289,6 +344,8 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
   };
 
   let tab: SettingsTab = DEFAULT_TAB;
+  /** Нажатое место нижней панели в редакторе «Управления». */
+  let barSlot = 0;
 
   /** Открыть вкладку и вернуть фокус на её кнопку: перерисовка снесла прежнюю. */
   const select = (next: SettingsTab): void => {
@@ -299,7 +356,12 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
 
   function render(): void {
     const v = host.view();
-    host.root().innerHTML = settingsBoxHtml(v, typeof host.renderingReport === 'function', tab);
+    host.root().innerHTML = settingsBoxHtml(
+      v,
+      typeof host.renderingReport === 'function',
+      tab,
+      barSlot,
+    );
     for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-settab]'))) {
       b.addEventListener('click', () => select(tabOf(b.dataset.settab)));
       // Стрелки ходят по кругу, Home/End — к краям (образец WAI-ARIA «tabs»).
@@ -411,6 +473,34 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       host.resetColors();
       render();
     });
+    // Нижняя панель (UIX-3.3): место запоминается, окно встаёт на него, перерисовка показывает
+    // новую раскладку. Прокрутка окна и фокус на нажатой кнопке переживают перерисовку: окна
+    // лежат ниже панели, и окно настроек не должно уезжать к началу после каждого нажатия.
+    const refocus = (selector: string): void => {
+      const top = host.root().querySelector<HTMLElement>('.setbox')?.scrollTop ?? 0;
+      render();
+      const box = host.root().querySelector<HTMLElement>('.setbox');
+      if (box) box.scrollTop = top;
+      host.root().querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
+    };
+    for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-barslot]'))) {
+      b.addEventListener('click', () => {
+        barSlot = Number(b.dataset.barslot);
+        refocus(`[data-barslot="${barSlot}"]`);
+      });
+    }
+    for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-baritem]'))) {
+      b.addEventListener('click', () => {
+        const bar = host.view().phoneBar;
+        if (!bar) return;
+        host.setPhoneBar?.(placeInBar(bar, barSlot, b.dataset.baritem as PhoneItemId));
+        refocus(`[data-baritem="${b.dataset.baritem}"]`);
+      });
+    }
+    q('set-bar-reset')?.addEventListener('click', () => {
+      host.setPhoneBar?.(DEFAULT_PHONE_BAR);
+      refocus(`[data-barslot="${barSlot}"]`);
+    });
     q('set-close')?.addEventListener('click', () => host.root().classList.remove('show'));
   }
 
@@ -421,6 +511,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
   return {
     open: () => {
       tab = DEFAULT_TAB; // окно открывается на первой вкладке, а не там, где его закрыли
+      barSlot = 0;
       render();
       host.root().classList.add('show');
     },

@@ -483,7 +483,8 @@ body.mobile-ui.holo-no-glow #mobile-sheet {
   box-shadow: none;
 }
 
-/* UIX-3.1: нижняя панель — Карта, Производство, Наука, События, Ещё (`phoneNav.ts`). Она
+/* UIX-3.1: нижняя панель — Карта, Производство, Наука, События, Ещё (`phoneNav.ts`); три
+   средних места игрок меняет в настройках (UIX-3.3). Она
    заменила «☰» с колонкой инструментов, а кнопка сохранения из строки статуса уехала в
    «Ещё»: пункты нажимают их, спрятанных, поэтому окна и обработчики прежние. */
 body.mobile-ui #rail,
@@ -501,11 +502,11 @@ body.mobile-ui #phone-nav {
   bottom: 0;
   z-index: 30;
   display: grid;
-  /* Столбец не уже своей подписи. «Производство» — самая длинная, ей и доля больше; но на
-     320 px пропорциональным шрифтом не входит в пятую часть и «События». */
-  grid-template-columns:
-    minmax(max-content, 1fr) minmax(max-content, 1.25fr)
-    repeat(3, minmax(max-content, 1fr));
+  /* Столбец не уже своей подписи, остальное — поровну. Длинная подпись («Производство»,
+     «Корпорация») может стоять на любом месте, а на 320 px пятая часть ширины ей мала. В
+     забеге без «Производства» столбцов четыре, и они те же равные доли. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(max-content, 1fr);
   height: var(--phone-navh);
   box-sizing: border-box;
   padding: 0 max(2px, env(safe-area-inset-right)) env(safe-area-inset-bottom)
@@ -514,9 +515,13 @@ body.mobile-ui #phone-nav {
   background: linear-gradient(180deg, rgba(7, 22, 33, 0.97), rgba(2, 9, 15, 0.99));
   box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.45);
 }
-/* В забеге Sector Zero «Производства» нет — четыре равных столбца. */
-body.mobile-ui #phone-nav[data-tabs='4'] {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+/* Уже 340 px три самые длинные подписи («Производство», «Корпорация», «Дипломатия») с краями не
+   входят. Тогда кнопка не уже 44 px, а подпись, которой не хватило места, режется многоточием:
+   палец важнее последней буквы. */
+@media (max-width: 339px) {
+  body.mobile-ui #phone-nav {
+    grid-auto-columns: minmax(44px, auto);
+  }
 }
 body.mobile-ui:is(.aim-mode, .chain-mode) #phone-nav {
   display: none;
@@ -550,7 +555,8 @@ body.mobile-ui:is(.aim-mode, .chain-mode) #phone-nav {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-#phone-nav svg {
+#phone-nav svg,
+.phone-more-grid svg {
   width: 24px;
   height: 24px;
   flex: none;
@@ -669,12 +675,8 @@ body.mobile-ui #phone-more:not([hidden]) {
 .phone-more-grid button:active {
   background: rgba(53, 214, 230, 0.14);
 }
-.phone-more-grid i {
+.phone-more-grid svg {
   color: #8ce9f2;
-  font-size: 22px;
-  font-style: normal;
-  font-variant-emoji: text;
-  line-height: 1;
 }
 .phone-more-grid .phone-badge {
   top: 6px;
