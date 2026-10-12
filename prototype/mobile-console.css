@@ -89,10 +89,8 @@ body.mobile-ui #mobile-sheet {
   flex: none;
   width: 44px;
   height: 44px;
-  border: 1px solid #7da8bc30;
   border-radius: 12px;
-  background: #0c1b2b;
-  color: #b3dae6;
+  background-color: #0c1b2b;
   font: 24px/1 sans-serif;
 }
 .mobile-quick {
@@ -635,16 +633,12 @@ body.mobile-ui #phone-more:not([hidden]) {
   color: #d9f6fb;
   font-size: 16px;
 }
-.phone-more-head button {
+.phone-more-head .btn-x {
   width: 44px;
   height: 44px;
-  border: 0;
   border-radius: 10px;
-  background: none;
-  color: #93b4c0;
   font: inherit;
   font-size: 22px;
-  cursor: pointer;
 }
 .phone-more-grid {
   display: grid;

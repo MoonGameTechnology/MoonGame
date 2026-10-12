@@ -56,7 +56,7 @@ export function cardHeader(
   return `<div class="phead">
     <span class="pflag" style="background:${color}"></span>
     <div class="ptitle">${tt}<span>${esc(subFit)}</span></div>${opts.badge ?? ''}
-    <button class="pclose" data-act="close" data-arg="">✕</button>
+    <button class="pclose btn-x" data-act="close" data-arg="">✕</button>
   </div>`;
 }
 

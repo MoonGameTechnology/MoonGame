@@ -2022,6 +2022,7 @@ function saveWarning(failing: boolean): void {
   text.textContent = t('sector-zero.save-failed');
   const hide = document.createElement('button');
   hide.type = 'button';
+  hide.className = 'btn-x';
   hide.textContent = '×';
   hide.setAttribute('aria-label', t('card.close'));
   hide.addEventListener('click', () => bar.remove());

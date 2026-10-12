@@ -6,7 +6,7 @@
 // героев, корпорации, итоге партии, входе и обозревателе партий (UIX-11.2):
 // разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
 // перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { cargoSplit, splitSlots } from '../../decisions/splitPlan';
@@ -206,7 +206,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
   it('окно флота на ПК: «Подробнее о флоте» — тихая, крестик — свой', () => {
     const html = commandWindowHtml('', 'PALADIN 2', 'LETHE-5');
     expect(unstyled(html).map((tag) => /class="([^"]*)"/.exec(tag)?.[1])).toEqual([
-      'holo-command-close',
+      'holo-command-close btn-x',
     ]);
     expect(html).toContain('class="holo-command-details btn-quiet"');
   });
@@ -392,5 +392,85 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       expect(body, sel).toContain('var(--sf-sel)');
       expect(body, sel).not.toMatch(/#4fe0b0|--grn/);
     }
+  });
+});
+
+// Крестик ✕ — закрыть окно, панель, плашку или убрать строку списка. Заказ владельца
+// 2026-10-12: «все кнопки крестик обвести красным, чтоб выделялись из общего фона». Вид у всех
+// один и берётся классом `.btn-x`, как у трёх стилей выше: правило экрана задаёт крестику
+// размер и место, а рамку и цвет не трогает. Иначе забытый или перекрашенный крестик снова
+// теряется на фоне окна.
+describe('крестик ✕ — красная рамка классом .btn-x', () => {
+  const X_SHEETS: Record<string, string> = {
+    ...SHEETS,
+    'profile.css': read('../profile.css'),
+    'sector-zero.css': read('../sector-zero.css'),
+  };
+  const sources: Record<string, string> = { 'build.mjs': BUILD };
+  for (const f of readdirSync(new URL('./', import.meta.url), { recursive: true })) {
+    const name = String(f);
+    if (name.endsWith('.ts') && !name.endsWith('.test.ts')) sources[name] = read(`./${name}`);
+  }
+  /** Кнопка, вся надпись которой — крестик: глиф или вектор меню Sector Zero. */
+  const CROSS =
+    /<button\b[^>]*>(?:✕|×|<svg\b[^>]*><path d="M2\.5 2\.5l7 7M9\.5 2\.5l-7 7"\/><\/svg>)<\/button>/g;
+  const tags = Object.entries(sources).flatMap(([file, src]) =>
+    [...src.matchAll(CROSS)].map((m) => ({ file, tag: m[0].slice(0, m[0].indexOf('>') + 1) })),
+  );
+  /** Крестики, собранные через `createElement`: переменная и её `className`. */
+  const made = Object.entries(sources).flatMap(([file, src]) =>
+    [...src.matchAll(/(\w+)\.textContent = '(?:✕|×)'/g)].map((m) => ({
+      file,
+      el: m[1]!,
+      cls: new RegExp(`${m[1]}\\.className = '([^']*)'`).exec(src)?.[1] ?? '',
+    })),
+  );
+
+  it('у каждого крестика — класс .btn-x', () => {
+    expect(tags.length).toBeGreaterThanOrEqual(25);
+    // «Отмена» приказа и исключение из корпорации уже красные: это кнопки `.danger`.
+    const bare = tags.filter(({ tag }) => !/class="[^"]*\b(btn-x|danger)\b/.test(tag));
+    expect(bare).toEqual([]);
+    expect(made.length).toBeGreaterThanOrEqual(2);
+    expect(made.filter((x) => !/\bbtn-x\b/.test(x.cls))).toEqual([]);
+  });
+
+  it('вид крестика задан токенами: красная рамка', () => {
+    const own = rules(GAME).filter((r) => /^\.btn-x(:[\w-]+)?$/.test(r.sel));
+    expect(own.map((r) => r.sel)).toContain('.btn-x');
+    expect(own.find((r) => r.sel === '.btn-x')!.body).toMatch(/border:1px solid var\(--red\)/);
+    expect(own.filter((r) => /#[0-9a-f]{3,8}\b|rgba?\(/i.test(r.body)).map((r) => r.sel)).toEqual(
+      [],
+    );
+  });
+
+  /** Классы и id крестиков из разметки: правило с ними в последнем звене красит крестик. */
+  const marks = new Set([
+    '.btn-x',
+    ...[...tags.map(({ tag }) => /class="([^"]*)"/.exec(tag)?.[1] ?? ''), ...made.map((x) => x.cls)]
+      .flatMap((cls) => cls.split(/\s+/))
+      .filter((c) => c && !/^(btn-x|danger)$/.test(c))
+      .map((c) => `.${c}`),
+    ...tags.flatMap(({ tag }) => [...tag.matchAll(/\bid="([\w-]+)"/g)].map((m) => `#${m[1]}`)),
+  ]);
+  /** Рамка (любая, и `border: 0` тоже — она и снимет красную), цвет, фон целиком, тень.
+   *  Подложку (`background-color`) экран даёт сам: крестику поверх картинки она нужна. */
+  const X_LOOK =
+    /(?<![-\w])(background|background-image|color|box-shadow|opacity|border(?:-(?:top|right|bottom|left))?(?:-(?:color|style|width))?)\s*:/;
+
+  it.each(Object.keys(X_SHEETS))('%s: правило экрана не красит крестик', (name) => {
+    const painted = rules(X_SHEETS[name]!)
+      .filter((r) =>
+        parts(r.sel).some((part) => {
+          const s = subject(part);
+          if (/:not\([^)]*\.btn-x\b/.test(s)) return false; // правило явно обходит крестики
+          const bare = s.replace(/::?[\w-]+(\([^)]*\))?/g, '');
+          if (name === 'build.mjs' && part === s && bare === '.btn-x') return false; // сам вид
+          return [...bare.matchAll(/[.#][\w-]+/g)].some((m) => marks.has(m[0]));
+        }),
+      )
+      .filter((r) => X_LOOK.test(r.body))
+      .map((r) => `${r.sel} { ${X_LOOK.exec(r.body)![1]} }`);
+    expect(painted).toEqual([]);
   });
 });

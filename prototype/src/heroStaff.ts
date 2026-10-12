@@ -674,7 +674,7 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
   const sep = dossier.indexOf(':');
   const kind = dossier.slice(0, sep);
   const id = dossier.slice(sep + 1);
-  const close = `<button class="hx-dx" data-hdclose>✕</button>`;
+  const close = `<button class="hx-dx btn-x" data-hdclose>✕</button>`;
   if (kind === 'node') {
     const nd = data.heroSkillTrees[id];
     if (!nd) return '';

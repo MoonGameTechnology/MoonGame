@@ -83,8 +83,8 @@ function rowHtml(r: FriendRow): string {
         `<button class="fr-b" data-fr-act="drop" data-fr-id="${esc(r.accountId)}">${t('friends.act.decline')}</button>`
       : r.kind === 'outgoing'
         ? `<span class="fr-wait">${t('friends.sent')}</span>` +
-          `<button class="fr-b" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.cancel')}">✕</button>`
-        : `<button class="fr-b" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.remove')}">✕</button>`;
+          `<button class="fr-b btn-x" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.cancel')}">✕</button>`
+        : `<button class="fr-b btn-x" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.remove')}">✕</button>`;
   const sub = r.kind === 'incoming' ? t('friends.incoming') : presenceText(r.presence);
   return (
     `<div class="fr-row${r.kind === 'incoming' ? ' req' : ''}">` +

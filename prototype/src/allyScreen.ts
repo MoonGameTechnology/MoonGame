@@ -70,7 +70,7 @@ export function allyBoxHtml(
   return (
     `<div class="albox"><div class="lw-head"><b><i class="al-emblem" aria-hidden="true">${ALLY_EMBLEM}</i> ${esc(t('ally.title'))}</b>` +
     `<span class="al-tag">${esc(t('ally.label'))}</span>` +
-    `<button type="button" class="al-close" aria-label="${esc(t('card.close'))}">✕</button></div>` +
+    `<button type="button" class="al-close btn-x" aria-label="${esc(t('card.close'))}">✕</button></div>` +
     `<div class="al-body">${offerHtml}${card}<div class="al-lbl">${esc(t('ally.orders'))}</div><div class="al-orders">${orders}</div>` +
     `<div class="al-status" role="status" aria-live="polite">${esc(status)}</div></div></div>`
   );

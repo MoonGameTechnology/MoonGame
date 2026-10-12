@@ -629,7 +629,7 @@ export function yardBoxHtml(tab: YardTab, body: string, order = '', again = ''):
   const tabBtn = (k: YardTab, label: string): string =>
     `<button class="cn-tab${tab === k ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
   return (
-    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b>${again}<button class="cn-close">✕</button></div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b>${again}<button class="cn-close btn-x">✕</button></div>` +
     `<div class="cn-tabs">${YARD_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
     `<div id="constructorbody">${body}</div>${order}</div>`
   );

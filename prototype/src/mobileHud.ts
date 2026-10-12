@@ -47,7 +47,7 @@ export function initMobileHud(host: MobileHudHost) {
   grab.appendChild(subtitle);
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'mobile-close';
+  close.className = 'mobile-close btn-x';
   close.dataset.mobile = 'close';
   close.textContent = '×';
   // Метка карточки рядом с именем (`.phead .pbadge`, очки победы мира): шапка карточки на

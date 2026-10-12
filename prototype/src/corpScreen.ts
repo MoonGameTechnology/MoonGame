@@ -733,10 +733,10 @@ export function initCorp(host: CorpHost): {
         `${corpRank === null ? t('corp.head.rank.none') : t('corp.head.rank', { n: String(corpRank) })}` +
         `</span></div>` +
         `<div class="cpoints"><b>${nfmt(c.influence)}</b><span>${t('corp.card.influence')}</span></div>` +
-        `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`
+        `<button id="corpclose" class="cx btn-x" title="${t('corp.close')}">✕</button></div>`
       : `<div class="chrow"><span class="cemblem">⬢</span>` +
         `<div class="cident"><b>${t('corp.card.none')}</b></div>` +
-        `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`;
+        `<button id="corpclose" class="cx btn-x" title="${t('corp.close')}">✕</button></div>`;
     host.tabs().innerHTML = CORP_TABS.map(
       (ct) =>
         `<button class="ctab${ct.id === corpTab ? ' on' : ''}" data-corptab="${ct.id}">` +

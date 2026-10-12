@@ -93,7 +93,7 @@ export function pingPanelHtml(
               ? `<button data-pact="edit" title="${t('ping.panel.edit')}">✎</button>`
               : '') +
             (canRemovePing(r)
-              ? `<button data-pact="del" title="${t('ping.panel.del')}">✕</button>`
+              ? `<button data-pact="del" class="btn-x" title="${t('ping.panel.del')}">✕</button>`
               : '') +
             `</div>`
           );
@@ -102,7 +102,7 @@ export function pingPanelHtml(
     : `<div class="pp-empty">${t('ping.panel.empty')}</div>`;
   return (
     `<div class="lw-head"><b>${t('ping.panel.title')}</b>` +
-    `<button class="lw-close" data-pact="close" aria-label="${t('card.close')}">✕</button></div>` +
+    `<button class="lw-close btn-x" data-pact="close" aria-label="${t('card.close')}">✕</button></div>` +
     body
   );
 }

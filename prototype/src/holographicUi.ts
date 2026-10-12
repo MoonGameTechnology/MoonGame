@@ -33,7 +33,7 @@ export function commandWindowHtml(
 ): string {
   return (
     `<div class="holo-command-head"><div><b>${esc(title)}</b><span>${esc(sub)}</span></div>` +
-    `<button type="button" data-holo-action="close" class="holo-command-close" aria-label="${esc(t('card.close'))}">×</button></div>` +
+    `<button type="button" data-holo-action="close" class="holo-command-close btn-x" aria-label="${esc(t('card.close'))}">×</button></div>` +
     `<div class="holo-command-body">${commands}</div>` +
     aside +
     (details

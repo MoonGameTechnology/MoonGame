@@ -123,7 +123,7 @@ export function initPcHotkeys(host: PcHotkeysHost) {
       .join('');
     memo.innerHTML =
       `<b>${t('keys.memo.title')}</b>${items}` +
-      `<button type="button" aria-label="${t('keys.memo.close')}">✕</button>`;
+      `<button type="button" class="btn-x" aria-label="${t('keys.memo.close')}">✕</button>`;
     memo.querySelector('button')!.addEventListener('click', learn);
     memo.hidden = false;
     window.clearTimeout(memoTimer);

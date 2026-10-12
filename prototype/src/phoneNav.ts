@@ -96,7 +96,7 @@ export function initPhoneNav(host: PhoneNavHost) {
     const mail = unread > 0 ? `<b class="phone-badge">${esc(String(unread))}</b>` : '';
     more.innerHTML =
       `<div class="phone-more-panel"><div class="phone-more-head"><b>${esc(t('hud.tools'))}</b>` +
-      `<button type="button" data-phone-close="1" aria-label="${esc(t('card.close'))}">×</button></div>` +
+      `<button type="button" class="btn-x" data-phone-close="1" aria-label="${esc(t('card.close'))}">×</button></div>` +
       `<div class="phone-more-grid">` +
       phoneMoreItems(present)
         .map(

@@ -65,7 +65,7 @@ export function conveyorHtml(
       `<div class="current" data-desc="${key}:active:${a.seq}">` +
       `<span>${labels.now}</span><b>${a.label}</b>` +
       `<em class="conv-time" data-at="${a.at}">—</em>` +
-      `<button class="conv-cancel" data-act="cancelbuild" data-arg="${a.seq}" title="${esc(labels.cancel)}">✕</button>` +
+      `<button class="conv-cancel btn-x" data-act="cancelbuild" data-arg="${a.seq}" title="${esc(labels.cancel)}">✕</button>` +
       `</div>`;
     html += bar(` class="conv-fill" data-at="${a.at}" data-dur="${a.durationMs}"`);
   } else if (view.waitingCost !== null) {
@@ -88,7 +88,7 @@ export function conveyorHtml(
         .map(
           (q, i) =>
             `<span data-desc="${key}:queued:${i}"><em>${i + 1}</em>${q.label}` +
-            `<button class="q-x" data-act="dequeue" data-arg="${q.id}" title="${esc(labels.dequeue)}">✕</button></span>`,
+            `<button class="q-x btn-x" data-act="dequeue" data-arg="${q.id}" title="${esc(labels.dequeue)}">✕</button></span>`,
         )
         .join('') +
       `</div>`;
