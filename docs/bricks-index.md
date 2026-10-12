@@ -1347,6 +1347,10 @@
 | MSVC-3 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Auction |
 | MSVC-4 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Фоновые потребители по измеренной нагрузке |
 | MSVC-5 | ⏳ | ops | `docs/service-resilience-roadmap.md` | Автоматизированное учение отказов |
+| MSVC-6 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Доменные правила и границы слоёв |
+| MSVC-7 | ⏳ | ops sec | `docs/service-resilience-roadmap.md` | Сегменты и разрешённые соединения |
+| MSVC-8 | ⏳ | ops sec | `docs/service-resilience-roadmap.md` | Отдельный административный канал |
+| MSVC-9 | ⏳ | srv sec ops | `docs/service-resilience-roadmap.md` | Проверки компрометации и ограниченных полномочий |
 | SH-0.1 | ✅ | data core | `docs/shields-roadmap.md` | Стат shield + двойной пул в UnitStack |
 | SH-0.2 | ✅ | core | `docs/shields-roadmap.md` | applyDamage двухслойно |
 | SH-1.1 | ✅ | core | `docs/shields-roadmap.md` | Реген щита на time.advanced |
