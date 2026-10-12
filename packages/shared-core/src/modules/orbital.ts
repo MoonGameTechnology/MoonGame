@@ -19,6 +19,7 @@ import {
   type DamageHookArgs,
 } from '../util/combat';
 import { splitVolley } from '../util/volley';
+import { fireOnGarrison, shipGroundDamage } from '../util/groundFire';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
 export const BOMBARD_FRACTION = 0.5;
@@ -102,10 +103,16 @@ function bombardPower(fleet: Fleet, data: GameData): number {
   });
 }
 
+/** Огонь обстреливающего флота по ВОЙСКАМ мира за час (ROS-1.6) — той же линией огня. */
+function shipGroundPower(fleet: Fleet, data: GameData): number {
+  return cappedUnitStat(fleet.units, data, shipGroundDamage);
+}
+
 /** Resolves the orbital layer over one continuous time span: planetary AA fires
  *  at near-orbit attackers (unless a ground assault keeps it busy), and each
  *  bombarding fleet wears the world's structures (and freezes its production —
- *  enforced in economy/construction via `isBombarded`).
+ *  enforced in economy/construction via `isBombarded`) and, weakly, its garrison
+ *  (ROS-1.6).
  *
  *  Optimized with a fleet-by-location index and a ground-assault set so the
  *  cost is O(planets + fleets + battles) instead of O(planets × fleets). */
@@ -231,6 +238,13 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
       const hostile = (a: string, b: string): boolean => isHostile(h, a, b);
       for (const f of localFleets) {
         if (isActivelyBombarding(h.state, f, hostile, data)) {
+          const hit: DamageHookArgs = {
+            phase: 'bombard',
+            location: planetId,
+            attacker: f.owner,
+            defender: planet.owner,
+            attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
+          };
           const power = bombardPower(f, data) * hours;
           if (power > 0) {
             // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
@@ -240,13 +254,6 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             // обстрел уезжает по шине, а `construction` уже сам стачивает им постройки.
             // Тип в payload события не уедет (по шине идёт JSON), поэтому шов тут
             // остаётся явным и держится тестом `damageHookScope.test.ts` (CORE-DMG-2).
-            const hit: DamageHookArgs = {
-              phase: 'bombard',
-              location: planetId,
-              attacker: f.owner,
-              defender: planet.owner,
-              attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
-            };
             const shelling = hookedDamage(h, power, hit);
             // `hit` и `factor` — чем этот обстрел срезан: постройки, которые он снесёт,
             // перестают прикрывать мир для остатка того же урона, и `construction`
@@ -261,6 +268,10 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
               factor: mitigationFactor(h, hit),
             });
           }
+          // ROS-1.6: тот же обстрел бьёт и войска мира — слабо и без последнего бойца
+          // (`util/groundFire.ts`). Те же аргументы хука: прикрытие мира режет и этот урон.
+          const troops = shipGroundPower(f, data) * hours;
+          if (troops > 0) fireOnGarrison(h, planet, hookedDamage(h, troops, hit), f.owner);
         }
       }
     }
@@ -280,7 +291,8 @@ export const orbitalModule: GameModule = {
   id: 'orbital',
   // 1.1.0: обстрел сообщает, каким прикрытием он срезан (`hit` + `factor`, FORT-5.16).
   // 1.2.0: мина не встаёт на орбиту, не обстреливает и не делит залп ПВО (ревью #1411).
-  version: '1.2.0',
+  // 1.3.0: обстрел бьёт и войска мира, без последнего бойца (ROS-1.6).
+  version: '1.3.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this
@@ -310,8 +322,8 @@ export const orbitalModule: GameModule = {
     });
 
     // Toggle bombardment of the world below (near orbit, a hostile world, ships
-    // aboard). While on, it shells structures and freezes the owner's production
-    // each time span — and the fleet eats the planet's AA fire in return.
+    // aboard). While on, it shells structures and the garrison and freezes the owner's
+    // production each time span — and the fleet eats the planet's AA fire in return.
     api.onAction('fleet.bombard', (action, h) => {
       const { fleetId, on } = action.payload as { fleetId?: string; on?: boolean };
       if (typeof fleetId !== 'string' || typeof on !== 'boolean') {

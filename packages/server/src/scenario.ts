@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '78'; // CORE-DMG-4: пси-зона героя — на каждый удар
+export const MODULE_MANIFEST_VERSION = '79'; // ROS-1.6: огонь сверху по войскам мира. Членство
+// и порядок не тронуты; `orbital` 1.3.0 — обстрел бьёт и гарнизон, `shuttle` 1.11.0 — удар по
+// миру задевает его войска; оба не добивают последнего бойца. Партия на 78 молча сменила бы
+// исход осады посреди игры.
+// export const MODULE_MANIFEST_VERSION = '78'; // CORE-DMG-4: пси-зона героя — на каждый удар
 // по флоту. Членство и порядок не тронуты; `heroEffects` 1.3.0 — лестница `scan` ищет флот
 // под ударом по `defenderFleet` + `location`, а не по `battleId`, и действует вне боя: ПВО
 // мира, челноки, ракета. Партия на 77 посреди игры молча получила бы другой урон.

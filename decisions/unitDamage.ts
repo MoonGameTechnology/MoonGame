@@ -9,10 +9,11 @@
  *
  * 1. **Корабль.** Корабли — `attack` (бой флотов). Здания — обстрел с орбиты:
  *    `siegeDamage`, а без него `attack × BOMBARD_FRACTION` (как `bombardPower`).
- *    Авиация — точечная оборона `pointDefense`. По наземным войскам корабль не бьёт:
- *    обстрел стачивает только постройки.
+ *    Авиация — точечная оборона `pointDefense`. Техника и пехота — тот же обстрел по
+ *    войскам мира, `shipGroundDamage` (ROS-1.6), за час.
  * 2. **Шаттл.** Корабли — `attack` (удар по флоту). Здания — `siegeDamage`, а без него
  *    полный `attack` (как `strikePower` по миру). Авиация — `shuttleDamage` перехватчика.
+ *    Техника и пехота — удар по миру задевает его войска, `shuttleGroundDamage` (ROS-1.6).
  * 3. **Наземный юнит.** Корабли — `aaDamage` (ПВО гарнизона по флоту на орбите). Здания —
  *    `buildingDamage` (зачистка органов Роя). Техника и пехота — СВОИ числа штурма
  *    (решение владельца 2026-09-25, `util/groundTargets.ts`): атака по роду в нападении и
@@ -22,7 +23,13 @@
  * Статы — уже с оснащением (`effectiveStats`), если карточка их так посчитала: тогда
  * модуль, добавивший урон по постройкам, виден и здесь.
  */
-import { BOMBARD_FRACTION, statVs, type UnitDef } from '../packages/shared-core/src/index';
+import {
+  BOMBARD_FRACTION,
+  shipGroundDamage,
+  shuttleGroundDamage,
+  statVs,
+  type UnitDef,
+} from '../packages/shared-core/src/index';
 
 export type DamageTarget = 'ships' | 'buildings' | 'air' | 'vehicles' | 'infantry';
 
@@ -76,20 +83,22 @@ export function unitDamageProfile(
     ];
   }
   if (def.traits.includes('shuttle')) {
+    const troops = shuttleGroundDamage(stats);
     by = {
       ships: n('attack'),
       buildings: siege > 0 ? siege : n('attack'),
       air: n('shuttleDamage'),
-      vehicles: 0,
-      infantry: 0,
+      vehicles: troops,
+      infantry: troops,
     };
   } else {
+    const troops = shipGroundDamage(stats);
     by = {
       ships: n('attack'),
       buildings: siege > 0 ? siege : n('attack') * BOMBARD_FRACTION,
       air: n('pointDefense'),
-      vehicles: 0,
-      infantry: 0,
+      vehicles: troops,
+      infantry: troops,
     };
   }
   return DAMAGE_TARGETS.map((target) => ({ target, value: by[target] }));

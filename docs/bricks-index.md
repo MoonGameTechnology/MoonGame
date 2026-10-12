@@ -1160,6 +1160,7 @@
 | ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
 | ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md` | Бомбардировщик и профили урона челноков 2026-09-09 |
 | ROS-1.5 | ✅ | core data proto | `docs/roster-roadmap.md` | Десантный челнок: высадка вместо удара 2026-09-09 |
+| ROS-1.6 | ✅ | core proto | `docs/roster-roadmap.md` | Корабли и шаттлы бьют наземные войска 2026-10-12 |
 | ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
 | ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
