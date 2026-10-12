@@ -1,5 +1,5 @@
 digraph services {
-  graph [rankdir=TB, bgcolor="#f7f9fd", fontname="DejaVu Sans", fontsize=19, pad=0.35, nodesep=0.4, ranksep=0.62, compound=true, labelloc=t, label="VOID DOMINION / MOONGAME\nСервисы и сетевые сегменты — ЦЕЛЕВАЯ архитектура\nПунктир: предстоит реализовать. Зелёный: отдельный Corp поддерживается кодом.\nACL сегментов и живой cutover этой картой не подтверждены."];
+  graph [rankdir=TB, bgcolor="#f7f9fd", fontname="DejaVu Sans", fontsize=19, pad=0.35, nodesep=0.4, ranksep=0.62, compound=true, labelloc=t, label="VOID DOMINION / MOONGAME\nСервисы и сетевые сегменты — ЦЕЛЕВАЯ архитектура\nПунктирные блоки: целевое выделение/политика. Зелёный: Corp поддерживается кодом.\nACL сегментов и живой cutover этой картой не подтверждены."];
   node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#9babc5", fillcolor="white", margin="0.18,0.13"];
   edge [fontname="DejaVu Sans", fontsize=10, color="#536783", arrowsize=0.75];
   current [label="СЕЙЧАС\nGame: API/Auth + матчи + Inventory + MetaMarket / общая Game DB\nCorp: опциональный отдельный процесс и PostgreSQL\nGuard: 16 вызовов; timeout 2s; 3 сбоя → пауза 5s → одна проба", fillcolor="#e8efff", color="#617fc2"];
@@ -61,7 +61,7 @@ digraph services {
   api -> corp [label="корпоративные операции"];
   auction -> inventory [label="reserve / settlement / status", color="#b7791f", constraint=false];
   game -> inventory [label="до боя: loadout\nпосле: durable награды", style=dashed, constraint=false];
-  game -> corp [label="AvA RPC / итог / аудит", style=dashed, constraint=false];
+  game -> corp [label="AvA RPC / итог / аудит\nИнтеграция готова в коде", constraint=false];
   gameDB -> bg [label="через роль доставки Game\nверсионированные события", color="#8862ba"];
   policy [shape=note, label="ПОЛИТИКА ДОСТУПА\nПо умолчанию запрещено: ingress + egress\nСтрелка: инициатор; ответ не даёт права обратного вызова\nКаждый store: отдельный data ACL, только владелец\nIdentity + TLS + scope + права исходного actor\nRuntime не получает management, SSH или Docker socket\nАдмин-связи к конкретным ресурсам — по матрице", fillcolor="white", color="#ce8c98"];
   bg -> policy [style=invis];

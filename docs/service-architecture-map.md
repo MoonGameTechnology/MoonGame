@@ -41,6 +41,8 @@ flowchart TB
         Workers["Группы match workers"]
         GameDB[("Game DB: снимки / receipts / доставка")]
         Workers --> GameDB
+        Delivery["Роль долговечной доставки Game"]
+        GameDB -->|после commit| Delivery
     end
     subgraph InvNet["Приватный сегмент Inventory"]
         Inv["Инвентарь + атомарный settlement"]
@@ -74,9 +76,11 @@ flowchart TB
     Api --> Auction
     Api --> Corp
     Auction -->|reserve / settlement / status| Inv
-    Workers -->|loadout / долговечные награды| Inv
-    Workers -->|AvA RPC / итог / аудит| Corp
-    Workers -->|долговечные события| Bg
+    Workers -->|loadout до старта| Inv
+    Workers -->|AvA RPC до боя| Corp
+    Delivery -->|награды / износ / возврат| Inv
+    Delivery -->|итог AvA / аудит| Corp
+    Delivery -->|долговечные события| Bg
 ```
 
 Для компактности stores нарисованы внутри доменных блоков. В реализации у каждого
@@ -108,6 +112,7 @@ enforcement фиксируются перед включением конкре�
 | Владелец Game / его роль доставки | Фоновые потребители | Версионированные durable события, без права выдать валюту от имени проекции |
 | Каждый доменный runtime | Только собственный store | Собственная DML-роль, TLS и отдельный data ACL; никаких чужих таблиц/DDL |
 | Оператор | Management access gateway | Отдельная сильная аутентификация, ограниченный срок, журнал и отзыв |
+| Management gateway — bastion/access proxy | Разрешённая management job / управляемый endpoint хоста | Инициирует только согласованный SSH/control-сеанс к конкретному ресурсу; identity gateway и исходный operator связаны в аудите, credentials job отдельны |
 | Авторизованная management job | Конкретный хост/store | Deploy, миграция, backup либо restore своим набором прав; не постоянный доступ приложения |
 | Runtime / job | DNS / secret-store / аудит | Только явно нужные адреса и операции; свой namespace секретов и write-only аудит |
 | Backup job | Зашифрованное хранилище бэкапов | Отдельная роль своего домена; offline ключ восстановления вне runtime |
@@ -118,6 +123,11 @@ enforcement фиксируются перед включением конкре�
 всех соединений не является этапом миграции.
 Доступ runtime к клиентскому endpoint secret-store/аудита не включает их
 административные API; эти поверхности и credentials разделяются.
+При VPN доступ operator → gateway → ресурс маршрутизируется с сохранением
+идентичности VPN-peer и её ACL. Если используется SNAT/proxy, общий исходный IP
+не подтверждает личность: конечный ресурс проверяет credentials оператора/job,
+а аудит связывает peer/operator, gateway и целевую операцию. VPN и bastion —
+варианты реализации одного ограниченного канала; ни один не выдаёт blanket-доступ.
 
 **По умолчанию запрещено:** браузер → внутренние API/БД; Auction → Corp/Game API
 и любые чужие БД; runtime → управляющие поверхности management/SSH/Docker socket;
