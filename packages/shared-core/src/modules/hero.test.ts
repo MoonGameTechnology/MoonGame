@@ -1494,6 +1494,16 @@ describe('hero — железо корабля: модули на герое (HP
     expect(r.state.heroes!['hero:p1']?.modules).toEqual(['bay', 'bay2']);
   });
 
+  // Отсеки за звёзды героя Sector Zero (PVR-6.24) едут на героя снимком `moduleSlots` —
+  // ядро считает их так же, как отсек ступени.
+  it('снимок `moduleSlots` героя добавляет отсеки — второй утилитный модуль встаёт', () => {
+    const st = okApply(
+      kernel.applyAction(docked({ moduleSlots: { utility: 1 } }), install('bay', 1), ctx(0)),
+    ).state;
+    const r = okApply(kernel.applyAction(st, install('bay2', 2), ctx(0)));
+    expect(r.state.heroes!['hero:p1']?.modules).toEqual(['bay', 'bay2']);
+  });
+
   it('правило допуска самого модуля никуда не делось: отсеки — не универсальная розетка', () => {
     // `scout_eye` разрешён только корпусу `scout`.
     expect(errCode(kernel.applyAction(docked(), install('scout_eye'), ctx(0)))).toBe(

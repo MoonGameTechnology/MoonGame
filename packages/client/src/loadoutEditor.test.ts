@@ -303,3 +303,39 @@ describe('loadout editor — module stars and rarity (Sector Zero arsenal snapsh
     expect(m1.preview.find((l) => l.stat === 'attack')?.effective).toBe(22);
   });
 });
+
+describe('loadout editor — bought hull slots (Sector Zero ship stars)', () => {
+  // `Player.arsenal.slots[unit]`: the core's build gate counts these, so the editor must too —
+  // before, the bought slot was missing here and the module for it could not be fitted.
+  const bonusSlots = { weapon: 1, utility: 1 };
+
+  it('a bought slot is a bay of its type, after the catalog ones, and says so', () => {
+    const m = ok(createLoadoutEditor('cruiser', data, rich, { bonusSlots }));
+    expect(m.slots).toEqual([
+      { type: 'weapon' },
+      { type: 'weapon', bonus: true },
+      { type: 'defense' },
+      { type: 'utility' },
+      { type: 'utility', bonus: true },
+    ]);
+  });
+
+  it('the bought slot takes a module the catalog hull has no room for, round-trip included', () => {
+    const m0 = ok(createLoadoutEditor('cruiser', data, rich, { modules: ['targeting'], bonusSlots }));
+    expect(m0.palette.find((p) => p.id === 'targeting2')?.installable).toBe(true);
+    const m1 = ok(applyLoadoutAction({ kind: 'equip', moduleId: 'targeting2' }, m0, data, rich));
+    expect(m1.slots.slice(0, 2)).toEqual([
+      { type: 'weapon', moduleId: 'targeting', moduleName: 'Наведение', rarity: 'simple', star: 0 },
+      { type: 'weapon', moduleId: 'targeting2', moduleName: 'Наведение II', rarity: 'simple', star: 0, bonus: true },
+    ]);
+    expect(m1.bonusSlots).toEqual(bonusSlots);
+    // Without the snapshot the same second weapon has nowhere to go.
+    const plain = ok(createLoadoutEditor('cruiser', data, rich, { modules: ['targeting'] }));
+    expect(err(applyLoadoutAction({ kind: 'equip', moduleId: 'targeting2' }, plain, data, rich))).toBe('E_NO_SLOT');
+  });
+
+  it('universal bays are never bought: a star adds a typed bay next to them', () => {
+    const m = ok(createLoadoutEditor('reinforced', data, rich, { bonusSlots: { defense: 1 } }));
+    expect(m.slots).toEqual([{ type: 'defense', bonus: true }, { type: 'universal' }, { type: 'universal' }]);
+  });
+});

@@ -382,19 +382,24 @@ function sectorHeroHullIds(data: GameData): string[] {
   const units = new Set(Object.keys(data.heroes).map((id) => sectorHeroShipUnit(id, data)));
   return [...units].filter((u) => data.units[u] !== undefined && !data.units[u].traits.includes('issued'));
 }
+/** Слоты корабля героя за его звёзды (`HERO_SHIP_STAR_SLOTS`); нет таких — `undefined`. */
+function heroStarSlots(hero: SectorHero): Partial<SlotCounts> | undefined {
+  const bonus: Partial<SlotCounts> = {};
+  for (let star = 2; star <= hero.level; star++) {
+    const slot = HERO_SHIP_STAR_SLOTS[star];
+    if (slot) bonus[slot] = (bonus[slot] ?? 0) + 1;
+  }
+  return Object.keys(bonus).length > 0 ? bonus : undefined;
+}
 /** Слоты корабля героя: слоты корпуса плюс слоты за его звёзды. */
 export function sectorHeroShipSlots(id: string, hero: SectorHero, data: GameData): SlotCounts {
   const hull = data.units[sectorHeroShipUnit(id, data)]?.slots;
-  const out: SlotCounts = {
-    weapon: hull?.weapon ?? 0,
-    defense: hull?.defense ?? 0,
-    utility: hull?.utility ?? 0,
+  const bonus = heroStarSlots(hero);
+  return {
+    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0),
+    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0),
+    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0),
   };
-  for (let star = 2; star <= hero.level; star++) {
-    const slot = HERO_SHIP_STAR_SLOTS[star];
-    if (slot) out[slot]++;
-  }
-  return out;
 }
 /** Набор, где `id` стоит на месте `out`, или `null`, если `out` не надет, `id` уже надет или
  *  не встаёт без `out`. Место сохраняется: отсеки одного типа заполняются в порядке набора
@@ -1447,6 +1452,7 @@ export function prepareSectorZeroRun(
   if (!selected || !def || !home) return next;
   const id = 'sector-zero:hero';
   const fleetId = 'sector-zero:flagship';
+  const starSlots = heroStarSlots(selected);
   const hero: Hero = {
     id,
     owner: 'p1',
@@ -1462,6 +1468,9 @@ export function prepareSectorZeroRun(
     equipped: [...selected.equipped],
     // Набор корабля героя (PVR-6.24): с ним корабль и ВОЗРОДИТСЯ после гибели (`heroShipStack`).
     ...(selected.ship?.length ? { modules: [...selected.ship] } : {}),
+    // Отсеки за звёзды героя едут тем же снимком: ядро считает их в отсеках корабля
+    // (`heroModuleSlots`), и набор из подготовки — не «лишний» и после гибели встаёт обратно.
+    ...(starSlots ? { moduleSlots: starSlots } : {}),
     passives: [
       ...new Set([
         ...def.startPassives,

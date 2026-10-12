@@ -17,6 +17,7 @@
  */
 import {
   effectiveStats,
+  heroModuleSlots,
   knownSkillNodes,
   moduleAllowed,
   slotUsage,
@@ -384,16 +385,12 @@ function heroHullOf(hero: HeroInst): string {
   );
 }
 
-/** Module bays of the hero's ship — mirrors the core's `heroModuleSlots`: the hull's own
- *  typed slots plus the grade's `moduleSlots` bonus (§0.38 — only the main hero has one). */
+/** Module bays of the hero's ship — the core's own `heroModuleSlots`, not a copy: the
+ *  hull's typed slots, the grade's bonus (§0.38 — only the main hero has one) and the
+ *  hero's Sector Zero star bays. A mirror here would miss whatever the core adds next, as it
+ *  missed the star bays. */
 function heroBaysOf(hero: HeroInst): SlotCounts {
-  const hull = data.units[heroHullOf(hero)]?.slots;
-  const bonus = hero.grade !== undefined ? data.heroGrades[hero.grade]?.moduleSlots : undefined;
-  return {
-    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0),
-    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0),
-    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0),
-  };
+  return heroModuleSlots(hero, heroHullOf(hero), data);
 }
 
 /** A passive that is worn in a skill slot (PVR-6.16), or undefined for an always-on one. */

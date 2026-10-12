@@ -673,6 +673,7 @@ export { visibilityModule } from './modules/visibility';
 export {
   heroModule,
   abilityRange,
+  heroModuleSlots,
   HERO_ACTIVE_CAP,
   cooldownKey as heroCooldownKey,
 } from './modules/hero';

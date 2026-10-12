@@ -1454,6 +1454,11 @@ export interface Hero {
    *  game-day of downtime would be impossible to explain. `deployHero` stamps this list
    *  onto the ship it forms. Absent/empty ⇒ a bare hull, exactly as before. */
   modules?: ModuleId[];
+  /** Extra bays of this hero's ship beyond the hull and the grade — the Sector Zero hero
+   *  stars snapshotted at run start (PVR-6.24: 2★ a defense bay, 3★ a weapon bay). Without
+   *  it the run's flagship carried modules its bays did not count: the ship card called them
+   *  surplus and a refit could not put them back. Absent ⇒ hull + grade only. */
+  moduleSlots?: { weapon?: number; defense?: number; utility?: number };
   /** Respawn anchor — the owner's capital. A slain hero re-forms here if still held;
    *  absent ⇒ the core falls back to the hero's last node, then any owned world. */
   home?: PlanetId;

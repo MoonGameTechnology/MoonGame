@@ -98,7 +98,9 @@ export function shipCardHtml(
   const filled = m.bays.filter((b) => b.module).length;
   const bays = m.bays
     .map((b) => {
-      const slot = `<div class="cn-bt">${t(SLOT_KEY[b.type] ?? b.type)}${b.extra ? ` · ${t('shipcard.extra')}` : ''}</div>`;
+      // Отсек, купленный звездой, — той же золотой звездой, что в окне производства.
+      const bought = b.bonus ? ` <span class="cn-bbuy" title="${esc(t('yard.slot.bonus'))}">★</span>` : '';
+      const slot = `<div class="cn-bt">${t(SLOT_KEY[b.type] ?? b.type)}${bought}${b.extra ? ` · ${t('shipcard.extra')}` : ''}</div>`;
       if (!b.module) {
         return `<div class="cn-bay empty"><div class="cn-bic">${SLOT_ICON[b.type] ?? '＋'}</div><div>${slot}<div class="cn-bn">${t('shipcard.empty')}</div></div></div>`;
       }

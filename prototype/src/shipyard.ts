@@ -321,8 +321,9 @@ export function loadoutPaneHtml(
   if (!ownedHulls.length) return `<div class="cn-soon">${t('yard.hull.none')}</div>`;
   const res = state.players[me]?.resources ?? {};
   // Звёзды и поднятая редкость места (снимок арсенала забега Сектора Зеро): с ними числа
-  // карточек и характеристик — те, что получит построенный корабль.
-  const boosts = { moduleStars: snap?.stars, moduleRarity: snap?.rarity };
+  // карточек и характеристик — те, что получит построенный корабль. Слоты, купленные звёздами
+  // корабля, — тоже отсеки: без них модуль под купленный слот было не поставить.
+  const boosts = { moduleStars: snap?.stars, moduleRarity: snap?.rarity, bonusSlots: snap?.slots?.[draft.hull] };
   const ed: LoadoutEditorResult = createLoadoutEditor(draft.hull, data, res, {
     modules: draft.modules,
     count: draft.count,
@@ -348,11 +349,13 @@ export function loadoutPaneHtml(
     : portrait;
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
-    `<div class="cn-hm">${m.hasSlots ? t('yard.slots.count', { n: String(m.slots.length) }) : t('yard.slots.none')}</div></div></div></div>`;
+    `<div class="cn-hm">${slotCountText(m.slots)}</div></div></div></div>`;
   // Строка отсека открывает его, как плитка на арте; снять модуль — кнопкой над его модулями.
   const bays = m.slots
     .map((sl, i) => {
       const on = i === sel ? ' sel' : '';
+      // Слот, купленный звездой корабля, помечен той же золотой звездой, что плитка на арте.
+      const bought = sl.bonus ? ` <span class="cn-bbuy" title="${esc(t('yard.slot.bonus'))}">★</span>` : '';
       if (sl.moduleId) {
         const md = data.modules[sl.moduleId];
         const own = m.palette.find((o) => o.id === sl.moduleId)?.effect ?? md?.effects.stats ?? {};
@@ -363,12 +366,12 @@ export function loadoutPaneHtml(
           : '';
         return (
           `<div class="cn-bay filled${on}" data-cnsel="${i}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
-          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div></div>`
+          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div></div>`
         );
       }
       return (
         `<div class="cn-bay empty${on}" data-cnsel="${i}"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
-        `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
+        `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
       );
     })
     .join('');
@@ -512,15 +515,26 @@ export function unitLaneAhead(
   return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
 }
 
+/** Подпись под корпусом: сколько у него слотов и сколько из них куплено звёздами корабля —
+ *  «по размеру корпуса» про купленные было бы неправдой. */
+function slotCountText(slots: LoadoutModel['slots']): string {
+  if (slots.length === 0) return t('yard.slots.none');
+  const bought = slots.filter((sl) => sl.bonus).length;
+  return bought > 0
+    ? t('yard.slots.count-bonus', { n: String(slots.length), b: String(bought) })
+    : t('yard.slots.count', { n: String(slots.length) });
+}
+
 /**
  * Слой выносок поверх арта корпуса: точка на корпусе, плитка слота рядом и линия между ними
  * (форма «Выноска», решение владельца 2026-10-10). Координаты — проценты картинки
  * (`decisions/slotCallouts.ts`), а слой лежит ровно на картинке, поэтому точка стоит на той
  * же детали корабля и на телефоне, и на ПК. Плитка открывает свой отсек: рядом встают его
- * модули (шаг 3), открытый отсек обведён.
+ * модули (шаг 3), открытый отсек обведён. Слот, купленный звездой корабля, несёт золотую
+ * звезду в углу, а только что купленный (`fresh`) один раз вспыхивает.
  */
 export function slotLayerHtml(
-  slots: LoadoutModel['slots'],
+  slots: readonly (LoadoutModel['slots'][number] & { fresh?: boolean })[],
   callouts: readonly SlotCallout[],
   sel: number,
   // Чем плитка сообщает о себе по клику: верфь ловит `data-cnsel`, подготовка Сектора Зеро —
@@ -537,9 +551,13 @@ export function slotLayerHtml(
     .map((sl, i) => {
       const c = callouts[i]!;
       const dot = `left:${c.a[0]}%;top:${c.a[1]}%`;
-      const kind = t(SLOT_KEY[sl.type] ?? sl.type);
+      const kind = sl.bonus
+        ? `${t(SLOT_KEY[sl.type] ?? sl.type)} (${t('yard.slot.bonus')})`
+        : t(SLOT_KEY[sl.type] ?? sl.type);
       const on = i === sel;
       const pressed = ` aria-pressed="${on ? 'true' : 'false'}"`;
+      const mark = (sl.bonus ? ' bonus' : '') + (sl.fresh ? ' fresh' : '');
+      const bought = sl.bonus ? `<span class="cn-tbuy" aria-hidden="true">★</span>` : '';
       if (sl.moduleId) {
         // Плитка несёт ступень цветом рамки и уровень прокачки значком «★2» в углу; словом
         // то же самое — в подписи для диктора и подсказке.
@@ -550,13 +568,13 @@ export function slotLayerHtml(
         const badge = star > 0 ? `<span class="cn-tst" aria-hidden="true">★${star}</span>` : '';
         return (
           `<span class="cn-dot full" style="${dot}"></span>` +
-          `<button class="cn-tile filled${on ? ' sel' : ''}" ${attr(i, sl)}${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}</button>`
+          `<button class="cn-tile filled${on ? ' sel' : ''}${mark}" ${attr(i, sl)}${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}${bought}</button>`
         );
       }
       const label = `${kind}: ${t('yard.slot.empty')}`;
       return (
         `<span class="cn-dot" style="${dot}"></span>` +
-        `<button class="cn-tile empty${on ? ' sel' : ''}" ${attr(i, sl)}${pressed} style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}"><span class="cn-ti">${SLOT_ICON[sl.type] ?? '＋'}</span></button>`
+        `<button class="cn-tile empty${on ? ' sel' : ''}${mark}" ${attr(i, sl)}${pressed} style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}"><span class="cn-ti">${SLOT_ICON[sl.type] ?? '＋'}</span>${bought}</button>`
       );
     })
     .join('');
@@ -584,6 +602,7 @@ export function orderBarHtml(
     modules: draft.modules,
     count: draft.count,
     ownedModules: snap ? new Set(snap.modules) : undefined,
+    bonusSlots: snap?.slots?.[draft.hull],
   });
   if (!ed.ok) return '';
   // Цена десантного челнока — челнок с модулями ПЛЮС бойцы, срок — дольший из двух (SHU-5.2).
@@ -767,6 +786,7 @@ export function initShipyard(host: YardHost): {
       modules: [...modules],
       count: draft.count,
       ownedModules: p?.arsenal ? new Set(p.arsenal.modules) : undefined,
+      bonusSlots: p?.arsenal?.slots?.[draft.hull],
     });
   }
 
