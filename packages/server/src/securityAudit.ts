@@ -82,6 +82,26 @@ export class SecurityAudit {
   }
 }
 
+/** Room refusals that point at a client crossing a boundary — forged or malformed
+ *  envelopes, replays, another player's seat, oversized frames. Ordinary game-rule
+ *  refusals («трюм полон», unaffordable build) are everyday play: counted with these,
+ *  any busy server crossed the 20/min alert threshold and the alert turned into noise.
+ *  `E_OUT_OF_ORDER` stays out too — a reconnect's resend window produces it honestly. */
+const SECURITY_REJECT_CODES: ReadonlySet<string> = new Set([
+  'E_FORBIDDEN',
+  'E_BAD_PAYLOAD',
+  'E_BAD_ACTION_ID',
+  'E_BAD_MESSAGE',
+  'E_REPLAY',
+  'E_PAYLOAD_TOO_LARGE',
+]);
+
+/** Which audit event, if any, a room rejection/error code is. */
+export function roomRejectionEvent(code: string): SecurityEvent | null {
+  if (code === 'E_RATE_LIMIT') return 'rate.limit';
+  return SECURITY_REJECT_CODES.has(code) ? 'action.reject' : null;
+}
+
 /** Default on for release posture; explicit SECURITY_AUDIT=1 also enables LAN staging. */
 export function securityAuditFromEnv(env: NodeJS.ProcessEnv): SecurityAudit | undefined {
   return env.PROD === '1' || env.PROD === 'true' || env.SECURITY_AUDIT === '1'

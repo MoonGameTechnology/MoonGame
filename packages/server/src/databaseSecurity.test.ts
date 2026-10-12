@@ -254,3 +254,38 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     });
   });
 });
+
+// Playtest 2026-10-08 PT-05: two processes booting on one fresh database used to race
+// the unlocked `CREATE TABLE IF NOT EXISTS`, and the loser failed on 23505.
+describe.skipIf(!base)('boot-time migration on a fresh database', () => {
+  it('lets several processes migrate the same empty database at once', async () => {
+    const name = `void_boot_${randomBytes(6).toString('hex')}`;
+    const root = new Pool({ connectionString: base, max: 1 });
+    const dbUrl = new URL(base!);
+    dbUrl.pathname = `/${name}`;
+    await root.query(`CREATE DATABASE "${name}"`);
+    const pools = Array.from({ length: 4 }, () => new Pool({ connectionString: dbUrl.toString(), max: 1 }));
+    try {
+      const results = await Promise.allSettled(pools.map((pool) => prepareRuntimeDatabase(pool, {})));
+      expect(results.map((r) => r.status)).toEqual(pools.map(() => 'fulfilled'));
+      const { rows } = await pools[0]!.query<{ n: number }>(
+        "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND tablename = ANY($1::text[])",
+        [APP_TABLES],
+      );
+      expect(rows[0]!.n).toBe(APP_TABLES.length);
+    } finally {
+      for (const pool of pools) await pool.end().catch(() => undefined);
+      // Same drain as above: let the server see the closes before dropping the database.
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const { rows } = await root.query(
+          'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1',
+          [name],
+        );
+        if (rows[0].n === 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await root.query(`DROP DATABASE IF EXISTS "${name}"`);
+      await root.end();
+    }
+  }, 30_000);
+});

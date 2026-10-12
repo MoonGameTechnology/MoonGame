@@ -174,6 +174,28 @@ function ticketMatches(presented: string, storedHash: string): boolean {
  *  `undefined` (⇒ plain `ws`, or TLS terminated by a proxy upstream). A PARTIAL config
  *  (only one of the two) throws — a half-configured TLS is a deploy error, not a silent
  *  downgrade to cleartext (fail-secure). Pass the result straight to the `tls` option. */
+/** Server-side TLS policy for every native listener (game and corporations). TLS 1.2
+ *  stays allowed: Android 9 and older WebViews have no TLS 1.3, and a mobile game cannot
+ *  shut those players out. What the 2026-10-10 encryption audit flagged (ECP-04) is the
+ *  CBC suites Node still offers under 1.2 — so 1.2 is limited to forward-secret AEAD
+ *  (GCM, ChaCha20-Poly1305). TLS 1.3 suites are listed explicitly so the custom string
+ *  cannot drop them. */
+export const TLS_POLICY = {
+  minVersion: 'TLSv1.2',
+  ciphers: [
+    'TLS_AES_128_GCM_SHA256',
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'ECDHE-ECDSA-AES128-GCM-SHA256',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    'ECDHE-ECDSA-AES256-GCM-SHA384',
+    'ECDHE-RSA-AES256-GCM-SHA384',
+    'ECDHE-ECDSA-CHACHA20-POLY1305',
+    'ECDHE-RSA-CHACHA20-POLY1305',
+  ].join(':'),
+  honorCipherOrder: true,
+} as const;
+
 export function tlsFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): { key: Buffer; cert: Buffer } | undefined {
@@ -265,7 +287,7 @@ export function createMultiplayerServer(
     // wss end-to-end. Absent ⇒ plain http/ws (a proxy may still terminate TLS upstream).
     // The spread keeps `app` a single FastifyInstance type; https.Server ⊆ http.Server,
     // so `httpServer: app.server` stays sound.
-    ...(options.tls ? { https: options.tls } : {}),
+    ...(options.tls ? { https: { ...TLS_POLICY, ...options.tls } } : {}),
   });
 
   app.addHook('onResponse', async (request, reply) => {

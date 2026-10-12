@@ -1,4 +1,4 @@
-import type { SecurityAudit } from './securityAudit';
+import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
   Action,
   Context,
@@ -2244,7 +2244,8 @@ export class MatchRoom {
 
   private send(peer: RoomPeer, message: ServerMessage): void {
     if (message.type === 'rejection' || message.type === 'error') {
-      this.securityAudit?.record(message.code === 'E_RATE_LIMIT' ? 'rate.limit' : 'action.reject', message.code, this.id);
+      const event = roomRejectionEvent(message.code);
+      if (event) this.securityAudit?.record(event, message.code, this.id);
     }
     if (!canSend(peer)) return;
     // Backpressure: a peer whose buffer is backing up isn't draining — keep queuing

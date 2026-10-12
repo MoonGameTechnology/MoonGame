@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
 import { build } from 'esbuild';
 import { recoveryMailer } from './recoveryMailer';
-import { LOCALE, setLocale } from '../../localization/core';
-import type { Mailer } from '../../packages/server/src/authApi';
+import { LOCALE, setLocale } from '../localization/core';
+import type { Mailer } from '../packages/server/src/authApi';
 
 it('keeps recipient locales and literal reset links independent across overlapping deliveries', async () => {
   const sent: Parameters<Mailer>[0][] = [];

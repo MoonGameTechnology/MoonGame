@@ -66,12 +66,30 @@ function passwordVerifier(password: string): string {
   return `SCRAM-SHA-256$4096:${salt.toString('base64')}$${storedKey}:${serverKey}`;
 }
 
+/** Boot-time migration, serialized with the admin path's lock: two processes starting
+ * on one fresh database otherwise race `CREATE TABLE IF NOT EXISTS` and the loser fails
+ * on the catalog's unique index (23505, playtest 2026-10-08 PT-05). */
+async function migrateLocked(pool: Pool): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
+    await migrate(client);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 /** Legacy dev boots still migrate. The hardened process NEVER receives migration creds. */
 export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv): Promise<void> {
   try {
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1' && env.DB_AUTO_MIGRATE !== '0')
       throw new Error('E_DB_RUNTIME_ROLE');
-    if (env.DB_AUTO_MIGRATE !== '0') await migrate(pool);
+    if (env.DB_AUTO_MIGRATE !== '0') await migrateLocked(pool);
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1') {
       if (env.DB_AUTO_MIGRATE !== '0') throw new Error('E_DB_RUNTIME_ROLE');
       const { rows } = await pool.query<{ unsafe: boolean }>(`
