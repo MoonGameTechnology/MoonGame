@@ -116,10 +116,15 @@ describe('native TLS policy', () => {
   /** Handshake outcome for one client offer: the negotiated protocol, or 'refused'. */
   function offer(port: number, options: tls.ConnectionOptions): Promise<string> {
     return new Promise((resolve) => {
-      // Self-signed test cert: the subject here is the server's protocol/cipher policy,
-      // not the trust chain (verified with a real CA in deploy/healthcheck tests).
-      // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification
-      const socket = tls.connect({ host: '127.0.0.1', port, rejectUnauthorized: false, ...options });
+      // The throwaway cert is its own CA: trusting it explicitly keeps verification on,
+      // so a refusal here can only come from the protocol/cipher policy under test.
+      const socket = tls.connect({
+        host: '127.0.0.1',
+        port,
+        servername: 'localhost',
+        ca: certs!.cert,
+        ...options,
+      });
       socket.once('secureConnect', () => {
         resolve(socket.getProtocol() ?? 'unknown');
         socket.destroy();
