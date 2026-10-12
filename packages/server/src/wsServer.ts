@@ -470,6 +470,10 @@ export function createMultiplayerServer(
       if (bytes === undefined) return reply.code(404).send({ error: 'E_NOT_FOUND' });
       void reply.header('content-type', assetType(name));
       void reply.header('cache-control', 'public, max-age=31536000, immutable');
+      // Отдаются байты, прочитанные со своего диска при старте, а не ввод клиента: от
+      // запроса зависит только выбор ключа в карте. Тип — картинка, политика `default-src
+      // 'none'`, так что исполнить в ответе нечего.
+      // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
       return reply.send(bytes);
     });
   }

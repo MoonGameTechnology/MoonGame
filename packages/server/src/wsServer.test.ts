@@ -553,6 +553,8 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
     const server = createMultiplayerServer({
       room: makeRoom(),
       indexHtml: CLIENT,
+      // Тестовые байты-константа, а не ввод: правило путает их с HTML документа рядом.
+      // nosemgrep: javascript.lang.security.audit.unknown-value-with-script-tag.unknown-value-with-script-tag
       assets: new Map([['fighter-DYTR3J73.webp', webp]]),
     });
     const base = httpBase(await server.listen());
