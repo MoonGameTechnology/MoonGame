@@ -31,7 +31,7 @@
 | CON-3 | 🗑 | proto | `docs/backlog.md` | Армия |
 | SHIP-5 | 🔒 | srv | `docs/backlog.md` | предметы мета-экономики |
 | ONB-5 | 🔶 | proto srv | `docs/backlog.md` | Async-модель + дневной дайджест. |
-| CORE-DMG-4 | ⏳ | core | `docs/backlog.md` | Пси-зона героя (лестница scan) работает только в свалке — |
+| CORE-DMG-4 | ✅ | core | `docs/backlog.md` | Пси-зона героя (лестница scan) работает только в свалке — |
 | BAL-3 | 🔶 | proto data | `docs/backlog.md` | Кредиты, энергия и еда — декорации, а не ресурсы. |
 | BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |

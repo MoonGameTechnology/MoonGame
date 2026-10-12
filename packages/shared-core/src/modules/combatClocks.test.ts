@@ -6,6 +6,7 @@ import { createInitialState, type GameState, type BattleSide } from '../state/ga
 import { parseGameData } from '../data/schemas';
 import { combatantKey } from '../state/battle';
 import { inspectBattle } from '../state/battleReadout';
+import { heroEffectsModule } from './heroEffects';
 import { hashState } from '../state/hash';
 
 const hour = 3_600_000;
@@ -273,5 +274,27 @@ describe('personal attack clocks', () => {
     const after = advance(k, s, hour);
     expect(1000 - after.state.fleets.b!.units[0]!.hp!).toBeCloseTo(view.attack);
     expect(1000 - after.state.fleets.a!.units[0]!.hp!).toBeCloseTo(view.defense.max);
+  });
+
+  it('CORE-DMG-4: readout names the fleet under fire, so a psi zone shows as it lands', () => {
+    const k = createKernel([combatModule, heroEffectsModule]);
+    const s = fixture();
+    s.heroes = {
+      h: {
+        id: 'h',
+        owner: 'a',
+        location: 'P',
+        cooldowns: {},
+        alive: true,
+        activeReveals: [{ center: 'P', radius: 10, until: 10 * hour, weakPoints: 0.5 }],
+      },
+    };
+    const view = inspectBattle(k, s, ctx(0), 'B')[combatantKey(s.battles.B!.sides[0]!.ref)]!;
+    const after = advance(k, s, hour);
+    expect(1000 - after.state.fleets.b!.units[0]!.hp!).toBeCloseTo(view.attack);
+    expect(view.attack).toBeGreaterThan(
+      inspectBattle(kernel, fixture(), ctx(0), 'B')[combatantKey(s.battles.B!.sides[0]!.ref)]!
+        .attack,
+    );
   });
 });

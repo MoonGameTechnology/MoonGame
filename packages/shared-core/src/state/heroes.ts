@@ -1,4 +1,4 @@
-import type { Battle, BattleSide, GameState, Hero, PlanetId } from './gameState';
+import type { GameState, Hero, PlanetId } from './gameState';
 import type { GameData } from '../data/schemas';
 
 /**
@@ -46,31 +46,4 @@ export function heroNode(state: GameState, hero: Hero): PlanetId {
     if (typeof loc === 'string') return loc;
   }
   return hero.location;
-}
-
-/**
- * The FLEET side TAKING this `combat.damage` hit, or null when the args don't resolve
- * to one. `args.defender` is the owner the damage lands on, so a modifier keyed off
- * this side is INCOMING damage for it. Fleet sides only — the hero family buffs
- * fleets, not garrisons.
- *
- * ⚠️ **Требует БОЯ, и это оставшаяся половина CORE-DMG-3.** Близнец этой функции,
- * `fleetSideDealingHit`, здесь БЫЛ и снят: ауры и пассивы героя перешли на позиционный
- * поиск стороны (`DamageHookArgs.attackerFleet` + `location`) и потому дошли до всех
- * неближних каналов. Лестница пси-зоны (`revealZoneFactor`) осталась на `battleId`, то
- * есть работает только в свалке — ровно тот дефект, который CORE-DMG-3 чинил для аур.
- * Симметричная правка (поле `defenderFleet`) — отдельный кирпич: это сдвиг баланса, и
- * его нельзя мерить тем же прогоном, что и этот.
- */
-export function fleetSideTakingHit(
-  state: GameState,
-  battleId: unknown,
-  defender: unknown,
-): { battle: Battle; side: BattleSide & { ref: { kind: 'fleet'; fleetId: string } } } | null {
-  if (typeof battleId !== 'string' || typeof defender !== 'string') return null;
-  const battle = state.battles[battleId];
-  if (!battle) return null;
-  const side = battle.sides.find((s) => s.owner === defender);
-  if (!side || side.ref.kind !== 'fleet') return null;
-  return { battle, side: side as BattleSide & { ref: { kind: 'fleet'; fleetId: string } } };
 }

@@ -14,6 +14,7 @@ import { fleetPositionAt } from '../state/fleetPosition';
 import { shuttleModule } from './shuttle';
 import { fleetOpsModule } from './fleetOps';
 import type { GameModule } from '../kernel/module';
+import { heroEffectsModule } from './heroEffects';
 
 const HOUR = 3_600_000;
 const data = parseGameData({
@@ -46,7 +47,17 @@ const data = parseGameData({
     interceptor: {
       faction: 'x',
       traits: ['shuttle'],
-      stats: { attack: 40, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2, patrolHours: 4, patrolRadius: 60 },
+      stats: {
+        attack: 40,
+        defense: 3,
+        speed: 100,
+        hp: 10,
+        strikeRange: 180,
+        fuel: 3,
+        rearmRounds: 2,
+        patrolHours: 4,
+        patrolRadius: 60,
+      },
     },
     // Контактная мина (SM-3.6) — в неё ракетная мина не целится.
     mine: {
@@ -182,10 +193,22 @@ describe('legendary rocket mine', () => {
     s.fleets.layer!.units[0]!.modules = ['mine'];
     // A content error must reject the action, not change the rules: a `rocket_mine` without
     // the shared `mine` trait would stand as a fighting fleet (Codex, #1499).
-    const loose = { ...data, units: { ...data.units, rocket_mine: { ...data.units.rocket_mine!, traits: ['immobile', 'issued', 'rocketMine'] } } };
+    const loose = {
+      ...data,
+      units: {
+        ...data.units,
+        rocket_mine: { ...data.units.rocket_mine!, traits: ['immobile', 'issued', 'rocketMine'] },
+      },
+    };
     const r = kernel.applyAction(
       s,
-      { id: 's:p:1', playerId: 'p', type: 'fleet.deployRocketMine', payload: { fleetId: 'layer', mode: 'any' }, issuedAt: s.time },
+      {
+        id: 's:p:1',
+        playerId: 'p',
+        type: 'fleet.deployRocketMine',
+        payload: { fleetId: 'layer', mode: 'any' },
+        issuedAt: s.time,
+      },
       { now: s.time, data: loose },
     );
     expect(r).toMatchObject({ ok: false, code: 'E_NO_ROCKET_MINELAYER' });
@@ -266,10 +289,36 @@ describe('legendary rocket mine', () => {
     launch.fleets.target!.edge!.t = 0.9;
     expect(advance(launch, m.arrivesAt).fleets.target!.units[0]!.hp).toBeUndefined();
   });
+  it('CORE-DMG-4: a hero psi zone over the blast point weighs on the hit fleet', () => {
+    // Цель стоит на дороге A→B у B: `fleetNodeAt` относит её к провинции B, туда и светим.
+    const withHeroes = createKernel([movementModule, rocketMinesModule, heroEffectsModule]);
+    const hpAfter = (owner: string, step: { weakPoints?: number; evasion?: number }) => {
+      const launch = armed();
+      launch.heroes = {
+        h: {
+          id: 'h',
+          owner,
+          location: 'B',
+          cooldowns: {},
+          alive: true,
+          activeReveals: [{ center: 'B', radius: 50, until: 10 * HOUR, ...step }],
+        },
+      };
+      const at = missiles(launch)[0]!.flight!.arrivesAt;
+      const r = withHeroes.advanceTo(launch, { now: at, data });
+      if (!r.ok) throw new Error(r.code);
+      return r.state.fleets.target!.units[0]!.hp;
+    };
+    expect(hpAfter('p', { weakPoints: 0.1 })).toBeCloseTo(100 - 80 * 1.1, 9);
+    expect(hpAfter('q', { evasion: 0.25 })).toBeCloseTo(100 - 80 / 1.25, 9);
+  });
   it('the blast spares mines in its radius: shuttles remove mines, not missiles (Codex, #1499)', () => {
     const s = world();
     // q's contact and rocket mines 4 from the target, well inside the blast radius of 10.
-    for (const [id, unit] of [['qmine', 'mine'], ['qrocket', 'rocket_mine']] as const)
+    for (const [id, unit] of [
+      ['qmine', 'mine'],
+      ['qrocket', 'rocket_mine'],
+    ] as const)
       s.fleets[id] = {
         id,
         owner: 'q',
@@ -412,7 +461,9 @@ describe('legendary rocket mine', () => {
     expect(act(s, 'rocketMine.mode', { mineId, mode: 'any' }, 'q')).toMatchObject({
       code: 'E_NO_ROCKET_MINE',
     });
-    expect(act(s, 'rocketMine.disarm', { mineId }, 'q')).toMatchObject({ code: 'E_NO_ROCKET_MINE' });
+    expect(act(s, 'rocketMine.disarm', { mineId }, 'q')).toMatchObject({
+      code: 'E_NO_ROCKET_MINE',
+    });
     const switched = act(s, 'rocketMine.mode', { mineId, mode: 'any' });
     if (!switched.ok) throw new Error(switched.code);
     expect(advance(switched.state, HOUR).fleets.target!.units[0]!.hp).toBe(20);
@@ -557,7 +608,13 @@ describe('legendary rocket mine', () => {
     const mineId = mines(s)[0]!.id;
     const r = both.applyAction(
       s,
-      { id: 's:q:1', playerId: 'q', type: 'test.kill', payload: { fleetId: mineId }, issuedAt: s.time },
+      {
+        id: 's:q:1',
+        playerId: 'q',
+        type: 'test.kill',
+        payload: { fleetId: mineId },
+        issuedAt: s.time,
+      },
       { now: s.time, data },
     );
     if (!r.ok) throw new Error(r.code);
@@ -572,8 +629,28 @@ describe('legendary rocket mine', () => {
       cooldowns: {},
       installations: [],
       // Before SM-3.7b a flying missile lived here; the list is read by nothing any more.
-      missiles: [{ id: 'rocketMine:p:8', owner: 'p', moduleId: 'mine', from: { x: 200, y: 0 }, to: { x: 280, y: 0 }, launchedAt: 0, arrivesAt: HOUR, damage: 80, hp: 12 }],
-      mines: [{ id: 'rocketMine:p:9', owner: 'p', moduleId: 'mine', position: { x: 200, y: 0 }, mode: 'any' }],
+      missiles: [
+        {
+          id: 'rocketMine:p:8',
+          owner: 'p',
+          moduleId: 'mine',
+          from: { x: 200, y: 0 },
+          to: { x: 280, y: 0 },
+          launchedAt: 0,
+          arrivesAt: HOUR,
+          damage: 80,
+          hp: 12,
+        },
+      ],
+      mines: [
+        {
+          id: 'rocketMine:p:9',
+          owner: 'p',
+          moduleId: 'mine',
+          position: { x: 200, y: 0 },
+          mode: 'any',
+        },
+      ],
     } as unknown as GameState['ordnance'];
     expect(() => visibleState(old, 'p', data)).not.toThrow();
     // The stale record reaches nobody, not even through the opponent's projection.
@@ -603,7 +680,10 @@ describe('legendary rocket mine', () => {
     const s = world();
     s.fleets.layer!.units.push({ unit: 'ship', count: 1, modules: ['contact'] });
     s.fleets.target!.edge = { from: 'A', to: 'B', t: 0.95 }; // 180 от мины — вне её радара
-    const rocket = run(step(s, 'fleet.deployRocketMine', { fleetId: 'layer', mode: 'any' }), HOUR / 4);
+    const rocket = run(
+      step(s, 'fleet.deployRocketMine', { fleetId: 'layer', mode: 'any' }),
+      HOUR / 4,
+    );
     const both = run(step(rocket, 'fleet.layMines', { fleetId: 'layer' }), HOUR / 2);
     expect(mines(both).map((f) => f.units)).toEqual([
       [{ unit: 'rocket_mine', count: 1, modules: ['mine'] }],
@@ -646,9 +726,14 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     expect(m!.id).toMatch(/^fleet:missile:\d+:\d+$/);
     expect(launch.ordnance!.warheads).toEqual({ [m!.id]: 80 });
     const fl = m!.flight!;
-    expect(fleetPositionAt(launch, m!, (fl.departedAt + fl.arrivesAt) / 2)).toEqual({ x: 240, y: 0 });
+    expect(fleetPositionAt(launch, m!, (fl.departedAt + fl.arrivesAt) / 2)).toEqual({
+      x: 240,
+      y: 0,
+    });
     // Приказов нет: ни хода (стоянки, от которой строят маршрут, у ракеты нет), ни своей мины.
-    expect(act(launch, 'fleet.move', { fleetId: m!.id, to: 'A' })).toMatchObject({ code: 'E_FLEET_BUSY' });
+    expect(act(launch, 'fleet.move', { fleetId: m!.id, to: 'A' })).toMatchObject({
+      code: 'E_FLEET_BUSY',
+    });
     expect(act(launch, 'fleet.deployRocketMine', { fleetId: m!.id, mode: 'any' })).toMatchObject({
       code: 'E_MISSILE_PASSIVE',
     });
@@ -731,7 +816,10 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       units: { ...data.units, missile: { ...data.units.missile!, radarRange: 500, radarLevel: 3 } },
       modules: {
         ...data.modules,
-        [layerId]: { ...layer, effects: { ...layer.effects, stats: { ...layer.effects.stats, radarRange: 300 } } },
+        [layerId]: {
+          ...layer,
+          effects: { ...layer.effects, stats: { ...layer.effects.stats, radarRange: 300 } },
+        },
       },
     });
     const without = structuredClone(launch);
@@ -758,8 +846,18 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     expect(visibleState(launch, 'p', data).fleets.qmine).toBeUndefined();
     // И корабль у конца полёта ей не виден: ракета летит, а не смотрит. Пост q стоит на узле
     // C в 2 от точки ракеты на 95% пути — будь ракета глазом, узел был бы опознан.
-    launch.planets.C = { ...structuredClone(launch.planets.A!), id: 'C', position: { x: 278, y: 0 }, links: [] };
-    launch.fleets.post = { ...structuredClone(launch.fleets.target!), id: 'post', location: 'C', edge: null };
+    launch.planets.C = {
+      ...structuredClone(launch.planets.A!),
+      id: 'C',
+      position: { x: 278, y: 0 },
+      links: [],
+    };
+    launch.fleets.post = {
+      ...structuredClone(launch.fleets.target!),
+      id: 'post',
+      location: 'C',
+      edge: null,
+    };
     const fl = m.flight!;
     const close = advance(launch, fl.departedAt + 0.95 * (fl.arrivesAt - fl.departedAt));
     expect(isVisibleTo(close, 'p', { fleetId: 'post' }, data)).toBe(false);
@@ -776,7 +874,12 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       location: null,
       movement: null,
       edge: null,
-      flight: { from: { x: 260, y: 30 }, to: { x: 260, y: -30 }, departedAt: 0, arrivesAt: 4 * HOUR },
+      flight: {
+        from: { x: 260, y: 30 },
+        to: { x: 260, y: -30 },
+        departedAt: 0,
+        arrivesAt: 4 * HOUR,
+      },
       units: [{ unit: 'missile', count: 1, modules: ['mine'] }],
       traits: [],
     };
@@ -818,7 +921,13 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     // Тик через 5 минут полёта: ракета в (220, 0), в 30 от центра круга.
     const tick = k.applyAction(
       launch,
-      { id: 's:q:1', playerId: 'q', type: 'test.patrolTick', payload: { at: launch.time + 5 * 60_000 }, issuedAt: launch.time },
+      {
+        id: 's:q:1',
+        playerId: 'q',
+        type: 'test.patrolTick',
+        payload: { at: launch.time + 5 * 60_000 },
+        issuedAt: launch.time,
+      },
       { now: launch.time, data },
     );
     if (!tick.ok) throw new Error(tick.code);
@@ -826,7 +935,10 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     if (!r.ok) throw new Error(r.code);
     expect(r.failures).toEqual([]);
     expect(r.events).toContainEqual(
-      expect.objectContaining({ type: 'shuttle.hit', payload: expect.objectContaining({ targetId: m.id }) }),
+      expect.objectContaining({
+        type: 'shuttle.hit',
+        payload: expect.objectContaining({ targetId: m.id }),
+      }),
     );
     expect(missiles(r.state)).toEqual([]);
     expect(r.state.ordnance!.warheads ?? {}).toEqual({});
@@ -853,7 +965,9 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     const fl = m.flight!;
     const strikeData = parseGameData({
       ...data,
-      buildings: { spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 12 } },
+      buildings: {
+        spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 12 },
+      },
     });
     const k = createKernel([shuttleModule]);
     const strike = (s: GameState) => {
@@ -880,7 +994,9 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     const mid = (fl.departedAt + fl.arrivesAt) / 2;
     expect(strike(advance(launch, mid))).toBe('E_NO_TARGET');
     // У самой цели (276, 0) — видна, удар уходит.
-    expect(strike(advance(launch, fl.departedAt + 0.95 * (fl.arrivesAt - fl.departedAt)))).toBe('ok');
+    expect(strike(advance(launch, fl.departedAt + 0.95 * (fl.arrivesAt - fl.departedAt)))).toBe(
+      'ok',
+    );
     // Окно шпионажа по флотам хозяина открывает ракету и в проекции, и для удара: что видно,
     // по тому и бьют (замечание Codex на #1503).
     const spied = advance(launch, mid);
@@ -925,11 +1041,20 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
 
   it('a missile without a hull is refused at deployment: nothing to shoot down (Codex, #1503)', () => {
     const missile = data.units.missile!;
-    const hollow = { ...data, units: { ...data.units, missile: { ...missile, stats: { ...missile.stats, hp: 0 } } } };
+    const hollow = {
+      ...data,
+      units: { ...data.units, missile: { ...missile, stats: { ...missile.stats, hp: 0 } } },
+    };
     const s = world();
     const r = kernel.applyAction(
       s,
-      { id: 's:p:1', playerId: 'p', type: 'fleet.deployRocketMine', payload: { fleetId: 'layer', mode: 'any' }, issuedAt: s.time },
+      {
+        id: 's:p:1',
+        playerId: 'p',
+        type: 'fleet.deployRocketMine',
+        payload: { fleetId: 'layer', mode: 'any' },
+        issuedAt: s.time,
+      },
       { now: s.time, data: hollow },
     );
     expect(r).toMatchObject({ ok: false, code: 'E_NO_ROCKET_MINELAYER' });
