@@ -3,7 +3,7 @@
  *
  * До этого кирпича `state.strikes` не читал в прототипе НИКТО: игрок отправлял удар и
  * видел результат в журнале, но не путь. Здесь закреплены решения трассы; рисование
- * (канва) остаётся в `main.ts`.
+ * (канва) — у наложений карты `mapOverlays.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { strikeHome, strikeProgress, strikeTrails, type BasePos } from './strikeTrail';

@@ -171,7 +171,7 @@ describe('RULES-5 — блэкаут пережил переезд', () => {
 });
 
 describe('SHU-6.10 — чужой висящий патруль на карте — по правилу ядра', () => {
-  // Зрение кадра считает туман (`mapFog.ts`, REFM-231), рисует — `main.ts`.
+  // Зрение кадра считает туман (`mapFog.ts`, REFM-231), рисуют наложения (`mapOverlays.ts`, REFM-233).
   const fnOf = (file: string, name: string): string => {
     const src = readFileSync(new URL(file, import.meta.url), 'utf8');
     const at = src.indexOf(`function ${name}(`);
@@ -189,7 +189,7 @@ describe('SHU-6.10 — чужой висящий патруль на карте 
   it('drawSeenPatrols рисует этот список и не читает чужие вылеты из `strikes` сам', () => {
     // Чужой вылет в соло лежит в полном мире целиком — с базой, сроком и летящими ногами.
     // Прочти его карта напрямую, и соло показало бы больше сети (правило 1 `strikeTrail.ts`).
-    const fn = fnOf('./main.ts', 'drawSeenPatrols');
+    const fn = fnOf('./mapOverlays.ts', 'drawSeenPatrols');
     expect(fn).toContain('vision?.seenPatrols');
     expect(fn).not.toContain('strikes');
   });
