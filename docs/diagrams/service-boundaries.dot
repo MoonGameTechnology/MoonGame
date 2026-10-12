@@ -1,37 +1,72 @@
 digraph services {
-  graph [rankdir=TB, bgcolor="#f6f8fc", fontname="DejaVu Sans", fontsize=18, pad=0.4, nodesep=0.4, ranksep=0.65, labelloc=t, label="VOID DOMINION / MOONGAME\nГраницы отказа — целевая архитектура\nПунктир: предстоит реализовать. Зелёный: Corp уже поддерживается кодом."];
-  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#a3afc3", fillcolor="white", margin="0.18,0.12"];
-  edge [fontname="DejaVu Sans", fontsize=10, color="#52627a", arrowsize=0.75];
-  now [label="СЕЙЧАС\nGame: матчи + Auth + Inventory + MetaMarket / одна Game DB\nCorp: опциональный отдельный процесс и PostgreSQL\nФундамент: 16 вызовов, timeout 2s; 3 сбоя → пауза 5s → одна проба", fillcolor="#e8efff", color="#607ec5"];
-  browser [label="Игрок / браузер\nHTTPS и WSS", fillcolor="#e8efff"];
-  api [label="API / Auth / Lobby\nПока роль Game; отделяется с workers", style="rounded,filled,dashed", fillcolor="#e8efff"];
-  now -> browser [style=invis];
-  browser -> api;
-  subgraph cluster_domains {
-    label="САМОСТОЯТЕЛЬНЫЕ ДОМЕНЫ / ограниченные CPU, RAM, пулы, таймауты";
-    color="#c9d3e3"; style=rounded; fontsize=12;
-    workers [label="MATCH WORKERS\nНесколько комнат на worker\nБой + движение + экономика\nPinned версии и loadout", style="rounded,filled,dashed", fillcolor="#e8efff"];
-    inventory [label="INVENTORY + SETTLEMENT\nПредметы / аренда / резервы\nКошельки + ledger + receipts\nОдна локальная транзакция", style="rounded,filled,dashed", fillcolor="#fff2d9"];
-    auction [label="AUCTION\nЛоты / цены / tradeId\nВитрина и reconciliation\nНе пишет чужие таблицы", style="rounded,filled,dashed", fillcolor="#fff2d9"];
-    corp [label="CORPORATIONS\nЧленство / роли / влияние\nСтроительство / AvA / аудит\nДо боя: закрепление; после: итог", fillcolor="#e3f5e9", color="#3e9362"];
-    {rank=same; workers; inventory; auction; corp;}
-    gameDB [shape=cylinder, label="Game DB\nСнимки / receipts / итог\nДолговечная доставка", style="filled,dashed", fillcolor="#e8efff"];
-    inventoryDB [shape=cylinder,label="Inventory DB\nВладение и расчёты",style="filled,dashed",fillcolor="#fff2d9"];
-    auctionDB [shape=cylinder,label="Auction DB\nЛоты и workflow",style="filled,dashed",fillcolor="#fff2d9"];
-    corpDB [shape=cylinder,label="Corp DB\nСостояние и nonce",fillcolor="#e3f5e9",color="#3e9362"];
-    {rank=same; gameDB; inventoryDB; auctionDB; corpDB;}
-    workers -> gameDB; inventory -> inventoryDB; auction -> auctionDB; corp -> corpDB;
+  graph [rankdir=TB, bgcolor="#f7f9fd", fontname="DejaVu Sans", fontsize=19, pad=0.35, nodesep=0.4, ranksep=0.62, compound=true, labelloc=t, label="VOID DOMINION / MOONGAME\nСервисы и сетевые сегменты — ЦЕЛЕВАЯ архитектура\nПунктир: предстоит реализовать. Зелёный: отдельный Corp поддерживается кодом.\nACL сегментов и живой cutover этой картой не подтверждены."];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#9babc5", fillcolor="white", margin="0.18,0.13"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#536783", arrowsize=0.75];
+  current [label="СЕЙЧАС\nGame: API/Auth + матчи + Inventory + MetaMarket / общая Game DB\nCorp: опциональный отдельный процесс и PostgreSQL\nGuard: 16 вызовов; timeout 2s; 3 сбоя → пауза 5s → одна проба", fillcolor="#e8efff", color="#617fc2"];
+  browser [label="Браузер / PWA / мобильная оболочка", fillcolor="#e8efff"];
+  current -> browser [style=invis];
+  subgraph cluster_edge {
+    label="ПУБЛИЧНЫЙ ПЕРИМЕТР / целевая политика"; color="#83a5d4"; style="rounded,dashed"; fontsize=13;
+    http [label="HTTPS ingress\nЗащита периметра", style="rounded,filled,dashed", fillcolor="#e8efff"];
+    wss [label="Отдельный WSS ingress\nНе зависит от API-процесса", style="rounded,filled,dashed", fillcolor="#e8efff"];
+    {rank=same; http; wss;}
   }
-  api -> workers [label="маршрут / join-token"];
-  browser -> workers [label="WSS: отдельный ingress",constraint=false];
+  subgraph cluster_api {
+    label="ПРИВАТНЫЙ API-СЕГМЕНТ"; color="#83a5d4"; style="rounded,dashed"; fontsize=13;
+    api [label="API / Auth / Lobby\nПока роль Game\nActor/authz, маршрут и join-token", style="rounded,filled,dashed", fillcolor="#e8efff"];
+    apiStore [shape=cylinder, label="Состояние входа / маршрутов\nСостав и перенос: SV-4.1 / OPS-2.1", style="filled,dashed", fillcolor="#e8efff"];
+    api -> apiStore [label="свой store / роль"];
+  }
+  subgraph cluster_game {
+    label="ПРИВАТНЫЙ GAME-СЕГМЕНТ"; color="#83a5d4"; style="rounded,dashed"; fontsize=13;
+    game [label="MATCH WORKERS\nГруппы комнат / pinned версии\nДетерминированное модульное ядро", style="rounded,filled,dashed", fillcolor="#e8efff"];
+    gameDB [shape=cylinder, label="Game DB / собственный data ACL\nСнимки / receipts / durable доставка", style="filled,dashed", fillcolor="#e8efff"];
+    game -> gameDB [label="только свой DML"];
+  }
+  subgraph cluster_inv {
+    label="ПРИВАТНЫЙ INVENTORY-СЕГМЕНТ"; color="#d4b16c"; style="rounded,dashed"; fontsize=13;
+    inventory [label="INVENTORY + SETTLEMENT\nВладение / аренда / резервы\nПредмет + деньги: одна транзакция", style="rounded,filled,dashed", fillcolor="#fff2d9"];
+    invDB [shape=cylinder, label="Inventory DB / свой data ACL\nКошельки / ledger / receipts", style="filled,dashed", fillcolor="#fff2d9"];
+    inventory -> invDB [label="только свой DML"];
+  }
+  subgraph cluster_auction {
+    label="ПРИВАТНЫЙ AUCTION-СЕГМЕНТ"; color="#d4b16c"; style="rounded,dashed"; fontsize=13;
+    auction [label="AUCTION\nЛоты / tradeId / workflow\nНе пишет чужие таблицы", style="rounded,filled,dashed", fillcolor="#fff2d9"];
+    auctionDB [shape=cylinder, label="Auction DB / свой data ACL\nКнига лотов / reconciliation", style="filled,dashed", fillcolor="#fff2d9"];
+    auction -> auctionDB [label="только свой DML"];
+  }
+  subgraph cluster_corp {
+    label="ПРИВАТНЫЙ CORP-СЕГМЕНТ\nПолитика — MSVC-7"; color="#6baf84"; style="rounded,dashed"; fontsize=13;
+    corp [label="CORPORATIONS\nЧленство / роли / строительство\nВлияние / AvA / аудит", fillcolor="#e3f5e9", color="#409163"];
+    corpDB [shape=cylinder, label="Corp DB / свой data ACL\nОтдельный store поддерживается", fillcolor="#e3f5e9", color="#409163"];
+    corp -> corpDB [label="только свой DML"];
+  }
+  subgraph cluster_bg {
+    label="ФОНОВЫЙ СЕГМЕНТ / по потребности"; color="#a48ac7"; style="rounded,dashed"; fontsize=13;
+    bg [label="Проекции / статистика / уведомления\nСобственные данные; не источник наград", style="rounded,filled,dashed", fillcolor="#f0eaff"];
+  }
+  subgraph cluster_mgmt {
+    label="ОТДЕЛЬНЫЙ MANAGEMENT-СЕГМЕНТ"; color="#ce8c98"; style="rounded,dashed"; fontsize=13;
+    access [label="VPN / access gateway / bastion\nСильная аутентификация и отзыв", style="rounded,filled,dashed", fillcolor="#ffe9ee"];
+    jobs [label="Deploy / мигратор / backup / restore\nКонкретный домен и временные права\nSecret-store / аудит: собственные ACL", style="rounded,filled,dashed", fillcolor="#ffe9ee"];
+    access -> jobs [label="административный канал"];
+  }
+  browser -> http [label="HTTPS"];
+  browser -> wss [label="WSS"];
+  http -> api [label="публичные маршруты"];
+  wss -> game [label="join-token / WS upgrade"];
+  api -> game [label="место / маршрут"];
   api -> inventory [label="личный инвентарь"];
   api -> auction [label="торговля"];
-  api -> corp [label="управление"];
-  auction -> inventory [label="резерв / settlement\nтот же tradeId",constraint=false,color="#b7791f"];
-  workers -> inventory [label="до старта: loadout\nпосле: выдача по receipt",style=dashed,constraint=false];
-  
-  background [label="ФОНОВЫЕ ПОТРЕБИТЕЛИ — по потребности\nПрофиль / статистика / уведомления\nПроекции; не блокируют бой",style="rounded,filled,dashed",fillcolor="#f0eaff"];
-  gameDB -> background [label="долговечные события",color="#8862ba"];
-  rule [shape=note,label="ПРИ ОТКАЗЕ\nAuction → торговля ждёт; инвентарь работает\nCorp → корпоративные операции ждут; бой работает\nInventory → новые операции ждут; начатый бой работает\nWorker → восстанавливаются его комнаты; соседи работают\nОбщий хост / PG / сеть всё ещё требуют отдельной HA/DR-проверки",fillcolor="white"];
-  background -> rule [style=invis];
+  api -> corp [label="корпоративные операции"];
+  auction -> inventory [label="reserve / settlement / status", color="#b7791f", constraint=false];
+  game -> inventory [label="до боя: loadout\nпосле: durable награды", style=dashed, constraint=false];
+  game -> corp [label="AvA RPC / итог / аудит", style=dashed, constraint=false];
+  gameDB -> bg [label="через роль доставки Game\nверсионированные события", color="#8862ba"];
+  policy [shape=note, label="ПОЛИТИКА ДОСТУПА\nПо умолчанию запрещено: ingress + egress\nСтрелка: инициатор; ответ не даёт права обратного вызова\nКаждый store: отдельный data ACL, только владелец\nIdentity + TLS + scope + права исходного actor\nRuntime не получает management, SSH или Docker socket\nАдмин-связи к конкретным ресурсам — по матрице", fillcolor="white", color="#ce8c98"];
+  bg -> policy [style=invis];
+  jobs -> policy [style=invis];
+  note [shape=note, label="ПРИ ОТКАЗЕ — ЦЕЛЕВЫЕ ГАРАНТИИ\nAuction: торговля ждёт, свободный инвентарь работает\nCorp: корпоративные операции ждут, обычный бой работает\nInventory: новые операции ждут, закреплённый бой работает\nWorker: восстанавливаются его комнаты, соседи работают\nОбщие host / PG / DNS / edge требуют отдельной HA/DR-проверки", fillcolor="white"];
+  {rank=same; policy; note;}
+  policy -> note [style=invis];
 }

@@ -70,6 +70,14 @@ A09 логирование/мониторинг · A10 SSRF. Помечаю за
 
 ## Фаза 1 · Сеть и периметр `[A05]`
 
+Для выделяемых Game/Corp/Inventory/Auction/worker-доменов конкретизация SE-0.3,
+SE-1.2/1.3 и управления инфраструктурой записана в
+[MSVC-7/8/9](service-resilience-roadmap.md): default-deny ingress/egress,
+отдельный административный канал и негативные проверки компрометации.
+[Карта сервисов и сегментов](service-architecture-map.md) задаёт целевые разрешения;
+она не подтверждает текущий firewall живого хоста. Кирпичи SE остаются владельцами
+общих механизмов identity/TLS/secrets, MSVC — их применения к новым доменам.
+
 ### SE-1.1 · Cloudflare: DDoS / WAF / rate-limit на краю `[sec]` ⏳ — M
 
 **Подзадачи:** Cloudflare перед сервером — поглощение DDoS L3/4 и L7, WAF, bot-management, edge-rate-limit; правила под наши маршруты.
