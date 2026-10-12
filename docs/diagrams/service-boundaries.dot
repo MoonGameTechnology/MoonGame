@@ -4,12 +4,14 @@ digraph services {
   edge [fontname="DejaVu Sans", fontsize=10, color="#536783", arrowsize=0.75];
   current [label="СЕЙЧАС\nGame: API/Auth + матчи + Inventory + MetaMarket / общая Game DB\nCorp: опциональный отдельный процесс и PostgreSQL\nGuard: 16 вызовов; timeout 2s; 3 сбоя → пауза 5s → одна проба", fillcolor="#e8efff", color="#617fc2"];
   browser [label="Браузер / PWA / мобильная оболочка", fillcolor="#e8efff"];
+  employee [label="Пульты модератора / игрового администратора\nПерсональная служебная identity", fillcolor="#e8efff", style="rounded,filled,dashed"];
   current -> browser [style=invis];
   subgraph cluster_edge {
     label="ПУБЛИЧНЫЙ ПЕРИМЕТР / целевая политика"; color="#83a5d4"; style="rounded,dashed"; fontsize=13;
     http [label="HTTPS ingress\nЗащита периметра", style="rounded,filled,dashed", fillcolor="#e8efff"];
     wss [label="Отдельный WSS ingress\nНе зависит от API-процесса", style="rounded,filled,dashed", fillcolor="#e8efff"];
-    {rank=same; http; wss;}
+    staffIngress [label="Защищённый staff ingress\nMFA / служебная сессия", style="rounded,filled,dashed", fillcolor="#e8efff"];
+    {rank=same; http; wss; staffIngress;}
   }
   subgraph cluster_api {
     label="ПРИВАТНЫЙ API-СЕГМЕНТ"; color="#83a5d4"; style="rounded,dashed"; fontsize=13;
@@ -51,22 +53,36 @@ digraph services {
     jobs [label="Deploy / мигратор / backup / restore\nКонкретный домен и временные права\nSecret-store / аудит: собственные ACL", style="rounded,filled,dashed", fillcolor="#ffe9ee"];
     access -> jobs [label="административный канал"];
   }
+  subgraph cluster_staff {
+    label="ПРИВАТНЫЙ STAFF-СЕГМЕНТ / OPS-4.3/4.4/4.5"; color="#ad89c3"; style="rounded,dashed"; fontsize=13;
+    staff [label="STAFF / SUPPORT\nЗаявки / назначения / evidence\nВременные grants / admission\nРоль + дело + цель + срок + лимиты", style="rounded,filled,dashed", fillcolor="#f0eaff"];
+    staffDB [shape=cylinder, label="Staff DB / свой data ACL\nДела / принятия / результаты\nНезависимый audit sink — SE-8", style="filled,dashed", fillcolor="#f0eaff"];
+    staff -> staffDB [label="только свой DML"];
+  }
   browser -> http [label="HTTPS"];
   browser -> wss [label="WSS"];
+  employee -> staffIngress [label="защищённый вход"];
+  staffIngress -> staff [label="пульт / ограниченные права"];
   http -> api [label="публичные маршруты"];
   wss -> game [label="join-token / WS upgrade"];
   api -> game [label="место / маршрут"];
   api -> inventory [label="личный инвентарь"];
   api -> auction [label="торговля"];
   api -> corp [label="корпоративные операции"];
+  api -> staff [dir=both, label="intake / staff accounts-команда\nowner: consume/status", color="#8862ba"];
+  staff -> game [dir=both, label="staff-команда / owner consume-status", color="#8862ba", constraint=false, style=dashed];
+  staff -> inventory [dir=both, label="staff-команда / owner consume-status", color="#8862ba", constraint=false, style=dashed];
+  staff -> corp [dir=both, label="staff-команда / owner consume-status", color="#8862ba", constraint=false, style=dashed];
   auction -> inventory [label="reserve / settlement / status", color="#b7791f", constraint=false];
   game -> inventory [label="до боя: loadout\nпосле: durable награды", style=dashed, constraint=false];
   game -> corp [label="AvA RPC / итог / аудит\nИнтеграция готова в коде", constraint=false];
   gameDB -> bg [label="через роль доставки Game\nверсионированные события", color="#8862ba"];
+  gameDB -> staff [label="через роль доставки Game\nсистемные события заявок", color="#8862ba", style=dashed, constraint=false];
   policy [shape=note, label="ПОЛИТИКА ДОСТУПА\nПо умолчанию запрещено: ingress + egress\nСтрелка: инициатор; ответ не даёт права обратного вызова\nКаждый store: отдельный data ACL, только владелец\nIdentity + TLS + scope + права исходного actor\nRuntime не получает management, SSH или Docker socket\nАдмин-связи к конкретным ресурсам — по матрице", fillcolor="white", color="#ce8c98"];
   bg -> policy [style=invis];
   jobs -> policy [style=invis];
   note [shape=note, label="ПРИ ОТКАЗЕ — ЦЕЛЕВЫЕ ГАРАНТИИ\nAuction: торговля ждёт, свободный инвентарь работает\nCorp: корпоративные операции ждут, обычный бой работает\nInventory: новые операции ждут, закреплённый бой работает\nWorker: восстанавливаются его комнаты, соседи работают\nОбщие host / PG / DNS / edge требуют отдельной HA/DR-проверки", fillcolor="white"];
-  {rank=same; policy; note;}
+  ops [shape=note, style="filled,dashed", label="НЕЗАВИСИМЫЕ ОПЕРАЦИОННЫЕ КОНТУРЫ\nBackup / logs-audit / SIEM / response\nДругие среды, identities и storage\nПодробная карта: security-operations.dot", fillcolor="#f0eaff"];
+  {rank=same; policy; note; ops;}
   policy -> note [style=invis];
 }
