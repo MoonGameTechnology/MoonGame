@@ -16,6 +16,7 @@ import { verifyJoinToken, type JoinTokenVerifyConfig } from './auth';
 import { serializeServerMessage, type ServerErrorCode } from './protocol';
 import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
+import { assetType } from './staticAssets';
 
 export interface MultiplayerServerOptions {
   securityAudit?: SecurityAudit;
@@ -37,6 +38,9 @@ export interface MultiplayerServerOptions {
    *  заведённый мимо этого списка, получил бы политику для JSON, и скрипт документа не
    *  запустился бы вовсе. */
   documents?: readonly { routes: readonly string[]; html: string }[];
+  /** Картинки, вынесенные сборкой из документа (`readAssetDir`): имя файла → байты.
+   *  Отдаются по `/assets/<имя>` с годовым кэшем — имя несёт хеш содержимого. */
+  assets?: ReadonlyMap<string, Buffer>;
   /** Кому разрешено встраивать документ в свой iframe (SE-7.1, правило 5). По умолчанию
    *  никому. Площадка-портал (`YAG`) показывает игру в своём фрейме — её origin
    *  перечисляется здесь, а не вырезанием заголовка. */
@@ -453,6 +457,25 @@ export function createMultiplayerServer(
     // сюда, и без этого маршрута она упирается в 404. Отдаём тот же клиент, а какую
     // партию открыть, он читает из своего же пути (`decisions/matchAddress.ts`).
     app.get('/game/:matchId', serveIndex);
+  }
+
+  const assets = options.assets;
+  if (assets !== undefined && assets.size > 0) {
+    // Имя несёт хеш содержимого, поэтому кэш на год безопасен: новая картинка придёт под
+    // новым именем вместе с новым документом. Политика API (`default-src 'none'`) с хука
+    // остаётся: SVG, открытый напрямую, не исполнит ни строчки.
+    app.get('/assets/:file', async (request: FastifyRequest, reply: FastifyReply) => {
+      const name = (request.params as { file: string }).file;
+      const bytes = assets.get(name);
+      if (bytes === undefined) return reply.code(404).send({ error: 'E_NOT_FOUND' });
+      void reply.header('content-type', assetType(name));
+      void reply.header('cache-control', 'public, max-age=31536000, immutable');
+      // Отдаются байты, прочитанные со своего диска при старте, а не ввод клиента: от
+      // запроса зависит только выбор ключа в карте. Тип — картинка, политика `default-src
+      // 'none'`, так что исполнить в ответе нечего.
+      // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
+      return reply.send(bytes);
+    });
   }
 
   // Caller-supplied routes (the match create/join API, SV-2.4) — registered after the

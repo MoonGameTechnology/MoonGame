@@ -6,7 +6,8 @@
 //     and time-acceleration controls are compiled out of the JS, and the matching
 //     markup (fenced with <!--dev-only--> … <!--/dev-only--> below) is stripped.
 import { build } from 'esbuild';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
 
@@ -19,20 +20,41 @@ const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.m
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
 
-const bundle = async (playerBuild) => {
+const bundleOptions = (playerBuild) => ({
+  entryPoints: ['prototype/src/bootstrap.ts'],
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2020',
+  loader: { '.webp': 'dataurl', '.svg': 'dataurl' },
+  minify: true,
+  legalComments: 'none',
+  write: false,
+  define: { __PLAYER_BUILD__: String(playerBuild), __SECTOR_ZERO_ONLY__: 'false' },
+});
+
+const bundle = async (playerBuild) => (await build(bundleOptions(playerBuild))).outputFiles[0].text;
+
+/**
+ * Клиент для СЕРВЕРА (`dist/served/`): тот же бандл, но картинки — отдельными файлами в
+ * `assets/` с хешем в имени, а не base64 внутри HTML. Однофайловый документ сервер отдаёт
+ * с `no-store`, и игрок перекачивал 16 МБ арта при каждом открытии; файл с хешем в имени
+ * браузер держит год (`/assets/:file` в `wsServer.ts`). Путь АБСОЛЮТНЫЙ: тот же документ
+ * открывается и на `/game/<id>`, где относительный `assets/…` ушёл бы в `/game/assets/…`.
+ * Однофайловые сборки остаются как были: их открывают с диска и кладут в APK.
+ */
+const bundleServed = async (playerBuild) => {
   const res = await build({
-    entryPoints: ['prototype/src/bootstrap.ts'],
-    bundle: true,
-    format: 'iife',
-    platform: 'browser',
-    target: 'es2020',
-    loader: { '.webp': 'dataurl', '.svg': 'dataurl' },
-    minify: true,
-    legalComments: 'none',
-    write: false,
-    define: { __PLAYER_BUILD__: String(playerBuild), __SECTOR_ZERO_ONLY__: 'false' },
+    ...bundleOptions(playerBuild),
+    loader: { '.webp': 'file', '.svg': 'file' },
+    assetNames: 'assets/[name]-[hash]',
+    entryNames: playerBuild ? 'player' : 'dev',
+    outdir: 'prototype/dist/served',
+    publicPath: '/',
   });
-  return res.outputFiles[0].text;
+  const js = res.outputFiles.find((f) => f.path.endsWith('.js'));
+  const assets = res.outputFiles.filter((f) => f !== js);
+  return { js: js.text, assets };
 };
 
 /** Платформенная цель (`YAG-1.1b`, `YAG-1.1c`): настройки — в `platformBuild.mjs`, общие со
@@ -4476,6 +4498,28 @@ console.log(
   'wrote prototype/dist/void-dominion-player.html (' +
     (playerHtml.length / 1024).toFixed(0) +
     ' KB)',
+);
+// --- Клиент для сервера: документ + картинки файлами (см. `bundleServed`) ----------
+// Каталог пересоздаётся: картинка, которой больше нет в игре, не должна ехать в образ.
+rmSync('prototype/dist/served', { recursive: true, force: true });
+mkdirSync('prototype/dist/served/assets', { recursive: true });
+const writeServedAssets = (files) => {
+  for (const file of files)
+    writeFileSync(`prototype/dist/served/assets/${basename(file.path)}`, file.contents);
+};
+const servedDev = await bundleServed(false);
+const servedPlayer = await bundleServed(true);
+writeServedAssets(servedDev.assets);
+writeServedAssets(servedPlayer.assets);
+const servedPlayerHtml = stripDevMarkup(page(servedPlayer.js));
+writeFileSync('prototype/dist/served/dev.html', page(servedDev.js));
+writeFileSync('prototype/dist/served/player.html', servedPlayerHtml);
+console.log(
+  'wrote prototype/dist/served/ (player.html ' +
+    (servedPlayerHtml.length / 1024).toFixed(0) +
+    ' KB + ' +
+    servedPlayer.assets.length +
+    ' картинок в assets/)',
 );
 // --- Платформенная цель (`YAG-1.1b`): index.html в корне + assets/ рядом ---------
 // Требование 1.22: `index.html` именно в КОРНЕ архива, а имена файлов и папок — без
