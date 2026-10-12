@@ -356,7 +356,7 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #missionpanel[hidden]{display:none;}
 #missionpanel .mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#8ff5c8;
   font-size:var(--fs-body);}
-#missionpanel .mp-close{min-width:32px;min-height:32px;border:0;background:none;color:var(--ink);font-size:16px;cursor:pointer;}
+#missionpanel .mp-close{min-width:32px;min-height:32px;border-radius:6px;font-size:16px;}
 #missionpanel .mp-hint{margin:2px 0 8px;color:var(--dim);font-size:var(--fs-caption);}
 #missionpanel .mp-row{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:2px 8px;width:100%;
   margin:0 0 6px;padding:8px 10px;border-radius:9px;text-align:left;font:inherit;font-size:var(--fs-body);color:var(--ink);
@@ -459,8 +459,7 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
   background:rgba(24,15,3,.92);border:1px solid var(--amber);border-radius:3px;padding:0 0 0 12px;
   font:var(--fs-body) var(--sf-font);color:var(--fg);line-height:1.45;overflow-wrap:anywhere;}
 #savewarn span{padding:7px 0;}
-#savewarn button{flex:none;width:44px;min-height:44px;align-self:stretch;border:0;background:transparent;
-  color:var(--amber);font-size:20px;line-height:1;cursor:pointer;}
+#savewarn .btn-x{flex:none;width:40px;min-height:40px;margin:2px;border-radius:3px;font-size:20px;line-height:1;}
 #toasts .toast.out{opacity:0;transform:translateY(-6px);transition:opacity .4s ease,transform .4s ease;}
 @keyframes toast-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
 #speedbar{position:fixed;right:14px;bottom:14px;z-index:24;display:flex;align-items:center;gap:4px;
@@ -863,8 +862,7 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #pirate-intro[hidden]{display:none;}
 #pirate-intro .pe-title{color:#ffb399;display:block;padding-right:28px;}
 #pirate-intro .pe-copy{margin:8px 0 10px;}
-#pirate-intro .pe-close{position:absolute;right:4px;top:4px;width:32px;height:32px;
-  border:0;background:transparent;color:var(--ink);cursor:pointer;}
+#pirate-intro .pe-close{position:absolute;right:4px;top:4px;width:32px;height:32px;border-radius:5px;}
 #pirate-intro .pe-action{min-height:40px;width:100%;border:1px solid #a95e48;border-radius:5px;
   background:#302128;color:var(--ink);font:inherit;cursor:pointer;}
 body.holo-ui #pirate-intro{left:84px;} /* правее колонки инструментов слева */
@@ -1020,8 +1018,7 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .dp-tab{padding:6px 11px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 .dp-tab.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.1);}
-.dp-close{margin-left:auto;width:28px;height:28px;border-radius:6px;border:1px solid var(--line);
-  background:transparent;color:var(--dim);cursor:pointer;font-size:var(--fs-body);}
+.dp-close{margin-left:auto;width:28px;height:28px;border-radius:6px;font-size:var(--fs-body);}
 .dp-sorts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--line);
   font-size:var(--fs-caption);color:var(--dim);}
 .dp-sortb{padding:4px 8px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--dim);
@@ -1086,10 +1083,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .fr-q{flex:1;min-width:0;background:rgba(6,18,22,.9);border:1px solid var(--line);border-radius:8px;
   color:var(--ink);font:inherit;font-size:var(--fs-body);padding:9px 11px;}
 .fr-q:focus{outline:none;border-color:var(--cyan);}
-.fr-b{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:8px;
-  padding:8px 13px;font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;}
-.fr-b:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
-.fr-b.ok{border-color:var(--cyan-dim);color:var(--cyan);}
+.fr-b{border-radius:8px;padding:8px 13px;font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
+  cursor:pointer;white-space:nowrap;}
+/* ✕ «убрать из друзей» и «отозвать заявку» — крестик (.btn-x), остальные кнопки строки — свои. */
+.fr-b:not(.btn-x){border:1px solid var(--line);background:transparent;color:var(--dim);}
+.fr-b:not(.btn-x):hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.fr-b.ok:not(.btn-x){border-color:var(--cyan-dim);color:var(--cyan);}
 .fr-note{padding:0 0 8px;font-size:var(--fs-caption);color:var(--amber);}
 .fr-list{display:flex;flex-direction:column;gap:8px;}
 .fr-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
@@ -1143,10 +1142,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 /* Кнопки строки — стандартные квадратные иконко-кнопки интерфейса (метрика .cw-btn /
    .lw-close): раньше у них была своя типографика и свои поля. */
 .pp-row button{width:28px;height:28px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
-  border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px;
-  font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.pp-row button:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
-.pp-row button:active{background:rgba(53,214,230,.2);}
+  border-radius:6px;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+/* ✕ «снять метку» — крестик (.btn-x). */
+.pp-row button:not(.btn-x){border:1px solid var(--line);background:transparent;color:var(--dim);}
+.pp-row button:not(.btn-x):hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.pp-row button:not(.btn-x):active{background:rgba(53,214,230,.2);}
 .pp-empty{padding:16px 12px;color:var(--dim);font-size:var(--fs-body);}
 .dp-intel{padding:2px 10px 9px 39px;font-size:var(--fs-caption);color:var(--cyan);}
 .dp-intel b{color:#eafffb;}
@@ -1399,12 +1399,10 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .ptitle{flex:1 1 auto;min-width:0;}
 .ptitle b{display:block;color:#eafffb;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ptitle span{color:var(--dim);font-size:var(--fs-caption);}
-/* Крестик карточки — как у всех окон (.tw-close, .dp-close, .mk-close…): закрыть окно —
-   не опасное действие, и красный здесь спорил с красным опасности (заказ владельца
-   2026-09-29: «кнопки где-то красные, где-то не красные»). */
-.pclose{flex:0 0 auto;width:24px;height:24px;cursor:pointer;font-size:var(--fs-caption);border-radius:7px;
-  background:transparent;border:1px solid var(--line);color:var(--dim);}
-.pclose:hover{color:var(--ink);border-color:var(--line-hi);}
+/* Крестик карточки — как у всех окон (.tw-close, .dp-close, .mk-close…): вид даёт .btn-x
+   (заказ владельца 2026-09-29 «кнопки где-то красные, где-то не красные» — одинаково везде;
+   2026-10-12 — все крестики в красной рамке). */
+.pclose{flex:0 0 auto;width:24px;height:24px;font-size:var(--fs-caption);border-radius:7px;}
 /* Очки победы мира — в шапке рядом с именем (заказ владельца 2026-09-29). */
 .pbadge{flex:none;padding:3px 8px;border:1px solid var(--line);border-radius:4px;font-size:var(--fs-body);
   color:var(--ink);background:rgba(53,214,230,.06);white-space:nowrap;}
@@ -1484,11 +1482,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .conveyor .queue span{display:flex;align-items:center;gap:4px;border:1px solid var(--line);background:rgba(2,9,13,.55);padding:3px 6px;font-size:var(--fs-caption);color:var(--ink);}
 .conveyor .queue em{font-style:normal;color:var(--dim);margin-right:5px;}
 .conveyor .queue.empty{color:var(--dim);font-size:var(--fs-caption);}
-.conveyor .current button,.conveyor .queue button,.conveyor .paused button{
-  border:1px solid var(--line-hi);background:transparent;color:var(--dim);cursor:pointer;
+.conveyor .current button,.conveyor .queue button,.conveyor .paused button{cursor:pointer;
   font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:2px;line-height:1.3;}
-.conveyor .current button:hover,.conveyor .queue button:hover,.conveyor .paused button:hover{
-  color:var(--cyan);border-color:var(--cyan);}
+/* ✕ отмены постройки и снятия из очереди — крестики (.btn-x); ▶ возобновить — своя рамка. */
+.conveyor .paused button{border:1px solid var(--line-hi);background:transparent;color:var(--dim);}
+.conveyor .paused button:hover{color:var(--cyan);border-color:var(--cyan);}
 .conveyor .paused{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
 .conveyor .paused span{display:flex;align-items:center;gap:4px;border:1px solid var(--amber,#f0b429);
   background:rgba(240,180,41,.08);padding:3px 6px;font-size:var(--fs-caption);color:var(--ink);}
@@ -1518,6 +1516,14 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* Серая кнопка с причиной нажимается: нажатие говорит, почему нельзя (cmdBtn, why). */
 :is(.btn-main,.btn-second,.btn-quiet)[aria-disabled="true"]{cursor:help;}
 :is(.btn-main,.btn-second,.btn-quiet):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+/* Крестик ✕ — закрыть окно, панель, плашку или убрать строку списка. Заказ владельца
+   2026-10-12: «все кнопки крестик обвести красным, чтоб выделялись из общего фона». Вид у всех
+   крестиков один и даёт его класс, как у трёх стилей выше: правило экрана задаёт крестику
+   размер, место и, если нужна, подложку (background-color). Держит buttonStyles.test.ts. */
+.btn-x{border:1px solid var(--red);background:transparent;color:var(--ink);cursor:pointer;}
+.btn-x:hover{color:var(--red);background-color:color-mix(in srgb,var(--red) 14%,transparent);}
+.btn-x:active{background-color:color-mix(in srgb,var(--red) 24%,transparent);}
+.btn-x:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
 
 /* desktop: spread the panel's scrollable sections into side-by-side columns,
    divided by faint vertical rules, instead of one tall single-width stack. Each
@@ -1568,7 +1574,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .lw-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line-hi);}
 .lw-head b{font-size:var(--fs-body);color:var(--cyan);}
-.lw-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.lw-close{width:28px;height:28px;border-radius:6px;}
 #logwin .lw-head b{flex:1;} /* push the buttons to the right when the recap button is present */
 .lw-recap{width:28px;height:28px;margin-right:6px;border-radius:6px;border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer;}
 .lw-recap:active{background:rgba(53,214,230,.2);}
@@ -1588,7 +1594,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #tech .twbox,#steward .twbox,#battlewin .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
-.tw-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.tw-close{width:28px;height:28px;border-radius:6px;}
 #techbody,#stewardbody,#battlewinbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
 #buildwinbody{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
 /* heroes window: roster cards + abilities / skill tree / fittings */
@@ -1706,7 +1712,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #herobody .hx-dossier{margin-top:12px;border:1px solid var(--cyan);border-radius:10px;padding:12px;background:var(--glass);}
 #herobody .hx-dh{display:flex;align-items:center;gap:8px;}
 #herobody .hx-dnm{font-weight:700;color:#eafffb;font-size:var(--fs-body);}
-#herobody .hx-dx{margin-left:auto;width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+#herobody .hx-dx{margin-left:auto;width:24px;height:24px;border-radius:6px;}
 #herobody .hx-give{margin:10px 0;padding:9px 10px;border-radius:7px;background:rgba(53,214,230,.08);border:1px solid var(--cyan-dim);}
 #herobody .hx-dgl{font-size:var(--fs-caption);color:var(--cyan);}
 #herobody .hx-dgv{font-weight:600;color:#eafffb;font-size:var(--fs-body);margin-top:2px;}
@@ -1920,7 +1926,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста). */
 .tt-mwin.pop{animation:ttpop .14s ease-out;}
 @keyframes ttpop{from{transform:scale(.94);opacity:.4;}to{transform:scale(1);opacity:1;}}
-.tt-mx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.tt-mx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;}
 .tt-mhead{display:flex;gap:11px;align-items:center;padding-right:30px;}
 .tt-mico{flex:none;width:50px;height:50px;border-radius:11px;border:2px solid var(--line-hi);
   background:linear-gradient(180deg,#0f2b31,#0a1a1f);display:grid;place-items:center;font-size:23px;font-variant-emoji:text;}
@@ -2098,9 +2104,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #scipick .sp-slot .sp-sn{padding-right:36px;font-size:16px;font-weight:700;color:var(--sf-hi);}
 #scipick .sp-slot .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-text);}
 #scipick .sp-rm{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:0;
-  border:1px solid var(--sf-edge-hi);border-radius:9px;background:var(--sf-inset);color:var(--sf-text);cursor:pointer;
-  font:inherit;font-size:14px;line-height:1;}
-#scipick .sp-rm:hover{border-color:var(--red);color:var(--red);}
+  border-radius:9px;background-color:var(--sf-inset);font:inherit;font-size:14px;line-height:1;}
 #scipick .sp-warn{display:flex;gap:8px;margin-top:12px;padding:12px 14px;border:1px solid #6a4a17;border-radius:12px;
   background:rgba(255,180,58,.09);color:#f4d199;font-size:14px;line-height:1.45;}
 #scipick .sp-h{margin:16px 0 10px;font-size:14px;font-weight:600;line-height:1.4;color:var(--sf-head);}
@@ -2132,7 +2136,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .tr-purse{margin-left:auto;margin-right:10px;font-size:var(--fs-body);color:var(--ink);}
-.tr-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.tr-close{width:28px;height:28px;border-radius:6px;}
 .tr-body{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
 .tr-rule{margin:0 0 10px;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
 .tr-goods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:12px;}
@@ -2162,7 +2166,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(74,140,255,.08);}
 .al-emblem{font-style:normal;color:#4a8cff;}
 .al-tag{margin-left:auto;margin-right:10px;padding:1px 8px;border-radius:9px;border:1px solid #4a8cff;color:#4a8cff;font-size:var(--fs-caption);}
-.al-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.al-close{width:28px;height:28px;border-radius:6px;}
 .al-body{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
 .al-op{padding:10px 12px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(74,140,255,.55);background:rgba(74,140,255,.08);}
 .al-op.own{border-style:dashed;}
@@ -2201,7 +2205,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #market .mkbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
-.mk-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.mk-close{width:28px;height:28px;border-radius:6px;}
 .mk-tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
 .mk-tab{padding:6px 11px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -2236,7 +2240,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   box-shadow:0 0 48px rgba(0,0,0,.66),inset 0 0 0 1px rgba(53,214,230,.06);}
 #constructor .cn-head{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line);}
 #constructor .cn-head b{font:800 14px var(--sf-font);font-variant-numeric:tabular-nums;color:#eafffb;}
-.cn-close{margin-left:auto;width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.cn-close{margin-left:auto;width:28px;height:28px;border-radius:6px;}
 /* «Как в прошлый раз» (UIX-7.3): rebuilds the last order; a long hull name is cut, not wrapped */
 .cn-again{margin-left:auto;min-width:0;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cn-again+.cn-close{margin-left:0;flex:none;}
@@ -3197,7 +3201,7 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
   box-shadow:0 0 30px rgba(0,0,0,.6),inset 0 0 30px rgba(53,214,230,.05);overflow:hidden;}
 #emblempick .ep-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;
   border-bottom:1px solid var(--line);color:var(--cyan);font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
-#emblempick .ep-head button{background:transparent;border:0;color:var(--dim);font-size:16px;cursor:pointer;}
+#emblempick .ep-head .btn-x{width:32px;height:32px;border-radius:6px;font-size:16px;}
 #emblempick .ep-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px;}
 #emblempick .ep-cell{aspect-ratio:1;display:grid;place-items:center;font-size:24px;cursor:pointer;font-variant-emoji:text;
   color:var(--cyan);background:rgba(3,12,16,.6);border:1px solid var(--line-hi);border-radius:10px;
@@ -3397,9 +3401,7 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #profile .pf-medal.off .pf-mn{color:var(--sf-dim);}
 #profile .pf-hint{color:var(--sf-dim);font-size:14px;line-height:1.5;margin:0;}
 #profile .pf-close{position:absolute;top:20px;right:16px;width:44px;height:44px;border-radius:12px;
-  border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);font-size:18px;cursor:pointer;z-index:2;}
-#profile .pf-close:hover{border-color:var(--sf-edge-hi);color:var(--sf-hi);}
-#profile .pf-close:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+  background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
@@ -3438,9 +3440,7 @@ ${profileCss}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #corp .ctag{color:var(--cyan);font-size:var(--fs-body);}
 #corp .cmotto{color:var(--dim);font-size:var(--fs-caption);margin-top:2px;font-style:italic;}
-#corp .cx{flex:none;width:32px;height:32px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-size:14px;cursor:pointer;}
-#corp .cx:active{background:rgba(255,90,77,.15);color:var(--red);}
+#corp .cx{flex:none;width:32px;height:32px;border-radius:8px;font-size:14px;}
 #corp .csub{display:block;margin-top:3px;color:var(--dim);font-size:var(--fs-caption);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* Плашка очков корпорации — то самое число, ради которого её и качают. */
@@ -3899,14 +3899,14 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </nav>
 <!-- floating chat window (desktop only) — content rendered by renderChat() in main.ts -->
 <div id="chatwin" class="desk-only"></div>
-<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close">✕</button></div><div id="log"></div></div></div>
+<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close btn-x">✕</button></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
-<div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="techbody"></div></div></div>
-<div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
+<div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="techbody"></div></div></div>
+<div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
-<div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
+<div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- окно боя: открывается тапом по значку боя на карте (battleScreen.ts) -->
-<div id="battlewin"><div class="twbox"><div class="lw-head"><div id="battlewinhead" class="bw-hd"><b data-i18n="battle.win.head"></b></div><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
+<div id="battlewin"><div class="twbox"><div class="lw-head"><div id="battlewinhead" class="bw-hd"><b data-i18n="battle.win.head"></b></div><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
@@ -3942,7 +3942,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="goals"></div>
 <aside id="pirate-intro" hidden>
   <b class="pe-title" data-i18n="pve.pirates.title"></b>
-  <button type="button" id="pirate-close" class="pe-close" data-i18n-aria="pve.pirates.hide">×</button>
+  <button type="button" id="pirate-close" class="pe-close btn-x" data-i18n-aria="pve.pirates.hide">×</button>
   <p id="pirate-copy" class="pe-copy" aria-live="polite"></p>
   <button type="button" id="pirate-action" class="pe-action"></button>
 </aside>
@@ -4217,7 +4217,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         </svg>
       </div>
       <aside id="sz-map-panel" class="sz-map-panel" hidden aria-labelledby="sz-map-title">
-        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" class="sz-panel-x" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button></div>
+        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" class="sz-panel-x btn-x" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button></div>
         <div id="sz-map-body" class="sz-map-body"></div>
         <div id="sz-map-task" class="sz-map-task" role="status" aria-live="polite"></div>
         <div id="sz-map-foot" class="sz-map-foot"></div>
@@ -4319,7 +4319,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div>
 <div id="emblempick">
   <div class="ep-box">
-    <div class="ep-head"><b data-i18n="hub.emblem.title"></b><button id="ep-close" type="button" data-i18n-aria="hub.emblem.close">✕</button></div>
+    <div class="ep-head"><b data-i18n="hub.emblem.title"></b><button id="ep-close" class="btn-x" type="button" data-i18n-aria="hub.emblem.close">✕</button></div>
     <div class="ep-grid" id="ep-grid"></div>
   </div>
 </div>

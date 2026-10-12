@@ -59,7 +59,7 @@ export function sciPickBodyHtml(
     }
     const def = data.scientists[id];
     return (
-      `<div class="sp-slot filled"><button class="sp-rm" data-sprm="${i}" title="${t('ping.remove')}">✕</button>` +
+      `<div class="sp-slot filled"><button class="sp-rm btn-x" data-sprm="${i}" title="${t('ping.remove')}">✕</button>` +
       `<div class="sp-sn">${esc(tData(def?.name ?? id))}</div>` +
       `<div class="sp-inf">${esc(influence(id))}</div></div>`
     );

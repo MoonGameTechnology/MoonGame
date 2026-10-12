@@ -121,7 +121,7 @@ export function missionPanelHtml(
   captiveLoaders: ReadonlyArray<{ id: string; label: string }> = [],
 ): string {
   return (
-    `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
+    `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close btn-x" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
     chainHtml +
     // Полигон пока не платит за задачи — награду не обещаем (§14.5: не определяют победу).
     `<p class="mp-hint">${t(training ? 'training.missions.hint' : 'hud.missions.hint')}</p>` +

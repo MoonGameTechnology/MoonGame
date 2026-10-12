@@ -639,7 +639,7 @@ export function renderDiplo(): void {
         : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
-    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${spyTab ? tabBtn('intel', t('diplo.tab.espionage')) : ''}<button class="dp-close">✕</button></div>` +
+    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${spyTab ? tabBtn('intel', t('diplo.tab.espionage')) : ''}<button class="dp-close btn-x">✕</button></div>` +
     body +
     `</div>`;
   if (diploTab === 'msgs') scrollFeedToEnd();

@@ -116,10 +116,10 @@
 .sz-map-eyebrow { color: #79dfdf; font-size: 12px; font-weight: 600; line-height: 1.5; }
 .sz-map-head b { color: #e1f4f4; font-size: 15px; font-weight: 600; margin-right: auto; }
 /* Крестик панелей меню (карта главы, досье Роя) — вектором, а не глифом «×»: у глифа своя
-   посадка в строке шрифта, и он стоял выше центра кольца. Вектор центрирует сетка. */
-#sector-zero .sz-panel-x { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border: 1px solid #2c5663; border-radius: 50%; background: transparent; color: #9fc6cc; transition: border-color .15s, color .15s, background-color .15s; }
+   посадка в строке шрифта, и он стоял выше центра кольца. Вектор центрирует сетка. Рамку и
+   цвет даёт .btn-x, как у всех крестиков игры. */
+#sector-zero .sz-panel-x { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border-radius: 50%; transition: border-color .15s, color .15s, background-color .15s; }
 #sector-zero .sz-panel-x svg { display: block; width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
-#sector-zero .sz-panel-x:hover { border-color: #79dfdf; color: #e1f4f4; background-color: #79dfdf14; }
 /* Карта главы по своей форме: высота — из пропорций viewBox, без чёрных полос по бокам.
    Потолок высоты оставлен для коротких окон — там полосы честнее, чем обрезанная карта. */
 .sz-map-body { position: relative; border: 1px solid #16323b; border-radius: 6px; overflow: hidden; background: #050c12; }

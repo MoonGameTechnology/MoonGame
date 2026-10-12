@@ -89,7 +89,7 @@ describe('крестик панелей меню', () => {
   it.each(['sz-map-close'])('%s — векторный крест, не глиф', (id) => {
     const button = new RegExp(`<button id="${id}"[^>]*>([\\s\\S]*?)</button>`).exec(build);
     expect(button).not.toBeNull();
-    expect(button![0]).toContain('class="sz-panel-x"');
+    expect(button![0]).toContain('class="sz-panel-x btn-x"');
     expect(button![1]).toMatch(/^<svg viewBox="0 0 12 12" aria-hidden="true"/);
     expect(button![1]).not.toContain('×');
     expect(button![0]).toMatch(/data-i18n-aria="[^"]+"/); // имя кнопки — подпись, а не картинка

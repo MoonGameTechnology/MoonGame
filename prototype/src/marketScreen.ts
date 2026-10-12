@@ -100,7 +100,7 @@ export function marketBoxHtml(
     ? bids.map((l) => lotRow(l, true)).join('')
     : `<div class="mk-empty">${t('market.no-bids')}</div>`;
   return (
-    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close" aria-label="${esc(t('card.close'))}" style="margin-left:auto">✕</button></div>` +
+    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close btn-x" aria-label="${esc(t('card.close'))}" style="margin-left:auto">✕</button></div>` +
     `<div class="mk-tabs">${MARKET_RES.map((r) => tabBtn(r.key, t(r.label))).join('')}</div>` +
     `<div id="marketbody">${stock}${form}` +
     `<div class="mk-sec">${t('market.side.sell')} · ${asks.length}</div>${askList}` +

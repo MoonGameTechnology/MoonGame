@@ -54,7 +54,7 @@ export function traderBoxHtml(
     )
     .join('');
   return (
-    `<div class="trbox"><div class="lw-head"><b>${esc(t('trader.title'))}</b><span class="tr-purse">${cr} <b>${Math.floor(view.credits)}</b></span><button type="button" class="tr-close" aria-label="${esc(t('card.close'))}">✕</button></div>` +
+    `<div class="trbox"><div class="lw-head"><b>${esc(t('trader.title'))}</b><span class="tr-purse">${cr} <b>${Math.floor(view.credits)}</b></span><button type="button" class="tr-close btn-x" aria-label="${esc(t('card.close'))}">✕</button></div>` +
     `<div class="tr-body"><p class="tr-rule">${esc(rule)}</p>` +
     `<div class="tr-goods">${goods}</div>` +
     `<div class="tr-lbl">${esc(t('trader.amount'))}</div><div class="tr-amts">${amounts}</div>` +

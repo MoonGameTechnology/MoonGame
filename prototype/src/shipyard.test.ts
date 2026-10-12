@@ -1087,7 +1087,7 @@ describe('производство — «Как в прошлый раз» (UIX-
 
   it('кнопка стоит в шапке окна, перед крестиком', () => {
     const html = yardBoxHtml('ships', '', '', '<button data-cnagain></button>');
-    expect(html).toContain('<b>' + t('yard.title') + '</b><button data-cnagain></button><button class="cn-close">');
+    expect(html).toContain('<b>' + t('yard.title') + '</b><button data-cnagain></button><button class="cn-close btn-x">');
   });
 
   it('после заказа другой корпус и вкладка — кнопка собирает заказ заново', () => {

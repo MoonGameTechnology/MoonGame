@@ -355,7 +355,7 @@ export function techTreeHtml(
                 : `<button class="tt-mbtn wait btn-main" disabled>⚗ ${t('tech.action.unmet')}</button>`;
     modal =
       `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div><div class="tt-mwin">` +
-      `<button class="tt-mx" data-mclose="1">✕</button>` +
+      `<button class="tt-mx btn-x" data-mclose="1">✕</button>` +
       `<div class="tt-mhead"><div class="tt-mico">${TECH_ICONS[id] ?? '🔬'}</div><div>` +
       `<div class="tt-mname">${esc(tData(td.name))}<span class="tt-tier">T${td.tier}</span></div>` +
       `<div class="tt-mtags">${tag}</div></div></div>` +

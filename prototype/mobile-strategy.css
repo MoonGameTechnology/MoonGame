@@ -124,7 +124,7 @@ body.mobile-ui #tech .tt-mx {
   display: block;
   top: 0;
   margin: 0 0 6px auto;
-  background: #0b202e;
+  background-color: #0b202e;
   z-index: 1;
 }
 body.mobile-ui #tech :is(.tt-mdesc, .tt-mstats) {
