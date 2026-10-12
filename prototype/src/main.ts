@@ -434,6 +434,7 @@ import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from '.
 import { tapRadius } from '../../decisions/tapPriority';
 import { initMobileHud, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
+import type { PhoneItemId } from '../../decisions/phoneNav';
 import { initPhoneSpeed } from './phoneSpeed';
 import { tempoOf } from '../../decisions/phoneSpeed';
 import { initPcHotkeys } from './pcHotkeys';
@@ -10187,6 +10188,8 @@ const settings = initSettings({
     ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
     // Размер интерфейса — множитель зума ПК (`holographicUi.ts`), у телефона его нет.
     ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
+    // Нижняя панель есть там, где телефонная раскладка (UIX-3.3); настраивают её и с хаба.
+    ...(MOBILE ? { phoneBar: phoneNav.bar() } : {}),
   }),
   setSweepOpacity,
   setWindowOpacity: (v) => {
@@ -10207,6 +10210,7 @@ const settings = initSettings({
   previewSound: () => snd.play('tap'),
   setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
   resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
+  setPhoneBar: (bar) => phoneNav.setBar(bar),
 });
 $('hub-settings').addEventListener('click', () => settings.open());
 $('hub-gear').addEventListener('click', () => settings.open());
@@ -10993,15 +10997,34 @@ function closeTopLayer(): boolean {
  *  то, что окном не является, — снять комикс, подготовку карты или обучающий тур значило
  *  бы пропустить урок или уйти из партии. */
 const MAP_KEEPS = new Set(['comic', 'maploading', 'spotlight', 'side', 'setup']);
+/** Ступень «Назад» окна, которое открывает пункт нижней панели (UIX-3.3). Дипломатия и
+ *  сообщения — одно окно с двумя вкладками, их различает вкладка (`phoneWindowOpen`). */
+const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, string> = {
+  production: 'constructor',
+  science: 'tech',
+  events: 'logwin',
+  pings: 'pingpanel',
+  market: 'market',
+  trader: 'trader',
+  corporation: 'corp',
+  steward: 'steward',
+  dossier: 'swarm-dossier',
+  codex: 'codexhub',
+  settings: 'settings',
+};
+/** Открыто ли окно пункта: по нему раздел панели подсвечен. */
+function phoneWindowOpen(id: PhoneItemId): boolean {
+  if (id === 'diplomacy') return diploOpen && diploTab !== 'msgs';
+  if (id === 'mail') return diploOpen && diploTab === 'msgs';
+  return BACK_LAYERS.find((layer) => layer.id === PHONE_WINDOW_LAYER[id])?.isOpen() === true;
+}
 // UIX-3.1: нижняя панель телефона. Состав и правила — `decisions/phoneNav.ts`; разделы
 // нажимают кнопки рельсы, а перед этим убирают окна над картой, как «Назад».
 const phoneNav = initPhoneNav({
   toMap: () => {
     for (const layer of BACK_LAYERS) if (!MAP_KEEPS.has(layer.id) && layer.isOpen()) layer.close();
   },
-  windowOpen: (tab) =>
-    (tab === 'production' ? constructorWin : tab === 'science' ? techWin : logWin)?.classList.contains('show') ===
-    true,
+  windowOpen: phoneWindowOpen,
 });
 // UIX-3.2: скорость на телефоне — одна кнопка, ряд раскрывается над ней (`phoneSpeed.ts`).
 const phoneSpeed = initPhoneSpeed();

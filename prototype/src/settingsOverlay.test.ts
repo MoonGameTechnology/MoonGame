@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t } from '../../localization/runtime';
+import { DEFAULT_PHONE_BAR, PHONE_PINNABLE } from '../../decisions/phoneNav';
 import {
   settingsBoxHtml,
   initSettings,
@@ -103,6 +104,19 @@ function fakeWin() {
           return nodes.get(key) as never;
         });
       }
+      // Места и окна нижней панели (UIX-3.3) — тоже из разметки.
+      const bar = /data-(barslot|baritem)/.exec(sel)?.[1];
+      if (bar) {
+        return [...el.innerHTML.matchAll(new RegExp(`data-${bar}="([a-z0-9]+)"`, 'g'))].map(([, id]) => {
+          const key = `${bar}:${id}`;
+          if (!nodes.has(key)) {
+            const n = make() as never as { dataset: Record<string, string> };
+            n.dataset[bar] = id!;
+            nodes.set(key, n as never);
+          }
+          return nodes.get(key) as never;
+        });
+      }
       if (!sel.includes('data-pal')) return [];
       return PALETTES.map((p) => {
         const key = `pal:${p.id}`;
@@ -123,6 +137,9 @@ function fakeWin() {
     node: (id: string) => nodes.get(id),
     fire: (id: string, type = 'change') => nodes.get(id)?.on[type]?.(),
     firePalette: (pal: string) => nodes.get(`pal:${pal}`)?.on.click?.(),
+    /** Нажать место нижней панели или окно для него. */
+    barSlot: (i: number) => nodes.get(`barslot:${i}`)?.on.click?.(),
+    barItem: (id: string) => nodes.get(`baritem:${id}`)?.on.click?.(),
     /** Нажать вкладку. Узлы строятся при отрисовке — тут их только находим. */
     tab: (id: string) => nodes.get(`tab:${id}`)?.on.click?.(),
     /** Клавиша на кнопке вкладки. */
@@ -175,6 +192,44 @@ describe('настройки — разметка', () => {
     expect(pc).toContain(t('controls.box.keys'));
     expect(phone).not.toContain(t('controls.box.keys'));
     expect(phone).toContain(t('controls.long-press.keys'));
+  });
+
+  it('нижняя панель (UIX-3.3): редактор есть только у телефонной раскладки, сверху «Управления»', () => {
+    expect(settingsBoxHtml(viewOf({ touchOnly: true }), false, 'controls')).not.toContain('set-bar');
+    const html = settingsBoxHtml(
+      viewOf({ touchOnly: true, phoneBar: DEFAULT_PHONE_BAR }),
+      false,
+      'controls',
+    );
+    expect(html.indexOf('class="set-bar"')).toBeLessThan(html.indexOf('class="set-keys"'));
+    expect(html).toContain(`>${t('settings.controls.gestures')}</div>`);
+    // Карта и «Ещё» — края: нажать можно только три места, у каждого свой номер.
+    expect(html.match(/data-barslot="/g)).toHaveLength(3);
+    expect(html).toMatch(/data-barslot="2"[^>]*>.*?<b class="set-bar-at">3<\/b><\/button>/);
+    expect(html).toContain(t('settings.bar.hint'));
+    expect(html.match(/data-baritem="/g)).toHaveLength(PHONE_PINNABLE.length);
+    expect(html).not.toContain('data-baritem="exit"');
+  });
+
+  it('нажатое место и окно на нём подсвечены, окна с других мест несут номер места', () => {
+    const html = settingsBoxHtml(
+      viewOf({ touchOnly: true, phoneBar: ['mail', 'science', 'events'] }),
+      false,
+      'controls',
+      1,
+    );
+    expect(html).toContain('data-barslot="1" aria-pressed="true"');
+    expect(html).toContain('class="set-bar-pick on" data-baritem="science" aria-pressed="true"');
+    expect(html).toMatch(/data-baritem="mail"[^>]*>.*?<b class="set-bar-at">1<\/b>/);
+    expect(html).toMatch(/data-baritem="events"[^>]*>.*?<b class="set-bar-at">3<\/b>/);
+    expect(html).toContain(t('settings.bar.slot', { n: 1, name: t('rail.msgs.title') }));
+  });
+
+  it('«Вернуть как было» неактивна, пока раскладка по умолчанию', () => {
+    const at = (bar: readonly ('production' | 'science' | 'events' | 'mail')[]) =>
+      settingsBoxHtml(viewOf({ touchOnly: true, phoneBar: bar }), false, 'controls');
+    expect(at(DEFAULT_PHONE_BAR as never)).toContain('id="set-bar-reset" disabled');
+    expect(at(['mail', 'science', 'events'])).not.toContain('id="set-bar-reset" disabled');
   });
 
   // UX-SET-1 (заказ владельца 2026-09-23): звук, графика, карта и управление — вкладками,
@@ -538,6 +593,40 @@ describe('настройки — окно и обработчики', () => {
     const renders = w.win.renderCount();
     expect(w.win.tabKey('sound', 'Enter')).toBe(false);
     expect(w.win.renderCount()).toBe(renders);
+  });
+
+  it('нижняя панель: место, затем окно; окно с панели меняется местами (UIX-3.3)', () => {
+    const bars: unknown[] = [];
+    const w = wired(
+      { setPhoneBar: (bar) => bars.push(bar) },
+      viewOf({ touchOnly: true, phoneBar: DEFAULT_PHONE_BAR }),
+    );
+    w.api.open();
+    w.win.tab('controls');
+    w.win.barSlot(2);
+    expect(w.win.html()).toContain('data-barslot="2" aria-pressed="true"');
+    w.win.barItem('diplomacy');
+    expect(bars.at(-1)).toEqual(['production', 'science', 'diplomacy']);
+    w.win.barSlot(0);
+    w.win.barItem('events');
+    expect(bars.at(-1)).toEqual(['events', 'science', 'production']);
+  });
+
+  it('«Вернуть как было» отдаёт раскладку по умолчанию, место сбрасывается при новом открытии', () => {
+    const bars: unknown[] = [];
+    const w = wired(
+      { setPhoneBar: (bar) => bars.push(bar) },
+      viewOf({ touchOnly: true, phoneBar: ['mail', 'codex', 'trader'] }),
+    );
+    w.api.open();
+    w.win.tab('controls');
+    w.win.barSlot(1);
+    w.win.fire('set-bar-reset', 'click');
+    expect(bars.at(-1)).toEqual(DEFAULT_PHONE_BAR);
+    w.win.fire('set-close', 'click');
+    w.api.open();
+    w.win.tab('controls');
+    expect(w.win.html()).toContain('data-barslot="0" aria-pressed="true"');
   });
 
   it('тап по фону закрывает окно', () => {

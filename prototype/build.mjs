@@ -994,6 +994,29 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
 .set-keys dt{font:600 var(--fs-caption)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);}
 .set-keys dd{margin:0;font-size:var(--fs-caption);line-height:1.45;color:var(--ink);}
+/* «Нижняя панель» телефона (UIX-3.3): три места между Картой и «Ещё» и окна для них. Нажатое
+   место и окно на нём подсвечены, номер места стоит и на месте, и на окне с другого места. */
+.set-bar-hint{margin:0 0 8px;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
+.set-bar,.set-bar-picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 10px;}
+.set-bar{padding:4px;border:1px solid var(--line);border-radius:10px;background:rgba(2,9,15,.6);}
+.set-bar-slot,.set-bar-pick{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;min-width:0;min-height:56px;padding:6px 3px;border:1px solid var(--line-hi);border-radius:8px;
+  background:rgba(53,214,230,.05);color:var(--ink);font:var(--fs-caption)/1.15 var(--sf-font);text-align:center;cursor:pointer;}
+.set-bar-slot span,.set-bar-pick span{max-width:100%;overflow-wrap:break-word;hyphens:auto;}
+.set-bar-slot.on,.set-bar-pick.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.14);}
+.set-bar svg,.set-bar-picks svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;}
+/* Уже 375 px «Производство» (85 px подписи) в треть окна настроек не входит: места встают
+   строками во всю ширину, окна — в два столбца. */
+@media (max-width:374px){
+  .set-bar{grid-template-columns:1fr;}
+  .set-bar-picks{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .set-bar-slot{flex-direction:row;justify-content:flex-start;gap:10px;min-height:44px;padding:0 34px 0 10px;text-align:left;}
+  .set-bar-slot .set-bar-at{top:50%;transform:translateY(-50%);}
+}
+.set-bar-at{position:absolute;top:4px;right:5px;min-width:16px;height:16px;border-radius:8px;background:var(--cyan);
+  color:#04111a;font:700 var(--fs-caption)/16px var(--sf-font);font-variant-numeric:tabular-nums;}
+.set-bar-reset{display:block;min-height:44px;margin:0 0 14px auto;padding:0 14px;}
 .set-ctl{display:flex;align-items:center;gap:10px;}
 .set-ctl input[type=range]{flex:1;accent-color:var(--cyan);height:22px;cursor:pointer;}
 .set-val{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--cyan);font-weight:700;}

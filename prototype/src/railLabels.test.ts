@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { PHONE_MORE, PHONE_TABS } from '../../decisions/phoneNav';
+import { PHONE_ITEMS } from '../../decisions/phoneNav';
 import { en } from '../../localization/en';
 import { ru } from '../../localization/ru';
 
@@ -46,7 +46,7 @@ describe('колонка инструментов — подписи полны�
   });
 
   it('подпись — то же имя, что у кнопки на телефоне', () => {
-    const phone = new Map([...PHONE_TABS, ...PHONE_MORE].map((item) => [item.opens, item.label]));
+    const phone = new Map(PHONE_ITEMS.map((item) => [item.opens, item.label]));
     const shared = buttons.filter((b) => phone.has(`#${b.id}`));
     expect(shared.length).toBeGreaterThanOrEqual(10);
     for (const b of shared) expect(b.label, b.id).toBe(phone.get(`#${b.id}`));
