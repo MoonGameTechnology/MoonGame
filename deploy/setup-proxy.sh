@@ -47,7 +47,7 @@ for v in "$INTERNAL_IP" "$EXTERNAL_IP"; do
     fi
 done
 for v in "$INTERNAL_PORT" "$EXTERNAL_PORT"; do
-    if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 65535 ]; then
+    if ! [[ "$v" =~ ^[0-9]{1,5}$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 65535 ]; then
         log_error "Недопустимый порт: $v"
         exit 1
     fi
