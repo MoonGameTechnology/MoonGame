@@ -25,6 +25,7 @@
 #      не остаётся наполовину восстановленной. Первые две проверки этот случай не
 #      видят: файл-то в порядке.
 set -euo pipefail
+umask 077
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE="$DEPLOY_DIR/docker-compose.yml"
@@ -36,6 +37,11 @@ DB_USER="${POSTGRES_USER:-void}"
 ARCHIVE="${1:-}"
 [ -n "$ARCHIVE" ] || { echo "Использование: $0 <файл-бэкапа>" >&2; exit 2; }
 [ -f "$ARCHIVE" ] || { echo "[✗] Нет такого файла: $ARCHIVE" >&2; exit 2; }
+
+case "${BACKUP_REQUIRE_SIGNED:-0}" in
+  0|1) ;;
+  *) echo '[✗] E_BACKUP_CONFIG: BACKUP_REQUIRE_SIGNED must be 0 or 1.' >&2; exit 1 ;;
+esac
 
 # Имя базы для ЛОГА. В прямом режиме оно приходит из `DATABASE_URL`, а не из умолчания
 # `POSTGRES_DB`: во время аварии сообщение «восстанавливаем базу void» при работе с другой
@@ -50,10 +56,30 @@ STARTED=$SECONDS
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-# ---- 1. контрольная сумма ----
-if [ -f "$ARCHIVE.sha256" ]; then
-  ( cd "$(dirname "$ARCHIVE")" && sha256sum -c --status "$(basename "$ARCHIVE").sha256" ) \
-    || { echo "[✗] Контрольная сумма НЕ СОВПАЛА — архив повреждён. База не тронута." >&2; exit 1; }
+# ---- 1. authenticate a bundle, or explicitly use the legacy checksum path ----
+SRC="$ARCHIVE"
+if [[ "$ARCHIVE" == *.vdbak ]] || [ "${BACKUP_REQUIRE_SIGNED:-0}" = 1 ] || [ -n "${BACKUP_VERIFY_KEY:-}" ]; then
+  command -v node >/dev/null || { echo '[✗] E_BACKUP_CONFIG: signed restore requires Node >=20.' >&2; exit 1; }
+  # The helper checks externally selected identity/ID and copies the verified
+  # ciphertext to private WORK. Decryption never reopens the untrusted bundle.
+  node "$DEPLOY_DIR/backup-bundle.mjs" prepare "$ARCHIVE" "$WORK/verified"
+  SRC="$WORK/verified/archive.sql.gz.age"
+elif [ -f "$ARCHIVE.sha256" ]; then
+  # Verify THIS archive. sha256sum -c follows the filename inside the sidecar and
+  # could validate an unrelated file while restore reads a damaged archive.
+  CHECKSUM_LINE=''
+  if [ "$(wc -c < "$ARCHIVE.sha256")" -gt 4096 ] ||
+     [ "$(wc -l < "$ARCHIVE.sha256")" -ne 1 ] ||
+     ! IFS= read -r CHECKSUM_LINE < "$ARCHIVE.sha256" ||
+     [[ ! "$CHECKSUM_LINE" =~ ^([a-fA-F0-9]{64})[[:space:]][[:space:]](.+)$ ]]; then
+    echo '[✗] Контрольная сумма НЕ СОВПАЛА — некорректный sidecar.' >&2; exit 1
+  fi
+  EXPECTED="${BASH_REMATCH[1],,}"
+  CHECKSUM_NAME="${BASH_REMATCH[2]}"
+  ACTUAL="$(sha256sum -- "$ARCHIVE")"
+  if [ "$CHECKSUM_NAME" != "$(basename "$ARCHIVE")" ] || [ "$EXPECTED" != "${ACTUAL:0:64}" ]; then
+    echo '[✗] Контрольная сумма НЕ СОВПАЛА — архив повреждён. База не тронута.' >&2; exit 1
+  fi
   echo "[✓] Контрольная сумма совпала"
 elif [ "${VOID_RESTORE_UNVERIFIED:-0}" = "1" ]; then
   echo "[!] Суммы рядом нет, продолжаем по VOID_RESTORE_UNVERIFIED=1 — целостность НЕ проверена."
@@ -64,7 +90,6 @@ else
 fi
 
 # ---- расшифровка + распаковка ----
-SRC="$ARCHIVE"
 if [ "${SRC%.age}" != "$SRC" ]; then
   : "${BACKUP_AGE_IDENTITY:?[✗] Архив зашифрован — укажи BACKUP_AGE_IDENTITY=<файл с приватным ключом>}"
   command -v age >/dev/null || { echo "[✗] age не установлен (apt install age)." >&2; exit 1; }
