@@ -44,6 +44,8 @@ const data: GameData = parseGameData({
       traits: ['shuttle'],
       stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180, fuel: 4, rearmRounds: 2 },
     },
+    // Корабль с зональным ПВО: радиус по умолчанию (120), залп 60.
+    flak: { faction: 'x', domain: 'space', stats: { attack: 1, defense: 1, speed: 5, hp: 10, pointDefense: 60 } },
     // SM-3.7a: ракетная мина — тоже мина-отряд, у неё свой юнит.
     rocket_mine: {
       faction: 'neutral',
@@ -257,5 +259,59 @@ describe('челноки уничтожают мину безопасно', () =
     expect(done.state.fleets.ROCKET).toBeUndefined();
     const back = (done.state.planets.N!.hangar ?? []).reduce((n, sq) => n + sq.units.reduce((m, u) => m + u.count, 0), 0);
     expect(back).toBe(3);
+  });
+});
+
+describe('зональное ПВО бьёт чужую мину в радиусе (решение владельца 2026-10-13)', () => {
+  const pd = createKernel([shuttleModule]);
+  const flak = (id: string, owner: string, location: string): Fleet => ({
+    ...ships(id, owner, location, 1),
+    units: [{ unit: 'flak', count: 1 }],
+  });
+  const step = (s0: GameState) => {
+    const r = pd.advanceTo(s0, ctx(HOUR));
+    if (!r.ok) throw new Error(r.code);
+    return r;
+  };
+
+  it('видимую вражескую мину залп снимает: отработавшей, своей строкой и убийством', () => {
+    const s0 = world([mine({ location: 'M' }, 3), flak('FLAK', 'p2', 'M')]);
+    const r = step(s0);
+    expect(r.state.fleets.MINE).toBeUndefined(); // 60 = 3 заряда × 20 корпуса
+    expect(r.events).toContainEqual({
+      type: 'fleet.destroyed',
+      payload: { fleetId: 'MINE', owner: 'p1', spent: true },
+    });
+    expect(r.events).toContainEqual({
+      type: 'pd.mineCleared',
+      payload: { owner: 'p2', playerId: 'p1', mineId: 'MINE' },
+    });
+    // Убийство засчитывается: `unit.died` с тем, чей огонь её снял.
+    expect(r.events).toContainEqual(
+      expect.objectContaining({ type: 'unit.died', payload: expect.objectContaining({ unit: 'mine', killedBy: 'p2' }) }),
+    );
+    expect(r.state.fleets.FLAK!.pdCooldownUntil).toBeGreaterThan(0);
+    // Залп по одним минам не заводит в состоянии список вылетов.
+    expect(r.state.strikes).toBeUndefined();
+  });
+
+  it('залпа мало — мина теряет заряды, но стоит', () => {
+    const s0 = world([mine({ location: 'M' }, 6), flak('FLAK', 'p2', 'M')]);
+    const r = step(s0);
+    expect(r.state.fleets.MINE?.units[0]?.count).toBe(3);
+    expect(r.events.map((e) => e.type)).not.toContain('pd.mineCleared');
+  });
+
+  it('невидимую мину ПВО не находит: в радиусе 120, но дальше обзора 24', () => {
+    const s0 = world([mine({ location: 'M' }, 3), flak('FLAK', 'p2', 'N')]); // 100 до мины
+    const r = step(s0);
+    expect(r.state.fleets.MINE?.units[0]?.count).toBe(3);
+    expect(r.state.fleets.FLAK!.pdCooldownUntil).toBeUndefined();
+  });
+
+  it('мину не врага не трогает', () => {
+    const s0 = { ...world([mine({ location: 'M' }, 3), flak('FLAK', 'p2', 'M')]), diplomacy: { 'p1|p2': 'peace' as const } };
+    const r = step(s0);
+    expect(r.state.fleets.MINE?.units[0]?.count).toBe(3);
   });
 });

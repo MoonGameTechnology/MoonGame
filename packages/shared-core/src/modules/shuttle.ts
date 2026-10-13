@@ -1155,17 +1155,24 @@ function downMissile(h: HandlerContext, strike: ShuttleStrike, missileId: string
 }
 
 /**
- * Мина, снятая челноками (SM-3.6, SM-3.7a), уходит с карты отработавшей — `spent`, как
- * ракета выше: «☠️ флот уничтожен» читался бы хозяину мины потерей флота, которой не было.
- * Конец мины объявляет своя строка обеим сторонам, теми же ключами, что у сбитой ракеты.
- * Места в событии нет: мину видно только вблизи, и узел выдал бы её третьим.
+ * Мина, снятая челноками или зональным ПВО (SM-3.6, SM-3.7a), уходит с карты отработавшей —
+ * `spent`, как ракета выше: «☠️ флот уничтожен» читался бы хозяину мины потерей флота,
+ * которой не было. Конец мины объявляет своя строка обеим сторонам, теми же ключами, что у
+ * сбитой ракеты: `owner` — кто снял, `playerId` — хозяин мины. Места в событии нет: мину
+ * видно только вблизи, и узел выдал бы её третьим. Убийством она засчитывается (`unit.died`
+ * с `killedBy`, решение владельца 2026-10-13).
  */
-function clearMine(h: HandlerContext, strike: ShuttleStrike, mineId: string): void {
+function clearMine(
+  h: HandlerContext,
+  by: string,
+  mineId: string,
+  event: 'shuttle.mineCleared' | 'pd.mineCleared',
+): void {
   const mine = h.state.fleets[mineId];
   if (!mine || mine.units.length > 0) return;
   delete h.state.fleets[mineId];
   h.emit('fleet.destroyed', { fleetId: mineId, owner: mine.owner, spent: true });
-  h.emit('shuttle.mineCleared', { owner: strike.owner, playerId: mine.owner, mineId });
+  h.emit(event, { owner: by, playerId: mine.owner, mineId });
 }
 
 /**
@@ -1214,7 +1221,7 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
       strike.owner,
     );
     if (missile) downMissile(h, strike, target.id);
-    else if (mine) clearMine(h, strike, target.id);
+    else if (mine) clearMine(h, strike.owner, target.id, 'shuttle.mineCleared');
     else removeIfWiped(h, target.id);
   }
   repelStrike(h, strike, answer, {
@@ -1847,7 +1854,9 @@ export const shuttleModule: GameModule = {
   // 1.11.0: удар по миру задевает и его войска, без последнего бойца (ROS-1.6).
   // 1.12.0: мина, снятая челноками, уходит отработавшей (`spent`) со своей строкой
   //         `shuttle.mineCleared` — журнал не объявляет её гибелью флота.
-  version: '1.12.0',
+  // 1.13.0: зональное ПВО тем же залпом бьёт видимые чужие мины в радиусе; снятая мина —
+  //         `pd.mineCleared` (решение владельца 2026-10-13).
+  version: '1.13.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -2520,11 +2529,18 @@ export const shuttleModule: GameModule = {
      *
      * Раньше здесь целями были «флоты-крылья» — сущность, которой в новой модели нет.
      * Цель сменилась вместе с моделью, механика (радиус, кулдаун, деление залпа) — та же.
+     *
+     * Тот же залп бьёт и ЧУЖИЕ МИНЫ в радиусе (решение владельца 2026-10-13): мина — отряд,
+     * и снимают её те же, кто сбивает челноки. Только видимую хозяину ПВО (`mineFleetVisible`),
+     * как и челноки: иначе корабль с ПВО тралил бы невидимые мины, и ловушка перестала бы
+     * работать. Только враждебную (`isHostile`): мину союзника не трогают. Залп один на все
+     * цели, перезарядка общая — мина не уводит залп в сторону от идущего налёта.
      */
     api.on('time.advanced', (_event, h: HandlerContext) => {
       const strikes = h.state.strikes ?? [];
-      if (strikes.length === 0) return;
       const data = h.ctx.data;
+      const mines = Object.values(h.state.fleets).filter((f) => isMineFleet(f, data));
+      if (strikes.length === 0 && mines.length === 0) return;
       const cooldownMs = (PD_COOLDOWN_MINUTES / 60) * hourMs(h);
 
       for (const fleet of Object.values(h.state.fleets)) {
@@ -2541,9 +2557,14 @@ export const shuttleModule: GameModule = {
           const p = strikePosition(st, h.state, h.ctx.now);
           return !!p && distance(myPos, p) <= range;
         });
-        if (targets.length === 0) continue;
+        const mineTargets = mines.filter((m) => {
+          if (!h.state.fleets[m.id] || !isHostile(h, fleet.owner, m.owner)) return false;
+          const p = fleetPositionAt(h.state, m, h.ctx.now);
+          return !!p && distance(myPos, p) <= range && mineFleetVisible(h.state, m, fleet.owner, data);
+        });
+        if (targets.length + mineTargets.length === 0) continue;
 
-        const perTarget = pd / targets.length;
+        const perTarget = pd / (targets.length + mineTargets.length);
         for (const target of targets) {
           const dealt = hookedDamage(h, perTarget, {
             phase: 'pointDefense',
@@ -2564,10 +2585,23 @@ export const shuttleModule: GameModule = {
             downed,
           });
         }
+        for (const mine of mineTargets) {
+          const dealt = hookedDamage(h, perTarget, {
+            phase: 'pointDefense',
+            location: fleet.location ?? '',
+            attacker: fleet.owner,
+            defender: mine.owner,
+            attackerFleet: fleet.id,
+            defenderFleet: mine.id,
+          });
+          applyDamageToSide(h, { kind: 'fleet', fleetId: mine.id }, dealt, data, mine.location ?? '', undefined, undefined, fleet.owner);
+          clearMine(h, fleet.owner, mine.id, 'pd.mineCleared');
+        }
         fleet.pdCooldownUntil = h.ctx.now + cooldownMs;
       }
-      // Вылет, у которого не осталось машин, до цели не долетит.
-      h.state.strikes = strikes.filter((st) => st.units.length > 0);
+      // Вылет, у которого не осталось машин, до цели не долетит. Без вылетов список не
+      // заводится: залп по одним минам не должен дописывать в состояние пустой `strikes`.
+      if (strikes.length > 0) h.state.strikes = strikes.filter((st) => st.units.length > 0);
     });
 
     /**

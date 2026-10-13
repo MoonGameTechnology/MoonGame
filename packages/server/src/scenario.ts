@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '79'; // ROS-1.6: огонь сверху по войскам мира. Членство
+export const MODULE_MANIFEST_VERSION = '80'; // ПВО по минам (решение владельца 2026-10-13).
+// Членство и порядок не тронуты; `shuttle` 1.13.0 — зональное ПВО тем же залпом бьёт видимые
+// чужие мины в радиусе и снимает их (`pd.mineCleared`). Партия на 79 посреди игры молча
+// начала бы терять мины под кораблями с ПВО.
+// export const MODULE_MANIFEST_VERSION = '79'; // ROS-1.6: огонь сверху по войскам мира. Членство
 // и порядок не тронуты; `orbital` 1.3.0 — обстрел бьёт и гарнизон, `shuttle` 1.11.0 — удар по
 // миру задевает его войска; оба не добивают последнего бойца. Партия на 78 молча сменила бы
 // исход осады посреди игры.

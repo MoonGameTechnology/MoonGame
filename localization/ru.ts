@@ -2903,6 +2903,7 @@ export const ru: Record<string, string> = {
   'log.shuttle.hit': '✳ Удар шаттлов: {what}',
   'log.shuttle.missile-downed': '✳ Ракета сбита челноками',
   'log.shuttle.mine-cleared': '💣 Мина снята челноками',
+  'log.pd.mine-cleared': '💣 Мина сбита ПВО',
   'log.spy.caught': '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!',
   'log.spy.fail': '🕵 Агент провалился ({who}) — плата сгорела',
   'log.spy.fail.short': '✖ Провал против {who} — плата сгорела',

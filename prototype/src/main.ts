@@ -2586,6 +2586,10 @@ function handleEvents(events: DomainEvent[]) {
       case 'shuttle.mineCleared':
         if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.mine-cleared'));
         break;
+      // …и зональное ПВО корабля (решение владельца 2026-10-13) — так же обеим сторонам.
+      case 'pd.mineCleared':
+        if (p.owner === ME || p.playerId === ME) note(t('log.pd.mine-cleared'));
+        break;
       // «Держать патруль» снят ядром (SHU-6.6): помеха сама не пройдёт — эскадра больше не
       // висит, точка за радиусом. Без строки игрок ждал бы патруль над базой, который уже
       // не встанет, и не знал бы почему.
