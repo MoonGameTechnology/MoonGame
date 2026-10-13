@@ -30,8 +30,8 @@ describe('gainNews — кто слышит о захвате', () => {
   // Сторож места вызова: строку захвата пускает `captureHeard`, а не фог-вердикт. Если
   // её снова занесут под `seen(...)` вместе со вспышкой, чужой захват на видимом мире
   // опять поедет в журнал, тосты и сводку — и увидит это только игрок.
-  it('в main.ts строка захвата стоит под captureHeard, а не под фог-вердиктом', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  it('в ленте (`eventFeed.ts`) строка захвата стоит под captureHeard, а не под фог-вердиктом', () => {
+    const src = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
     const at = src.indexOf("case 'planet.captured':");
     expect(at).toBeGreaterThan(-1);
     const body = src.slice(at, src.indexOf("      case '", at + 10));

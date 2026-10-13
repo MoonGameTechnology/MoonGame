@@ -207,6 +207,7 @@ describe('UI-RES2 — сторож: ресурс не печатается сл�
     'dossiers.ts',
     'buildScreen.ts',
     'main.ts',
+    'eventFeed.ts',
     'diploWindow.ts',
     'techTree.ts',
     'marketScreen.ts',
