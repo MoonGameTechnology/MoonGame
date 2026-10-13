@@ -9,7 +9,8 @@
  * The main page is the same file GitHub Pages publishes (`.github/workflows/pages.yml`),
  * so both web addresses show one game.
  */
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { headersFile } from './siteHeaders.mjs';
 
 const dist = 'prototype/dist';
 const site = `${dist}/site`;
@@ -24,7 +25,12 @@ const PAGES = {
 // A fresh folder each time: a page dropped from the list must not linger on the site.
 rmSync(site, { recursive: true, force: true });
 mkdirSync(site, { recursive: true });
+const staged = {};
 for (const [published, built] of Object.entries(PAGES)) {
   copyFileSync(`${dist}/${built}`, `${site}/${published}`);
+  staged[published] = readFileSync(`${site}/${published}`, 'utf8');
   console.log(`staged ${site}/${published} ← ${built}`);
 }
+// Cloudflare reads `_headers` from the assets folder and does not serve it (siteHeaders.mjs).
+writeFileSync(`${site}/_headers`, headersFile(staged));
+console.log(`staged ${site}/_headers`);
