@@ -636,6 +636,7 @@ const server = createMultiplayerServer({
           registerAdminApi(scope, {
             identify,
             admins: ADMIN_LOGINS,
+            users: stores.userStore,
             roster: async (matchId) => {
               // Load-on-demand: a hibernated match still has a roster to command —
               // an admin asking about it is exactly a reason to wake it.

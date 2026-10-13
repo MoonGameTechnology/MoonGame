@@ -141,7 +141,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'hero.uninstall': { heroId: 'hero:p1', moduleId: 'ion_engine' },
   'hero.unequip': { heroId: 'hero:p1', abilityId: 'scan' },
   'station.deploy': { planetId: 'home_p1' },
-  'seat.claim': { faction: 'missing-faction', scientists: [] },
   'building.construct': { planetId: 'home_p1', building: 'mine' },
   'building.upgrade': { planetId: 'home_p1', building: 'spaceport' },
   'unit.build': { planetId: 'home_p1', unit: 'cruiser', count: 1 },

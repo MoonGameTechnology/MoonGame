@@ -17,6 +17,7 @@ import type { Action, AdvanceResult, ApplyResult, Context } from '../action/type
 import { deepFreeze } from '../util/clone';
 import { setStance } from '../state/diplomacy';
 import { sumUnitStat } from '../util/stacks';
+import { visibleState } from '../state/visibility';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -247,6 +248,33 @@ function corridorWorld(skills: string[] = []): GameState {
 }
 const corridor = (to: string, seq = 1): Action =>
   act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: to }, seq);
+
+describe('HERO-CORRIDOR — чужой личный коридор в тумане', () => {
+  const kernel = createKernel([heroModule, movementModule]);
+
+  it('сопернику не видны ни лейн, ни добавленное им ребро, ни прирост topology', () => {
+    const before = visibleState(corridorWorld(), 'p2', data);
+    const s = okApply(kernel.applyAction(corridorWorld(), corridor('C'), ctx(0))).state;
+    const rival = visibleState(s, 'p2', data);
+    expect(rival.tempLanes).toBeUndefined();
+    expect(rival.planets.A?.links).toEqual(['B']);
+    expect(rival.planets.C?.links).toEqual([]);
+    expect(rival.topology).toBe(before.topology); // открытие коридора не выдаёт себя
+
+    const own = visibleState(s, 'p1', data);
+    expect(own.tempLanes).toHaveLength(1);
+    expect(own.planets.A?.links).toContain('C');
+    expect(own.topology).not.toBe(rival.topology); // кэш дорог владельца перестроится
+  });
+
+  it('общий коридор (ступень 3) виден всем: по нему идёт и соперник', () => {
+    const base = corridorWorld(['neural_lace', 'corridor_sustained', 'corridor_open']);
+    const s = okApply(kernel.applyAction(base, corridor('C'), ctx(0))).state;
+    const rival = visibleState(s, 'p2', data);
+    expect(rival.tempLanes).toHaveLength(1);
+    expect(rival.planets.C?.links).toContain('A');
+  });
+});
 
 describe('AUD-18 — наследных действий героя больше нет', () => {
   const kernel = createKernel([heroModule]);
