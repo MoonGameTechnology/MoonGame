@@ -29,7 +29,7 @@ log_error() {
 
 # Конфигурация
 # Адреса задаются окружением: в репозитории нет адресов конкретного сервера.
-#   INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> sudo -E ./setup-proxy.sh
+#   sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash deploy/setup-proxy.sh
 INTERNAL_IP="${INTERNAL_IP:-}"
 INTERNAL_PORT="${INTERNAL_PORT:-8788}"
 EXTERNAL_IP="${EXTERNAL_IP:-}"

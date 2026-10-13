@@ -126,7 +126,8 @@ moongame update
 
 ```bash
 # Установи и настрой проксирование
-sudo bash deploy/setup-proxy.sh
+sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> \
+  bash deploy/setup-proxy.sh
 
 # Готово! Теперь доступна по адресу:
 # http://<внешний-IP>:<порт>

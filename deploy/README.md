@@ -123,7 +123,8 @@ moongame shell      # shell в директории проекта
 Для доступа через `<внешний-IP>:<порт>` запусти:
 
 ```bash
-sudo bash deploy/setup-proxy.sh
+sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> \
+  bash deploy/setup-proxy.sh
 ```
 
 Это настроит Nginx проксирование с поддержкой WebSocket.
