@@ -1039,6 +1039,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
+      pull-requests: write # для comment-summary-in-pr: on-failure
     steps:
       - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
@@ -1052,9 +1053,11 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
-          # Без комментария в PR: каждый новый комментарий — письмо всем наблюдателям
-          # репо. Находка видна в job summary и в сводном отчёте `report`.
-          comment-summary-in-pr: never
+          # Комментарий ТОЛЬКО при находке. Сводный sticky-отчёт находок этого действия
+          # не видит (его сентинел несёт лишь outcome, а `summarize-security.mjs` читает
+          # SARIF/TruffleHog/ZAP), поэтому с `never` уязвимая зависимость в PR не видна
+          # вовсе. Письмо на такой комментарий — по делу, а не шум.
+          comment-summary-in-pr: on-failure
           # Лицензионная политика НЕ включена намеренно: `deny-licenses` — решение
           # команды, а не сканера, и ошибка в нём блокирует PR из-за ТРАНЗИТИВНОЙ
           # зависимости, которую никто не выбирал. Включать отдельным кирпичом, когда
