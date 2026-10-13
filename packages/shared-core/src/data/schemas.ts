@@ -620,10 +620,10 @@ export const TechnologyEffectsSchema = z.object({
   radarRangeBonus: z.number().default(0),
 });
 
-/** The five tech-tree branches (UI tabs), shared by technologies, scientists and the
+/** The six tech-tree branches (UI tabs), shared by technologies, scientists and the
  *  `has_scientist` gate. `command` is the automation / command-and-control branch (AI
  *  delegation "Steward", and later order chains and standing postures). */
-const BranchSchema = z.enum(['ground', 'space', 'shuttle', 'missile', 'command']);
+const BranchSchema = z.enum(['ground', 'space', 'shuttle', 'missile', 'command', 'industry']);
 
 /** Where a technology's `combatDamageBonus` applies (BAL-6, owner's decision 2026-10-07):
  *  a branch's damage feeds only its own channel of fire. Which channels form a scope is
@@ -664,6 +664,8 @@ export const TechnologyConditionSchema = z.discriminatedUnion('type', [
 export type TechnologyCondition = z.infer<typeof TechnologyConditionSchema>;
 
 export const TechnologyDefSchema = z.object({
+  /** Optional catalogue extension, enabled only by matching pinned match rules. */
+  ruleset: z.string().min(1).optional(),
   name: z.string(),
   description: z.string().optional(),
   tier: z.number().int().positive().default(1),
@@ -1453,8 +1455,10 @@ const ModeTraderSchema = z
  *  как в сетевом матче.
  *  - `dayGates: false` — ворота дней снимаются целиком: остаются предки, условия и цена;
  *  - `exclude` — узлы, которых в режиме нет вовсе: их не исследовать и не показывать. */
-const ModeTechnologySchema = z
+export const TechnologyRulesSchema = z
   .object({
+    ruleset: z.string().min(1).optional(),
+    starting: z.array(z.string()).optional(),
     dayGates: z.boolean().default(true),
     exclude: z.array(z.string()).default([]),
   })
@@ -1482,7 +1486,7 @@ export const GameModeDefSchema = z.object({
   /** Свои радиусы зрения режима; нет ⇒ общие числа ядра. */
   sight: ModeSightSchema.optional(),
   /** Своё дерево технологий режима (PVR-6.17); нет ⇒ как в сетевом матче. */
-  technology: ModeTechnologySchema.optional(),
+  technology: TechnologyRulesSchema.optional(),
   /** Торговец экспедиции («живой курс»); нет ⇒ торговца нет. */
   trader: ModeTraderSchema.optional(),
 });

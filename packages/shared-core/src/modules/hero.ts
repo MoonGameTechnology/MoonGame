@@ -705,7 +705,7 @@ export const heroModule: GameModule = {
   // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
   // 4.5.0: герой не появляется на крепости у развилки — это не мир (FORT-6.1).
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
-  version: '4.6.0',
+  version: '4.7.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -1067,6 +1067,11 @@ export const heroModule: GameModule = {
         return h.reject('E_HERO_ALIVE');
       }
       if (onCooldown(hero, 'respawn', h.ctx.now)) return h.reject('E_RESPAWN_COOLDOWN');
+      const requirement = h.hook<{ allowed: boolean; code?: string }>(
+        'construction.requirement', { allowed: true },
+        { playerId: action.playerId, kind: 'unit', id: heroShipStack(h, hero).unit },
+      );
+      if (!requirement.allowed) return h.reject(requirement.code ?? 'E_TECH_LOCKED');
       // Target resolution: a world (own; allied with the `spawn_allied` marker) or —
       // with the `spawn_fleet` marker (HERO-8) — one of the player's own fleets.
       const planet = h.state.planets[at];

@@ -403,8 +403,8 @@
       "location": "home_1",
       "units": [
         {
-          "unit": "cruiser",
-          "count": 2
+          "unit": "scout",
+          "count": 1
         }
       ]
     },
@@ -413,8 +413,8 @@
       "location": "home_2",
       "units": [
         {
-          "unit": "cruiser",
-          "count": 2
+          "unit": "scout",
+          "count": 1
         }
       ]
     },
@@ -423,8 +423,8 @@
       "location": "home_3",
       "units": [
         {
-          "unit": "cruiser",
-          "count": 2
+          "unit": "scout",
+          "count": 1
         }
       ]
     },
@@ -433,10 +433,18 @@
       "location": "home_4",
       "units": [
         {
-          "unit": "cruiser",
-          "count": 2
+          "unit": "scout",
+          "count": 1
         }
       ]
     }
+  },
+  "techRules": {
+    "ruleset": "main",
+    "starting": [
+      "scout_design"
+    ],
+    "dayGates": true,
+    "exclude": []
   }
 }

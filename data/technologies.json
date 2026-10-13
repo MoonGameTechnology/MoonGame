@@ -2,7 +2,7 @@
   "industrial_automation": {
     "name": "Industrial Automation",
     "description": "tech.node.industrial-automation.desc",
-    "branch": "space",
+    "branch": "industry",
     "tier": 1,
     "cost": {
       "credits": 120,
@@ -91,7 +91,7 @@
   "microelectronics_fabrication": {
     "name": "Microelectronics Fabrication",
     "description": "tech.node.microelectronics-fabrication.desc",
-    "branch": "space",
+    "branch": "industry",
     "tier": 2,
     "cost": {
       "credits": 220,
@@ -489,6 +489,499 @@
       "buildings": [
         "void_shield"
       ]
+    }
+  },
+  "scout_design": {
+    "name": "Scout Design",
+    "description": "tech.node.scout-design.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 1,
+    "cost": {
+      "credits": 0,
+      "metal": 0
+    },
+    "researchTimeHours": 0,
+    "unlocks": {
+      "units": [
+        "scout"
+      ]
+    }
+  },
+  "frigate_design": {
+    "name": "Frigate Design",
+    "description": "tech.node.frigate-design.desc",
+    "ruleset": "main",
+    "branch": "space",
+    "tier": 1,
+    "cost": {
+      "credits": 40,
+      "metal": 25
+    },
+    "researchTimeHours": 1,
+    "unlocks": {
+      "units": [
+        "frigate"
+      ]
+    }
+  },
+  "cruiser_design": {
+    "name": "Cruiser Design",
+    "description": "tech.node.cruiser-design.desc",
+    "ruleset": "main",
+    "branch": "space",
+    "tier": 2,
+    "cost": {
+      "credits": 100,
+      "metal": 70
+    },
+    "researchTimeHours": 4,
+    "prerequisites": [
+      "frigate_design"
+    ],
+    "unlocks": {
+      "units": [
+        "cruiser"
+      ]
+    }
+  },
+  "heavy_cruiser_design": {
+    "name": "Heavy Cruiser Design",
+    "description": "tech.node.heavy-cruiser-design.desc",
+    "ruleset": "main",
+    "branch": "space",
+    "tier": 3,
+    "cost": {
+      "credits": 240,
+      "metal": 160,
+      "microelectronics": 20
+    },
+    "researchTimeHours": 8,
+    "prerequisites": [
+      "cruiser_design"
+    ],
+    "dayGate": 2,
+    "unlocks": {
+      "units": [
+        "heavy_cruiser"
+      ]
+    }
+  },
+  "picket_design": {
+    "name": "Picket Design",
+    "description": "tech.node.picket-design.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 2,
+    "cost": {
+      "credits": 100,
+      "metal": 60
+    },
+    "researchTimeHours": 4,
+    "prerequisites": [
+      "scout_design"
+    ],
+    "unlocks": {
+      "units": [
+        "picket_frigate"
+      ]
+    }
+  },
+  "drone_design": {
+    "name": "Survey Drone Design",
+    "description": "tech.node.drone-design.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 2,
+    "cost": {
+      "credits": 80,
+      "metal": 50
+    },
+    "researchTimeHours": 3,
+    "prerequisites": [
+      "scout_design"
+    ],
+    "unlocks": {
+      "units": [
+        "scout_drone"
+      ]
+    }
+  },
+  "militia_training": {
+    "name": "Militia Training",
+    "description": "tech.node.militia-training.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 1,
+    "cost": {
+      "credits": 30,
+      "metal": 20
+    },
+    "researchTimeHours": 1,
+    "unlocks": {
+      "units": [
+        "militia"
+      ]
+    }
+  },
+  "drop_training": {
+    "name": "Drop Infantry Training",
+    "description": "tech.node.drop-training.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 1,
+    "cost": {
+      "credits": 50,
+      "metal": 30
+    },
+    "researchTimeHours": 2,
+    "prerequisites": [
+      "militia_training"
+    ],
+    "unlocks": {
+      "units": [
+        "drop_infantry"
+      ]
+    }
+  },
+  "heavy_infantry_training": {
+    "name": "Heavy Infantry Training",
+    "description": "tech.node.heavy-infantry-training.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 2,
+    "cost": {
+      "credits": 100,
+      "metal": 70
+    },
+    "researchTimeHours": 4,
+    "prerequisites": [
+      "militia_training"
+    ],
+    "unlocks": {
+      "units": [
+        "heavy_infantry"
+      ]
+    }
+  },
+  "armored_warfare": {
+    "name": "Armored Warfare",
+    "description": "tech.node.armored-warfare.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 3,
+    "cost": {
+      "credits": 180,
+      "metal": 130,
+      "microelectronics": 20
+    },
+    "researchTimeHours": 6,
+    "prerequisites": [
+      "heavy_infantry_training",
+      "vehicle_works"
+    ],
+    "dayGate": 1,
+    "unlocks": {
+      "units": [
+        "tank"
+      ]
+    }
+  },
+  "special_operations": {
+    "name": "Special Operations",
+    "description": "tech.node.special-operations.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 3,
+    "cost": {
+      "credits": 200,
+      "metal": 100,
+      "microelectronics": 20
+    },
+    "researchTimeHours": 6,
+    "prerequisites": [
+      "drop_training",
+      "signal_corps"
+    ],
+    "dayGate": 1,
+    "unlocks": {
+      "units": [
+        "special_forces"
+      ]
+    }
+  },
+  "interceptor_design": {
+    "name": "Interceptor Design",
+    "description": "tech.node.interceptor-design.desc",
+    "ruleset": "main",
+    "branch": "shuttle",
+    "tier": 1,
+    "cost": {
+      "credits": 80,
+      "metal": 50
+    },
+    "researchTimeHours": 3,
+    "unlocks": {
+      "units": [
+        "interceptor"
+      ]
+    }
+  },
+  "bomber_design": {
+    "name": "Bomber Design",
+    "description": "tech.node.bomber-design.desc",
+    "ruleset": "main",
+    "branch": "shuttle",
+    "tier": 2,
+    "cost": {
+      "credits": 130,
+      "metal": 90
+    },
+    "researchTimeHours": 5,
+    "prerequisites": [
+      "interceptor_design"
+    ],
+    "dayGate": 1,
+    "unlocks": {
+      "units": [
+        "bomber"
+      ]
+    }
+  },
+  "landing_design": {
+    "name": "Landing Shuttle Design",
+    "description": "tech.node.landing-design.desc",
+    "ruleset": "main",
+    "branch": "shuttle",
+    "tier": 1,
+    "cost": {
+      "credits": 50,
+      "metal": 30
+    },
+    "researchTimeHours": 2,
+    "unlocks": {
+      "units": [
+        "landing_shuttle"
+      ]
+    }
+  },
+  "carrier_design": {
+    "name": "Carrier Design",
+    "description": "tech.node.carrier-design.desc",
+    "ruleset": "main",
+    "branch": "shuttle",
+    "tier": 3,
+    "cost": {
+      "credits": 240,
+      "metal": 180,
+      "microelectronics": 20
+    },
+    "researchTimeHours": 8,
+    "prerequisites": [
+      "flight_decks",
+      "cruiser_design"
+    ],
+    "dayGate": 2,
+    "unlocks": {
+      "units": [
+        "shuttle_carrier"
+      ]
+    }
+  },
+  "flagship_command": {
+    "name": "Flagship Command",
+    "description": "tech.node.flagship-command.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 2,
+    "cost": {
+      "credits": 140,
+      "metal": 90
+    },
+    "researchTimeHours": 5,
+    "prerequisites": [
+      "signal_corps"
+    ],
+    "unlocks": {
+      "units": [
+        "hero"
+      ]
+    }
+  },
+  "field_medicine": {
+    "name": "Field Medicine",
+    "description": "tech.node.field-medicine.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 2,
+    "cost": {
+      "credits": 100,
+      "metal": 60
+    },
+    "researchTimeHours": 4,
+    "prerequisites": [
+      "militia_training"
+    ],
+    "unlocks": {
+      "buildings": [
+        "hospital"
+      ]
+    }
+  },
+  "vehicle_works": {
+    "name": "Vehicle Works",
+    "description": "tech.node.vehicle-works.desc",
+    "ruleset": "main",
+    "branch": "industry",
+    "tier": 2,
+    "cost": {
+      "credits": 120,
+      "metal": 100
+    },
+    "researchTimeHours": 4,
+    "prerequisites": [
+      "industrial_automation"
+    ],
+    "unlocks": {
+      "buildings": [
+        "factory"
+      ]
+    }
+  },
+  "field_fortification": {
+    "name": "Field Fortification",
+    "description": "tech.node.field-fortification.desc",
+    "ruleset": "main",
+    "branch": "ground",
+    "tier": 1,
+    "cost": {
+      "credits": 70,
+      "metal": 60
+    },
+    "researchTimeHours": 3,
+    "unlocks": {
+      "buildings": [
+        "fort"
+      ]
+    }
+  },
+  "area_interception": {
+    "name": "Area Interception",
+    "description": "tech.node.area-interception.desc",
+    "ruleset": "main",
+    "branch": "missile",
+    "tier": 2,
+    "cost": {
+      "credits": 150,
+      "metal": 110
+    },
+    "researchTimeHours": 5,
+    "prerequisites": [
+      "orbital_defense_grid"
+    ],
+    "dayGate": 1,
+    "unlocks": {
+      "buildings": [
+        "zonal_aa"
+      ]
+    }
+  },
+  "spaceport_infrastructure": {
+    "name": "Spaceport Infrastructure",
+    "description": "tech.node.spaceport-infrastructure.desc",
+    "ruleset": "main",
+    "branch": "shuttle",
+    "tier": 1,
+    "cost": {
+      "credits": 60,
+      "metal": 40
+    },
+    "researchTimeHours": 2,
+    "unlocks": {
+      "buildings": [
+        "spaceport"
+      ]
+    }
+  },
+  "fiscal_administration": {
+    "name": "Fiscal Administration",
+    "description": "tech.node.fiscal-administration.desc",
+    "ruleset": "main",
+    "branch": "industry",
+    "tier": 2,
+    "cost": {
+      "credits": 120,
+      "metal": 80
+    },
+    "researchTimeHours": 4,
+    "prerequisites": [
+      "industrial_automation"
+    ],
+    "unlocks": {
+      "buildings": [
+        "tax_office"
+      ]
+    }
+  },
+  "precision_extraction": {
+    "name": "Precision Extraction",
+    "description": "tech.node.precision-extraction.desc",
+    "ruleset": "main",
+    "branch": "industry",
+    "tier": 2,
+    "cost": {
+      "credits": 120,
+      "metal": 100
+    },
+    "researchTimeHours": 5,
+    "prerequisites": [
+      "industrial_automation"
+    ],
+    "dayGate": 1,
+    "effects": {
+      "productionBonus": 0.04
+    }
+  },
+  "integrated_industry": {
+    "name": "Integrated Industry",
+    "description": "tech.node.integrated-industry.desc",
+    "ruleset": "main",
+    "branch": "industry",
+    "tier": 4,
+    "cost": {
+      "credits": 380,
+      "metal": 260,
+      "microelectronics": 40
+    },
+    "researchTimeHours": 12,
+    "prerequisites": [
+      "precision_extraction",
+      "microelectronics_fabrication"
+    ],
+    "dayGate": 4,
+    "effects": {
+      "productionBonus": 0.06
+    }
+  },
+  "deep_range_network": {
+    "name": "Deep Range Network",
+    "description": "tech.node.deep-range-network.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 4,
+    "cost": {
+      "credits": 320,
+      "metal": 200,
+      "microelectronics": 40
+    },
+    "researchTimeHours": 10,
+    "prerequisites": [
+      "deep_survey",
+      "picket_design"
+    ],
+    "dayGate": 3,
+    "effects": {
+      "radarRangeBonus": 0.12
     }
   }
 }
