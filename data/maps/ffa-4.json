@@ -1,0 +1,274 @@
+{
+  "id": "ffa-4",
+  "seed": "ffa-4",
+  "sectors": {
+    "home_1": {
+      "position": {
+        "x": 800,
+        "y": 0
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "slot_1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "home_2": {
+      "position": {
+        "x": 0,
+        "y": 800
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "slot_2",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "home_3": {
+      "position": {
+        "x": -800,
+        "y": 0
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "slot_3",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "home_4": {
+      "position": {
+        "x": 0,
+        "y": -800
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "slot_4",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "world_1": {
+      "position": {
+        "x": 400,
+        "y": 400
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "world_2": {
+      "position": {
+        "x": -400,
+        "y": 400
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "world_3": {
+      "position": {
+        "x": -400,
+        "y": -400
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "world_4": {
+      "position": {
+        "x": 400,
+        "y": -400
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "veil_1": {
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "veil_2": {
+      "position": {
+        "x": 0,
+        "y": 400
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "veil_3": {
+      "position": {
+        "x": -400,
+        "y": 0
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "veil_4": {
+      "position": {
+        "x": 0,
+        "y": -400
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "core": {
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    }
+  },
+  "slots": {
+    "slot_1": {
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
+      "team": "slot_1"
+    },
+    "slot_2": {
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
+      "team": "slot_2"
+    },
+    "slot_3": {
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
+      "team": "slot_3"
+    },
+    "slot_4": {
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
+      "team": "slot_4"
+    }
+  },
+  "fleets": {
+    "fleet_1": {
+      "owner": "slot_1",
+      "location": "home_1",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_2": {
+      "owner": "slot_2",
+      "location": "home_2",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_3": {
+      "owner": "slot_3",
+      "location": "home_3",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_4": {
+      "owner": "slot_4",
+      "location": "home_4",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    }
+  }
+}

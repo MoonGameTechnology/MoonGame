@@ -64,8 +64,8 @@ describe('Frontier 50', () => {
     expect(scoreLimitFor(restored)).toBeGreaterThan(scoreLimitFor(newGame()));
   });
 
-  it('offers only the compact preset but preserves existing 100-seat snapshots', () => {
-    expect(MAP_IDS).toEqual(['nexus', 'frontier-50']);
+  it('offers only duel and four-player FFA but preserves existing 100-seat snapshots', () => {
+    expect(MAP_IDS).toEqual(['ava-duel-1', 'ffa-4']);
     const old = newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100') });
     expect(Object.keys(old.planets)).toHaveLength(1675);
     expect(mapPreset('frontier-100').starts).toHaveLength(100);
@@ -78,5 +78,69 @@ describe('Frontier 50', () => {
     expect(mapPreset().starts).toHaveLength(10);
     expect(newGame().mapId).toBe('nexus');
     expect(() => mapPreset('missing')).toThrow('E_UNKNOWN_MAP');
+  });
+});
+
+describe('published match maps', () => {
+  it.each([
+    ['ava-duel-1', 2],
+    ['ffa-4', 4],
+  ] as const)('%s has the same valid geometry locally and online', (id, capacity) => {
+    const preset = mapPreset(id);
+    const seats = networkSeats('5v5', id); // The environment cannot override map capacity.
+    expect(seats).toHaveLength(capacity);
+    expect(new Set(seats.map((s) => s.start)).size).toBe(capacity);
+    const online = newGame({ mapId: id, seats });
+    const local = newGame({ mapId: id, seats: seats.map((s, i) => ({ ...s, ai: i !== 0 })) });
+    expect(local.planets).toEqual(online.planets);
+    expect(Object.keys(online.players)).toHaveLength(capacity);
+    expect(Object.keys(online.capital ?? {})).toHaveLength(capacity);
+    expect(online.version.data).not.toBe('0.1.0');
+    for (const seat of seats) {
+      const home = online.planets[seat.start]!;
+      expect(home.owner).toBe(seat.id);
+      expect(home.kind).toBe('planet');
+      expect(home.links!.length).toBeGreaterThanOrEqual(2);
+      expect(home.buildings.some((b) => b.type === 'shipyard' && b.level === 2)).toBe(true);
+    }
+    for (const node of preset.nodes) {
+      expect([...online.planets[node.id]!.links!].sort()).toEqual([...node.links].sort());
+      expect(online.planets[node.id]!.terrain).toBe(preset.map!.sectors[node.id]!.terrain);
+    }
+    expect(Object.values(online.diplomacy!)).toEqual(
+      Array((capacity * (capacity - 1)) / 2).fill(id === 'ava-duel-1' ? 'war' : 'peace'),
+    );
+    expect(
+      mapNodesFromState(JSON.parse(JSON.stringify(online)))
+        .map((n) => n.id)
+        .sort(),
+    ).toEqual(preset.nodes.map((n) => n.id).sort());
+  });
+
+  it('gives all four FFA starts identical terrain, neighbours and distances by quarter turn', () => {
+    const map = mapPreset('ffa-4');
+    const rotate = (id: string): string => {
+      const node = map.nodes.find((n) => n.id === id)!;
+      return map.nodes.find((n) => n.x === -node.y && n.y === node.x)!.id;
+    };
+    for (const node of map.nodes) {
+      const other = map.nodes.find((n) => n.id === rotate(node.id))!;
+      expect(other.sector).toBe(node.sector);
+      expect(other.type).toBe(node.type);
+      expect(other.links.slice().sort()).toEqual(node.links.map(rotate).sort());
+    }
+    expect(map.starts.map(rotate).sort()).toEqual([...map.starts].sort());
+    expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
+    const reached = new Set([map.starts[0]!]);
+    const queue = [...reached];
+    for (const id of queue)
+      for (const next of map.nodes.find((n) => n.id === id)!.links) {
+        if (!reached.has(next)) {
+          reached.add(next);
+          queue.push(next);
+        }
+      }
+    expect(reached.size).toBe(map.nodes.length);
+    expect(networkSeats('ffa', 'ffa-4').every((s) => s.team === undefined)).toBe(true);
   });
 });

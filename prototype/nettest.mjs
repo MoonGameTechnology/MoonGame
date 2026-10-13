@@ -324,6 +324,17 @@ try {
     assert.equal(await overlay(), 'none', 'поверх хаба не легла карточка входа');
     console.log('✓ выход: игрок в хабе, сокет закрыт, сервер видит уход, дозвона нет');
 
+    // The same two maps are offered locally and online. Archived maps remain readable,
+    // but the picker no longer offers them for a new match.
+    for (const selector of ['#setup-map-id', '#match-create-map']) {
+      assert.deepEqual(await page.locator(`${selector} option:not([hidden])`).evaluateAll(
+        (options) => options.map((option) => option.value),
+      ), ['ava-duel-1', 'ffa-4']);
+    }
+    for (const id of ['hub-sector-zero', 'hub-proving-ground'])
+      assert.equal(await page.locator(`#${id}`).isVisible(), false);
+    console.log('✓ карты: меню предлагает только 1 на 1 и FFA на четверых');
+
     // --- дев-клиент ---------------------------------------------------------------------
     // Его отдаёт тот же сервер, но другим маршрутом, и политика ему нужна своя — по его
     // собственному скрипту. С политикой для JSON скрипт не запускался, и `/dev` был пустым.

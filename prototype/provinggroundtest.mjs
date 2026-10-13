@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window -- browser-side test hooks */
+/* global window, document -- browser-side test hooks */
 // Полигон основной игры (M2.15): дверь в хабе открывает карту со всеми областями,
 // старт — песочница, имена областей проступают при отдалении и гаснут вблизи.
 import assert from 'node:assert/strict';
@@ -45,7 +45,9 @@ try {
     await page.goto(host.url);
     await waitForApp(page);
     await page.locator('#cnew').click();
-    await page.locator('#hub-proving-ground').click();
+    // The archived sandbox is hidden; exercise its loader through the retained handler.
+    assert.equal(await page.locator('#hub-proving-ground').isVisible(), false);
+    await page.evaluate(() => document.getElementById('hub-proving-ground').click());
     await page.waitForFunction(() => window.__pgTest.facts().inMatch);
     assert.deepEqual(await page.evaluate(() => window.__pgTest.facts()), {
       mapId: 'proving-ground',

@@ -9,7 +9,7 @@ describe('шапка мест на экране настройки (UIX-15.1, UI
     const html = setupRivalsHtml(3, false);
     expect(html).toContain('<b>Соперники: 3</b>');
     expect(html).toContain(
-      '<span>Кнопка в строке: выкл → слабый → сильный. Кружок — цвет игрока на карте.</span>',
+      '<span>Кнопка в строке: слабый ↔ сильный. Кружок — цвет игрока на карте.</span>',
     );
   });
 
@@ -21,11 +21,11 @@ describe('шапка мест на экране настройки (UIX-15.1, UI
     expect(html).not.toContain('class="shelp"');
   });
 
-  it('раскрытое «?» показывает разницу слабого и сильного бота и песочницу', () => {
+  it('раскрытое «?» показывает разницу слабого и сильного бота', () => {
     const html = setupRivalsHtml(0, true);
     expect(html).toContain('aria-expanded="true"');
     expect(html).toMatch(
-      /<p class="shelp">Слабый бот умеет то же, что сильный, .*мирная песочница\.<\/p>$/,
+      /<p class="shelp">Слабый бот умеет то же, что сильный, .*чаще ошибается\.<\/p>$/,
     );
   });
 });

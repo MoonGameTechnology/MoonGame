@@ -4153,8 +4153,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div id="match-create" class="mfilter" style="display:none">
           <label for="match-create-map" data-i18n="setup.map"></label>
           <select id="match-create-map" class="inp">
-            <option value="nexus" data-i18n="setup.map.nexus"></option>
-            <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
+            <option value="ava-duel-1" data-i18n="setup.map.ava-duel-1"></option>
+            <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
           </select>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
         </div>
@@ -4308,9 +4308,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
-      <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
+      <button id="hub-sector-zero" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
-      <button id="hub-proving-ground" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
+      <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
@@ -4382,9 +4382,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="scol">
         <label for="setup-map-id" data-i18n="setup.map"></label>
         <select id="setup-map-id" class="inp">
+          <!-- Retired maps are readable only when joining an existing match. -->
+          <option value="nexus" data-i18n="setup.map.nexus" disabled hidden></option>
+          <option value="frontier-50" data-i18n="setup.map.frontier-50" disabled hidden></option>
           <option value="frontier-100" data-i18n="setup.map.frontier-100" disabled hidden></option>
-          <option value="nexus" data-i18n="setup.map.nexus"></option>
-          <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
+          <option value="ava-duel-1" data-i18n="setup.map.ava-duel-1"></option>
+          <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
         </select>
         <p class="smaphint" id="setup-map-info"></p>
         <label for="setup-home-id" data-i18n="setup.home.list"></label>

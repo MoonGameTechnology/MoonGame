@@ -13,6 +13,10 @@ export const ru: Record<string, string> = {
   "setup.network.creating": "Создание…",
   "setup.network.failed": "Не удалось создать игру",
   "setup.map": "Карта",
+  'setup.map.ava-duel-1': '1 на 1',
+  'setup.map.ffa-4': 'FFA · 4 игрока',
+  'setup.map.ava-duel-1-info': 'Два игрока, противоположные старты.',
+  'setup.map.ffa-4-info': 'Четыре игрока, каждый сам за себя.',
   "setup.map.nexus": "Нексус · 10 игроков",
   "setup.map.frontier-100": "Фронтир · 100 игроков",
   "setup.map.frontier-50": "Фронтир · 50 игроков",
@@ -3052,7 +3056,7 @@ export const ru: Record<string, string> = {
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
   'setup.bonus.damage': '+{n}% урон',
   'setup.bonus.economy': '+{n}% экономика',
-  'setup.ai.hint': 'Щелчок переключает: выкл → слабый → сильный',
+  'setup.ai.hint': 'Щелчок переключает: слабый ↔ сильный',
   'setup.ai.strong': 'Сильный',
   'setup.ai.weak': 'Слабый',
   'setup.bonus.radar': '+{n}% радар',
@@ -3070,9 +3074,9 @@ export const ru: Record<string, string> = {
   'setup.off': 'Выкл',
   'setup.rivals': 'Соперники: {n}',
   'setup.rivals.help':
-    'Слабый бот умеет то же, что сильный, но отдаёт приказы вдвое реже и чаще ошибается. Все места выключены — мирная песочница.',
+    'Слабый бот умеет то же, что сильный, но отдаёт приказы вдвое реже и чаще ошибается.',
   'setup.rivals.help.aria': 'Подробнее о соперниках',
-  'setup.rivals.hint': 'Кнопка в строке: выкл → слабый → сильный. Кружок — цвет игрока на карте.',
+  'setup.rivals.hint': 'Кнопка в строке: слабый ↔ сильный. Кружок — цвет игрока на карте.',
   'setup.sandbox': '🧪 Песочница',
   'setup.speed.hint':
     '×1 — реальное время (час пути = час жизни, мир живёт и офлайн). Для быстрой партии выберите ×10–×100.',

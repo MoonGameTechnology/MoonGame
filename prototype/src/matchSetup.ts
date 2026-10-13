@@ -11,6 +11,7 @@
  */
 import {
   createInitialState,
+  buildStateFromMap,
   deriveRoads,
   factionStart,
   shareRoadNetwork,
@@ -183,6 +184,16 @@ export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMo
 /** Claimable human chairs for the prototype host. Empty chairs are driven by server AI. */
 export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nexus'): SeatConfig[] {
   const START_CANDIDATES = mapPreset(mapId).starts;
+  // Published maps own their capacity and sides; TEAMS applies only to legacy maps.
+  if (mapId === 'ava-duel-1' || mapId === 'ffa-4') {
+    return START_CANDIDATES.map((start, i) => ({
+      id: `p${i + 1}`,
+      ...NETWORK_HOUSES[i]!,
+      start,
+      ai: false,
+      ...(mapId === 'ava-duel-1' ? { team: i === 0 ? 'A' : 'B' } : {}),
+    }));
+  }
   if (mode === 'pve') {
     // PvE: 2 human players (team A) vs 1 strong AI (team B).
     // Players start near each other in the centre; the AI starts at the edge.
@@ -218,13 +229,29 @@ export const NEUTRAL_PLANET_MILITIA = 2;
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   const preset = mapPreset(setup.mapId);
   const seed = setup.seed ?? 'prototype-1';
-  const base = createInitialState({
-    seed,
-    version: { data: '0.1.0', manifest: '1' },
-  });
+  // Load authored geography through the same core path as other JSON maps. The
+  // skirmish start kit below belongs to the selected seats, not to fixed slot ids.
+  const base = preset.map
+    ? buildStateFromMap({
+        ...preset.map,
+        seed,
+        avaEligible: false,
+        slots: {},
+        fleets: {},
+        sectors: Object.fromEntries(Object.entries(preset.map.sectors).map(([id, sector]) => [id, {
+          ...sector,
+          owner: null,
+          buildings: [],
+          garrison: sector.kind === 'planet' ? [{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }] : [],
+        }])),
+      }, data)
+    : createInitialState({
+        seed,
+        version: { data: '0.1.0', manifest: '1' },
+      });
   // Every province starts NEUTRAL; the chosen seats below claim + fortify their homeworld.
-  const planets: Record<string, Planet> = {};
-  for (const n of preset.nodes) {
+  const planets: Record<string, Planet> = base.planets;
+  for (const n of preset.map ? [] : preset.nodes) {
     planets[n.id] = {
       id: n.id,
       owner: null,
@@ -248,7 +275,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // дорога пересекает границу в середине между центрами, а сколько троп выходит от
   // планеты, решает её местность (`data.sectors[*].corridors`). Без этого ядро водило бы
   // флоты по дорогам на картах глав и по прямым здесь — два правила движения в одной игре.
-  const roads = deriveRoads({
+  const roads = preset.map ? {} : deriveRoads({
     sectors: Object.fromEntries(
       preset.nodes.map((n) => [n.id, { x: n.x, y: n.y, terrain: planets[n.id]!.terrain }]),
     ),
@@ -444,7 +471,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       const tb = teamOf.get(ids[j]!);
       const pirates = players[ids[i]!]!.npc === 'pirate' || players[ids[j]!]!.npc === 'pirate';
       const neutral = players[ids[i]!]!.npc === 'neutral' || players[ids[j]!]!.npc === 'neutral';
-      const stance: DiplomaticStance = pirates ? 'war' : neutral ? 'peace' : !teamed
+      const stance: DiplomaticStance = pirates ? 'war' : neutral ? 'peace'
+        : preset.id === 'ava-duel-1' ? 'war'
+        : preset.id === 'ffa-4' || !teamed
         ? 'peace'
         : ta !== undefined && ta === tb
           ? 'alliance'
