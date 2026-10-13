@@ -144,18 +144,15 @@ async function copy(body, target, expected) {
   const hash = createHash('sha256');
   let size = 0;
   try {
-    output = await open(target, CREATE, 0o600);
+    output = await open(target, CREATE, 0o600).catch(() => fail('IO'));
     for await (const value of body) {
       const chunk = Buffer.from(value);
       if (size + chunk.length > expected) fail('REMOTE_INVALID');
       let offset = 0;
       while (offset < chunk.length) {
-        const { bytesWritten } = await output.write(
-          chunk,
-          offset,
-          chunk.length - offset,
-          size + offset,
-        );
+        const { bytesWritten } = await output
+          .write(chunk, offset, chunk.length - offset, size + offset)
+          .catch(() => fail('IO'));
         if (!bytesWritten) fail('IO');
         offset += bytesWritten;
       }
@@ -163,11 +160,11 @@ async function copy(body, target, expected) {
       hash.update(chunk);
     }
     if (size !== expected) fail('REMOTE_INVALID');
-    await output.sync();
+    await output.sync().catch(() => fail('IO'));
     return hash.digest('hex');
   } finally {
     body.destroy?.();
-    await output?.close();
+    await output?.close().catch(() => fail('IO'));
   }
 }
 
@@ -353,7 +350,7 @@ export async function downloadBundle(options, injected) {
             signal.removeEventListener('abort', stop);
           }
         } catch (error) {
-          if (error?.message === 'E_BACKUP_REMOTE_INVALID') throw error;
+          if (['E_BACKUP_REMOTE_INVALID', 'E_BACKUP_IO'].includes(error?.message)) throw error;
           fail('REMOTE_FAILED');
         } finally {
           body?.destroy?.();

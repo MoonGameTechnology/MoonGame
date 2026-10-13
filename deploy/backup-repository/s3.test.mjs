@@ -4,6 +4,7 @@ import {
   chmod,
   mkdir,
   mkdtemp,
+  open,
   readFile,
   readdir,
   rm,
@@ -272,6 +273,58 @@ describe('S3 backup transport: authenticated bundles and pinned versions', () =>
       ),
     ).rejects.toThrow('E_BACKUP_SIGNATURE');
     expect(await readdir(outputDir)).toEqual([]);
+  });
+
+  it.each(['open', 'write', 'sync'])(
+    'reports local staging %s failure as I/O, without publishing',
+    async (operation) => {
+      const probe = await open(join(dir, 'probe'), 'w');
+      const prototype = Object.getPrototypeOf(probe);
+      await probe.close();
+      const body = Readable.from([original]);
+      client.send.mockImplementationOnce(async () => {
+        if (operation === 'open') {
+          const job = (await readdir(options.workDir)).find((name) =>
+            name.startsWith('.bundle-job-'),
+          );
+          await mkdir(join(options.workDir, job, 'download.vdbak'));
+        } else {
+          vi.spyOn(prototype, operation).mockRejectedValueOnce(
+            Object.assign(new Error('local storage details'), { code: 'ENOSPC' }),
+          );
+        }
+        return { VersionId: receipt.versionId, ContentLength: receipt.bytes, Body: body };
+      });
+      const outputDir = join(dir, 'restored');
+      await expect(downloadBundle({ ...options, receipt, outputDir }, client)).rejects.toThrow(
+        /^E_BACKUP_IO$/,
+      );
+      expect(await readdir(outputDir)).toEqual([]);
+      expect(await readdir(options.workDir)).toEqual(['.backup.lock']);
+      expect(body.destroyed).toBe(true);
+      expect(client.send).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('keeps a broken response stream classified as a remote failure', async () => {
+    const body = Readable.from(
+      (async function* () {
+        yield original.subarray(0, 20);
+        throw Object.assign(new Error('connection details'), { code: 'ECONNRESET' });
+      })(),
+    );
+    client.send.mockResolvedValue({
+      VersionId: receipt.versionId,
+      ContentLength: receipt.bytes,
+      Body: body,
+    });
+    const outputDir = join(dir, 'restored');
+    await expect(downloadBundle({ ...options, receipt, outputDir }, client)).rejects.toThrow(
+      /^E_BACKUP_REMOTE_FAILED$/,
+    );
+    expect(await readdir(outputDir)).toEqual([]);
+    expect(await readdir(options.workDir)).toEqual(['.backup.lock']);
+    expect(body.destroyed).toBe(true);
   });
 
   it('does not replace a pre-existing restored bundle', async () => {
