@@ -79,6 +79,7 @@ function room(): MatchRoom {
     id: 'test-room',
     initialState: testState(),
     kernel: createKernel([renameModule]),
+    clientActionTypes: ['player.rename'],
     data: testData(),
     now: () => 10,
   });
@@ -90,6 +91,7 @@ describe('MatchRoom — player-action deny-list (AVA-8)', () => {
       id: 'ava-room',
       initialState: testState(),
       kernel: createKernel([renameModule]),
+      clientActionTypes: ['player.rename'],
       data: testData(),
       now: () => 10,
       // The AvA wire rule: the orchestrator owns this action type — players don't.
@@ -119,6 +121,75 @@ describe('MatchRoom — player-action deny-list (AVA-8)', () => {
     const result = await r.submitServerAction('p1', action('a2', 'p1', 'System'));
     expect(result.ok).toBe(true);
     expect(r.state.players.p1?.name).toBe('System');
+  });
+});
+
+describe('MatchRoom — bare path keeps to the gate catalog', () => {
+  // Host-issued types: a handler that would let the player name itself if it ever ran.
+  const HOST_TYPES = ['fleet.premiumRepair', 'pve.supply', 'arsenal.sync', 'seat.confirm'];
+  const hostModule: GameModule = {
+    id: 'host-only-test',
+    version: '1.0.0',
+    setup(api) {
+      for (const type of HOST_TYPES) {
+        api.onAction(type, (a, h) => {
+          h.state.players[a.playerId]!.name = type;
+        });
+      }
+    },
+  };
+  function defaultCatalogRoom(): MatchRoom {
+    // No `clientActionTypes` override — the shipped catalog (`CLIENT_ACTION_TYPES`) applies.
+    return new MatchRoom({
+      id: 'bare-room',
+      initialState: testState(),
+      kernel: createKernel([hostModule]),
+      data: testData(),
+      now: () => 10,
+    });
+  }
+
+  it.each(HOST_TYPES)('refuses host-issued %s from the wire with the gate code', async (type) => {
+    const r = defaultCatalogRoom();
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    const sent: Action = { id: 'w1', type, playerId: 'p1', issuedAt: 1, payload: {} };
+    await r.receive(
+      'p1',
+      p1,
+      JSON.stringify({ type: 'action', matchId: 'bare-room', action: sent }),
+    );
+    expect(p1.messages.at(-1)).toMatchObject({
+      type: 'rejection',
+      actionId: 'w1',
+      code: 'E_BAD_PAYLOAD',
+    });
+    expect(r.state.players.p1?.name).toBe('One'); // the reducer never saw it
+  });
+
+  it('refuses an unknown type the same way', async () => {
+    const r = defaultCatalogRoom();
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    await r.receive('p1', p1, JSON.stringify({ type: 'action', action: action('w2', 'p1', 'X') }));
+    expect(p1.messages.at(-1)).toMatchObject({
+      type: 'rejection',
+      actionId: 'w2',
+      code: 'E_BAD_PAYLOAD',
+    });
+  });
+
+  it('host-issued submits still reach the reducer', async () => {
+    const r = defaultCatalogRoom();
+    const sent: Action = {
+      id: 'srv:1',
+      type: 'pve.supply',
+      playerId: 'p1',
+      issuedAt: 1,
+      payload: {},
+    };
+    expect((await r.submitServerAction('p1', sent)).ok).toBe(true);
+    expect(r.state.players.p1?.name).toBe('pve.supply');
   });
 });
 

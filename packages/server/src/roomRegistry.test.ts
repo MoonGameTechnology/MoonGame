@@ -66,6 +66,7 @@ function makeRoom(id: string): MatchRoom {
   const base = createInitialState({ seed: id, version: { data: 'test', manifest: 'test' } });
   return new MatchRoom({
     id,
+    clientActionTypes: ['marker.set'],
     initialState: { ...base, players: { p1: player('p1'), p2: player('p2') } },
     kernel: createKernel([markerModule]),
     data: parseGameData({

@@ -12,6 +12,7 @@ import type {
   SignatureContact,
 } from '@void/shared-core';
 import {
+  CLIENT_ACTION_TYPES,
   diffState,
   flashBattles,
   getStance,
@@ -115,6 +116,10 @@ export interface MatchRoomOptions {
    *  escalation) do not pass through `receive` and stay unaffected; e.g. an AvA
    *  room denies `diplomacy.declare` because the orchestrator owns the stances. */
   denyPlayerActions?: (type: string) => string | null | undefined;
+  /** Action types a player may send on the BARE path (no `GATE`). Defaults to the gate's
+   *  own catalog (`CLIENT_ACTION_TYPES`), so a host-issued type is refused from the wire
+   *  with or without the gate. Only rooms over a toy test kernel override it. */
+  clientActionTypes?: readonly string[];
   /** Observation-only room-event stream for metrics/playtest logging (M0). */
   observe?: (event: RoomObservation) => void;
   securityAudit?: SecurityAudit;
@@ -498,6 +503,8 @@ export class MatchRoom {
   private readonly gate?: ActionGate;
   /** Player-action deny-list (see options.denyPlayerActions). */
   private readonly denyPlayerActions?: (type: string) => string | null | undefined;
+  /** Bare-path wire catalog (see options.clientActionTypes). */
+  private readonly clientActionTypes: ReadonlySet<string>;
   /** LARS-1 live ownership read (see options.arsenalStore). */
   private readonly arsenalStore?: ArsenalStore;
   /** PVE-5.2 server-side order source (see options.serverOrders). */
@@ -650,6 +657,7 @@ export class MatchRoom {
     this.persist = options.persist;
     this.gate = options.gate;
     if (options.denyPlayerActions) this.denyPlayerActions = options.denyPlayerActions;
+    this.clientActionTypes = new Set(options.clientActionTypes ?? CLIENT_ACTION_TYPES);
     this.arsenalStore = options.arsenalStore;
     if (options.initialSeq && options.initialSeq > 0) this.seq = options.initialSeq;
     this.maxReceipts = options.maxReceipts ?? RECEIPTS_MAX_DEFAULT;
@@ -1149,6 +1157,14 @@ export class MatchRoom {
     // validation, authorization and the sequence gate.
     if (this.gate) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_BAD_MESSAGE' });
+      return;
+    }
+    // The gate's type catalog on the bare path too: a type with no client payload schema
+    // (a host-issued action — premium repair, supply, arsenal sync, seat confirm — or an
+    // unknown type) is refused with the gate's own code. Host-issued actions reach the
+    // reducer through `submitAction`/`submitServerAction`, never through `receive`.
+    if (!this.clientActionTypes.has(message.action.type)) {
+      this.sendReject(peer, message.action.id, 'E_BAD_PAYLOAD');
       return;
     }
     // The same player deny-list on the bare path. Server-internal drivers (AI /
