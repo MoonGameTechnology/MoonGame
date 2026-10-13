@@ -1,6 +1,7 @@
 # Независимые контуры бэкапов, логов, SIEM и реагирования
 
-Решение владельца: 2026-10-12. **План**; живые площадки не проверены.
+Решение владельца: 2026-10-12. **План с частично реализованным фундаментом**
+(backup bundle v1 — 2026-10-13); живые площадки не проверены.
 Владельцы задач — [SE-3.4/3.5, SE-8.1/8.4/8.5, SE-9.2](secure-environment-roadmap.md);
 связанные [OPS-0/1](operations-roadmap.md), [MSVC-7/8/9](service-resilience-roadmap.md),
 [служебные дела](staff-case-roadmap.md) и [карта сервисов](service-architecture-map.md).
@@ -8,8 +9,21 @@
 ## Что уже есть
 
 - `deploy/backup.sh`/`restore.sh`: age-шифрование, проверка полноты/целостности,
-  атомарные файлы/restore и учения в CI. SE-3.4 частичный: off-host repository,
-  PITR и фактические RTO/RPO работающего стенда не подтверждены.
+  транзакционный restore и учения в CI. В legacy-формате архив и checksum-sidecar
+  публикуются раздельно; общей атомарности пары нет. SE-3.4 частичный: PITR и
+  фактические RTO/RPO работающего стенда не подтверждены.
+- SE-3.5 частичный с 2026-10-13: opt-in `BACKUP_FORMAT=bundle-v1` создаёт один
+  `.vdbak` с age-ciphertext и Ed25519-подписью manifest. Exclusive publication
+  сохраняет существующие ID; restore сверяет внешний trusted key и ожидаемые
+  domain/producer/backupId, затем проверяет скопированные в private staging байты
+  до расшифровки/БД. Права на приватный signing key проверяются до чтения;
+  уборка аварийных остатков требует exclusive `flock` и сохраняет активные
+  shared-lock задания и готовые копии. Отдельный S3 transport выполняет conditional
+  PUT и проверенный GET по version ID; SDK не входит в runtime-зависимости игры.
+  Реальный внешний bucket, его IAM/Object Lock и независимый receipt journal
+  ещё не развёрнуты/не проверены.
+  [Настройка и ограничения](../deploy/README.md#подписанный-комплект-v1).
+  [S3 transport и приёмка провайдера](../deploy/backup-repository/README.md).
 - Типизированный security JSONL и локальный `security.alert`; центральный сбор,
   внешний получатель, SIEM и runtime-response пока не построены.
 - CI SAST/SCA/DAST/image scans проверяют выпуск. Они не являются SIEM наблюдения
@@ -37,6 +51,20 @@ service mesh или конкретный SIEM-вендор не обязател
 не считается изоляцией; namespaces, quotas и secrets разделяются.
 
 ## Backup и восстановление — SE-3.4/3.5, SE-9.2
+
+**Полный целевой контракт ниже остаётся планом.** Реализованный manifest v1
+связывает domain, producer, backupId, время создания, формат, длину и SHA-256
+ciphertext. Он пока не содержит schema/image/data pins и snapshot/WAL interval.
+Trusted verify-key и ожидаемая identity/ID задаются снаружи; подпись подтверждает
+происхождение от signer и неизменность, но не свежесть или корректность данных.
+Backup signing key отличается от приватного age restore-key; создание комплекта
+не требует restore-key. S3 transport проверяет TLS peer и сохраняет version ID
+в receipt; GET проверяет выбранную версию до публикации. Клиент не управляет
+retention/удалением и сам не создаёт внешний durable receipt journal.
+Развёртывание внешнего repository, приёмка immutable IAM/retention,
+freshness-мониторинг, controlled key-release и независимый restore lab ещё нужны.
+`BACKUP_KEEP_DAYS` обслуживает только legacy-архивы; `.vdbak` не удаляются им,
+но остаются удаляемыми владельцем локальных файлов.
 
 - Автоматические jobs работают по расписанию/policy и не ждут ручного тикета.
   Backup-role читает свой домен и явно нужную WAL/replication область, не меняет

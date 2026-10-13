@@ -2581,6 +2581,11 @@ function handleEvents(events: DomainEvent[]) {
       case 'shuttle.missileDowned':
         if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.missile-downed'));
         break;
+      // Мину сняли челноки (SM-3.6): так же одна строка обеим сторонам, а `fleet.destroyed`
+      // следом помечен `spent`.
+      case 'shuttle.mineCleared':
+        if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.mine-cleared'));
+        break;
       // «Держать патруль» снят ядром (SHU-6.6): помеха сама не пройдёт — эскадра больше не
       // висит, точка за радиусом. Без строки игрок ждал бы патруль над базой, который уже
       // не встанет, и не знал бы почему.
@@ -2909,6 +2914,8 @@ initMapSurface({
  *  показываются одним именем — раньше это был тернарник, скопированный в два места, и два
  *  ключа локали с ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
 function mapLabel(mapId: string | undefined): string {
+  if (mapId === 'duel-1') return t('setup.map.duel-1');
+  if (mapId === 'ffa-4') return t('setup.map.ffa-4');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 
@@ -8192,7 +8199,7 @@ initSectorZeroShell({
   },
   back: () => {
     openHub();
-    $('hub-sector-zero').focus({ preventScroll: true });
+    $('hub-solo').focus({ preventScroll: true });
   },
   openSettings: () => settings.open(),
   note,

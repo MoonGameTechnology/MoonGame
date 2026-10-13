@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ResourceBagSchema } from './schemas';
+import { ResourceBagSchema, TechnologyRulesSchema } from './schemas';
 
 /**
  * Map-as-content (map-roadmap.md M1.1). A **map** is a data-driven match setup:
@@ -204,6 +204,8 @@ export const MapOperationSchema = z.object({
 export type MapOperation = z.infer<typeof MapOperationSchema>;
 
 export const MatchMapSchema = z.object({
+  /** Research progression owned by this map, frozen into its initial state. */
+  techRules: TechnologyRulesSchema.optional(),
   id: z.string(),
   seed: z.string(),
   /** Opts this map into the AvA pool (AVA-5, `corporation-wars.md` S4). The map's

@@ -86,7 +86,8 @@ RUN node prototype/bundle-netserver.mjs
 # interactive confirmation first. `docker build` has no TTY, so pnpm refuses outright
 # (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY) and the build dies here. The variable is
 # scoped to this one RUN so it cannot change how any other step behaves.
-RUN CI=true pnpm install --prod --frozen-lockfile --ignore-scripts
+# SE-3.5: S3 belongs to the independent backup job, not the game runtime image.
+RUN CI=true pnpm --filter '!@void/backup-repository' install --prod --frozen-lockfile --ignore-scripts
 
 # Pre-create the dir the server writes at runtime so it exists (and, after the
 # COPY --chown below, is owned by the non-root user): playtest-logs/ (event JSONL).

@@ -25,7 +25,7 @@ beforeAll(() => setLocale('ru'));
  *  принадлежат: их выдают, а не исследуют. Отбор по ФЛАГУ данных `grantOnly`, а не по
  *  префиксу имени — PVR-1.4 перенёс это правило из соглашения об именах в данные. */
 const TECHS = Object.fromEntries(
-  Object.entries(data.technologies).filter(([, def]) => !def.grantOnly),
+  Object.entries(data.technologies).filter(([, def]) => !def.grantOnly && def.ruleset === undefined),
 );
 
 /** Node with the smallest day-gate in a branch — always visible on the first day. */

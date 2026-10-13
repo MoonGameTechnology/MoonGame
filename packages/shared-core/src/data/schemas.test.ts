@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.65'); // юнит ракеты `missile` (SM-3.7b; корпус и сигнатура ракеты переехали из модуля) поверх 0.1.64: юнит ракетной мины `rocket_mine` (SM-3.7a) поверх 0.1.63: круг патруля шаттлов 60 → 90 (SHU-6.9) поверх 0.1.62: площадка крепости на развилке (FORT-6.1) поверх 0.1.61: ракетная мина — только корабль героя, мины — только фрегаты (утилитарный слот) поверх 0.1.60: защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
+    expect(data.version).toBe('0.1.66'); // юнит ракеты `missile` (SM-3.7b; корпус и сигнатура ракеты переехали из модуля) поверх 0.1.64: юнит ракетной мины `rocket_mine` (SM-3.7a) поверх 0.1.63: круг патруля шаттлов 60 → 90 (SHU-6.9) поверх 0.1.62: площадка крепости на развилке (FORT-6.1) поверх 0.1.61: ракетная мина — только корабль героя, мины — только фрегаты (утилитарный слот) поверх 0.1.60: защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -321,7 +321,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
       .toEqual({ infantry: true, vehicle: true });
   });
 
-  it('исследование запирает ровно три вещи — и список закрыт намеренно (CONV-12)', () => {
+  it('исследования открывают только согласованный список контента (CONV-12)', () => {
     // Гейт на контент, который строится с первой минуты, меняет экономику молча: игрок
     // получает ту же постройку на несколько игровых дней позже, а замер об этом не
     // узнает. При сведении каталогов (CONV-12) канон снял три таких гейта — на `fort`,
@@ -363,6 +363,8 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // намеренно ЯРУС 1 без предпосылок — цена в том, что оборону надо оплатить и
     // подождать, а не в том, что её увели за цепочку исследований.
     const data = parseGameData(loadShippedBundle());
+    // Main research (2026-10-13): отдельные открытия обычных юнитов и особых зданий.
+    // Новые гейты ограничены ruleset=main; старые сценарии сохраняют прежнюю доступность.
     const gates = Object.entries(data.technologies)
       .flatMap(([id, def]) => [
         ...(def.unlocks.units ?? []).map((u) => `${id} → unit:${u}`),
@@ -370,12 +372,35 @@ describe('game data schema (docs/architecture.md §2)', () => {
         ...(def.unlocks.abilities ?? []).map((a) => `${id} → ability:${a}`),
       ])
       .sort();
+    // Main-game progression: every ordinary hull/troop and special building is researched.
     expect(gates).toEqual([
       'ai_stewardship → ability:steward',
+      'area_interception → building:zonal_aa',
+      'armored_warfare → unit:tank',
+      'bomber_design → unit:bomber',
+      'carrier_design → unit:shuttle_carrier',
+      'cruiser_design → unit:cruiser',
+      'drone_design → unit:scout_drone',
+      'drop_training → unit:drop_infantry',
+      'field_fortification → building:fort',
+      'field_medicine → building:hospital',
+      'fiscal_administration → building:tax_office',
+      'flagship_command → unit:hero',
+      'frigate_design → unit:frigate',
+      'heavy_cruiser_design → unit:heavy_cruiser',
+      'heavy_infantry_training → unit:heavy_infantry',
       'industrial_automation → building:mine_t2',
+      'interceptor_design → unit:interceptor',
+      'landing_design → unit:landing_shuttle',
+      'militia_training → unit:militia',
       'orbital_defense_grid → building:orbital_aa',
+      'picket_design → unit:picket_frigate',
+      'scout_design → unit:scout',
       'siege_doctrine → unit:siege_lance',
+      'spaceport_infrastructure → building:spaceport',
+      'special_operations → unit:special_forces',
       'strike_vectors → unit:heavy_striker',
+      'vehicle_works → building:factory',
       'void_fortification → building:starfort',
       'void_shielding → building:void_shield',
       'void_shipworks → building:void_hangar',

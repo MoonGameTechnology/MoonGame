@@ -20,6 +20,7 @@ import {
   previewBattle,
   slotUsage,
   technologyLock,
+  technologiesUnlocking,
   techInMatch,
   scientistsOf,
   hangarMachines,
@@ -678,7 +679,10 @@ function baseAiOrders(
   const turn = hand === WEAK_HANDICAP ? weakTurn(state, ai) : 'full';
   if (turn === 'skip') return out;
   const skilled = capable && turn === 'full';
-  const lineUnit = pirate ? 'pirate_cruiser' : 'cruiser';
+  const cruiserLocked = technologiesUnlocking(data, 'unit', 'cruiser', state).some(
+    (id) => !state.players[ai]!.technologies?.completed.includes(id),
+  );
+  const lineUnit = pirate ? 'pirate_cruiser' : cruiserLocked ? 'frigate' : 'cruiser';
   const scoutUnit = pirate ? 'pirate_skiff' : 'scout';
   const militiaUnit = pirate ? 'pirate_boarder' : 'militia';
   // Доктрина — ветка учёного совета места (`botDoctrine.ts`); у NPC совета нет.
@@ -1447,7 +1451,7 @@ function baseAiOrders(
     const techState = pl.technologies;
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
-    if (skilled && activeTech.length < BASE_RESEARCH_SLOTS) {
+    if ((skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
       const costOf = (id: string): Record<string, number> => data.technologies[id]?.cost ?? {};
       /** Чего не хватает на узел — с запасом `ORDER_RESERVE`, как у заказов войск. Прежний
        *  запас 60 на всё держал и микроэлектронику, а её у бота 40–150, и узлы второго
@@ -1460,9 +1464,13 @@ function baseAiOrders(
       // ранг у всех один, и порядок прежний — по цене.
       const ranks =
         doctrine !== undefined
-          ? doctrineRanks(data.technologies, doctrine, (id) => techInMatch(state, id))
+          ? doctrineRanks(data.technologies, doctrine, (id) => techInMatch(state, id, data))
           : undefined;
-      const rank = (id: string): number => ranks?.get(id) ?? 2;
+      const rank = (id: string): number => {
+        const def = data.technologies[id]!;
+        if (def.ruleset === 'main' && def.tier === 1 && def.unlocks.units?.length) return -1;
+        return ranks?.get(id) ?? 2;
+      };
       const open = Object.keys(data.technologies)
         .filter((id) => {
           const def = data.technologies[id];
@@ -2559,11 +2567,16 @@ function baseAiOrders(
     }
     if (best !== null) out.push(marketTake(ai, best.id, best.qty));
   }
+  // Новая партия начинает только с разведчика: закрытые заказы ждут исследования.
+  // Решение о доступности остаётся у ядра, включая войска десантного челнока и героев.
+  const available = state.techRules?.ruleset === 'main'
+    ? out.filter((a) => canOrder(state, a) !== 'E_TECH_LOCKED')
+    : out;
   // Копилка доктрины: войска, которые тратят то, на что место копит узел ветки, ждут.
   const held =
     saving.size === 0
-      ? out
-      : out.filter((a) => {
+      ? available
+      : available.filter((a) => {
           if (a.type !== 'unit.build') return true;
           const p = a.payload as { unit: string; modules?: string[]; troop?: string };
           const costs = [

@@ -161,7 +161,8 @@ describe('накопитель — назначение на извлечени�
         'E_NO_VAULT',
       ],
       [world([fleet('f1', 'p1')]), { fleetId: 'ghost' }, 'p1', 'E_NO_FLEET'],
-      [world([fleet('f1', 'swarm')]), { fleetId: 'f1' }, 'p1', 'E_FORBIDDEN'],
+      // Чужой флот — как несуществующий: «не твой» подтвердил бы флот в тумане (A06).
+      [world([fleet('f1', 'swarm')]), { fleetId: 'f1' }, 'p1', 'E_NO_FLEET'],
       [world([fleet('f1', 'ally')]), { fleetId: 'f1' }, 'ally', 'E_FORBIDDEN'],
       // Чужая ракета (SM-3.7b) — как несуществующий флот: «не твой» выдал бы пуск (#1503).
       [

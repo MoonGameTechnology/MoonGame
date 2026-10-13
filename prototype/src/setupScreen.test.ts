@@ -102,6 +102,8 @@ const SEATS = Array.from({ length: 100 }, (_, i) => ({
   color: '#35d6e6',
 }));
 const NEXUS = mapPreset('nexus').starts;
+const DUEL = mapPreset('duel-1').starts;
+const FFA = mapPreset('ffa-4').starts;
 const SPEEDS = [1, 2, 5, 10, 50, 100];
 
 function stubPage(): void {
@@ -169,24 +171,24 @@ describe('REFM-212 — заход на экран', () => {
     expect(screen.sciWin.classList.contains('show')).toBe(true);
     expect(el('setupcouncil').innerHTML).not.toBe('');
     expect(screen.netSetup).toBeNull();
-    expect(screen.setupSlots).toEqual(['human', 'ai', ...Array(8).fill('off')]);
+    expect(screen.setupSlots).toEqual(['human', 'ai']);
     expect(screen.setupSpeed).toBe(10);
 
     // Игрок всё поменял…
     tap('setupslots', { 'data-slot': '2' });
     tap('setupslots', { 'data-teamtog': '1' });
     tap('setupmap', { 'data-cand': NEXUS[3]! });
-    expect(screen.setupSlots[2]).toBe('ai');
+    expect(screen.setupSlots).toEqual(['human', 'ai']);
     // …и вернулся на экран: всё сначала.
     screen.openSetup('hub');
-    expect(screen.setupSlots).toEqual(['human', 'ai', ...Array(8).fill('off')]);
+    expect(screen.setupSlots).toEqual(['human', 'ai']);
     el('setupgo').click();
     const seats = env.started[0]!.seats;
     expect(seats.map((s) => [s.id, s.start])).toEqual([
-      ['p1', NEXUS[0]],
-      ['p2', NEXUS[1]],
+      ['p1', DUEL[0]],
+      ['p2', DUEL[1]],
     ]);
-    expect(seats.some((s) => 'team' in s)).toBe(false);
+    expect(seats.map((s) => s.team)).toEqual(['A', 'B']);
   });
 
   it('темп открывается последним выбранным, а чужое число — дефолтом ×10', async () => {
@@ -212,21 +214,23 @@ describe('REFM-212 — что уезжает в матч', () => {
   it('ты своим домом на своём мире, боты — следом; совет, позывной героя и прокачка', async () => {
     const { screen, env } = await boot();
     screen.openSetup();
+    pick('setup-map-id', 'ffa-4');
     tap('setupfactions', { 'data-fpick': 'crimson' });
-    tap('setupmap', { 'data-cand': NEXUS[2]! });
+    tap('setupmap', { 'data-cand': FFA[2]! });
     tap('setupslots', { 'data-slot': '2' }); // выкл → слабый
     tap('setupslots', { 'data-slot': '1' }); // слабый → сильный
     el('setupgo').click();
     const setup = env.started[0]!;
-    expect(setup.mapId).toBe('nexus');
+    expect(setup.mapId).toBe('ffa-4');
     expect(setup.seats.map((s) => [s.id, s.start, s.ai])).toEqual([
-      ['p1', NEXUS[2], false],
-      ['p2', NEXUS[0], true],
-      ['p3', NEXUS[1], true],
+      ['p1', FFA[2], false],
+      ['p2', FFA[0], true],
+      ['p3', FFA[1], true],
+      ['p4', FFA[3], true],
     ]);
     expect(setup.seats[0]!.faction).toBe('crimson');
     expect(setup.seats[1]!.faction).not.toBe('crimson');
-    expect(screen.setupSlots.slice(0, 3)).toEqual(['human', 'ai-strong', 'ai']);
+    expect(screen.setupSlots.slice(0, 3)).toEqual(['human', 'ai-strong', 'ai-strong']);
     expect(setup.scientists).toEqual(['overseer', 'polymath']);
     expect(setup.heroes!.find((h) => h.grade === 'main')!.name).toBe('Орион');
     expect(setup.meta).toEqual(metaGrant(parseMetaState(null)));
@@ -251,23 +255,29 @@ describe('REFM-212 — что уезжает в матч', () => {
     expect(screen.buildSetupConfig().seats.map((s) => s.team)).toEqual(['A', 'B']);
   });
 
-  it('смена карты — свежие места и мир новой карты; карту не из списка экран не берёт', async () => {
+  it('смена карты даёт ровно четыре места FFA; скрытые карты и команды недоступны', async () => {
     const { screen } = await boot();
     screen.openSetup();
+    pick('setup-map-id', 'ffa-4');
+    expect(screen.setupMapId).toBe('ffa-4');
+    expect(screen.setupSlots).toEqual(['human', 'ai', 'ai', 'ai']);
+    expect(el('setupslots').innerHTML).not.toContain('data-teamtog');
     tap('setupslots', { 'data-teamtog': '1' });
-    pick('setup-map-id', 'frontier-50');
-    expect(screen.setupMapId).toBe('frontier-50');
-    expect(screen.setupSlots.slice(0, 3)).toEqual(['human', 'ai', 'ai']);
-    pick('setup-map-id', 'frontier-100');
-    expect(screen.setupMapId).toBe('frontier-50');
-    pick('setup-map-id', 'nexus');
-    tap('setupmap', { 'data-cand': 'C9R1' });
-    pick('setup-home-id', 'nowhere'); // не кандидат — мир остаётся
+    tap('setupslots', { 'data-teamseat': '1' });
+    for (const hidden of ['frontier-100', 'frontier-50', 'nexus', 'missing']) {
+      pick('setup-map-id', hidden);
+      expect(screen.setupMapId).toBe('ffa-4');
+    }
+    tap('setupmap', { 'data-cand': FFA[3]! });
+    pick('setup-home-id', 'nowhere');
     const seats = screen.buildSetupConfig().seats;
-    expect(seats.map((s) => [s.start, s.team])).toEqual([
-      [NEXUS[9], undefined],
-      [NEXUS[0], undefined],
-    ]);
+    expect(seats.map((s) => s.start)).toEqual([FFA[3], ...FFA.slice(0, 3)]);
+    expect(seats.every((s) => s.team === undefined)).toBe(true);
+    tap('setupslots', { 'data-slot': '1' });
+    tap('setupslots', { 'data-slot': '1' });
+    expect(screen.setupSlots[1]).toBe('ai'); // Difficulty cycles without removing a player.
+    pick('setup-map-id', 'duel-1');
+    expect(screen.buildSetupConfig().seats).toHaveLength(2);
   });
 
   it('занятый слот сохранения спрашивает о замене, а не стартует; песочница стартует сразу', async () => {
@@ -310,15 +320,15 @@ describe('REFM-212 — двери гида и сети', () => {
     taken,
   });
 
-  it('гид получает «Нексус» без соперников на предсказуемом мире', async () => {
+  it('гид получает дуэльную карту без соперников на предсказуемом мире', async () => {
     const { screen } = await boot();
     screen.openSetup();
     pick('setup-map-id', 'frontier-50');
     tap('setupfactions', { 'data-fpick': 'amber' });
     screen.prepareGuidedSetup();
-    expect(screen.setupMapId).toBe('nexus');
+    expect(screen.setupMapId).toBe('duel-1');
     const setup = screen.buildSetupConfig();
-    expect(setup.seats.map((s) => [s.id, s.start, s.faction])).toEqual([['p1', NEXUS[0], 'amber']]);
+    expect(setup.seats.map((s) => [s.id, s.start, s.faction])).toEqual([['p1', DUEL[0], 'amber']]);
   });
 
   it('сетевой вход: карта и места от сервера, вход заперт до свободного мира', async () => {

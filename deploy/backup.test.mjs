@@ -31,7 +31,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 
 const run = promisify(execFile);
 const DEPLOY_DIR = dirname(fileURLToPath(import.meta.url));
@@ -143,7 +143,13 @@ describe.skipIf(!BASE_URL)('учение: бэкап → разрушение �
   const restore = (file, extra = {}) =>
     run('bash', [RESTORE_SH, file], { env: { ...env, ...extra } });
   const newest = (into, suffix) =>
-    join(into, readdirSync(into).filter((f) => f.endsWith(suffix)).sort().at(-1));
+    join(
+      into,
+      readdirSync(into)
+        .filter((f) => f.endsWith(suffix))
+        .sort()
+        .at(-1),
+    );
 
   /** Готовый открытый бэкап под тесты, которым нужен ИСХОДНЫЙ материал для порчи. */
   const plainBackup = async () => {
@@ -223,7 +229,10 @@ describe.skipIf(!BASE_URL)('учение: бэкап → разрушение �
     const file = await plainBackup(); // снимок состояния А
     // Уводим базу в состояние Б, чтобы откат был ОТЛИЧИМ от успешного применения:
     // будь дамп применён, строка исчезла бы вместе с состоянием А.
-    await psql(drillUrl(DRILL_DB), `INSERT INTO users (id, login, pass_hash) VALUES ('u3','later','x')`);
+    await psql(
+      drillUrl(DRILL_DB),
+      `INSERT INTO users (id, login, pass_hash) VALUES ('u3','later','x')`,
+    );
     const stateB = await fingerprint(drillUrl(DRILL_DB));
 
     // Портим дамп В СЕРЕДИНЕ, оставляя хвостовой маркер нетронутым: сторож полноты
@@ -309,26 +318,97 @@ else [ -s "$ident" ] || { echo "нет ключа" >&2; exit 1; }; tail -c +9 "$
     expect(await fingerprint(drillUrl(DRILL_DB))).toEqual(before);
   }, 120_000);
 
-  it.skipIf(!hasAge)('зашифрованный круг: архив нечитаем без ключа и восстанавливается с ним', async () => {
+  it.skipIf(!hasAge)(
+    'зашифрованный круг: архив нечитаем без ключа и восстанавливается с ним',
+    async () => {
+      const into = freshDir();
+      const key = join(into, 'drill.key');
+      const { stderr } = await run('age-keygen', ['-o', key]);
+      const recipient = /age1[a-z0-9]+/.exec(stderr)[0];
+
+      const before = await fingerprint(drillUrl(DRILL_DB));
+      await backup(into, { BACKUP_AGE_RECIPIENT: recipient });
+      const enc = newest(into, '.age');
+
+      // Захват бэкап-хоста не должен раскрывать содержимое: на нём лежит только
+      // ПУБЛИЧНЫЙ ключ, приватный там не нужен.
+      const raw = readFileSync(enc).toString('latin1');
+      expect(raw).not.toContain('PostgreSQL database dump');
+      expect(raw).not.toContain('argon2$abc');
+      await expect(restore(enc)).rejects.toThrow(/BACKUP_AGE_IDENTITY/);
+
+      await psql(BASE_URL, `DROP DATABASE ${DRILL_DB} WITH (FORCE)`);
+      await psql(BASE_URL, `CREATE DATABASE ${DRILL_DB}`);
+      await restore(enc, { BACKUP_AGE_IDENTITY: key });
+      expect(await fingerprint(drillUrl(DRILL_DB))).toEqual(before);
+    },
+    120_000,
+  );
+
+  it('подписанный комплект восстанавливает выбранную копию в отдельную пустую БД', async () => {
     const into = freshDir();
-    const key = join(into, 'drill.key');
-    const { stderr } = await run('age-keygen', ['-o', key]);
-    const recipient = /age1[a-z0-9]+/.exec(stderr)[0];
-
+    const keys = generateKeyPairSync('ed25519');
+    const signingKey = join(dir, 'bundle-sign.pem');
+    const verifyKey = join(dir, 'bundle-verify.pem');
+    writeFileSync(signingKey, keys.privateKey.export({ format: 'pem', type: 'pkcs8' }), {
+      mode: 0o600,
+    });
+    writeFileSync(verifyKey, keys.publicKey.export({ format: 'pem', type: 'spki' }), {
+      mode: 0o600,
+    });
+    const identity = join(dir, 'bundle-age.key');
+    let recipient = 'age1wiringdouble';
+    let ageEnv = {};
+    if (hasAge) {
+      const { stderr } = await run('age-keygen', ['-o', identity]);
+      recipient = /age1[a-z0-9]+/.exec(stderr)[0];
+    } else {
+      // CI still exercises real PG and Ed25519; only the age executable is a
+      // reversible wiring double. Locally installed age takes the branch above.
+      const bin = mkdtempSync(join(dir, 'bundle-age-bin-'));
+      writeFileSync(identity, 'wiring-double');
+      writeFileSync(
+        join(bin, 'age'),
+        `#!/bin/bash
+mode=enc; out=; inp=
+while [ $# -gt 0 ]; do
+  case "$1" in -d) mode=dec;; -r|-i) shift;; -o) out="$2"; shift;; *) inp="$1";; esac
+  shift
+done
+if [ "$mode" = enc ]; then { printf 'age-encryption.org/v1\\n'; cat "$inp"; } > "$out"
+else tail -n +2 "$inp" > "$out"; fi
+`,
+        { mode: 0o700 },
+      );
+      ageEnv = { PATH: `${bin}:${process.env.PATH}` };
+    }
     const before = await fingerprint(drillUrl(DRILL_DB));
-    await backup(into, { BACKUP_AGE_RECIPIENT: recipient });
-    const enc = newest(into, '.age');
-
-    // Захват бэкап-хоста не должен раскрывать содержимое: на нём лежит только
-    // ПУБЛИЧНЫЙ ключ, приватный там не нужен.
-    const raw = readFileSync(enc).toString('latin1');
-    expect(raw).not.toContain('PostgreSQL database dump');
-    expect(raw).not.toContain('argon2$abc');
-    await expect(restore(enc)).rejects.toThrow(/BACKUP_AGE_IDENTITY/);
-
+    const { stdout } = await backup(into, {
+      ...ageEnv,
+      BACKUP_FORMAT: 'bundle-v1',
+      BACKUP_AGE_RECIPIENT: recipient,
+      BACKUP_SIGNING_KEY: signingKey,
+      BACKUP_DOMAIN: 'game',
+      BACKUP_PRODUCER: 'pg-drill',
+    });
+    const receipt = JSON.parse(stdout.split('\n').find((line) => line.startsWith('{')));
+    const recovery = {
+      ...ageEnv,
+      BACKUP_VERIFY_KEY: verifyKey,
+      BACKUP_REQUIRE_SIGNED: '1',
+      BACKUP_EXPECT_DOMAIN: 'game',
+      BACKUP_EXPECT_PRODUCER: 'pg-drill',
+      BACKUP_EXPECT_ID: receipt.backupId,
+      BACKUP_AGE_IDENTITY: identity,
+    };
+    await expect(
+      restore(receipt.path, { ...recovery, BACKUP_EXPECT_DOMAIN: 'corp' }),
+    ).rejects.toThrow();
+    expect(await fingerprint(drillUrl(DRILL_DB))).toEqual(before);
     await psql(BASE_URL, `DROP DATABASE ${DRILL_DB} WITH (FORCE)`);
     await psql(BASE_URL, `CREATE DATABASE ${DRILL_DB}`);
-    await restore(enc, { BACKUP_AGE_IDENTITY: key });
+    expect(await fingerprint(drillUrl(DRILL_DB))).toEqual([]);
+    await restore(receipt.path, recovery);
     expect(await fingerprint(drillUrl(DRILL_DB))).toEqual(before);
   }, 120_000);
 });

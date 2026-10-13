@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Бэкап боевой БД: снять дамп, доказать что он ПОЛНЫЙ, зашифровать, положить под
-# итоговым именем атомарно, вычистить просроченные.
+# Бэкап БД: снять завершённый дамп, зашифровать, опубликовать файл.
+# bundle-v1 добавляет подпись; legacy сохраняет checksum и локальную ротацию.
 #
 # ПОЧЕМУ ЭТОТ ФАЙЛ СУЩЕСТВУЕТ (SE-3.4). До него бэкапа в репозитории не было вообще —
 # он жил в `deploy/README.md` одной строкой crontab:
@@ -24,9 +24,9 @@
 #      РАЗДЕЛЬНЫМИ шагами через временный каталог: код возврата каждого принадлежит
 #      ровно ему и ловится `set -e`, а не растворяется в чужом успехе.
 #   2. ИМЯ ФАЙЛА — ЭТО УТВЕРЖДЕНИЕ О ПРИГОДНОСТИ. Под итоговым именем файл появляется
-#      последним действием, `mv` по уже проверенному. Незавершённый бэкап физически
-#      не может выглядеть как завершённый: он остаётся во временном каталоге и
-#      исчезает вместе с ним.
+#      после подготовки содержимого. В legacy каждый `mv` атомарен отдельно,
+#      архив и sidecar не являются атомарной парой. bundle-v1 публикует один файл
+#      эксклюзивным hardlink: прежний ID не заменяется.
 #
 # Полноту дампа проверяем по хвостовому маркеру `PostgreSQL database dump complete`,
 # который `pg_dump` печатает ПОСЛЕДНИМ. Проверка не косметическая: обрыв дампа — тот
@@ -36,6 +36,7 @@
 # же учении: живая база из 26 таблиц осталась с 10, код возврата — 0). Здесь
 # единственное место, где обрыв ещё ловится.
 set -euo pipefail
+umask 077
 
 # Пути считаются ОТ САМОГО СКРИПТА — как в `update.sh`: файл репозитория, а клон может
 # лежать где угодно (прод-хост, машина разработчика, CI).
@@ -47,6 +48,26 @@ BACKUP_DIR="${BACKUP_DIR:-/var/backups/void}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
 DB_NAME="${POSTGRES_DB:-void}"
 DB_USER="${POSTGRES_USER:-void}"
+FORMAT="${BACKUP_FORMAT:-legacy}"
+
+# Bundle mode is explicit: existing Docker-only hosts do not necessarily have Node.
+# Reject configuration before taking a plaintext dump or contacting PostgreSQL.
+case "$FORMAT" in
+  legacy) ;;
+  bundle-v1)
+    command -v node >/dev/null || { echo '[✗] E_BACKUP_CONFIG: bundle-v1 requires Node >=20.' >&2; exit 1; }
+    command -v flock >/dev/null || { echo '[✗] E_BACKUP_CONFIG: bundle-v1 requires util-linux flock.' >&2; exit 1; }
+    [ -n "${BACKUP_AGE_RECIPIENT:-}" ] || { echo '[✗] E_BACKUP_CONFIG: bundle-v1 requires BACKUP_AGE_RECIPIENT.' >&2; exit 1; }
+    command -v age >/dev/null || { echo '[✗] E_BACKUP_CONFIG: age is required.' >&2; exit 1; }
+    # Keep a known job ID even if publication succeeds but its final fsync fails.
+    # A scheduler may persist/provide it; retry must not silently create a new ID.
+    BACKUP_ID="${BACKUP_ID:-$(node --input-type=module -e 'import { randomUUID } from "node:crypto"; process.stdout.write(randomUUID())')}"
+    export BACKUP_ID
+    node "$DEPLOY_DIR/backup-bundle.mjs" check-seal >/dev/null
+    echo "[*] Подписанный backupId=$BACKUP_ID"
+    ;;
+  *) echo '[✗] E_BACKUP_CONFIG: unknown BACKUP_FORMAT.' >&2; exit 1 ;;
+esac
 
 # Как ходим в Postgres. По умолчанию — ВНУТРЬ контейнера: на прод-хосте база живёт в
 # compose, её порт опубликован только на loopback, клиентский `pg_dump` установщик на
@@ -83,11 +104,25 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BASE="void-$STAMP"
 mkdir -p "$BACKUP_DIR"
 
+WORK_PREFIX=".tmp-$STAMP"
+if [ "$FORMAT" = bundle-v1 ]; then
+  # GC takes an exclusive nonblocking lock; a running job makes it skip cleanup.
+  # The stable lock inode must never be removed/replaced. Hold shared fd 9 through
+  # dump/age/seal/EXIT cleanup; subprocesses inherit it, including after shell death.
+  node "$DEPLOY_DIR/backup-bundle.mjs" cleanup "$BACKUP_DIR" >/dev/null
+  exec 9<>"$BACKUP_DIR/.backup.lock"
+  flock -s 9
+  WORK_PREFIX=".bundle-job-$STAMP"
+fi
+
 # Временный каталог — В ТОМ ЖЕ разделе, что и цель: иначе финальный `mv` перестаёт быть
 # атомарным (превращается в копирование между устройствами) и снова может оставить
 # полуфайл под итоговым именем.
-WORK="$(mktemp -d "$BACKUP_DIR/.tmp-$STAMP.XXXXXX")"
+WORK="$(mktemp -d "$BACKUP_DIR/$WORK_PREFIX.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
+
+# Legacy names also need to distinguish jobs started in the same second.
+BASE="$BASE-${WORK##*.}"
 
 echo "[*] Снимаем дамп базы «$DB_LABEL»..."
 dump_to "$WORK/$BASE.sql"
@@ -118,8 +153,15 @@ elif [ "${BACKUP_PLAINTEXT:-0}" != "1" ]; then
   exit 1
 fi
 
-# Контрольная сумма рядом: единственный способ для `restore.sh` отличить порчу файла
-# в хранилище от целого архива ДО того, как он тронет базу.
+if [ "$FORMAT" = bundle-v1 ]; then
+  # One authenticated file is the publication unit. The helper never replaces a
+  # previous ID. Local legacy rotation must never become repository retention.
+  node "$DEPLOY_DIR/backup-bundle.mjs" seal "$WORK/$ARTIFACT" "$BACKUP_DIR"
+  echo "[✓] Подписанный комплект готов за $((SECONDS - STARTED)) с."
+  exit 0
+fi
+
+# Legacy: checksum ловит порчу до касания базы, но не доказывает происхождение.
 ( cd "$WORK" && sha256sum "$ARTIFACT" > "$ARTIFACT.sha256" )
 
 mv "$WORK/$ARTIFACT" "$WORK/$ARTIFACT.sha256" "$BACKUP_DIR/"

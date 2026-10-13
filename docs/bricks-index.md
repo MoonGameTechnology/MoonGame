@@ -1292,7 +1292,7 @@
 | SE-3.2 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Шифрование at-rest + in-transit [A02] |
 | SE-3.3 | ⏳ | srv | `docs/secure-environment-roadmap.md` | RLS как defense-in-depth |
 | SE-3.4 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Бэкапы + PITR + проверенный restore |
-| SE-3.5 | ⏳ | ops sec | `docs/secure-environment-roadmap.md` | Независимый backup repository и restore-площадка |
+| SE-3.5 | 🔶 | ops sec | `docs/secure-environment-roadmap.md` | Независимый backup repository и restore-площадка |
 | SE-4.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | ACL / TLS / приватный bind |
 | SE-5.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | Минимальный non-root read-only образ |
 | SE-5.2 | ✅ | sec | `docs/secure-environment-roadmap.md` | Сканирование образа сервера |

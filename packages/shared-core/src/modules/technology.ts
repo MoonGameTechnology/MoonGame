@@ -118,13 +118,16 @@ function effectsSum(
 /** Технологии, любая из которых открывает юнита или здание (пусто — не заперто). Тот же
  *  список, по которому хук `construction.requirement` решает, пускать ли стройку, —
  *  экспортирован, чтобы клиент называл игроку ИМЕННО эту технологию, а не гадал. */
-export function technologiesUnlocking(data: GameData, kind: 'unit' | 'building', id: string): string[] {
+export function technologiesUnlocking(
+  data: GameData, kind: 'unit' | 'building', id: string, state?: Pick<GameState, 'techRules'>,
+): string[] {
   const out: string[] = [];
   for (const technology of Object.keys(data.technologies).sort()) {
     const def = data.technologies[technology];
     if (!def) {
       continue;
     }
+    if (state && def.ruleset !== undefined && def.ruleset !== techRulesOf(state).ruleset) continue;
     const unlocked = kind === 'unit' ? (def.unlocks.units ?? []) : (def.unlocks.buildings ?? []);
     if (unlocked.includes(id)) {
       out.push(technology);
@@ -236,8 +239,12 @@ export function techRulesOf(state: Pick<GameState, 'techRules'>): Readonly<TechR
 
 /** Есть ли узел `id` в дереве этого матча (PVR-6.17): режим может убрать узел целиком —
  *  в забеге нет «Хранителя». Окно, бот и редьюсер спрашивают одно и то же. */
-export function techInMatch(state: Pick<GameState, 'techRules'>, id: string): boolean {
-  return !techRulesOf(state).exclude.includes(id);
+export function techInMatch(
+  state: Pick<GameState, 'techRules'>, id: string, data?: GameData,
+): boolean {
+  const rules = techRulesOf(state);
+  const ruleset = data?.technologies[id]?.ruleset;
+  return !rules.exclude.includes(id) && (ruleset === undefined || ruleset === rules.ruleset);
 }
 
 /** Правила дерева режима — один раз, на первом шаге часов, как `sight` у зрения: дальше
@@ -247,7 +254,8 @@ function pinTechRules(h: HandlerContext): void {
   if (h.state.techRules !== undefined) return;
   const modeId = h.ctx.config?.modeId;
   const rules = modeId === undefined ? undefined : h.ctx.data.modes[modeId]?.technology;
-  if (rules) h.state.techRules = { dayGates: rules.dayGates, exclude: [...rules.exclude] };
+  if (rules) h.state.techRules = { ...rules, exclude: [...rules.exclude],
+    ...(rules.starting ? { starting: [...rules.starting] } : {}) };
 }
 
 /** The data-driven availability gate of a tech, independent of cost / research-slot
@@ -270,9 +278,10 @@ export function technologyLock(
   // these are free — asked for one every step, got E_GRANT_ONLY, and never reached the
   // real tree: research was dead in every match (BAL-15).
   if (def.grantOnly) return 'E_GRANT_ONLY';
+  if (def.ruleset !== undefined && def.ruleset !== techRulesOf(state).ruleset) return 'E_NOT_IN_MATCH';
   // PVR-6.17: узла нет в дереве этого матча (режим его убрал). `id` необязателен лишь
   // ради старых вызовов по одному определению; все читатели в игре его передают.
-  if (id !== undefined && !techInMatch(state, id)) return 'E_NOT_IN_MATCH';
+  if (id !== undefined && !techInMatch(state, id, data)) return 'E_NOT_IN_MATCH';
   const completed = state.players[playerId]?.technologies?.completed ?? [];
   for (const prerequisite of def.prerequisites) {
     if (!completed.includes(prerequisite)) return 'E_PREREQUISITE';
@@ -415,7 +424,7 @@ export const technologyModule: GameModule = {
   id: 'technology',
   // 1.1.0: условие «есть юнит» видит и десант на плацдарме.
   // 1.2.0: площадка крепости на развилке не считается сектором (замечание Codex на #1410).
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);
@@ -463,7 +472,7 @@ export const technologyModule: GameModule = {
       if (typeof playerId !== 'string' || !kind || typeof id !== 'string') {
         return current;
       }
-      const locks = technologiesUnlocking(h.ctx.data, kind, id);
+      const locks = technologiesUnlocking(h.ctx.data, kind, id, h.state);
       if (locks.length === 0) {
         return current;
       }

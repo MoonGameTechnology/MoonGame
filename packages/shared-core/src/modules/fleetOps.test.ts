@@ -377,7 +377,9 @@ describe('fleetOps — fleet.merge (fuse two co-located idle fleets)', () => {
     });
     expect(errCode(kernel.applyAction(s, merge('F1', 'F1'), ctx))).toBe('E_SAME_FLEET');
     expect(errCode(kernel.applyAction(s, merge('missing', 'F2'), ctx))).toBe('E_NO_FLEET');
-    expect(errCode(kernel.applyAction(s, merge('F3', 'F2'), ctx))).toBe('E_FORBIDDEN');
+    // Чужой флот — как несуществующий: «не твой» подтвердил бы флот в тумане (A06).
+    expect(errCode(kernel.applyAction(s, merge('F3', 'F2'), ctx))).toBe('E_NO_FLEET');
+    expect(errCode(kernel.applyAction(s, merge('F1', 'F3'), ctx))).toBe('E_NO_FLEET');
     expect(errCode(kernel.applyAction(s, merge('F1', 'F4'), ctx))).toBe('E_NOT_COLOCATED');
   });
 
@@ -458,7 +460,7 @@ describe('fleetOps — fleet.merge на догоняющем ходу (MRG-1)', 
     const st = world();
     st.fleets.F2!.owner = 'p2';
     st.players.p2 = player('p2');
-    expect(errCode(kernel.applyAction(st, merge('F1', 'F2'), ctx))).toBe('E_FORBIDDEN');
+    expect(errCode(kernel.applyAction(st, merge('F1', 'F2'), ctx))).toBe('E_NO_FLEET');
     // И встречный случай: догоняющий летит НЕ туда, где цель, — это не слияние.
     const elsewhere = stateWith({
       players: [player('p1')],
@@ -479,6 +481,21 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
   // два крейсера с рельсотроном и два голых были для раскола одним «cruiser: 4», и
   // фиттинги уезжали как повезёт. Лоадаут — часть идентичности стека (SM-0.3), значит
   // и адресовать надо стек: `{ unit, modules }`.
+  it('чужой флот — тот же отказ, что несуществующий (A06)', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1'), player('p2')],
+      fleets: [fleet('F2', 'p2', 'A', [['cruiser', 2]])],
+    });
+    // «Не твой» вместо «нет такого» подтвердил бы перебором id флот, скрытый туманом.
+    expect(errCode(kernel.applyAction(s, split('F2', [{ unit: 'cruiser', count: 1 }]), ctx))).toBe(
+      'E_NO_FLEET',
+    );
+    expect(errCode(kernel.applyAction(s, split('NOPE', [{ unit: 'cruiser', count: 1 }]), ctx))).toBe(
+      'E_NO_FLEET',
+    );
+  });
+
   it('ЛОАДАУТ АДРЕСУЕТСЯ: уходят ровно фиттованные, голые остаются', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
@@ -892,6 +909,8 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
     expect(errCode(kernel.applyAction(s, engage('A', 'A'), ctx))).toBe('E_SAME_FLEET');
     expect(errCode(kernel.applyAction(s, engage('A', 'B'), ctx))).toBe('E_NOT_HOSTILE'); // same owner
     expect(errCode(kernel.applyAction(s, engage('A', 'NOPE'), ctx))).toBe('E_NO_FLEET');
+    // Чужой флот как атакующий — тот же отказ, что несуществующий (A06).
+    expect(errCode(kernel.applyAction(s, engage('A', 'B', 'p2'), ctx))).toBe('E_NO_FLEET');
     expect(errCode(kernel.applyAction(s, { ...engage('A', 'B'), payload: {} }, ctx))).toBe(
       'E_BAD_PAYLOAD',
     );

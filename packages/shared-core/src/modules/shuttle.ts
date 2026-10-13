@@ -1155,6 +1155,20 @@ function downMissile(h: HandlerContext, strike: ShuttleStrike, missileId: string
 }
 
 /**
+ * Мина, снятая челноками (SM-3.6, SM-3.7a), уходит с карты отработавшей — `spent`, как
+ * ракета выше: «☠️ флот уничтожен» читался бы хозяину мины потерей флота, которой не было.
+ * Конец мины объявляет своя строка обеим сторонам, теми же ключами, что у сбитой ракеты.
+ * Места в событии нет: мину видно только вблизи, и узел выдал бы её третьим.
+ */
+function clearMine(h: HandlerContext, strike: ShuttleStrike, mineId: string): void {
+  const mine = h.state.fleets[mineId];
+  if (!mine || mine.units.length > 0) return;
+  delete h.state.fleets[mineId];
+  h.emit('fleet.destroyed', { fleetId: mineId, owner: mine.owner, spent: true });
+  h.emit('shuttle.mineCleared', { owner: strike.owner, playerId: mine.owner, mineId });
+}
+
+/**
  * УДАР ВЫЛЕТА ПО ФЛОТУ — урон, гибель цели и её ответка. Один на удар по прибытии и на
  * тик патруля (SHU-6.2): `share` — доля обычного удара (у удара 1, у тика ¼), и ответка
  * берётся той же долей. Две копии этих строк разъехались бы на первой правке урона.
@@ -1165,8 +1179,9 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
   // считаются из состояния до отрезка.
   const answer = returnFireAgainstFleet(target, h.ctx.data) * share;
   const power = strikePower(strike, h.ctx.data, 'fleet') * share;
-  // Ракету узнаём ДО удара: у добитого отряда не остаётся юнитов, по которым её узнать.
+  // Ракету и мину узнаём ДО удара: у добитого отряда не остаётся юнитов, по которым их узнать.
   const missile = isMissileFleet(target, h.ctx.data);
+  const mine = isMineFleet(target, h.ctx.data);
   if (power > 0) {
     const dealt = hookedDamage(h, power, {
       phase: 'shuttle',
@@ -1199,6 +1214,7 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
       strike.owner,
     );
     if (missile) downMissile(h, strike, target.id);
+    else if (mine) clearMine(h, strike, target.id);
     else removeIfWiped(h, target.id);
   }
   repelStrike(h, strike, answer, {
@@ -1829,7 +1845,9 @@ export const shuttleModule: GameModule = {
   // 1.10.0: эскадра в воздухе (SHU-6.13) — `shuttle.redirect`, «Домой» у любого вылета,
   //         перелёт и делёж по `strikeId`; номер приказа `orderSeq` гасит события прежнего.
   // 1.11.0: удар по миру задевает и его войска, без последнего бойца (ROS-1.6).
-  version: '1.11.0',
+  // 1.12.0: мина, снятая челноками, уходит отработавшей (`spent`) со своей строкой
+  //         `shuttle.mineCleared` — журнал не объявляет её гибелью флота.
+  version: '1.12.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
