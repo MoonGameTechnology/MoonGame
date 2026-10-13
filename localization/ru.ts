@@ -65,6 +65,7 @@ export const ru: Record<string, string> = {
   "setup.network.create": "Создать сетевую игру",
   "setup.network.creating": "Создание…",
   "setup.network.failed": "Не удалось создать игру",
+  "setup.network.quota": "У вас уже идут три партии. Новую можно создать, когда одна из них закончится.",
   "setup.map": "Карта",
   'setup.map.duel-1': '1 на 1',
   'setup.map.ffa-4': 'FFA · 4 игрока',

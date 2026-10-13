@@ -99,6 +99,12 @@ export interface MatchApiDeps {
    *  request carries no valid session. Wired ⇒ create/join REQUIRE identity (401 E_AUTH)
    *  and the session's login IS the nick. Absent ⇒ legacy `?nick=` dev behaviour. */
   identify?(request: FastifyRequest): Promise<Identity | null>;
+  /** Ids of the matches still running (`MatchStore.ongoingMatchIds`). Wired together
+   *  with `identify`, it turns on the per-account create quota: an account may have at
+   *  most `createQuota` running matches that it created through this route. */
+  ongoingMatchIds?(): Promise<readonly string[]>;
+  /** Per-account quota on running matches it created (default `CREATE_QUOTA`). */
+  createQuota?: number;
   /** Injectable clock + limits for the per-IP rate limit (deterministic tests). */
   now?: () => number;
   rateMax?: number;
@@ -127,6 +133,13 @@ const RATE_MAX = 30; // create+join attempts per IP per window (shared budget)
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_IPS = 10_000;
 
+/** Running matches one account may have created at once. The per-IP limit alone let a
+ *  single account fill the host's whole match capacity in a couple of minutes, and the
+ *  matches persist, so nobody could create one after that, restarts included. Three is
+ *  enough for a player who sets up games for several groups of friends. */
+const CREATE_QUOTA = 3;
+const CREATE_QUOTA_ACCOUNTS = 10_000; // bounded tracker: oldest account evicted first
+
 export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void {
   const identify = deps.identify;
   const now = deps.now ?? ((): number => Date.now());
@@ -143,12 +156,22 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
   // band (netserver) omits `createMatch` and gets the join route alone.
   const createMatch = deps.createMatch;
   if (createMatch) {
+    const createQuota = deps.createQuota ?? CREATE_QUOTA;
+    /** Account → the matches it created here, each with the order it was recorded in
+     *  (pruned to the running ones on the account's next create). In memory: after a
+     *  restart older matches no longer count, which a player cannot trigger, so the quota
+     *  still holds between restarts. */
+    const created = new Map<string, Array<{ id: string; order: number }>>();
+    let recorded = 0;
+    /** Account → creations in flight, so parallel requests cannot all pass the check. */
+    const inFlight = new Map<string, number>();
     app.post('/matches', async (request: FastifyRequest, reply: FastifyReply) => {
       if (rateLimited(request.ip)) {
         void reply.code(429);
         return { error: 'E_RATE_LIMIT' as const };
       }
-      if (identify && !(await identify(request))) {
+      const who = identify ? await identify(request) : null;
+      if (identify && !who) {
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
@@ -167,11 +190,46 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(400);
         return { error: 'E_UNKNOWN_MODE' as const };
       }
-      if (mapId === undefined && modeId === undefined) return createMatch();
-      return createMatch({
-        ...(mapId !== undefined ? { mapId } : {}),
-        ...(modeId !== undefined ? { modeId } : {}),
-      });
+      const choice =
+        mapId === undefined && modeId === undefined
+          ? undefined
+          : {
+              ...(mapId !== undefined ? { mapId } : {}),
+              ...(modeId !== undefined ? { modeId } : {}),
+            };
+      const listOngoing = deps.ongoingMatchIds;
+      if (!who || !listOngoing) return choice ? createMatch(choice) : createMatch();
+      const account = who.accountId;
+      const listedAfter = recorded;
+      const running = new Set(await listOngoing());
+      // From here to the reservation below nothing awaits, so the check and the
+      // reservation are one step. A match recorded while the list was being read is not
+      // in it yet and still counts.
+      const mine = (created.get(account) ?? []).filter(
+        (m) => running.has(m.id) || m.order >= listedAfter,
+      );
+      if (mine.length + (inFlight.get(account) ?? 0) >= createQuota) {
+        void reply.code(429);
+        return { error: 'E_MATCH_QUOTA' as const };
+      }
+      inFlight.set(account, (inFlight.get(account) ?? 0) + 1);
+      try {
+        const match = choice ? await createMatch(choice) : await createMatch();
+        const kept = (created.get(account) ?? []).filter(
+          (m) => running.has(m.id) || m.order >= listedAfter,
+        );
+        created.delete(account); // re-insert: insertion order = last create
+        created.set(account, [...kept, { id: match.matchId, order: recorded++ }]);
+        if (created.size > CREATE_QUOTA_ACCOUNTS) {
+          const oldest = created.keys().next().value;
+          if (oldest !== undefined) created.delete(oldest);
+        }
+        return match;
+      } finally {
+        const left = (inFlight.get(account) ?? 1) - 1;
+        if (left > 0) inFlight.set(account, left);
+        else inFlight.delete(account);
+      }
     });
   }
 

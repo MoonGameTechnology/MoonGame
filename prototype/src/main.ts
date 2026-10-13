@@ -7481,10 +7481,15 @@ function createOnlineMatch(mapId: MapId): void {
         headers: { 'content-type': 'application/json', ...(pass ? { authorization: `Bearer ${pass}` } : {}) },
         body: JSON.stringify({ mapId }),
       });
-      if (!res.ok) throw new Error('E_CREATE_MATCH');
+      if (!res.ok) {
+        const refusal = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(refusal?.error ?? 'E_CREATE_MATCH');
+      }
       const body = await res.json() as { matchId: string };
       await openSeatPicker(body.matchId);
-    } catch { note(t('setup.network.failed')); }
+    } catch (err) {
+      note(t(err instanceof Error && err.message === 'E_MATCH_QUOTA' ? 'setup.network.quota' : 'setup.network.failed'));
+    }
     finally {
       creatingMatch = false;
       for (const button of buttons) { button.disabled = false; button.textContent = t('setup.network.create'); }

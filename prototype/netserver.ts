@@ -1133,6 +1133,10 @@ const server = createMultiplayerServer({
           const h = await hostNewMatch(mapPreset(request?.mapId ?? DEFAULT_MAP_ID).id, request?.modeId);
           return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
         },
+        // Квота на учётку: не больше трёх ИДУЩИХ партий, созданных ею (`createQuota`).
+        // Без неё одна учётка за пару минут выбирала весь `MAX_HOSTED`, и партии в сторе
+        // переживали рестарт — создать новую не мог больше никто.
+        ongoingMatchIds: () => matchStore.ongoingMatchIds(),
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
         // reset revokes older sessions before they can claim/reclaim a seat (SE-1.x).
         identify: identifySession,
