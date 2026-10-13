@@ -9,7 +9,7 @@ import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity'
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
-import { isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { DEFAULT_MAP_ID, isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
@@ -390,12 +390,10 @@ if (process.env.TRUST_PROXY === '1' && HOST_BIND !== '127.0.0.1' && HOST_BIND !=
       'deploy/docker-compose.tls.yml) или закройте порт файрволом.\n',
   );
 }
-// The prototype host defaults to a ten-chair FFA. `TEAMS=<format>` seeds two allied
-// flanks instead: 1v1/2v2/3v3/4v4/5v5 give 2/4/6/8/10 chairs (PVE-1.1), and `TEAMS=pve`
-// keeps its own layout — two humans against one strong bot. Every
-// chair is claimable by a human, while the server AI stands in after the reconnect grace.
+// New matches take their capacity and sides from the selected map: duel by default,
+// or four-player FFA. Legacy seating formats remain readable for existing sessions.
 const NETWORK_MODE = parseNetworkMatchMode(process.env.TEAMS);
-const NET_SEATS = networkSeats(NETWORK_MODE);
+const NET_SEATS = networkSeats(NETWORK_MODE, DEFAULT_MAP_ID);
 // MATCHES=N — сколько партий ЗАСЕЯТЬ на пустом сторе (default 1); тот же режим и та же
 // шкала времени у всех, браузер матчей показывает каждую. Это НЕ список партий хоста:
 // список приходит из стора (ADDR-1, `matchRoster.ts`). Первая засеянная сохраняет
@@ -424,7 +422,7 @@ interface HostedMatch {
 
 async function createHostedMatch(
   id: string,
-  mapId: MapId = 'nexus',
+  mapId: MapId = DEFAULT_MAP_ID,
   modeId?: string,
 ): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates the empty-seat AI)
@@ -853,7 +851,7 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  */
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
-async function hostNewMatch(mapId: MapId = 'nexus', modeId?: string): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Promise<HostedMatch> {
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
   const h = await createHostedMatch(newMatchId(), mapId, modeId);
   hosted.push(h);
@@ -1131,7 +1129,7 @@ const server = createMultiplayerServer({
         // бы второй перечень режимов, который молча разъедется с `data/modes.json`.
         modeIds: Object.keys(data.modes),
         createMatch: async (request) => {
-          const h = await hostNewMatch(mapPreset(request?.mapId).id, request?.modeId);
+          const h = await hostNewMatch(mapPreset(request?.mapId ?? DEFAULT_MAP_ID).id, request?.modeId);
           return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
         },
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
@@ -1289,12 +1287,7 @@ const lines = [
   `  matches: ${MATCHES} session${MATCHES > 1 ? 's' : ''} in this process (${matchIds.join(', ')}) — set MATCHES=N for more; all listed in the in-game browser`,
   `  ai     : substitute bot takes an abandoned chair after ${(AI_GRACE_MS / 3_600_000).toFixed(1)}h offline (real time; set AI_GRACE_MS); a delegated Steward runs instantly`,
   `  join   : a NEW player may claim a free seat for ${(ENTRY_WINDOW_MS / 86_400_000).toFixed(1)} real days from a session's creation (set ENTRY_WINDOW_MS); a seated player reconnects any time`,
-  // Строка выводится ИЗ РАСКЛАДА, а не из списка режимов: перечисление вручную
-  // устаревало на каждом новом формате (PVE-1.1 добавил 1v1/3v3/4v4, и лесенка
-  // тернарников напечатала бы им «10-player FFA»).
-  NETWORK_MODE === 'ffa'
-    ? `  mode   : ${NET_SEATS.length}-player FFA — empty chairs are AI-driven (set TEAMS=3v3 for teams)`
-    : `  mode   : ${NETWORK_MODE} — ${NET_SEATS.length} claimable chairs; empty chairs are AI-driven`,
+  `  map    : ${DEFAULT_MAP_ID} — ${NET_SEATS.length} claimable chairs; empty chairs are AI-driven`,
   '',
   '  Multiplayer test:',
   `   • You:     open ${localHttp}/  → enter a callsign → join`,

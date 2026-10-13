@@ -599,7 +599,9 @@ try {
     await leave();
     // Забег из шага 1 сохранён — «Продолжить» идёт ДРУГИМ путём кода (восстановление
     // снимка), и флаг забега там ставится в своём месте: его тоже надо поймать.
-    await page.locator('#hub-sector-zero').click();
+    // Archived entry stays wired for saved sessions, but is hidden from the main hub.
+    assert.equal(await page.locator('#hub-sector-zero').isVisible(), false);
+    await page.evaluate(() => document.getElementById('hub-sector-zero').click());
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
     assert.equal(await page.locator('#sz-save-label').isVisible(), true, 'сохранённый забег подписан');
     assert.equal(await singlePlayer(), 1, '«Одиночная игра» — один раз и при сохранённом забеге');

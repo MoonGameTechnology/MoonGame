@@ -35,7 +35,7 @@ import {
   type SetupConfig,
 } from './game';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
-import { isFrontier, mapPreset, MAP_IDS, type MapId } from './mapCatalog';
+import { DEFAULT_MAP_ID, isCurrentMap, isFrontier, mapPreset, MAP_IDS, type MapId } from './mapCatalog';
 import { metaGrant, type MetaState } from './meta';
 import { mapWorldName } from './planetName';
 import { resetSandboxConfig } from './sandbox';
@@ -84,7 +84,7 @@ let game: SetupScreenHost;
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
-export let setupMapId: MapId = 'nexus';
+export let setupMapId: MapId = DEFAULT_MAP_ID;
 const setupPreset = () => mapPreset(setupMapId);
 const setupSeatCount = () => setupPreset().starts.length;
 
@@ -93,7 +93,7 @@ const setupSeatCount = () => setupPreset().starts.length;
 const freshSetupSlots = (): SeatRole[] =>
   game.seats
     .slice(0, setupSeatCount())
-    .map((_, i) => (i === 0 ? 'human' : isFrontier(setupMapId) || i === 1 ? 'ai' : 'off'));
+    .map((_, i) => (i === 0 ? 'human' : isCurrentMap(setupMapId) || isFrontier(setupMapId) || i === 1 ? 'ai' : 'off'));
 // Свежие места сеет `initSetupScreen`: их список — места хоста.
 export let setupSlots: SeatRole[] = [];
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
@@ -288,10 +288,10 @@ function renderSetupSlots(): void {
   // Sector Zero — режим со своей дверью на хабе, а не настройка этой схватки (UIX-15.1).
   let h =
     setupRivalsHtml(rivalCount(setupSlots), setupHelp) +
-    `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
+    (isCurrentMap(setupMapId) ? '' : `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
-    `</div>`;
+    `</div>`);
   if (isFrontier(setupMapId)) {
     const count = rivalCount(setupSlots);
     setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
@@ -335,7 +335,9 @@ function renderSetup(): void {
   mapSelect.value = setupMapId;
   mapSelect.disabled = !!netSetup;
   $('setup-map-info').textContent = t(
-    setupMapId === 'frontier-100'
+    setupMapId === 'duel-1' ? 'setup.map.duel-1-info'
+      : setupMapId === 'ffa-4' ? 'setup.map.ffa-4-info'
+      : setupMapId === 'frontier-100'
       ? 'setup.map.frontier-legacy-info'
       : isFrontier(setupMapId)
         ? 'setup.map.frontier-info'
@@ -411,6 +413,7 @@ export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   // одиночную схватку — тот же довод, что у чистого выбора в `seatJoin.ts`.
   netSetup = null;
   game.stopNetPoll();
+  if (!isCurrentMap(setupMapId)) setupMapId = DEFAULT_MAP_ID;
   setupSlots = freshSetupSlots();
   setupTeams = false; // a fresh setup opens on the classic free-for-all
   setupSeatTeam = [...DEFAULT_TEAM_SIDES];
@@ -458,7 +461,8 @@ export function buildSetupConfig(): SetupConfig {
       faction: fids[i]!,
       start,
       ai: i !== 0,
-      ...(setupTeams ? { team: setupSeatTeam[i] } : {}),
+      ...(setupMapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' }
+        : setupTeams && setupMapId !== 'ffa-4' ? { team: setupSeatTeam[i] } : {}),
     };
   });
   // Carry the player's division templates + hero roster into the match (deep-cloned),
@@ -477,11 +481,11 @@ export function buildSetupConfig(): SetupConfig {
   };
 }
 
-/** Гид по первому матчу (ONB-2) готовит свою партию: «Нексус» без соперников и
+/** Гид по первому матчу (ONB-2) готовит свою партию: дуэльную карту без соперников и
  *  предсказуемый родной мир. Остальной выбор экрана гид не трогает. */
 export function prepareGuidedSetup(): void {
-  setupMapId = 'nexus';
-  setupSlots = ['human', 'off', 'off', 'off']; // no rivals — a safe, calm sandbox
+  setupMapId = DEFAULT_MAP_ID;
+  setupSlots = ['human', 'off']; // no rivals — a safe, calm sandbox
   setupStart = setupPreset().starts[0]!; // a deterministic homeworld
 }
 
@@ -618,6 +622,7 @@ export function initSetupScreen(host: SetupScreenHost): void {
   });
   setupSlotsEl.addEventListener('click', (ev) => {
     if ((ev.target as Element).closest('[data-teamtog]')) {
+      if (isCurrentMap(setupMapId)) return;
       setupTeams = !setupTeams;
       renderSetup();
       return;
@@ -629,6 +634,7 @@ export function initSetupScreen(host: SetupScreenHost): void {
     }
     const ts = (ev.target as Element).closest('[data-teamseat]');
     if (ts) {
+      if (isCurrentMap(setupMapId)) return;
       const i = Number(ts.getAttribute('data-teamseat'));
       if (i > 0) setupSeatTeam[i] = setupSeatTeam[i] === 'A' ? 'B' : 'A'; // you (0) are locked to A
       renderSetup();
@@ -637,7 +643,10 @@ export function initSetupScreen(host: SetupScreenHost): void {
     const t = (ev.target as Element).closest('[data-slot]');
     if (!t) return;
     const i = Number(t.getAttribute('data-slot'));
-    setupSlots[i] = nextSeatRole(setupSlots[i]!); // выкл → слабый → сильный → выкл
+    if (i <= 0 || i >= setupSeatCount()) return;
+    setupSlots[i] = isCurrentMap(setupMapId)
+      ? setupSlots[i] === 'ai-strong' ? 'ai' : 'ai-strong'
+      : nextSeatRole(setupSlots[i]!); // выкл → слабый → сильный → выкл
     renderSetup();
   });
   setupSpeedEl.addEventListener('click', (ev) => {

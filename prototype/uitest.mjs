@@ -467,18 +467,15 @@ const selectMap = (id) => {
 if (sectorEntry) await click('sz-back');
 await click('cwgo');
 await click('hub-solo');
-selectMap('frontier-50');
-assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 50);
-assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 50);
-assert.ok(getEl('setupslots').innerHTML.includes('max="49"'));
+selectMap('ffa-4');
+assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 4);
+assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 4);
+assert.equal((getEl('setupslots').innerHTML.match(/data-slot=/g) ?? []).length, 3);
 // Играть можно только за ДОМА: Улей и легаси-`vanguard` лежат в каталоге фракций, но в
 // выбор игрока не попадают (баг «можно играть за Улей», владелец 2026-09-23).
 assert.ok(getEl('setupfactions').innerHTML.includes('data-fpick="azure"'));
 assert.ok(!getEl('setupfactions').innerHTML.includes('data-fpick="swarm"'), 'the Swarm is not a playable house');
 assert.ok(!getEl('setupfactions').innerHTML.includes('data-fpick="vanguard"'));
-for (const handle of (listeners.get(getEl('setupslots')) ?? {}).change ?? [])
-  handle({ target: { id: 'setup-bot-count', value: '999' } });
-assert.ok(getEl('setupslots').innerHTML.includes('value="49"'));
 for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
 assert.equal(getEl('setup').style.display, 'none');
 for (let i = 0; i < 30 && rafCbs.length; i++) {
@@ -498,13 +495,13 @@ const soloCheckpoint = storage.get('void.solo.v1');
 assert.ok(soloCheckpoint);
 assert.equal(getEl('hub-solo-continue').disabled, false);
 // UIX-10.1: главная дверь называет партию — режим, карта и день.
-assert.match(getEl('hub-continue-sub').textContent, / · (Фронтир|Frontier) · \S+ \d+$/);
+assert.match(getEl('hub-continue-sub').textContent, / · FFA · 4 (игрока|players) · \S+ \d+$/);
 await click('hub-solo-continue');
 assert.deepEqual(JSON.parse(mod.exports.state()), JSON.parse(soloCheckpoint).payload.state);
 assert.equal(mod.exports.solo().speed, 0);
 await click('hub-solo');
-selectMap('nexus');
-assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 10);
+selectMap('duel-1');
+assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 2);
 for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
 for (let i = 0; i < 10 && rafCbs.length; i++) {
   await rafCbs.shift()(performance.now());
@@ -518,7 +515,7 @@ assert.equal(getEl('solo-replace').style.display, 'none');
 assert.equal(storage.get('void.solo.v1'), beforeReplace, 'Back cancels replacement');
 await click('setupgo');
 await click('solo-replace-confirm');
-assert.equal(JSON.parse(storage.get('void.solo.v1')).payload.state.mapId, 'nexus');
+assert.equal(JSON.parse(storage.get('void.solo.v1')).payload.state.mapId, 'duel-1');
 for (const [checkpoint, extra] of [[soloCheckpoint, []], ['{broken', []], [soloCheckpoint, ['--player']]]) {
   const child = spawnSync(process.execPath, ['prototype/uitest.mjs', '--solo-boot-check', ...extra], {
     input: checkpoint, encoding: 'utf8', timeout: 120000,

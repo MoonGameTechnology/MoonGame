@@ -10,6 +10,10 @@ export const en: Record<string, string> = {
   "setup.network.creating": "Creating…",
   "setup.network.failed": "Could not create game",
   "setup.map": "Map",
+  'setup.map.duel-1': '1 vs 1',
+  'setup.map.ffa-4': 'FFA · 4 players',
+  'setup.map.duel-1-info': '19 sectors, two players, distinct flanks.',
+  'setup.map.ffa-4-info': '31 sectors, four distinct starts, free for all.',
   "setup.map.nexus": "Nexus · 10 players",
   "setup.map.frontier-100": "Frontier · 100 players",
   "setup.map.frontier-50": "Frontier · 50 players",
@@ -3043,7 +3047,7 @@ export const en: Record<string, string> = {
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
   'setup.bonus.damage': '+{n}% damage',
   'setup.bonus.economy': '+{n}% economy',
-  'setup.ai.hint': 'Click to cycle: off → weak → strong',
+  'setup.ai.hint': 'Click to switch: weak ↔ strong',
   'setup.ai.strong': 'Strong',
   'setup.ai.weak': 'Weak',
   'setup.bonus.radar': '+{n}% radar',
@@ -3061,9 +3065,9 @@ export const en: Record<string, string> = {
   'setup.off': 'Off',
   'setup.rivals': 'Rivals: {n}',
   'setup.rivals.help':
-    'A weak bot can do everything a strong one can, but gives orders half as often and makes more mistakes. All seats off make a peaceful sandbox.',
+    'A weak bot can do everything a strong one can, but gives orders half as often and makes more mistakes.',
   'setup.rivals.help.aria': 'More about rivals',
-  'setup.rivals.hint': 'Row button: off → weak → strong. The dot is the player’s colour on the map.',
+  'setup.rivals.hint': 'Row button: weak ↔ strong. The dot is the player’s colour on the map.',
   'setup.sandbox': '🧪 Sandbox',
   'setup.speed.hint':
     '×1 — real time (an hour of travel = an hour of life, the world runs offline too). For a quick game pick ×10–×100.',

@@ -1,0 +1,254 @@
+{
+  "id": "duel-1",
+  "seed": "duel-1",
+  "sectors": {
+    "home_1": {
+      "position": {
+        "x": -1160,
+        "y": 170
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "slot_1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "home_2": {
+      "position": {
+        "x": 1120,
+        "y": -110
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "slot_2",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "world_1": {
+      "position": {
+        "x": -850,
+        "y": 310
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "world_2": {
+      "position": {
+        "x": -960,
+        "y": -90
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "world_3": {
+      "position": {
+        "x": 860,
+        "y": -290
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "world_4": {
+      "position": {
+        "x": 920,
+        "y": 140
+      },
+      "kind": "planet",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "shale": {
+      "position": {
+        "x": -650,
+        "y": -240
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "mist": {
+      "position": {
+        "x": -570,
+        "y": 170
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "watch": {
+      "position": {
+        "x": -470,
+        "y": 470
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "drift": {
+      "position": {
+        "x": -320,
+        "y": -60
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "crossing": {
+      "position": {
+        "x": -80,
+        "y": 210
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "wreck": {
+      "position": {
+        "x": 110,
+        "y": 490
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
+    },
+    "ember": {
+      "position": {
+        "x": 170,
+        "y": -130
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "shelf": {
+      "position": {
+        "x": 350,
+        "y": -440
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "cloud": {
+      "position": {
+        "x": 440,
+        "y": 70
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "outpost": {
+      "position": {
+        "x": 610,
+        "y": 360
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "shoal": {
+      "position": {
+        "x": 650,
+        "y": -130
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "reach": {
+      "position": {
+        "x": -780,
+        "y": 600
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "south_void": {
+      "position": {
+        "x": -140,
+        "y": -480
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    }
+  },
+  "slots": {
+    "slot_1": {
+      "team": "A",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_2": {
+      "team": "B",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    }
+  },
+  "fleets": {
+    "fleet_1": {
+      "owner": "slot_1",
+      "location": "home_1",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_2": {
+      "owner": "slot_2",
+      "location": "home_2",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    }
+  }
+}
