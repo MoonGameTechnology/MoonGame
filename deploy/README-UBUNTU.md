@@ -69,8 +69,8 @@ sudo systemctl restart nginx
 Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
 запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
 deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
-`/opt/moongame/deploy/server.env` и выполни `moongame restart`. IPv6 в origin пишется в
-квадратных скобках: `http://[2001:db8::10]:<порт>`.
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`. Порт 80 в origin не
+пишется (`http://<внешний-IP>`), IPv6 пишется в квадратных скобках: `http://[2001:db8::10]:<порт>`.
 
 #### Вариант 2: На роутере
 

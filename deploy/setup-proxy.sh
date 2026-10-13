@@ -40,7 +40,7 @@ if [ -z "$INTERNAL_IP" ] || [ -z "$EXTERNAL_IP" ] || [ -z "$EXTERNAL_PORT" ]; th
     exit 1
 fi
 # Значения подставляются в конфиг nginx, поэтому только IPv4 или имя хоста и число.
-# IPv6 скрипт не поддерживает: для него конфиг nginx пишется вручную.
+# IPv6 скрипт не поддерживает.
 for v in "$INTERNAL_IP" "$EXTERNAL_IP"; do
     if ! [[ "$v" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]]; then
         log_error "Недопустимый адрес: $v"
@@ -80,6 +80,12 @@ fi
 # Создание конфига
 log_info "Создание конфигурации проксирования..."
 
+# Прежний конфиг сохраняется: если новый не пройдёт nginx -t, рабочий вернётся на место.
+HAD_SITE=0
+if [ -f /etc/nginx/sites-available/moongame ]; then
+    cp -a /etc/nginx/sites-available/moongame /etc/nginx/sites-available/moongame.prev
+    HAD_SITE=1
+fi
 cat > /etc/nginx/sites-available/moongame << 'EOF'
 # Void Dominion — проксирование внешнего доступа
 #
@@ -159,8 +165,10 @@ else
 fi
 
 # Отключение default сайта если он есть
+DEFAULT_REMOVED=0
 if [ -L /etc/nginx/sites-enabled/default ]; then
     rm /etc/nginx/sites-enabled/default
+    DEFAULT_REMOVED=1
     log_info "Default сайт отключен"
 fi
 
@@ -168,9 +176,18 @@ fi
 log_info "Проверка конфигурации Nginx..."
 if nginx -t &>/dev/null; then
     log_success "Конфиг валиден"
+    rm -f /etc/nginx/sites-available/moongame.prev
 else
-    log_error "Ошибка в конфиге Nginx!"
+    log_error "Ошибка в конфиге Nginx! Возвращаю прежнюю конфигурацию."
     nginx -t
+    if [ "$HAD_SITE" = 1 ]; then
+        mv /etc/nginx/sites-available/moongame.prev /etc/nginx/sites-available/moongame
+    else
+        rm -f /etc/nginx/sites-available/moongame /etc/nginx/sites-enabled/moongame
+    fi
+    if [ "$DEFAULT_REMOVED" = 1 ]; then
+        ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+    fi
     exit 1
 fi
 
