@@ -179,7 +179,7 @@ if nginx -t &>/dev/null; then
     rm -f /etc/nginx/sites-available/moongame.prev
 else
     log_error "Ошибка в конфиге Nginx! Возвращаю прежнюю конфигурацию."
-    nginx -t
+    nginx -t || true
     if [ "$HAD_SITE" = 1 ]; then
         mv /etc/nginx/sites-available/moongame.prev /etc/nginx/sites-available/moongame
     else
