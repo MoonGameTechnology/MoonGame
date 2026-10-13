@@ -48,6 +48,7 @@ sudo apt-get install -y nginx
 sudo bash -c 'cat > /etc/nginx/sites-available/moongame << EOF
 server {
     listen <порт>;
+    listen [::]:<порт>;
     server_name <внешний-IP>;
 
     location / {

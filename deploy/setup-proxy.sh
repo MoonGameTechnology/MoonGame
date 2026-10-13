@@ -39,9 +39,9 @@ if [ -z "$INTERNAL_IP" ] || [ -z "$EXTERNAL_IP" ] || [ -z "$EXTERNAL_PORT" ]; th
     log_error "Задай INTERNAL_IP, EXTERNAL_IP и EXTERNAL_PORT"
     exit 1
 fi
-# Значения подставляются в конфиг nginx, поэтому только адрес или имя хоста и число.
+# Значения подставляются в конфиг nginx, поэтому только IPv4, IPv6 или имя хоста и число.
 for v in "$INTERNAL_IP" "$EXTERNAL_IP"; do
-    if ! [[ "$v" =~ ^[0-9A-Za-z.:-]+$ ]]; then
+    if ! [[ "$v" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ || ("$v" =~ ^[0-9A-Fa-f:]+$ && "$v" =~ [0-9A-Fa-f] && "$v" == *:*:*) ]]; then
         log_error "Недопустимый адрес: $v"
         exit 1
     fi
@@ -97,6 +97,7 @@ upstream moongame_backend {
 server {
     # Слушаем внешний порт
     listen __EXTERNAL_PORT__;
+    listen [::]:__EXTERNAL_PORT__;
     server_name __EXTERNAL_IP__;
 
     # Логирование
@@ -152,11 +153,6 @@ EOF
 sed -i -e "s/__INTERNAL_IP__/$INTERNAL_HOST/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
     -e "s/__EXTERNAL_IP__/$EXTERNAL_HOST/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
     /etc/nginx/sites-available/moongame
-# `listen <порт>` в nginx слушает только IPv4; для внешнего IPv6 нужен отдельный слушатель.
-if [[ "$EXTERNAL_IP" == *:* ]]; then
-    sed -i "s/^    listen $EXTERNAL_PORT;$/&\n    listen [::]:$EXTERNAL_PORT;/" \
-        /etc/nginx/sites-available/moongame
-fi
 
 # Включение сайта
 if [ -L /etc/nginx/sites-enabled/moongame ]; then
