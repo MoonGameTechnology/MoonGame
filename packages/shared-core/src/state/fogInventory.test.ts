@@ -108,8 +108,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // SM-3.4: мины, видные врагу, мины не работают — своё поле и своя перезарядка, чужое снято.
   minefields: 'filtered',
   heroes: 'filtered', // только свои
-  tempLanes: 'public', // настоящие рёбра графа: их видно всем
-  topology: 'public',
+  tempLanes: 'filtered', // свои и общие коридоры; чужой личный вместе с его ребром снят
+  topology: 'filtered', // отпечаток видимых коридоров, а не счётчик всех открытий
   heroSeq: 'stripped', // его поднимает и коридор, и корабль героя, вставший в тумане
   diplomacy: 'public', // кто с кем воюет — открытое знание
   diplomacyOffers: 'filtered', // а кто с кем ТОРГУЕТСЯ — дело двоих
@@ -402,8 +402,29 @@ function maximalState(): GameState {
       },
     },
     tempLanes: [
-      // Настоящее ребро графа — публичная топология, канареек тут быть не должно.
-      { id: 'lane1', owner: RIVAL, from: 'A', to: 'Z', speedBonus: 0.5, expiresAt: 900, addedLink: false },
+      // Свой коридор виден, чужой личный (ступень 1) снят целиком.
+      {
+        id: 'lane1',
+        owner: VIEWER,
+        from: 'A',
+        to: 'Z',
+        speedBonus: 0.5,
+        expiresAt: 900,
+        addedLink: false,
+        tier: 1,
+        heroId: 'mine_hero',
+      },
+      {
+        id: 'CANARY_lane',
+        owner: RIVAL,
+        from: 'Z',
+        to: 'A',
+        speedBonus: 0.5,
+        expiresAt: 900,
+        addedLink: true,
+        tier: 1,
+        heroId: 'CANARY_hero',
+      },
     ],
     topology: 3,
     heroSeq: 1,
