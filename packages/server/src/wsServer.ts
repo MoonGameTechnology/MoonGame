@@ -66,6 +66,12 @@ export interface MultiplayerServerOptions {
    *  match and its `playerId` must be a seat in it. Absent ⇒ the dev `?player=`/`?nick=`
    *  handshake (the default for local dev, LAN playtests, and tests). */
   auth?: JoinTokenVerifyConfig;
+  /** Password freshness of a join token (under `auth`): the account's CURRENT password
+   *  fingerprint, or null when there is no such account (`currentPwfp` in authApi). When
+   *  set, a join token must carry `accountId` + `pwfp`, and `pwfp` must still match — a
+   *  token minted before a password reset is refused (401), like the session it came
+   *  from. A lookup error refuses too. Both hosts wire it whenever accounts exist. */
+  accountPwfp?: (accountId: string) => Promise<string | null>;
   /** Seat lock (REL-5) — protect the nick-login path without accounts. On a nick's
    *  FIRST join the server mints a random seat ticket, stores only its sha256 in the
    *  account store and hands the plaintext to that client in `welcome.seatTicket`;
@@ -615,6 +621,15 @@ export function createMultiplayerServer(
           if (verified.claim.matchId !== matchId) {
             refuseUpgrade(403); // a token for a different match
             return;
+          }
+          // A password reset revokes sessions by fingerprint; the join token minted from
+          // such a session must die with it, not live out its TTL.
+          if (options.accountPwfp) {
+            const { accountId: owner, pwfp } = verified.claim;
+            if (!owner || !pwfp || (await options.accountPwfp(owner)) !== pwfp) {
+              refuseUpgrade(401);
+              return;
+            }
           }
           playerId = verified.claim.playerId;
           accountId = verified.claim.accountId;

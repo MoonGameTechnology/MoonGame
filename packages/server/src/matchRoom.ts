@@ -1064,6 +1064,34 @@ export class MatchRoom {
     return closed;
   }
 
+  /**
+   * Отзыв сессии: закрыть сокеты ОДНОГО АККАУНТА во всех креслах этой комнаты — после
+   * смены пароля (`/auth/reset`). Тот же кадр `error` + закрытие 1000, что у `evict`,
+   * но с двумя отличиями.
+   *
+   * Отбор — по аккаунту КАЖДОГО сокета (`peerAccountId`), а не по креслу: кресло могло
+   * перейти к другому аккаунту (админский кик), и его сокеты отзыв не касается.
+   *
+   * Сокет снимается из `peers` СИНХРОННО, как при перехвате кресла в `addPeer`: `close()`
+   * лишь переводит соединение в CLOSING, и уже отправленные кадры укравшего аккаунт ещё
+   * доехали бы до `receive`. Повторный `removePeer` по событию закрытия ничего не делает —
+   * сокета в наборе уже нет. Место в партии не освобождается: это не кик, владелец
+   * вернётся в своё кресло с новой сессией.
+   */
+  evictAccount(accountId: string, code: ServerErrorCode): number {
+    let closed = 0;
+    for (const [playerId, playerPeers] of [...this.peers]) {
+      for (const peer of [...playerPeers]) {
+        if (this.peerAccountId.get(peer) !== accountId) continue;
+        this.send(peer, { type: 'error', matchId: this.id, code });
+        peer.close?.(1000, code);
+        this.removePeer(playerId, peer);
+        closed += 1;
+      }
+    }
+    return closed;
+  }
+
   async receive(
     playerId: PlayerId,
     peer: RoomPeer,

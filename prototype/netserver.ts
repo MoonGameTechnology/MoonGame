@@ -77,6 +77,8 @@ import {
   registerLeaderboardApi,
   FriendService,
   liveSession,
+  currentPwfp,
+  revokeAccountConnections,
   configFromEnv,
   type AccountStore,
   type FriendStore,
@@ -878,7 +880,11 @@ const server = createMultiplayerServer({
   // Accounts (SES-2.5): with AUTH on, the WS handshake requires a verified join token
   // (`?token=`) and ignores nick/ticket entirely — the token is minted by the join
   // route below, AFTER the session + entry-window checks passed.
-  ...(AUTH ? { auth: authCfg.auth } : {}),
+  // The join token is also bound to the account's password: after a reset the old one
+  // is refused here (and the reset itself closes the account's open sockets, below).
+  ...(AUTH
+    ? { auth: authCfg.auth, accountPwfp: (accountId: string) => currentPwfp(userStore, accountId) }
+    : {}),
   // TLS-2 (playtest-hardening): за https-прокси хост обязан уважать Origin-allowlist
   // (CSWSH) и реальные клиентские IP из X-Forwarded-For — без этой проводки env в
   // docker-compose ничего не включает, а per-IP rate-limit auth-роутов за прокси
@@ -1031,6 +1037,10 @@ const server = createMultiplayerServer({
         users: userStore,
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
+        // Новый пароль закрывает открытые игровые сокеты аккаунта во всех партиях.
+        onPasswordChanged: (accountId) => {
+          revokeAccountConnections(registry, accountId);
+        },
         // Плейтест на десять человек часто приходит с ОДНОГО адреса (общий Wi-Fi, NAT
         // оператора), а первый вход стоит двух запросов — поэтому потолок задаётся
         // окружением, а не только дефолтом (`AUTH_RATE_MAX`/`AUTH_RATE_WINDOW_MS`).
@@ -1146,7 +1156,10 @@ const server = createMultiplayerServer({
         // BF-30: `preferredFaction` decouples faction from the slot's start point —
         // the player picks a faction independently; the server overrides the seat's
         // default faction after assigning it.
-        join: async (id, { nick: login, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
+        join: async (
+          id,
+          { nick: login, accountId, pwfp, preferredSlot, preferredFaction, preferredScientists },
+        ) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
@@ -1186,7 +1199,7 @@ const server = createMultiplayerServer({
           if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
           return {
             playerId: seat.playerId,
-            token: await authCfg.signToken!(id, seat.playerId, accountId),
+            token: await authCfg.signToken!(id, seat.playerId, accountId, pwfp),
           };
         },
       });
