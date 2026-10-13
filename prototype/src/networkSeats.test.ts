@@ -31,6 +31,17 @@ describe('prototype network seats', () => {
     const starts = networkStartsOf(state, 'ffa'); // host restarted with TEAMS unset
     expect(Object.keys(starts)).toEqual(plan.map((seat) => seat.id));
     for (const seat of plan) expect(starts[seat.id]).toBe(seat.start);
+    // The house is the player's pick at join (`seat.claim`), so it does not identify the plan.
+    state.players.p1!.faction = 'violet';
+    expect(networkStartsOf(state, 'ffa')).toEqual(starts);
+  });
+
+  it('frontier NPCs hold no seat and do not hide the start worlds', () => {
+    const plan = networkSeatPlan('ffa', 'frontier-50');
+    const state = newGame({ mapId: 'frontier-50', seats: plan });
+    expect(Object.keys(state.players).some((id) => id.startsWith('npc-'))).toBe(true);
+    const starts = networkStartsOf(state, '2v2');
+    for (const seat of plan) expect(starts[seat.id]).toBe(seat.start);
   });
 
   it('frontier maps seat FFA whatever the host mode; an unknown map has no start worlds', () => {

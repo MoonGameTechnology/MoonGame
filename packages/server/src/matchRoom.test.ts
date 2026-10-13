@@ -1821,6 +1821,27 @@ describe('MatchRoom — the wire does not time hidden actions', () => {
     const { signatures: _s, remembered: _r, ...core } = visibleView(r.state, 'p1', testData()).view;
     expect(applyDelta(welcome.state, delta.delta)).toEqual(core);
   });
+
+  it("a player's second socket resyncs the first: the baseline they share moved", async () => {
+    let wall = 10;
+    const r = quietRoom(() => wall);
+    const a = new MemoryPeer();
+    r.addPeer('p1', a);
+    r.addPeer('p2', new MemoryPeer());
+    wall = 500;
+    await send(r, new MemoryPeer(), 'p2', hoard('h1')); // moves the clock, sends p1 nothing
+    expect(a.messages.map((m) => m.type)).toEqual(['welcome']);
+    const b = new MemoryPeer();
+    r.addPeer('p1', b); // the welcome resets p1's baseline to the present
+    const welcome = b.messages[0];
+    const sync = a.messages.at(-1);
+    if (welcome?.type !== 'welcome' || sync?.type !== 'state') throw new Error('expected a resync');
+    expect(sync.state).toEqual(welcome.state);
+    // A desync reply resets the baseline too, so it reaches both sockets.
+    await r.receive('p1', a, JSON.stringify({ type: 'desync', matchId: 'quiet', seq: 0, hash: 'x' }));
+    expect(a.messages.at(-1)?.type).toBe('state');
+    expect(b.messages.at(-1)?.type).toBe('state');
+  });
 });
 
 describe('MatchRoom — host fog (hostFog)', () => {

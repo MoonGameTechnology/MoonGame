@@ -978,6 +978,13 @@ export class MatchRoom {
       ...this.hashField(view.base),
       ...this.lobbyField(),
     });
+    // The delta baseline is per PLAYER, and the welcome just reset it. The player's other
+    // sockets get the same point as a full snapshot: a delta from the new baseline would
+    // skip whatever changed since their last one (a hidden action sends them nothing).
+    if (playerPeers.size > 1) {
+      const sync = this.stateMessageFor(playerId, view);
+      for (const other of playerPeers) if (other !== peer) this.send(other, sync);
+    }
     detach('маркеры союзников при входе', this.sendVisiblePings(playerId, peer)); // best-effort
     this.sendVisibleChat(playerId, peer); // the visible chat back-log, on join
     // Tell already-present peers the wait ended (waitForPlayers) or the lobby
@@ -1160,7 +1167,7 @@ export class MatchRoom {
       const last = this.lastResyncAt.get(playerId);
       if (last === undefined || wallNow - last >= DESYNC_RESYNC_COOLDOWN_MS) {
         this.lastResyncAt.set(playerId, wallNow);
-        this.send(peer, this.stateMessageFor(playerId));
+        this.resyncPlayer(playerId, peer);
       }
       return;
     }
@@ -1331,7 +1338,7 @@ export class MatchRoom {
     if (value.status === 'duplicate') {
       // Idempotent replay — mirror the bare path's dedup response: a full resync for an
       // action that succeeded, the cached rejection otherwise. No re-apply.
-      if (value.receipt.ok) this.send(peer, this.stateMessageFor(playerId));
+      if (value.receipt.ok) this.resyncPlayer(playerId, peer);
       else
         this.sendReject(peer, playerId, value.receipt.actionId, value.receipt.code ?? 'E_INTERNAL');
       return null;
@@ -1413,7 +1420,7 @@ export class MatchRoom {
     const cached = this.receipts.get(actionId);
     if (cached) {
       if (peer) {
-        if (cached.ok) this.send(peer, this.stateMessageFor(playerId));
+        if (cached.ok) this.resyncPlayer(playerId, peer);
         else this.sendRejection(peer, cached);
       }
       return { kind: 'cached', receipt: cached };
@@ -1620,8 +1627,7 @@ export class MatchRoom {
 
   /** A full per-player resync snapshot (fog applied), e.g. for a deduped retry.
    *  Resets that player's delta baseline. */
-  private stateMessageFor(playerId: PlayerId): ServerMessage {
-    const view = this.viewFor(playerId);
+  private stateMessageFor(playerId: PlayerId, view = this.viewFor(playerId)): ServerMessage {
     this.lastVisible.set(playerId, view.base);
     return {
       type: 'state',
@@ -1634,6 +1640,15 @@ export class MatchRoom {
       ...this.hashField(view.base),
       ...this.lobbyField(),
     };
+  }
+
+  /** A full snapshot to `peer` AND every other socket of `playerId`. The delta baseline is
+   *  per player, so resetting it for one socket must bring the rest to the same point. */
+  private resyncPlayer(playerId: PlayerId, peer: RoomPeer): void {
+    const message = this.stateMessageFor(playerId);
+    const targets = new Set(this.peers.get(playerId) ?? []);
+    targets.add(peer);
+    for (const target of targets) this.send(target, message);
   }
 
   /** Advance `this.stateValue` to `now`, committing the catch-up in place. Thin wrapper

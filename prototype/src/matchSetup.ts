@@ -241,12 +241,10 @@ export function networkStartsOf(
   mode: NetworkMatchMode,
 ): Record<string, string | null> {
   // Режим, с которым партия создана, в состоянии не записан, а `TEAMS` хоста мог смениться
-  // после её создания. Поэтому `mode` — только первая догадка: берётся тот расклад, чьи места
-  // совпадают с игроками партии (те же id и фракции). Не совпал ни один — мест без мира.
-  const ids = Object.keys(state.players);
-  const fits = (plan: SeatConfig[]): boolean =>
-    plan.length === ids.length &&
-    plan.every((seat) => state.players[seat.id]?.faction === seat.faction);
+  // после её создания. Поэтому `mode` — только первая догадка, а берётся самый полный
+  // расклад, все места которого есть среди игроков партии. Сверяются только id мест: дом
+  // игрок выбирает при входе (`seat.claim`), а NPC фронтира (`npc-*`) мест не занимают.
+  // Не подошёл ни один — мест без мира.
   let plan: SeatConfig[] = [];
   for (const candidate of [mode, ...NETWORK_MODES.filter((m) => m !== mode)]) {
     let seats: SeatConfig[];
@@ -255,9 +253,8 @@ export function networkStartsOf(
     } catch {
       break; // неизвестная карта: мест без мира честнее, чем выдуманный мир
     }
-    if (fits(seats)) {
+    if (seats.length > plan.length && seats.every((seat) => seat.id in state.players)) {
       plan = seats;
-      break;
     }
   }
   const starts: Record<string, string | null> = {};

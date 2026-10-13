@@ -604,6 +604,8 @@ export function createMultiplayerServer(
         // Plaintext seat ticket minted THIS join (seat lock) — delivered once in
         // `welcome.seatTicket`; the server keeps only the hash.
         let mintedTicket: string | undefined;
+        // The password fingerprint the join token was checked against (auth + revocation only).
+        let stampedPwfp: string | undefined;
         if (auth) {
           // Authenticated handshake (SE-0.1): the join token is the SOLE identity —
           // `?player=`/`?nick=` are ignored so they can't bypass it. The token rides in
@@ -630,6 +632,7 @@ export function createMultiplayerServer(
               refuseUpgrade(401);
               return;
             }
+            stampedPwfp = pwfp;
           }
           playerId = verified.claim.playerId;
           accountId = verified.claim.accountId;
@@ -725,6 +728,7 @@ export function createMultiplayerServer(
             mintedTicket,
             accountId,
             verifiedIdentity,
+            stampedPwfp,
           );
         });
       } catch {
@@ -757,6 +761,8 @@ export function createMultiplayerServer(
       /** Личность доказана рукопожатием (токен/билет) — только тогда комната разрешит
        *  перехватить занятое кресло. */
       verifiedIdentity = false,
+      /** The password fingerprint the join token was checked against (revocation only). */
+      stampedPwfp?: string,
     ) => {
       sockets.add(ws);
       alive.set(ws, true);
@@ -785,6 +791,23 @@ export function createMultiplayerServer(
         )
       ) {
         registry.retain?.(room.id); // keep the match resident while this socket is connected
+        // A password change that landed between the check above and `addPeer` swept the
+        // rooms before this socket was in one. Checked again now that it is registered: a
+        // change from here on finds it in the sweep, an earlier one shows up in the lookup.
+        const owner = accountId;
+        const lookup = options.accountPwfp;
+        if (stampedPwfp !== undefined && owner !== undefined && lookup) {
+          const stamped = stampedPwfp;
+          detach('повторная сверка пароля', (async () => {
+            let current: string | null;
+            try {
+              current = await lookup(owner);
+            } catch {
+              current = null; // the store failed: fail-secure, the session is not proven live
+            }
+            if (current !== stamped) room.evictAccount(owner, 'E_SESSION_REVOKED');
+          })());
+        }
         // ENTRY-3 (правило 6): место закрепляется не заявкой, а ПОПАДАНИЕМ НА КАРТУ —
         // `addPeer` вернул true, значит игрок принят и получил мир. До этого момента
         // заявка временная и истекает, иначе взявший место по ссылке и не пришедший
