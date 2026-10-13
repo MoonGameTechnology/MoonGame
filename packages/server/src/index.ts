@@ -9,6 +9,7 @@ export {
 export {
   createMultiplayerServer,
   tlsFromEnv,
+  wsLimitsFromEnv,
   SOCKET_FLOOD_MAX,
   SOCKET_FLOOD_WINDOW_MS,
   type MultiplayerServerHandle,
