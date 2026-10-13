@@ -348,6 +348,7 @@ describe('MatchRoom · mailbox serializes lobby start', () => {
       id: 'lobby',
       initialState: { ...base, players: { p1: lobbyPlayer('p1'), p2: lobbyPlayer('p2') } },
       kernel: createKernel([markerModule]),
+      clientActionTypes: ['marker.set'],
       data: markerData(),
       now: () => 1000,
       manualStart: true, // clock frozen until the host presses Start

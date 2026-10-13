@@ -26,7 +26,7 @@ import {
 import { data } from './gameData';
 import { botCouncil } from './botCouncil';
 import { SECTOR_TYPES, START_CANDIDATES } from './map';
-import { mapPreset, type MapId } from './mapCatalog';
+import { isFrontier, mapPreset, type MapId } from './mapCatalog';
 import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
@@ -220,6 +220,48 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nex
       ...(teamStarts ? { team: i < half ? 'A' : 'B' } : {}),
     };
   });
+}
+
+/** Кресла сетевой партии на карте `mapId`. Фронтир всегда FFA, `TEAMS` хоста на него не
+ *  действует. Одна запись на создание партии и на расклад мест (`networkStartsOf`) — иначе
+ *  они могли бы разойтись. */
+export function networkSeatPlan(mode: NetworkMatchMode, mapId: MapId): SeatConfig[] {
+  return networkSeats(isFrontier(mapId) ? 'ffa' : mode, mapId);
+}
+
+/**
+ * Родной мир каждого места — по раскладу, с которым партия СОЗДАНА (карта + режим хоста),
+ * а не по живому владению. «Первый мир в порядке карты, которым игрок владеет сейчас»
+ * сдвигается с каждым захватом и потерей, и расклад мест (`GET /matches/:id/seats`)
+ * пересказывал бы их тому, кто туман в игре не пробивает. `null` — у места нет мира в
+ * раскладе или карта больше не известна каталогу.
+ */
+export function networkStartsOf(
+  state: GameState,
+  mode: NetworkMatchMode,
+): Record<string, string | null> {
+  // Режим, с которым партия создана, в состоянии не записан, а `TEAMS` хоста мог смениться
+  // после её создания. Поэтому `mode` — только первая догадка, а берётся самый полный
+  // расклад, все места которого есть среди игроков партии. Сверяются только id мест: дом
+  // игрок выбирает при входе (`seat.claim`), а NPC фронтира (`npc-*`) мест не занимают.
+  // Не подошёл ни один — мест без мира.
+  let plan: SeatConfig[] = [];
+  for (const candidate of [mode, ...NETWORK_MODES.filter((m) => m !== mode)]) {
+    let seats: SeatConfig[];
+    try {
+      seats = networkSeatPlan(candidate, (state.mapId ?? 'nexus') as MapId);
+    } catch {
+      break; // неизвестная карта: мест без мира честнее, чем выдуманный мир
+    }
+    if (seats.length > plan.length && seats.every((seat) => seat.id in state.players)) {
+      plan = seats;
+    }
+  }
+  const starts: Record<string, string | null> = {};
+  for (const id of Object.keys(state.players)) {
+    starts[id] = plan.find((seat) => seat.id === id)?.start ?? null;
+  }
+  return starts;
 }
 
 /** Militia holding each neutral planet at match start (BAL-10: two break the snowball's
