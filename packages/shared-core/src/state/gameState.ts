@@ -1003,7 +1003,9 @@ export interface GameState {
   planets: Record<PlanetId, Planet>;
   fleets: Record<FleetId, Fleet>;
   battles: Record<BattleId, Battle>;
-  /** Monotonic counter handing each battle its id. */
+  /** Monotonic counter handing each battle its id. Server-side, как и все счётчики id
+   *  ниже: `visibleState` их снимает, иначе прирост без нового в обзоре выдал бы бой,
+   *  налёт, эскадру или героя за туманом. */
   battleSeq: number;
   /** EVT-2, owned by `salvageModule`: per-node value of what died in the battle running
    *  there, waiting to be claimed by its winners, plus (for the rest of one drain) who
@@ -1031,9 +1033,9 @@ export interface GameState {
    *  `Math.random` в ядре запрещён. */
   squadronSeq?: number;
   /** Monotonic counter handing each FLEET its id (`nextFleetSeq`, BF-25): его поднимают
-   *  вылет, раскол, авто-сбор, мины и пуск ракеты. В отличие от `battleSeq`/`strikeSeq`,
-   *  `visibleState` его снимает: прирост без нового флота в обзоре выдал бы скрытый пуск
-   *  ракеты (замечание Codex на #1503). Нет на старых сохранениях — `nextFleetSeq` сеет
+   *  вылет, раскол, авто-сбор, мины и пуск ракеты. `visibleState` его снимает, как и
+   *  `battleSeq`: прирост без нового флота в обзоре выдал бы скрытый пуск ракеты
+   *  (замечание Codex на #1503). Нет на старых сохранениях — `nextFleetSeq` сеет
    *  его числом живых флотов. */
   fleetSeq?: number;
   /** Pending timeline, processed in (at, seq) order by `advanceTo`. */

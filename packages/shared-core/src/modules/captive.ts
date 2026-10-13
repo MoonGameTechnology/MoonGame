@@ -57,7 +57,9 @@ function lose(h: HandlerContext, reason: 'hideout' | 'carrier'): void {
 export const captiveModule: GameModule = {
   id: 'captive',
   // 1.1.0: чужая ракета (SM-3.7b) для `captive.load` — как отсутствующий флот (`E_NO_FLEET`).
-  version: '1.1.0',
+  // 1.2.0: любой чужой флот — `E_NO_FLEET`, а не `E_FORBIDDEN` (A06: разница кодов
+  //        подтверждала флот в тумане).
+  version: '1.2.0',
   setup(api) {
     // Убежище сменило хозяина. Сторона людей — пленный взят (или остаётся у неё, если мир
     // перешёл от одного её участника к другому); кто-то ещё — пленный потерян.
@@ -92,8 +94,8 @@ export const captiveModule: GameModule = {
       const side = captiveSide(h.state);
       if (h.state.players[me]?.status !== 'active' || !side.has(me)) return h.reject('E_FORBIDDEN');
       const fleet = fleetForOrder(h.state, fleetId, me, h.ctx.data);
-      if (!fleet) return h.reject('E_NO_FLEET');
-      if (fleet.owner !== me) return h.reject('E_FORBIDDEN');
+      // Чужой флот — как несуществующий: разница кодов выдала бы флот в тумане (A06).
+      if (!fleet || fleet.owner !== me) return h.reject('E_NO_FLEET');
       if (fleet.movement) return h.reject('E_IN_TRANSIT');
       if (fleet.location !== c.hideout) return h.reject('E_NOT_AT_HIDEOUT');
       if (fleet.battleId) return h.reject('E_IN_BATTLE');

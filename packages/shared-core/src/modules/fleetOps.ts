@@ -53,7 +53,9 @@ export const fleetOpsModule: GameModule = {
   // слияния с догоняющего в пути (ревью #1417).
   // 1.10.0: «Атака» по ракете — отказ `E_NO_FLEET`, как по несуществующему флоту (SM-3.7b);
   //         чужая ракета в поле атакующего, слияния и раскола — тот же `E_NO_FLEET`.
-  version: '1.10.0',
+  // 1.11.0: чужой флот в слиянии, расколе и «Атаке» — `E_NO_FLEET`, а не `E_FORBIDDEN`:
+  //         разница кодов подтверждала перебором id флот, скрытый туманом (A06).
+  version: '1.11.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -144,11 +146,10 @@ export const fleetOpsModule: GameModule = {
       }
       const from = fleetForOrder(h.state, payload.from, action.playerId, h.ctx.data);
       const into = fleetForOrder(h.state, payload.into, action.playerId, h.ctx.data);
-      if (!from || !into) {
+      // Чужой флот — тот же отказ, что несуществующий: иначе разница E_NO_FLEET/E_FORBIDDEN
+      // подтвердила бы перебором id флот, скрытый туманом (A06, как у `combat.retreat`).
+      if (!from || !into || from.owner !== action.playerId || into.owner !== action.playerId) {
         return h.reject('E_NO_FLEET');
-      }
-      if (from.owner !== action.playerId || into.owner !== action.playerId) {
-        return h.reject('E_FORBIDDEN');
       }
       if (from.battleId || into.battleId) {
         return h.reject('E_IN_BATTLE');
@@ -302,11 +303,9 @@ export const fleetOpsModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const fleet = fleetForOrder(h.state, payload.fleetId, action.playerId, h.ctx.data);
-      if (!fleet) {
+      // Чужой флот — как несуществующий (A06, см. `fleet.merge`).
+      if (!fleet || fleet.owner !== action.playerId) {
         return h.reject('E_NO_FLEET');
-      }
-      if (fleet.owner !== action.playerId) {
-        return h.reject('E_FORBIDDEN');
       }
       if (fleet.battleId) {
         return h.reject('E_IN_BATTLE');
@@ -495,11 +494,9 @@ export const fleetOpsModule: GameModule = {
       // Ракету корабли не бьют (решение владельца 2026-10-06, SM-3.7b), а её id предсказуем:
       // цель-ракета — тот же отказ, что несуществующий флот, иначе код отказа выдал бы пуск,
       // скрытый туманом (замечание Codex на #1503).
-      if (!f || !target || isMissileFleet(target, h.ctx.data)) {
+      // Свой флот чужим не подменить: чужой — как несуществующий (A06, см. `fleet.merge`).
+      if (!f || f.owner !== action.playerId || !target || isMissileFleet(target, h.ctx.data)) {
         return h.reject('E_NO_FLEET');
-      }
-      if (f.owner !== action.playerId) {
-        return h.reject('E_FORBIDDEN');
       }
       if (!isHostile(h, f.owner, target.owner)) {
         return h.reject('E_NOT_HOSTILE');

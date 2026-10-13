@@ -807,13 +807,20 @@ function project(
   // cannot see — including ones they have never scouted. The player learns what they
   // salvaged from `salvage.paid`, which is addressed to them by name.
   delete view.salvage;
-  // The fleet-id and timeline counters are server-side too: they rise for every fleet
-  // minted and every event scheduled anywhere, so a rise with nothing new in sight would
-  // tell a blind target that a hidden missile just launched and keeps flying — its
-  // minute-by-minute flight step is a timer (Codex on #1503). The server mints ids and
-  // seqs; no client needs either counter.
+  // The id and timeline counters are server-side too: they rise for every entity minted
+  // and every event scheduled anywhere, so a rise with nothing new in sight would tell a
+  // blind viewer that something happened in the dark — a hidden missile launched and keeps
+  // flying (its minute-by-minute flight step is a timer, Codex on #1503), a battle broke
+  // out, a shuttle strike took off, a hangar filled a squadron, a hero ship formed. The
+  // server mints ids and seqs; no client needs any of these counters. What stays: an id
+  // the viewer IS shown carries its seq, so their own next entity still samples the
+  // global count — opaque ids would close that, at the price of a replay-visible change.
   delete view.fleetSeq;
   delete (view as Partial<GameState>).scheduleSeq;
+  delete (view as Partial<GameState>).battleSeq;
+  delete view.strikeSeq;
+  delete view.squadronSeq;
+  delete view.heroSeq;
   const fields = visibleMinefields(state, viewerId);
   if (fields) view.minefields = fields;
   else delete view.minefields;

@@ -2581,6 +2581,11 @@ function handleEvents(events: DomainEvent[]) {
       case 'shuttle.missileDowned':
         if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.missile-downed'));
         break;
+      // Мину сняли челноки (SM-3.6): так же одна строка обеим сторонам, а `fleet.destroyed`
+      // следом помечен `spent`.
+      case 'shuttle.mineCleared':
+        if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.mine-cleared'));
+        break;
       // «Держать патруль» снят ядром (SHU-6.6): помеха сама не пройдёт — эскадра больше не
       // висит, точка за радиусом. Без строки игрок ждал бы патруль над базой, который уже
       // не встанет, и не знал бы почему.

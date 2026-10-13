@@ -220,6 +220,16 @@ describe('челноки уничтожают мину безопасно', () =
     const back = (done.state.planets.N!.hangar ?? []).reduce((n, sq) => n + sq.units.reduce((m, u) => m + u.count, 0), 0);
     expect(back).toBe(3);
     expect(done.events.some((e) => e.type === 'shuttle.repelled')).toBe(false);
+    // Мина уходит отработавшей, со своей строкой обеим сторонам: «☠️ флот уничтожен»
+    // читался бы её хозяину потерей флота, которой не было.
+    expect(done.events).toContainEqual({
+      type: 'fleet.destroyed',
+      payload: { fleetId: 'MINE', owner: 'p2', spent: true },
+    });
+    expect(done.events).toContainEqual({
+      type: 'shuttle.mineCleared',
+      payload: { owner: 'p1', playerId: 'p2', mineId: 'MINE' },
+    });
   });
 
   it('ракетную мину на дороге — тем же ударом и тоже без потерь (SM-3.7a)', () => {
