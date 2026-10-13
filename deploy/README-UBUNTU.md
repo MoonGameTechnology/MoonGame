@@ -30,12 +30,12 @@ sudo bash deploy/install-ubuntu.sh
 
 После установки сервер будет доступен по адресам:
 
-- **Локально:** `http://192.168.1.7:8788`
-- **Снаружи:** требует проксирования на `http://94.190.83.220:95367`
+- **Локально:** `http://<IP-сервера>:8788`
+- **Снаружи:** требует проксирования на `http://<внешний-IP>:<порт>`
 
 ### Настройка проксирования (для внешнего доступа)
 
-Если хочешь играть с внешних устройств через `94.190.83.220:95367`:
+Если хочешь играть с внешних устройств через `<внешний-IP>:<порт>`:
 
 #### Вариант 1: Nginx на том же сервере
 
@@ -45,11 +45,11 @@ sudo apt-get install -y nginx
 # Создай конфиг:
 sudo bash -c 'cat > /etc/nginx/sites-available/moongame << EOF
 server {
-    listen 95367;
-    server_name 94.190.83.220;
+    listen <порт>;
+    server_name <внешний-IP>;
 
     location / {
-        proxy_pass http://192.168.1.7:8788;
+        proxy_pass http://<IP-сервера>:8788;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -66,11 +66,17 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
+Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
+запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
+deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`. Порт 80 в origin не
+пишется (`http://<внешний-IP>`), IPv6 пишется в квадратных скобках: `http://[2001:db8::10]:<порт>`.
+
 #### Вариант 2: На роутере
 
 Настрой Port Forward:
-- Внешний порт: `95367`
-- Внутренний IP: `192.168.1.7`
+- Внешний порт: `<порт>`
+- Внутренний IP: `<IP-сервера>`
 - Внутренний порт: `8788`
 - Протокол: TCP
 

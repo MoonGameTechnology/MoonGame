@@ -120,17 +120,24 @@ moongame shell      # shell в директории проекта
 
 ## 🌐 Внешний доступ
 
-Для доступа через `94.190.83.220:95367` запусти:
+Для доступа через `<внешний-IP>:<порт>` запусти:
 
 ```bash
-sudo bash deploy/setup-proxy.sh
+sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> \
+  bash deploy/setup-proxy.sh
 ```
 
 Это настроит Nginx проксирование с поддержкой WebSocket.
 
+Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
+запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
+deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`. Порт 80 в origin не
+пишется (`http://<внешний-IP>`), IPv6 пишется в квадратных скобках: `http://[2001:db8::10]:<порт>`.
+
 Или настрой Port Forwarding на роутере:
-- Внешний порт: `95367 TCP`
-- Внутренний IP: `192.168.1.7`
+- Внешний порт: `<порт> TCP`
+- Внутренний IP: `<IP-сервера>`
 - Внутренний порт: `8788 TCP`
 
 ## 🔒 TLS / wss (RS-5.1)

@@ -53,9 +53,14 @@ METRICS_TOKEN="${METRICS_TOKEN:-$(openssl rand -hex 32)}"
 # Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
 # Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
 # адрес (если он задан) добавляется вторым: через роутер это другой хост:порт.
-ALLOWED_ORIGINS="http://$INTERNAL_IP:$INTERNAL_PORT"
+# IPv6 браузер пишет в origin в квадратных скобках, а сравнение точное.
+origin_host() { if [[ "$1" == *:* ]]; then printf '[%s]' "$1"; else printf '%s' "$1"; fi; }
+ALLOWED_ORIGINS="http://$(origin_host "$INTERNAL_IP"):$INTERNAL_PORT"
 if [ -n "$EXTERNAL_IP" ]; then
-    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$EXTERNAL_IP:${EXTERNAL_PORT:-$INTERNAL_PORT}"
+    # Порт 80 браузер в origin не пишет.
+    EXTERNAL_ORIGIN_PORT="${EXTERNAL_PORT:-$INTERNAL_PORT}"
+    if [ "$EXTERNAL_ORIGIN_PORT" = 80 ]; then EXTERNAL_ORIGIN_PORT=""; else EXTERNAL_ORIGIN_PORT=":$EXTERNAL_ORIGIN_PORT"; fi
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$(origin_host "$EXTERNAL_IP")$EXTERNAL_ORIGIN_PORT"
 fi
 
 # Функции для вывода
@@ -444,9 +449,9 @@ log_success "Установка завершена!"
 log_success "=========================================="
 echo ""
 echo -e "${BLUE}🎮 Доступ к серверу:${NC}"
-echo "  Локально:  http://$INTERNAL_IP:$INTERNAL_PORT"
+echo "  Локально:  http://$(origin_host "$INTERNAL_IP"):$INTERNAL_PORT"
 if [ -n "$EXTERNAL_IP" ]; then
-    echo "  Снаружи:   http://$EXTERNAL_IP:${EXTERNAL_PORT:-$INTERNAL_PORT} (требует проксирования)"
+    echo "  Снаружи:   http://$(origin_host "$EXTERNAL_IP"):${EXTERNAL_PORT:-$INTERNAL_PORT} (требует проксирования)"
 fi
 echo ""
 echo -e "${BLUE}⚙️  Управление:${NC}"
@@ -461,7 +466,7 @@ echo "  PostgreSQL Пароль: $POSTGRES_PASSWORD"
 echo "  (сохранен в $ENV_FILE)"
 echo ""
 echo -e "${YELLOW}⚠️  Для проксирования внешнего адреса:${NC}"
-echo "  На роутере или nginx: перенаправь внешний порт → $INTERNAL_IP:$INTERNAL_PORT"
+echo "  На роутере или nginx: перенаправь внешний порт → $(origin_host "$INTERNAL_IP"):$INTERNAL_PORT"
 echo ""
 echo -e "${GREEN}✓ Сервер готов!${NC}"
 echo ""

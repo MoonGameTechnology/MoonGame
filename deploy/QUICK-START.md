@@ -3,9 +3,9 @@
 ## Шаг 1: Подключись к Ubuntu серверу
 
 ```bash
-ssh user@192.168.1.7
+ssh user@<IP-сервера>
 # или используй SSH ключ
-ssh -i ~/.ssh/your_key user@192.168.1.7
+ssh -i ~/.ssh/your_key user@<IP-сервера>
 ```
 
 ## Шаг 2: Запусти скрипт установки
@@ -44,10 +44,10 @@ moongame logs
 
 - На ноутбуке, подключенном в локальную сеть:
   ```
-  http://192.168.1.7:8788
+  http://<IP-сервера>:8788
   ```
 
-- Если с внешней сети (через 94.190.83.220:95367):
+- Если с внешней сети (через <внешний-IP>:<порт>):
   - Нужна настройка проксирования (см. [README-UBUNTU.md](README-UBUNTU.md))
 
 ## 🔄 Обновление кода
@@ -105,15 +105,15 @@ journalctl -u moongame -n 50
 
 1. **SSH без пароля (по ключам):**
    ```bash
-   ssh-copy-id -i ~/.ssh/id_rsa.pub user@192.168.1.7
+   ssh-copy-id -i ~/.ssh/id_rsa.pub user@<IP-сервера>
    ```
 
 2. **Aliases для быстроты:**
    ```bash
    # Добавь в ~/.bashrc на ноутбуке:
-   alias mg-update='ssh user@192.168.1.7 "moongame update"'
-   alias mg-logs='ssh user@192.168.1.7 "moongame logs"'
-   alias mg-restart='ssh user@192.168.1.7 "moongame restart"'
+   alias mg-update='ssh user@<IP-сервера> "moongame update"'
+   alias mg-logs='ssh user@<IP-сервера> "moongame logs"'
+   alias mg-restart='ssh user@<IP-сервера> "moongame restart"'
    ```
    Затем:
    ```bash
@@ -135,4 +135,4 @@ journalctl -u moongame -n 50
 
 ---
 
-**Готово!** Если скрипт выполнил все шаги, сервер должен быть запущен и доступен на `http://192.168.1.7:8788` 🎮
+**Готово!** Если скрипт выполнил все шаги, сервер должен быть запущен и доступен на `http://<IP-сервера>:8788` 🎮
