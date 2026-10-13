@@ -2975,16 +2975,16 @@ export const en: Record<string, string> = {
   'onb.goal.score': 'Reach 100 points',
   'onb.goal.tray.title': 'First-session goals — expand',
   'onb.goals.all-done':
-    '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
+    '🏅 All first-session goals done! +{n} XP. You are ready for a real match.',
   'onb.goals.title': 'First-session goals',
   'onb.intro.async-delay.body':
-    'The fleet travels for real hours — you can leave, the order will run.',
+    'The fleet travels for real hours. You can leave the game: the order runs on its own.',
   'onb.intro.async-delay.title': 'The world runs without you',
   'onb.intro.ava.body':
     'A challenge can be accepted once both corporations mark themselves ready; the war runs on a schedule.',
   'onb.intro.ava.title': 'Alliance wars (AvA)',
   'onb.intro.constructor.body':
-    'Modules are fixed at build time — a finished ship cannot be refitted.',
+    'Modules are fixed at build time. A finished ship cannot be refitted.',
   'onb.intro.constructor.title': 'Production — orders and loadouts',
   'onb.intro.corp.body': 'Shared storage, member roles and alliance wars.',
   'onb.intro.corp.title': 'Corporation cabinet',
@@ -3006,7 +3006,7 @@ export const en: Record<string, string> = {
   'onb.recap.close': 'Close',
   'onb.recap.rest': 'While you were away',
   'onb.recap.title': 'Return digest',
-  'onb.tour.done': '✔ Tutorial complete · +{n} XP — now play a real match!',
+  'onb.tour.done': '✔ Tutorial complete · +{n} XP. Now play a real match!',
   'onb.tour.first.capture': 'Take the neutral world: orbit first, then the ground.',
   'onb.tour.first.course': 'Select your fleet ▲, then press a neighbouring world to set a course.',
   'onb.tour.first.details': 'Open «Details»: the world\'s buildings are there.',
