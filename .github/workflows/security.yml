@@ -3,8 +3,10 @@ name: Security scan
 # Security pipeline. Runs a DIVERSE set of scanners on every push to a work branch,
 # on PRs, in the merge queue and weekly on `main` —
 # different methods / data sources / surfaces, not clones — aggregates everything
-# into ONE report, and posts it back (sticky PR comment, or a commit comment
-# otherwise) + job summary + artifact.
+# into ONE report: job summary + artifact + ONE sticky comment per open PR, edited in
+# place on later runs. Never a commit comment: a NEW comment mails every watcher, and
+# commit comments were new on every push without a PR and every merge-queue run; an
+# edit of the sticky one sends no mail.
 #
 # === GATING (SEC-1 ratchet) ===
 #
@@ -1037,7 +1039,6 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
-      pull-requests: write # для comment-summary-in-pr: on-failure
     steps:
       - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
@@ -1051,10 +1052,9 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
-          # Комментарий ТОЛЬКО при находке: в обычном случае канал отчётности один —
-          # sticky-комментарий summarizer'а, второй бот в треде был бы шумом. Но если PR
-          # реально вносит уязвимую зависимость, сказать об этом надо там, где смотрят.
-          comment-summary-in-pr: on-failure
+          # Без комментария в PR: каждый новый комментарий — письмо всем наблюдателям
+          # репо. Находка видна в job summary и в сводном отчёте `report`.
+          comment-summary-in-pr: never
           # Лицензионная политика НЕ включена намеренно: `deny-licenses` — решение
           # команды, а не сканера, и ошибка в нём блокирует PR из-за ТРАНЗИТИВНОЙ
           # зависимости, которую никто не выбирал. Включать отдельным кирпичом, когда
@@ -1493,9 +1493,9 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     permissions:
-      contents: write # commit comments
-      pull-requests: write # PR comments
-      issues: write
+      contents: read
+      pull-requests: write # sticky PR comment
+      issues: write # PR comments go through the issues API
       actions: read # base line: download the last report artifact from `main`
     steps:
       - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -1555,40 +1555,37 @@ jobs:
             reports/**/trufflehog.json
             reports/**/zap-report.json
           if-no-files-found: warn
-      - name: post report (sticky PR comment or commit comment)
+      # Один sticky-комментарий на PR: создаётся один раз, дальше правится на месте —
+      # правка писем не шлёт, письмо приходит только на создание. Комментариев к коммиту
+      # нет вовсе: без открытого PR (push в ветку, merge queue, крон) отчёт остаётся в job
+      # summary — раньше там каждый прогон давал НОВЫЙ комментарий и письмо всем
+      # наблюдателям.
+      - name: post report (sticky PR comment)
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');
-            // Weekly rescan (SEC-10) runs on `main`, where there is no PR to stick the
-            // comment to — it would drop a fresh commit comment on the same head commit
-            // every Monday. The run's own red/green + job summary is the signal there.
-            if (context.eventName === 'schedule') {
-              core.info('scheduled rescan — report stays in the job summary/artifacts');
-              return;
-            }
             const marker = '<!-- void-security-report -->';
             const body = marker + '\n' + fs.readFileSync('security-report.md', 'utf8');
             const { owner, repo } = context.repo;
-            const sha = context.sha;
             let prs = [];
             try {
-              const res = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha });
+              const res = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: context.sha });
               prs = res.data.filter((p) => p.state === 'open');
             } catch (e) {
               core.warning('PR lookup failed: ' + e.message);
             }
-            if (prs.length) {
-              for (const pr of prs) {
-                const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: pr.number, per_page: 100 });
-                const existing = comments.find((c) => c.body && c.body.includes(marker));
-                if (existing) {
-                  await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-                } else {
-                  await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
-                }
+            if (!prs.length) {
+              core.info('no open PR for this commit — report stays in the job summary/artifacts');
+              return;
+            }
+            for (const pr of prs) {
+              const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr.number, per_page: 100 });
+              const existing = comments.find((c) => c.body && c.body.includes(marker));
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
               }
-            } else {
-              await github.rest.repos.createCommitComment({ owner, repo, commit_sha: sha, body });
             }

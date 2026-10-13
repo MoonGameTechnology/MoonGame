@@ -137,9 +137,10 @@ jobs:
   
   report:
     permissions:
-      contents: write  # Для commit comments
-      pull-requests: write  # Для PR comments
-      issues: write  # Для issue comments
+      contents: read  # Комментариев к коммитам нет
+      pull-requests: write  # Sticky PR-комментарий
+      issues: write  # PR-комментарии идут через issues API
+      actions: read  # Базовая линия: артефакт последнего прогона на main
 ```
 
 Каждый job указывает **только** нужные permissions, не больше.
