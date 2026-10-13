@@ -6,10 +6,11 @@ import type { ResourceBag } from '../data/schemas';
  * counts as zero so partial bags compare and pay correctly.
  */
 
-/** True if the treasury can cover every line of `cost`. */
+/** True if the treasury can cover every line of `cost`. Fail-closed: a non-numeric line on
+ *  either side (NaN) is "cannot afford", never a free purchase. */
 export function canAfford(treasury: ResourceBag, cost: ResourceBag): boolean {
   for (const res of Object.keys(cost)) {
-    if ((treasury[res] ?? 0) < (cost[res] ?? 0)) {
+    if (!((treasury[res] ?? 0) >= (cost[res] ?? 0))) {
       return false;
     }
   }

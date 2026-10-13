@@ -136,13 +136,20 @@ function treasuryOf(h: HandlerContext, playerId: string): Record<string, number>
   return player.resources;
 }
 
+/** Товар ли это у торговца. Только собственные ключи: `in` видит и прототип, и имя вроде
+ *  `toString` дало бы цену NaN. */
+function isGood(cfg: ModeTrader, good: string): boolean {
+  return Object.hasOwn(cfg.goods, good);
+}
+
 function record(h: HandlerContext, good: string, shift: number): void {
   (h.state.trader ??= {})[good] = { shift, at: h.ctx.now };
 }
 
 export const traderModule: GameModule = {
   id: 'trader',
-  version: '1.0.0',
+  // 1.0.1: товар — только собственный ключ `goods`; покупка отказывает, если кредиты не число.
+  version: '1.0.1',
   setup(api) {
     api.onAction('trader.buy', (action, h) => {
       const p = action.payload as { resource?: unknown; amount?: unknown };
@@ -152,10 +159,10 @@ export const traderModule: GameModule = {
       if (!cfg) return h.reject('E_NO_TRADER');
       const bag = treasuryOf(h, action.playerId);
       if (!bag) return h.reject('E_FORBIDDEN');
-      if (!(p.resource in cfg.goods)) return h.reject('E_UNKNOWN_RESOURCE');
+      if (!isGood(cfg, p.resource)) return h.reject('E_UNKNOWN_RESOURCE');
       const shift = traderShift(h.state, cfg, p.resource, h.ctx);
       const cost = traderBuyCost(cfg, p.resource, shift, n);
-      if ((bag[MONEY] ?? 0) < cost) return h.reject('E_INSUFFICIENT');
+      if (!((bag[MONEY] ?? 0) >= cost)) return h.reject('E_INSUFFICIENT');
       bag[MONEY] = (bag[MONEY] ?? 0) - cost;
       bag[p.resource] = (bag[p.resource] ?? 0) + n;
       record(h, p.resource, traderShiftAfter(cfg, p.resource, shift, n, 'buy'));
@@ -175,8 +182,8 @@ export const traderModule: GameModule = {
       if (!cfg) return h.reject('E_NO_TRADER');
       const bag = treasuryOf(h, action.playerId);
       if (!bag) return h.reject('E_FORBIDDEN');
-      if (!(p.resource in cfg.goods)) return h.reject('E_UNKNOWN_RESOURCE');
-      if ((bag[p.resource] ?? 0) < n) return h.reject('E_INSUFFICIENT');
+      if (!isGood(cfg, p.resource)) return h.reject('E_UNKNOWN_RESOURCE');
+      if (!((bag[p.resource] ?? 0) >= n)) return h.reject('E_INSUFFICIENT');
       const shift = traderShift(h.state, cfg, p.resource, h.ctx);
       const credits = traderSellValue(cfg, p.resource, shift, n);
       bag[p.resource] = (bag[p.resource] ?? 0) - n;
@@ -199,8 +206,8 @@ export const traderModule: GameModule = {
       if (!cfg) return h.reject('E_NO_TRADER');
       const bag = treasuryOf(h, action.playerId);
       if (!bag) return h.reject('E_FORBIDDEN');
-      if (!(p.give in cfg.goods) || !(p.get in cfg.goods)) return h.reject('E_UNKNOWN_RESOURCE');
-      if ((bag[p.give] ?? 0) < n) return h.reject('E_INSUFFICIENT');
+      if (!isGood(cfg, p.give) || !isGood(cfg, p.get)) return h.reject('E_UNKNOWN_RESOURCE');
+      if (!((bag[p.give] ?? 0) >= n)) return h.reject('E_INSUFFICIENT');
       const giveShift = traderShift(h.state, cfg, p.give, h.ctx);
       const proceeds = traderSellValue(cfg, p.give, giveShift, n);
       const getShift = traderShift(h.state, cfg, p.get, h.ctx);
