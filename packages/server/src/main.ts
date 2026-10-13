@@ -22,6 +22,7 @@ import { createMultiplayerServer, tlsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
+import { operatorTokenFromEnv } from './operatorAccess';
 import { createMatchLoader } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { newMatchId } from './matchId';
@@ -493,6 +494,8 @@ const server = createMultiplayerServer({
   ready: () => stores.store.ping?.() ?? Promise.resolve(true),
   // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
   version: buildVersion(process.env.GIT_SHA),
+  // `GET /metrics` is operator-only: a direct loopback peer, or `Bearer $METRICS_TOKEN`.
+  operatorToken: operatorTokenFromEnv(process.env),
   auth,
   allowedOrigins,
   securityAudit,

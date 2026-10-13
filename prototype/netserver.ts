@@ -890,6 +890,8 @@ const server = createMultiplayerServer({
   // This host is what the image runs, so it is the one that has to report it.
   version: buildVersion(process.env.GIT_SHA),
   ready: () => matchStore.ping?.() ?? Promise.resolve(true),
+  // `GET /metrics` is operator-only, like the `/metrics/*` routes below (same token).
+  ...(METRICS_TOKEN ? { operatorToken: METRICS_TOKEN } : {}),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
