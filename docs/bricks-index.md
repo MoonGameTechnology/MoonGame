@@ -1503,5 +1503,6 @@
 | ZTP-4.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
 | ZTP-4.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автоматическая проверка дрейфа |
 | ZTP-4.3 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Break-glass доступ |
+| ZTP-4.4 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Docker без root и контейнеры без root |
 | ZTP-5.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Откат по метрикам |
 | ZTP-5.2 | 🔒 | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Выкатка без разрыва матчей |
