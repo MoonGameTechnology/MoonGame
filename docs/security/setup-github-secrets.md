@@ -85,8 +85,8 @@ jobs:
 
   report:
     permissions:
-      contents: write  # Для создания commit comments
-      pull-requests: write  # Для PR comments
+      contents: read  # Отчёт — в job summary, комментариев не пишет
+      actions: read  # Базовая линия: артефакт последнего прогона на main
 ```
 
 ✅ **Actions — SHA-пинены**
