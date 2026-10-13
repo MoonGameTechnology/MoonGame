@@ -59,7 +59,7 @@ import { bossFallen, heroByFleet, heroNode } from '../../packages/shared-core/sr
 import { fleetHangarRepairRate } from '../../packages/shared-core/src/util/repair';
 // Опознанные узлы считаются ОДИН раз на тик и передаются в `knownGarrison`: покрытие
 // сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
-import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
+import { identifiedNodes, isVisibleTo } from '../../packages/shared-core/src/state/visibility';
 import { canOrder, canOrderAll } from './protoKernel';
 import { doctrineRanks, seatDoctrine } from './botDoctrine';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
@@ -2030,8 +2030,9 @@ function baseAiOrders(
           getStance(state, ai, fl.owner) === 'war' &&
           fl.location !== null &&
           fl.units.some((st) => st.count > 0) &&
-          // Мину бот бьёт челноками, только когда видит её — вблизи (SM-3.6).
-          (!isMineFleet(fl, data) || mineFleetVisible(state, fl, ai, data)),
+          // Цель — только видимый боту флот: ядро отказывает в ударе по скрытому (A06), и бот
+          // повторял бы отвергнутый приказ. Мину видно только вблизи (SM-3.6).
+          isVisibleTo(state, ai, { fleetId: fl.id }, data),
       );
       const foeFleetPos = (fl: Fleet): { x: number; y: number } =>
         state.planets[fl.location!]?.position ?? { x: 1e9, y: 1e9 };

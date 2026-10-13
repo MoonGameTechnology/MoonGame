@@ -94,6 +94,9 @@ function world(): GameState {
   home.hangar = [1, 2, 3].map((n) => ({ id: `sq:${n}`, units: [{ unit: 'interceptor', count: 1 }] }));
   return {
     ...s,
+    // Зрение на всю карту: здесь проверяются дальность и полёт удара, а не туман. Цель,
+    // которую игрок не видит, ядро отбивает как несуществующую (`E_NO_TARGET`).
+    sight: { world: 5000, fleet: 5000, radarScale: 1 },
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
       HOME: home,

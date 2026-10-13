@@ -48,7 +48,7 @@ import { chaseRadius, chaseStep } from '../state/chase';
 import { fleetPositionAt } from '../state/fleetPosition';
 import { isMineFleet, mineFleetVisible } from '../state/minefields';
 import { isMissileFleet } from '../state/ordnance';
-import { missileVisible } from '../state/visibility';
+import { isVisibleTo } from '../state/visibility';
 import { hasMapShare } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
 import { isForkSite } from '../state/forkSite';
@@ -1501,19 +1501,12 @@ function strikeAimOf(
   const targetFleet = wantFleet ? h.state.fleets[p.targetFleetId as string] : undefined;
   const targetPlanet = wantPlanet ? h.state.planets[p.targetPlanetId as string] : undefined;
   if (wantFleet && !targetFleet) return h.reject('E_NO_TARGET');
-  // Чужую мину видно только своим флотом вблизи (SM-3.6); невидимая мина — тот же
-  // `E_NO_TARGET`, что и отсутствующий флот, иначе перебором id её нашёл бы любой
-  // клиент (A06). Ревью #1411: правило видимости мин — во всех путях к цели челнока.
-  // Ракету (SM-3.7b) — тоже только видимую: её id предсказуем, и перебор нашёл бы ракету,
-  // которой зритель не видит. Бить её челноками — правило владельца 2026-10-06.
-  if (
-    targetFleet &&
-    targetFleet.owner !== playerId &&
-    ((isMineFleet(targetFleet, h.ctx.data) &&
-      !mineFleetVisible(h.state, targetFleet, playerId, h.ctx.data)) ||
-      (isMissileFleet(targetFleet, h.ctx.data) &&
-        !missileVisible(h.state, targetFleet, playerId, h.ctx.data)))
-  ) {
+  // Флот, которого игрок не видит, — тот же `E_NO_TARGET`, что и отсутствующий: иначе
+  // `E_INVALID_TARGET`, `E_NOT_HOSTILE` или отказ по дальности подтверждали бы перебором
+  // id флот за туманом (A06). Правило видимости одно с проекцией (`isVisibleTo`): чужую
+  // мину видно только своим флотом вблизи (SM-3.6, ревью #1411), ракету (SM-3.7b) — только
+  // глазами; бить её челноками — правило владельца 2026-10-06.
+  if (targetFleet && !isVisibleTo(h.state, playerId, { fleetId: targetFleet.id }, h.ctx.data)) {
     return h.reject('E_NO_TARGET');
   }
   if (wantPlanet && !targetPlanet) return h.reject('E_NO_PLANET');
@@ -1856,7 +1849,8 @@ export const shuttleModule: GameModule = {
   //         `shuttle.mineCleared` — журнал не объявляет её гибелью флота.
   // 1.13.0: зональное ПВО тем же залпом бьёт видимые чужие мины в радиусе; снятая мина —
   //         `pd.mineCleared` (решение владельца 2026-10-13).
-  version: '1.13.0',
+  // 1.14.0: невидимый игроку флот — не цель вылета (`E_NO_TARGET`, как несуществующий).
+  version: '1.14.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`

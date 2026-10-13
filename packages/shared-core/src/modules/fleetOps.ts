@@ -39,6 +39,7 @@ import { sumUnitStat, takeFromStacks, loadoutKey } from '../util/stacks';
 import { emplacedFleet, fuseFleets } from '../util/fleetMerge';
 import { hangarSize, strikesReserved } from '../state/shuttle';
 import { isMineFleet, isMissileFleet } from '../state/minefields';
+import { isVisibleTo } from '../state/visibility';
 import type { BattlePullIn } from './combat';
 
 export const fleetOpsModule: GameModule = {
@@ -55,7 +56,8 @@ export const fleetOpsModule: GameModule = {
   //         чужая ракета в поле атакующего, слияния и раскола — тот же `E_NO_FLEET`.
   // 1.11.0: чужой флот в слиянии, расколе и «Атаке» — `E_NO_FLEET`, а не `E_FORBIDDEN`:
   //         разница кодов подтверждала перебором id флот, скрытый туманом (A06).
-  version: '1.11.0',
+  // 1.12.0: невидимая атакующему цель «Атаки» — `E_NO_FLEET`, как несуществующая (A06).
+  version: '1.12.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -496,6 +498,14 @@ export const fleetOpsModule: GameModule = {
       // скрытый туманом (замечание Codex на #1503).
       // Свой флот чужим не подменить: чужой — как несуществующий (A06, см. `fleet.merge`).
       if (!f || f.owner !== action.playerId || !target || isMissileFleet(target, h.ctx.data)) {
+        return h.reject('E_NO_FLEET');
+      }
+      // Цель, которой атакующий не видит, — тот же отказ, что несуществующая: иначе
+      // `E_NOT_HOSTILE`/`E_NOT_COLOCATED` подтверждали бы перебором id флот за туманом.
+      // Цель на том же узле стоит прямо перед атакующим и видна всегда — для неё туман
+      // не считается, и честную атаку правило не задевает.
+      const besideUs = f.location !== null && f.location === target.location;
+      if (!besideUs && !isVisibleTo(h.state, action.playerId, { fleetId: target.id }, h.ctx.data)) {
         return h.reject('E_NO_FLEET');
       }
       if (!isHostile(h, f.owner, target.owner)) {

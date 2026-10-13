@@ -284,6 +284,22 @@ function maximalState(): GameState {
     fleets: {
       mine: fleet('mine', VIEWER, 'A', 'scout'),
       CANARY_fleet: fleet('CANARY_fleet', RIVAL, 'Z', 'CANARY_unit'),
+      // Опознанный чужой флот (только что ушёл с `A`): сам он виден, а его намерения —
+      // оставшиеся прыжки, конечная цель, стоянка в её конце и путь после боя — нет.
+      seen_rival: {
+        ...fleet('seen_rival', RIVAL, 'A', 'scout'),
+        location: null,
+        movement: {
+          from: 'A',
+          to: 'Z',
+          departedAt: 100,
+          arrivesAt: 200,
+          path: ['CANARY_hop'],
+          destination: 'CANARY_destination',
+          parkT: 0.5,
+        },
+        resume: { to: 'CANARY_resume' },
+      },
     },
     battles: {
       mine_battle: {
