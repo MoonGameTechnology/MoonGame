@@ -928,8 +928,10 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
 
   it('rejects engaging a fleet not co-located, in transit, or already in battle', () => {
     const kernel = createKernel([fleetOpsModule]);
+    // Цель на соседнем узле в поле зрения: видна, но не рядом.
     const elsewhere = stateWith({
       players: [player('p1'), player('p2')],
+      planets: [planet('X', null), planet('Y', null)],
       fleets: [fleet('A', 'p1', 'X', [['cruiser', 2]]), fleet('D', 'p2', 'Y', [['cruiser', 2]])],
     });
     expect(errCode(kernel.applyAction(elsewhere, engage('A', 'D'), ctx))).toBe('E_NOT_COLOCATED');
@@ -941,6 +943,21 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
       ],
     });
     expect(errCode(kernel.applyAction(busy, engage('A', 'D'), ctx))).toBe('E_IN_BATTLE');
+  });
+
+  it('цель за туманом — тот же E_NO_FLEET, что несуществующая (код не подтверждает флот)', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1'), player('p2')],
+      // Y далеко за кругом зрения флота A: зритель Y не опознаёт.
+      planets: [planet('X', null), { ...planet('Y', null), position: { x: 9000, y: 0 } }],
+      fleets: [fleet('A', 'p1', 'X', [['cruiser', 2]]), fleet('D', 'p2', 'Y', [['cruiser', 2]])],
+    });
+    expect(errCode(kernel.applyAction(s, engage('A', 'NOPE'), ctx))).toBe('E_NO_FLEET');
+    // Прежде здесь был `E_NOT_COLOCATED`, а при мире — `E_NOT_HOSTILE`: перебор id находил флот.
+    expect(errCode(kernel.applyAction(s, engage('A', 'D'), ctx))).toBe('E_NO_FLEET');
+    setStance(s, 'p1', 'p2', 'peace');
+    expect(errCode(kernel.applyAction(s, engage('A', 'D'), ctx))).toBe('E_NO_FLEET');
   });
 
   // ASSAULT-1: у штурмующего корабли на орбите, а десант внизу. Наземный бой запирает

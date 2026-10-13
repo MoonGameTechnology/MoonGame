@@ -29,11 +29,13 @@ import type {
  *  production / arrivals in their view (the client renders the build queue + ETAs from
  *  them) while every enemy timer stays hidden. */
 function scheduledOwnedBy(event: ScheduledEvent, viewerId: PlayerId, state: GameState): boolean {
-  const p = (event.payload ?? {}) as Record<string, unknown>;
-  if (p.owner === viewerId) return true;
-  // Per-player events tagged by `playerId` (e.g. `technology.complete`) — the
-  // viewer's own research/economy timers, which they should keep in view.
-  if (p.playerId === viewerId) return true;
+  const raw = event.payload;
+  const p = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  // An event that names its player (`owner`, or `playerId` as on `technology.complete` and
+  // `construction.complete`) belongs to that player ALONE. The planet/fleet fallback below
+  // answers «who owns it NOW», so a world captured mid-build would hand its new owner the
+  // previous owner's pending order (unit, count, loadout) — the tag wins over the location.
+  if ('owner' in p || 'playerId' in p) return p.owner === viewerId || p.playerId === viewerId;
   if (typeof p.planetId === 'string' && state.planets[p.planetId]?.owner === viewerId) return true;
   if (typeof p.fleetId === 'string' && state.fleets[p.fleetId]?.owner === viewerId) return true;
   return false;
@@ -730,6 +732,11 @@ export function isVisibleTo(
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
+  // Окно шпионажа `fleets` открывает все флоты цели, как и в проекции (`visibleView`).
+  const spied = (state.intel?.[viewerId] ?? []).some(
+    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
+  );
+  if (spied) return true;
   // Ракета — по своей позиции, глазами блока зрения, и в окне шпионажа (SM-3.7b).
   if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
@@ -1003,6 +1010,9 @@ function project(
       // поле — нет, поэтому опознанный чужой мир отдавал планы прежнего владельца
       // целиком. Режем там же и по той же причине.
       delete planet.pausedConstruction;
+      // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
+      // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
+      delete planet.sortie;
     }
     // FORT-5.13. `priorKind` — СЛУЖЕБНАЯ память конверсии («чем узел был до крепости»),
     // и наружу она не идёт НИКОМУ: само её наличие выдаёт стоящую крепость, а значение —
@@ -1147,6 +1157,20 @@ function project(
   for (const fleet of Object.values(view.fleets)) {
     if (fleet.owner === viewerId) continue;
     for (const squad of fleet.hangar ?? []) delete squad.hold;
+    // Счётчик вылетов носителя — как у порта выше: по нему читался бы скрытый удар.
+    delete fleet.sortie;
+    // Маршрут чужого флота — тоже намерение, как цепочки приказов: виден текущий участок
+    // (откуда, куда, когда пришёл и придёт, где на нём встанет — `startT`/`endT`), но не
+    // оставшиеся прыжки, не конечная цель, не точка стоянки в её конце и не то, куда флот
+    // пойдёт после боя (`resume`).
+    delete fleet.resume;
+    // Намерение слиться (`mergeInto`, MRG-1) — тот же план: выдало бы, к кому флот идёт.
+    delete fleet.mergeInto;
+    if (fleet.movement) {
+      delete fleet.movement.path;
+      delete fleet.movement.destination;
+      delete fleet.movement.parkT;
+    }
   }
   // Battles you cannot see, and enemy timers from the schedule (it leaks future
   // events) — but KEEP the viewer's own pending events: their construction/production/

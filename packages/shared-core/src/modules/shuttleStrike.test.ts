@@ -123,6 +123,9 @@ function world(over: { portHp?: number; hangar?: number } = {}): GameState {
   home.hangar = [{ id: 'sq:interceptor', units: [{ unit: 'interceptor', count: over.hangar ?? 2 }] }];
   return {
     ...s,
+    // Зрение на всю карту: здесь проверяются дальность и полёт удара, а не туман. Цель,
+    // которую игрок не видит, ядро отбивает как несуществующую (`E_NO_TARGET`).
+    sight: { world: 5000, fleet: 5000, radarScale: 1 },
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
       A: home,
@@ -219,6 +222,19 @@ describe('удар челноков — вылет (правила 1–2, 5)', (
 
   it('ДАЛЬШЕ РАДИУСА НЕ БЬЮТ: цель за strikeRange от узла базирования', () => {
     expect(code(world(), strike({ targetFleetId: 'FAR' }))).toBe('E_OUT_OF_RANGE');
+  });
+
+  it('флот за туманом — `E_NO_TARGET`, как несуществующий: код не подтверждает перебор id', () => {
+    // Обычное зрение матча: мир A видит на 120, FAR стоит в 300 — его не видно.
+    const { sight: _wide, ...fogged } = world();
+    expect(code(fogged, strike({ targetFleetId: 'НЕТ' }))).toBe('E_NO_TARGET');
+    expect(code(fogged, strike({ targetFleetId: 'FAR' }))).toBe('E_NO_TARGET'); // был E_OUT_OF_RANGE
+    // Видимая цель в радиусе по-прежнему принимается.
+    expect(code(fogged, strike({ targetFleetId: 'E1' }))).toBe(null);
+    // Окно шпионажа `fleets` открывает флот, как и в проекции: дальше судит дальность.
+    const grant = { kind: 'fleets' as const, target: fogged.fleets.FAR!.owner, until: fogged.time + 1 };
+    const spied = { ...fogged, intel: { p1: [grant] } };
+    expect(code(spied, strike({ targetFleetId: 'FAR' }))).toBe('E_OUT_OF_RANGE');
   });
 
   it('по своим не бьют', () => {
