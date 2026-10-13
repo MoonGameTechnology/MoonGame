@@ -732,6 +732,11 @@ export function isVisibleTo(
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
+  // Окно шпионажа `fleets` открывает все флоты цели, как и в проекции (`visibleView`).
+  const spied = (state.intel?.[viewerId] ?? []).some(
+    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
+  );
+  if (spied) return true;
   // Ракета — по своей позиции, глазами блока зрения, и в окне шпионажа (SM-3.7b).
   if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;

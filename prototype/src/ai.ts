@@ -2032,7 +2032,7 @@ function baseAiOrders(
           fl.units.some((st) => st.count > 0) &&
           // Цель — только видимый боту флот: ядро отказывает в ударе по скрытому (A06), и бот
           // повторял бы отвергнутый приказ. Мину видно только вблизи (SM-3.6).
-          isVisibleTo(state, ai, { fleetId: fl.id }, data),
+          isVisibleTo(state, ai, { fleetId: fl.id }, data, identified),
       );
       const foeFleetPos = (fl: Fleet): { x: number; y: number } =>
         state.planets[fl.location!]?.position ?? { x: 1e9, y: 1e9 };
