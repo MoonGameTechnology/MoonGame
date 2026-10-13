@@ -28,10 +28,16 @@ log_error() {
 }
 
 # Конфигурация
-INTERNAL_IP="192.168.1.7"
-INTERNAL_PORT="8788"
-EXTERNAL_IP="94.190.83.220"
-EXTERNAL_PORT="95367"
+# Адреса задаются окружением: в репозитории нет адресов конкретного сервера.
+#   INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> sudo -E ./setup-proxy.sh
+INTERNAL_IP="${INTERNAL_IP:-}"
+INTERNAL_PORT="${INTERNAL_PORT:-8788}"
+EXTERNAL_IP="${EXTERNAL_IP:-}"
+EXTERNAL_PORT="${EXTERNAL_PORT:-}"
+if [ -z "$INTERNAL_IP" ] || [ -z "$EXTERNAL_IP" ] || [ -z "$EXTERNAL_PORT" ]; then
+    log_error "Задай INTERNAL_IP, EXTERNAL_IP и EXTERNAL_PORT"
+    exit 1
+fi
 
 if [[ $EUID -ne 0 ]]; then
     log_error "Скрипт должен быть запущен от root"
@@ -62,18 +68,18 @@ log_info "Создание конфигурации проксирования..
 cat > /etc/nginx/sites-available/moongame << 'EOF'
 # Void Dominion — проксирование внешнего доступа
 #
-# Проксирует запросы с http://94.190.83.220:95367
-# на локальный сервер http://192.168.1.7:8788
+# Проксирует запросы с http://__EXTERNAL_IP__:__EXTERNAL_PORT__
+# на локальный сервер http://__INTERNAL_IP__:__INTERNAL_PORT__
 
 upstream moongame_backend {
-    server 192.168.1.7:8788;
+    server __INTERNAL_IP__:__INTERNAL_PORT__;
     keepalive 64;
 }
 
 server {
     # Слушаем внешний порт
-    listen 95367;
-    server_name 94.190.83.220;
+    listen __EXTERNAL_PORT__;
+    server_name __EXTERNAL_IP__;
 
     # Логирование
     access_log /var/log/nginx/moongame-access.log combined buffer=16k flush=1m;
@@ -121,10 +127,13 @@ server {
 # Редирект HTTP → HTTPS (если нужно добавить SSL позже)
 # server {
 #     listen 80;
-#     server_name 94.190.83.220;
+#     server_name __EXTERNAL_IP__;
 #     return 301 https://$server_name:$server_port$request_uri;
 # }
 EOF
+sed -i -e "s/__INTERNAL_IP__/$INTERNAL_IP/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
+    -e "s/__EXTERNAL_IP__/$EXTERNAL_IP/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
+    /etc/nginx/sites-available/moongame
 
 # Включение сайта
 if [ -L /etc/nginx/sites-enabled/moongame ]; then
@@ -164,10 +173,10 @@ echo ""
 echo -e "${BLUE}Проверка доступа:${NC}"
 echo ""
 echo "1. Локально (внутри сети):"
-echo "   curl http://192.168.1.7:8788"
+echo "   curl http://$INTERNAL_IP:$INTERNAL_PORT"
 echo ""
 echo "2. Через Nginx проксирование:"
-echo "   curl http://94.190.83.220:95367"
+echo "   curl http://$EXTERNAL_IP:$EXTERNAL_PORT"
 echo "   (если с внешней машины, нужен доступ к этому IP)"
 echo ""
 echo -e "${YELLOW}Логирование:${NC}"
