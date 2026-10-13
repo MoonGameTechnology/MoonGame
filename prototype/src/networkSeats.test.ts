@@ -25,6 +25,14 @@ describe('prototype network seats', () => {
     expect(networkStartsOf(state, 'ffa')).toEqual(before);
   });
 
+  it('reads starts from the plan the match was created with, even after the host mode changed', () => {
+    const plan = networkSeatPlan('2v2', 'nexus');
+    const state = newGame({ mapId: 'nexus', seats: plan });
+    const starts = networkStartsOf(state, 'ffa'); // host restarted with TEAMS unset
+    expect(Object.keys(starts)).toEqual(plan.map((seat) => seat.id));
+    for (const seat of plan) expect(starts[seat.id]).toBe(seat.start);
+  });
+
   it('frontier maps seat FFA whatever the host mode; an unknown map has no start worlds', () => {
     expect(networkSeatPlan('2v2', 'frontier-50')).toEqual(networkSeats('ffa', 'frontier-50'));
     const state = newGame({ mapId: 'ffa-4', seats: networkSeatPlan('ffa', 'ffa-4') });

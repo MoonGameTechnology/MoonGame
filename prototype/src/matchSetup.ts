@@ -240,11 +240,25 @@ export function networkStartsOf(
   state: GameState,
   mode: NetworkMatchMode,
 ): Record<string, string | null> {
-  let plan: SeatConfig[];
-  try {
-    plan = networkSeatPlan(mode, (state.mapId ?? 'nexus') as MapId);
-  } catch {
-    plan = []; // неизвестная карта: мест без мира честнее, чем выдуманный мир
+  // Режим, с которым партия создана, в состоянии не записан, а `TEAMS` хоста мог смениться
+  // после её создания. Поэтому `mode` — только первая догадка: берётся тот расклад, чьи места
+  // совпадают с игроками партии (те же id и фракции). Не совпал ни один — мест без мира.
+  const ids = Object.keys(state.players);
+  const fits = (plan: SeatConfig[]): boolean =>
+    plan.length === ids.length &&
+    plan.every((seat) => state.players[seat.id]?.faction === seat.faction);
+  let plan: SeatConfig[] = [];
+  for (const candidate of [mode, ...NETWORK_MODES.filter((m) => m !== mode)]) {
+    let seats: SeatConfig[];
+    try {
+      seats = networkSeatPlan(candidate, (state.mapId ?? 'nexus') as MapId);
+    } catch {
+      break; // неизвестная карта: мест без мира честнее, чем выдуманный мир
+    }
+    if (fits(seats)) {
+      plan = seats;
+      break;
+    }
   }
   const starts: Record<string, string | null> = {};
   for (const id of Object.keys(state.players)) {

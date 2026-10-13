@@ -65,6 +65,8 @@ export interface ClockDriverOptions {
    *  `MAX_DELAY`); a tighter cap also periodically re-syncs a long sleep against
    *  wall-clock drift (the prototype host pins 1h). */
   maxDelayMs?: number;
+  /** Wall clock for the armed deadline (tests inject one). Default: `Date.now`. */
+  now?: () => number;
 }
 
 /** Consecutive due-but-non-progressing ticks that trip the stall guard. Small: a
@@ -78,7 +80,10 @@ export function startClockDriver(
   const schedule = options.schedule ?? ((fn, ms) => setTimeout(fn, ms));
   const cancel = options.cancel ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
   const maxDelay = options.maxDelayMs ?? MAX_DELAY;
+  const now = options.now ?? Date.now;
   let handle: unknown = null;
+  /** Wall time the pending timer fires at (null while none is armed). */
+  let dueAt: number | null = null;
   let stopped = false;
   let stalls = 0; // consecutive due-but-non-progressing ticks
 
@@ -87,6 +92,7 @@ export function startClockDriver(
       cancel(handle);
       handle = null;
     }
+    dueAt = null;
   };
 
   /** Один тик. Возвращает, взводить ли следующий: `false` — это ОСОЗНАННЫЙ уход в простой
@@ -115,6 +121,7 @@ export function startClockDriver(
 
   const fire = (): void => {
     handle = null;
+    dueAt = null;
     // Перевзвод ВЫНЕСЕН из тела тика намеренно. Пока `arm()` стоял последней строкой
     // самого тика, любое исключение из `room.tick()` или из хука `onTick` означало, что
     // следующего тика не будет НИКОГДА: часы матча вставали для всех, кто в нём, — а
@@ -135,8 +142,10 @@ export function startClockDriver(
   };
 
   function arm(): void {
-    clear();
-    if (stopped) return;
+    if (stopped) {
+      clear();
+      return;
+    }
     const ev = room.msUntilNextEvent(); // wall-ms to the next scheduled event, or null
     // Heartbeat only while the room is watched (≥1 peer) AND its clock is running: an
     // unwatched/hibernated room has nobody to freeze on-screen, and a frozen pre-start
@@ -146,10 +155,21 @@ export function startClockDriver(
       options.heartbeatMs !== undefined && room.isClockRunning && room.peerCount > 0
         ? options.heartbeatMs
         : null;
-    if (ev === null && beat === null) return; // nothing pending, nobody watching → idle
+    if (ev === null && beat === null) {
+      clear(); // nothing pending, nobody watching → idle
+      return;
+    }
     // Soonest of {next event, next beat}, capped at maxDelay (a long sleep taken in hops).
-    const ms = Math.min(ev ?? Infinity, beat ?? Infinity, maxDelay);
-    handle = schedule(fire, Math.max(0, ms));
+    const ms = Math.max(0, Math.min(ev ?? Infinity, beat ?? Infinity, maxDelay));
+    const at = now() + ms;
+    // A re-arm never pushes a pending wake LATER, only sooner. Every player action
+    // re-arms (`reschedule()`); if that restarted the beat, a steady stream of orders
+    // would keep the tick from ever firing — the catch-up other players are owed would
+    // never arrive, and the tick's phase would retell when someone acted.
+    if (handle !== null && dueAt !== null && dueAt <= at) return;
+    clear();
+    dueAt = at;
+    handle = schedule(fire, ms);
   }
 
   arm();

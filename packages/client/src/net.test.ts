@@ -202,6 +202,27 @@ describe('net — reconnect and resume (CP1.4)', () => {
     expect(FakeWebSocket.all).toHaveLength(1); // nothing reconnected
   });
 
+  it.each(['E_KICKED', 'E_SESSION_REVOKED'])(
+    '%s is final — no reconnect, status closed',
+    (code) => {
+      installFakeSocket();
+      vi.useFakeTimers();
+      const statuses: MultiplayerStatus[] = [];
+      const errors: string[] = [];
+      openLiveMatch('ws://x', {
+        onStatus: (s) => statuses.push(s),
+        onError: (c) => errors.push(c),
+      });
+      FakeWebSocket.last!.fireOpen();
+      FakeWebSocket.last!.fireMessage(JSON.stringify({ type: 'error', matchId: 'm', code }));
+      FakeWebSocket.last!.close(); // the server closes right after the error frame
+      expect(errors).toEqual([code]);
+      expect(statuses.at(-1)).toBe('closed');
+      vi.advanceTimersByTime(120_000);
+      expect(FakeWebSocket.all).toHaveLength(1); // the dead token is not retried
+    },
+  );
+
   it('a pending retry is cancelled by close()', () => {
     installFakeSocket();
     vi.useFakeTimers();
