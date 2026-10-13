@@ -37,7 +37,7 @@ RTMP — «80% результата за 20% усилий»), а не разов
   (lint+typecheck+test+docs-check), Semgrep + CodeQL SAST, Gitleaks + TruffleHog (секреты),
   osv-scanner (SCA, `pnpm-lock.yaml` + `mobile/package-lock.json`), Trivy fs/image, Syft SBOM
   (CycloneDX), zizmor (workflow-безопасность), OpenSSF Scorecard; агрегация всех находок в один
-  отчёт (SARIF → Code Scanning + job summary; комментариев в PR не пишет — 2026-10-13). Экшены пиннятся по SHA, образы —
+  отчёт (SARIF → Code Scanning + job summary + sticky PR-комментарий, без комментариев к коммитам). Экшены пиннятся по SHA, образы —
   по тегу/`@sha256`; `permissions: {}` по умолчанию, права выдаются поджобно.
 - **Детерминизм-инварианты** в ESLint (`eslint.config.js`): запрет `Math.random`/`Date.now`
   в `shared-core/src`.

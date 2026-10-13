@@ -85,7 +85,9 @@ jobs:
 
   report:
     permissions:
-      contents: read  # Отчёт — в job summary, комментариев не пишет
+      contents: read  # Комментариев к коммитам нет
+      pull-requests: write  # Sticky PR-комментарий
+      issues: write  # PR-комментарии идут через issues API
       actions: read  # Базовая линия: артефакт последнего прогона на main
 ```
 
