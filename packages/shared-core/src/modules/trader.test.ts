@@ -255,6 +255,33 @@ describe('торговец экспедиции — сделки', () => {
     ).toBe('E_BAD_PAYLOAD');
   });
 
+  it('имя из прототипа объекта — не товар, кредиты остаются числом', () => {
+    const w = world();
+    for (const resource of ['toString', 'constructor', '__proto__', 'hasOwnProperty'])
+      for (const type of ['trader.buy', 'trader.sell'])
+        expect(code(kernel.applyAction(w, act(type, { resource, amount: 1 }), at(0)))).toBe(
+          'E_UNKNOWN_RESOURCE',
+        );
+    expect(
+      code(
+        kernel.applyAction(
+          w,
+          act('trader.swap', { give: 'metal', get: 'toString', amount: 5 }),
+          at(0),
+        ),
+      ),
+    ).toBe('E_UNKNOWN_RESOURCE');
+    expect(bag(w).credits).toBe(1000);
+  });
+
+  it('кредиты не число — покупка отказывает, а не идёт даром', () => {
+    const w = world();
+    w.players.a!.resources.credits = Number.NaN;
+    expect(
+      code(kernel.applyAction(w, act('trader.buy', { resource: 'metal', amount: 1 }), at(0))),
+    ).toBe('E_INSUFFICIENT');
+  });
+
   it('режим без торговца — торговца нет; NPC и выбывший не торгуют', () => {
     const w = world();
     expect(
