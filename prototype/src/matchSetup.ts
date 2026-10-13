@@ -249,6 +249,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
         seed,
         version: { data: '0.1.0', manifest: '1' },
       });
+  const researchStart = base.techRules?.starting;
   // Every province starts NEUTRAL; the chosen seats below claim + fortify their homeworld.
   const planets: Record<string, Planet> = base.planets;
   for (const n of preset.map ? [] : preset.nodes) {
@@ -362,7 +363,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       }
       // …and lands the unlocked hidden techs as completed (bonuses ride the normal
       // technology hooks from the first second — the C3 pre-match seam, reused).
-      const grant = (setup.meta?.tech ?? []).filter((id) => data.technologies[id]);
+      const grant = (setup.meta?.tech ?? []).filter((id) => data.technologies[id]?.grantOnly);
       if (grant.length) players[seat.id]!.technologies = { completed: [...new Set(grant)] };
     } else {
       // BAL-12: бот тоже посвящает совет. Без этого `state.players.*.scientists` у
@@ -374,11 +375,14 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
         (id) => ({ id, level: 1 }),
       );
     }
+    if (researchStart) players[seat.id]!.technologies = {
+      completed: [...new Set([...researchStart, ...(players[seat.id]!.technologies?.completed ?? [])])],
+    };
     fleets[`${seat.id}-1`] = fleet(
       `${seat.id}-1`,
       seat.id,
       seat.start,
-      [
+      researchStart ? [['scout', 1]] : [
         ['hero', 1], // the commander's projection — flagship of the home fleet
         ['cruiser', 2],
         ['scout', 1],
@@ -429,7 +433,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
         equipped: picks.slice(0, heroSlots(loadout.grade)),
         passives: [...(def?.startPassives ?? [])],
         home: seat.start,
-        ...(main ? { alive: true, fleetId: `${seat.id}-1` } : {}),
+        ...(main && !researchStart ? { alive: true, fleetId: `${seat.id}-1` } : {}),
       };
     });
   }

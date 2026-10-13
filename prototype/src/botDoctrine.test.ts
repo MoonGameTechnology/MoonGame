@@ -31,7 +31,7 @@ describe('ранги узлов доктрины', () => {
       'combined_arms',
       'planetary_bastions',
       'fortified_infrastructure',
-      // Бастионы стоят на автоматизации промышленности, а она в космической ветке.
+      // Бастионы стоят на автоматизации промышленности, а она в промышленной ветке.
       'industrial_automation',
     ])
       expect(ranks.get(id)).toBe(0);
@@ -48,9 +48,14 @@ describe('ранги узлов доктрины', () => {
   });
 
   it('у ветки без боевых узлов путь ведёт к её высшему тиру', () => {
-    const ranks = doctrineRanks(data.technologies, 'command');
-    expect(ranks.get('ai_stewardship')).toBe(0);
-    expect(ranks.get('signal_corps')).toBe(1);
+    const legacy = doctrineRanks(data.technologies, 'command',
+      (id) => data.technologies[id]?.ruleset === undefined);
+    expect(legacy.get('ai_stewardship')).toBe(0);
+    expect(legacy.get('signal_corps')).toBe(1);
+    const main = doctrineRanks(data.technologies, 'command');
+    expect(main.get('deep_range_network')).toBe(0);
+    expect(main.get('picket_design')).toBe(0);
+    expect(main.get('ai_stewardship')).toBe(1);
   });
 
   it('узел, убранный режимом из матча, в доктрину не попадает', () => {

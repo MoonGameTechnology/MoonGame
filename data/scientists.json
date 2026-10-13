@@ -28,5 +28,10 @@
     "name": "Ordnance Savant",
     "description": "sci.ordnance-savant.desc",
     "branch": "missile"
+  },
+  "industrial_architect": {
+    "name": "Industrial Architect",
+    "description": "sci.industrial-architect.desc",
+    "branch": "industry"
   }
 }

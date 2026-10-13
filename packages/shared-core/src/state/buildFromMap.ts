@@ -654,6 +654,16 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     time: options.time ?? map.time,
   });
 
+  if (map.techRules) {
+    base.techRules = { ...map.techRules, exclude: [...map.techRules.exclude],
+      ...(map.techRules.starting ? { starting: [...map.techRules.starting] } : {}) };
+    for (const id of base.techRules.starting ?? []) {
+      const def = data.technologies[id];
+      if (!def || (def.ruleset && def.ruleset !== base.techRules.ruleset))
+        throw new Error('E_UNKNOWN_TECHNOLOGY');
+    }
+  }
+
   // per-sector links from the resolved adjacency (sorted = JSON-stable), plus the
   // borders terrain shut — a derived map publishes those so the renderer can draw the
   // barrier without re-deriving the geometry (M4.3).
@@ -751,7 +761,8 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       throw new Error(`E_BAD_PLAYER_ID: ${a.playerId}`);
     }
     const scientists = resolveScientists(a, data); // fail-secure: unknown / duplicate / >2
-    for (const t of a.technologies ?? []) {
+    const initialTechs = [...(base.techRules?.starting ?? []), ...(a.technologies ?? [])];
+    for (const t of initialTechs) {
       if (!data.technologies[t]) throw new Error(`E_UNKNOWN_TECHNOLOGY: ${t}`); // fail-secure at boot
     }
     players[a.playerId] = {
@@ -762,7 +773,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       resources: { ...slot.resources },
       ...(a.ai ? { ai: true } : {}),
       ...(scientists.length ? { scientists } : {}),
-      ...(a.technologies?.length ? { technologies: { completed: [...new Set(a.technologies)] } } : {}),
+      ...(initialTechs.length ? { technologies: { completed: [...new Set(initialTechs)] } } : {}),
       // ARS-3: the ownership snapshot rides onto the seat — copied (unique+sorted)
       // so later mutations of the caller's object can't reach the frozen match.
       ...(a.arsenal

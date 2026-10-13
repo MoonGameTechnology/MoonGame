@@ -1754,6 +1754,10 @@ export interface SightRules {
 
 /** Правила дерева технологий матча (PVR-6.17). */
 export interface TechRules {
+  /** Optional catalogue extension pinned when the match is created. */
+  ruleset?: string;
+  /** Technologies granted to each playable seat at creation. */
+  starting?: string[];
   /** Действуют ли ворота дней (`dayGate`) — в забеге нет. */
   dayGates: boolean;
   /** Узлы, которых в этом матче нет вовсе. */

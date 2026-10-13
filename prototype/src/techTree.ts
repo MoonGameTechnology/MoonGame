@@ -31,6 +31,7 @@ import { isGrantOnlyTech } from './techCoverage';
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 
 export const TECH_BRANCHES: Array<{ key: string; label: string }> = [
+  { key: 'industry', label: 'tech.branch.industry' },
   { key: 'space', label: 'tech.branch.space' },
   { key: 'ground', label: 'tech.branch.ground' },
   { key: 'shuttle', label: 'tech.branch.shuttle' },
@@ -169,7 +170,7 @@ export function techTreeHtml(
   // «Хранителя»). Правило в ядре (`techInMatch`), редьюсер отвечает на него же.
   const techs = Object.fromEntries(
     Object.entries(data.technologies).filter(
-      ([id, def]) => !isGrantOnlyTech(id, def) && techInMatch(state, id),
+      ([id, def]) => !isGrantOnlyTech(id, def) && techInMatch(state, id, data),
     ),
   );
   // Ворота дней режим может снять целиком (забег до третьего дня не доживает) — тогда нет
