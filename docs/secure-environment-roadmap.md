@@ -176,8 +176,9 @@ crontab в `README.md`, из которой ни разу не восстана�
 
 **Осталось:** PITR (архивация WAL + base backup — снизит RPO с суток до минут) и
 pgaudit. `BACKUP_KEEP_DAYS` удаляет только legacy-архивы и sidecar; подписанные
-`.vdbak` этой ротацией не удаляются. Встроенной отправки за пределы хоста нет;
-off-host repository и его retention остаются SE-3.5.
+`.vdbak` этой ротацией не удаляются. `backup.sh` создаёт локальную копию;
+S3-доставка выполняется отдельным инструментом SE-3.5. Развёртывание внешнего
+repository и приёмка его retention остаются SE-3.5.
 
 ### SE-3.5 · Независимый backup repository и restore-площадка `[ops][sec]` 🔶 — M
 
@@ -207,9 +208,23 @@ Restore требует внешний доверенный verify-key и ожи�
 Уборка остатков не заменяет retention готовых копий.
 [Настройка и границы v1](../deploy/README.md#подписанный-комплект-v1).
 
-**Осталось:** внешний repository и TLS-транспорт с проверкой peer; отдельные
+**S3-транспорт реализован (2026-10-13).** Отдельный workspace-пакет
+`@void/backup-repository` (`deploy/backup-repository/s3.mjs`) отправляет проверенный
+приватный снимок через conditional PUT с SHA-256. Receipt сохраняет version ID,
+identity и digest всего комплекта; GET получает только выбранную версию, сверяет
+receipt с конфигурацией, digest и подпись до локальной публикации без перезаписи.
+HTTPS проверяет CA/hostname (TLS >=1.2); редиректов и автоматических retries нет.
+Потеря PUT-ответа оставляет неизвестный исход и исходную копию для сверки.
+SDK исключён из production-зависимостей игрового образа; worker ставится отдельно.
+Проверены реальный SDK/HTTPS, отказы и SIGKILL; PostgreSQL + age восстановлены
+после удаления локального архива и тестовой БД через S3 wire fixture.
+[Установка, границы и приёмка провайдера](../deploy/backup-repository/README.md).
+
+**Осталось:** развёртывание и проверка внешнего bucket/repository; отдельные
 job/data ACL, immutable IAM/retention/delete-права; schema/image/data и WAL pins,
-freshness-мониторинг, управляемый key-release и независимый restore lab.
+независимый durable receipt journal, freshness-мониторинг, управляемый key-release
+и независимый restore lab. Доступа к реальному bucket в этой среде нет;
+его IAM/Object Lock и выживание при потере игрового хоста ещё не подтверждены.
 Manifest v1 содержит domain/producer/ID, время и digest/длину ciphertext;
 подпись не доказывает свежесть, согласованность доменов или сохранность ключа signer.
 Локальный запрет перезаписи не запрещает владельцу файлов удалить архив и

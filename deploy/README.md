@@ -362,8 +362,9 @@ BACKUP_KEEP_DAYS=14
 
 SE-3.5, первый этап: `BACKUP_FORMAT=bundle-v1` создаёт **один** файл
 `void-<backupId>.vdbak`: подписанный Ed25519 manifest и зашифрованный age дамп.
-Это переносимый формат для будущего независимого repository; сейчас скрипт
-публикует его только в доверенный локальный staging. Для режима нужен **Node >=20**
+Скрипт публикует комплект в доверенный локальный staging; отдельный
+[S3 transport](backup-repository/README.md) передаёт его в настроенное хранилище
+и получает выбранную версию для restore. Для bundle-режима нужен **Node >=20**
 на машине запуска job/restore (установщик Docker-стека его не устанавливает),
 `age`, утилита `flock` из util-linux и локальная Linux-файловая система с
 hardlink/fsync/flock. Сетевые файловые системы этим учением не проверены.
@@ -444,8 +445,9 @@ retention готовых копий остаётся отдельной зада
 `BACKUP_KEEP_DAYS` управляет **только legacy** файлами. `.vdbak` этот скрипт не
 удаляет: контролируйте место/возраст копий до внедрения отдельного retention
 сервиса. Hardlink не защищает историю от пользователя с правами записи в staging.
-Off-host передача, immutable storage, независимые роли writer/retention/restore
-и мониторинг пока остаются в [SE-3.5](../docs/secure-environment-roadmap.md).
+S3-доставка реализована отдельным инструментом; развёртывание и приёмка внешнего
+bucket, immutable storage, независимых ролей writer/retention/restore и мониторинга
+остаются в [SE-3.5](../docs/secure-environment-roadmap.md).
 
 #### Контракт файла v1
 
