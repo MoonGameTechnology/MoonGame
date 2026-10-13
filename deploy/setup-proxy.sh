@@ -4,7 +4,8 @@
 # Void Dominion — Настройка Nginx проксирования
 #
 # Если хочешь получить доступ к серверу через внешний IP и порт
-# Использование: sudo bash deploy/setup-proxy.sh
+# Использование:
+#   sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash deploy/setup-proxy.sh
 #############################################################################
 
 set -e
@@ -28,8 +29,8 @@ log_error() {
 }
 
 # Конфигурация
-# Адреса задаются окружением: в репозитории нет адресов конкретного сервера.
-#   sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash deploy/setup-proxy.sh
+# Адреса задаются окружением (см. «Использование» выше): в репозитории нет адресов
+# конкретного сервера.
 INTERNAL_IP="${INTERNAL_IP:-}"
 INTERNAL_PORT="${INTERNAL_PORT:-8788}"
 EXTERNAL_IP="${EXTERNAL_IP:-}"
@@ -38,6 +39,23 @@ if [ -z "$INTERNAL_IP" ] || [ -z "$EXTERNAL_IP" ] || [ -z "$EXTERNAL_PORT" ]; th
     log_error "Задай INTERNAL_IP, EXTERNAL_IP и EXTERNAL_PORT"
     exit 1
 fi
+# Значения подставляются в конфиг nginx, поэтому только адрес или имя хоста и число.
+for v in "$INTERNAL_IP" "$EXTERNAL_IP"; do
+    if ! [[ "$v" =~ ^[0-9A-Za-z.:-]+$ ]]; then
+        log_error "Недопустимый адрес: $v"
+        exit 1
+    fi
+done
+for v in "$INTERNAL_PORT" "$EXTERNAL_PORT"; do
+    if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 65535 ]; then
+        log_error "Недопустимый порт: $v"
+        exit 1
+    fi
+done
+# IPv6 в nginx пишется в квадратных скобках, иначе адрес не отделить от порта.
+bracket() { if [[ "$1" == *:* ]]; then printf '[%s]' "$1"; else printf '%s' "$1"; fi; }
+INTERNAL_HOST="$(bracket "$INTERNAL_IP")"
+EXTERNAL_HOST="$(bracket "$EXTERNAL_IP")"
 
 if [[ $EUID -ne 0 ]]; then
     log_error "Скрипт должен быть запущен от root"
@@ -131,8 +149,8 @@ server {
 #     return 301 https://$server_name:$server_port$request_uri;
 # }
 EOF
-sed -i -e "s/__INTERNAL_IP__/$INTERNAL_IP/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
-    -e "s/__EXTERNAL_IP__/$EXTERNAL_IP/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
+sed -i -e "s/__INTERNAL_IP__/$INTERNAL_HOST/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
+    -e "s/__EXTERNAL_IP__/$EXTERNAL_HOST/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
     /etc/nginx/sites-available/moongame
 
 # Включение сайта
@@ -173,10 +191,10 @@ echo ""
 echo -e "${BLUE}Проверка доступа:${NC}"
 echo ""
 echo "1. Локально (внутри сети):"
-echo "   curl http://$INTERNAL_IP:$INTERNAL_PORT"
+echo "   curl http://$INTERNAL_HOST:$INTERNAL_PORT"
 echo ""
 echo "2. Через Nginx проксирование:"
-echo "   curl http://$EXTERNAL_IP:$EXTERNAL_PORT"
+echo "   curl http://$EXTERNAL_HOST:$EXTERNAL_PORT"
 echo "   (если с внешней машины, нужен доступ к этому IP)"
 echo ""
 echo -e "${YELLOW}Логирование:${NC}"
