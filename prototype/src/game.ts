@@ -37,6 +37,8 @@ export {
   type NetworkMatchMode,
   parseNetworkMatchMode,
   networkSeats,
+  networkSeatPlan,
+  networkStartsOf,
   newGame,
   PLAYABLE_FACTIONS,
 } from './matchSetup';

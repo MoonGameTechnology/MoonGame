@@ -9,7 +9,7 @@ import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity'
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
-import { DEFAULT_MAP_ID, isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
@@ -91,6 +91,8 @@ import {
   kernel,
   data,
   networkSeats,
+  networkSeatPlan,
+  networkStartsOf,
   parseNetworkMatchMode,
   aiOrders,
   seatAiDecision,
@@ -440,7 +442,7 @@ async function createHostedMatch(
     newGame({
       mapId,
       ...(modeId !== undefined ? { modeId } : {}),
-      seats: networkSeats(isFrontier(mapId) ? 'ffa' : NETWORK_MODE, mapId),
+      seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
   // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
   // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
@@ -997,20 +999,19 @@ const server = createMultiplayerServer({
         const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
         if (!room) return null;
         const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+        // The homeworld from the match's setup, never from live ownership (which would
+        // retell every capture and loss to whoever reads the layout).
+        const starts = networkStartsOf(room.state, NETWORK_MODE);
         return {
           mapId: room.state.mapId ?? 'nexus',
           ended: room.state.match.status === 'ended',
-          seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => {
-            // Find the start planet (owner === playerId, the homeworld).
-            const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
-            return {
-              playerId: p.id,
-              name: p.name,
-              faction: p.faction,
-              start: startPlanet?.id ?? null,
-              taken: taken.has(p.id),
-            };
-          }),
+          seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => ({
+            playerId: p.id,
+            name: p.name,
+            faction: p.faction,
+            start: starts[p.id] ?? null,
+            taken: taken.has(p.id),
+          })),
         };
       },
       entryOpen: (id) => registry.entryOpen(id),
