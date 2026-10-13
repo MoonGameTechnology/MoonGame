@@ -129,8 +129,13 @@ sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PO
 
 Это настроит Nginx проксирование с поддержкой WebSocket.
 
+Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
+запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
+deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`.
+
 Или настрой Port Forwarding на роутере:
-- Внешний порт: `95367 TCP`
+- Внешний порт: `<порт> TCP`
 - Внутренний IP: `<IP-сервера>`
 - Внутренний порт: `8788 TCP`
 

@@ -133,11 +133,16 @@ sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PO
 # http://<внешний-IP>:<порт>
 ```
 
+Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
+запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
+deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`.
+
 ### Вариант 2: Проксирование на роутере
 
 На роутере (тот, где точка доступа Wi-Fi) в "Port Forwarding":
 ```
-Внешний порт: 95367 TCP
+Внешний порт: <порт> TCP
 Внутренний IP: <IP-сервера>
 Внутренний порт: 8788 TCP
 ```
@@ -261,7 +266,7 @@ ssh user@<IP-сервера>
 # Разреши порты
 sudo ufw allow 22/tcp    # SSH
 sudo ufw allow 8788/tcp  # Игровой сервер
-sudo ufw allow 95367/tcp # Nginx (если используется)
+sudo ufw allow <порт>/tcp # Nginx (если используется)
 sudo ufw enable
 ```
 

@@ -68,6 +68,11 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
+Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
+запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
+deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`.
+
 #### Вариант 2: На роутере
 
 Настрой Port Forward:

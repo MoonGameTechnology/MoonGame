@@ -152,6 +152,11 @@ EOF
 sed -i -e "s/__INTERNAL_IP__/$INTERNAL_HOST/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
     -e "s/__EXTERNAL_IP__/$EXTERNAL_HOST/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
     /etc/nginx/sites-available/moongame
+# `listen <порт>` в nginx слушает только IPv4; для внешнего IPv6 нужен отдельный слушатель.
+if [[ "$EXTERNAL_IP" == *:* ]]; then
+    sed -i "s/^    listen $EXTERNAL_PORT;$/&\n    listen [::]:$EXTERNAL_PORT;/" \
+        /etc/nginx/sites-available/moongame
+fi
 
 # Включение сайта
 if [ -L /etc/nginx/sites-enabled/moongame ]; then
