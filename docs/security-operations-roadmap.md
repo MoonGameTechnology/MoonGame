@@ -18,9 +18,12 @@
   domain/producer/backupId, затем проверяет скопированные в private staging байты
   до расшифровки/БД. Права на приватный signing key проверяются до чтения;
   уборка аварийных остатков требует exclusive `flock` и сохраняет активные
-  shared-lock задания и готовые копии. Off-host repository и immutable retention
-  ещё отсутствуют.
+  shared-lock задания и готовые копии. Отдельный S3 transport выполняет conditional
+  PUT и проверенный GET по version ID; SDK не входит в runtime-зависимости игры.
+  Реальный внешний bucket, его IAM/Object Lock и независимый receipt journal
+  ещё не развёрнуты/не проверены.
   [Настройка и ограничения](../deploy/README.md#подписанный-комплект-v1).
+  [S3 transport и приёмка провайдера](../deploy/backup-repository/README.md).
 - Типизированный security JSONL и локальный `security.alert`; центральный сбор,
   внешний получатель, SIEM и runtime-response пока не построены.
 - CI SAST/SCA/DAST/image scans проверяют выпуск. Они не являются SIEM наблюдения
@@ -55,7 +58,10 @@ ciphertext. Он пока не содержит schema/image/data pins и snapsh
 Trusted verify-key и ожидаемая identity/ID задаются снаружи; подпись подтверждает
 происхождение от signer и неизменность, но не свежесть или корректность данных.
 Backup signing key отличается от приватного age restore-key; создание комплекта
-не требует restore-key. Внешний TLS-транспорт, immutable IAM/retention,
+не требует restore-key. S3 transport проверяет TLS peer и сохраняет version ID
+в receipt; GET проверяет выбранную версию до публикации. Клиент не управляет
+retention/удалением и сам не создаёт внешний durable receipt journal.
+Развёртывание внешнего repository, приёмка immutable IAM/retention,
 freshness-мониторинг, controlled key-release и независимый restore lab ещё нужны.
 `BACKUP_KEEP_DAYS` обслуживает только legacy-архивы; `.vdbak` не удаляются им,
 но остаются удаляемыми владельцем локальных файлов.

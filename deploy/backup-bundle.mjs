@@ -9,7 +9,7 @@
  * Signing covers a protocol-specific context followed by the exact JSON bytes.
  */
 import { constants } from 'node:fs';
-import { link, lstat, mkdir, open, readdir, rm, unlink } from 'node:fs/promises';
+import { link, lstat, mkdir, mkdtemp, open, readdir, rm, unlink } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import {
   createHash,
@@ -177,6 +177,29 @@ export async function cleanupBundles(options = {}) {
   } catch (error) {
     throw safeError(error);
   } finally {
+    await close(lock);
+    await close(directory?.handle);
+  }
+}
+
+/** Private job scratch space using the same crash-cleanup protocol as backup.sh. */
+export async function withBackupWorkspace(outputDir, action) {
+  let directory;
+  let lock;
+  let workspace;
+  try {
+    directory = await privateDirectory(outputDir);
+    lock = await lockFile(directory.path);
+    if (await flock(lock, true)) await removeOrphans(directory);
+    await flock(lock, false);
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}Z$/, 'Z');
+    workspace = await mkdtemp(join(directory.path, `.bundle-job-${stamp}.`));
+    return await action(workspace);
+  } finally {
+    if (workspace) await rm(workspace, { recursive: true, force: true }).catch(() => {});
     await close(lock);
     await close(directory?.handle);
   }

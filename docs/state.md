@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 11481 зелёных** (0 skip — прогон с PostgreSQL 16, age и собранным `prototype/dist`; 926 файлов; прогон 2026-10-13, SE-3.5 foundation; без PostgreSQL и без `dist` пропускается около сотни). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 11529 зелёных** (0 skip — прогон с PostgreSQL 16, age и собранным `prototype/dist`; 928 файлов; прогон 2026-10-13, SE-3.5 S3 transport; без PostgreSQL и без `dist` пропускается около сотни). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
 
 
 **Стресс-тест 2026-10-11:** устранены heap OOM при выдаче HTML, неограниченная durable-очередь и ложная readiness при отказе БД; добавлены отказ по заполненной очереди без расхода sequence, проверка актуальности peer и защита legacy restore от чужого schema marker без второй копии SQL. Подтверждение места повторяет временные отказы при полной очереди и проверяет сокет и поколение заявки непосредственно при исполнении очереди; disconnect отменяет ещё не начатое подтверждение без квитанции. Recovery-письма форматирует внешний адаптер под локаль получателя; оба хоста инъецируют его в auth API, а серверный пакет передаёт только структурные параметры и не зависит от каталогов локализации. 160 WSS-клиентов за 20 минут записали 9 579 уникальных команд без потерь/дублей/расхождений; при 160 × 0,5 команды/s стенд уже перегружается. Обе игры проверены в Chromium desktop/mobile. [Полный отчёт, профили ресурсов и ограничения](reviews/2026-10-11-full-stress.md).
@@ -7925,6 +7925,25 @@ basename; случайный суффикс различает задания о
 пользователя по-прежнему позволяют удалить файлы. Bundle-ротации пока нет,
 `BACKUP_KEEP_DAYS` относится только к legacy. [Контракт и включение](../deploy/README.md#подписанный-комплект-v1).
 
+**S3 transport (2026-10-13, продолжение SE-3.5).** Отдельный workspace-пакет
+`@void/backup-repository` предоставляет `deploy/backup-repository/s3.mjs`:
+проверенный приватный снимок отправляется через HTTPS conditional PUT с SHA-256,
+receipt содержит version ID и digest всего `.vdbak`. GET принимает только этот
+version ID, сравнивает receipt с независимой конфигурацией, проверяет bytes/digest
+и подпись до публикации без перезаписи. Лимит single PUT — 5 ГиБ, TLS >=1.2 с
+CA/hostname verification; редиректы и автоматические retries отключены.
+Потеря PUT-ответа — неизвестный исход; исходник сохраняется. Рабочие файлы используют
+общий shared/exclusive lock-протокол `withBackupWorkspace` для уборки после SIGKILL.
+S3 SDK исключён из production-зависимостей игрового образа; отдельная установка
+worker не тянет игровые зависимости. Инструмент не расшифровывает данные,
+не обращается к БД и не назначает IAM/retention. [Установка и границы](../deploy/backup-repository/README.md).
+Тесты `s3.test.mjs`/`s3-https.test.mjs`: подмена/обрыв/версия/таймаут, реальные
+SDK/HTTPS и CLI, TLS отказы и SIGKILL. При PostgreSQL и age также выполнен полный
+круг после удаления локального архива и тестовой БД; отпечаток данных совпал.
+S3 wire fixture не подтверждает IAM/Object Lock выбранного провайдера: реальные
+bucket/credentials пока не подключены. Независимый durable receipt journal и
+развёртывание/приёмка repository остаются задачами SE-3.5.
+
 `deploy/backup.test.mjs` (9 тестов) снимает дамп настоящим `pg_dump` в отдельной БД
 `void_backup_drill` с двумя синтетическими таблицами: отказы до изменения данных,
 legacy и signed v1 restore после полного DROP/CREATE, равные отпечатки таблиц.
@@ -7936,7 +7955,7 @@ legacy и signed v1 restore после полного DROP/CREATE, равные 
 тихие отказы прежних конвейеров и измерило **RTO ≈ 3 мин/ГБ** (30 МБ → 3.3 с,
 223 МБ → 35 с, 1080 МБ → 181 с). Это не актуальный prod SLO; суточный cron задаёт
 целевой RPO 24 ч только при успешных проверенных копиях. Осталось: PITR/pgaudit
-(SE-3.4), независимые identities/ACL, off-host transport/repository/retention,
+(SE-3.4), независимые identities/ACL, развёртывание и приёмка off-host repository/retention,
 полные schema/image/data/WAL pins, freshness, key-release и restore lab (SE-3.5).
 
 Тесты лежат рядом с кодом (`*.test.ts`) — и в пакетах, и в `prototype/src` (Vitest
