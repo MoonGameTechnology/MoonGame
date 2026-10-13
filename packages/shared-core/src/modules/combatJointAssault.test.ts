@@ -162,6 +162,22 @@ describe('MSB-4 — совместный штурм и чей мир', () => {
     expect(p.winners).toEqual(['p1', 'p2']);
   });
 
+  it('ПРОИГРАВШИЕ (BAL-16): `battle.resolved` называет и тех, у кого не уцелело ни стороны', () => {
+    // Очки за бой платит модуль победы по этому событию, а сам бой к нему уже удалён —
+    // без списка проигравших снять с них очки было бы не по чему.
+    const losersOf = (s: GameState): unknown => {
+      const r = kernel.advanceTo(s, ctx(400 * HOUR));
+      if (!r.ok) throw new Error('advance failed');
+      const resolved = r.events.filter((e) => e.type === 'battle.resolved');
+      expect(resolved).toHaveLength(1);
+      return (resolved[0]!.payload as { losers?: unknown }).losers;
+    };
+    // Гарнизон пал под двумя берегами — проиграл его хозяин.
+    expect(losersOf(siege([['marine', 1]], [['p1', [['marine', 6]]], ['p2', [['marine', 6]]]]))).toEqual(['p0']);
+    // Оба берега выбиты — проиграли оба штурмующих, хозяин мира победил.
+    expect(losersOf(siege([['guard', 3]], [['p1', [['marine', 1]]], ['p2', [['marine', 1]]]]))).toEqual(['p1', 'p2']);
+  });
+
   it('ОБА ДЕСАНТА ПОГИБЛИ — мир остаётся хозяину, вечных чужих войск не завелось', () => {
     const after = run(siege([['guard', 3]], [
       ['p1', [['marine', 1]]],

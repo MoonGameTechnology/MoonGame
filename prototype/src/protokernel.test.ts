@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { SCORE_LIMIT, kernel, advance, setMatchMode } from './game';
+import { SCORE_LIMIT, kernel, advance, setMatchMode, ctx } from './game';
 import { data } from './gameData';
 import { pveState, pveModeId } from '../../packages/client/src/gameData';
 import type { Context } from '../../packages/shared-core/src/index';
@@ -13,6 +13,19 @@ describe('victory score limit', () => {
   it('sits below the ~60% domination line so the score race can resolve first', () => {
     expect(SCORE_LIMIT).toBe(1100);
     expect(SCORE_LIMIT).toBeLessThan(0.6 * 2410); // 2410 = board base points
+  });
+
+  it('duel and four-player FFA: the points of the whole map and an 80% capture (BAL-16)', () => {
+    for (const [mapId, scoreLimit] of [
+      ['duel-1', 560],
+      ['ffa-4', 790],
+    ] as const) {
+      expect(ctx(0, { mapId }).config?.victory).toMatchObject({
+        scoreLimit,
+        dominationPercent: 0.8,
+      });
+    }
+    expect(ctx(0, { mapId: 'team-2v2' }).config?.victory?.dominationPercent).toBeUndefined();
   });
 });
 

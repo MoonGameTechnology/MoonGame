@@ -36,14 +36,27 @@ describe('слагаемые счёта (BAL-5)', () => {
   });
 
   it('ФЛОТ В СЧЁТ НЕ ВХОДИТ — это ответ кирпича, данный кодом, а не прогоном', () => {
-    // «military never scores» (GDD §8.1): у места есть флоты и юниты, но `total`
-    // складывается только из территории и построек.
+    // Армия очков не даёт тем, что она есть (GDD §8.1): у места есть флоты и юниты, но
+    // `total` складывается из территории, построек и боевых очков (боёв ещё не было).
     let state = newGame(duel);
     state = advance(state, 1 * DAY).state;
     const parts = scoreParts(state, data)['p1']!;
     expect(parts.fleets).toBeGreaterThan(0);
     expect(parts.units).toBeGreaterThan(0);
+    expect(parts.battle).toBe(0);
     expect(parts.total).toBe(parts.territory + parts.buildings);
+  });
+
+  it('боевые очки (BAL-16) — третье слагаемое, и разложение сходится с ядром', () => {
+    let state = newGame(duel);
+    state.match.battlePoints = { p1: 36, p2: -8 };
+    state = advance(state, 1 * DAY).state;
+    const parts = scoreParts(state, data);
+    const scores = state.match.scores ?? {};
+    expect([parts.p1!.battle, parts.p2!.battle]).toEqual([36, -8]);
+    for (const seat of ['p1', 'p2'] as const) {
+      expect([seat, parts[seat]!.total]).toEqual([seat, scores[seat]?.total ?? 0]);
+    }
   });
 
   it('на старте счёт — это территория; постройки приходят позже', () => {

@@ -1082,7 +1082,7 @@ export const en: Record<string, string> = {
     'Fleets travel not in straight lines but along star lanes between worlds — the route is built automatically. Lane nodes can be intercepted: an enemy met on the way is a battle.',
   'codex.term.lanes.title': 'Star lanes',
   'codex.term.score.body':
-    'Points accrue from what you hold: a world — 50, any other sector — 10, buildings add per level. Reach the score threshold to win. Other paths to victory: eliminating rivals or domination.',
+    'Points accrue from holdings: a world — 50, any other sector — 10, buildings add per level. A battle for a player\'s world: won +40, lost −5% of score. Reach the threshold to win. Other paths: elimination or domination.',
   'codex.term.score.title': 'Victory points',
   'codex.term.shield.body':
     'Takes damage before the [[hull|hull]] and recharges for free out of combat.',

@@ -994,7 +994,6 @@ describe('victory — боеприпас не войско', () => {
   });
 });
 
-
 describe('victory — fixed 2v2 sides', () => {
   const kernel = createKernel([victoryModule]);
   const config: MatchConfig = {
@@ -1078,5 +1077,135 @@ describe('victory — fixed 2v2 sides', () => {
     const tied = okAdvance(kernel.advanceTo(state, ctx(HOUR, cap)));
     expect(tied.state.match).toMatchObject({ status: 'ended', reason: 'timeout', winner: null });
     expect(tied.state.match.winners).toBeUndefined();
+  });
+});
+
+describe('victory — очки за бой (BAL-16)', () => {
+  // Бой здесь не разыгрывается: модуль победы слушает только итог, а кто выиграл, решает
+  // `combat.ts` (его список проигравших проверяет `combatJointAssault.test.ts`).
+  const battleModule: GameModule = {
+    id: 'test-battle',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.battle', (action, h) => h.emit('battle.resolved', action.payload));
+      // Два боя в одном проходе событий: первый может кончить партию раньше второго.
+      api.onAction('test.battles', (action, h) => {
+        for (const payload of action.payload as unknown[]) h.emit('battle.resolved', payload);
+      });
+    },
+  };
+  const kernel = createKernel([victoryModule, battleModule]);
+  const noRace: MatchConfig = { timeScale: 1, victory: { dominationPercent: 0, scoreLimit: 1_000_000 } };
+  const battle = (
+    state: GameState,
+    winners: string[],
+    losers: string[],
+    config = noRace,
+    location = 'A', // мир лидера p1
+  ): GameState => {
+    const r = kernel.applyAction(
+      state,
+      { id: 's:p1:1', type: 'test.battle', playerId: 'p1', payload: { battleId: 'b', location, winners, losers }, issuedAt: 0 },
+      ctx(HOUR, config),
+    );
+    if (!r.ok) throw new Error(`apply failed: ${r.code}`);
+    return r.state;
+  };
+  // Лидер p1 — четыре мира (200), p2 и p3 — мир и малая провинция (по 60).
+  const board = (): GameState => ({
+    ...baseState(),
+    players: { p1: player('p1'), p2: player('p2'), p3: player('p3') },
+    planets: {
+      ...Object.fromEntries(['A', 'D', 'E', 'F'].map((id) => [id, planet(id, 'p1', { kind: 'planet' })])),
+      B: planet('B', 'p2', { kind: 'planet' }),
+      G: planet('G', 'p2'),
+      C: planet('C', 'p3', { kind: 'planet' }),
+      H: planet('H', 'p3'),
+    },
+  });
+
+  it('победитель +40, проигравший теряет 5% своего счёта, и это входит в счёт', () => {
+    const s = battle(board(), ['p1'], ['p2']);
+    expect(s.match.battlePoints).toEqual({ p1: 40, p2: -3 });
+    expect(s.match.scores.p1?.total).toBe(200 + 40);
+    expect(s.match.scores.p2?.total).toBe(60 - 3);
+    expect(s.match.scores.p3?.total).toBe(60);
+  });
+
+  it('лидер теряет за проигранный бой больше отстающего', () => {
+    expect(battle(board(), ['p2'], ['p1']).match.battlePoints).toEqual({ p1: -10, p2: 40 });
+    expect(battle(board(), ['p1'], ['p2']).match.battlePoints).toEqual({ p1: 40, p2: -3 });
+  });
+
+  it('очки копятся, а процент берётся от счёта вместе с прошлыми боями', () => {
+    let s = battle(board(), ['p1'], ['p2']); // p2: 60 → −3
+    s = battle(s, ['p2'], ['p1']); // p1: 240 → −12
+    s = battle(s, ['p1'], ['p2']); // p2: 97 → −5
+    expect(s.match.battlePoints).toEqual({ p1: 68, p2: 32 });
+    // Флотов в счёте нет вовсе, так что уход армии с поля очки не трогает.
+    const r = okAdvance(kernel.advanceTo(s, ctx(2 * HOUR, noRace)));
+    expect(r.state.match.scores.p1?.total).toBe(268);
+  });
+
+  it('совместная победа делит +40 между союзниками, каждый проигравший теряет свои 5%', () => {
+    expect(battle(board(), ['p1', 'p2'], ['p3']).match.battlePoints).toEqual({ p1: 20, p2: 20, p3: -3 });
+    expect(battle(board(), ['p1'], ['p2', 'p3']).match.battlePoints).toEqual({ p1: 40, p2: -3, p3: -3 });
+  });
+
+  it('платит только бой за планету игрока, где её владелец дрался сам', () => {
+    const s0 = board();
+    s0.planets.N = planet('N', null);
+    expect(battle(s0, ['p2'], ['p1'], noRace, 'B').match.battlePoints).toEqual({ p1: -10, p2: 40 }); // оборона
+    expect(battle(s0, ['p1'], ['p2'], noRace, 'N').match.battlePoints).toBeUndefined(); // ничья планета
+    expect(battle(s0, ['p1'], ['p2'], noRace, 'C').match.battlePoints).toBeUndefined(); // планета p3
+    expect(battle(s0, ['p1'], ['p2'], noRace, 'Z').match.battlePoints).toBeUndefined(); // не планета
+  });
+
+  it('проигравший без очков ничего не теряет', () => {
+    const s0 = board();
+    s0.players.p4 = player('p4');
+    expect(battle(s0, ['p1'], ['p4']).match.battlePoints).toEqual({ p1: 40, p4: 0 });
+  });
+
+  it('ничья, перемирие и бой с ополчением или обитателями карты очков не дают', () => {
+    const s0 = board();
+    s0.players.npc = { ...player('npc'), npc: 'pirate' };
+    expect(battle(s0, [], []).match.battlePoints).toBeUndefined(); // ничья / перемирие
+    expect(battle(s0, ['p1'], []).match.battlePoints).toBeUndefined(); // ополчение ничьего мира
+    expect(battle(s0, ['p1'], ['npc']).match.battlePoints).toBeUndefined();
+    expect(battle(s0, ['npc'], ['p2']).match.battlePoints).toBeUndefined();
+  });
+
+  it('бои с Роем забега очков не дают', () => {
+    const s0 = board();
+    s0.pve = { npcPlayerId: 'p3', waveNumber: 0, totalWaves: 3 } as GameState['pve'];
+    expect(battle(s0, ['p3'], ['p1']).match.battlePoints).toBeUndefined();
+  });
+
+  it('порог можно взять выигранными боями', () => {
+    const s = battle(board(), ['p1'], ['p2'], { timeScale: 1, victory: { dominationPercent: 0, scoreLimit: 230 } });
+    expect(s.match.status).toBe('ended');
+    expect(s.match.reason).toBe('score');
+    expect(s.match.winner).toBe('p1');
+  });
+
+  it('бой, закрытый после конца партии, очков уже не меняет', () => {
+    const r = kernel.applyAction(
+      board(),
+      {
+        id: 's:p1:1',
+        type: 'test.battles',
+        playerId: 'p1',
+        payload: [
+          { battleId: 'b1', location: 'A', winners: ['p1'], losers: ['p2'] },
+          { battleId: 'b2', location: 'B', winners: ['p2'], losers: ['p1'] },
+        ],
+        issuedAt: 0,
+      },
+      ctx(HOUR, { timeScale: 1, victory: { dominationPercent: 0, scoreLimit: 230 } }),
+    );
+    if (!r.ok) throw new Error(`apply failed: ${r.code}`);
+    expect(r.state.match.winner).toBe('p1');
+    expect(r.state.match.battlePoints).toEqual({ p1: 40, p2: -3 });
   });
 });

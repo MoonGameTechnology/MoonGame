@@ -395,6 +395,15 @@ describe('visibleState (fog of war as a security boundary)', () => {
     expect(state.match.scores.p2?.total).toBe(240);
   });
 
+  it('fogs battle points (BAL-16): an enemy line would reveal a battle behind the fog', () => {
+    const state = scenario();
+    state.match.battlePoints = { p1: 16, p2: 40 };
+    expect(visibleState(state, 'p1', data).match.battlePoints).toEqual({ p1: 16 });
+    state.match.battlePoints = { p2: 40 };
+    expect(visibleState(state, 'p1', data).match.battlePoints).toBeUndefined();
+    expect(state.match.battlePoints).toEqual({ p2: 40 }); // source untouched (purity)
+  });
+
   it('keeps the viewer own pending schedule, drops enemy timers (no future-intent leak)', () => {
     const state = scenario();
     // own construction (A is p1's) survives; an enemy build (C is p2's) and an
