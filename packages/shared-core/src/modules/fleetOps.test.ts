@@ -659,6 +659,43 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     ).toBe('E_NO_CAPACITY');
   });
 
+  it('ДВЕ ЗАПИСИ НА ОДНИ КОРАБЛИ: «любые» и «с лоадаутом» не считаются дважды — E_NOT_ENOUGH', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet(
+          'F1',
+          [
+            { unit: 'cruiser', count: 2, modules: ['plating'] },
+            { unit: 'cruiser', count: 2 },
+            { unit: 'scout', count: 1 },
+          ],
+          [{ unit: 'militia', count: 8 }], // трюм полон: 4 крейсера × 2
+        ),
+      ],
+    });
+    // Обе записи указывают на одни и те же два бронированных крейсера: уйти может только
+    // пара, и восьми militia в её трюме (4 места) не место.
+    expect(
+      errCode(
+        kernel.applyAction(
+          s,
+          split(
+            'F1',
+            [
+              { unit: 'cruiser', count: 2 },
+              { unit: 'cruiser', count: 2, modules: ['plating'] },
+            ],
+            'p1',
+            [{ unit: 'militia', count: 8 }],
+          ),
+          ctx,
+        ),
+      ),
+    ).toBe('E_NOT_ENOUGH');
+  });
+
   it('СТОЛЬКО ДЕСАНТА НЕТ: заказ больше наличного — E_NO_ARMY, состояние не тронуто', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({

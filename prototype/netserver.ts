@@ -1089,6 +1089,7 @@ const server = createMultiplayerServer({
       registerAdminApi(app, {
         identify: identifySession,
         admins: ADMIN_LOGINS,
+        users: userStore,
         roster: async (id) => {
           const room = registry.get(id);
           if (!room) return null;

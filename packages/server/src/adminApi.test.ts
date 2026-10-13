@@ -54,15 +54,27 @@ async function world(nick = 'griefer', seat = 'green'): Promise<World> {
   return { registry, accounts, room };
 }
 
-/** Сервер с админским API. Личность — как в остальных тестах: логин в `Bearer`. */
-function adminApp(w: World, admins: string[]): FastifyInstance {
+/** Учётки, существующие к монтированию: логин (без учёта регистра) → id. По умолчанию
+ *  каждый логин зарегистрирован как `acct:<логин>` — так же, как его называет `identify`. */
+type Accounts = Map<string, string> | 'all';
+
+/** Сервер с админским API. Личность — как в остальных тестах: `Bearer <логин>` или
+ *  `Bearer <логин>@<id учётки>`, когда тесту нужна другая учётка под тем же логином. */
+function adminApp(w: World, admins: string[], accounts: Accounts = 'all'): FastifyInstance {
   app = Fastify();
   registerAdminApi(app, {
     admins: new Set(admins),
+    users: {
+      findUser: (login) => {
+        const id = accounts === 'all' ? `acct:${login}` : accounts.get(login.toLowerCase());
+        return Promise.resolve(id ? { userId: id, login, passHash: 'x' } : null);
+      },
+    },
     identify: (request) => {
       const raw = request.headers.authorization;
-      const login = typeof raw === 'string' ? raw.replace(/^Bearer /, '') : '';
-      return Promise.resolve(login ? { accountId: `acct:${login}`, login } : null);
+      const bearer = typeof raw === 'string' ? raw.replace(/^Bearer /, '') : '';
+      const [login = '', accountId = `acct:${login}`] = bearer.split('@');
+      return Promise.resolve(login ? { accountId, login } : null);
     },
     roster: async (id) => {
       const room = w.registry.get(id);
@@ -139,6 +151,29 @@ describe('ADM-1 · кто такой администратор', () => {
     const ok = await server.inject({ method: 'GET', url: '/admin/whoami', headers: ADMIN });
     expect(ok.statusCode).toBe(200);
     expect(ok.json()).toEqual({ login: 'boss', admin: true });
+  });
+
+  // Полномочие — у УЧЁТКИ, которая носила логин к запуску сервера, а не у любого, кто
+  // назовётся этим логином потом: логин из списка, ещё не занятый (или стёртый вместе с
+  // памятью хоста при рестарте), мог бы зарегистрировать кто угодно.
+  it('логин, которого не было к запуску, полномочий не даёт — даже зарегистрированный позже', async () => {
+    const server = adminApp(await world(), ['boss'], new Map());
+    const late = await server.inject({ method: 'GET', url: '/admin/whoami', headers: ADMIN });
+    expect(late.statusCode).toBe(403);
+  });
+
+  it('другая учётка под тем же логином (в любом регистре) — не администратор', async () => {
+    const server = adminApp(await world(), ['boss'], new Map([['boss', 'acct:boss']]));
+    for (const bearer of ['Bearer boss@acct:other', 'Bearer BOSS@acct:other']) {
+      const r = await server.inject({
+        method: 'GET',
+        url: '/admin/whoami',
+        headers: { authorization: bearer },
+      });
+      expect(r.statusCode, bearer).toBe(403);
+    }
+    const ok = await server.inject({ method: 'GET', url: '/admin/whoami', headers: ADMIN });
+    expect(ok.statusCode).toBe(200);
   });
 });
 

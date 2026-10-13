@@ -103,7 +103,9 @@ export const rendezvousModule: GameModule = {
   id: 'rendezvous',
   // 1.2.0: ракета не цель приказа «Охранять» (SM-3.7b); чужая ракета — как отсутствующий
   //        флот для любого приказа (`E_BAD_TARGET`), а не «не враг».
-  version: '1.2.0',
+  // 1.3.0: `ally.cancel` снимает только операцию, отданную самим игроком; чужая —
+  //        `E_NO_ORDER`, как отсутствующая.
+  version: '1.3.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -217,7 +219,8 @@ export const rendezvousModule: GameModule = {
       const { ally } = (action.payload ?? {}) as { ally?: unknown };
       if (typeof ally !== 'string') return h.reject('E_BAD_PAYLOAD');
       const op = h.state.allyOps?.[ally];
-      if (!op) return h.reject('E_NO_ORDER');
+      // Снять можно только СВОЮ операцию; чужая — как отсутствующая, тем же кодом (A06).
+      if (!op || op.by !== action.playerId) return h.reject('E_NO_ORDER');
       if (!contactedAllies(h.state, action.playerId).includes(ally))
         return h.reject('E_NO_CONTACT');
       delete h.state.allyOps![ally];

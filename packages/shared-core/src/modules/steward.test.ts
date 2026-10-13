@@ -111,6 +111,21 @@ describe('steward module', () => {
     });
   });
 
+  // Бессрочного Хранителя не бывает: вахта длиннее игровых суток — тот же отказ, что
+  // у прошедшего срока. Ровно сутки — ещё вахта.
+  it('caps the window at one game day from now', () => {
+    expect(
+      kernel.applyAction(baseState(), delegate('p1', 'defend', HOUR + 24 * HOUR + 1), ctx(HOUR)),
+    ).toEqual({ ok: false, code: 'E_BAD_UNTIL' });
+    expect(
+      kernel.applyAction(baseState(), delegate('p1', 'defend', Number.MAX_SAFE_INTEGER), ctx(0)),
+    ).toEqual({ ok: false, code: 'E_BAD_UNTIL' });
+    const day = okApply(
+      kernel.applyAction(baseState(), delegate('p1', 'defend', HOUR + 24 * HOUR), ctx(HOUR)),
+    );
+    expect(day.state.players.p1?.steward?.until).toBe(25 * HOUR);
+  });
+
   it('hands the seat back early on recall, and is a safe no-op when nothing is delegated', () => {
     const delegated = okApply(kernel.applyAction(baseState(), delegate('p1', 'defend', 8 * HOUR), ctx(0)));
 
