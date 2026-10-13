@@ -57,7 +57,10 @@ METRICS_TOKEN="${METRICS_TOKEN:-$(openssl rand -hex 32)}"
 origin_host() { if [[ "$1" == *:* ]]; then printf '[%s]' "$1"; else printf '%s' "$1"; fi; }
 ALLOWED_ORIGINS="http://$(origin_host "$INTERNAL_IP"):$INTERNAL_PORT"
 if [ -n "$EXTERNAL_IP" ]; then
-    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$(origin_host "$EXTERNAL_IP"):${EXTERNAL_PORT:-$INTERNAL_PORT}"
+    # Порт 80 браузер в origin не пишет.
+    EXTERNAL_ORIGIN_PORT="${EXTERNAL_PORT:-$INTERNAL_PORT}"
+    if [ "$EXTERNAL_ORIGIN_PORT" = 80 ]; then EXTERNAL_ORIGIN_PORT=""; else EXTERNAL_ORIGIN_PORT=":$EXTERNAL_ORIGIN_PORT"; fi
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$(origin_host "$EXTERNAL_IP")$EXTERNAL_ORIGIN_PORT"
 fi
 
 # Функции для вывода

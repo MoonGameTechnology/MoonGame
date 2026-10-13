@@ -39,9 +39,10 @@ if [ -z "$INTERNAL_IP" ] || [ -z "$EXTERNAL_IP" ] || [ -z "$EXTERNAL_PORT" ]; th
     log_error "Задай INTERNAL_IP, EXTERNAL_IP и EXTERNAL_PORT"
     exit 1
 fi
-# Значения подставляются в конфиг nginx, поэтому только IPv4, IPv6 или имя хоста и число.
+# Значения подставляются в конфиг nginx, поэтому только IPv4 или имя хоста и число.
+# IPv6 скрипт не поддерживает: для него конфиг nginx пишется вручную.
 for v in "$INTERNAL_IP" "$EXTERNAL_IP"; do
-    if ! [[ "$v" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ || ("$v" =~ ^[0-9A-Fa-f:]+$ && "$v" =~ [0-9A-Fa-f] && "$v" == *:*:*) ]]; then
+    if ! [[ "$v" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]]; then
         log_error "Недопустимый адрес: $v"
         exit 1
     fi
@@ -52,10 +53,6 @@ for v in "$INTERNAL_PORT" "$EXTERNAL_PORT"; do
         exit 1
     fi
 done
-# IPv6 в nginx пишется в квадратных скобках, иначе адрес не отделить от порта.
-bracket() { if [[ "$1" == *:* ]]; then printf '[%s]' "$1"; else printf '%s' "$1"; fi; }
-INTERNAL_HOST="$(bracket "$INTERNAL_IP")"
-EXTERNAL_HOST="$(bracket "$EXTERNAL_IP")"
 
 if [[ $EUID -ne 0 ]]; then
     log_error "Скрипт должен быть запущен от root"
@@ -97,7 +94,6 @@ upstream moongame_backend {
 server {
     # Слушаем внешний порт
     listen __EXTERNAL_PORT__;
-    listen [::]:__EXTERNAL_PORT__;
     server_name __EXTERNAL_IP__;
 
     # Логирование
@@ -150,8 +146,8 @@ server {
 #     return 301 https://$server_name:$server_port$request_uri;
 # }
 EOF
-sed -i -e "s/__INTERNAL_IP__/$INTERNAL_HOST/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
-    -e "s/__EXTERNAL_IP__/$EXTERNAL_HOST/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
+sed -i -e "s/__INTERNAL_IP__/$INTERNAL_IP/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
+    -e "s/__EXTERNAL_IP__/$EXTERNAL_IP/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
     /etc/nginx/sites-available/moongame
 
 # Включение сайта
@@ -192,10 +188,10 @@ echo ""
 echo -e "${BLUE}Проверка доступа:${NC}"
 echo ""
 echo "1. Локально (внутри сети):"
-echo "   curl http://$INTERNAL_HOST:$INTERNAL_PORT"
+echo "   curl http://$INTERNAL_IP:$INTERNAL_PORT"
 echo ""
 echo "2. Через Nginx проксирование:"
-echo "   curl http://$EXTERNAL_HOST:$EXTERNAL_PORT"
+echo "   curl http://$EXTERNAL_IP:$EXTERNAL_PORT"
 echo "   (если с внешней машины, нужен доступ к этому IP)"
 echo ""
 echo -e "${YELLOW}Логирование:${NC}"

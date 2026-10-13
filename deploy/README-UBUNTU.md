@@ -39,8 +39,6 @@ sudo bash deploy/install-ubuntu.sh
 
 #### Вариант 1: Nginx на том же сервере
 
-Адрес IPv6 в `proxy_pass` пишется в квадратных скобках: `http://[2001:db8::10]:8788`.
-
 ```bash
 sudo apt-get install -y nginx
 
@@ -48,7 +46,6 @@ sudo apt-get install -y nginx
 sudo bash -c 'cat > /etc/nginx/sites-available/moongame << EOF
 server {
     listen <порт>;
-    listen [::]:<порт>;
     server_name <внешний-IP>;
 
     location / {
