@@ -86,7 +86,9 @@ if [ -f /etc/nginx/sites-available/moongame ]; then
     cp -a /etc/nginx/sites-available/moongame /etc/nginx/sites-available/moongame.prev
     HAD_SITE=1
 fi
-cat > /etc/nginx/sites-available/moongame << 'EOF'
+# Конфиг собирается во временном файле и встаёт на место одним mv: сбой подстановки
+# не оставит активный файл с плейсхолдерами.
+cat > /etc/nginx/sites-available/moongame.new << 'EOF'
 # Void Dominion — проксирование внешнего доступа
 #
 # Проксирует запросы с http://__EXTERNAL_IP__:__EXTERNAL_PORT__
@@ -154,7 +156,8 @@ server {
 EOF
 sed -i -e "s/__INTERNAL_IP__/$INTERNAL_IP/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
     -e "s/__EXTERNAL_IP__/$EXTERNAL_IP/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
-    /etc/nginx/sites-available/moongame
+    /etc/nginx/sites-available/moongame.new
+mv -f /etc/nginx/sites-available/moongame.new /etc/nginx/sites-available/moongame
 
 # Включение сайта
 LINK_CREATED=0
