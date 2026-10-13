@@ -330,7 +330,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
    *  test). Mirrors the serverConfig composition: same key, a distinct `reset` audience. */
   function recoverApp(
     resetBaseUrl = 'https://play.example',
-    rate: { rateMax?: number; rateWindowMs?: number } = {},
+    rate: { rateMax?: number; rateWindowMs?: number; recoveryCooldownMs?: number } = {},
     delivery?: () => Promise<void>,
   ): {
     server: FastifyInstance;
@@ -420,7 +420,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { release = resolve; });
     let attempts = 0;
-    const { server, sent } = recoverApp('https://play.example', { rateMax: 200 }, async () => {
+    const { server, sent } = recoverApp('https://play.example', { rateMax: 200, recoveryCooldownMs: 0 }, async () => {
       if (++attempts === 1) {
         await blocked;
         throw new Error('synthetic SMTP outage');
@@ -521,7 +521,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
   it('passes bounded recipient metadata and a structural reset link to the host adapter', async () => {
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { release = resolve; });
-    const { server, sent } = recoverApp('https://play.example', {}, () => blocked);
+    const { server, sent } = recoverApp('https://play.example', { recoveryCooldownMs: 0 }, () => blocked);
     await post(server, '/auth/register', { login: 'locale', password: 'longenough', email: 'locale@example.com' });
     try {
       for (const locale of ['en', 'ru', 'unsupported', { language: 'en' }, 'x'.repeat(65)])
@@ -541,6 +541,19 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
           .toBe(sent.indexOf(msg) === 0 ? 200 : 401);
       }
     } finally { release(); }
+  });
+
+  it('one recovery mail per account per cooldown, whatever the number of requests', async () => {
+    const { server, sent } = recoverApp('https://play.example', { rateMax: 200 });
+    await post(server, '/auth/register', { login: 'inbox', password: 'longenough', email: 'inbox@example.com' });
+    await post(server, '/auth/register', { login: 'other', password: 'longenough', email: 'other@example.com' });
+    for (let i = 0; i < 5; i++) {
+      const r = await post(server, '/auth/recover', { email: 'inbox@example.com' });
+      expect(r.json()).toEqual({ ok: true }); // the answer does not change: no oracle
+    }
+    await post(server, '/auth/recover', { email: 'other@example.com' });
+    await vi.waitFor(() => expect(sent.map((m) => m.to)).toContain('other@example.com'));
+    expect(sent.map((m) => m.to)).toEqual(['inbox@example.com', 'other@example.com']);
   });
 
   it('recover is anti-enumeration: an unknown email still 200s and sends nothing', async () => {
