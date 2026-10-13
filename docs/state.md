@@ -702,7 +702,7 @@ Sector Zero: `decisions/sectorZeroMenu.ts`, `decisions/sectorZeroProgress.ts` (�
   щит регенит сам, корпус чинится только в порту (see construction, SH-1.1/2.1).
 - `heroes?: Record<id, Hero>` (`{owner, location, cooldowns}`), `tempLanes?: TempLane[]`
   (временные публичные трассы), `topology?` (версия графа для инвалидации `RouteCache`),
-  `heroSeq?` (счётчик id лейнов) — модуль `hero`.
+  `heroSeq?` (счётчик id лейнов и кораблей героя) — модуль `hero`.
 - `intel?: Record<PlayerId, IntelGrant[]>` — **шпионаж (SPY-1)**: украденные «окна
   разведданных» `{kind: treasury|planet|fleets, target, until}`. `espionage.spy` платит
   (150¤ база, хук `espionage.cost`), бросает seeded-шанс (0.6 база, хук, кламп 0.05–0.95)
@@ -1002,7 +1002,7 @@ PVR-7.3 (`sector-zero-map-concepts.md` §6.7). Карта объявляет а�
 `vault: {hours, zone}` (валидатор: зона — существующая проходимая провинция, не сам архив,
 архив на карте один — `E_INVALID_VAULT`, `E_MULTIPLE_VAULTS`); загрузчик заводит
 `state.extraction`. Действие **`extraction.start {fleetId}`** назначает флот игрока у архива
-(коды `E_BAD_PAYLOAD, E_NO_VAULT, E_FORBIDDEN, E_ALREADY, E_NO_FLEET, E_IN_TRANSIT,
+(коды `E_BAD_PAYLOAD, E_NO_VAULT, E_FORBIDDEN, E_ALREADY, E_NO_FLEET (и «не твой флот» — один код, A06), E_IN_TRANSIT,
 E_NOT_AT_VAULT, E_IN_BATTLE, E_NO_SHIPS, E_VAULT_HELD`). Работа копится по `time.advanced`,
 пока назначенный флот стоит у архива, не в бою, а архив свой, союзный или ничей; уход — пауза,
 а не обнуление; другой флот до готовности сохраняет сделанное. Готовый накопитель едет на
@@ -1072,7 +1072,7 @@ PVR-9.5 (`covenant-of-unity.md`, «Голос Единения»). Карта о
 человеческое место или житель, с которым оно на связи по месту встречи и в союзе
 (`planet.captured`): `captive.taken`. Действие **`captive.load {fleetId}`** грузит его на флот
 этой стороны у взятого убежища (коды `E_BAD_PAYLOAD, E_NO_CAPTIVE, E_ALREADY, E_NOT_TAKEN,
-E_FORBIDDEN, E_NO_FLEET, E_IN_TRANSIT, E_NOT_AT_HIDEOUT, E_IN_BATTLE, E_NO_SHIPS,
+E_FORBIDDEN, E_NO_FLEET (и «не твой флот» — один код, A06), E_IN_TRANSIT, E_NOT_AT_HIDEOUT, E_IN_BATTLE, E_NO_SHIPS,
 E_HIDEOUT_HELD`). Носитель один: слияние переносит пленного, разделение оставляет на исходном
 флоте. Прибытие носителя в зону — `captive.delivered`, одно на матч. Потеря — убежище взял
 кто-то вне стороны людей, мир уничтожен до погрузки, носитель погиб или исчез —
@@ -1131,7 +1131,9 @@ SM-3.4. `fleet.layMines {fleetId}` требует надетого заград�
   только вблизи. Угрозой миру (`scanNodeThreats`) мина не считается.
 - **Челноки** бьют мину обычным ударом по флоту: корпус 20 на мину, ответки нет. Цель — только
   видимая мина: патруль невидимую целью не выбирает, приказ удара по невидимой отбивается
-  `E_NO_TARGET`, как по несуществующему флоту.
+  `E_NO_TARGET`, как по несуществующему флоту. Снятая мина уходит отработавшей
+  (`fleet.destroyed` с `spent`, `shuttle` 1.12.0), и обе стороны читают свою строку
+  `shuttle.mineCleared` («Мина снята челноками») вместо «☠️ флот уничтожен».
 - Мина захвату не мешает (`capture-on-arrival` 0.3.0), в счёт флотов и юнитов победы не
   идёт (`victory` 1.5.0), не сливается, не делится и не ходит (`E_EMPLACEMENT`,
   `E_FLEET_IMMOBILE`). **Приказов мина не принимает** (`E_MINE_PASSIVE`): ни «Атаки», ни
@@ -2294,7 +2296,7 @@ E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOA
 - **`fleet.merge {from, into}`** — сливает два стоящих на месте флота (`mergeStacks` —
   коалесцирует только одинаковый юнит+лоадаут+полное здоровье, повреждённые/разно
   оснащённые стеки остаются раздельными); герой на поглощённом флоте перевязывается
-  на `into.fleetId`, чтобы не осиротеть. Коды: `E_SAME_FLEET, E_NO_FLEET, E_FORBIDDEN,
+  на `into.fleetId`, чтобы не осиротеть. Коды: `E_SAME_FLEET, E_NO_FLEET (и «не твой флот» — один код, A06),
   E_IN_BATTLE, E_NOT_COLOCATED, E_TWO_HEROES, E_BAD_PAYLOAD`.
   **ДОГОНЯЮЩЕЕ СЛИЯНИЕ ЖДЁТ В МИРЕ (MRG-1).** Приказ у ЛЕТЯЩЕГО флота больше не
   отбивается `E_NOT_COLOCATED`, если он летит в узел цели: он ложится НАМЕРЕНИЕМ
@@ -2324,7 +2326,7 @@ E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOA
   перехвата; следующие участки считаются по её собственной скорости. Флот на линии
   делится на той же точке (`edge`). Кнопка «Разделить» и окно деления в пути не гаснут
   (`splitBlock`, `splitDialogLives`); новость в пути — «флот разделён в пути». Коды:
-  `E_NO_FLEET, E_FORBIDDEN, E_IN_BATTLE, E_HERO_UNIT, E_NOT_ENOUGH, E_NO_ARMY,
+  `E_NO_FLEET (и «не твой флот» — один код, A06), E_IN_BATTLE, E_HERO_UNIT, E_NOT_ENOUGH, E_NO_ARMY,
   E_NO_CAPACITY, E_SPLIT_EMPTY, E_SPLIT_ALL, E_BAD_PAYLOAD`.
   **Адрес отбора — СТЕК, а не тип корабля (FSPLIT-1):** `take[i].modules` называет
   лоадаут, потому что он часть личности стека (SM-0.3) и один корпус летает и с
@@ -2351,7 +2353,7 @@ E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOA
   друга», инвариант #3), но раунд той же каденции (`hoursToMs`). Ждавших у мира в этот бой
   втягивает модуль боя через возможность `battle.pullIn` (ATK-3), а цель, которая уже
   дерётся у этого мира, принимает атакующего в свой бой; вступить некуда — `E_IN_BATTLE`.
-  Коды: `E_SAME_FLEET, E_NO_FLEET, E_FORBIDDEN, E_NOT_HOSTILE, E_IN_BATTLE, E_NOT_COLOCATED,
+  Коды: `E_SAME_FLEET, E_NO_FLEET (и «не твой флот» — один код, A06), E_NOT_HOSTILE, E_IN_BATTLE, E_NOT_COLOCATED,
   E_MINE_PASSIVE, E_BAD_PAYLOAD`.
 
 Портирован С АДАПТАЦИЕЙ (не 1:1, в отличие от чистых REFP-переносов): прототип
@@ -3362,7 +3364,11 @@ type, target?}`. Payload-схема `hero.ability` добавлена в гей�
 `state.capital`, `divisions`/`divisionTemplates` (закрыты в PR #434) и `rng`. Счётчик id
 флотов `fleetSeq` шёл мимо описи: `nextFleetSeq` дописывал его, не объявляя в `GameState`.
 Теперь он объявлен и снят (SM-3.7b), как и счётчик таймеров `scheduleSeq`, прежде
-публичный: их прирост выдал бы скрытый пуск ракеты и её поминутный полёт. Опись
+публичный: их прирост выдал бы скрытый пуск ракеты и её поминутный полёт. По той же причине
+сняты и прочие счётчики id — `battleSeq`, `strikeSeq`, `squadronSeq`, `heroSeq`: их прирост
+выдавал бой, налёт челноков, новую эскадру в ангаре и корабль героя за туманом. Остаток
+утечки — номер в id, который зритель видит у СВОЕЙ новой сущности (`battle:N`, `sq:…:N`):
+закрыть его можно только непрозрачными id, ценой смены id в реплеях. Опись
 типизирована как `Record<keyof GameState, …>` / `Record<keyof Player, …>` — новое поле
 роняет ТИПИЗАЦИЮ, пока автор не выберет `public` / `stripped` / `filtered`. Дальше тесты
 бьют по решению: `stripped` в проекции нет, `public` доехало бит в бит, `filtered`
