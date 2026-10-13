@@ -214,7 +214,8 @@ describe('пленный — погрузка', () => {
     expect(code(s, { fleetId: 'f1' })).toBe('E_NOT_TAKEN');
     const taken = capture(s, 'p1').state;
     expect(code(taken, { fleetId: 's1' }, 'swarm')).toBe('E_FORBIDDEN');
-    expect(code(taken, { fleetId: 's1' })).toBe('E_FORBIDDEN');
+    // Чужой флот — как несуществующий: «не твой» подтвердил бы флот в тумане (A06).
+    expect(code(taken, { fleetId: 's1' })).toBe('E_NO_FLEET');
     expect(code(taken, { fleetId: 'ghost' })).toBe('E_NO_FLEET');
     // Чужая ракета (SM-3.7b) — та же пустота, что несуществующий id, а не «не твой»: иначе
     // отказ подтвердил бы пуск, скрытый туманом (замечание Codex на #1503).

@@ -68,7 +68,9 @@ export const extractionModule: GameModule = {
   id: 'extraction',
   // 1.1.0: мина не берёт груз хранилища — она без приказов (`E_MINE_PASSIVE`, ревью #1411).
   // 1.2.0: чужая ракета (SM-3.7b) — как отсутствующий флот (`E_NO_FLEET`).
-  version: '1.2.0',
+  // 1.3.0: любой чужой флот — `E_NO_FLEET`, а не `E_FORBIDDEN` (A06: разница кодов
+  //        подтверждала флот в тумане).
+  version: '1.3.0',
   setup(api) {
     api.onAction('extraction.start', (action, h) => {
       const { fleetId } = (action.payload ?? {}) as { fleetId?: unknown };
@@ -80,8 +82,8 @@ export const extractionModule: GameModule = {
       if (ex.carrier !== undefined || ex.deliveredAt !== undefined || ex.lostAt !== undefined)
         return h.reject('E_ALREADY');
       const fleet = fleetForOrder(h.state, fleetId, action.playerId, h.ctx.data);
-      if (!fleet) return h.reject('E_NO_FLEET');
-      if (fleet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      // Чужой флот — как несуществующий: разница кодов выдала бы флот в тумане (A06).
+      if (!fleet || fleet.owner !== action.playerId) return h.reject('E_NO_FLEET');
       rejectMine(h, fleet);
       if (fleet.movement) return h.reject('E_IN_TRANSIT');
       if (fleet.location !== ex.vault) return h.reject('E_NOT_AT_VAULT');
