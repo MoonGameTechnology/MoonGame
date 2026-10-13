@@ -33,6 +33,10 @@ const markerModule: GameModule = {
       player.resources.marker = (player.resources.marker ?? 0) + 1;
       h.emit('marker.set', { playerId: action.playerId });
     });
+    // A change of nobody's state that every seat hears about (`match.*` passes the fog).
+    api.onAction('marker.wave', (action, h) => {
+      h.emit('match.waved', { by: action.playerId });
+    });
   },
 };
 
@@ -44,7 +48,7 @@ function makeRoom(p1Name = 'p1'): MatchRoom {
   const base = createInitialState({ seed: 'ws-test', version: { data: 'test', manifest: 'test' } });
   return new MatchRoom({
     id: 'ws-room',
-    clientActionTypes: ['marker.set'],
+    clientActionTypes: ['marker.set', 'marker.wave'],
     initialState: { ...base, players: { p1: player('p1', p1Name), p2: player('p2') } },
     kernel: createKernel([markerModule]),
     data: parseGameData({
@@ -197,7 +201,7 @@ describe('createMultiplayerServer', () => {
       expect(await welcome2).toMatchObject({ type: 'welcome', playerId: 'p2' });
 
       const state1 = nextMessage(p1);
-      const state2 = nextMessage(p2);
+      const next2 = nextMessage(p2);
       p1.send(
         JSON.stringify({
           type: 'action',
@@ -205,9 +209,11 @@ describe('createMultiplayerServer', () => {
         }),
       );
 
-      const [m1, m2] = await Promise.all([state1, state2]);
+      const m1 = await state1;
       expect(m1).toMatchObject({ type: 'delta', seq: 1 });
-      expect(m2).toMatchObject({ type: 'delta', seq: 1 });
+      // p2 sees nothing of p1's treasury, so p2 gets no delta: the pong is p2's next frame.
+      p2.send(JSON.stringify({ type: 'ping' }));
+      expect(await next2).toMatchObject({ type: 'pong' });
       if (m1.type !== 'delta') throw new Error('expected delta');
       const changedP1 = m1.delta.changed.players?.p1 as
         | { resources?: Record<string, number> }
@@ -741,7 +747,7 @@ describe('socket compression (permessage-deflate)', () => {
       p2.send(
         JSON.stringify({
           type: 'action',
-          action: { id: 'p2:1', type: 'marker.set', playerId: 'p2', issuedAt: 1, payload: {} },
+          action: { id: 'p2:1', type: 'marker.wave', playerId: 'p2', issuedAt: 1, payload: {} },
         }),
       );
       const delta = await next(); // under the threshold: not worth compressing
