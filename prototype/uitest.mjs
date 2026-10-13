@@ -500,7 +500,7 @@ await click('hub-solo-continue');
 assert.deepEqual(JSON.parse(mod.exports.state()), JSON.parse(soloCheckpoint).payload.state);
 assert.equal(mod.exports.solo().speed, 0);
 await click('hub-solo');
-selectMap('ava-duel-1');
+selectMap('duel-1');
 assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 2);
 for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
 for (let i = 0; i < 10 && rafCbs.length; i++) {
@@ -515,7 +515,7 @@ assert.equal(getEl('solo-replace').style.display, 'none');
 assert.equal(storage.get('void.solo.v1'), beforeReplace, 'Back cancels replacement');
 await click('setupgo');
 await click('solo-replace-confirm');
-assert.equal(JSON.parse(storage.get('void.solo.v1')).payload.state.mapId, 'ava-duel-1');
+assert.equal(JSON.parse(storage.get('void.solo.v1')).payload.state.mapId, 'duel-1');
 for (const [checkpoint, extra] of [[soloCheckpoint, []], ['{broken', []], [soloCheckpoint, ['--player']]]) {
   const child = spawnSync(process.execPath, ['prototype/uitest.mjs', '--solo-boot-check', ...extra], {
     input: checkpoint, encoding: 'utf8', timeout: 120000,

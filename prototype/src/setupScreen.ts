@@ -335,7 +335,7 @@ function renderSetup(): void {
   mapSelect.value = setupMapId;
   mapSelect.disabled = !!netSetup;
   $('setup-map-info').textContent = t(
-    setupMapId === 'ava-duel-1' ? 'setup.map.ava-duel-1-info'
+    setupMapId === 'duel-1' ? 'setup.map.duel-1-info'
       : setupMapId === 'ffa-4' ? 'setup.map.ffa-4-info'
       : setupMapId === 'frontier-100'
       ? 'setup.map.frontier-legacy-info'
@@ -461,7 +461,7 @@ export function buildSetupConfig(): SetupConfig {
       faction: fids[i]!,
       start,
       ai: i !== 0,
-      ...(setupMapId === 'ava-duel-1' ? { team: i === 0 ? 'A' : 'B' }
+      ...(setupMapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' }
         : setupTeams && setupMapId !== 'ffa-4' ? { team: setupSeatTeam[i] } : {}),
     };
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAP_IDS, mapPreset, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 import { newGame, networkSeats } from './matchSetup';
+import { laneRoadLength } from '../../packages/shared-core/src/index';
 
 describe('Frontier 50', () => {
   it('keeps 50 starts two provinces apart, three provinces inside the rim, and bases buffered', () => {
@@ -65,7 +66,7 @@ describe('Frontier 50', () => {
   });
 
   it('offers only duel and four-player FFA but preserves existing 100-seat snapshots', () => {
-    expect(MAP_IDS).toEqual(['ava-duel-1', 'ffa-4']);
+    expect(MAP_IDS).toEqual(['duel-1', 'ffa-4']);
     const old = newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100') });
     expect(Object.keys(old.planets)).toHaveLength(1675);
     expect(mapPreset('frontier-100').starts).toHaveLength(100);
@@ -83,7 +84,7 @@ describe('Frontier 50', () => {
 
 describe('published match maps', () => {
   it.each([
-    ['ava-duel-1', 2],
+    ['duel-1', 2],
     ['ffa-4', 4],
   ] as const)('%s has the same valid geometry locally and online', (id, capacity) => {
     const preset = mapPreset(id);
@@ -108,7 +109,7 @@ describe('published match maps', () => {
       expect(online.planets[node.id]!.terrain).toBe(preset.map!.sectors[node.id]!.terrain);
     }
     expect(Object.values(online.diplomacy!)).toEqual(
-      Array((capacity * (capacity - 1)) / 2).fill(id === 'ava-duel-1' ? 'war' : 'peace'),
+      Array((capacity * (capacity - 1)) / 2).fill(id === 'duel-1' ? 'war' : 'peace'),
     );
     expect(
       mapNodesFromState(JSON.parse(JSON.stringify(online)))
@@ -117,30 +118,62 @@ describe('published match maps', () => {
     ).toEqual(preset.nodes.map((n) => n.id).sort());
   });
 
-  it('gives all four FFA starts identical terrain, neighbours and distances by quarter turn', () => {
-    const map = mapPreset('ffa-4');
-    const rotate = (id: string): string => {
-      const node = map.nodes.find((n) => n.id === id)!;
-      return map.nodes.find((n) => n.x === -node.y && n.y === node.x)!.id;
-    };
-    for (const node of map.nodes) {
-      const other = map.nodes.find((n) => n.id === rotate(node.id))!;
-      expect(other.sector).toBe(node.sector);
-      expect(other.type).toBe(node.type);
-      expect(other.links.slice().sort()).toEqual(node.links.map(rotate).sort());
-    }
-    expect(map.starts.map(rotate).sort()).toEqual([...map.starts].sort());
-    expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
-    const reached = new Set([map.starts[0]!]);
-    const queue = [...reached];
-    for (const id of queue)
-      for (const next of map.nodes.find((n) => n.id === id)!.links) {
-        if (!reached.has(next)) {
-          reached.add(next);
-          queue.push(next);
+  it.each(MAP_IDS)('%s has distinct start surroundings and fair opening access', (id) => {
+    const map = mapPreset(id);
+    const nodes = new Map(map.nodes.map((n) => [n.id, n]));
+    const state = newGame({ mapId: id, seats: networkSeats('ffa', id) });
+    const distances = (start: string, blocked?: string) => {
+      const d = new Map([[start, 0]]);
+      const queue = [start];
+      for (const current of queue)
+        for (const next of nodes.get(current)!.links) {
+          if (next !== blocked && !d.has(next)) {
+            d.set(next, d.get(current)! + 1);
+            queue.push(next);
+          }
         }
+      return d;
+    };
+    // Different topology/terrain around each home, not a repeated quadrant with jitter.
+    const profile = (node: string, depth: number): string => {
+      const n = nodes.get(node)!;
+      return depth === 0 ? n.sector
+        : `${n.sector}(${n.links.map((next) => profile(next, depth - 1)).sort().join(',')})`;
+    };
+    expect(new Set(map.starts.map((start) => profile(start, 2))).size).toBe(map.starts.length);
+    expect(map.map!.paths).toBeUndefined(); // All lanes come from the real mosaic.
+    expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
+    const openingLengths: number[] = [];
+    for (const start of map.starts) {
+      const d = distances(start);
+      expect(d.size).toBe(nodes.size);
+      const worlds = nodes.get(start)!.links.filter((n) => nodes.get(n)!.sector === 'planet');
+      expect(worlds).toHaveLength(2);
+      for (const world of worlds) {
+        expect(map.starts).not.toContain(world);
+        expect(state.planets[world]!.planetType).toBe('terran');
+        expect(state.planets[world]!.garrison).toEqual([{ unit: 'militia', count: 2 }]);
+        openingLengths.push(laneRoadLength(state, start, world));
       }
-    expect(reached.size).toBe(map.nodes.length);
-    expect(networkSeats('ffa', 'ffa-4').every((s) => s.team === undefined)).toBe(true);
+      for (const other of map.starts)
+        if (other !== start) expect(d.get(other)).toBeGreaterThanOrEqual(5);
+    }
+    // The two starting conquests take similar travel distances at every seat.
+    expect(Math.max(...openingLengths) / Math.min(...openingLengths)).toBeLessThan(1.15);
+    const kits = map.starts.map((start) => map.map!.sectors[start]!);
+    for (const kit of kits) {
+      expect(kit.buildings).toEqual(kits[0]!.buildings);
+      expect(kit.garrison).toEqual(kits[0]!.garrison);
+      expect(map.map!.slots[kit.owner!]!.resources).toEqual(
+        map.map!.slots[kits[0]!.owner!]!.resources,
+      );
+    }
+    // No single province is the only connection between two parts of either map.
+    for (const blocked of nodes.keys()) {
+      const start = map.nodes.find((n) => n.id !== blocked)!.id;
+      expect(distances(start, blocked).size).toBe(nodes.size - 1);
+    }
+    if (id === 'ffa-4')
+      expect(networkSeats('ffa', id).every((s) => s.team === undefined)).toBe(true);
   });
 });

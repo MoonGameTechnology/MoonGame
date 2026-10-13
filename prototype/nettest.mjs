@@ -329,7 +329,7 @@ try {
     for (const selector of ['#setup-map-id', '#match-create-map']) {
       assert.deepEqual(await page.locator(`${selector} option:not([hidden])`).evaluateAll(
         (options) => options.map((option) => option.value),
-      ), ['ava-duel-1', 'ffa-4']);
+      ), ['duel-1', 'ffa-4']);
     }
     for (const id of ['hub-sector-zero', 'hub-proving-ground'])
       assert.equal(await page.locator(`#${id}`).isVisible(), false);

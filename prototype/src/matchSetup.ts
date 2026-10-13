@@ -185,13 +185,13 @@ export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMo
 export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nexus'): SeatConfig[] {
   const START_CANDIDATES = mapPreset(mapId).starts;
   // Published maps own their capacity and sides; TEAMS applies only to legacy maps.
-  if (mapId === 'ava-duel-1' || mapId === 'ffa-4') {
+  if (mapId === 'duel-1' || mapId === 'ffa-4') {
     return START_CANDIDATES.map((start, i) => ({
       id: `p${i + 1}`,
       ...NETWORK_HOUSES[i]!,
       start,
       ai: false,
-      ...(mapId === 'ava-duel-1' ? { team: i === 0 ? 'A' : 'B' } : {}),
+      ...(mapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' } : {}),
     }));
   }
   if (mode === 'pve') {
@@ -472,7 +472,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       const pirates = players[ids[i]!]!.npc === 'pirate' || players[ids[j]!]!.npc === 'pirate';
       const neutral = players[ids[i]!]!.npc === 'neutral' || players[ids[j]!]!.npc === 'neutral';
       const stance: DiplomaticStance = pirates ? 'war' : neutral ? 'peace'
-        : preset.id === 'ava-duel-1' ? 'war'
+        : preset.id === 'duel-1' ? 'war'
         : preset.id === 'ffa-4' || !teamed
         ? 'peace'
         : ta !== undefined && ta === tb

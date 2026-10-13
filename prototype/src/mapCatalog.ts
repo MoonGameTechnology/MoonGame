@@ -8,13 +8,13 @@ import {
 import { isForkSite } from '../../packages/shared-core/src/state/forkSite';
 import frontier50 from '../../data/frontier-50.json';
 import frontier100 from '../../data/frontier-100.json';
-import duel from '../../data/maps/ava-duel-1.json';
+import duel from '../../data/maps/duel-1.json';
 import ffa4 from '../../data/maps/ffa-4.json';
 import { data } from './gameData';
 import { MAP, START_CANDIDATES, type MapNode } from './map';
 
 /** Presets offered for NEW matches. The retired id remains readable for old sessions. */
-export const MAP_IDS = ['ava-duel-1', 'ffa-4'] as const;
+export const MAP_IDS = ['duel-1', 'ffa-4'] as const;
 export const DEFAULT_MAP_ID = MAP_IDS[0];
 export type MapId = (typeof MAP_IDS)[number] | 'nexus' | 'frontier-50' | 'frontier-100';
 export const isCurrentMap = (id: string | undefined): boolean => MAP_IDS.some((map) => map === id);
@@ -25,7 +25,7 @@ export const isFrontier = (id: string | undefined): boolean =>
  *  предел через `scoreLimitFor`, победа в матче — из пресета), так что правка одного
  *  места молча разводила полосу прогресса с настоящим порогом конца партии. */
 const SCORE_LIMITS: Record<MapId, number> = {
-  'ava-duel-1': 1100,
+  'duel-1': 1100,
   'ffa-4': 1100,
   nexus: 1100,
   'frontier-50': 7500,
@@ -63,8 +63,8 @@ declare const __SECTOR_ZERO_ONLY__: boolean | undefined;
 export function mapPreset(id: string = 'nexus'): MapPreset {
   const cached = PRESETS.get(id);
   if (cached) return cached;
-  if (id === 'ava-duel-1' || id === 'ffa-4') {
-    const map = parseMatchMap(id === 'ava-duel-1' ? duel : ffa4);
+  if (id === 'duel-1' || id === 'ffa-4') {
+    const map = parseMatchMap(id === 'duel-1' ? duel : ffa4);
     if (validateMatchMap(map, data).length) throw new Error('E_INVALID_MAP');
     const edges = matchMapEdges(map, data);
     const nodes: MapNode[] = Object.entries(map.sectors).map(([id, sector]) => ({

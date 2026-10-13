@@ -4153,7 +4153,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div id="match-create" class="mfilter" style="display:none">
           <label for="match-create-map" data-i18n="setup.map"></label>
           <select id="match-create-map" class="inp">
-            <option value="ava-duel-1" data-i18n="setup.map.ava-duel-1"></option>
+            <option value="duel-1" data-i18n="setup.map.duel-1"></option>
             <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
           </select>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
@@ -4386,7 +4386,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <option value="nexus" data-i18n="setup.map.nexus" disabled hidden></option>
           <option value="frontier-50" data-i18n="setup.map.frontier-50" disabled hidden></option>
           <option value="frontier-100" data-i18n="setup.map.frontier-100" disabled hidden></option>
-          <option value="ava-duel-1" data-i18n="setup.map.ava-duel-1"></option>
+          <option value="duel-1" data-i18n="setup.map.duel-1"></option>
           <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
         </select>
         <p class="smaphint" id="setup-map-info"></p>

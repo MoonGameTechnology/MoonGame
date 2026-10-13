@@ -102,7 +102,7 @@ const SEATS = Array.from({ length: 100 }, (_, i) => ({
   color: '#35d6e6',
 }));
 const NEXUS = mapPreset('nexus').starts;
-const DUEL = mapPreset('ava-duel-1').starts;
+const DUEL = mapPreset('duel-1').starts;
 const FFA = mapPreset('ffa-4').starts;
 const SPEEDS = [1, 2, 5, 10, 50, 100];
 
@@ -276,7 +276,7 @@ describe('REFM-212 — что уезжает в матч', () => {
     tap('setupslots', { 'data-slot': '1' });
     tap('setupslots', { 'data-slot': '1' });
     expect(screen.setupSlots[1]).toBe('ai'); // Difficulty cycles without removing a player.
-    pick('setup-map-id', 'ava-duel-1');
+    pick('setup-map-id', 'duel-1');
     expect(screen.buildSetupConfig().seats).toHaveLength(2);
   });
 
@@ -326,7 +326,7 @@ describe('REFM-212 — двери гида и сети', () => {
     pick('setup-map-id', 'frontier-50');
     tap('setupfactions', { 'data-fpick': 'amber' });
     screen.prepareGuidedSetup();
-    expect(screen.setupMapId).toBe('ava-duel-1');
+    expect(screen.setupMapId).toBe('duel-1');
     const setup = screen.buildSetupConfig();
     expect(setup.seats.map((s) => [s.id, s.start, s.faction])).toEqual([['p1', DUEL[0], 'amber']]);
   });

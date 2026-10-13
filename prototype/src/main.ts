@@ -2914,7 +2914,7 @@ initMapSurface({
  *  показываются одним именем — раньше это был тернарник, скопированный в два места, и два
  *  ключа локали с ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
 function mapLabel(mapId: string | undefined): string {
-  if (mapId === 'ava-duel-1') return t('setup.map.ava-duel-1');
+  if (mapId === 'duel-1') return t('setup.map.duel-1');
   if (mapId === 'ffa-4') return t('setup.map.ffa-4');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
