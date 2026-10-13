@@ -157,10 +157,12 @@ sed -i -e "s/__INTERNAL_IP__/$INTERNAL_IP/g" -e "s/__INTERNAL_PORT__/$INTERNAL_P
     /etc/nginx/sites-available/moongame
 
 # Включение сайта
+LINK_CREATED=0
 if [ -L /etc/nginx/sites-enabled/moongame ]; then
     log_info "Конфиг уже включен"
 else
     ln -sf /etc/nginx/sites-available/moongame /etc/nginx/sites-enabled/
+    LINK_CREATED=1
     log_success "Конфиг включен"
 fi
 
@@ -172,28 +174,42 @@ if [ -L /etc/nginx/sites-enabled/default ]; then
     log_info "Default сайт отключен"
 fi
 
-# Проверка конфига
-log_info "Проверка конфигурации Nginx..."
-if nginx -t &>/dev/null; then
-    log_success "Конфиг валиден"
-    rm -f /etc/nginx/sites-available/moongame.prev
-else
-    log_error "Ошибка в конфиге Nginx! Возвращаю прежнюю конфигурацию."
-    nginx -t || true
+# Возврат к состоянию до запуска скрипта.
+restore_previous() {
     if [ "$HAD_SITE" = 1 ]; then
         mv /etc/nginx/sites-available/moongame.prev /etc/nginx/sites-available/moongame
     else
-        rm -f /etc/nginx/sites-available/moongame /etc/nginx/sites-enabled/moongame
+        rm -f /etc/nginx/sites-available/moongame
+    fi
+    if [ "$LINK_CREATED" = 1 ]; then
+        rm -f /etc/nginx/sites-enabled/moongame
     fi
     if [ "$DEFAULT_REMOVED" = 1 ]; then
         ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
     fi
+}
+
+# Проверка конфига
+log_info "Проверка конфигурации Nginx..."
+if nginx -t &>/dev/null; then
+    log_success "Конфиг валиден"
+else
+    log_error "Ошибка в конфиге Nginx! Возвращаю прежнюю конфигурацию."
+    nginx -t || true
+    restore_previous
     exit 1
 fi
 
-# Перезагрузка Nginx
+# Перезагрузка Nginx. nginx -t не проверяет, свободен ли порт, поэтому прежний конфиг
+# хранится до успешного рестарта.
 log_info "Перезагрузка Nginx..."
-systemctl restart nginx
+if ! systemctl restart nginx; then
+    log_error "Nginx не запустился с новым конфигом. Возвращаю прежнюю конфигурацию."
+    restore_previous
+    systemctl restart nginx || true
+    exit 1
+fi
+rm -f /etc/nginx/sites-available/moongame.prev
 systemctl enable nginx
 log_success "Nginx перезагружен"
 
