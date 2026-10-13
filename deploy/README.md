@@ -132,7 +132,8 @@ sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PO
 Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
 запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
 deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
-`/opt/moongame/deploy/server.env` и выполни `moongame restart`.
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`. IPv6 в origin пишется в
+квадратных скобках: `http://[2001:db8::10]:<порт>`.
 
 Или настрой Port Forwarding на роутере:
 - Внешний порт: `<порт> TCP`

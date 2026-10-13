@@ -53,9 +53,11 @@ METRICS_TOKEN="${METRICS_TOKEN:-$(openssl rand -hex 32)}"
 # Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
 # Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
 # адрес (если он задан) добавляется вторым: через роутер это другой хост:порт.
-ALLOWED_ORIGINS="http://$INTERNAL_IP:$INTERNAL_PORT"
+# IPv6 браузер пишет в origin в квадратных скобках, а сравнение точное.
+origin_host() { if [[ "$1" == *:* ]]; then printf '[%s]' "$1"; else printf '%s' "$1"; fi; }
+ALLOWED_ORIGINS="http://$(origin_host "$INTERNAL_IP"):$INTERNAL_PORT"
 if [ -n "$EXTERNAL_IP" ]; then
-    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$EXTERNAL_IP:${EXTERNAL_PORT:-$INTERNAL_PORT}"
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$(origin_host "$EXTERNAL_IP"):${EXTERNAL_PORT:-$INTERNAL_PORT}"
 fi
 
 # Функции для вывода
