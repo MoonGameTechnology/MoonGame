@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
   Action,
@@ -337,6 +338,13 @@ type ApplyPlan =
 /** План, у которого есть что коммитить (всё, кроме несостоявшегося догона). */
 type CommittablePlan = Extract<ApplyPlan, { kind: 'rejected' | 'applied' }>;
 
+/** The unique tail of a ping/chat id. Random, not a counter: a room-wide (or even
+ *  per-sender) counter would show a recipient, by its gaps, how many pings and messages
+ *  went to OTHER audiences — DMs and coalition talk included. Clients only dedupe by id. */
+function opaqueId(): string {
+  return randomBytes(9).toString('base64url');
+}
+
 /** A delta that changes nothing. */
 function isEmptyDelta(delta: StateDelta): boolean {
   return (
@@ -563,10 +571,8 @@ export class MatchRoom {
   /** Ally pings live behind the ephemeral store (in-memory now, Redis later) — never
    *  in GameState, so they can't trip hashState / replay / the schedule. */
   private readonly ephemeral: EphemeralStore;
-  private pingSeq = 0;
   /** Per-player placement timestamps, for the (local, single-process) rate limit. */
   private readonly pingWindow = new PerKeyWindow<PlayerId>(PING_RATE_MAX, PING_RATE_WINDOW_MS);
-  private chatSeq = 0;
   /** Per-player chat timestamps (WALL clock), for the chat rate limit. */
   private readonly chatWindow = new PerKeyWindow<PlayerId>(CHAT_RATE_MAX, CHAT_RATE_WINDOW_MS);
   /** Bounded session-chat back-log, replayed to a (re)joining peer. Room-local and
@@ -2236,7 +2242,7 @@ export class MatchRoom {
       });
     }
     const ping: Ping = {
-      id: `ping:${playerId}:${this.pingSeq++}`,
+      id: `ping:${playerId}:${opaqueId()}`,
       owner: playerId,
       kind: draft.kind,
       target: draft.target,
@@ -2306,7 +2312,7 @@ export class MatchRoom {
       return;
     }
     const msg: ChatMessage = {
-      id: `chat:${playerId}:${this.chatSeq++}`,
+      id: `chat:${playerId}:${opaqueId()}`,
       from: playerId,
       channel: message.channel,
       text,

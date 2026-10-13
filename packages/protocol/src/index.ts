@@ -77,7 +77,7 @@ export interface PingAnchor {
 }
 
 export interface Ping {
-  /** `ping:<owner>:<seq>` (server-assigned). */
+  /** `ping:<owner>:<random>` (server-assigned, opaque). */
   id: string;
   owner: PlayerId;
   kind: PingKind;
@@ -105,7 +105,7 @@ export const CHAT_CHANNELS: readonly ChatChannel[] = ['session', 'coalition', 'd
 export const CHAT_TEXT_MAX = 240;
 
 export interface ChatMessage {
-  /** `chat:<from>:<seq>` (server-assigned). */
+  /** `chat:<from>:<random>` (server-assigned, opaque). */
   id: string;
   from: PlayerId;
   channel: ChatChannel;
