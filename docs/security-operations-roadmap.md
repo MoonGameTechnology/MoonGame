@@ -16,7 +16,10 @@
   `.vdbak` с age-ciphertext и Ed25519-подписью manifest. Exclusive publication
   сохраняет существующие ID; restore сверяет внешний trusted key и ожидаемые
   domain/producer/backupId, затем проверяет скопированные в private staging байты
-  до расшифровки/БД. Off-host repository и immutable retention ещё отсутствуют.
+  до расшифровки/БД. Права на приватный signing key проверяются до чтения;
+  уборка аварийных остатков требует exclusive `flock` и сохраняет активные
+  shared-lock задания и готовые копии. Off-host repository и immutable retention
+  ещё отсутствуют.
   [Настройка и ограничения](../deploy/README.md#подписанный-комплект-v1).
 - Типизированный security JSONL и локальный `security.alert`; центральный сбор,
   внешний получатель, SIEM и runtime-response пока не построены.

@@ -73,6 +73,10 @@ describe('signed backup bundles (SE-3.5 foundation)', () => {
     return result.path;
   }
 
+  async function outputFiles() {
+    return (await readdir(seal.outputDir)).filter((name) => name !== '.backup.lock');
+  }
+
   async function altered(change) {
     const bytes = await readFile(await bundle());
     const result = change(bytes) ?? bytes;
@@ -115,7 +119,8 @@ describe('signed backup bundles (SE-3.5 foundation)', () => {
     expect((await stat(seal.outputDir)).mode & 0o777).toBe(0o700);
     expect((await stat(prepare.outputDir)).mode & 0o777).toBe(0o700);
     expect((await stat(join(prepare.outputDir, 'archive.sql.gz.age'))).mode & 0o777).toBe(0o600);
-    expect(await readdir(seal.outputDir)).toEqual([`void-${ID}.vdbak`]);
+    expect(await outputFiles()).toEqual([`void-${ID}.vdbak`]);
+    expect((await stat(join(seal.outputDir, '.backup.lock'))).mode & 0o777).toBe(0o600);
     expect((await readFile(result.path)).includes(pem)).toBe(false);
   });
 
@@ -131,7 +136,7 @@ describe('signed backup bundles (SE-3.5 foundation)', () => {
     await writeFile(archive, Buffer.from('age-encryption.org/v1\nreplacement'));
     await expect(createBundle(seal)).rejects.toThrow('E_BACKUP_EXISTS');
     expect(await readFile(join(seal.outputDir, `void-${ID}.vdbak`))).toEqual(oldBytes);
-    expect((await readdir(seal.outputDir)).filter((x) => x.startsWith('.'))).toEqual([]);
+    expect((await outputFiles()).filter((x) => x.startsWith('.'))).toEqual([]);
   });
 
   it.each(['expectedDomain', 'expectedProducer', 'expectedBackupId'])(
@@ -353,7 +358,7 @@ describe('signed backup bundles (SE-3.5 foundation)', () => {
     await expect(createBundle(seal)).rejects.toThrow('E_BACKUP_COMMIT_UNKNOWN');
     fault.mockRestore();
     const bundlePath = join(seal.outputDir, `void-${ID}.vdbak`);
-    expect(await readdir(seal.outputDir)).toEqual([`void-${ID}.vdbak`]);
+    expect(await outputFiles()).toEqual([`void-${ID}.vdbak`]);
     expect((await prepareBundle({ ...prepare, bundlePath })).backupId).toBe(ID);
     await expect(createBundle(seal)).rejects.toThrow('E_BACKUP_EXISTS');
   });
@@ -379,7 +384,7 @@ describe('signed backup bundles (SE-3.5 foundation)', () => {
     async (value) => {
       await writeFile(archive, value);
       await expect(createBundle(seal)).rejects.toThrow('E_BACKUP_FORMAT');
-      expect(await readdir(seal.outputDir).catch(() => [])).toEqual([]);
+      expect(await outputFiles().catch(() => [])).toEqual([]);
     },
   );
 
@@ -388,6 +393,42 @@ describe('signed backup bundles (SE-3.5 foundation)', () => {
     await expect(validateSealConfig(seal)).rejects.toThrow('E_BACKUP_KEY');
     await expect(createBundle(seal)).rejects.toThrow('E_BACKUP_KEY');
     expect(await readdir(seal.outputDir).catch(() => [])).toEqual([]);
+  });
+
+  it.each([0o644, 0o640, 0o604, 0o620, 0o602, 0o610, 0o601])(
+    'rejects signing-key group/other permissions before reading PEM: %i',
+    async (mode) => {
+      await chmod(seal.privateKeyPath, mode);
+      const keyInfo = await stat(seal.privateKeyPath);
+      const probe = await open(archive, 'r');
+      const prototype = Object.getPrototypeOf(probe);
+      await probe.close();
+      const read = prototype.read;
+      let keyReads = 0;
+      vi.spyOn(prototype, 'read').mockImplementation(async function (...args) {
+        const info = await this.stat();
+        if (info.dev === keyInfo.dev && info.ino === keyInfo.ino) keyReads += 1;
+        return read.apply(this, args);
+      });
+      await expect(validateSealConfig(seal)).rejects.toThrow('E_BACKUP_KEY');
+      await expect(createBundle(seal)).rejects.toThrow('E_BACKUP_KEY');
+      expect(keyReads).toBe(0);
+      expect(await readdir(seal.outputDir).catch(() => [])).toEqual([]);
+    },
+  );
+
+  it.each([0o600, 0o400])('accepts an owner-only signing key: %i', async (mode) => {
+    await chmod(seal.privateKeyPath, mode);
+    await expect(validateSealConfig(seal)).resolves.toEqual({ ok: true });
+    await expect(createBundle(seal)).resolves.toMatchObject({ backupId: ID });
+  });
+
+  it('permits a public verifier with mode 0644', async () => {
+    const bundlePath = await bundle();
+    await chmod(prepare.publicKeyPath, 0o644);
+    await expect(prepareBundle({ ...prepare, bundlePath })).resolves.toMatchObject({
+      backupId: ID,
+    });
   });
 
   it('rejects oversized PEMs and keys for another signature algorithm', async () => {

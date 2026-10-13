@@ -9,7 +9,8 @@
  * Signing covers a protocol-specific context followed by the exact JSON bytes.
  */
 import { constants } from 'node:fs';
-import { link, mkdir, open, unlink } from 'node:fs/promises';
+import { link, lstat, mkdir, open, readdir, rm, unlink } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import {
   createHash,
   createPrivateKey,
@@ -28,6 +29,8 @@ const MANIFEST_OFFSET = 76;
 const SIGN_CONTEXT = Buffer.from('Void Dominion backup bundle v1\0', 'utf8');
 const AGE_HEADER = Buffer.from('age-encryption.org/v1\n');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const TEMP_BUNDLE = /^\.bundle-([0-9a-f-]{36})\.tmp$/;
+const TEMP_JOB = /^\.bundle-job-[0-9]{8}T[0-9]{6}Z\.[A-Za-z0-9]{6}$/;
 const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const READ_FLAGS = constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK;
 const CREATE_FLAGS =
@@ -106,6 +109,79 @@ async function privateDirectory(path) {
   }
 }
 
+// Linux flock locks belong to the open file description. The short-lived utility
+// receives a duplicate on fd 3; after it exits, our descriptor keeps the lock until
+// finally closes it (or the kernel closes it after SIGKILL). Never unlink this inode.
+async function lockFile(directory) {
+  let handle;
+  try {
+    handle = await open(
+      join(directory, '.backup.lock'),
+      constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+      0o600,
+    );
+    const info = await handle.stat();
+    if (!info.isFile() || (info.mode & 0o777) !== 0o600) fail('E_BACKUP_LOCK');
+    return handle;
+  } catch {
+    await close(handle);
+    fail('E_BACKUP_LOCK');
+  }
+}
+
+async function flock(handle, exclusive) {
+  const code = await new Promise((resolveCode, reject) => {
+    const child = spawn('flock', exclusive ? ['-n', '-x', '-E', '75', '3'] : ['-s', '3'], {
+      stdio: ['ignore', 'ignore', 'ignore', handle.fd],
+    });
+    child.once('error', () => reject(new BackupError('E_BACKUP_LOCK')));
+    child.once('close', resolveCode);
+  });
+  if (code === 0) return true;
+  if (exclusive && code === 75) return false;
+  fail('E_BACKUP_LOCK');
+}
+
+// Only run while holding the exclusive lock. Writers hold shared locks before any
+// reserved temporary name exists, including shell-owned dump/encryption job dirs.
+// Unrelated files, legacy temporary dirs, symlinks and ready bundles are retained.
+async function removeOrphans(directory) {
+  let removed = 0;
+  for (const name of await readdir(directory.path)) {
+    const bundle = TEMP_BUNDLE.exec(name);
+    if (!(bundle && UUID.test(bundle[1])) && !TEMP_JOB.test(name)) continue;
+    const path = join(directory.path, name);
+    const info = await lstat(path);
+    if (bundle && info.isFile()) {
+      await unlink(path);
+      removed += 1;
+    } else if (TEMP_JOB.test(name) && info.isDirectory() && (info.mode & 0o777) === 0o700) {
+      // fs.rm does not follow symlinks inside the abandoned private job directory.
+      await rm(path, { recursive: true });
+      removed += 1;
+    }
+  }
+  if (removed) await directory.handle.sync();
+  return removed;
+}
+
+/** Reclaim abandoned bundle staging only when no conforming writer is active. */
+export async function cleanupBundles(options = {}) {
+  let directory;
+  let lock;
+  try {
+    directory = await privateDirectory(options.outputDir);
+    lock = await lockFile(directory.path);
+    if (!(await flock(lock, true))) return { skipped: true, removed: 0 };
+    return { skipped: false, removed: await removeOrphans(directory) };
+  } catch (error) {
+    throw safeError(error);
+  } finally {
+    await close(lock);
+    await close(directory?.handle);
+  }
+}
+
 async function readExactly(handle, buffer, position) {
   let offset = 0;
   while (offset < buffer.length) {
@@ -139,6 +215,9 @@ async function keyFile(path, privateKey) {
   try {
     const source = await regularFile(path);
     handle = source.handle;
+    // Check the opened descriptor before reading secrets. Public verification
+    // keys may be shared, but no group/other access is allowed for signing PEMs.
+    if (privateKey && ((await handle.stat()).mode & 0o077) !== 0) fail('E_BACKUP_KEY');
     if (!source.size || source.size > 16384) fail('E_BACKUP_KEY');
     const pem = Buffer.alloc(source.size);
     await readExactly(handle, pem, 0);
@@ -255,6 +334,7 @@ export async function createBundle(options = {}) {
   let directory;
   let output;
   let temporary;
+  let lock;
   let linked = false;
   try {
     const backupId = options.backupId ?? randomUUID();
@@ -262,6 +342,9 @@ export async function createBundle(options = {}) {
     const key = await keyFile(options.privateKeyPath, true);
     source = await regularFile(options.archivePath);
     directory = await privateDirectory(options.outputDir);
+    lock = await lockFile(directory.path);
+    if (await flock(lock, true)) await removeOrphans(directory);
+    await flock(lock, false);
     temporary = join(directory.path, `.bundle-${randomUUID()}.tmp`);
     output = await open(temporary, CREATE_FLAGS, 0o600);
     await writeExactly(output, Buffer.alloc(HEADER_BYTES), 0);
@@ -299,8 +382,9 @@ export async function createBundle(options = {}) {
   } finally {
     await close(output);
     await close(source?.handle);
-    await close(directory?.handle);
     if (temporary) await unlink(temporary).catch(() => {});
+    await close(lock);
+    await close(directory?.handle);
   }
 }
 
@@ -382,6 +466,8 @@ async function main() {
   };
   let result;
   if (command === 'check-seal' && source === undefined) result = await validateSealConfig(sealing);
+  else if (command === 'cleanup' && source && outputDir === undefined)
+    result = await cleanupBundles({ outputDir: source });
   else if (command === 'seal' && source && outputDir && !extra.length)
     result = await createBundle({ ...sealing, archivePath: source, outputDir });
   else if (command === 'prepare' && source && outputDir && !extra.length)

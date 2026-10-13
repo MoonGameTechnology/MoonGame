@@ -1,11 +1,20 @@
 /** Signed-backup shell boundaries. PG/age here are wiring doubles; the PG drill
  * in backup.test.mjs verifies actual data and (when installed) real age. */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { createHash, generateKeyPairSync } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +25,7 @@ const fixture = '-- synthetic fixture\nSELECT 42;\n-- PostgreSQL database dump c
 
 describe('signed backup shell admission and publication', () => {
   let root, bin, env, calls, output;
+  const running = new Set();
   const backup = (extra = {}) =>
     run('bash', [join(deploy, 'backup.sh')], { env: { ...env, ...extra } });
   const restore = (path, extra = {}) =>
@@ -101,13 +111,23 @@ else tail -n +2 "$inp" > "$out"; fi
       STUB_SQL: join(root, 'restored.sql'),
     };
   });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
+  afterEach(async () => {
+    for (const child of running) {
+      if (child.exitCode === null && child.signalCode === null) {
+        const exited = once(child, 'exit');
+        process.kill(-child.pid, 'SIGKILL');
+        await exited;
+      }
+    }
+    running.clear();
+    rmSync(root, { recursive: true, force: true });
+  });
 
   it('publishes distinct complete bundles under concurrent same-second jobs and restores the selected one', async () => {
     await Promise.all([backup(), backup()]);
     const files = backups();
     expect(files).toHaveLength(2);
-    expect(readdirSync(output)).toHaveLength(2);
+    expect(readdirSync(output).filter((name) => name !== '.backup.lock')).toHaveLength(2);
     await restore(files[0], { BACKUP_EXPECT_ID: id(files[0]) });
     expect(readFileSync(join(root, 'restored.sql'), 'utf8')).toContain(fixture);
     expect(
@@ -147,6 +167,51 @@ else tail -n +2 "$inp" > "$out"; fi
     expect(readFileSync(file)).toEqual(before);
     expect(backups()).toEqual([file]);
   });
+
+  it('reclaims a killed job on restart while preserving live jobs and ready backups', async () => {
+    mkdirSync(output, { mode: 0o700 });
+    const ready = join(output, 'void-preserved.vdbak');
+    writeFileSync(ready, 'ready backup sentinel');
+    const marker = join(root, 'dump-started');
+    writeFileSync(
+      join(bin, 'pg_dump'),
+      `#!/bin/bash
+cat "$STUB_FIXTURE"
+if [ "\${STUB_BLOCK_DUMP:-0}" = 1 ]; then
+  touch "$STUB_MARKER"
+  exec sleep 30
+fi
+`,
+      { mode: 0o700 },
+    );
+    const child = spawn('bash', [join(deploy, 'backup.sh')], {
+      detached: true,
+      env: { ...env, STUB_BLOCK_DUMP: '1', STUB_MARKER: marker },
+      stdio: 'ignore',
+    });
+    running.add(child);
+    const exited = once(child, 'exit');
+    await expect.poll(() => existsSync(marker), { timeout: 4000 }).toBe(true);
+    const work = readdirSync(output).find((name) => name.startsWith('.bundle-job-'));
+    expect(work).toBeTruthy();
+    const cleanup = () =>
+      run(process.execPath, [join(deploy, 'backup-bundle.mjs'), 'cleanup', output]);
+    const busy = JSON.parse((await cleanup()).stdout);
+    expect(busy.skipped).toBe(true);
+    expect(existsSync(join(output, work))).toBe(true);
+    process.kill(-child.pid, 'SIGKILL');
+    await exited;
+    running.delete(child);
+
+    // A normal restart reclaims the abandoned plaintext job directory before dump.
+    const { stdout } = await backup();
+    expect(existsSync(join(output, work))).toBe(false);
+    expect(readFileSync(ready, 'utf8')).toBe('ready backup sentinel');
+    expect(readdirSync(output).some((name) => name.startsWith('.bundle-job-'))).toBe(false);
+    const receipt = JSON.parse(stdout.split('\n').find((line) => line.startsWith('{')));
+    await restore(receipt.path, { BACKUP_EXPECT_ID: receipt.backupId });
+    expect(readFileSync(join(root, 'restored.sql'), 'utf8')).toContain(fixture);
+  }, 15_000);
 
   it.each([
     { BACKUP_EXPECT_DOMAIN: 'corp' },

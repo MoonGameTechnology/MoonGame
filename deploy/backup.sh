@@ -56,6 +56,7 @@ case "$FORMAT" in
   legacy) ;;
   bundle-v1)
     command -v node >/dev/null || { echo '[✗] E_BACKUP_CONFIG: bundle-v1 requires Node >=20.' >&2; exit 1; }
+    command -v flock >/dev/null || { echo '[✗] E_BACKUP_CONFIG: bundle-v1 requires util-linux flock.' >&2; exit 1; }
     [ -n "${BACKUP_AGE_RECIPIENT:-}" ] || { echo '[✗] E_BACKUP_CONFIG: bundle-v1 requires BACKUP_AGE_RECIPIENT.' >&2; exit 1; }
     command -v age >/dev/null || { echo '[✗] E_BACKUP_CONFIG: age is required.' >&2; exit 1; }
     # Keep a known job ID even if publication succeeds but its final fsync fails.
@@ -103,10 +104,21 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BASE="void-$STAMP"
 mkdir -p "$BACKUP_DIR"
 
+WORK_PREFIX=".tmp-$STAMP"
+if [ "$FORMAT" = bundle-v1 ]; then
+  # GC takes an exclusive nonblocking lock; a running job makes it skip cleanup.
+  # The stable lock inode must never be removed/replaced. Hold shared fd 9 through
+  # dump/age/seal/EXIT cleanup; subprocesses inherit it, including after shell death.
+  node "$DEPLOY_DIR/backup-bundle.mjs" cleanup "$BACKUP_DIR" >/dev/null
+  exec 9<>"$BACKUP_DIR/.backup.lock"
+  flock -s 9
+  WORK_PREFIX=".bundle-job-$STAMP"
+fi
+
 # Временный каталог — В ТОМ ЖЕ разделе, что и цель: иначе финальный `mv` перестаёт быть
 # атомарным (превращается в копирование между устройствами) и снова может оставить
 # полуфайл под итоговым именем.
-WORK="$(mktemp -d "$BACKUP_DIR/.tmp-$STAMP.XXXXXX")"
+WORK="$(mktemp -d "$BACKUP_DIR/$WORK_PREFIX.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 # Legacy names also need to distinguish jobs started in the same second.
