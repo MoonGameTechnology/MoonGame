@@ -956,7 +956,16 @@ const server = createMultiplayerServer({
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary, one `curl` from the host.
-    app.get('/metrics/summary', async (req, reply) => (operator(req) ? metrics.summary() : reply.callNotFound()));
+    // PTM-2.3: plus the telemetry pipeline itself — is it flowing during a test? Aggregates only.
+    app.get('/metrics/summary', async (req, reply) =>
+      operator(req)
+        ? {
+            ...metrics.summary(),
+            journal: { match: matchLog.stats(), client: clientLog.stats() },
+            ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
+          }
+        : reply.callNotFound(),
+    );
     // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
     // derived from the live MetricsAggregator. Returns a compact status with
     // thresholds so a playtest host can `curl /metrics/health` and read a single
@@ -1445,11 +1454,15 @@ const shutdown = (): void => {
   void (async () => {
     // Final flush per room so the latest state of EVERY session is durable before exit.
     for (const h of hosted) await h.flush();
-    // The journals last: `flush()` waits for an append already in flight, then writes the
-    // rest, so the summary lands after every line before it and nothing is cut by exit.
+    // Stop taking requests (Fastify waits for those in flight) before the journals: a
+    // `/telemetry` batch landing after the last flush would be lost at exit.
+    await server.close();
+    // The journals last, after a fresh summary (the one above stays as a fallback; the
+    // report keeps a run's LAST summary). `flush()` waits for an append already in flight,
+    // so the summary lands after every line before it and nothing is cut by exit.
+    writeSummary();
     await Promise.all([matchLog.flush(), clientLog.flush()]);
     if (pool) await pool.end();
-    await server.close();
     process.exit(0);
   })().catch((err: unknown) => {
     process.stderr.write(`shutdown failed: ${String(err)}\n`);

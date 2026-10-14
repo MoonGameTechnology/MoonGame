@@ -113,6 +113,11 @@ function telemetrySink(): ReturnType<typeof createBrowserTelemetrySink> | undefi
   const sha = currentBuild()?.sha ?? '';
   const sink = createBrowserTelemetrySink({
     target: () => {
+      // Поле «сервер» первым: вход идёт туда, куда смотрит поле, а в `void.server` адрес
+      // попадает только после удачного запроса — отказ входа уехал бы на прежний сервер.
+      const typed = (document.getElementById('csrv') as HTMLInputElement | null)?.value.trim();
+      const fromField = typed ? telemetryTarget(typed, location) : null;
+      if (fromField) return fromField;
       let stored: string | null = null;
       try {
         stored = localStorage.getItem('void.server');

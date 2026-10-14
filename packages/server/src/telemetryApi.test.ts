@@ -91,6 +91,20 @@ describe('POST /telemetry', () => {
     expect(codes.filter((c) => c === 429)).toHaveLength(10);
   });
 
+  it('one flooding address cannot spend the shared budget and lock out everyone else', async () => {
+    const { app } = setup();
+    const from = (ip: string, install: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/telemetry',
+        remoteAddress: ip,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify(batch({ install })),
+      });
+    for (let i = 0; i < 3_100; i += 1) await from('10.0.0.1', `install-${10_000 + i}`);
+    expect((await from('10.0.0.2', 'install-other')).statusCode).toBe(204);
+  });
+
   it('a live session adds the pseudonym; the account id never lands', async () => {
     const { lines, post } = setup({
       actorOf,
@@ -111,6 +125,18 @@ describe('POST /telemetry', () => {
     });
     expect((await post(batch(), { authorization: 'Bearer x' })).statusCode).toBe(204);
     expect(lines[0]?.actor).toBeUndefined();
+  });
+
+  it('counts devices active in the last five minutes', async () => {
+    let clock = 0;
+    const { post, stats } = setup({ now: () => clock });
+    await post(batch({ install: 'install-aaaa' }));
+    clock = 60_000;
+    await post(batch({ install: 'install-bbbb' }));
+    await post(batch({ install: 'install-aaaa', session: 'session-0002' }));
+    expect(stats().activeInstalls).toBe(2);
+    clock = 60_000 + 5 * 60_000 + 1;
+    expect(stats().activeInstalls).toBe(0);
   });
 
   it('with an origin allowlist a foreign site is refused, our page and curl are not', async () => {

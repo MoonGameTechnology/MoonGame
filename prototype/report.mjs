@@ -20,14 +20,15 @@ function newestLog() {
   let best = null;
   let bestM = 0;
   for (const f of readdirSync(dir)) {
-    if (!f.endsWith('.jsonl')) continue;
+    // client-*.jsonl is browser telemetry (PTM-1.1) — no matches in it; `pnpm run analytics` reads it.
+    if (!f.endsWith('.jsonl') || f.startsWith('client-')) continue;
     const m = statSync(join(dir, f)).mtimeMs;
     if (m > bestM) {
       bestM = m;
       best = join(dir, f);
     }
   }
-  if (!best) throw new Error('no .jsonl in playtest-logs/ — run a playtest first');
+  if (!best) throw new Error('no match .jsonl in playtest-logs/ — run a playtest first');
   return best;
 }
 
