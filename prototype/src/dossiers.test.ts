@@ -39,6 +39,7 @@ function hostOf(over: Partial<DossierHost> = {}): DossierHost {
     queuedOrders: () => [],
     activeConstruction: () => null,
     progressPct: () => 0,
+    victoryPoints: () => true,
     ...over,
   };
 }
@@ -338,6 +339,13 @@ describe('codex — карточка полной информации', () => {
     expect(html).toContain('cx-stats');
     expect(html).toContain(cxRow('Уровни', '1').slice(0, 20)); // строка-ряд той же формы
     expect(html).toContain(buildingDossier('mine', 1)!.body); // описание = тело досье
+  });
+
+  it('очки победы постройки — строкой карточки, а в забеге Sector Zero их нет', () => {
+    expect(codexHtml('b', 'mine')).toContain('Очки победы');
+    const run = createDossiers(hostOf({ victoryPoints: () => false }));
+    expect(run.codexHtml('b', 'mine')).not.toContain('Очки победы');
+    expect(run.codexHtml('b', 'mine')).toContain('cx-stats'); // остальная карточка на месте
   });
 
   it('карточка здания листает уровни: цифры и цена — ДЛЯ уровня (BUILD-1)', () => {

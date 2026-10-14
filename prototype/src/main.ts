@@ -336,6 +336,7 @@ import {
   SECTOR_ZERO_ABSENT_TWINS,
   espionageShown,
   toolShown,
+  victoryPointsShown,
   type SessionTool,
 } from '../../decisions/sectorZeroTools';
 import {
@@ -4470,8 +4471,9 @@ function planetPanelHtml(p: Planet): string {
   const sm = planetSummary(p, data, here);
   // Очки победы — рядом с именем (заказ владельца 2026-09-29: «эти 50 можно в шапку»). На
   // телефоне их переносит в шапку листа `mobileHud.ts`, досье — тем же тапом, что у фишек.
+  // В забеге Sector Zero очков нет (`victoryPointsShown`).
   const vp =
-    sm.victoryPoints > 0
+    sm.victoryPoints > 0 && victoryPointsShown(sectorZeroToolsHidden())
       ? `<span class="pbadge" data-desc="fact:vp" aria-label="${esc(t('side.world.vp'))}">✦ ${sm.victoryPoints}</span>`
       : '';
   let h = cardHeader(
@@ -4759,6 +4761,7 @@ const { objDossier, codexHtml } = createDossiers({
     })),
   activeConstruction,
   progressPct,
+  victoryPoints: () => victoryPointsShown(sectorZeroToolsHidden()),
 });
 
 /** Лента сообщений изменилась (`messageLog.ts`, снятие метки в `pingUi`): перерисовать
@@ -4934,7 +4937,11 @@ function codexItemHtml(e: CodexEntry): string {
 function renderCodexResults(query: string): void {
   const host = document.getElementById('ch-results');
   if (!host) return;
-  const hits = searchCodex(CODEX_INDEX, query, (e) =>
+  // В забеге Sector Zero очков нет (`victoryPointsShown`) — и статьи о них тоже.
+  const index = victoryPointsShown(sectorZeroToolsHidden())
+    ? CODEX_INDEX
+    : CODEX_INDEX.filter((e) => e.key !== 'm:score');
+  const hits = searchCodex(index, query, (e) =>
     (codexEntryLabel(e) + ' ' + e.title + ' ' + e.tags.join(' ')).toLowerCase(),
   );
   if (!query.trim()) {
