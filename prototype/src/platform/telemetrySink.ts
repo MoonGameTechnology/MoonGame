@@ -64,6 +64,8 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
   let armed = false;
   let sending = false;
   let inflight: TelemetryEvent[] = [];
+  /** Куда ушёл пакет в полёте: его маяк едет туда же, даже если игрок сменил сервер. */
+  let inflightUrl = '';
 
   const body = (events: TelemetryEvent[]): string =>
     JSON.stringify({
@@ -121,6 +123,7 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
         const events = take();
         if (events.length === 0) continue;
         inflight = events;
+        inflightUrl = to.url;
         // Один повтор — и всё: сеть, которая не пускает дважды, не пустит и в третий раз.
         // Пакет, который уже забрал маяк (`pageHide`), второй раз не шлётся.
         const ok = (await send(to, events)) || (inflight === events && (await send(to, events)));
@@ -144,10 +147,11 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
     flush,
     pageHide() {
       const url = deps.target()?.url;
-      if (url === undefined) return;
-      queue = [...inflight, ...queue];
+      const flying = inflight;
       inflight = [];
       try {
+        if (flying.length > 0) deps.beacon(inflightUrl, body(flying));
+        if (url === undefined) return;
         while (queue.length > 0) {
           const events = take();
           if (events.length > 0) deps.beacon(url, body(events));

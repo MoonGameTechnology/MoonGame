@@ -1457,11 +1457,12 @@ const shutdown = (): void => {
     // Stop taking requests (Fastify waits for those in flight) before the journals: a
     // `/telemetry` batch landing after the last flush would be lost at exit.
     await server.close();
-    // The journals last, after a fresh summary (the one above stays as a fallback; the
-    // report keeps a run's LAST summary). `flush()` waits for an append already in flight,
-    // so the summary lands after every line before it and nothing is cut by exit.
-    writeSummary();
+    // The journals last: drain them, THEN write a fresh summary (its counters now match
+    // the files; the one above stays as a fallback, the report keeps a run's LAST one)
+    // and drain that. `flush()` waits for an append already in flight, so nothing is cut.
     await Promise.all([matchLog.flush(), clientLog.flush()]);
+    writeSummary();
+    await matchLog.flush();
     if (pool) await pool.end();
     process.exit(0);
   })().catch((err: unknown) => {

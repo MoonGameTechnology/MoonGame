@@ -2,9 +2,11 @@
 // Pure: takes parsed journal lines, returns numbers. The CLI around it is
 // `analyticsReport.mjs` (`pnpm run analytics`).
 //
-// Who is a "person": the analytics pseudonym `actor` when any of their lines carries one
-// (they logged in), otherwise the browser install. An install that logged in is folded
-// into its actor, so the anonymous steps before login count for the same person.
+// Who is a "person": the analytics pseudonym `actor` when the line carries one (they
+// logged in), otherwise the browser install. An anonymous line goes to the actor of the
+// same page load (the steps before login count for the one who then logged in); a page
+// load with no login goes to the install's actor only when that install only ever had
+// one — "switch commander" on a shared browser must not mix two people.
 // Definitions follow docs/research/2026-10-13-player-engagement-research.md («План
 // измерения»): cohorts by the UTC day of first activity, only complete windows count.
 
@@ -22,50 +24,82 @@ export function percentile(values, p) {
 }
 
 /** Client lines without repeats: a batch the tab sent by beacon while its request was
- *  still in flight can land twice — the event id (per install) tells them apart. */
+ *  still in flight can land twice — the event id (per install) tells them apart. Of two
+ *  copies the one with `actor` wins (the beacon copy is anonymous), whatever came first. */
 export function uniqueEvents(clientLines) {
-  const seen = new Set();
-  return clientLines.filter((l) => {
+  const kept = new Map();
+  for (const l of clientLines) {
     const key = `${l.install}|${l.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const known = kept.get(key);
+    if (!known || (!known.actor && l.actor)) kept.set(key, l);
+  }
+  const keep = new Set(kept.values());
+  return clientLines.filter((l) => keep.has(l));
 }
 
-/** install → actor, from any client line of that install that carries one. */
-export function installActors(clientLines) {
+/** Person of every client line (see the header): returns `line → person`. */
+export function people(clientLines) {
+  const bySession = new Map();
+  const installActors = new Map();
+  for (const l of clientLines) {
+    if (!bySession.has(l.session)) bySession.set(l.session, []);
+    bySession.get(l.session).push(l);
+    if (l.actor) {
+      if (!installActors.has(l.install)) installActors.set(l.install, new Set());
+      installActors.get(l.install).add(l.actor);
+    }
+  }
+  const out = new Map();
+  for (const lines of bySession.values()) {
+    const signed = lines.filter((l) => l.actor).sort((a, b) => a.t - b.t);
+    for (const l of lines) {
+      if (l.actor) {
+        out.set(l, l.actor);
+        continue;
+      }
+      // The login that followed it on this page, else the one before it.
+      const near = signed.find((x) => x.t >= l.t) ?? signed.at(-1);
+      const only = installActors.get(l.install);
+      out.set(l, near?.actor ?? (only?.size === 1 ? [...only][0] : `install:${l.install}`));
+    }
+  }
+  return (line) => out.get(line) ?? line.actor ?? `install:${line.install}`;
+}
+
+/** Who held each (match, seat) and when, from the journal's join/leave lines. */
+function seatTenures(matchLines) {
   const map = new Map();
-  for (const l of clientLines) if (l.actor && !map.has(l.install)) map.set(l.install, l.actor);
+  for (const l of [...matchLines].sort((a, b) => a.t - b.t)) {
+    const key = `${l.match}|${l.playerId}`;
+    const list = map.get(key) ?? [];
+    if (l.kind === 'join' && l.actor) {
+      // A crash leaves no `leave`: a new join closes whatever tenure is still open.
+      if (list.at(-1)?.to === Infinity) list.at(-1).to = l.t;
+      list.push({ actor: l.actor, from: l.t, to: Infinity });
+    } else if (l.kind === 'leave' && list.at(-1)?.to === Infinity) list.at(-1).to = l.t;
+    else continue;
+    map.set(key, list);
+  }
   return map;
 }
 
-/** Person key for a client line. */
-export function personOf(line, actors) {
-  return line.actor ?? actors.get(line.install) ?? `install:${line.install}`;
-}
-
-/** (match, seat) → actor from the match journal's joins. */
-function seatActors(matchLines) {
-  const map = new Map();
-  for (const l of matchLines) if (l.kind === 'join' && l.actor) map.set(`${l.match}|${l.playerId}`, l.actor);
-  return map;
-}
-
-/** Every person's time-ordered activity: client events plus their own match actions. */
+/** Every person's time-ordered activity: client events plus their own match actions.
+ *  An action counts for whoever was connected to that seat at that moment; a seat's
+ *  actions while nobody holds it (stand-in AI) and the server's own `seat.*`
+ *  bookkeeping are nobody's. */
 export function activity(clientLines, matchLines) {
-  const actors = installActors(clientLines);
-  const seats = seatActors(matchLines);
+  const personOf = people(clientLines);
+  const tenures = seatTenures(matchLines);
   const byPerson = new Map();
   const add = (person, entry) => {
     if (!byPerson.has(person)) byPerson.set(person, []);
     byPerson.get(person).push(entry);
   };
-  for (const l of clientLines) add(personOf(l, actors), { t: l.t, e: l.e, p: l.p ?? {}, session: l.session });
+  for (const l of clientLines) add(personOf(l), { t: l.t, e: l.e, p: l.p ?? {}, session: l.session });
   for (const l of matchLines) {
-    if (l.kind !== 'action') continue;
-    const actor = seats.get(`${l.match}|${l.playerId}`);
-    if (actor) add(actor, { t: l.t, e: l.ok ? 'action_ok' : 'action_rejected', p: l.code ? { code: l.code } : {} });
+    if (l.kind !== 'action' || String(l.type ?? '').startsWith('seat.')) continue;
+    const held = tenures.get(`${l.match}|${l.playerId}`)?.findLast((x) => x.from <= l.t && l.t <= x.to);
+    if (held) add(held.actor, { t: l.t, e: l.ok ? 'action_ok' : 'action_rejected', p: l.code ? { code: l.code } : {} });
   }
   for (const list of byPerson.values()) list.sort((a, b) => a.t - b.t);
   return byPerson;
@@ -157,16 +191,24 @@ export function errors(clientLines) {
 /** Sessions (page loads): length percentiles, per person per active day, and the gaps
  *  between a person's sessions — the gap histogram is what picks the "gone" threshold. */
 export function sessions(clientLines) {
-  const actors = installActors(clientLines);
+  const personOf = people(clientLines);
+  // A page load is one session per person on it: «Сменить командира» keeps the page
+  // (and its telemetry session id) but changes who plays.
   const bySession = new Map();
+  const pagePeople = new Map();
   for (const l of clientLines) {
-    const s = bySession.get(l.session) ?? { person: personOf(l, actors), start: l.t, end: l.t, ms: 0 };
+    const person = personOf(l);
+    const key = `${l.session}|${person}`;
+    const s = bySession.get(key) ?? { page: l.session, person, start: l.t, end: l.t, ms: 0 };
     s.start = Math.min(s.start, l.t);
     s.end = Math.max(s.end, l.t);
     if (l.e === 'session_ended' && typeof l.p?.ms === 'number') s.ms = Math.max(s.ms, l.p.ms);
-    bySession.set(l.session, s);
+    bySession.set(key, s);
+    pagePeople.set(l.session, (pagePeople.get(l.session) ?? new Set()).add(person));
   }
   const list = [...bySession.values()];
+  // The page's own length belongs to the page, not to one of several people on it.
+  for (const s of list) if (pagePeople.get(s.page).size > 1) s.ms = 0;
   const lengths = list.map((s) => Math.max(s.ms, s.end - s.start) / 60_000);
   const perPersonDay = new Map();
   for (const s of list) {
@@ -194,16 +236,17 @@ export function sessions(clientLines) {
 /**
  * Retention by first-day cohort. `day n` = active exactly on day n after the first;
  * `unbounded n` = active on day n or any later day. Only people whose window has
- * closed (first day + n ≤ last day of data) are counted.
+ * closed are counted: day first + n must have ENDED, so it lies before the last day of
+ * data (that day may still be running when the report is made).
  */
 export function retention(byPerson, lastT, days = [1, 3, 7, 14, 30]) {
   const last = dayIndex(lastT);
-  const people = [...byPerson.values()].map((list) => {
+  const cohort = [...byPerson.values()].map((list) => {
     const active = new Set(list.map((e) => dayIndex(e.t)));
     return { first: Math.min(...active), active };
   });
   return days.map((n) => {
-    const eligible = people.filter((p) => p.first + n <= last);
+    const eligible = cohort.filter((p) => p.first + n < last);
     const exact = eligible.filter((p) => p.active.has(p.first + n)).length;
     const unbounded = eligible.filter((p) => [...p.active].some((d) => d >= p.first + n)).length;
     return {
@@ -271,11 +314,11 @@ export function taskSuccess(byPerson) {
 
 /** Invite tag of each person: the first `src` their `app_loaded` carried (`—` if none). */
 export function personSources(clientLines) {
-  const actors = installActors(clientLines);
+  const personOf = people(clientLines);
   const out = new Map();
   for (const l of clientLines) {
     if (l.e !== 'app_loaded') continue;
-    const person = personOf(l, actors);
+    const person = personOf(l);
     if (!out.has(person)) out.set(person, l.p?.src ?? '—');
   }
   return out;

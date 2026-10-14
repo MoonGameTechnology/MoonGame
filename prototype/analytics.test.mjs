@@ -143,4 +143,73 @@ describe('analytics', () => {
     const b = { install: 'i2', id: 'ev-1', e: 'pve_started' };
     expect(uniqueEvents([a, { ...a }, b])).toEqual([a, b]);
   });
+
+  it('of a request and its beacon copy the signed one stays, whichever came first', () => {
+    const anon = { install: 'i1', id: 'ev-1', e: 'login_ok' };
+    const signed = { ...anon, actor: 'alice' };
+    expect(uniqueEvents([anon, signed])).toEqual([signed]);
+    expect(uniqueEvents([signed, anon])).toEqual([signed]);
+  });
+
+  it('an action counts only while that person holds the seat; seat.* and stand-in moves are nobody\'s', () => {
+    const cl = [c(D0, 'ia', 's1', 'app_loaded', {}, 'alice'), c(D0, 'ib', 's2', 'app_loaded', {}, 'bob')];
+    const m = [
+      { t: D0 + 1, match: 'm', kind: 'action', playerId: 'p1', type: 'seat.claim', ok: true },
+      { t: D0 + 2, match: 'm', kind: 'join', playerId: 'p1', actor: 'alice' },
+      { t: D0 + 3, match: 'm', kind: 'action', playerId: 'p1', type: 'seat.confirm', ok: true },
+      { t: D0 + 4, match: 'm', kind: 'action', playerId: 'p1', type: 'fleet.move', ok: true },
+      { t: D0 + 5, match: 'm', kind: 'leave', playerId: 'p1' },
+      { t: D0 + 6, match: 'm', kind: 'action', playerId: 'p1', type: 'fleet.move', ok: true }, // stand-in AI
+      { t: D0 + 7, match: 'm', kind: 'join', playerId: 'p1', actor: 'bob' },
+      { t: D0 + 8, match: 'm', kind: 'action', playerId: 'p1', type: 'fleet.move', ok: false, code: 'E_X' },
+    ];
+    const by = activity(cl, m);
+    const acts = (who) => by.get(who).filter((e) => e.e.startsWith('action_')).map((e) => e.t - D0);
+    expect(acts('alice')).toEqual([4]);
+    expect(acts('bob')).toEqual([8]);
+  });
+
+  it('two accounts on one browser stay two people', () => {
+    const cl = [
+      c(D0, 'ia', 's1', 'login_shown'),
+      c(D0 + 1, 'ia', 's1', 'login_ok', {}, 'alice'),
+      c(D0 + H, 'ia', 's2', 'login_shown'),
+      c(D0 + H + 1, 'ia', 's2', 'login_ok', {}, 'bob'),
+      c(D0 + 2 * H, 'ia', 's3', 'app_loaded'), // nobody logged in on this page
+    ];
+    const by = activity(cl, []);
+    expect(by.get('alice').map((e) => e.e)).toEqual(['login_shown', 'login_ok']);
+    expect(by.get('bob').map((e) => e.e)).toEqual(['login_shown', 'login_ok']);
+    expect(by.get('install:ia').map((e) => e.e)).toEqual(['app_loaded']);
+  });
+
+  it('after a crash (no leave) the next join takes the seat over', () => {
+    const cl = [c(D0, 'ia', 's1', 'app_loaded', {}, 'alice'), c(D0, 'ib', 's2', 'app_loaded', {}, 'bob')];
+    const m = [
+      { t: D0 + 1, match: 'm', kind: 'join', playerId: 'p1', actor: 'alice' },
+      { t: D0 + 2, match: 'm', kind: 'action', playerId: 'p1', type: 'fleet.move', ok: true },
+      { t: D0 + 3, match: 'm', kind: 'join', playerId: 'p1', actor: 'bob' }, // server restarted
+      { t: D0 + 4, match: 'm', kind: 'action', playerId: 'p1', type: 'fleet.move', ok: true },
+    ];
+    const by = activity(cl, m);
+    const acts = (who) => by.get(who).filter((e) => e.e.startsWith('action_')).map((e) => e.t - D0);
+    expect(acts('alice')).toEqual([2]);
+    expect(acts('bob')).toEqual([4]);
+  });
+
+  it('a commander switch on one page splits the page into two people’s sessions', () => {
+    const s = sessions([
+      c(D0, 'ia', 's1', 'login_ok', {}, 'alice'),
+      c(D0 + H, 'ia', 's1', 'login_ok', {}, 'bob'),
+      c(D0 + 2 * H, 'ia', 's1', 'session_ended', { ms: 2 * H }),
+    ]);
+    expect(s.count).toBe(2);
+    expect(s.gaps).toEqual({ '<1h': 0, '1-6h': 0, '6-24h': 0, '1-3d': 0, '>3d': 0 });
+  });
+
+  it('a window still running on the last day of data is not counted', () => {
+    const by = activity([c(D0, 'ia', 's1', 'app_loaded', {}, 'alice')], []);
+    expect(retention(by, D0 + DAY + 60_000, [1])[0].eligible).toBe(0); // D1 has barely begun
+    expect(retention(by, D0 + 2 * DAY, [1])[0].eligible).toBe(1);
+  });
 });
