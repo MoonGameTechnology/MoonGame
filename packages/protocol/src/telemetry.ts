@@ -25,6 +25,16 @@ export const TELEMETRY_EVENTS = [
   'meta_unlock',
   // PTM-1.3: an uncaught error in the browser — type and place only, never the message.
   'client_error',
+  // PTM-1.2: the path from opening the page to a match, and the link's health.
+  'app_loaded',
+  'login_shown',
+  'login_ok',
+  'login_failed',
+  'match_list_shown',
+  'match_joined',
+  'ws_ready',
+  'ws_closed',
+  'session_ended',
 ] as const;
 export type TelemetryEventName = (typeof TELEMETRY_EVENTS)[number];
 

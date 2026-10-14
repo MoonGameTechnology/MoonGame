@@ -19,6 +19,7 @@ import { resolveBase } from '../../decisions/serverAddress';
 import { saveSession } from '../../decisions/sessionStore';
 import { authMode, ensureSession, pendingJoinAfterAuth, probeAuthMode } from './accountSession';
 import { detach } from './detach';
+import { getPlatform } from './platform/host';
 import { revealSignup } from './identityProbe';
 import { initPasswordReset } from './passwordReset';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
@@ -68,7 +69,14 @@ export function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 
   recoverStageEl.style.display = stage === 'recover' ? '' : 'none';
   resetStageEl.style.display = stage === 'reset' ? '' : 'none';
   browseStageEl.style.display = stage === 'browse' ? '' : 'none';
+  // PTM-1.2: карточку входа УВИДЕЛИ — раз за загрузку и только на видимом экране
+  // подключения: `showStage('welcome')` зовут и чтобы сбросить скрытый экран на будущее.
+  if (stage === 'welcome' && !loginShown && document.getElementById('connect')?.style.display !== 'none') {
+    loginShown = true;
+    getPlatform().analytics.emit('login_shown');
+  }
 }
+let loginShown = false;
 
 // A fresh callsign for a brand-new commander. Deterministic on purpose (no random/
 // time even in UI glue) — the wordlist and the counter arithmetic live in

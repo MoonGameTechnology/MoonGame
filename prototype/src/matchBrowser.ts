@@ -24,6 +24,7 @@ import { tokenFor } from '../../decisions/sessionStore';
 import { probeAuthMode } from './accountSession';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { detach } from './detach';
+import { getPlatform } from './platform/host';
 import { esc } from './format';
 import {
   clampFilter,
@@ -92,6 +93,7 @@ export interface MatchRow {
 }
 
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
+let listShown = false;
 let activeTab: MatchTab = 'available';
 /** Выбор фильтров (BRW-3). Живёт в модуле, поэтому тихий переопрос раз в десять секунд
  *  его не сбрасывает — перерисовка читает то же состояние. Между заходами он лежит в
@@ -139,6 +141,14 @@ async function loadMatchLists(srv: { base: string; nick: string }): Promise<bool
     );
     if (queryOutcome(res) !== 'ok') throw new Error('http ' + res.status);
     matchLists = (await res.json()) as Record<MatchTab, MatchRow[]>;
+    // PTM-1.2: список партий дошёл до игрока — раз за загрузку; лента потом опрашивается.
+    if (!listShown) {
+      listShown = true;
+      getPlatform().analytics.emit('match_list_shown', {
+        available: matchLists.available?.length ?? 0,
+        mine: matchLists.active?.length ?? 0,
+      });
+    }
     localStorage.setItem('void.server', srv.base);
     localStorage.setItem('void.nick', srv.nick);
     return true;

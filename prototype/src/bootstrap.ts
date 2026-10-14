@@ -24,6 +24,7 @@ import { measureViewport } from './viewport';
 import { createBrowserTelemetrySink } from './platform/telemetrySink';
 import { createErrorReporter, installErrorReporter } from './platform/errorReporter';
 import { telemetryTarget } from '../../decisions/telemetryEndpoint';
+import { appLoadedProps } from '../../decisions/sessionAnalytics';
 import { anyToken } from '../../decisions/sessionStore';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
@@ -149,6 +150,8 @@ const errors = createErrorReporter({
 installErrorReporter(errors);
 // Уходящая страница: сначала дописать ожидающие отчёты, потом отправить всё маяком.
 window.addEventListener('pagehide', () => {
+  // PTM-1.2: длина визита — от начала загрузки страницы.
+  getPlatform().analytics.emit('session_ended', { ms: Math.round(performance.now()) });
   errors.flush();
   telemetry?.pageHide();
 });
@@ -189,6 +192,17 @@ loaderReady()
   .then(
     () => {
       document.body.classList.remove('app-starting');
+      // PTM-1.2: игра загрузилась и отвечает — сколько это заняло и у кого.
+      getPlatform().analytics.emit(
+        'app_loaded',
+        appLoadedProps({
+          loadMs: performance.now(),
+          entry: document.body.dataset.entry,
+          mobile: measureViewport().mobile,
+          lang: LOCALE,
+          search: location.search,
+        }),
+      );
       // `LoadingAPI.ready()` — РОВНО здесь, и это не стилистика. Модерация смотрит
       // debug-панель покадрово и в двух сценариях (загрузочный экран площадки скрыт
       // тапом и исчез сам), поэтому привязка ко времени провалила бы один из них.
