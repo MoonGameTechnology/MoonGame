@@ -34,6 +34,7 @@ import {
   relocateAloft,
   relocateShuttle,
   retreatBattle,
+  setRallyPoint,
 } from '../../decisions/actions';
 // AIM-PAN — «коммитит ли отпускание вооружённый приказ»: правило со сторожем.
 import { releaseCommits } from '../../decisions/aimGesture';
@@ -63,6 +64,7 @@ import {
 } from '../../decisions/holdPress';
 import { toBake, type LayerTransform } from '../../decisions/mapLayerView';
 import { pickEffect } from '../../decisions/pickApply';
+import { rallyPick } from '../../decisions/rallyPoint';
 import {
   boxSelection,
   insideBox,
@@ -119,6 +121,7 @@ import {
   pickMode,
   pickStrike,
   pickWorld,
+  rallyAim,
   retreatAim,
   selFleet,
   selPlanet,
@@ -334,6 +337,7 @@ export function selectAt(mx: number, my: number) {
     engageAim,
     strikeAim: !!strikeAim,
     allyAim: !!allyAim,
+    rallyAim: !!rallyAim,
     pickMode,
     aiming,
   });
@@ -386,6 +390,19 @@ export function selectAt(mx: number, my: number) {
     if (!ally || (!hit && !node)) game.note(t('ally.pick-missed'));
     else if (playerOrder(allyOrder(ME, ally, kind, hit ? { fleet: hit.id } : { planet: node!.id })))
       game.note(t('ally.ordered'));
+    game.invalidatePanel();
+    return;
+  }
+  // RALLY-1 — ТОЧКА СБОРА ВЗВЕДЕНА из панели мира: тап по другому своему миру ставит её.
+  // Чужой мир и сам мир-верфь объясняются правилом, промах снимает прицел молча-с-нотой.
+  if (owner === 'rally-point' && rallyAim) {
+    const from = rallyAim;
+    drop('rallyAim');
+    const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+    const hit = n ? { id: n.id, owner: s.planets[n.id]?.owner ?? null } : null;
+    const pick = rallyPick(from, hit, ME);
+    if (pick === 'order') playerOrder(setRallyPoint(ME, from, hit!.id));
+    else game.note(t(pick === 'not-own' ? 'hint.rally-own' : 'hint.rally-cancelled'));
     game.invalidatePanel();
     return;
   }

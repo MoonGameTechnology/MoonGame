@@ -22,17 +22,97 @@
  * The rally fleet is tagged `rally`; fleets the player already had on orbit lack
  * the tag, so a build never silently merges into one of them. The stack is pulled
  * loadout-keyed (BF-29) so paid modules ride along instead of being stripped.
+ *
+ * ТОЧКА СБОРА (RALLY-1, заказ владельца 2026-10-14 «как во всяких RTS»): мир-верфи можно
+ * назначить свой же мир (`rally.point`), и тогда каждый готовый заказ кораблей не ложится
+ * в орбитальный флот, а сразу вылетает туда СВОИМ флотом. На месте его подхватывает
+ * автослияние — подкрепления собираются во флот, который стоит у цели. Корабли, что уже
+ * стояли на орбите, точка не трогает: она про новостройки, как в RTS. Курс прокладывает
+ * модуль движения (возможность `fleet.course`, тот же маршрутизатор, что у приказа
+ * «Курс»), поэтому правила пути общие: мир соседа по миру не пропустит. Курса нет (пути
+ * нет, нет модуля движения) — заказ остаётся на орбите, как без точки. Боя в мире-верфи
+ * здесь не проверяем: под боем верфь не выпускает заказ вовсе (`construction`, «узел не
+ * работает»), так что осаждённый мир защитников не отсылает и так.
  */
-import type { GameModule } from '../kernel/module';
-import type { Fleet } from '../state/gameState';
+import type { GameModule, HandlerContext } from '../kernel/module';
+import type { Fleet, GameState, PlanetId, PlayerId } from '../state/gameState';
+import type { FleetCourse } from './movement';
 import { defHasTrait } from '../data/traits';
+import { rallyPointOf } from '../state/rallyPoint';
 import { nextFleetSeq } from '../util/fleet';
 import { addUnits, findHealthyStack } from '../util/stacks';
 
+/** Новый пустой флот сбора на орбите мира. */
+function newRallyFleet(h: HandlerContext, owner: PlayerId, at: PlanetId): Fleet {
+  const seq = nextFleetSeq(h.state);
+  const fresh: Fleet = {
+    id: `fleet:${owner}:${h.ctx.now}:${seq}`,
+    owner,
+    location: at,
+    movement: null,
+    units: [],
+    landing: [],
+    traits: ['rally'],
+    battleId: null,
+  };
+  h.state.fleets[fresh.id] = fresh;
+  return fresh;
+}
+
+/** Убирает точки сбора, которые потеряли смысл: мир сменил хозяина — его точка у
+ *  прежнего хозяина больше не действует, и не действуют точки, указывавшие на него. */
+function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: PlayerId): void {
+  const all = state.rallyPoints;
+  if (!all) return;
+  for (const owner of Object.keys(all)) {
+    if (owner === keepOwner) continue;
+    const mine = all[owner];
+    if (!mine) continue;
+    for (const from of Object.keys(mine)) {
+      if (from === planetId || mine[from] === planetId) delete mine[from];
+    }
+    if (Object.keys(mine).length === 0) delete all[owner];
+  }
+  if (Object.keys(all).length === 0) delete state.rallyPoints;
+}
+
 export const autoRallyModule: GameModule = {
   id: 'auto-rally',
-  version: '1.0.0',
+  version: '1.1.0', // RALLY-1: точка сбора (`rally.point`)
   setup(api) {
+    // RALLY-1: поставить (`to` — свой другой мир) или снять (`to: null`) точку сбора.
+    api.onAction('rally.point', (action, h) => {
+      const p = action.payload as { planetId?: unknown; to?: unknown };
+      if (typeof p?.planetId !== 'string' || (p.to !== null && typeof p.to !== 'string')) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const planet = h.state.planets[p.planetId];
+      if (!planet) return h.reject('E_NO_PLANET');
+      if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      if (p.to === null) {
+        const all = h.state.rallyPoints;
+        const mine = all?.[action.playerId];
+        if (!all || !mine) return;
+        delete mine[p.planetId];
+        if (Object.keys(mine).length === 0) delete all[action.playerId];
+        if (Object.keys(all).length === 0) delete h.state.rallyPoints;
+        return;
+      }
+      if (p.to === p.planetId) return h.reject('E_SAME_LOCATION');
+      const target = h.state.planets[p.to];
+      if (!target) return h.reject('E_NO_PLANET');
+      // Точка сбора — только СВОЙ мир (решение 2026-10-14): подкрепления собираются в
+      // один флот у себя, а не летят в чужой мир по одному заказу.
+      if (target.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      ((h.state.rallyPoints ??= {})[action.playerId] ??= {})[p.planetId] = p.to;
+    });
+
+    api.on('planet.captured', (event, h) => {
+      const p = event.payload as { planetId?: unknown; owner?: unknown };
+      if (typeof p?.planetId !== 'string' || typeof p.owner !== 'string') return;
+      dropRallyPointsOf(h.state, p.planetId, p.owner);
+    });
+
     api.on('unit.built', (event, h) => {
       const p = event.payload as {
         planetId?: string;
@@ -70,6 +150,16 @@ export const autoRallyModule: GameModule = {
       if (take <= 0) return;
       stack.count -= take;
       if (stack.count <= 0) planet.garrison.splice(planet.garrison.indexOf(stack), 1);
+      // Точка сбора: заказ вылетает к ней своим флотом. Курс не дан — флот этого заказа
+      // разбирается обратно, и корабли ложатся на орбиту, как без точки.
+      const to = rallyPointOf(h.state, p.owner, planet.id);
+      if (to !== null) {
+        const wave = newRallyFleet(h, p.owner, planet.id);
+        addUnits(wave.units, p.unit, take, mods, stack.moduleStars, stack.moduleRarity, stack);
+        const course = h.capability<FleetCourse>('fleet.course');
+        if (course?.({ fleetId: wave.id, playerId: p.owner, to }, h) === null) return;
+        delete h.state.fleets[wave.id];
+      }
       let rally = Object.values(h.state.fleets).find(
         (f) =>
           f.owner === p.owner &&
@@ -78,21 +168,7 @@ export const autoRallyModule: GameModule = {
           !f.battleId &&
           f.traits.includes('rally'),
       );
-      if (!rally) {
-        const seq = nextFleetSeq(h.state);
-        const fresh: Fleet = {
-          id: `fleet:${p.owner}:${h.ctx.now}:${seq}`,
-          owner: p.owner,
-          location: planet.id,
-          movement: null,
-          units: [],
-          landing: [],
-          traits: ['rally'],
-          battleId: null,
-        };
-        h.state.fleets[fresh.id] = fresh;
-        rally = fresh;
-      }
+      rally ??= newRallyFleet(h, p.owner, planet.id);
       // Звёздность едет с тем же стеком, что и лоадаут (SZE-1.1) — иначе корабль
       // терял бы заточку ровно в тот момент, когда его поднимают с верфи во флот.
       //

@@ -1127,6 +1127,12 @@ export interface GameState {
    *  was seeded at match start (usually the homeworld); designating updates both this
    *  map AND every owned hero's `home` in one action. */
   capital?: Record<PlayerId, PlanetId>;
+  /** RALLY-1 точка сбора (заказ владельца 2026-10-14, «как во всяких RTS»): игрок → его
+   *  мир-верфь → его же мир, куда сами вылетают построенные там корабли. Ставит и снимает
+   *  `autoRallyModule` действием `rally.point`; читать — через `rallyPointOf`, который
+   *  отбрасывает запись, ставшую чужой. Будущее намерение: туман оставляет зрителю только
+   *  его записи, как у столицы. */
+  rallyPoints?: Record<PlayerId, Record<PlanetId, PlanetId>>;
   /** CC-2 auto-storm: fleet ids with "auto-assault when idle at a hostile world"
    *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
    *  itself only stores the flag and garbage-collects it for dead fleets. */

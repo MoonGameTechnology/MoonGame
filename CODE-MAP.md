@@ -110,7 +110,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 22 | `market` | `market.ts` | `market.cancel`, `market.list`, `market.take` | — | — | `market.cancelled`, `market.listed`, `market.traded` |
 | 23 | `army` | `army.ts` | `army.load`, `army.unload` | — | — | `army.loaded`, `army.unloaded` |
 | 24 | `fleet-ops` | `fleetOps.ts` | `fleet.engage`, `fleet.launch`, `fleet.merge`, `fleet.split` | — | — | `battle.started`, `fleet.launched`, `fleet.merged`, `fleet.split` · sched: `combat.tick` |
-| 25 | `auto-rally` | `autoRally.ts` | — | `unit.built` | — | — |
+| 25 | `auto-rally` | `autoRally.ts` | `rally.point` | `planet.captured`, `unit.built` | — | — |
 | 26 | `shuttle` | `shuttle.ts` | `shuttle.return`, `shuttle.strike` | `shuttle.arrived`, `time.advanced` | — | `fleet.arrived`, `pd.fired`, `shuttle.docked`, `shuttle.launched`, `shuttle.returning` · sched: `shuttle.arrived` |
 | 27 | `capital` | `capital.ts` | `capital.designate` | — | — | `capital.designated` |
 | 28 | `standing-orders` | `standingOrders.ts` | `chain.stamp`, `order.auto`, `order.chain`, `order.retreat` | `time.advanced` | — | — |
@@ -212,7 +212,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `match.ended` | `victory` | — |
 | `pd.fired` | `shuttle` | — |
 | `planet.bombarded` | `orbital` | `construction` |
-| `planet.captured` | `combat`, `capture-on-arrival` | `steward`, `victory`, `visibility`, `effects` |
+| `planet.captured` | `combat`, `capture-on-arrival` | `steward`, `victory`, `visibility`, `effects`, `auto-rally` |
 | `planet.destroyed` | `hero` | `steward` |
 | `player.eliminated` | `victory` | `diplomacy` |
 | `pve.started` | `pve` | — |

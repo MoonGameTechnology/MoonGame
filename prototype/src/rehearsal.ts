@@ -184,6 +184,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   },
   'shuttle.merge': { planetId: 'C0R1', squadronId: 'missing-squadron', intoId: 'other' },
   'capital.designate': { planetId: 'home_p1' },
+  'rally.point': { planetId: 'home_p1', to: null },
   // Усиление забега (PVR-1.4). В этом прогоне матч не PvE, поэтому приказ законно
   // отобьётся `E_NOT_PVE` — каталог проверяет ФОРМУ конверта, а не исполнимость.
   'pve.boon': { tech: 'boon_gunnery' },

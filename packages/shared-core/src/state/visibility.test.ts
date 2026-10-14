@@ -363,6 +363,7 @@ describe('visibleState (fog of war as a security boundary)', () => {
     state.players.p1!.stewardHoldPoints = ['B'];
     state.players.p1!.scientists = [{ id: 'ground_marshal', level: 2 }];
     state.capital = { p1: 'B', p2: 'A' };
+    state.rallyPoints = { p1: { A: 'B' }, p2: { C: 'A' } };
     const view = visibleState(state, 'p1', data);
     expect(view.players.p1?.resources).toEqual({ metal: 99 }); // own treasury intact
     expect(view.players.p2?.resources).toEqual({}); // enemy treasury hidden
@@ -371,6 +372,7 @@ describe('visibleState (fog of war as a security boundary)', () => {
     expect(view.players.p2?.scientists).toBeUndefined(); // enemy council hidden (same intel)
     expect(view.players.p1?.scientists).toEqual([{ id: 'ground_marshal', level: 2 }]); // own council stays
     expect(view.capital).toEqual({ p1: 'B' }); // rival capital = hero-respawn anchor, hidden
+    expect(view.rallyPoints).toEqual({ p1: { A: 'B' } }); // rival rally point = where reinforcements go
     expect(view.players.p2?.steward).toBeUndefined(); // enemy autopilot status hidden
     expect(view.players.p2?.stewardLog).toBeUndefined(); // enemy SITREP hidden
     expect(view.players.p2?.stewardHoldPoints).toBeUndefined(); // enemy anchors hidden

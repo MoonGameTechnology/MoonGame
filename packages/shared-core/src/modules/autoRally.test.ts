@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { autoRallyModule } from './autoRally';
+import { autoMergeModule } from './autoMerge';
 import { constructionModule } from './construction';
+import { movementModule } from './movement';
+import type { GameModule } from '../kernel/module';
+import { rallyPointOf } from '../state/rallyPoint';
 import {
   createInitialState,
   type Fleet,
@@ -241,5 +245,161 @@ describe('autoRally module', () => {
     const ordered = okApply(kernel.applyAction(before, build('cruiser', 1), ctx(0)));
     deepFreeze(ordered.state);
     expect(() => okAdvance(kernel.advanceTo(ordered.state, ctx(HOUR)))).not.toThrow();
+  });
+});
+
+// RALLY-1 (заказ владельца 2026-10-14, «как во всяких RTS»): у мира-верфи есть точка
+// сбора — свой другой мир, куда каждый готовый заказ кораблей вылетает сам.
+describe('autoRally — точка сбора (RALLY-1)', () => {
+  /** Захват по тестовому приказу: модуль боя здесь не нужен, нужно только событие. */
+  const capturer: GameModule = {
+    id: 'test-capture',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.capture', (action, h) => {
+        const { planetId } = action.payload as { planetId: string };
+        const planet = h.state.planets[planetId]!;
+        const from = planet.owner;
+        planet.owner = action.playerId;
+        h.emit('planet.captured', { planetId, owner: action.playerId, from, via: 'occupy' });
+      });
+    },
+  };
+  const full = createKernel([
+    constructionModule,
+    movementModule,
+    autoRallyModule,
+    capturer,
+    autoMergeModule,
+  ]);
+
+  /** A (верфь) — B (свой мир) по дороге, C — чужой мир, D — свой, но без дороги. */
+  function front(): GameState {
+    const s = stateWith();
+    const at = (id: string, owner: string | null, x: number, links: string[]): Planet => ({
+      ...planet(id, owner),
+      position: { x, y: 0 },
+      links,
+    });
+    s.planets = {
+      A: at('A', 'p1', 0, ['B', 'C']),
+      B: at('B', 'p1', 100, ['A']),
+      C: at('C', 'p2', -100, ['A']),
+      D: at('D', 'p1', 500, []),
+    };
+    return s;
+  }
+  function rally(planetId: string, to: string | null, playerId = 'p1'): Action {
+    return {
+      id: `r:${playerId}:${planetId}:${to}`,
+      type: 'rally.point',
+      playerId,
+      payload: { planetId, to },
+      issuedAt: 0,
+    };
+  }
+  const apply = (s: GameState, a: Action) => full.applyAction(s, a, ctx(s.time));
+  const pointed = (to: string, s = front()) => okApply(apply(s, rally('A', to))).state;
+  /** Заказ и выпуск в тот же миг: часы НЕ уходят вперёд, флот ещё в пути. */
+  function launched(s: GameState, unit = 'cruiser', count = 1): GameState {
+    const ordered = okApply(full.applyAction(s, build(unit, count), ctx(s.time)));
+    return okAdvance(full.advanceTo(ordered.state, ctx(s.time + 1))).state;
+  }
+  const flying = (s: GameState) => Object.values(s.fleets).filter((f) => f.movement);
+  const idleAt = (s: GameState, at: string) =>
+    Object.values(s.fleets).filter((f) => f.location === at && !f.movement);
+
+  it('построенный заказ сам вылетает к точке своим флотом', () => {
+    const s = launched(pointed('B'), 'cruiser', 2);
+    expect(s.planets.A?.garrison).toEqual([]);
+    expect(idleAt(s, 'A')).toEqual([]); // на орбите верфи ничего не осталось
+    const [wave] = flying(s);
+    expect(wave?.units).toEqual([{ unit: 'cruiser', count: 2 }]);
+    expect(wave?.movement?.destination).toBe('B');
+    expect(wave?.traits).toEqual(['rally']);
+  });
+
+  it('на месте подкрепление вливается во флот, который стоит у цели', () => {
+    const s0 = pointed('B');
+    s0.fleets.G = {
+      id: 'G',
+      owner: 'p1',
+      location: 'B',
+      movement: null,
+      units: [{ unit: 'cruiser', count: 5 }],
+      traits: [],
+    };
+    const s = okAdvance(full.advanceTo(launched(s0), ctx(s0.time + 100 * HOUR))).state;
+    expect(flying(s)).toEqual([]);
+    expect(Object.keys(s.fleets)).toEqual(['G']);
+    expect(s.fleets.G?.units).toEqual([{ unit: 'cruiser', count: 6 }]);
+  });
+
+  it('корабли, уже стоявшие на орбите верфи, точка не трогает', () => {
+    const before = built(front(), 'cruiser', 3); // сборный флот на орбите A
+    const [orbit] = rallyFleets(before);
+    const s = launched(pointed('B', before));
+    expect(s.fleets[orbit!.id]?.location).toBe('A');
+    expect(s.fleets[orbit!.id]?.units).toEqual([{ unit: 'cruiser', count: 3 }]);
+    expect(flying(s)).toHaveLength(1);
+  });
+
+  it('наземные войска и орудия остаются дома, как без точки', () => {
+    const s = launched(launched(pointed('B'), 'militia', 2), 'orbital_aa', 1);
+    expect(s.planets.A?.garrison).toEqual([
+      { unit: 'militia', count: 2 },
+      { unit: 'orbital_aa', count: 1 },
+    ]);
+    expect(flying(s)).toEqual([]);
+  });
+
+  it('нет пути к цели — заказ ложится на орбиту, лишнего флота не остаётся', () => {
+    const s = launched(pointed('D'));
+    expect(flying(s)).toEqual([]);
+    expect(Object.values(s.fleets)).toHaveLength(1);
+    expect(rallyFleets(s)[0]?.units).toEqual([{ unit: 'cruiser', count: 1 }]);
+  });
+
+  it('без модуля движения точка молчит: корабли на орбите, как раньше', () => {
+    const s0 = okApply(kernel.applyAction(front(), rally('A', 'B'), ctx(0))).state;
+    const s = built(s0, 'cruiser', 1);
+    expect(rallyFleets(s).map((f) => f.location)).toEqual(['A']);
+  });
+
+  it('ставится только со своего мира на свой другой мир', () => {
+    expect(apply(front(), rally('A', 'C'))).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect(apply(front(), rally('C', 'A'))).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect(apply(front(), rally('A', 'A'))).toMatchObject({ ok: false, code: 'E_SAME_LOCATION' });
+    expect(apply(front(), rally('A', 'Z'))).toMatchObject({ ok: false, code: 'E_NO_PLANET' });
+    expect(pointed('B').rallyPoints).toEqual({ p1: { A: 'B' } });
+  });
+
+  it('снятие точки убирает запись целиком', () => {
+    const s = okApply(apply(pointed('B'), rally('A', null))).state;
+    expect(s.rallyPoints).toBeUndefined();
+    expect(okApply(apply(front(), rally('A', null))).state.rallyPoints).toBeUndefined();
+  });
+
+  it('потеря мира-верфи или цели снимает точку', () => {
+    const capture = (planetId: string): Action => ({
+      id: `cap:${planetId}`,
+      type: 'test.capture',
+      playerId: 'p2',
+      payload: { planetId },
+      issuedAt: 0,
+    });
+    const lostTarget = okApply(apply(pointed('B'), capture('B'))).state;
+    expect(lostTarget.rallyPoints).toBeUndefined();
+    const lostSource = okApply(apply(pointed('B'), capture('A'))).state;
+    expect(lostSource.rallyPoints).toBeUndefined();
+    // Захватчик не наследует чужую точку и не получает подкреплений.
+    expect(rallyPointOf(lostSource, 'p2', 'A')).toBeNull();
+  });
+
+  it('rallyPointOf не верит записи, ставшей чужой', () => {
+    const s = pointed('B');
+    expect(rallyPointOf(s, 'p1', 'A')).toBe('B');
+    s.planets.B!.owner = 'p2'; // мир ушёл мимо события захвата
+    expect(rallyPointOf(s, 'p1', 'A')).toBeNull();
   });
 });

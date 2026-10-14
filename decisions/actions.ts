@@ -392,6 +392,10 @@ export const marketCancel = (playerId: string, id: string) =>
 /** Designate one of your inhabited worlds as your capital (hero respawn / re-fit anchor). */
 export const designateCapital = (playerId: string, planetId: string) =>
   act(playerId, 'capital.designate', { planetId });
+/** Точка сбора мира-верфи (RALLY-1): куда сами летят построенные там корабли. `null`
+ *  снимает точку. */
+export const setRallyPoint = (playerId: string, planetId: string, to: string | null) =>
+  act(playerId, 'rally.point', { planetId, to });
 
 /** Забрать усиление, предложенное забегом между волнами (PVR-1.4). Что предложить —
  *  `decisions/waveBoons.ts`; кому и сколько должно — `pveModule`, он же и проверяет. */

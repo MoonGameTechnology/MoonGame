@@ -631,7 +631,7 @@ export {
   MAX_RESEARCH_SLOTS,
   clampResearchSlots,
 } from './modules/technology';
-export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
+export { constructionModule, hasShipyard, unitBuildSiteBlocker } from './modules/construction';
 export { coverPoints, worldDamageReduction } from './util/worldCover';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule, STATION_COST, STATION_CORE } from './modules/station';
@@ -659,6 +659,7 @@ export { promotionModule } from './modules/promotion';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
+export { rallyPointOf } from './state/rallyPoint';
 export { autoMergeModule } from './modules/autoMerge';
 export { shuttleModule } from './modules/shuttle';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';

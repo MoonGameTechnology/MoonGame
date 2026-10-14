@@ -26,6 +26,7 @@ const SAMPLE: { [F in Flag]: I.Armed[F] } = {
   heroSpawnAim: 'h1',
   strikeAim: { from: { planetId: 'w1' }, squadronId: 's1' },
   allyAim: 'guard',
+  rallyAim: 'w1',
   squadMerge: { from: 's1' },
   cmdMore: true,
   castMenu: true,
