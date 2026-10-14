@@ -63,3 +63,15 @@ export const SECTOR_ZERO_ABSENT_TWINS: Partial<Record<keyof typeof SECTOR_ZERO_A
 export function espionageShown(sectorZeroRun: boolean): boolean {
   return !sectorZeroRun;
 }
+
+/**
+ * Очков победы в забеге Sector Zero тоже НЕТ (заказ владельца 2026-10-14: «Они же там не
+ * нужны»). Счёт в забеге ничего не решает: в PvE-режиме ядро не завершает партию по очкам
+ * (`modules/victory.ts`), а фишку «✦ 82/1100» шапка не показывает с 2026-09-24 (выше).
+ * Уходят и остальные места, где игрок видел очки: метка «✦ 50» у имени мира (на телефоне —
+ * в шапке листа), строка «Очки победы» в досье постройки, строка «Очки» в карточке игрока и
+ * статья «Очки победы» в Справочнике.
+ */
+export function victoryPointsShown(sectorZeroRun: boolean): boolean {
+  return !sectorZeroRun;
+}

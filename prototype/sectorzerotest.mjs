@@ -239,6 +239,14 @@ async function check(label, run) {
     run ? 0 : 1,
     `${label}: «Пинг»`,
   );
+  // Очки победы (заказ владельца 2026-10-14): в забеге ни метки «✦ 50» у имени мира, ни
+  // статьи о них в Справочнике; в схватке — и то и другое.
+  assert.equal(await page.locator('#side .phead .pbadge').count(), run ? 0 : 1, `${label}: очки мира`);
+  await page.evaluate(() => document.getElementById('rail-help').click());
+  await page.locator('#codexhub [data-codex]').first().waitFor();
+  assert.equal(await page.locator('#codexhub [data-codex="m:score"]').count(), run ? 0 : 1, `${label}: статья об очках`);
+  await page.locator('#ch-close').click();
+  await page.locator('#codexhub').waitFor({ state: 'hidden' });
   if (run) {
     // Панель задач (REFM-203, `missionPanel.ts`): чип открывает её со строками задач,
     // ✕ закрывает, и чип это отражает.

@@ -7,6 +7,7 @@ import {
   SECTOR_ZERO_ABSENT_TOOLS,
   SECTOR_ZERO_ABSENT_TWINS,
   toolShown,
+  victoryPointsShown,
   type SessionTool,
 } from './sectorZeroTools';
 
@@ -54,5 +55,12 @@ describe('шпионаж — не в забеге (заказ владельца
   it('в забеге Sector Zero шпионажа нет, в остальной игре — есть', () => {
     expect(espionageShown(true)).toBe(false);
     expect(espionageShown(false)).toBe(true);
+  });
+});
+
+describe('очки победы — не в забеге (заказ владельца 2026-10-14)', () => {
+  it('в забеге Sector Zero очков нет, в остальной игре — есть', () => {
+    expect(victoryPointsShown(true)).toBe(false);
+    expect(victoryPointsShown(false)).toBe(true);
   });
 });

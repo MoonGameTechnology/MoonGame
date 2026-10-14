@@ -21,7 +21,7 @@
  * и плавающий чат живут в `main.ts`; модуль получает их хуками {@link initDiploWindow} —
  * импорт оттуда был бы циклом.
  */
-import { espionageShown } from '../../decisions/sectorZeroTools';
+import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { t, tData } from '../../localization/runtime';
 import {
   getOffer,
@@ -170,10 +170,13 @@ function playerCardHtml(): string {
     row(t('card.faction'), esc(faction)) +
     row(t('card.worlds'), String(worlds)) +
     row(t('card.units'), String(units)) +
-    row(
-      t('card.score'),
-      `${score} / ${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('card.score.goal') : ''}`,
-    ) +
+    // В забеге Sector Zero очков нет (`victoryPointsShown`).
+    (victoryPointsShown(game.sectorZeroToolsHidden())
+      ? row(
+          t('card.score'),
+          `${score} / ${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('card.score.goal') : ''}`,
+        )
+      : '') +
     `</div><div class="pc-sec">${t('card.combat')}</div><div class="pc-stats">` +
     row(t('card.kills'), kfmt(killStats.destroyed)) +
     row(t('card.losses'), kfmt(killStats.lost)) +
