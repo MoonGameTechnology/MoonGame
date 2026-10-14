@@ -221,6 +221,9 @@ CPU/mem, cost) + алерты на **desync rate**, error rate, recovery time. �
 **Готово, когда:** дашборд живой + алерт срабатывает на искусственный десинк.
 
 ### M6 · Продуктовая аналитика (категория H) `[server][tools]` ⏳
+> **Исполнение под сетевые тесты — [`playtest-telemetry-roadmap.md`](playtest-telemetry-roadmap.md)**
+> (кирпичи PTM: псевдоним игрока, приёмник клиентских событий, воронка, отчёт).
+
 **Цель:** retention, DAU и воронка онбординга считаются из логов, без PII.
 **Подзадачи:** (1) **схема аналитических событий** — минимальный набор
 (`account.registered`, `session.start`/`session.end`, `match.join`, `match.first_action`,
