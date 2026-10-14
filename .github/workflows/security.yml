@@ -191,7 +191,7 @@ jobs:
           [ -s semgrep.sarif ] || ok=false
           echo "{\"key\":\"semgrep\",\"ok\":$ok,\"exit\":$rc}" > status-semgrep.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-semgrep
           path: |
@@ -249,7 +249,7 @@ jobs:
           ok=false
           if [ "$CQA_OUTCOME" = "success" ]; then ok=true; fi
           echo "{\"key\":\"codeql\",\"ok\":$ok}" > status-codeql.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: report-codeql
@@ -286,7 +286,7 @@ jobs:
           [ -s gitleaks.sarif ] || ok=false
           echo "{\"key\":\"gitleaks\",\"ok\":$ok,\"exit\":$rc}" > status-gitleaks.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-gitleaks
           path: |
@@ -338,7 +338,7 @@ jobs:
           # ливнес-проверка идёт по коду выхода — она ортогональна находкам.
           ok=true; [ "$rc" -eq 0 ] || ok=false
           echo "{\"key\":\"trufflehog\",\"ok\":$ok,\"exit\":$rc}" > status-trufflehog.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-trufflehog
           path: |
@@ -374,7 +374,7 @@ jobs:
           [ -s osv.sarif ] || ok=false
           echo "{\"key\":\"osv\",\"ok\":$ok,\"exit\":$rc}" > status-osv.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-osv
           path: |
@@ -428,7 +428,7 @@ jobs:
           [ -s trivy.sarif ] || ok=false
           echo "{\"key\":\"trivy-fs\",\"ok\":$ok,\"exit\":$rc}" > status-trivy-fs.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-trivy-fs
           path: |
@@ -522,7 +522,7 @@ jobs:
           [ -s trivy-image.sarif ] || ok=false
           echo "{\"key\":\"trivy-image\",\"ok\":$ok,\"exit\":$rc}" > status-trivy-image.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-trivy-image
           path: |
@@ -632,7 +632,7 @@ jobs:
       # должно, иначе критерий приёмки разъедется между «проверяем» и «выпускаем».
       - name: приёмка SEC-31/SEC-40 — целевые находки исчезли, база обновлена
         run: .github/scripts/caddy-rebuild-acceptance.sh trivy-caddy.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: report-trivy-caddy
@@ -801,7 +801,7 @@ jobs:
           echo "{\"key\":\"trivy-deps\",\"ok\":$ok,\"exit\":$rc,\"fail\":$fail}" > status-trivy-deps.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           echo "fail=$fail" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-trivy-deps
           path: |
@@ -979,7 +979,7 @@ jobs:
                  else . end)' \
             kics-out/results.sarif > kics-out/results.fixed.sarif
           mv kics-out/results.fixed.sarif kics-out/results.sarif
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-kics
           path: |
@@ -1076,7 +1076,7 @@ jobs:
           [ "$OUTCOME" = 'success' ] || rc=1
           echo "{\"key\":\"dependency-review\",\"ok\":$ok,\"exit\":$rc,\"outcome\":\"$OUTCOME\"}" \
             > status-dependency-review.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: report-dependency-review
@@ -1191,7 +1191,7 @@ jobs:
         run: |
           echo "::warning::NVD_API_KEY is not set — Dependency-Check did not run. Add the secret (Settings → Secrets and variables → Actions)."
           echo '{"key":"dependency-check","ok":false,"exit":"no-key"}' > status-dependency-check.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-dependency-check
           path: |
@@ -1307,7 +1307,7 @@ jobs:
       - name: stop the server
         if: always()
         run: kill "$(cat server.pid)" 2>/dev/null || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: report-dast-zap
@@ -1368,7 +1368,7 @@ jobs:
           ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
           [ -s sbom.cdx.json ] || ok=false
           echo "{\"key\":\"sbom\",\"ok\":$ok,\"exit\":$rc}" > status-sbom.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-sbom
           path: |
@@ -1402,7 +1402,7 @@ jobs:
           ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
           [ -s zizmor.sarif ] || ok=false
           echo "{\"key\":\"zizmor\",\"ok\":$ok,\"exit\":$rc}" > status-zizmor.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: report-zizmor
           path: |
@@ -1453,7 +1453,7 @@ jobs:
         with:
           sarif_file: scorecard.sarif
           category: scorecard
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: report-scorecard
@@ -1548,7 +1548,7 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
       - name: job summary
         run: cat security-report.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: security-report
           path: |
