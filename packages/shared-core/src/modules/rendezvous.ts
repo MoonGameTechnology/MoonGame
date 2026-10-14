@@ -28,7 +28,7 @@ import type { AllyOperation, GameState, PlayerId } from '../state/gameState';
 import { getStance, setStance } from '../state/diplomacy';
 import { isMissileFleet } from '../state/minefields';
 import { fleetForOrder } from '../util/fleet';
-import { identifiedNodes } from '../state/visibility';
+import { identifiedNodes, isVisibleTo } from '../state/visibility';
 
 /** С кем игрок уже установил связь: жители из `rendezvous` провинций, где он побывал. */
 export function contactedAllies(state: GameState, player: PlayerId): PlayerId[] {
@@ -105,7 +105,8 @@ export const rendezvousModule: GameModule = {
   //        флот для любого приказа (`E_BAD_TARGET`), а не «не враг».
   // 1.3.0: `ally.cancel` снимает только операцию, отданную самим игроком; чужая —
   //        `E_NO_ORDER`, как отсутствующая.
-  version: '1.3.0',
+  // 1.4.0: невидимый игроку чужой флот — `E_BAD_TARGET`, как несуществующий (A06).
+  version: '1.4.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -167,7 +168,16 @@ export const rendezvousModule: GameModule = {
           return h.reject('E_BAD_TARGET');
       } else {
         const target = fleetForOrder(h.state, fleet as string, me, h.ctx.data);
-        if (!target) return h.reject('E_BAD_TARGET');
+        // Чужой флот, которого игрок не видит, — как несуществующий (A06): иначе «не враг»
+        // или принятый приказ подтверждали бы перебором id флот за туманом. Свой и союзника
+        // скрытыми не бывают.
+        if (
+          !target ||
+          (target.owner !== me &&
+            target.owner !== ally &&
+            !isVisibleTo(h.state, me, { fleetId: target.id }, h.ctx.data))
+        )
+          return h.reject('E_BAD_TARGET');
         if (kind === 'guard' && target.owner !== me && target.owner !== ally)
           return h.reject('E_BAD_TARGET');
         // Ракета (SM-3.7b) — отряд без стоянки и без приказов: охранять в ней нечего, план

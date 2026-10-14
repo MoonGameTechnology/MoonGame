@@ -290,6 +290,16 @@ describe('приказ союзнику (PVR-7.4)', () => {
       ok: false,
       code: 'E_BAD_TARGET',
     });
+    // Необнаруженный флот — как несуществующий (A06): флот того, с кем союзник не воюет,
+    // не выдаёт себя «не врагом».
+    s.players.p3 = player('p3');
+    setStance(s, 'ally', 'p3', 'peace');
+    s.fleets.p3f = { ...s.fleets.s1!, id: 'p3f', owner: 'p3' };
+    for (const id of ['p3f', 'nope'])
+      expect(order(s, { kind: 'attack', fleet: id })).toMatchObject({
+        ok: false,
+        code: 'E_BAD_TARGET',
+      });
     expect(order(s, { kind: 'scout', planet: 'mine' })).toMatchObject({
       ok: false,
       code: 'E_BAD_TARGET',
