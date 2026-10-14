@@ -7642,7 +7642,7 @@ pnpm test            # vitest
 pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.html
 pnpm run rehearsal   # 4 gated WS-клиента: конкурентность → дубль → reconnect → restart
 pnpm run selfplay 300 base   # батч AI-vs-AI на реальном ядре (баланс), сессия 14 дней (AI-BAL-6)
-pnpm run metrics             # разбор JSONL живого плейтеста
+pnpm run metrics             # разбор JSONL живого плейтеста (журнал за UTC-день: -- --day D --match id)
 ```
 
 `rehearsal` — самодостаточная production-like репетиция мультиплеерного протокола без

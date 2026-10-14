@@ -1124,8 +1124,8 @@
 | PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
-| PTM-0.1 | ⏳ | srv proto | `docs/playtest-telemetry-roadmap.md` | Журнал по дням, отчёт по партии, сводка не теряется |
-| PTM-0.2 | 🔒 | srv | `docs/playtest-telemetry-roadmap.md` | Псевдоним игрока в журнале партии |
+| PTM-0.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Журнал по дням, отчёт по партии, сводка не теряется |
+| PTM-0.2 | ⏳ | srv | `docs/playtest-telemetry-roadmap.md` | Псевдоним игрока в журнале партии |
 | PTM-1.1 | ⏳ | srv proto | `docs/playtest-telemetry-roadmap.md` | Приёмник клиентских событий |
 | PTM-1.2 | 🔒 | proto cli | `docs/playtest-telemetry-roadmap.md` | События пути входа и связи |
 | PTM-1.3 | 🔒 | proto | `docs/playtest-telemetry-roadmap.md` | Ошибки браузера |

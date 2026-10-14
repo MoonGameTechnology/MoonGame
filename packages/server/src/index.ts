@@ -63,6 +63,7 @@ export {
   type StarterArsenalTemplate,
 } from './arsenal';
 export { MetricsAggregator, type MetricsSummary, type SeriesStat } from './metrics';
+export { DailyJsonl, utcDay, type DailyJsonlStats } from './dailyJsonl';
 export { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 export {
   hmacSecret,

@@ -31,7 +31,7 @@ import { playablePlayerIds } from '../packages/shared-core/src/state/playableSea
 // client's `MAP` lines up 1:1 with the server's planets and the renderer needs
 // no changes. This is NOT the Stage-3 server: state lives in memory (a restart
 // loses the match) and the `?player=` handshake is unauthenticated.
-import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import pgPkg from 'pg';
 import {
@@ -42,6 +42,7 @@ import {
   newMatchId,
   pveOrders,
   MetricsAggregator,
+  DailyJsonl,
   createMultiplayerServer,
   wsLimitsFromEnv,
   tlsFromEnv,
@@ -136,9 +137,17 @@ installFatalHandlers();
 // high-frequency kinds are handled with care: `broadcast`/`timing` lines land in
 // the JSONL only when anomalous (slow or fat) — the aggregator still counts them
 // all — and `events` lines only fire on real activity (battles, arrivals).
-mkdirSync('playtest-logs', { recursive: true });
-const logFile = `playtest-logs/proto-${Date.now()}.jsonl`;
+// PTM-0.1: one file per UTC day (`playtest-logs/match-YYYY-MM-DD.jsonl`), written off the
+// room's hot path through a bounded queue; every line carries its match id, so
+// `pnpm run metrics -- --match <id>` reports one match out of the shared file.
+const matchLog = new DailyJsonl({ dir: 'playtest-logs', prefix: 'match' });
 const metrics = new MetricsAggregator();
+// PTM-0.1: the aggregated summary also lands periodically, so a crash (no graceful
+// shutdown) loses at most this much of it.
+const SUMMARY_EVERY_MS = 10 * 60 * 1000;
+const writeSummary = (): void =>
+  matchLog.write({ kind: 'summary', summary: metrics.summary(), log: matchLog.stats() });
+setInterval(writeSummary, SUMMARY_EVERY_MS).unref();
 const SLOW_MS = 50; // a submit/broadcast slower than this is worth a JSONL line
 const FAT_DELTA_BYTES = 10_240; // a per-player delta fatter than this too (target: idle < 1 KB)
 function worthLogging(ev: RoomObservation): boolean {
@@ -465,7 +474,7 @@ async function createHostedMatch(
   const observe = (ev: RoomObservation): void => {
     metrics.observe(ev);
     if (worthLogging(ev)) {
-      appendFileSync(logFile, JSON.stringify({ t: Date.now(), match: id, ...ev }) + '\n');
+      matchLog.write({ match: id, ...ev });
     }
     if (ev.kind === 'join') {
       connected++;
@@ -969,10 +978,12 @@ const server = createMultiplayerServer({
       if (!operator(req)) return reply.callNotFound();
       const n = Math.min(Number((req.query as { n?: string }).n ?? '20') || 20, 200);
       try {
-        const lines = readFileSync(logFile, 'utf8').trimEnd().split('\n');
-        return { file: logFile, total: lines.length, recent: lines.slice(-n).map((l) => JSON.parse(l)) };
+        await matchLog.flush();
+        const file = matchLog.currentFile();
+        const lines = readFileSync(file, 'utf8').trimEnd().split('\n');
+        return { file, total: lines.length, recent: lines.slice(-n).map((l) => JSON.parse(l)) };
       } catch {
-        return { file: logFile, total: 0, recent: [] };
+        return { file: matchLog.currentFile(), total: 0, recent: [] };
       }
     });
     // Одна проверка сессии на все аккаунтные API: подпись валидна И пароль не менялся
@@ -1375,7 +1386,7 @@ const printSummary = (): void => {
       s.end
         ? `  match end : winner ${s.end.winner ?? '—'}${s.end.reason ? ` (${s.end.reason})` : ''}`
         : '  match end : —',
-      `  log file  : ${logFile}`,
+      `  log file  : ${matchLog.currentFile()}`,
       '──────────────────────────────────────────────────',
       '',
     ].join('\n'),
@@ -1388,10 +1399,8 @@ const shutdown = (): void => {
   // only anomalous broadcast/timing entries, so without this the report script would
   // have no full latency/delta aggregates to read.
   try {
-    appendFileSync(
-      logFile,
-      JSON.stringify({ t: Date.now(), kind: 'summary', summary: metrics.summary() }) + '\n',
-    );
+    writeSummary();
+    matchLog.flushSync();
   } catch {
     /* the report just falls back to the partial per-line data */
   }

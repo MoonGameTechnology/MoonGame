@@ -5,12 +5,15 @@
 //
 //   pnpm run metrics                     # newest playtest-logs/*.jsonl
 //   pnpm run metrics playtest-logs/proto-123.jsonl
+//   pnpm run metrics -- --day 2026-10-14 # that day's journal (PTM-0.1): lists its matches
+//   pnpm run metrics -- --day 2026-10-14 --match <id>   # one match out of the day file
 //
 // Reads only; safe on a live log. Latency/delta aggregates come from the final
 // `summary` line netserver appends on shutdown — before that (or after a crash)
 // the report falls back to the anomalous-only per-line entries with a caveat.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseReportArgs, selectLines } from './reportSelect.mjs';
 
 function newestLog() {
   const dir = 'playtest-logs';
@@ -28,8 +31,9 @@ function newestLog() {
   return best;
 }
 
-const file = process.argv[2] ?? newestLog();
-const lines = readFileSync(file, 'utf8')
+const args = parseReportArgs(process.argv.slice(2));
+const file = args.file ?? (args.day ? join('playtest-logs', `match-${args.day}.jsonl`) : newestLog());
+const allLines = readFileSync(file, 'utf8')
   .split('\n')
   .filter(Boolean)
   .map((l, i) => {
@@ -42,14 +46,26 @@ const lines = readFileSync(file, 'utf8')
   })
   .filter(Boolean);
 
-if (lines.length === 0) {
+if (allLines.length === 0) {
   console.error(`empty log: ${file}`);
   process.exit(1);
 }
 
+// PTM-0.1: a day journal holds every match of the day — pick one.
+const picked = selectLines(allLines, args.match);
+if (!picked.lines) {
+  if (picked.missing) console.error(`партии ${picked.missing} в ${file} нет`);
+  console.log(`${file}: партий ${picked.choose.length} — выбери одну флагом --match <id>`);
+  for (const m of picked.choose) console.log(`  ${m.id}  (${m.count} строк)`);
+  process.exit(picked.missing ? 1 : 0);
+}
+const lines = picked.lines;
+
 // --- aggregate ----------------------------------------------------------------
-const t0 = lines[0].t;
-const tEnd = lines.at(-1).t;
+// Periodic summaries (PTM-0.1) are process-wide: they don't stretch a match's span.
+const spanLines = lines.some((l) => l.kind !== 'summary') ? lines.filter((l) => l.kind !== 'summary') : lines;
+const t0 = spanLines[0].t;
+const tEnd = spanLines.at(-1).t;
 const joins = new Map(); // player -> count
 const leaves = new Map();
 const actions = { total: 0, ok: 0, rejected: 0 };
@@ -110,7 +126,7 @@ for (const ev of lines) {
       end = ev;
       break;
     case 'summary':
-      summary = ev.summary; // the aggregated truth, appended on shutdown
+      summary = ev.summary; // the aggregated truth: periodic + on shutdown, the last one wins
       break;
   }
 }
@@ -130,7 +146,7 @@ const msStat = (x) =>
   !x || x.count === 0 ? '—' : `avg ${x.avg.toFixed(1)}ms · max ${x.max.toFixed(1)}ms (${x.count})`;
 
 const out = [];
-out.push(`━━ match report ━━ ${file}`);
+out.push(`━━ match report ━━ ${file}${args.match ? ` · партия ${args.match}` : ''}`);
 out.push(`  span      : ${new Date(t0).toISOString()} → ${new Date(tEnd).toISOString()} (${mmss(tEnd - t0)})`);
 if (lobbyStartT !== null) out.push(`  lobby     : старт через ${mmss(lobbyStartT - t0)} после первого события`);
 out.push(`  players   : joins ${top(joins)} · leaves ${top(leaves)}`);
@@ -178,6 +194,9 @@ if (perf.length > 0) {
   }
 }
 if (summary) {
+  if (picked.summaryScope === 'process') {
+    out.push('  (задержки ниже — по всему серверному процессу, а не по одной партии)');
+  }
   out.push(`  submit    : ${msStat(summary.submitMs)}`);
   out.push(`  advance   : ${msStat(summary.advanceMs)}`);
   out.push(

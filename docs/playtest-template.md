@@ -6,8 +6,8 @@
 `docs/multiplayer.md`.
 
 Копируй блок ниже в новый файл (например, `playtest-logs/2026-06-26-notes.md`) и
-заполняй. Машинный лог лежит рядом: `playtest-logs/proto-<timestamp>.jsonl`
-(пишется сам), сводка печатается в терминал сервера по `Ctrl-C`.
+заполняй. Машинный лог лежит рядом: `playtest-logs/match-YYYY-MM-DD.jsonl`
+(журнал за UTC-день, все партии дня; пишется сам), сводка печатается в терминал сервера по `Ctrl-C`.
 
 ---
 
@@ -70,11 +70,12 @@
 
 1. **Сводка сервера** — скопировать из терминала блок `── playtest summary ──`
    (joins/leaves/actions/ok/rejects/by type/by reject/match end).
-2. **JSONL-лог** — `playtest-logs/proto-<timestamp>.jsonl` (по строке на событие:
+2. **JSONL-лог** — `playtest-logs/match-YYYY-MM-DD.jsonl` (по строке на событие, у каждой — `match`:
    `join` / `leave` / `action` / `end`; `lobby` оставлен для паритета транспорта, но при авто-старте SES-2.1 не эмитится). Быстрый разбор, например:
    ```bash
    # сколько действий каждого типа и сколько реджектов
-   grep '"kind":"action"' playtest-logs/proto-*.jsonl | wc -l
-   grep '"ok":false' playtest-logs/proto-*.jsonl
+   grep '"kind":"action"' playtest-logs/match-*.jsonl | wc -l
+   grep '"ok":false' playtest-logs/match-*.jsonl
    ```
+   Отчёт по одной партии: `pnpm run metrics -- --day YYYY-MM-DD --match <id>`.
 3. Если ловили desync — сохранить кадр/скрин оверлея с `✗` и время.
