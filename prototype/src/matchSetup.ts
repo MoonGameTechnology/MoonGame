@@ -26,7 +26,7 @@ import {
 import { data } from './gameData';
 import { botCouncil } from './botCouncil';
 import { SECTOR_TYPES, START_CANDIDATES } from './map';
-import { isFrontier, mapPreset, type MapId } from './mapCatalog';
+import { isFrontier, isCurrentMap, mapPreset, teamForStart, type MapId } from './mapCatalog';
 import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
@@ -185,13 +185,14 @@ export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMo
 export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nexus'): SeatConfig[] {
   const START_CANDIDATES = mapPreset(mapId).starts;
   // Published maps own their capacity and sides; TEAMS applies only to legacy maps.
-  if (mapId === 'duel-1' || mapId === 'ffa-4') {
+  if (isCurrentMap(mapId)) {
     return START_CANDIDATES.map((start, i) => ({
       id: `p${i + 1}`,
       ...NETWORK_HOUSES[i]!,
       start,
       ai: false,
-      ...(mapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' } : {}),
+      ...(mapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' }
+        : mapId === 'team-2v2' ? { team: teamForStart(mapId, start) } : {}),
     }));
   }
   if (mode === 'pve') {
@@ -271,6 +272,7 @@ export const NEUTRAL_PLANET_MILITIA = 2;
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   const preset = mapPreset(setup.mapId);
   const seed = setup.seed ?? 'prototype-1';
+  const inhabitants = new Set(Object.keys(preset.map?.players ?? {}));
   // Load authored geography through the same core path as other JSON maps. The
   // skirmish start kit below belongs to the selected seats, not to fixed slot ids.
   const base = preset.map
@@ -279,8 +281,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
         seed,
         avaEligible: false,
         slots: {},
-        fleets: {},
-        sectors: Object.fromEntries(Object.entries(preset.map.sectors).map(([id, sector]) => [id, {
+        fleets: Object.fromEntries(Object.entries(preset.map.fleets)
+          .filter(([, fleet]) => inhabitants.has(fleet.owner))),
+        sectors: Object.fromEntries(Object.entries(preset.map.sectors).map(([id, sector]) => [id, sector.owner && inhabitants.has(sector.owner) ? sector : {
           ...sector,
           owner: null,
           buildings: [],
@@ -330,8 +333,8 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // Сеть за партию не меняется — клон ядра делит её, а не копирует (`shareRoadNetwork`):
   // на карте в 831 провинцию копия сети стоила каждому шагу мира около полутора миллисекунд.
   shareRoadNetwork(planets);
-  const players: Record<string, Player> = {};
-  const fleets: Record<string, Fleet> = {};
+  const players: Record<string, Player> = { ...base.players };
+  const fleets: Record<string, Fleet> = { ...base.fleets };
   const heroes: Record<string, Hero> = {};
   for (const seat of setup.seats) {
     const home = planets[seat.start];
@@ -489,6 +492,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // the same economic/combat rules as every other faction.
   for (const n of preset.nodes) {
     if (n.sector !== 'pirate_base' && n.sector !== 'neutral_base') continue;
+    if (planets[n.id]!.owner && inhabitants.has(planets[n.id]!.owner!)) continue;
     const npc = n.sector === 'pirate_base' ? 'pirate' : 'neutral';
     const id = `npc-${n.id}`;
     players[id] = { ...player(id, npc === 'pirate' ? 'Pirate Base' : 'Neutral AI Base',
@@ -507,17 +511,19 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       : [['cruiser', 3], ['scout', 1]];
     fleets[`${id}-1`] = fleet(`${id}-1`, id, n.id, ships, []);
   }
-  const teamed = setup.seats.some((seat) => seat.team !== undefined);
-  const teamOf = new Map(setup.seats.map((seat) => [seat.id, seat.team]));
+  const teamOf = new Map(setup.seats.map((seat) => [seat.id,
+    preset.id === 'team-2v2' ? teamForStart(preset.id, seat.start) : seat.team]));
+  const teamed = [...teamOf.values()].some((team) => team !== undefined);
   const diplomacy: Record<string, DiplomaticStance> = {};
   const ids = Object.keys(players);
   for (let i = 0; i < ids.length; i++)
     for (let j = i + 1; j < ids.length; j++) {
       const ta = teamOf.get(ids[i]!);
       const tb = teamOf.get(ids[j]!);
-      const pirates = players[ids[i]!]!.npc === 'pirate' || players[ids[j]!]!.npc === 'pirate';
+      const hostile = [players[ids[i]!]!.npc, players[ids[j]!]!.npc]
+        .some((npc) => npc === 'pirate' || npc === 'swarm');
       const neutral = players[ids[i]!]!.npc === 'neutral' || players[ids[j]!]!.npc === 'neutral';
-      const stance: DiplomaticStance = pirates ? 'war' : neutral ? 'peace'
+      const stance: DiplomaticStance = hostile ? 'war' : neutral ? 'peace'
         : preset.id === 'duel-1' ? 'war'
         : preset.id === 'ffa-4' || !teamed
         ? 'peace'
@@ -532,7 +538,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   for (const seat of Object.values(players)) {
     if (!seat.ai) continue;
     approval[seat.id] = {};
-    for (const other of ids) if (other !== seat.id) approval[seat.id]![other] = seat.npc === 'pirate' ? 0 : FAVOUR_BASE;
+    for (const other of ids) if (other !== seat.id) approval[seat.id]![other] = seat.npc === 'pirate' || seat.npc === 'swarm' ? 0 : FAVOUR_BASE;
   }
   const heroRoster: Record<string, HeroLoadout[]> = {};
   const shipLoadouts: Record<string, ShipLoadout[]> = {};
@@ -551,7 +557,8 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     mapId: preset.id,
     // Режим пишется ТОЛЬКО когда он задан: пустое поле в состоянии и отсутствие поля —
     // разные вещи для ленты браузера, которая молчание читает как «режим неизвестен».
-    ...(setup.modeId !== undefined ? { modeId: setup.modeId } : {}),
+    ...(preset.id === 'team-2v2' ? { modeId: 'team_2v2' }
+      : setup.modeId !== undefined ? { modeId: setup.modeId } : {}),
     players,
     planets,
     fleets,

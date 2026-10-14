@@ -7,6 +7,18 @@
 // НЕ добавляй сюда русский текст, который уже лежит в коде строкой — сначала
 // заведи ключ, потом замени строку в коде на t('ключ').
 export const ru: Record<string, string> = {
+  "setup.map.team-2v2": "2 на 2 · Разорванный предел",
+  "setup.map.team-2v2-info": "85 провинций · 2 команды · 2 пиратские базы · 2 улья Роя · 4 нейтральных бота",
+  "setup.teams.fixed-2v2": "1 союзник и 2 противника · команды закреплены за стартами",
+  "data.veil-corsairs": "Корсары Вуали",
+  "data.wreck-corsairs": "Корсары Обломков",
+  "data.ash-brood": "Пепельный выводок",
+  "data.iron-brood": "Железный выводок",
+  "data.western-observatory": "Западная обсерватория",
+  "data.eastern-anchorage": "Восточная стоянка",
+  "data.northern-commune": "Северная коммуна",
+  "data.southern-freehold": "Южное вольное поселение",
+
   "data.industrial-architect": "Промышленный архитектор",
   "sci.industrial-architect.desc": "Научный руководитель промышленной ветки.",
   "tech.branch.industry": "Промышленность",

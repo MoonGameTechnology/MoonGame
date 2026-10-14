@@ -538,7 +538,7 @@ function seedTeamDiplomacy(
       const tb = teamOf.get(ids[j]!);
       const a = players[ids[i]!]!.npc;
       const b = players[ids[j]!]!.npc;
-      diplomacy[pairKey(ids[i]!, ids[j]!)] = a === 'pirate' || b === 'pirate'
+      diplomacy[pairKey(ids[i]!, ids[j]!)] = a === 'pirate' || b === 'pirate' || a === 'swarm' || b === 'swarm'
         ? 'war'
         : a === 'neutral' || b === 'neutral' || !teamed
           ? 'peace'

@@ -101,7 +101,7 @@ const MapPlayerSchema = z.object({
   ai: z.boolean().default(false),
   /** Map inhabitant, excluded from player seats and victory. Independent of `ai`:
    *  an NPC without a field controller holds its starting position and fights normally. */
-  npc: z.enum(['pirate', 'neutral']).optional(),
+  npc: z.enum(['pirate', 'neutral', 'swarm']).optional(),
 });
 
 /** A player id. `|` is barred: it is the diplomacy pair-key separator — an id

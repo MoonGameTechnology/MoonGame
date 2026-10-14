@@ -144,7 +144,7 @@ export interface Player {
    *  invitable (`diplomacyModule` rejects `E_BOT_ALLIANCE`). */
   ai?: boolean;
   /** Map inhabitants, never claimable player seats or PvP contenders. */
-  npc?: 'pirate' | 'neutral';
+  npc?: 'pirate' | 'neutral' | 'swarm';
   /** The player's treasury — production accrues here, upkeep/costs drain it. */
   resources: ResourceBag;
   /** Resources whose upkeep went UNPAID at the last settlement (treasury pinned at

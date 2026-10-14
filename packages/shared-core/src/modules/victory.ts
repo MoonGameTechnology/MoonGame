@@ -424,6 +424,16 @@ function evaluateVictory(h: HandlerContext): void {
     return;
   }
 
+  // Fixed 2v2 sides finish when only one allied side remains. Ambient NPCs are
+  // not contenders; the surviving allies must not have to break their treaty.
+  if (h.state.modeId === 'team_2v2' && active.length > 1) {
+    const sides = victoryUnits(h, active);
+    if (sides.length === 1) {
+      endMatch(h, highestScore(scores, active) ?? active[0]!, 'elimination', active);
+      return;
+    }
+  }
+
   // Domination: hold a share of the CAPTURABLE provinces. The denominator counts
   // only ownable territory — non-capturable void/empty/debris nodes (the bulk of a
   // post-vision-rework map) must not dilute the share, or 60% becomes unreachable.
@@ -497,7 +507,8 @@ export const victoryModule: GameModule = {
   // 1.5.0: мина не идёт в счёт флотов и юнитов (SM-3.6).
   // 1.6.0: исход главы с контрактом операции решают его три результата (PVR-8.3).
   // 1.7.0: летящая ракета не идёт в счёт флотов и юнитов (SM-3.7b).
-  version: '1.7.0',
+  // 1.8.0: последний союз в фиксированном 2v2 побеждает совместно.
+  version: '1.8.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));

@@ -10,11 +10,12 @@ import frontier50 from '../../data/frontier-50.json';
 import frontier100 from '../../data/frontier-100.json';
 import duel from '../../data/maps/duel-1.json';
 import ffa4 from '../../data/maps/ffa-4.json';
+import team2v2 from '../../data/maps/team-2v2.json';
 import { data } from './gameData';
 import { MAP, START_CANDIDATES, type MapNode } from './map';
 
 /** Presets offered for NEW matches. The retired id remains readable for old sessions. */
-export const MAP_IDS = ['duel-1', 'ffa-4'] as const;
+export const MAP_IDS = ['duel-1', 'ffa-4', 'team-2v2'] as const;
 export const DEFAULT_MAP_ID = MAP_IDS[0];
 export type MapId = (typeof MAP_IDS)[number] | 'nexus' | 'frontier-50' | 'frontier-100';
 export const isCurrentMap = (id: string | undefined): boolean => MAP_IDS.some((map) => map === id);
@@ -27,6 +28,7 @@ export const isFrontier = (id: string | undefined): boolean =>
 const SCORE_LIMITS: Record<MapId, number> = {
   'duel-1': 1100,
   'ffa-4': 1100,
+  'team-2v2': 2200,
   nexus: 1100,
   'frontier-50': 7500,
   'frontier-100': 15000,
@@ -63,8 +65,8 @@ declare const __SECTOR_ZERO_ONLY__: boolean | undefined;
 export function mapPreset(id: string = 'nexus'): MapPreset {
   const cached = PRESETS.get(id);
   if (cached) return cached;
-  if (id === 'duel-1' || id === 'ffa-4') {
-    const map = parseMatchMap(id === 'duel-1' ? duel : ffa4);
+  if (id === 'duel-1' || id === 'ffa-4' || id === 'team-2v2') {
+    const map = parseMatchMap(id === 'duel-1' ? duel : id === 'ffa-4' ? ffa4 : team2v2);
     if (validateMatchMap(map, data).length) throw new Error('E_INVALID_MAP');
     const edges = matchMapEdges(map, data);
     const nodes: MapNode[] = Object.entries(map.sectors).map(([id, sector]) => ({
@@ -124,6 +126,14 @@ export function mapPreset(id: string = 'nexus'): MapPreset {
   PRESETS.set(id, preset);
   return preset;
 }
+/** Fixed side belongs to a starting world, even when the solo player changes seats. */
+export function teamForStart(mapId: MapId, start: string): string | undefined {
+  if (mapId !== 'team-2v2') return undefined;
+  const map = mapPreset(mapId).map!;
+  const slot = map.sectors[start]?.owner;
+  return slot ? map.slots[slot]?.team : undefined;
+}
+
 export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
   const id = state.mapId;
   return (id !== undefined && SCORE_LIMITS[id as MapId]) || SCORE_LIMITS.nexus;
