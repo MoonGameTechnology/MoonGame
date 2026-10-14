@@ -1009,6 +1009,21 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       expect(r.events.map((e) => e.type)).not.toContain('rocketMine.hit');
     });
 
+    it('влёт на последнем отрезке до цели — выстрел до попадания (Codex на #1644)', () => {
+      const launch = armed();
+      const m = missiles(launch)[0]!;
+      // Шаг полёта — минута (4 ед.), последний шаг в (276, 0), цель (280, 0). Круг 4 над
+      // (282, 0) накрывает цель, но не точку последнего шага: в круг ракета входит только на
+      // отрезке, который до попадания уже не объявлялся шагом.
+      const r = fly(patrolOver(launch, 'interceptor', { x: 282, y: 0 }, 4), m.flight!.arrivesAt);
+      expect(r.events).toContainEqual({
+        type: 'shuttle.missileDowned',
+        payload: { owner: 'q', playerId: 'p', missileId: m.id },
+      });
+      expect(r.events.map((e) => e.type)).not.toContain('rocketMine.hit');
+      expect(r.events.map((e) => e.type)).not.toContain('rocketMine.detonated');
+    });
+
     it('ракета, пущенная внутри круга, не влетает — до тика патруль молчит', () => {
       const launch = armed();
       const m = missiles(launch)[0]!;

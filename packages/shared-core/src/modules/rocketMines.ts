@@ -20,6 +20,7 @@ import {
 import { MINE_TRAIT } from '../state/minefields';
 import { defHasTrait } from '../data/traits';
 import { flightPointAt, fleetNodeAt, fleetPositionAt } from '../state/fleetPosition';
+import type { MissileFlew } from './shuttle';
 import { isCorridorEdge } from '../state/corridor';
 import { laneRoad } from '../state/roads';
 import { distance } from '../state/route';
@@ -247,6 +248,14 @@ function flightStep(h: HandlerContext): number {
   return Math.max(1, Math.ceil(hoursToMs(h.ctx, 1 / 60)));
 }
 
+/** Время последнего шага полёта до попадания (или пуск, если шагов не было): шаги идут
+ *  через `flightStep` от пуска, пока строго раньше прибытия (см. `scheduleFlight`). */
+function lastStepAt(h: HandlerContext, fl: { departedAt: number; arrivesAt: number }): number {
+  const step = flightStep(h);
+  const steps = Math.max(0, Math.ceil((fl.arrivesAt - fl.departedAt) / step) - 1);
+  return fl.departedAt + steps * step;
+}
+
 function scheduleFlight(h: HandlerContext, missile: Fleet): void {
   const step = flightStep(h);
   if (missile.flight && h.ctx.now + step < missile.flight.arrivesAt) {
@@ -260,7 +269,8 @@ export const rocketMinesModule: GameModule = {
   // часть — в `ordnance.controls`; мина не целится в мины, и взрыв их не задевает.
   // 3.0.0: ракета — отряд во `fleets` (юнит `missile`, полёт по прямой, SM-3.7b); её боевая
   // часть — в `ordnance.warheads`; мина не целится в ракеты, и взрыв их не задевает.
-  // 3.1.0: шаг полёта ракеты объявляет пройденный отрезок `rocketMine.flew` (SM-3.7d).
+  // 3.1.0: шаг полёта ракеты и последний отрезок до цели (перед попаданием) уходят возможности
+  //        `missile.flew` — тем, кто ловит ракету на влёте (SM-3.7d, замечание Codex на #1644).
   version: '3.1.0',
   setup(api) {
     api.onAction('fleet.deployRocketMine', (action, h) => {
@@ -405,22 +415,27 @@ export const rocketMinesModule: GameModule = {
       const missile = missileFleet(h, missileId);
       if (!missile) return;
       if (intercepted(h, missile)) return endMissile(h, missile);
-      // Пройденный за шаг отрезок — для тех, кто ловит ракету на влёте (SM-3.7d: патруль
-      // челноков стреляет, когда ракета входит в его круг). Начало — точка прошлого шага,
-      // или пуск, если шаг первый. Слышит только хозяин: место ракеты — её тайна.
+      // Пройденный за шаг отрезок — тем, кто ловит ракету на влёте (SM-3.7d: патруль челноков
+      // стреляет, когда ракета входит в его круг). Начало — точка прошлого шага или пуск.
       const fl = missile.flight!;
-      h.emit('rocketMine.flew', {
-        owner: missile.owner,
+      h.capability<MissileFlew>('missile.flew')?.(
+        h,
         missileId,
-        from: flightPointAt(fl, Math.max(fl.departedAt, h.ctx.now - flightStep(h))),
-        to: flightPointAt(fl, h.ctx.now),
-      });
+        flightPointAt(fl, Math.max(fl.departedAt, h.ctx.now - flightStep(h))),
+        flightPointAt(fl, h.ctx.now),
+      );
+      if (!missileFleet(h, missileId)) return; // сбита на влёте
       scheduleFlight(h, missile);
     });
     api.on('rocketMine.impact', (event, h) => {
       const { missileId } = event.payload as { missileId: string };
       const missile = missileFleet(h, missileId);
       if (!missile || missile.flight!.arrivesAt !== h.ctx.now) return;
+      // Последний отрезок — от последнего шага до цели: влёт в круг патруля в последнюю минуту
+      // (или весь полёт короче минуты) тоже встречает выстрел, и до попадания (Codex на #1644).
+      const fl = missile.flight!;
+      h.capability<MissileFlew>('missile.flew')?.(h, missileId, flightPointAt(fl, lastStepAt(h, fl)), fl.to);
+      if (!missileFleet(h, missileId)) return; // сбита на подлёте
       const to = missile.flight!.to;
       const def = missileModule(missile, h.ctx.data)?.def;
       const warhead = h.state.ordnance?.warheads?.[missile.id];

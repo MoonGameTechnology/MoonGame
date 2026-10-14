@@ -1511,6 +1511,15 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
   }
 }
 
+/** Ракета прошла отрезок [from, to] своего полёта (SM-3.7d): шаг или последний отрезок до
+ *  цели. Даёт `shuttle`, зовёт `rocketMines`; нет модуля челноков — некому и стрелять. */
+export type MissileFlew = (
+  h: HandlerContext,
+  missileId: string,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) => void;
+
 /** Расстояние от точки до отрезка [a, b] — пересёк ли путь ракеты круг патруля. */
 function distanceToSegment(
   a: { x: number; y: number },
@@ -1907,7 +1916,8 @@ export const shuttleModule: GameModule = {
   // 1.15.0: ПВО не тратит залп на мину при ракете в радиусе, бьёт мину с узла стрелка,
   //         недобитая мина ставит `pd.reload` на конец перезарядки (замечания Codex на #1626).
   // 1.16.0: ракета — воздушная цель (SM-3.7d): патруль и удар бьют её `shuttleDamage`, а
-  //         патруль стреляет и в момент, когда ракета влетает в его круг (`rocketMine.flew`).
+  //         патруль стреляет и в момент, когда ракета влетает в его круг (возможность
+  //         `missile.flew`, и по последнему отрезку до цели — замечание Codex на #1644).
   version: '1.16.0',
   setup(api) {
     /**
@@ -2475,16 +2485,16 @@ export const shuttleModule: GameModule = {
     /**
      * ВЫСТРЕЛ ПРИ ВЛЁТЕ (SM-3.7d, решение владельца 2026-10-14). Ракета пролетает круг
      * патруля за минуты, а тик патруля — раз в 15 минут: без этого выстрела она проскакивала
-     * бы между тиками. Висящий патруль бьёт её долей тика в тот шаг полёта, когда её путь
-     * входит в круг, — по отрезку, а не по точке, поэтому круг не перепрыгнуть и за один шаг.
+     * бы между тиками. Висящий патруль бьёт её долей тика, когда пройденный ею отрезок входит
+     * в его круг, — по отрезку, а не по точке, поэтому круг не перепрыгнуть и за один шаг.
      * Ракета, пущенная уже внутри круга, не «влетает»: её бьёт обычный тик.
+     *
+     * Возможность, а не событие: `rocketMines` зовёт её синхронно на каждом шаге полёта и
+     * ПЕРЕД попаданием, с последним отрезком до цели. Событие разбиралось бы после того, как
+     * попадание уже сняло ракету с карты, и влёт в последнюю минуту (или весь полёт короче
+     * минуты) остался бы без выстрела (замечание Codex на #1644).
      */
-    api.on('rocketMine.flew', (event, h: HandlerContext) => {
-      const { missileId, from, to } = event.payload as {
-        missileId: string;
-        from: { x: number; y: number };
-        to: { x: number; y: number };
-      };
+    api.provideCapability<MissileFlew>('missile.flew', (h, missileId, from, to) => {
       for (const strike of h.state.strikes ?? []) {
         const missile = Object.prototype.hasOwnProperty.call(h.state.fleets, missileId)
           ? h.state.fleets[missileId]
