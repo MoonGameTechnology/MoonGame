@@ -43,6 +43,8 @@ import {
   pveOrders,
   MetricsAggregator,
   DailyJsonl,
+  analyticsActorFromEnv,
+  journalRecord,
   createMultiplayerServer,
   wsLimitsFromEnv,
   tlsFromEnv,
@@ -145,6 +147,9 @@ const metrics = new MetricsAggregator();
 // PTM-0.1: the aggregated summary also lands periodically, so a crash (no graceful
 // shutdown) loses at most this much of it.
 const SUMMARY_EVERY_MS = 10 * 60 * 1000;
+// PTM-0.2: the seat's account becomes the analytics pseudonym `actor`; the raw account
+// id never reaches the journal (nor `/metrics/recent`, which serves its lines).
+const actorOf = analyticsActorFromEnv(process.env);
 const writeSummary = (): void =>
   matchLog.write({ kind: 'summary', summary: metrics.summary(), log: matchLog.stats() });
 setInterval(writeSummary, SUMMARY_EVERY_MS).unref();
@@ -474,7 +479,7 @@ async function createHostedMatch(
   const observe = (ev: RoomObservation): void => {
     metrics.observe(ev);
     if (worthLogging(ev)) {
-      matchLog.write({ match: id, ...ev });
+      matchLog.write(journalRecord(id, ev, actorOf));
     }
     if (ev.kind === 'join') {
       connected++;
