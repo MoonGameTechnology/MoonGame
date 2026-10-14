@@ -43,12 +43,14 @@ const data = parseGameData({
       signature: 13,
       traits: ['immobile', 'issued', 'missile'],
     },
-    // Челнок перехвата (SM-3.7b): патруль бьёт ракету, влетевшую в его круг.
+    // Челнок перехвата (SM-3.7b): патруль бьёт ракету, влетевшую в его круг. Ракета —
+    // воздушная цель (SM-3.7d): её бьёт `shuttleDamage`, а не `attack`.
     interceptor: {
       faction: 'x',
       traits: ['shuttle'],
       stats: {
         attack: 40,
+        shuttleDamage: 48,
         defense: 3,
         speed: 100,
         hp: 10,
@@ -58,6 +60,12 @@ const data = parseGameData({
         patrolHours: 4,
         patrolRadius: 60,
       },
+    },
+    // Ударник без зенитного оружия: по кораблям бьёт, по ракете — нечем (SM-3.7d).
+    striker: {
+      faction: 'x',
+      traits: ['shuttle'],
+      stats: { attack: 60, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2, patrolHours: 4, patrolRadius: 60 },
     },
     // Контактная мина (SM-3.6) — в неё ракетная мина не целится.
     mine: {
@@ -957,6 +965,89 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     // И юнитом она не «гибнет», как и под ПРО: `unit.died` засчитал бы её потерей и
     // убийством в счёте PvE, трофеях и опыте героя (замечание Codex на #1503).
     expect(r.events.map((e) => e.type)).not.toContain('unit.died');
+  });
+
+  // SM-3.7d (решение владельца 2026-10-14): ракета — воздушная цель, а патруль бьёт её и в
+  // момент влёта в круг, не дожидаясь своего тика.
+  describe('патруль и ракета (SM-3.7d)', () => {
+    const patrolOver = (s: GameState, unit: string, at: { x: number; y: number }, radius: number) => {
+      s.strikes = [
+        {
+          id: 'strike:q:1',
+          owner: 'q',
+          base: { kind: 'planet', id: 'B' },
+          squadronId: 'sq:q:1',
+          units: [{ unit, count: 2 }],
+          target: { kind: 'point' },
+          to: at,
+          departedAt: s.time,
+          arrivesAt: s.time + 4 * HOUR,
+          leg: 'patrol',
+          patrol: { hours: 4, radius },
+        },
+      ];
+      return s;
+    };
+    const fly = (s: GameState, until: number) => {
+      const k = createKernel([movementModule, rocketMinesModule, shuttleModule]);
+      const r = k.advanceTo(s, { now: until, data });
+      if (!r.ok) throw new Error(r.code);
+      expect(r.failures).toEqual([]);
+      return r;
+    };
+
+    it('влёт в круг — выстрел сразу, без тика патруля', () => {
+      const launch = armed();
+      const m = missiles(launch)[0]!;
+      // Круг 40 над (250, 0): пуск (200, 0) снаружи, путь к (280, 0) входит в круг.
+      const r = fly(patrolOver(launch, 'interceptor', { x: 250, y: 0 }, 40), m.flight!.arrivesAt);
+      expect(r.events).toContainEqual({
+        type: 'shuttle.missileDowned',
+        payload: { owner: 'q', playerId: 'p', missileId: m.id },
+      });
+      expect(r.events.map((e) => e.type)).not.toContain('shuttle.patrol.tick');
+      expect(r.events.map((e) => e.type)).not.toContain('rocketMine.hit');
+    });
+
+    it('ракета, пущенная внутри круга, не влетает — до тика патруль молчит', () => {
+      const launch = armed();
+      const m = missiles(launch)[0]!;
+      const r = fly(patrolOver(launch, 'interceptor', { ...m.flight!.from }, 40), m.flight!.arrivesAt);
+      expect(r.events.map((e) => e.type)).not.toContain('shuttle.missileDowned');
+    });
+
+    it('без `shuttleDamage` ракету не сбить: ни на влёте, ни приказом', () => {
+      const launch = armed();
+      const m = missiles(launch)[0]!;
+      const r = fly(patrolOver(launch, 'striker', { x: 250, y: 0 }, 40), m.flight!.arrivesAt);
+      expect(r.events.map((e) => e.type)).not.toContain('shuttle.missileDowned');
+      // Удар приказом по видимой ракете — отказ: бить её нечем.
+      const k = createKernel([shuttleModule]);
+      const near = advance(launch, m.flight!.departedAt + 0.95 * (m.flight!.arrivesAt - m.flight!.departedAt));
+      near.strikes = [];
+      near.planets.B = {
+        ...near.planets.B!,
+        owner: 'q',
+        buildings: [{ type: 'spaceport', level: 1, hp: 30 }],
+        hangar: [{ id: 'sq:q', units: [{ unit: 'striker', count: 2 }] }],
+      };
+      const strikeData = parseGameData({
+        ...data,
+        buildings: { spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 12 } },
+      });
+      const res = k.applyAction(
+        near,
+        {
+          id: 's:q:2',
+          playerId: 'q',
+          type: 'shuttle.strike',
+          payload: { planetId: 'B', squadronId: 'sq:q', targetFleetId: m.id },
+          issuedAt: near.time,
+        },
+        { now: near.time, data: strikeData },
+      );
+      expect(res.ok ? 'ok' : res.code).toBe('E_INVALID_TARGET');
+    });
   });
 
   it('a shuttle strike by order finds it only in sight — its id is predictable', () => {

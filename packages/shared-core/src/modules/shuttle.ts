@@ -605,6 +605,12 @@ function strikePower(
   );
 }
 
+/** Огонь вылета по ВОЗДУШНОЙ цели — чужому вылету и ракете (SM-3.7d): `shuttleDamage`, в
+ *  доле живого корпуса. */
+function strikeAirPower(strike: ShuttleStrike, data: GameData): number {
+  return sumUnitStat(strike.units, data, 'shuttleDamage') * hullShare(strike.units, strike.damage, data);
+}
+
 /** Огонь вылета по ВОЙСКАМ мира за удар (ROS-1.6): той же линией огня и в той же доле
  *  живого корпуса, что и удар по постройкам. */
 function strikeGroundPower(strike: ShuttleStrike, data: GameData): number {
@@ -1155,6 +1161,34 @@ function downMissile(h: HandlerContext, strike: ShuttleStrike, missileId: string
 }
 
 /**
+ * Залп эскадры по ракете (SM-3.7d, решение владельца 2026-10-14): ракета — воздушная цель,
+ * и бьют её `shuttleDamage`, тем же каналом, что чужой вылет (`intercept`). Ответки нет:
+ * ракета без оружия. Один путь на тик патруля, выстрел при влёте в круг и удар приказом.
+ */
+function hitMissile(h: HandlerContext, strike: ShuttleStrike, missile: Fleet, power: number): void {
+  if (power <= 0) return;
+  const dealt = hookedDamage(h, power, {
+    phase: 'intercept',
+    location: '',
+    attacker: strike.owner,
+    defender: missile.owner,
+    ...strikeAttackerFleet(strike),
+    defenderFleet: missile.id,
+  });
+  h.emit('shuttle.hit', {
+    strikeId: strike.id,
+    owner: strike.owner,
+    targetId: missile.id,
+    targetOwner: missile.owner,
+    playerId: missile.owner,
+    location: '',
+    damage: dealt,
+  });
+  applyDamageToSide(h, { kind: 'fleet', fleetId: missile.id }, dealt, h.ctx.data, '', undefined, undefined, strike.owner);
+  downMissile(h, strike, missile.id);
+}
+
+/**
  * Мина, снятая челноками или зональным ПВО (SM-3.6, SM-3.7a), уходит с карты отработавшей —
  * `spent`, как ракета выше: «☠️ флот уничтожен» читался бы хозяину мины потерей флота,
  * которой не было. Конец мины объявляет своя строка обеим сторонам, теми же ключами, что у
@@ -1186,8 +1220,9 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
   // считаются из состояния до отрезка.
   const answer = returnFireAgainstFleet(target, h.ctx.data) * share;
   const power = strikePower(strike, h.ctx.data, 'fleet') * share;
-  // Ракету и мину узнаём ДО удара: у добитого отряда не остаётся юнитов, по которым их узнать.
-  const missile = isMissileFleet(target, h.ctx.data);
+  // Ракета — воздушная цель (SM-3.7d): её бьёт `shuttleDamage`, ответки нет.
+  if (isMissileFleet(target, h.ctx.data)) return hitMissile(h, strike, target, strikeAirPower(strike, h.ctx.data) * share);
+  // Мину узнаём ДО удара: у добитого отряда не остаётся юнитов, по которым её узнать.
   const mine = isMineFleet(target, h.ctx.data);
   if (power > 0) {
     const dealt = hookedDamage(h, power, {
@@ -1220,8 +1255,7 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
       undefined,
       strike.owner,
     );
-    if (missile) downMissile(h, strike, target.id);
-    else if (mine) clearMine(h, strike.owner, target.id, 'shuttle.mineCleared');
+    if (mine) clearMine(h, strike.owner, target.id, 'shuttle.mineCleared');
     else removeIfWiped(h, target.id);
   }
   repelStrike(h, strike, answer, {
@@ -1403,8 +1437,9 @@ function holdWait(h: HandlerContext, base: BaseView, why: string): number | null
  *    патруле. Миры патруль не бомбит (развилка 2а владельца). Враждебность — `isHostile`:
  *    союзник и партнёр по миру — не цели. Невидимая мина — не цель, как и для удара.
  * 3. **Бьётся только то, чему патруль может навредить.** По флотам — `attack`, по вылетам
- *    — `shuttleDamage`; безоружная половина не выбирает цель, иначе чистый охотник за
- *    машинами нырял бы под пушки флота ради нуля урона.
+ *    и ракетам — `shuttleDamage` (ракета — воздушная цель, SM-3.7d); безоружная половина не
+ *    выбирает цель, иначе чистый охотник за машинами нырял бы под пушки флота ради нуля
+ *    урона.
  * 4. **По флоту — тот же удар, что по прибытии, долей тика**, с ответкой той же долей
  *    (`strikeFleet`). **По вылету — тот же канал, что перехват** (фаза `intercept`,
  *    событие `shuttle.intercepted` с `patrolId`): чужой вылет не отвечает, как не
@@ -1415,15 +1450,13 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
   const data = h.ctx.data;
   const now = h.ctx.now;
   const vsFleet = strikePower(strike, data, 'fleet') * PATROL_TICK_SHARE;
-  const vsAir =
-    sumUnitStat(strike.units, data, 'shuttleDamage') *
-    hullShare(strike.units, strike.damage, data) *
-    PATROL_TICK_SHARE;
+  const vsAir = strikeAirPower(strike, data) * PATROL_TICK_SHARE;
   const contacts: PatrolContact[] = [];
   if (vsFleet > 0) {
     for (const f of Object.values(h.state.fleets)) {
       if (f.owner === strike.owner || !isHostile(h, strike.owner, f.owner)) continue;
       if (!f.units.some((st) => st.count > 0)) continue;
+      if (isMissileFleet(f, data)) continue; // ракета — воздушная цель, ниже
       if (isMineFleet(f, data) && !mineFleetVisible(h.state, f, strike.owner, data)) continue;
       const pos = fleetPositionAt(h.state, f, now);
       if (pos) contacts.push({ id: f.id, pos });
@@ -1436,6 +1469,11 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
       const pos = strikePosition(st, h.state, now);
       if (pos) contacts.push({ id: st.id, pos });
     }
+    for (const f of Object.values(h.state.fleets)) {
+      if (!isMissileFleet(f, data) || !isHostile(h, strike.owner, f.owner)) continue;
+      const pos = fleetPositionAt(h.state, f, now);
+      if (pos) contacts.push({ id: f.id, pos });
+    }
   }
   const pick = patrolTarget(strike.to, radius, contacts);
   if (pick === null) return;
@@ -1443,6 +1481,7 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
   const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, pick)
     ? h.state.fleets[pick]
     : undefined;
+  if (fleet && isMissileFleet(fleet, data)) return hitMissile(h, strike, fleet, vsAir);
   if (fleet) return strikeFleet(h, strike, fleet, PATROL_TICK_SHARE);
   const target = (h.state.strikes ?? []).find((st) => st.id === pick);
   if (!target) return;
@@ -1470,6 +1509,19 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
   if (target.units.length === 0) {
     h.state.strikes = (h.state.strikes ?? []).filter((st) => st.id !== target.id);
   }
+}
+
+/** Расстояние от точки до отрезка [a, b] — пересёк ли путь ракеты круг патруля. */
+function distanceToSegment(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  p: { x: number; y: number },
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 > 0 ? Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+  return distance(p, { x: a.x + dx * t, y: a.y + dy * t });
 }
 
 /** Цель удара, проверенная по всем правилам приказа: флот или мир, и груз, который
@@ -1515,7 +1567,9 @@ function strikeAimOf(
   // данных (`attack`), а не из имени юнита и не из отдельного флага: «нечем бить»
   // и есть всё правило. Отказ — на приказе, потому что пустой полёт стоил бы
   // игроку топлива и часа ради заведомого ничего.
-  if (targetFleet && cappedUnitStat(squad.units, h.ctx.data, 'attack') <= 0) {
+  // Ракета — воздушная цель (SM-3.7d): по ней бьёт `shuttleDamage`, а не `attack`.
+  const airTarget = !!targetFleet && isMissileFleet(targetFleet, h.ctx.data);
+  if (targetFleet && cappedUnitStat(squad.units, h.ctx.data, airTarget ? 'shuttleDamage' : 'attack') <= 0) {
     return h.reject('E_INVALID_TARGET');
   }
   // Свой мир бомбить нельзя — но ВЕЗТИ на него подкрепление можно и нужно (ROS-1.5):
@@ -1852,7 +1906,9 @@ export const shuttleModule: GameModule = {
   // 1.14.0: невидимый игроку флот — не цель вылета (`E_NO_TARGET`, как несуществующий).
   // 1.15.0: ПВО не тратит залп на мину при ракете в радиусе, бьёт мину с узла стрелка,
   //         недобитая мина ставит `pd.reload` на конец перезарядки (замечания Codex на #1626).
-  version: '1.15.0',
+  // 1.16.0: ракета — воздушная цель (SM-3.7d): патруль и удар бьют её `shuttleDamage`, а
+  //         патруль стреляет и в момент, когда ракета влетает в его круг (`rocketMine.flew`).
+  version: '1.16.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -2414,6 +2470,33 @@ export const shuttleModule: GameModule = {
       }
       if (h.ctx.now >= strike.arrivesAt) return turnHome(h, strike);
       schedulePatrolTick(h, strike);
+    });
+
+    /**
+     * ВЫСТРЕЛ ПРИ ВЛЁТЕ (SM-3.7d, решение владельца 2026-10-14). Ракета пролетает круг
+     * патруля за минуты, а тик патруля — раз в 15 минут: без этого выстрела она проскакивала
+     * бы между тиками. Висящий патруль бьёт её долей тика в тот шаг полёта, когда её путь
+     * входит в круг, — по отрезку, а не по точке, поэтому круг не перепрыгнуть и за один шаг.
+     * Ракета, пущенная уже внутри круга, не «влетает»: её бьёт обычный тик.
+     */
+    api.on('rocketMine.flew', (event, h: HandlerContext) => {
+      const { missileId, from, to } = event.payload as {
+        missileId: string;
+        from: { x: number; y: number };
+        to: { x: number; y: number };
+      };
+      for (const strike of h.state.strikes ?? []) {
+        const missile = Object.prototype.hasOwnProperty.call(h.state.fleets, missileId)
+          ? h.state.fleets[missileId]
+          : undefined;
+        if (!missile) return;
+        if (strike.leg !== 'patrol' || strike.units.length === 0) continue;
+        if (strike.owner === missile.owner || !isHostile(h, strike.owner, missile.owner)) continue;
+        const radius = strike.patrol?.radius ?? 0;
+        if (radius <= 0 || distance(from, strike.to) <= radius) continue;
+        if (distanceToSegment(from, to, strike.to) > radius) continue;
+        hitMissile(h, strike, missile, strikeAirPower(strike, h.ctx.data) * PATROL_TICK_SHARE);
+      }
     });
 
     /**

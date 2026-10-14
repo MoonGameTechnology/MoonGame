@@ -242,8 +242,13 @@ function intercepted(h: HandlerContext, m: Fleet): boolean {
   return false;
 }
 
+/** Шаг полёта ракеты — игровая минута. */
+function flightStep(h: HandlerContext): number {
+  return Math.max(1, Math.ceil(hoursToMs(h.ctx, 1 / 60)));
+}
+
 function scheduleFlight(h: HandlerContext, missile: Fleet): void {
-  const step = Math.max(1, Math.ceil(hoursToMs(h.ctx, 1 / 60)));
+  const step = flightStep(h);
   if (missile.flight && h.ctx.now + step < missile.flight.arrivesAt) {
     h.schedule(h.ctx.now + step, 'rocketMine.flight', { missileId: missile.id });
   }
@@ -255,7 +260,8 @@ export const rocketMinesModule: GameModule = {
   // часть — в `ordnance.controls`; мина не целится в мины, и взрыв их не задевает.
   // 3.0.0: ракета — отряд во `fleets` (юнит `missile`, полёт по прямой, SM-3.7b); её боевая
   // часть — в `ordnance.warheads`; мина не целится в ракеты, и взрыв их не задевает.
-  version: '3.0.0',
+  // 3.1.0: шаг полёта ракеты объявляет пройденный отрезок `rocketMine.flew` (SM-3.7d).
+  version: '3.1.0',
   setup(api) {
     api.onAction('fleet.deployRocketMine', (action, h) => {
       const p = action.payload as { fleetId?: string; mode?: string } | null;
@@ -398,8 +404,18 @@ export const rocketMinesModule: GameModule = {
       const { missileId } = event.payload as { missileId: string };
       const missile = missileFleet(h, missileId);
       if (!missile) return;
-      if (intercepted(h, missile)) endMissile(h, missile);
-      else scheduleFlight(h, missile);
+      if (intercepted(h, missile)) return endMissile(h, missile);
+      // Пройденный за шаг отрезок — для тех, кто ловит ракету на влёте (SM-3.7d: патруль
+      // челноков стреляет, когда ракета входит в его круг). Начало — точка прошлого шага,
+      // или пуск, если шаг первый. Слышит только хозяин: место ракеты — её тайна.
+      const fl = missile.flight!;
+      h.emit('rocketMine.flew', {
+        owner: missile.owner,
+        missileId,
+        from: flightPointAt(fl, Math.max(fl.departedAt, h.ctx.now - flightStep(h))),
+        to: flightPointAt(fl, h.ctx.now),
+      });
+      scheduleFlight(h, missile);
     });
     api.on('rocketMine.impact', (event, h) => {
       const { missileId } = event.payload as { missileId: string };

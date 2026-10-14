@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '82'; // Замечания Codex на #1626. Членство и порядок не
+export const MODULE_MANIFEST_VERSION = '83'; // SM-3.7d: ракета — воздушная цель. Членство и
+// порядок не тронуты; `shuttle` 1.16.0 — патруль и удар бьют ракету `shuttleDamage`, патруль
+// стреляет и на влёте ракеты в круг; `rocketMines` 3.1.0 объявляет отрезок полёта
+// `rocketMine.flew`. Партия на 82 сбивала бы ракеты иначе.
+// export const MODULE_MANIFEST_VERSION = '82'; // Замечания Codex на #1626. Членство и порядок не
 // тронуты; `shuttle` 1.15.0 — ПВО не тратит залп на мину при враждебной ракете в радиусе,
 // недобитая мина ставит `pd.reload` на конец перезарядки. Партия на 81 добивала бы мину иначе.
 // export const MODULE_MANIFEST_VERSION = '81'; // RALLY-1: точка сбора мира-верфи.
