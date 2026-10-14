@@ -66,5 +66,7 @@ describe('finite Frontier rim', () => {
         expect(y).toBeCloseTo(rim.poly[i]![1] * 3 - 456, 5);
       });
     },
+    // Two power diagrams over 100 worlds: ~1.5 s alone, past the 5 s default on a loaded CI runner.
+    20_000,
   );
 });
