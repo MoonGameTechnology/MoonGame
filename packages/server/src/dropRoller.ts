@@ -136,9 +136,13 @@ export async function awardMatchDrops(
   const tablesHash = hashJson(deps.tables); // ARS-7 — one edition rolls the whole pass
   for (const { accountId, reward } of entries) {
     if (!(await deps.drops.claim(matchId, accountId))) continue; // replay — already rolled
-    const pity = await deps.drops.pityOf(accountId);
     const chance = chanceForPlace(deps.tables, reward.place);
     const rng = rollStream(`${matchId}:${accountId}`);
+    // The roll does not depend on the streak, so it goes first and the streak is read
+    // and advanced in ONE store step: two matches of this account ending together
+    // must not both see the same streak and both be forced into a drop.
+    const hit = rng() < chance;
+    const pity = await deps.drops.stepPity(accountId, hit, deps.tables.pityAfter);
     const forced = pity + 1 >= deps.tables.pityAfter;
     const record: DropRecord = {
       matchId,
@@ -150,7 +154,7 @@ export async function awardMatchDrops(
       dropped: null,
       tablesHash,
     };
-    if (rng() < chance || forced) {
+    if (hit || forced) {
       const line = pickFromPool(deps.tables.pool, rng());
       await deps.arsenal.grant({
         itemId: `drop:${matchId}:${accountId}`,
@@ -162,10 +166,7 @@ export async function awardMatchDrops(
         origin: 'drop',
         acquiredAt: deps.now,
       });
-      await deps.drops.setPity(accountId, 0);
       record.dropped = { kind: line.kind, defId: line.defId };
-    } else {
-      await deps.drops.setPity(accountId, pity + 1);
     }
     deps.log?.(record);
     records.push(record);
