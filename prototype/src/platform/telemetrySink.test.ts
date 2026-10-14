@@ -163,4 +163,21 @@ describe('telemetry sink', () => {
     await flushing;
     expect(calls).toBe(1); // ушедший маяком пакет второй раз не шлётся
   });
+
+  it('the in-flight batch is beaconed to the server it was sent to, the rest to the current one', async () => {
+    let server = 'a';
+    const h = harness({
+      target: () => ({ url: `https://${server}.example/telemetry`, token: null }),
+      post: () => new Promise(() => undefined), // так и не ответил
+    });
+    h.sink.emit('pve_started');
+    void h.sink.flush();
+    server = 'b';
+    h.sink.emit('pve_completed');
+    h.sink.pageHide();
+    expect(h.beacons.map((b) => [b.url, JSON.parse(b.body).events.map((e: { e: string }) => e.e)])).toEqual([
+      ['https://a.example/telemetry', ['pve_started']],
+      ['https://b.example/telemetry', ['pve_completed']],
+    ]);
+  });
 });
