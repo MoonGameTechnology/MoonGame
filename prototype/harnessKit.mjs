@@ -173,7 +173,7 @@ export async function waitForApp(page, { timeout = 15000 } = {}) {
 export async function enterSkirmish(page, { tap = false, fromWelcome = true } = {}) {
   const press = (id) => (tap ? page.locator('#' + id).tap() : page.locator('#' + id).click());
   await waitForApp(page);
-  for (const id of [...(fromWelcome ? ['cnew'] : []), 'hub-solo', 'sp-go', 'setupgo'])
+  for (const id of [...(fromWelcome ? ['cnew'] : []), 'hub-solo', 'setupgo'])
     await press(id);
   // Диалог приходит, только если сохранение уже есть; ждём одного из двух исходов.
   await page.waitForFunction(

@@ -233,15 +233,13 @@ try {
     assert.equal(await page.locator('#cupd').isVisible(), false, 'кнопки обновлений нет');
     await page.locator('#mlist .mrow .mbtn').first().click();
     await page.locator('#setup').waitFor({ state: 'visible' });
-    // Совет учёных открывается сам и уже собран по умолчанию — подтверждаем как есть.
-    if (await page.locator('#scipick.show').isVisible()) await page.click('#sp-go');
-    const free = await page.$$eval('#setup-home-id option', (os) =>
-      os.filter((o) => o.value && !o.disabled).map((o) => o.value),
+    // Совет учёных уже собран по умолчанию и окном не всплывает (UIX-16.1): старт — тапом
+    // по свободному миру на карте.
+    const free = await page.$$eval('#setupmap [data-cand]:not([data-taken])', (cs) =>
+      cs.map((c) => c.getAttribute('data-cand')),
     );
     assert(free.length > 0, 'в партии есть свободный мир');
-    if (await page.locator('#setup-home-id').isVisible())
-      await page.selectOption('#setup-home-id', free[0]);
-    else await page.locator(`[data-cand="${free[0]}"]`).first().click();
+    await page.locator(`#setupmap [data-cand="${free[0]}"]`).click();
     await Promise.all([page.waitForURL(/\/game\//), page.click('#setupgo')]);
     await until('впуск в партию', async () => (await overlay()) === 'none');
 
@@ -326,11 +324,16 @@ try {
 
     // The same two maps are offered locally and online. Archived maps remain readable,
     // but the picker no longer offers them for a new match.
-    for (const selector of ['#setup-map-id', '#match-create-map']) {
-      assert.deepEqual(await page.locator(`${selector} option:not([hidden])`).evaluateAll(
-        (options) => options.map((option) => option.value),
-      ), ['duel-1', 'ffa-4']);
-    }
+    // Настройка схватки рисует карты сегментами (UIX-16.1) — их и считаем.
+    await page.click('#hub-solo');
+    await page.locator('#setupmaps [data-map]').first().waitFor({ state: 'visible' });
+    assert.deepEqual(await page.locator('#setupmaps [data-map]').evaluateAll(
+      (chips) => chips.map((chip) => chip.getAttribute('data-map')),
+    ), ['duel-1', 'ffa-4']);
+    await page.click('#setupcancel');
+    assert.deepEqual(await page.locator('#match-create-map option:not([hidden])').evaluateAll(
+      (options) => options.map((option) => option.value),
+    ), ['duel-1', 'ffa-4']);
     for (const id of ['hub-sector-zero', 'hub-proving-ground'])
       assert.equal(await page.locator(`#${id}`).isVisible(), false);
     console.log('✓ карты: меню предлагает только 1 на 1 и FFA на четверых');

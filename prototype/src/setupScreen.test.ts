@@ -36,6 +36,7 @@ interface El {
   };
   kids: El[];
   setAttribute(k: string, v: string): void;
+  querySelector(sel: string): El | null;
   querySelectorAll(sel: string): El[];
   addEventListener(type: string, fn: (ev: unknown) => void): void;
   fire(type: string, ev?: unknown): void;
@@ -68,6 +69,7 @@ function stub(): El {
     },
     kids: [],
     setAttribute: () => {},
+    querySelector: () => null,
     querySelectorAll: () => el.kids,
     addEventListener: (type, fn) => void on.set(type, [...(on.get(type) ?? []), fn]),
     fire: (type, ev = {}) => {
@@ -93,7 +95,10 @@ const hit = (attrs: Record<string, string>) => ({
 });
 const tap = (id: string, attrs: Record<string, string>): void =>
   el(id).fire('click', { target: hit(attrs) });
-const pick = (id: string, value: string): void => el(id).fire('change', { target: { id, value } });
+/** Выбор карты — сегментом в ряду `#setupmaps`. */
+const pickMap = (id: string): void => tap('setupmaps', { 'data-map': id });
+const YOU = '#3ad17a';
+const RIVAL = '#ff5a4d';
 
 const SEATS = Array.from({ length: 100 }, (_, i) => ({
   id: `p${i + 1}`,
@@ -157,6 +162,8 @@ async function boot(net = false) {
     showConnect: (show) => void env.connect.push(show),
     openHub: () => void env.hubs++,
     startMatch: (setup) => void env.started.push(setup),
+    mapLabel: (id) => `map:${id}`,
+    sideColors: () => ({ you: YOU, rival: RIVAL }),
   });
   return { screen, env };
 }
@@ -167,9 +174,12 @@ describe('REFM-212 — заход на экран', () => {
     screen.openSetup('hub');
     expect([env.halts, env.polls, env.connect]).toEqual([1, 1, [false]]);
     expect(screen.setupEl.style.display).toBe('flex');
-    // Совет учёных посвящают первым: окно открыто, строка совета нарисована.
+    // Окно совета не всплывает первым (UIX-16.1): рекомендованная пара видна строкой, и
+    // окно открывается с неё.
+    expect(screen.sciWin.classList.contains('show')).toBe(false);
+    expect(el('setupcouncil').innerHTML).toContain('data-council');
+    el('setupcouncil').click();
     expect(screen.sciWin.classList.contains('show')).toBe(true);
-    expect(el('setupcouncil').innerHTML).not.toBe('');
     expect(screen.netSetup).toBeNull();
     expect(screen.setupSlots).toEqual(['human', 'ai']);
     expect(screen.setupSpeed).toBe(10);
@@ -214,7 +224,7 @@ describe('REFM-212 — что уезжает в матч', () => {
   it('ты своим домом на своём мире, боты — следом; совет, позывной героя и прокачка', async () => {
     const { screen, env } = await boot();
     screen.openSetup();
-    pick('setup-map-id', 'ffa-4');
+    pickMap('ffa-4');
     tap('setupfactions', { 'data-fpick': 'crimson' });
     tap('setupmap', { 'data-cand': FFA[2]! });
     tap('setupslots', { 'data-slot': '2' }); // выкл → слабый
@@ -258,25 +268,25 @@ describe('REFM-212 — что уезжает в матч', () => {
   it('смена карты даёт ровно четыре места FFA; скрытые карты и команды недоступны', async () => {
     const { screen } = await boot();
     screen.openSetup();
-    pick('setup-map-id', 'ffa-4');
+    pickMap('ffa-4');
     expect(screen.setupMapId).toBe('ffa-4');
     expect(screen.setupSlots).toEqual(['human', 'ai', 'ai', 'ai']);
     expect(el('setupslots').innerHTML).not.toContain('data-teamtog');
     tap('setupslots', { 'data-teamtog': '1' });
     tap('setupslots', { 'data-teamseat': '1' });
     for (const hidden of ['frontier-100', 'frontier-50', 'nexus', 'missing']) {
-      pick('setup-map-id', hidden);
+      pickMap(hidden);
       expect(screen.setupMapId).toBe('ffa-4');
     }
     tap('setupmap', { 'data-cand': FFA[3]! });
-    pick('setup-home-id', 'nowhere');
+    tap('setupmap', { 'data-cand': 'nowhere' }); // не старт этой карты — выбор не меняется
     const seats = screen.buildSetupConfig().seats;
     expect(seats.map((s) => s.start)).toEqual([FFA[3], ...FFA.slice(0, 3)]);
     expect(seats.every((s) => s.team === undefined)).toBe(true);
     tap('setupslots', { 'data-slot': '1' });
     tap('setupslots', { 'data-slot': '1' });
     expect(screen.setupSlots[1]).toBe('ai'); // Difficulty cycles without removing a player.
-    pick('setup-map-id', 'duel-1');
+    pickMap('duel-1');
     expect(screen.buildSetupConfig().seats).toHaveLength(2);
   });
 
@@ -323,7 +333,7 @@ describe('REFM-212 — двери гида и сети', () => {
   it('гид получает дуэльную карту без соперников на предсказуемом мире', async () => {
     const { screen } = await boot();
     screen.openSetup();
-    pick('setup-map-id', 'frontier-50');
+    pickMap('frontier-50');
     tap('setupfactions', { 'data-fpick': 'amber' });
     screen.prepareGuidedSetup();
     expect(screen.setupMapId).toBe('duel-1');
@@ -342,11 +352,15 @@ describe('REFM-212 — двери гида и сети', () => {
       entryOffer([seat('p1', NEXUS[0]!, false), seat('p2', NEXUS[1]!, true)]),
     );
     expect(screen.netSetup?.matchId).toBe('m1');
-    expect([el('setupgo').disabled, el('setup-map-id').disabled]).toEqual([true, true]);
-    expect(el('setup-solo-col').style.display).toBe('none');
+    expect(el('setupgo').disabled).toBe(true);
+    // Класс `net` прячет выбор карты, ботов и темп и показывает шапку партии.
+    expect(screen.setupEl.classList.contains('net')).toBe(true);
+    expect(el('setup-sub').innerHTML).toContain('map:nexus');
+    expect(el('setup-sub').innerHTML).toContain('m1');
+    expect(el('setup-sub').innerHTML).toContain(t('setup.net.free', { n: 1, m: 2 }));
     expect(el('setuphint').textContent).toBe(t('setup.map-hint'));
-    // Карту сетевой партии выбрал сервер — список её не меняет.
-    pick('setup-map-id', 'frontier-50');
+    // Карту сетевой партии выбрал сервер — сегменты её не меняют.
+    pickMap('frontier-50');
     expect(screen.setupMapId).toBe('nexus');
     // Занятый мир виден, но не выбирается — и об этом говорят.
     tap('setupmap', { 'data-cand': NEXUS[1]! });
@@ -384,6 +398,88 @@ describe('REFM-212 — двери гида и сети', () => {
     screen.openSetup('hub');
     screen.updateNetOffer('m1', entryOffer([seat('p2', NEXUS[1]!, false)]));
     expect(screen.netSetup).toBeNull();
+  });
+});
+
+describe('UIX-16.1 — карта стартов', () => {
+  const seat = (playerId: string, start: string, taken: boolean): MatchSeat => ({
+    playerId,
+    faction: 'azure',
+    start,
+    taken,
+  });
+  /** Кружок старта `id` на мини-карте: класс и цвет. */
+  const circle = (id: string): string =>
+    new RegExp(`<g class="cand [^"]*" data-cand="${id}"[^>]*>`).exec(
+      el('setupmap').innerHTML,
+    )?.[0] ?? '';
+
+  it('твой старт — твоим цветом, остальные светятся; занятых в одиночной нет', async () => {
+    const { screen } = await boot();
+    screen.openSetup();
+    expect(circle(DUEL[0]!)).toContain('class="cand you"');
+    expect(circle(DUEL[0]!)).toContain(`--c:${YOU}`);
+    expect(circle(DUEL[1]!)).toContain('class="cand free"');
+    expect(el('setuplegend').innerHTML).toContain(t('setup.legend.you'));
+    expect(el('setuplegend').innerHTML).not.toContain(t('setup.legend.taken'));
+    expect(screen.setupEl.classList.contains('net')).toBe(false);
+    // Карты — сегментами, выбранная отмечена.
+    expect(el('setupmaps').innerHTML).toContain('data-map="duel-1" aria-pressed="true"');
+    expect(el('setupmaps').innerHTML).toContain('data-map="ffa-4" aria-pressed="false"');
+  });
+
+  it('сетевая партия: занятый мир — цветом соперника и с пометкой, в легенде «Занято»', async () => {
+    const { screen } = await boot();
+    screen.openSetup('hub');
+    screen.enterNetSetup(
+      'm1',
+      'duel-1',
+      entryOffer([seat('p1', DUEL[0]!, true), seat('p2', DUEL[1]!, false)]),
+    );
+    expect(circle(DUEL[0]!)).toContain('class="cand taken"');
+    expect(circle(DUEL[0]!)).toContain(`--c:${RIVAL}`);
+    expect(circle(DUEL[0]!)).toContain('aria-disabled="true"');
+    expect(circle(DUEL[1]!)).toContain('class="cand free"');
+    expect(el('setuplegend').innerHTML).toContain(t('setup.legend.taken'));
+    // Своего старта ещё нет — легенда о нём не говорит.
+    expect(el('setuplegend').innerHTML).not.toContain(t('setup.legend.you'));
+    tap('setupmap', { 'data-cand': DUEL[1]! });
+    expect(circle(DUEL[1]!)).toContain('class="cand you"');
+    expect(el('setuplegend').innerHTML).toContain(t('setup.legend.you'));
+    expect(el('setupgo').textContent).toBe(t('seatpick.go'));
+  });
+
+  it('клавиатура: Enter и пробел на кружке выбирают старт, другие клавиши — нет', async () => {
+    vi.stubGlobal('CSS', { escape: (v: string) => v });
+    const { screen } = await boot();
+    screen.openSetup();
+    pickMap('ffa-4');
+    let prevented = 0;
+    const press = (key: string, id: string): void =>
+      el('setupmap').fire('keydown', {
+        key,
+        target: hit({ 'data-cand': id }),
+        preventDefault: () => void prevented++,
+      });
+    press('Tab', FFA[2]!);
+    expect(screen.buildSetupConfig().seats[0]!.start).toBe(FFA[0]);
+    press('Enter', FFA[2]!);
+    expect(screen.buildSetupConfig().seats[0]!.start).toBe(FFA[2]);
+    press(' ', FFA[3]!);
+    expect(screen.buildSetupConfig().seats[0]!.start).toBe(FFA[3]);
+    expect(prevented).toBe(2);
+  });
+
+  it('«Закрыть» в окне совета возвращает на экран, а не уводит из него', async () => {
+    const { screen, env } = await boot();
+    screen.openSetup('hub');
+    el('setupcouncil').click();
+    expect(screen.sciWin.classList.contains('show')).toBe(true);
+    el('scipick').fire('click', {
+      target: { closest: (sel: string) => (sel === '.sp-cancel' ? {} : null) },
+    });
+    expect(screen.sciWin.classList.contains('show')).toBe(false);
+    expect([screen.setupEl.style.display, env.hubs]).toEqual(['flex', 0]);
   });
 });
 

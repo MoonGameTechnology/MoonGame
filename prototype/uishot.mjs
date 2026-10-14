@@ -77,7 +77,6 @@ try {
     await page.locator('#hub-solo').waitFor({ state: 'visible' });
     if (opts.screen === 'setup') {
       await press('#hub-solo');
-      await press('#sp-go');
       await page.locator('#setupgo').waitFor({ state: 'visible' });
     }
   } else if (opts.screen === 'match') {

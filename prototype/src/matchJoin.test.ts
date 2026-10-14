@@ -79,6 +79,7 @@ beforeEach(() => {
     ['seatpick', node()],
     ['seatpick-list', node()],
     ['seatpick-cancel', node()],
+    ['seatpick-retry', node()],
   ]);
   fetched = [];
   calls = [];
@@ -348,6 +349,22 @@ describe('REFM-217 — выбор места', () => {
     await join.openSeatPicker('m1');
     page.get('seatpick-cancel')!.click();
     expect(overlay().style.display).toBe('none');
+  });
+  it('«Повторить» есть только на отказе и спрашивает места той же партии заново', async () => {
+    const { join } = await boot();
+    const retry = page.get('seatpick-retry')!;
+    server = () => new Promise<Reply>(() => undefined);
+    void join.openSeatPicker('m1');
+    expect(retry.style.display).toBe('none');
+    server = () => reply(403);
+    await join.openSeatPicker('m1');
+    expect(retry.style.display).toBe('');
+    server = () => reply(200, { seats, mapId: 'nexus' });
+    retry.click();
+    await settle();
+    expect(fetched.map((f) => f.url)).toEqual(Array(3).fill(`${HTTP}/matches/m1/seats?nick=Orion`));
+    expect(overlay().style.display).toBe('none');
+    expect(of('enterNetSetup')).toEqual([['enterNetSetup', 'm1', 'nexus', entryOffer(seats)]]);
   });
 });
 

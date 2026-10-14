@@ -66,7 +66,6 @@ function hostOf(over: Partial<SciPickHost> = {}): SciPickHost {
     setChosen: (v) => {
       chosen = v;
     },
-    onCancel: () => {},
     ...over,
   };
 }
@@ -172,7 +171,6 @@ describe('совет учёных — клики', () => {
   function wired(initial: string[] = []) {
     const win = fakeWin();
     let chosen = [...initial];
-    let cancelled = 0;
     const api = initSciPick(
       hostOf({
         root: () => win.root,
@@ -181,7 +179,6 @@ describe('совет учёных — клики', () => {
         setChosen: (v) => {
           chosen = v;
         },
-        onCancel: () => cancelled++,
       }),
     );
     return {
@@ -189,9 +186,6 @@ describe('совет учёных — клики', () => {
       api,
       get chosen() {
         return chosen;
-      },
-      get cancelled() {
-        return cancelled;
       },
     };
   }
@@ -244,12 +238,12 @@ describe('совет учёных — клики', () => {
     expect(full.win.shown()).toBe(false);
   });
 
-  it('отмена закрывает окно и выводит из настройки матча', () => {
-    const w = wired();
+  it('«Закрыть» закрывает окно и оставляет выбор как есть', () => {
+    const w = wired([ids()[0]!]);
     w.api.open();
     w.win.fire(click('.sp-cancel'));
     expect(w.win.shown()).toBe(false);
-    expect(w.cancelled).toBe(1);
+    expect(w.chosen).toEqual([ids()[0]!]);
   });
 
   it('чужой клик ничего не меняет', () => {
