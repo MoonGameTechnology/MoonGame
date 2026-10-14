@@ -99,12 +99,16 @@ describe('DailyJsonl', () => {
     expect(readLines(join(dir, 'match-2026-10-14.jsonl'))).toHaveLength(1);
   });
 
-  it('flushSync writes the queue at once (shutdown path)', () => {
+  it('shutdown mid-append: the final summary lands after the in-flight lines', async () => {
     const dir = tempDir();
     const log = new DailyJsonl({ dir, prefix: 'match', now: () => DAY1, flushDelayMs: 60_000 });
+    log.write({ kind: 'a' });
+    const inFlight = log.flush();
+    await Promise.resolve(); // the batch has left the queue, its append is pending
     log.write({ kind: 'summary' });
-    log.flushSync();
-    expect(readLines(join(dir, 'match-2026-10-14.jsonl')).map((r) => r.kind)).toEqual(['summary']);
+    await log.flush(); // what shutdown awaits
+    await inFlight;
+    expect(readLines(join(dir, 'match-2026-10-14.jsonl')).map((r) => r.kind)).toEqual(['a', 'summary']);
   });
 
   it('concurrent flushes keep line order', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listMatches, parseReportArgs, selectLines } from './reportSelect.mjs';
+import { lastSummaries, listMatches, parseReportArgs, selectLines } from './reportSelect.mjs';
 
 const twoMatches = [
   { t: 1, match: 'm1', kind: 'join', playerId: 'p1' },
@@ -27,6 +27,22 @@ describe('parseReportArgs', () => {
   });
 });
 
+describe('lastSummaries', () => {
+  it('keeps the last snapshot of each run, runs apart, in order', () => {
+    const lines = [
+      { kind: 'summary', run: 'a', summary: { n: 1 } },
+      { kind: 'join' },
+      { kind: 'summary', run: 'a', summary: { n: 2 } },
+      { kind: 'summary', run: 'b', summary: { n: 1 } },
+    ];
+    expect(lastSummaries(lines)).toEqual([{ n: 2 }, { n: 1 }]);
+  });
+
+  it('an old file without run ids has one run', () => {
+    expect(lastSummaries([{ kind: 'summary', summary: { n: 1 } }, { kind: 'summary', summary: { n: 3 } }])).toEqual([{ n: 3 }]);
+  });
+});
+
 describe('listMatches', () => {
   it('lists matches by first appearance with line counts', () => {
     expect(listMatches(twoMatches)).toEqual([
@@ -45,6 +61,15 @@ describe('selectLines', () => {
     const r = selectLines(twoMatches, 'm1');
     expect(r.lines.map((l) => l.t)).toEqual([1, 3, 4]);
     expect(r.summaryScope).toBe('process');
+  });
+
+  it('a daily journal (summaries carry run) is process-wide even with one match', () => {
+    const daily = [
+      { t: 1, match: 'm1', kind: 'join', playerId: 'p1' },
+      { t: 2, kind: 'summary', run: 'r1', summary: {} },
+    ];
+    expect(selectLines(daily, undefined).summaryScope).toBe('process');
+    expect(selectLines(daily, 'm1').summaryScope).toBe('process');
   });
 
   it('a one-match file reads as before, summary scoped to the match', () => {

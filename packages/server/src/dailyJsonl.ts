@@ -6,7 +6,7 @@
 // throws — telemetry losing a line is acceptable, a room stalling on a slow disk is not.
 // Pure observation: nothing here feeds back into any room.
 
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -75,7 +75,9 @@ export class DailyJsonl {
     this.schedule();
   }
 
-  /** Append everything queued so far. Resolves once it is on disk (or counted failed). */
+  /** Append everything queued so far. Resolves once it is on disk (or counted failed).
+   *  An append already in flight finishes first, so this is also the shutdown path: await
+   *  it before exit and every line lands, in order. */
   flush(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer);
@@ -87,22 +89,6 @@ export class DailyJsonl {
       if (this.flushing === run) this.flushing = undefined;
     });
     return run;
-  }
-
-  /** Shutdown path: write what is queued synchronously — the process is about to exit. */
-  flushSync(): void {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = undefined;
-    }
-    for (const [day, text] of this.takeByDay()) {
-      try {
-        appendFileSync(this.fileFor(day), text);
-        this.stats_.written += countLines(text);
-      } catch {
-        this.stats_.failed += countLines(text);
-      }
-    }
   }
 
   private fileFor(day: string): string {

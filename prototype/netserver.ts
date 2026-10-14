@@ -45,6 +45,8 @@ import {
   DailyJsonl,
   analyticsActorFromEnv,
   journalRecord,
+  registerTelemetryApi,
+  type TelemetryStats,
   createMultiplayerServer,
   wsLimitsFromEnv,
   tlsFromEnv,
@@ -150,8 +152,21 @@ const SUMMARY_EVERY_MS = 10 * 60 * 1000;
 // PTM-0.2: the seat's account becomes the analytics pseudonym `actor`; the raw account
 // id never reaches the journal (nor `/metrics/recent`, which serves its lines).
 const actorOf = analyticsActorFromEnv(process.env);
+// PTM-1.1: browser product events, their own daily file (the receiver is wired in
+// `httpRoutes` below, where the session check lives).
+const clientLog = new DailyJsonl({ dir: 'playtest-logs', prefix: 'client' });
+let telemetryStats: (() => TelemetryStats) | undefined;
+// A summary is a cumulative snapshot of THIS process; a restart within the UTC day appends
+// a fresh run to the same file, and the report keeps each run's last snapshot apart.
+const RUN_ID = Date.now().toString(36);
 const writeSummary = (): void =>
-  matchLog.write({ kind: 'summary', summary: metrics.summary(), log: matchLog.stats() });
+  matchLog.write({
+    kind: 'summary',
+    run: RUN_ID,
+    summary: metrics.summary(),
+    log: matchLog.stats(),
+    client: { log: clientLog.stats(), ...(telemetryStats ? { receiver: telemetryStats() } : {}) },
+  });
 setInterval(writeSummary, SUMMARY_EVERY_MS).unref();
 const SLOW_MS = 50; // a submit/broadcast slower than this is worth a JSONL line
 const FAT_DELTA_BYTES = 10_240; // a per-player delta fatter than this too (target: idle < 1 KB)
@@ -986,7 +1001,15 @@ const server = createMultiplayerServer({
         await matchLog.flush();
         const file = matchLog.currentFile();
         const lines = readFileSync(file, 'utf8').trimEnd().split('\n');
-        return { file, total: lines.length, recent: lines.slice(-n).map((l) => JSON.parse(l)) };
+        // A crash can leave one torn line mid-file; it must not hide every line after it.
+        const recent = lines.slice(-n).flatMap((l) => {
+          try {
+            return [JSON.parse(l) as unknown];
+          } catch {
+            return [];
+          }
+        });
+        return { file, total: lines.length, recent };
       } catch {
         return { file: matchLog.currentFile(), total: 0, recent: [] };
       }
@@ -1006,6 +1029,12 @@ const server = createMultiplayerServer({
       const who = bearer ? await authCfg.verifySession!(bearer) : null;
       return who?.ok ? liveSession(who.claim, userStore) : null;
     };
+    telemetryStats = registerTelemetryApi(app, {
+      log: clientLog,
+      ...(AUTH ? { identify: identifySession } : {}),
+      ...(actorOf ? { actorOf } : {}),
+      ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
+    });
     // REL-7: seat selection — list the match's slots (faction, name, start planet,
     // taken) so the client can render a faction picker BEFORE joining. The player
     // chooses a slot, then GET /matches/:id/join?slot= reserves it.
@@ -1405,7 +1434,6 @@ const shutdown = (): void => {
   // have no full latency/delta aggregates to read.
   try {
     writeSummary();
-    matchLog.flushSync();
   } catch {
     /* the report just falls back to the partial per-line data */
   }
@@ -1417,6 +1445,9 @@ const shutdown = (): void => {
   void (async () => {
     // Final flush per room so the latest state of EVERY session is durable before exit.
     for (const h of hosted) await h.flush();
+    // The journals last: `flush()` waits for an append already in flight, then writes the
+    // rest, so the summary lands after every line before it and nothing is cut by exit.
+    await Promise.all([matchLog.flush(), clientLog.flush()]);
     if (pool) await pool.end();
     await server.close();
     process.exit(0);

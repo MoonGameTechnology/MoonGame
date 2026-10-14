@@ -47,6 +47,8 @@ import {
   takeJoinToken,
 } from './accountSession';
 import { detach } from './detach';
+import { getPlatform } from './platform/host';
+import { admittedEvents, wsClosedProps } from '../../decisions/sessionAnalytics';
 import { dropPing, takeChat, takePing } from './messageLog';
 import { showStage } from './signInPages';
 import { WAIT_MARK, waitingBanner } from './snapshotIngest';
@@ -109,6 +111,24 @@ let netTicketKey = '';
 /** Текущий сокет получил приветственный снимок (нас впустили). Было локальной переменной
  *  дозвона; переехало наверх, потому что обработчики клиента теперь переживают сокет. */
 let socketAdmitted = false;
+/** PTM-1.2: когда начат текущий дозвон и когда текущий сокет впустили (`performance.now`). */
+let dialAt = 0;
+let admittedAt = 0;
+const JOINED_KEY = 'void.telemetry.joined';
+
+/** PTM-1.2: впустили — `ws_ready`, а на первом входе ещё и `match_joined`. */
+function reportAdmitted(reconnect: boolean): void {
+  let firstEver = false;
+  try {
+    firstEver = localStorage.getItem(JOINED_KEY) === null;
+    if (firstEver) localStorage.setItem(JOINED_KEY, '1');
+  } catch {
+    /* хранилище закрыто — «впервые» неизвестно, считаем, что нет */
+  }
+  admittedAt = performance.now();
+  for (const { event, props } of admittedEvents({ connectMs: admittedAt - dialAt, reconnect, firstEver }))
+    getPlatform().analytics.emit(event, props);
+}
 // M0 net telemetry (dev overlay): smoothed round-trip ms, and a desync check that
 // compares our reconstructed view to the server's hash on the snapshots that carry one.
 export let rttEma: number | null = null;
@@ -268,6 +288,7 @@ function netClientFor(seat: string): MultiplayerClient {
         const plan = welcomePlan({ admitted: socketAdmitted, reconnecting, banner: game.banner() });
         game.setBanner(plan.banner);
         if (plan.admit) {
+          reportAdmitted(reconnecting);
           // Server accepted us — NOW we're really in the match.
           socketAdmitted = true;
           netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
@@ -386,6 +407,7 @@ export function connect(): void {
   // the first welcome snapshot, so a rejected join never flashes the map.
   socketAdmitted = false;
   if (netSock) netSock.close();
+  dialAt = performance.now();
   const sock = (netSock = new WebSocket(url));
   // Клиент привязан к МЕСТУ, а не к сокету (NETA2-5): дозвон в то же место берёт прежнего
   // вместе с его очередью приказов, дозвон в другое — заводит чистого.
@@ -400,7 +422,7 @@ export function connect(): void {
     if (!isCurrentSocket(sock, netSock)) return;
     client.receive(String(ev.data));
   };
-  sock.onclose = () => {
+  sock.onclose = (ev?: CloseEvent) => {
     // Что значит это закрытие — `socketFate.ts` (REFM-143): устаревший сокет (игрок
     // нажал «Подключиться» ещё раз) НЕ должен рушить свежую сессию — его позднее
     // закрытие погасило бы её таймеры и выбросило оверлей поверх живой игры.
@@ -412,6 +434,9 @@ export function connect(): void {
       admitted: socketAdmitted,
     });
     if (fate === 'ignore') return;
+    // PTM-1.2: оборвалась связь, в которую нас уже впустили. Выход игрока сюда не доходит.
+    if (socketAdmitted)
+      getPlatform().analytics.emit('ws_closed', wsClosedProps(ev?.code ?? 0, performance.now() - admittedAt));
     stopNetTimers();
     // Закрытие, затеянное игроком, сюда не доходит: выход идёт через `leaveNetwork`, а она
     // забывает сокет до закрытия, и `closeAction` видит чужой сокет (REFM-205).

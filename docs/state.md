@@ -4504,11 +4504,11 @@ id `__proto__` писало `level: NaN` прямо в `Object.prototype`. Не�
 **Платформенный слой появился (`YAG-1.1a`).** `prototype/src/platform/types.ts` — контракты
 `GamePlatform` (`auth`/`save`/`ads`/`iap`/`analytics` и необязательный `language`),
 `PlatformCapabilities` и словарь
-`PLATFORM_EVENTS` из десяти событий, один на все площадки. `prototype/src/platform/web.ts` —
+`PLATFORM_EVENTS`, один на все площадки. `prototype/src/platform/web.ts` —
 `createWebPlatform`, площадка по умолчанию: обычный браузер, разработка и тесты, внешнего
 SDK не требует.
 
-**Словарь эмитится (`YAG-5.1` 🔶 2026-09-24): восемь событий из десяти.**
+**Словарь эмитится (`YAG-5.1` 🔶 2026-09-24): всё, кроме `iap_*`.**
 - `session_started` — на загрузке страницы, с точкой входа.
 - `onboarding_step` — этапы боя с пиратами главы I.
 - `pve_started` — новая попытка; «Продолжить» и дев-забег попыткой не считаются.
@@ -4518,9 +4518,12 @@ SDK не требует.
   устройства открытием не считается.
 - `rewarded_ad_offered` / `rewarded_ad_completed` — из одной двери `watchAd`.
 
-`iap_*` ждут покупок (`YAG-4.2`). Решения — `decisions/runAnalytics.ts`. **Приёмника пока
-нет:** веб-площадка складывает события в `events`, адаптер Яндекса — в память
-(`analytics: false`). Доставка — остаток кирпича.
+`iap_*` ждут покупок (`YAG-4.2`). Решения — `decisions/runAnalytics.ts`. **Веб-площадка
+доставляет события на игровой сервер (`PTM-1.1`):** `POST /telemetry` пишет их в
+`playtest-logs/client-YYYY-MM-DD.jsonl` (см. `docs/playtest-telemetry-roadmap.md`), словарь
+объявлен в `packages/protocol/src/telemetry.ts`. Необработанные ошибки браузера уходят
+событием `client_error` — тип и место без текста (`PTM-1.3`). Адаптер Яндекса держит их в памяти
+(`analytics: false`), его доставка — остаток `YAG-5.1`.
 
 **Адаптер Яндекса — жизненный цикл (`YAG-1.2`, 🔶 2026-09-22).**
 `prototype/src/platform/yandex.ts` получает УЖЕ поднятый `ysdk` и переводит его в тот же
