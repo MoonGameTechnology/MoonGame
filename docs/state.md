@@ -4515,9 +4515,11 @@ SDK не требует.
   устройства открытием не считается.
 - `rewarded_ad_offered` / `rewarded_ad_completed` — из одной двери `watchAd`.
 
-`iap_*` ждут покупок (`YAG-4.2`). Решения — `decisions/runAnalytics.ts`. **Приёмника пока
-нет:** веб-площадка складывает события в `events`, адаптер Яндекса — в память
-(`analytics: false`). Доставка — остаток кирпича.
+`iap_*` ждут покупок (`YAG-4.2`). Решения — `decisions/runAnalytics.ts`. **Веб-площадка
+доставляет события на игровой сервер (`PTM-1.1`):** `POST /telemetry` пишет их в
+`playtest-logs/client-YYYY-MM-DD.jsonl` (см. `docs/playtest-telemetry-roadmap.md`), словарь
+объявлен в `packages/protocol/src/telemetry.ts`. Адаптер Яндекса держит их в памяти
+(`analytics: false`), его доставка — остаток `YAG-5.1`.
 
 **Адаптер Яндекса — жизненный цикл (`YAG-1.2`, 🔶 2026-09-22).**
 `prototype/src/platform/yandex.ts` получает УЖЕ поднятый `ysdk` и переводит его в тот же

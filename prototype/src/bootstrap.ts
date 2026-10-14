@@ -21,6 +21,9 @@ import {
 import { sdkLoaderPresent } from './platform/sdkWait';
 import { loadLocaleAsset } from './platform/localeAsset';
 import { measureViewport } from './viewport';
+import { createBrowserTelemetrySink } from './platform/telemetrySink';
+import { telemetryTarget } from '../../decisions/telemetryEndpoint';
+import { anyToken } from '../../decisions/sessionStore';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
@@ -97,9 +100,43 @@ function loaderReady(): Promise<YaGamesGlobal | undefined> {
   });
 }
 
+/**
+ * PTM-1.1: продуктовые события веб-адаптера уходят на игровой сервер — тот, что стоит в
+ * поле «сервер» (`decisions/telemetryEndpoint.ts`). Архив площадки их туда не шлёт: там
+ * события принимает сама площадка, а запросы к нашему серверу из её сборки — сторонний
+ * сервис. Сток живёт до импорта игры, поэтому событие `session_started` уже доедет.
+ */
+function telemetrySink(): ReturnType<typeof createBrowserTelemetrySink> | undefined {
+  if (__SECTOR_ZERO_ONLY__) return undefined;
+  const sha = currentBuild()?.sha ?? '';
+  const sink = createBrowserTelemetrySink({
+    target: () => {
+      let stored: string | null = null;
+      try {
+        stored = localStorage.getItem('void.server');
+      } catch {
+        /* хранилище закрыто — остаётся адрес страницы */
+      }
+      return telemetryTarget(stored, location);
+    },
+    token: (base) => {
+      try {
+        return anyToken(localStorage, base);
+      } catch {
+        return null;
+      }
+    },
+    build: /^[0-9a-f]{7,40}$/i.test(sha) ? `apk-${sha.slice(0, 12)}` : __PLAYER_BUILD__ ? 'web' : 'dev',
+  });
+  window.addEventListener('pagehide', () => sink.pageHide());
+  return sink;
+}
+const telemetry = telemetrySink();
+
 loaderReady()
   .then((yaGames) =>
     createPlatform({
+      ...(telemetry ? { sink: (event, props) => telemetry.emit(event, props) } : {}),
       simulate: !__PLAYER_BUILD__,
       yaGames,
       // Сбой чужого SDK — в лог разработчика, а не на экран игроку: сообщение или стек

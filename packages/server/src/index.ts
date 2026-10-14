@@ -70,6 +70,12 @@ export {
   journalRecord,
   type ActorOf,
 } from './analyticsActor';
+export {
+  registerTelemetryApi,
+  type TelemetryApiOptions,
+  type TelemetryLog,
+  type TelemetryStats,
+} from './telemetryApi';
 export { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 export {
   hmacSecret,

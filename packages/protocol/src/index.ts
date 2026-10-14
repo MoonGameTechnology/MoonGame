@@ -17,6 +17,7 @@ export * from './corpInfrastructure';
  * imports TYPES only, so the runtime half tree-shakes away and its bundle is unchanged.
  */
 export * from './playerProfile';
+export * from './telemetry';
 import type {
   Action,
   DomainEvent,

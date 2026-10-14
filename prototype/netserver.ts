@@ -45,6 +45,8 @@ import {
   DailyJsonl,
   analyticsActorFromEnv,
   journalRecord,
+  registerTelemetryApi,
+  type TelemetryStats,
   createMultiplayerServer,
   wsLimitsFromEnv,
   tlsFromEnv,
@@ -150,8 +152,17 @@ const SUMMARY_EVERY_MS = 10 * 60 * 1000;
 // PTM-0.2: the seat's account becomes the analytics pseudonym `actor`; the raw account
 // id never reaches the journal (nor `/metrics/recent`, which serves its lines).
 const actorOf = analyticsActorFromEnv(process.env);
+// PTM-1.1: browser product events, their own daily file (the receiver is wired in
+// `httpRoutes` below, where the session check lives).
+const clientLog = new DailyJsonl({ dir: 'playtest-logs', prefix: 'client' });
+let telemetryStats: (() => TelemetryStats) | undefined;
 const writeSummary = (): void =>
-  matchLog.write({ kind: 'summary', summary: metrics.summary(), log: matchLog.stats() });
+  matchLog.write({
+    kind: 'summary',
+    summary: metrics.summary(),
+    log: matchLog.stats(),
+    client: { log: clientLog.stats(), ...(telemetryStats ? { receiver: telemetryStats() } : {}) },
+  });
 setInterval(writeSummary, SUMMARY_EVERY_MS).unref();
 const SLOW_MS = 50; // a submit/broadcast slower than this is worth a JSONL line
 const FAT_DELTA_BYTES = 10_240; // a per-player delta fatter than this too (target: idle < 1 KB)
@@ -1006,6 +1017,12 @@ const server = createMultiplayerServer({
       const who = bearer ? await authCfg.verifySession!(bearer) : null;
       return who?.ok ? liveSession(who.claim, userStore) : null;
     };
+    telemetryStats = registerTelemetryApi(app, {
+      log: clientLog,
+      ...(AUTH ? { identify: identifySession } : {}),
+      ...(actorOf ? { actorOf } : {}),
+      ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
+    });
     // REL-7: seat selection — list the match's slots (faction, name, start planet,
     // taken) so the client can render a faction picker BEFORE joining. The player
     // chooses a slot, then GET /matches/:id/join?slot= reserves it.
@@ -1406,6 +1423,7 @@ const shutdown = (): void => {
   try {
     writeSummary();
     matchLog.flushSync();
+    clientLog.flushSync();
   } catch {
     /* the report just falls back to the partial per-line data */
   }

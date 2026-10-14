@@ -25,7 +25,7 @@
  * Это тот же fail-secure, что в ядре: ошибка → отказ в возможности, никогда не молчаливый
  * проход.
  */
-import { createWebPlatform } from './web';
+import { createWebPlatform, type WebPlatformOptions } from './web';
 import { createYandexPlatform, type YandexSdk } from './yandex';
 import type { GamePlatform } from './types';
 
@@ -61,6 +61,8 @@ export interface PlatformHostOptions {
   yaGames?: YaGamesGlobal;
   /** Куда сообщать о сбоях чужого SDK. Молчать нельзя, падать — тем более. */
   onSdkError?: (where: string, error: unknown) => void;
+  /** Сток аналитики веб-адаптера (PTM-1.1). Адаптер площадки шлёт события ей самой. */
+  sink?: WebPlatformOptions['sink'];
 }
 
 /**
@@ -74,7 +76,8 @@ export const SDK_INIT_TIMEOUT_MS = 10_000;
  * Поднять площадку. Всегда резолвится — отказ площадки это тоже рабочий исход.
  */
 export async function createPlatform(options: PlatformHostOptions): Promise<GamePlatform> {
-  const fallback = (): GamePlatform => createWebPlatform({ simulate: options.simulate });
+  const fallback = (): GamePlatform =>
+    createWebPlatform({ simulate: options.simulate, ...(options.sink ? { sink: options.sink } : {}) });
   const loader = options.yaGames;
   // Нет тега, старый лоадер без `init`, чужая страница — всё это не ошибка, а просто
   // «мы не на площадке». Сообщать хозяину не о чем, поэтому и не сообщаем.
