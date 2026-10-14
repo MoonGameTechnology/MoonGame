@@ -43,6 +43,7 @@ import {
   pveOrders,
   MetricsAggregator,
   createMultiplayerServer,
+  wsLimitsFromEnv,
   tlsFromEnv,
   registerBrowserApi,
   registerMatchApi,
@@ -891,6 +892,8 @@ const server = createMultiplayerServer({
   // схлопывается в один bucket. Зеркалит packages/server/src/main.ts.
   ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
   trustProxy: process.env.TRUST_PROXY === '1',
+  // Лимиты WS-рукопожатия на адрес — те же переменные, что у packages/server/src/main.ts.
+  ...wsLimitsFromEnv(process.env),
   // RS-5.1: native TLS — TLS_KEY_FILE+TLS_CERT_FILE ⇒ this host serves wss:// itself (no
   // nginx needed for a single-node playtest). Unset ⇒ plain ws (proxy may terminate TLS).
   tls: tlsFromEnv(),

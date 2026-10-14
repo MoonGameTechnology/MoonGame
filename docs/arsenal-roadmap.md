@@ -234,7 +234,9 @@ JSONL (EC-5.1 позже заберёт).
 > реплей прохода был бит-идентичен и складывался с exactly-once. Exactly-once —
 > `DropStore.claim` (PK (match, account), ON CONFLICT DO NOTHING): повторный `end`
 > не роллит и не бампает pity второй раз; сам грант тоже идемпотентен
-> (`drop:<match>:<acc>`). Дроп — ТОРГУЕМЫЙ чертёж `origin: drop` (F2P-кэтчап кормит
+> (`drop:<match>:<acc>`). Счётчик pity читается и сдвигается ОДНИМ шагом стора
+> (`DropStore.stepPity`, в Postgres — под `FOR UPDATE`): два матча аккаунта, закончившиеся
+> разом, видят серию по очереди, и одна серия не даёт двух гарантированных дропов. Дроп — ТОРГУЕМЫЙ чертёж `origin: drop` (F2P-кэтчап кормит
 > аукцион, ARS-0). Сальваж: `salvageFromEvents` над observe-батчем — осколки
 > победителю каждого `battle.resolved` от павшего вражеского состава (`unit.died`
 > несёт `owner`), цены per-unit в данных; баланс осколков в `DropStore` (вход

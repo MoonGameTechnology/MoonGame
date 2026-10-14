@@ -18,7 +18,7 @@ import {
 } from './scenario';
 import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
-import { createMultiplayerServer, tlsFromEnv } from './wsServer';
+import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
@@ -494,6 +494,9 @@ const server = createMultiplayerServer({
   // Behind a TLS-terminating proxy (Caddy), set TRUST_PROXY=1 so request.ip (and the
   // auth API's per-IP rate limit) sees the client, not the proxy.
   trustProxy: process.env.TRUST_PROXY === '1',
+  // Лимиты WS-рукопожатия на адрес (`WS_RATE_MAX` / `WS_RATE_WINDOW_MS` / `WS_MAX_PER_IP`);
+  // без переменных — дефолты `wsServer.ts`.
+  ...wsLimitsFromEnv(process.env),
   // RS-5.1: native TLS — set TLS_KEY_FILE+TLS_CERT_FILE to serve wss:// in-process (no
   // proxy needed). Unset ⇒ undefined ⇒ plain ws (a proxy may still terminate upstream).
   tls: tlsFromEnv(process.env),
