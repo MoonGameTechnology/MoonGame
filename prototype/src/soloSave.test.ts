@@ -111,12 +111,12 @@ describe('normal single-player checkpoint', () => {
       expect(parseSoloSave(serializeSoloSave(malformed, rules), rules)).toBeNull();
     }
   });
-  it('refuses completed games and modes outside normal solo or authored 2v2', () => {
+  it('refuses completed games and modes outside normal solo or the authored team maps', () => {
     const save = checkpoint();
     save.state.match.status = 'ended';
     expect(parseSoloSave(serializeSoloSave(save, rules), rules)).toBeNull();
     save.state.match.status = 'ongoing';
-    for (const mode of ['sector-zero', 'training', 'team_3v3', 'standard', 'unknown']) {
+    for (const mode of ['sector-zero', 'training', 'team_4v4', 'standard', 'unknown']) {
       save.state.modeId = mode;
       expect(parseSoloSave(serializeSoloSave(save, rules), rules)).toBeNull();
     }

@@ -48,3 +48,13 @@ export function resolveMatchConfig(data: GameData, config: MatchConfig): ModeRes
     config: { ...config, victory: { ...mode.victory, ...config.victory } },
   };
 }
+
+/** Team modes whose sides are MATCH RULES fixed at the start (`Player.team`), not
+ *  treaties: no cross-side peace, no teammate war, the score race counts sides. Only
+ *  the formats an authored map seats today; other team formats keep their old rules. */
+export const FIXED_SIDE_MODES: readonly string[] = ['team_2v2', 'team_3v3'];
+
+/** Does this match play with fixed sides? Unset mode — no. */
+export function hasFixedSides(modeId: string | undefined): boolean {
+  return modeId !== undefined && FIXED_SIDE_MODES.includes(modeId);
+}

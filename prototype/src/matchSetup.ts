@@ -26,7 +26,7 @@ import {
 import { data } from './gameData';
 import { botCouncil } from './botCouncil';
 import { SECTOR_TYPES, START_CANDIDATES } from './map';
-import { isFrontier, isCurrentMap, mapPreset, teamForStart, type MapId } from './mapCatalog';
+import { fixedSideMode, isFrontier, isCurrentMap, mapPreset, teamForStart, type MapId } from './mapCatalog';
 import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
@@ -167,6 +167,14 @@ const NETWORK_HOUSES = [
  *  игру, в которую никто не играет. */
 export const PLAYABLE_FACTIONS: readonly string[] = NETWORK_HOUSES.map((h) => h.faction);
 
+/** House of seat `i`: the four houses cycle, later rounds get a numeral (`II`, `III`). */
+function networkHouse(i: number): { name: string; faction: string } {
+  const house = NETWORK_HOUSES[i % NETWORK_HOUSES.length]!;
+  const cycle = Math.floor(i / NETWORK_HOUSES.length) + 1;
+  const suffix = cycle === 1 ? '' : cycle === 2 ? ' II' : cycle === 3 ? ' III' : ` ${cycle}`;
+  return { name: `${house.name}${suffix}`, faction: house.faction };
+}
+
 const NETWORK_MODES: readonly NetworkMatchMode[] = ['ffa', ...TEAM_MODES, 'pve'];
 
 export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMode {
@@ -188,11 +196,11 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nex
   if (isCurrentMap(mapId)) {
     return START_CANDIDATES.map((start, i) => ({
       id: `p${i + 1}`,
-      ...NETWORK_HOUSES[i]!,
+      ...networkHouse(i),
       start,
       ai: false,
       ...(mapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' }
-        : mapId === 'team-2v2' ? { team: teamForStart(mapId, start) } : {}),
+        : fixedSideMode(mapId) ? { team: teamForStart(mapId, start) } : {}),
     }));
   }
   if (mode === 'pve') {
@@ -209,13 +217,9 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nex
   // Половина мест — сторона A, половина — B; у `ffa` сторон нет вовсе.
   const half = startIndexes.length / 2;
   return startIndexes.map((startIndex, i) => {
-    const house = NETWORK_HOUSES[i % NETWORK_HOUSES.length]!;
-    const cycle = Math.floor(i / NETWORK_HOUSES.length) + 1;
-    const suffix = cycle === 1 ? '' : cycle === 2 ? ' II' : cycle === 3 ? ' III' : ` ${cycle}`;
     return {
       id: `p${i + 1}`,
-      name: `${house.name}${suffix}`,
-      faction: house.faction,
+      ...networkHouse(i),
       start: START_CANDIDATES[startIndex]!,
       ai: false,
       ...(teamStarts ? { team: i < half ? 'A' : 'B' } : {}),
@@ -511,10 +515,11 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       : [['cruiser', 3], ['scout', 1]];
     fleets[`${id}-1`] = fleet(`${id}-1`, id, n.id, ships, []);
   }
+  const fixedMode = fixedSideMode(preset.id);
   const teamOf = new Map(setup.seats.map((seat) => [seat.id,
-    preset.id === 'team-2v2' ? teamForStart(preset.id, seat.start) : seat.team]));
-  // Only this authored map has fixed sides; legacy setup teams seed diplomacy only.
-  if (preset.id === 'team-2v2') {
+    fixedMode ? teamForStart(preset.id, seat.start) : seat.team]));
+  // Only the authored team maps have fixed sides; legacy setup teams seed diplomacy only.
+  if (fixedMode) {
     for (const [id, team] of teamOf) if (players[id] && team !== undefined) players[id]!.team = team;
   }
   const teamed = [...teamOf.values()].some((team) => team !== undefined);
@@ -561,7 +566,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     mapId: preset.id,
     // Режим пишется ТОЛЬКО когда он задан: пустое поле в состоянии и отсутствие поля —
     // разные вещи для ленты браузера, которая молчание читает как «режим неизвестен».
-    ...(preset.id === 'team-2v2' ? { modeId: 'team_2v2' }
+    ...(fixedMode ? { modeId: fixedMode }
       : setup.modeId !== undefined ? { modeId: setup.modeId } : {}),
     players,
     planets,

@@ -26,6 +26,7 @@ import { data, hpOfLevel, type MapNode, type SECTOR_TYPES } from './game';
 import { fxBlur, fxBreath } from './graphicsPrefs';
 import { hasTerrainMaterial } from './holographicSurface';
 import { BUILD_ICON, KIND_ICON } from './icons';
+import { isCurrentMap, mapPreset } from './mapCatalog';
 import { selFork, selPlanet } from './interaction';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { visible, world } from './mapCamera';
@@ -85,7 +86,9 @@ function drawRegionLabels(lod: MapLod): void {
   const cx = game.ctx();
   const alpha = regionLabelAlpha(lod.provinceDetail);
   if (alpha <= 0) return;
-  const labels = regionLabels(s.mapId, mapRegions(s.mapId), (id) => s.planets[id]?.position);
+  // Карты матча (2 на 2) несут области в своём пресете; полигон — в данных клиента.
+  const regions = isCurrentMap(s.mapId) ? (mapPreset(s.mapId).map?.regions ?? []) : mapRegions(s.mapId);
+  const labels = regionLabels(s.mapId, regions, (id) => s.planets[id]?.position);
   if (labels.length === 0) return;
   cx.save();
   cx.globalAlpha *= alpha;

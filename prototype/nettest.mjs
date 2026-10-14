@@ -329,11 +329,11 @@ try {
     await page.locator('#setupmaps [data-map]').first().waitFor({ state: 'visible' });
     assert.deepEqual(await page.locator('#setupmaps [data-map]').evaluateAll(
       (chips) => chips.map((chip) => chip.getAttribute('data-map')),
-    ), ['duel-1', 'ffa-4', 'team-2v2']);
+    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3']);
     await page.click('#setupcancel');
     assert.deepEqual(await page.locator('#match-create-map option:not([hidden])').evaluateAll(
       (options) => options.map((option) => option.value),
-    ), ['duel-1', 'ffa-4', 'team-2v2']);
+    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3']);
     for (const id of ['hub-sector-zero', 'hub-proving-ground'])
       assert.equal(await page.locator(`#${id}`).isVisible(), false);
     console.log('✓ карты: меню предлагает 1 на 1, FFA на четверых и 2 на 2');

@@ -1,4 +1,5 @@
 import type { GameModule } from '../kernel/module';
+import { hasFixedSides } from '../action/matchMode';
 import type { DiplomaticStance } from '../state/gameState';
 import {
   clearMapShareOffers,
@@ -80,7 +81,7 @@ export const diplomacyModule: GameModule = {
       }
       // Fixed sides are match rules, not revocable treaties. Check before creating
       // an offer too: a friendly bot must not accept cross-team peace downstream.
-      if (h.ctx.config?.modeId === 'team_2v2' && !actor.npc && !victim.npc &&
+      if (hasFixedSides(h.ctx.config?.modeId) && !actor.npc && !victim.npc &&
           actor.team !== undefined && victim.team !== undefined) {
         const fixed = actor.team === victim.team ? 'alliance' : 'war';
         if (stance !== fixed) return h.reject('E_FORBIDDEN');

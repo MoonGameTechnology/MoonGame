@@ -14,6 +14,7 @@ import type {
 import {
   clearOffers,
   getStance,
+  hasFixedSides,
   setStance,
   timeScaleOf,
   type DiplomaticStance,
@@ -122,7 +123,7 @@ export const botDiplomacyModule: GameModule = {
           // A fixed teammate remains an ally even after counter-intelligence
           // fallout; the favour meter cannot bypass the core declaration guard.
           const side = h.state.players[bot]!.team;
-          if (h.ctx.config?.modeId === 'team_2v2' && side !== undefined &&
+          if (hasFixedSides(h.ctx.config?.modeId) && side !== undefined &&
               side === h.state.players[player]!.team) continue;
           const atWar = getStance(h.state, bot, player) === 'war';
           meter[player] = atWar
