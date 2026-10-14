@@ -42,6 +42,7 @@
 | 2026-09-24 | [`2026-09-24-sector-zero-readiness.md`](2026-09-24-sector-zero-readiness.md) | Sector Zero: готовность к Яндекс Играм — скоркарта, 10 находок, статус OBS-01…17, порядок до подачи |
 | 2026-10-08 | [Плейтест — текст](2026-10-08-playtest/REPORT.txt) · [HTML со скриншотами](2026-10-08-playtest/REPORT.html) · [Доказательства](https://github.com/MoonGameTechnology/MoonGame/blob/a91af1ff972730de1951f60a1d42840950c87baf/docs/reviews/2026-10-08-playtest/evidence.zip) | Void Dominion / Averion: Sector Zero: первый проход, PT-01…PT-06; проверен `cbd2a6a` |
 | 2026-10-09 | [Дополнительный плейтест — текст](2026-10-09-playtest/REPORT.txt) · [HTML со скриншотами](2026-10-09-playtest/REPORT.html) · [Доказательства](https://github.com/MoonGameTechnology/MoonGame/blob/a91af1ff972730de1951f60a1d42840950c87baf/docs/reviews/2026-10-09-playtest/evidence.zip) | Свежая main `29f8608`: 9 замечаний, 3 новых; три движка, 96 self-play, сеть/нагрузка/бэкап/рестарт |
+| 2026-10-14 | [Промежуточный пентест MoonMCP](2026-10-14-moonmcp-interim-pentest.md) | AUTH=1, WebSocket/fog/corp/market: подтверждённые live-контроли, находки V-1—V-7, ограничения и порядок исправлений |
 
 Архивы доказательств плейтестов (`evidence.zip`, по 42 МБ) лежат не в рабочем дереве, а в
 истории git: ссылки в таблице ведут на коммит, где они есть. Рабочее дерево целиком уходит в
