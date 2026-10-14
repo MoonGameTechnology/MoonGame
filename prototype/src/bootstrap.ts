@@ -22,6 +22,7 @@ import { sdkLoaderPresent } from './platform/sdkWait';
 import { loadLocaleAsset } from './platform/localeAsset';
 import { measureViewport } from './viewport';
 import { createBrowserTelemetrySink } from './platform/telemetrySink';
+import { createErrorReporter, installErrorReporter } from './platform/errorReporter';
 import { telemetryTarget } from '../../decisions/telemetryEndpoint';
 import { anyToken } from '../../decisions/sessionStore';
 
@@ -128,10 +129,29 @@ function telemetrySink(): ReturnType<typeof createBrowserTelemetrySink> | undefi
     },
     build: /^[0-9a-f]{7,40}$/i.test(sha) ? `apk-${sha.slice(0, 12)}` : __PLAYER_BUILD__ ? 'web' : 'dev',
   });
-  window.addEventListener('pagehide', () => sink.pageHide());
   return sink;
 }
 const telemetry = telemetrySink();
+
+/**
+ * PTM-1.3: необработанные ошибки — событием `client_error` (тип и место, без текста;
+ * правила — `decisions/clientErrorReport.ts`). Слушатели ставятся до загрузки игры, чтобы
+ * поймать и её старт. Событие идёт через площадку, как любое другое: в архиве площадки
+ * его примет она сама.
+ */
+const errors = createErrorReporter({
+  emit: (props) => getPlatform().analytics.emit('client_error', props),
+  later: (fn, ms) => {
+    setTimeout(fn, ms);
+  },
+  ownPage: () => location.origin + location.pathname,
+});
+installErrorReporter(errors);
+// Уходящая страница: сначала дописать ожидающие отчёты, потом отправить всё маяком.
+window.addEventListener('pagehide', () => {
+  errors.flush();
+  telemetry?.pageHide();
+});
 
 loaderReady()
   .then((yaGames) =>
@@ -179,6 +199,7 @@ loaderReady()
       // Raw errors belong in developer logs, not in the player's UI: a message or
       // stack may contain a URL or stored data. The screen reports only safe codes.
       console.error('E_CLIENT_STARTUP', error);
+      errors.report('error', error);
       // Сбой до снятия покрова (архив площадки: не скачался язык) — экран ошибки обязан
       // быть виден, покров его не прячет.
       document.body.classList.remove('app-booting');

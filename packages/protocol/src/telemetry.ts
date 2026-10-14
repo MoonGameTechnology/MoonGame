@@ -23,6 +23,8 @@ export const TELEMETRY_EVENTS = [
   'iap_started',
   'iap_completed',
   'meta_unlock',
+  // PTM-1.3: an uncaught error in the browser — type and place only, never the message.
+  'client_error',
 ] as const;
 export type TelemetryEventName = (typeof TELEMETRY_EVENTS)[number];
 
