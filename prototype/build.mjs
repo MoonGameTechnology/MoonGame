@@ -2855,9 +2855,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    столбцами, подписи разделов без КАПС с разрядкой. */
 :is(#setup,#seatpick) .sbox{font-family:var(--sf-font);font-variant-numeric:tabular-nums;color:var(--sf-text);}
 :is(#setup,#seatpick) :is(button,select,input):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
-/* Окно — колонкой: шапка и ряд кнопок стоят на месте, листается середина (UIX-16.1). */
-#setup .sbox{display:flex;flex-direction:column;width:min(560px,95vw);max-height:92vh;overflow:hidden;background:var(--sf-panel);
-  border:1px solid var(--sf-panel-edge);border-radius:18px;padding:18px;box-shadow:var(--sf-shadow);}
+/* Окно — колонкой: шапка и ряд кнопок стоят на месте, листается середина (UIX-16.1).
+   На телефоне это весь экран, а не окно поверх него: рамка, скругления и поля вокруг
+   отнимали ширину у карты и карточек (заказ владельца 2026-10-14). Кнопки — у нижнего
+   края, отступы учитывают вырез и полосу жестов. Окном с рамкой экран становится на ПК. */
+#setup .sbox{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:var(--sf-panel);
+  padding:calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));}
 :is(#setup,#seatpick) .stitle{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700;line-height:1.3;color:var(--sf-hi);}
 :is(#setup,#seatpick) .stitle .dia{width:10px;height:10px;transform:rotate(45deg);background:var(--sf-accent);
   box-shadow:0 0 10px var(--sf-accent);border:none;}
@@ -2869,7 +2873,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #setup .ssub .mid{max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* Телефон: одна лента. Колонки ПК растворяются (display:contents), и порядок задают разделы:
    карта и старт, потом дом, совет и соперники, темп в конце. */
-#setup .spane{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;margin-top:14px;}
+#setup .spane{flex:1 1 auto;min-height:0;overflow:hidden auto;display:flex;flex-direction:column;gap:12px;margin-top:14px;}
 #setup .scol{display:contents;}
 #setup .smaps{order:1;}
 #setup .sinfo{order:2;}
@@ -2883,8 +2887,11 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #setup .snetnew{order:10;}
 #setup .sbx-check{order:11;}
 /* Выбор карты — сегментами: карт две, и выбор виден целиком (.btn-second, .on — выбранная). */
-#setup .smaps{display:flex;gap:8px;}
-#setup .smapchip{flex:1 1 0;min-width:0;min-height:44px;padding:0 12px;border-radius:12px;font-size:14px;}
+/* Карты — сеткой: четыре кнопки в ряд не вмещали «2 на 2 · Разорванный предел», длинное
+   слово вылезало на соседку и раздувало ленту вбок. Две в ряд читаются и на телефоне, и в колонке ПК. */
+#setup .smaps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+#setup .smapchip{min-width:0;min-height:44px;padding:6px 12px;border-radius:12px;font-size:14px;line-height:1.3;
+  overflow-wrap:anywhere;}
 /* Карта — главное на экране: на ней выбирают старт и видят, где уже сидят. */
 #setup .smap{width:100%;height:220px;display:block;flex:none;border:1px solid var(--sf-edge);border-radius:12px;
   background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--sf-accent) 8%,transparent),transparent 70%),var(--sf-inset);}
@@ -3767,7 +3774,8 @@ ${profileCss}
      map, pace) | the sides (your house, council, rivals) — instead of one narrow scrolling
      stack. The map grows into the free height; each column scrolls on its own; the title
      and the button row never leave the screen (UIX-16.1). */
-  #setup .sbox{width:min(1080px,62vw);max-height:61vh;}
+  #setup .sbox{width:min(1080px,62vw);height:auto;max-height:61vh;padding:18px;
+    border:1px solid var(--sf-panel-edge);border-radius:18px;box-shadow:var(--sf-shadow);}
   #setup .spane{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);
     gap:16px;overflow:hidden;}
   #setup .scol{display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto;border:1px solid var(--sf-edge);
