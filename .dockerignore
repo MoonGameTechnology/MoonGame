@@ -5,3 +5,9 @@ node_modules
 mobile/android
 mobile/www
 *.log
+# Host-only secrets and state: a host build (`moongame update` without VOID_IMAGE) runs
+# `COPY . .`, which would bake them into an image layer.
+deploy/server.env
+deploy/migration.env
+deploy/certs
+.last-good-image
