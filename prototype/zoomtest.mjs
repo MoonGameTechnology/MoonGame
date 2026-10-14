@@ -102,7 +102,7 @@ try {
       }, compatibility);
       await page.goto(`http://127.0.0.1:${server.address().port}/${profile}`);
       await page.addScriptTag({ url: `/${profile}.js` });
-      for (const id of ['cnew', 'hub-solo', 'sp-go', 'setupgo']) await page.locator('#' + id).tap();
+      for (const id of ['cnew', 'hub-solo', 'setupgo']) await page.locator('#' + id).tap();
       await page.locator('#maploading').waitFor({ state: 'hidden' });
       // Changing the stored preference must not replace the live canvas/context or game.
       await page.evaluate(() => window.__zoomTest.settings());

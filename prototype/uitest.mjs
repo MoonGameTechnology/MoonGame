@@ -459,16 +459,17 @@ for (let i = 0; i < 20 && rafCbs.length; i++) {
 
 // Exercise the shipped map selector and launch path, including switching back.
 // This catches stale geometry/capacity references that pure map tests cannot see.
+// Карта выбирается сегментом (UIX-16.1): нажатие на кнопку с `data-map`.
 const selectMap = (id) => {
-  const input = getEl('setup-map-id');
-  input.value = id;
-  for (const handle of (listeners.get(input) ?? {}).change ?? []) handle({ target: input });
+  const chip = { getAttribute: (name) => (name === 'data-map' ? id : null) };
+  for (const handle of (listeners.get(getEl('setupmaps')) ?? {}).click ?? [])
+    handle({ target: { closest: (selector) => (selector === '[data-map]' ? chip : null) } });
 };
 if (sectorEntry) await click('sz-back');
 await click('cwgo');
 await click('hub-solo');
 selectMap('ffa-4');
-assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 4);
+assert.ok(getEl('setupmaps').innerHTML.includes('data-map="ffa-4" aria-pressed="true"'));
 assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 4);
 assert.equal((getEl('setupslots').innerHTML.match(/data-slot=/g) ?? []).length, 3);
 // Играть можно только за ДОМА: Улей и легаси-`vanguard` лежат в каталоге фракций, но в
@@ -501,7 +502,7 @@ assert.deepEqual(JSON.parse(mod.exports.state()), JSON.parse(soloCheckpoint).pay
 assert.equal(mod.exports.solo().speed, 0);
 await click('hub-solo');
 selectMap('duel-1');
-assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 2);
+assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 2);
 for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
 for (let i = 0; i < 10 && rafCbs.length; i++) {
   await rafCbs.shift()(performance.now());

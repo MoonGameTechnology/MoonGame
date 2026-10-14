@@ -104,7 +104,7 @@ try {
     });
     await page.goto(`http://127.0.0.1:${server.address().port}/${profile}`);
     await page.addScriptTag({ url: `/${profile}.js` });
-    for (const id of ['cnew', 'hub-solo', 'sp-go']) await page.locator('#' + id).tap();
+    for (const id of ['cnew', 'hub-solo']) await page.locator('#' + id).tap();
     // Complete preparation with the display context unavailable. The loader must
     // remain until a complete frame can actually be presented.
     await page.evaluate(() => {

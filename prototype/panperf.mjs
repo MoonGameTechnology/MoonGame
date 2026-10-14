@@ -219,7 +219,7 @@ try {
   });
   await page.addInitScript(() => localStorage.setItem('vd.locale', 'ru'));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  for (const id of ['cnew', 'hub-solo', 'sp-go', 'setupgo']) await page.locator('#' + id).click();
+  for (const id of ['cnew', 'hub-solo', 'setupgo']) await page.locator('#' + id).click();
   const cdp = await page.context().newCDPSession(page);
   const report = {};
   for (const reveal of [false, true]) {

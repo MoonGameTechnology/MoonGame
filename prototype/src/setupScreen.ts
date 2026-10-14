@@ -75,6 +75,11 @@ export interface SetupScreenHost {
   openHub(): void;
   /** Старт схватки по собранной настройке. */
   startMatch(setup: SetupConfig): void;
+  /** Подпись карты — та же, что в строке обозревателя партий. */
+  mapLabel(mapId: string): string;
+  /** Цвета карты матча: твой (настройка «свой цвет») и соперника (выбранная палитра).
+   *  Мини-карта красит ими старт и занятые миры, чтобы они читались так же, как в партии. */
+  sideColors(): { you: string; rival: string };
 }
 
 // Дев-сборка: инструменты песочницы на экране настройки (флаг сборщика, как в `main.ts`).
@@ -132,13 +137,13 @@ export let setupSpeed = 10;
 // match, so it's a peaceful space to read descriptions and learn the interface.
 export let setupEl: HTMLElement;
 let setupMapEl: HTMLElement;
+let setupMapsEl: HTMLElement;
+let setupLegendEl: HTMLElement;
+let setupSubEl: HTMLElement;
 let setupSlotsEl: HTMLElement;
 let setupFactionsEl: HTMLElement;
 let setupSpeedEl: HTMLElement;
 let setupHintEl: HTMLElement;
-/** Правая колонка сетапа — боты, команды, скорость времени. В сетевом матче это
- *  решения сервера, а не игрока, поэтому там она прячется целиком. */
-let soloColEl: HTMLElement | null;
 let setupGoEl: HTMLButtonElement;
 
 // The player's division templates / hero roster / ship blueprints. Pre-match loadout
@@ -172,8 +177,8 @@ const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
  *  Экран ОДИН на оба режима намеренно: игрок просил «как в одиночке, но в сетевой», и
  *  второй экран с той же картой и теми же карточками разошёлся бы с первым на первой же
  *  правке. Меняется не разметка, а источник данных: кандидаты приходят от сервера, а не
- *  из `START_CANDIDATES`, занятые миры видны и не выбираются, правая колонка (боты,
- *  команды, скорость времени) скрыта — в сетевом матче это не твои решения. */
+ *  из `START_CANDIDATES`, занятые миры видны и не выбираются, а выбор карты, боты и
+ *  скорость времени скрыты (класс экрана `net`): в сетевом матче это не твои решения. */
 export let netSetup: { matchId: string; offer: EntryOffer } | null = null;
 
 /** Стартовые миры, которые сейчас предлагает экран. */
@@ -192,13 +197,26 @@ function worldTaken(planetId: string): boolean {
   return netSetup?.offer.worlds.find((w) => w.planetId === planetId)?.taken === true;
 }
 
+/** Имя мира — как его подпишет карта партии, а не код «C0R1» (UIX-5.2). */
+function homeName(id: string): string {
+  return mapWorldName(setupMapId, setupPreset().nodes, id);
+}
+
 function renderSetupMap(): void {
   // Рамка, трассы без повторов и порядок рисования — в `setupMap.ts` (REFM-45):
   // там же правило «каждое ребро один раз» и «кандидаты рисуются последними».
   const MAP = setupPreset().nodes;
-  const box = mapViewBox(MAP, 60);
-  setupMapEl.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
   const order = drawOrder(MAP, setupCandidateIds());
+  // Стартовые миры — главное на карте (UIX-16.1). Раньше это были кружки в процент ширины:
+  // на телефоне 4–5 px, и «светящийся мир» из подсказки было не найти. Размер — от размаха
+  // карты, но не больше трети расстояния до соседнего старта: на Фронтире их полсотни.
+  // Поле рамки — по ореолу, иначе крайний старт обрезан краем карты.
+  const span = mapViewBox(MAP, 0);
+  const unit = Math.max(span.w, span.h) / 100;
+  const r = Math.min(2.4 * unit, candidateGap(order.candidates) * 0.3);
+  const line = r * 0.22;
+  const box = mapViewBox(MAP, Math.max(60, r * 2.4));
+  setupMapEl.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
   let svg = '';
   for (const l of lanes(MAP)) {
     svg += `<line x1="${l.from.x}" y1="${l.from.y}" x2="${l.to.x}" y2="${l.to.y}" stroke="#1d3640" stroke-width="3"/>`;
@@ -215,26 +233,51 @@ function renderSetupMap(): void {
     const planet = n.sector === 'planet';
     svg += `<circle cx="${n.x}" cy="${n.y}" r="${planet ? 16 : 11}" fill="${planet ? '#2c5460' : '#1b2d34'}" stroke="#33555f" stroke-width="2"/>`;
   }
+  const { you, rival } = game.sideColors();
   for (const n of order.candidates) {
-    const picked = n.id === setupStart;
-    // Занятый мир ОСТАЁТСЯ на карте и гаснет (`entrySetup.ts`, правило 2): карта — это
-    // расклад матча, и дырка на месте соперника читалась бы как «там пусто».
-    const taken = worldTaken(n.id);
-    const fill = taken
-      ? 'rgba(120,140,146,.12)'
-      : picked
-        ? 'rgba(58,209,122,.35)'
-        : 'rgba(53,214,230,.16)';
-    const stroke = taken ? '#4a6169' : picked ? '#3ad17a' : '#35d6e6';
-    // У занятого мира — подпись прямо на кружке: цвет один читают мельком и не всегда
-    // верно, а «занято» отвечает на вопрос сразу.
+    const name = esc(homeName(n.id));
+    // Занятый мир ОСТАЁТСЯ на карте (`entrySetup.ts`, правило 2): карта — это расклад
+    // матча, и дырка на месте соперника читалась бы как «там пусто». Он в цвете соперника
+    // и не выбирается; о нём говорят подсказка всплывающая и подпись для экранного чтеца.
+    const at = `cx="${n.x}" cy="${n.y}"`;
+    if (worldTaken(n.id)) {
+      svg +=
+        `<g class="cand taken" data-cand="${n.id}" data-taken="1" style="--c:${rival}" tabindex="0" role="button" ` +
+        `aria-disabled="true" aria-label="${name}, ${esc(t('seatpick.taken'))}"><title>${name}, ${esc(t('seatpick.taken'))}</title>` +
+        `<circle class="core" ${at} r="${r * 0.8}" stroke-width="${line}"/></g>`;
+      continue;
+    }
+    if (n.id === setupStart) {
+      svg +=
+        `<g class="cand you" data-cand="${n.id}" style="--c:${you}" tabindex="0" role="button" aria-pressed="true" ` +
+        `aria-label="${name}"><title>${name}</title>` +
+        `<circle class="halo" ${at} r="${r * 2.1}"/>` +
+        `<circle class="core" ${at} r="${r * 1.15}" stroke-width="${line}"/></g>`;
+      continue;
+    }
     svg +=
-      `<circle class="cand${taken ? ' taken' : ''}" data-cand="${n.id}"` +
-      `${taken ? ' data-taken="1"' : ''} cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
-      `fill="${fill}" stroke="${stroke}" stroke-width="${picked ? 6 : 4}">` +
-      `${taken ? `<title>${esc(t('seatpick.taken'))}</title>` : ''}</circle>`;
+      `<g class="cand free" data-cand="${n.id}" tabindex="0" role="button" aria-pressed="false" aria-label="${name}">` +
+      `<title>${name}</title><circle class="halo" ${at} r="${r * 1.9}"/>` +
+      `<circle class="ring" ${at} r="${r}" stroke-width="${line}"/></g>`;
   }
   setupMapEl.innerHTML = svg;
+  // Легенда — что значат цвета кружков: только те, что есть на карте. «Ваш старт» в сети
+  // появляется после выбора, «Занято» бывает только в сетевой партии.
+  const item = (cls: string, key: string, color?: string): string =>
+    `<span><i class="${cls}"${color ? ` style="--c:${color}"` : ''}></i>${esc(t(key))}</span>`;
+  setupLegendEl.innerHTML =
+    (setupStart ? item('lg-you', 'setup.legend.you', you) : '') +
+    item('lg-free', 'setup.legend.free') +
+    (netSetup ? item('lg-taken', 'setup.legend.taken', rival) : '');
+}
+
+/** Наименьшее расстояние между стартовыми мирами — чтобы их кружки не слиплись. */
+function candidateGap(nodes: ReadonlyArray<{ x: number; y: number }>): number {
+  let gap = Infinity;
+  for (let i = 0; i < nodes.length; i++)
+    for (let j = i + 1; j < nodes.length; j++)
+      gap = Math.min(gap, Math.hypot(nodes[i]!.x - nodes[j]!.x, nodes[i]!.y - nodes[j]!.y));
+  return gap;
 }
 
 /** H3 — which house each seat plays: seat 0 (you) = `setupFaction`, then the four
@@ -330,10 +373,19 @@ function renderSetupSlots(): void {
   setupSlotsEl.innerHTML = h;
 }
 
+/** Выбор карты — сегментами (UIX-16.1): карт две, и список прятал вторую за раскрытием. */
+function renderSetupMaps(): void {
+  setupMapsEl.innerHTML = MAP_IDS.map(
+    (id) =>
+      `<button class="smapchip btn-second${id === setupMapId ? ' on' : ''}" type="button" data-map="${id}" ` +
+      `aria-pressed="${id === setupMapId}">${esc(game.mapLabel(id))}</button>`,
+  ).join('');
+}
+
 function renderSetup(): void {
-  const mapSelect = $('setup-map-id') as HTMLSelectElement;
-  mapSelect.value = setupMapId;
-  mapSelect.disabled = !!netSetup;
+  // Сетевой режим прячет решения сервера и показывает шапку партии (`build.mjs`, класс `net`).
+  setupEl.classList.toggle('net', !!netSetup);
+  renderSetupMaps();
   $('setup-map-info').textContent = t(
     setupMapId === 'duel-1' ? 'setup.map.duel-1-info'
       : setupMapId === 'ffa-4' ? 'setup.map.ffa-4-info'
@@ -343,31 +395,24 @@ function renderSetup(): void {
         ? 'setup.map.frontier-info'
         : 'setup.map.nexus-info',
   );
-  const homeSelect = $('setup-home-id') as HTMLSelectElement;
-  // Дом — по имени, как его подпишет карта партии, а не по коду «C0R1» (UIX-5.2); значение
-  // опции остаётся id.
-  const homeName = (id: string): string => mapWorldName(setupMapId, setupPreset().nodes, id);
-  homeSelect.innerHTML = setupCandidateIds()
-    .map(
-      (id) =>
-        `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(homeName(id))}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`,
-    )
-    .join('');
-  homeSelect.value = setupStart;
   renderSetupMap();
   renderSetupSlots();
   renderSetupCouncil();
+  for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
+    c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
   // Seat 1 (you) is always in, so the match can always launch — including with ZERO
   // rivals: a calm solo sandbox to read descriptions, learn the UI and test in peace
   // (the core never ends a one-player match — victory needs ≥2 active sides).
   // Сетевой режим (ENTRY-2): решения — в `decisions/entrySetup.ts`, здесь только показ.
-  // Правая колонка скрыта: боты, команды и скорость времени в сетевом матче не твои
-  // решения, а сервера. Кнопка заперта, пока не выбран СВОБОДНЫЙ мир — пустой выбор
-  // отправил бы игрока на сервер без места, и тот посадил бы куда-нибудь.
-  if (soloColEl) soloColEl.style.display = netSetup ? 'none' : '';
+  // Кнопка заперта, пока не выбран СВОБОДНЫЙ мир — пустой выбор отправил бы игрока на
+  // сервер без места, и тот посадил бы куда-нибудь.
   if (netSetup) {
-    const free = netSetup.offer.free;
-    const ready = netStartEnabled(slotForWorld(setupStart), netSetup.offer.worlds);
+    const { free, worlds } = netSetup.offer;
+    // Шапка партии — как её строка в обозревателе: карта, номер, и сколько мест свободно.
+    setupSubEl.innerHTML =
+      `<b>${esc(game.mapLabel(setupMapId))}</b><span class="mid">${esc(netSetup.matchId)}</span>` +
+      `<span>${esc(t('setup.net.free', { n: free, m: worlds.length }))}</span>`;
+    const ready = netStartEnabled(slotForWorld(setupStart), worlds);
     setupGoEl.disabled = !ready;
     setupGoEl.textContent = t('seatpick.go');
     setupHintEl.textContent =
@@ -376,8 +421,6 @@ function renderSetup(): void {
         : ready
           ? t('setup.home.pick', { home: homeName(setupStart) })
           : t('setup.map-hint');
-    for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
-      c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
     return;
   }
   const rivals = rivalCount(setupSlots);
@@ -386,14 +429,12 @@ function renderSetup(): void {
   setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {
     home: homeName(setupStart),
   });
-  for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
-    c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
 }
 
 // Where the Setup screen's Back button returns to — the surface that opened it, so
 // arriving from the hub goes back to the hub, not the raw identity card.
 let setupReturn: 'welcome' | 'hub' = 'welcome';
-// --- scientist council picker: choose your 2 research leaders BEFORE the start-point ----
+// --- scientist council picker: your 2 research leaders, changed from the council row ----
 // Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 export let sciWin: HTMLElement;
@@ -420,8 +461,9 @@ export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   setupStart = setupPreset().starts[0]!;
   // Re-consecrate the council each time setup opens, PRE-SEEDED with the recommended
   // newbie pair (командование «Куратор» + генералист «Полимат»): the first permanent
-  // choice a new player faces must never be a wall of empty slots + a disabled button —
-  // one tap continues, swapping is optional. Guarded by presence so data edits degrade.
+  // choice a new player faces must never be a wall of empty slots + a disabled button.
+  // Окно совета больше не всплывает первым (UIX-16.1): пара видна строкой на экране, и
+  // сменить её — нажать на эту строку. Guarded by presence so data edits degrade.
   setupScientists = ['overseer', 'polymath'].filter((id) => data.scientists[id]);
   // A lively default: ×1 wall-clock reads as a FROZEN screen to a newcomer, so the
   // setup opens on the last chosen multiplier (first launch: ×10). True real time
@@ -438,7 +480,6 @@ export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
     if (sbx) sbx.checked = false;
   }
   renderSetup();
-  openSciPick(); // consecrate your 2 research leaders before picking the start point
 }
 
 export function buildSetupConfig(): SetupConfig {
@@ -516,17 +557,33 @@ export function updateNetOffer(matchId: string, offer: EntryOffer): void {
   renderSetup();
 }
 
+/** Выбрать стартовый мир тапом, щелчком или с клавиатуры. */
+function pickStart(pick: string): void {
+  if (!setupCandidateIds().includes(pick)) return;
+  // Занятый мир виден, но не выбирается (`entrySetup.ts`, правило 2). Молча
+  // проигнорировать тап нельзя — это выглядит как непрожатая кнопка, поэтому говорим,
+  // что случилось.
+  if (worldTaken(pick)) {
+    setupHintEl.textContent = t('seatpick.lost');
+    return;
+  }
+  setupStart = pick;
+  renderSetup();
+}
+
 /** Поднять экран: хуки игры, элементы, окно совета и обработчики. Зовётся из `main.ts`
  *  один раз. */
 export function initSetupScreen(host: SetupScreenHost): void {
   game = host;
   setupEl = $('setup');
   setupMapEl = $('setupmap');
+  setupMapsEl = $('setupmaps');
+  setupLegendEl = $('setuplegend');
+  setupSubEl = $('setup-sub');
   setupSlotsEl = $('setupslots');
   setupFactionsEl = $('setupfactions');
   setupSpeedEl = $('setupspeed');
   setupHintEl = $('setuphint');
-  soloColEl = document.getElementById('setup-solo-col');
   setupGoEl = $('setupgo') as HTMLButtonElement;
   setupSlots = freshSetupSlots();
   sciWin = $('scipick');
@@ -544,23 +601,17 @@ export function initSetupScreen(host: SetupScreenHost): void {
       // закрытии» разошлось бы с состоянием ровно на этом пути.
       renderSetupCouncil();
     },
-    onCancel: () => $('setupcancel').click(),
   });
   setupCouncilEl.addEventListener('click', openSciPick);
 
-  $('setup-map-id').addEventListener('change', (ev) => {
-    const id = (ev.target as HTMLSelectElement).value;
-    if (netSetup || !MAP_IDS.some((value) => value === id)) return;
+  setupMapsEl.addEventListener('click', (ev) => {
+    const id = (ev.target as Element).closest('[data-map]')?.getAttribute('data-map');
+    if (!id || netSetup || !MAP_IDS.some((value) => value === id)) return;
+    if (id === setupMapId) return;
     setupMapId = mapPreset(id).id;
     setupSlots = freshSetupSlots();
     setupTeams = false;
     setupStart = setupPreset().starts[0]!;
-    renderSetup();
-  });
-  $('setup-home-id').addEventListener('change', (ev) => {
-    const id = (ev.target as HTMLSelectElement).value;
-    if (!setupCandidateIds().includes(id) || worldTaken(id)) return;
-    setupStart = id;
     renderSetup();
   });
   setupSlotsEl.addEventListener('change', (ev) => {
@@ -602,16 +653,19 @@ export function initSetupScreen(host: SetupScreenHost): void {
         pick = hit?.id ?? null;
       }
     }
+    if (pick) pickStart(pick);
+  });
+  // Список стартовых миров ушёл (UIX-16.1): он повторял карту. Клавиатуре карта отвечает
+  // сама — кружки стартов в порядке Tab, Enter и пробел выбирают мир.
+  setupMapEl.addEventListener('keydown', (ev) => {
+    const key = (ev as KeyboardEvent).key;
+    if (key !== 'Enter' && key !== ' ') return;
+    const pick = (ev.target as Element).closest('[data-cand]')?.getAttribute('data-cand');
     if (!pick) return;
-    // Занятый мир виден, но не выбирается (`entrySetup.ts`, правило 2). Молча
-    // проигнорировать тап нельзя — это выглядит как непрожатая кнопка, поэтому говорим,
-    // что случилось.
-    if (worldTaken(pick)) {
-      setupHintEl.textContent = t('seatpick.lost');
-      return;
-    }
-    setupStart = pick;
-    renderSetup();
+    ev.preventDefault();
+    pickStart(pick);
+    // Кружки перерисованы — фокус возвращается на выбранный мир, а не теряется.
+    (setupMapEl.querySelector(`[data-cand="${CSS.escape(pick)}"]`) as SVGElement | null)?.focus();
   });
   setupFactionsEl.addEventListener('click', (ev) => {
     const fp = (ev.target as Element).closest('[data-fpick]');

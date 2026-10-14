@@ -111,6 +111,9 @@ export function connectToMatch(
 // and the server auto-assigned the first free seat (no choice).
 let seatpickEl: HTMLElement | null = null;
 let seatpickListEl: HTMLElement | null = null;
+let seatpickRetryEl: HTMLElement | null = null;
+/** Партия, в которую сейчас входим: «Повторить» спрашивает места у неё же. */
+let seatpickMatch: string | null = null;
 
 /** Запрос расклада мест, назвавшись (ADDR-6).
  *
@@ -181,10 +184,14 @@ function startNetSetupPoll(base: string, matchId: string, nick: string): void {
 export async function openSeatPicker(matchId: string): Promise<void> {
   const srv = game.resolveServer();
   if (!srv) return;
+  seatpickMatch = matchId;
   const показать = (view: SeatView): void => {
     if (!seatpickListEl || view.kind !== 'placeholder') return;
     const style = view.tone === 'dim' ? 'color:var(--dim);text-align:center' : 'color:var(--red)';
     seatpickListEl.innerHTML = `<p style="${style}">${t(view.key)}</p>`;
+    // На отказе и обрыве — «Повторить»: раньше вместо неё стояла запертая «Выбрать», и
+    // уйти с заставки можно было только назад, в обозреватель.
+    if (seatpickRetryEl) seatpickRetryEl.style.display = view.tone === 'bad' ? '' : 'none';
   };
   показать(seatView('opening'));
   if (seatpickEl) seatpickEl.style.display = 'flex';
@@ -207,7 +214,7 @@ export async function openSeatPicker(matchId: string): Promise<void> {
 }
 
 /** Спрятать оверлей мест. Выбор переехал на экран настройки (ENTRY-2), и оверлей остался
- *  заглушкой на время загрузки и на отказ: закрыть его можно, только спрятав. */
+ *  заставкой на время загрузки и на отказ: закрыть его можно, только спрятав. */
 export function closeSeatPicker(): void {
   if (seatpickEl) seatpickEl.style.display = 'none';
 }
@@ -234,8 +241,12 @@ export function initMatchJoin(host: MatchJoinHost): void {
   game = host;
   seatpickEl = document.getElementById('seatpick');
   seatpickListEl = document.getElementById('seatpick-list');
+  seatpickRetryEl = document.getElementById('seatpick-retry');
   // Кнопка «Назад» на оверлее до REFM-217 не делала ничего: после отказа сервера игрок
   // видел красную строку и кнопку, которая не закрывает окно, — уйти можно было только
   // аппаратным Back или Escape.
   document.getElementById('seatpick-cancel')?.addEventListener('click', closeSeatPicker);
+  seatpickRetryEl?.addEventListener('click', () => {
+    if (seatpickMatch) detach('вход в партию: повтор', openSeatPicker(seatpickMatch));
+  });
 }

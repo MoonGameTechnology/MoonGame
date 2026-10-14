@@ -2680,11 +2680,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   /* toasts (goal line etc.) wrap to two lines instead of clipping with an ellipsis
      that hides the rest and offers no way to read it */
   #toasts .toast{white-space:normal;text-overflow:clip;line-height:1.45;}
-  /* setup: the LAUNCH button must never scroll below the fold — the pane scrolls,
-     the CTA (and Back) stay pinned at the bottom of the box */
-  #setup .sbox{display:flex;flex-direction:column;overflow:hidden;}
-  #setup .spane{flex:1 1 auto;min-height:0;overflow:auto;}
-  #setup .sgo,#setup .scancel{flex:0 0 auto;}
   /* rail: icons get tiny labels — seven unlabeled glyphs read as a puzzle */
   #railtools button{width:64px;height:54px;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:3px;}
@@ -2742,9 +2737,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   color:var(--ink);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;font:inherit;min-height:44px;}
 #setup .inp:focus-visible,#match-create .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 #setup-bot-count{max-width:140px;}
-#setup-network-create{display:block;width:100%;min-height:44px;margin:16px 0 0;padding:0 16px;color:var(--sf-text);background:var(--sf-card);
-  border:1px solid var(--sf-edge);border-radius:12px;font:inherit;font-size:16px;font-weight:600;cursor:pointer;}
-#setup-network-create:hover{border-color:var(--sf-edge-hi);}
+/* «Создать сетевую игру» — вторичная кнопка (.btn-second): здесь только размер и место. */
+#setup-network-create{display:block;width:100%;min-height:44px;padding:0 16px;border-radius:12px;font-size:16px;}
 #connect .cfield input,#connect .cfield select{display:block;width:100%;margin-top:5px;padding:11px 12px;
   background:rgba(2,10,14,.9);border:1px solid var(--line-hi);border-radius:7px;color:var(--ink);
   font:var(--fs-body)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;}
@@ -2861,19 +2855,66 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    столбцами, подписи разделов без КАПС с разрядкой. */
 :is(#setup,#seatpick) .sbox{font-family:var(--sf-font);font-variant-numeric:tabular-nums;color:var(--sf-text);}
 :is(#setup,#seatpick) :is(button,select,input):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
-#setup .sbox{width:min(560px,95vw);max-height:92vh;overflow:auto;background:var(--sf-panel);
-  border:1px solid var(--sf-panel-edge);border-radius:18px;padding:22px;box-shadow:var(--sf-shadow);}
+/* Окно — колонкой: шапка и ряд кнопок стоят на месте, листается середина (UIX-16.1). */
+#setup .sbox{display:flex;flex-direction:column;width:min(560px,95vw);max-height:92vh;overflow:hidden;background:var(--sf-panel);
+  border:1px solid var(--sf-panel-edge);border-radius:18px;padding:18px;box-shadow:var(--sf-shadow);}
 :is(#setup,#seatpick) .stitle{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700;line-height:1.3;color:var(--sf-hi);}
 :is(#setup,#seatpick) .stitle .dia{width:10px;height:10px;transform:rotate(45deg);background:var(--sf-accent);
   box-shadow:0 0 10px var(--sf-accent);border:none;}
-#setup .smap{width:100%;height:200px;display:block;margin-top:10px;border:1px solid var(--sf-edge);border-radius:12px;
+/* Сетевой режим прячет решения сервера (.solo-only), одиночный — шапку партии (.net-only). */
+#setup.net .solo-only,#setup:not(.net) .net-only{display:none;}
+/* Шапка сетевой партии: карта, номер партии и свободные места — как строка обозревателя. */
+#setup .ssub{display:flex;flex-wrap:wrap;gap:2px 12px;margin:6px 0 0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
+#setup .ssub b{font-weight:600;color:var(--sf-text);}
+#setup .ssub .mid{max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* Телефон: одна лента. Колонки ПК растворяются (display:contents), и порядок задают разделы:
+   карта и старт, потом дом, совет и соперники, темп в конце. */
+#setup .spane{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;margin-top:14px;}
+#setup .scol{display:contents;}
+#setup .smaps{order:1;}
+#setup .sinfo{order:2;}
+#setup .smap{order:3;}
+#setup .slegend{order:4;}
+#setup .shint{order:5;}
+#setup .sfactions{order:6;}
+#setup .scouncilrow{order:7;}
+#setup .sslots{order:8;}
+#setup .sspeedsec{order:9;}
+#setup .snetnew{order:10;}
+#setup .sbx-check{order:11;}
+/* Выбор карты — сегментами: карт две, и выбор виден целиком (.btn-second, .on — выбранная). */
+#setup .smaps{display:flex;gap:8px;}
+#setup .smapchip{flex:1 1 0;min-width:0;min-height:44px;padding:0 12px;border-radius:12px;font-size:14px;}
+/* Карта — главное на экране: на ней выбирают старт и видят, где уже сидят. */
+#setup .smap{width:100%;height:220px;display:block;flex:none;border:1px solid var(--sf-edge);border-radius:12px;
   background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--sf-accent) 8%,transparent),transparent 70%),var(--sf-inset);}
-#setup .smap .cand{cursor:pointer;}
-#setup .smaphint{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
-/* Подписи разделов: «Карта», «Домашний мир», «Фракция…», «Скорость времени». */
-#setup :is(.scol > label:not(.sbx-check),.fph,.sspeedlabel){display:block;margin:16px 0 8px;font-size:14px;font-weight:600;
-  line-height:1.3;color:var(--sf-head);}
-#setup .scol > label:first-of-type{margin-top:0;}
+#setup .smap .cand{cursor:pointer;outline:none;}
+#setup .smap .cand.taken{cursor:not-allowed;}
+/* Свободный мир светится акцентом; твой — твоим цветом карты; занятый — цветом соперника.
+   Цвет приходит переменной --c (настройка «свой цвет» и палитра соперников). */
+#setup .smap .cand .ring{fill:color-mix(in srgb,var(--sf-accent) 18%,transparent);stroke:var(--sf-accent);}
+#setup .smap .cand .halo{fill:color-mix(in srgb,var(--sf-accent) 12%,transparent);stroke:none;}
+#setup .smap .cand.you .halo{fill:color-mix(in srgb,var(--c) 24%,transparent);}
+#setup .smap .cand.you .core{fill:var(--c);stroke:var(--sf-hi);}
+#setup .smap .cand.taken .core{fill:color-mix(in srgb,var(--c) 55%,transparent);stroke:var(--c);}
+#setup .smap .cand.free:hover .ring{stroke:var(--sf-hi);}
+#setup .smap .cand:focus-visible :is(.ring,.core){stroke:var(--sf-hi);}
+/* Свечение дышит прозрачностью, а не размером: рамка кружка стоит на месте, и палец
+   (и робот смоука) попадает в неподвижную цель. */
+@media (prefers-reduced-motion:no-preference){
+  #setup .smap .cand.free .halo{animation:setuphalo 1.8s ease-in-out infinite;}}
+@keyframes setuphalo{0%,100%{opacity:.35;}50%{opacity:1;}}
+/* Легенда карты: что значат цвета кружков. */
+#setup .slegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:var(--fs-caption);line-height:1.4;color:var(--sf-dim);}
+#setup .slegend span{display:inline-flex;align-items:center;gap:6px;}
+#setup .slegend i{width:10px;height:10px;flex:none;border-radius:50%;}
+#setup .slegend .lg-you{background:var(--c);}
+#setup .slegend .lg-free{border:2px solid var(--sf-accent);box-shadow:0 0 6px var(--sf-accent);}
+#setup .slegend .lg-taken{border:1px solid var(--c);background:color-mix(in srgb,var(--c) 55%,transparent);}
+#setup .smaphint{margin:0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
+#setup .shint{color:var(--sf-text);}
+/* Подписи разделов: «Фракция…», «Скорость времени». */
+#setup :is(.fph,.sspeedlabel){display:block;margin:0 0 8px;font-size:14px;font-weight:600;line-height:1.3;color:var(--sf-head);}
 #setup :is(.inp,#setup-bot-count){min-height:48px;margin:0;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;
   background:var(--sf-inset);color:var(--sf-text);font-size:16px;}
 #setup .sslots{display:flex;flex-direction:column;gap:6px;}
@@ -2883,20 +2924,21 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* H3 faction picker: four houses, each a pure passive bonus (economy or units).
    Две колонки — только где карточке хватает 200 px: в узкой колонке (телефон, планшет стоя)
    «владычество» шире половины, и карточка вылезала за край. */
-#setup .fpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:8px;}
-#setup .fchip{position:relative;display:flex;flex-direction:column;gap:4px;min-height:64px;padding:11px 36px 11px 14px;
-  border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);text-align:left;cursor:pointer;font:inherit;}
-#setup .fchip b{font-size:16px;font-weight:600;line-height:1.3;color:var(--sf-text);}
+#setup .fpick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+#setup .fchip{position:relative;display:flex;flex-direction:column;gap:4px;min-height:60px;padding:10px 12px;
+  border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);text-align:left;cursor:pointer;font:inherit;
+  overflow-wrap:anywhere;}
+#setup .fchip b{padding-right:22px;font-size:14px;font-weight:600;line-height:1.3;color:var(--sf-text);}
 #setup .fchip span{font-size:14px;line-height:1.35;color:var(--grn);}
 #setup .fchip:hover{border-color:var(--sf-edge-hi);}
 #setup .fchip.on{border-color:var(--sf-accent);background:var(--sf-sel);}
 #setup .fchip.on b{color:var(--sf-hi);}
 /* Выбранный дом — ещё и галочкой: на ПК одна рамка не отличает выбор от наведения. */
-#setup .fchip.on::after{content:'✓';position:absolute;top:10px;right:10px;display:grid;place-items:center;width:20px;height:20px;
+#setup .fchip.on::after{content:'✓';position:absolute;top:8px;right:8px;display:grid;place-items:center;width:18px;height:18px;
   border-radius:50%;background:var(--sf-accent);color:var(--void);font-size:var(--fs-body);font-weight:800;}
 /* Совет учёных строкой: подпись над именами, «изменить» справа. */
 #setup .scouncil{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"h go" "n go";gap:2px 12px;
-  width:100%;min-height:60px;margin:16px 0 0;padding:10px 14px;border:1px solid var(--sf-edge);border-radius:12px;
+  width:100%;min-height:60px;margin:0;padding:10px 14px;border:1px solid var(--sf-edge);border-radius:12px;
   background:var(--sf-card);cursor:pointer;font:inherit;text-align:left;}
 #setup .scouncil:hover{border-color:var(--sf-edge-hi);}
 #setup .scouncil .sc-h{grid-area:h;font-size:14px;color:var(--sf-dim);}
@@ -2946,9 +2988,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #setup .srow .tmchip.sA{border-color:#4fe0b0;color:#4fe0b0;background:rgba(79,224,176,.14);}
 #setup .srow .tmchip.sB{border-color:#e5884a;color:#e5884a;background:rgba(229,136,74,.14);}
 #setup .srow .tmchip.lock{cursor:default;opacity:.85;}
-#setup .sspeedhint{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
+#setup .sspeedhint{margin:0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
 /* Скорость — одним переключателем: дорожка, на ней подсвечен выбранный множитель. */
-#setup .sspeed{display:flex;gap:4px;margin:10px 0 0;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;
+#setup .sspeed{display:flex;gap:4px;margin:8px 0 0;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;
   background:var(--sf-inset);}
 #setup .sspeed .spdchip{flex:1;min-height:40px;padding:0 4px;border:0;border-radius:9px;background:transparent;
   color:var(--sf-dim);font:inherit;font-size:16px;font-weight:600;cursor:pointer;}
@@ -2956,24 +2998,17 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #setup .sspeed .spdchip.on{color:var(--sf-hi);background:var(--sf-sel);box-shadow:inset 0 0 0 1px var(--sf-accent);}
 @media (prefers-reduced-motion:no-preference){
   #setup :is(.fchip,.scouncil,.srow .stog,.sspeed .spdchip){transition:background-color .15s,border-color .15s,color .15s;}}
-/* «Запуск» — та же главная кнопка, что «Играть сейчас» на хабе; «Назад» — карточкой. */
-:is(#setup,#seatpick) .sgo{width:100%;min-height:52px;margin-top:16px;padding:0 16px;border:1px solid var(--sf-accent);
-  border-radius:12px;background:var(--sf-primary);color:var(--sf-hi);font:inherit;font-size:16px;font-weight:700;
-  box-shadow:var(--sf-glow);cursor:pointer;}
-:is(#setup,#seatpick) .sgo:hover:not(:disabled){background:var(--sf-primary-hi);}
-:is(#setup,#seatpick) .sgo:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;}
-:is(#setup,#seatpick) .scancel{width:100%;min-height:44px;margin-top:8px;padding:0 16px;border:1px solid var(--sf-edge);
-  border-radius:12px;background:var(--sf-card);color:var(--sf-text);font:inherit;font-size:16px;font-weight:600;cursor:pointer;}
-:is(#setup,#seatpick) .scancel:hover{border-color:var(--sf-edge-hi);}
-/* Телефон: колонки идут одна под другой — между ними отступ и черта, а не стык. */
-body:not(.holo-ui) #setup .stitle{margin-bottom:14px;}
-body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;border-top:1px solid var(--sf-edge);}
+/* Низ окна — одна главная кнопка (.btn-main: «Начать», «Занять место») и тихое «Назад»
+   (.btn-quiet) слева: по весу они больше не равны. Вид даёт класс, здесь размер и место. */
+:is(#setup,#seatpick) .sfoot{display:flex;align-items:center;gap:10px;flex:none;margin-top:14px;}
+:is(#setup,#seatpick) .sgo{flex:1 1 auto;min-height:52px;padding:0 20px;border-radius:12px;font-size:16px;}
+:is(#setup,#seatpick) .scancel{flex:none;min-height:48px;padding:0 14px;border-radius:12px;font-size:16px;}
 /* REL-7: seat/faction picker for multiplayer — reuses #setup styles */
 #seatpick{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;
   background:rgba(2,8,12,.86);backdrop-filter:blur(6px);}
-#seatpick .sbox{width:min(520px,95vw);max-height:92vh;overflow:auto;background:var(--sf-panel);
+#seatpick .sbox{width:min(440px,95vw);max-height:92vh;overflow:auto;background:var(--sf-panel);
   border:1px solid var(--sf-panel-edge);border-radius:18px;padding:22px;box-shadow:var(--sf-shadow);}
-#seatpick .ssub{margin:8px 0 14px;font-size:14px;line-height:1.5;color:var(--sf-dim);}
+#seatpick .sstatus{margin:14px 0 0;font-size:14px;line-height:1.5;}
 #seatpick-list{display:flex;flex-direction:column;gap:8px;}
 .seat-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line-hi);
   border-radius:8px;background:rgba(2,9,13,.5);cursor:pointer;transition:border-color .15s,background .15s;}
@@ -3728,15 +3763,17 @@ ${profileCss}
   #connect .mlist{max-height:30.5vh;}
   #connect .ccrest .wm{font-size:clamp(20px,4.33vw,26px);letter-spacing:clamp(3px,1.33vw,8px);}
   #connect .ccrest .wtag{letter-spacing:clamp(2px,.93vw,5px);}
-  /* skirmish setup on PC: two side-by-side card-columns (map+faction | seats+speed)
-     instead of one narrow scrolling stack — the box widens to fit both. Each column
-     scrolls on its own; the title and the LAUNCH/Back buttons never leave the screen. */
-  #setup .sbox{width:min(1080px,62vw);max-height:61vh;display:flex;flex-direction:column;overflow:hidden;}
-  #setup .spane{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;}
-  #setup .scol{min-height:0;overflow-y:auto;border:1px solid var(--sf-edge);border-radius:14px;
-    padding:16px 18px;background:var(--sf-card-off);}
-  #setup .sgo{margin-top:14px;}
-  #setup .sgo,#setup .scancel{flex:0 0 auto;}
+  /* skirmish setup on PC: two card-columns — the match (map choice, start world on the
+     map, pace) | the sides (your house, council, rivals) — instead of one narrow scrolling
+     stack. The map grows into the free height; each column scrolls on its own; the title
+     and the button row never leave the screen (UIX-16.1). */
+  #setup .sbox{width:min(1080px,62vw);max-height:61vh;}
+  #setup .spane{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);
+    gap:16px;overflow:hidden;}
+  #setup .scol{display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto;border:1px solid var(--sf-edge);
+    border-radius:14px;padding:16px 18px;background:var(--sf-card-off);}
+  #setup .smap{flex:1 1 0;height:auto;min-height:220px;}
+  #setup .sgo{flex:0 1 340px;margin-left:auto;}
   #updbar{width:min(440px,calc(66.7vw - 20px));}
   #testmode .tmbox{width:min(620px,64vw);max-height:61vh;}
   #sandbox .sbx-box-w{width:min(460px,44vw);max-height:61vh;}
@@ -3954,7 +3991,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="battlewin"><div class="twbox"><div class="lw-head"><div id="battlewinhead" class="bw-hd"><b data-i18n="battle.win.head"></b></div><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
-<div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
+<div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.close"></button></div><div id="scipickbody"></div></div></div>
 <!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
 <!-- язычок досье Роя у правого края: панель выезжает справа, язычок — её ручка (заказ владельца 2026-09-24) -->
 <button id="swarm-tab" type="button" data-i18n-title="swarm.intel.title" data-i18n-aria="swarm.intel.title" hidden><i aria-hidden="true">☣</i><span data-i18n="swarm.intel.tab"></span></button>
@@ -4377,59 +4414,56 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div>
 <div id="setup">
   <div class="sbox">
-    <div class="stitle"><span class="dia"></span><b data-i18n="setup.title"></b></div>
+    <!-- Один экран на оба входа (UIX-16.1): одиночная схватка и сетевая партия. Сетевой режим
+         ставит экрану класс «net»: он прячет решения, которые в сетевом матче принимает
+         сервер (.solo-only), и показывает шапку партии (.net-only). -->
+    <div class="stitle"><span class="dia"></span><b class="solo-only" data-i18n="setup.title"></b><b class="net-only" data-i18n="seatpick.title"></b></div>
+    <p id="setup-sub" class="ssub net-only"></p>
     <div id="setup-start" class="spane">
-      <div class="scol">
-        <label for="setup-map-id" data-i18n="setup.map"></label>
-        <select id="setup-map-id" class="inp">
-          <!-- Retired maps are readable only when joining an existing match. -->
-          <option value="nexus" data-i18n="setup.map.nexus" disabled hidden></option>
-          <option value="frontier-50" data-i18n="setup.map.frontier-50" disabled hidden></option>
-          <option value="frontier-100" data-i18n="setup.map.frontier-100" disabled hidden></option>
-          <option value="duel-1" data-i18n="setup.map.duel-1"></option>
-          <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
-        </select>
-        <p class="smaphint" id="setup-map-info"></p>
-        <label for="setup-home-id" data-i18n="setup.home.list"></label>
-        <select id="setup-home-id" class="inp"></select>
-        <svg id="setupmap" class="smap" preserveAspectRatio="xMidYMid meet"></svg>
-        <p class="smaphint" id="setuphint" data-i18n="setup.map-hint"></p>
-        <div id="setupfactions"></div>
-        <div id="setupcouncil"></div>
-      </div>
-      <div class="scol" id="setup-solo-col">
-        <div id="setupslots" class="sslots"></div>
-        <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
-        <p class="sspeedhint" data-i18n="setup.speed.hint"></p>
-        <div id="setupspeed" class="sspeed">
-          <button class="spdchip" type="button" data-spd="1">×1</button>
-          <button class="spdchip" type="button" data-spd="2">×2</button>
-          <button class="spdchip" type="button" data-spd="5">×5</button>
-          <button class="spdchip" type="button" data-spd="10">×10</button>
-          <button class="spdchip" type="button" data-spd="50">×50</button>
-          <button class="spdchip" type="button" data-spd="100">×100</button>
+      <div class="scol smatch">
+        <div id="setupmaps" class="smaps solo-only" role="group" data-i18n-aria="setup.map"></div>
+        <p class="smaphint sinfo solo-only" id="setup-map-info"></p>
+        <svg id="setupmap" class="smap" preserveAspectRatio="xMidYMid meet" role="group" data-i18n-aria="setup.map.aria"></svg>
+        <div id="setuplegend" class="slegend"></div>
+        <p class="smaphint shint" id="setuphint" data-i18n="setup.map-hint"></p>
+        <div class="sspeedsec solo-only">
+          <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
+          <p class="sspeedhint" data-i18n="setup.speed.hint"></p>
+          <div id="setupspeed" class="sspeed">
+            <button class="spdchip" type="button" data-spd="1">×1</button>
+            <button class="spdchip" type="button" data-spd="2">×2</button>
+            <button class="spdchip" type="button" data-spd="5">×5</button>
+            <button class="spdchip" type="button" data-spd="10">×10</button>
+            <button class="spdchip" type="button" data-spd="50">×50</button>
+            <button class="spdchip" type="button" data-spd="100">×100</button>
+          </div>
         </div>
-        <button id="setup-network-create" class="mbtn" type="button" data-i18n="setup.network.create"></button>
+        <button id="setup-network-create" class="snetnew btn-second solo-only" type="button" data-i18n="setup.network.create"></button>
+      </div>
+      <div class="scol sside">
+        <div id="setupfactions" class="sfactions"></div>
+        <div id="setupcouncil" class="scouncilrow"></div>
+        <div id="setupslots" class="sslots solo-only"></div>
         <!-- SANDBOX — setup checkbox; delete this fenced block + the #sandbox markup to cut it -->
-        <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n="setup.sandbox"></span></label><!--/dev-only-->
+        <!--dev-only--><label class="sbx-check solo-only"><input id="setupsandbox" type="checkbox"><span data-i18n="setup.sandbox"></span></label><!--/dev-only-->
       </div>
     </div>
-    <button id="setupgo" class="sgo" disabled data-i18n="setup.go"></button>
-    <button id="setupcancel" class="scancel" data-i18n="setup.cancel"></button>
+    <div class="sfoot">
+      <button id="setupcancel" class="scancel btn-quiet" type="button" data-i18n="setup.cancel"></button>
+      <button id="setupgo" class="sgo btn-main" type="button" disabled data-i18n="setup.go"></button>
+    </div>
   </div>
 </div>
-<!-- REL-7: multiplayer seat/faction picker — shown before joining a match -->
+<!-- REL-7: заставка входа в сетевую партию — пока сервер отдаёт места; на отказ — «Повторить».
+     Сам выбор места и дома — на экране настройки (ENTRY-2). -->
 <div id="seatpick" style="display:none">
   <div class="sbox">
     <div class="stitle"><span class="dia"></span><b data-i18n="seatpick.title"></b></div>
-    <div class="spane">
-      <div class="scol">
-        <p class="ssub" data-i18n="seatpick.sub"></p>
-        <div id="seatpick-list"></div>
-      </div>
+    <div id="seatpick-list" class="sstatus"></div>
+    <div class="sfoot">
+      <button id="seatpick-cancel" class="scancel btn-quiet" type="button" data-i18n="seatpick.cancel"></button>
+      <button id="seatpick-retry" class="sgo btn-main" type="button" style="display:none" data-i18n="seatpick.retry"></button>
     </div>
-    <button id="seatpick-go" class="sgo" disabled data-i18n="seatpick.go"></button>
-    <button id="seatpick-cancel" class="scancel" data-i18n="seatpick.cancel"></button>
   </div>
 </div>
 <!-- hero fitting: the module "on the cursor" — follows the pointer (heroes setup tab) -->

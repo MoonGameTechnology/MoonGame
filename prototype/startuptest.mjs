@@ -120,7 +120,7 @@ try {
     await page.locator('#cwgo').tap();
     await page.locator('#hub-solo').waitFor({ state: 'visible' });
     await page.locator('#hub-solo').tap();
-    await page.locator('#sp-go').tap();
+    await page.locator('#setupgo').waitFor({ state: 'visible' });
     await sample('transparent setup', true);
     await page.locator('#setupgo').tap();
     await sample('match', true);

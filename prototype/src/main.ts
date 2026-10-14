@@ -547,7 +547,7 @@ import {
 // REFM-201: чей сейчас ход в переговорах — одна формула на оба чипа.
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
-import { COLOR } from './sideColors';
+import { COLOR, paletteOf } from './sideColors';
 // REFM-237 — цвета сторон, места матча и константы карты: у владельца, `mapPalette.ts`.
 import {
   initMapPalette,
@@ -7252,6 +7252,10 @@ initSetupScreen({
   showConnect,
   openHub: () => openHub(),
   startMatch: (setup) => startMatch(setup),
+  mapLabel,
+  // Чужой мир на мини-карте — цветом войны из выбранной палитры: так соперник выглядит
+  // и на карте партии, и игрок с CVD-палитрой не получит красно-зелёную пару.
+  sideColors: () => ({ you: youColor, rival: paletteOf(rivalPaletteId).war }),
 });
 
 // --- meta-progression (прокачка командующего) --------------------------------

@@ -3,7 +3,8 @@
 // `.btn-second`, `.btn-quiet` (лист `build.mjs`), а правило экрана задаёт ей только размер и
 // место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
 // производстве и науке (UIX-11.1), карточке мира, разделении флота, окне боя, рынке, штабе
-// героев, корпорации, итоге партии, входе и обозревателе партий (UIX-11.2):
+// героев, корпорации, итоге партии, входе и обозревателе партий (UIX-11.2), настройке схватки
+// и заставке входа в партию (UIX-16.1):
 // разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
 // перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
 import { readdirSync, readFileSync } from 'node:fs';
@@ -93,6 +94,10 @@ function converted(part: string): boolean {
   )
     return true;
   if (/^button\.b(?![-\w])/.test(s)) return true;
+  // Настройка схватки и заставка входа в партию (UIX-16.1): ряд кнопок внизу, сегменты карт
+  // и «Создать сетевую игру».
+  if (/#(setup|seatpick)(?![-\w])/.test(part) && /^\.(sgo|scancel|smapchip)\b/.test(s)) return true;
+  if (/^#setup-network-create\b/.test(s)) return true;
   if (part.includes('#splitdlg') && /^(button|\.cbtn)\b/.test(s)) return true;
   if (/#battlewinbody (\.bw-(actions|orders) )?button\b/.test(part) || s.includes('bw-attack'))
     return true;
@@ -121,6 +126,19 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       .filter((r) => parts(r.sel).some(converted) && LOOK.test(r.body))
       .map((r) => `${r.sel} { ${LOOK.exec(r.body)![1]} }`);
     expect(painted).toEqual([]);
+  });
+
+  it('настройка схватки: «Начать» — главная, «Назад» — тихая, карты — вторичные (UIX-16.1)', () => {
+    const marks: Array<[string, string]> = [
+      ['setupgo', 'btn-main'],
+      ['setupcancel', 'btn-quiet'],
+      ['setup-network-create', 'btn-second'],
+      ['seatpick-retry', 'btn-main'],
+      ['seatpick-cancel', 'btn-quiet'],
+    ];
+    for (const [id, style] of marks)
+      expect(BUILD).toMatch(new RegExp(`<button id="${id}" class="[^"]*\\b${style}\\b`));
+    expect(read('./setupScreen.ts')).toContain('class="smapchip btn-second');
   });
 
   it('главные кнопки науки и производства — .btn-main', () => {
