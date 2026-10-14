@@ -28,6 +28,7 @@
     "doctor": "node prototype/doctor.mjs",
     "perf": "node prototype/perf.mjs",
     "metrics": "node prototype/report.mjs",
+    "analytics": "node prototype/analyticsReport.mjs",
     "selfplay": "node prototype/selfplay.mjs",
     "meritscan": "node prototype/meritscan.mjs",
     "rehearsal": "node prototype/rehearsal.mjs",
