@@ -18,10 +18,11 @@ import {
 } from './scenario';
 import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
-import { createMultiplayerServer, tlsFromEnv } from './wsServer';
+import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
+import { operatorTokenFromEnv } from './operatorAccess';
 import { createMatchLoader } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { newMatchId } from './matchId';
@@ -31,7 +32,13 @@ import {
   type MatchApiDeps,
   type CreatedMatch,
 } from './matchApi';
-import { registerAuthApi, liveSession, authRateFromEnv, type RecoveryMailer } from './authApi';
+import {
+  registerAuthApi,
+  liveSession,
+  currentPwfp,
+  authRateFromEnv,
+  type RecoveryMailer,
+} from './authApi';
 import { registerAdminApi, adminLoginsFromEnv } from './adminApi';
 import { kickSeat } from './seatKick';
 import { registerCorpApi } from './corpApi';
@@ -53,7 +60,7 @@ import { configureWebPush, vapidFromEnv } from './push';
 import { loadMedalCatalog } from './medalCatalog';
 import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
-import { LazyRoomRegistry } from './roomRegistry';
+import { LazyRoomRegistry, revokeAccountConnections } from './roomRegistry';
 import { buildVersion } from './buildVersion';
 
 export async function startServer({
@@ -346,6 +353,8 @@ const createMatch = async (): Promise<CreatedMatch> => {
 };
 const matchApi: MatchApiDeps = {
   createMatch,
+  // Per-account create quota: running matches an account created through the route.
+  ongoingMatchIds: () => stores.store.ongoingMatchIds(),
   // ENTRY-1: `preferredSlot`/`preferredFaction` доезжают до резолвера и до состояния.
   // Раньше эта реализация принимала ТРИ параметра из пяти, объявленных `MatchApiDeps`, и
   // два последних молча роняла: функция с меньшим числом параметров совместима с более
@@ -354,7 +363,7 @@ const matchApi: MatchApiDeps = {
   // проявлялся ровно потому, что играли на прототипном.
     join: async (
       matchId,
-      { nick, accountId, preferredSlot, preferredFaction, preferredScientists },
+      { nick, accountId, pwfp, preferredSlot, preferredFaction, preferredScientists },
     ) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
@@ -409,7 +418,7 @@ const matchApi: MatchApiDeps = {
     if (room) await stores.store.save(snapshotOf(room));
     return {
       playerId: seat.playerId,
-      token: await signToken(matchId, seat.playerId, accountId),
+      token: await signToken(matchId, seat.playerId, accountId, pwfp),
     };
   },
   // Wired ⇒ create/join require a session from /auth/login — the session's login IS
@@ -485,6 +494,9 @@ const server = createMultiplayerServer({
   // Behind a TLS-terminating proxy (Caddy), set TRUST_PROXY=1 so request.ip (and the
   // auth API's per-IP rate limit) sees the client, not the proxy.
   trustProxy: process.env.TRUST_PROXY === '1',
+  // Лимиты WS-рукопожатия на адрес (`WS_RATE_MAX` / `WS_RATE_WINDOW_MS` / `WS_MAX_PER_IP`);
+  // без переменных — дефолты `wsServer.ts`.
+  ...wsLimitsFromEnv(process.env),
   // RS-5.1: native TLS — set TLS_KEY_FILE+TLS_CERT_FILE to serve wss:// in-process (no
   // proxy needed). Unset ⇒ undefined ⇒ plain ws (a proxy may still terminate upstream).
   tls: tlsFromEnv(process.env),
@@ -493,7 +505,13 @@ const server = createMultiplayerServer({
   ready: () => stores.store.ping?.() ?? Promise.resolve(true),
   // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
   version: buildVersion(process.env.GIT_SHA),
+  // `GET /metrics` is operator-only: a direct loopback peer, or `Bearer $METRICS_TOKEN`.
+  operatorToken: operatorTokenFromEnv(process.env),
   auth,
+  // A join token is bound to the account's password: a reset refuses the old one here.
+  ...(auth
+    ? { accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId) }
+    : {}),
   allowedOrigins,
   securityAudit,
   accountStore, // dev ?nick= WS login (when auth is off)
@@ -521,6 +539,10 @@ const server = createMultiplayerServer({
           users: stores.userStore,
           sendRecoveryMail,
           signSession,
+          // A new password closes the account's open game sockets in every live match.
+          onPasswordChanged: (accountId) => {
+            revokeAccountConnections(registry, accountId);
+          },
           // Retunable per deployment (`AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS`): behind a
           // proxy every player shares one source address, so the default budget — sized
           // for one lobby — is the thing a bigger deployment raises first.
@@ -619,6 +641,7 @@ const server = createMultiplayerServer({
           registerAdminApi(scope, {
             identify,
             admins: ADMIN_LOGINS,
+            users: stores.userStore,
             roster: async (matchId) => {
               // Load-on-demand: a hibernated match still has a roster to command —
               // an admin asking about it is exactly a reason to wake it.

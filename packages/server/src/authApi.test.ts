@@ -228,8 +228,13 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
 });
 
 describe('SE-1.x · session gate on the match API', () => {
-  function gatedApp(): { server: FastifyInstance; users: MemoryUserStore } {
+  function gatedApp(): {
+    server: FastifyInstance;
+    users: MemoryUserStore;
+    joins: Parameters<MatchApiDeps['join']>[1][];
+  } {
     const users = new MemoryUserStore();
+    const joins: Parameters<MatchApiDeps['join']>[1][] = [];
     app = Fastify();
     registerAuthApi(app, {
       users,
@@ -239,8 +244,13 @@ describe('SE-1.x · session gate on the match API', () => {
     });
     const deps: MatchApiDeps = {
       createMatch: () => Promise.resolve({ matchId: 'm1', seats: ['green', 'red'] }),
-      join: (matchId, { nick, accountId }) =>
-        Promise.resolve({ playerId: 'green', token: `join:${matchId}:${nick}:${accountId}` }),
+      join: (matchId, req) => {
+        joins.push(req);
+        return Promise.resolve({
+          playerId: 'green',
+          token: `join:${matchId}:${req.nick}:${req.accountId}`,
+        });
+      },
       // Mirrors production (main.ts / netserver.ts): signature verify THEN a live re-check
       // against the current password, so a reset revokes older sessions at the seat gate.
       identify: async (request) => {
@@ -251,8 +261,21 @@ describe('SE-1.x · session gate on the match API', () => {
       },
     };
     registerMatchApi(app, deps);
-    return { server: app, users };
+    return { server: app, users, joins };
   }
+
+  it('join hands the session password fingerprint to the token minting (pwfp binding)', async () => {
+    const { server, users, joins } = gatedApp();
+    const reg = await post(server, '/auth/register', { login: 'dave', password: 'longenough' });
+    const { token } = reg.json() as { token: string };
+    await server.inject({
+      method: 'GET',
+      url: '/matches/m1/join',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const user = await users.findUser('dave');
+    expect(joins.at(-1)?.pwfp).toBe(pwFingerprint(user!.passHash));
+  });
 
   it('join requires a session; the seat goes to the SESSION login, not a query nick', async () => {
     const { server } = gatedApp();
@@ -330,7 +353,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
    *  test). Mirrors the serverConfig composition: same key, a distinct `reset` audience. */
   function recoverApp(
     resetBaseUrl = 'https://play.example',
-    rate: { rateMax?: number; rateWindowMs?: number } = {},
+    rate: { rateMax?: number; rateWindowMs?: number; recoveryCooldownMs?: number } = {},
     delivery?: () => Promise<void>,
   ): {
     server: FastifyInstance;
@@ -420,7 +443,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { release = resolve; });
     let attempts = 0;
-    const { server, sent } = recoverApp('https://play.example', { rateMax: 200 }, async () => {
+    const { server, sent } = recoverApp('https://play.example', { rateMax: 200, recoveryCooldownMs: 0 }, async () => {
       if (++attempts === 1) {
         await blocked;
         throw new Error('synthetic SMTP outage');
@@ -521,7 +544,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
   it('passes bounded recipient metadata and a structural reset link to the host adapter', async () => {
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { release = resolve; });
-    const { server, sent } = recoverApp('https://play.example', {}, () => blocked);
+    const { server, sent } = recoverApp('https://play.example', { recoveryCooldownMs: 0 }, () => blocked);
     await post(server, '/auth/register', { login: 'locale', password: 'longenough', email: 'locale@example.com' });
     try {
       for (const locale of ['en', 'ru', 'unsupported', { language: 'en' }, 'x'.repeat(65)])
@@ -541,6 +564,19 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
           .toBe(sent.indexOf(msg) === 0 ? 200 : 401);
       }
     } finally { release(); }
+  });
+
+  it('one recovery mail per account per cooldown, whatever the number of requests', async () => {
+    const { server, sent } = recoverApp('https://play.example', { rateMax: 200 });
+    await post(server, '/auth/register', { login: 'inbox', password: 'longenough', email: 'inbox@example.com' });
+    await post(server, '/auth/register', { login: 'other', password: 'longenough', email: 'other@example.com' });
+    for (let i = 0; i < 5; i++) {
+      const r = await post(server, '/auth/recover', { email: 'inbox@example.com' });
+      expect(r.json()).toEqual({ ok: true }); // the answer does not change: no oracle
+    }
+    await post(server, '/auth/recover', { email: 'other@example.com' });
+    await vi.waitFor(() => expect(sent.map((m) => m.to)).toContain('other@example.com'));
+    expect(sent.map((m) => m.to)).toEqual(['inbox@example.com', 'other@example.com']);
   });
 
   it('recover is anti-enumeration: an unknown email still 200s and sends nothing', async () => {

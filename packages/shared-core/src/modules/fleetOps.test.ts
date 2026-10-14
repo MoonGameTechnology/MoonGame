@@ -659,6 +659,43 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     ).toBe('E_NO_CAPACITY');
   });
 
+  it('ДВЕ ЗАПИСИ НА ОДНИ КОРАБЛИ: «любые» и «с лоадаутом» не считаются дважды — E_NOT_ENOUGH', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet(
+          'F1',
+          [
+            { unit: 'cruiser', count: 2, modules: ['plating'] },
+            { unit: 'cruiser', count: 2 },
+            { unit: 'scout', count: 1 },
+          ],
+          [{ unit: 'militia', count: 8 }], // трюм полон: 4 крейсера × 2
+        ),
+      ],
+    });
+    // Обе записи указывают на одни и те же два бронированных крейсера: уйти может только
+    // пара, и восьми militia в её трюме (4 места) не место.
+    expect(
+      errCode(
+        kernel.applyAction(
+          s,
+          split(
+            'F1',
+            [
+              { unit: 'cruiser', count: 2 },
+              { unit: 'cruiser', count: 2, modules: ['plating'] },
+            ],
+            'p1',
+            [{ unit: 'militia', count: 8 }],
+          ),
+          ctx,
+        ),
+      ),
+    ).toBe('E_NOT_ENOUGH');
+  });
+
   it('СТОЛЬКО ДЕСАНТА НЕТ: заказ больше наличного — E_NO_ARMY, состояние не тронуто', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
@@ -928,8 +965,10 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
 
   it('rejects engaging a fleet not co-located, in transit, or already in battle', () => {
     const kernel = createKernel([fleetOpsModule]);
+    // Цель на соседнем узле в поле зрения: видна, но не рядом.
     const elsewhere = stateWith({
       players: [player('p1'), player('p2')],
+      planets: [planet('X', null), planet('Y', null)],
       fleets: [fleet('A', 'p1', 'X', [['cruiser', 2]]), fleet('D', 'p2', 'Y', [['cruiser', 2]])],
     });
     expect(errCode(kernel.applyAction(elsewhere, engage('A', 'D'), ctx))).toBe('E_NOT_COLOCATED');
@@ -941,6 +980,21 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
       ],
     });
     expect(errCode(kernel.applyAction(busy, engage('A', 'D'), ctx))).toBe('E_IN_BATTLE');
+  });
+
+  it('цель за туманом — тот же E_NO_FLEET, что несуществующая (код не подтверждает флот)', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1'), player('p2')],
+      // Y далеко за кругом зрения флота A: зритель Y не опознаёт.
+      planets: [planet('X', null), { ...planet('Y', null), position: { x: 9000, y: 0 } }],
+      fleets: [fleet('A', 'p1', 'X', [['cruiser', 2]]), fleet('D', 'p2', 'Y', [['cruiser', 2]])],
+    });
+    expect(errCode(kernel.applyAction(s, engage('A', 'NOPE'), ctx))).toBe('E_NO_FLEET');
+    // Прежде здесь был `E_NOT_COLOCATED`, а при мире — `E_NOT_HOSTILE`: перебор id находил флот.
+    expect(errCode(kernel.applyAction(s, engage('A', 'D'), ctx))).toBe('E_NO_FLEET');
+    setStance(s, 'p1', 'p2', 'peace');
+    expect(errCode(kernel.applyAction(s, engage('A', 'D'), ctx))).toBe('E_NO_FLEET');
   });
 
   // ASSAULT-1: у штурмующего корабли на орбите, а десант внизу. Наземный бой запирает

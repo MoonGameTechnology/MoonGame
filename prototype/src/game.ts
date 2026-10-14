@@ -37,6 +37,8 @@ export {
   type NetworkMatchMode,
   parseNetworkMatchMode,
   networkSeats,
+  networkSeatPlan,
+  networkStartsOf,
   newGame,
   PLAYABLE_FACTIONS,
 } from './matchSetup';
@@ -161,6 +163,7 @@ export {
 // --- heroes + capital --------------------------------------------------------
 export { heroRosterOf } from './heroes';
 export { capitalOf } from '../../packages/shared-core/src/index';
+export { hasShipyard, rallyPointOf } from '../../packages/shared-core/src/index';
 // RETR-2: ступени авто-отхода закрыты списком в ЯДРЕ — интерфейс обходит его по кругу,
 // а не держит свою копию чисел.
 export { RETREAT_THRESHOLDS } from '../../packages/shared-core/src/index';
@@ -216,6 +219,7 @@ export {
   marketTake,
   marketCancel,
   designateCapital,
+  setRallyPoint,
   spawnHero,
   unlockHeroSkill,
   installHeroModule,

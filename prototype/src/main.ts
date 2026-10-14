@@ -147,6 +147,9 @@ import {
   isInhabited,
   type SetupConfig,
   setHoldPoint,
+  setRallyPoint,
+  hasShipyard,
+  rallyPointOf,
   MAX_STEWARD_HOLD_POINTS,
   FORCED_MARCH_MULT,
   instantRepairFleet,
@@ -264,7 +267,7 @@ import { initApkUpdater } from './apkUpdate';
 import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
 import { forgetBorderLayer, initBorderLayer } from './borderLayer';
-import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
+import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { addFlak, clearFlak, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashMines, flashProvince, initMapEffects, noticeFlash } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
@@ -697,6 +700,7 @@ import {
   heroAim,
   heroSpawnAim,
   inspectFleet,
+  rallyAim,
   merging,
   mobileChoices,
   offerChoices,
@@ -738,6 +742,7 @@ import { netViewAt } from '../../decisions/netViewClock';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
+import { rallyOffer, type RallyOffer } from '../../decisions/rallyPoint';
 import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { mountLocaleMenu } from './localeMenu';
@@ -2969,6 +2974,7 @@ function renderMap(now: number) {
   // 3. Наложения под мирами: сеть Роя, маршруты, патрули, вылеты, мины и ракеты, вспышки.
   drawSwarmNet(); // сеть Роя: круги связи разведанных узлов
   drawFleetRoutes();
+  drawRallyPoint(); // RALLY-1: точка сбора выбранного мира-верфи
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
   drawStrikeTrails(now); // остаток SHU-3.1: вылет в воздухе виден на карте
@@ -4432,6 +4438,20 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }
 
+/** Точка сбора мира-верфи (RALLY-1): цель и «Сменить»/«Снять», либо «Задать». Что
+ *  предлагать — `decisions/rallyPoint.ts`; цель берётся у ядра (`rallyPointOf`). */
+function rallySectionHtml(planetId: string, offer: Exclude<RallyOffer, 'none'>): string {
+  const to = rallyPointOf(s, ME, planetId);
+  const row =
+    offer === 'change' && to
+      ? `<b>${esc(t('side.world.rally.to', { w: placeName(to) }))}</b>` +
+        btn('rally', 'pick', t('side.world.rally.change'), true) +
+        btn('rally', 'off', t('side.world.rally.clear'), true)
+      : `<b class="dim">${esc(t('side.world.rally.none'))}</b>` +
+        btn('rally', 'pick', t('side.world.rally.set'), true);
+  return `<div class="sec">${t('side.world.rally')}</div><div class="asset-row">${row}</div>`;
+}
+
 /** Side-panel: a known world — ownership header + ground/ships/shuttle/buildings tabs. */
 function planetPanelHtml(p: Planet): string {
   const mine = p.owner === ME;
@@ -4531,6 +4551,10 @@ function planetPanelHtml(p: Planet): string {
     if (ships.length) {
       cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + garrisonTilesHtml(p.owner, ships));
     }
+    // RALLY-1: куда сами летят корабли, построенные здесь. Стоит у очереди кораблей —
+    // это настройка выпуска мира, а не одного заказа.
+    const rally = rallyOffer(mine, hasShipyard(p, data), rallyPointOf(s, ME, p.id) !== null);
+    if (rally !== 'none') cols.push(rallySectionHtml(p.id, rally));
     if (mine) {
       cols.push(
         `<div class="sec">${t('side.units.conveyor')}</div>` +
@@ -5161,6 +5185,7 @@ function renderPanel() {
       !!strikeAim?.patrol ||
       !!strikeAim?.relocate ||
       !!retreatAim ||
+      !!rallyAim ||
       (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim)),
     merging,
     picking: pickMode,
@@ -5626,6 +5651,13 @@ side.addEventListener('click', (ev) => {
     playerOrder(designateCapital(ME, selPlanet!));
   } else if (act === 'holdpoint') {
     playerOrder(setHoldPoint(ME, selPlanet!, arg === 'on'));
+  } else if (act === 'rally') {
+    // RALLY-1: «Задать»/«Сменить» взводят выбор цели на карте, «Снять» — сразу приказ.
+    if (arg === 'off') playerOrder(setRallyPoint(ME, selPlanet!, null));
+    else {
+      arm('rallyAim', selPlanet!);
+      note(t('hint.rally-pick'));
+    }
   } else if (act === 'ping') {
     pings?.openMenu();
   } else if (act === 'bombard') {
@@ -7481,10 +7513,15 @@ function createOnlineMatch(mapId: MapId): void {
         headers: { 'content-type': 'application/json', ...(pass ? { authorization: `Bearer ${pass}` } : {}) },
         body: JSON.stringify({ mapId }),
       });
-      if (!res.ok) throw new Error('E_CREATE_MATCH');
+      if (!res.ok) {
+        const refusal = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(refusal?.error ?? 'E_CREATE_MATCH');
+      }
       const body = await res.json() as { matchId: string };
       await openSeatPicker(body.matchId);
-    } catch { note(t('setup.network.failed')); }
+    } catch (err) {
+      note(t(err instanceof Error && err.message === 'E_MATCH_QUOTA' ? 'setup.network.quota' : 'setup.network.failed'));
+    }
     finally {
       creatingMatch = false;
       for (const button of buttons) { button.disabled = false; button.textContent = t('setup.network.create'); }

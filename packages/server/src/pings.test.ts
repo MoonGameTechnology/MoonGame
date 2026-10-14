@@ -100,6 +100,27 @@ describe('ally pings', () => {
     expect(r.ofType('ping.added')).toHaveLength(0); // enemy never sees it
   });
 
+  it("a ping id tells an ally nothing about the enemy's pings", async () => {
+    // red (team B) marks twice; then green (team A) marks once. blue sees only green's ping
+    // and must not be able to count red's off its id (a room counter would read `:2`).
+    const room = makeRoom({ teams: { green: 'A', blue: 'A', red: 'B' } });
+    const g = new Peer();
+    const b = new Peer();
+    const r = new Peer();
+    room.addPeer('green', g);
+    room.addPeer('blue', b);
+    room.addPeer('red', r);
+    await room.receive('red', r, place({ kind: 'mark', target: { node: 'home_red' } }));
+    await room.receive('red', r, place({ kind: 'mark', target: { node: 'home_red' } }));
+    await room.receive('green', g, place({ kind: 'mark', target: { node: 'home_green' } }));
+    const seen = b.ofType('ping.added').map((m) => m.ping!.id);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatch(/^ping:green:[A-Za-z0-9_-]+$/);
+    expect(seen[0]!.split(':')[2]).not.toMatch(/^\d+$/);
+    const reds = r.ofType('ping.added').map((m) => m.ping!.id);
+    expect(new Set(reds).size).toBe(2); // still unique per ping
+  });
+
   it('allows free point anchors but fog-gates node anchors (E_PING_UNSEEN)', async () => {
     const room = makeRoom({ teams: { green: 'A', blue: 'A' } });
     const g = new Peer();

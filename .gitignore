@@ -19,6 +19,8 @@ prototype/econ-playtest-result.json
 
 # VPS server config — holds a token; never commit (see deploy/server.env.example)
 deploy/server.env
+# Migrator credentials for DB_AUTO_MIGRATE=0 (docs/security/zero-trust-rollout.md)
+deploy/migration.env
 # Rollback point written by deploy/update.sh on the prod host (runtime state, not code)
 .last-good-image
 

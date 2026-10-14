@@ -108,8 +108,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // SM-3.4: мины, видные врагу, мины не работают — своё поле и своя перезарядка, чужое снято.
   minefields: 'filtered',
   heroes: 'filtered', // только свои
-  tempLanes: 'public', // настоящие рёбра графа: их видно всем
-  topology: 'public',
+  tempLanes: 'filtered', // свои и общие коридоры; чужой личный вместе с его ребром снят
+  topology: 'filtered', // отпечаток видимых коридоров, а не счётчик всех открытий
   heroSeq: 'stripped', // его поднимает и коридор, и корабль героя, вставший в тумане
   diplomacy: 'public', // кто с кем воюет — открытое знание
   diplomacyOffers: 'filtered', // а кто с кем ТОРГУЕТСЯ — дело двоих
@@ -124,6 +124,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   operation: 'filtered', // контракт главы VI: правила публичны, флоты соединений — только видимые
   captive: 'public', // пленный главы V — сценарий PvE: укрытие и носитель Рой не ищет
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
+  rallyPoints: 'filtered', // чужая точка сбора — куда пойдут его подкрепления (RALLY-1)
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
   autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
   orders: 'filtered',
@@ -284,6 +285,22 @@ function maximalState(): GameState {
     fleets: {
       mine: fleet('mine', VIEWER, 'A', 'scout'),
       CANARY_fleet: fleet('CANARY_fleet', RIVAL, 'Z', 'CANARY_unit'),
+      // Опознанный чужой флот (только что ушёл с `A`): сам он виден, а его намерения —
+      // оставшиеся прыжки, конечная цель, стоянка в её конце и путь после боя — нет.
+      seen_rival: {
+        ...fleet('seen_rival', RIVAL, 'A', 'scout'),
+        location: null,
+        movement: {
+          from: 'A',
+          to: 'Z',
+          departedAt: 100,
+          arrivesAt: 200,
+          path: ['CANARY_hop'],
+          destination: 'CANARY_destination',
+          parkT: 0.5,
+        },
+        resume: { to: 'CANARY_resume' },
+      },
     },
     battles: {
       mine_battle: {
@@ -386,8 +403,29 @@ function maximalState(): GameState {
       },
     },
     tempLanes: [
-      // Настоящее ребро графа — публичная топология, канареек тут быть не должно.
-      { id: 'lane1', owner: RIVAL, from: 'A', to: 'Z', speedBonus: 0.5, expiresAt: 900, addedLink: false },
+      // Свой коридор виден, чужой личный (ступень 1) снят целиком.
+      {
+        id: 'lane1',
+        owner: VIEWER,
+        from: 'A',
+        to: 'Z',
+        speedBonus: 0.5,
+        expiresAt: 900,
+        addedLink: false,
+        tier: 1,
+        heroId: 'mine_hero',
+      },
+      {
+        id: 'CANARY_lane',
+        owner: RIVAL,
+        from: 'Z',
+        to: 'A',
+        speedBonus: 0.5,
+        expiresAt: 900,
+        addedLink: true,
+        tier: 1,
+        heroId: 'CANARY_hero',
+      },
     ],
     topology: 3,
     heroSeq: 1,
@@ -425,6 +463,7 @@ function maximalState(): GameState {
     },
     captive: { hideout: 'a', zone: 'b' },
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
+    rallyPoints: { [VIEWER]: { A: 'B' }, [RIVAL]: { Z: 'CANARY_target' } },
     autoAssault: { mine: true, CANARY_fleet: true },
     autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },
     orders: {

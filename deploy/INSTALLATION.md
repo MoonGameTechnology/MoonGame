@@ -37,7 +37,7 @@
 
 ```bash
 # Подключись к серверу
-ssh user@192.168.1.7
+ssh user@<IP-сервера>
 
 # Убедись, что есть sudo доступ
 sudo whoami  # должен показать "root"
@@ -76,7 +76,7 @@ moongame status
 # Смотри логи
 moongame logs
 
-# Открой http://192.168.1.7:8788 в браузере
+# Открой http://<IP-сервера>:8788 в браузере
 ```
 
 ---
@@ -115,7 +115,7 @@ moongame update
 
 ### Доступ к серверу
 
-- **Локально:** `http://192.168.1.7:8788`
+- **Локально:** `http://<IP-сервера>:8788`
 - **Снаружи:** требует настройки проксирования (см. ниже)
 
 ---
@@ -126,18 +126,25 @@ moongame update
 
 ```bash
 # Установи и настрой проксирование
-sudo bash deploy/setup-proxy.sh
+sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> \
+  bash deploy/setup-proxy.sh
 
 # Готово! Теперь доступна по адресу:
-# http://94.190.83.220:95367
+# http://<внешний-IP>:<порт>
 ```
+
+Сервер пускает WebSocket только с адресов из `ALLOWED_ORIGINS`. Поэтому `install-ubuntu.sh`
+запускай с теми же значениями (`sudo EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash
+deploy/install-ubuntu.sh`) или допиши `http://<внешний-IP>:<порт>` в `ALLOWED_ORIGINS` в
+`/opt/moongame/deploy/server.env` и выполни `moongame restart`. Порт 80 в origin не
+пишется (`http://<внешний-IP>`), IPv6 пишется в квадратных скобках: `http://[2001:db8::10]:<порт>`.
 
 ### Вариант 2: Проксирование на роутере
 
 На роутере (тот, где точка доступа Wi-Fi) в "Port Forwarding":
 ```
-Внешний порт: 95367 TCP
-Внутренний IP: 192.168.1.7
+Внешний порт: <порт> TCP
+Внутренний IP: <IP-сервера>
 Внутренний порт: 8788 TCP
 ```
 
@@ -246,10 +253,10 @@ cat /opt/moongame/deploy/server.env | grep POSTGRES_PASSWORD
 
 ```bash
 # На локальном ноутбуке
-ssh-copy-id -i ~/.ssh/id_rsa.pub user@192.168.1.7
+ssh-copy-id -i ~/.ssh/id_rsa.pub user@<IP-сервера>
 
 # Теперь можешь подключаться без пароля
-ssh user@192.168.1.7
+ssh user@<IP-сервера>
 ```
 
 ### Firewall
@@ -260,7 +267,7 @@ ssh user@192.168.1.7
 # Разреши порты
 sudo ufw allow 22/tcp    # SSH
 sudo ufw allow 8788/tcp  # Игровой сервер
-sudo ufw allow 95367/tcp # Nginx (если используется)
+sudo ufw allow <порт>/tcp # Nginx (если используется)
 sudo ufw enable
 ```
 
@@ -429,7 +436,7 @@ docker exec -it $(docker ps -qf "name=postgres") psql -U void -d void -c "SELECT
 - [ ] Скрипт `install-ubuntu.sh` запущен с успехом
 - [ ] `moongame status` показывает "running"
 - [ ] `moongame logs` не содержит ошибок
-- [ ] `http://192.168.1.7:8788` открывается в браузере
+- [ ] `http://<IP-сервера>:8788` открывается в браузере
 - [ ] Игра загружается и показывает экран входа
 - [ ] `moongame update` работает (тестирование обновления)
 - [ ] Настроено внешнее проксирование (опционально)

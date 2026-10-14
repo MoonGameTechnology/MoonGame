@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
   Action,
@@ -10,8 +11,10 @@ import type {
   PlayerId,
   PlayerReward,
   SignatureContact,
+  StateDelta,
 } from '@void/shared-core';
 import {
+  CLIENT_ACTION_TYPES,
   diffState,
   flashBattles,
   getStance,
@@ -115,6 +118,10 @@ export interface MatchRoomOptions {
    *  escalation) do not pass through `receive` and stay unaffected; e.g. an AvA
    *  room denies `diplomacy.declare` because the orchestrator owns the stances. */
   denyPlayerActions?: (type: string) => string | null | undefined;
+  /** Action types a player may send on the BARE path (no `GATE`). Defaults to the gate's
+   *  own catalog (`CLIENT_ACTION_TYPES`), so a host-issued type is refused from the wire
+   *  with or without the gate. Only rooms over a toy test kernel override it. */
+  clientActionTypes?: readonly string[];
   /** Observation-only room-event stream for metrics/playtest logging (M0). */
   observe?: (event: RoomObservation) => void;
   securityAudit?: SecurityAudit;
@@ -327,9 +334,26 @@ type ApplyPlan =
   /** Ядро отвергло действие, но догон УЖЕ посчитан: коммитится он один (SRV-1). */
   | { kind: 'rejected'; code: string; state: GameState; events: DomainEvent[] }
   /** Действие принято: коммитится итоговое состояние и события догона + применения. */
-  | { kind: 'applied'; state: GameState; events: DomainEvent[]; at: number };
+  | { kind: 'applied'; state: GameState; events: DomainEvent[]; at: number; advanced: GameState };
 /** План, у которого есть что коммитить (всё, кроме несостоявшегося догона). */
 type CommittablePlan = Extract<ApplyPlan, { kind: 'rejected' | 'applied' }>;
+
+/** The unique tail of a ping/chat id. Random, not a counter: a room-wide (or even
+ *  per-sender) counter would show a recipient, by its gaps, how many pings and messages
+ *  went to OTHER audiences — DMs and coalition talk included. Clients only dedupe by id. */
+function opaqueId(): string {
+  return randomBytes(9).toString('base64url');
+}
+
+/** A delta that changes nothing. */
+function isEmptyDelta(delta: StateDelta): boolean {
+  return (
+    Object.keys(delta.changed).length === 0 &&
+    Object.keys(delta.removed).length === 0 &&
+    delta.meta === undefined &&
+    delta.removedMeta === undefined
+  );
+}
 
 /** Вердикт фронта подачи — дедупа и лимита (NETA2-8). Стоял тремя копиями: у голого
  *  sync-submit, у голого durable-submit и у серверного submit; расходились они молча
@@ -498,6 +522,8 @@ export class MatchRoom {
   private readonly gate?: ActionGate;
   /** Player-action deny-list (see options.denyPlayerActions). */
   private readonly denyPlayerActions?: (type: string) => string | null | undefined;
+  /** Bare-path wire catalog (see options.clientActionTypes). */
+  private readonly clientActionTypes: ReadonlySet<string>;
   /** LARS-1 live ownership read (see options.arsenalStore). */
   private readonly arsenalStore?: ArsenalStore;
   /** PVE-5.2 server-side order source (see options.serverOrders). */
@@ -529,6 +555,12 @@ export class MatchRoom {
   private readonly peers = new Map<PlayerId, Set<RoomPeer>>();
   private readonly receipts = new Map<string, ActionReceipt>();
   private seq = 0;
+  /** Per-player wire sequence: the `seq` a client sees counts only the deltas sent to
+   *  THAT player. The room-wide `seq` counts every receipt (any player's action, any
+   *  rejection), so on the wire it would time and count actions the player cannot see.
+   *  Kept across reconnects (only ever rises); the client only needs it monotonic within a
+   *  connection, and a room restart starts it over behind a fresh `welcome`. */
+  private readonly wireSeq = new Map<PlayerId, number>();
   private stateValue: GameState;
   /** Per-player baseline the deltas diff against — each player's last broadcast
    *  *visible* view (fog of war is server-authoritative, so every player holds a
@@ -539,10 +571,8 @@ export class MatchRoom {
   /** Ally pings live behind the ephemeral store (in-memory now, Redis later) — never
    *  in GameState, so they can't trip hashState / replay / the schedule. */
   private readonly ephemeral: EphemeralStore;
-  private pingSeq = 0;
   /** Per-player placement timestamps, for the (local, single-process) rate limit. */
   private readonly pingWindow = new PerKeyWindow<PlayerId>(PING_RATE_MAX, PING_RATE_WINDOW_MS);
-  private chatSeq = 0;
   /** Per-player chat timestamps (WALL clock), for the chat rate limit. */
   private readonly chatWindow = new PerKeyWindow<PlayerId>(CHAT_RATE_MAX, CHAT_RATE_WINDOW_MS);
   /** Bounded session-chat back-log, replayed to a (re)joining peer. Room-local and
@@ -650,6 +680,7 @@ export class MatchRoom {
     this.persist = options.persist;
     this.gate = options.gate;
     if (options.denyPlayerActions) this.denyPlayerActions = options.denyPlayerActions;
+    this.clientActionTypes = new Set(options.clientActionTypes ?? CLIENT_ACTION_TYPES);
     this.arsenalStore = options.arsenalStore;
     if (options.initialSeq && options.initialSeq > 0) this.seq = options.initialSeq;
     this.maxReceipts = options.maxReceipts ?? RECEIPTS_MAX_DEFAULT;
@@ -934,7 +965,7 @@ export class MatchRoom {
       type: 'welcome',
       matchId: this.id,
       playerId,
-      seq: this.seq,
+      seq: this.wireSeqOf(playerId),
       serverTime: this.clock(),
       state: view.base,
       signatures: view.signatures,
@@ -947,6 +978,13 @@ export class MatchRoom {
       ...this.hashField(view.base),
       ...this.lobbyField(),
     });
+    // The delta baseline is per PLAYER, and the welcome just reset it. The player's other
+    // sockets get the same point as a full snapshot: a delta from the new baseline would
+    // skip whatever changed since their last one (a hidden action sends them nothing).
+    if (playerPeers.size > 1) {
+      const sync = this.stateMessageFor(playerId, view);
+      for (const other of playerPeers) if (other !== peer) this.send(other, sync);
+    }
     detach('маркеры союзников при входе', this.sendVisiblePings(playerId, peer)); // best-effort
     this.sendVisibleChat(playerId, peer); // the visible chat back-log, on join
     // Tell already-present peers the wait ended (waitForPlayers) or the lobby
@@ -958,13 +996,16 @@ export class MatchRoom {
   /** What `playerId` may see right now: a clean visible `GameState` baseline
    *  (fog applied, internal memory stripped), the fog extras for the wire, and
    *  the identify set behind them (one coverage pass serves view + event fog). */
-  private viewFor(playerId: PlayerId): {
+  private viewFor(
+    playerId: PlayerId,
+    state: GameState = this.stateValue,
+  ): {
     base: GameState;
     signatures: SignatureContact[];
     remembered: string[];
     identified: Set<string>;
   } {
-    const { view, identified } = visibleView(this.stateValue, playerId, this.data);
+    const { view, identified } = visibleView(state, playerId, this.data);
     const { signatures, remembered, ...core } = view;
     const base = this.hostFog ? this.hostFog(core as GameState, playerId) : (core as GameState);
     return { base, signatures, remembered, identified };
@@ -1026,6 +1067,34 @@ export class MatchRoom {
       // авто-переподключением — причину он уже получил кадром выше.
       peer.close?.(1000, code);
       closed += 1;
+    }
+    return closed;
+  }
+
+  /**
+   * Отзыв сессии: закрыть сокеты ОДНОГО АККАУНТА во всех креслах этой комнаты — после
+   * смены пароля (`/auth/reset`). Тот же кадр `error` + закрытие 1000, что у `evict`,
+   * но с двумя отличиями.
+   *
+   * Отбор — по аккаунту КАЖДОГО сокета (`peerAccountId`), а не по креслу: кресло могло
+   * перейти к другому аккаунту (админский кик), и его сокеты отзыв не касается.
+   *
+   * Сокет снимается из `peers` СИНХРОННО, как при перехвате кресла в `addPeer`: `close()`
+   * лишь переводит соединение в CLOSING, и уже отправленные кадры укравшего аккаунт ещё
+   * доехали бы до `receive`. Повторный `removePeer` по событию закрытия ничего не делает —
+   * сокета в наборе уже нет. Место в партии не освобождается: это не кик, владелец
+   * вернётся в своё кресло с новой сессией.
+   */
+  evictAccount(accountId: string, code: ServerErrorCode): number {
+    let closed = 0;
+    for (const [playerId, playerPeers] of [...this.peers]) {
+      for (const peer of [...playerPeers]) {
+        if (this.peerAccountId.get(peer) !== accountId) continue;
+        this.send(peer, { type: 'error', matchId: this.id, code });
+        peer.close?.(1000, code);
+        this.removePeer(playerId, peer);
+        closed += 1;
+      }
     }
     return closed;
   }
@@ -1098,7 +1167,7 @@ export class MatchRoom {
       const last = this.lastResyncAt.get(playerId);
       if (last === undefined || wallNow - last >= DESYNC_RESYNC_COOLDOWN_MS) {
         this.lastResyncAt.set(playerId, wallNow);
-        this.send(peer, this.stateMessageFor(playerId));
+        this.resyncPlayer(playerId, peer);
       }
       return;
     }
@@ -1134,6 +1203,7 @@ export class MatchRoom {
         if (deniedCode) {
           this.sendReject(
             peer,
+            playerId,
             typeof envAction?.id === 'string' ? envAction.id : 'unknown',
             deniedCode,
           );
@@ -1151,12 +1221,20 @@ export class MatchRoom {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_BAD_MESSAGE' });
       return;
     }
+    // The gate's type catalog on the bare path too: a type with no client payload schema
+    // (a host-issued action — premium repair, supply, arsenal sync, seat confirm — or an
+    // unknown type) is refused with the gate's own code. Host-issued actions reach the
+    // reducer through `submitAction`/`submitServerAction`, never through `receive`.
+    if (!this.clientActionTypes.has(message.action.type)) {
+      this.sendReject(peer, playerId, message.action.id, 'E_BAD_PAYLOAD');
+      return;
+    }
     // The same player deny-list on the bare path. Server-internal drivers (AI /
     // standing orders / the AvA war escalation itself) do NOT pass through `receive`,
     // so they stay unaffected — the deny is a WIRE rule, not a reducer rule.
     const denied = this.denyPlayerActions?.(message.action.type);
     if (denied) {
-      this.sendReject(peer, message.action.id, denied);
+      this.sendReject(peer, playerId, message.action.id, denied);
       return;
     }
     if (this.persist) {
@@ -1187,12 +1265,12 @@ export class MatchRoom {
       await this.enqueue(() =>
         this.admitCommitted(playerId, peer, envelope, sessionId).catch(() => {
           try {
-            this.sendReject(peer, envelopeActionId(envelope), 'E_INTERNAL');
+            this.sendReject(peer, playerId, envelopeActionId(envelope), 'E_INTERNAL');
           } catch {
             /* peer gone */
           }
         }),
-        () => this.sendReject(peer, envelopeActionId(envelope), 'E_RATE_LIMIT'),
+        () => this.sendReject(peer, playerId, envelopeActionId(envelope), 'E_RATE_LIMIT'),
       );
       return;
     }
@@ -1248,20 +1326,21 @@ export class MatchRoom {
     // its clientSeq, or a legitimate backoff-retry of the same seq would hit E_REPLAY. This
     // is the fine-grained per-player limit (the connection-level flood guard is in wsServer).
     if (this.rateLimited(playerId)) {
-      this.sendReject(peer, envelopeActionId(envelope), 'E_RATE_LIMIT');
+      this.sendReject(peer, playerId, envelopeActionId(envelope), 'E_RATE_LIMIT');
       return null;
     }
     const admission = this.gate!.admit(envelope, { matchId: this.id, playerId, sessionId });
     if (!admission.ok) {
-      this.sendReject(peer, envelopeActionId(envelope), admission.code);
+      this.sendReject(peer, playerId, envelopeActionId(envelope), admission.code);
       return null;
     }
     const value = admission.value;
     if (value.status === 'duplicate') {
       // Idempotent replay — mirror the bare path's dedup response: a full resync for an
       // action that succeeded, the cached rejection otherwise. No re-apply.
-      if (value.receipt.ok) this.send(peer, this.stateMessageFor(playerId));
-      else this.sendReject(peer, value.receipt.actionId, value.receipt.code ?? 'E_INTERNAL');
+      if (value.receipt.ok) this.resyncPlayer(playerId, peer);
+      else
+        this.sendReject(peer, playerId, value.receipt.actionId, value.receipt.code ?? 'E_INTERNAL');
       return null;
     }
     return value;
@@ -1341,7 +1420,7 @@ export class MatchRoom {
     const cached = this.receipts.get(actionId);
     if (cached) {
       if (peer) {
-        if (cached.ok) this.send(peer, this.stateMessageFor(playerId));
+        if (cached.ok) this.resyncPlayer(playerId, peer);
         else this.sendRejection(peer, cached);
       }
       return { kind: 'cached', receipt: cached };
@@ -1350,7 +1429,7 @@ export class MatchRoom {
     // пишется, поэтому честный повтор после бэкоффа применяется (идемпотентность не
     // должна превращать лимит в вечный отказ).
     if (this.rateLimited(playerId)) {
-      if (peer) this.sendReject(peer, actionId, 'E_RATE_LIMIT');
+      if (peer) this.sendReject(peer, playerId, actionId, 'E_RATE_LIMIT');
       return { kind: 'rate-limited' };
     }
     return { kind: 'pass' };
@@ -1377,6 +1456,7 @@ export class MatchRoom {
       state: result.state,
       events: [...advanced.events, ...result.events],
       at,
+      advanced: advanced.state,
     };
   }
 
@@ -1397,7 +1477,12 @@ export class MatchRoom {
     if (plan.state.time > this.stateValue.time) this.record?.({ at: plan.state.time });
     this.stateValue = plan.state;
     if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
-    if (plan.events.length > 0 || plan.kind === 'applied') this.broadcastState(plan.events);
+    if (plan.events.length > 0 || plan.kind === 'applied') {
+      // A rejected plan commits only the catch-up, so «the world without this action» is
+      // the committed state itself.
+      const without = plan.kind === 'applied' ? plan.advanced : plan.state;
+      this.broadcastState(plan.events, { actor: action.playerId, without });
+    }
     // Догон мог ЗАВЕРШИТЬ матч (порог очков/доминирования перейден на span'е
     // `time.advanced`) — тогда действие отвергается с E_MATCH_ENDED, но награды всё
     // равно банкуются. Идемпотентно, поэтому зовётся на каждом коммите.
@@ -1542,13 +1627,12 @@ export class MatchRoom {
 
   /** A full per-player resync snapshot (fog applied), e.g. for a deduped retry.
    *  Resets that player's delta baseline. */
-  private stateMessageFor(playerId: PlayerId): ServerMessage {
-    const view = this.viewFor(playerId);
+  private stateMessageFor(playerId: PlayerId, view = this.viewFor(playerId)): ServerMessage {
     this.lastVisible.set(playerId, view.base);
     return {
       type: 'state',
       matchId: this.id,
-      seq: this.seq,
+      seq: this.wireSeqOf(playerId),
       serverTime: this.clock(),
       state: view.base,
       signatures: view.signatures,
@@ -1556,6 +1640,15 @@ export class MatchRoom {
       ...this.hashField(view.base),
       ...this.lobbyField(),
     };
+  }
+
+  /** A full snapshot to `peer` AND every other socket of `playerId`. The delta baseline is
+   *  per player, so resetting it for one socket must bring the rest to the same point. */
+  private resyncPlayer(playerId: PlayerId, peer: RoomPeer): void {
+    const message = this.stateMessageFor(playerId);
+    const targets = new Set(this.peers.get(playerId) ?? []);
+    targets.add(peer);
+    for (const target of targets) this.send(target, message);
   }
 
   /** Advance `this.stateValue` to `now`, committing the catch-up in place. Thin wrapper
@@ -1725,12 +1818,12 @@ export class MatchRoom {
         // Last-resort: report and swallow. The `send` itself must not throw (a dead
         // socket would otherwise reject the task), so guard it too.
         try {
-          if (peer) this.sendReject(peer, action.id, 'E_INTERNAL');
+          if (peer) this.sendReject(peer, playerId, action.id, 'E_INTERNAL');
         } catch {
           /* peer gone */
         }
       }),
-      () => { if (peer) this.sendReject(peer, action.id, 'E_RATE_LIMIT'); },
+      () => { if (peer) this.sendReject(peer, playerId, action.id, 'E_RATE_LIMIT'); },
     );
   }
 
@@ -1894,7 +1987,7 @@ export class MatchRoom {
       await this.persist!(snapshot, receipt);
       return true;
     } catch {
-      if (peer) this.sendReject(peer, actionId, 'E_UNAVAILABLE');
+      if (peer) this.sendReject(peer, receipt.playerId, actionId, 'E_UNAVAILABLE');
       return false;
     }
   }
@@ -1903,11 +1996,36 @@ export class MatchRoom {
    *  per-code and the client's call: transient (E_RATE_LIMIT / E_UNAVAILABLE / E_INTERNAL)
    *  vs. permanent (E_FORBIDDEN / E_BAD_PAYLOAD / a sequence code). Used by both the bare
    *  committed path and the action-layer gate front door. */
-  private sendReject(peer: RoomPeer, actionId: string, code: string): void {
-    this.send(peer, { type: 'rejection', matchId: this.id, seq: this.seq, actionId, code });
+  private sendReject(peer: RoomPeer, playerId: PlayerId, actionId: string, code: string): void {
+    const seq = this.wireSeqOf(playerId);
+    this.send(peer, { type: 'rejection', matchId: this.id, seq, actionId, code });
   }
 
-  private broadcastState(events: DomainEvent[]): void {
+  /** `playerId`'s current wire `seq` (see `wireSeq`): what a snapshot or a rejection
+   *  carries — the count of deltas sent to that player so far. */
+  private wireSeqOf(playerId: PlayerId): number {
+    return this.wireSeq.get(playerId) ?? 0;
+  }
+
+  /** The next wire `seq` for a delta to `playerId`. */
+  private nextWireSeq(playerId: PlayerId): number {
+    const next = (this.wireSeq.get(playerId) ?? 0) + 1;
+    this.wireSeq.set(playerId, next);
+    return next;
+  }
+
+  /**
+   * `cause` marks a broadcast caused by one player's action: `without` is the world the
+   * same catch-up produces WITHOUT that action. Any other player whose view the action
+   * does not change, and who sees none of the batch's events besides the clock span, gets
+   * nothing now — otherwise a bare delta at that instant would time and count orders they
+   * cannot see. Their baseline stays put; the next broadcast (the heartbeat at the latest)
+   * carries the catch-up.
+   */
+  private broadcastState(
+    events: DomainEvent[],
+    cause?: { actor: PlayerId; without: GameState },
+  ): void {
     // M1 events observation: surface the raw (pre-fog) domain events of this committed
     // change to the metrics stream — battles/captures/arrivals are countable even with
     // no peer connected (the 24/7 world fights alone). Clock spans are pure noise here.
@@ -1943,14 +2061,25 @@ export class MatchRoom {
         // приходит, когда боя в состоянии уже нет.
         const battles = new Set([...Object.keys(baseline.battles), ...Object.keys(view.base.battles)]);
         for (const [id, owners] of flash) if (inVisionBloc(this.stateValue, playerId, owners)) battles.add(id);
+        const visibleEvents = events.filter((e) =>
+          this.eventVisibleTo(e, playerId, identify, battles),
+        );
+        if (
+          cause &&
+          playerId !== cause.actor &&
+          visibleEvents.every((e) => e.type === 'time.advanced') &&
+          this.actionUnseenBy(playerId, view, cause.without)
+        ) {
+          continue;
+        }
         const delta = diffState(baseline, view.base);
         const message: ServerMessage = {
           type: 'delta',
           matchId: this.id,
-          seq: this.seq,
+          seq: this.nextWireSeq(playerId),
           serverTime: now,
           delta,
-          events: events.filter((e) => this.eventVisibleTo(e, playerId, identify, battles)),
+          events: visibleEvents,
           signatures: view.signatures,
           remembered: view.remembered,
           ...(this.hashDue(playerId, wall) ? this.hashField(view.base) : {}),
@@ -1973,6 +2102,22 @@ export class MatchRoom {
         deltaBytes,
       });
     }
+  }
+
+  /** True when `playerId`'s view of the committed world equals their view of `without`
+   *  (the same catch-up minus the action) — the action changed nothing they can see. */
+  private actionUnseenBy(
+    playerId: PlayerId,
+    view: { base: GameState; signatures: SignatureContact[]; remembered: string[] },
+    without: GameState,
+  ): boolean {
+    if (without === this.stateValue) return true;
+    const other = this.viewFor(playerId, without);
+    return (
+      isEmptyDelta(diffState(other.base, view.base)) &&
+      JSON.stringify(other.signatures) === JSON.stringify(view.signatures) &&
+      JSON.stringify(other.remembered) === JSON.stringify(view.remembered)
+    );
   }
 
   /** Whether a domain event may be revealed to `playerId` — events leak intent
@@ -2033,7 +2178,9 @@ export class MatchRoom {
     const message: ServerRejectionMessage = {
       type: 'rejection',
       matchId: this.id,
-      seq: receipt.seq,
+      // The receipt's room-wide `seq` counts everyone's actions — the wire carries the
+      // recipient's own sequence instead.
+      seq: this.wireSeqOf(receipt.playerId),
       actionId: receipt.actionId,
       code: receipt.code ?? 'E_INTERNAL',
     };
@@ -2138,7 +2285,7 @@ export class MatchRoom {
       });
     }
     const ping: Ping = {
-      id: `ping:${playerId}:${this.pingSeq++}`,
+      id: `ping:${playerId}:${opaqueId()}`,
       owner: playerId,
       kind: draft.kind,
       target: draft.target,
@@ -2208,7 +2355,7 @@ export class MatchRoom {
       return;
     }
     const msg: ChatMessage = {
-      id: `chat:${playerId}:${this.chatSeq++}`,
+      id: `chat:${playerId}:${opaqueId()}`,
       from: playerId,
       channel: message.channel,
       text,

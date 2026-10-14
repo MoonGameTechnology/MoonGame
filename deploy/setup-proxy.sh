@@ -4,7 +4,8 @@
 # Void Dominion — Настройка Nginx проксирования
 #
 # Если хочешь получить доступ к серверу через внешний IP и порт
-# Использование: sudo bash deploy/setup-proxy.sh
+# Использование:
+#   sudo INTERNAL_IP=<IP-сервера> EXTERNAL_IP=<внешний-IP> EXTERNAL_PORT=<порт> bash deploy/setup-proxy.sh
 #############################################################################
 
 set -e
@@ -28,10 +29,30 @@ log_error() {
 }
 
 # Конфигурация
-INTERNAL_IP="192.168.1.7"
-INTERNAL_PORT="8788"
-EXTERNAL_IP="94.190.83.220"
-EXTERNAL_PORT="95367"
+# Адреса задаются окружением (см. «Использование» выше): в репозитории нет адресов
+# конкретного сервера.
+INTERNAL_IP="${INTERNAL_IP:-}"
+INTERNAL_PORT="${INTERNAL_PORT:-8788}"
+EXTERNAL_IP="${EXTERNAL_IP:-}"
+EXTERNAL_PORT="${EXTERNAL_PORT:-}"
+if [ -z "$INTERNAL_IP" ] || [ -z "$EXTERNAL_IP" ] || [ -z "$EXTERNAL_PORT" ]; then
+    log_error "Задай INTERNAL_IP, EXTERNAL_IP и EXTERNAL_PORT"
+    exit 1
+fi
+# Значения подставляются в конфиг nginx, поэтому только IPv4 или имя хоста и число.
+# IPv6 скрипт не поддерживает.
+for v in "$INTERNAL_IP" "$EXTERNAL_IP"; do
+    if ! [[ "$v" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]]; then
+        log_error "Недопустимый адрес: $v"
+        exit 1
+    fi
+done
+for v in "$INTERNAL_PORT" "$EXTERNAL_PORT"; do
+    if ! [[ "$v" =~ ^[0-9]{1,5}$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 65535 ]; then
+        log_error "Недопустимый порт: $v"
+        exit 1
+    fi
+done
 
 if [[ $EUID -ne 0 ]]; then
     log_error "Скрипт должен быть запущен от root"
@@ -59,21 +80,29 @@ fi
 # Создание конфига
 log_info "Создание конфигурации проксирования..."
 
-cat > /etc/nginx/sites-available/moongame << 'EOF'
+# Прежний конфиг сохраняется: если новый не пройдёт nginx -t, рабочий вернётся на место.
+HAD_SITE=0
+if [ -f /etc/nginx/sites-available/moongame ]; then
+    cp -a /etc/nginx/sites-available/moongame /etc/nginx/sites-available/moongame.prev
+    HAD_SITE=1
+fi
+# Конфиг собирается во временном файле и встаёт на место одним mv: сбой подстановки
+# не оставит активный файл с плейсхолдерами.
+cat > /etc/nginx/sites-available/moongame.new << 'EOF'
 # Void Dominion — проксирование внешнего доступа
 #
-# Проксирует запросы с http://94.190.83.220:95367
-# на локальный сервер http://192.168.1.7:8788
+# Проксирует запросы с http://__EXTERNAL_IP__:__EXTERNAL_PORT__
+# на локальный сервер http://__INTERNAL_IP__:__INTERNAL_PORT__
 
 upstream moongame_backend {
-    server 192.168.1.7:8788;
+    server __INTERNAL_IP__:__INTERNAL_PORT__;
     keepalive 64;
 }
 
 server {
     # Слушаем внешний порт
-    listen 95367;
-    server_name 94.190.83.220;
+    listen __EXTERNAL_PORT__;
+    server_name __EXTERNAL_IP__;
 
     # Логирование
     access_log /var/log/nginx/moongame-access.log combined buffer=16k flush=1m;
@@ -121,38 +150,69 @@ server {
 # Редирект HTTP → HTTPS (если нужно добавить SSL позже)
 # server {
 #     listen 80;
-#     server_name 94.190.83.220;
+#     server_name __EXTERNAL_IP__;
 #     return 301 https://$server_name:$server_port$request_uri;
 # }
 EOF
+sed -i -e "s/__INTERNAL_IP__/$INTERNAL_IP/g" -e "s/__INTERNAL_PORT__/$INTERNAL_PORT/g" \
+    -e "s/__EXTERNAL_IP__/$EXTERNAL_IP/g" -e "s/__EXTERNAL_PORT__/$EXTERNAL_PORT/g" \
+    /etc/nginx/sites-available/moongame.new
+mv -f /etc/nginx/sites-available/moongame.new /etc/nginx/sites-available/moongame
 
 # Включение сайта
+LINK_CREATED=0
 if [ -L /etc/nginx/sites-enabled/moongame ]; then
     log_info "Конфиг уже включен"
 else
     ln -sf /etc/nginx/sites-available/moongame /etc/nginx/sites-enabled/
+    LINK_CREATED=1
     log_success "Конфиг включен"
 fi
 
 # Отключение default сайта если он есть
+DEFAULT_REMOVED=0
 if [ -L /etc/nginx/sites-enabled/default ]; then
     rm /etc/nginx/sites-enabled/default
+    DEFAULT_REMOVED=1
     log_info "Default сайт отключен"
 fi
+
+# Возврат к состоянию до запуска скрипта.
+restore_previous() {
+    if [ "$HAD_SITE" = 1 ]; then
+        mv /etc/nginx/sites-available/moongame.prev /etc/nginx/sites-available/moongame
+    else
+        rm -f /etc/nginx/sites-available/moongame
+    fi
+    if [ "$LINK_CREATED" = 1 ]; then
+        rm -f /etc/nginx/sites-enabled/moongame
+    fi
+    if [ "$DEFAULT_REMOVED" = 1 ]; then
+        ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+    fi
+}
 
 # Проверка конфига
 log_info "Проверка конфигурации Nginx..."
 if nginx -t &>/dev/null; then
     log_success "Конфиг валиден"
 else
-    log_error "Ошибка в конфиге Nginx!"
-    nginx -t
+    log_error "Ошибка в конфиге Nginx! Возвращаю прежнюю конфигурацию."
+    nginx -t || true
+    restore_previous
     exit 1
 fi
 
-# Перезагрузка Nginx
+# Перезагрузка Nginx. nginx -t не проверяет, свободен ли порт, поэтому прежний конфиг
+# хранится до успешного рестарта.
 log_info "Перезагрузка Nginx..."
-systemctl restart nginx
+if ! systemctl restart nginx; then
+    log_error "Nginx не запустился с новым конфигом. Возвращаю прежнюю конфигурацию."
+    restore_previous
+    systemctl restart nginx || true
+    exit 1
+fi
+rm -f /etc/nginx/sites-available/moongame.prev
 systemctl enable nginx
 log_success "Nginx перезагружен"
 
@@ -164,10 +224,10 @@ echo ""
 echo -e "${BLUE}Проверка доступа:${NC}"
 echo ""
 echo "1. Локально (внутри сети):"
-echo "   curl http://192.168.1.7:8788"
+echo "   curl http://$INTERNAL_IP:$INTERNAL_PORT"
 echo ""
 echo "2. Через Nginx проксирование:"
-echo "   curl http://94.190.83.220:95367"
+echo "   curl http://$EXTERNAL_IP:$EXTERNAL_PORT"
 echo "   (если с внешней машины, нужен доступ к этому IP)"
 echo ""
 echo -e "${YELLOW}Логирование:${NC}"

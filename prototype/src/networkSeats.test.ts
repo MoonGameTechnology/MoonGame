@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { getStance } from '../../packages/shared-core/src/index';
 import {
+  networkSeatPlan,
   networkSeats,
+  networkStartsOf,
   newGame,
   parseNetworkMatchMode,
   seatAiDecision,
@@ -9,6 +11,47 @@ import {
 } from './game';
 
 describe('prototype network seats', () => {
+  it("names each seat's start world from the setup, not from live ownership", () => {
+    // `GET /matches/:id/seats` reads this: a start that followed ownership would retell
+    // every capture and loss to whoever reads the seat layout.
+    const plan = networkSeatPlan('ffa', 'ffa-4');
+    const state = newGame({ mapId: 'ffa-4', seats: plan });
+    const before = networkStartsOf(state, 'ffa');
+    for (const seat of plan) expect(before[seat.id]).toBe(seat.start);
+    // p2 loses its homeworld to p1 and takes the first neutral world in map order.
+    state.planets[before.p2!]!.owner = 'p1';
+    const neutral = Object.keys(state.planets).find((id) => state.planets[id]!.owner === null)!;
+    state.planets[neutral]!.owner = 'p2';
+    expect(networkStartsOf(state, 'ffa')).toEqual(before);
+  });
+
+  it('reads starts from the plan the match was created with, even after the host mode changed', () => {
+    const plan = networkSeatPlan('2v2', 'nexus');
+    const state = newGame({ mapId: 'nexus', seats: plan });
+    const starts = networkStartsOf(state, 'ffa'); // host restarted with TEAMS unset
+    expect(Object.keys(starts)).toEqual(plan.map((seat) => seat.id));
+    for (const seat of plan) expect(starts[seat.id]).toBe(seat.start);
+    // The house is the player's pick at join (`seat.claim`), so it does not identify the plan.
+    state.players.p1!.faction = 'violet';
+    expect(networkStartsOf(state, 'ffa')).toEqual(starts);
+  });
+
+  it('frontier NPCs hold no seat and do not hide the start worlds', () => {
+    const plan = networkSeatPlan('ffa', 'frontier-50');
+    const state = newGame({ mapId: 'frontier-50', seats: plan });
+    expect(Object.keys(state.players).some((id) => id.startsWith('npc-'))).toBe(true);
+    const starts = networkStartsOf(state, '2v2');
+    for (const seat of plan) expect(starts[seat.id]).toBe(seat.start);
+  });
+
+  it('frontier maps seat FFA whatever the host mode; an unknown map has no start worlds', () => {
+    expect(networkSeatPlan('2v2', 'frontier-50')).toEqual(networkSeats('ffa', 'frontier-50'));
+    const state = newGame({ mapId: 'ffa-4', seats: networkSeatPlan('ffa', 'ffa-4') });
+    expect(Object.values(networkStartsOf({ ...state, mapId: 'gone' }, 'ffa'))).toEqual(
+      Object.keys(state.players).map(() => null),
+    );
+  });
+
   it('defaults to ten unique claimable FFA chairs and starts', () => {
     const seats = networkSeats();
     expect(seats.map((seat) => seat.id)).toEqual(Array.from({ length: 10 }, (_, i) => `p${i + 1}`));

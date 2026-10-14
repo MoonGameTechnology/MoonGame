@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MemoryArsenalStore } from './store';
 import { META_MARKET_FEE, MemoryMetaMarket } from './metaMarket';
 import { PostgresArsenalStore, migrate } from './store';
-import { PostgresMetaMarket } from './metaMarket';
+import { MAX_META_LISTINGS, PostgresMetaMarket } from './metaMarket';
 import pg from 'pg';
 
 /** Фаусет по умолчанию выключен (anti-RMT), поэтому тесты задают его явно. */
@@ -50,6 +50,21 @@ describe.skipIf(!databaseUrl)('meta market — PostgreSQL', () => {
     await pool.query('DELETE FROM meta_wallets WHERE account_id = ANY($1)', [[seller, a, b]]);
     await pool.query('DELETE FROM meta_market_listings WHERE seller_id=$1', [seller]);
     await pool.query('DELETE FROM arsenal WHERE item_id=$1', [itemId]);
+    await pool.end();
+  });
+
+  it('a burst of concurrent listings stays under the per-seller cap', async () => {
+    const pool = new pg.Pool({ connectionString: databaseUrl, max: 20 });
+    await migrate(pool);
+    const seller = `cap-${Date.now()}-${Math.random()}`;
+    const ids = Array.from({ length: MAX_META_LISTINGS + 5 }, (_, i) => `${seller}-${i}`);
+    const arsenal = new PostgresArsenalStore(pool);
+    for (const id of ids) await arsenal.grant(item(id, seller));
+    const market = new PostgresMetaMarket(pool, () => 1, 0);
+    const results = await Promise.all(ids.map((id) => market.list(seller, 'Cap', id, 5)));
+    expect(results.filter((r) => r.ok)).toHaveLength(MAX_META_LISTINGS);
+    await pool.query('DELETE FROM meta_market_listings WHERE seller_id=$1', [seller]);
+    await pool.query('DELETE FROM arsenal WHERE account_id=$1', [seller]);
     await pool.end();
   });
 });

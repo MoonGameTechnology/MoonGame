@@ -496,8 +496,9 @@ function hasCapability(planet: Planet, data: GameData, key: ConstructionCapabili
 }
 
 /** The yard a space-domain hull needs to be laid down (shipyard/spaceport). Ground
- *  units never check this. */
-function hasShipyard(planet: Planet, data: GameData): boolean {
+ *  units never check this. Exported for the client's rally-point offer (RALLY-1): the
+ *  button belongs to worlds that can lay down a hull, by the same rule. */
+export function hasShipyard(planet: Planet, data: GameData): boolean {
   return hasCapability(planet, data, 'enablesShipConstruction');
 }
 

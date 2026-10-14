@@ -3,6 +3,7 @@ import { observedSwarm } from './swarmIntel';
 import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
+import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
@@ -21,6 +22,7 @@ import type {
   ScheduledEvent,
   SeenPatrol,
   SightRules,
+  TempLane,
   UnitStack,
 } from './gameState';
 
@@ -29,11 +31,13 @@ import type {
  *  production / arrivals in their view (the client renders the build queue + ETAs from
  *  them) while every enemy timer stays hidden. */
 function scheduledOwnedBy(event: ScheduledEvent, viewerId: PlayerId, state: GameState): boolean {
-  const p = (event.payload ?? {}) as Record<string, unknown>;
-  if (p.owner === viewerId) return true;
-  // Per-player events tagged by `playerId` (e.g. `technology.complete`) — the
-  // viewer's own research/economy timers, which they should keep in view.
-  if (p.playerId === viewerId) return true;
+  const raw = event.payload;
+  const p = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  // An event that names its player (`owner`, or `playerId` as on `technology.complete` and
+  // `construction.complete`) belongs to that player ALONE. The planet/fleet fallback below
+  // answers «who owns it NOW», so a world captured mid-build would hand its new owner the
+  // previous owner's pending order (unit, count, loadout) — the tag wins over the location.
+  if ('owner' in p || 'playerId' in p) return p.owner === viewerId || p.playerId === viewerId;
   if (typeof p.planetId === 'string' && state.planets[p.planetId]?.owner === viewerId) return true;
   if (typeof p.fleetId === 'string' && state.fleets[p.fleetId]?.owner === viewerId) return true;
   return false;
@@ -730,6 +734,11 @@ export function isVisibleTo(
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
+  // Окно шпионажа `fleets` открывает все флоты цели, как и в проекции (`visibleView`).
+  const spied = (state.intel?.[viewerId] ?? []).some(
+    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
+  );
+  if (spied) return true;
   // Ракета — по своей позиции, глазами блока зрения, и в окне шпионажа (SM-3.7b).
   if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
@@ -755,6 +764,46 @@ export interface VisibleView {
   view: VisibleState;
   /** Nodes the viewer currently identifies — the same set `identifiedNodes` returns. */
   identified: Set<PlanetId>;
+}
+
+/**
+ * Чужой ЛИЧНЫЙ коридор героя (ступени 1–2) зрителю не показывается: ни сам лейн, ни
+ * ребро, которое он добавил в `links`. Пройти по нему зритель всё равно не может
+ * (`corridorVeto`), а видимый коридор заранее выдаёт, куда ударит чужой герой. Общий
+ * коридор (ступень 3) и коридор без героя (старое состояние) проходимы для всех, поэтому
+ * остаются на карте.
+ *
+ * `topology` — счётчик ВСЕХ открытий и закрытий, включая чужие, поэтому вместо него зритель
+ * получает отпечаток видимых ему коридоров. Клиенту он нужен только как ключ кэша дорог и
+ * меняется ровно тогда, когда меняются видимые ему `links`.
+ */
+function hideRivalCorridors(state: GameState, view: VisibleState, viewerId: PlayerId): void {
+  const lanes = state.tempLanes ?? [];
+  const shown = lanes.filter(
+    (l) => l.owner === viewerId || laneIsPublic(l) || l.heroId === undefined,
+  );
+  for (const lane of lanes) {
+    if (shown.includes(lane) || !lane.addedLink) continue;
+    const join = (l: TempLane): boolean =>
+      (l.from === lane.from && l.to === lane.to) || (l.from === lane.to && l.to === lane.from);
+    if (shown.some(join)) continue; // то же ребро держит видимый коридор
+    for (const [a, b] of [[lane.from, lane.to], [lane.to, lane.from]] as const) {
+      const planet = view.planets[a];
+      if (planet?.links) planet.links = planet.links.filter((id) => id !== b);
+    }
+  }
+  if (shown.length === 0) {
+    delete view.tempLanes;
+    delete view.topology;
+    return;
+  }
+  view.tempLanes = shown.map((l) => ({ ...l }));
+  const ids = shown.map((l) => l.id).sort();
+  let fp = 0x811c9dc5; // FNV-1a по id видимых коридоров
+  for (const ch of ids.join('\0')) {
+    fp = Math.imul(fp ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  }
+  view.topology = fp;
 }
 
 /**
@@ -923,13 +972,13 @@ function project(
     }
     if (Object.keys(view.diplomacyOffers).length === 0) delete view.diplomacyOffers;
   }
-  // Heroes are private: a viewer sees only their own (position + cooldowns). Temp
-  // lanes stay — they are public map topology (real `links`), visible to everyone.
+  // Heroes are private: a viewer sees only their own (position + cooldowns).
   if (view.heroes) {
     for (const id of Object.keys(view.heroes)) {
       if (view.heroes[id]?.owner !== viewerId) delete view.heroes[id];
     }
   }
+  hideRivalCorridors(state, view, viewerId);
   // Order chains and standing orders (`standingOrdersModule`'s `orders` / `autoAssault`,
   // and the prototype-style `forcedMarch`) are future intent — exactly what `scheduled`
   // is stripped for below. Keep only the entries of the viewer's OWN fleets; a map left
@@ -951,6 +1000,14 @@ function project(
       if (playerId !== viewerId) delete view.capital[playerId];
     }
     if (Object.keys(view.capital).length === 0) delete view.capital;
+  }
+  // Точки сбора (RALLY-1) — куда пойдут подкрепления, то есть то же будущее намерение.
+  // Остаются только записи зрителя; пустая карта убирается.
+  if (view.rallyPoints) {
+    for (const playerId of Object.keys(view.rallyPoints)) {
+      if (playerId !== viewerId) delete view.rallyPoints[playerId];
+    }
+    if (Object.keys(view.rallyPoints).length === 0) delete view.rallyPoints;
   }
 
   // Челночные удары (SHU-1.2): свои видны, чужие сняты целиком. Иначе игрок заранее
@@ -1003,6 +1060,9 @@ function project(
       // поле — нет, поэтому опознанный чужой мир отдавал планы прежнего владельца
       // целиком. Режем там же и по той же причине.
       delete planet.pausedConstruction;
+      // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
+      // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
+      delete planet.sortie;
     }
     // FORT-5.13. `priorKind` — СЛУЖЕБНАЯ память конверсии («чем узел был до крепости»),
     // и наружу она не идёт НИКОМУ: само её наличие выдаёт стоящую крепость, а значение —
@@ -1147,6 +1207,20 @@ function project(
   for (const fleet of Object.values(view.fleets)) {
     if (fleet.owner === viewerId) continue;
     for (const squad of fleet.hangar ?? []) delete squad.hold;
+    // Счётчик вылетов носителя — как у порта выше: по нему читался бы скрытый удар.
+    delete fleet.sortie;
+    // Маршрут чужого флота — тоже намерение, как цепочки приказов: виден текущий участок
+    // (откуда, куда, когда пришёл и придёт, где на нём встанет — `startT`/`endT`), но не
+    // оставшиеся прыжки, не конечная цель, не точка стоянки в её конце и не то, куда флот
+    // пойдёт после боя (`resume`).
+    delete fleet.resume;
+    // Намерение слиться (`mergeInto`, MRG-1) — тот же план: выдало бы, к кому флот идёт.
+    delete fleet.mergeInto;
+    if (fleet.movement) {
+      delete fleet.movement.path;
+      delete fleet.movement.destination;
+      delete fleet.movement.parkT;
+    }
   }
   // Battles you cannot see, and enemy timers from the schedule (it leaks future
   // events) — but KEEP the viewer's own pending events: their construction/production/

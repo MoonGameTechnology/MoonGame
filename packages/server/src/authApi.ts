@@ -54,6 +54,18 @@ export async function liveSession(
   return claim;
 }
 
+/** The account's CURRENT password fingerprint, or null when there is no such account.
+ *  The WS handshake compares a join token's stamped `pwfp` against it, so a token minted
+ *  before a password reset no longer opens a socket. A store error propagates — the
+ *  caller refuses the handshake (fail-secure). */
+export async function currentPwfp(
+  users: Pick<UserStore, 'findById'>,
+  accountId: string,
+): Promise<string | null> {
+  const user = await users.findById(accountId);
+  return user ? pwFingerprint(user.passHash) : null;
+}
+
 export interface AuthApiDeps {
   users: UserStore;
   /** Mint a session token for an authenticated account (from serverConfig). `pwfp` binds
@@ -68,6 +80,12 @@ export interface AuthApiDeps {
   resetBaseUrl?: string;
   /** Required when recovery is enabled. Never logs reset bearers. */
   sendRecoveryMail?: RecoveryMailer;
+  /** Runs after a password change has been committed (today, `/auth/reset`): the host
+   *  closes the account's open game connections (`revokeAccountConnections`) — a session
+   *  revoked by the new password must not keep issuing orders over a socket it opened
+   *  earlier. Awaited before the response; a throw is logged and swallowed (the password
+   *  is already changed — failing the reset would only hide that from its owner). */
+  onPasswordChanged?(accountId: string): void | Promise<void>;
   /** Post-registration hook (e.g. the starter-arsenal grant, ARS-2), awaited before
    *  the 201 so the account's first read sees its grant. MUST be resilient: a throw
    *  is swallowed here (registration already succeeded — never fail it for a
@@ -78,6 +96,9 @@ export interface AuthApiDeps {
   now?: () => number;
   rateMax?: number;
   rateWindowMs?: number;
+  /** Shortest gap between two recovery mails to one account (default
+   *  `RECOVERY_COOLDOWN_MS`). Tests that exercise the queue pass 0. */
+  recoveryCooldownMs?: number;
   /** Test-only: cheaper scrypt cost. Production callers omit it (default cost). */
   scryptParams?: ScryptParams;
 }
@@ -124,6 +145,12 @@ function parseEmail(v: unknown): string | null | undefined {
 const RATE_MAX = 40;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_IPS = 10_000; // bounded tracker: oldest window evicted first
+
+/** One recovery mail per account per this window. The per-IP budget alone does not
+ *  protect a mailbox: requests from many addresses would each get their own budget and
+ *  all land in one inbox. A real user who lost the first mail waits a few minutes. */
+const RECOVERY_COOLDOWN_MS = 10 * 60_000;
+const RECOVERY_COOLDOWN_MAX = 10_000; // bounded tracker: oldest entry evicted first
 
 /**
  * Auth rate limit from the environment, for hosts that want to retune it (both do).
@@ -266,6 +293,9 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     // One worker and at most 64 waiting requests bound work during an SMTP outage.
     // This is best-effort process-local delivery; shutdown/full queue requires retry.
     const recoveryQueue: Array<{ email: string; locale?: string }> = [];
+    const cooldownMs = deps.recoveryCooldownMs ?? RECOVERY_COOLDOWN_MS;
+    /** Account → when its last recovery mail went out (insertion order = age). */
+    const lastMailed = new Map<string, number>();
     let recovering = false;
     let recoveryClosed = false;
     app.addHook('onClose', async () => {
@@ -279,6 +309,8 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
           try {
             const user = await deps.users.findUserByEmail(email);
             if (!user?.email || recoveryClosed) continue;
+            const sentAt = lastMailed.get(user.userId);
+            if (sentAt !== undefined && now() - sentAt < cooldownMs) continue;
             const token = await signReset(user.userId, pwFingerprint(user.passHash));
             const link = `${resetBaseUrl}/?reset=${encodeURIComponent(token)}`;
             await sendRecoveryMail({
@@ -287,6 +319,13 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
               locale,
               params: { link },
             });
+            // Only a delivered mail starts the cooldown: after a failed send the user may retry.
+            lastMailed.delete(user.userId);
+            lastMailed.set(user.userId, now());
+            if (lastMailed.size > RECOVERY_COOLDOWN_MAX) {
+              const oldest = lastMailed.keys().next().value;
+              if (oldest !== undefined) lastMailed.delete(oldest);
+            }
           } catch {
             /* keep the worker alive; never expose lookup/delivery failures or bearers */
           }
@@ -350,6 +389,14 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       if (!(await deps.users.setPasswordIfCurrent(user.userId, expectedHash, passHash))) {
         void reply.code(401);
         return { error: 'E_AUTH' as const };
+      }
+      // Sessions are revoked by the fingerprint check; open sockets are not — close them.
+      if (deps.onPasswordChanged) {
+        try {
+          await deps.onPasswordChanged(user.userId);
+        } catch (err) {
+          request.log.error({ err }, 'password change: revoking connections failed');
+        }
       }
       // Reset IS a login: hand back a fresh session (stamped with the NEW password's
       // fingerprint, so it survives while every pre-reset session is now revoked).

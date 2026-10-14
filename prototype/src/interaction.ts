@@ -52,6 +52,7 @@ export interface Armed {
     strikeId?: string;
   };
   allyAim: AllyOrderKind;
+  rallyAim: string;
   squadMerge: { from: string };
   cmdMore: true;
   castMenu: true;
@@ -97,6 +98,9 @@ export let heroSpawnAim: string | null = null;
 export let strikeAim: Armed['strikeAim'] | null = null;
 /** Глава IV (PVR-7.5): взведённый приказ союзнику — следующий тап по карте выбирает цель. */
 export let allyAim: AllyOrderKind | null = null;
+/** Точка сбора (RALLY-1) взведена из панели мира: держит id мира-верфи, следующий тап по
+ *  своему миру ставит её цель. */
+export let rallyAim: string | null = null;
 /** Взведённое СЛИЯНИЕ эскадр (SHU-4.3): первый тап называет источник, второй —
  *  приёмника. Два тапа, а не выпадающий список: приёмник это такая же карточка на
  *  экране, и выбирать его удобнее там же, где на него смотрят. */
@@ -150,6 +154,7 @@ const WRITE: { [F in Flag]: (value: Armed[F] | null) => void } = {
   heroSpawnAim: (v) => void (heroSpawnAim = v),
   strikeAim: (v) => void (strikeAim = v),
   allyAim: (v) => void (allyAim = v),
+  rallyAim: (v) => void (rallyAim = v),
   squadMerge: (v) => void (squadMerge = v),
   cmdMore: (v) => void (cmdMore = v !== null),
   castMenu: (v) => void (castMenu = v !== null),
@@ -170,6 +175,7 @@ const READ: Record<Flag, () => unknown> = {
   heroSpawnAim: () => heroSpawnAim,
   strikeAim: () => strikeAim,
   allyAim: () => allyAim,
+  rallyAim: () => rallyAim,
   squadMerge: () => squadMerge,
   cmdMore: () => cmdMore,
   castMenu: () => castMenu,

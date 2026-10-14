@@ -62,6 +62,11 @@ permissions: {}
 jobs:
   publish:
     name: build → scan → push → sign
+    # Тег `:main` и подпись — только из `main`. `workflow_dispatch` можно запустить с любой
+    # ветки: без этого условия такой запуск перезаписал бы `:main` образом, подпись которого
+    # деплой (личность `image.yml@refs/heads/main`) отвергнет, и выкатка встала бы до
+    # следующего merge.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -246,6 +251,7 @@ jobs:
 
   publish-caddy:
     name: 'Caddy: build → приёмка → smoke → push → sign'
+    if: github.ref == 'refs/heads/main' # тег `:main` — только из `main`, см. `publish`
     # SEC-35 — вторая половина того же утверждения. Джоба `publish` выше сделала
     # проверяемым «что бежит в проде — то и просканировано» для образа СЕРВЕРА. У Caddy
     # этого не было: SEC-31 перевёл его на собственную сборку, но собиралась она НА ХОСТЕ

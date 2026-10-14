@@ -9,6 +9,7 @@ export {
 export {
   createMultiplayerServer,
   tlsFromEnv,
+  wsLimitsFromEnv,
   SOCKET_FLOOD_MAX,
   SOCKET_FLOOD_WINDOW_MS,
   type MultiplayerServerHandle,
@@ -30,6 +31,7 @@ export {
   type LazyRoomRegistryOptions,
   type LoadedMatch,
   type RoomRegistry,
+  revokeAccountConnections,
 } from './roomRegistry';
 export {
   registerBrowserApi,
@@ -84,6 +86,7 @@ export {
   registerAuthApi,
   liveSession,
   pwFingerprint,
+  currentPwfp,
   authRateFromEnv,
   type AuthApiDeps,
   type Mailer,

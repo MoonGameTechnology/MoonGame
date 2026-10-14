@@ -117,6 +117,9 @@ function world(hangar: Squadron[]): GameState {
   home.hangar = hangar;
   return {
     ...s,
+    // Зрение на всю карту: здесь проверяются дальность и полёт удара, а не туман. Цель,
+    // которую игрок не видит, ядро отбивает как несуществующую (`E_NO_TARGET`).
+    sight: { world: 5000, fleet: 5000, radarScale: 1 },
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
       A: home,

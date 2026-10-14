@@ -227,6 +227,72 @@ describe('visibleState — order chains are the owner’s secret (future intent)
     state.forcedMarch = { 'enemy-near': true };
     expect('forcedMarch' in visibleState(state, 'p1', data)).toBe(false);
   });
+
+  it('маршрут чужого флота — намерение: виден текущий участок, но не цель, прыжки и `resume`', () => {
+    const state = scenario();
+    const route = {
+      from: 'B',
+      to: 'C',
+      departedAt: state.time,
+      arrivesAt: state.time + 1000,
+      endT: 1,
+      path: ['D'],
+      destination: 'D',
+      parkT: 0.5,
+    };
+    // enemy-near только что ушёл с опознанного B — он виден, а значит, проверка не пустая.
+    state.fleets['enemy-near'] = {
+      ...state.fleets['enemy-near']!,
+      location: null,
+      movement: { ...route },
+      resume: { to: 'E' },
+      mergeInto: 'enemy-far',
+    };
+    state.fleets['mine-1'] = {
+      ...state.fleets['mine-1']!,
+      location: null,
+      movement: { ...route, from: 'A', to: 'B' },
+      resume: { to: 'E' },
+    };
+    const view = visibleState(state, 'p1', data);
+    expect(view.fleets['enemy-near']?.movement).toEqual({
+      from: 'B',
+      to: 'C',
+      departedAt: state.time,
+      arrivesAt: state.time + 1000,
+      endT: 1,
+    });
+    expect(view.fleets['enemy-near']?.resume).toBeUndefined();
+    expect(view.fleets['enemy-near']?.mergeInto).toBeUndefined();
+    // Свой маршрут — свой: панель флота считает по нему ETA до конечной цели.
+    expect(view.fleets['mine-1']?.movement).toEqual({ ...route, from: 'A', to: 'B' });
+    expect(view.fleets['mine-1']?.resume).toEqual({ to: 'E' });
+    // Союз делит зрение, а не планы: союзник видит флот, но не его маршрут (как и цепочки).
+    state.diplomacy = { [pairKey('p1', 'p2')]: 'alliance' };
+    const ally = visibleState(state, 'p1', data).fleets['enemy-near'];
+    expect(ally?.movement?.destination).toBeUndefined();
+    expect(ally?.movement?.path).toBeUndefined();
+    // Проекция не трогает сам мир.
+    expect(state.fleets['enemy-near']?.movement?.destination).toBe('D');
+  });
+
+  it('счётчик вылетов (`sortie`) чужого порта и носителя снят: по нему читался бы скрытый удар', () => {
+    const state = scenario();
+    const sortie = { fuel: 1, rearming: 2 };
+    state.planets.A = { ...state.planets.A!, sortie: { ...sortie } };
+    state.planets.B = { ...state.planets.B!, owner: 'p2', sortie: { ...sortie } }; // опознан
+    state.planets.D = { ...state.planets.D!, sortie: { ...sortie } }; // за туманом
+    state.fleets['mine-1'] = { ...state.fleets['mine-1']!, sortie: { ...sortie } };
+    state.fleets['enemy-near'] = { ...state.fleets['enemy-near']!, sortie: { ...sortie } };
+    const view = visibleState(state, 'p1', data);
+    expect(view.planets.B?.sortie).toBeUndefined();
+    expect(view.planets.D?.sortie).toBeUndefined();
+    expect(view.fleets['enemy-near']).toBeDefined();
+    expect(view.fleets['enemy-near']?.sortie).toBeUndefined();
+    // Свои счётчики — свои: панель ангара рисует по ним топливо и перезарядку.
+    expect(view.planets.A?.sortie).toEqual(sortie);
+    expect(view.fleets['mine-1']?.sortie).toEqual(sortie);
+  });
 });
 
 describe('visibleView (one coverage pass for the broadcast path)', () => {
@@ -297,6 +363,7 @@ describe('visibleState (fog of war as a security boundary)', () => {
     state.players.p1!.stewardHoldPoints = ['B'];
     state.players.p1!.scientists = [{ id: 'ground_marshal', level: 2 }];
     state.capital = { p1: 'B', p2: 'A' };
+    state.rallyPoints = { p1: { A: 'B' }, p2: { C: 'A' } };
     const view = visibleState(state, 'p1', data);
     expect(view.players.p1?.resources).toEqual({ metal: 99 }); // own treasury intact
     expect(view.players.p2?.resources).toEqual({}); // enemy treasury hidden
@@ -305,6 +372,7 @@ describe('visibleState (fog of war as a security boundary)', () => {
     expect(view.players.p2?.scientists).toBeUndefined(); // enemy council hidden (same intel)
     expect(view.players.p1?.scientists).toEqual([{ id: 'ground_marshal', level: 2 }]); // own council stays
     expect(view.capital).toEqual({ p1: 'B' }); // rival capital = hero-respawn anchor, hidden
+    expect(view.rallyPoints).toEqual({ p1: { A: 'B' } }); // rival rally point = where reinforcements go
     expect(view.players.p2?.steward).toBeUndefined(); // enemy autopilot status hidden
     expect(view.players.p2?.stewardLog).toBeUndefined(); // enemy SITREP hidden
     expect(view.players.p2?.stewardHoldPoints).toBeUndefined(); // enemy anchors hidden
@@ -395,6 +463,28 @@ describe('visibleState (fog of war as a security boundary)', () => {
       },
     ];
     expect(visibleState(state, 'p1', data).scheduled.map((e) => e.id)).toEqual(['my-research']);
+  });
+
+  it('захваченный посреди стройки мир не отдаёт новому хозяину заказ прежнего', () => {
+    const state = scenario();
+    // A теперь у p1, но стройку заказал p2 до захвата: событие несёт `playerId: 'p2'`.
+    state.scheduled = [
+      {
+        id: 'prior-build',
+        at: 50,
+        type: 'construction.complete',
+        payload: { planetId: 'A', playerId: 'p2', kind: 'unit', unit: 'cruiser', count: 3 },
+        seq: 0,
+      },
+      {
+        id: 'my-build',
+        at: 60,
+        type: 'construction.complete',
+        payload: { planetId: 'A', playerId: 'p1', kind: 'unit', unit: 'cruiser', count: 1 },
+        seq: 1,
+      },
+    ];
+    expect(visibleState(state, 'p1', data).scheduled.map((e) => e.id)).toEqual(['my-build']);
   });
 
   it('serialized view never contains hidden data (the real anti-leak test)', () => {

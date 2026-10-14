@@ -386,6 +386,18 @@ describe('приказ союзнику (PVR-7.4)', () => {
     );
   });
 
+  it('чужую операцию не отменить: даже со связью — тот же отказ, что «нечего снимать»', () => {
+    const s = run(met(), 'ally.order', { ally: 'ally', kind: 'attack', planet: 'nest' }).state;
+    // Второй игрок тоже вышел на связь с этим союзником.
+    s.players.p2 = player('p2');
+    s.missionFacts!.contacted!.p2 = ['dock'];
+    setStance(s, 'p2', 'ally', 'alliance');
+    expect(kernel.applyAction(s, act('ally.cancel', { ally: 'ally' }, 'p2'), ctx(0))).toMatchObject(
+      { ok: false, code: 'E_NO_ORDER' },
+    );
+    expect(s.allyOps?.ally?.by).toBe('p1');
+  });
+
   it('ядро закрывает операцию по миру: взяли цель, разведчик дошёл, цель охраны потеряна', () => {
     const attack = run(met(), 'ally.order', { ally: 'ally', kind: 'attack', planet: 'nest' }).state;
     const taken = run(attack, 'test.planet.captured', {

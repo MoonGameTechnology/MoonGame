@@ -20,6 +20,7 @@ import {
   setRocketMineMode,
   delegateSteward,
   designateCapital,
+  setRallyPoint,
   takeBoon,
   engageFleet,
   equipHeroAbility,
@@ -167,6 +168,7 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['traderSell', traderSell(P, 'energy', 10)],
   ['traderSwap', traderSwap(P, 'metal', 'energy', 50)],
   ['designateCapital', designateCapital(P, 'alpha')],
+  ['setRallyPoint', setRallyPoint(P, 'alpha', 'beta')],
   ['takeBoon', takeBoon(P, 'boon_gunnery')],
   ['spawnHero', spawnHero(P, 'h1', 'alpha')],
   ['unlockHeroSkill', unlockHeroSkill(P, 'h1', 'node1')],
@@ -237,14 +239,14 @@ describe('строители приказов против схем гейта',
     expect(isValidActionPayload('swarm.adapt', swarmAdapt(P, 'veil', 'f1').payload)).toBe(false);
   });
 
-  it('три приказа каталога не строит НИКТО — у игрока нет способа их отдать', () => {
+  it('два приказа каталога не строит НИКТО — у игрока нет способа их отдать', () => {
     // Не придирка к списку, а честный замер охвата. Список зафиксирован, чтобы новая дыра
     // не появилась молча, а закрытая — заставила его сократить: так и вышло в AUD-18,
     // когда `hero.move` и `planet.annihilate` ушли из ядра и с шлюза (второй был живым
-    // обходом правил способностей), и список сократился с пяти до трёх.
+    // обходом правил способностей), и список сократился с пяти до трёх. Затем ушёл
+    // `seat.claim`: заявку места подаёт только сервер во входе (`joinSeat.ts`).
     const built = new Set(CALLS.map(([, a]) => a.type));
     expect(CLIENT_ACTION_TYPES.filter((t) => !built.has(t)).sort()).toEqual([
-      'seat.claim',
       'station.deploy',
       'technology.boost',
     ]);

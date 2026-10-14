@@ -57,7 +57,11 @@ export type ServerErrorCode =
   // ADM-1: администратор снял игрока с места. Приезжает ОТДЕЛЬНЫМ кодом, а не молчаливым
   // закрытием сокета: иначе клиент показал бы «связь потеряна» и вечно переподключался бы
   // в кресло, которого у него больше нет.
-  | 'E_KICKED';
+  | 'E_KICKED'
+  // Пароль аккаунта сменён (`/auth/reset`): все открытые игровые сокеты этого аккаунта
+  // закрываются с этим кодом, а прежний join-токен на рукопожатии больше не принимается.
+  // Место в партии остаётся за аккаунтом — войти заново можно с новой сессией.
+  | 'E_SESSION_REVOKED';
 
 /**
  * Ally ping — a tactical marker one player drops to propose a plan to allies
@@ -77,7 +81,7 @@ export interface PingAnchor {
 }
 
 export interface Ping {
-  /** `ping:<owner>:<seq>` (server-assigned). */
+  /** `ping:<owner>:<random>` (server-assigned, opaque). */
   id: string;
   owner: PlayerId;
   kind: PingKind;
@@ -105,7 +109,7 @@ export const CHAT_CHANNELS: readonly ChatChannel[] = ['session', 'coalition', 'd
 export const CHAT_TEXT_MAX = 240;
 
 export interface ChatMessage {
-  /** `chat:<from>:<seq>` (server-assigned). */
+  /** `chat:<from>:<random>` (server-assigned, opaque). */
   id: string;
   from: PlayerId;
   channel: ChatChannel;

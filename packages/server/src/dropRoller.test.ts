@@ -123,6 +123,24 @@ describe('awardMatchDrops (ARS-4)', () => {
     expect(await d.drops.pityOf('acc')).toBe(0); // no double bump either
   });
 
+  it('two matches ending together for one account: one pity counter forces one drop', async () => {
+    // chance 0 → only pity drops. Streak 2 of 3: the NEXT dry match is forced, the one
+    // after starts a new streak. Two overlapping award passes used to both read 2 and
+    // both force a drop — a second guaranteed drop nobody earned.
+    const d = deps({ byPlace: [{ maxPlace: 999, chance: 0 }] });
+    await d.drops.setPity('acc', 2);
+    const entries = [{ accountId: 'acc', reward: { place: 5, xp: 0 } }];
+    const passes = await Promise.all([
+      awardMatchDrops(d, 'together-m1', entries),
+      awardMatchDrops(d, 'together-m2', entries),
+    ]);
+    const records = passes.flat();
+    expect(records.filter((r) => r.dropped)).toHaveLength(1);
+    expect(records.map((r) => r.pity).sort()).toEqual([0, 2]); // the streaks were serial
+    expect(await d.arsenal.listOf('acc')).toHaveLength(1);
+    expect(await d.drops.pityOf('acc')).toBe(1); // the dry one started a new streak
+  });
+
   it('a drop is a TRADABLE blueprint with origin drop; a dry roll bumps pity', async () => {
     const d = deps({ byPlace: [{ maxPlace: 1, chance: 1 }] });
     await awardMatchDrops(d, 'm-x', [

@@ -232,6 +232,103 @@ describe('SV-2.4 · match API', () => {
   });
 });
 
+describe('create quota per account', () => {
+  /** A host whose matches stay running until the test ends them. */
+  function quotaApp(createQuota = 2) {
+    const running = new Set<string>();
+    let n = 0;
+    let release: (() => void) | undefined;
+    const app = appWith({
+      createMatch: async () => {
+        if (release === undefined) {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        const matchId = `m-${++n}`;
+        running.add(matchId);
+        return { matchId, seats: [] };
+      },
+      join: denyJoin,
+      identify: (request) => {
+        const who = request.headers['x-as'];
+        return Promise.resolve(
+          typeof who === 'string' ? { accountId: `acct:${who}`, login: who } : null,
+        );
+      },
+      ongoingMatchIds: () => Promise.resolve([...running]),
+      createQuota,
+      rateMax: 1_000,
+    });
+    const create = (who: string) =>
+      app.inject({ method: 'POST', url: '/matches', headers: { 'x-as': who } });
+    const open = () => {
+      release?.();
+      release = () => {};
+    };
+    return { app, running, create, open };
+  }
+
+  it('refuses an account past its running matches, and frees a slot when one ends', async () => {
+    const { app, running, create, open } = quotaApp();
+    open();
+    expect((await create('alice')).statusCode).toBe(200);
+    expect((await create('alice')).statusCode).toBe(200);
+    const refused = await create('alice');
+    expect(refused.statusCode).toBe(429);
+    expect(refused.json()).toEqual({ error: 'E_MATCH_QUOTA' });
+    expect(running.size).toBe(2); // nothing seeded for the refused request
+    expect((await create('bob')).statusCode).toBe(200); // the quota is per account
+    running.delete('m-1'); // alice's first match ended
+    expect((await create('alice')).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('parallel requests cannot all pass the check', async () => {
+    const { app, running, create, open } = quotaApp();
+    const pending = [create('alice'), create('alice'), create('alice')];
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    open();
+    const codes = (await Promise.all(pending)).map((res) => res.statusCode).sort();
+    expect(codes).toEqual([200, 200, 429]);
+    expect(running.size).toBe(2);
+    await app.close();
+  });
+
+  it('a match created while the list was being read still counts', async () => {
+    const running = new Set<string>();
+    let n = 0;
+    const app = appWith({
+      createMatch: () => {
+        const matchId = `m-${++n}`;
+        running.add(matchId);
+        return Promise.resolve({ matchId, seats: [] });
+      },
+      join: denyJoin,
+      identify: () => Promise.resolve({ accountId: 'acct:alice', login: 'alice' }),
+      // A slow store: the answer is what was running when the read began.
+      ongoingMatchIds: () => {
+        const snapshot = [...running];
+        return new Promise((resolve) => setTimeout(() => resolve(snapshot), 20));
+      },
+      createQuota: 2,
+      rateMax: 1_000,
+    });
+    expect((await app.inject({ method: 'POST', url: '/matches' })).statusCode).toBe(200);
+    const codes = (
+      await Promise.all([
+        app.inject({ method: 'POST', url: '/matches' }),
+        app.inject({ method: 'POST', url: '/matches' }),
+      ])
+    )
+      .map((res) => res.statusCode)
+      .sort();
+    expect(codes).toEqual([200, 429]);
+    expect(running.size).toBe(2);
+    await app.close();
+  });
+});
+
 // ADDR-6 — the seat layout is pre-join browsing for a match you may still enter (REL-7),
 // and intel about strangers' homeworlds for one you may not. The route tells those apart.
 
