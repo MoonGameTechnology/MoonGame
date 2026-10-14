@@ -23,6 +23,7 @@ import {
   sessions,
   survival,
   taskSuccess,
+  uniqueEvents,
   utcDay,
 } from './analytics.mjs';
 
@@ -67,7 +68,7 @@ function readJournal(dir, prefix, from, to) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const client = readJournal(args.dir, 'client', args.from, args.to);
+const client = uniqueEvents(readJournal(args.dir, 'client', args.from, args.to));
 const match = readJournal(args.dir, 'match', args.from, args.to);
 if (client.length === 0) {
   console.log(`В ${args.dir} нет client-*.jsonl за выбранные дни — браузерных событий не было.`);

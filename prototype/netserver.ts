@@ -1454,11 +1454,15 @@ const shutdown = (): void => {
   void (async () => {
     // Final flush per room so the latest state of EVERY session is durable before exit.
     for (const h of hosted) await h.flush();
-    // The journals last: `flush()` waits for an append already in flight, then writes the
-    // rest, so the summary lands after every line before it and nothing is cut by exit.
+    // Stop taking requests (Fastify waits for those in flight) before the journals: a
+    // `/telemetry` batch landing after the last flush would be lost at exit.
+    await server.close();
+    // The journals last, after a fresh summary (the one above stays as a fallback; the
+    // report keeps a run's LAST summary). `flush()` waits for an append already in flight,
+    // so the summary lands after every line before it and nothing is cut by exit.
+    writeSummary();
     await Promise.all([matchLog.flush(), clientLog.flush()]);
     if (pool) await pool.end();
-    await server.close();
     process.exit(0);
   })().catch((err: unknown) => {
     process.stderr.write(`shutdown failed: ${String(err)}\n`);

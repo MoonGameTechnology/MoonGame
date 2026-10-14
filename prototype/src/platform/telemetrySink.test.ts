@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTelemetryBatch } from '../../../packages/protocol/src/telemetry';
+import { parseTelemetryBatch, TELEMETRY_BODY_MAX } from '../../../packages/protocol/src/telemetry';
 import { createTelemetrySink, TELEMETRY_QUEUE_MAX, type TelemetrySinkDeps } from './telemetrySink';
 
 function harness(over: Partial<TelemetrySinkDeps> = {}) {
@@ -9,8 +9,7 @@ function harness(over: Partial<TelemetrySinkDeps> = {}) {
   let id = 0;
   let answers: boolean[] = [];
   const sink = createTelemetrySink({
-    endpoint: () => 'https://play.example/telemetry',
-    token: () => 'tok',
+    target: () => ({ url: 'https://play.example/telemetry', token: 'tok' }),
     install: 'install-0001',
     session: 'session-0001',
     build: 'abc1234',
@@ -94,11 +93,74 @@ describe('telemetry sink', () => {
   });
 
   it('no server address → nothing is sent and nothing piles up', async () => {
-    const h = harness({ endpoint: () => null });
+    const h = harness({ target: () => null });
     h.sink.emit('pve_started');
     await h.tick();
     h.sink.pageHide();
     expect(h.posts).toHaveLength(0);
     expect(h.beacons).toHaveLength(0);
+  });
+
+  it('a retry goes to the same server with the same session, even after a switch', async () => {
+    let server = 'a';
+    const sent: { url: string; token: string | null }[] = [];
+    let first = true;
+    const h = harness({
+      target: () => ({ url: `https://${server}.example/telemetry`, token: `tok-${server}` }),
+      post: (url, _body, token) => {
+        sent.push({ url, token });
+        server = 'b'; // игрок сменил сервер, пока пакет был в пути
+        const ok = !first;
+        first = false;
+        return Promise.resolve(ok);
+      },
+    });
+    h.sink.emit('pve_started');
+    await h.tick();
+    expect(sent).toEqual([
+      { url: 'https://a.example/telemetry', token: 'tok-a' },
+      { url: 'https://a.example/telemetry', token: 'tok-a' },
+    ]);
+  });
+
+  it('cuts batches by body size, not only by count', async () => {
+    const h = harness();
+    const fat = { a: '中'.repeat(120), b: '中'.repeat(120), c: '中'.repeat(120), d: '中'.repeat(120) };
+    for (let i = 0; i < 20; i += 1) h.sink.emit('onboarding_step', fat);
+    await h.tick();
+    expect(h.posts.length).toBeGreaterThan(1);
+    for (const p of h.posts) expect(new TextEncoder().encode(p.body).length).toBeLessThanOrEqual(TELEMETRY_BODY_MAX);
+    expect(h.posts.reduce((n, p) => n + JSON.parse(p.body).events.length, 0)).toBe(20);
+  });
+
+  it('an event too big to send alone is dropped, the rest still go', async () => {
+    const h = harness();
+    const huge = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`k${i}`, '中'.repeat(120)]));
+    h.sink.emit('onboarding_step', huge);
+    h.sink.emit('pve_started');
+    await h.tick();
+    expect(h.posts.flatMap((p) => JSON.parse(p.body).events.map((e: { e: string }) => e.e))).toEqual(['pve_started']);
+  });
+
+  it('closing the tab mid-request sends the in-flight batch by beacon and does not retry it', async () => {
+    let answer: (ok: boolean) => void = () => undefined;
+    let calls = 0;
+    const h = harness({
+      post: () => {
+        calls += 1;
+        return new Promise((r) => (answer = r));
+      },
+    });
+    h.sink.emit('pve_started');
+    const flushing = h.sink.flush();
+    h.sink.emit('pve_completed');
+    h.sink.pageHide();
+    expect(h.beacons.flatMap((b) => JSON.parse(b.body).events.map((e: { e: string }) => e.e))).toEqual([
+      'pve_started',
+      'pve_completed',
+    ]);
+    answer(false); // запрос оборвался вместе со страницей
+    await flushing;
+    expect(calls).toBe(1); // ушедший маяком пакет второй раз не шлётся
   });
 });

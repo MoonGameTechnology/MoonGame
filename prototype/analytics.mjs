@@ -21,6 +21,18 @@ export function percentile(values, p) {
   return sorted[rank];
 }
 
+/** Client lines without repeats: a batch the tab sent by beacon while its request was
+ *  still in flight can land twice — the event id (per install) tells them apart. */
+export function uniqueEvents(clientLines) {
+  const seen = new Set();
+  return clientLines.filter((l) => {
+    const key = `${l.install}|${l.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /** install → actor, from any client line of that install that carries one. */
 export function installActors(clientLines) {
   const map = new Map();

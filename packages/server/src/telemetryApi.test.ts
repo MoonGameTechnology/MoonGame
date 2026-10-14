@@ -91,6 +91,20 @@ describe('POST /telemetry', () => {
     expect(codes.filter((c) => c === 429)).toHaveLength(10);
   });
 
+  it('one flooding address cannot spend the shared budget and lock out everyone else', async () => {
+    const { app } = setup();
+    const from = (ip: string, install: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/telemetry',
+        remoteAddress: ip,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify(batch({ install })),
+      });
+    for (let i = 0; i < 3_100; i += 1) await from('10.0.0.1', `install-${10_000 + i}`);
+    expect((await from('10.0.0.2', 'install-other')).statusCode).toBe(204);
+  });
+
   it('a live session adds the pseudonym; the account id never lands', async () => {
     const { lines, post } = setup({
       actorOf,

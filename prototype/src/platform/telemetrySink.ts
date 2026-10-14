@@ -11,18 +11,28 @@
  * не доходит до игры. Повтор — один, и только для пакета, который не дошёл; дальше он
  * теряется. Очередь ограничена: офлайн-вкладка не копит события бесконечно.
  *
+ * Адрес и сессия снимаются ОДНОЙ парой на пакет: если игрок сменил сервер, пока пакет
+ * в пути, повтор уйдёт туда же и с той же сессией, а не на старый адрес с сессией нового
+ * сервера. Пакет режется и по числу событий, и по размеру тела — приёмник отрежет всё, что
+ * больше {@link TELEMETRY_BODY_MAX}. Пакет в полёте на `pagehide` уходит маяком вместе с
+ * остатком: обычный запрос уходящая страница может оборвать (дубль сервер различит по `id`).
+ *
  * Всё, что трогает браузер, приходит снаружи ({@link TelemetrySinkDeps}), поэтому модуль
  * тестируется без браузера и без сети.
  */
-import { TELEMETRY_MAX_EVENTS, TELEMETRY_VERSION, type TelemetryEvent } from '../../../packages/protocol/src/telemetry';
+import {
+  TELEMETRY_BODY_MAX,
+  TELEMETRY_MAX_EVENTS,
+  TELEMETRY_VERSION,
+  type TelemetryEvent,
+} from '../../../packages/protocol/src/telemetry';
 import type { TelemetryTarget } from '../../../decisions/telemetryEndpoint';
 import type { PlatformEvent } from './types';
 
 export interface TelemetrySinkDeps {
-  /** Адрес приёмника; `null` — слать некуда (адрес не разобрался). */
-  endpoint: () => string | null;
-  /** Сессия игрока, если он вошёл: тогда сервер добавит псевдоним. */
-  token: () => string | null;
+  /** Адрес приёмника и сессия игрока НА НЁМ (если вошёл — сервер добавит псевдоним);
+   *  `null` — слать некуда (адрес не разобрался). */
+  target: () => { url: string; token: string | null } | null;
   install: string;
   session: string;
   build: string;
@@ -53,6 +63,7 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
   let queue: TelemetryEvent[] = [];
   let armed = false;
   let sending = false;
+  let inflight: TelemetryEvent[] = [];
 
   const body = (events: TelemetryEvent[]): string =>
     JSON.stringify({
@@ -63,6 +74,23 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
       events,
     });
 
+  const bytes = (text: string): number => new TextEncoder().encode(text).length;
+
+  /** Следующий пакет из очереди: до {@link TELEMETRY_MAX_EVENTS} событий и не больше
+   *  {@link TELEMETRY_BODY_MAX} байт. Событие, которое одно не влезает, выбрасывается. */
+  const take = (): TelemetryEvent[] => {
+    const events: TelemetryEvent[] = [];
+    while (queue.length > 0 && events.length < TELEMETRY_MAX_EVENTS) {
+      events.push(queue[0]!);
+      if (bytes(body(events)) > TELEMETRY_BODY_MAX) {
+        events.pop();
+        if (events.length > 0) break;
+      }
+      queue.shift();
+    }
+    return events;
+  };
+
   const arm = (): void => {
     if (armed || queue.length === 0) return;
     armed = true;
@@ -72,9 +100,9 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
     }, TELEMETRY_FLUSH_MS);
   };
 
-  async function send(url: string, events: TelemetryEvent[]): Promise<boolean> {
+  async function send(to: { url: string; token: string | null }, events: TelemetryEvent[]): Promise<boolean> {
     try {
-      return await deps.post(url, body(events), deps.token());
+      return await deps.post(to.url, body(events), to.token);
     } catch {
       return false;
     }
@@ -82,17 +110,22 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
 
   async function flush(): Promise<void> {
     if (sending) return;
-    const url = deps.endpoint();
-    if (url === null) {
+    const to = deps.target();
+    if (to === null) {
       queue = [];
       return;
     }
     sending = true;
     try {
       while (queue.length > 0) {
-        const events = queue.splice(0, TELEMETRY_MAX_EVENTS);
+        const events = take();
+        if (events.length === 0) continue;
+        inflight = events;
         // Один повтор — и всё: сеть, которая не пускает дважды, не пустит и в третий раз.
-        if (!(await send(url, events)) && !(await send(url, events))) break;
+        // Пакет, который уже забрал маяк (`pageHide`), второй раз не шлётся.
+        const ok = (await send(to, events)) || (inflight === events && (await send(to, events)));
+        inflight = [];
+        if (!ok) break;
       }
     } finally {
       sending = false;
@@ -110,10 +143,15 @@ export function createTelemetrySink(deps: TelemetrySinkDeps): TelemetrySink {
     },
     flush,
     pageHide() {
-      const url = deps.endpoint();
-      if (url === null) return;
+      const url = deps.target()?.url;
+      if (url === undefined) return;
+      queue = [...inflight, ...queue];
+      inflight = [];
       try {
-        while (queue.length > 0) deps.beacon(url, body(queue.splice(0, TELEMETRY_MAX_EVENTS)));
+        while (queue.length > 0) {
+          const events = take();
+          if (events.length > 0) deps.beacon(url, body(events));
+        }
       } catch {
         /* маяк не принял — страница уже уходит, игре до этого дела нет */
       }
@@ -146,16 +184,15 @@ function installId(): string {
 
 /** Сток для настоящей страницы: адрес, сессия и отправка — из браузера. */
 export function createBrowserTelemetrySink(opts: {
-  /** Читается на каждой отправке: игрок мог сменить сервер на экране входа. */
+  /** Читается на каждом пакете: игрок мог сменить сервер на экране входа. */
   target: () => TelemetryTarget | null;
   token: (base: string) => string | null;
   build: string;
 }): TelemetrySink {
   return createTelemetrySink({
-    endpoint: () => opts.target()?.url ?? null,
-    token: () => {
+    target: () => {
       const target = opts.target();
-      return target === null ? null : opts.token(target.base);
+      return target === null ? null : { url: target.url, token: opts.token(target.base) };
     },
     install: installId(),
     session: randomId(),

@@ -12,6 +12,7 @@ import {
   sessions,
   survival,
   taskSuccess,
+  uniqueEvents,
 } from './analytics.mjs';
 
 const DAY = 86_400_000;
@@ -135,5 +136,11 @@ describe('analytics', () => {
   it('percentile is nearest-rank', () => {
     expect(percentile([5, 1, 3, 2, 4], 50)).toBe(3);
     expect(percentile([], 50)).toBeNull();
+  });
+
+  it('a batch delivered twice (request and beacon) counts once', () => {
+    const a = { install: 'i1', id: 'ev-1', e: 'pve_started' };
+    const b = { install: 'i2', id: 'ev-1', e: 'pve_started' };
+    expect(uniqueEvents([a, { ...a }, b])).toEqual([a, b]);
   });
 });

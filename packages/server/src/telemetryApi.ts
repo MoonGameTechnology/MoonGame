@@ -87,7 +87,8 @@ export function registerTelemetryApi(
       const origin = request.headers.origin;
       if (options.allowedOrigins && origin !== undefined && !options.allowedOrigins.includes(origin))
         return refuse(reply, 403, 'E_FORBIDDEN');
-      if (globalLimited('*') || ipLimited(request.ip)) return refuse(reply, 429, 'E_RATE_LIMIT');
+      // Per-IP first: a source already over its own limit must not spend the shared budget.
+      if (ipLimited(request.ip) || globalLimited('*')) return refuse(reply, 429, 'E_RATE_LIMIT');
       // sendBeacon posts text/plain (no preflight); fetch posts JSON. Both are one shape.
       let body: unknown = request.body;
       if (typeof body === 'string') {
