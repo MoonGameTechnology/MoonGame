@@ -134,8 +134,10 @@ describe('кошелёк: ролик только по раскрытой кно
 describe('шапка забега — проводка в кадре', () => {
   // Кадр — единственное место, где признак забега доходит до шапки.
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  // Кошелёк поднимает оболочка Sector Zero (REFM-211), перерисовывает кадр `main.ts`.
+  // Кошелёк поднимает оболочка Sector Zero (REFM-211), перерисовывает кадр верхней полосы
+  // (`matchTopBar.ts`, REFM-222).
   const shell = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
+  const bar = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 
   it('поля основной игры прячутся в забеге и возвращаются вне его', () => {
     // Каждое поле — вместе со своим дублем в другом месте интерфейса (кнопка «Производство»
@@ -149,7 +151,8 @@ describe('шапка забега — проводка в кадре', () => {
     // Признак забега для интерфейса — `sectorZeroToolsHidden` в `main.ts`, оболочка зовёт его хуком.
     expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
     expect(main).toContain('runOnScreen: () => sectorZeroToolsHidden(),');
-    expect(main).toMatch(/\n {2}runWallet\.render\(\);/);
+    expect(bar).toMatch(/\n {2}runWallet\.render\(\);/);
+    expect(main).toMatch(/\n {2}renderTopBar\(nowReal, preparingMap, missions\);/);
   });
 
   it('ролик в кошельке — те же порция и дневной лимит, что у магазина, по сегодняшним суткам', () => {
@@ -162,7 +165,10 @@ describe('шапка забега — проводка в кадре', () => {
   it('основная игра не показывает выдуманные Суверены, кошелёк забега остаётся из профиля', () => {
     // Неподтверждённая валюта скрыта целиком, а не заменена числом вне забега.
     expect(main).not.toMatch(/\bSOVEREIGNS\b/);
-    const status = main.slice(main.indexOf('  const statusHtml ='), main.indexOf('  if (statusHtml !== lastClockText)'));
+    expect(bar).not.toMatch(/\bSOVEREIGNS\b/);
+    // Строка статуса — у владельца верхней полосы (`matchTopBar.ts`, REFM-222).
+    const status = bar.slice(bar.indexOf('  const statusHtml ='), bar.indexOf('  if (statusHtml !== lastClockText)'));
+    expect(status).toContain('data-solo-save');
     expect(status).not.toMatch(/dl-donate|data-donate=/);
     expect(main).toContain('wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),');
     // Отдельный настоящий баланс Sector Zero по-прежнему приходит из профиля.

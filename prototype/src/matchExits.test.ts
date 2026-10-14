@@ -117,20 +117,25 @@ describe('rule 6 in the markup', () => {
 
 describe('rule 6 in the frame', () => {
   // Кадр — единственное место, где признак забега доходит до полосы: без него CSS выше не
-  // сработает, а правила получат «не забег».
+  // сработает, а правила получат «не забег». Кадр полосы — у её владельца (`matchTopBar.ts`,
+  // REFM-222); признак забега и тумблер разработчика он берёт хуками `main.ts`.
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  const bar = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 
   it('marks the bar in a run and passes the run to both rules', () => {
-    expect(main).toContain('const run = sectorZeroToolsHidden();');
-    expect(main).toContain("speedbarEl.classList.toggle('spd-run', run);");
-    expect(main).toContain(
-      'timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__, run)',
+    expect(bar).toContain('const run = game.toolsHidden();');
+    expect(bar).toContain("speedbarEl.classList.toggle('spd-run', run);");
+    expect(bar).toContain(
+      'timeControlsShown(pcUi(), game.speedControl(), NET, __PLAYER_BUILD__, run)',
     );
-    expect(main).toContain('speedbarShown(pcUi(), devSpeedControl, run)');
+    expect(bar).toContain('speedbarShown(pcUi(), game.speedControl(), run)');
+    expect(main).toContain('toolsHidden: sectorZeroToolsHidden,');
+    expect(main).toContain('speedControl: () => devSpeedControl,');
+    expect(main).toMatch(/renderEndScreen\(\);\s*renderSpeedbar\(\);/);
   });
 
   it('▶▶▶ — только в дев-забеге, и в игроцкой сборке её нет вовсе', () => {
-    expect(main).toContain('if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);');
+    expect(bar).toContain('if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);');
     const markup = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
     expect(markup).toMatch(/<!--dev-only--><button id="spd-dev"[^>]*hidden>▶▶▶<\/button><!--\/dev-only-->/);
   });

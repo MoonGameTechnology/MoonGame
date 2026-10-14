@@ -25,7 +25,8 @@ import {
 import { SECTOR_ZERO_ABSENT_TOOLS, SECTOR_ZERO_ABSENT_TWINS } from './sectorZeroTools';
 
 const MARKUP = readFileSync(new URL('../prototype/build.mjs', import.meta.url), 'utf8');
-const MAIN = readFileSync(new URL('../prototype/src/main.ts', import.meta.url), 'utf8');
+// Строку статуса рисует верхняя полоса (`matchTopBar.ts`, REFM-222).
+const TOPBAR = readFileSync(new URL('../prototype/src/matchTopBar.ts', import.meta.url), 'utf8');
 
 /** Кнопки, которых нет: в обычной партии — торговца, досье Роя, сохранения и «Завершить». */
 const missing =
@@ -99,7 +100,7 @@ describe('нижняя панель телефона (UIX-3.1)', () => {
       const id = /^#([\w-]+)/.exec(opens)?.[1];
       expect(MARKUP, `id="${id}" в build.mjs`).toContain(`id="${id}"`);
     }
-    expect(MAIN, 'кнопка сохранения строки статуса').toContain('data-solo-save="1"');
+    expect(TOPBAR, 'кнопка сохранения строки статуса').toContain('data-solo-save="1"');
   });
 
   it('у каждой подписи есть текст в обеих локалях', () => {

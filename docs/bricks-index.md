@@ -61,7 +61,7 @@
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-221 | ⏳ | proto | `docs/backlog.md` | Обучение и справка |
-| REFM-222 | ⏳ | proto | `docs/backlog.md` | Верхняя полоса |
+| REFM-222 | ✅ | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
 | REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
 | REFM-225 | ⏳ | proto | `docs/backlog.md` | Хозяин боковой панели |
