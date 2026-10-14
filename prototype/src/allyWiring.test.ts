@@ -11,6 +11,8 @@ const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 // Тап по карте — у ввода на холсте (REFM-236).
 const INPUT = readFileSync(new URL('./mapInput.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+// События мира разбирает лента (`eventFeed.ts`, REFM-230); чип мигает дверью `main.ts`.
+const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
 
 describe('глава IV — проводка интерфейса', () => {
   it('окно есть в разметке; вход — чип строки статуса', () => {
@@ -43,9 +45,10 @@ describe('глава IV — проводка интерфейса', () => {
   });
 
   it('встреча зовёт открыть связь: заметка и мигающий чип', () => {
-    expect(MAIN).toMatch(
-      /case 'ally\.contact':[\s\S]{0,120}note\(t\('ally\.contact\.note'\)\);\s*allyPulseUntil = /,
+    expect(FEED).toMatch(
+      /case 'ally\.contact':[\s\S]{0,120}note\(t\('ally\.contact\.note'\)\);\s*game\.pulseAlly\(\);/,
     );
+    expect(MAIN).toMatch(/pulseAlly: \(\) => \{\s*allyPulseUntil = performance\.now\(\) \+ /);
   });
 });
 
@@ -57,7 +60,7 @@ describe('глава VI — проводка интерфейса (PVR-8.4, PVR-
   });
 
   it('доки найдены — живой сигнал; угроза докам — доклад и мигающий чип связи', () => {
-    expect(MAIN).toMatch(
+    expect(FEED).toMatch(
       /case 'refuge\.found':\s*if \(p\.owner === ME\) note\(t\('refuge\.signal'\)/,
     );
     expect(MAIN).toMatch(

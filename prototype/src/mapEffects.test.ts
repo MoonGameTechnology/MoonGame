@@ -274,6 +274,9 @@ describe('REFM-234 — вспышки на карте', () => {
 describe('REFM-234 — стык вспышек с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const SRC = readFileSync(new URL('./mapEffects.ts', import.meta.url), 'utf8');
+  // События партии разбирает лента (`eventFeed.ts`, REFM-230): залпы, захваты и мины она
+  // ставит теми же дверями.
+  const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
   const init = /initMapEffects\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
   it('хуки — мир и кадр', () => {
@@ -283,12 +286,15 @@ describe('REFM-234 — стык вспышек с main.ts', () => {
   it('очереди вспышек живут только в модуле: события и смена партии пишут их дверями', () => {
     expect(MAIN).not.toMatch(/\b(aaShots|captureFlashes|mineFlashes|goFlash|noticeFlashes)\b/);
     expect(MAIN).not.toMatch(/\bfunction (drawFlak|drawCaptureFlashes|drawMineFlashes|drawGoFlash|drawNoticeFlashes|noticeFlash)\(/);
+    expect(FEED).not.toMatch(/\b(aaShots|captureFlashes|mineFlashes|goFlash|noticeFlashes)\b/);
     // Четыре тира огня из событий: ПКО, перехват, корабельное ПВО, удар шаттлов.
-    expect(MAIN.match(/\baddFlak\(\{/g)).toHaveLength(4);
+    expect(FEED.match(/\baddFlak\(\{/g)).toHaveLength(4);
     // Захват — событие и предпросмотр волны в инструментах разработчика.
-    expect(MAIN.match(/\bflashProvince\(/g)).toHaveLength(2);
-    expect(MAIN).toContain('flashMines(at, p.position as { x: number; y: number } | undefined);');
-    expect(MAIN).toMatch(/battleLosses\.clear\(\);\s*clearFlak\(\);/);
+    expect(FEED.match(/\bflashProvince\(/g)).toHaveLength(1);
+    expect(MAIN.match(/\bflashProvince\(/g)).toHaveLength(1);
+    expect(FEED).toContain('flashMines(at, p.position as { x: number; y: number } | undefined);');
+    const install = /function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(MAIN)?.[1];
+    expect(install).toContain('clearFlak();');
     expect(MAIN).toContain('ring: flashGo,');
   });
 
