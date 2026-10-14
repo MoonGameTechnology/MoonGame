@@ -124,6 +124,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   operation: 'filtered', // контракт главы VI: правила публичны, флоты соединений — только видимые
   captive: 'public', // пленный главы V — сценарий PvE: укрытие и носитель Рой не ищет
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
+  rallyPoints: 'filtered', // чужая точка сбора — куда пойдут его подкрепления (RALLY-1)
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
   autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
   orders: 'filtered',
@@ -462,6 +463,7 @@ function maximalState(): GameState {
     },
     captive: { hideout: 'a', zone: 'b' },
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
+    rallyPoints: { [VIEWER]: { A: 'B' }, [RIVAL]: { Z: 'CANARY_target' } },
     autoAssault: { mine: true, CANARY_fleet: true },
     autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },
     orders: {

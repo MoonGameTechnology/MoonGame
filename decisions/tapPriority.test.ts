@@ -27,6 +27,12 @@ describe('тап по карте — кто его забирает', () => {
     expect(tapOwner(modes({ strikeAim: true, assaultAim: true }))).toBe('assault');
   });
 
+  it('RALLY-1 — взведённая ТОЧКА СБОРА забирает тап у выделения и набора группы', () => {
+    expect(tapOwner(modes({ rallyAim: true }))).toBe('rally-point');
+    expect(tapOwner(modes({ rallyAim: true, pickMode: true }))).toBe('rally-point');
+    expect(tapOwner(modes({ rallyAim: true, chainMode: true }))).toBe('chain-plan');
+  });
+
   it('РЕЖИМ «ПРИКАЗ» ГЛУШИТ ВСЁ: пока он жив, тап — всегда точка плана', () => {
     const все = modes({
       chainMode: true,

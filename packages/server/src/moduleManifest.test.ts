@@ -109,7 +109,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 78: порядок тот же; heroEffects 1.3.0 — пси-зона героя на каждый удар по флоту (CORE-DMG-4).
 // 79: порядок тот же; orbital 1.3.0, shuttle 1.11.0 — обстрел и удар шаттлов бьют войска мира (ROS-1.6).
 // 80: порядок тот же; shuttle 1.13.0 — зональное ПВО бьёт видимые чужие мины в радиусе.
-const PINNED_FOR_VERSION = '80';
+// 81: порядок тот же; auto-rally 1.1.0 — точка сбора мира-верфи, действие `rally.point` (RALLY-1).
+const PINNED_FOR_VERSION = '81';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

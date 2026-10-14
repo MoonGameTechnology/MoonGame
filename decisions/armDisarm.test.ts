@@ -80,6 +80,7 @@ describe('ALWAYS_DISARMED', () => {
       'strikeAim',
       'retreatAim',
       'allyAim',
+      'rallyAim',
       'squadMerge',
     ]);
     for (const name of ALWAYS_DISARMED) expect(STATES).not.toContain(name as unknown as ArmedState);
@@ -105,7 +106,7 @@ describe('the table itself', () => {
 
   it('splits every flag into exactly one kind: aim or popover', () => {
     expect(new Set(FLAGS).size).toBe(FLAGS.length);
-    expect(FLAGS).toHaveLength(16);
+    expect(FLAGS).toHaveLength(17);
     for (const flag of FLAGS) expect(AIMS.includes(flag)).toBe(!POPOVERS.includes(flag));
   });
 });
@@ -127,6 +128,7 @@ heroAim         x      x          .           .        .          .           .
 heroSpawnAim    x      x          .           .        .          .           .
 strikeAim       x      x          .           .        .          .           .
 allyAim         x      x          .           .        .          .           .
+rallyAim        x      x          .           .        .          .           .
 squadMerge      x      x          .           x        x          .           .
 cmdMore         x      .          P           P        x          .           .
 castMenu        x      .          x           x        x          .           x
@@ -176,7 +178,14 @@ describe('disarmedBy — каждый повод × каждый флаг', () =
 
 describe('поводы — правила 8–14 словами', () => {
   const both = (reason: Reason): Flag[][] => [disarmedBy(reason, false), disarmedBy(reason, true)];
-  const WINDOW_AIMS: Flag[] = ['retreatAim', 'heroAim', 'heroSpawnAim', 'strikeAim', 'allyAim'];
+  const WINDOW_AIMS: Flag[] = [
+    'retreatAim',
+    'heroAim',
+    'heroSpawnAim',
+    'strikeAim',
+    'allyAim',
+    'rallyAim',
+  ];
 
   // Правило 8: прицел и меню старого матча указывают на то, чего в новом нет.
   it('a new match drops everything on both platforms', () => {

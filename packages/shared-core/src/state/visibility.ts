@@ -1001,6 +1001,14 @@ function project(
     }
     if (Object.keys(view.capital).length === 0) delete view.capital;
   }
+  // Точки сбора (RALLY-1) — куда пойдут подкрепления, то есть то же будущее намерение.
+  // Остаются только записи зрителя; пустая карта убирается.
+  if (view.rallyPoints) {
+    for (const playerId of Object.keys(view.rallyPoints)) {
+      if (playerId !== viewerId) delete view.rallyPoints[playerId];
+    }
+    if (Object.keys(view.rallyPoints).length === 0) delete view.rallyPoints;
+  }
 
   // Челночные удары (SHU-1.2): свои видны, чужие сняты целиком. Иначе игрок заранее
   // знает о налёте, и внезапность, ради которой челнок и летит мимо линий, исчезает.

@@ -12,7 +12,7 @@
  * те же.
  */
 import type { GameState, ShuttleStrike, Squadron } from '../../packages/shared-core/src/index';
-import { legT, roadAhead } from '../../packages/shared-core/src/index';
+import { legT, rallyPointOf, roadAhead } from '../../packages/shared-core/src/index';
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { patrolMarks } from '../../decisions/patrolMarks';
@@ -212,6 +212,37 @@ export function drawFleetRoutes() {
     cx.stroke();
     cx.restore();
   }
+}
+
+/**
+ * Точка сбора ВЫБРАННОГО мира-верфи (RALLY-1): прямой пунктир от мира к цели и кольцо на
+ * цели. Только у выбранного мира, как точка сбора здания в RTS: на большой карте линии
+ * всех верфей разом читались бы шумом. Прямая, а не путь по дорогам: это назначение, а не
+ * маршрут, — путь каждого вылета рисует `drawFleetRoutes`.
+ */
+export function drawRallyPoint(): void {
+  if (!selPlanet) return;
+  const s = game.world();
+  const to = rallyPointOf(s, game.me(), selPlanet);
+  const from = s.planets[selPlanet];
+  const dest = to ? s.planets[to] : undefined;
+  if (!from || !dest) return;
+  const a = world(from.position);
+  const b = world(dest.position);
+  const cx = game.ctx();
+  cx.save();
+  cx.strokeStyle = rgba(LOCK, 0.8);
+  cx.lineWidth = 1.5;
+  cx.setLineDash([2, 6]);
+  cx.beginPath();
+  cx.moveTo(a.x, a.y);
+  cx.lineTo(b.x, b.y);
+  cx.stroke();
+  cx.setLineDash([]);
+  cx.beginPath();
+  cx.arc(b.x, b.y, 10, 0, TAU);
+  cx.stroke();
+  cx.restore();
 }
 
 /**

@@ -63,6 +63,7 @@ const CLIENT_ACTION_TYPES = [
   'shuttle.strike',
   'shuttle.unload',
   'capital.designate',
+  'rally.point',
   'steward.delegate',
   'steward.recall',
   'steward.holdpoint',
@@ -134,6 +135,8 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.split', { fleetId: 'f1', take: [{ unit: 'interceptor', count: 2 }] }],
       ['fleet.engage', { fleetId: 'f1', targetId: 'f2' }],
       ['capital.designate', { planetId: 'p1' }],
+      ['rally.point', { planetId: 'p1', to: 'p2' }],
+      ['rally.point', { planetId: 'p1', to: null }], // null снимает точку
       ['steward.delegate', { posture: 'defend', until: 123456 }],
       ['steward.recall', {}],
       ['steward.holdpoint', { planetId: 'p1', on: true }],
