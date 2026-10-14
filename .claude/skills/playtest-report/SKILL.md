@@ -71,8 +71,8 @@ pnpm prototype                      # печатает: wrote prototype/dist/voi
 `docs/metrics-roadmap.md`, категория C: следим за ростом от прогона к прогону, поэтому
 цифра в заметках должна быть от **той самой** сборки, на которой играли.
 
-Поле «Файл лога» — `playtest-logs/proto-<timestamp>.jsonl`; точное имя сервер печатает в
-сводке при выходе, туда же его и подставь.
+Поле «Файл лога» — `playtest-logs/match-YYYY-MM-DD.jsonl` (журнал за UTC-день, в нём все
+партии дня, PTM-0.1) плюс id партии; точное имя файла сервер печатает в сводке при выходе.
 
 ## 4. Во время теста
 
@@ -98,7 +98,8 @@ fps/rtt, match end, путь к логу) и дописывает те же аг
 
 ```bash
 pnpm run metrics                                   # свежайший playtest-logs/*.jsonl
-pnpm run metrics playtest-logs/proto-1750000000.jsonl
+pnpm run metrics -- --day 2026-10-14               # журнал дня: список партий в нём
+pnpm run metrics -- --day 2026-10-14 --match <id>  # отчёт по одной партии
 ```
 
 `prototype/report.mjs` разбирает лог: длительность, joins/leaves, микс действий по типам

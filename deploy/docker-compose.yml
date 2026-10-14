@@ -106,6 +106,9 @@ services:
       # the host a curl arrives via the Docker bridge, not loopback, so prod needs the
       # token (≥32 chars, e.g. `openssl rand -hex 32`). Unset ⇒ the routes 404 for everyone.
       METRICS_TOKEN: ${METRICS_TOKEN:-}
+      # PTM-0.2: salt of the analytics pseudonym in the match journal (≥32 chars). Unset ⇒
+      # the journal carries no `actor`, so players can't be linked across matches and days.
+      ANALYTICS_SALT: ${ANALYTICS_SALT:-}
       # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
       # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
       # plain `docker compose up` against the public interface is safe. Override
