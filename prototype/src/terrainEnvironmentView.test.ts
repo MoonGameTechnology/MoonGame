@@ -51,6 +51,18 @@ describe('world environment scene cache', () => {
     expect(cache.prepare(structuredClone(original))).toBe(scene);
   });
 
+  it('keeps the scene when camera roundoff flips the last rounded digit of a vertex', () => {
+    // 1799.0546875 sits exactly halfway between two 1e-6 steps; a zoom rebake nudged it
+    // to either side and rebuilt the whole environment once per bake.
+    const at = (x: number): TerrainEnvironmentInput => ({ ...input(), cells: input().cells.map(c =>
+      c.known ? { ...c, poly: [[0, 0], [x, 0], [512, 512], [0, 512]] as const } : c) });
+    const cache = new TerrainEnvironmentSceneCache();
+    const scene = cache.prepare(at(1799.0546875 - 1e-10));
+    expect(cache.prepare(at(1799.0546875 + 1e-10))).toBe(scene);
+    expect(cache.prepare(at(1799.0546875 - 1e-10))).toBe(scene);
+    expect(cache.prepare(at(1799.06))).not.toBe(scene);
+  });
+
   it('excludes every unknown metadata value, identity and geometry from its key', () => {
     const cache = new TerrainEnvironmentSceneCache();
     const original = input();

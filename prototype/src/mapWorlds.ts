@@ -94,16 +94,18 @@ function drawRegionLabels(lod: MapLod): void {
   cx.globalAlpha *= alpha;
   cx.textAlign = 'center';
   cx.textBaseline = 'middle';
-  cx.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+  // Подпись — тихая надпись на карте, а не плашка: тонкое начертание, разрядка, мягкий ореол.
+  cx.font = '300 12px ui-sans-serif, system-ui, sans-serif';
+  if ('letterSpacing' in cx) cx.letterSpacing = '2px';
   cx.lineJoin = 'round';
   for (const label of labels) {
     const c = world(label);
     if (!visible(c, 240)) continue;
     const text = label.text.toUpperCase();
-    cx.lineWidth = 4;
-    cx.strokeStyle = 'rgba(4,10,12,.85)';
+    cx.lineWidth = 2;
+    cx.strokeStyle = 'rgba(4,10,12,.35)';
     cx.strokeText(text, c.x, c.y);
-    cx.fillStyle = 'rgba(214,236,244,.92)';
+    cx.fillStyle = 'rgba(200,226,236,.5)';
     cx.fillText(text, c.x, c.y);
   }
   cx.restore();
