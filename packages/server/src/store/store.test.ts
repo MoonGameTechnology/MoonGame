@@ -749,6 +749,26 @@ function dropStoreContract(name: string, make: () => DropStore, uniq: (p: string
       expect(await store.shardsOf(acc)).toBe(7);
       expect(await store.shardsOf(uniq('drop-nobody'))).toBe(0);
     });
+
+    it('stepPity reads and advances the streak in one step, also under concurrency', async () => {
+      const store = make();
+      const acc = uniq('drop-step');
+      expect(await store.stepPity(acc, false, 3)).toBe(0); // unknown account starts at 0
+      expect(await store.stepPity(acc, false, 3)).toBe(1);
+      expect(await store.stepPity(acc, false, 3)).toBe(2); // the forced roll: resets
+      expect(await store.pityOf(acc)).toBe(0);
+      await store.stepPity(acc, true, 3); // a hit resets too
+      expect(await store.pityOf(acc)).toBe(0);
+      // Two rolls of one account at once (two matches ending together): the streaks
+      // they report are serial, never the same value twice.
+      await store.setPity(acc, 2);
+      const seen = await Promise.all([
+        store.stepPity(acc, false, 3),
+        store.stepPity(acc, false, 3),
+      ]);
+      expect(seen.sort()).toEqual([0, 2]);
+      expect(await store.pityOf(acc)).toBe(1);
+    });
   });
 }
 
