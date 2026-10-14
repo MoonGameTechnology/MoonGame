@@ -1130,7 +1130,7 @@
 | PTM-1.2 | ✅ | proto cli | `docs/playtest-telemetry-roadmap.md` | События пути входа и связи |
 | PTM-1.3 | ✅ | proto | `docs/playtest-telemetry-roadmap.md` | Ошибки браузера |
 | PTM-2.1 | ✅ | proto | `docs/playtest-telemetry-roadmap.md` | Отчёт по поведению pnpm run analytics |
-| PTM-2.2 | ⏳ | docs ops | `docs/playtest-telemetry-roadmap.md` | Порядок теста: до, во время, после |
+| PTM-2.2 | 🔶 | docs ops | `docs/playtest-telemetry-roadmap.md` | Порядок теста: до, во время, после |
 | PTM-2.3 | ✅ | srv | `docs/playtest-telemetry-roadmap.md` | Счётчики приёмника в /metrics/summary |
 | PTM-3.1 | ⏳ | srv docs | `docs/playtest-telemetry-roadmap.md` | Хранение и удаление |
 | PTM-3.2 | ⏳ | srv proto | `docs/playtest-telemetry-roadmap.md` | Назначение экспериментов |
