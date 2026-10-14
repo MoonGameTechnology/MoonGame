@@ -30,6 +30,12 @@ export interface LiveMatch {
  *  successful open resets it. Mobile-network drops recover on the early short waits. */
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
+/** Server codes that end the match for this socket for good: the seat was taken away
+ *  (`E_KICKED`) or the password changed and the session's join token is dead
+ *  (`E_SESSION_REVOKED`). Reconnecting to the same URL can only be refused again, so the
+ *  transport closes instead — the caller hears the code and sends the player to sign in. */
+const TERMINAL_CODES: ReadonlySet<string> = new Set(['E_KICKED', 'E_SESSION_REVOKED']);
+
 /** Open a live match over a browser WebSocket at `url`. The caller's `handlers` receive
  *  `onStatus`/`onSnapshot`/… as usual; the returned {@link LiveMatch} is for sending. */
 export function openLiveMatch(url: string, handlers: MultiplayerClientHandlers): LiveMatch {
@@ -55,6 +61,10 @@ export function openLiveMatch(url: string, handlers: MultiplayerClientHandlers):
 
   const client = new MultiplayerClient(socket, {
     ...handlers,
+    onError: (code) => {
+      handlers.onError?.(code);
+      if (TERMINAL_CODES.has(code) && !closedForGood) client.close();
+    },
     // A non-monotonic delta means our baseline can't be trusted — force a fresh
     // socket: the welcome it brings is the full resync. The caller still hears it.
     onDesync: (lastSeq, gotSeq) => {

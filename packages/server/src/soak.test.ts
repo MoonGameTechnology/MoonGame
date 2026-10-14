@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { applyDelta, visibleState, type Action, type GameData, type GameState } from '@void/shared-core';
 import { createDevMatch, loadShippedData } from './scenario';
@@ -24,41 +24,42 @@ function orbit(player: string, seq: number, to: 'near'): Action {
   };
 }
 
-/** Drive one client: connect, fire all its actions, and resolve with the state
- *  reconstructed from welcome + deltas once it has applied the delta carrying
- *  `untilSeq` (the globally-last action). */
+/** Drive one client: connect and fire all its actions, reconstructing its state from
+ *  welcome + deltas. The wire `seq` counts only this client's own messages, so there is
+ *  no «globally last» seq to wait for: `settle()` (called once the room has applied every
+ *  action) pings and resolves at the pong — every delta sent before it has been applied. */
 function runClient(
   url: string,
   player: string,
   actions: Action[],
-  untilSeq: number,
-): Promise<GameState> {
-  return new Promise<GameState>((resolve, reject) => {
+): Promise<{ settle(): Promise<GameState> }> {
+  return new Promise((resolveOpen, reject) => {
     const ws = new WebSocket(`${url}?player=${player}`);
     let state: GameState | null = null;
-    const timer = setTimeout(() => {
-      ws.terminate();
-      reject(new Error(`${player} did not converge`));
-    }, 15_000);
+    let onPong: (() => void) | null = null;
     ws.on('message', (data) => {
       const message = JSON.parse(String(data)) as ServerMessage;
       if (message.type === 'welcome') {
         state = message.state;
       } else if (message.type === 'delta' && state) {
         state = applyDelta(state, message.delta);
-        if (message.seq >= untilSeq) {
-          clearTimeout(timer);
-          const final = state;
-          ws.close();
-          resolve(final);
-        }
+      } else if (message.type === 'pong') {
+        onPong?.();
       }
     });
+    const settle = (): Promise<GameState> =>
+      new Promise<GameState>((resolve) => {
+        onPong = () => {
+          ws.close();
+          resolve(state!);
+        };
+        ws.send(JSON.stringify({ type: 'ping' }));
+      });
     ws.on('open', () => {
       for (const action of actions) ws.send(JSON.stringify({ type: 'action', action }));
+      resolveOpen({ settle });
     });
     ws.on('error', (error) => {
-      clearTimeout(timer);
       reject(error instanceof Error ? error : new Error(String(error)));
     });
   });
@@ -79,13 +80,15 @@ describe('soak: concurrent clients converge on their authoritative view', () => 
     const server = createMultiplayerServer({ room });
     const url = await server.listen();
     try {
-      const finals = await Promise.all(
+      const clients = await Promise.all(
         players.map((player) => {
           const actions: Action[] = [];
           for (let k = 0; k < K; k++) actions.push(orbit(player, k, 'near'));
-          return runClient(url, player, actions, total);
+          return runClient(url, player, actions);
         }),
       );
+      await vi.waitFor(() => expect(room.sequence).toBe(total), { timeout: 15_000 });
+      const finals = await Promise.all(clients.map((c) => c.settle()));
 
       // Every action was applied exactly once, in a single serialized order.
       expect(room.sequence).toBe(total);

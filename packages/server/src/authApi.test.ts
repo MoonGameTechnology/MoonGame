@@ -228,8 +228,13 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
 });
 
 describe('SE-1.x · session gate on the match API', () => {
-  function gatedApp(): { server: FastifyInstance; users: MemoryUserStore } {
+  function gatedApp(): {
+    server: FastifyInstance;
+    users: MemoryUserStore;
+    joins: Parameters<MatchApiDeps['join']>[1][];
+  } {
     const users = new MemoryUserStore();
+    const joins: Parameters<MatchApiDeps['join']>[1][] = [];
     app = Fastify();
     registerAuthApi(app, {
       users,
@@ -239,8 +244,13 @@ describe('SE-1.x · session gate on the match API', () => {
     });
     const deps: MatchApiDeps = {
       createMatch: () => Promise.resolve({ matchId: 'm1', seats: ['green', 'red'] }),
-      join: (matchId, { nick, accountId }) =>
-        Promise.resolve({ playerId: 'green', token: `join:${matchId}:${nick}:${accountId}` }),
+      join: (matchId, req) => {
+        joins.push(req);
+        return Promise.resolve({
+          playerId: 'green',
+          token: `join:${matchId}:${req.nick}:${req.accountId}`,
+        });
+      },
       // Mirrors production (main.ts / netserver.ts): signature verify THEN a live re-check
       // against the current password, so a reset revokes older sessions at the seat gate.
       identify: async (request) => {
@@ -251,8 +261,21 @@ describe('SE-1.x · session gate on the match API', () => {
       },
     };
     registerMatchApi(app, deps);
-    return { server: app, users };
+    return { server: app, users, joins };
   }
+
+  it('join hands the session password fingerprint to the token minting (pwfp binding)', async () => {
+    const { server, users, joins } = gatedApp();
+    const reg = await post(server, '/auth/register', { login: 'dave', password: 'longenough' });
+    const { token } = reg.json() as { token: string };
+    await server.inject({
+      method: 'GET',
+      url: '/matches/m1/join',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const user = await users.findUser('dave');
+    expect(joins.at(-1)?.pwfp).toBe(pwFingerprint(user!.passHash));
+  });
 
   it('join requires a session; the seat goes to the SESSION login, not a query nick', async () => {
     const { server } = gatedApp();

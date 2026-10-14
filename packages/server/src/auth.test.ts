@@ -34,6 +34,26 @@ describe('SE-2.1 · verifyJoinToken', () => {
     expect(result).toEqual({ ok: true, claim: { matchId: 'm1', playerId: 'green' } });
   });
 
+  it('round-trips the password fingerprint and rejects a malformed one', async () => {
+    const bound = { ...claim, pwfp: 'fp-abc' };
+    const token = await signJoinToken(bound, signCfg, { ttlSeconds: 300 });
+    expect(await verifyJoinToken(token, verifyCfg)).toEqual({ ok: true, claim: bound });
+    const nowSec = Math.floor(Date.now() / 1000);
+    const bad = await new SignJWT({
+      matchId: 'm1',
+      playerId: 'green',
+      accountId: 'acct-1',
+      pwfp: 7,
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'join+jwt' })
+      .setIssuer('void')
+      .setAudience('match')
+      .setIssuedAt(nowSec)
+      .setExpirationTime(nowSec + 300)
+      .sign(secret);
+    expect(await verifyJoinToken(bad, verifyCfg)).toEqual({ ok: false, code: 'E_AUTH' });
+  });
+
   it('rejects an alg=none token (no allowlist entry, and jose bans none)', async () => {
     const enc = (o: unknown): string => Buffer.from(JSON.stringify(o)).toString('base64url');
     const header = enc({ alg: 'none', typ: 'JWT' });
