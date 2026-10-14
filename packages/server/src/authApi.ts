@@ -96,6 +96,9 @@ export interface AuthApiDeps {
   now?: () => number;
   rateMax?: number;
   rateWindowMs?: number;
+  /** Shortest gap between two recovery mails to one account (default
+   *  `RECOVERY_COOLDOWN_MS`). Tests that exercise the queue pass 0. */
+  recoveryCooldownMs?: number;
   /** Test-only: cheaper scrypt cost. Production callers omit it (default cost). */
   scryptParams?: ScryptParams;
 }
@@ -142,6 +145,12 @@ function parseEmail(v: unknown): string | null | undefined {
 const RATE_MAX = 40;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_IPS = 10_000; // bounded tracker: oldest window evicted first
+
+/** One recovery mail per account per this window. The per-IP budget alone does not
+ *  protect a mailbox: requests from many addresses would each get their own budget and
+ *  all land in one inbox. A real user who lost the first mail waits a few minutes. */
+const RECOVERY_COOLDOWN_MS = 10 * 60_000;
+const RECOVERY_COOLDOWN_MAX = 10_000; // bounded tracker: oldest entry evicted first
 
 /**
  * Auth rate limit from the environment, for hosts that want to retune it (both do).
@@ -284,6 +293,9 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     // One worker and at most 64 waiting requests bound work during an SMTP outage.
     // This is best-effort process-local delivery; shutdown/full queue requires retry.
     const recoveryQueue: Array<{ email: string; locale?: string }> = [];
+    const cooldownMs = deps.recoveryCooldownMs ?? RECOVERY_COOLDOWN_MS;
+    /** Account → when its last recovery mail went out (insertion order = age). */
+    const lastMailed = new Map<string, number>();
     let recovering = false;
     let recoveryClosed = false;
     app.addHook('onClose', async () => {
@@ -297,6 +309,8 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
           try {
             const user = await deps.users.findUserByEmail(email);
             if (!user?.email || recoveryClosed) continue;
+            const sentAt = lastMailed.get(user.userId);
+            if (sentAt !== undefined && now() - sentAt < cooldownMs) continue;
             const token = await signReset(user.userId, pwFingerprint(user.passHash));
             const link = `${resetBaseUrl}/?reset=${encodeURIComponent(token)}`;
             await sendRecoveryMail({
@@ -305,6 +319,13 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
               locale,
               params: { link },
             });
+            // Only a delivered mail starts the cooldown: after a failed send the user may retry.
+            lastMailed.delete(user.userId);
+            lastMailed.set(user.userId, now());
+            if (lastMailed.size > RECOVERY_COOLDOWN_MAX) {
+              const oldest = lastMailed.keys().next().value;
+              if (oldest !== undefined) lastMailed.delete(oldest);
+            }
           } catch {
             /* keep the worker alive; never expose lookup/delivery failures or bearers */
           }
