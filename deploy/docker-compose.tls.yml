@@ -1,21 +1,27 @@
 # Void Dominion — TLS overlay (HTTPS-2.1). Public HTTPS/WSS via Caddy in front of the
 # game server, which drops its public port. Compose it WITH the base file:
 #
-#   DOMAIN=play.example.com SERVER_BIND=127.0.0.1 \
+#   DOMAIN=play.example.com \
 #     docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
 #
 # Prereqs: a domain whose A/AAAA record points at THIS host (Caddy needs :80/:443 to
 # prove ownership and fetch the cert — see deploy/Caddyfile).
 #
-# Why SERVER_BIND=127.0.0.1: the base publishes the server on ${SERVER_BIND:-0.0.0.0}.
-# Set it to loopback here so the plain HTTP port is reachable only from the host (curl,
-# debugging) and NEVER from the internet — Caddy is the sole public listener (:443).
-# Caddy still reaches the server over the compose network at server:8788 regardless.
+# The base publishes the server on ${SERVER_BIND:-0.0.0.0}; this overlay pins the plain
+# HTTP port to loopback (see `ports: !override` below), so it is reachable only from the
+# host (curl, debugging) and NEVER from the internet — Caddy is the sole public listener
+# (:443). Needs Docker Compose v2.24.4+ for `!override`.
 services:
   server:
     # Behind a proxy the server must trust X-Forwarded-* to see the real https scheme and
     # client host/IP (HTTPS-1.1). Only set here — a directly-exposed server ignores these
     # headers (a client could otherwise spoof its scheme/IP), which is the fail-secure default.
+    # The plain port is loopback-only here, whatever SERVER_BIND says: Caddy is the sole
+    # public listener and reaches the server over the compose network at server:8788.
+    # `!override` replaces the base file's port list instead of merging into it — a merge
+    # would keep the base `${SERVER_BIND:-0.0.0.0}` binding next to this one.
+    ports: !override
+      - '127.0.0.1:8788:8788'
     environment:
       TRUST_PROXY: '1'
       # Публичный путь знает свой домен, поэтому Origin-allowlist выводится из него и

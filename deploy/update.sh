@@ -49,6 +49,10 @@ if [ -n "$STATE_DIR" ]; then
   LAST_GOOD="$STATE_DIR/last-good-image"
 fi
 
+# Учётка мигратора (`DB_MIGRATION_URL`, docs/security/zero-trust-rollout.md) лежит в
+# отдельном файле рядом с `server.env`, но игровому контейнеру не передаётся.
+MIGRATION_ENV="${MIGRATION_ENV:-$(dirname "$ENV_FILE")/migration.env}"
+
 # Подъём стека на подписанном образе. На хосте автодеплоя — тем же stack.sh, которым его
 # поднимает юнит после ребута: два разных способа собрать стек рано или поздно разъехались
 # бы, и перезагрузка поднимала бы не то, что выкатили.
@@ -85,6 +89,28 @@ restore_env() {
   echo "[*] server.env возвращён к состоянию до обновления." >&2
 }
 
+# Последнее значение ключа из server.env, без кавычек вокруг.
+env_value() {
+  [ -f "$ENV_FILE" ] || return 0
+  sed -n "s/^$1=//p" "$ENV_FILE" | tail -n 1 | sed -e 's/^["'"'"']//' -e 's/["'"'"']$//'
+}
+
+# Миграция схемы образом, который сейчас поднимется (SE-3.1). Сервер с
+# `DB_AUTO_MIGRATE=0` схему сам не меняет и при несовпадении отпечатка не стартует,
+# поэтому без этого шага каждое изменение схемы откатывало бы выкатку. При
+# `DB_AUTO_MIGRATE` по умолчанию (1) миграцию делает сам сервер — здесь ничего.
+migrate_db() {
+  [ "$(env_value DB_AUTO_MIGRATE)" = "0" ] || return 0
+  if [ ! -f "$MIGRATION_ENV" ]; then
+    echo "[✗] DB_AUTO_MIGRATE=0, а файла мигратора $MIGRATION_ENV нет (DB_MIGRATION_URL)." >&2
+    return 1
+  fi
+  echo "[*] Миграция схемы образом $1..."
+  docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --memory 512m --pids-limit 64 --network "${DB_NETWORK:-deploy_default}" \
+    --env-file "$MIGRATION_ENV" "$1" packages/server/dist/database-admin.mjs migrate
+}
+
 health_ok() {
   local i
   for ((i = 1; i <= HEALTH_TRIES; i++)); do
@@ -119,6 +145,11 @@ if [ -n "${VOID_IMAGE:-}" ]; then
 
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
+  if ! migrate_db "$VOID_IMAGE"; then
+    echo "[✗] Миграция не прошла — обновление ОТМЕНЕНО, сервер не тронут." >&2
+    restore_env
+    exit 1
+  fi
   release_up "$VOID_IMAGE"
 
   if health_ok; then
@@ -131,6 +162,8 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   restore_env
   if [ -n "$PREV_IMAGE" ]; then
     echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
+    # Порядок отката из runbook: мигратор прежнего образа, потом прежний сервер.
+    migrate_db "$PREV_IMAGE" || echo "[!] Миграция прежним образом не прошла." >&2
     release_up "$PREV_IMAGE"
     health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
       || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2

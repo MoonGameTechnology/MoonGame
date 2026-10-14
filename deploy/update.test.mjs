@@ -19,7 +19,14 @@
 import { describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,7 +49,12 @@ function stub(binDir, name, body) {
  * `healthFailFirst` — сколько первых проверок `/health` считать провальными
  * (так тест доходит до отката, не дожидаясь реальных таймаутов).
  */
-function sandbox({ verifyExit = 0, healthFailFirst = 0, branch = 'playtest', serverEnv = '# stub\n' } = {}) {
+function sandbox({
+  verifyExit = 0,
+  healthFailFirst = 0,
+  branch = 'playtest',
+  serverEnv = '# stub\n',
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), 'void-update-'));
   const repo = join(root, 'repo');
   const deploy = join(repo, 'deploy');
@@ -64,8 +76,12 @@ function sandbox({ verifyExit = 0, healthFailFirst = 0, branch = 'playtest', ser
   const counter = join(root, 'health.count');
   writeFileSync(counter, '0');
 
-  stub(bin, 'git', `echo "git $*" >> "$LOG"
-if [ "$3" = "rev-parse" ]; then echo "${branch}"; fi`);
+  stub(
+    bin,
+    'git',
+    `echo "git $*" >> "$LOG"
+if [ "$3" = "rev-parse" ]; then echo "${branch}"; fi`,
+  );
   stub(
     bin,
     'docker',
@@ -218,6 +234,62 @@ describe('deploy/update.sh — путь подписанного образа', 
   });
 });
 
+describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRATE=0 (SE-3.1)', () => {
+  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:deadbeef';
+  const MIGRATE = 'database-admin.mjs migrate';
+
+  it('по умолчанию мигратор не запускается: схему меняет сам сервер', async () => {
+    const sb = sandbox();
+    const res = await runUpdate(sb, { VOID_IMAGE: IMAGE });
+
+    expect(res.code).toBe(0);
+    expect(sb.readLog()).not.toContain(MIGRATE);
+  });
+
+  it('мигрирует целевым образом ДО подъёма стека', async () => {
+    const sb = sandbox({ serverEnv: 'DB_AUTO_MIGRATE=0\n' });
+    writeFileSync(
+      join(sb.deploy, 'migration.env'),
+      'DB_MIGRATION_URL=postgres://m@postgres/void\n',
+    );
+    const res = await runUpdate(sb, { VOID_IMAGE: IMAGE });
+
+    expect(res.code).toBe(0);
+    const log = sb.readLog();
+    const migrate = log.indexOf(
+      `--env-file ${join(sb.deploy, 'migration.env')} ${IMAGE} packages/server/dist/${MIGRATE}`,
+    );
+    expect(migrate).toBeGreaterThan(-1);
+    expect(migrate).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
+  });
+
+  it('нет файла мигратора → выкатка отменена, стек не тронут', async () => {
+    const sb = sandbox({ serverEnv: 'DB_AUTO_MIGRATE="0"\n' });
+    const res = await runUpdate(sb, { VOID_IMAGE: IMAGE });
+
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain('migration.env');
+    expect(sb.readLog()).not.toContain(' compose');
+  });
+
+  it('откат мигрирует прежним образом перед его подъёмом', async () => {
+    const sb = sandbox({ serverEnv: 'DB_AUTO_MIGRATE=0\n', healthFailFirst: 1 });
+    writeFileSync(
+      join(sb.deploy, 'migration.env'),
+      'DB_MIGRATION_URL=postgres://m@postgres/void\n',
+    );
+    const prev = 'ghcr.io/moongametechnology/moongame@sha256:0ldimage';
+    writeFileSync(join(sb.repo, '.last-good-image'), `${prev}\n`);
+    const res = await runUpdate(sb, { VOID_IMAGE: IMAGE });
+
+    expect(res.code).toBe(1);
+    const log = sb.readLog();
+    const migratePrev = log.indexOf(`${prev} packages/server/dist/${MIGRATE}`);
+    expect(migratePrev).toBeGreaterThan(-1);
+    expect(migratePrev).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${prev}] compose`));
+  });
+});
+
 describe('install-ubuntu.sh — механизм обновления больше не копируется на диск', () => {
   const installer = readFileSync(INSTALLER, 'utf8');
 
@@ -364,9 +436,7 @@ describe('update.sh — добор недостающих ключей server.en
       .split(/\s+/);
     const installer = readFileSync(INSTALLER, 'utf8');
     for (const key of keys) {
-      expect(installer, `${key} нет в install-ubuntu.sh`).toMatch(
-        new RegExp(`^${key}=`, 'm'),
-      );
+      expect(installer, `${key} нет в install-ubuntu.sh`).toMatch(new RegExp(`^${key}=`, 'm'));
     }
   });
 });
