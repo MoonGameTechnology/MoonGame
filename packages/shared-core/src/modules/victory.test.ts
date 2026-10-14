@@ -993,3 +993,90 @@ describe('victory — боеприпас не войско', () => {
     expect(r.state.match.scores.p1).toMatchObject({ fleets: 1, units: 1 });
   });
 });
+
+
+describe('victory — fixed 2v2 sides', () => {
+  const kernel = createKernel([victoryModule]);
+  const config: MatchConfig = {
+    timeScale: 1, modeId: 'team_2v2', victory: { dominationPercent: 0, scoreLimit: 10_000 },
+  };
+  function sides(): GameState {
+    const state = baseState();
+    state.players = Object.fromEntries(['p1', 'p2', 'p3', 'p4'].map((id, i) =>
+      [id, { ...player(id), team: i < 2 ? 'A' : 'B' }]));
+    state.planets = {
+      A: planet('A', 'p1', { kind: 'planet' }), B: planet('B', 'p2', { kind: 'planet' }),
+      C: planet('C', 'p3', { kind: 'dead_world' }), D: planet('D', 'p4', { kind: 'dead_world' }),
+    };
+    // Deliberately conflicting treaties: victory must use the roster alone.
+    setStance(state, 'p1', 'p3', 'alliance');
+    setStance(state, 'p2', 'p4', 'alliance');
+    return state;
+  }
+
+  it('uses the persisted roster for elimination, including a defeated teammate', () => {
+    const state = sides();
+    state.planets.B!.owner = null;
+    state.planets.C!.owner = null;
+    state.planets.D!.owner = null;
+    const result = okAdvance(kernel.advanceTo(JSON.parse(JSON.stringify(state)), ctx(HOUR, config)));
+    expect(result.state.match).toMatchObject({
+      status: 'ended', reason: 'elimination', winners: ['p1', 'p2'], winner: 'p1',
+    });
+    expect(result.state.players.p2!.status).toBe('defeated');
+    expect(result.state.match.rewards!.p2!.xp).toBeGreaterThan(result.state.match.rewards!.p3!.xp);
+  });
+
+  it('uses the resolved config mode, not the persisted metadata, and preserves legacy rules', () => {
+    const state = sides();
+    state.planets.C!.owner = null;
+    state.planets.D!.owner = null;
+    state.modeId = 'standard';
+    expect(okAdvance(kernel.advanceTo(state, ctx(HOUR, config))).state.match.winners).toEqual(['p1', 'p2']);
+    state.modeId = 'team_2v2';
+    for (const modeId of [undefined, 'standard']) {
+      expect(okAdvance(kernel.advanceTo(state, ctx(HOUR, { ...config, modeId }))).state.match.status).toBe('ongoing');
+    }
+    for (const p of Object.values(state.players)) delete p.team;
+    setStance(state, 'p1', 'p2', 'alliance');
+    expect(okAdvance(kernel.advanceTo(state, ctx(HOUR, config))).state.match.status).toBe('ongoing');
+  });
+
+  it('adds fixed teammates for the score race, ignoring cross-team treaties', () => {
+    const result = okAdvance(kernel.advanceTo(sides(), ctx(HOUR, {
+      ...config, victory: { dominationPercent: 0, scoreLimit: 60 },
+    })));
+    expect(result.state.match).toMatchObject({ status: 'ended', reason: 'score', winners: ['p1', 'p2'] });
+  });
+
+  it('keeps the original team score threshold when a partner is eliminated', () => {
+    const state = sides();
+    state.planets.B!.owner = null; // A lone survivor cannot use the solo threshold.
+    const result = okAdvance(kernel.advanceTo(state, ctx(HOUR, {
+      ...config, victory: { dominationPercent: 0, scoreLimit: 40 },
+    })));
+    expect(result.state.players.p2!.status).toBe('defeated');
+    expect(result.state.match.status).toBe('ongoing'); // 50 < 40 × 2 × 0.7
+  });
+
+  it('counts domination by side and awards both members', () => {
+    const state = sides();
+    state.planets.E = planet('E', 'p1'); // team A: 3/5; individual p1: 2/5
+    const result = okAdvance(kernel.advanceTo(state, ctx(HOUR, {
+      ...config, victory: { dominationPercent: 0.6, scoreLimit: 10_000 },
+    })));
+    expect(result.state.match).toMatchObject({ status: 'ended', reason: 'domination', winners: ['p1', 'p2'] });
+  });
+
+  it('ranks sides at the session cap and preserves a tied result', () => {
+    const state = sides();
+    const cap = { ...config, victory: { ...config.victory, endsAt: HOUR } };
+    const result = okAdvance(kernel.advanceTo(state, ctx(HOUR, cap)));
+    expect(result.state.match).toMatchObject({ status: 'ended', reason: 'timeout', winner: 'p1', winners: ['p1', 'p2'] });
+    state.planets.C!.kind = 'planet';
+    state.planets.D!.kind = 'planet';
+    const tied = okAdvance(kernel.advanceTo(state, ctx(HOUR, cap)));
+    expect(tied.state.match).toMatchObject({ status: 'ended', reason: 'timeout', winner: null });
+    expect(tied.state.match.winners).toBeUndefined();
+  });
+});

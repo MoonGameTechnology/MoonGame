@@ -20,6 +20,11 @@ function signature(field: TerrainField, dpr: number): string {
   // Camera projection introduces roundoff at ~1e-12. Keep subpixel precision,
   // without treating a translated copy of the same province as new terrain.
   const q = (n: number): number => Math.round(n * 1e6);
+  // A tile fingerprint covers its world-space features AND the permitted fog mask.
+  // Camera placement is not content; width/height below decide when a sharper bake is
+  // needed, while gesture frames can keep the same drawing at a temporary scale.
+  if (field.environment) return ['environment', field.environment.tile.fingerprint,
+    dpr, q(b.width / b.height)].join('/');
   const point = (x: number, y: number): string =>
     `${q((x - b.x) / b.width)},${q((y - b.y) / b.height)}`;
   const polygon = (poly: TerrainField['poly']): string =>
@@ -40,7 +45,7 @@ function signature(field: TerrainField, dpr: number): string {
 /** A sharp raster of `field` in device pixels; `null` — it keeps none: real worlds keep their
  *  own wire renderers, and an oversized province is painted as vector instead. */
 function rasterSize(field: TerrainField, dpr: number, maxPixels: number): { width: number; height: number } | null {
-  if (field.kind === 'planet' || field.kind === 'empty' || field.kind === 'void_station') return null;
+  if (!field.environment && (field.kind === 'planet' || field.kind === 'empty' || field.kind === 'void_station')) return null;
   const width = Math.ceil((field.box.width + PAD * 2) * dpr);
   const height = Math.ceil((field.box.height + PAD * 2) * dpr);
   return width * height > maxPixels || width > 4096 || height > 4096 ? null : { width, height };

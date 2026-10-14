@@ -290,6 +290,20 @@ describe('REFM-212 — что уезжает в матч', () => {
     expect(screen.buildSetupConfig().seats).toHaveLength(2);
   });
 
+  it('2v2 shows fixed sides and follows the chosen starting world', async () => {
+    const { screen } = await boot();
+    screen.openSetup();
+    pickMap('team-2v2');
+    expect(screen.buildSetupConfig().seats.map((s) => s.team)).toEqual(['A', 'A', 'B', 'B']);
+    expect(el('setupslots').innerHTML).toContain('data-teamseat');
+    tap('setupmap', { 'data-cand': 'home_3' });
+    expect(screen.buildSetupConfig().seats.map((s) => [s.start, s.team])).toEqual([
+      ['home_3', 'B'], ['home_1', 'A'], ['home_2', 'A'], ['home_4', 'B'],
+    ]);
+    tap('setupslots', { 'data-teamseat': '1' });
+    expect(screen.buildSetupConfig().seats[1]!.team).toBe('A');
+  });
+
   it('занятый слот сохранения спрашивает о замене, а не стартует; песочница стартует сразу', async () => {
     cell.set(SOLO_SAVE_KEY, '{"v":1}');
     const { screen, env } = await boot();

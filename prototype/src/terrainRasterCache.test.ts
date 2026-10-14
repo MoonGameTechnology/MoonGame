@@ -16,6 +16,18 @@ const field = (dx = 0, dy = 0): TerrainField => ({
     [dx + 10, dy + 83],
   ],
 });
+const environmentField = (scale = 1, dx = 0, dy = 0, fingerprint = 'visible-v1'): TerrainField => ({
+  id: 'environment:0,0', kind: 'environment', color: '#95b8c5', phase: 0,
+  box: { x: dx, y: dy, width: 120 * scale, height: 90 * scale }, poly: [],
+  environment: {
+    tile: { id: '0,0', x: 0, y: 0, size: 256, box: { x: 0, y: 0, width: 120, height: 90 },
+      fingerprint, clipPolygons: [[[0, 0], [120, 0], [120, 90], [0, 90]]],
+      features: [{ id: 'storm', family: 'storm', color: '#80c4d5', detail: 'major',
+        paths: [{ points: [[5, 10], [60, 25], [110, 15]], closed: false, alpha: 0.3, width: 0.8 }] }],
+    },
+    projection: { scale, x: dx, y: dy },
+  },
+});
 function surfaces() {
   const strokes = vi.fn();
   const created: (EventTarget & { width: number; height: number })[] = [];
@@ -51,6 +63,46 @@ function surfaces() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('province raster cache', () => {
+  it('reuses environment geography across camera placement and sharpens after zoom', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    cache.draw(f.target, environmentField(), 2);
+    expect(f.strokes).toHaveBeenCalled();
+    f.strokes.mockClear();
+    cache.draw(f.target, environmentField(1, 178.273, -57.199), 2);
+    // Political/province metadata is irrelevant to a continuous tile's drawing.
+    cache.draw(f.target, { ...environmentField(), color: '#ff0000', phase: 0.5, poly: [[0, 0]] }, 2);
+    cache.draw(f.target, environmentField(2, 10, -5), 2, true);
+    expect(f.created).toHaveLength(1);
+    expect(f.strokes).not.toHaveBeenCalled();
+    expect(cache.pending).toBe(true);
+    expect(cache.owed(environmentField(2, 10, -5), 2)).toBe(488 * 368);
+    cache.beginFrame(1);
+    cache.draw(f.target, environmentField(2, 10, -5), 2);
+    expect(f.created).toHaveLength(2);
+    expect(cache.owed(environmentField(2, -80, 36), 2)).toBe(0);
+  });
+
+  it('invalidates edited terrain, roads or fog masks by tile fingerprint without showing stale pixels', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    cache.prepare(environmentField(), 1);
+    const edited = environmentField(1, 0, 0, 'visible-v2');
+    expect(cache.owed(edited, 1)).toBe(124 * 94);
+    cache.beginFrame(0);
+    f.strokes.mockClear();
+    cache.draw(f.target, edited, 1, true);
+    expect(cache.pending).toBe(true);
+    expect(f.created[0]!.width).toBe(0);
+    expect(f.drawImage).not.toHaveBeenCalled();
+    expect(f.strokes).not.toHaveBeenCalled();
+    cache.beginFrame(1);
+    cache.draw(f.target, edited, 1);
+    expect(f.created).toHaveLength(2);
+    expect(f.strokes).toHaveBeenCalled();
+    expect(cache.owed(edited, 1)).toBe(0);
+  });
+
   it('reuses pixels throughout a zoom and sharpens only after it settles', () => {
     const f = surfaces();
     const cache = new TerrainRasterCache();

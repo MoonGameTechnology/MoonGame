@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { makeTerrainField } from './holographicSurface';
+import { describe, expect, it, vi } from 'vitest';
+import { drawTerrainEnvironmentTile } from '../../packages/client/src/terrainEnvironmentDraw';
+import { drawTerrainField, makeTerrainField, type TerrainField } from './holographicSurface';
+
+vi.mock('../../packages/client/src/terrainEnvironmentDraw', () => ({ drawTerrainEnvironmentTile: vi.fn() }));
 
 const poly = [
   [0, 0],
@@ -66,5 +69,27 @@ describe('terrain presentation respects discovered geometry', () => {
       expect(Math.hypot((x - marker.x) / 140, (y - marker.y) / 100)).toBeGreaterThan(0.15 + radius / 100);
     }
     expect(marker).toEqual({ x: 33, y: 72 });
+  });
+
+  it('delegates complete environment tiles without a province clip or duplicate live pass', () => {
+    vi.mocked(drawTerrainEnvironmentTile).mockClear();
+    const field: TerrainField = {
+      ...makeTerrainField('C2R3', 'nebula', '#8877aa', poly, true)!,
+      environment: {
+        tile: { id: '0,0', x: 0, y: 0, size: 256, box: { x: 0, y: 0, width: 300, height: 300 },
+          clipPolygons: [poly], features: [], fingerprint: 'visible-v1' },
+        projection: { scale: 2, x: -10, y: 20 },
+      },
+    };
+    // No path/clip methods: the adapter must not clip the tile back to field.poly.
+    const g = { save: vi.fn(), restore: vi.fn() } as unknown as CanvasRenderingContext2D;
+    drawTerrainField(g, field, 0, false);
+    expect(drawTerrainEnvironmentTile).toHaveBeenCalledExactlyOnceWith(
+      g, field.environment!.tile, field.environment!.projection,
+    );
+    expect(g.restore).toHaveBeenCalledTimes(1);
+    drawTerrainField(g, field, 14000, true);
+    expect(drawTerrainEnvironmentTile).toHaveBeenCalledTimes(1);
+    expect(g.save).toHaveBeenCalledTimes(1);
   });
 });
