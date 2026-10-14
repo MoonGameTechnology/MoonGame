@@ -62,6 +62,7 @@ export const en: Record<string, string> = {
   "setup.network.create": "Create online game",
   "setup.network.creating": "Creating…",
   "setup.network.failed": "Could not create game",
+  "setup.network.quota": "You already have three games running. You can create a new one when one of them ends.",
   "setup.map": "Map",
   'setup.map.duel-1': '1 vs 1',
   'setup.map.ffa-4': 'FFA · 4 players',

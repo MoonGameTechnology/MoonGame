@@ -353,6 +353,8 @@ const createMatch = async (): Promise<CreatedMatch> => {
 };
 const matchApi: MatchApiDeps = {
   createMatch,
+  // Per-account create quota: running matches an account created through the route.
+  ongoingMatchIds: () => stores.store.ongoingMatchIds(),
   // ENTRY-1: `preferredSlot`/`preferredFaction` доезжают до резолвера и до состояния.
   // Раньше эта реализация принимала ТРИ параметра из пяти, объявленных `MatchApiDeps`, и
   // два последних молча роняла: функция с меньшим числом параметров совместима с более
