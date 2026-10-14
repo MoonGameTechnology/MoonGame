@@ -113,6 +113,18 @@ describe('POST /telemetry', () => {
     expect(lines[0]?.actor).toBeUndefined();
   });
 
+  it('counts devices active in the last five minutes', async () => {
+    let clock = 0;
+    const { post, stats } = setup({ now: () => clock });
+    await post(batch({ install: 'install-aaaa' }));
+    clock = 60_000;
+    await post(batch({ install: 'install-bbbb' }));
+    await post(batch({ install: 'install-aaaa', session: 'session-0002' }));
+    expect(stats().activeInstalls).toBe(2);
+    clock = 60_000 + 5 * 60_000 + 1;
+    expect(stats().activeInstalls).toBe(0);
+  });
+
   it('with an origin allowlist a foreign site is refused, our page and curl are not', async () => {
     const { post } = setup({ allowedOrigins: ['https://play.example'] });
     expect((await post(batch(), { origin: 'https://evil.example' })).statusCode).toBe(403);

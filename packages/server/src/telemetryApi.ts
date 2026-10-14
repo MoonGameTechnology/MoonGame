@@ -41,7 +41,13 @@ export interface TelemetryStats {
   /** Whole requests refused: bad envelope, foreign origin. */
   rejected: number;
   limited: number;
+  /** Installs that sent anything in the last {@link ACTIVE_WINDOW_MS}: devices online now. */
+  activeInstalls: number;
 }
+
+export const ACTIVE_WINDOW_MS = 5 * 60_000;
+/** Cap on tracked installs: a spray of fake ids must not grow memory without bound. */
+const ACTIVE_MAX = 10_000;
 
 const MINUTE = 60_000;
 const PER_IP = 30;
@@ -56,7 +62,17 @@ export function registerTelemetryApi(
   const ipLimited = slidingWindowIpLimiter({ now, max: PER_IP, windowMs: MINUTE });
   const installLimited = slidingWindowIpLimiter({ now, max: PER_INSTALL, windowMs: MINUTE });
   const globalLimited = slidingWindowIpLimiter({ now, max: GLOBAL, windowMs: MINUTE, maxIps: 1 });
-  const stats: TelemetryStats = { batches: 0, events: 0, droppedEvents: 0, rejected: 0, limited: 0 };
+  const stats = { batches: 0, events: 0, droppedEvents: 0, rejected: 0, limited: 0 };
+  // install → last accepted batch; insertion order = freshness (re-inserted on each batch).
+  const lastSeen = new Map<string, number>();
+  const activeInstalls = (): number => {
+    const since = now() - ACTIVE_WINDOW_MS;
+    for (const [id, at] of lastSeen) {
+      if (at >= since) break; // the rest are fresher
+      lastSeen.delete(id);
+    }
+    return lastSeen.size;
+  };
 
   const refuse = (reply: FastifyReply, code: number, error: string) => {
     if (code === 429) stats.limited += 1;
@@ -107,6 +123,12 @@ export function registerTelemetryApi(
           ...(ev.p ? { p: ev.p } : {}),
         });
       }
+      lastSeen.delete(batch.install);
+      lastSeen.set(batch.install, t);
+      if (lastSeen.size > ACTIVE_MAX) {
+        const oldest = lastSeen.keys().next().value;
+        if (oldest !== undefined) lastSeen.delete(oldest);
+      }
       stats.batches += 1;
       stats.events += batch.events.length;
       stats.droppedEvents += dropped;
@@ -114,5 +136,5 @@ export function registerTelemetryApi(
     },
   );
 
-  return () => ({ ...stats });
+  return () => ({ ...stats, activeInstalls: activeInstalls() });
 }

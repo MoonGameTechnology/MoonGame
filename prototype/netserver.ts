@@ -956,7 +956,16 @@ const server = createMultiplayerServer({
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary, one `curl` from the host.
-    app.get('/metrics/summary', async (req, reply) => (operator(req) ? metrics.summary() : reply.callNotFound()));
+    // PTM-2.3: plus the telemetry pipeline itself — is it flowing during a test? Aggregates only.
+    app.get('/metrics/summary', async (req, reply) =>
+      operator(req)
+        ? {
+            ...metrics.summary(),
+            journal: { match: matchLog.stats(), client: clientLog.stats() },
+            ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
+          }
+        : reply.callNotFound(),
+    );
     // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
     // derived from the live MetricsAggregator. Returns a compact status with
     // thresholds so a playtest host can `curl /metrics/health` and read a single
