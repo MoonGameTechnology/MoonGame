@@ -24,6 +24,13 @@ describe('configFromEnv', () => {
     const token = await cfg.signToken!('m-1', 'green');
     const result = await verifyJoinToken(token, cfg.auth!);
     expect(result).toEqual({ ok: true, claim: { matchId: 'm-1', playerId: 'green' } });
+
+    // The account's password fingerprint rides along, so a reset can revoke the token.
+    const bound = await cfg.signToken!('m-1', 'green', 'acct-1', 'fp-abc');
+    expect(await verifyJoinToken(bound, cfg.auth!)).toEqual({
+      ok: true,
+      claim: { matchId: 'm-1', playerId: 'green', accountId: 'acct-1', pwfp: 'fp-abc' },
+    });
   });
 
   it('honours AUTH_ISSUER / AUTH_AUDIENCE consistently across sign and verify', async () => {

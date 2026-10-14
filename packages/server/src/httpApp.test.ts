@@ -93,6 +93,31 @@ describe('SV-0.1 · HTTP app', () => {
     }
   });
 
+  it('/metrics is operator-only: a proxied stranger gets 404, the token holder reads it', async () => {
+    const token = 'm'.repeat(32);
+    const server = createMultiplayerServer({ room: createDevMatch(data), operatorToken: token });
+    const url = await server.listen();
+    try {
+      // Through a proxy the loopback peer is the proxy, not the operator.
+      const proxied = await fetch(`${httpBase(url)}/metrics`, {
+        headers: { 'x-forwarded-for': '203.0.113.7' },
+      });
+      expect(proxied.status).toBe(404);
+      expect(await proxied.text()).not.toContain('connections');
+      const wrong = await fetch(`${httpBase(url)}/metrics`, {
+        headers: { authorization: 'Bearer nope' },
+      });
+      expect(wrong.status).toBe(404);
+      const operator = await fetch(`${httpBase(url)}/metrics`, {
+        headers: { 'x-forwarded-for': '203.0.113.7', authorization: `Bearer ${token}` },
+      });
+      expect(operator.status).toBe(200);
+      expect(await operator.json()).toEqual({ matches: 1, connections: 0 });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('/ready flips to 503 while the server is draining', async () => {
     // A registry whose shutdown hangs until released — close() sets `draining` and then
     // awaits it, holding the HTTP server up (still listening) so we can probe mid-drain.

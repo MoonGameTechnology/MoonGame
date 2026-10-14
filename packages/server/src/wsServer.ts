@@ -17,6 +17,7 @@ import { serializeServerMessage, type ServerErrorCode } from './protocol';
 import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
 import { assetType } from './staticAssets';
+import { isOperatorRequest } from './operatorAccess';
 
 export interface MultiplayerServerOptions {
   securityAudit?: SecurityAudit;
@@ -65,6 +66,12 @@ export interface MultiplayerServerOptions {
    *  match and its `playerId` must be a seat in it. Absent ⇒ the dev `?player=`/`?nick=`
    *  handshake (the default for local dev, LAN playtests, and tests). */
   auth?: JoinTokenVerifyConfig;
+  /** Password freshness of a join token (under `auth`): the account's CURRENT password
+   *  fingerprint, or null when there is no such account (`currentPwfp` in authApi). When
+   *  set, a join token must carry `accountId` + `pwfp`, and `pwfp` must still match — a
+   *  token minted before a password reset is refused (401), like the session it came
+   *  from. A lookup error refuses too. Both hosts wire it whenever accounts exist. */
+  accountPwfp?: (accountId: string) => Promise<string | null>;
   /** Seat lock (REL-5) — protect the nick-login path without accounts. On a nick's
    *  FIRST join the server mints a random seat ticket, stores only its sha256 in the
    *  account store and hands the plaintext to that client in `welcome.seatTicket`;
@@ -107,6 +114,10 @@ export interface MultiplayerServerOptions {
    *  HTTPS — upgrade с `x-forwarded-proto`, отличным от `https` (в том числе без
    *  заголовка вовсе), отбивается 403. См. `forwardedHttps`. */
   trustProxy?: boolean;
+  /** `METRICS_TOKEN` for the operator-only `GET /metrics` (`operatorAccess.ts`): a bearer
+   *  with this token, or a direct loopback peer, reads it; anyone else gets a 404. Absent
+   *  ⇒ loopback only. */
+  operatorToken?: string;
 }
 
 export interface MultiplayerServerHandle {
@@ -413,8 +424,11 @@ export function createMultiplayerServer(
   });
   // Minimal ops metrics (OPS-0.1): AGGREGATE gauges only — live match count and total
   // connected sockets. No match ids (F-13). Richer per-match metrics / a Prometheus
-  // exposition are a later ops brick.
-  app.get('/metrics', async () => {
+  // exposition are a later ops brick. OPERATOR-ONLY, like `/metrics/*`: the live socket
+  // count, polled, tells an outsider when players come and go.
+  app.get('/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+    const view = { remoteAddress: request.raw.socket.remoteAddress, headers: request.headers };
+    if (!isOperatorRequest(view, options.operatorToken)) return reply.callNotFound();
     const ids = registry.ids();
     let connections = 0;
     for (const id of ids) connections += registry.get(id)?.peerCount ?? 0;
@@ -590,6 +604,8 @@ export function createMultiplayerServer(
         // Plaintext seat ticket minted THIS join (seat lock) — delivered once in
         // `welcome.seatTicket`; the server keeps only the hash.
         let mintedTicket: string | undefined;
+        // The password fingerprint the join token was checked against (auth + revocation only).
+        let stampedPwfp: string | undefined;
         if (auth) {
           // Authenticated handshake (SE-0.1): the join token is the SOLE identity —
           // `?player=`/`?nick=` are ignored so they can't bypass it. The token rides in
@@ -607,6 +623,16 @@ export function createMultiplayerServer(
           if (verified.claim.matchId !== matchId) {
             refuseUpgrade(403); // a token for a different match
             return;
+          }
+          // A password reset revokes sessions by fingerprint; the join token minted from
+          // such a session must die with it, not live out its TTL.
+          if (options.accountPwfp) {
+            const { accountId: owner, pwfp } = verified.claim;
+            if (!owner || !pwfp || (await options.accountPwfp(owner)) !== pwfp) {
+              refuseUpgrade(401);
+              return;
+            }
+            stampedPwfp = pwfp;
           }
           playerId = verified.claim.playerId;
           accountId = verified.claim.accountId;
@@ -702,6 +728,7 @@ export function createMultiplayerServer(
             mintedTicket,
             accountId,
             verifiedIdentity,
+            stampedPwfp,
           );
         });
       } catch {
@@ -734,6 +761,8 @@ export function createMultiplayerServer(
       /** Личность доказана рукопожатием (токен/билет) — только тогда комната разрешит
        *  перехватить занятое кресло. */
       verifiedIdentity = false,
+      /** The password fingerprint the join token was checked against (revocation only). */
+      stampedPwfp?: string,
     ) => {
       sockets.add(ws);
       alive.set(ws, true);
@@ -762,6 +791,23 @@ export function createMultiplayerServer(
         )
       ) {
         registry.retain?.(room.id); // keep the match resident while this socket is connected
+        // A password change that landed between the check above and `addPeer` swept the
+        // rooms before this socket was in one. Checked again now that it is registered: a
+        // change from here on finds it in the sweep, an earlier one shows up in the lookup.
+        const owner = accountId;
+        const lookup = options.accountPwfp;
+        if (stampedPwfp !== undefined && owner !== undefined && lookup) {
+          const stamped = stampedPwfp;
+          detach('повторная сверка пароля', (async () => {
+            let current: string | null;
+            try {
+              current = await lookup(owner);
+            } catch {
+              current = null; // the store failed: fail-secure, the session is not proven live
+            }
+            if (current !== stamped) room.evictAccount(owner, 'E_SESSION_REVOKED');
+          })());
+        }
         // ENTRY-3 (правило 6): место закрепляется не заявкой, а ПОПАДАНИЕМ НА КАРТУ —
         // `addPeer` вернул true, значит игрок принят и получил мир. До этого момента
         // заявка временная и истекает, иначе взявший место по ссылке и не пришедший
