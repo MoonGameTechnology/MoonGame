@@ -72,8 +72,11 @@ function seatTenures(matchLines) {
   for (const l of [...matchLines].sort((a, b) => a.t - b.t)) {
     const key = `${l.match}|${l.playerId}`;
     const list = map.get(key) ?? [];
-    if (l.kind === 'join' && l.actor) list.push({ actor: l.actor, from: l.t, to: Infinity });
-    else if (l.kind === 'leave' && list.at(-1)?.to === Infinity) list.at(-1).to = l.t;
+    if (l.kind === 'join' && l.actor) {
+      // A crash leaves no `leave`: a new join closes whatever tenure is still open.
+      if (list.at(-1)?.to === Infinity) list.at(-1).to = l.t;
+      list.push({ actor: l.actor, from: l.t, to: Infinity });
+    } else if (l.kind === 'leave' && list.at(-1)?.to === Infinity) list.at(-1).to = l.t;
     else continue;
     map.set(key, list);
   }
@@ -95,7 +98,7 @@ export function activity(clientLines, matchLines) {
   for (const l of clientLines) add(personOf(l), { t: l.t, e: l.e, p: l.p ?? {}, session: l.session });
   for (const l of matchLines) {
     if (l.kind !== 'action' || String(l.type ?? '').startsWith('seat.')) continue;
-    const held = tenures.get(`${l.match}|${l.playerId}`)?.find((x) => x.from <= l.t && l.t <= x.to);
+    const held = tenures.get(`${l.match}|${l.playerId}`)?.findLast((x) => x.from <= l.t && l.t <= x.to);
     if (held) add(held.actor, { t: l.t, e: l.ok ? 'action_ok' : 'action_rejected', p: l.code ? { code: l.code } : {} });
   }
   for (const list of byPerson.values()) list.sort((a, b) => a.t - b.t);
@@ -189,15 +192,23 @@ export function errors(clientLines) {
  *  between a person's sessions — the gap histogram is what picks the "gone" threshold. */
 export function sessions(clientLines) {
   const personOf = people(clientLines);
+  // A page load is one session per person on it: «Сменить командира» keeps the page
+  // (and its telemetry session id) but changes who plays.
   const bySession = new Map();
+  const pagePeople = new Map();
   for (const l of clientLines) {
-    const s = bySession.get(l.session) ?? { person: personOf(l), start: l.t, end: l.t, ms: 0 };
+    const person = personOf(l);
+    const key = `${l.session}|${person}`;
+    const s = bySession.get(key) ?? { page: l.session, person, start: l.t, end: l.t, ms: 0 };
     s.start = Math.min(s.start, l.t);
     s.end = Math.max(s.end, l.t);
     if (l.e === 'session_ended' && typeof l.p?.ms === 'number') s.ms = Math.max(s.ms, l.p.ms);
-    bySession.set(l.session, s);
+    bySession.set(key, s);
+    pagePeople.set(l.session, (pagePeople.get(l.session) ?? new Set()).add(person));
   }
   const list = [...bySession.values()];
+  // The page's own length belongs to the page, not to one of several people on it.
+  for (const s of list) if (pagePeople.get(s.page).size > 1) s.ms = 0;
   const lengths = list.map((s) => Math.max(s.ms, s.end - s.start) / 60_000);
   const perPersonDay = new Map();
   for (const s of list) {
