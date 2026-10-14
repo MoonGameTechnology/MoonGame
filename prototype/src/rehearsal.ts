@@ -141,7 +141,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'hero.uninstall': { heroId: 'hero:p1', moduleId: 'ion_engine' },
   'hero.unequip': { heroId: 'hero:p1', abilityId: 'scan' },
   'station.deploy': { planetId: 'home_p1' },
-  'seat.claim': { faction: 'missing-faction', scientists: [] },
   'building.construct': { planetId: 'home_p1', building: 'mine' },
   'building.upgrade': { planetId: 'home_p1', building: 'spaceport' },
   'unit.build': { planetId: 'home_p1', unit: 'cruiser', count: 1 },
@@ -217,6 +216,29 @@ async function waitFor(check: () => boolean, ms: number, label: string): Promise
   while (!check()) {
     if (Date.now() > deadline) throw new Error(label);
     await sleep(1);
+  }
+}
+
+/** Дождаться, пока комната затихнет: ни одной новой квитанции за `quietMs`. Приказ,
+ *  зафиксированный уже ПОСЛЕ сдвига часов, догоняет мир внутри себя, а соседу, который из
+ *  него ничего не видит, сервер этот догон не шлёт (дельта в тот же миг выдала бы время и
+ *  число чужих приказов) — его доносит следующий тик. Поэтому часы двигаются только в
+ *  тихой комнате: тогда догон делает тик, и его рассылка достаётся всем. */
+async function settle(
+  room: { readonly sequence: number },
+  ms: number,
+  quietMs = 30,
+): Promise<void> {
+  const deadline = Date.now() + ms;
+  let seen = room.sequence;
+  let since = Date.now();
+  while (Date.now() - since < quietMs) {
+    if (Date.now() > deadline) throw new Error('комната не затихла');
+    await sleep(1);
+    if (room.sequence !== seen) {
+      seen = room.sequence;
+      since = Date.now();
+    }
   }
 }
 
@@ -727,6 +749,20 @@ export async function runRehearsal(
           }
           driver.reschedule(); // действия могли запланировать новое — взвести под них
         }
+        // Ещё один удар сердца после последних приказов (см. `settle`): на живом сервере
+        // это секундный пульс, здесь его надо выстрелить руками, когда комната затихла.
+        await settle(room, options.timeoutMs);
+        clock.now += 1_000;
+        const beatDeadline = Date.now() + options.timeoutMs;
+        while (room.state.time < clock.now) {
+          if (timer.fn) {
+            const fire = timer.fn;
+            timer.fn = null;
+            fire();
+          }
+          await sleep(1);
+          if (Date.now() > beatDeadline) throw new Error('последний пульс не наступил');
+        }
       } finally {
         driver.stop();
       }
@@ -839,6 +875,7 @@ export async function runRehearsal(
         const orders = aiOrders(room.state, client.playerId).slice(0, options.botActionsPerHour);
         for (const order of orders) await client.send(order.type, order.payload);
       }
+      await settle(room, options.timeoutMs);
       clock.now += 2 * 3_600_000;
       // Довести мир, а не стрельнуть разок: пропущенный из-за фиксации тик оставил бы
       // спящей вкладке нечего догонять, и проверка позеленела бы на пустом месте.
@@ -879,9 +916,11 @@ export async function runRehearsal(
         options.timeoutMs,
       );
       const client = clients[i]!;
-      if (client.welcome.seq < expectedSequence || !room.state.fleets.p1_1) {
+      // Счётчик квитанций комнаты, а не `seq` из welcome: на проводе у каждого игрока свой
+      // счёт дельт, и о поднятом снапшоте он ничего не говорит.
+      if (room.sequence < expectedSequence || !room.state.fleets.p1_1) {
         throw new Error(
-          `restart did not restore the durable snapshot (minimum seq ${expectedSequence}, got ${client.welcome.seq})`,
+          `restart did not restore the durable snapshot (minimum seq ${expectedSequence}, got ${room.sequence})`,
         );
       }
       const expected = baseView(room.state, client.playerId, data);

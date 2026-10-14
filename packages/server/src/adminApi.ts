@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PlayerId } from '@void/shared-core';
 import type { Identity } from './matchApi';
+import type { UserStore } from './store';
 
 /**
  * ADM-1 — the operator's command surface over a live playtest: see who is actually
@@ -25,6 +26,10 @@ import type { Identity } from './matchApi';
  *    would have been less code and worse: it names nobody in the log, it cannot be
  *    revoked without a restart, and it has to be pasted into a browser to be used.
  *    A password reset revokes admin access for free, because it revokes the session.
+ *    The listed login is resolved to its account id ONCE, when the routes mount, and
+ *    authority is checked against that id: a listed login nobody holds yet (or one a
+ *    memory-store host forgot on restart) would otherwise go to whoever registers it
+ *    first. A login registered after the mount commands nothing until the next start.
  * 2. **Empty list ⇒ the routes DO NOT EXIST.** No admins configured is not «anyone
  *    may» and not «a 403 door»: nothing is mounted at all (fail-secure, invariant #4).
  *    A deployment that never sets `ADMIN_LOGINS` has no admin surface to attack.
@@ -72,6 +77,8 @@ export interface AdminApiDeps {
   identify(request: FastifyRequest): Promise<Identity | null>;
   /** Logins with command authority. Empty ⇒ nothing is mounted (decision 2). */
   admins: ReadonlySet<string>;
+  /** Account lookup that pins each listed login to its account id at mount (decision 1). */
+  users: Pick<UserStore, 'findUser'>;
   /** The match's seats, or null when there is no such match. */
   roster(matchId: string): Promise<AdminRoster | null>;
   /** Free `nick`'s seat in `matchId`: core action, store unbind, socket close. */
@@ -114,6 +121,22 @@ export function registerAdminApi(app: FastifyInstance, deps: AdminApiDeps): void
   // Decision 2: no admins ⇒ no admin surface. Not a 403 door — no door.
   if (deps.admins.size === 0) return;
 
+  // Decision 1: listed login → the account that holds it NOW. Not registered, or the
+  // store failed to answer ⇒ no entry, i.e. no authority (fail-secure): a later lookup
+  // could find whoever registered that login after the mount.
+  const pinned = (async () => {
+    const ids = new Map<string, string>();
+    for (const login of deps.admins) {
+      try {
+        const user = await deps.users.findUser(login);
+        if (user) ids.set(login, user.userId);
+      } catch {
+        /* no entry — see above */
+      }
+    }
+    return ids;
+  })();
+
   /** The calling admin, or null once the reply has been filled with the refusal. */
   const commander = async (
     request: FastifyRequest,
@@ -125,7 +148,10 @@ export function registerAdminApi(app: FastifyInstance, deps: AdminApiDeps): void
       void reply.send({ error: 'E_UNAUTHORIZED' as const });
       return null;
     }
-    if (!isAdmin(who.login, deps.admins)) {
+    const accountId = isAdmin(who.login, deps.admins)
+      ? (await pinned).get(who.login.toLowerCase())
+      : undefined;
+    if (accountId === undefined || accountId !== who.accountId) {
       void reply.code(403);
       void reply.send({ error: 'E_FORBIDDEN' as const });
       return null;

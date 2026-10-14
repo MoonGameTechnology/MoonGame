@@ -40,6 +40,8 @@
   и `steward.recall`; авто-истечение на `time.advanced` → событие `steward.expired`; читалка
   `stewardActive(state, playerId, now)` для серверного драйвера. Поле `Player.steward {posture, until}`
   (JSON-safe). Отказы `E_NO_PLAYER` / `E_BAD_POSTURE` / `E_BAD_UNTIL` / `E_STEWARD_LOCKED`.
+  Вахта не длиннее игровых суток от момента делегирования (`MAX_STEWARD_WATCH_MS`, steward 1.2.0;
+  панель предлагает 4/8/12 ч): `until` дальше — тот же `E_BAD_UNTIL`, бессрочного Хранителя нет.
 - **Гейт (данные + `tech-tree-roadmap.md`):** техно `ai_stewardship` — ветка `command`,
   `dayGate: 15`, `conditions: [has_scientist {branch: 'command'}]`, `unlocks.abilities: ['steward']`;
   учёный **«Куратор»** (`overseer`, ветка `command`). Учёный выбирается **до старта** в «Совете

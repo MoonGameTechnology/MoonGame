@@ -9,7 +9,7 @@ import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity'
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
-import { DEFAULT_MAP_ID, isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
@@ -78,6 +78,8 @@ import {
   registerLeaderboardApi,
   FriendService,
   liveSession,
+  currentPwfp,
+  revokeAccountConnections,
   configFromEnv,
   type AccountStore,
   type FriendStore,
@@ -92,6 +94,8 @@ import {
   kernel,
   data,
   networkSeats,
+  networkSeatPlan,
+  networkStartsOf,
   parseNetworkMatchMode,
   aiOrders,
   seatAiDecision,
@@ -441,7 +445,7 @@ async function createHostedMatch(
     newGame({
       mapId,
       ...(modeId !== undefined ? { modeId } : {}),
-      seats: networkSeats(isFrontier(mapId) ? 'ffa' : NETWORK_MODE, mapId),
+      seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
   // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
   // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
@@ -877,7 +881,11 @@ const server = createMultiplayerServer({
   // Accounts (SES-2.5): with AUTH on, the WS handshake requires a verified join token
   // (`?token=`) and ignores nick/ticket entirely — the token is minted by the join
   // route below, AFTER the session + entry-window checks passed.
-  ...(AUTH ? { auth: authCfg.auth } : {}),
+  // The join token is also bound to the account's password: after a reset the old one
+  // is refused here (and the reset itself closes the account's open sockets, below).
+  ...(AUTH
+    ? { auth: authCfg.auth, accountPwfp: (accountId: string) => currentPwfp(userStore, accountId) }
+    : {}),
   // TLS-2 (playtest-hardening): за https-прокси хост обязан уважать Origin-allowlist
   // (CSWSH) и реальные клиентские IP из X-Forwarded-For — без этой проводки env в
   // docker-compose ничего не включает, а per-IP rate-limit auth-роутов за прокси
@@ -893,6 +901,8 @@ const server = createMultiplayerServer({
   // This host is what the image runs, so it is the one that has to report it.
   version: buildVersion(process.env.GIT_SHA),
   ready: () => matchStore.ping?.() ?? Promise.resolve(true),
+  // `GET /metrics` is operator-only, like the `/metrics/*` routes below (same token).
+  ...(METRICS_TOKEN ? { operatorToken: METRICS_TOKEN } : {}),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
@@ -998,20 +1008,19 @@ const server = createMultiplayerServer({
         const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
         if (!room) return null;
         const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+        // The homeworld from the match's setup, never from live ownership (which would
+        // retell every capture and loss to whoever reads the layout).
+        const starts = networkStartsOf(room.state, NETWORK_MODE);
         return {
           mapId: room.state.mapId ?? 'nexus',
           ended: room.state.match.status === 'ended',
-          seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => {
-            // Find the start planet (owner === playerId, the homeworld).
-            const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
-            return {
-              playerId: p.id,
-              name: p.name,
-              faction: p.faction,
-              start: startPlanet?.id ?? null,
-              taken: taken.has(p.id),
-            };
-          }),
+          seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => ({
+            playerId: p.id,
+            name: p.name,
+            faction: p.faction,
+            start: starts[p.id] ?? null,
+            taken: taken.has(p.id),
+          })),
         };
       },
       entryOpen: (id) => registry.entryOpen(id),
@@ -1031,6 +1040,10 @@ const server = createMultiplayerServer({
         users: userStore,
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
+        // Новый пароль закрывает открытые игровые сокеты аккаунта во всех партиях.
+        onPasswordChanged: (accountId) => {
+          revokeAccountConnections(registry, accountId);
+        },
         // Плейтест на десять человек часто приходит с ОДНОГО адреса (общий Wi-Fi, NAT
         // оператора), а первый вход стоит двух запросов — поэтому потолок задаётся
         // окружением, а не только дефолтом (`AUTH_RATE_MAX`/`AUTH_RATE_WINDOW_MS`).
@@ -1092,6 +1105,7 @@ const server = createMultiplayerServer({
       registerAdminApi(app, {
         identify: identifySession,
         admins: ADMIN_LOGINS,
+        users: userStore,
         roster: async (id) => {
           const room = registry.get(id);
           if (!room) return null;
@@ -1146,7 +1160,10 @@ const server = createMultiplayerServer({
         // BF-30: `preferredFaction` decouples faction from the slot's start point —
         // the player picks a faction independently; the server overrides the seat's
         // default faction after assigning it.
-        join: async (id, { nick: login, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
+        join: async (
+          id,
+          { nick: login, accountId, pwfp, preferredSlot, preferredFaction, preferredScientists },
+        ) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
@@ -1186,7 +1203,7 @@ const server = createMultiplayerServer({
           if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
           return {
             playerId: seat.playerId,
-            token: await authCfg.signToken!(id, seat.playerId, accountId),
+            token: await authCfg.signToken!(id, seat.playerId, accountId, pwfp),
           };
         },
       });

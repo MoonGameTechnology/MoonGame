@@ -62,11 +62,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.uninstall': z.object({ heroId: id, moduleId: id }),
   // station.ts. `trail` — крепость на развилке этой тропы провинции `planetId` (FORT-6.1).
   'station.deploy': z.object({ planetId: id, trail: z.number().int().nonnegative().optional() }),
-  // seatClaim.ts (ENTRY-3). Оба поля необязательны: заявка без выбора законна —
-  // игрок берёт место с домом из расклада и пустым советом. Совет капается двумя
-  // и здесь, и в обработчике: схема режет явную чушь до редьюсера, обработчик
-  // остаётся самодостаточным (схема не строже handler'а — она его не заменяет).
-  'seat.claim': z.object({ faction: id.optional(), scientists: z.array(id).max(2).optional() }),
+  // seatClaim.ts (ENTRY-3): схемы у `seat.claim` НЕТ намеренно, как у `seat.confirm`.
+  // Заявку подаёт сервер во входе (`joinSeat.ts`), где дом сверяется со списком этого
+  // матча и с ростером AvA; от клиента она прошла бы мимо обеих сверок.
   // construction.ts
   'building.construct': z.object({ planetId: id, building: id }),
   'building.upgrade': z.object({ planetId: id, building: id }),

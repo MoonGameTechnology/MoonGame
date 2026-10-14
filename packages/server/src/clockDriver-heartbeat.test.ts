@@ -165,6 +165,31 @@ describe('clock driver · live-player heartbeat (NETA2-6)', () => {
     expect(clock.armed()).not.toBeNull(); // still beating
   });
 
+  it('a reschedule never pushes the pending wake later — a stream of actions cannot starve the beat', () => {
+    const clock = capturingClock();
+    let calls = 0;
+    const schedule = (fn: () => void, ms: number): unknown => {
+      calls += 1;
+      return clock.schedule(fn, ms);
+    };
+    let wall = 0;
+    const room = stubRoom({ peerCount: 1, next: null });
+    const driver = startClockDriver(asRoom(room), {
+      heartbeatMs: 1000,
+      now: () => wall,
+      schedule,
+      cancel: clock.cancel,
+    });
+    expect(calls).toBe(1); // beat due at wall 1000
+    for (wall = 100; wall < 1000; wall += 100) driver.reschedule(); // an order every 100 ms
+    expect(calls).toBe(1); // the 1000 deadline stands; restarting it would never let it fire
+    wall = 900;
+    room.next = 50; // an action scheduled something sooner than the pending beat (950 < 1000)
+    driver.reschedule();
+    expect(calls).toBe(2);
+    expect(clock.armed()!.ms).toBe(50); // re-armed EARLIER
+  });
+
   it('stops beating when the last peer leaves (reschedule with peerCount 0 → idle)', () => {
     const clock = capturingClock();
     const room = stubRoom({ peerCount: 1, next: null });

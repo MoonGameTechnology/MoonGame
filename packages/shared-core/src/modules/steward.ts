@@ -2,6 +2,7 @@ import type { GameData } from '../data/schemas';
 import type { GameModule } from '../kernel/module';
 import type { GameState, Player, PlayerId, StewardLogEntry } from '../state/gameState';
 import { isForkSite } from '../state/forkSite';
+import { MS_PER_DAY } from '../util/time';
 
 /**
  * Steward — "hand the seat to the AI while I sleep" (the automation pillar for a 24/7
@@ -38,6 +39,11 @@ export const STEWARD_LOSS_LIMIT = 0.35;
 /** SITREP journal cap (ST-2.4): the decision log is a bounded FIFO — a whole night
  *  of 2-hour ticks fits with room to spare, and state stays small (JSONB). */
 export const MAX_STEWARD_LOG = 50;
+
+/** Longest single watch, in game time: one game day from the moment of delegating —
+ *  twice the longest watch the panel offers (12 h). Past it the seat must be handed
+ *  over again, so «Хранитель» never becomes a permanent autopilot. */
+export const MAX_STEWARD_WATCH_MS = MS_PER_DAY;
 
 /** Hold-point cap (ST-2.1): 1–2 anchors per the roadmap — guarding is a focused
  *  order, not a blanket «держать всё» (that would make the autopilot too strong). */
@@ -125,7 +131,8 @@ export function stewardActive(
 export const stewardModule: GameModule = {
   id: 'steward',
   // 1.1.0: a fork-site fortress is no hold point; a station's fall frees its point (Codex on #1410).
-  version: '1.1.0',
+  // 1.2.0: a watch longer than `MAX_STEWARD_WATCH_MS` is refused (`E_BAD_UNTIL`).
+  version: '1.2.0',
   setup(api) {
     // Delegate the seat to the AI: posture + a game-time instant to hand control back.
     api.onAction('steward.delegate', (action, h) => {
@@ -136,7 +143,11 @@ export const stewardModule: GameModule = {
       if (!stewardUnlocked(player, h.ctx.data)) return h.reject('E_STEWARD_LOCKED');
       const payload = action.payload as { posture?: unknown; until?: unknown };
       if (!isPosture(payload.posture)) return h.reject('E_BAD_POSTURE');
-      if (typeof payload.until !== 'number' || payload.until <= h.ctx.now) {
+      if (
+        typeof payload.until !== 'number' ||
+        payload.until <= h.ctx.now ||
+        payload.until - h.ctx.now > MAX_STEWARD_WATCH_MS
+      ) {
         return h.reject('E_BAD_UNTIL');
       }
       player.steward = { posture: payload.posture, until: payload.until };

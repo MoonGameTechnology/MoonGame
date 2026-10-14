@@ -54,6 +54,18 @@ export async function liveSession(
   return claim;
 }
 
+/** The account's CURRENT password fingerprint, or null when there is no such account.
+ *  The WS handshake compares a join token's stamped `pwfp` against it, so a token minted
+ *  before a password reset no longer opens a socket. A store error propagates — the
+ *  caller refuses the handshake (fail-secure). */
+export async function currentPwfp(
+  users: Pick<UserStore, 'findById'>,
+  accountId: string,
+): Promise<string | null> {
+  const user = await users.findById(accountId);
+  return user ? pwFingerprint(user.passHash) : null;
+}
+
 export interface AuthApiDeps {
   users: UserStore;
   /** Mint a session token for an authenticated account (from serverConfig). `pwfp` binds
@@ -68,6 +80,12 @@ export interface AuthApiDeps {
   resetBaseUrl?: string;
   /** Required when recovery is enabled. Never logs reset bearers. */
   sendRecoveryMail?: RecoveryMailer;
+  /** Runs after a password change has been committed (today, `/auth/reset`): the host
+   *  closes the account's open game connections (`revokeAccountConnections`) — a session
+   *  revoked by the new password must not keep issuing orders over a socket it opened
+   *  earlier. Awaited before the response; a throw is logged and swallowed (the password
+   *  is already changed — failing the reset would only hide that from its owner). */
+  onPasswordChanged?(accountId: string): void | Promise<void>;
   /** Post-registration hook (e.g. the starter-arsenal grant, ARS-2), awaited before
    *  the 201 so the account's first read sees its grant. MUST be resilient: a throw
    *  is swallowed here (registration already succeeded — never fail it for a
@@ -350,6 +368,14 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       if (!(await deps.users.setPasswordIfCurrent(user.userId, expectedHash, passHash))) {
         void reply.code(401);
         return { error: 'E_AUTH' as const };
+      }
+      // Sessions are revoked by the fingerprint check; open sockets are not — close them.
+      if (deps.onPasswordChanged) {
+        try {
+          await deps.onPasswordChanged(user.userId);
+        } catch (err) {
+          request.log.error({ err }, 'password change: revoking connections failed');
+        }
       }
       // Reset IS a login: hand back a fresh session (stamped with the NEW password's
       // fingerprint, so it survives while every pre-reset session is now revoked).
