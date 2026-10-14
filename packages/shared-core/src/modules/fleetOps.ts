@@ -57,7 +57,10 @@ export const fleetOpsModule: GameModule = {
   // 1.11.0: чужой флот в слиянии, расколе и «Атаке» — `E_NO_FLEET`, а не `E_FORBIDDEN`:
   //         разница кодов подтверждала перебором id флот, скрытый туманом (A06).
   // 1.12.0: невидимая атакующему цель «Атаки» — `E_NO_FLEET`, как несуществующая (A06).
-  version: '1.12.0',
+  // 1.13.0: раскол, чьи записи «любой лоадаут» и «этот лоадаут» вместе просят больше
+  //         кораблей, чем есть, — `E_NOT_ENOUGH`: трюм уходящей половины больше не
+  //         считается по одному корпусу дважды.
+  version: '1.13.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -401,6 +404,10 @@ export const fleetOpsModule: GameModule = {
           st.count -= move;
           left -= move;
         }
+        // Записи «любой лоадаут» и «этот лоадаут» могут указывать на одни корабли: каждая
+        // по отдельности проходит проверку наличия выше, но вместе их не хватает. Без этого
+        // отказа превью трюма считало бы один корпус дважды.
+        if (left > 0) return h.reject('E_NOT_ENOUGH');
       }
       const keptLandingPreview: UnitStack[] = landing.map((st) => ({ ...st }));
       for (const [unit, n] of wantLanding) {

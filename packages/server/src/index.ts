@@ -30,6 +30,7 @@ export {
   type LazyRoomRegistryOptions,
   type LoadedMatch,
   type RoomRegistry,
+  revokeAccountConnections,
 } from './roomRegistry';
 export {
   registerBrowserApi,
@@ -84,6 +85,7 @@ export {
   registerAuthApi,
   liveSession,
   pwFingerprint,
+  currentPwfp,
   authRateFromEnv,
   type AuthApiDeps,
   type Mailer,

@@ -27,7 +27,6 @@ const CLIENT_ACTION_TYPES = [
   'hero.uninstall',
   'pve.boon',
   'station.deploy',
-  'seat.claim',
   'building.construct',
   'building.upgrade',
   'unit.build',
@@ -274,17 +273,17 @@ describe('SV-1.2 · action payload schemas', () => {
     expect(isValidActionPayload('pve.supply', {})).toBe(false);
   });
 
-  // Серверные действия места (`seatClaim.ts`, правила 6–8). Схемы у них нет НАМЕРЕННО:
-  // это и есть замок. Игрок не должен уметь закрепить за собой место в обход прихода
-  // на карту, отпустить чужое — и тем более выкинуть соседа властью администратора.
-  it('seat.confirm / seat.release / seat.kick — серверные, от клиента не принимаются', () => {
-    for (const type of ['seat.confirm', 'seat.release', 'seat.kick']) {
+  // Действия места (`seatClaim.ts`) — все серверные. Схемы у них нет НАМЕРЕННО: это и
+  // есть замок. Игрок не должен уметь закрепить за собой место в обход прихода на карту,
+  // отпустить чужое, выкинуть соседа властью администратора — и заявить место мимо входа:
+  // дом сверяется со списком ЭТОГО матча и с ростером AvA только во входе (`joinSeat.ts`).
+  it('seat.claim / seat.confirm / seat.release / seat.kick — серверные, от клиента не принимаются', () => {
+    for (const type of ['seat.claim', 'seat.confirm', 'seat.release', 'seat.kick']) {
       expect(isValidActionPayload(type, {})).toBe(false);
       expect(isValidActionPayload(type, { playerId: 'p1' })).toBe(false);
     }
-    // А заявка — клиентская, её принимать надо: иначе тест выше проходил бы и на
-    // сломанном реестре схем.
-    expect(isValidActionPayload('seat.claim', {})).toBe(true);
+    // Реестр схем при этом жив: иначе тест выше проходил бы и на пустом.
+    expect(isValidActionPayload('fleet.stop', { fleetId: 'f1' })).toBe(true);
   });
 
   it('H4-REVERT: division.* больше не client-submittable', () => {

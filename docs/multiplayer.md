@@ -362,8 +362,10 @@ serves a SEPARATE admin client at `/admin`: sign in with a normal account, see w
 each seat (callsign, confirmed, online), and take a seat back. The kicked player's socket
 closes with an `E_KICKED` frame instead of a silent drop, their empire stays on the map
 under the substitute AI, and the freed chair is claimable again — a newcomer who takes it
-inherits the empire. Every kick is logged with the admin's login. With `ADMIN_LOGINS`
-unset, none of those routes and no `/admin` page exist at all.
+inherits the empire. Every kick is logged with the admin's login. Each listed login is
+bound to its account id when the server starts; a login registered later commands nothing
+until the next start. With `ADMIN_LOGINS` unset, none of those routes and no `/admin` page
+exist at all.
 
 **Known constraints before this is "real" multiplayer** (see limitations below): auth and the
 action gate are opt-in (env-switched, default off for dev), identity is login+password (no

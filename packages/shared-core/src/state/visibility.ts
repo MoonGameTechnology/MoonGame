@@ -3,6 +3,7 @@ import { observedSwarm } from './swarmIntel';
 import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
+import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
@@ -21,6 +22,7 @@ import type {
   ScheduledEvent,
   SeenPatrol,
   SightRules,
+  TempLane,
   UnitStack,
 } from './gameState';
 
@@ -765,6 +767,46 @@ export interface VisibleView {
 }
 
 /**
+ * Чужой ЛИЧНЫЙ коридор героя (ступени 1–2) зрителю не показывается: ни сам лейн, ни
+ * ребро, которое он добавил в `links`. Пройти по нему зритель всё равно не может
+ * (`corridorVeto`), а видимый коридор заранее выдаёт, куда ударит чужой герой. Общий
+ * коридор (ступень 3) и коридор без героя (старое состояние) проходимы для всех, поэтому
+ * остаются на карте.
+ *
+ * `topology` — счётчик ВСЕХ открытий и закрытий, включая чужие, поэтому вместо него зритель
+ * получает отпечаток видимых ему коридоров. Клиенту он нужен только как ключ кэша дорог и
+ * меняется ровно тогда, когда меняются видимые ему `links`.
+ */
+function hideRivalCorridors(state: GameState, view: VisibleState, viewerId: PlayerId): void {
+  const lanes = state.tempLanes ?? [];
+  const shown = lanes.filter(
+    (l) => l.owner === viewerId || laneIsPublic(l) || l.heroId === undefined,
+  );
+  for (const lane of lanes) {
+    if (shown.includes(lane) || !lane.addedLink) continue;
+    const join = (l: TempLane): boolean =>
+      (l.from === lane.from && l.to === lane.to) || (l.from === lane.to && l.to === lane.from);
+    if (shown.some(join)) continue; // то же ребро держит видимый коридор
+    for (const [a, b] of [[lane.from, lane.to], [lane.to, lane.from]] as const) {
+      const planet = view.planets[a];
+      if (planet?.links) planet.links = planet.links.filter((id) => id !== b);
+    }
+  }
+  if (shown.length === 0) {
+    delete view.tempLanes;
+    delete view.topology;
+    return;
+  }
+  view.tempLanes = shown.map((l) => ({ ...l }));
+  const ids = shown.map((l) => l.id).sort();
+  let fp = 0x811c9dc5; // FNV-1a по id видимых коридоров
+  for (const ch of ids.join('\0')) {
+    fp = Math.imul(fp ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  }
+  view.topology = fp;
+}
+
+/**
  * `visibleState` plus the identify set behind it, from ONE coverage pass.
  * The broadcast path needs both (the view to diff, the set to fog-filter
  * events); computing them together halves the per-player coverage work.
@@ -930,13 +972,13 @@ function project(
     }
     if (Object.keys(view.diplomacyOffers).length === 0) delete view.diplomacyOffers;
   }
-  // Heroes are private: a viewer sees only their own (position + cooldowns). Temp
-  // lanes stay — they are public map topology (real `links`), visible to everyone.
+  // Heroes are private: a viewer sees only their own (position + cooldowns).
   if (view.heroes) {
     for (const id of Object.keys(view.heroes)) {
       if (view.heroes[id]?.owner !== viewerId) delete view.heroes[id];
     }
   }
+  hideRivalCorridors(state, view, viewerId);
   // Order chains and standing orders (`standingOrdersModule`'s `orders` / `autoAssault`,
   // and the prototype-style `forcedMarch`) are future intent — exactly what `scheduled`
   // is stripped for below. Keep only the entries of the viewer's OWN fleets; a map left

@@ -105,6 +105,28 @@ describe('session chat relay', () => {
     expect(msg.id).toMatch(/^chat:green:/);
   });
 
+  it("an id tells a reader nothing about talk they weren't sent", async () => {
+    // green whispers to red twice, then speaks to everyone. blue must not be able to count
+    // the whispers off the session message's id (a counter would read `chat:green:2`).
+    const room = makeRoom();
+    const g = new Peer();
+    const b = new Peer();
+    const r = new Peer();
+    room.addPeer('green', g);
+    room.addPeer('blue', b);
+    room.addPeer('red', r);
+    await room.receive('green', g, say('dm', 'one', 'red'));
+    await room.receive('green', g, say('dm', 'two', 'red'));
+    await room.receive('green', g, say('session', 'all'));
+    const seen = b.ofType('chat.msg').map((m) => m.message!.id);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatch(/^chat:green:[A-Za-z0-9_-]+$/);
+    expect(seen[0]!.split(':')[2]).not.toMatch(/^\d+$/);
+    // Still unique — the client dedupes by id.
+    const ids = g.ofType('chat.msg').map((m) => m.message!.id);
+    expect(new Set(ids).size).toBe(3);
+  });
+
   it('coalition reaches static-team allies and LIVE in-state alliances — never enemies', async () => {
     // green+blue allied through the diplomacy stance map (no static teams at all)
     const room = makeRoom({ alliance: ['green', 'blue'] });
