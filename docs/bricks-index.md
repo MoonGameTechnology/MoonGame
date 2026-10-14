@@ -1135,6 +1135,7 @@
 | PTM-3.1 | 🔒 | srv docs | `docs/playtest-telemetry-roadmap.md` | Хранение и удаление |
 | PTM-3.2 | 🔒 | srv proto | `docs/playtest-telemetry-roadmap.md` | Назначение экспериментов |
 | PTM-3.3 | 🔒 | srv ops | `docs/playtest-telemetry-roadmap.md` | Хранилище вместо файлов и дашборды |
+| PTM-3.4 | 🔒 | srv proto | `docs/playtest-telemetry-roadmap.md` | Пуш как канал возврата: замер с контролем |
 | PVE-0.1 | ✅ | core data | `docs/pve-team-modes-roadmap.md` | GameModeDef zod-схема + modes в GameData |
 | PVE-0.2 | ✅ | core srv | `docs/pve-team-modes-roadmap.md` | modeId в MatchConfig + консервация |
 | PVE-0.3 | ✅ | data | `docs/pve-team-modes-roadmap.md` | Пресет standard |
