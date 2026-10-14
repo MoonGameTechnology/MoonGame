@@ -45,7 +45,7 @@ import type {
 import type { GameData } from '../data/schemas';
 import { distance } from '../state/route';
 import { chaseRadius, chaseStep } from '../state/chase';
-import { fleetPositionAt } from '../state/fleetPosition';
+import { fleetNodeAt, fleetPositionAt } from '../state/fleetPosition';
 import { isMineFleet, mineFleetVisible } from '../state/minefields';
 import { isMissileFleet } from '../state/ordnance';
 import { isVisibleTo } from '../state/visibility';
@@ -1850,7 +1850,9 @@ export const shuttleModule: GameModule = {
   // 1.13.0: зональное ПВО тем же залпом бьёт видимые чужие мины в радиусе; снятая мина —
   //         `pd.mineCleared` (решение владельца 2026-10-13).
   // 1.14.0: невидимый игроку флот — не цель вылета (`E_NO_TARGET`, как несуществующий).
-  version: '1.14.0',
+  // 1.15.0: ПВО не тратит залп на мину при ракете в радиусе, бьёт мину с узла стрелка,
+  //         недобитая мина ставит `pd.reload` на конец перезарядки (замечания Codex на #1626).
+  version: '1.15.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -2529,12 +2531,28 @@ export const shuttleModule: GameModule = {
      * как и челноки: иначе корабль с ПВО тралил бы невидимые мины, и ловушка перестала бы
      * работать. Только враждебную (`isHostile`): мину союзника не трогают. Залп один на все
      * цели, перезарядка общая — мина не уводит залп в сторону от идущего налёта.
+     *
+     * Мина ждёт, а ракета нет: пока враждебная ракета в радиусе, корабль мину не бьёт, иначе
+     * общая перезарядка ушла бы на мину, и ракета прошла бы ПВО (`rocketMines`) нетронутой
+     * (замечание Codex на #1626). Видимость мин считается один раз на хозяина ПВО, а не на
+     * каждый корабль. Уцелевшая мина ставит в расписание `pd.reload` на конец перезарядки:
+     * без игроков время идёт от события к событию, и следующего залпа иначе не было бы.
      */
     api.on('time.advanced', (_event, h: HandlerContext) => {
       const strikes = h.state.strikes ?? [];
       const data = h.ctx.data;
       const mines = Object.values(h.state.fleets).filter((f) => isMineFleet(f, data));
       if (strikes.length === 0 && mines.length === 0) return;
+      const missiles = mines.length > 0 ? Object.values(h.state.fleets).filter((f) => isMissileFleet(f, data)) : [];
+      const seenMines = new Map<string, Set<string>>();
+      const minesSeenBy = (owner: string): Set<string> => {
+        let seen = seenMines.get(owner);
+        if (!seen) {
+          seen = new Set(mines.filter((m) => mineFleetVisible(h.state, m, owner, data)).map((m) => m.id));
+          seenMines.set(owner, seen);
+        }
+        return seen;
+      };
       const cooldownMs = (PD_COOLDOWN_MINUTES / 60) * hourMs(h);
 
       for (const fleet of Object.values(h.state.fleets)) {
@@ -2551,11 +2569,22 @@ export const shuttleModule: GameModule = {
           const p = strikePosition(st, h.state, h.ctx.now);
           return !!p && distance(myPos, p) <= range;
         });
-        const mineTargets = mines.filter((m) => {
-          if (!h.state.fleets[m.id] || !isHostile(h, fleet.owner, m.owner)) return false;
-          const p = fleetPositionAt(h.state, m, h.ctx.now);
-          return !!p && distance(myPos, p) <= range && mineFleetVisible(h.state, m, fleet.owner, data);
-        });
+        const inRange = (f: Fleet): boolean => {
+          const p = fleetPositionAt(h.state, f, h.ctx.now);
+          return !!p && distance(myPos, p) <= range;
+        };
+        const missileNear = missiles.some(
+          (m) => !!h.state.fleets[m.id] && isHostile(h, fleet.owner, m.owner) && inRange(m),
+        );
+        const mineTargets = missileNear
+          ? []
+          : mines.filter(
+              (m) =>
+                !!h.state.fleets[m.id] &&
+                isHostile(h, fleet.owner, m.owner) &&
+                inRange(m) &&
+                minesSeenBy(fleet.owner).has(m.id),
+            );
         if (targets.length + mineTargets.length === 0) continue;
 
         const perTarget = pd / (targets.length + mineTargets.length);
@@ -2579,24 +2608,34 @@ export const shuttleModule: GameModule = {
             downed,
           });
         }
+        // Узел стрелка — и на дороге: позиционные хуки (сектор, ауры героя) пустую строку
+        // пропускают (замечание Codex на #1626).
+        const node = fleetNodeAt(h.state, fleet, h.ctx.now) ?? '';
         for (const mine of mineTargets) {
           const dealt = hookedDamage(h, perTarget, {
             phase: 'pointDefense',
-            location: fleet.location ?? '',
+            location: node,
             attacker: fleet.owner,
             defender: mine.owner,
             attackerFleet: fleet.id,
             defenderFleet: mine.id,
           });
-          applyDamageToSide(h, { kind: 'fleet', fleetId: mine.id }, dealt, data, mine.location ?? '', undefined, undefined, fleet.owner);
+          const at = fleetNodeAt(h.state, mine, h.ctx.now) ?? '';
+          applyDamageToSide(h, { kind: 'fleet', fleetId: mine.id }, dealt, data, at, undefined, undefined, fleet.owner);
           clearMine(h, fleet.owner, mine.id, 'pd.mineCleared');
         }
         fleet.pdCooldownUntil = h.ctx.now + cooldownMs;
+        if (mineTargets.some((m) => h.state.fleets[m.id])) {
+          h.schedule(fleet.pdCooldownUntil, 'pd.reload', { fleetId: fleet.id });
+        }
       }
       // Вылет, у которого не осталось машин, до цели не долетит. Без вылетов список не
       // заводится: залп по одним минам не должен дописывать в состояние пустой `strikes`.
       if (strikes.length > 0) h.state.strikes = strikes.filter((st) => st.units.length > 0);
     });
+    // Конец перезарядки ПВО у недобитой мины. Своей работы у события нет: оно лишь делит
+    // время, и залп выше срабатывает на своём `time.advanced` в эту минуту.
+    api.on('pd.reload', () => {});
 
     /**
      * ПЕРЕХВАТ (SHU-1.3) — вторая контрмера челнокам и единственная АКТИВНАЯ: своя

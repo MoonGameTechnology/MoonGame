@@ -248,7 +248,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '81'; // RALLY-1: точка сбора мира-верфи.
+export const MODULE_MANIFEST_VERSION = '82'; // Замечания Codex на #1626. Членство и порядок не
+// тронуты; `shuttle` 1.15.0 — ПВО не тратит залп на мину при враждебной ракете в радиусе,
+// недобитая мина ставит `pd.reload` на конец перезарядки. Партия на 81 добивала бы мину иначе.
+// export const MODULE_MANIFEST_VERSION = '81'; // RALLY-1: точка сбора мира-верфи.
 // Членство и порядок не тронуты; `auto-rally` 1.1.0 — новое действие `rally.point` и запись
 // `state.rallyPoints`: построенные корабли вылетают к точке, а не ложатся на орбиту.
 // export const MODULE_MANIFEST_VERSION = '80'; // ПВО по минам (решение владельца 2026-10-13).

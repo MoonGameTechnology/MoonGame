@@ -44,6 +44,12 @@ const data: GameData = parseGameData({
       traits: ['shuttle'],
       stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180, fuel: 4, rearmRounds: 2 },
     },
+    missile: {
+      faction: 'neutral',
+      domain: 'space',
+      stats: { hp: 12, attack: 0, defense: 0, speed: 0 },
+      traits: ['immobile', 'issued', 'missile'],
+    },
     // Корабль с зональным ПВО: радиус по умолчанию (120), залп 60.
     flak: { faction: 'x', domain: 'space', stats: { attack: 1, defense: 1, speed: 5, hp: 10, pointDefense: 60 } },
     // SM-3.7a: ракетная мина — тоже мина-отряд, у неё свой юнит.
@@ -304,6 +310,31 @@ describe('зональное ПВО бьёт чужую мину в радиус
 
   it('невидимую мину ПВО не находит: в радиусе 120, но дальше обзора 24', () => {
     const s0 = world([mine({ location: 'M' }, 3), flak('FLAK', 'p2', 'N')]); // 100 до мины
+    const r = step(s0);
+    expect(r.state.fleets.MINE?.units[0]?.count).toBe(3);
+    expect(r.state.fleets.FLAK!.pdCooldownUntil).toBeUndefined();
+  });
+
+  it('недобитую мину добивают по расписанию: следующий залп — в конце перезарядки', () => {
+    // 9 зарядов × 20 = 180 корпуса — три залпа по 60. Без игроков время идёт от события к
+    // событию: без `pd.reload` второй залп случился бы один раз за весь следующий час.
+    const s0 = world([mine({ location: 'M' }, 9), flak('FLAK', 'p2', 'M')]);
+    const first = step(s0);
+    expect(first.state.fleets.MINE?.units[0]?.count).toBe(6);
+    expect(first.state.scheduled.map((e) => e.type)).toContain('pd.reload');
+    const r = pd.advanceTo(first.state, ctx(2 * HOUR));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.fleets.MINE).toBeUndefined(); // залпы на 1:20 и 1:40
+    expect(r.state.scheduled.map((e) => e.type)).not.toContain('pd.reload');
+  });
+
+  it('пока рядом враждебная ракета, мина ждёт: перезарядка остаётся для ракеты', () => {
+    const missile: Fleet = {
+      ...ships('MSL', 'p1', null, 1),
+      units: [{ unit: 'missile', count: 1 }],
+      flight: { from: { x: 0, y: 0 }, to: { x: 200, y: 0 }, departedAt: 0, arrivesAt: 10 * HOUR },
+    };
+    const s0 = world([mine({ location: 'M' }, 3), flak('FLAK', 'p2', 'M'), missile]);
     const r = step(s0);
     expect(r.state.fleets.MINE?.units[0]?.count).toBe(3);
     expect(r.state.fleets.FLAK!.pdCooldownUntil).toBeUndefined();
