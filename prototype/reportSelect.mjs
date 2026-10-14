@@ -28,20 +28,37 @@ export function listMatches(lines) {
 }
 
 /**
+ * The last summary of each server run in the file, in run order. A summary is a
+ * cumulative snapshot of ONE process: a restart within the UTC day starts the next
+ * run's counters at zero, so only the last snapshot per run is its truth, and runs are
+ * reported side by side, not merged (percentiles of two runs don't add up). Old files
+ * carry no `run` — they were one run each.
+ */
+export function lastSummaries(lines) {
+  const byRun = new Map();
+  for (const l of lines) if (l.kind === 'summary') byRun.set(l.run ?? '', l.summary);
+  return [...byRun.values()];
+}
+
+/**
  * Lines for one match report.
  * - `match` given: that match's lines (+ process summaries, flagged as process-wide).
  * - none given and the file holds at most one match: every line, as before.
  * - none given and several matches: `{ choose: [...] }` — the caller lists them.
- * `summaryScope` says what the latency summary covers: the whole report (one match in
- * the file) or the whole server process (several matches share it).
+ * `summaryScope` says what the latency summary covers. Summaries are written by the
+ * server's one process-wide aggregator, which outlives matches and UTC days, so they
+ * are process-wide — except in an old per-run file (no `run` on its summaries) that holds
+ * a single match.
  */
 export function selectLines(lines, match) {
   const matches = listMatches(lines);
+  const daily = lines.some((l) => l.kind === 'summary' && l.run !== undefined);
+  const summaryScope = daily || matches.length > 1 ? 'process' : 'match';
   if (match === undefined) {
     if (matches.length > 1) return { choose: matches };
-    return { lines, summaryScope: 'match' };
+    return { lines, summaryScope };
   }
   if (!matches.some((m) => m.id === match)) return { missing: match, choose: matches };
   const picked = lines.filter((l) => l.match === match || l.kind === 'summary');
-  return { lines: picked, summaryScope: matches.length > 1 ? 'process' : 'match' };
+  return { lines: picked, summaryScope };
 }

@@ -13,7 +13,7 @@
 // the report falls back to the anomalous-only per-line entries with a caveat.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseReportArgs, selectLines } from './reportSelect.mjs';
+import { lastSummaries, parseReportArgs, selectLines } from './reportSelect.mjs';
 
 function newestLog() {
   const dir = 'playtest-logs';
@@ -79,7 +79,6 @@ const perf = []; // client_perf samples
 const timingsSeen = { submit: [], advance: [] }; // anomalous-only unless summary present
 let lobbyStartT = null;
 let end = null;
-let summary = null;
 
 const bump = (map, key, n = 1) => map.set(key, (map.get(key) ?? 0) + n);
 
@@ -124,9 +123,6 @@ for (const ev of lines) {
       break;
     case 'end':
       end = ev;
-      break;
-    case 'summary':
-      summary = ev.summary; // the aggregated truth: periodic + on shutdown, the last one wins
       break;
   }
 }
@@ -193,15 +189,20 @@ if (perf.length > 0) {
     );
   }
 }
-if (summary) {
+// The aggregated truth: the last periodic/shutdown summary of each server run.
+const summaries = lastSummaries(lines);
+if (summaries.length > 0) {
   if (picked.summaryScope === 'process') {
     out.push('  (задержки ниже — по всему серверному процессу, а не по одной партии)');
   }
-  out.push(`  submit    : ${msStat(summary.submitMs)}`);
-  out.push(`  advance   : ${msStat(summary.advanceMs)}`);
-  out.push(
-    `  broadcast : ${msStat(summary.broadcastMs)} · delta avg ${(summary.deltaBytes.avg / 1024).toFixed(2)}KB · max ${(summary.deltaBytes.max / 1024).toFixed(2)}KB`,
-  );
+  summaries.forEach((summary, i) => {
+    if (summaries.length > 1) out.push(`  запуск сервера ${i + 1} из ${summaries.length}:`);
+    out.push(`  submit    : ${msStat(summary.submitMs)}`);
+    out.push(`  advance   : ${msStat(summary.advanceMs)}`);
+    out.push(
+      `  broadcast : ${msStat(summary.broadcastMs)} · delta avg ${(summary.deltaBytes.avg / 1024).toFixed(2)}KB · max ${(summary.deltaBytes.max / 1024).toFixed(2)}KB`,
+    );
+  });
 } else {
   const slow = timingsSeen.submit.length + timingsSeen.advance.length;
   out.push(
