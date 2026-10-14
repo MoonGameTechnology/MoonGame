@@ -666,6 +666,7 @@ function baseAiOrders(
   if (state.players[ai]!.npc === 'pirate') posture = 'expand';
   // NPC pirates replenish their own roster; ordinary and legacy seats retain theirs.
   const pirate = state.players[ai]!.faction === 'pirates';
+  const swarmInhabitant = state.players[ai]!.npc === 'swarm';
   // ОДИН РЕПЕРТУАР, РАЗНАЯ РУКА (заказ владельца 2026-09-28: «слабый бот тоже умный, но
   // менее шустрый и чаще ошибается»). Эвристики блока AI-BAL достаются ОБОИМ профилям
   // обычного места; слабость — это `WEAK_HANDICAP`, а не отсутствие умений. NPC (пираты,
@@ -682,9 +683,9 @@ function baseAiOrders(
   const cruiserLocked = technologiesUnlocking(data, 'unit', 'cruiser', state).some(
     (id) => !state.players[ai]!.technologies?.completed.includes(id),
   );
-  const lineUnit = pirate ? 'pirate_cruiser' : cruiserLocked ? 'frigate' : 'cruiser';
-  const scoutUnit = pirate ? 'pirate_skiff' : 'scout';
-  const militiaUnit = pirate ? 'pirate_boarder' : 'militia';
+  const lineUnit = pirate ? 'pirate_cruiser' : swarmInhabitant ? 'swarm_brood_mother' : cruiserLocked ? 'frigate' : 'cruiser';
+  const scoutUnit = pirate ? 'pirate_skiff' : swarmInhabitant ? 'swarm_relay_small' : 'scout';
+  const militiaUnit = pirate ? 'pirate_boarder' : swarmInhabitant ? 'swarm_lander' : 'militia';
   // Доктрина — ветка учёного совета места (`botDoctrine.ts`); у NPC совета нет.
   const doctrine = skilled
     ? seatDoctrine(scientistsOf(state.players[ai]), data.scientists, data.technologies)
@@ -1451,7 +1452,7 @@ function baseAiOrders(
     const techState = pl.technologies;
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
-    if ((skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
+    if (!swarmInhabitant && (skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
       const costOf = (id: string): Record<string, number> => data.technologies[id]?.cost ?? {};
       /** Чего не хватает на узел — с запасом `ORDER_RESERVE`, как у заказов войск. Прежний
        *  запас 60 на всё держал и микроэлектронику, а её у бота 40–150, и узлы второго
@@ -2570,7 +2571,9 @@ function baseAiOrders(
   }
   // Новая партия начинает только с разведчика: закрытые заказы ждут исследования.
   // Решение о доступности остаётся у ядра, включая войска десантного челнока и героев.
-  const available = state.techRules?.ruleset === 'main'
+  const available = swarmInhabitant
+    ? out.filter((a) => canOrder(state, a) === null)
+    : state.techRules?.ruleset === 'main'
     ? out.filter((a) => canOrder(state, a) !== 'E_TECH_LOCKED')
     : out;
   // Копилка доктрины: войска, которые тратят то, на что место копит узел ветки, ждут.

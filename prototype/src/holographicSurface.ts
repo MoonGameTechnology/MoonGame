@@ -2,6 +2,8 @@
 import { rgba } from '../../packages/client/src/holoDraw';
 import { holographicTheme as theme } from '../../packages/client/src/theme';
 import type { ProvincePolygon } from '../../packages/client/src/provinceSelection';
+import type { TerrainEnvironmentTile } from '../../decisions/terrainEnvironment';
+import { drawTerrainEnvironmentTile, type TerrainEnvironmentProjection } from '../../packages/client/src/terrainEnvironmentDraw';
 import type { HoloRect } from './holographicLayout';
 import { drawTerrainArt } from './holographicTerrainArt';
 
@@ -14,6 +16,8 @@ export interface TerrainField {
   phase: number;
   marker?: { x: number; y: number };
   asteroids?: readonly AsteroidRock[];
+  /** A complete world-space tile, independent of province ownership and camera placement. */
+  environment?: { tile: TerrainEnvironmentTile; projection: TerrainEnvironmentProjection };
 }
 
 interface AsteroidRock {
@@ -289,6 +293,15 @@ export function drawTerrainField(
   clock = 0,
   live = false,
 ): void {
+  if (field.environment) {
+    if (!live) {
+      g.save();
+      g.globalCompositeOperation = 'screen';
+      drawTerrainEnvironmentTile(g, field.environment.tile, field.environment.projection);
+      g.restore();
+    }
+    return;
+  }
   if (drawTerrainArt(g, field, clock, live)) return;
   // Actual celestial nodes retain their original wire renderers.
   if (field.kind === 'planet' || field.kind === 'empty' || field.kind === 'void_station') return;

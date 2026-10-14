@@ -16,11 +16,13 @@
  */
 import type { Planet } from '../../packages/shared-core/src/index';
 
-/** Последнее известное состояние мира: владелец, численность гарнизона, постройки. */
+/** Последнее известное состояние мира: владелец, гарнизон, постройки и среда. */
 export interface Snapshot {
   owner: string | null;
   garrison: number;
   buildings: Array<{ type: string; level: number }>;
+  /** Last identified physical environment; absent on older saved snapshots. */
+  environment?: { kind?: string; terrain?: string };
 }
 
 /** Снимок мира на момент опознания — копия, живое состояние за ним не тянется. */
@@ -29,6 +31,7 @@ export function snapshotOf(p: Planet): Snapshot {
     owner: p.owner,
     garrison: p.garrison.reduce((n, st) => n + st.count, 0),
     buildings: p.buildings.map((b) => ({ type: b.type, level: b.level })),
+    environment: { kind: p.kind, terrain: p.terrain },
   };
 }
 

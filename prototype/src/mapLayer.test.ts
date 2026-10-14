@@ -103,12 +103,12 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
       { id: 'p2', name: 'B', faction: 'crimson', start: game.START_CANDIDATES[1]!, ai: false },
     ],
   });
-  const env = { world, holo: !!opts.holo, lost: 0, fps: 60 };
+  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900 };
   const nodes = (await import('./mapCatalog')).mapNodesFromState(world);
   const camera = await import('./mapCamera');
   camera.initMapCamera({
-    vw: () => 1600,
-    vh: () => 900,
+    vw: () => env.width,
+    vh: () => env.height,
     mobile: () => false,
     console: () => false,
     world: () => env.world,
@@ -131,8 +131,8 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
     me: () => 'p1',
     nodes: () => nodes,
     ctx: () => frame.getContext() as CanvasRenderingContext2D,
-    vw: () => 1600,
-    vh: () => 900,
+    vw: () => env.width,
+    vh: () => env.height,
     dpr: () => 1,
     mobile: () => false,
     fps: () => env.fps,
@@ -380,6 +380,109 @@ describe('REFM-232 — статический слой карты', () => {
     expect(ml.roadDrawingOf(env.world)).toBe(next);
     ml.forgetMapArt();
     expect(ml.roadDrawingOf(env.world)).not.toBe(next);
+  });
+
+  it('памятная среда не читает изменённый скрытый тип даже при новой выпечке', async () => {
+    const { ml, fog, env } = await boot({ holo: true });
+    const hidden = Object.values(env.world.planets).find(p => !fog.known(p.id))!;
+    hidden.kind = 'nebula';
+    hidden.terrain = 'nebula';
+    fog.rememberScan([hidden.id]);
+    ml.blitStaticLayer(1000);
+    const geometry = ml.provinceGeometry!;
+    const environment = geometry.environment!;
+    expect(environment.tiles.length).toBeGreaterThan(0);
+    const index = geometry.nodes.findIndex(n => n.id === hidden.id);
+    expect(geometry.seeds[index]!.kind).toBe('nebula');
+    hidden.kind = 'graveyard';
+    hidden.terrain = 'graveyard';
+    const authoritative = structuredClone(env.world);
+    ml.blitStaticLayer(1016);
+    expect(ml.provinceGeometry).toBe(geometry);
+    ml.forgetMapBake();
+    ml.mapLayerForInput();
+    expect(ml.provinceGeometry!.environment).toBe(environment);
+    expect(ml.provinceGeometry!.seeds[index]!.kind).toBe('nebula');
+    expect(env.world).toEqual(authoritative);
+  });
+
+  it('чужой личный коридор не меняет ни видимые дороги, ни просветы в окружении', async () => {
+    const { ml, fog, env, home } = await boot({ holo: true });
+    const source = home('p1');
+    const target = Object.values(env.world.planets).find(p =>
+      p.id !== source.id && !source.links?.includes(p.id))!;
+    source.terrain = 'asteroid_field';
+    fog.rememberScan([source.id]);
+    ml.blitStaticLayer(1000);
+    const geometry = ml.provinceGeometry!;
+    const environment = geometry.environment!;
+    const roads = ml.roadDrawingOf(env.world);
+    expect(environment.tiles.length).toBeGreaterThan(0);
+    (source.links ??= []).push(target.id);
+    (target.links ??= []).push(source.id);
+    env.world.tempLanes = [{ id: 'private:p2', owner: 'p2', from: source.id, to: target.id,
+      speedBonus: 0.5, expiresAt: env.world.time + 100_000, addedLink: true, tier: 1, heroId: 'hero:p2' }];
+    env.world.topology = (env.world.topology ?? 0) + 1;
+    const authoritative = structuredClone(env.world);
+    ml.blitStaticLayer(1016);
+    expect(ml.roadDrawingOf(env.world).strokes).toEqual(roads.strokes);
+    expect(ml.roadDrawingOf(env.world).marks).toEqual(roads.marks);
+    expect(ml.provinceGeometry).toBe(geometry);
+    ml.forgetMapBake();
+    ml.mapLayerForInput();
+    expect(ml.provinceGeometry!.environment).toBe(environment);
+    expect(env.world).toEqual(authoritative);
+    // A publicly traversable corridor must appear, including its local calming.
+    env.world.tempLanes[0]!.tier = 3;
+    env.world.topology!++;
+    ml.blitStaticLayer(1032);
+    expect(ml.roadDrawingOf(env.world).strokes.length).toBeGreaterThan(roads.strokes.length);
+    expect(ml.provinceGeometry!.environment!.signature).not.toBe(environment.signature);
+  });
+
+  it('захват меняет политическую заливку, сохраняя ту же мировую среду и её растры', async () => {
+    const { ml, home } = await boot({ holo: true });
+    const mine = home('p1');
+    mine.terrain = 'asteroid_field';
+    ml.blitStaticLayer(1000);
+    const geometry = ml.provinceGeometry!;
+    const environment = geometry.environment!;
+    const fingerprints = environment.tiles.map(t => [t.id, t.fingerprint]);
+    expect(fingerprints.length).toBeGreaterThan(0);
+    mine.owner = 'p2';
+    ml.blitStaticLayer(1016);
+    expect(ml.provinceGeometry).not.toBe(geometry);
+    expect(ml.knownOwner(mine.id)).toBe('p2');
+    expect(ml.provinceGeometry!.environment).toBe(environment);
+    expect(ml.provinceGeometry!.environment!.tiles.map(t => [t.id, t.fingerprint])).toEqual(fingerprints);
+  });
+
+  it('зум и смена desktop на узкое окно не перемещают мировые формы и волну границ', async () => {
+    const { ml, env, camera, home } = await boot({ holo: true });
+    home('p1').terrain = 'dense_nebula';
+    ml.mapLayerForInput();
+    const original = ml.provinceGeometry!.environment!;
+    expect(original.tiles.length).toBeGreaterThan(0);
+    const points = (scene: typeof original) => scene.tiles.flatMap(tile => tile.features.map(f => ({
+      id: f.id,
+      paths: f.paths.map(path => path.points.map(([x, y]) => [
+        Math.round(x * 1e5) / 1e5, Math.round(y * 1e5) / 1e5,
+      ])),
+    })));
+    const boundaries = (scene: typeof original) => scene.clipPolygons.map(poly => poly.map(([x, y]) => [
+      Math.round(x * 1e5) / 1e5, Math.round(y * 1e5) / 1e5,
+    ]));
+    for (const view of [{ scale: 2.3, x: 47.25, y: -21.5, width: 1600, height: 900 },
+      { scale: 1, x: 0, y: 0, width: 390, height: 844 }]) {
+      env.width = view.width;
+      env.height = view.height;
+      camera.setView(view);
+      ml.forgetMapBake();
+      ml.mapLayerForInput();
+      const current = ml.provinceGeometry!.environment!;
+      expect(points(current)).toEqual(points(original));
+      expect(boundaries(current)).toEqual(boundaries(original));
+    }
   });
 });
 

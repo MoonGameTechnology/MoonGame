@@ -18,7 +18,7 @@
  * живут в `main.ts`; модуль получает их хуками {@link initMapLayer} — импорт оттуда был бы
  * циклом.
  */
-import type { GameState } from '../../packages/shared-core/src/index';
+import { visibleState, type GameState } from '../../packages/shared-core/src/index';
 import { projection as camProjection } from '../../packages/client/src/camera';
 import { clearHolographicSprites, rgba } from '../../packages/client/src/holoDraw';
 import { drawForkMark } from '../../packages/client/src/forkMark';
@@ -59,10 +59,12 @@ import {
   type PixelRect,
 } from '../../decisions/mapLayerView';
 import { forkMarks, roadStrokes, type ForkMark, type NetPoint } from '../../decisions/roadNetwork';
-import { terrainArtKind } from '../../decisions/terrainArt';
+import type { TerrainEnvironment } from '../../decisions/terrainEnvironment';
+import { projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { SECTOR_TYPES, type MapNode } from './game';
+import { data } from './gameData';
 import { glowOn, starfieldOn } from './graphicsPrefs';
 import { clipGlassSurface, drawGlassScreen, type TerrainField } from './holographicSurface';
 import { cam, insets, mapBounds, panBy, world } from './mapCamera';
@@ -156,6 +158,7 @@ let mapSpare = document.createElement('canvas');
 let mapSpareX = (mapContextOptions ? mapSpare.getContext('2d', mapContextOptions) : mapSpare.getContext('2d')) as CanvasRenderingContext2D;
 const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
 const terrainGeometry = new TerrainGeometryCache();
+const terrainEnvironment = new TerrainEnvironmentSceneCache();
 export const mapContextEvents = { lost: 0, restored: 0 };
 export const backgroundContextEvents = { lost: 0, restored: 0 };
 let mapLayerContent = ''; // content signature of the map-layer bake ('' — none or invalid)
@@ -254,12 +257,16 @@ for (const surface of [mapLayer, mapSpare])
  * сбрасывается вместе с геометрией карты. Там же рамка каждого штриха в координатах
  * карты: дорогу вне выпечки отсеивают, не проецируя ни одной её точки.
  */
-type RoadDrawing = { strokes: NetPoint[][]; boxes: Float64Array; marks: ForkMark[] };
-let roadDrawing: (RoadDrawing & { topology: number }) | null = null;
+type RoadDrawing = { strokes: NetPoint[][]; boxes: Float64Array; marks: ForkMark[]; topology: number };
+let roadDrawing: (RoadDrawing & { topology: number; sourceTopology: number; viewer: string }) | null = null;
 export function roadDrawingOf(state: GameState): RoadDrawing {
   const topology = state.topology ?? 0;
-  if (roadDrawing?.topology !== topology) {
-    const strokes = roadStrokes(state.planets);
+  const viewer = game?.me() ?? '';
+  if (roadDrawing?.sourceTopology !== topology || roadDrawing.viewer !== viewer) {
+    // In solo the host owns the authoritative state. Project secret hero corridors
+    // before they can influence either visible roads or the decorative clearings.
+    const permitted = state.tempLanes?.length && viewer ? visibleState(state, viewer, data) : state;
+    const strokes = roadStrokes(permitted.planets);
     const boxes = new Float64Array(strokes.length * 4);
     strokes.forEach((line, i) => {
       let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
@@ -271,7 +278,7 @@ export function roadDrawingOf(state: GameState): RoadDrawing {
       }
       boxes.set([x0, y0, x1, y1], i * 4);
     });
-    roadDrawing = { topology, strokes, boxes, marks: forkMarks(state.planets) };
+    roadDrawing = { topology: permitted.topology ?? 0, sourceTopology: topology, viewer, strokes, boxes, marks: forkMarks(permitted.planets) };
   }
   return roadDrawing;
 }
@@ -281,6 +288,7 @@ export function roadDrawingOf(state: GameState): RoadDrawing {
 export function forgetMapArt(): void {
   roadDrawing = null; // другая карта — другая сеть
   terrainGeometry.clear();
+  terrainEnvironment.clear();
   terrainRaster.clear();
 }
 
@@ -347,8 +355,8 @@ function mapLayerSignature(): string {
   }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
     // The roads: a hero's corridor lays new lanes mid-match. A scroll paints its strips with
     // the roads of the moment, so a bake that missed them would end at the strip's edge.
-    `|topo:${s.topology ?? 0}` +
-    `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
+    `|topo:${roadDrawingOf(s).topology}` +
+    `|environment:${JSON.stringify(MAP.map(n => terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id))))}`;
 }
 
 /** The sky under the map — backdrop art (or the fallback nebulae), grid and stars — in
@@ -411,6 +419,8 @@ interface ScreenRect {
 export interface MapLayerGeometry {
   /** The bake's space: map point `p` lies at `at.a·p + (at.x, at.y)` in it. */
   readonly at: MapProjection;
+  /** One permitted world-space scene, reused by the bake and all its exposed strips. */
+  environment: TerrainEnvironment | null;
   readonly lod: MapLod;
   readonly seeds: ProvinceSeed[];
   /** The province of `seeds[i]`. */
@@ -446,8 +456,9 @@ function measureMapLayer(): MapLayerGeometry {
   // would draw a different map than the one being played (provinceMap.ts, rule 1).
   // Вес семени — там же (REFM-61): растёт квадратично по масштабу, иначе карта
   // перекраивается при зуме.
+  const at = camProjection(cam, insets(), mapBounds());
   const nodes: MapNode[] = [];
-  const seeds = provinceSeeds(MAP, cam.scale, (n) => {
+  const seeds = provinceSeeds(MAP, at.a, (n) => {
     const p = s.planets[n.id];
     if (!p) return null;
     nodes.push(n);
@@ -455,7 +466,7 @@ function measureMapLayer(): MapLayerGeometry {
   });
   for (let i = 0; i < seeds.length; i++) {
     const id = nodes[i]!.id;
-    if (!known(id) && !memory.has(id)) seeds[i]!.kind = 'unknown';
+    seeds[i]!.kind = terrainKnowledge(s.planets[id], known(id), memory.get(id)).kind ?? 'unknown';
   }
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
@@ -485,7 +496,8 @@ function measureMapLayer(): MapLayerGeometry {
     boxes[i + 1] = shape.boxes[i + 1]! * place.scale + place.y;
   }
   return {
-    at: camProjection(cam, insets(), mapBounds()),
+    at,
+    environment: null,
     lod: currentMapLod(),
     seeds,
     nodes,
@@ -588,8 +600,8 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   const palette: TerritoryPalette = {
     ownerColor,
     neutralFill: COLOR.null!,
-    kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
-      : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
+    // Continuous terrain supplies geography; a kind wash would redraw cell seams.
+    kindAccent: () => undefined,
     hideOwnedInner: holographicMapOn(),
     provinceDetail: lod.provinceDetail,
     // M2.11: на голографической карте граница живёт, как рамка, — её рисует кадр, а не
@@ -627,30 +639,58 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
       });
   }
   const fields: TerrainField[] = [];
+  const roads = roadDrawingOf(s);
+  if (!geo.environment) {
+    const projection = geo.at;
+    geo.environment = terrainEnvironment.prepare({
+      seed: s.mapId ?? 'terrain',
+      cells: geo.shape.cells.map(cell => {
+        const n = geo.nodes[cell.idx]!;
+        return {
+          id: n.id,
+          ...terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id)),
+          poly: cell.poly.map(([x, y]): [number, number] => [
+            (x * geo.place.scale + geo.place.x - projection.x) / projection.a,
+            (y * geo.place.scale + geo.place.y - projection.y) / projection.a,
+          ]),
+        };
+      }),
+      roads: roads.strokes,
+      markers: [
+        ...geo.nodes.map(n => ({ x: n.x, y: n.y, kind: 'capture' as const })),
+        ...roads.marks.map(m => ({ ...m.at, kind: 'fork' as const })),
+      ],
+    });
+  }
+  // Large fields remain legible in overview and in the simplified renderer.
+  // Features belong to spatial tiles once; only the union of KNOWN territory clips them.
+  g.save();
+  g.globalAlpha *= Math.max(0.5, lod.art);
+  const reach = TERRAIN_PAD + 1;
+  const projection = { scale: at.a, x: at.x, y: at.y };
+  for (const tile of geo.environment.tiles) {
+    const field = projectTerrainTile(tile, projection);
+    const b = field.box;
+    if (b.x > view.x1 + reach || b.y > view.y1 + reach ||
+      b.x + b.width < view.x0 - reach || b.y + b.height < view.y0 - reach) continue;
+    fields.push(field);
+    if (!preparing) terrainRaster.draw(g, field, DPR, zooming);
+  }
+  g.restore();
+  // Rifts retain their exceptional local identity; ordinary environments use the field above.
   if (holographicMapOn() && lod.art > 0) {
     g.save();
     g.globalAlpha *= lod.art;
-    // A field's raster reaches past its box by its padding: cull by that reach, or a field
-    // just outside one paint would miss the edge pixels a later strip keeps from it.
-    const reach = TERRAIN_PAD + 1;
-    const x0 = view.x0 - reach;
-    const x1 = view.x1 + reach;
-    const y0 = view.y0 - reach;
-    const y1 = view.y1 + reach;
-    // Cells keep the map's order, so the fields overlap as they always did.
     for (let i = 0; i < geo.shape.cells.length; i++) {
-      // Cull by the province's box BEFORE constructing rock geometry.
       if (!meets(i, reach)) continue;
       const n = geo.nodes[geo.shape.cells[i]!.idx]!;
-      const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', cellPoly(geo, i),
-        known(n.id) || memory.has(n.id), inBake(n));
-      if (!field || field.box.x > x1 || field.box.y > y1 ||
-        field.box.x + field.box.width < x0 || field.box.y + field.box.height < y0) continue;
+      const visible = terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id));
+      if (visible.kind !== 'rift') continue;
+      const field = terrainGeometry.project(n.id, 'rift', sectorTypeOf(n.id)?.color ?? '#9fb6bd',
+        cellPoly(geo, i), visible.known, inBake(n));
+      if (!field) continue;
       fields.push(field);
-      if (preparing) continue; // prewarm these fields in bounded loading slices
-      // Reuse the last sharp bake through the gesture; sharpen in bounded slices
-      // once settled (`blitStaticLayer`), instead of redrawing vector strokes per tick.
-      terrainRaster.draw(g, field, DPR, zooming);
+      if (!preparing) terrainRaster.draw(g, field, DPR, zooming);
     }
     g.restore();
   }
@@ -674,7 +714,6 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   // грани. Какими отрезками её рисовать (каждый кусок один раз, прямая — только у лейна
   // без дороги) — чистое решение `decisions/roadNetwork.ts`; здесь проекция и отсев.
   const M = 1 + g.lineWidth;
-  const roads = roadDrawingOf(s);
   // The same frame in map units (the projection is a positive uniform scale), one pixel
   // wider: a road whose box misses it is dropped before a single point is projected.
   const pad = (M + 1) / at.a;
@@ -1178,14 +1217,11 @@ export function mapPreparationJobs(): PreparationJob[] {
       // The borders' detail by zoom is weighed once per shape: here, not on the first zoom out.
       if (holographicMapOn() && provinceGeometry) territoryGeometry.weighBorders(provinceGeometry.shape);
     } },
-    ...game.nodes().map(n => ({ label: t('map-loading.terrain'), run: () => {
-      // Prepare known geometry beyond the first screen, in cooperative loading
-      // slices. Unexplored provinces never enter either terrain cache.
-      const poly = provincePolygon(n.id);
-      if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, terrainArtKind(n.sector, game.world().planets[n.id]?.terrain),
-        sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
-      const field = terrainFields.find(f => f.id === n.id);
-      if (field) terrainRaster.prepare(field, game.dpr());
+    ...game.nodes().map((_, index, nodes) => ({ label: t('map-loading.terrain'), run: () => {
+      // A loading slice warms a bounded share of the scene tiles, rather than stamping
+      // a separate illustration into each province. No hidden material enters this list.
+      for (let i = index; i < terrainFields.length; i += nodes.length)
+        terrainRaster.prepare(terrainFields[i]!, game.dpr());
     } })),
     { label: t('map-loading.ready'), run: () => { bakeMapLayer(mapLayerSignature(), false); bgComposite = ''; } },
   ];

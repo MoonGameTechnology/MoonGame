@@ -6,6 +6,8 @@ export interface SoloIntel {
   owner: string | null;
   garrison: number;
   buildings: Array<{ type: string; level: number }>;
+  /** Last identified physical environment; absent on older saved snapshots. */
+  environment?: { kind?: string; terrain?: string };
 }
 export interface SoloSave {
   state: GameState;
@@ -64,7 +66,7 @@ export function parseSoloSave(raw: string | null, rules: string): SoloSave | nul
       !record(s.match) ||
       s.match.status !== 'ongoing' ||
       s.pve !== undefined ||
-      s.modeId !== undefined ||
+      (s.modeId !== undefined && s.modeId !== 'team_2v2') ||
       typeof s.mapId !== 'string'
     )
       return null;
@@ -85,6 +87,10 @@ export function parseSoloSave(raw: string | null, rules: string): SoloSave | nul
           record(x[1]) &&
           (x[1].owner === null || typeof x[1].owner === 'string') &&
           nonnegative(x[1].garrison) &&
+          (x[1].environment === undefined ||
+            (record(x[1].environment) &&
+              (x[1].environment.kind === undefined || typeof x[1].environment.kind === 'string') &&
+              (x[1].environment.terrain === undefined || typeof x[1].environment.terrain === 'string'))) &&
           Array.isArray(x[1].buildings) &&
           x[1].buildings.every(
             (b) => record(b) && typeof b.type === 'string' && nonnegative(b.level),

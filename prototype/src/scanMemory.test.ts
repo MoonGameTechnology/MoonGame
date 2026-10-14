@@ -11,6 +11,8 @@ const world = (id: string, over: Partial<Planet> = {}): Planet =>
     ...anyPlanet,
     id,
     owner: 'p2',
+    kind: 'planet',
+    terrain: 'nebula',
     garrison: [{ unit: 'militia', count: 3 }],
     buildings: [{ type: 'mine', level: 2, hp: 100 }],
     ...over,
@@ -25,6 +27,7 @@ describe('память разведки — снимок', () => {
       owner: 'p2',
       garrison: 3,
       buildings: [{ type: 'mine', level: 2 }],
+      environment: { kind: 'planet', terrain: 'nebula' },
     });
   });
 
@@ -47,6 +50,7 @@ describe('память разведки — снимок', () => {
       owner: 'p2',
       garrison: 0,
       buildings: [],
+      environment: { kind: 'planet', terrain: 'nebula' },
     });
   });
 });
@@ -76,6 +80,7 @@ describe('память разведки — что попадает внутрь
       owner: 'p3',
       garrison: 0,
       buildings: [{ type: 'mine', level: 2 }],
+      environment: { kind: 'planet', terrain: 'nebula' },
     });
   });
 });
@@ -94,7 +99,20 @@ describe('память разведки — снимок НЕ следует з�
       owner: 'p2',
       garrison: 3,
       buildings: [{ type: 'mine', level: 2 }],
+      environment: { kind: 'planet', terrain: 'nebula' },
     });
+  });
+
+  it('скрытая смена среды не меняет снимок до нового опознания', () => {
+    const mem = createScanMemory();
+    const live = world('A');
+    mem.remember(['A'], worlds(live));
+    live.kind = 'pirate_base';
+    live.terrain = 'asteroid_field';
+    mem.remember([], worlds(live));
+    expect(mem.get('A')!.environment).toEqual({ kind: 'planet', terrain: 'nebula' });
+    mem.remember(['A'], worlds(live));
+    expect(mem.get('A')!.environment).toEqual({ kind: 'pirate_base', terrain: 'asteroid_field' });
   });
 
   it('список построек в памяти — своя копия, живой массив её не трогает', () => {

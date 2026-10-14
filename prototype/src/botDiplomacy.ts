@@ -41,7 +41,7 @@ const DAY = 24 * 3_600_000;
 
 export const botDiplomacyModule: GameModule = {
   id: 'bot-diplomacy',
-  version: '0.1.0',
+  version: '0.2.0',
   setup(api) {
     // CONV-9: рынок ядра спрашивает эмбарго через капабилити, а не лезет в чужое
     // состояние. Владелец правила — этот модуль: счётчик расположения ботов живёт
@@ -119,6 +119,11 @@ export const botDiplomacyModule: GameModule = {
         const meter = approval[bot]!;
         for (const player of Object.keys(meter)) {
           if (h.state.players[player]?.status !== 'active') continue; // no grudges vs the dead
+          // A fixed teammate remains an ally even after counter-intelligence
+          // fallout; the favour meter cannot bypass the core declaration guard.
+          const side = h.state.players[bot]!.team;
+          if (h.ctx.config?.modeId === 'team_2v2' && side !== undefined &&
+              side === h.state.players[player]!.team) continue;
           const atWar = getStance(h.state, bot, player) === 'war';
           meter[player] = atWar
             ? Math.max(0, meter[player]! - FAVOUR_WAR_DECAY_PER_DAY * days)

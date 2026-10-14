@@ -1617,7 +1617,7 @@ function installMapGeometry(state: GameState): void {
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   frameMap(MAP);
   needMapPreparation();
-  for (const p of Object.values(state.players)) if (p.npc) COLOR[p.id] = p.npc === 'pirate' ? '#f17457' : '#b79bea';
+  for (const p of Object.values(state.players)) if (p.npc) COLOR[p.id] = p.npc === 'pirate' ? '#f17457' : p.npc === 'swarm' ? '#8eb858' : '#b79bea';
 }
 /** Sector-type def of a node. SECTOR_OF is total for the generated MAP, but the type
  *  can't promise that for an arbitrary id — fail-soft to undefined (callers `?.`). */
@@ -2926,6 +2926,7 @@ initMapSurface({
 function mapLabel(mapId: string | undefined): string {
   if (mapId === 'duel-1') return t('setup.map.duel-1');
   if (mapId === 'ffa-4') return t('setup.map.ffa-4');
+  if (mapId === 'team-2v2') return t('setup.map.team-2v2');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 
@@ -7391,7 +7392,7 @@ function startMatch(setup: SetupConfig, persist = true): void {
     const i = SEAT_META.findIndex((m) => m.id === seat.id);
     profiles.set(seat.id, (i >= 0 ? seatAiProfile(setupSlots[i]) : null) ?? 'weak');
   }
-  installMatch(st, profiles);
+  installMatch(st, profiles, st.modeId);
   applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
   // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
   // checkbox; remember the home world for the immortal-home toggle and show the opener.
@@ -8029,7 +8030,7 @@ initSoloCheckpoint({
   install: (save) => {
     leaveNetwork(); // схватка из сохранения — не сетевая партия: из сети той же дверью
     cameFromLink = false;
-    installMatch(save.state, new Map(save.ai));
+    installMatch(save.state, new Map(save.ai), save.state.modeId);
     restoreAutoAssault(save.autoAssault);
     restoreFogMemory(save.memory);
     applyTimeSpeed(save.normalSpeed, save.fastSpeed);

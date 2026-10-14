@@ -245,7 +245,12 @@ module.exports = {
   backLabel: () => t('side.summary.back'),
   dev: () => ({ active: sectorDevActive, fog: sandboxConfig.fog, reveal: vision === null }),
   finishDev: () => { s.match = { ...s.match, status: 'ended', winner: ME }; awardSectorRun(); tickRunSave(performance.now()); },
-  solo: () => ({ active: soloSaveActive, speed, save: currentSoloSave() }),
+  solo: () => ({ active: soloSaveActive, speed, mode: matchMode(), save: currentSoloSave() }),
+  breakTeam: () => {
+    const partner = Object.values(s.players).find(p => p.id !== ME && !p.npc && p.team === s.players[ME].team);
+    return order(s, { id: 'resume-team-guard', type: 'diplomacy.declare', playerId: ME,
+      issuedAt: s.time, payload: { target: partner.id, stance: 'war' } }, s.time).error;
+  },
   soloBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'solo-replace')),
   tutorial: startGuidedMatch,
   saveSolo: () => saveSolo(true),
@@ -315,6 +320,9 @@ if (soloBootCheck) {
     assert.deepEqual(JSON.parse(mod.exports.state()), expected.state);
     assert.deepEqual(mod.exports.solo().save.ai, expected.ai);
     assert.deepEqual(mod.exports.solo().save.memory, expected.memory);
+    assert.equal(mod.exports.solo().mode, expected.state.modeId, 'reload restores the resolved match mode');
+    if (expected.state.modeId === 'team_2v2')
+      assert.equal(mod.exports.breakTeam(), 'E_FORBIDDEN', 'fixed sides remain enforced after Continue');
     assert.equal(mod.exports.solo().speed, 0, 'reload resumes paused');
     for (let i = 0; i < 5 && rafCbs.length; i++) await rafCbs.shift()(performance.now());
     assert.equal(JSON.parse(mod.exports.state()).time, expected.state.time, 'no offline advancement');
@@ -517,7 +525,25 @@ assert.equal(storage.get('void.solo.v1'), beforeReplace, 'Back cancels replaceme
 await click('setupgo');
 await click('solo-replace-confirm');
 assert.equal(JSON.parse(storage.get('void.solo.v1')).payload.state.mapId, 'duel-1');
-for (const [checkpoint, extra] of [[soloCheckpoint, []], ['{broken', []], [soloCheckpoint, ['--player']]]) {
+// The authored team map is a normal saved skirmish too. Exercise its real start and
+// Continue callback, including restoration of the immutable-side rules in protoKernel.
+await click('tomenu');
+await click('hub-solo');
+selectMap('team-2v2');
+await click('setupgo');
+await click('solo-replace-confirm');
+assert.equal(JSON.parse(mod.exports.state()).mapId, 'team-2v2');
+assert.equal(mod.exports.solo().mode, 'team_2v2');
+for (let i = 0; i < 30 && rafCbs.length; i++) {
+  await rafCbs.shift()(performance.now());
+  frames++;
+}
+await click('tomenu');
+const teamCheckpoint = storage.get('void.solo.v1');
+assert.ok(teamCheckpoint);
+assert.equal(getEl('hub-solo-continue').disabled, false, 'team save is offered as resumable');
+for (const [checkpoint, extra] of [[soloCheckpoint, []], ['{broken', []], [soloCheckpoint, ['--player']],
+  [teamCheckpoint, []], [teamCheckpoint, ['--player']]]) {
   const child = spawnSync(process.execPath, ['prototype/uitest.mjs', '--solo-boot-check', ...extra], {
     input: checkpoint, encoding: 'utf8', timeout: 120000,
   });

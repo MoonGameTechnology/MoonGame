@@ -5,17 +5,19 @@
  * geometry all flows through the pure camera helpers, so both surfaces can share one map.
  *
  * Reads a `GameState` (positions + lane graph live inside `state.planets`; ownership/fleets
- * in the live state) and paints, in z-order: the political territory fill (weighted Voronoi),
- * star lanes, holographic planet spheres coloured by owner with a floating type badge, and
- * fleets at their interpolated positions. Node sizes stay constant in screen px.
+ * in the live state) and paints, in z-order: continuous known terrain, the political
+ * territory fill (weighted Voronoi), roads, holographic planet spheres coloured by owner
+ * with a floating type badge, and fleets at interpolated positions. Node sizes stay
+ * constant in screen px.
  */
 import { drawFleetCount, fleetCountWidth } from './fleetCountBadge';
 import { emblemTally } from '../../../decisions/fleetTally';
 import { forkMarks, roadStrokes } from '../../../decisions/roadNetwork';
+import { buildTerrainEnvironment, type TerrainEnvironment } from '../../../decisions/terrainEnvironment';
 import { ambushOf } from '../../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from './forkMark';
 import { effectiveStats, fleetPositionAt, isForkSite, isMineFleet, isMissileFleet, type GameData, type GameState, type PlayerId } from '@void/shared-core';
-import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
+import { worldToScreen, fitTransform, inView, projection, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
 import { theme } from './theme';
@@ -26,9 +28,20 @@ import { drawShipShape } from './shipShapes';
 import { drawMineShape } from './mineShape';
 import { drawMissile } from './ordnanceView';
 import { mapLod, mapSpacing, drawSchematicNode } from './mapLod';
-import { TerritoryGeometryCache } from './territoryGeometry';
+import { placePoly, TerritoryGeometryCache, type ShapeCell, type ShapePlacement, type TerritoryShape } from './territoryGeometry';
+import { drawTerrainEnvironment } from './terrainEnvironmentDraw';
 
-const geometryCaches = new WeakMap<CanvasRenderingContext2D, TerritoryGeometryCache>();
+interface MapGeometry {
+  geometry: TerritoryGeometryCache;
+  shape?: TerritoryShape;
+  place?: ShapePlacement;
+  cells: ShapeCell[];
+  environmentKey?: string;
+  environment?: TerrainEnvironment;
+}
+// A single world snapshot per live canvas, released with that canvas. Camera changes and
+// ownership updates do not retain additional plans or rebuild the static environment.
+const geometryCaches = new WeakMap<CanvasRenderingContext2D, MapGeometry>();
 
 /** Seat colours in join order (cyan / red / amber / violet — the prototype's palette). */
 const OWNER_COLORS = ['#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff'] as const;
@@ -45,7 +58,7 @@ const KIND_ICON: Record<string, string> = {
   ion_storm: '⌁',
   solar_flare: '✸',
 };
-/** Sector-kind accent tints (the faint terrain wash under the owner fill). */
+/** Sector-kind accent tints for the floating type badge. */
 const KIND_COLOR: Record<string, string> = {
   planet: '#5fd0ff',
   dead_world: '#9fb0a8',
@@ -97,47 +110,83 @@ export function renderMap(
   // Площадка крепости на развилке (FORT-6.1) — не провинция: клетки мозаики и узла карты у
   // неё нет. Эта поверхность её пока не рисует вовсе (рисует прототип), но и провинцией в
   // точке развилки не покажет.
-  const planets = Object.values(state.planets).filter((p) => !isForkSite(p));
+  const planets = Object.values(state.planets).filter((p) => !isForkSite(p))
+    .sort((a, b) => a.id.localeCompare(b.id));
   const gap = mapSpacing(planets.map((p) => ({ id: p.id, ...p.position, links: p.links })));
   const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale, cam.scale);
   g.clearRect(vp.left, vp.top, vw - vp.left, vh - vp.top);
   drawSpaceBackdrop(g, vw, vh, cam.x, cam.y, true);
 
-  // Political territory — the weighted-Voronoi province fill (shared drawTerritory): every
-  // sector is a cell coloured by its owner (neutral a faint wash), so who-holds-what reads
-  // at a glance. Clipped to the map bounding box (+ padding) so it pans/zooms with the map.
+  // Build the mosaic in WORLD units. A screen-space weight that omits the fit scale makes
+  // a province change shape on window resize, and would move its cached terrain with it.
+  const screen = projection(cam, vp, bounds);
+  const at = { scale: screen.a, x: screen.x, y: screen.y };
   const padB = Math.max(40, (bounds.maxX - bounds.minX) * 0.05);
-  const tl = worldToScreen({ x: bounds.minX - padB, y: bounds.minY - padB }, cam, vp, bounds);
-  const br = worldToScreen({ x: bounds.maxX + padB, y: bounds.maxY + padB }, cam, vp, bounds);
   const clip: Array<[number, number]> = [
-    [tl.x, tl.y],
-    [br.x, tl.y],
-    [br.x, br.y],
-    [tl.x, br.y],
+    [bounds.minX - padB, bounds.minY - padB],
+    [bounds.maxX + padB, bounds.minY - padB],
+    [bounds.maxX + padB, bounds.maxY + padB],
+    [bounds.minX - padB, bounds.maxY + padB],
   ];
-  const W = 9000 * cam.scale * cam.scale; // size → weight (screen px²), zoom-consistent
   const seeds: TerritorySeed[] = [];
   for (const p of planets) {
-    const c = worldToScreen(p.position, cam, vp, bounds);
     seeds.push({
-      x: c.x,
-      y: c.y,
-      w: (p.size ?? 1) * W,
+      x: p.position.x,
+      y: p.position.y,
+      w: (p.size ?? 1) * 9000,
       owner: p.owner ?? null,
       kind: p.kind ?? 'planet',
     });
   }
+  const roads = roadStrokes(state.planets);
+  const forks = forkMarks(state.planets);
   if (seeds.length >= 2) {
-    let geometry = geometryCaches.get(g);
-    if (!geometry) { geometry = new TerritoryGeometryCache(); geometryCaches.set(g, geometry); }
+    let cache = geometryCaches.get(g);
+    if (!cache) {
+      cache = { geometry: new TerritoryGeometryCache(), cells: [] };
+      geometryCaches.set(g, cache);
+    }
+    const { shape, place } = cache.geometry.shape(seeds, clip, 1);
+    if (cache.shape !== shape || cache.place?.x !== place.x || cache.place.y !== place.y) {
+      cache.shape = shape;
+      cache.place = place;
+      cache.cells = shape.cells.map(cell => ({ ...cell, poly: placePoly(cell.poly, place) }));
+      cache.environmentKey = undefined;
+    }
+    const markers = [
+      ...planets.map(p => ({ ...p.position, kind: 'capture' as const })),
+      ...forks.map(f => ({ ...f.at, kind: 'fork' as const })),
+    ];
+    // visibleState physically removes kind/terrain from unknown cells. Only the permitted
+    // view is read here; its public topology cannot import an authoritative hidden type.
+    const environmentKey = JSON.stringify([
+      state.mapId, planets.map(p => [p.id, p.kind, p.terrain]), roads, markers,
+    ]);
+    if (cache.environmentKey !== environmentKey || !cache.environment) {
+      cache.environment = buildTerrainEnvironment({
+        cells: cache.cells.map(cell => {
+          const p = planets[cell.idx]!;
+          return { id: p.id, kind: p.kind, terrain: p.terrain, poly: cell.poly,
+            known: p.kind !== undefined || p.terrain !== undefined };
+        }),
+        roads, markers, seed: state.mapId ?? 'terrain',
+      });
+      cache.environmentKey = environmentKey;
+    }
+    drawTerrainEnvironment(g, cache.environment, at, lod.detail, {
+      x: vp.left, y: vp.top, width: vp.right - vp.left, height: vp.bottom - vp.top,
+    });
+    // The political wash and borders stay above geography. A kind-coloured per-cell wash
+    // would restore the administrative seams that the continuous environment removes.
     const cells = drawTerritory(g, seeds, clip, {
       ownerColor,
       neutralFill: NEUTRAL,
-      kindAccent: (kind) => KIND_COLOR[kind],
+      kindAccent: () => undefined,
       provinceDetail: lod.provinceDetail,
-    }, geometry.project(seeds, clip, cam.scale));
+    }, cache.cells.map(cell => ({ ...cell, owner: seeds[cell.idx]!.owner, kind: seeds[cell.idx]!.kind })),
+    { x0: vp.left, y0: vp.top, x1: vp.right, y1: vp.bottom }, at);
     const selected = cells.find((cell) => planets[cell.idx]?.id === opts.selected);
-    if (selected) drawProvinceSelection(g, selected.poly);
+    if (selected) drawProvinceSelection(g, placePoly(selected.poly, at));
   }
 
   // Roads (ROADS-4), over the territory fill: the road NETWORK the core flies fleets along —
@@ -148,7 +197,7 @@ export function renderMap(
   g.lineWidth = 0.7;
   g.strokeStyle = rgba(theme.cyan, 0.28 * lod.provinceDetail);
   g.beginPath();
-  for (const line of roadStrokes(state.planets)) {
+  for (const line of roads) {
     const pts = line.map((p) => worldToScreen(p, cam, vp, bounds));
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
@@ -161,7 +210,7 @@ export function renderMap(
   // Forks — a place, not a bend: standing on one catches everyone on its trail (ROADS-3).
   if (lod.provinceDetail > 0) {
     g.fillStyle = rgba(theme.cyan, 0.55 * lod.provinceDetail);
-    for (const mark of forkMarks(state.planets)) {
+    for (const mark of forks) {
       const c = worldToScreen(mark.at, cam, vp, bounds);
       if (inView(c, vw, vh, 6)) drawForkMark(g, c.x, c.y);
     }
