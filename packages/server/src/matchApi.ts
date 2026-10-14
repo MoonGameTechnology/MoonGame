@@ -54,6 +54,9 @@ export type JoinFailure = {
 export interface Identity {
   accountId: string;
   login: string;
+  /** The session's password fingerprint (present when `identify` is a live session
+   *  check). Stamped into the join token so a password reset revokes it too. */
+  pwfp?: string;
 }
 
 /** Что игрок принёс на вход: кто он и что выбрал на экране входа (ENTRY-2/3).
@@ -67,6 +70,8 @@ export interface JoinRequest {
   /** Ник места. На аутентифицированном пути — логин сессии, чужим им не назовёшься. */
   nick: string;
   accountId?: string | undefined;
+  /** Отпечаток пароля сессии — уходит в join-токен (см. `Identity.pwfp`). */
+  pwfp?: string | undefined;
   /** Выбранный стартовый мир (кресло). */
   preferredSlot?: string | undefined;
   /** Выбранный дом. */
@@ -279,6 +284,7 @@ function preferencesFrom(query: unknown): {
       const result = await deps.join(id, {
         nick: who.login,
         accountId: who.accountId,
+        pwfp: who.pwfp,
         ...preferencesFrom(request.query),
       });
       if ('error' in result) void reply.code(STATUS[result.error]);

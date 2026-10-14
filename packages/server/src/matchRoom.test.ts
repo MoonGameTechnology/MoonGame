@@ -79,6 +79,7 @@ function room(): MatchRoom {
     id: 'test-room',
     initialState: testState(),
     kernel: createKernel([renameModule]),
+    clientActionTypes: ['player.rename'],
     data: testData(),
     now: () => 10,
   });
@@ -90,6 +91,7 @@ describe('MatchRoom — player-action deny-list (AVA-8)', () => {
       id: 'ava-room',
       initialState: testState(),
       kernel: createKernel([renameModule]),
+      clientActionTypes: ['player.rename'],
       data: testData(),
       now: () => 10,
       // The AvA wire rule: the orchestrator owns this action type — players don't.
@@ -119,6 +121,75 @@ describe('MatchRoom — player-action deny-list (AVA-8)', () => {
     const result = await r.submitServerAction('p1', action('a2', 'p1', 'System'));
     expect(result.ok).toBe(true);
     expect(r.state.players.p1?.name).toBe('System');
+  });
+});
+
+describe('MatchRoom — bare path keeps to the gate catalog', () => {
+  // Host-issued types: a handler that would let the player name itself if it ever ran.
+  const HOST_TYPES = ['fleet.premiumRepair', 'pve.supply', 'arsenal.sync', 'seat.confirm'];
+  const hostModule: GameModule = {
+    id: 'host-only-test',
+    version: '1.0.0',
+    setup(api) {
+      for (const type of HOST_TYPES) {
+        api.onAction(type, (a, h) => {
+          h.state.players[a.playerId]!.name = type;
+        });
+      }
+    },
+  };
+  function defaultCatalogRoom(): MatchRoom {
+    // No `clientActionTypes` override — the shipped catalog (`CLIENT_ACTION_TYPES`) applies.
+    return new MatchRoom({
+      id: 'bare-room',
+      initialState: testState(),
+      kernel: createKernel([hostModule]),
+      data: testData(),
+      now: () => 10,
+    });
+  }
+
+  it.each(HOST_TYPES)('refuses host-issued %s from the wire with the gate code', async (type) => {
+    const r = defaultCatalogRoom();
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    const sent: Action = { id: 'w1', type, playerId: 'p1', issuedAt: 1, payload: {} };
+    await r.receive(
+      'p1',
+      p1,
+      JSON.stringify({ type: 'action', matchId: 'bare-room', action: sent }),
+    );
+    expect(p1.messages.at(-1)).toMatchObject({
+      type: 'rejection',
+      actionId: 'w1',
+      code: 'E_BAD_PAYLOAD',
+    });
+    expect(r.state.players.p1?.name).toBe('One'); // the reducer never saw it
+  });
+
+  it('refuses an unknown type the same way', async () => {
+    const r = defaultCatalogRoom();
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    await r.receive('p1', p1, JSON.stringify({ type: 'action', action: action('w2', 'p1', 'X') }));
+    expect(p1.messages.at(-1)).toMatchObject({
+      type: 'rejection',
+      actionId: 'w2',
+      code: 'E_BAD_PAYLOAD',
+    });
+  });
+
+  it('host-issued submits still reach the reducer', async () => {
+    const r = defaultCatalogRoom();
+    const sent: Action = {
+      id: 'srv:1',
+      type: 'pve.supply',
+      playerId: 'p1',
+      issuedAt: 1,
+      payload: {},
+    };
+    expect((await r.submitServerAction('p1', sent)).ok).toBe(true);
+    expect(r.state.players.p1?.name).toBe('pve.supply');
   });
 });
 
@@ -1545,6 +1616,9 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
 
   function lastEvents(peer: MemoryPeer): string[] {
     const last = peer.messages.at(-1) as { type: string; events?: { type: string }[] };
+    // A player who sees nothing of another's action gets no delta at all — the welcome
+    // is still their last message.
+    if (last.type === 'welcome') return [];
     expect(last.type).toBe('delta');
     return (last.events ?? []).map((e) => e.type);
   }
@@ -1646,6 +1720,130 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
   });
 });
 
+describe('MatchRoom — the wire does not time hidden actions', () => {
+  // `test.hoard` touches only the actor's treasury — fogged for everyone else.
+  const hoardModule: GameModule = {
+    id: 'hoard-test',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.hoard', (a, h) => {
+        const p = h.state.players[a.playerId]!;
+        p.resources.credits = (p.resources.credits ?? 0) + 1;
+      });
+      api.onAction('test.fail', (_a, h) => h.reject('E_NOPE'));
+    },
+  };
+  const hoard = (id: string, playerId = 'p2'): Action => ({
+    id,
+    type: 'test.hoard',
+    playerId,
+    issuedAt: 1,
+    payload: {},
+  });
+  function quietRoom(now: () => number = () => 10): MatchRoom {
+    return new MatchRoom({
+      id: 'quiet',
+      initialState: testState(),
+      kernel: createKernel([hoardModule, renameModule]),
+      clientActionTypes: ['test.hoard', 'test.fail', 'player.rename'],
+      data: testData(),
+      now,
+    });
+  }
+  const send = (r: MatchRoom, peer: MemoryPeer, playerId: string, a: Action) =>
+    r.receive(playerId, peer, JSON.stringify({ type: 'action', matchId: 'quiet', action: a }));
+
+  it("sends nothing to a player for another's hidden action or rejection", async () => {
+    const r = quietRoom();
+    const p1 = new MemoryPeer();
+    const p2 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    r.addPeer('p2', p2);
+    await send(r, p2, 'p2', hoard('h1'));
+    await send(r, p2, 'p2', hoard('h2'));
+    await send(r, p2, 'p2', { ...hoard('h3'), type: 'test.fail' });
+    expect(r.state.players.p2?.resources.credits).toBe(2);
+    expect(p1.messages.map((m) => m.type)).toEqual(['welcome']);
+    // The actor still hears about every one of its own orders.
+    expect(p2.messages.map((m) => m.type)).toEqual(['welcome', 'delta', 'delta', 'rejection']);
+  });
+
+  it("numbers each player's own deltas: the seq shows no gap for another's orders", async () => {
+    const r = quietRoom();
+    const p1 = new MemoryPeer();
+    const p2 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    r.addPeer('p2', p2);
+    for (const id of ['h1', 'h2', 'h3']) await send(r, p2, 'p2', hoard(id));
+    await send(r, p2, 'p2', { ...hoard('h4'), type: 'test.fail' });
+    await send(r, p1, 'p1', action('n1', 'p1', 'Uno'));
+    expect(r.sequence).toBe(5); // the room counts every receipt...
+    const seqs = (peer: MemoryPeer) => peer.messages.map((m) => ('seq' in m ? m.seq : null));
+    // ...the wire counts only what each player was sent.
+    expect(seqs(p1)).toEqual([0, 1]);
+    expect(seqs(p2)).toEqual([0, 1, 2, 3, 3, 4]); // …, the rejection, then p1's public rename
+    // A rejection carries the recipient's own count, never the room's.
+    await send(r, p1, 'p1', { ...hoard('f1', 'p1'), type: 'test.fail' });
+    expect(p1.messages.at(-1)).toMatchObject({ type: 'rejection', seq: 1 });
+  });
+
+  it('a visible change still goes out at once', async () => {
+    const r = quietRoom();
+    const p1 = new MemoryPeer();
+    const p2 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    r.addPeer('p2', p2);
+    await send(r, p2, 'p2', action('n2', 'p2', 'Renamed')); // names are public
+    expect(p1.messages.at(-1)).toMatchObject({
+      type: 'delta',
+      seq: 1,
+      delta: { changed: { players: { p2: { name: 'Renamed' } } } },
+    });
+  });
+
+  it('the catch-up a hidden action computed reaches the others on the next tick', async () => {
+    let wall = 10;
+    const r = quietRoom(() => wall);
+    const p1 = new MemoryPeer();
+    const p2 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    r.addPeer('p2', p2);
+    const welcome = p1.messages[0];
+    if (welcome?.type !== 'welcome') throw new Error('expected a welcome snapshot');
+    wall = 500;
+    await send(r, p2, 'p2', hoard('h1')); // advances the world to 500 inside the action
+    expect(p1.messages).toHaveLength(1);
+    wall = 1_500;
+    r.tick();
+    const delta = p1.messages.at(-1);
+    if (delta?.type !== 'delta') throw new Error('expected a delta');
+    expect(delta.seq).toBe(1);
+    const { signatures: _s, remembered: _r, ...core } = visibleView(r.state, 'p1', testData()).view;
+    expect(applyDelta(welcome.state, delta.delta)).toEqual(core);
+  });
+
+  it("a player's second socket resyncs the first: the baseline they share moved", async () => {
+    let wall = 10;
+    const r = quietRoom(() => wall);
+    const a = new MemoryPeer();
+    r.addPeer('p1', a);
+    r.addPeer('p2', new MemoryPeer());
+    wall = 500;
+    await send(r, new MemoryPeer(), 'p2', hoard('h1')); // moves the clock, sends p1 nothing
+    expect(a.messages.map((m) => m.type)).toEqual(['welcome']);
+    const b = new MemoryPeer();
+    r.addPeer('p1', b); // the welcome resets p1's baseline to the present
+    const welcome = b.messages[0];
+    const sync = a.messages.at(-1);
+    if (welcome?.type !== 'welcome' || sync?.type !== 'state') throw new Error('expected a resync');
+    expect(sync.state).toEqual(welcome.state);
+    // A desync reply resets the baseline too, so it reaches both sockets.
+    await r.receive('p1', a, JSON.stringify({ type: 'desync', matchId: 'quiet', seq: 0, hash: 'x' }));
+    expect(a.messages.at(-1)?.type).toBe('state');
+    expect(b.messages.at(-1)?.type).toBe('state');
+  });
+});
+
 describe('MatchRoom — host fog (hostFog)', () => {
   /** A host extension shaped like the prototype's bot favour ledger: one bot's opinion of
    *  every seat, in a top-level key the core projection does not know. */
@@ -1708,9 +1906,8 @@ describe('MatchRoom — host fog (hostFog)', () => {
     expect(welcomeOpinion(p1)).toEqual({ bot: { p1: 60 } });
 
     r.submitAction('p2', sour('a1', 'p2'));
-    const delta = p1.messages.at(-1);
-    if (delta?.type !== 'delta') throw new Error('expected a delta');
-    expect(delta.delta.meta?.opinion).toBeUndefined(); // the bot soured on p2: not p1's to see
+    // The bot soured on p2: not p1's to see — so p1 gets no delta at all for it.
+    expect(p1.messages.at(-1)?.type).toBe('welcome');
 
     r.submitAction('p2', sour('a2', 'p1'));
     const own = p1.messages.at(-1);
@@ -1734,6 +1931,10 @@ describe('MatchRoom — host fog (hostFog)', () => {
     ] as const) {
       r.submitAction('p2', sour(id, about));
       const delta = p1.messages.at(-1);
+      if (about === 'p2') {
+        expect(delta?.type).toBe('welcome'); // nothing p1 can see changed — nothing sent
+        continue;
+      }
       if (delta?.type !== 'delta') throw new Error('expected a delta');
       clientState = applyDelta(clientState, delta.delta);
       expect(hashState(clientState)).toBe(delta.hash);
