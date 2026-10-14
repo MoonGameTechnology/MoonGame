@@ -878,6 +878,13 @@ export class MemoryDropStore implements DropStore {
     return Promise.resolve();
   }
 
+  stepPity(accountId: string, hit: boolean, pityAfter: number): Promise<number> {
+    // Read and write with no await between them: one event-loop step is the atomicity.
+    const pity = this.pity.get(accountId) ?? 0;
+    this.pity.set(accountId, hit || pity + 1 >= pityAfter ? 0 : pity + 1);
+    return Promise.resolve(pity);
+  }
+
   addShards(accountId: string, delta: number): Promise<void> {
     this.shards.set(accountId, (this.shards.get(accountId) ?? 0) + delta);
     return Promise.resolve();

@@ -301,12 +301,29 @@ export class PostgresMetaMarket implements MetaMarket {
     if (!Number.isSafeInteger(price) || price < 1) return { ok: false, code: 'E_BAD_PRICE' };
     const id = randomUUID(),
       at = this.now();
-    const r = await this.pool.query<LotRow>(
-      `INSERT INTO meta_market_listings(id,seller_id,seller_login,item_id,price,created_at) SELECT $1,$2,$3,a.item_id,$4,$5 FROM arsenal a WHERE a.item_id=$6 AND a.account_id=$2 AND NOT a.soulbound AND a.form='instance' AND (SELECT count(*) FROM meta_market_listings WHERE seller_id=$2)<$7 ON CONFLICT DO NOTHING RETURNING *, (SELECT kind FROM arsenal WHERE item_id=$6), (SELECT form FROM arsenal WHERE item_id=$6), (SELECT def_id FROM arsenal WHERE item_id=$6), (SELECT grade FROM arsenal WHERE item_id=$6), (SELECT soulbound FROM arsenal WHERE item_id=$6), (SELECT durability FROM arsenal WHERE item_id=$6), (SELECT origin FROM arsenal WHERE item_id=$6), (SELECT acquired_at FROM arsenal WHERE item_id=$6)`,
-      [id, accountId, login, price, at, itemId, MAX_META_LISTINGS],
-    );
-    if (!r.rows[0]) return { ok: false, code: 'E_NOT_TRADABLE' };
-    return { ok: true, listing: fromRow(r.rows[0]) };
+    const c = await this.pool.connect();
+    try {
+      await c.query('BEGIN');
+      // Лимит лотов на продавца — подзапрос count(*) в том же INSERT. Без замка
+      // параллельные выставления одного продавца видят один и тот же счёт и все
+      // проходят: пачка запросов выставляла больше MAX_META_LISTINGS. Транзакционный
+      // advisory-замок по продавцу ставит их в очередь; чужие продавцы не ждут.
+      await c.query("SELECT pg_advisory_xact_lock(hashtext('meta_market_list'), hashtext($1))", [
+        accountId,
+      ]);
+      const r = await c.query<LotRow>(
+        `INSERT INTO meta_market_listings(id,seller_id,seller_login,item_id,price,created_at) SELECT $1,$2,$3,a.item_id,$4,$5 FROM arsenal a WHERE a.item_id=$6 AND a.account_id=$2 AND NOT a.soulbound AND a.form='instance' AND (SELECT count(*) FROM meta_market_listings WHERE seller_id=$2)<$7 ON CONFLICT DO NOTHING RETURNING *, (SELECT kind FROM arsenal WHERE item_id=$6), (SELECT form FROM arsenal WHERE item_id=$6), (SELECT def_id FROM arsenal WHERE item_id=$6), (SELECT grade FROM arsenal WHERE item_id=$6), (SELECT soulbound FROM arsenal WHERE item_id=$6), (SELECT durability FROM arsenal WHERE item_id=$6), (SELECT origin FROM arsenal WHERE item_id=$6), (SELECT acquired_at FROM arsenal WHERE item_id=$6)`,
+        [id, accountId, login, price, at, itemId, MAX_META_LISTINGS],
+      );
+      await c.query('COMMIT');
+      if (!r.rows[0]) return { ok: false, code: 'E_NOT_TRADABLE' };
+      return { ok: true, listing: fromRow(r.rows[0]) };
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      throw e;
+    } finally {
+      c.release();
+    }
   }
   async buy(accountId: string, listingId: string): Promise<MetaMarketResult<{ balance: number }>> {
     const c = await this.pool.connect();

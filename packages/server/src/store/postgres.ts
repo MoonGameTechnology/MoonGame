@@ -1904,6 +1904,35 @@ export class PostgresDropStore implements DropStore {
     );
   }
 
+  async stepPity(accountId: string, hit: boolean, pityAfter: number): Promise<number> {
+    // The row lock is the atomicity: a second award pass for the same account waits
+    // here and then reads the streak this one wrote, never the one it is replacing.
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO drop_meta (account_id) VALUES ($1) ON CONFLICT (account_id) DO NOTHING`,
+        [accountId],
+      );
+      const r = await client.query<{ pity: number }>(
+        `SELECT pity FROM drop_meta WHERE account_id = $1 FOR UPDATE`,
+        [accountId],
+      );
+      const pity = r.rows[0]?.pity ?? 0;
+      await client.query(`UPDATE drop_meta SET pity = $2 WHERE account_id = $1`, [
+        accountId,
+        hit || pity + 1 >= pityAfter ? 0 : pity + 1,
+      ]);
+      await client.query('COMMIT');
+      return pity;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async addShards(accountId: string, delta: number): Promise<void> {
     // Atomic increment — two concurrent battle credits both land.
     await this.pool.query(

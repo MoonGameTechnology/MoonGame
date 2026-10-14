@@ -631,6 +631,8 @@ export interface CorpRentStore {
  *  lives above; the store guards the invariants that need storage-level atomicity:
  *   - `claim` is the exactly-once gate per (match, account) — a replayed match end
  *     can never roll (or bump pity for) the same account twice;
+ *   - `stepPity` is one atomic read-and-advance of the dry streak — two matches of
+ *     one account ending together cannot both read the same streak;
  *   - `addShards` is an atomic increment (concurrent battle credits both land). */
 export interface DropStore {
   /** First-writer-wins marker for one account's roll in one match: true = this call
@@ -639,6 +641,11 @@ export interface DropStore {
   /** The account's current dry streak (matches since the last drop). 0 when unknown. */
   pityOf(accountId: string): Promise<number>;
   setPity(accountId: string, value: number): Promise<void>;
+  /** Advance the dry streak for ONE roll, atomically: the streak resets to 0 when the
+   *  roll dropped (`hit`, or the streak reached `pityAfter`), otherwise grows by one.
+   *  Returns the streak BEFORE this roll. A separate read + write let two concurrent
+   *  award passes both see a streak of `pityAfter - 1` and both force a drop. */
+  stepPity(accountId: string, hit: boolean, pityAfter: number): Promise<number>;
   /** Credit salvage shards — `delta` must be positive (earning only). */
   addShards(accountId: string, delta: number): Promise<void>;
   shardsOf(accountId: string): Promise<number>;
