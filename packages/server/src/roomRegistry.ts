@@ -31,6 +31,22 @@ export interface RoomRegistry {
   shutdown?(): Promise<void>;
 }
 
+/**
+ * Close every live game connection of `accountId` across all matches this process hosts
+ * (password reset/change). A hibernated match has no sockets, so the LIVE rooms are the
+ * whole set. Returns the number of connections closed. See `MatchRoom.evictAccount`.
+ */
+export function revokeAccountConnections(
+  registry: Pick<RoomRegistry, 'ids' | 'get'>,
+  accountId: string,
+): number {
+  let closed = 0;
+  for (const id of registry.ids()) {
+    closed += registry.get(id)?.evictAccount(accountId, 'E_SESSION_REVOKED') ?? 0;
+  }
+  return closed;
+}
+
 /** In-memory registry: the matches this process holds live in a Map. The default for
  *  dev/tests and the single-process deployment; a lazy/DB-backed impl swaps in behind
  *  the same interface when hibernation lands. */

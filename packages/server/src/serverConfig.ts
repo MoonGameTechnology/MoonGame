@@ -27,8 +27,15 @@ import {
 export interface ServerConfig {
   auth?: JoinTokenVerifyConfig;
   allowedOrigins?: string[];
-  /** Mint a join token for a seat (the /join API). Present iff auth is configured. */
-  signToken?: (matchId: string, playerId: string, accountId?: string) => Promise<string>;
+  /** Mint a join token for a seat (the /join API). Present iff auth is configured.
+   *  `pwfp` — the session's password fingerprint — binds the token to the current
+   *  password, so a reset revokes it at the handshake (see `accountPwfp` in wsServer). */
+  signToken?: (
+    matchId: string,
+    playerId: string,
+    accountId?: string,
+    pwfp?: string,
+  ) => Promise<string>;
   /** Mint a session token for an authenticated account (the /auth API). Present iff
    *  auth is configured — same secret, but a distinct `typ` + audience, so session and
    *  join tokens can never be replayed as each other. */
@@ -76,9 +83,14 @@ export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
     ? { ...rotation, key: hmacSecret(authSecret), algorithms: ['HS256'], issuer, audience, maxTokenAgeSec: JOIN_TOKEN_TTL_SEC }
     : undefined;
   const signToken = authSecret
-    ? (matchId: string, playerId: string, accountId?: string): Promise<string> =>
+    ? (matchId: string, playerId: string, accountId?: string, pwfp?: string): Promise<string> =>
         signJoinToken(
-          accountId ? { matchId, playerId, accountId } : { matchId, playerId },
+          {
+            matchId,
+            playerId,
+            ...(accountId ? { accountId } : {}),
+            ...(accountId && pwfp ? { pwfp } : {}),
+          },
           { key: hmacSecret(authSecret), algorithm: 'HS256', issuer, audience },
           { ttlSeconds: JOIN_TOKEN_TTL_SEC },
         )

@@ -60,6 +60,11 @@ export interface JoinClaim {
   matchId: string;
   playerId: PlayerId;
   accountId?: string;
+  /** Password fingerprint of `accountId` at mint time (the same `pwfp` a session token
+   *  carries). The handshake re-checks it against the CURRENT password when the host
+   *  wires a lookup (`MultiplayerServerOptions.accountPwfp`), so a password reset kills a
+   *  join token that was minted before it. Absent on tokens without an account. */
+  pwfp?: string;
 }
 
 export type JoinTokenResult = { ok: true; claim: JoinClaim } | { ok: false; code: 'E_AUTH' };
@@ -94,7 +99,13 @@ function claimFromPayload(payload: JWTPayload): JoinClaim | null {
   if (typeof matchId !== 'string' || matchId === '') return null;
   if (typeof playerId !== 'string' || playerId === '') return null;
   const accountId = typeof payload.accountId === 'string' ? payload.accountId : undefined;
-  return accountId ? { matchId, playerId, accountId } : { matchId, playerId };
+  // A `pwfp` that is present but not a non-empty string is a malformed token, not an
+  // absent claim — rejected rather than silently dropped (fail-secure).
+  const pwfp = payload.pwfp;
+  if (pwfp !== undefined && (typeof pwfp !== 'string' || pwfp === '')) return null;
+  const claim: JoinClaim = accountId ? { matchId, playerId, accountId } : { matchId, playerId };
+  if (pwfp !== undefined) claim.pwfp = pwfp;
+  return claim;
 }
 
 export interface JoinTokenSignConfig {
@@ -117,6 +128,7 @@ export function signJoinToken(
   const nowSec = Math.floor((opts.now?.() ?? Date.now()) / 1000);
   const payload: JWTPayload = { matchId: claim.matchId, playerId: claim.playerId };
   if (claim.accountId !== undefined) payload.accountId = claim.accountId;
+  if (claim.pwfp !== undefined) payload.pwfp = claim.pwfp;
   return new SignJWT(payload)
     .setProtectedHeader({ alg: config.algorithm, typ: JOIN_TOKEN_TYP })
     .setIssuer(config.issuer)

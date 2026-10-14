@@ -65,14 +65,14 @@ describe('dev match — fog of war over WebSocket (F6)', () => {
       expect((mg1.delta.changed.fleets?.green_1 as { orbit?: string } | undefined)?.orbit).toBe('near');
       reconstructed = applyDelta(reconstructed, mg1.delta);
 
-      // Red orders ITS fleet (at the hidden homeworld). Green gets a delta too,
-      // but it must carry nothing about red_1 — the enemy stays invisible.
+      // Red orders ITS fleet (at the hidden homeworld). Green sees none of it, so green
+      // gets no delta at all — not even an empty one that would time red's order.
       const g2 = nextMessage(green);
+      const r1 = nextMessage(red);
       red.send(JSON.stringify({ type: 'action', action: orbit('red', 'red_1', 'near', 1) }));
-      const mg2 = await g2;
-      if (mg2.type !== 'delta') throw new Error('expected a delta');
-      expect(mg2.delta.changed.fleets?.red_1).toBeUndefined();
-      reconstructed = applyDelta(reconstructed, mg2.delta);
+      expect(await r1).toMatchObject({ type: 'delta' });
+      green.send(JSON.stringify({ type: 'ping' }));
+      expect(await g2).toMatchObject({ type: 'pong' });
 
       // The authoritative sim is correct (both fleets moved); the projections hide it.
       expect(room.state.fleets.green_1?.orbit).toBe('near');
