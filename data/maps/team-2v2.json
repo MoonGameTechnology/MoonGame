@@ -49,7 +49,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran",
+      "planetType": "oceanic",
       "garrison": [
         {
           "unit": "militia",
@@ -104,7 +104,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran",
+      "planetType": "oceanic",
       "garrison": [
         {
           "unit": "militia",
@@ -159,7 +159,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran",
+      "planetType": "oceanic",
       "garrison": [
         {
           "unit": "militia",
@@ -214,7 +214,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran",
+      "planetType": "oceanic",
       "garrison": [
         {
           "unit": "militia",
@@ -543,501 +543,649 @@
     },
     "reach_24": {
       "position": {
-        "x": -1376,
-        "y": 1785
-      },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
-    },
-    "reach_25": {
-      "position": {
-        "x": 109,
-        "y": 772
-      },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
-    },
-    "reach_26": {
-      "position": {
-        "x": 304,
-        "y": -913
-      },
-      "kind": "nebula",
-      "terrain": "nebula"
-    },
-    "reach_27": {
-      "position": {
-        "x": 1867,
-        "y": 1412
+        "x": -1911,
+        "y": 27
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
+    "reach_25": {
+      "position": {
+        "x": -2514,
+        "y": 35
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "reach_26": {
+      "position": {
+        "x": -1289,
+        "y": 246
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "fortress_world"
+    },
+    "reach_27": {
+      "position": {
+        "x": -2520,
+        "y": 594
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
     "reach_28": {
       "position": {
-        "x": -57,
-        "y": 1468
+        "x": -2333,
+        "y": -741
       },
-      "kind": "asteroid",
+      "kind": "rift",
       "terrain": "empty_space"
     },
     "reach_29": {
       "position": {
-        "x": -663,
-        "y": -1669
+        "x": -1227,
+        "y": -281
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "dead_world",
+      "terrain": "empty_space"
     },
     "reach_30": {
       "position": {
-        "x": 1064,
-        "y": 413
+        "x": 1935,
+        "y": 15
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "dead_world",
+      "terrain": "deep_void"
     },
     "reach_31": {
       "position": {
-        "x": 856,
-        "y": -516
+        "x": 2570,
+        "y": 12
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "dead_world",
+      "terrain": "deep_void"
     },
     "reach_32": {
       "position": {
-        "x": 430,
-        "y": 108
+        "x": 2468,
+        "y": -592
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "dead_world",
+      "terrain": "deep_void"
     },
     "reach_33": {
       "position": {
-        "x": 959,
-        "y": 962
+        "x": 2316,
+        "y": 728
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "rift",
+      "terrain": "empty_space"
     },
     "reach_34": {
       "position": {
-        "x": -1429,
-        "y": 71
+        "x": 1241,
+        "y": -259
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "fortress_world"
     },
     "reach_35": {
       "position": {
-        "x": 369,
-        "y": -1694
+        "x": 1257,
+        "y": 325
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "dead_world",
+      "terrain": "empty_space"
     },
     "reach_36": {
       "position": {
-        "x": -2528,
-        "y": 268
+        "x": -1560,
+        "y": -1476
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
     },
     "reach_37": {
       "position": {
-        "x": -2458,
-        "y": -410
+        "x": -1014,
+        "y": -1457
       },
       "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "terrain": "dust_lane"
     },
     "reach_38": {
       "position": {
-        "x": -2519,
-        "y": -793
+        "x": -1215,
+        "y": -2021
       },
       "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "terrain": "dust_lane"
     },
     "reach_39": {
       "position": {
-        "x": -844,
-        "y": 427
+        "x": -1974,
+        "y": -1492
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
     },
     "reach_40": {
       "position": {
-        "x": -743,
-        "y": 900
-      },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
-    },
-    "reach_41": {
-      "position": {
-        "x": -282,
-        "y": -2157
-      },
-      "kind": "asteroid",
-      "terrain": "empty_space"
-    },
-    "reach_42": {
-      "position": {
-        "x": 1752,
-        "y": -31
-      },
-      "kind": "asteroid",
-      "terrain": "empty_space"
-    },
-    "reach_43": {
-      "position": {
-        "x": 2342,
-        "y": -373
-      },
-      "kind": "asteroid",
-      "terrain": "empty_space"
-    },
-    "reach_44": {
-      "position": {
-        "x": -1447,
-        "y": -1972
+        "x": -1084,
+        "y": -937
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
-    "reach_45": {
+    "reach_41": {
       "position": {
-        "x": 1266,
-        "y": 1688
+        "x": -855,
+        "y": -2190
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "reach_42": {
+      "position": {
+        "x": -2313,
+        "y": -1102
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "reach_43": {
+      "position": {
+        "x": 1520,
+        "y": 1495
       },
       "kind": "dead_world",
-      "terrain": "deep_void"
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "reach_44": {
+      "position": {
+        "x": 1054,
+        "y": 1503
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "reach_45": {
+      "position": {
+        "x": 1237,
+        "y": 2003
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
     },
     "reach_46": {
       "position": {
-        "x": -248,
-        "y": -1535
+        "x": 1929,
+        "y": 1518
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
     },
     "reach_47": {
       "position": {
-        "x": 652,
-        "y": 1871
+        "x": 1045,
+        "y": 965
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
     },
     "reach_48": {
       "position": {
-        "x": 460,
-        "y": 872
+        "x": 857,
+        "y": 2139
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
     },
     "reach_49": {
       "position": {
-        "x": 2224,
-        "y": -931
+        "x": 2265,
+        "y": 1098
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "reach_50": {
+      "position": {
+        "x": -1341,
+        "y": 1597
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "reach_51": {
+      "position": {
+        "x": -1505,
+        "y": 1914
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "reach_52": {
+      "position": {
+        "x": -1799,
+        "y": 1327
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
-    "reach_50": {
-      "position": {
-        "x": 1443,
-        "y": 179
-      },
-      "kind": "asteroid",
-      "terrain": "empty_space"
-    },
-    "reach_51": {
-      "position": {
-        "x": -331,
-        "y": 1842
-      },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
-    },
-    "reach_52": {
-      "position": {
-        "x": -947,
-        "y": 1639
-      },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
-    },
     "reach_53": {
       "position": {
-        "x": -1299,
-        "y": 1227
+        "x": -1033,
+        "y": 1206
       },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
+      "kind": "nebula",
+      "terrain": "nebula"
     },
     "reach_54": {
       "position": {
-        "x": -2201,
-        "y": -1383
+        "x": -1014,
+        "y": 2056
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "nebula",
+      "terrain": "nebula"
     },
     "reach_55": {
       "position": {
-        "x": 1011,
-        "y": 2055
+        "x": -955,
+        "y": 792
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
     },
     "reach_56": {
       "position": {
-        "x": -1127,
-        "y": -1473
+        "x": -2275,
+        "y": 1185
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "dead_world",
+      "terrain": "empty_space"
     },
     "reach_57": {
       "position": {
-        "x": 2264,
-        "y": 1139
+        "x": -543,
+        "y": 953
       },
       "kind": "dead_world",
-      "terrain": "deep_void"
+      "terrain": "empty_space"
     },
     "reach_58": {
       "position": {
-        "x": -1800,
-        "y": -108
+        "x": 1332,
+        "y": -1582
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
     },
     "reach_59": {
       "position": {
-        "x": -719,
-        "y": 2124
+        "x": 1526,
+        "y": -1928
       },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
     },
     "reach_60": {
       "position": {
-        "x": 2138,
-        "y": -1313
+        "x": 1825,
+        "y": -1340
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "reach_61": {
       "position": {
-        "x": 2478,
-        "y": 670
-      },
-      "kind": "asteroid",
-      "terrain": "empty_space"
-    },
-    "reach_62": {
-      "position": {
-        "x": 694,
-        "y": 555
-      },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
-    },
-    "reach_63": {
-      "position": {
-        "x": 1486,
-        "y": -1684
+        "x": 987,
+        "y": -1177
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
+    "reach_62": {
+      "position": {
+        "x": 1027,
+        "y": -2034
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "reach_63": {
+      "position": {
+        "x": 2226,
+        "y": -1181
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
     "reach_64": {
       "position": {
-        "x": -2373,
-        "y": 921
+        "x": 957,
+        "y": -733
       },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
     },
     "reach_65": {
       "position": {
-        "x": -209,
-        "y": -998
+        "x": 581,
+        "y": -896
       },
-      "kind": "asteroid",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "reach_66": {
       "position": {
-        "x": -940,
-        "y": -1134
+        "x": 149,
+        "y": -1398
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
     },
     "reach_67": {
       "position": {
-        "x": -1116,
-        "y": -721
+        "x": -394,
+        "y": -1489
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "debris_field",
+      "terrain": "derelict_graveyard"
     },
     "reach_68": {
       "position": {
-        "x": -1877,
-        "y": -1676
+        "x": 409,
+        "y": -1879
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "debris_field",
+      "terrain": "empty_space"
     },
     "reach_69": {
       "position": {
-        "x": -505,
-        "y": 545
+        "x": -57,
+        "y": -965
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
     },
     "reach_70": {
       "position": {
-        "x": -231,
-        "y": 931
+        "x": -543,
+        "y": -1845
       },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
+      "kind": "debris_field",
+      "terrain": "empty_space"
     },
     "reach_71": {
       "position": {
-        "x": -1890,
-        "y": 1527
+        "x": -356,
+        "y": -2148
       },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
+      "kind": "debris_field",
+      "terrain": "empty_space"
     },
     "reach_72": {
       "position": {
-        "x": 383,
-        "y": 1522
+        "x": -163,
+        "y": 1440
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "barren"
     },
     "reach_73": {
       "position": {
-        "x": -830,
-        "y": -509
+        "x": 363,
+        "y": 1473
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "planetType": "dead_world"
     },
     "reach_74": {
       "position": {
-        "x": 852,
-        "y": -1369
+        "x": -367,
+        "y": 1844
       },
-      "kind": "dense_nebula",
-      "terrain": "dense_nebula"
+      "kind": "asteroid",
+      "terrain": "depleted_system"
     },
     "reach_75": {
       "position": {
-        "x": 1416,
-        "y": -1259
+        "x": 511,
+        "y": 1802
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "dead_world",
+      "terrain": "deep_void"
     },
     "reach_76": {
       "position": {
-        "x": 998,
-        "y": -2113
+        "x": 64,
+        "y": 961
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "ringworld"
     },
     "reach_77": {
       "position": {
-        "x": 402,
-        "y": -2117
+        "x": 303,
+        "y": 2200
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "dead_world",
+      "terrain": "deep_void"
     },
     "reach_78": {
       "position": {
-        "x": -1692,
-        "y": -1341
+        "x": 316,
+        "y": -132
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "reach_79": {
       "position": {
-        "x": 2116,
-        "y": -91
+        "x": -341,
+        "y": 132
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "reach_80": {
       "position": {
-        "x": 2472,
-        "y": 311
+        "x": 565,
+        "y": -503
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
     },
     "reach_81": {
       "position": {
-        "x": 1849,
-        "y": -1536
+        "x": -607,
+        "y": 447
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
     },
     "reach_82": {
       "position": {
-        "x": 1330,
-        "y": 1123
+        "x": -378,
+        "y": -802
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "reach_83": {
       "position": {
-        "x": 957,
-        "y": 1377
+        "x": 438,
+        "y": 805
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "reach_84": {
       "position": {
-        "x": -1223,
-        "y": -281
+        "x": -696,
+        "y": -448
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "reach_85": {
       "position": {
-        "x": -922,
-        "y": -1932
+        "x": 734,
+        "y": 481
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "dead_world",
+      "terrain": "empty_space"
     }
   },
+  "regions": [
+    {
+      "id": "western_expanse",
+      "sectors": [
+        "home_1",
+        "opening_1_1",
+        "opening_1_2",
+        "home_2",
+        "opening_2_1",
+        "opening_2_2",
+        "reach_24",
+        "reach_25",
+        "reach_26",
+        "reach_27",
+        "reach_28",
+        "reach_29"
+      ]
+    },
+    {
+      "id": "eastern_expanse",
+      "sectors": [
+        "home_3",
+        "opening_3_1",
+        "home_4",
+        "opening_4_2",
+        "reach_30",
+        "reach_31",
+        "reach_32",
+        "reach_33",
+        "reach_34",
+        "reach_35"
+      ]
+    },
+    {
+      "id": "ash_massif",
+      "sectors": [
+        "hive_north",
+        "reach_36",
+        "reach_37",
+        "reach_38",
+        "reach_39",
+        "reach_40",
+        "reach_41",
+        "reach_42"
+      ]
+    },
+    {
+      "id": "iron_massif",
+      "sectors": [
+        "opening_4_1",
+        "hive_south",
+        "reach_43",
+        "reach_44",
+        "reach_45",
+        "reach_46",
+        "reach_47",
+        "reach_48",
+        "reach_49"
+      ]
+    },
+    {
+      "id": "drift_nebula",
+      "sectors": [
+        "reach_50",
+        "reach_51",
+        "reach_52",
+        "reach_53",
+        "reach_54",
+        "reach_55",
+        "reach_56",
+        "reach_57"
+      ]
+    },
+    {
+      "id": "veil_nebula",
+      "sectors": [
+        "opening_3_2",
+        "reach_58",
+        "reach_59",
+        "reach_60",
+        "reach_61",
+        "reach_62",
+        "reach_63",
+        "reach_64",
+        "reach_65"
+      ]
+    },
+    {
+      "id": "expedition_graveyard",
+      "sectors": [
+        "pirate_north",
+        "neutral_north",
+        "reach_66",
+        "reach_67",
+        "reach_68",
+        "reach_69",
+        "reach_70",
+        "reach_71"
+      ]
+    },
+    {
+      "id": "depleted_node",
+      "sectors": [
+        "pirate_south",
+        "neutral_south",
+        "reach_72",
+        "reach_73",
+        "reach_74",
+        "reach_75",
+        "reach_76",
+        "reach_77"
+      ]
+    },
+    {
+      "id": "storm_front",
+      "sectors": [
+        "neutral_west",
+        "neutral_east",
+        "remnant",
+        "relic",
+        "crossing",
+        "reach_78",
+        "reach_79",
+        "reach_80",
+        "reach_81",
+        "reach_82",
+        "reach_83",
+        "reach_84",
+        "reach_85"
+      ]
+    }
+  ],
   "players": {
     "npc-pirate_north": {
       "name": "Veil Corsairs",

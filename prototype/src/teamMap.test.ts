@@ -7,6 +7,9 @@ import { assignSeats } from './setupSeats';
 import { aiOrders } from './ai';
 import { advance, order, setMatchMode } from './protoKernel';
 import { HOUR } from './time';
+import { regionKey } from '../../decisions/regionName';
+import { ru } from '../../localization/ru';
+import { en } from '../../localization/en';
 
 const preset = mapPreset('team-2v2');
 const seats = networkSeats('ffa', 'team-2v2');
@@ -27,7 +30,6 @@ describe('Broken Reach — main-game 2v2', () => {
     expect(validateMatchMap(preset.map!, data)).toEqual([]);
     expect(preset.nodes).toHaveLength(85);
     expect(preset.map!.paths).toBeUndefined();
-    expect(preset.nodes.some((n) => n.sector === 'empty')).toBe(false);
     const raw = buildStateFromMap(preset.map!, data, {
       slots: Object.fromEntries(seats.map((seat, i) => [`slot_${i + 1}`, { playerId: seat.id }])),
     });
@@ -53,7 +55,11 @@ describe('Broken Reach — main-game 2v2', () => {
   });
 
   it('keeps every route reachable, with alternative crossings away from occupied bases', () => {
-    expect(distances('home_1').size).toBe(84); // the black hole is deliberately impassable
+    // The black hole and the two rifts are deliberately impassable; everything else is reachable.
+    const barriers = preset.nodes.filter((n) => data.sectorKinds[n.sector]?.traversable === false);
+    expect(barriers.map((n) => n.sector).sort()).toEqual(['black_hole', 'rift', 'rift']);
+    for (const n of barriers) expect(n.links).toEqual([]);
+    expect(distances('home_1').size).toBe(preset.nodes.length - barriers.length);
     expect(nodes.get('remnant')!.links).toEqual([]);
     const inhabited = Object.keys(preset.map!.sectors).filter((id) => preset.map!.sectors[id]!.owner?.startsWith('npc-'));
     for (const start of preset.starts) {
@@ -90,6 +96,59 @@ describe('Broken Reach — main-game 2v2', () => {
       }
     }
     expect(Math.max(...lengths) / Math.min(...lengths)).toBeLessThan(1.05);
+  });
+
+  it('uses the whole catalogue, and a derelict graveyard stays a rare find', () => {
+    const sectors = Object.values(preset.map!.sectors);
+    const has = (pick: (s: (typeof sectors)[number]) => string | undefined): string[] =>
+      [...new Set(sectors.map(pick).filter((v): v is string => v !== undefined))].sort();
+    // A fork fortress is never authored: it appears when a fortress is set on a road fork.
+    // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts).
+    const kinds = Object.keys(data.sectorKinds).filter((k) => k !== 'fork_station' && k !== 'empty').sort();
+    expect(has((s) => s.kind)).toEqual(kinds);
+    expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());
+    expect(has((s) => s.planetType)).toEqual(Object.keys(data.planetTypes).sort());
+    expect(sectors.filter((s) => s.kind === 'graveyard')).toHaveLength(1);
+    expect(sectors.filter((s) => s.terrain === 'derelict_graveyard').length).toBeLessThanOrEqual(2);
+  });
+
+  it('splits the map into named areas, every province in exactly one', () => {
+    const regions = preset.map!.regions;
+    expect(regions.flatMap((r) => r.sectors).sort()).toEqual(Object.keys(preset.map!.sectors).sort());
+    const missing = regions
+      .map((r) => regionKey('team-2v2', r.id))
+      .filter((key) => !(key in ru) || !(key in en));
+    expect(missing).toEqual([]);
+  });
+
+  it('gives both teams the same prizes at comparable distances', () => {
+    const fromStart = new Map(preset.starts.map((s) => [s, distances(s)]));
+    const near = (team: string, id: string): number =>
+      Math.min(...preset.starts.filter((s) => teamForStart('team-2v2', s) === team)
+        .map((s) => fromStart.get(s)!.get(id) ?? Infinity));
+    const prizes = new Map<string, { A: number[]; B: number[] }>();
+    let closerA = 0, closerB = 0, sumA = 0, sumB = 0;
+    for (const n of preset.nodes) {
+      if (preset.starts.includes(n.id) || n.links.length === 0) continue;
+      const a = near('A', n.id), b = near('B', n.id);
+      sumA += a;
+      sumB += b;
+      if (a < b) closerA++;
+      if (b < a) closerB++;
+      // Every world type but the common temperate one, and the dense metal pockets.
+      const prize = n.type && n.type !== 'terran' ? n.type : n.sector === 'asteroid_cluster' ? n.sector : undefined;
+      if (!prize) continue;
+      const list = prizes.get(prize) ?? { A: [], B: [] };
+      list.A.push(a);
+      list.B.push(b);
+      prizes.set(prize, list);
+    }
+    expect(Math.abs(closerA - closerB)).toBeLessThanOrEqual(3);
+    expect(Math.abs(sumA - sumB) / Math.max(sumA, sumB)).toBeLessThan(0.03);
+    for (const [prize, { A, B }] of prizes) {
+      const b = B.sort((x, y) => x - y);
+      A.sort((x, y) => x - y).forEach((d, i) => expect([prize, Math.abs(d - b[i]!) <= 2]).toEqual([prize, true]));
+    }
   });
 
   it.each(preset.starts)('keeps fixed 2v2 sides when the player chooses %s', (start) => {
