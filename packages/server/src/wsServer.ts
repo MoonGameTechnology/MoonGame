@@ -17,6 +17,7 @@ import { serializeServerMessage, type ServerErrorCode } from './protocol';
 import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
 import { assetType } from './staticAssets';
+import { slidingWindowIpLimiter } from './rateLimit';
 import { isOperatorRequest } from './operatorAccess';
 
 export interface MultiplayerServerOptions {
@@ -114,10 +115,89 @@ export interface MultiplayerServerOptions {
    *  HTTPS — upgrade с `x-forwarded-proto`, отличным от `https` (в том числе без
    *  заголовка вовсе), отбивается 403. См. `forwardedHttps`. */
   trustProxy?: boolean;
+  /** Бюджет WS-рукопожатий на адрес клиента (адрес — `upgradeClientAddress`): сверх
+   *  `max` за `windowMs` upgrade отбивается 429 до всякой асинхронной работы (проверка
+   *  токена, стор, подъём спящего матча). Считается каждая попытка, и отбитая тоже.
+   *  По умолчанию `WS_HANDSHAKE_RATE_DEFAULT`. */
+  wsHandshakeRate?: { max: number; windowMs: number };
+  /** Сколько открытых сокетов держит один адрес одновременно; следующий upgrade
+   *  отбивается 429, пока один из открытых не закроется. По умолчанию
+   *  `WS_MAX_PER_IP_DEFAULT`. */
+  wsMaxPerIp?: number;
   /** `METRICS_TOKEN` for the operator-only `GET /metrics` (`operatorAccess.ts`): a bearer
    *  with this token, or a direct loopback peer, reads it; anyone else gets a 404. Absent
    *  ⇒ loopback only. */
   operatorToken?: string;
+}
+
+/** Рукопожатий на адрес за окно. Плейтест сидит за одним NAT (~10 игроков): каждый
+ *  входит одним рукопожатием, а потерявший связь клиент переподключается по графику
+ *  1-2-4-8-16-30 с (`packages/client/src/net.ts`) — шесть попыток в первую минуту.
+ *  Десять игроков, рвущихся одновременно, — 60; дефолт вдвое выше. */
+export const WS_HANDSHAKE_RATE_DEFAULT = { max: 120, windowMs: 60_000 } as const;
+/** Открытых сокетов на адрес. Десять игроков под одним NAT, у кого-то по 2-3 вкладки
+ *  или устройства, плюс сокеты, ещё не дожатые сердцебиением (до ~30 с), — 32 с запасом. */
+export const WS_MAX_PER_IP_DEFAULT = 32;
+
+/**
+ * Лимиты WS-рукопожатия из окружения, как `authRateFromEnv`: `WS_RATE_MAX`,
+ * `WS_RATE_WINDOW_MS`, `WS_MAX_PER_IP`. Отсутствующее, неразобранное или неположительное
+ * значение оставляет дефолт, а не снимает лимит (fail-secure, инвариант #4). Половина
+ * пары частоты дополняется дефолтом второй. Срез опций — хост разворачивает его в вызов.
+ */
+export function wsLimitsFromEnv(
+  env: Record<string, string | undefined>,
+): Pick<MultiplayerServerOptions, 'wsHandshakeRate' | 'wsMaxPerIp'> {
+  const positive = (raw: string | undefined): number | undefined => {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+  };
+  const max = positive(env.WS_RATE_MAX);
+  const windowMs = positive(env.WS_RATE_WINDOW_MS);
+  const perIp = positive(env.WS_MAX_PER_IP);
+  return {
+    ...(max !== undefined || windowMs !== undefined
+      ? {
+          wsHandshakeRate: {
+            max: max ?? WS_HANDSHAKE_RATE_DEFAULT.max,
+            windowMs: windowMs ?? WS_HANDSHAKE_RATE_DEFAULT.windowMs,
+          },
+        }
+      : {}),
+    ...(perIp !== undefined ? { wsMaxPerIp: perIp } : {}),
+  };
+}
+
+/**
+ * Доверие прокси для Fastify при `trustProxy`: верим ровно одному хопу — пиру сокета,
+ * то есть самому прокси. `trustProxy: true` поверил бы ВСЕЙ цепочке `X-Forwarded-For`,
+ * и `request.ip` стал бы её самой левой записью — той, что клиент вписал сам, если
+ * прокси дописывает к присланному заголовку (`$proxy_add_x_forwarded_for` в
+ * `deploy/setup-proxy.sh`). С одним доверенным хопом `request.ip` — правая запись,
+ * которую поставил прокси. Caddy (`deploy/Caddyfile`) чужой заголовок по умолчанию
+ * заменяет, там обе записи совпадают. На `request.protocol`/`host` это не влияет: Fastify
+ * сверяет с этой функцией только хоп 0.
+ */
+function trustOneProxy(_address: string, hop: number): boolean {
+  return hop === 0;
+}
+
+/**
+ * Адрес клиента для лимитов WS-рукопожатия — тот же, что `request.ip` у HTTP-маршрутов
+ * при `trustOneProxy`: без `trustProxy` — адрес пира сокета; с ним — самая правая
+ * непустая запись `X-Forwarded-For` (её дописал наш прокси), а без заголовка — снова
+ * пир. Экспортирован ради теста, сверяющего обе стороны.
+ */
+export function upgradeClientAddress(request: IncomingMessage, trustProxy: boolean): string {
+  const peer = request.socket.remoteAddress ?? '';
+  if (!trustProxy) return peer;
+  const header = request.headers['x-forwarded-for'];
+  if (typeof header !== 'string') return peer;
+  const hops = header
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter((hop) => hop !== '');
+  return hops[hops.length - 1] ?? peer;
 }
 
 export interface MultiplayerServerHandle {
@@ -163,6 +243,7 @@ const UPGRADE_REASON: Record<number, string> = {
   401: 'Unauthorized',
   403: 'Forbidden',
   409: 'Conflict',
+  429: 'Too Many Requests',
   500: 'Internal Server Error',
 };
 
@@ -296,7 +377,7 @@ export function createMultiplayerServer(
   const app = Fastify({
     logger: options.logger ?? false,
     disableRequestLogging: true,
-    trustProxy: options.trustProxy ?? false,
+    trustProxy: options.trustProxy ? trustOneProxy : false,
     // RS-5.1: native TLS — with a key/cert Fastify builds an https.Server (checked at
     // runtime); the `ws` upgrade rides `app.server` byte-identically, so the socket is
     // wss end-to-end. Absent ⇒ plain http/ws (a proxy may still terminate TLS upstream).
@@ -498,9 +579,23 @@ export function createMultiplayerServer(
 
   const accountStore = options.accountStore;
   const auth = options.auth;
+  // Лимиты рукопожатия на адрес клиента: частота (ограниченная карта адресов внутри
+  // лимитера) и число открытых сокетов. Счётчик открытых растёт только на принятом
+  // сокете и падает на его 'close' — ровно один раз на сокет; адрес без сокетов из
+  // карты удаляется, так что она не больше числа живых соединений.
+  const handshakeRate = options.wsHandshakeRate ?? WS_HANDSHAKE_RATE_DEFAULT;
+  const handshakeLimited = slidingWindowIpLimiter({
+    now: Date.now,
+    max: handshakeRate.max,
+    windowMs: handshakeRate.windowMs,
+  });
+  const maxSocketsPerIp = options.wsMaxPerIp ?? WS_MAX_PER_IP_DEFAULT;
+  const openPerIp = new Map<string, number>();
+  const atSocketCap = (ip: string): boolean => (openPerIp.get(ip) ?? 0) >= maxSocketsPerIp;
   app.server.on('upgrade', (request, socket, head) => {
     const refuseUpgrade = (status: number): void => {
       if (status === 401 || status === 403) options.securityAudit?.record('ws.reject', 'E_AUTH');
+      else if (status === 429) options.securityAudit?.record('rate.limit', 'E_RATE_LIMIT');
       rejectUpgrade(socket, status);
     };
     // Node's http server takes its own 'error' listener off the socket before handing it
@@ -512,6 +607,13 @@ export function createMultiplayerServer(
     socket.on('error', () => {
       /* see above */
     });
+    // Лимиты адреса — до любой асинхронной работы рукопожатия. Попытка списывает бюджет
+    // частоты, даже если её потом отобьёт что-то другое.
+    const clientIp = upgradeClientAddress(request, !!options.trustProxy);
+    if (handshakeLimited(clientIp) || atSocketCap(clientIp)) {
+      refuseUpgrade(429);
+      return;
+    }
     // Async because auth/nick-login resolve identity through the join-token verifier or
     // the (possibly DB-backed) account store before we accept the upgrade. Отказ этого
     // промиса содержан (`detach`): рукопожатие идёт от кого угодно из сети, и уронить им
@@ -717,7 +819,20 @@ export function createMultiplayerServer(
         // client (a client-chosen value could reset its own sequence cursor / forge the
         // envelope's session binding, SV-1.1-live-A). A reconnect mints a fresh one.
         const sessionId = randomUUID();
+        // Пока рукопожатие ждало, другие с того же адреса могли занять остаток лимита.
+        // Отсюда до колбэка `handleUpgrade` всё синхронно, так что проверка и счёт
+        // атомарны.
+        if (atSocketCap(clientIp)) {
+          refuseUpgrade(429);
+          return;
+        }
         wss.handleUpgrade(request, socket, head, (ws) => {
+          openPerIp.set(clientIp, (openPerIp.get(clientIp) ?? 0) + 1);
+          ws.once('close', () => {
+            const left = (openPerIp.get(clientIp) ?? 1) - 1;
+            if (left > 0) openPerIp.set(clientIp, left);
+            else openPerIp.delete(clientIp);
+          });
           wss.emit(
             'connection',
             ws,
