@@ -3,7 +3,7 @@
  * A fixed spatial lattice gives neighbouring provinces one drawing, even without a road.
  * Polygon influence is local; roads only calm decoration and never generate new routes. */
 export type TerrainPoint = readonly [number, number];
-export type TerrainFamily = 'asteroid' | 'nebula' | 'dust' | 'debris' | 'storm' | 'orbit';
+export type TerrainFamily = 'asteroid' | 'nebula' | 'dust' | 'debris' | 'wreck' | 'storm' | 'orbit';
 export interface TerrainEnvironmentCell {
   id: string;
   kind?: string;
@@ -60,10 +60,10 @@ export interface TerrainEnvironment {
 export const TERRAIN_ENVIRONMENT_TILE_SIZE = 256;
 const STEP = 64;
 const MAX_INFLUENCE = 80;
-const FAMILIES: readonly TerrainFamily[] = ['asteroid', 'nebula', 'dust', 'debris', 'storm', 'orbit'];
+const FAMILIES: readonly TerrainFamily[] = ['asteroid', 'nebula', 'dust', 'debris', 'wreck', 'storm', 'orbit'];
 const COLORS: Readonly<Record<TerrainFamily, string>> = {
   asteroid: '#95b8c5', nebula: '#929edb', dust: '#b6a2bd',
-  debris: '#819fac', storm: '#80c4d5', orbit: '#8593b2',
+  debris: '#819fac', wreck: '#819fac', storm: '#80c4d5', orbit: '#8593b2',
 };
 interface Profile { family: TerrainFamily; density: number; scale: number; contrast: number }
 const PROFILES: Readonly<Record<string, Profile>> = {
@@ -74,7 +74,7 @@ const PROFILES: Readonly<Record<string, Profile>> = {
   dense_nebula: { family: 'nebula', density: 1, scale: 1.2, contrast: 0.3 },
   dust_lane: { family: 'dust', density: 0.8, scale: 1, contrast: 0.24 },
   debris_field: { family: 'debris', density: 0.72, scale: 0.7, contrast: 0.32 },
-  graveyard: { family: 'debris', density: 0.9, scale: 1.4, contrast: 0.4 },
+  graveyard: { family: 'wreck', density: 0.9, scale: 1.4, contrast: 0.4 },
   ion_storm: { family: 'storm', density: 0.68, scale: 1, contrast: 0.3 },
   solar_flare: { family: 'storm', density: 0.8, scale: 1.2, contrast: 0.3 },
   dead_world: { family: 'orbit', density: 0.34, scale: 1, contrast: 0.22 },
@@ -255,6 +255,40 @@ function feature(
       }
     }
   } else if (mix.family === 'debris') {
+    // A loose drift of torn plating: shards of uneven size, each tumbling on its own
+    // axis, thinning out from a dense middle. No shared silhouette, no shared heading.
+    const shards = (major ? 6 : 3) + Math.floor(random() * 4);
+    const spread = 30 * mix.scale;
+    for (let i = 0; i < shards; i++) {
+      const a = random() * Math.PI * 2;
+      const reach = spread * Math.pow(random(), 0.7);
+      const cx = x + Math.cos(a) * reach, cy = y + Math.sin(a) * reach * 0.75;
+      const size = (2.4 + random() * random() * 10) * mix.scale;
+      const spin = random() * Math.PI * 2;
+      const corners = 3 + Math.floor(random() * 2);
+      const points = Array.from({ length: corners }, (_, j): TerrainPoint => {
+        const t = spin + (j + random() * 0.6) / corners * Math.PI * 2;
+        const r = size * (0.35 + random() * 0.65);
+        return [cx + Math.cos(t) * r, cy + Math.sin(t) * r];
+      });
+      const far = reach / spread;
+      path(points, true, 0.95 - far * 0.45, 0.65);
+    }
+    // A bent strip of hull now and then, and fine grit between the larger pieces.
+    if (major && random() < 0.6) {
+      const t = random() * Math.PI * 2, len = (8 + random() * 9) * mix.scale;
+      const kink = (random() - 0.5) * 1.2;
+      const p0: TerrainPoint = [x - Math.cos(t) * len, y - Math.sin(t) * len];
+      const p2: TerrainPoint = [x + Math.cos(t + kink) * len * 0.8, y + Math.sin(t + kink) * len * 0.8];
+      path([p0, [x, y], p2], false, 0.7, 0.7);
+    }
+    for (let i = 0, grit = 2 + Math.floor(random() * 4); i < grit; i++) {
+      const a = random() * Math.PI * 2, reach = spread * (0.4 + random() * 0.8);
+      const gx = x + Math.cos(a) * reach, gy = y + Math.sin(a) * reach * 0.75;
+      const t = random() * Math.PI, d = 0.6 + random() * 1.2;
+      path([[gx, gy], [gx + Math.cos(t) * d, gy + Math.sin(t) * d]], false, 0.4, 0.6);
+    }
+  } else if (mix.family === 'wreck') {
     const length = (major ? 17 : 7) + random() * 12;
     // Angular ribs and broken hulls remain distinct from the closed rock silhouettes.
     path([point(-length, -4), point(length * 0.3, -4), point(length, 1), point(length * 0.15, 6), point(-length * 0.6, 6)]);

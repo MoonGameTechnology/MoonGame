@@ -91,10 +91,10 @@ describe('continuous terrain environment', () => {
     const cells = [cell('left', 'nebula', -300, -150, 300),
       cell('right', 'asteroid', 0, 0, 300), cell('small', 'graveyard', 0, -40, 40)];
     const junction = sampleTerrainEnvironment(cells, 0, 0);
-    expect(junction.map(m => m.family)).toEqual(['asteroid', 'nebula', 'debris']);
+    expect(junction.map(m => m.family)).toEqual(['asteroid', 'nebula', 'wreck']);
     expect(junction.reduce((sum, m) => sum + m.density, 0)).toBeLessThanOrEqual(1);
     const small = sampleTerrainEnvironment(cells, 20, -20);
-    expect(small.find(m => m.family === 'debris')!.density).toBeGreaterThan(0.45);
+    expect(small.find(m => m.family === 'wreck')!.density).toBeGreaterThan(0.45);
   });
 
   it('never consults unknown kind, terrain, identity, ownership or array order', () => {

@@ -407,9 +407,9 @@ describe('REFM-235 — схема и области', () => {
       const c = camera.world(l);
       const text = l.text.toUpperCase();
       const halo = call(frame.calls, 'strokeText', text, c.x, c.y)!;
-      expect([halo.stroke, halo.width, halo.alpha]).toEqual(['rgba(4,10,12,.85)', 4, 0.75]);
+      expect([halo.stroke, halo.width, halo.alpha]).toEqual(['rgba(4,10,12,.35)', 2, 0.75]);
       const ink = call(frame.calls, 'fillText', text, c.x, c.y)!;
-      expect([ink.fill, ink.font]).toEqual(['rgba(214,236,244,.92)', '600 15px ui-sans-serif, system-ui, sans-serif']);
+      expect([ink.fill, ink.font]).toEqual(['rgba(200,226,236,.5)', '300 12px ui-sans-serif, system-ui, sans-serif']);
     }
     expect(frame.named('strokeText')).toHaveLength(labels.length);
     // Имя области за экраном не пишется.
