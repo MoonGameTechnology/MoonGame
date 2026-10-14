@@ -4193,6 +4193,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <option value="duel-1" data-i18n="setup.map.duel-1"></option>
             <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
             <option value="team-2v2" data-i18n="setup.map.team-2v2"></option>
+            <option value="team-3v3" data-i18n="setup.map.team-3v3"></option>
           </select>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
         </div>

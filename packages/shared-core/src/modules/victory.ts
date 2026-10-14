@@ -13,6 +13,7 @@ import { isCapturable, provinceScore } from '../state/sectorKind';
 import { isForkSite } from '../state/forkSite';
 import { getStance } from '../state/diplomacy';
 import { isOrdnanceFleet } from '../state/ordnance';
+import { hasFixedSides } from '../action/matchMode';
 
 /** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
  *  pinned to them by test instead of to copied literals — the same fact now lives in
@@ -198,7 +199,7 @@ function endMatch(
  *  Eliminated teammates remain members: a side's threshold and winning roster do
  *  not shrink when one partner loses their last province. */
 function fixedVictoryUnits(h: HandlerContext, active: readonly PlayerId[]): PlayerId[][] | undefined {
-  if (h.ctx.config?.modeId !== 'team_2v2') return undefined;
+  if (!hasFixedSides(h.ctx.config?.modeId)) return undefined;
   const ids = playablePlayerIds(h.state).sort();
   if (ids.length === 0 || ids.some((id) => h.state.players[id]!.team === undefined)) return undefined;
   const sides = new Map<string, PlayerId[]>();

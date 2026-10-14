@@ -119,8 +119,9 @@
         "x": -570,
         "y": 170
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
     },
     "watch": {
       "position": {
@@ -135,16 +136,17 @@
         "x": -320,
         "y": -60
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
     },
     "crossing": {
       "position": {
         "x": -80,
         "y": 210
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "wreck": {
       "position": {
@@ -159,24 +161,25 @@
         "x": 170,
         "y": -130
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
     },
     "shelf": {
       "position": {
         "x": 350,
         "y": -440
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
     },
     "cloud": {
       "position": {
         "x": 440,
         "y": 70
       },
-      "kind": "dense_nebula",
-      "terrain": "dense_nebula"
+      "kind": "debris_field",
+      "terrain": "empty_space"
     },
     "outpost": {
       "position": {
@@ -191,26 +194,63 @@
         "x": 650,
         "y": -130
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
     },
     "reach": {
       "position": {
         "x": -780,
         "y": 600
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "debris_field",
+      "terrain": "empty_space"
     },
     "south_void": {
       "position": {
         "x": -140,
         "y": -480
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     }
   },
+  "regions": [
+    {
+      "id": "western_reach",
+      "sectors": [
+        "home_1",
+        "world_1",
+        "world_2",
+        "shale",
+        "mist",
+        "watch",
+        "drift",
+        "reach"
+      ]
+    },
+    {
+      "id": "eastern_reach",
+      "sectors": [
+        "home_2",
+        "world_3",
+        "world_4",
+        "shoal",
+        "cloud",
+        "outpost",
+        "ember",
+        "shelf"
+      ]
+    },
+    {
+      "id": "storm_front",
+      "sectors": [
+        "crossing",
+        "wreck",
+        "south_void"
+      ]
+    }
+  ],
   "slots": {
     "slot_1": {
       "team": "A",

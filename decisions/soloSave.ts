@@ -1,6 +1,6 @@
 /** Local single-player checkpoint. The world stays JSON; host-only policies travel
  * alongside it. No wall-clock catch-up and no dependency on a particular client. */
-import { hashJson, type GameState } from '../packages/shared-core/src/index';
+import { hashJson, hasFixedSides, type GameState } from '../packages/shared-core/src/index';
 
 export interface SoloIntel {
   owner: string | null;
@@ -66,7 +66,7 @@ export function parseSoloSave(raw: string | null, rules: string): SoloSave | nul
       !record(s.match) ||
       s.match.status !== 'ongoing' ||
       s.pve !== undefined ||
-      (s.modeId !== undefined && s.modeId !== 'team_2v2') ||
+      (s.modeId !== undefined && (typeof s.modeId !== 'string' || !hasFixedSides(s.modeId))) ||
       typeof s.mapId !== 'string'
     )
       return null;

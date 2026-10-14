@@ -2198,6 +2198,7 @@ function mapLabel(mapId: string | undefined): string {
   if (mapId === 'duel-1') return t('setup.map.duel-1');
   if (mapId === 'ffa-4') return t('setup.map.ffa-4');
   if (mapId === 'team-2v2') return t('setup.map.team-2v2');
+  if (mapId === 'team-3v3') return t('setup.map.team-3v3');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 

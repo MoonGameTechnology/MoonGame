@@ -223,8 +223,9 @@
         "x": -390,
         "y": -540
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "crystalline"
     },
     "watch": {
       "position": {
@@ -240,7 +241,8 @@
         "y": -800
       },
       "kind": "dense_nebula",
-      "terrain": "dense_nebula"
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
     },
     "cinder": {
       "position": {
@@ -255,8 +257,8 @@
         "x": 320,
         "y": -140
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "nebula",
+      "terrain": "nebula"
     },
     "storm": {
       "position": {
@@ -271,24 +273,27 @@
         "x": 820,
         "y": -170
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "planet",
+      "terrain": "nebula",
+      "planetType": "gas_giant"
     },
     "wreck": {
       "position": {
         "x": 1190,
         "y": -40
       },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard"
+      "kind": "planet",
+      "terrain": "ion_storm",
+      "planetType": "irradiated"
     },
     "cloud": {
       "position": {
         "x": 100,
         "y": 140
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "planetType": "dead_world"
     },
     "outpost": {
       "position": {
@@ -304,39 +309,41 @@
         "y": 830
       },
       "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "terrain": "dust_lane"
     },
     "reach": {
       "position": {
         "x": -120,
         "y": 840
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
     },
     "veil": {
       "position": {
         "x": -230,
         "y": 440
       },
-      "kind": "dense_nebula",
-      "terrain": "dense_nebula"
+      "kind": "debris_field",
+      "terrain": "derelict_graveyard"
     },
     "belt": {
       "position": {
         "x": -610,
         "y": 250
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "barren"
     },
     "haze": {
       "position": {
         "x": -1090,
         "y": 150
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "asteroid",
+      "terrain": "dust_lane"
     },
     "flotsam": {
       "position": {
@@ -351,18 +358,77 @@
         "x": -10,
         "y": -130
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "ringworld"
     },
     "spur": {
       "position": {
         "x": 340,
         "y": -820
       },
-      "kind": "dead_world",
-      "terrain": "deep_void"
+      "kind": "asteroid",
+      "terrain": "dust_lane"
     }
   },
+  "regions": [
+    {
+      "id": "ash_massif",
+      "sectors": [
+        "home_1",
+        "world_1",
+        "world_2",
+        "shale",
+        "mist",
+        "haze",
+        "watch"
+      ]
+    },
+    {
+      "id": "veil_nebula",
+      "sectors": [
+        "home_2",
+        "world_3",
+        "world_4",
+        "riftward",
+        "drift",
+        "shelf",
+        "spur"
+      ]
+    },
+    {
+      "id": "storm_front",
+      "sectors": [
+        "home_3",
+        "world_5",
+        "world_6",
+        "storm",
+        "wreck",
+        "outpost",
+        "shoal"
+      ]
+    },
+    {
+      "id": "expedition_graveyard",
+      "sectors": [
+        "home_4",
+        "world_7",
+        "world_8",
+        "flotsam",
+        "reach",
+        "veil"
+      ]
+    },
+    {
+      "id": "depleted_node",
+      "sectors": [
+        "ember",
+        "cinder",
+        "cloud",
+        "belt"
+      ]
+    }
+  ],
   "slots": {
     "slot_1": {
       "team": "slot_1",

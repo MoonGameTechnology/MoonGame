@@ -22,6 +22,7 @@ province, ringed by plain debris fields — not a terrain to fill a quarter with
 import collections
 import json
 import math
+import os
 import random
 from pathlib import Path
 
@@ -87,8 +88,8 @@ FIXED = list(sectors)
 # A fixed Poisson sample supplies varied cell sizes and degrees. Each accepted point
 # brings its twin turned 180° about the centre, nudged a little: the two teams get the
 # same amount of space at the same distances, but no district is a copy of another.
-import os
-rng = random.Random(int(os.environ.get("SEED", 6)))
+# SEED picks the sample; 6 gives the closest team balance (see teamMap.test.ts).
+rng = random.Random(int(os.environ.get('SEED', 6)))
 cells = []
 
 

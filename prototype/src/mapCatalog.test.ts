@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { MAP_IDS, mapPreset, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 import { newGame, networkSeats } from './matchSetup';
 import { laneRoadLength } from '../../packages/shared-core/src/index';
+import { regionKey } from '../../decisions/regionName';
+import { ru } from '../../localization/ru';
+import { en } from '../../localization/en';
 
 describe('Frontier 50', () => {
   it('keeps 50 starts two provinces apart, three provinces inside the rim, and bases buffered', () => {
@@ -66,7 +69,7 @@ describe('Frontier 50', () => {
   });
 
   it('offers duel, four-player FFA and 2v2 but preserves existing 100-seat snapshots', () => {
-    expect(MAP_IDS).toEqual(['duel-1', 'ffa-4', 'team-2v2']);
+    expect(MAP_IDS).toEqual(['duel-1', 'ffa-4', 'team-2v2', 'team-3v3']);
     const old = newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100') });
     expect(Object.keys(old.planets)).toHaveLength(1675);
     expect(mapPreset('frontier-100').starts).toHaveLength(100);
@@ -175,5 +178,18 @@ describe('published match maps', () => {
     }
     if (id === 'ffa-4')
       expect(networkSeats('ffa', id).every((s) => s.team === undefined)).toBe(true);
+  });
+
+  it.each(['duel-1', 'ffa-4'] as const)('%s has named areas, varied worlds and one graveyard at most', (id) => {
+    const map = mapPreset(id).map!;
+    const sectors = Object.values(map.sectors);
+    expect(map.regions.flatMap((r) => r.sectors).sort()).toEqual(Object.keys(map.sectors).sort());
+    const missing = map.regions.map((r) => regionKey(id, r.id)).filter((key) => !(key in ru) || !(key in en));
+    expect(missing).toEqual([]);
+    // A derelict graveyard is a rare find, not a terrain to repeat.
+    expect(sectors.filter((s) => s.kind === 'graveyard').length).toBeLessThanOrEqual(1);
+    // Opening worlds stay temperate; the rest of the map shows other world types.
+    expect(new Set(sectors.map((s) => s.planetType).filter((t) => t && t !== 'terran')).size)
+      .toBeGreaterThanOrEqual(id === 'duel-1' ? 2 : 8);
   });
 });
