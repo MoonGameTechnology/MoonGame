@@ -35,7 +35,7 @@ import {
   type SetupConfig,
 } from './game';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
-import { DEFAULT_MAP_ID, isCurrentMap, isFrontier, mapPreset, MAP_IDS, type MapId } from './mapCatalog';
+import { DEFAULT_MAP_ID, isCurrentMap, isFrontier, mapPreset, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
 import { metaGrant, type MetaState } from './meta';
 import { mapWorldName } from './planetName';
 import { resetSandboxConfig } from './sandbox';
@@ -330,7 +330,9 @@ function renderSetupSlots(): void {
   // needs three AI seats on); shown always so the player can arm it before adding them.
   // Sector Zero — режим со своей дверью на хабе, а не настройка этой схватки (UIX-15.1).
   let h =
-    setupRivalsHtml(rivalCount(setupSlots), setupHelp) +
+    (setupMapId === 'team-2v2'
+      ? `<div class="srivals"><b>${t('setup.teams.fixed-2v2')}</b></div>`
+      : setupRivalsHtml(rivalCount(setupSlots), setupHelp)) +
     (isCurrentMap(setupMapId) ? '' : `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
@@ -343,7 +345,10 @@ function renderSetupSlots(): void {
   const fids = seatFactionIds();
   // A/B side chip for a seat (you are locked to A; AI seats toggle side).
   const teamChip = (i: number, locked: boolean): string => {
-    const side = setupSeatTeam[i]!;
+    const start = assignSeats(setupSeatCount(), setupSlots, setupStart, setupPreset().starts)
+      .find((seat) => seat.index === i)?.start;
+    const side = (start && teamForStart(setupMapId, start)) ?? setupSeatTeam[i]!;
+    locked ||= setupMapId === 'team-2v2';
     return `<button class="tmchip s${side}${locked ? ' lock' : ''}" data-teamseat="${i}"${locked ? ' disabled' : ''}>${side}</button>`;
   };
   for (let i = 0; i < setupSeatCount(); i++) {
@@ -354,7 +359,7 @@ function renderSetupSlots(): void {
       h +=
         `<div class="srow"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
-        (setupTeams ? teamChip(0, true) : '') +
+        (setupTeams || setupMapId === 'team-2v2' ? teamChip(0, true) : '') +
         `<span class="you">${t('comms.you')}</span></div>`;
     } else {
       // Кнопка строки гоняет место по кругу «выкл → слабый → сильный» (AIDIFF-1) —
@@ -366,14 +371,14 @@ function renderSetupSlots(): void {
       h +=
         `<div class="srow ${aiOn ? '' : 'off'}"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
-        (setupTeams && aiOn ? teamChip(i, false) : '') +
+        ((setupTeams || setupMapId === 'team-2v2') && aiOn ? teamChip(i, false) : '') +
         `<button class="stog ${aiOn ? 'ai' : ''}${strong ? ' strong' : ''}" data-slot="${i}" title="${esc(t('setup.ai.hint'))}">${label}</button></div>`;
     }
   }
   setupSlotsEl.innerHTML = h;
 }
 
-/** Выбор карты — сегментами (UIX-16.1): карт две, и список прятал вторую за раскрытием. */
+/** Выбор карты — сегментами (UIX-16.1): варианты видны без раскрытия списка. */
 function renderSetupMaps(): void {
   setupMapsEl.innerHTML = MAP_IDS.map(
     (id) =>
@@ -389,6 +394,7 @@ function renderSetup(): void {
   $('setup-map-info').textContent = t(
     setupMapId === 'duel-1' ? 'setup.map.duel-1-info'
       : setupMapId === 'ffa-4' ? 'setup.map.ffa-4-info'
+      : setupMapId === 'team-2v2' ? 'setup.map.team-2v2-info'
       : setupMapId === 'frontier-100'
       ? 'setup.map.frontier-legacy-info'
       : isFrontier(setupMapId)
@@ -503,6 +509,7 @@ export function buildSetupConfig(): SetupConfig {
       start,
       ai: i !== 0,
       ...(setupMapId === 'duel-1' ? { team: i === 0 ? 'A' : 'B' }
+        : setupMapId === 'team-2v2' ? { team: teamForStart(setupMapId, start) }
         : setupTeams && setupMapId !== 'ffa-4' ? { team: setupSeatTeam[i] } : {}),
     };
   });

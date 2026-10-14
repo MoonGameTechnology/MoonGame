@@ -140,6 +140,7 @@ const PLAYER_EXPOSURE: Record<keyof Player, 'public' | 'owner-private'> = {
   status: 'public', // выбыл или играет — видно всем
   ai: 'public',
   npc: 'public',
+  team: 'public',
   // Заявка на место и её подтверждение (ENTRY-3). Публично по существу: занятость
   // мест и так видна в ленте матчей и на экране входа — прятать нечего.
   claimedAt: 'public',
@@ -232,6 +233,7 @@ function maximalState(): GameState {
         status: 'active',
         ai: false,
         npc: 'neutral',
+        team: 'A',
         claimedAt: 0,
         seated: true,
         freedAt: 0,
@@ -253,6 +255,7 @@ function maximalState(): GameState {
         status: 'active',
         ai: true,
         npc: 'pirate',
+        team: 'B',
         claimedAt: 0,
         seated: true,
         freedAt: 0,

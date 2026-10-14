@@ -51,6 +51,8 @@ env_default_for() {
     # Токен оператора для /metrics/*. Без него маршруты закрыты для всех: под Docker
     # запрос с хоста приходит с адреса моста, а не с loopback (operatorAccess.ts).
     METRICS_TOKEN) openssl rand -hex 32 ;;
+    # Соль псевдонима игрока в журналах (PTM-0.2). Постоянная: смена рвёт связь с прошлым.
+    ANALYTICS_SALT) openssl rand -hex 32 ;;
     *) echo '' ;;
   esac
 }
@@ -61,6 +63,7 @@ env_why_for() {
     TIME_SCALE) echo 'без него мир шёл в реальном времени: постройки по 3–24 часа' ;;
     AUTH_JWT_SECRET) echo 'без него сервер стоял БЕЗ АККАУНТОВ — место брал любой, кто знает позывной' ;;
     METRICS_TOKEN) echo 'без него /metrics/* закрыты даже для оператора на хосте' ;;
+    ANALYTICS_SALT) echo 'без него журнал не связывал игрока между партиями и днями' ;;
     GATE) echo 'без него принимались голые действия, без валидации конвертов' ;;
     SEAT_LOCK) echo 'без него любой позывной занимал любое свободное место' ;;
     PROD) echo 'без него compose подставлял 1, и сервер отказывался стартовать без TLS' ;;
@@ -70,7 +73,7 @@ env_why_for() {
 
 # Ключи, которые обязаны быть в файле. Порядок — как в установщике, чтобы дописанное
 # читалось в том же порядке, что и написанное изначально.
-ENV_REQUIRED_KEYS="PORT TIME_SCALE MATCHES POSTGRES_PASSWORD GATE SEAT_LOCK AUTH_JWT_SECRET METRICS_TOKEN PROD"
+ENV_REQUIRED_KEYS="PORT TIME_SCALE MATCHES POSTGRES_PASSWORD GATE SEAT_LOCK AUTH_JWT_SECRET METRICS_TOKEN ANALYTICS_SALT PROD"
 
 # Ключи без безопасного дефолта: о них только предупреждаем (правило 3).
 ENV_WARN_ONLY_KEYS="ALLOWED_ORIGINS"

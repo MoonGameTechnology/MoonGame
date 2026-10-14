@@ -193,6 +193,24 @@ function endMatch(
   });
 }
 
+/** Fixed sides come from the persisted roster, never the current diplomatic graph.
+ *  Require a complete roster so legacy matches without sides retain their rules.
+ *  Eliminated teammates remain members: a side's threshold and winning roster do
+ *  not shrink when one partner loses their last province. */
+function fixedVictoryUnits(h: HandlerContext, active: readonly PlayerId[]): PlayerId[][] | undefined {
+  if (h.ctx.config?.modeId !== 'team_2v2') return undefined;
+  const ids = playablePlayerIds(h.state).sort();
+  if (ids.length === 0 || ids.some((id) => h.state.players[id]!.team === undefined)) return undefined;
+  const sides = new Map<string, PlayerId[]>();
+  for (const id of ids) {
+    const team = h.state.players[id]!.team!;
+    const members = sides.get(team) ?? [];
+    members.push(id);
+    sides.set(team, members);
+  }
+  return [...sides.values()].filter((side) => side.some((id) => active.includes(id)));
+}
+
 /** Victory units for the score race: a coalition is a mutually-allied CLIQUE (every
  *  pair inside it holds the `alliance` stance), NOT a connected component — a chain
  *  A–B, B–C with A–C at war must not let A and C share a win, and a treaty A was not
@@ -209,6 +227,8 @@ function endMatch(
  *  in theory, but a unit's vertices are the match's ACTIVE HUMAN seats (bots are
  *  barred from `alliance`) — a handful of players, each edge a bilateral treaty. */
 function victoryUnits(h: HandlerContext, active: readonly PlayerId[]): PlayerId[][] {
+  const fixed = fixedVictoryUnits(h, active);
+  if (fixed) return fixed;
   const allied = (a: PlayerId, b: PlayerId): boolean => getStance(h.state, a, b) === 'alliance';
   const units: PlayerId[][] = [];
   // R — the clique built so far; P — sorted candidates that all extend R; X — vertices
@@ -275,6 +295,15 @@ function endOnSessionCap(
   const endsAt =
     h.ctx.config?.victory?.endsAt ?? (SESSION_MAX_DAYS[timeScale] ?? DEFAULT_SESSION_DAYS) * MS_PER_DAY;
   if (h.ctx.now >= endsAt) {
+    const sides = fixedVictoryUnits(h, active);
+    if (sides) {
+      const totals = sides.map((side) => side.reduce((sum, id) => sum + (scores[id]?.total ?? 0), 0));
+      const best = Math.max(...totals);
+      const leaders = sides.filter((_side, i) => totals[i] === best);
+      const winningSide = leaders.length === 1 ? leaders[0]! : undefined;
+      endMatch(h, winningSide ? highestScore(scores, winningSide) ?? winningSide[0]! : null, 'timeout', winningSide);
+      return;
+    }
     endMatch(h, highestScore(scores, active), 'timeout');
   }
 }
@@ -381,7 +410,7 @@ function evaluateVictory(h: HandlerContext): void {
     }
   }
 
-  if (activeBefore.length < 2) {
+  if (activeBefore.length < 2 && fixedVictoryUnits(h, activeBefore) === undefined) {
     // A solo exploration map can still have hostile inhabitants. They never
     // receive a PvP victory, but taking the lone commander's last world is a loss.
     const lone = playerIds.length === 1 ? activeBefore[0] : undefined;
@@ -419,6 +448,14 @@ function evaluateVictory(h: HandlerContext): void {
     return;
   }
 
+  // Ambient NPCs and diplomatic changes cannot alter the fixed team contest.
+  const fixedSides = fixedVictoryUnits(h, active);
+  if (fixedSides?.length === 1) {
+    const side = fixedSides[0]!;
+    endMatch(h, highestScore(scores, side) ?? side[0]!, 'elimination', side);
+    return;
+  }
+
   if (active.length === 1 && activeBefore.length > 1) {
     endMatch(h, active[0] ?? null, 'elimination');
     return;
@@ -442,14 +479,16 @@ function evaluateVictory(h: HandlerContext): void {
     // `find` on the sorted id list crowned the alphabetically-first one. Domination
     // means holding MORE than every rival: the crown goes to the strict leader
     // among the qualifiers; a dead-equal share keeps the match running.
-    const qualified = active.filter(
-      (playerId) => (ownedCapturable.get(playerId) ?? 0) / capturableCount >= dominationPercent,
-    );
+    const units = fixedSides ?? active.map((id) => [id]);
+    const holdings = (unit: PlayerId[]): number =>
+      unit.reduce((sum, id) => sum + (ownedCapturable.get(id) ?? 0), 0);
+    const qualified = units.filter((unit) => holdings(unit) / capturableCount >= dominationPercent);
     if (qualified.length > 0) {
-      const best = Math.max(...qualified.map((p) => ownedCapturable.get(p) ?? 0));
-      const leaders = qualified.filter((p) => (ownedCapturable.get(p) ?? 0) === best);
+      const best = Math.max(...qualified.map(holdings));
+      const leaders = qualified.filter((unit) => holdings(unit) === best);
       if (leaders.length === 1) {
-        endMatch(h, leaders[0]!, 'domination');
+        const unit = leaders[0]!;
+        endMatch(h, highestScore(scores, unit) ?? unit[0]!, 'domination', fixedSides ? unit : undefined);
         return;
       }
     }
@@ -497,7 +536,9 @@ export const victoryModule: GameModule = {
   // 1.5.0: мина не идёт в счёт флотов и юнитов (SM-3.6).
   // 1.6.0: исход главы с контрактом операции решают его три результата (PVR-8.3).
   // 1.7.0: летящая ракета не идёт в счёт флотов и юнитов (SM-3.7b).
-  version: '1.7.0',
+  // 1.8.0: последний союз в фиксированном 2v2 побеждает совместно.
+  // 1.9.0: fixed teams use the persisted roster and the resolved mode for every PvP ending.
+  version: '1.9.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));

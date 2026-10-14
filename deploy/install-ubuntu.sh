@@ -50,6 +50,8 @@ AUTH_JWT_SECRET="$(openssl rand -hex 32)"
 # побеждает токен прошлой установки — так его можно сменить переустановкой.
 METRICS_TOKEN_FROM_ENV="${METRICS_TOKEN:+1}"
 METRICS_TOKEN="${METRICS_TOKEN:-$(openssl rand -hex 32)}"
+# Соль псевдонима игрока в журналах (PTM-0.2).
+ANALYTICS_SALT="${ANALYTICS_SALT:-$(openssl rand -hex 32)}"
 # Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
 # Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
 # адрес (если он задан) добавляется вторым: через роутер это другой хост:порт.
@@ -189,6 +191,9 @@ if [ -d "$INSTALL_DIR" ]; then
             OLD_PG=$(grep -m1 '^POSTGRES_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)
             OLD_JWT=$(grep -m1 '^AUTH_JWT_SECRET=' "$ENV_FILE" | cut -d= -f2-)
             OLD_MT=$(grep -m1 '^METRICS_TOKEN=' "$ENV_FILE" | cut -d= -f2-)
+            # Новая соль разорвала бы связь журналов с прошлыми партиями (PTM-0.2).
+            OLD_AS=$(grep -m1 '^ANALYTICS_SALT=' "$ENV_FILE" | cut -d= -f2-)
+            [ -n "$OLD_AS" ] && ANALYTICS_SALT="$OLD_AS"
             if [ -n "$OLD_PG" ]; then
                 POSTGRES_PASSWORD="$OLD_PG"
                 REUSED_SECRETS=1
@@ -251,6 +256,10 @@ AUTH_JWT_SECRET=$AUTH_JWT_SECRET
 #   curl -H "Authorization: Bearer \$(sudo grep -m1 '^METRICS_TOKEN=' $ENV_FILE | cut -d= -f2-)" \\
 #     http://127.0.0.1:8788/metrics/summary
 METRICS_TOKEN=$METRICS_TOKEN
+
+# Соль псевдонима игрока в журнале партий (PTM-0.2): игрок связывается между партиями и
+# днями без хранения id аккаунта. Держи СТАБИЛЬНОЙ: смена рвёт связь с прошлым.
+ANALYTICS_SALT=$ANALYTICS_SALT
 
 # Origin-allowlist против CSWSH: без него браузер отдаст сессию на wss:// с чужой
 # страницы. Значение — ровно тот адрес, с которого игроки открывают игру.

@@ -72,6 +72,8 @@ export interface DossierHost {
   queuedOrders(planetId: string, lane: BuildLane): QueuedBuild[];
   activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null;
   progressPct(active: ActiveBuild): number;
+  /** Показывать ли очки победы: в забеге Sector Zero их нет (`victoryPointsShown`). */
+  victoryPoints(): boolean;
 }
 
 /** Доля защиты мира без знака («45%»): текст сам говорит, что урон МЕНЬШЕ. */
@@ -633,7 +635,7 @@ export function createDossiers(host: DossierHost): {
         rows.push(cxRow(t('codex.row.radar-level'), String(lv.radarLevel)));
         rows.push(cxRow(t('codex.row.radar-detects'), radarDetects(lv.radarLevel)));
       }
-      if ((def.scoreValue ?? 0) > 0)
+      if ((def.scoreValue ?? 0) > 0 && host.victoryPoints())
         rows.push(
           cxRow(t('codex.row.score'), t('codex.value.per-level', { n: def.scoreValue ?? 0 })),
         );

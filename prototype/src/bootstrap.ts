@@ -21,6 +21,11 @@ import {
 import { sdkLoaderPresent } from './platform/sdkWait';
 import { loadLocaleAsset } from './platform/localeAsset';
 import { measureViewport } from './viewport';
+import { createBrowserTelemetrySink } from './platform/telemetrySink';
+import { createErrorReporter, installErrorReporter } from './platform/errorReporter';
+import { telemetryTarget } from '../../decisions/telemetryEndpoint';
+import { appLoadedProps } from '../../decisions/sessionAnalytics';
+import { anyToken } from '../../decisions/sessionStore';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
@@ -97,9 +102,69 @@ function loaderReady(): Promise<YaGamesGlobal | undefined> {
   });
 }
 
+/**
+ * PTM-1.1: продуктовые события веб-адаптера уходят на игровой сервер — тот, что стоит в
+ * поле «сервер» (`decisions/telemetryEndpoint.ts`). Архив площадки их туда не шлёт: там
+ * события принимает сама площадка, а запросы к нашему серверу из её сборки — сторонний
+ * сервис. Сток живёт до импорта игры, поэтому событие `session_started` уже доедет.
+ */
+function telemetrySink(): ReturnType<typeof createBrowserTelemetrySink> | undefined {
+  if (__SECTOR_ZERO_ONLY__) return undefined;
+  const sha = currentBuild()?.sha ?? '';
+  const sink = createBrowserTelemetrySink({
+    target: () => {
+      // Поле «сервер» первым: вход идёт туда, куда смотрит поле, а в `void.server` адрес
+      // попадает только после удачного запроса — отказ входа уехал бы на прежний сервер.
+      const typed = (document.getElementById('csrv') as HTMLInputElement | null)?.value.trim();
+      const fromField = typed ? telemetryTarget(typed, location) : null;
+      if (fromField) return fromField;
+      let stored: string | null = null;
+      try {
+        stored = localStorage.getItem('void.server');
+      } catch {
+        /* хранилище закрыто — остаётся адрес страницы */
+      }
+      return telemetryTarget(stored, location);
+    },
+    token: (base) => {
+      try {
+        return anyToken(localStorage, base);
+      } catch {
+        return null;
+      }
+    },
+    build: /^[0-9a-f]{7,40}$/i.test(sha) ? `apk-${sha.slice(0, 12)}` : __PLAYER_BUILD__ ? 'web' : 'dev',
+  });
+  return sink;
+}
+const telemetry = telemetrySink();
+
+/**
+ * PTM-1.3: необработанные ошибки — событием `client_error` (тип и место, без текста;
+ * правила — `decisions/clientErrorReport.ts`). Слушатели ставятся до загрузки игры, чтобы
+ * поймать и её старт. Событие идёт через площадку, как любое другое: в архиве площадки
+ * его примет она сама.
+ */
+const errors = createErrorReporter({
+  emit: (props) => getPlatform().analytics.emit('client_error', props),
+  later: (fn, ms) => {
+    setTimeout(fn, ms);
+  },
+  ownPage: () => location.origin + location.pathname,
+});
+installErrorReporter(errors);
+// Уходящая страница: сначала дописать ожидающие отчёты, потом отправить всё маяком.
+window.addEventListener('pagehide', () => {
+  // PTM-1.2: длина визита — от начала загрузки страницы.
+  getPlatform().analytics.emit('session_ended', { ms: Math.round(performance.now()) });
+  errors.flush();
+  telemetry?.pageHide();
+});
+
 loaderReady()
   .then((yaGames) =>
     createPlatform({
+      ...(telemetry ? { sink: (event, props) => telemetry.emit(event, props) } : {}),
       simulate: !__PLAYER_BUILD__,
       yaGames,
       // Сбой чужого SDK — в лог разработчика, а не на экран игроку: сообщение или стек
@@ -132,6 +197,17 @@ loaderReady()
   .then(
     () => {
       document.body.classList.remove('app-starting');
+      // PTM-1.2: игра загрузилась и отвечает — сколько это заняло и у кого.
+      getPlatform().analytics.emit(
+        'app_loaded',
+        appLoadedProps({
+          loadMs: performance.now(),
+          entry: document.body.dataset.entry,
+          mobile: measureViewport().mobile,
+          lang: LOCALE,
+          search: location.search,
+        }),
+      );
       // `LoadingAPI.ready()` — РОВНО здесь, и это не стилистика. Модерация смотрит
       // debug-панель покадрово и в двух сценариях (загрузочный экран площадки скрыт
       // тапом и исчез сам), поэтому привязка ко времени провалила бы один из них.
@@ -142,6 +218,7 @@ loaderReady()
       // Raw errors belong in developer logs, not in the player's UI: a message or
       // stack may contain a URL or stored data. The screen reports only safe codes.
       console.error('E_CLIENT_STARTUP', error);
+      errors.report('error', error);
       // Сбой до снятия покрова (архив площадки: не скачался язык) — экран ошибки обязан
       // быть виден, покров его не прячет.
       document.body.classList.remove('app-booting');

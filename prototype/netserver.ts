@@ -31,7 +31,7 @@ import { playablePlayerIds } from '../packages/shared-core/src/state/playableSea
 // client's `MAP` lines up 1:1 with the server's planets and the renderer needs
 // no changes. This is NOT the Stage-3 server: state lives in memory (a restart
 // loses the match) and the `?player=` handshake is unauthenticated.
-import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import pgPkg from 'pg';
 import {
@@ -42,6 +42,11 @@ import {
   newMatchId,
   pveOrders,
   MetricsAggregator,
+  DailyJsonl,
+  analyticsActorFromEnv,
+  journalRecord,
+  registerTelemetryApi,
+  type TelemetryStats,
   createMultiplayerServer,
   wsLimitsFromEnv,
   tlsFromEnv,
@@ -136,9 +141,33 @@ installFatalHandlers();
 // high-frequency kinds are handled with care: `broadcast`/`timing` lines land in
 // the JSONL only when anomalous (slow or fat) — the aggregator still counts them
 // all — and `events` lines only fire on real activity (battles, arrivals).
-mkdirSync('playtest-logs', { recursive: true });
-const logFile = `playtest-logs/proto-${Date.now()}.jsonl`;
+// PTM-0.1: one file per UTC day (`playtest-logs/match-YYYY-MM-DD.jsonl`), written off the
+// room's hot path through a bounded queue; every line carries its match id, so
+// `pnpm run metrics -- --match <id>` reports one match out of the shared file.
+const matchLog = new DailyJsonl({ dir: 'playtest-logs', prefix: 'match' });
 const metrics = new MetricsAggregator();
+// PTM-0.1: the aggregated summary also lands periodically, so a crash (no graceful
+// shutdown) loses at most this much of it.
+const SUMMARY_EVERY_MS = 10 * 60 * 1000;
+// PTM-0.2: the seat's account becomes the analytics pseudonym `actor`; the raw account
+// id never reaches the journal (nor `/metrics/recent`, which serves its lines).
+const actorOf = analyticsActorFromEnv(process.env);
+// PTM-1.1: browser product events, their own daily file (the receiver is wired in
+// `httpRoutes` below, where the session check lives).
+const clientLog = new DailyJsonl({ dir: 'playtest-logs', prefix: 'client' });
+let telemetryStats: (() => TelemetryStats) | undefined;
+// A summary is a cumulative snapshot of THIS process; a restart within the UTC day appends
+// a fresh run to the same file, and the report keeps each run's last snapshot apart.
+const RUN_ID = Date.now().toString(36);
+const writeSummary = (): void =>
+  matchLog.write({
+    kind: 'summary',
+    run: RUN_ID,
+    summary: metrics.summary(),
+    log: matchLog.stats(),
+    client: { log: clientLog.stats(), ...(telemetryStats ? { receiver: telemetryStats() } : {}) },
+  });
+setInterval(writeSummary, SUMMARY_EVERY_MS).unref();
 const SLOW_MS = 50; // a submit/broadcast slower than this is worth a JSONL line
 const FAT_DELTA_BYTES = 10_240; // a per-player delta fatter than this too (target: idle < 1 KB)
 function worthLogging(ev: RoomObservation): boolean {
@@ -465,7 +494,7 @@ async function createHostedMatch(
   const observe = (ev: RoomObservation): void => {
     metrics.observe(ev);
     if (worthLogging(ev)) {
-      appendFileSync(logFile, JSON.stringify({ t: Date.now(), match: id, ...ev }) + '\n');
+      matchLog.write(journalRecord(id, ev, actorOf));
     }
     if (ev.kind === 'join') {
       connected++;
@@ -927,7 +956,16 @@ const server = createMultiplayerServer({
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary, one `curl` from the host.
-    app.get('/metrics/summary', async (req, reply) => (operator(req) ? metrics.summary() : reply.callNotFound()));
+    // PTM-2.3: plus the telemetry pipeline itself — is it flowing during a test? Aggregates only.
+    app.get('/metrics/summary', async (req, reply) =>
+      operator(req)
+        ? {
+            ...metrics.summary(),
+            journal: { match: matchLog.stats(), client: clientLog.stats() },
+            ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
+          }
+        : reply.callNotFound(),
+    );
     // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
     // derived from the live MetricsAggregator. Returns a compact status with
     // thresholds so a playtest host can `curl /metrics/health` and read a single
@@ -969,10 +1007,20 @@ const server = createMultiplayerServer({
       if (!operator(req)) return reply.callNotFound();
       const n = Math.min(Number((req.query as { n?: string }).n ?? '20') || 20, 200);
       try {
-        const lines = readFileSync(logFile, 'utf8').trimEnd().split('\n');
-        return { file: logFile, total: lines.length, recent: lines.slice(-n).map((l) => JSON.parse(l)) };
+        await matchLog.flush();
+        const file = matchLog.currentFile();
+        const lines = readFileSync(file, 'utf8').trimEnd().split('\n');
+        // A crash can leave one torn line mid-file; it must not hide every line after it.
+        const recent = lines.slice(-n).flatMap((l) => {
+          try {
+            return [JSON.parse(l) as unknown];
+          } catch {
+            return [];
+          }
+        });
+        return { file, total: lines.length, recent };
       } catch {
-        return { file: logFile, total: 0, recent: [] };
+        return { file: matchLog.currentFile(), total: 0, recent: [] };
       }
     });
     // Одна проверка сессии на все аккаунтные API: подпись валидна И пароль не менялся
@@ -990,6 +1038,12 @@ const server = createMultiplayerServer({
       const who = bearer ? await authCfg.verifySession!(bearer) : null;
       return who?.ok ? liveSession(who.claim, userStore) : null;
     };
+    telemetryStats = registerTelemetryApi(app, {
+      log: clientLog,
+      ...(AUTH ? { identify: identifySession } : {}),
+      ...(actorOf ? { actorOf } : {}),
+      ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
+    });
     // REL-7: seat selection — list the match's slots (faction, name, start planet,
     // taken) so the client can render a faction picker BEFORE joining. The player
     // chooses a slot, then GET /matches/:id/join?slot= reserves it.
@@ -1375,7 +1429,7 @@ const printSummary = (): void => {
       s.end
         ? `  match end : winner ${s.end.winner ?? '—'}${s.end.reason ? ` (${s.end.reason})` : ''}`
         : '  match end : —',
-      `  log file  : ${logFile}`,
+      `  log file  : ${matchLog.currentFile()}`,
       '──────────────────────────────────────────────────',
       '',
     ].join('\n'),
@@ -1388,10 +1442,7 @@ const shutdown = (): void => {
   // only anomalous broadcast/timing entries, so without this the report script would
   // have no full latency/delta aggregates to read.
   try {
-    appendFileSync(
-      logFile,
-      JSON.stringify({ t: Date.now(), kind: 'summary', summary: metrics.summary() }) + '\n',
-    );
+    writeSummary();
   } catch {
     /* the report just falls back to the partial per-line data */
   }
@@ -1403,8 +1454,15 @@ const shutdown = (): void => {
   void (async () => {
     // Final flush per room so the latest state of EVERY session is durable before exit.
     for (const h of hosted) await h.flush();
-    if (pool) await pool.end();
+    // Stop taking requests (Fastify waits for those in flight) before the journals: a
+    // `/telemetry` batch landing after the last flush would be lost at exit.
     await server.close();
+    // The journals last, after a fresh summary (the one above stays as a fallback; the
+    // report keeps a run's LAST summary). `flush()` waits for an append already in flight,
+    // so the summary lands after every line before it and nothing is cut by exit.
+    writeSummary();
+    await Promise.all([matchLog.flush(), clientLog.flush()]);
+    if (pool) await pool.end();
     process.exit(0);
   })().catch((err: unknown) => {
     process.stderr.write(`shutdown failed: ${String(err)}\n`);

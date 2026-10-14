@@ -54,7 +54,7 @@ function isStance(value: unknown): value is DiplomaticStance {
  */
 export const diplomacyModule: GameModule = {
   id: 'diplomacy',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     api.provideCapability<DiplomacyCapability>('diplomacy', {
       getRelation: (state, a, b) => stanceToRelation(getStance(state, a, b)),
@@ -77,6 +77,13 @@ export const diplomacyModule: GameModule = {
       const victim = h.state.players[target];
       if (!victim || victim.status !== 'active') {
         return h.reject('E_NO_PLAYER');
+      }
+      // Fixed sides are match rules, not revocable treaties. Check before creating
+      // an offer too: a friendly bot must not accept cross-team peace downstream.
+      if (h.ctx.config?.modeId === 'team_2v2' && !actor.npc && !victim.npc &&
+          actor.team !== undefined && victim.team !== undefined) {
+        const fixed = actor.team === victim.team ? 'alliance' : 'war';
+        if (stance !== fixed) return h.reject('E_FORBIDDEN');
       }
       const me = action.playerId;
       const from = getStance(h.state, me, target);

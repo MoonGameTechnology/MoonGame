@@ -227,7 +227,10 @@ export interface ActionReceipt {
 /** Observation-only stream of room events for metrics/playtest logging (M0). The
  *  callback never feeds back into the room — it just sees what happened. */
 export type RoomObservation =
-  | { kind: 'join'; playerId: PlayerId }
+  /** `accountId` — who sits in the seat, when the handshake proved an account. SERVER-
+   *  INTERNAL: a host that writes the stream to disk must not write it raw — PTM-0.2
+   *  turns it into the analytics pseudonym (`analyticsActor.ts`) and drops it. */
+  | { kind: 'join'; playerId: PlayerId; accountId?: string }
   | { kind: 'leave'; playerId: PlayerId }
   | { kind: 'lobby'; waiting: boolean }
   | {
@@ -956,7 +959,7 @@ export class MatchRoom {
     // ПЕРВОГО владельца кресла на всю жизнь комнаты (и правильно делает — это договор
     // арсенала), а для перехвата нужен тот, кто сидит сейчас.
     this.peerAccountId.set(peer, accountId);
-    this.observe?.({ kind: 'join', playerId });
+    this.observe?.({ kind: 'join', playerId, ...(accountId ? { accountId } : {}) });
     if (this.manualStart && this.host === null) this.host = playerId; // first in hosts
     const flipped = this.syncLobbyClock(); // last player in? the match resumes
     const view = this.viewFor(playerId);

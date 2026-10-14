@@ -4,6 +4,18 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  "setup.map.team-2v2": "2v2 · Broken Reach",
+  "setup.map.team-2v2-info": "85 provinces · 2 teams · 2 pirate bases · 2 Swarm hives · 4 neutral bots",
+  "setup.teams.fixed-2v2": "1 ally and 2 opponents · starting worlds determine teams",
+  "data.veil-corsairs": "Veil Corsairs",
+  "data.wreck-corsairs": "Wreck Corsairs",
+  "data.ash-brood": "Ash Brood",
+  "data.iron-brood": "Iron Brood",
+  "data.western-observatory": "Western Observatory",
+  "data.eastern-anchorage": "Eastern Anchorage",
+  "data.northern-commune": "Northern Commune",
+  "data.southern-freehold": "Southern Freehold",
+
   "data.industrial-architect": "Industrial Architect",
   "sci.industrial-architect.desc": "Research leader for the industry branch.",
   "tech.branch.industry": "Industry",

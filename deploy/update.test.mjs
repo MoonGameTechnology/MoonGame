@@ -333,6 +333,8 @@ describe('update.sh — добор недостающих ключей server.en
     expect(env).toMatch(/^AUTH_JWT_SECRET=[0-9a-f]{64}$/m);
     // Без токена /metrics/* закрыты даже оператору: под Docker хост — не loopback.
     expect(env).toMatch(/^METRICS_TOKEN=[0-9a-f]{64}$/m);
+    // Без соли журнал не связывает игрока между партиями (PTM-0.2).
+    expect(env).toMatch(/^ANALYTICS_SALT=[0-9a-f]{64}$/m);
   });
 
   it('НЕ трогает значение, которое оператор уже выставил', async () => {
@@ -379,6 +381,7 @@ describe('update.sh — добор недостающих ключей server.en
       'SEAT_LOCK=1',
       'AUTH_JWT_SECRET=abc',
       'METRICS_TOKEN=def',
+      'ANALYTICS_SALT=ghi',
       'PROD=0',
       'ALLOWED_ORIGINS=http://host:8788',
     ].join('\n');

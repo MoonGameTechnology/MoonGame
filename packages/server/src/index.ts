@@ -63,6 +63,19 @@ export {
   type StarterArsenalTemplate,
 } from './arsenal';
 export { MetricsAggregator, type MetricsSummary, type SeriesStat } from './metrics';
+export { DailyJsonl, utcDay, type DailyJsonlStats } from './dailyJsonl';
+export {
+  analyticsActor,
+  analyticsActorFromEnv,
+  journalRecord,
+  type ActorOf,
+} from './analyticsActor';
+export {
+  registerTelemetryApi,
+  type TelemetryApiOptions,
+  type TelemetryLog,
+  type TelemetryStats,
+} from './telemetryApi';
 export { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 export {
   hmacSecret,

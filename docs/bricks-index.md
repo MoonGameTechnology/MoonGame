@@ -1124,6 +1124,18 @@
 | PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
+| PTM-0.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Журнал по дням, отчёт по партии, сводка не теряется |
+| PTM-0.2 | ✅ | srv ops | `docs/playtest-telemetry-roadmap.md` | Псевдоним игрока в журнале партии |
+| PTM-1.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Приёмник клиентских событий |
+| PTM-1.2 | ✅ | proto cli | `docs/playtest-telemetry-roadmap.md` | События пути входа и связи |
+| PTM-1.3 | ✅ | proto | `docs/playtest-telemetry-roadmap.md` | Ошибки браузера |
+| PTM-2.1 | ✅ | proto | `docs/playtest-telemetry-roadmap.md` | Отчёт по поведению pnpm run analytics |
+| PTM-2.2 | 🔶 | docs ops | `docs/playtest-telemetry-roadmap.md` | Порядок теста: до, во время, после |
+| PTM-2.3 | ✅ | srv | `docs/playtest-telemetry-roadmap.md` | Счётчики приёмника в /metrics/summary |
+| PTM-3.1 | ⏳ | srv docs | `docs/playtest-telemetry-roadmap.md` | Хранение и удаление |
+| PTM-3.2 | ⏳ | srv proto | `docs/playtest-telemetry-roadmap.md` | Назначение экспериментов |
+| PTM-3.3 | 🔒 | srv ops | `docs/playtest-telemetry-roadmap.md` | Хранилище вместо файлов и дашборды |
+| PTM-3.4 | 🔒 | srv proto | `docs/playtest-telemetry-roadmap.md` | Пуш как канал возврата: замер с контролем |
 | PVE-0.1 | ✅ | core data | `docs/pve-team-modes-roadmap.md` | GameModeDef zod-схема + modes в GameData |
 | PVE-0.2 | ✅ | core srv | `docs/pve-team-modes-roadmap.md` | modeId в MatchConfig + консервация |
 | PVE-0.3 | ✅ | data | `docs/pve-team-modes-roadmap.md` | Пресет standard |
@@ -1259,6 +1271,7 @@
 | PVR-6.38 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда экспедиции — за волны, а не за сам забег |
 | PVR-6.39 | ✅ | proto | `docs/sector-zero-roadmap.md` | «Корабли» подготовки — по окну производства |
 | PVR-6.40 | ✅ | proto cli core | `docs/sector-zero-roadmap.md` | Купленные слоты — на арте и в забеге |
+| PVR-6.41 | ✅ | proto | `docs/sector-zero-roadmap.md` | Очков победы в забеге нет нигде |
 | PVR-7.1 | ✅ | data | `docs/sector-zero-roadmap.md` | Карта главы IV |
 | PVR-7.2 | ✅ | core data | `docs/sector-zero-roadmap.md` | Сценарный союзник: контакт, союз, общий обзор |
 | PVR-7.3 | ✅ | core data | `docs/sector-zero-roadmap.md` | Накопитель: извлечение, носитель, победа доставкой |
@@ -1395,7 +1408,7 @@
 | SM-3.7a | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Ракетная мина — неподвижный отряд |
 | SM-3.7b | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Ракета — отряд без приказов, полёт по прямой, обычный туман |
 | SM-3.7c | ✅ | core | `docs/ship-modules-roadmap.md` | Челноки бьют ракету |
-| SM-3.7d | ⏳ | core | `docs/ship-modules-roadmap.md` | Чем и когда челноки сбивают ракету — развилка владельца |
+| SM-3.7d | ✅ | core | `docs/ship-modules-roadmap.md` | Чем и когда челноки сбивают ракету |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

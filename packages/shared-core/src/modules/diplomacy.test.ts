@@ -411,3 +411,49 @@ describe('diplomacyModule — MAPSHARE-1: обмен картами', () => {
     expect(gone.ok && hasMapShare(gone.state, 'p1', 'p2')).toBe(false);
   });
 });
+
+
+describe('diplomacy — fixed match sides', () => {
+  const kernel = createKernel([diplomacyModule]);
+  const teamContext: Context = { ...ctx(), config: { timeScale: 1, modeId: 'team_2v2' } };
+  function sides(): GameState {
+    const state = baseState();
+    state.players.p1!.team = 'A';
+    state.players.p2!.team = 'A';
+    state.players.p3 = { ...player('p3'), team: 'B' };
+    state.players.neutral = { ...player('neutral'), npc: 'neutral', ai: true };
+    setStance(state, 'p1', 'p2', 'alliance');
+    return state;
+  }
+
+  it.each([false, true])('rejects breaking or crossing fixed sides (AI partner: %s)', (ai) => {
+    const state = sides();
+    state.players.p2!.ai = ai;
+    for (const [actor, target, stance] of [
+      ['p1', 'p2', 'war'], ['p2', 'p1', 'peace'], ['p1', 'p2', 'pact'],
+      ['p1', 'p3', 'peace'], ['p3', 'p1', 'pact'], ['p1', 'p3', 'alliance'],
+    ]) {
+      const result = kernel.applyAction(deepFreeze(state), declare(actor!, target!, stance), teamContext);
+      expect(errCode(result)).toBe('E_FORBIDDEN');
+      expect(state.diplomacyOffers).toBeUndefined();
+      expect(getStance(state, 'p1', 'p2')).toBe('alliance');
+    }
+  });
+
+  it('does not lock diplomacy with unteamed inhabitants', () => {
+    const state = sides();
+    setStance(state, 'p1', 'neutral', 'peace');
+    const result = okApply(kernel.applyAction(state, declare('p1', 'neutral', 'war'), teamContext));
+    expect(getStance(result.state, 'p1', 'neutral')).toBe('war');
+  });
+
+  it('takes its mode from resolved config, with unchanged legacy diplomacy', () => {
+    const state = sides();
+    state.modeId = 'team_2v2';
+    const result = okApply(kernel.applyAction(state, declare('p1', 'p2', 'war'), ctx()));
+    expect(getStance(result.state, 'p1', 'p2')).toBe('war');
+    delete state.players.p1!.team;
+    delete state.players.p2!.team;
+    expect(kernel.applyAction(state, declare('p1', 'p2', 'war'), teamContext).ok).toBe(true);
+  });
+});

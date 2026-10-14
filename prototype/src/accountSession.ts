@@ -46,6 +46,14 @@ import {
 } from '../../decisions/sessionStore';
 import { authStatusUrl, identityMode, type IdentityMode } from './identityProbe';
 import { createPendingJoin } from './pendingJoin';
+import { getPlatform } from './platform/host';
+import { loginEvent, type LoginResult } from '../../decisions/sessionAnalytics';
+
+/** PTM-1.2: исход попытки войти — в аналитику (правила — `sessionAnalytics.ts`). */
+function reportLogin(result: LoginResult): void {
+  const { event, props } = loginEvent(result);
+  getPlatform().analytics.emit(event, props);
+}
 
 /** Что сессии нужно от игры: строка статуса и лента из `main.ts`, карточка входа — со
  *  страниц входа (`signInPages.ts`). */
@@ -143,6 +151,7 @@ export async function ensureSession(
   // Правила логина и пароля — в `authRules.ts` (REFM-47): зеркало серверных, чтобы
   // игрок увидел ПРИЧИНУ, а не сухой одинаковый отказ.
   if (!validLogin(login)) {
+    reportLogin('nick-rule');
     game.status(t('acc.nick.rule'));
     return null;
   }
@@ -153,6 +162,7 @@ export async function ensureSession(
   const passInput = document.getElementById('cpass') as HTMLInputElement | null;
   const password = passwordFrom(passwordArg, game.welcomePassword(), passInput?.value ?? '');
   if (!validPassword(password)) {
+    reportLogin('pass-rule');
     game.status(t('acc.pass.rule'));
     return null;
   }
@@ -180,6 +190,7 @@ export async function ensureSession(
     const outcome = authOutcome(login1, reg);
     // Пропуск — у входа, регистрация вторая (`authRequest.ts`, правило 4).
     const token = mintedToken(login1, reg);
+    reportLogin(token ? (outcome === 'created' ? 'created' : 'ok') : outcome);
     if (token) {
       saveSession(localStorage, base, { login, token });
       if (outcome === 'created') game.note('✔ ' + t('acc.created'));
@@ -188,6 +199,7 @@ export async function ensureSession(
     game.status(t(AUTH_REASON[outcome]));
     return null;
   } catch {
+    reportLogin('server-down');
     game.status(t('acc.server-down'));
     return null;
   }

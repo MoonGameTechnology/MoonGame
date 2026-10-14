@@ -18,6 +18,7 @@
  * продуктовая: в первом случае кнопка остаётся, во втором её не должно быть вовсе.
  * Отсутствие рекламы — нормальное состояние, а не поломка игрового цикла.
  */
+import { TELEMETRY_EVENTS } from '../../../packages/protocol/src/telemetry';
 
 /** Что умеет площадка. UI принимает решения по этим флагам, а не по её названию. */
 export interface PlatformCapabilities {
@@ -98,19 +99,9 @@ export interface PlatformIAP {
 }
 
 /** Словарь продуктовых событий — НАШ, общий для всех площадок: иначе воронки с разных
- *  площадок не сравнить. Куда и в каком формате их отправить, решает адаптер. */
-export const PLATFORM_EVENTS = [
-  'session_started',
-  'onboarding_step',
-  'pve_started',
-  'pve_completed',
-  'pve_failed',
-  'rewarded_ad_offered',
-  'rewarded_ad_completed',
-  'iap_started',
-  'iap_completed',
-  'meta_unlock',
-] as const;
+ *  площадок не сравнить. Куда и в каком формате их отправить, решает адаптер. Объявлен в
+ *  `@void/protocol` (PTM-1.1): тот же список принимает приёмник сервера. */
+export const PLATFORM_EVENTS = TELEMETRY_EVENTS;
 export type PlatformEvent = (typeof PLATFORM_EVENTS)[number];
 
 export interface PlatformAnalytics {
