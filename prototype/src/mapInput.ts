@@ -83,6 +83,7 @@ import {
   type TapPick,
 } from '../../decisions/tapCycle';
 import { tapOwner, tapRadius } from '../../decisions/tapPriority';
+import { rightClickAct } from '../../decisions/rightClick';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { chainMapTap, chainMode, enterChainMode } from './chainComposer';
 import { engageTarget, mobileOrderKind, stageMobileTarget } from './cmdActions';
@@ -229,6 +230,7 @@ export function initMapInput(host: MapInputHost): void {
   canvas.addEventListener('dblclick', () => defaultView());
   canvas.addEventListener('pointermove', hover);
   canvas.addEventListener('pointerleave', () => canvas.classList.remove('cur-hot'));
+  canvas.addEventListener('contextmenu', rightClick);
 }
 
 /** Shift или Ctrl/⌘ на текущем тапе: добрать флот в группу, а не заменить. */
@@ -305,6 +307,51 @@ function aloftAimTap(
   else game.note(t('hint.wing-cancelled'));
 }
 
+/** Кому принадлежит клик по карте сейчас — по взведённым режимам (`tapPriority.ts`). */
+function currentTapOwner(): ReturnType<typeof tapOwner> {
+  return tapOwner({
+    chainMode: !!chainMode,
+    merging,
+    heroAim: !!heroAim,
+    heroSpawnAim: !!heroSpawnAim,
+    retreatAim: !!retreatAim,
+    assaultAim,
+    engageAim,
+    strikeAim: !!strikeAim,
+    allyAim: !!allyAim,
+    rallyAim: !!rallyAim,
+    pickMode,
+    aiming,
+  });
+}
+
+/** Курс флотов `ids` в точку экрана: в мир под курсором, а мимо миров — в точку дороги. */
+function courseAt(ids: string[], mx: number, my: number): void {
+  const n = nearestHit(game.nodes(), (nn) => world(nn), mx, my, tapRadius('node', tapByTouch));
+  if (n) tryMoveGroup(ids, n.id);
+  else {
+    const lane = nearestLanePoint(mx, my);
+    if (lane) tryMoveEdgeGroup(ids, { from: lane.from, to: lane.to, t: lane.t });
+  }
+}
+
+/** ПКМ по карте на ПК — «Курс сюда» для выбранных флотов (`rightClick.ts`, UIX-9.2). */
+function rightClick(ev: MouseEvent): void {
+  const act = rightClickAct({
+    button: ev.button,
+    touch: (ev as PointerEvent).pointerType === 'touch',
+    pc: pcUi(),
+    armed: currentTapOwner() !== 'select',
+    movers: selectedFleetIds().length,
+  });
+  // Системное меню гасит слушатель документа (`main.ts`) — здесь только жест игры.
+  if (act !== 'course') return;
+  const p = ptXY(ev);
+  tapByTouch = false;
+  courseAt(selectedFleetIds(), p.x, p.y);
+  game.invalidatePanel();
+}
+
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
 export function selectAt(mx: number, my: number) {
   const s = game.world();
@@ -327,20 +374,7 @@ export function selectAt(mx: number, my: number) {
   const rNode = tapRadius('node', tapByTouch);
   // Кто забирает этот тап — решает модуль, а не порядок `if`ов ниже: вооружённый
   // приказ важнее выделения, а набор группы уступает вооружённому ходу.
-  const owner = tapOwner({
-    chainMode: !!chainMode,
-    merging,
-    heroAim: !!heroAim,
-    heroSpawnAim: !!heroSpawnAim,
-    retreatAim: !!retreatAim,
-    assaultAim,
-    engageAim,
-    strikeAim: !!strikeAim,
-    allyAim: !!allyAim,
-    rallyAim: !!rallyAim,
-    pickMode,
-    aiming,
-  });
+  const owner = currentTapOwner();
   // Merge armed: the next tap on a friendly fleet (not itself in the selection) is
   // the anchor — the selected fleet(s) fly to it and fuse. Any other tap cancels.
   if (owner === 'merge') {
@@ -665,11 +699,7 @@ export function selectAt(mx: number, my: number) {
       );
       return;
     }
-    if (n) tryMoveGroup(selectedFleetIds(), n.id);
-    else {
-      const lane = nearestLanePoint(mx, my);
-      if (lane) tryMoveEdgeGroup(selectedFleetIds(), { from: lane.from, to: lane.to, t: lane.t });
-    }
+    courseAt(selectedFleetIds(), mx, my);
     drop('aiming');
     game.invalidatePanel();
     return;
@@ -856,6 +886,8 @@ const ptXY = (ev: { clientX: number; clientY: number }) =>
     game.vh(),
   );
 function pointerDown(ev: PointerEvent): void {
+  // Правая кнопка мыши — не выбор и не рамка: её жест «Курс сюда» берёт `rightClick`.
+  if (ev.pointerType === 'mouse' && ev.button === 2) return;
   const s = game.world();
   const ME = game.me();
   const MOBILE = game.mobile();
