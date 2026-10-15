@@ -165,7 +165,7 @@ body.app-starting #map{visibility:hidden;}
    \`holo-ui\`) и без подписей, а через полсекунды — новый. Покров снимает \`bootstrap.ts\`,
    уже поставив классы консоли и подписи. */
 body.app-booting > *{visibility:hidden!important;}
-body.app-startup-failed > :not(#startup-error):not(#dev-badge):not(#dev-notice){display:none!important;}
+body.app-startup-failed > :not(#startup-error):not(#dev-badge){display:none!important;}
 /* AUD-29: the tab that lost Sector Zero to another tab looks like a stopped start, too. */
 #startup-error,#tab-taken{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:18px;padding:24px;
