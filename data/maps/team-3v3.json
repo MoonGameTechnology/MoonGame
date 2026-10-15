@@ -1197,7 +1197,7 @@
         "x": 318,
         "y": -2434
       },
-      "kind": "debris_field",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "crown_097": {
@@ -1205,7 +1205,7 @@
         "x": -503,
         "y": -2455
       },
-      "kind": "debris_field",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "crown_098": {
