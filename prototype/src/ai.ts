@@ -323,6 +323,11 @@ const CREDIT_RUNWAY_HOURS = 48;
 const LEADER_METAL_SURPLUS = 600;
 /** Что ведущее место улучшает дома, по порядку: кредиты, налог, микроэлектроника. */
 const LEADER_UPGRADES = ['refinery', 'tax_office', 'fabricator'] as const;
+/** Сколько разведчиков место заказывает за ход на войне. Разведчик берёт пустую провинцию
+ *  прилётом, и на дуэли это решает партию: 200 очных партий duel-1 против бота с одним
+ *  разведчиком за ход — 1 → 50%, 2 → 74–77%, 3 → 85%, 4 → 93%, 5 → 82%, 6 → 61%, 8 → 60%.
+ *  Пачка строится за то же время, что один корабль. */
+const WAR_SCOUT_BATCH = 4;
 
 /** С какого размера кулак сильного бота делится надвое при отплытии (AI-BAL-7). Ниже —
  *  ударная группа и так на пределе: её порог выхода в рейд равен трём корпусам. */
@@ -1589,7 +1594,10 @@ function baseAiOrders(
         out.push(buildUnit(ai, base.id, militiaUnit, 2));
       }
       if (ownFleets < 8 && (pl.resources.metal ?? 0) > 140) {
-        out.push(buildUnit(ai, base.id, scoutUnit, 1));
+        // Пачку берёт обычное место в полную силу. Оборона наместника флот не двигает, а
+        // NPC — PvE-контент: им и простому ходу по одному, как было.
+        const batch = skilled && !defensive && !state.players[ai]!.npc ? WAR_SCOUT_BATCH : 1;
+        out.push(buildUnit(ai, base.id, scoutUnit, batch));
       }
     }
     // ═══ СИЛЬНЫЙ БОТ (AI-BAL-3): наземная кампания ═══
