@@ -159,9 +159,16 @@ describe('шапка забега — проводка в кадре', () => {
     expect(shell).toContain("apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),");
   });
 
-  it('плашка-заглушка Суверенов в строке статуса в забеге не рисуется', () => {
-    expect(main).toMatch(
-      /\(sectorZeroToolsHidden\(\)\s*\? ''\s*: `<button type="button" class="dl-donate"/,
+  it('основная игра не показывает выдуманные Суверены, кошелёк забега остаётся из профиля', () => {
+    // Неподтверждённая валюта скрыта целиком, а не заменена числом вне забега.
+    expect(main).not.toMatch(/\bSOVEREIGNS\b/);
+    const status = main.slice(main.indexOf('  const statusHtml ='), main.indexOf('  if (statusHtml !== lastClockText)'));
+    expect(status).not.toMatch(/dl-donate|data-donate=/);
+    expect(main).toContain('wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),');
+    // Отдельный настоящий баланс Sector Zero по-прежнему приходит из профиля.
+    expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
+    expect(runWalletHtml({ research: 0, warrants: 0, sovereigns: 7 })).toMatch(
+      /tw-sovereigns[^>]*><i aria-hidden="true"><svg.*<\/svg><\/i>7<\/button>/,
     );
   });
 });

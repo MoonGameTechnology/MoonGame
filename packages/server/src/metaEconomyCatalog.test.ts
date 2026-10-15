@@ -1,0 +1,53 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { loadShippedData } from './scenario';
+import { loadMetaEconomyCatalog, parseMetaEconomyCatalog } from './metaEconomyCatalog';
+
+const data = loadShippedData();
+const raw = (): Record<string, unknown> =>
+  JSON.parse(readFileSync('data/metaEconomy.json', 'utf8')) as Record<string, unknown>;
+
+describe('main-game meta content', () => {
+  it('ships five useful materials, six existing modules and a complete seasonal track', () => {
+    const catalog = loadMetaEconomyCatalog(data);
+    expect(Object.keys(catalog.materials)).toHaveLength(5);
+    expect(Object.keys(catalog.recipes)).toHaveLength(6);
+    expect(catalog.seasons[0]).toMatchObject({ durationDays: 56, levels: 50 });
+    expect(catalog.seasons[0]!.milestones.map((row) => row.level)).toEqual([1, 10, 20, 30, 40, 50]);
+    expect(catalog.seasons[0]!.contracts).toHaveLength(8);
+  });
+
+  it('rejects dangling material/module references and salvage multiplication', () => {
+    const catalog = loadMetaEconomyCatalog(data);
+    expect(() =>
+      parseMetaEconomyCatalog(
+        {
+          ...catalog,
+          recipes: {
+            ...catalog.recipes,
+            bad: { defId: 'missing', ingredients: { ferroalloys: 1 }, salvage: { ferroalloys: 1 } },
+          },
+        },
+        data,
+      ),
+    ).toThrow('E_META_MODULE');
+    expect(() =>
+      parseMetaEconomyCatalog(
+        { ...catalog, rewards: { ...catalog.rewards, materials: { fake: 3 } } },
+        data,
+      ),
+    ).toThrow('E_META_MATERIAL');
+    catalog.recipes.ablative_plating!.salvage.ferroalloys = 25;
+    expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_SALVAGE');
+  });
+
+  it('rejects unordered stage budgets and advertising season XP bypasses', () => {
+    const catalog = loadMetaEconomyCatalog(data);
+    catalog.rewards.stageFractions = [0.5, 0.25];
+    expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_STAGES');
+    const other = loadMetaEconomyCatalog(data);
+    other.commerce.products.rewarded_supply!.premiumSeason = other.seasons[0]!.id;
+    expect(() => parseMetaEconomyCatalog(other, data)).toThrow('E_META_AD_PRODUCT');
+    expect(() => parseMetaEconomyCatalog({ ...raw(), typo: true }, data)).toThrow();
+  });
+});

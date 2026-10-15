@@ -1,3 +1,5 @@
+import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
+import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
 import { randomUUID } from 'node:crypto';
@@ -56,6 +58,11 @@ import {
 export class MemoryMatchStore implements MatchStore {
   private readonly snaps = new Map<string, MatchSnapshot>();
 
+  economyMatchIds(after = '', limit = 100): Promise<string[]> {
+    const size = Number.isSafeInteger(limit) ? Math.min(100, Math.max(1, limit)) : 100;
+    return Promise.resolve([...this.snaps.keys()].filter((id) => id > after).sort().slice(0, size));
+  }
+
   load(matchId: string): Promise<MatchSnapshot | null> {
     const snap = this.snaps.get(matchId);
     return Promise.resolve(snap ? clone(snap) : null);
@@ -64,7 +71,17 @@ export class MemoryMatchStore implements MatchStore {
   save(snapshot: MatchSnapshot): Promise<void> {
     const prev = this.snaps.get(snapshot.matchId);
     if (!prev || snapshot.seq >= prev.seq) {
-      this.snaps.set(snapshot.matchId, clone(snapshot)); // optimistic: keep the newest
+      const economyObservations = { ...snapshot.economyObservations, ...prev?.economyObservations };
+      const economyActivity: Record<string, string[]> = {};
+      for (const [key, ids] of Object.entries(prev?.economyActivity ?? {})) economyActivity[key] = [...ids];
+      for (const [key, ids] of Object.entries(snapshot.economyActivity ?? {})) {
+        economyActivity[key] = [...new Set([...(economyActivity[key] ?? []), ...ids])].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE);
+      }
+      this.snaps.set(snapshot.matchId, clone({
+        ...snapshot,
+        ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
+        ...(Object.keys(economyActivity).length ? { economyActivity } : {}),
+      })); // optimistic: keep the newest while retaining committed reward evidence
     }
     return Promise.resolve();
   }
@@ -768,57 +785,59 @@ export class MemoryReceiptStore implements ReceiptStore {
  *  invariants: idempotent grant (first write wins), owner-guarded transfer/consume,
  *  soulbound never transfers. */
 export class MemoryArsenalStore implements ArsenalStore {
-  private readonly items = new Map<string, OwnedArsenalItem>();
+  private items = new Map<string, OwnedArsenalItem>();
+  private readonly lock = memoryEconomyLock(this);
+
+  /** Transaction checkpoints are only used while holding the shared economy gate. */
+  snapshotState(): Array<[string, OwnedArsenalItem]> {
+    return structuredClone([...this.items]);
+  }
+  restoreState(rows: Array<[string, OwnedArsenalItem]>): void {
+    this.items = new Map(structuredClone(rows));
+  }
 
   grant(item: OwnedArsenalItem): Promise<void> {
-    if (!this.items.has(item.itemId)) this.items.set(item.itemId, { ...item });
-    return Promise.resolve();
+    return this.lock.run(async () => {
+      if (!this.items.has(item.itemId)) this.items.set(item.itemId, { ...item });
+    });
   }
-
   get(itemId: string): Promise<OwnedArsenalItem | null> {
-    const row = this.items.get(itemId);
-    return Promise.resolve(row ? { ...row } : null);
+    return this.lock.run(async () => {
+      const row = this.items.get(itemId);
+      return row ? { ...row } : null;
+    });
   }
-
   listOf(accountId: string): Promise<ArsenalItem[]> {
-    return Promise.resolve(
-      [...this.items.values()]
-        .filter((r) => r.accountId === accountId)
-        .sort(
-          (a, b) =>
-            a.kind.localeCompare(b.kind) ||
-            a.defId.localeCompare(b.defId) ||
-            a.itemId.localeCompare(b.itemId),
-        )
-        .map(({ accountId: _owner, ...item }) => ({ ...item })),
-    );
+    return this.lock.run(async () => [...this.items.values()]
+      .filter((r) => r.accountId === accountId)
+      .sort((a, b) => a.kind.localeCompare(b.kind) || a.defId.localeCompare(b.defId) || a.itemId.localeCompare(b.itemId))
+      .map(({ accountId: _owner, ...item }) => ({ ...item })));
   }
-
-  transfer(
-    itemId: string,
-    from: string,
-    to: string,
-  ): Promise<{ ok: true } | { ok: false; code: 'E_NOT_OWNER' | 'E_SOULBOUND' }> {
-    const row = this.items.get(itemId);
-    if (!row || row.accountId !== from) return Promise.resolve({ ok: false, code: 'E_NOT_OWNER' });
-    if (row.soulbound) return Promise.resolve({ ok: false, code: 'E_SOULBOUND' });
-    row.accountId = to;
-    return Promise.resolve({ ok: true });
+  transfer(itemId: string, from: string, to: string): Promise<{ ok: true } | { ok: false; code: 'E_NOT_OWNER' | 'E_SOULBOUND' }> {
+    return this.lock.run(async () => {
+      const row = this.items.get(itemId);
+      if (!row || row.accountId !== from) return { ok: false, code: 'E_NOT_OWNER' };
+      if (row.soulbound) return { ok: false, code: 'E_SOULBOUND' };
+      row.accountId = to;
+      return { ok: true };
+    });
   }
-
   consume(itemId: string, accountId: string): Promise<boolean> {
-    const row = this.items.get(itemId);
-    if (!row || row.accountId !== accountId) return Promise.resolve(false);
-    this.items.delete(itemId);
-    return Promise.resolve(true);
+    return this.lock.run(async () => {
+      const row = this.items.get(itemId);
+      if (!row || row.accountId !== accountId) return false;
+      this.items.delete(itemId);
+      return true;
+    });
   }
-
   wear(itemId: string, by: number): Promise<{ durability?: number } | null> {
-    const row = this.items.get(itemId);
-    if (!row) return Promise.resolve(null);
-    if (row.durability === undefined) return Promise.resolve({ durability: undefined });
-    row.durability = Math.max(0, row.durability - by);
-    return Promise.resolve({ durability: row.durability });
+    return this.lock.run(async () => {
+      const row = this.items.get(itemId);
+      if (!row) return null;
+      if (row.durability === undefined) return { durability: undefined };
+      row.durability = Math.max(0, row.durability - by);
+      return { durability: row.durability };
+    });
   }
 }
 
@@ -858,40 +877,46 @@ export class MemoryCorpRentStore implements CorpRentStore {
 /** In-memory drop-loop store (ARS-4): exactly-once per-(match, account) roll claims,
  *  the pity counter and the salvage-shard balance. */
 export class MemoryDropStore implements DropStore {
-  private readonly claims = new Set<string>();
-  private readonly pity = new Map<string, number>();
-  private readonly shards = new Map<string, number>();
+  private claims = new Set<string>();
+  private pity = new Map<string, number>();
+  private shards = new Map<string, number>();
+  private lock: MemoryEconomyLock = memoryEconomyLock(this);
 
+  bindEconomyLock(owner: object): void { this.lock = memoryEconomyLock(owner); }
+  snapshotState(): { claims: string[]; pity: Array<[string, number]>; shards: Array<[string, number]> } {
+    return { claims: [...this.claims], pity: [...this.pity], shards: [...this.shards] };
+  }
+  restoreState(state: ReturnType<MemoryDropStore['snapshotState']>): void {
+    this.claims = new Set(state.claims);
+    this.pity = new Map(state.pity);
+    this.shards = new Map(state.shards);
+  }
   claim(matchId: string, accountId: string): Promise<boolean> {
-    const key = `${matchId} ${accountId}`;
-    if (this.claims.has(key)) return Promise.resolve(false);
-    this.claims.add(key);
-    return Promise.resolve(true);
+    return this.lock.run(async () => {
+      const key = JSON.stringify([matchId, accountId]);
+      if (this.claims.has(key)) return false;
+      this.claims.add(key);
+      return true;
+    });
   }
-
   pityOf(accountId: string): Promise<number> {
-    return Promise.resolve(this.pity.get(accountId) ?? 0);
+    return this.lock.run(async () => this.pity.get(accountId) ?? 0);
   }
-
   setPity(accountId: string, value: number): Promise<void> {
-    this.pity.set(accountId, value);
-    return Promise.resolve();
+    return this.lock.run(async () => { this.pity.set(accountId, value); });
   }
-
   stepPity(accountId: string, hit: boolean, pityAfter: number): Promise<number> {
-    // Read and write with no await between them: one event-loop step is the atomicity.
-    const pity = this.pity.get(accountId) ?? 0;
-    this.pity.set(accountId, hit || pity + 1 >= pityAfter ? 0 : pity + 1);
-    return Promise.resolve(pity);
+    return this.lock.run(async () => {
+      const pity = this.pity.get(accountId) ?? 0;
+      this.pity.set(accountId, hit || pity + 1 >= pityAfter ? 0 : pity + 1);
+      return pity;
+    });
   }
-
   addShards(accountId: string, delta: number): Promise<void> {
-    this.shards.set(accountId, (this.shards.get(accountId) ?? 0) + delta);
-    return Promise.resolve();
+    return this.lock.run(async () => { this.shards.set(accountId, (this.shards.get(accountId) ?? 0) + delta); });
   }
-
   shardsOf(accountId: string): Promise<number> {
-    return Promise.resolve(this.shards.get(accountId) ?? 0);
+    return this.lock.run(async () => this.shards.get(accountId) ?? 0);
   }
 }
 

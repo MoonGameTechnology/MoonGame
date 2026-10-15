@@ -101,7 +101,7 @@ ArsenalItem {
   grade?,                 // заточка (EC-2.1), только у экземпляров
   soulbound: bool,        // донат/лутбокс — не торгуется (анти-RMT, GDD §4.4)
   durability?,            // износ (ARS-6); отсутствует = не изнашивается
-  origin: starter|drop|craft|auction|lootbox|rent,
+  origin: starter|drop|craft|auction|lootbox|rent|commerce|ad|season,
   acquiredAt
 }
 ```
@@ -117,7 +117,7 @@ ArsenalItem {
 > (hull/module/hero_fitting) × **`form` (blueprint/instance)**; `grade` (EC-2.1,
 > +1..+3) и `durability` (износ ARS-6) — только у экземпляров (superRefine,
 > fail-secure); `soulbound` (анти-RMT), `origin` (starter/drop/craft/auction/
-> lootbox/rent). `parseArsenalItem`/`safeParseArsenalItem` +
+> lootbox/rent/commerce/ad/season). `parseArsenalItem`/`safeParseArsenalItem` +
 > `validateArsenalItem(item, data)` — defId сверяется с каталогом СВОЕГО kind
 > (`E_UNKNOWN_DEF:<kind>:<id>`; kinds не кросс-валидируются). Тесты — против
 > реальных шипованных каталогов.
@@ -227,24 +227,18 @@ observe-поток сервера (симуляцию не трогаем — м
 **DoD.** Неделя игры без доната ощутимо пополняет арсенал; телеметрия дропа в
 JSONL (EC-5.1 позже заберёт).
 
-> **Итог реализации.** `dropRoller.ts` (server-side, вне редьюсера — симуляция не
-> тронута). Дроп: на observe-`end` шанс по `rewards.place` (SES-2), пул весами,
-> pity — гарантия на K-й сухой матч подряд (`pityAfter` в данных); роллы
-> детерминированы на (матч, аккаунт) (FNV-1a→mulberry32) не ради геймплея, а чтобы
-> реплей прохода был бит-идентичен и складывался с exactly-once. Exactly-once —
-> `DropStore.claim` (PK (match, account), ON CONFLICT DO NOTHING): повторный `end`
-> не роллит и не бампает pity второй раз; сам грант тоже идемпотентен
-> (`drop:<match>:<acc>`). Счётчик pity читается и сдвигается ОДНИМ шагом стора
-> (`DropStore.stepPity`, в Postgres — под `FOR UPDATE`): два матча аккаунта, закончившиеся
-> разом, видят серию по очереди, и одна серия не даёт двух гарантированных дропов. Дроп — ТОРГУЕМЫЙ чертёж `origin: drop` (F2P-кэтчап кормит
-> аукцион, ARS-0). Сальваж: `salvageFromEvents` над observe-батчем — осколки
-> победителю каждого `battle.resolved` от павшего вражеского состава (`unit.died`
-> несёт `owner`), цены per-unit в данных; баланс осколков в `DropStore` (вход
-> крафта EC-2.2), атомарный инкремент. Таблицы — `data/dropTables.json`,
-> валидируются при старте против каталогов (fail-secure). Обвязка — AvA
-> `matchExtras` (slot→account из `AvaSession.seats`; боты без аккаунта не получают
-> ничего); телеметрия — JSONL-строка на ролл (раскрытие шансов, вход EC-5.1).
-> `DropStore`: Memory + Postgres (`drop_claims`, `drop_meta`), общий контракт-тест.
+> **Итог реализации (обновлено 2026-10-15).** `dropRoller.ts` содержит таблицы,
+> выбор по месту и детерминированный поток RNG; runtime-выдача выполняется
+> `MetaEconomy.settle` из сохранённых серверных фактов обычных матчей и AvA.
+> В одной транзакции находятся `DropStore.claim`, pity, грант торгуемого чертежа,
+> гарантированное снабжение и receipt. Повтор не меняет серию и не выдаёт второй
+> предмет; сбой гранта откатывает также claim/pity. Старые уже выданные AvA-claims
+> учитываются, повторного броска при переходе нет. Таблицы `data/dropTables.json`
+> проверяются при старте. Наблюдаемость получает событие после commit и не блокирует
+> выдачу; результат читается отдельно от открытия итогового экрана.
+> Прежний AvA `salvageFromEvents` сохраняет осколки победителю боя; этот ресурс
+> не смешивается с пятью новыми производственными материалами.
+> [Участие, восстановление, производство и торговля v0](meta-economy.md).
 
 > **Правка 2026-09-14 — половина кораблей была недостижима.** Найдено из живой жалобы про
 > челноки. Для места со снапшотом (человеческое кресло AvA) «что можно построить» =

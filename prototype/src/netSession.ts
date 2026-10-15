@@ -168,6 +168,11 @@ export function initNetSession(host: NetSessionHost): void {
   }
 }
 
+/** Server match identity for account-scoped, read-only result receipts. */
+export function serverMatchId(): string | null {
+  return NET && netAdmitted ? currentMatchId : null;
+}
+
 /** Партия, в которую звонить. Новая цель начинает с чистого цикла: прежний дозвон гаснет,
  *  счётчик попыток обнуляется, а выход игрока из прошлой партии больше не держит. */
 export function targetMatch(id: string): void {

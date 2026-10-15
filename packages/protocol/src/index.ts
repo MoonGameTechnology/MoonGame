@@ -1,4 +1,7 @@
 export * from './corpInfrastructure';
+export type * from './metaEconomy';
+export type * from './metaEconomyView';
+export * from './commerce';
 /**
  * THE wire contract between the server and the client — one declaration, imported by both
  * (NETA2-4). Before this package each side hand-wrote its own copy: they duplicated

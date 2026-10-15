@@ -58,7 +58,7 @@ export interface ProfileView {
   stats: MetaStats;
   /** The live corp record, or null when this commander flies alone. */
   corp: { name: string; influence: number } | null;
-  sovereigns: number;
+  sovereigns: number | null;
   /** Medal ids the account holds, and the full catalog to show them against. */
   owned: readonly string[];
   catalog: readonly MedalEntry[];
@@ -155,7 +155,7 @@ export function profileHtml(v: ProfileView): string {
       ? `<div class="pf-av face"><img src="${esc(v.face)}" alt=""></div>`
       : `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>`) +
     `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
-    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>` +
+    (v.sovereigns === null ? '' : `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>`) +
     `</div>` +
     `<div class="pf-body">` +
     (v.studio ?? profileCareerHtml(v)) +

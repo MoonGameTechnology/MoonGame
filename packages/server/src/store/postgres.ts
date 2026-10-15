@@ -1,5 +1,6 @@
 import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
+import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
@@ -66,6 +67,8 @@ const SCHEMA_SQL = `
       updated_at    timestamptz NOT NULL DEFAULT now()
     );
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS clock jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
 
     CREATE TABLE IF NOT EXISTS seats (
@@ -312,6 +315,40 @@ const SCHEMA_SQL = `
     );
     CREATE INDEX IF NOT EXISTS meta_market_ledger_account_idx ON meta_market_ledger(account_id, at DESC);
 
+    -- One local transaction owns material stock, crafting, seasons and trade receipts.
+    CREATE TABLE IF NOT EXISTS meta_economy_accounts (
+      account_id text PRIMARY KEY,
+      state jsonb NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS meta_economy_receipts (
+      receipt_key text PRIMARY KEY,
+      fingerprint text NOT NULL,
+      response jsonb NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS meta_material_listings (
+      id text PRIMARY KEY,
+      seller_id text NOT NULL,
+      seller_login text NOT NULL,
+      material_id text NOT NULL,
+      quantity bigint NOT NULL CHECK(quantity > 0),
+      reserved jsonb NOT NULL,
+      price bigint NOT NULL CHECK(price > 0),
+      created_at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_material_price_idx ON meta_material_listings(price,created_at);
+    CREATE TABLE IF NOT EXISTS meta_market_receipts (
+      account_id text NOT NULL,
+      trade_id text NOT NULL,
+      fingerprint text NOT NULL,
+      result jsonb NOT NULL,
+      PRIMARY KEY(account_id,trade_id)
+    );
+    CREATE TABLE IF NOT EXISTS meta_entitlement_nonces (
+      nonce text PRIMARY KEY,
+      expires_at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_entitlement_nonce_expiry_idx ON meta_entitlement_nonces(expires_at);
+
     -- Drop loop (ARS-4): the (match, account) claim PK is the exactly-once roll gate
     -- (a replayed match end inserts nothing → no second roll, no double pity bump);
     -- drop_meta holds the pity counter and the salvage-shard balance per account.
@@ -384,7 +421,23 @@ const SCHEMA_SQL = `
 export const schemaFingerprint = (): string => createHash('sha256').update(SCHEMA_SQL).digest('hex');
 
 export async function migrate(pool: Pool | PoolClient): Promise<void> {
-  await pool.query(SCHEMA_SQL);
+  // Boot/admin callers already own their client's transaction and migration lock.
+  if ('release' in pool) {
+    await pool.query(SCHEMA_SQL);
+    return;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
+    await client.query(SCHEMA_SQL);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 interface MatchRow {
@@ -394,9 +447,16 @@ interface MatchRow {
   status: string;
   state: MatchSnapshot['state'];
   clock: MatchSnapshot['clock'] | null;
+  economy_observations: MatchSnapshot['economyObservations'] | null;
+  economy_activity: MatchSnapshot['economyActivity'] | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
+  async economyMatchIds(after = '', limit = 100): Promise<string[]> {
+    const size = Number.isSafeInteger(limit) ? Math.min(100, Math.max(1, limit)) : 100;
+    const result = await this.pool.query<{ id: string }>('SELECT id FROM matches WHERE id>$1 ORDER BY id LIMIT $2', [after, size]);
+    return result.rows.map((row) => row.id);
+  }
   constructor(private readonly pool: Pool) {}
 
   async ping(): Promise<boolean> {
@@ -414,7 +474,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -426,6 +486,8 @@ export class PostgresMatchStore implements MatchStore {
       status: row.status === 'ended' ? 'ended' : 'ongoing',
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
+      ...(row.economy_observations ? { economyObservations: row.economy_observations } : {}),
+      ...(row.economy_activity ? { economyActivity: row.economy_activity } : {}),
     };
   }
 
@@ -433,17 +495,45 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     await this.pool.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
          status       = EXCLUDED.status,
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
+         economy_observations = CASE
+           WHEN matches.economy_observations IS NULL AND EXCLUDED.economy_observations IS NULL THEN NULL
+           ELSE COALESCE(EXCLUDED.economy_observations, '{}'::jsonb) || COALESCE(matches.economy_observations, '{}'::jsonb)
+         END,
+         economy_activity = CASE
+           WHEN matches.economy_activity IS NULL AND EXCLUDED.economy_activity IS NULL THEN NULL
+           ELSE COALESCE((
+             SELECT jsonb_object_agg(tenure, ids) FROM (
+               SELECT tenure, jsonb_agg(activity_id ORDER BY activity_rank) AS ids FROM (
+                 SELECT tenure, activity_id, row_number() OVER(PARTITION BY tenure ORDER BY source, ordinal, activity_id) AS activity_rank
+                 FROM (
+                   SELECT DISTINCT ON(tenure, activity_id) tenure, activity_id, source, ordinal FROM (
+                     SELECT entry.key AS tenure, activity.value AS activity_id, 0 AS source, activity.ordinality AS ordinal
+                     FROM jsonb_each(COALESCE(matches.economy_activity, '{}'::jsonb)) AS entry
+                     CROSS JOIN LATERAL jsonb_array_elements_text(entry.value) WITH ORDINALITY AS activity
+                     UNION ALL
+                     SELECT entry.key AS tenure, activity.value AS activity_id, 1 AS source, activity.ordinality AS ordinal
+                     FROM jsonb_each(COALESCE(EXCLUDED.economy_activity, '{}'::jsonb)) AS entry
+                     CROSS JOIN LATERAL jsonb_array_elements_text(entry.value) WITH ORDINALITY AS activity
+                   ) AS all_activity ORDER BY tenure, activity_id, source, ordinal
+                 ) AS distinct_activity
+               ) AS ranked_activity WHERE activity_rank <= $9 GROUP BY tenure
+             ) AS per_tenure
+           ), '{}'::jsonb)
+         END,
          updated_at   = now()
        WHERE matches.seq <= EXCLUDED.seq`,
-      [snapshot.matchId, snapshot.dataVersion, snapshot.seq, snapshot.status, snapshot.state, snapshot.clock ?? null],
+      [snapshot.matchId, snapshot.dataVersion, snapshot.seq, snapshot.status, snapshot.state, snapshot.clock ?? null,
+        snapshot.economyObservations ? JSON.stringify(snapshot.economyObservations) : null,
+        snapshot.economyActivity ? JSON.stringify(Object.fromEntries(Object.entries(snapshot.economyActivity).map(([key, ids]) => [key, [...new Set(ids)].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE)]))) : null,
+        MAX_META_ACTIVITY_FACTS_PER_ROLE],
     );
   }
 
@@ -1720,7 +1810,7 @@ function corpRentOf(row: CorpRentRow): CorpRent {
  *  NOTHING — first write wins); transfer/consume are owner-guarded conditional writes,
  *  so a double-sell race and a soulbound move are impossible at the storage level. */
 export class PostgresArsenalStore implements ArsenalStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pick<Pool, 'query'>) {}
 
   async grant(item: OwnedArsenalItem): Promise<void> {
     await this.pool.query( // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input

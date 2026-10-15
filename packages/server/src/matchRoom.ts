@@ -45,6 +45,7 @@ import { arsenalSnapshotOf } from './arsenal';
 import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
 import { detach } from './detach';
+import { captureMetaEconomyActivity } from './metaEconomyActivity';
 
 export interface RoomPeer {
   /** `compress: false` keeps this one message out of socket compression (a `ws` option). */
@@ -521,6 +522,8 @@ export class MatchRoom {
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
   private readonly persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
+  /** Server-side participation evidence, never part of the deterministic state or wire view. */
+  private economyActivity: Record<string, string[]> = {};
   /** Opt-in action-layer front-door (see options.gate). */
   private readonly gate?: ActionGate;
   /** Player-action deny-list (see options.denyPlayerActions). */
@@ -794,6 +797,10 @@ export class MatchRoom {
     const wallTime = this.now();
     return { wallTime, gameTime: this.clock(wallTime), timeScale: this.timeScale,
       running: this.isClockRunning && this.stateValue.match.status !== 'ended' };
+  }
+
+  get economyActivitySnapshot(): Record<string, string[]> {
+    return structuredClone(this.economyActivity);
   }
 
   /** Re-evaluate running/paused after a connection change: freeze or resume the
@@ -1478,6 +1485,7 @@ export class MatchRoom {
     // RPL-2: граница, которой мир ДЕЙСТВИТЕЛЬНО достиг (throttled-догон не доходит до
     // `now`) — пустой догон границей не считается, чтобы журнал не пух.
     if (plan.state.time > this.stateValue.time) this.record?.({ at: plan.state.time });
+    this.economyActivity = captureMetaEconomyActivity(this.economyActivity, plan.events, this.stateValue);
     this.stateValue = plan.state;
     if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
     if (plan.events.length > 0 || plan.kind === 'applied') {
@@ -1660,6 +1668,7 @@ export class MatchRoom {
     const from = this.stateValue.time;
     const r = this.computeAdvance(this.stateValue, now);
     if (!r.ok) return { ok: false, code: r.code };
+    this.economyActivity = captureMetaEconomyActivity(this.economyActivity, r.events, this.stateValue);
     this.stateValue = r.state;
     // RPL-2: the boundary the world ACTUALLY reached (a throttled advance stops
     // short of `now`) — a no-op advance is not a boundary, keep the log compact.
@@ -1773,7 +1782,7 @@ export class MatchRoom {
 
   /** Builds a durable snapshot of a specific `(state, seq)` — used by the committed
    *  path to persist a prospective result BEFORE committing it. */
-  private snapshot(state: GameState, seq: number): MatchSnapshot {
+  private snapshot(state: GameState, seq: number, events: readonly DomainEvent[] = []): MatchSnapshot {
     const clock = this.clockSnapshot;
     return {
       matchId: this.id,
@@ -1781,6 +1790,7 @@ export class MatchRoom {
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
       state,
+      economyActivity: captureMetaEconomyActivity(this.economyActivity, events, this.stateValue),
       ...(clock ? { clock: { ...clock, running: clock.running && state.match.status !== 'ended' } } : {}),
     };
   }
@@ -1930,7 +1940,7 @@ export class MatchRoom {
       const receipt: ActionReceipt = ok
         ? { actionId: action.id, playerId, seq, ok: true }
         : { actionId: action.id, playerId, seq, ok: false, code: plan.code };
-      if (!(await this.persistGuarded(this.snapshot(plan.state, seq), receipt, action.id, peer))) {
+      if (!(await this.persistGuarded(this.snapshot(plan.state, seq, plan.events), receipt, action.id, peer))) {
         return TRANSIENT_VERDICT;
       }
       this.seq = seq;

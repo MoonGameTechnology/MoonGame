@@ -11,10 +11,11 @@
 Game пока ведёт комнаты одним процессом (durable-Postgres — opt-in по `DATABASE_URL`);
 Corp поддерживает отдельный процесс/БД через `CORPORATIONS_URL`, без подтверждения
 живого cutover. [Роадмап сервисов](service-resilience-roadmap.md) продолжает эти границы
-для Inventory/settlement, Auction и workers. Деплой-артефакты есть
+для единого Meta/Economy (включая Auction), отдельного Commerce и workers. Деплой-артефакты есть
 (`Dockerfile`, `render.yaml`, `deploy/docker-compose.yml`) и базовая наблюдаемость тоже
-(структурные pino-логи, минимальный `/metrics`). Горизонтального масштаба, игровой
-телеметрии и модерации нет; OTel/Prometheus/Grafana/Sentry — нет.
+(структурные pino-логи, минимальный `/metrics`). Горизонтального масштаба,
+агрегации игровой телеметрии и модерации нет; экономические события v0 пишутся
+после commit. OTel/Prometheus/Grafana/Sentry — нет.
 SBOM/сканеры есть (SEC-0). Контент — `data/*.json` + manifest (валидируется), но без пайплайна
 публикации/версий без даунтайма.
 
