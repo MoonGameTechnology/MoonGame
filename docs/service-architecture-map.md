@@ -1,15 +1,15 @@
 # Карта архитектуры — сервисы и сетевые сегменты
 
 [Роадмап и задачи MSVC](service-resilience-roadmap.md) ·
-[PNG](diagrams/service-boundaries.png) · [PDF](diagrams/service-boundaries.pdf) ·
-[SVG](diagrams/service-boundaries.svg) · [Редактируемый DOT](diagrams/service-boundaries.dot).
+[операционные/security-контуры](security-operations-roadmap.md).
 
-Карта состоит из игрового/служебного контура ниже и отдельной
-[карты backup/logs/SIEM/response](security-operations-roadmap.md).
+> **Канон после решения 2026-10-15 — текст и Mermaid на этой странице.**
+> Существующие `diagrams/service-boundaries.{png,pdf,svg,dot}` отражают прежний
+> вариант с физически отдельным Auction и оставлены только как исторический снимок.
+> В этом изменении графические файлы намеренно не регенерируются.
 
-Если SVG не отображается, используйте встроенный PNG или схему Mermaid ниже.
-Эта страница и изображения хранятся в репозитории; для открытия не требуется путь
-к файловой системе среды агента.
+Карта состоит из игрового/служебного контура ниже и отдельной карты
+backup/logs/SIEM/response.
 
 ## Что есть сейчас
 
@@ -20,13 +20,13 @@ Game объединяет API/Auth/Lobby, матчи, личный инвент�
 Минимальный отдельный `/admin` (roster/kick) существует; полноценные модераторский
 пульт и [Staff/Support с заявками и grants](staff-case-roadmap.md) ещё в плане.
 
-Ниже **целевая** топология. Каждый блок сегмента означает отдельную политику доступа,
+Ниже **целевая** топология после решения 2026-10-15. Commerce физически отделён,
+а Inventory/Wallet/Rewards/Crafting/Season/Auction объединены в один Meta/Economy
+transaction boundary. Каждый блок сегмента означает отдельную политику доступа,
 а не уже развёрнутый VLAN/контейнер/хост. Приватная сеть допускает только заданные
 соединения; сетевое разрешение всегда дополняется проверкой identity и операции.
 Общий физический хост, PG-кластер, DNS, edge или secret-store могут оставаться общей
 точкой отказа: сегментация сама по себе не доказывает HA/DR.
-
-![Целевая карта сервисов и сетевых сегментов](diagrams/service-boundaries.png)
 
 ![Отдельные операционные и security-контуры](diagrams/security-operations.png)
 
@@ -46,26 +46,25 @@ flowchart TB
         StaffIngress["Защищённый staff ingress / MFA"]
     end
     subgraph ApiNet["Приватный сегмент API"]
-        Api["API / Auth / Lobby"]
+        Api["API / Auth / Lobby / routing"]
         ApiStore["Состояние входа и маршрутов"]
         Api --> ApiStore
     end
     subgraph GameNet["Приватный игровой сегмент"]
         Workers["Группы match workers"]
-        GameDB[("Game DB: снимки / receipts / доставка")]
-        Workers --> GameDB
-        Delivery["Роль долговечной доставки Game"]
-        GameDB -->|после commit| Delivery
+        GameDB[("Game DB: snapshots / receipts / delivery")]
+        Delivery["Долговечная доставка Game"]
+        Workers --> GameDB --> Delivery
     end
-    subgraph InvNet["Приватный сегмент Inventory"]
-        Inv["Инвентарь + атомарный settlement"]
-        InvDB[("Inventory DB: предметы / кошельки / ledger")]
-        Inv --> InvDB
+    subgraph MetaNet["Приватный сегмент Meta / Economy"]
+        Meta["Inventory · Wallet · Rewards · Crafting · Season · Auction · Entitlements"]
+        MetaDB[("Meta DB: items / materials / wallets / ledger / lots / receipts")]
+        Meta --> MetaDB
     end
-    subgraph AuctionNet["Приватный сегмент Auction"]
-        Auction["Лоты / намерения сделки / reconciliation"]
-        AuctionDB[("Auction DB")]
-        Auction --> AuctionDB
+    subgraph CommerceNet["Изолированный сегмент Commerce"]
+        Commerce["Catalog · Orders · Payments · Rewarded Ads · Refunds"]
+        CommerceDB[("Commerce DB: orders / provider receipts")]
+        Commerce --> CommerceDB
     end
     subgraph CorpNet["Приватный сегмент Corp"]
         Corp["Членство / роли / строительство / AvA"]
@@ -73,7 +72,7 @@ flowchart TB
         Corp --> CorpDB
     end
     subgraph BgNet["Фоновый сегмент — по потребности"]
-        Bg["Проекции / статистика / уведомления"]
+        Bg["Проекции / analytics / уведомления"]
         BgStore[("Собственные проекции")]
         Bg --> BgStore
     end
@@ -87,28 +86,36 @@ flowchart TB
         Ops["Операторы / deploy / мигратор / backup / аудит"]
         Access --> Ops
     end
+
     Player -->|HTTPS| Http --> Api
     Player -->|WSS| Ws --> Workers
     Employee -->|персональная staff identity| StaffIngress --> Staff
-    Api -->|заявка / статус своего обращения| Staff
+
     Api -->|route / join-token| Workers
-    Api --> Inv
-    Api --> Auction
-    Api --> Corp
-    Auction -->|reserve / settlement / status| Inv
-    Workers -->|loadout до старта| Inv
-    Workers -->|AvA RPC до боя| Corp
-    Delivery -->|награды / износ / возврат| Inv
+    Api -->|inventory / craft / season / auction| Meta
+    Api -->|catalog / order status| Commerce
+    Api -->|corporate commands| Corp
+    Api -->|case intake / status| Staff
+
+    Workers -->|loadout / live ownership reads| Meta
+    Delivery -->|MatchSettled / rewards / wear| Meta
     Delivery -->|итог AvA / аудит| Corp
-    Delivery -->|долговечные события| Bg
-    Delivery -->|подписанные системные события заявки| Staff
-    Staff -->|служебная команда accounts| Api
-    Staff -->|case-bound команда Game| Workers
-    Staff -->|case-bound команда Inventory| Inv
-    Staff -->|case-bound команда Corp| Corp
-    Workers -->|служебное authorize-consume-status| Staff
-    Inv -->|служебное authorize-consume-status| Staff
-    Corp -->|служебное authorize-consume-status| Staff
+    Delivery -->|durable analytics events| Bg
+
+    Commerce -->|verified entitlement command| Meta
+    Corp -->|scoped rent/return authorization| Meta
+
+    Staff -->|case-bound command| Api
+    Staff -->|case-bound game command| Workers
+    Staff -->|case-bound value command| Meta
+    Staff -->|case-bound billing command| Commerce
+    Staff -->|case-bound corporate command| Corp
+
+    Api -->|authorize-consume-status| Staff
+    Workers -->|authorize-consume-status| Staff
+    Meta -->|authorize-consume-status| Staff
+    Commerce -->|authorize-consume-status| Staff
+    Corp -->|authorize-consume-status| Staff
 ```
 
 Для компактности stores нарисованы внутри доменных блоков. В реализации у каждого
@@ -139,15 +146,16 @@ enforcement фиксируются перед включением конкре�
 | Сотрудник / служебный пульт | Защищённый staff ingress | Персональная staff identity/MFA; роль и case-scope проверяются сервером |
 | Staff ingress | Staff/Support | Только публичные staff-маршруты; внутренний consume/status не опубликован |
 | API/Auth/Lobby | Workers / их маршрутизатор | Управление местом и маршрутом; scoped операции, без горячего пути боя |
-| API/Auth/Lobby | Inventory | Личный инвентарь, equip/rent и другие команды с правами исходного actor |
-| API/Auth/Lobby | Auction | Лоты и торговые намерения с подтверждённой волей продавца/покупателя |
+| API/Auth/Lobby | Meta/Economy | Личный арсенал, крафт, сезон, Auction и другие команды с правами исходного actor |
+| API/Auth/Lobby | Commerce | Каталог, создание/статус заказа; клиент не передаёт доверенный статус платежа |
 | API/Auth/Lobby | Corp | Корпоративные команды с проверкой членства/ролей |
 | API/Auth/Lobby | Staff/Support | Игровой intake/статус только своего дела; отдельный owner-identity вызов consume/status для accounts-команд |
-| Staff/Support | Game / Auth/accounts / Inventory / Corp | Только предусмотренные case-bound служебные команды; исходный employee, audience, target, actionId и policy-лимиты |
-| Game / Auth/accounts / Inventory / Corp | Staff/Support | Авторизованный owner принимает/проверяет grant через атомарный consume/status; только служебный путь |
+| Staff/Support | Game / Auth/accounts / Meta/Economy / Commerce / Corp | Только предусмотренные case-bound служебные команды; исходный employee, audience, target, actionId и policy-лимиты |
+| Game / Auth/accounts / Meta/Economy / Commerce / Corp | Staff/Support | Авторизованный owner принимает/проверяет grant через атомарный consume/status; только служебный путь |
 | Доменная роль долговечной доставки | Staff/Support | Отдельный аутентифицированный intake системного источника; eventId, bounded retries и дедупликация, вне горячего пути боя |
-| Auction | Inventory | Только reserve/commit/cancel/status по стабильному ID и ограниченным полномочиям |
-| Game/workers и роль доставки Game | Inventory | Loadout до старта; идемпотентная выдача/износ/возврат после результата |
+| Commerce | Meta/Economy | Только versioned/idempotent entitlement/refund-команды по стабильному order/provider transaction ID; без SQL-доступа к Meta DB |
+| Corp | Meta/Economy | Только scoped rent/return authorization для конкретного предмета/получателя/матча |
+| Game/workers и роль доставки Game | Meta/Economy | Loadout/live ownership reads; идемпотентная выдача/износ/награды после результата |
 | Game/workers и роль доставки Game | Corp | Ограниченные AvA RPC, доставка результата и аудита |
 | Владелец Game / его роль доставки | Фоновые потребители | Версионированные durable события, без права выдать валюту от имени проекции |
 | Каждый доменный runtime | Только собственный store | Собственная DML-роль, TLS и отдельный data ACL; никаких чужих таблиц/DDL |
@@ -182,13 +190,14 @@ enforcement фиксируются перед включением конкре�
 а аудит связывает peer/operator, gateway и целевую операцию. VPN и bastion —
 варианты реализации одного ограниченного канала; ни один не выдаёт blanket-доступ.
 
-**По умолчанию запрещено:** браузер → внутренние API/БД; Auction → Corp/Game API
-и любые чужие БД; runtime → управляющие поверхности management/SSH/Docker socket;
-соседний runtime → чужие
+**По умолчанию запрещено:** браузер → внутренние API/БД; Commerce → Game/Corp DB
+или Meta DB напрямую; Meta/Economy → payment-provider secrets; runtime →
+управляющие поверхности management/SSH/Docker socket; соседний runtime → чужие
 секреты; произвольный egress. Допустимые бизнес-команды проверяются независимо от ACL:
-identity Auction не разрешает произвольную цену, выдачу предмета или изменение баланса.
-Контракт MSVC-1 должен связать подтверждение actor с предметом, ценой, валютой,
-получателем, комиссией и ID сделки; доверенный transport не заменяет это подтверждение.
+identity Commerce не разрешает произвольную выдачу предмета/Варрантов, а identity
+Meta/Economy не разрешает подделать provider payment. Контракт MSVC-1 связывает
+actor, предмет/продукт, цену/валюту, получателя, комиссию и стабильный ID операции;
+доверенный transport не заменяет это подтверждение.
 
 ## Внутри каждого сервиса
 
