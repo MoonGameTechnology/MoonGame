@@ -46,7 +46,6 @@ import {
   pushMsg,
   replaceMessages,
   sessionMessages,
-  unreadMsgs,
 } from './messageLog';
 import {
   closeDiplo,
@@ -96,9 +95,6 @@ import {
 import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
 import { fleetBaseSpeed, forkSiteId, isForkSite, shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
-import { swarmDossier } from '../../decisions/swarmDossier';
-import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
-import { swarmJournal } from '../../decisions/swarmJournal';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -121,7 +117,6 @@ import {
   SECTOR_TYPES,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
-  DAY,
   spyOn,
   assaultFleet,
   bombardFleet,
@@ -236,8 +231,6 @@ import {
   getStance,
   previewBattle,
   previewLossCount,
-  scanNodeThreats,
-  identifiedNodes,
   sightCircles,
   type SightCircle,
   type Squadron,
@@ -307,14 +300,11 @@ import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
-import { waveReadout } from '../../decisions/waveReadout';
 import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
 import { initMissionPanel } from './missionPanel';
 import { bossTask } from '../../decisions/runBoss';
-import { devourSieges } from '../../decisions/devourSiege';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { runAiSeats } from '../../decisions/runAiSeats';
-import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { tileHp } from '../../decisions/unitTile';
@@ -368,7 +358,6 @@ import {
   openSectorZero,
   playChapterComic,
   playTaskComic,
-  runWallet,
   sectorZeroMenu,
   watchAd,
 } from './sectorZeroShell';
@@ -392,7 +381,7 @@ import {
   sovereignRepairCost,
   abandonRunReward,
 } from '../../decisions/sectorZeroProgress';
-import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
+import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import { syncCommanderXp } from './commanderSync';
 import { cardCovers } from './panelSlack';
@@ -401,11 +390,8 @@ import { initMobileHud, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
 import type { PhoneItemId } from '../../decisions/phoneNav';
 import { initPhoneSpeed } from './phoneSpeed';
-import { tempoOf } from '../../decisions/phoneSpeed';
 import { initPcHotkeys } from './pcHotkeys';
 import { HOTKEY_SILENT_LAYERS, cycledFleets, homeTarget, nextFleet } from '../../decisions/hotkeys';
-import { initPurseFloats } from './purseFloats';
-import type { PurseReading } from '../../decisions/purseDelta';
 import { arrivalHours, restRouteHours } from './travelEta';
 import { toScreen } from './screenAnchor';
 import { pickHome } from './openingView';
@@ -419,8 +405,6 @@ import {
 } from './panelKit';
 import { laneOf } from './buildOrders';
 import { barPct } from './buildProgress';
-import { hourBucket } from './alerts';
-import { threatAlerts, threatScanDue, threatsHeard, type ThreatSighting } from './threatAlerts';
 import { SPY_COST } from './intel';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
@@ -442,13 +426,9 @@ import {
   displayUnit,
   buildingName,
   fmtEta,
-  flowPer,
-  flowRate,
-  clockHM,
   countdownHMS,
   setRunClock,
 } from './format';
-import { runClockText } from '../../decisions/runClock';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
   BUILD_ICON,
@@ -513,11 +493,10 @@ import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
 import { initTrader } from './traderScreen';
-import { ALLY_EMBLEM, initAllyScreen } from './allyScreen';
-import { allyPanelView, linkedAlly } from '../../decisions/allyPanel';
+import { initAllyScreen } from './allyScreen';
+import { linkedAlly } from '../../decisions/allyPanel';
 import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
 import { captiveLoad, extractionStart } from '../../decisions/actions';
-import { refugeThreats } from '../../decisions/refugeThreat';
 import { captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
@@ -570,13 +549,26 @@ import { flushPinch, forgetAdditive, forgetAimPointer, initMapInput, pointers, s
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer, marchFlagged } from './chainComposer';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
 import { eventLog, handleEvents, initEventFeed, killStats, logLines, note, resetEventFeed, toast } from './eventFeed';
-// ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
-// with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
-// morning report (`stewMetrics`).
+import {
+  PLAY_BASE,
+  applyTimeSpeed,
+  closeSwarmDossier,
+  forgetStatusLine,
+  hideSwarmDossier,
+  initTopBar,
+  renderSpeedbar,
+  renderSwarmDossier,
+  renderTopBar,
+  resetThreatAlerts,
+  swarmDossierPinned,
+  updateThreatAlerts,
+} from './matchTopBar';
+// ST-2/ST-3 — «Хранитель»: the window is REFM-7; its read-only helpers are shared with
+// the threat alert (`stewFmtDur`, `matchTopBar.ts`), the side panel (`stewardTechDone`)
+// and the morning report (`stewMetrics`).
 import { battleRetreats, initBattleWindow } from './battleScreen';
 import {
   initSteward,
-  stewFmtDur,
   stewardTechDone,
 } from './stewardScreen';
 import { initArsenal } from './arsenalScreen';
@@ -653,16 +645,10 @@ import {
   rewardDue,
 } from './goalsPanel';
 import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
-import { attentionTotal, countShown, myBattleCount, railBadge } from './attentionBadges';
-import { atLimit, callsign, liveStanding, standingShown, topSignature } from './standingLine';
 import { CLEARED, needsClearing, overlayAlarm, overlayShown, overlayText } from './netOverlay';
 import {
   BANNER_FORGOTTEN,
   bannerOffersRestart,
-  displayOf,
-  speedbarRestartShown,
-  speedbarShown,
-  timeControlsShown,
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
 import {
@@ -707,16 +693,6 @@ import {
   fleetEffects,
   pointDefenseTotal,
 } from './fleetEffects';
-import {
-  chipDead,
-  chipShort,
-  flowDigits,
-  flowPrefix,
-  flowRounded,
-  flowShown,
-  flowSign,
-  stockText,
-} from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { netViewAt } from '../../decisions/netViewClock';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -843,9 +819,6 @@ const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
 
 let s: GameState = newGame();
 let speed = 1 / 3600; // game-hours per real second (0 = paused); ×1 = wall-clock, overwritten at launch
-/** Множитель «×N», на который настроена пара «играть / ускорить», — его пишет кнопка скорости
- *  телефона (UIX-3.2): у ряда нет чипа на каждый множитель настройки матча (×2, ×5, ×300). */
-let timeMult = 1;
 let banner: string | null = null;
 // Terminal end screen (the match-over overlay): outcome + reason + XP award, filled
 // once by checkEnd from the authoritative `match` state. `dismissed` lets the player
@@ -1041,41 +1014,8 @@ let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
 let sandboxHomeId: string | null = null;
 let lastPanelHtml = '';
 let lastSplitHtml = '';
-let lastHudHtml = '';
-/** Плашки ресурсов обновляются НА МЕСТЕ. Числа на быстрой скорости меняются каждый кадр, и
- *  замена `innerHTML` всей шапки пересоздавала узел плашки между нажатием и отпусканием —
- *  клик по ресурсу терялся (нашёл прогон «потыкать все кнопки», 2026-09-25). Узел `.res`
- *  живёт, пока набор ресурсов тот же; меняются его класс, подпись и содержимое, а
- *  содержимое прозрачно для указателя (CSS), так что целью клика всегда остаётся плашка. */
-const purseTpl = document.createElement('template');
-function patchPurse(html: string): void {
-  purseTpl.innerHTML = html;
-  // Без настоящего DOM (упрощённые харнесы) — прежняя замена целиком.
-  if (!purseTpl.content?.children || !purse.children) {
-    purse.innerHTML = html;
-    return;
-  }
-  const fresh = [...purseTpl.content.children] as HTMLElement[];
-  const cur = [...purse.children] as HTMLElement[];
-  const same = fresh.length === cur.length && fresh.every((el, i) => el.dataset.res === cur[i]!.dataset.res);
-  if (!same) {
-    purse.replaceChildren(...fresh);
-    return;
-  }
-  fresh.forEach((el, i) => {
-    const old = cur[i]!;
-    if (old.className !== el.className) old.className = el.className;
-    if (old.title !== el.title) old.title = el.title;
-    if (old.innerHTML !== el.innerHTML) old.innerHTML = el.innerHTML;
-  });
-}
-let lastClockText = '';
-let lastClockHead = '';
-let lastTopText = ''; // row-1 dirty check (nick / standing / score / day / countdown)
 let lastObjDescHtml = '';
 let lastLogHtml = '';
-let lastAlertText = '';
-let lastRailAlert = '';
 // --- fog of war (renderer projection; always on) -----------------------------
 // Client-side projection just for the renderer — NOT the real security boundary
 // (that is `visibleState` in shared-core). Зрение кадра и память разведки — `mapFog.ts`.
@@ -1103,72 +1043,6 @@ if (typeof ResizeObserver !== 'undefined')
     if (h > 0) document.body.style.setProperty('--sheeth', sheetHeightVar(h));
   }).observe(side);
 const logEl = $('log');
-const swarmDossierWin = $('swarm-dossier');
-const swarmDossierDesktop = window.matchMedia?.('(min-width:900px) and (hover:hover) and (pointer:fine)');
-let swarmDossierPinned = false;
-let lastSwarmDossierHtml = '';
-let lastSwarmDossierRefresh = -Infinity;
-let lastSwarmDossierContactKey = '';
-let swarmDossierScanUntil = 0;
-const SWARM_DOSSIER_REFRESH_MS = 500;
-/** Чем досье открыли — язычком или пунктом гамбургера: туда и вернуть фокус при закрытии. */
-let swarmDossierOpener: HTMLElement | null = null;
-function openSwarmDossier(opener: HTMLElement): void {
-  swarmDossierOpener = opener;
-  swarmDossierWin.classList.add('show');
-  renderSwarmDossier();
-  $('swarm-dossier-close').focus({ preventScroll: true });
-}
-function closeSwarmDossier(): void {
-  if (swarmDossierPinned) return;
-  swarmDossierWin.classList.remove('show');
-  swarmDossierOpener?.focus({ preventScroll: true });
-}
-// Входы в досье на телефоне (заказ владельца 2026-09-24): пункт гамбургера и язычок у
-// правого края. Кнопка в строке статуса снята — на телефоне её обрезало на «Досье Р…».
-const railDossier = $('rail-dossier');
-const swarmTab = $('swarm-tab');
-railDossier.addEventListener('click', () => openSwarmDossier(railDossier));
-swarmTab.addEventListener('click', () => openSwarmDossier(swarmTab));
-$('swarm-dossier-close').addEventListener('click', closeSwarmDossier);
-// Досье сворачивается до шапки со сводкой (заказ владельца 2026-09-23). Свёрнутость —
-// удобство ЗРИТЕЛЯ, а не состояние партии: хранится в localStorage и переживает перезагрузку;
-// хранилище может быть недоступно (приватное окно) — тогда досье просто развёрнуто.
-// Сворачивает только приколотое досье: у выдвижной панели на телефоне есть «Закрыть».
-const SWARM_DOSSIER_FOLD_KEY = 'vd.swarmDossier.folded';
-let swarmDossierFolded = (() => {
-  try {
-    return localStorage.getItem(SWARM_DOSSIER_FOLD_KEY) === '1';
-  } catch {
-    return false;
-  }
-})();
-let lastSwarmDossierBadge = '';
-function applySwarmDossierFold(): void {
-  const folded = swarmDossierPinned && swarmDossierFolded;
-  swarmDossierWin.classList.toggle('folded', folded);
-  const fold = $('swarm-dossier-fold');
-  fold.setAttribute('aria-expanded', String(!folded));
-  fold.title = swarmDossierPinned ? t(folded ? 'swarm.intel.unfold' : 'swarm.intel.fold') : '';
-}
-$('swarm-dossier-fold').addEventListener('click', () => {
-  if (!swarmDossierPinned) return;
-  swarmDossierFolded = !swarmDossierFolded;
-  try {
-    localStorage.setItem(SWARM_DOSSIER_FOLD_KEY, swarmDossierFolded ? '1' : '0');
-  } catch {
-    /* хранилище недоступно — свёрнутость проживёт до перезагрузки */
-  }
-  applySwarmDossierFold();
-});
-// Мир в карточке силы — ссылка: камера едет туда. На телефоне панель закрывает карту,
-// поэтому после перехода она уступает место тому, ради чего игрок нажал.
-$('swarm-dossier-body').addEventListener('click', (e) => {
-  const node = (e.target as Element).closest<HTMLElement>('[data-jump]')?.dataset.jump;
-  if (!node) return;
-  jumpToPing(node);
-  if (!swarmDossierPinned) closeSwarmDossier();
-});
 // «Флот потерян» / «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): без флота
 // игрок минутами смотрел, как Рой штурмует его планету. Карточка встаёт в кадре, когда кораблей
 // стало ноль (`decisions/fleetLost.ts`), и та же открывается кнопкой рельса в любой момент
@@ -1240,113 +1114,15 @@ function tickAbandon(): void {
   if (railAbandon.style.display !== shown) railAbandon.style.display = shown;
   if (!live && abandonCard.classList.contains('show')) closeAbandon();
 }
-function renderSwarmDossier(now = performance.now()): void {
-  const pinned = Boolean(inMatch() && s.pve && swarmDossierDesktop?.matches);
-  if (pinned !== swarmDossierPinned) {
-    swarmDossierPinned = pinned;
-    lastSwarmDossierRefresh = -Infinity;
-    swarmDossierWin.classList.toggle('pinned', pinned);
-    swarmDossierWin.classList.toggle('show', pinned);
-    swarmDossierWin.setAttribute('role', pinned ? 'complementary' : 'dialog');
-    if (pinned) swarmDossierWin.removeAttribute('aria-modal');
-    else swarmDossierWin.setAttribute('aria-modal', 'true');
-    applySwarmDossierFold();
-  }
-  if (pinned) swarmDossierWin.classList.add('show');
-  if (!inMatch()) swarmDossierWin.classList.remove('show');
-  if (!swarmDossierWin.classList.contains('show')) {
-    lastSwarmDossierRefresh = -Infinity;
-    lastSwarmDossierContactKey = '';
-    swarmDossierScanUntil = 0;
-    swarmDossierWin.classList.remove('updating');
-    return;
-  }
-  swarmDossierWin.classList.toggle('scan-motion', pinned && motionOn());
-  swarmDossierWin.classList.toggle('updating', pinned && now < swarmDossierScanUntil);
-  // Coalesce incoming state changes before building contacts/HTML, not only DOM writes.
-  // The simulation and fog keep their full cadence; only this desktop panel is sampled.
-  if (pinned && now - lastSwarmDossierRefresh < SWARM_DOSSIER_REFRESH_MS) return;
-  lastSwarmDossierRefresh = now;
-  const contacts = swarmDossier(s, ME, vision?.identify ?? new Set());
-  // A live observation's clock advances continuously. It must not spin the scanner.
-  const contactKey = JSON.stringify(contacts.map(c => ({
-    id: c.id, location: c.location, units: c.units, live: c.live, at: c.live ? undefined : c.at,
-  })));
-  if (pinned && contactKey !== lastSwarmDossierContactKey && (contacts.length || lastSwarmDossierContactKey)) {
-    swarmDossierScanUntil = now + 750;
-    swarmDossierWin.classList.add('updating');
-  }
-  lastSwarmDossierContactKey = contactKey;
-  // PVR-4.5: журнал строится из ПРОЕКЦИИ — в ней лежит только свой журнал, чужой снят
-  // фильтром зрителя, а память и проект Роя не приезжают вовсе.
-  const badge = swarmDossierBadge(contacts);
-  if (badge !== lastSwarmDossierBadge) {
-    $('swarm-dossier-badge').textContent = badge;
-    lastSwarmDossierBadge = badge;
-  }
-  const html = swarmDossierHtml(
-    contacts,
-    swarmJournal(s.swarmJournal?.[ME]),
-    swarmLoreKnown(sectorProgress, sectorRunActive),
-    placeName,
-  );
-  if (html !== lastSwarmDossierHtml) {
-    const body = $('swarm-dossier-body');
-    const scroll = body.scrollTop;
-    const biologyOpen = body.querySelector<HTMLDetailsElement>('.swarm-biology')?.open;
-    body.innerHTML = html;
-    const biology = body.querySelector<HTMLDetailsElement>('.swarm-biology');
-    if (biology && biologyOpen) biology.open = true;
-    body.scrollTop = scroll;
-    lastSwarmDossierHtml = html;
-  }
-}
-const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
-// Строка статуса рисуется двумя частями — часы и остальное (`build.mjs`, обе части
-// `display: contents`). Между ними стояла пауза забега (`YAG-6.2`); по решению владельца
-// 2026-09-24 она живёт в полосе скорости рядом с ▶ и ▶▶ — «там ей логичнее находиться».
-const devlineHead = $('devline-head');
-const devlineTail = $('devline-status');
-devlineEl.addEventListener('click', (event) => {
-  if ((event.target as Element).closest('[data-solo-play]')) {
-    if (soloSaveActive && !NET) {
-      speed = Number($('spd-play').dataset.speed);
-      lastReal = performance.now();
-      for (const x of Array.from(document.querySelectorAll('[data-speed]')))
-        x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
-    }
-    return;
-  }
-  if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
-  if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
-  if ((event.target as Element).closest('[data-missions]')) { missionPanel.toggle(); return; }
-  if ((event.target as Element).closest('[data-ally-open]')) { allyScreen.open(); return; }
-});
-
-const purse = $('purse');
-// UIX-4.1: «+N» под плашками — что и когда решает `decisions/purseDelta.ts`.
-const purseFloats = initPurseFloats(purse);
-// top-bar row 1: nick + live standing (left), victory chip (gap), day card (right)
 const topEl = $('top');
-const tbName = $('tbname');
-const tbPlace = $('tbplace');
-const tbScore = $('tbscore');
-const tbDay = $('tbday');
-const tbEta = $('tbeta');
 const bannerEl = $('banner');
 let lastBannerHtml = ''; // dirty-check so the banner's restart button isn't recreated each frame
-const restartBtn = $('restart'); // speedbar restart (shown in the no-bots solo sandbox)
-const restartSep = $('restart-sep');
-const spdCtl = $('spd-ctl'); // speedbar time-control group
-const speedbarEl = $('speedbar');
-const alertBadge = $('alertbadge');
 const cmdbar = $('cmdbar');
 const splitdlg = $('splitdlg');
 // top-bar right cluster + collapsible rail
 const railEl = $('rail');
 const railToggle = $('railtoggle');
 const railGlyph = $('railglyph');
-const railAlert = $('railalert');
 const crestMark = $('crestmark');
 const holoCoarsePointer = window.matchMedia?.('(pointer: coarse)');
 const holographic = initHolographicUi({
@@ -1493,54 +1269,6 @@ initMapRadar({
   ping: () => snd.play('radar'),
 });
 
-// --- threat alert (THREAT-HUD): «враг у ваших рубежей» ------------------------
-// The same fog-honest node-threat tripwire the Steward keys off (ST-3.1,
-// scanNodeThreats), surfaced to the LIVE player: one note per (node, fleet)
-// EPISODE — a camping fleet doesn't re-toast every step, a fresh approach after
-// the episode ended alerts again (the radarMemory pattern). Throttled to once
-// per GAME-HOUR bucket: solo advances s.time every frame, so a raw s.time guard
-// would be a no-op and the coverage flood would run per frame; threats move on
-// multi-hour ETAs, so an hourly sweep loses nothing. NET is naturally
-// fog-clean — the fogged state only ever holds fleets the player may see.
-const threatMemory = new Set<string>();
-let threatScanAt = -1;
-/** Флоты главных сил, о курсе которых к докам союзник уже доложил (глава VI, PVR-8.4). */
-const refugeReported = new Set<string>();
-function updateThreatAlerts(): void {
-  // РЕЖИМ звонка — `threatAlerts.ts` (REFM-169): дроссель на игровой час (соло двигает
-  // время каждый кадр, поэтому сторож «время изменилось» пустой), один звонок на эпизод
-  // «мир + флот», забывание кончившегося и правило «срок обещается, только пока не истёк».
-  if (!threatScanDue(hourBucket(s.time, HOUR), threatScanAt)) return;
-  threatScanAt = hourBucket(s.time, HOUR);
-  if (!threatsHeard(s.players[ME]?.status)) return;
-  const c = ctx(s.time, s);
-  const identified = identifiedNodes(s, ME, data);
-  const sightings: ThreatSighting[] = [];
-  for (const p of Object.values(s.planets)) {
-    if (p.owner !== ME) continue;
-    for (const th of scanNodeThreats(s, p.id, ME, c, identified)) {
-      sightings.push({ node: p.id, fleetId: th.fleetId, kind: th.kind, eta: th.eta });
-    }
-  }
-  for (const a of threatAlerts(sightings, s.time, threatMemory)) {
-    note(
-      a.left === null
-        ? t('threat.here', { node: placeName(a.node) })
-        : t('threat.incoming', { node: placeName(a.node), dur: stewFmtDur(a.left) }),
-      a.node,
-    );
-  }
-  // Глава VI (PVR-8.4, §8.7): союзник докладывает наблюдаемую угрозу месту эвакуации —
-  // видимый курс главных сил к найденным докам, один раз на флот (`refugeThreat.ts`). Чип
-  // «⬡ Союзник» мигает: в окне связи ждёт его предложение охранять доки (PVR-8.5).
-  const toRefuge = refugeThreats(s, ME, fleetSeen, refugeReported);
-  for (const th of toRefuge) refugeReported.add(th.fleetId);
-  if (toRefuge.length > 0) {
-    note(t('refuge.threat'), toRefuge[0]!.at);
-    allyPulseUntil = performance.now() + 12_000;
-  }
-}
-
 // Камера карты и рамка — у владельца, `mapCamera.ts` (REFM-231). Отсюда — только то, что
 // принадлежит игре: экран, раскладка, мир, своё место и побочные действия перехода.
 initMapCamera({
@@ -1626,7 +1354,6 @@ initWorldQueries({
 // отделено от корабля линии, иначе один и тот же корпус считается дважды.
 const isShuttle = (u: string) => isWingUnit(u, data);
 const isGround = (u: string) => isGroundUnit(u, data);
-const floor = Math.floor;
 /** Compact number like Iron Order's bar: 15.7k, 728, … */
 
 // Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
@@ -5243,62 +4970,46 @@ initMapInput({
 });
 
 // --- top bar / speed ---------------------------------------------------------
-
-for (const b of Array.from(document.querySelectorAll('[data-speed]'))) {
-  b.addEventListener('click', () => {
-    // Пауза забега — через его правило (`YAG-6.2`): оно помнит темп для продолжения, а уход
-    // со страницы и пауза площадки говорят с тем же правилом. «‖» на паузе продолжает.
-    if (b.id === 'spd-pause' && runPauseShown()) {
-      runPauseEvent('toggle');
-      return;
-    }
-    speed = Number((b as HTMLElement).dataset.speed);
-    for (const x of Array.from(document.querySelectorAll('[data-speed]')))
-      x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
-  });
-}
-// Pace chips (×1/×10/×50): retune the play/fast pair mid-match and start running at
-// the new multiplier — the same mapping the setup screen launches with.
-for (const b of Array.from(document.querySelectorAll('[data-mult]'))) {
-  b.addEventListener('click', () => applyTimeSpeed(Number((b as HTMLElement).dataset.mult)));
-}
-
-// Map a setup time-flow multiplier (×1/×2/×5/×10) onto the speedbar and start running at
-// it. ×1 is true wall-clock — 1 game-hour per real hour — matching the real-time MMO
-// design; each higher multiplier accelerates from there (×5 = 5 game-hours per real hour,
-// …), and fast-forward (▶▶) runs at 3× the chosen play. The play/fast buttons carry the
-// live values so pause→resume returns to the chosen pace, not the default.
-const PLAY_BASE = 1 / 3600; // game-hours per real second; 1/3600 ⇒ 1 game-hour per real hour (×1 = wall-clock)
-/**
- * Настроить пару «играть / ускорить». `fastMult` отдельным параметром, потому что у
- * ЗАБЕГА своё отношение между ними: обычной партии ускорение втрое только помогает, а
- * забег на нём проскакивает нижнюю границу прохождения (PVR-2.2). По умолчанию — прежние
- * втрое, так что для всех остальных вызовов ничего не изменилось.
- */
-function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void {
-  const play = PLAY_BASE * mult;
-  timeMult = mult;
-  const playBtn = $('spd-play');
-  const fastBtn = $('spd-fast');
-  if (playBtn) playBtn.dataset.speed = String(play);
-  if (fastBtn) fastBtn.dataset.speed = String(PLAY_BASE * fastMult);
-  speed = play;
-  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
-    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
-  for (const x of Array.from(document.querySelectorAll('[data-mult]')))
-    x.classList.toggle('on', Number((x as HTMLElement).dataset.mult) === mult);
-}
-// ▶▶▶ дев-забега (заказ владельца 2026-09-24) — свой постоянный темп: пара «играть /
-// ускорить» его не трогает. В игроцкой сборке кнопки нет вовсе (`<!--dev-only-->`).
-const devFastBtn = document.getElementById('spd-dev');
-if (devFastBtn) devFastBtn.dataset.speed = String(PLAY_BASE * RUN_SPEED_DEV);
-
-// Restart → back to the skirmish setup (bot selection). The speedbar button serves the
-// no-bots sandbox; the end-banner button (delegated) serves a finished bot match.
-// Player build: the button is stripped with the rest of the time controls (no skirmish).
-if (!__PLAYER_BUILD__) restartBtn.addEventListener('click', () => {
-  if (leavesToSectorZero()) openSectorZero();
-  else openSetup();
+// Верхняя полоса — строка статуса, шапка, плашки, значки и тревоги, полоса скорости и досье
+// Роя — у владельца, `matchTopBar.ts` (REFM-222). Отсюда — то, что принадлежит игре: мир,
+// своё место, имена, темп и реальные часы мира, пауза забега, окна и такт телефона.
+initTopBar({
+  world: () => s,
+  me: () => ME,
+  names: () => NAME,
+  placeName,
+  inMatch,
+  speed: () => speed,
+  setSpeed: (v) => {
+    speed = v;
+  },
+  restartRealClock: () => {
+    lastReal = performance.now();
+  },
+  runPauseShown,
+  runPauseEvent,
+  toolsHidden: sectorZeroToolsHidden,
+  scoreLimit: () => SCORE_LIMIT,
+  nick: () => nickInput.value,
+  income: () => perWorld('income', () => netIncome(s, ME)),
+  mobile: () => MOBILE,
+  aiSeats: () => AI_PLAYERS.size,
+  speedControl: () => devSpeedControl,
+  holographic: () => holographic.active(),
+  phoneSpeed: () => phoneSpeed,
+  phoneBadges: (battles, unread) => phoneNav.badges(battles, unread),
+  allyPulsing: () => performance.now() < allyPulseUntil,
+  pulseAlly: () => {
+    allyPulseUntil = performance.now() + 12_000;
+  },
+  openAlly: () => allyScreen.open(),
+  toggleMissions: () => missionPanel.toggle(),
+  missionsOpen: () => missionPanel.isOpen(),
+  openResource: (key) => resourceCard.open(key),
+  restart: () => {
+    if (leavesToSectorZero()) openSectorZero();
+    else openSetup();
+  },
 });
 bannerEl.addEventListener('click', (ev) => {
   if (!(ev.target as Element).closest('[data-restart]')) return;
@@ -6585,31 +6296,6 @@ function saveMeta(st: MetaState): void {
 // Install a ready GameState as the live match: reset all interaction state, queues,
 // camera and log, then hide the setup overlay. `aiPlayers` are the seats the local
 // sim drives. Shared by the normal skirmish and (via a hook) the dev test mode.
-// Tap a resource chip → open the resource card (RC-1): stock, net flow, breakdown,
-// and a button to open the market on that resource.
-purse.addEventListener('click', (ev) => {
-  const el = (ev.target as Element).closest('[data-res]') as HTMLElement | null;
-  if (!el) return;
-  resourceCard.open(el.dataset.res!);
-});
-
-// Tap the ✦ score chip → a plain-words breakdown of how the score is built and how
-// the match ends (the victory rule is otherwise invisible mid-match).
-topEl.addEventListener('click', (ev) => {
-  if (!(ev.target as Element).closest('.dstat')) return;
-  const mine = Object.values(s.planets).filter((p) => p.owner === ME);
-  const worlds = mine.filter((p) => (p.kind ?? 'planet') === 'planet').length;
-  const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
-  note(
-    t('hud.score.tip', {
-      score,
-      limit: SCORE_LIMIT,
-      w: worlds,
-      s: mine.length - worlds,
-    }),
-  );
-});
-
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
   leaveSolo();
   forgetAutoAssault();
@@ -6629,7 +6315,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   AI_PLAYERS = new Map(aiPlayers);
   for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
   pirateIntro.reset();
-  swarmDossierWin.classList.remove('show');
+  hideSwarmDossier();
   solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
@@ -6646,9 +6332,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
   worldMemo = null;
   forgetRadarContacts();
-  threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
-  threatScanAt = -1;
-  refugeReported.clear(); // id флотов карты повторяются от забега к забегу
+  resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();
   awayFromGameTime = null; // reset the away-window baseline for the new match
   banner = null; // clear any end-banner left by the menu-background match (else it sticks)
@@ -7468,7 +7152,7 @@ const missionPanel = initMissionPanel({
   rows: runMissionRows,
   training: isTraining,
   jump: id => jumpTo(id, 'goto'),
-  onToggle: () => { lastClockText = ''; },
+  onToggle: forgetStatusLine,
   chain: () => runChain(),
   extractors: () => extractionCandidates(s, ME).map((id) => ({ id, label: fleetLabelOf(id) })),
   extract: (fleetId) => {
@@ -7660,13 +7344,6 @@ function frame(nowReal: number) {
       maybeStartPendingTour();
     }
   }
-  // Status strip below the top bar: the in-game clock plus the donate currency
-  // (Суверены ◆) pushed to the right end — one level down from the resource row.
-  // Day + countdown live in the #daycard, victory progress in the #tbscore chip
-  // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
-  // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
-  // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
-  // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   tickSoloSave(nowReal);
   if (gameplayMarked !== (sectorRunActive && speed > 0 && !comicQueue.isBusy())) markGameplay();
@@ -7675,117 +7352,13 @@ function frame(nowReal: number) {
   tickAbandon();
   tickTrader();
   tickAlly();
-  const wave = waveReadout(s.pve, s.time);
-  const waveHtml =
-    wave.kind === 'none'
-      ? ''
-      : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'waves' ? wave.wave : wave.total, m: wave.total })}` +
-        ` · ${
-          wave.kind === 'cleared'
-            ? t('hud.wave.done')
-            : wave.kind === 'hold'
-              ? // Глава с архивом (PVR-7.3) или с контрактом операции (главы V и VI): удержание
-                // её не выигрывает — обещать «выстоять ещё» значило бы врать; волны просто
-                // кончились, исход решает накопитель или операция.
-                s.extraction || s.operation
-                ? t('hud.wave.done')
-                : t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
-              : // На телефоне строка статуса уже экрана: слова «следующая через» уходят, остаётся
-                // отсчёт (прогон кнопок на телефоне, 2026-09-25 — хвост обрезался маской).
-                `<span class="dl-full">${t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>` +
-                `<span class="dl-short">${countdownHMS(wave.nextInMs)}</span>`
-        }</span>`;
-  // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
-  // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
-  // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
-  // Видимы только задачи ЭТОГО забега — запас главы минус закрытое навсегда (PVR-5.3).
-  // Чип — кнопка панели задач (заказ владельца 2026-09-24): список прятался в подсказке
-  // при наведении, и на телефоне его не было видно вовсе.
-  // PVR-4.7: осада «Поглощения мира» над своим миром — и в строке статуса: на карте отсчёт
-  // может заслонить флот, здесь он читается всегда. На телефоне — только знак и время.
-  const siegeHtml = devourSieges(s, ME)
-    .map((m) => {
-      const place = placeName(m.target);
-      const left = countdownHMS(m.leftMs);
-      const tip = m.archetype ? ` title="${esc(t(`boss.${m.archetype}.siege`, { world: place, in: left }))}"` : '';
-      return `<span class="dl-siege"${tip}>☠ <span>${esc(place)} </span>${left}</span>`;
-    })
-    .join('');
+  // Задачи забега этого кадра: их читают чип строки статуса, панель задач и комиксы главы.
   const missions = sectorRunActive ? runMissionRows() : [];
-  const missionsDone = missions.filter(m => m.complete).length;
   const chain = runChain();
   if (isSectorZeroRun()) playTaskComic(missions, chain);
-  const missionHtml =
-    missions.length === 0
-      ? ''
-      : `<button type="button" class="dl-missions" data-missions="1" aria-expanded="${missionPanel.isOpen()}" title="${t('hud.missions.title')}"><i aria-hidden="true">⚑</i><span>${t('hud.missions.label')}</span><b>${missionsDone}/${missions.length}</b></button>`;
+  // Строка статуса, шапка, плашки ресурсов и значки внимания — у владельца полосы (REFM-222).
+  renderTopBar(nowReal, preparingMap, missions);
   missionPanel.render(missions);
-  // Глава IV (PVR-7.5): чип «⬡ Союзник · шаг операции» — вход в окно связи, только после
-  // встречи. После самой встречи он мигает, пока игрок его не заметит.
-  const allyView = sectorRunActive ? allyPanelView(s, ME, data) : null;
-  const allyHtml = allyView
-    ? `<button type="button" class="dl-ally${performance.now() < allyPulseUntil ? ' pulse' : ''}" data-ally-open="1" title="${esc(t('ally.title'))}">` +
-      `<i aria-hidden="true">${ALLY_EMBLEM}</i><span>${esc(t('ally.label'))}</span><b>${esc(t(`ally.step.${allyView.step}`))}</b></button>`
-    : '';
-  // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
-  // забег идёт, в тех же реальных минутах, что и все его таймеры.
-  const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;
-  if (clockHtml !== lastClockHead) {
-    devlineHead.innerHTML = clockHtml;
-    lastClockHead = clockHtml;
-  }
-  const statusHtml =
-    missionHtml +
-    allyHtml +
-    siegeHtml +
-    waveHtml +
-    (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
-    (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
-    (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '');
-  if (statusHtml !== lastClockText) {
-    devlineTail.innerHTML = statusHtml;
-    lastClockText = statusHtml;
-  }
-  // Входы в досье Роя — пока оно не приколото справа (ПК держит его открытым всегда).
-  // Язычок прячется и под открытой панелью: ручка того, что уже выдвинуто, не нужна.
-  const dossierEntry = Boolean(s.pve) && !swarmDossierPinned;
-  const railDossierShown = dossierEntry ? '' : 'none';
-  if (railDossier.style.display !== railDossierShown) railDossier.style.display = railDossierShown;
-  const tabHidden = !dossierEntry || swarmDossierWin.classList.contains('show');
-  if (swarmTab.hidden !== tabHidden) swarmTab.hidden = tabHidden;
-  // Top-bar row 1: nick + live standing («N-е из M» — the end-screen ranking formula
-  // over the LIVE scores), the ✦ victory chip in the middle gap, and the day card
-  // with a countdown to the next game day. Fixed nodes are patched by textContent
-  // (no innerHTML rebuild — the crest/who/dstat click targets stay put).
-  const d = floor(s.time / DAY) + 1;
-  // Живое положение в таблице — `standingLine.ts` (REFM-191): место берётся ТОЙ ЖЕ
-  // формулой, что и на итоговом экране (`placementOf`), иначе две рукописные копии
-  // сортировки молча разойдутся; пустая таблица даёт место 0, и печатать его нельзя —
-  // вышло бы «1-е из 0» до старта; подпись перерисовки несёт КАЖДОЕ видимое поле через
-  // разделитель, недостижимый в тексте, иначе строка застынет на прошлом значении.
-  const {
-    place: myPlace,
-    of: seats,
-    score,
-    need,
-  } = liveStanding(s.match?.scores ?? {}, ME, SCORE_LIMIT);
-  const nick = callsign(nickInput.value, NAME[ME]);
-  const eta = countdownHMS(DAY - (s.time % DAY));
-  // Шапка забега (решение владельца 2026-09-24): вместо эмблемы, очков и дня — кошелёк
-  // профиля, живой: награда или ролик посреди забега видны сразу.
-  runWallet.render();
-  const topText = topSignature(nick, myPlace, seats, score, d, eta);
-  if (topText !== lastTopText) {
-    tbName.textContent = nick;
-    tbPlace.textContent = standingShown(myPlace) ? t('hud.place', { p: myPlace, n: seats }) : '';
-    tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
-    tbScore.classList.toggle('win', atLimit(need));
-    tbDay.textContent = t('browser.day', { n: d });
-    // digits only: the «до след. дня» caption is a static sibling node (#tbetacap),
-    // so a narrow phone can drop the caption and keep the countdown.
-    tbEta.textContent = eta;
-    lastTopText = topText;
-  }
 
   // Служебное наложение (FPS, задержка, десинк) — `netOverlay.ts` (REFM-192): десинк
   // ПОКАЗЫВАЕТ строку сам, помимо галочки игрока, потому что иначе о нём некому сообщить;
@@ -7803,76 +7376,6 @@ function frame(nowReal: number) {
     fpsEl.textContent = CLEARED;
     lastFpsText = CLEARED;
   }
-  // Top bar = the five session resources (icon + amount). The donate currency (Суверены ◆)
-  // is rendered separately on the status line right under this bar (see statusHtml above).
-  const r = s.players[ME]?.resources ?? {};
-  // Inline-SVG line icons (RES_SVG) — pixel-true to the mock, tinted via
-  // currentColor. Name in `title` for hover/long-press.
-  // Flow under the stock: the tested netIncome() (production − upkeep, per hour)
-  // finally shown to the player. A resource with no stock AND no flow is dimmed —
-  // it plays no part in the current match yet.
-  const inc = perWorld('income', () => netIncome(s, ME));
-  const myArrears = s.players[ME]?.arrears ?? [];
-  // Как число на фишке говорит правду — `resourceChip.ts` (REFM-190): поток меньше
-  // единицы округляется до ДЕСЯТОЙ (содержание даёт доли за час, и целое врало бы «0»),
-  // фишка гаснет только когда пусто И не течёт, долг вытесняет скорость (при долге она
-  // считает производство, которое уже не доходит), а телефон печатает скорость, как ПК.
-  // Показания плашек идут и в «+N» под ними (UIX-4.1, `purseFloats.ts`).
-  const purseReadings: Record<string, PurseReading> = {};
-  const chip = (icon: string, key: string) => {
-    const stock = r[key] ?? 0;
-    purseReadings[key] = { stock, perHour: inc[key] ?? 0 };
-    // Часы забега: в забеге приток — за минуту (решение владельца 2026-09-24).
-    const flow = flowRounded(flowRate(inc[key] ?? 0));
-    const flowTxt = flowShown(flow)
-      ? `<em class="${flowSign(flow)}">${flowPrefix(flow)}${flowDigits(flow, kfmt)}${flowPer()}</em>`
-      : '';
-    const dead = chipDead(stock, flow) ? ' dead' : '';
-    const short = chipShort(myArrears, key) ? ' short' : '';
-    return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b>${stockText(stock, MOBILE, kfmt)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
-  };
-  // Capsule icons = RES_SVG (line art traced from the mock; TECH_CUR keeps the text
-  // glyphs for prose); capsule order follows the mock: coins, cube, sprout, bolt, chip.
-  const hudHtml =
-    chip(RES_SVG['credits']!, 'credits') +
-    chip(RES_SVG['metal']!, 'metal') +
-    chip(RES_SVG['food']!, 'food') +
-    chip(RES_SVG['energy']!, 'energy') +
-    chip(RES_SVG['microelectronics']!, 'microelectronics') +
-    ((r.biomass ?? 0) > 0 || (inc.biomass ?? 0) !== 0 ? chip(RES_SVG['biomass']!, 'biomass') : '');
-  if (hudHtml !== lastHudHtml) {
-    patchPurse(hudHtml);
-    lastHudHtml = hudHtml;
-  }
-  // Пока карта готовится или сеть ещё не впустила, мира на экране нет: не с чего и всплывать.
-  purseFloats.watch(inMatch() && !(NET && !netAdmitted) && !preparingMap, purseReadings, s.time, nowReal);
-  // Кого зовут значки внимания и куда ложится цифра — `attentionBadges.ts` (REFM-189):
-  // ноль ПРЯЧЕТ значок (значок с «0» гонит игрока в пустоту), бой считается моим и когда
-  // я его лишь ВИЖУ, а зеркало на гамбургере молчит при открытой панели — там свои значки.
-  const msgBadge = document.getElementById('msgbadge');
-  if (msgBadge) {
-    msgBadge.style.display = countShown(unreadMsgs) ? '' : 'none';
-    msgBadge.textContent = String(unreadMsgs);
-  }
-  const battles = myBattleCount(Object.values(s.battles), ME, known, (b) => !!vision?.engaged.battles.has(b.id));
-  const alertText = String(battles);
-  if (alertText !== lastAlertText) {
-    alertBadge.style.display = countShown(battles) ? 'grid' : 'none';
-    alertBadge.textContent = alertText;
-    lastAlertText = alertText;
-  }
-  // collapsed rail mirrors unread/battle attention onto the hamburger, so notifications
-  // still surface while the tool panel (with its per-tool badges) is closed.
-  const railAlertText = railBadge(
-    attentionTotal(battles, unreadMsgs),
-    railEl.classList.contains('open'),
-  );
-  if (railAlertText !== lastRailAlert) {
-    railAlert.style.display = railAlertText ? 'grid' : 'none';
-    if (railAlertText) railAlert.textContent = railAlertText;
-    lastRailAlert = railAlertText;
-  }
-  phoneNav.badges(battles, unreadMsgs); // те же значки на «Событиях» и «Ещё» телефона
   const logHtml = logLines.map((l) => `<div>${esc(l)}</div>`).join('');
   if (logHtml !== lastLogHtml) {
     logEl.innerHTML = logHtml;
@@ -7897,28 +7400,7 @@ function frame(nowReal: number) {
     lastBannerHtml = BANNER_FORGOTTEN;
   }
   renderEndScreen();
-  // Player build: the button (and the skirmish it restarts into) doesn't exist.
-  if (!__PLAYER_BUILD__) {
-    const restart = displayOf(speedbarRestartShown(NET, AI_PLAYERS.size));
-    restartBtn.style.display = restart;
-    restartSep.style.display = restart;
-  }
-  // Правило 6 (`matchExits.ts`): в забеге полоса несёт только его темп — ▶ и ▶▶.
-  const run = sectorZeroToolsHidden();
-  speedbarEl.classList.toggle('spd-run', run);
-  if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);
-  const showSpdCtl = displayOf(timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__, run));
-  if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
-  const showBar = displayOf(holographic.active() || speedbarShown(pcUi(), devSpeedControl, run));
-  if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
-  // Телефон прячет полосу за кнопкой скорости (UIX-3.2): кнопка есть, пока есть управление
-  // временем; на ней темп по скорости мира и множитель партии (в забеге множителей нет).
-  const devRate = devFastBtn && !devFastBtn.hidden ? Number(devFastBtn.dataset.speed) : undefined;
-  phoneSpeed.sync(
-    MOBILE && inMatch() && showSpdCtl === '' && showBar === '',
-    tempoOf(speed, { play: Number($('spd-play').dataset.speed), fast: Number($('spd-fast').dataset.speed), dev: devRate }),
-    run ? null : timeMult,
-  );
+  renderSpeedbar();
   // Как часто живёт открытое окно — `liveWindows.ts` (REFM-194): дроссель считает РЕАЛЬНОЕ
   // время (по игровому он на разгоне ×7200 пробивался бы каждым кадром, а на паузе — никогда),
   // отметка у каждого окна СВОЯ (с общей два открытых окна обновлялись бы вдвое реже), и

@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const build = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
-const main = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+// Ряд 1 шапки рисует верхняя полоса (`matchTopBar.ts`, REFM-222).
+const topBar = readFileSync(fileURLToPath(new URL('./matchTopBar.ts', import.meta.url)), 'utf8');
 const consoleCss = readFileSync(
   fileURLToPath(new URL('../mobile-console.css', import.meta.url)),
   'utf8',
@@ -43,8 +44,8 @@ describe('«до след. дня» — отдельный узел, чтобы 
   });
 
   it('в #tbeta уезжают только цифры: собранная строка вернула бы подпись назад', () => {
-    expect(main).toMatch(/tbEta\.textContent = eta;/);
-    expect(main).not.toMatch(/tbEta\.textContent = t\(/);
+    expect(topBar).toMatch(/tbEta\.textContent = eta;/);
+    expect(topBar).not.toMatch(/tbEta\.textContent = t\(/);
   });
 
   it('узкий телефон подпись прячет', () => {

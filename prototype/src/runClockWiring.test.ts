@@ -9,6 +9,8 @@ import { readFileSync } from 'node:fs';
 
 const read = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const MAIN = read('./main.ts');
+// Плашки ресурсов и строку статуса рисует верхняя полоса (`matchTopBar.ts`, REFM-222).
+const TOPBAR = read('./matchTopBar.ts');
 const CARD = read('./resourceCard.ts');
 
 describe('часы забега — проводка', () => {
@@ -18,9 +20,9 @@ describe('часы забега — проводка', () => {
   });
 
   it('приток в полосе ресурсов — через `flowRate`/`flowPer`, без вшитого «/ч»', () => {
-    expect(MAIN).toContain('const flow = flowRounded(flowRate(inc[key] ?? 0));');
-    expect(MAIN).toContain('${flowDigits(flow, kfmt)}${flowPer()}</em>');
-    expect(MAIN).not.toMatch(/flowDigits\(flow, kfmt\)\}\/ч/);
+    expect(TOPBAR).toContain('const flow = flowRounded(flowRate(inc[key] ?? 0));');
+    expect(TOPBAR).toContain('${flowDigits(flow, kfmt)}${flowPer()}</em>');
+    expect(TOPBAR).not.toMatch(/flowDigits\(flow, kfmt\)\}\/ч/);
   });
 
   it('карточка ресурса — те же скорости в той же единице', () => {
@@ -30,7 +32,7 @@ describe('часы забега — проводка', () => {
   });
 
   it('часы статусной полосы в забеге — время забега, а не время суток', () => {
-    expect(MAIN).toContain('isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)');
+    expect(TOPBAR).toContain('isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)');
   });
 
   it('сроки стройки и исследований — через `fmtDur`, а не голые часы', () => {
