@@ -102,6 +102,11 @@
       "tap": 0,
       "wide": 0
     },
+    "summary": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
     "production": {
       "text": 0,
       "tap": 0,
@@ -169,6 +174,11 @@
       "tap": 0,
       "wide": 0
     },
+    "summary": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
     "production": {
       "text": 0,
       "tap": 0,
@@ -232,6 +242,11 @@
       "wide": 0
     },
     "fleet": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "summary": {
       "text": 0,
       "tap": 0,
       "wide": 0
