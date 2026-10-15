@@ -289,13 +289,61 @@ function feature(
       path([[gx, gy], [gx + Math.cos(t) * d, gy + Math.sin(t) * d]], false, 0.4, 0.6);
     }
   } else if (mix.family === 'wreck') {
-    const length = (major ? 17 : 7) + random() * 12;
-    // Angular ribs and broken hulls remain distinct from the closed rock silhouettes.
-    path([point(-length, -4), point(length * 0.3, -4), point(length, 1), point(length * 0.15, 6), point(-length * 0.6, 6)]);
-    if (major) {
-      path([point(-length * 0.4, -4), point(-length * 0.4, 6)], false, 0.65);
-      path([point(length * 0.1, -4), point(length * 0.1, 6)], false, 0.65);
-      path([point(-length * 0.9, 10), point(-length * 1.15, 10), point(-length * 1.15, 0)], false, 0.65);
+    // A ship graveyard: long hulks snapped across the back, each on its own heading,
+    // among loose plating. The old drawing gave every slot the same arrow-shaped hull on
+    // the shared flow heading, and the field read as rows of identical arrows (owner,
+    // 2026-10-14). Neither the size, the heading nor the lattice row repeats here.
+    const heading = random() * Math.PI * 2;
+    const cx = x + (random() - 0.5) * 26, cy = y + (random() - 0.5) * 26;
+    const local = (a: number, ox: number, oy: number) => (u: number, v: number): TerrainPoint =>
+      [ox + u * Math.cos(a) - v * Math.sin(a), oy + u * Math.sin(a) + v * Math.cos(a)];
+    const shard = (px: number, py: number, size: number, alpha: number): void => {
+      const spin = random() * Math.PI * 2;
+      path([0, 2.1 + random() * 0.4, 4 + random() * 0.4].map((t): TerrainPoint =>
+        [px + Math.cos(spin + t) * size, py + Math.sin(spin + t) * size]), true, alpha, 0.6);
+    };
+    // Hulks in a little over a quarter of the slots: a field of wrecks, not a fleet in formation.
+    if (major && random() < 0.6) {
+      // An occasional capital ship among the escorts.
+      const length = (26 + random() * 22) * (random() < 0.2 ? 1.5 : 1) * mix.scale;
+      const beam = length * (0.08 + random() * 0.05);
+      const cut = (random() - 0.5) * 0.3 * length;
+      const jag = (): number => cut + (random() - 0.5) * 0.12 * length;
+      const top = jag(), mid = jag(), bottom = jag();
+      // Bow half: a long tapered prow, with a ragged edge where the back broke.
+      const bow = local(heading, cx, cy);
+      path([bow(top, -beam), bow(length * 0.24, -beam), bow(length * 0.5, 0),
+        bow(length * 0.24, beam), bow(bottom, beam), bow(mid, 0)], true);
+      path([bow(mid + length * 0.03, 0), bow(length * 0.3, 0)], false, 0.35, 0.6);
+      // Stern half: drifted back from the break and twisted, its frame showing, the
+      // engine bells still flared at its end.
+      const twist = (random() < 0.5 ? -1 : 1) * (0.12 + random() * 0.3);
+      const gap = (3 + random() * 5) * mix.scale;
+      const [bx, by] = bow(cut - gap, (random() - 0.5) * gap);
+      const stern = local(heading + twist, bx, by);
+      const s = (u: number, v: number): TerrainPoint => stern(u - cut, v);
+      const end = -length * 0.5;
+      path([s(end, -beam), s(top, -beam), s(mid, 0), s(bottom, beam), s(end, beam)], true);
+      for (const side of [-1, 1])
+        path([s(end, side * beam * 0.5), s(end - length * 0.07, side * beam * 0.85)], false, 0.7, 0.6);
+      for (const rib of [0.07, 0.15, 0.23])
+        path([s(cut - rib * length, -beam), s(cut - rib * length, beam)], false, 0.5, 0.5);
+      // Plating torn off at the break.
+      for (let i = 0, n = 2 + Math.floor(random() * 3); i < n; i++) {
+        const a = random() * Math.PI * 2, reach = (0.12 + random() * 0.3) * length;
+        const [px, py] = bow(cut + Math.cos(a) * reach, Math.sin(a) * reach * 0.6);
+        shard(px, py, (1.2 + random() * 2.4) * mix.scale, 0.65);
+      }
+    } else if (random() < 0.55) {
+      // A torn length of hull plating with one ragged end.
+      const length = (6 + random() * 8) * mix.scale;
+      const beam = length * (0.12 + random() * 0.1);
+      const f = local(heading, cx, cy);
+      path([f(-length * 0.5, -beam), f(length * 0.35, -beam), f(length * 0.5, (random() - 0.5) * beam),
+        f(length * 0.2, beam), f(-length * 0.5, beam)], true, 0.75, 0.6);
+    } else {
+      for (let i = 0, n = 1 + Math.floor(random() * 3); i < n; i++)
+        shard(cx + (random() - 0.5) * 20, cy + (random() - 0.5) * 20, (1 + random() * 2.2) * mix.scale, 0.55);
     }
   } else if (mix.family === 'storm') {
     const points = Array.from({ length: 7 }, (_, j) => point((j - 3) * 15, (random() - 0.5) * 24));

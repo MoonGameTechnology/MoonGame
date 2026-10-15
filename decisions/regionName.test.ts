@@ -3,7 +3,7 @@
  * отдалении.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { regionKey, regionLabelAlpha, regionLabels } from './regionName';
+import { layoutRegionLabels, regionKey, regionLabelAlpha, regionLabels } from './regionName';
 import { setLocale } from '../localization/core';
 
 afterEach(() => setLocale('ru'));
@@ -51,5 +51,52 @@ describe('подпись проступает при отдалении', () => 
   it('за пределами 0..1 число зажимается', () => {
     expect(regionLabelAlpha(-2)).toBe(1);
     expect(regionLabelAlpha(3)).toBe(0);
+  });
+});
+
+describe('подписи не наезжают друг на друга (правило 5)', () => {
+  // Моноширинная мерка: 10 px на знак.
+  const measure = (text: string): number => text.length * 10;
+  const view = { width: 390 };
+
+  it('свободная подпись стоит в своей точке одной строкой', () => {
+    expect(layoutRegionLabels([{ id: 'a', text: 'ШТОРМОВОЙ ФРОНТ', x: 200, y: 300 }], measure, view, 16)).toEqual([
+      { id: 'a', lines: ['ШТОРМОВОЙ ФРОНТ'], x: 200, y: 300 },
+    ]);
+  });
+
+  const box = (p: { lines: string[]; x: number; y: number }) => {
+    const w = Math.max(...p.lines.map(measure));
+    return { l: p.x - w / 2, r: p.x + w / 2, t: p.y - (p.lines.length * 16) / 2, b: p.y + (p.lines.length * 16) / 2 };
+  };
+
+  it('соседняя подпись уходит со своей точки, а не ложится поверх первой', () => {
+    const placed = layoutRegionLabels([
+      { id: 'a', text: 'ПЕПЕЛЬНЫЙ МАССИВ', x: 120, y: 300 },
+      { id: 'b', text: 'КЛАДБИЩЕ ЭКСПЕДИЦИИ', x: 230, y: 290 },
+    ], measure, view, 16);
+    expect(placed[0]).toEqual({ id: 'a', lines: ['ПЕПЕЛЬНЫЙ МАССИВ'], x: 120, y: 300 });
+    expect(placed).toHaveLength(2);
+    const [a, b] = placed.map(box);
+    expect(a!.r <= b!.l || b!.r <= a!.l || a!.b <= b!.t || b!.b <= a!.t).toBe(true);
+  });
+
+  it('имя шире экрана встаёт в две строки', () => {
+    const [label] = layoutRegionLabels([{ id: 'a', text: 'КЛАДБИЩЕ ЭКСПЕДИЦИИ', x: 80, y: 300 }], measure, { width: 160 }, 16);
+    expect(label).toEqual({ id: 'a', lines: ['КЛАДБИЩЕ', 'ЭКСПЕДИЦИИ'], x: 80, y: 300 });
+  });
+
+  it('подпись у края сдвигается внутрь экрана; дальняя область не притягивается', () => {
+    const [edge] = layoutRegionLabels([{ id: 'a', text: 'ЗАПАДНЫЙ ПРОСТОР', x: 20, y: 300 }], measure, view, 16);
+    expect(edge!.x - measure('ЗАПАДНЫЙ ПРОСТОР') / 2).toBeGreaterThanOrEqual(6);
+    const [far] = layoutRegionLabels([{ id: 'a', text: 'ЗАПАДНЫЙ ПРОСТОР', x: -60, y: 300 }], measure, view, 16);
+    expect(far!.x).toBe(-60);
+  });
+
+  it('места нет нигде — подпись не рисуется', () => {
+    const crowd = [0, 1, 2, 3, 4, 5].map((i) => ({ id: `r${i}`, text: 'ОБЛАСТЬ', x: 200, y: 300 }));
+    const placed = layoutRegionLabels(crowd, measure, view, 16);
+    expect(placed.length).toBeLessThan(crowd.length);
+    expect(placed.map((p) => p.y)).toEqual([300, 280, 320, 260, 340]);
   });
 });

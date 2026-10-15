@@ -125,6 +125,10 @@ export function worldDist(d: number): number {
   return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
 }
 
+/** Ширина экрана карты в CSS-пикселях: по ней подписи держатся внутри экрана. */
+export function viewWidth(): number {
+  return game.vw();
+}
 export function visible(c: { x: number; y: number }, pad = 80): boolean {
   const VW = game.vw();
   const VH = game.vh();

@@ -178,8 +178,8 @@
         "x": 440,
         "y": 70
       },
-      "kind": "debris_field",
-      "terrain": "empty_space"
+      "kind": "nebula",
+      "terrain": "nebula"
     },
     "outpost": {
       "position": {
@@ -203,8 +203,8 @@
         "x": -780,
         "y": 600
       },
-      "kind": "debris_field",
-      "terrain": "empty_space"
+      "kind": "nebula",
+      "terrain": "nebula"
     },
     "south_void": {
       "position": {

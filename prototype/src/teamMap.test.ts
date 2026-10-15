@@ -109,7 +109,7 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     expect(Math.max(...lengths) / Math.min(...lengths)).toBeLessThan(1.05);
   });
 
-  it('uses the whole catalogue, and a derelict graveyard stays a rare find', () => {
+  it('uses the whole catalogue, and wrecks stay a rare find', () => {
     const sectors = Object.values(preset.map!.sectors);
     const has = (pick: (s: (typeof sectors)[number]) => string | undefined): string[] =>
       [...new Set(sectors.map(pick).filter((v): v is string => v !== undefined))].sort();
@@ -119,7 +119,9 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     expect(has((s) => s.kind)).toEqual(kinds);
     expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());
     expect(has((s) => s.planetType)).toEqual(Object.keys(data.planetTypes).sort());
+    // One graveyard and one debris field beside it, nothing more (owner, 2026-10-14).
     expect(sectors.filter((s) => s.kind === 'graveyard')).toHaveLength(1);
+    expect(sectors.filter((s) => s.kind === 'debris_field')).toHaveLength(1);
     expect(sectors.filter((s) => s.terrain === 'derelict_graveyard').length).toBeLessThanOrEqual(2);
   });
 
