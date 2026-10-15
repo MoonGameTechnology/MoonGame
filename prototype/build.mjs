@@ -178,6 +178,27 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #startup-retry,#tab-taken button{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;
   color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
 #startup-retry:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
+/* «Игра в разработке»: плашка видна на любом экране, но не ловит касания и не занимает
+   места в раскладке; окно согласия — один раз на устройство (\`decisions/devNotice.ts\`). */
+#dev-badge{position:fixed;z-index:95;left:50%;transform:translateX(-50%);
+  bottom:max(2px,env(safe-area-inset-bottom));pointer-events:none;user-select:none;
+  font:600 var(--fs-caption)/1.2 var(--sf-font);white-space:nowrap;
+  color:var(--amber);opacity:.5;text-shadow:0 0 4px #000,0 0 2px #000;}
+/* Телефон: снизу стоит панель вкладок — плашка уходит в правый край, в поле экрана. */
+@media (max-width:720px),(max-height:500px){
+  #dev-badge{left:auto;bottom:auto;top:50%;right:max(1px,env(safe-area-inset-right));
+    transform:translateY(-50%);writing-mode:vertical-rl;}
+}
+#dev-notice{position:fixed;inset:0;z-index:99000;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:rgba(2,8,14,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#dev-notice[hidden]{display:none;}
+#dev-notice .dn-box{width:min(400px,100%);padding:22px 22px 18px;background:#091b20;border:1px solid var(--amber);
+  border-radius:12px;color:var(--ink);text-align:center;box-shadow:0 0 40px rgba(0,0,0,.6);}
+#dev-notice h2{margin:0 0 10px;font-size:18px;line-height:1.3;color:var(--amber);}
+#dev-notice p{margin:0 0 18px;font-size:15px;line-height:1.5;}
+#dev-notice-ack{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;cursor:pointer;
+  color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
+#dev-notice-ack:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 
 /* themed scrollbars — angular neon thumb on a dark grid track, in the HUD's tactical key.
    Firefox gets the colour pair; WebKit gets the full glow/gradient treatment. */
@@ -3916,6 +3937,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <code id="startup-code"></code>
   <button id="startup-retry" type="button" data-i18n="startup.retry"></button>
 </section>
+<div id="dev-badge" data-i18n="dev-notice.badge"></div>
+<div id="dev-notice" role="dialog" aria-modal="true" aria-labelledby="dev-notice-title" aria-describedby="dev-notice-body" hidden>
+  <div class="dn-box"><h2 id="dev-notice-title" data-i18n="dev-notice.title"></h2>
+  <p id="dev-notice-body" data-i18n="dev-notice.body"></p>
+  <button id="dev-notice-ack" type="button" data-i18n="dev-notice.ack"></button></div>
+</div>
 <canvas id="map" tabindex="-1"></canvas>
 <section id="comic" role="dialog" aria-modal="true" tabindex="-1" data-i18n-aria="sector-zero.comic.title">
   <button id="comic-skip" type="button" data-i18n="sector-zero.comic.skip"></button>
