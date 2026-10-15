@@ -165,7 +165,7 @@ body.app-starting #map{visibility:hidden;}
    \`holo-ui\`) и без подписей, а через полсекунды — новый. Покров снимает \`bootstrap.ts\`,
    уже поставив классы консоли и подписи. */
 body.app-booting > *{visibility:hidden!important;}
-body.app-startup-failed > :not(#startup-error){display:none!important;}
+body.app-startup-failed > :not(#startup-error):not(#dev-badge):not(#dev-notice){display:none!important;}
 /* AUD-29: the tab that lost Sector Zero to another tab looks like a stopped start, too. */
 #startup-error,#tab-taken{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:18px;padding:24px;
@@ -180,7 +180,7 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #startup-retry:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 /* «Игра в разработке»: плашка видна на любом экране, но не ловит касания и не занимает
    места в раскладке; окно согласия — один раз на устройство (\`decisions/devNotice.ts\`). */
-#dev-badge{position:fixed;z-index:95;left:50%;transform:translateX(-50%);
+#dev-badge{position:fixed;z-index:100001;left:50%;transform:translateX(-50%);
   bottom:max(2px,env(safe-area-inset-bottom));pointer-events:none;user-select:none;
   font:600 var(--fs-caption)/1.2 var(--sf-font);white-space:nowrap;
   color:var(--amber);opacity:.5;text-shadow:0 0 4px #000,0 0 2px #000;}
@@ -189,11 +189,12 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   #dev-badge{left:auto;bottom:auto;top:50%;right:max(1px,env(safe-area-inset-right));
     transform:translateY(-50%);writing-mode:vertical-rl;}
 }
-#dev-notice{position:fixed;inset:0;z-index:99000;display:flex;align-items:center;justify-content:center;
-  padding:20px;background:rgba(2,8,14,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
-#dev-notice[hidden]{display:none;}
-#dev-notice .dn-box{width:min(400px,100%);padding:22px 22px 18px;background:#091b20;border:1px solid var(--amber);
-  border-radius:12px;color:var(--ink);text-align:center;box-shadow:0 0 40px rgba(0,0,0,.6);}
+/* Окно — \`<dialog>\` через \`showModal()\`: верхний слой и инертный фон, так что Tab и
+   автофокус входа (\`fillWelcome\`) не уходят к полям под окном. */
+#dev-notice{width:min(400px,calc(100% - 40px));max-width:none;padding:22px 22px 18px;margin:auto;
+  background:#091b20;border:1px solid var(--amber);border-radius:12px;color:var(--ink);text-align:center;
+  box-shadow:0 0 40px rgba(0,0,0,.6);}
+#dev-notice::backdrop{background:rgba(2,8,14,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
 #dev-notice h2{margin:0 0 10px;font-size:18px;line-height:1.3;color:var(--amber);}
 #dev-notice p{margin:0 0 18px;font-size:15px;line-height:1.5;}
 #dev-notice-ack{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;cursor:pointer;
@@ -3938,11 +3939,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <button id="startup-retry" type="button" data-i18n="startup.retry"></button>
 </section>
 <div id="dev-badge" data-i18n="dev-notice.badge"></div>
-<div id="dev-notice" role="dialog" aria-modal="true" aria-labelledby="dev-notice-title" aria-describedby="dev-notice-body" hidden>
-  <div class="dn-box"><h2 id="dev-notice-title" data-i18n="dev-notice.title"></h2>
+<dialog id="dev-notice" aria-labelledby="dev-notice-title" aria-describedby="dev-notice-body">
+  <h2 id="dev-notice-title" data-i18n="dev-notice.title"></h2>
   <p id="dev-notice-body" data-i18n="dev-notice.body"></p>
-  <button id="dev-notice-ack" type="button" data-i18n="dev-notice.ack"></button></div>
-</div>
+  <button id="dev-notice-ack" type="button" data-i18n="dev-notice.ack"></button>
+</dialog>
 <canvas id="map" tabindex="-1"></canvas>
 <section id="comic" role="dialog" aria-modal="true" tabindex="-1" data-i18n-aria="sector-zero.comic.title">
   <button id="comic-skip" type="button" data-i18n="sector-zero.comic.skip"></button>
