@@ -81,6 +81,9 @@ function revealBoot(): void {
 function offerDevNotice(): void {
   const dialog = document.getElementById('dev-notice');
   const ack = document.getElementById('dev-notice-ack');
+  // Старый WebView без Dialog API: само имя `HTMLDialogElement` там бросает — окно не
+  // показываем вовсе (плашка остаётся), запуск игры важнее.
+  if (typeof HTMLDialogElement === 'undefined') return;
   if (!(dialog instanceof HTMLDialogElement) || !ack || navigator.webdriver) return;
   if (!needsDevNotice(readRaw(DEV_NOTICE_KEY))) return;
   // Esc закрыл бы модальный диалог без согласия — окно закрывает только кнопка.
@@ -254,6 +257,9 @@ loaderReady()
       // быть виден, покров его не прячет.
       document.body.classList.remove('app-booting');
       document.body.classList.add('app-startup-failed');
+      // Модальное окно «в разработке» лежит в верхнем слое и делает фон инертным —
+      // экран ошибки и его «Повторить» под ним были бы недоступны.
+      (document.getElementById('dev-notice') as HTMLDialogElement | null)?.close?.();
       const panel = document.getElementById('startup-error');
       if (panel) panel.hidden = false;
       const kinds = ['TypeError', 'ReferenceError', 'RangeError', 'SyntaxError', 'SecurityError'];
