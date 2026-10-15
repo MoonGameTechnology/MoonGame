@@ -7,6 +7,14 @@
 //   pnpm run selfplay 200        # 200 matches
 //   pnpm run selfplay 200 tag7   # 200 matches, another seed family
 //   pnpm run selfplay 40 sp 20   # …and a 20-day window instead of the standard 14
+//   pnpm run selfplay 200 sp 14 duel-1   # …on a published map instead of the Nexus
+//
+// Карта — ПЯТЫЙ аргумент. С 2026-10-13 новые партии идут на опубликованных картах
+// (`mapCatalog.MAP_IDS`), а у них свои старты и свой профиль исследований: `main`
+// начинает с одного разведчика, армия открывается узлами. Без аргумента прогон
+// по-прежнему играет «Нексус» — на нём снят весь накопленный ряд замеров. Командные
+// карты сюда не входят: там побеждает сторона целиком (`match.winners`), а отчёт
+// считает победу одного места.
 //
 // BAL-12: окно задаётся ЧЕТВЁРТЫМ аргументом, потому что часть дерева стоит за ним.
 // `ai_stewardship` (линия «Хранителя») открыт с `dayGate: 15`, а стандартный прогон
@@ -23,6 +31,12 @@ import { build } from 'esbuild';
 const N = Math.max(1, Number(process.argv[2] ?? 20) || 20);
 const BASE_SEED = process.argv[3] ?? 'sp';
 const SESSION_DAYS = Math.max(1, Number(process.argv[4] ?? 14) || 14);
+const SELFPLAY_MAPS = ['duel-1', 'ffa-4'];
+const MAP = process.argv[5];
+if (MAP !== undefined && !SELFPLAY_MAPS.includes(MAP)) {
+  console.error(`map must be one of ${SELFPLAY_MAPS.join(', ')}, got: ${MAP}`);
+  process.exit(2);
+}
 
 const res = await build({
   entryPoints: ['prototype/src/game.ts'],
@@ -47,6 +61,8 @@ const {
   HOUR,
   DAY,
   START_CANDIDATES,
+  networkSeats,
+  techInMatch,
   seatDoctrine,
 } = mod.exports;
 
@@ -57,17 +73,6 @@ const doctrineFor = (s, seat) =>
 const DOCTRINES = [
   ...new Set(Object.values(data.scientists).map((x) => x.branch).filter(Boolean)),
 ].sort();
-// Вершина доктрины — её боевой узел высшего тира (у ветки без боевых — высший тир ветки):
-// доходит ли до неё место за партию.
-const DOCTRINE_TOP = Object.fromEntries(
-  DOCTRINES.map((d) => {
-    const own = Object.entries(data.technologies).filter(([, t]) => t.branch === d && !t.grantOnly);
-    const combat = own.filter(([, t]) => t.damageScope === d);
-    const pool = combat.length ? combat : own;
-    const top = Math.max(...pool.map(([, t]) => t.tier ?? 0));
-    return [d, pool.filter(([, t]) => (t.tier ?? 0) === top).map(([id]) => id)];
-  }),
-);
 // Чем мерить армию места: боевые корпуса, войска, челноки и мины.
 const ARMY_KEYS = [
   'cruiser',
@@ -106,6 +111,72 @@ const FACTION_IDS = [...PLAYABLE_FACTIONS];
 const FACTION_PAIRS = FACTION_IDS.flatMap((a) =>
   FACTION_IDS.filter((b) => b !== a).map((b) => [a, b]),
 );
+
+/** Кресла матча `i` и его сетап для `newGame`. */
+function setupFor(i) {
+  const seed = `${BASE_SEED}-${i}`;
+  if (MAP !== undefined) {
+    // Старты и стороны задаёт сама карта (`networkSeats`). Старты сдвигаются по кругу на
+    // i, дома — на ⌊i / мест⌋, так что за мест² матчей каждый дом посидит на каждом
+    // старте. У дуэли это те же «старты меняются на i%2, упорядоченная пара по (i>>1)%12»,
+    // что и на «Нексусе».
+    const plan = networkSeats('ffa', MAP);
+    const n = plan.length;
+    const houses =
+      n === 2
+        ? FACTION_PAIRS[(i >> 1) % FACTION_PAIRS.length]
+        : plan.map((_, k) => FACTION_IDS[(k + Math.floor(i / n)) % FACTION_IDS.length]);
+    const seats = plan.map((s, k) => ({
+      ...s,
+      name: `Bot ${k + 1}`,
+      faction: houses[k],
+      start: plan[(k + i) % n].start,
+      ai: true,
+    }));
+    return { seats, seed, mapId: MAP };
+  }
+  const swapStart = i % 2 === 1;
+  // Дуэлянты садятся ДИАМЕТРАЛЬНО (сектор k и сектор k+5 из десяти), а не в соседние.
+  // Противоположная пара честна по построению: у неё общий бюджет двора и одинаковый
+  // профиль по прыжкам (BAL-1). Соседняя пара тоже равнозначна по метрикам, но фронт
+  // упирается друг в друга с первого часа: замер давал первый бой на 1.4-й день и 28%
+  // добиваний. Формат `1v1` в игре сажает игроков так же — противоположными индексами.
+  //
+  // BAL-9: пара ПЕРЕБИРАЕТСЯ по кругу (k = номер матча по модулю пяти). Секторы перестали
+  // быть копиями друг друга — у каждого свой рисунок, свои расстояния и своя пара типов
+  // планет, — поэтому замер на одной паре мерил бы один рисунок из пяти и молча пропускал
+  // перекос остальных. Теперь строка «очки/старт» покрывает все десять позиций.
+  const HALF = Math.floor(START_CANDIDATES.length / 2);
+  const home = Math.floor(i / 4) % HALF;
+  const pair = [START_CANDIDATES[home], START_CANDIDATES[home + HALF]];
+  const starts = swapStart ? [pair[1], pair[0]] : [pair[0], pair[1]];
+  const factions = FACTION_PAIRS[(i >> 1) % FACTION_PAIRS.length];
+  const seats = [
+    { id: 'p1', name: 'Bot One', faction: factions[0], start: starts[0], ai: true },
+    { id: 'p2', name: 'Bot Two', faction: factions[1], start: starts[1], ai: true },
+  ];
+  return { seats, seed };
+}
+
+// Дерево исследований ЭТОЙ карты: узел чужого профиля (`TechnologyDef.ruleset`) в матче
+// не стоит, а стартовый (`techRules.starting`) выдан в начале — исследовать его нечего.
+const PROBE = newGame(setupFor(0));
+const inTree = (id) =>
+  techInMatch(PROBE, id, data) && !(PROBE.techRules?.starting ?? []).includes(id);
+// Вершина доктрины — её боевой узел высшего тира (у ветки без боевых — высший тир ветки):
+// доходит ли до неё место за партию.
+const DOCTRINE_TOP = Object.fromEntries(
+  DOCTRINES.map((d) => {
+    const own = Object.entries(data.technologies).filter(
+      ([id, t]) => t.branch === d && !t.grantOnly && inTree(id),
+    );
+    const combat = own.filter(([, t]) => t.damageScope === d);
+    const pool = combat.length ? combat : own;
+    const top = Math.max(...pool.map(([, t]) => t.tier ?? 0));
+    return [d, pool.filter(([, t]) => (t.tier ?? 0) === top).map(([id]) => id)];
+  }),
+);
+const SEATS = setupFor(0).seats.length;
 
 // ДВУХНЕДЕЛЬНАЯ СЕССИЯ БЕЗ ДОСРОЧНОЙ ПОБЕДЫ (заказ владельца 2026-08-26). Раньше прогон
 // кончался порогом очков — и кончался на 4-м дне: `score` был исходом 100% матчей, а
@@ -151,27 +222,9 @@ function leaderByPlanets(state) {
 }
 
 function runMatch(i) {
-  const swapStart = i % 2 === 1;
-  // Дуэлянты садятся ДИАМЕТРАЛЬНО (сектор k и сектор k+5 из десяти), а не в соседние.
-  // Противоположная пара честна по построению: у неё общий бюджет двора и одинаковый
-  // профиль по прыжкам (BAL-1). Соседняя пара тоже равнозначна по метрикам, но фронт
-  // упирается друг в друга с первого часа: замер давал первый бой на 1.4-й день и 28%
-  // добиваний. Формат `1v1` в игре сажает игроков так же — противоположными индексами.
-  //
-  // BAL-9: пара ПЕРЕБИРАЕТСЯ по кругу (k = номер матча по модулю пяти). Секторы перестали
-  // быть копиями друг друга — у каждого свой рисунок, свои расстояния и своя пара типов
-  // планет, — поэтому замер на одной паре мерил бы один рисунок из пяти и молча пропускал
-  // перекос остальных. Теперь строка «очки/старт» покрывает все десять позиций.
-  const HALF = Math.floor(START_CANDIDATES.length / 2);
-  const home = Math.floor(i / 4) % HALF;
-  const pair = [START_CANDIDATES[home], START_CANDIDATES[home + HALF]];
-  const starts = swapStart ? [pair[1], pair[0]] : [pair[0], pair[1]];
-  const factions = FACTION_PAIRS[(i >> 1) % FACTION_PAIRS.length];
-  const seats = [
-    { id: 'p1', name: 'Bot One', faction: factions[0], start: starts[0], ai: true },
-    { id: 'p2', name: 'Bot Two', faction: factions[1], start: starts[1], ai: true },
-  ];
-  let state = newGame({ seats, seed: `${BASE_SEED}-${i}` });
+  const setup = setupFor(i);
+  const { seats } = setup;
+  let state = newGame(setup);
   const doctrineOf = Object.fromEntries(seats.map((s) => [s.id, doctrineFor(state, s.id)]));
   const techBySeat = Object.fromEntries(seats.map((s) => [s.id, []]));
   const armyBySeat = Object.fromEntries(seats.map((s) => [s.id, new Map()]));
@@ -711,8 +764,11 @@ for (let i = 0; i < N; i++) {
   // BAL-5: разложение исхода. Считаем только решённые матчи — «кто разогнался» без
   // победителя не определено.
   if (r.winner !== null && r.partsTrail.length > 0) {
-    const seats = Object.keys(r.finalParts);
-    const loser = seats.find((s2) => s2 !== r.winner);
+    // Отставший — последнее место по итоговому счёту, как в строке «разрыв»; в дуэли это
+    // просто второе.
+    const loser = Object.keys(r.finalParts)
+      .filter((s2) => s2 !== r.winner)
+      .sort((a, b) => (r.finalScores[a] ?? 0) - (r.finalScores[b] ?? 0))[0];
     if (loser) {
       const w = r.finalParts[r.winner];
       const l = r.finalParts[loser];
@@ -775,12 +831,13 @@ for (let i = 0; i < N; i++) {
     }
     if (r.winner !== null) {
       row.decided++;
-      const foe = Object.keys(r.doctrineOf).find((s2) => s2 !== seat);
-      const vs = (row.vs[r.doctrineOf[foe]] ??= { w: 0, n: 0 });
-      vs.n++;
-      if (r.winner === seat) {
-        row.wins++;
-        vs.w++;
+      if (r.winner === seat) row.wins++;
+      // Против каждого соперника: в дуэли он один, в FFA их трое.
+      for (const foe of Object.keys(r.doctrineOf)) {
+        if (foe === seat) continue;
+        const vs = (row.vs[r.doctrineOf[foe]] ??= { w: 0, n: 0 });
+        vs.n++;
+        if (r.winner === seat) vs.w++;
       }
     }
   }
@@ -880,7 +937,10 @@ const topTech = [...techTotal.entries()]
 // мета-прокачки (`meta_*`) не исследуются, а выдаются как `completed` на старте матча,
 // и пока они стояли в знаменателе, доля мёртвого дерева читалась меньше, чем есть.
 // Правило берётся из общего модуля — то же, которым окно дерева отбирает узлы игроку.
-const treeIds = researchableTechIds(data.technologies ?? {});
+// Узлы чужого профиля и стартовые отсекает `inTree`: иначе на «Нексусе» все узлы
+// основной игры числились бы мёртвыми.
+const researchable = researchableTechIds(data.technologies ?? {});
+const treeIds = researchable.filter(inTree);
 const techZeros = treeIds.filter((k) => !techTotal.has(k));
 const techTotalCount = [...techTotal.values()].reduce((s, v) => s + v, 0);
 // Слой `has_scientist` с причиной каждого нуля: «некому расгейтить» (дыра ростера),
@@ -907,9 +967,9 @@ const sciGateLine = sciRows
 
 console.log(
   [
-    `━━ self-play balance ━━ ${N} матчей · seed "${BASE_SEED}-*" · ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+    `━━ self-play balance ━━ ${N} матчей · карта ${MAP ?? 'nexus'} · seed "${BASE_SEED}-*" · ${((Date.now() - t0) / 1000).toFixed(1)}s`,
     `  decided   : ${decided} · draws ${draws} (кап ${days(CAP)}д)${errors ? ` · ERRORS ${errors}` : ''}`,
-    `  win by slot    : ${fmtWins(winsBySlot)}   ← цель ~50/50`,
+    `  win by slot    : ${fmtWins(winsBySlot)}   ← цель ~${Math.round(100 / SEATS)}% на место`,
     `  win by faction : ${fmtRate(winsByFaction, decidedByFaction)}   ← побед/партий; дом садится примерно в половину матчей (AI-BAL-12)`,
     `  win by start   : ${fmtWins(winsByStart)}`,
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
@@ -960,7 +1020,7 @@ console.log(
       : null,
     `  техи       : ${techTotalCount} исследовано · ${topTech || '—'}`,
     techZeros.length
-      ? `  не исследованы ни разу (${techZeros.length}/${treeIds.length}): ${techZeros.join(' ')}  ← знаменатель = НАСТОЯЩЕЕ дерево; псевдоузлы мета-прокачки (${Object.keys(data.technologies ?? {}).length - treeIds.length}) в него не входят: они выдаются грантом, а не исследуются (BAL-12)`
+      ? `  не исследованы ни разу (${techZeros.length}/${treeIds.length}): ${techZeros.join(' ')}  ← знаменатель = НАСТОЯЩЕЕ дерево; псевдоузлы мета-прокачки (${Object.keys(data.technologies ?? {}).length - researchable.length}) в него не входят: они выдаются грантом, а не исследуются (BAL-12)`
       : '  дерево технологий пройдено целиком ✓',
     sciGateLine
       ? `  учёные     : ${sciGateLine}  ← BAL-12: совет посвящают и БОТЫ (детерминированно по сиду матча), поэтому слой has_scientist наконец измерим. Окно прогона — 4-й аргумент: «вне окна» снимается прогоном длиннее гейта`

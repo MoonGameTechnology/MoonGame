@@ -32,6 +32,7 @@ seed воспроизводит матч байт-в-байт, а сотня м�
 pnpm run selfplay            # 20 матчей, база сидов "sp"
 pnpm run selfplay 200        # 200 матчей
 pnpm run selfplay 200 tag7   # 200 матчей, другая семья сидов
+pnpm run selfplay 200 sp 14 duel-1   # на опубликованной карте (duel-1 / ffa-4), не на «Нексусе»
 ```
 
 `prototype/selfplay.mjs`: два AI-места на **реальном ядре**, headless, без сервера и DOM.
