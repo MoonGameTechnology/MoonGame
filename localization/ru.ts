@@ -173,6 +173,8 @@ export const ru: Record<string, string> = {
   'controls.pinch.does': 'Масштаб',
   'controls.pinch.keys': 'Щипок двумя пальцами',
   'controls.quick-build.does': 'Заказать без окна подтверждения',
+  'controls.right-course.does': 'Отправить выбранные флоты в эту точку',
+  'controls.right-course.keys': 'ПКМ по миру или дороге',
   'controls.quick-build.keys': 'ПКМ по плитке постройки',
   'controls.touch-drag.keys': 'Провести пальцем',
   'controls.wheel.does': 'Масштаб под курсором',

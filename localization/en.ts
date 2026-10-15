@@ -170,6 +170,8 @@ export const en: Record<string, string> = {
   'controls.pinch.does': 'Zoom',
   'controls.pinch.keys': 'Two-finger pinch',
   'controls.quick-build.does': 'Order without the confirmation window',
+  'controls.right-course.does': 'Send the selected fleets to that point',
+  'controls.right-course.keys': 'Right-click a world or road',
   'controls.quick-build.keys': 'Right-click a build tile',
   'controls.touch-drag.keys': 'Drag a finger',
   'controls.wheel.does': 'Zoom at the cursor',

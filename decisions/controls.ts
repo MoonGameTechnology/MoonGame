@@ -31,6 +31,12 @@ export const CONTROLS: readonly ControlRow[] = [
   { id: 'dblclick', device: 'pc', keys: 'controls.dblclick.keys', does: 'controls.dblclick.does' },
   { id: 'box', device: 'pc', keys: 'controls.box.keys', does: 'controls.box.does' },
   { id: 'add', device: 'pc', keys: 'controls.add.keys', does: 'controls.add.does' },
+  {
+    id: 'right-course',
+    device: 'pc',
+    keys: 'controls.right-course.keys',
+    does: 'controls.right-course.does',
+  },
   { id: 'key-pause', device: 'pc', keys: 'key.space', does: 'controls.key-pause.does' },
   {
     id: 'key-speed',

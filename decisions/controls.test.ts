@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CONTROLS, controlsFor } from './controls';
 import { HOTKEYS, hotkeyOf, type HotkeyAction } from './hotkeys';
 import { longPressAction, pressIntent, type PressInput } from './pressIntent';
+import { rightClickAct } from './rightClick';
 
 const src = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 const main = src('../prototype/src/main.ts');
@@ -50,6 +51,12 @@ const PROOF: Record<string, () => void> = {
   add: () => {
     for (const key of ['ctrl', 'shift', 'meta'] as const)
       expect(pressIntent(press({ [key]: true, overOwnFleet: true })).additive).toBe(true);
+  },
+  'right-course': () => {
+    expect(rightClickAct({ button: 2, touch: false, pc: true, armed: false, movers: 1 })).toBe(
+      'course',
+    );
+    expect(input).toContain("canvas.addEventListener('contextmenu', rightClick);");
   },
   'quick-build': () => {
     expect(main).toContain("side.addEventListener('contextmenu'");
