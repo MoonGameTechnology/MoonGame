@@ -42,6 +42,9 @@ const ORIGIN_KEY: Record<ArsenalItem['origin'], string> = {
   auction: 'arsenal.origin.auction',
   lootbox: 'arsenal.origin.lootbox',
   rent: 'arsenal.origin.rent',
+  commerce: 'arsenal.origin.commerce',
+  ad: 'arsenal.origin.ad',
+  season: 'arsenal.origin.season',
 };
 
 /** «откуда» — the localized origin label. Exported because the Верфь tags its cards
@@ -60,6 +63,7 @@ export function arsenalItemName(item: ArsenalItem): string {
 /** One collection card: icon, name, and the grade/durability/origin footnote. */
 export function arsenalCardHtml(item: ArsenalItem): string {
   const badges = [
+    item.soulbound ? t('arsenal.personal') : '',
     item.grade ? `+${item.grade}` : '',
     typeof item.durability === 'number' ? `⛭${item.durability}` : '',
   ]

@@ -3,6 +3,7 @@ import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
 import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
+import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from './metaEconomyStore';
 import {
   MemoryAccountStore,
   MemoryArsenalStore,
@@ -106,6 +107,7 @@ export interface Stores {
   /** Аукцион мета-предметов (EC-3): кошелёк Варрантов, лоты, леджер. Фаусет по
    *  умолчанию ВЫКЛЮЧЕН — включается `META_MARKET_FAUCET` и только на стенде. */
   metaMarket: MetaMarket;
+  metaEconomy: MetaEconomyStore;
   /** Web Push subscriptions (ONB-5) — one per account, durable so it survives a restart. */
   friendStore: FriendStore;
   pushStore: PushStore;
@@ -122,6 +124,10 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const memoryMatches = new MemoryMatchStore();
   const url = env.DATABASE_URL;
   if (!url) {
+    const memoryDrops = new MemoryDropStore();
+    const market = new MemoryMetaMarket(memoryArsenal, undefined, faucet);
+    const economy = new MemoryMetaEconomyStore(memoryArsenal, memoryDrops, market);
+    market.setEconomy(economy);
     return {
       profileStore: new MemoryProfileStore(),
       store: memoryMatches,
@@ -137,9 +143,10 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       sessionStore: new MemoryAvaSessionStore(memoryMatches),
       medalStore: new MemoryMedalStore(),
       arsenalStore: memoryArsenal,
-      metaMarket: new MemoryMetaMarket(memoryArsenal, undefined, faucet),
+      metaMarket: market,
+      metaEconomy: economy,
       corpRentStore: new MemoryCorpRentStore(),
-      dropStore: new MemoryDropStore(),
+      dropStore: memoryDrops,
       friendStore: new MemoryFriendStore(),
       pushStore: new MemoryPushStore(),
       kind: 'memory',
@@ -151,6 +158,9 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const { Pool } = await import('pg');
   const pool = new Pool({ connectionString: url });
   await prepareRuntimeDatabase(pool, env);
+  const market = new PostgresMetaMarket(pool, undefined, faucet);
+  const economy = new PostgresMetaEconomyStore(pool);
+  market.setEconomy(economy);
   return {
     corporateServices: createCorporateServices(pool),
     profileStore: new PostgresProfileStore(pool),
@@ -167,7 +177,8 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     sessionStore: new PostgresAvaSessionStore(pool),
     medalStore: new PostgresMedalStore(pool),
     arsenalStore: new PostgresArsenalStore(pool),
-    metaMarket: new PostgresMetaMarket(pool, undefined, faucet),
+    metaMarket: market,
+    metaEconomy: economy,
     corpRentStore: new PostgresCorpRentStore(pool),
     dropStore: new PostgresDropStore(pool),
     friendStore: new PostgresFriendStore(pool),
@@ -189,6 +200,7 @@ export function snapshotOf(room: MatchRoom): MatchSnapshot {
     seq: room.sequence,
     status: state.match.status,
     state,
+    economyActivity: room.economyActivitySnapshot,
     ...(clock ? { clock } : {}),
   };
 }

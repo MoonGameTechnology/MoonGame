@@ -49,6 +49,16 @@ export async function bundleNetserver() {
     outfile: 'packages/server/dist/corporation-migrate.mjs',
     bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
   });
+  await build({
+    entryPoints: ['packages/server/src/commerceMain.ts'],
+    outfile: 'packages/server/dist/commerce-server.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg', 'fastify'],
+  });
+  await build({
+    entryPoints: ['packages/server/src/commerceMigrateMain.ts'],
+    outfile: 'packages/server/dist/commerce-migrate.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
+  });
   return outfile;
 }
 

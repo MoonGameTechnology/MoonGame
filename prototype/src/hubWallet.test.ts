@@ -13,6 +13,12 @@ describe('кошелёк главного экрана (UIX-10.2)', () => {
     expect(html).toContain('aria-label="Суверены: 500. Пополнить"');
   });
 
+  it('неизвестный баланс Суверенов скрыт, Варранты остаются', () => {
+    const html = hubWalletHtml({ sovereigns: null, warrants: 12 });
+    expect(html).not.toContain('dl-donate');
+    expect(html).toContain('⌖</i>12');
+  });
+
   it('Варранты ⌖ и дверь в аукцион — одна кнопка: валюта и место, где её тратят', () => {
     const html = hubWalletHtml({ sovereigns: 500, warrants: 1250 });
     expect(html).toMatch(

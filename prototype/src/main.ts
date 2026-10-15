@@ -84,6 +84,7 @@ import {
   netDesyncCount,
   netView,
   rttEma,
+  serverMatchId,
 } from './netSession';
 import {
   closeSeatPicker,
@@ -480,6 +481,7 @@ import {
 // TT-3.1 — экран дерева технологий (REFM-9).
 import { initTechTree } from './techTree';
 import { initBuildScreen, type UnitCatalogTab } from './buildScreen';
+import type { MetaMatchRewardsView } from '../../packages/protocol/src/metaEconomyView';
 import { initEndScreen, type MatchEnd } from './endScreen';
 import {
   pcUi,
@@ -579,6 +581,7 @@ import {
 } from './stewardScreen';
 import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
+import { initMetaEconomy } from './metaEconomyScreen';
 import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
@@ -830,10 +833,6 @@ const BUILD_UNITS = [
 // A small glyph per province KIND, drawn above each province so its type reads at a
 // glance (planet / asteroid / nebula / wreck-field / storm / …). Text glyphs only.
 let ME = 'p1';
-// Суверены — the donate/premium currency (docs/economy-roadmap.md). It's a meta-layer
-// account balance, NOT match state, so the prototype shows a placeholder here; the real
-// balance comes from the account once monetization is wired.
-const SOVEREIGNS = 500;
 type PlanetTab = 'ground' | 'ships' | 'shuttle' | 'buildings';
 
 /** Total count across a stack of units (ships, garrison or landing troops). */
@@ -5326,6 +5325,21 @@ const endScreenPanel = initEndScreen({
   net: () => NET,
   worldsFallback: () => worldsOf(ME),
   fmtStamp,
+  rewards: __SECTOR_ZERO_ONLY__ ? undefined : {
+    matchId: serverMatchId,
+    read: async (matchId) => {
+      const auth = await hubAuthorizedBase();
+      if (!auth) throw new Error('E_AUTH');
+      const response = await fetch(`${auth.base}/meta-economy/matches/${encodeURIComponent(matchId)}/rewards`, {
+        headers: { authorization: `Bearer ${auth.token}` },
+      });
+      if (!response.ok) throw new Error('E_NETWORK');
+      const result = await response.json() as MetaMatchRewardsView;
+      const current = await hubAuthorizedBase();
+      if (current?.base !== auth.base || current?.token !== auth.token) throw new Error('E_AUTH');
+      return result;
+    },
+  },
   // ×2 к награде забега (`run.double`) — та же дверь к ролику и то же удвоение, что на
   // экране подготовки; удвоение одно на забег, так что две кнопки не дают двух выплат.
   double: {
@@ -5892,12 +5906,13 @@ const HUB_PANELS: Record<string, string> = {
   friends: 'hp-friends',
   arsenal: 'hp-arsenal',
   auction: 'hp-auction',
+  supply: 'hp-supply',
   ally: 'hp-ally',
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 /** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends']);
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -5918,6 +5933,7 @@ function hubTab(tab: string): void {
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
   if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
+  if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
@@ -6022,7 +6038,7 @@ const rank = __SECTOR_ZERO_ONLY__
 const arsenal = __SECTOR_ZERO_ONLY__
   ? null
   : initArsenal({
-      root: () => $('hp-arsenal'),
+      root: () => $('arsenal-items'),
       readCache: () => {
         try {
           return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
@@ -6046,6 +6062,19 @@ const metaMarket = __SECTOR_ZERO_ONLY__
         hubNote.textContent = message;
       },
       changed: () => hubWallet?.render(),
+      inventoryChanged: async () => { await arsenal?.refresh(); },
+    });
+// Main-game supply has its own server-owned state; Sector Zero remains independent.
+const metaEconomy = __SECTOR_ZERO_ONLY__
+  ? null
+  : initMetaEconomy({
+      root: () => $('hp-supply'),
+      authorizedBase: hubAuthorizedBase,
+      changed: async () => {
+        await arsenal?.refresh();
+        await metaMarket?.sync();
+      },
+      confirm: (message) => window.confirm(message),
     });
 // Кошелёк главного экрана (UIX-10.2, заказ владельца 2026-10-01): Суверены — та же плашка с
 // «+», что в строке статуса партии; Варранты аукциона — плашкой, которая и есть дверь в аукцион.
@@ -6053,7 +6082,7 @@ const hubWallet = __SECTOR_ZERO_ONLY__
   ? null
   : initHubWallet({
       root: $('hubwallet'),
-      wallet: () => ({ sovereigns: SOVEREIGNS, warrants: metaMarket?.balance() ?? 0 }),
+      wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),
       donate: () => {
         hubNote.textContent = t('donate.soon');
       },
@@ -6087,7 +6116,7 @@ const profile = __SECTOR_ZERO_ONLY__
             const c = corp?.mine().corp;
             return c ? { name: c.name, influence: c.influence } : null;
           })(),
-          sovereigns: SOVEREIGNS,
+          sovereigns: null,
         };
       },
       readCache: () => {
@@ -6287,6 +6316,8 @@ document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('met
 document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
 document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
+for (const id of ['hub-supply', 'arsenal-supply'])
+  document.getElementById(id)?.addEventListener('click', () => hubTab('supply'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
@@ -7710,13 +7741,7 @@ function frame(nowReal: number) {
     waveHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
-    (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
-    // Суверены — приманка (заказ владельца 2026-09-23): кнопка с «+», золотом и бликом.
-    // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка. В забеге
-    // Sector Zero Суверены живут в шапке — настоящим балансом профиля (`runWallet.ts`).
-    (sectorZeroToolsHidden()
-      ? ''
-      : `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.aria', { n: kfmt(SOVEREIGNS) })}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em aria-hidden="true">+</em></button>`);
+    (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '');
   if (statusHtml !== lastClockText) {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;

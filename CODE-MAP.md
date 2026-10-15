@@ -303,6 +303,15 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `arsenal.ts` | `StarterArsenalTemplate`, `validateStarterArsenal` | ARS-2 starter arsenal |
 | `arsenalApi.ts` | `ArsenalApiDeps` | API арсенала |
 | `dropRoller.ts` | `DropTables`, `validateDropTables` | ARS-4 salvage/shards |
+| `metaEconomy.ts` / `metaEconomyCatalog.ts` | `MetaEconomy`, строгий каталог v0 | награды, крафт, разбор, сезон, entitlements вне ядра |
+| `metaEconomyStore.ts` / `memoryEconomyLock.ts` | общий transaction boundary | inventory/drop/wallet/materials/receipt: Memory + PostgreSQL |
+| `metaEconomyDelivery.ts` / `metaEconomyObservation.ts` / `metaEconomyActivity.ts` | durable факты и доставка | baseline + события сохраняются со snapshot; повтор/рестарт без новой выдачи |
+| `metaEconomyApi.ts` / `metaCommerce.ts` | session API / внутренний signed API | supply goal, craft, season, read-only receipts; Commerce grant отдельно от клиента |
+| `metaMarket.ts` / `metaMarketApi.ts` | Auction внутри Meta/Economy | предметы и material escrow, кошельки/комиссия/receipt одной транзакцией |
+| `mainGameArsenal.ts` | ordinary match initialization/sync | владение ограничивает новые постройки; существующие корабли неизменны |
+| `commerceMain.ts` / `commerceMigrateMain.ts` | отдельный процесс и миграция | собственная БД/роль; [runbook](docs/meta-economy.md) |
+| `commerceService.ts` / `commerceStore.ts` / `commercePostgres.ts` | orders, proof, outbox | verified provider adapters, retry/status/refund; runtime adapters отключены |
+| `commerceServer.ts` / `commerceTransport.ts` / `commerceCatalog.ts` | HTTP / подпись / предложения | отдельные ключи, audience/capability, nonce, четыре известных состава |
 | `avaOrchestrator.ts` | `AvaSessionSpec` | AvA-оркестратор |
 | `avaMapPool.ts` | `pickAvaMap` | AvA-карты |
 | `avaApi.ts` / `avaService.ts` | AvA API/service | AvA-логика |
@@ -372,6 +381,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `medals.json` | медали |
 | `events.json` | тёмные события |
 | `dropTables.json` | таблицы дропа (ARS-4) |
+| `metaEconomy.json` | серверный каталог v0: материалы, рецепты, сезон, лимиты; вне `GameData` |
 | `starterArsenal.json` | starter arsenal (ARS-2) |
 | `maps/` | карты (MatchMap JSON) |
 

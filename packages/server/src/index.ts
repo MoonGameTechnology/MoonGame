@@ -200,3 +200,4 @@ export {
 } from './store';
 
 export { mailerFromEnv } from './mailer';
+export { MemoryMetaEconomyStore, PostgresMetaEconomyStore, emptyMetaEconomyAccount, type MetaEconomyStore, type MetaEconomyTransaction } from './metaEconomyStore';

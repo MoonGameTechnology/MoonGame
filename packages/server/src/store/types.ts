@@ -12,6 +12,15 @@ export interface MatchClock {
   running: boolean;
 }
 
+/** Server-only observation captured with the first confirmed-seat snapshot. */
+export interface EconomyObservation {
+  known: string[];
+  buildings: string[];
+  evacuated: number;
+  rescued: number;
+  battles: number;
+}
+
 export interface MatchSnapshot {
   matchId: string;
   dataVersion: string;
@@ -20,11 +29,17 @@ export interface MatchSnapshot {
   state: GameState;
   /** Absent on legacy snapshots and rooms using absolute wall time. */
   clock?: MatchClock;
+  /** Immutable first observation per [playerId, claimedAt], outside GameState. */
+  economyObservations?: Record<string, EconomyObservation>;
+  /** Bounded verified activity IDs per [playerId, claimedAt, role], outside GameState. */
+  economyActivity?: Record<string, string[]>;
 }
 
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
  *  All methods are async so the same interface fits a real database. */
 export interface MatchStore {
+  /** Durable reward delivery scans committed matches in bounded, stable pages. */
+  economyMatchIds?(after?: string, limit?: number): Promise<string[]>;
   load(matchId: string): Promise<MatchSnapshot | null>;
   /** Upsert the snapshot. Optimistic by `seq`: a save with an older `seq` than the
    *  stored one is a no-op, so a late write can't clobber fresher state. */

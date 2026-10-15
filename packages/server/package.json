@@ -18,7 +18,8 @@
     "nodemailer": "10.0.16",
     "pg": "^8.23.0",
     "web-push": "^3.6.7",
-    "ws": "8.22.0"
+    "ws": "8.22.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/nodemailer": "^8.0.2",

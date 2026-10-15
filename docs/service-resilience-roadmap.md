@@ -14,7 +14,11 @@
 
 ## Что реализовано
 
-- Обычные матчи, авторизация, инвентарь и MetaMarket пока живут в Game и его БД.
+- Обычные матчи и авторизация живут в Game. Его локальный Meta/Economy объединяет
+  инвентарь, материалы, награды, крафт, сезон, кошелёк и Auction одной транзакцией.
+- Commerce имеет отдельный entrypoint, собственную БД/runtime-роль, signed entitlement
+  и долговечную доставку. Реальные провайдеры отключены; платный запуск не подтверждён.
+  [Точный объём v0 и runbook](meta-economy.md).
 - Corp имеет самостоятельный entrypoint и опциональную отдельную PostgreSQL.
   Game стартует без него; итог AvA и аудит возврата доставляются после восстановления.
   Код переноса готов, фактическое переключение живого сервера не подтверждено.
@@ -94,7 +98,9 @@ Backup repository, collector/audit store, SIEM и реагирование ра�
 
 ## Контракты, обязательные до следующего выделения
 
-Это требования к будущим API; перечисленные команды ещё не реализованы.
+Это общие требования к выделению доменов. Локальный settlement и контракт
+Commerce → Meta v0 уже реализованы; корпоративные leases и остальные будущие
+контракты не следует считать выполненными вместе с ними.
 
 1. Версия контракта, bounded payload и deadline; синхронные обращения не входят в
    горячий путь боя. Каждый домен владеет runtime-ролью БД, пулом, CPU/RAM/pids и
@@ -201,9 +207,14 @@ receipt/status.
 
 ### MSVC-1 · Контракт Meta/Economy и совместимость `[srv]` ⏳
 
-Следующий этап несколькими небольшими PR: инвентаризация **всех** писателей
+**Частично реализовано:** локальные reward/craft/season/trade/entitlement используют
+общую транзакцию, provenance и receipts; Game сохраняет observation/activity до
+доставки. Остаются совместимость всех legacy-писателей, явные account/corporation
+владельцы и общий контракт аренды/equip.
+
+Продолжение: инвентаризация **всех** писателей
 предметов/кошельков/материалов (награды, starter, equip, consume, аренда,
-MetaMarket, будущий крафт/сезон), явные типы владельца и provenance, idempotency
+MetaMarket, реализованные крафт/сезон), явные типы владельца и provenance, idempotency
 receipts и запрет обхода soulbound/reserve. Внутренние модули получают один
 application transaction boundary; HTTP/SQL не протекают в доменные правила.
 
@@ -230,12 +241,18 @@ Rewards/Drops, Crafting, Season Pass, Auction и Entitlements. Game достав
 рестарта награда/износ/trade/entitlement применяются однократно; Game/Corp не
 пишут его таблицы напрямую.
 
-### MSVC-3 · Отдельный Commerce service `[srv][sec]` 🔒(MSVC-1)
+### MSVC-3 · Отдельный Commerce service `[srv][sec]` ⏳
 
 **Предыдущий план этого ID — самостоятельный Auction — superseded решением
 2026-10-15.** Auction остаётся модулем Meta/Economy ради локальной атомарности.
 
-Commerce получает отдельный entrypoint, DB credentials и secret namespace.
+**Основа v0 реализована:** отдельные entrypoint, схема/роль PostgreSQL, каталог,
+orders/provider receipts/outbox, status/retry/refund и HMAC с audience/capability,
+ротацией ключей и durable nonce. Контрактные тесты включают настоящую PostgreSQL
+и Commerce → Meta HTTP. Реальные provider adapters и эксплуатационное подключение
+ещё не выполнены; готовность платежей не заявляется.
+
+Commerce использует отдельный entrypoint, DB credentials и secret namespace.
 Владеет каталогом платных offers, orders, payment/rewarded-ad provider adapters,
 webhooks, refunds/chargebacks и provider receipts. Он **не** владеет арсеналом,
 Варрантами, Season Pass state или игровыми лотами и не имеет SQL-доступа к их БД.

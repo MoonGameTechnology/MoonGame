@@ -2589,6 +2589,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #endscreen .es-xp .lvl{display:block;margin-top:3px;font-size:var(--fs-caption);color:var(--cyan);font-weight:400;}
 /* Итог забега Sector Zero по частям (PVR-5.4): забег и задачи — строками, сумма — внизу. */
 #endscreen .es-run{text-align:left;margin:12px 0 4px;border:1px solid var(--line-hi);border-radius:8px;padding:8px 10px;background:rgba(6,18,22,.6);}
+#endscreen .es-rewards h3{margin:0 0 9px;font-size:var(--fs-body);color:var(--cyan);}
 #endscreen .es-run ul{list-style:none;margin:0;padding:0;display:grid;gap:5px;}
 #endscreen .es-run li{display:flex;justify-content:space-between;gap:10px;font-size:var(--fs-body);color:var(--dim);}
 #endscreen .es-run li b{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;}
@@ -3516,6 +3517,7 @@ ${profileCss}
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
 #hp-arsenal{overflow-y:auto;gap:10px;}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:var(--fs-caption)}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
+#hp-supply{overflow-y:auto;gap:16px;padding-bottom:24px}.me-section{display:flex;flex-direction:column;gap:10px}.me-section h3,.me-section h4{margin:0}.me-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.me-head h2{margin:0;color:var(--cyan);font-size:20px}.me-hint{margin:0;color:var(--dim);font-size:var(--fs-caption);line-height:1.45}.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}.me-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--glass)}.me-card.me-goal{border-color:var(--cyan)}.me-card h4{margin:0}.me-amounts{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.me-amounts span,.me-row span{color:var(--dim)}.me-row{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-caption)}.me-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}#hp-supply button{min-height:40px;padding:8px 12px;border:1px solid var(--cyan-dim);border-radius:6px;background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer}#hp-supply button:disabled{opacity:.45;cursor:default}#hp-supply button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.me-badge{color:var(--cyan);font-size:var(--fs-caption)}.me-bound{color:#e8b869;font-size:var(--fs-caption);margin:0}.me-error{color:#ef9b9b}.me-track{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}.me-level{border-top:1px solid var(--line);padding-top:10px}.me-track details>summary{cursor:pointer;padding:8px 0}.me-material-list{display:grid;gap:6px}.me-select{width:100%;padding:8px;background:#07131b;color:var(--ink);border:1px solid var(--line);border-radius:6px}.me-reward{margin:0;padding-left:18px;font-size:var(--fs-caption);color:var(--dim)}
 .ar-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid var(--line);}
 .ar-fchip{padding:3px 9px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -4400,7 +4402,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
-    <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
+    <div class="hub-panel" id="hp-arsenal" style="display:none"><button id="arsenal-supply" class="hub-solo" type="button" data-i18n="hub.tile.supply"></button><div id="arsenal-items"></div></div>
+    <div class="hub-panel" id="hp-supply" style="display:none"></div>
     <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
@@ -4414,6 +4417,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
+        <button class="hub-tile" id="hub-supply" type="button"><span class="ht-ic">⚒</span><span data-i18n="hub.tile.supply"></span></button>
         <button class="hub-tile" id="hub-auction" type="button"><span class="ht-ic">⌖</span><span data-i18n="hub.tile.auction"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
         <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>

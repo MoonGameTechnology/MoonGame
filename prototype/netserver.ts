@@ -1,4 +1,15 @@
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
+import { MemoryDropStore } from '../packages/server/src/store';
+import { MetaEconomy } from '../packages/server/src/metaEconomy';
+import { loadMetaEconomyCatalog } from '../packages/server/src/metaEconomyCatalog';
+import { registerMetaEconomyApi } from '../packages/server/src/metaEconomyApi';
+import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from '../packages/server/src/metaEconomyStore';
+import { createMetaRewardDelivery } from '../packages/server/src/metaEconomyDelivery';
+import { commerceOffers } from '../packages/server/src/commerceCatalog';
+import { registerMetaCommerce } from '../packages/server/src/metaCommerce';
+import { loadDropTables, loadStarterArsenal } from '../packages/server/src/scenario';
+import { grantStarterArsenal } from '../packages/server/src/arsenal';
+import { initializeOrdinaryArsenal, syncAccountArsenal } from '../packages/server/src/mainGameArsenal';
 import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/store';
 import { corporateEndpoint, registerCorporateGateway, registerCorporateMaintenance } from '../packages/server/src/corporateTransport';
 import { corporateRemote } from '../packages/server/src/corporateRemote';
@@ -285,6 +296,7 @@ const corporationsEndpoint = corporateEndpoint(process.env);
 const metaFaucet = Number(process.env.META_MARKET_FAUCET ?? 0) || 0;
 let metaMarket: MetaMarket;
 let arsenalStore: ArsenalStore;
+let metaEconomyStore: MetaEconomyStore;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   await prepareRuntimeDatabase(pool, process.env);
@@ -298,6 +310,7 @@ if (DATABASE_URL) {
   corpStore = new PostgresCorpStore(pool);
   arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
+  metaEconomyStore = new PostgresMetaEconomyStore(pool);
 } else {
   matchStore = new MemoryMatchStore();
   accountStore = new MemoryAccountStore();
@@ -307,9 +320,22 @@ if (DATABASE_URL) {
   commanderStore = new MemoryCommanderStore();
   profileStore = new MemoryProfileStore();
   corpStore = new MemoryCorpStore();
-  arsenalStore = new MemoryArsenalStore();
-  metaMarket = new MemoryMetaMarket(arsenalStore, undefined, metaFaucet);
+  const memoryArsenal = new MemoryArsenalStore();
+  const memoryMarket = new MemoryMetaMarket(memoryArsenal, undefined, metaFaucet);
+  arsenalStore = memoryArsenal;
+  metaMarket = memoryMarket;
+  metaEconomyStore = new MemoryMetaEconomyStore(memoryArsenal, new MemoryDropStore(), memoryMarket);
 }
+metaMarket.setEconomy(metaEconomyStore);
+const metaCatalog = loadMetaEconomyCatalog(data);
+const starterArsenal = loadStarterArsenal(data);
+let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
+const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, dropTables: loadDropTables(data), now: Date.now,
+  onEvent: (event) => {
+    process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
+    void refreshGrantedArsenal(event.accountId).catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
+  },
+});
 
 if (corporationsEndpoint) corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
 
@@ -343,6 +369,17 @@ async function creditMatchXp(
 const authCfg = configFromEnv(process.env);
 const securityAudit = securityAuditFromEnv(process.env);
 const AUTH = authCfg.auth !== undefined;
+const rewardDelivery = createMetaRewardDelivery({
+  store: metaEconomyStore,
+  matches: matchStore,
+  seats: (id) => AUTH ? nickSeatAccounts(accountStore, userStore, id) : async () => ({}),
+  settle: (facts) => metaEconomy.settle(facts),
+  stageCount: metaCatalog.rewards.stageFractions.length,
+  participation: metaCatalog.rewards.participation,
+  onError: (error) => process.stderr.write(`meta reward delivery failed: ${String(error)}\n`),
+});
+matchStore = rewardDelivery.matches;
+rewardDelivery.start();
 // ADM-1: кто может командовать составом партии (`ADMIN_LOGINS=alice,bob`). Полномочие —
 // на УЧЁТКЕ, а не общий токен: в логе видно, кто снял игрока, а смена пароля отзывает
 // доступ вместе с сессией. Пусто ⇒ админских маршрутов на хосте нет вообще.
@@ -469,13 +506,14 @@ async function createHostedMatch(
   const aiEligibleAt = new Map<string, number>();
 
   const restoredSnap = await matchStore.load(id);
-  const initialState =
+  let initialState =
     restoredSnap?.state ??
     newGame({
       mapId,
       ...(modeId !== undefined ? { modeId } : {}),
       seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
+  if (AUTH && !restoredSnap) initialState = initializeOrdinaryArsenal(initialState, starterArsenal);
   // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
   // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
   // молча вернул бы PvE-сессию к базовым правилам — ровно та «подмена правил под
@@ -569,6 +607,7 @@ async function createHostedMatch(
     // each player gets only the bots' opinion of THEM, not every bot's of every seat.
     hostFog: approvalView,
     securityAudit,
+    arsenalStore,
     observe, // M0: log every room event to JSONL + count for the on-exit summary
     initialReceipts, // rehydrated idempotency (deduped action stays deduped after restart)
     // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
@@ -638,6 +677,7 @@ async function createHostedMatch(
         status: room.state.match.status === 'ended' ? 'ended' : 'ongoing',
         state: room.state,
         clock: room.clockSnapshot,
+        economyActivity: room.economyActivitySnapshot,
       });
     } catch (e) {
       process.stderr.write(`snapshot save failed (${id}): ${(e as Error)?.message ?? String(e)}\n`);
@@ -848,6 +888,10 @@ const hosted: HostedMatch[] = [];
 // сессии с режимом: поймано живым прогоном при BRW-0 — `modeId` в строке уже стоял,
 // а `kind` у всех трёх партий приезжал `undefined`.
 const registry = new MatchRegistry(accountStore, data);
+refreshGrantedArsenal = async (accountId) => {
+  const user = await userStore.findById(accountId);
+  if (user) await syncAccountArsenal({ accountId, login: user.login, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: () => true });
+};
 /** Метаданные браузера: карта и режим берутся из САМОЙ сессии (`sessionMeta`, BRW-0) —
  *  карта из сохранённого состояния, режим из резолвнутого конфига комнаты. Сборка живёт
  *  в `packages/server`, чтобы у неё был один экземпляр на оба хоста и на тест ленты.
@@ -1092,6 +1136,7 @@ const server = createMultiplayerServer({
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
         users: userStore,
+        onRegistered: async (accountId) => { await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now()); },
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
         // Новый пароль закрывает открытые игровые сокеты аккаунта во всех партиях.
@@ -1145,7 +1190,18 @@ const server = createMultiplayerServer({
       // MetaMarket (EC-3) — тот же слайс аукциона, что в проде: прото-хост не заводит
       // свою торговлю. Фаусет — из окружения, по умолчанию выключен.
       registerArsenalApi(app, { store: arsenalStore, identify: identifySession });
-      registerMetaMarketApi(app, { market: metaMarket, identify: identifySession });
+      const refreshAccountArsenal = async (who: { accountId: string; login: string }): Promise<void> => {
+        await syncAccountArsenal({ ...who, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: () => true });
+      };
+      registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal });
+      registerMetaCommerce(app, metaEconomy, metaEconomyStore);
+      app.get('/commerce/offers', async (_request, reply) => {
+        reply.header('cache-control', 'no-store');
+        return { offers: commerceOffers() };
+      });
+      registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
+        onChanged: refreshAccountArsenal,
+        canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
       registerProfileApi(app, { profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
       registerLeaderboardApi(app, {
         commanders: commanderStore,
@@ -1259,6 +1315,10 @@ const server = createMultiplayerServer({
             scientists: preferredScientists,
           });
           if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
+          if (accountId) {
+            await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now());
+            await refreshAccountArsenal({ accountId, login });
+          }
           return {
             playerId: seat.playerId,
             token: await authCfg.signToken!(id, seat.playerId, accountId, pwfp),
@@ -1457,6 +1517,7 @@ const shutdown = (): void => {
     // Stop taking requests (Fastify waits for those in flight) before the journals: a
     // `/telemetry` batch landing after the last flush would be lost at exit.
     await server.close();
+    await rewardDelivery.stop();
     // The journals last: drain them, THEN write a fresh summary (its counters now match
     // the files; the one above stays as a fallback, the report keeps a run's LAST one)
     // and drain that. `flush()` waits for an append already in flight, so nothing is cut.

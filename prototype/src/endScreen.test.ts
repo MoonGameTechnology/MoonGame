@@ -629,3 +629,26 @@ describe('итог операции главы VI — честный отчёт 
     expect(endScreenHtml(scored(), 'p1', endOf(), view)).not.toContain('es-op');
   });
 });
+
+
+describe('main-game receipt integration', () => {
+  it('reads receipts only for a visible network main-game result', async () => {
+    let reads = 0;
+    const h = wired({ rewards: { matchId: () => 'm1', read: async () => { reads++; return { receipts: [], finalReady: true }; } } });
+    h.api.render();
+    expect(reads).toBe(0);
+    h.setNet(true);
+    h.setEnd(endOf({ runReward: 5 }));
+    h.api.render();
+    expect(reads).toBe(0);
+    h.setEnd(endOf());
+    h.setHub(true);
+    h.api.render();
+    expect(reads).toBe(0);
+    h.setHub(false);
+    h.api.render();
+    await Promise.resolve();
+    expect(reads).toBe(1);
+    expect(h.ov.html()).toContain('Подтверждённой награды пока нет');
+  });
+});

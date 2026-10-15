@@ -13,8 +13,10 @@ backup/logs/SIEM/response.
 
 ## Что есть сейчас
 
-Game объединяет API/Auth/Lobby, матчи, личный инвентарь и fixed-price MetaMarket
-с общей игровой БД. Corp поддерживает отдельный процесс и отдельную PostgreSQL;
+Game объединяет API/Auth/Lobby, матчи и локальный транзакционный Meta/Economy:
+Inventory/Wallet/Rewards/Crafting/Season/Auction/Entitlements с общей игровой БД.
+Commerce v0 имеет отдельный процесс и PostgreSQL, но реальные провайдеры отключены;
+[объём реализации и запуск](meta-economy.md). Corp поддерживает отдельный процесс и отдельную PostgreSQL;
 его перенос и состояние живого сервера не подтверждены этой картой.
 Исходящие обращения к Corp ограничены `DependencyGuard`.
 Минимальный отдельный `/admin` (roster/kick) существует; полноценные модераторский

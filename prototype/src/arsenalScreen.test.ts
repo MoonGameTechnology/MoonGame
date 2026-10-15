@@ -95,10 +95,10 @@ describe('арсенал — карточка предмета', () => {
 
   it('бейджи показываются только когда есть что показывать', () => {
     expect(arsenalCardHtml(gradedModule)).toContain('+2 ⛭40 · ');
-    // чертёж без заточки и износа: подпись — один «откуда», без ведущего разделителя
+    // Личный стартовый чертёж показывает привязку и источник без износа.
     const card = arsenalCardHtml(hull);
     expect(card).not.toContain('⛭');
-    expect(card).toContain(`<span class="ar-meta">${originLabel('starter')}</span>`);
+    expect(card).toContain(`<span class="ar-meta">Личное · ${originLabel('starter')}</span>`);
   });
 
   it('defId экранируется — коллекция приходит с сервера (CWE-79)', () => {
@@ -108,8 +108,8 @@ describe('арсенал — карточка предмета', () => {
     expect(html).not.toContain('onclick="alert');
   });
 
-  it('у всех шести источников есть подпись — ключ наружу не течёт', () => {
-    for (const o of ['starter', 'drop', 'craft', 'auction', 'lootbox', 'rent'] as const) {
+  it('у всех источников есть подпись — ключ наружу не течёт', () => {
+    for (const o of ['starter', 'drop', 'craft', 'auction', 'lootbox', 'rent', 'commerce', 'ad', 'season'] as const) {
       expect(originLabel(o), o).not.toContain('arsenal.origin');
     }
   });

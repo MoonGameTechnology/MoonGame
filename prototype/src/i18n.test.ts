@@ -195,6 +195,10 @@ function shippedNames(): Array<[string, string]> {
 const DATA_KEY_GAPS = new Set<string>([]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
+  { prefix: 'meta.material.', built_by: 'metaEconomyScreen.ts: server meta economy material catalog nameKey' },
+  { prefix: 'meta.season.', built_by: 'metaEconomyScreen.ts: server season catalog nameKey' },
+  { prefix: 'meta.reward.', built_by: 'metaEconomyScreen.ts: server season milestone localization keys' },
+  { prefix: 'commerce.offer.', built_by: 'metaEconomyScreen.ts: Commerce offer nameKey and contentsKey' },
   { prefix: 'profile.portrait.', built_by: 'profileStudio.ts: static portrait index 1..40; completeness checked by profileStudio.test.ts' },
   { prefix: 'profile.medal.', built_by: 'profileStudio.ts: PROFILE_MEDALS ids; completeness checked by profileStudio.test.ts' },
   { prefix: 'profile.metric.', built_by: 'profileStudio.ts: PROFILE_MEDALS metrics; completeness checked by profileStudio.test.ts' },
@@ -329,6 +333,22 @@ describe('локализация — ключи', () => {
     };
     walk(data, 'data');
     expect(bad.sort()).toEqual([]);
+  });
+
+  it('каталог снабжения и известное содержимое магазина переведены', () => {
+    const catalog = JSON.parse(readFileSync(path.join(repoRoot, 'data/metaEconomy.json'), 'utf8')) as Record<string, unknown>;
+    const keys: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      for (const [field, value] of Object.entries(node as Record<string, unknown>)) {
+        if ((field === 'nameKey' || field === 'labelKey') && typeof value === 'string') keys.push(value);
+        else walk(value);
+      }
+    };
+    walk(catalog);
+    const products = (catalog.commerce as { products: Record<string, unknown> }).products;
+    for (const id of Object.keys(products)) keys.push(`commerce.offer.${id}.name`, `commerce.offer.${id}.contents`);
+    expect(keys.filter((key) => !(key in ru) || !(key in en))).toEqual([]);
   });
 
   it('каждый ключ из кода заведён в локали', () => {

@@ -1367,7 +1367,7 @@
 | MSVC-0 | ✅ | srv | `docs/service-resilience-roadmap.md` | Фундамент исходящих вызовов |
 | MSVC-1 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Контракт Meta/Economy и совместимость |
 | MSVC-2 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Meta/Economy |
-| MSVC-3 | 🔒 | srv sec | `docs/service-resilience-roadmap.md` | Отдельный Commerce service |
+| MSVC-3 | ⏳ | srv sec | `docs/service-resilience-roadmap.md` | Отдельный Commerce service |
 | MSVC-4 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Фоновые потребители по измеренной нагрузке |
 | MSVC-5 | ⏳ | ops | `docs/service-resilience-roadmap.md` | Автоматизированное учение отказов |
 | MSVC-6 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Доменные правила и границы слоёв |
