@@ -400,6 +400,10 @@ export const en: Record<string, string> = {
   'startup.failed.title': 'The game could not start',
   'startup.failed.body': 'Try again. If the error returns, share the code below with the developer.',
   'startup.retry': 'Try again',
+  'dev-notice.badge': 'In development',
+  'dev-notice.title': 'The game is in development',
+  'dev-notice.body': 'This is an early build. Expect bugs, balance changes and progress resets.',
+  'dev-notice.ack': 'I understand',
   // --- acc / browser — Аккаунты (вход, регистрация, сессия) и браузер матчей.
   'acc.bad-pass': 'Wrong password',
   'acc.created': 'Account created',

@@ -26,6 +26,8 @@ import { createErrorReporter, installErrorReporter } from './platform/errorRepor
 import { telemetryTarget } from '../../decisions/telemetryEndpoint';
 import { appLoadedProps } from '../../decisions/sessionAnalytics';
 import { anyToken } from '../../decisions/sessionStore';
+import { DEV_NOTICE_KEY, devNoticeAckValue, needsDevNotice } from '../../decisions/devNotice';
+import { readRaw, writeRaw } from './prefs';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
@@ -67,6 +69,30 @@ function revealBoot(): void {
   document.body.classList.toggle('holo-available', holo);
   document.body.classList.toggle('holo-ui', holo);
   document.body.classList.remove('app-booting');
+  offerDevNotice();
+}
+
+/**
+ * Окно «игра в разработке» (`decisions/devNotice.ts`): поверх входа, пока игра грузится
+ * под ним, и только до согласия с текущей версией текста. Под автоматикой
+ * (`navigator.webdriver` — смоук-харнесы на Playwright) окно не показывается: оно
+ * перекрыло бы кнопки, которые харнесы нажимают, а проверяет его отдельный тест решения.
+ */
+function offerDevNotice(): void {
+  const dialog = document.getElementById('dev-notice');
+  const ack = document.getElementById('dev-notice-ack');
+  if (!dialog || !ack || navigator.webdriver) return;
+  if (!needsDevNotice(readRaw(DEV_NOTICE_KEY))) return;
+  dialog.hidden = false;
+  ack.addEventListener(
+    'click',
+    () => {
+      writeRaw(DEV_NOTICE_KEY, devNoticeAckValue());
+      dialog.hidden = true;
+    },
+    { once: true },
+  );
+  ack.focus();
 }
 // Архиву площадки нечем подписать разметку, пока не скачан язык, — там покров снимается
 // после загрузки текстов (ниже), чтобы не показать кнопки без подписей.
@@ -133,7 +159,11 @@ function telemetrySink(): ReturnType<typeof createBrowserTelemetrySink> | undefi
         return null;
       }
     },
-    build: /^[0-9a-f]{7,40}$/i.test(sha) ? `apk-${sha.slice(0, 12)}` : __PLAYER_BUILD__ ? 'web' : 'dev',
+    build: /^[0-9a-f]{7,40}$/i.test(sha)
+      ? `apk-${sha.slice(0, 12)}`
+      : __PLAYER_BUILD__
+        ? 'web'
+        : 'dev',
   });
   return sink;
 }
