@@ -81,18 +81,19 @@ function revealBoot(): void {
 function offerDevNotice(): void {
   const dialog = document.getElementById('dev-notice');
   const ack = document.getElementById('dev-notice-ack');
-  if (!dialog || !ack || navigator.webdriver) return;
+  if (!(dialog instanceof HTMLDialogElement) || !ack || navigator.webdriver) return;
   if (!needsDevNotice(readRaw(DEV_NOTICE_KEY))) return;
-  dialog.hidden = false;
+  // Esc закрыл бы модальный диалог без согласия — окно закрывает только кнопка.
+  dialog.addEventListener('cancel', (event) => event.preventDefault());
   ack.addEventListener(
     'click',
     () => {
       writeRaw(DEV_NOTICE_KEY, devNoticeAckValue());
-      dialog.hidden = true;
+      dialog.close();
     },
     { once: true },
   );
-  ack.focus();
+  dialog.showModal();
 }
 // Архиву площадки нечем подписать разметку, пока не скачан язык, — там покров снимается
 // после загрузки текстов (ниже), чтобы не показать кнопки без подписей.
