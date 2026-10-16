@@ -47,6 +47,24 @@ const MAX_ADVANCE_STEPS = 100_000;
  *  time, so modules can accrue rate-based quantities (resources) by formula. */
 const TIME_ADVANCED = 'time.advanced';
 
+/**
+ * Где остановить мир внутри отрезка. Перед каждым отрезком `time.advanced` ядро спрашивает
+ * конвейер хука `time.stop` (база `Infinity`, аргументы `{ from, to }`): подписчик, которому
+ * нужен шаг мира раньше `to`, возвращает меньший миг — свой, если он раньше пришедшего. Миг
+ * в `(from, to]` режет отрезок там, и на этот миг идёт шаг с событием `time.stopped { at }`:
+ * после событий очереди, назначенных на тот же миг, как шёл бы поиск, поставленный в очередь
+ * заранее. Подписчик не пишет в состояние: он только читает мир на начало отрезка.
+ *
+ * Зачем. Шаг мира — это отрезок времени для всех модулей: экономика, туман, счёт. Событие в
+ * очереди режет время, даже если ничего не меняет. Ракетная мина, рядом с которой стоит
+ * чужой флот, раньше ставила поиск в очередь каждую игровую минуту, и на FFA-20 к 22-му дню
+ * такие пустые поиски давали семь шагов мира из десяти. Внутри отрезка мир меняется только
+ * со временем (позиции идут по своим записям), поэтому миг, когда поиск что-то найдёт, можно
+ * узнать заранее и остановить мир ровно там, а не каждую минуту.
+ */
+const TIME_STOP = 'time.stop';
+const TIME_STOPPED = 'time.stopped';
+
 /** Earliest scheduled event with `at <= now`. The `scheduled` array is kept
  *  sorted by `(at, seq)`, so this is O(1) — just check the head. */
 function earliestDue(scheduled: readonly ScheduledEvent[], now: number): ScheduledEvent | null {
@@ -357,35 +375,43 @@ export class Kernel {
       draft.scheduled.sort((a, b) => a.at - b.at || a.seq - b.seq);
     }
     const events: DomainEvent[] = [];
+    // Остановка, чей шаг ещё впереди: он идёт после событий, назначенных на тот же миг.
+    let halt: number | null = null;
     let guard = 0;
     for (;;) {
       if (++guard > MAX_ADVANCE_STEPS) {
         return { ok: true, state: draft, events, failures: [], partial: true };
       }
       const next = earliestDue(draft.scheduled, ctx.now);
-      let step: StepResult;
-      if (next && next.at > draft.time) {
-        const from = draft.time;
-        const to = next.at;
-        step = this.runOn(draft, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }), true);
-      } else if (next) {
+      if (next && next.at <= draft.time) {
         draft.scheduled.shift();
         const stepTime = Math.max(next.at, draft.time);
-        step = this.runOn(draft, ctx, stepTime, (h) => h.emit(next.type, next.payload), true);
-      } else if (ctx.now > draft.time) {
-        const from = draft.time;
-        const to = ctx.now;
-        step = this.runOn(draft, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }), true);
-      } else {
-        break;
+        const step = this.runOn(draft, ctx, stepTime, (h) => h.emit(next.type, next.payload), true);
+        if (!step.ok) return null;
+        events.push(...step.events);
+        continue;
       }
-      if (!step.ok) {
-        return null;
+      if (halt !== null) {
+        const at = halt;
+        halt = null;
+        const step = this.runOn(draft, ctx, at, (h) => h.emit(TIME_STOPPED, { at }), true);
+        if (!step.ok) return null;
+        events.push(...step.events);
+        continue;
       }
-      events.push(...step.events);
-      if (!next) {
-        break;
-      }
+      const end = next ? next.at : ctx.now;
+      if (!(end > draft.time)) break;
+      const from = draft.time;
+      const stop = this.stopWithin(draft, ctx, from, end);
+      if (stop === undefined) return null;
+      const to = stop ?? end;
+      const span = this.runOn(draft, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }), true);
+      if (!span.ok) return null;
+      events.push(...span.events);
+      halt = stop;
+      // Последний отрезок до `now` завершает ход, как и раньше: то, что его шаги поставили в
+      // очередь на этот же миг, ждёт следующего хода. Отрезок с остановкой — не последний.
+      if (!next && halt === null && draft.time >= ctx.now) break;
     }
     return { ok: true, state: draft, events, failures: [] };
   }
@@ -405,6 +431,8 @@ export class Kernel {
         : state;
     const events: DomainEvent[] = [];
     const failures: AdvanceFailure[] = [];
+    // Остановка, чей шаг ещё впереди: он идёт после событий, назначенных на тот же миг.
+    let halt: number | null = null;
     let guard = 0;
 
     for (;;) {
@@ -420,6 +448,11 @@ export class Kernel {
       }
 
       const next = earliestDue(committed.scheduled, ctx.now);
+      if (halt !== null && !(next && next.at <= committed.time)) {
+        committed = this.stopStep(committed, ctx, halt, events, failures);
+        halt = null;
+        continue;
+      }
       if (next) {
         // Accrue continuous time up to the event FIRST, then loop to re-read the
         // head. `accrue` emits `time.advanced`, whose handlers may legitimately
@@ -428,7 +461,7 @@ export class Kernel {
         // dispatch a stale one (events out of (at, seq) order). Once accrued, the
         // head is due at the current instant and handled by the branch below.
         if (next.at > committed.time) {
-          committed = this.accrue(committed, ctx, next.at, events, failures);
+          [committed, halt] = this.accrue(committed, ctx, next.at, events, failures);
           continue;
         }
         // Head is due now (at === committed.time): remove it (index 0 in sorted
@@ -453,9 +486,11 @@ export class Kernel {
         continue;
       }
 
-      // No more due events — accrue the final span up to the target time.
+      // No more due events — accrue the final span up to the target time. A `time.stop`
+      // inside it ends the span early, and the loop goes on from there.
       if (ctx.now > committed.time) {
-        committed = this.accrue(committed, ctx, ctx.now, events, failures);
+        [committed, halt] = this.accrue(committed, ctx, ctx.now, events, failures);
+        if (halt !== null) continue;
       }
       break;
     }
@@ -463,22 +498,86 @@ export class Kernel {
     return { ok: true, state: committed, events, failures };
   }
 
-  /** Emits a `time.advanced` span [committed.time, to] as one atomic step. */
+  /** Emits a `time.advanced` span [committed.time, end] as one atomic step — or a shorter
+   *  one up to a `time.stop`, whose instant comes back second: its `time.stopped` step runs
+   *  once the events due on that instant have fired ({@link stopStep}). */
   private accrue(
     committed: GameState,
     ctx: Context,
-    to: number,
+    end: number,
     events: DomainEvent[],
     failures: AdvanceFailure[],
-  ): GameState {
+  ): [GameState, number | null] {
     const from = committed.time;
+    const stop = this.stopWithin(committed, ctx, from, end);
+    if (stop === undefined) failures.push({ at: from, type: TIME_STOP, code: 'E_INTERNAL' });
+    const to = stop ?? end;
     const seg = this.runStep(committed, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }));
     if (seg.ok) {
       events.push(...seg.events);
-      return seg.state;
+      return [seg.state, stop ?? null];
     }
     failures.push({ at: to, type: TIME_ADVANCED, code: seg.code });
-    return { ...committed, time: to };
+    return [{ ...committed, time: to }, stop ?? null];
+  }
+
+  /** The `time.stopped` step of a stop at `at` ({@link TIME_STOP}). */
+  private stopStep(
+    committed: GameState,
+    ctx: Context,
+    at: number,
+    events: DomainEvent[],
+    failures: AdvanceFailure[],
+  ): GameState {
+    const step = this.runStep(committed, ctx, at, (h) => h.emit(TIME_STOPPED, { at }));
+    if (step.ok) {
+      events.push(...step.events);
+      return step.state;
+    }
+    failures.push({ at, type: TIME_STOPPED, code: step.code });
+    return committed;
+  }
+
+  /**
+   * Миг внутри отрезка `(from, end]`, где мир надо остановить ({@link TIME_STOP}), или `null`,
+   * если нигде. `undefined` — подписчик хука упал: ход на месте отдаёт работу пошаговому, а
+   * тот записывает отказ и идёт без остановки (мир не застревает, инвариант №4).
+   *
+   * Подписчик видит мир на начало отрезка, а писать ему нечем: `emit`, `schedule`, `reject`
+   * и кости здесь отказывают.
+   */
+  private stopWithin(
+    state: GameState,
+    ctx: Context,
+    from: number,
+    end: number,
+  ): number | null | undefined {
+    const entries = this.hooks.get(TIME_STOP);
+    if (!entries) return null;
+    const refuse = (): never => {
+      throw new Rejection('E_READ_ONLY');
+    };
+    const h: HandlerContext = {
+      state,
+      ctx: ctx.now === from ? ctx : { ...ctx, now: from },
+      rng: new AbsentRng(),
+      emit: refuse,
+      schedule: refuse,
+      reject: refuse,
+      hook: <T>(name: string, baseValue: T, args?: unknown): T => {
+        let value: unknown = baseValue;
+        for (const entry of this.hooks.get(name) ?? []) value = entry.fn(value, args ?? null, h);
+        return value as T;
+      },
+      capability: <T>(name: string): T | undefined => this.capabilities.get(name) as T | undefined,
+    };
+    let at: unknown = Infinity;
+    try {
+      for (const entry of entries) at = entry.fn(at, { from, to: end }, h);
+    } catch {
+      return undefined;
+    }
+    return typeof at === 'number' && at > from && at <= end ? at : null;
   }
 
   /**
