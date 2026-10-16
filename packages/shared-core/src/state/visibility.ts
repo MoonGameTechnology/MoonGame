@@ -947,6 +947,12 @@ function project(
     const own = view.match.scores[viewerId];
     view.match.scores = own ? { [viewerId]: own } : {};
   }
+  // Боевые очки (BAL-16) — та же разведка: их рост у соперника выдаёт бой за туманом.
+  if (view.match?.battlePoints) {
+    const own = view.match.battlePoints[viewerId];
+    if (own !== undefined) view.match.battlePoints = { [viewerId]: own };
+    else delete view.match.battlePoints;
+  }
   // Stolen intel is the thief's secret: strip everyone else's grants (and the key
   // entirely when the viewer has none — no empty-map blip in third-party deltas).
   if (view.intel) {
