@@ -46,7 +46,7 @@ function stub(dir, name, body) {
  *  заглушки там, где поведение проверяется отдельно. */
 function writeRelease(dir, { updateExit = 0, verifyExit = 0, marker = '' } = {}) {
   mkdirSync(dir, { recursive: true });
-  for (const f of ['autoupdate.sh', 'stack.sh', 'moongame.sh', 'env-keys.sh']) {
+  for (const f of ['autoupdate.sh', 'stack.sh', 'moongame.sh', 'env-keys.sh', 'production-preflight.sh']) {
     cpSync(join(DEPLOY_DIR, f), join(dir, f));
     chmodSync(join(dir, f), 0o755);
   }

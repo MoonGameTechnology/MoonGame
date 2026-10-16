@@ -143,6 +143,9 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   backup_env
   ensure_env_keys "$ENV_FILE"
 
+  . "$DEPLOY_DIR/production-preflight.sh"
+  if ! production_preflight "$ENV_FILE"; then restore_env; exit 1; fi
+
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
   if ! migrate_db "$VOID_IMAGE"; then
@@ -218,6 +221,9 @@ run_as_owner git -C "$REPO_DIR" merge --ff-only "origin/$BRANCH"
 backup_env
 ensure_env_keys "$ENV_FILE"
 
+. "$DEPLOY_DIR/production-preflight.sh"
+if ! production_preflight "$ENV_FILE"; then restore_env; exit 1; fi
+
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
 PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
@@ -226,6 +232,16 @@ echo "[*] Пересобираем образ (сервер пока работ�
 # Тоже от владельца: в группе docker состоит служебный пользователь (его туда завёл
 # установщик), а не тот, кто набрал `moongame update`.
 run_as_owner docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
+
+# The source-build path also needs a separate migration before the runtime starts.
+if [ "$(env_value DB_AUTO_MIGRATE)" = 0 ]; then
+  BUILT_IMAGE="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images server)"
+  [ -n "$BUILT_IMAGE" ] && migrate_db "$BUILT_IMAGE" || {
+    restore_env
+    echo '[✗] Миграция не прошла — работающий сервер не перезапущен.' >&2
+    exit 1
+  }
+fi
 
 echo "[*] Перезапускаем сервер на новом образе..."
 sudo systemctl restart "$SERVICE_NAME"

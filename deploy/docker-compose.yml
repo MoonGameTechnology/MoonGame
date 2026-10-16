@@ -115,6 +115,9 @@ services:
       # with PROD=0 for explicit dev-mode (loopback / LAN playtest).
       PROD: ${PROD:-1}
       SECURITY_AUDIT: ${SECURITY_AUDIT:-1}
+      # Set only by the host preflight after its independent recovery check succeeds.
+      # Do not persist this attestation in server.env; run launch.sh / stack.sh.
+      BACKUP_READINESS_VERIFIED: ${BACKUP_READINESS_VERIFIED:-0}
       # How many independent sessions this ONE process hosts (proto, proto-2, …):
       # all appear in the in-game match browser; each is durable in Postgres.
       MATCHES: ${MATCHES:-1}

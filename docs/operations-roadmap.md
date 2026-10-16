@@ -12,7 +12,7 @@ Game пока ведёт комнаты одним процессом (durable-P
 Corp поддерживает отдельный процесс/БД через `CORPORATIONS_URL`, без подтверждения
 живого cutover. [Роадмап сервисов](service-resilience-roadmap.md) продолжает эти границы
 для единого Meta/Economy (включая Auction), отдельного Commerce и workers. Деплой-артефакты есть
-(`Dockerfile`, `render.yaml`, `deploy/docker-compose.yml`) и базовая наблюдаемость тоже
+(`Dockerfile`, `deploy/docker-compose.yml`) и базовая наблюдаемость тоже
 (структурные pino-логи, операторский JSON `/metrics`, `/metrics/summary`,
 суточные игровые/клиентские JSONL и CLI-отчёты `metrics`/`analytics`).
 Горизонтального масштаба, централизованного хранилища телеметрии и полноценного

@@ -278,6 +278,8 @@ ALLOWED_ORIGINS=$ALLOWED_ORIGINS
 # Не выставляй TRUST_PROXY=1 «чтобы гард замолчал» без реального прокси перед сервером:
 # тогда сервер поверит заголовку X-Forwarded-For от клиента, и лимиты по IP обойдёт кто угодно.
 PROD=0
+# Bootstrap is local-only until the production data-protection preflight passes.
+SERVER_BIND=127.0.0.1
 EOF
 
 chown $SERVICE_USER:$SERVICE_USER "$ENV_FILE"
@@ -295,20 +297,21 @@ Wants=network-online.target
 Requires=docker.service
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 User=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR/deploy
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=$ENV_FILE
 
 # Запуск сервера
-ExecStart=/usr/bin/docker compose up --remove-orphans
+ExecStart=/bin/bash $INSTALL_DIR/deploy/launch.sh --no-build --remove-orphans
 
 # Остановка
-ExecStop=/usr/bin/docker compose down
+ExecStop=/bin/bash $INSTALL_DIR/deploy/launch.sh stop
 
 # Автоматический перезапуск при ошибке
-Restart=always
+Restart=on-failure
 RestartSec=10
 StartLimitInterval=60
 StartLimitBurst=3
@@ -454,7 +457,7 @@ done
 # Финальная информация
 echo ""
 log_success "=========================================="
-log_success "Установка завершена!"
+log_success "Локальный bootstrap завершён (SERVER_BIND=127.0.0.1)."
 log_success "=========================================="
 echo ""
 echo -e "${BLUE}🎮 Доступ к серверу:${NC}"
@@ -471,11 +474,8 @@ echo "  Перезапуск:     moongame restart"
 echo "  Оболочка:       moongame shell"
 echo ""
 echo -e "${BLUE}📋 Информация о базе:${NC}"
-echo "  PostgreSQL Пароль: $POSTGRES_PASSWORD"
-echo "  (сохранен в $ENV_FILE)"
+echo "  PostgreSQL пароль сохранён в $ENV_FILE (не выводится в журнал установки)."
 echo ""
-echo -e "${YELLOW}⚠️  Для проксирования внешнего адреса:${NC}"
-echo "  На роутере или nginx: перенаправь внешний порт → $(origin_host "$INTERNAL_IP"):$INTERNAL_PORT"
-echo ""
-echo -e "${GREEN}✓ Сервер готов!${NC}"
+echo -e "${YELLOW}Публичный запуск требует PROD=1, TLS, отдельных ролей БД и проверки внешнего backup/restore.${NC}"
+echo "  Порядок переноса: deploy/README.md и docs/security/zero-trust-rollout.md"
 echo ""

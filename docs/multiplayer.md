@@ -157,18 +157,19 @@ the JWT handshake — `AUTH_JWT_SECRET`, SE-0.1 — for anything beyond a throwa
 
 ### Path D — hosted, truly "just a link" (no local server)
 
-Deploy the server once and nobody runs anything locally — you just share a permanent
-URL. The repo ships a `Dockerfile` (builds the prototype + runs the proto-server,
-serving the game at `/`) and a `render.yaml` blueprint:
+Deploy the server once and share its HTTPS URL; players need no local server.
+Use the [production deployment guide](../deploy/README.md): provision durable
+PostgreSQL and separate runtime/migration roles, configure authentication and TLS,
+and provide a real independent backup/restore readiness verifier before starting
+the stack through its launcher. The image serves the game at `/`; the overlay
+auto-fills same-origin `wss://`.
 
-- **Render (free):** New → Blueprint → point at this repo → it builds the Dockerfile
-  and gives `https://<app>.onrender.com`. Share it; players open it and enter unique
-  callsigns. The overlay auto-fills the same-origin `wss://`, so there's nothing to type.
-- **Any Docker host / Fly.io / Railway:** `docker build -t void-dominion . && docker run -p 8788:8788 void-dominion`, or push the image. The server reads `$PORT`.
-
-Free hosts sleep when idle (cold start on first hit) and state is in-memory (a restart
-loses the match) — fine for testing, and the handshake is unauthenticated, so don't
-leave it public long-term (auth is brick F7 / SE-0.1).
+The former free Render one-click blueprint has been removed: it did not provision
+the durable database, restricted roles or host recovery preflight now required by
+`PROD=1`. A bare `docker run -p 8788:8788` also refuses incomplete production
+configuration. Managed hosting needs an equivalent verified deployment workflow;
+there is no supported one-click Render path in this repository. Keep `PROD=1` for
+public hosting.
 
 ### Troubleshooting — "the server won't open / we can't connect"
 

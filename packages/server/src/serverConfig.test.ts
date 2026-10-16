@@ -79,6 +79,10 @@ describe('checkProductionReadiness', () => {
     GATE: '1',
     TRUST_PROXY: '1',
     SEAT_LOCK: '1',
+    DATABASE_URL: `postgres://vd_app_test:${'a'.repeat(64)}@postgres/void`,
+    DB_AUTO_MIGRATE: '0',
+    DB_REQUIRE_LEAST_PRIVILEGE: '1',
+    BACKUP_READINESS_VERIFIED: '1',
   };
 
   it('PROD unset ⇒ ok, the dev harness is untouched', () => {
@@ -96,6 +100,10 @@ describe('checkProductionReadiness', () => {
       'GATE=1',
       'TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)',
       'SEAT_LOCK=1',
+      'DATABASE_URL (durable production storage)',
+      'DB_AUTO_MIGRATE=0 (separate migration job)',
+      'DB_REQUIRE_LEAST_PRIVILEGE=1 (verified runtime grants)',
+      'BACKUP_READINESS_VERIFIED=1 (deploy/production-preflight.sh)',
     ]);
   });
 
@@ -157,8 +165,21 @@ describe('checkProductionReadiness', () => {
     expect(r).toEqual({ ok: true, missing: [] });
   });
 
-  it('без DATABASE_URL молчит — in-memory-стор это законный режим', () => {
-    expect(checkProductionReadiness(NATIVE_TLS)).toEqual({ ok: true, missing: [] });
+  it('rejects production without durable storage, leaving in-memory for development', () => {
+    expect(checkProductionReadiness({ ...NATIVE_TLS, DATABASE_URL: undefined })).toEqual({
+      ok: false, missing: ['DATABASE_URL (durable production storage)'],
+    });
+  });
+
+  it.each([
+    ['DB_AUTO_MIGRATE', '1'],
+    ['DB_AUTO_MIGRATE', undefined],
+    ['DB_REQUIRE_LEAST_PRIVILEGE', '0'],
+    ['DB_REQUIRE_LEAST_PRIVILEGE', undefined],
+    ['BACKUP_READINESS_VERIFIED', '0'],
+    ['BACKUP_READINESS_VERIFIED', undefined],
+  ])('rejects an incomplete production data boundary: %s=%s', (key, value) => {
+    expect(checkProductionReadiness({ ...FULL, [key]: value }).ok).toBe(false);
   });
 
   it('не срабатывает на пароль, который лишь СОДЕРЖИТ «void»', () => {
