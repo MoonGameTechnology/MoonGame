@@ -32,6 +32,8 @@ import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { hpOfLevel as __hpOfLevel } from './game';
 // Дальность удара считают прицелы (REFM-233); \`main.ts\` сам её не зовёт.
 import { squadronReach as __squadronReach } from '../../packages/shared-core/src/index';
+// Точку страницы в мир переводит камера (REFM-236); \`main.ts\` сам её не зовёт.
+import { unworld as __unworld } from './mapCamera';
 window.__aloftTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Свой мир с целым портом и эскадрой из трёх перехватчиков. Эскадра уходит в патруль к
@@ -45,6 +47,10 @@ window.__aloftTest = {
     home.buildings.push({ type: 'spaceport', level: 1, hp: __hpOfLevel('spaceport', 1) });
     const sq = 'sq:' + ME + ':aloft';
     home.hangar = [{ id: sq, units: [{ unit: 'interceptor', count: 3 }] }];
+    // Карты 2026-10 разнесли миры: у дуэли ближайший ничейный мир в 328 единицах от дома, а
+    // удар перехватчика — 180. Дальность перехватчика в данных этой страницы растёт, иначе
+    // шагу «новая цель удара» бить некого (ядро и прицел читают одни и те же данные).
+    data.units.interceptor.stats.strikeRange = 400;
     delete home.sortie;
     const ok = playerOrder(
       __patrolShuttle(ME, { planetId: home.id }, sq, { x: home.position.x + 140, y: home.position.y }),
@@ -78,7 +84,18 @@ window.__aloftTest = {
       .filter((x) => x.owner === null && gap(x) <= reach * 0.9)
       .sort((a, b) => gap(a) - gap(b) || (a.id < b.id ? -1 : 1))[0];
     if (!p) return null;
+    // Мир встаёт на свободное место карты. Окно эскадры по содержимому (UIX-14.2) узкое и
+    // стоит рядом с выбором, а не внизу во всю ширину, — середина экрана бывает под ним.
+    const r = canvas.getBoundingClientRect();
+    const free = [[0.5, 0.5], [0.25, 0.45], [0.75, 0.45], [0.5, 0.3]]
+      .map(([fx, fy]) => ({ x: r.left + r.width * fx, y: r.top + r.height * fy }))
+      .find((pt) => document.elementFromPoint(pt.x, pt.y) === canvas);
     centerOn(p.position, cam.scale);
+    if (free) {
+      // Сдвиг камеры — перенос: мир, стоявший в свободной точке, уступает её цели.
+      const under = __unworld({ x: ((free.x - r.left) * VW) / r.width, y: ((free.y - r.top) * VH) / r.height });
+      centerOn({ x: 2 * p.position.x - under.x, y: 2 * p.position.y - under.y }, cam.scale);
+    }
     return { id: p.id, at: toScreen(world(p.position), canvas.getBoundingClientRect(), VW, VH) };
   },
   picked: () => selStrike,
@@ -96,7 +113,7 @@ window.__aloftTest = {
   // Мир в мировых координатах под точкой страницы — куда ляжет патруль.
   worldAt: (p) => {
     const r = canvas.getBoundingClientRect();
-    return unworld({ x: ((p.x - r.left) * VW) / r.width, y: ((p.y - r.top) * VH) / r.height });
+    return __unworld({ x: ((p.x - r.left) * VW) / r.width, y: ((p.y - r.top) * VH) / r.height });
   },
   // Мир доходит до посадки этого вылета.
   land: (id) => {
@@ -178,6 +195,23 @@ try {
       assert.equal(await page.evaluate(() => window.__aloftTest.picked()), strikeId, 'эскадра выделена');
       for (const name of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingkeep', 'wingrecall']) {
         assert.equal(await button(name).count(), 1, `кнопка ${name} на карточке`);
+      }
+      // UIX-14.2 (заказ владельца 2026-10-16): окно эскадры — по содержимому. Две строки,
+      // состав и шесть кнопок встают в одну колонку 440 px, а не в окно 1040 px газетой
+      // из пустых колонок, — и ничего не прячется ни справа, ни под рамкой.
+      if (!phone) {
+        const win = page.locator('#holo-selection-window');
+        assert.equal(await win.getAttribute('data-fit'), '1', 'окно эскадры — в одну колонку');
+        const fit = await win.evaluate((w) => {
+          const hides = (el) =>
+            el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+          return {
+            width: w.getBoundingClientRect().width,
+            hidden: hides(w.querySelector('#side .pscroll')) || hides(w.querySelector('#side')),
+          };
+        });
+        assert.ok(fit.width <= 460, `окно эскадры по содержимому, а не во всю ширину: ${fit.width}`);
+        assert.equal(fit.hidden, false, 'в окне видно всё');
       }
       await shot('card');
 

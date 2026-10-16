@@ -118,6 +118,7 @@
 | UIX-4.2 | ⏳ | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
 | UIX-4.3 | ⏳ | srv | `docs/backlog.md` | Push только о своём и срочном. |
 | UIX-4.4 | 🔒 | proto | `docs/backlog.md` | Подписка на push в клиенте. |
+| UIX-4.5 | ✅ | proto | `docs/backlog.md` | Без падающих цифр у ресурсов. |
 | UIX-5.1 | ✅ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |
 | UIX-5.2 | ✅ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
 | UIX-5.3 | ✅ | proto | `docs/backlog.md` | Английский в русской версии и грамматика. |
@@ -144,6 +145,7 @@
 | UIX-13.3 | ✅ | proto cli | `docs/backlog.md` | Верфь: редкость и уровень прокачки модулей. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | UIX-14.1 | ✅ | proto | `docs/backlog.md` | Окно мира без дублей: шапка фактов и одно число на вкладку. |
+| UIX-14.2 | ✅ | proto | `docs/backlog.md` | Окно выбора на ПК — по содержимому. |
 | UIX-15.1 | ✅ | proto | `docs/backlog.md` | Настройка схватки и выбор места — в палитре хаба. |
 | UIX-15.2 | ✅ | proto | `docs/backlog.md` | Совет учёных — в палитре хаба. |
 | UIX-15.3 | ✅ | proto | `docs/backlog.md` | Профиль командира — вкладками и в палитре хаба. |

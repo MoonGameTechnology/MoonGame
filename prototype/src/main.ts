@@ -7360,7 +7360,7 @@ function frame(nowReal: number) {
   const chain = runChain();
   if (isSectorZeroRun()) playTaskComic(missions, chain);
   // Строка статуса, шапка, плашки ресурсов и значки внимания — у владельца полосы (REFM-222).
-  renderTopBar(nowReal, preparingMap, missions);
+  renderTopBar(missions);
   missionPanel.render(missions);
 
   // Служебное наложение (FPS, задержка, десинк) — `netOverlay.ts` (REFM-192): десинк
