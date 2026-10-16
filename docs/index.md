@@ -116,6 +116,12 @@
 | `docs/yandex-games-card.md` | Sector Zero на Яндекс Играх — карточка и живая проверка | Материал к подаче (YAG-5.2 в yandex-games-roadmap.md): что |
 | `docs/yandex-games-roadmap.md` | Релиз PvE в Яндекс Играх — технический roadmap | Этот документ подчинён platform-adapters.md (PR #1038, |
 
+## docs/compliance/
+
+| Документ | Заголовок | Про что |
+| --- | --- | --- |
+| `docs/compliance/rf-compliance-audit-checklist.md` | Void Dominion / Averion — чек-лист аудита и комплаенса РФ | Версия: 1.0 · Дата правовой сверки: 16.10.2026 |
+
 ## docs/explanations/
 
 | Документ | Заголовок | Про что |
