@@ -24,7 +24,8 @@ export function projectSource(source, input) {
     const groups = new Map();
     for (const row of input.available) {
       const map = MAPS.has(row?.mapId) ? row.mapId : 'other';
-      const scale = [1, 2, 4, 24].includes(row?.rules?.timeScale) ? row.rules.timeScale : null;
+      const rawScale = number(row?.rules?.timeScale);
+      const scale = rawScale !== null && rawScale > 0 ? rawScale : null;
       const key = `${map}/${scale}`;
       if (!groups.has(key)) groups.set(key, { map, timeScale: scale, matches: 0 });
       groups.get(key).matches += 1;
@@ -45,8 +46,8 @@ export function projectSource(source, input) {
   if (Object.values(value).some((v) => v === null)) return null;
   for (const [field, path, divisor] of [['submitSeconds', 'submitMs', 1000], ['broadcastSeconds', 'broadcastMs', 1000], ['deltaBytes', 'deltaBytes', 1]]) {
     const series = input[path];
-    value[field] = series && ['count', 'total', 'max'].every((k) => number(series[k]) !== null)
-      ? { count: series.count, total: series.total / divisor, max: series.max / divisor } : null;
+    if (!series || !['count', 'total', 'max'].every((k) => number(series[k]) !== null)) return null;
+    value[field] = { count: series.count, total: series.total / divisor, max: series.max / divisor };
   }
   // Null means not observed/supported, not a healthy zero.
   value.journal = {};

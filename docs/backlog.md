@@ -921,6 +921,8 @@ BRW-2/3 написаны ровно под это.
   источников/доступа/свежести, units/reset/cardinality, профиль SSH/local/UI-only,
   caps/TTL; bounded read-only baseline CLI с privacy-проверками и
   [реальным замером](reviews/2026-10-16-obs-0-1-baseline.md). Runtime-стек не установлен.
+  Ревью CLI: сохранены все конечные положительные timeScale; неполные обязательные
+  submit/broadcast/delta series помечают summary invalid.
   Следующие кирпичи — в [роадмапе пульта](playtest-observability-roadmap.md).
 
 ## Блок HARD · Закалка плейтест-контура (заказ владельца 2026-07-18) `[ops]` `[core]` `[srv]` `[proto]` `[sec]`
