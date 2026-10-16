@@ -30,6 +30,11 @@
  *    Учётку там называет почта или токен ссылки, а пароль вспоминают как раз на новом
  *    устройстве, где позывного ещё нет. Требование позывного молча гасило просьбу выслать
  *    ссылку, а ссылку из письма объявляло «недействительной», не спросив сервер.
+ * 8. **Что стоит в поле, пока игрок ничего не набрал** ({@link defaultServerField}).
+ *    Запомненный адрес первым: это сервер, куда игрок уже заходил. Дальше адрес, вшитый
+ *    в APK на сборке: у APK страница `http://localhost` без порта, и «тот же origin»
+ *    вёл бы на `ws://localhost:8788`, то есть в никуда. Без того и другого — тот же
+ *    origin, что у страницы.
  */
 
 /** Чем кончился разбор того, что набрано в полях. */
@@ -89,4 +94,27 @@ export function resolveAddress(typed: TypedIn): AddressStep {
   const nick = typed.nick.trim();
   if (!nick) return { kind: 'need-nick' };
   return { kind: 'ok', base: step.base, nick };
+}
+
+/** Где открыта страница — ровно те поля `location`, что нужны правилу 8. */
+export interface PageLocation {
+  protocol: string;
+  host: string;
+  hostname: string;
+  port: string;
+}
+
+/** Начальное значение поля адреса (правило 8). */
+export function defaultServerField(
+  stored: string | null,
+  baked: string | null,
+  loc: PageLocation,
+): string {
+  if (stored) return stored;
+  if (baked) return baked;
+  // Тот же origin: развёрнутый https → wss://<host>; страница прото-сервера (http на его
+  // порту) → ws://<host>:<port>; file:// или страница без порта → ws://<host>:8788.
+  if (loc.protocol === 'https:') return `wss://${loc.host}`;
+  if (loc.port) return `ws://${loc.host}`;
+  return `ws://${loc.hostname || '127.0.0.1'}:8788`;
 }

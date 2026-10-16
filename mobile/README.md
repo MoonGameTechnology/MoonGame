@@ -84,6 +84,10 @@ build are compared on the same integer):
   `alpha` | `player`) — stamped into the APK by `patch-updater.mjs` and baked into the
   web layer as `window.__BUILD__` by `inject-build.mjs` (CI `Compute build version`
   step → `$GITHUB_ENV`).
+- The same `window.__BUILD__` carries `server` — the game server the connect screen's
+  address field starts on until the player connects elsewhere (`VOID_SERVER` in
+  `android.yml`, today the playtest server; rule 8 in `decisions/serverAddress.ts`). That
+  server's `ALLOWED_ORIGINS` must list `http://localhost`, the APK's WebView origin.
 - The release **body** carries a machine marker `<!-- void:versionCode=N void:sha=X -->`.
 - `prototype/src/updater.ts` reads `window.__BUILD__`, fetches the release via the
   CORS-enabled GitHub REST API, compares versionCode, and surfaces the banner. It is

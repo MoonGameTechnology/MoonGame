@@ -65,6 +65,10 @@ jobs:
       RELEASE_TAG: ${{ matrix.release_tag }}
       ASSET: ${{ matrix.asset }}
       RELEASE_TITLE: ${{ matrix.release_title }}
+      # The game server the APK's address field starts on until the player connects
+      # elsewhere (mobile/inject-build.mjs → decisions/serverAddress.ts, rule 8): the
+      # playtest server. Its ALLOWED_ORIGINS must include the APK origin http://localhost.
+      VOID_SERVER: https://77-221-140-87.sslip.io
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -111,7 +115,7 @@ jobs:
           mkdir -p www
           cp "../prototype/dist/${HTML}" www/index.html
           # Bake window.__BUILD__ into the packaged HTML so the APK knows its own version.
-          node inject-build.mjs www/index.html "$VOID_VC" "$VOID_SHA"
+          node inject-build.mjs www/index.html "$VOID_VC" "$VOID_SHA" "$VOID_SERVER"
           # The player APK gets its own applicationId so it installs SIDE BY SIDE with
           # the dev alpha (same display name; different app). The dev profile stamps the
           # same appId that is committed (a no-op) — existing alpha installs keep
@@ -250,7 +254,7 @@ jobs:
             echo "1. Download ${ASSET} below."
             echo "2. Open it; allow \"install from unknown sources\" if prompted."
             if [ "$PROFILE" = "player" ]; then
-              echo "3. Launch → enter the session server URL from your host → pick a running match."
+              echo "3. Launch → the server field already points at ${VOID_SERVER} → pick a running match."
               echo "   This is the PLAYER client: no single-player, no dev tools; the tutorial works offline."
             else
               echo "3. Launch — single-player works fully offline. Rotates freely (phone / tablet)."
