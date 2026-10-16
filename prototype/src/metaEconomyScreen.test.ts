@@ -115,6 +115,18 @@ describe('main-game supply screen', () => {
     expect(html).toContain('Архивная дорожка');
   });
 
+  it('names the daily season XP on the pass that receives it', () => {
+    const view = fixture();
+    view.seasons[0]!.dailyXp = 100;
+    const daily = '+100 опыта за каждый день с приказами в партии';
+    expect(metaEconomyHtml(view, [])).toContain(daily);
+    view.seasons[0]!.active = false;
+    expect(metaEconomyHtml(view, [])).not.toContain(daily);
+    delete view.seasons[0]!.dailyXp;
+    view.seasons[0]!.archived = false;
+    expect(metaEconomyHtml(view, [])).not.toContain('за каждый день');
+  });
+
   it('shows known store contents without a fake purchase button or fabricated price', () => {
     const html = metaEconomyHtml(fixture(), [
       {

@@ -45,7 +45,7 @@ import { arsenalSnapshotOf } from './arsenal';
 import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
 import { detach } from './detach';
-import { captureMetaEconomyActivity } from './metaEconomyActivity';
+import { captureMetaEconomyActivity, type OwnOrder } from './metaEconomyActivity';
 
 export interface RoomPeer {
   /** `compress: false` keeps this one message out of socket compression (a `ws` option). */
@@ -1492,11 +1492,17 @@ export class MatchRoom {
     action: Action,
     receipt: ActionReceipt,
     peer?: RoomPeer,
+    order = this.ownOrder(plan, action, peer),
   ): void {
     // RPL-2: граница, которой мир ДЕЙСТВИТЕЛЬНО достиг (throttled-догон не доходит до
     // `now`) — пустой догон границей не считается, чтобы журнал не пух.
     if (plan.state.time > this.stateValue.time) this.record?.({ at: plan.state.time });
-    this.economyActivity = captureMetaEconomyActivity(this.economyActivity, plan.events, this.stateValue);
+    this.economyActivity = captureMetaEconomyActivity(
+      this.economyActivity,
+      plan.events,
+      this.stateValue,
+      order,
+    );
     this.stateValue = plan.state;
     if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
     if (plan.events.length > 0 || plan.kind === 'applied') {
@@ -1510,6 +1516,14 @@ export class MatchRoom {
     // равно банкуются. Идемпотентно, поэтому зовётся на каждом коммите.
     this.observeEndIfNeeded();
     if (plan.kind === 'rejected' && peer) this.sendRejection(peer, receipt);
+  }
+
+  /** Presence evidence for meta rewards: an applied order from the player's own
+   *  connection. Drivers (AI, Steward, host bookkeeping) submit without a peer. */
+  private ownOrder(plan: CommittablePlan, action: Action, peer?: RoomPeer): OwnOrder | undefined {
+    return peer && plan.kind === 'applied'
+      ? { playerId: action.playerId, at: plan.at, wall: this.now() }
+      : undefined;
   }
 
   /**
@@ -1793,7 +1807,12 @@ export class MatchRoom {
 
   /** Builds a durable snapshot of a specific `(state, seq)` — used by the committed
    *  path to persist a prospective result BEFORE committing it. */
-  private snapshot(state: GameState, seq: number, events: readonly DomainEvent[] = []): MatchSnapshot {
+  private snapshot(
+    state: GameState,
+    seq: number,
+    events: readonly DomainEvent[] = [],
+    order?: OwnOrder,
+  ): MatchSnapshot {
     const clock = this.clockSnapshot;
     return {
       matchId: this.id,
@@ -1801,7 +1820,7 @@ export class MatchRoom {
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
       state,
-      economyActivity: captureMetaEconomyActivity(this.economyActivity, events, this.stateValue),
+      economyActivity: captureMetaEconomyActivity(this.economyActivity, events, this.stateValue, order),
       ...(clock ? { clock: { ...clock, running: clock.running && state.match.status !== 'ended' } } : {}),
     };
   }
@@ -1951,13 +1970,14 @@ export class MatchRoom {
       const receipt: ActionReceipt = ok
         ? { actionId: action.id, playerId, seq, ok: true }
         : { actionId: action.id, playerId, seq, ok: false, code: plan.code };
-      if (!(await this.persistGuarded(this.snapshot(plan.state, seq, plan.events), receipt, action.id, peer))) {
+      const order = this.ownOrder(plan, action, peer); // one wall reading for both writes
+      if (!(await this.persistGuarded(this.snapshot(plan.state, seq, plan.events, order), receipt, action.id, peer))) {
         return TRANSIENT_VERDICT;
       }
       this.seq = seq;
       this.retainReceipt(receipt);
       observeCommitted = () => this.observeAction(receipt, action.type, true); // durable: persist already wrote the receipt
-      this.commitPlan(plan, action, receipt, peer);
+      this.commitPlan(plan, action, receipt, peer, order);
       return ok ? { ok: true } : { ok: false, code: plan.code, durable: true };
     } finally {
       this.committing = false;

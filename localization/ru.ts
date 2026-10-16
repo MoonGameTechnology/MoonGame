@@ -2940,6 +2940,7 @@ export const ru: Record<string, string> = {
   'supply.season': 'Сезон',
   'supply.season.level': 'Уровень {level} / {max}',
   'supply.season.xp': 'Опыт сезона: {xp}',
+  'supply.season.daily': '+{xp} опыта за каждый день с приказами в партии',
   'supply.season.free': 'Бесплатная дорожка',
   'supply.season.premium': 'Премиум-дорожка',
   'supply.season.claim': 'Получить',

@@ -374,6 +374,7 @@ const rewardDelivery = createMetaRewardDelivery({
   matches: matchStore,
   seats: (id) => AUTH ? nickSeatAccounts(accountStore, userStore, id) : async () => ({}),
   settle: (facts) => metaEconomy.settle(facts),
+  activeDay: (accountId, day) => metaEconomy.settleActiveDay(accountId, day),
   stageCount: metaCatalog.rewards.stageFractions.length,
   participation: metaCatalog.rewards.participation,
   onError: (error) => process.stderr.write(`meta reward delivery failed: ${String(error)}\n`),

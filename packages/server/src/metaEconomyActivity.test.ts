@@ -267,3 +267,40 @@ describe('durable logistics and objective participation', () => {
     expect(captureMetaEconomyActivity(long, [], state())).toEqual(long);
   });
 });
+
+describe('presence evidence', () => {
+  const DAY = 86_400_000;
+  const key = (role: string) => JSON.stringify(['defender', 10, role]);
+  it('records the game day and UTC day of an own order once per day', () => {
+    const order = { playerId: 'defender', at: 3 * DAY + 5, wall: 20_741 * DAY + 7 };
+    const first = captureMetaEconomyActivity(undefined, [], state(), order);
+    expect(first).toEqual({ [key('orders')]: ['3'], [key('ordersUtc')]: ['20741'] });
+    const again = captureMetaEconomyActivity(first, [], state(), { ...order, at: 3 * DAY + 9 });
+    expect(again).toEqual(first);
+    const next = captureMetaEconomyActivity(again, [], state(), { ...order, at: 4 * DAY });
+    expect(next[key('orders')]).toEqual(['3', '4']);
+  });
+  it('ignores orders for bots, NPCs, unconfirmed seats and broken clocks', () => {
+    for (const change of [{ ai: true }, { npc: 'swarm' as const }, { seated: false }]) {
+      const current = state();
+      Object.assign(current.players.defender!, change);
+      const order = { playerId: 'defender', at: DAY, wall: DAY };
+      expect(captureMetaEconomyActivity(undefined, [], current, order)).toEqual({});
+    }
+    expect(
+      captureMetaEconomyActivity(undefined, [], state(), {
+        playerId: 'defender',
+        at: NaN,
+        wall: 1,
+      }),
+    ).toEqual({});
+  });
+  it('records an elimination at the start of the batch that reported it', () => {
+    const current = state();
+    current.time = 5 * DAY;
+    const eliminated = { type: 'player.eliminated', payload: { playerId: 'defender' } };
+    expect(captureMetaEconomyActivity(undefined, [eliminated], current)).toEqual({
+      [key('eliminated')]: [String(5 * DAY)],
+    });
+  });
+});

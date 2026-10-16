@@ -3,7 +3,7 @@ import { createInitialState, type GameState, type Planet } from '@void/shared-co
 import { MemoryArsenalStore, MemoryDropStore, MemoryMatchStore, type MatchSnapshot } from './store';
 import { MemoryMetaMarket } from './metaMarket';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
-import { createMetaRewardDelivery } from './metaEconomyDelivery';
+import { createMetaRewardDelivery, type MetaRewardDeliveryDeps } from './metaEconomyDelivery';
 import type { MatchRewardFacts } from './metaEconomy';
 
 function snapshot(): MatchSnapshot {
@@ -59,7 +59,7 @@ function fixture() {
   const matches = new MemoryMatchStore();
   const settle = vi.fn(async (_facts: MatchRewardFacts) => ({ ok: true }));
   const onError = vi.fn();
-  const create = (clock = 1000) =>
+  const create = (clock = 1000, extra: Partial<MetaRewardDeliveryDeps> = {}) =>
     createMetaRewardDelivery({
       store,
       matches,
@@ -68,6 +68,7 @@ function fixture() {
       stageCount: 3,
       now: () => clock,
       onError,
+      ...extra,
     });
   return { matches, store, settle, onError, create };
 }
@@ -185,5 +186,95 @@ describe('reward delivery from persisted match facts', () => {
     ).toEqual([awarded, awarded, awarded]);
     expect(credited).toBe(2); // one stage and one final, across both claims
     expect(settle.mock.calls.at(-1)![0].kind).toBe('final');
+  });
+});
+
+describe('rewards only for time in the match', () => {
+  const DAY = 86_400_000;
+  const participation = {
+    reconPerPoint: 3,
+    logisticsPerPoint: 2,
+    defensePerPoint: 1,
+    objectivesPerPoint: 1,
+    stagePoints: [1, 3],
+    stageDays: [3, 7],
+    finalPresence: 0.25,
+  };
+  const scope = (role: string) => JSON.stringify(['p1', 1, role]);
+  /** Three objectives (3 points) with own orders on the given game days. */
+  function played(days: number[], extra: Record<string, string[]> = {}): MatchSnapshot {
+    const next = snapshot();
+    next.seq = 2;
+    next.economyActivity = {
+      [scope('objectives')]: ['a', 'b', 'c'],
+      [scope('orders')]: days.map(String),
+      ...extra,
+    };
+    return next;
+  }
+  function endedAt(base: MatchSnapshot, day: number): MatchSnapshot {
+    const next = ended(base);
+    next.state.match.endedAt = day * DAY;
+    return next;
+  }
+  const kinds = (settle: ReturnType<typeof fixture>['settle']) =>
+    settle.mock.calls.map(([facts]) => `${facts.kind}${facts.stage ?? ''}`);
+
+  it('pays a stage only after enough distinct days of own orders', async () => {
+    const { create, settle } = fixture();
+    const delivery = create(1000, { participation, stageCount: 2 });
+    await delivery.deliver(snapshot());
+    await delivery.deliver(played([0, 0, 1]));
+    expect(settle).not.toHaveBeenCalled();
+    await delivery.deliver(played([0, 1, 2]));
+    expect(kinds(settle)).toEqual(['stage1']);
+    settle.mockClear();
+    await delivery.deliver(played([0, 1, 2, 3, 4, 5, 6]));
+    expect(kinds(settle)).toEqual(['stage1', 'stage2']);
+  });
+
+  it('does not pay the final to a seat abandoned to the bots', async () => {
+    const { create, settle } = fixture();
+    const delivery = create(1000, { participation, stageCount: 2 });
+    await delivery.deliver(snapshot());
+    // Seat claimed at game time 1, match ends on day 40: the last quarter starts on day 30.
+    await delivery.deliver(endedAt(played([0, 1, 2, 3, 4, 5, 6]), 40));
+    expect(kinds(settle)).toEqual(['stage1', 'stage2']);
+    settle.mockClear();
+    await delivery.deliver(endedAt(played([0, 1, 2, 3, 4, 5, 6, 30]), 40));
+    expect(kinds(settle)).toEqual(['stage1', 'stage2', 'final']);
+  });
+
+  it('pays the final to a short match and to a player who fought until eliminated', async () => {
+    const short = fixture();
+    const quick = short.create(1000, { participation, stageCount: 2 });
+    await quick.deliver(snapshot());
+    await quick.deliver(endedAt(played([0, 1]), 2));
+    expect(kinds(short.settle)).toEqual(['final']);
+
+    const lost = fixture();
+    const delivery = lost.create(1000, { participation, stageCount: 2 });
+    await delivery.deliver(snapshot());
+    const eliminated = { [scope('eliminated')]: [String(12 * DAY)] };
+    await delivery.deliver(endedAt(played([0, 1, 2, 10], eliminated), 40));
+    expect(kinds(lost.settle)).toEqual(['stage1', 'final']);
+  });
+
+  it('credits each UTC day of own orders once per account', async () => {
+    const { create } = fixture();
+    const activeDay = vi.fn(async (_account: string, _day: number) => ({ ok: true }));
+    const delivery = create(1000, { participation, activeDay });
+    const base = played([0], { [scope('ordersUtc')]: ['20741', '20742'] });
+    await delivery.deliver(base);
+    await delivery.deliver(base);
+    expect(activeDay.mock.calls).toEqual([
+      ['account', 20741],
+      ['account', 20742],
+    ]);
+    activeDay.mockResolvedValueOnce({ ok: false, code: 'E_META_UNAVAILABLE' } as never);
+    const later = played([0], { [scope('ordersUtc')]: ['20741', '20742', '20743'] });
+    await expect(delivery.deliver(later)).rejects.toThrow('E_META_UNAVAILABLE');
+    await delivery.deliver(later);
+    expect(activeDay.mock.calls.map(([, day]) => day)).toEqual([20741, 20742, 20743, 20743]);
   });
 });

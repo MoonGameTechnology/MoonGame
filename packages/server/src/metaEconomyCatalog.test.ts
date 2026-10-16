@@ -50,4 +50,17 @@ describe('main-game meta content', () => {
     expect(() => parseMetaEconomyCatalog(other, data)).toThrow('E_META_AD_PRODUCT');
     expect(() => parseMetaEconomyCatalog({ ...raw(), typo: true }, data)).toThrow();
   });
+
+  it('requires a presence rule for every stage, never easing towards later stages', () => {
+    const shipped = loadMetaEconomyCatalog(data).rewards.participation;
+    expect(shipped).toMatchObject({ stageDays: [3, 7], finalPresence: 0.25 });
+    for (const stageDays of [[3], [7, 3]]) {
+      const catalog = loadMetaEconomyCatalog(data);
+      catalog.rewards.participation.stageDays = stageDays;
+      expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_PARTICIPATION');
+    }
+    const catalog = loadMetaEconomyCatalog(data);
+    catalog.rewards.participation.finalPresence = 0;
+    expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow();
+  });
 });

@@ -252,6 +252,7 @@ export class MetaEconomy {
             endsAt,
             levels: season.levels,
             xpPerLevel: season.xpPerLevel,
+            ...(season.dailyXp ? { dailyXp: season.dailyXp } : {}),
             xp: progress?.xp ?? 0,
             level: this.seasonLevel(season, progress),
             premium: progress?.premium ?? false,
@@ -602,9 +603,9 @@ export class MetaEconomy {
 
   private async progressSeason(
     tx: MetaEconomyTransaction,
-    facts: MatchRewardFacts,
+    facts: Pick<MatchRewardFacts, 'accountId' | 'occurredAt'>,
     account: MetaEconomyAccount,
-    xp: number,
+    xp: number | ((season: MetaSeasonDefinition) => number),
     metrics: Record<string, number>,
     receipt: MetaCommandReceipt,
   ): Promise<void> {
@@ -620,7 +621,7 @@ export class MetaEconomy {
     }
     if (facts.occurredAt < season.startsAt) return;
     const progress = this.startSeason(account, season, receipt.at);
-    let earnedXp = xp;
+    let earnedXp = typeof xp === 'number' ? xp : xp(season);
     for (const contract of season.contracts) {
       if (
         facts.occurredAt < season.startsAt + (contract.week - 1) * 7 * DAY ||
@@ -774,6 +775,29 @@ export class MetaEconomy {
         }
         await this.progressSeason(tx, facts, account, deltaXp, metrics, receipt);
       },
+    );
+  }
+
+  /** Season tempo in real time: one UTC day with the account's own orders in a match
+   *  grants the pass's `dailyXp` once, however many matches it played that day. */
+  settleActiveDay(accountId: string, day: number): Promise<MetaCommandResult> {
+    if (!Number.isSafeInteger(day) || day < 0 || day * DAY > Number.MAX_SAFE_INTEGER) {
+      return Promise.resolve({ ok: false, code: 'E_META_FACTS' });
+    }
+    return this.command(
+      accountId,
+      metaEconomyFingerprint(['active-day', day]),
+      'season-day',
+      { day },
+      (tx, account, receipt) =>
+        this.progressSeason(
+          tx,
+          { accountId, occurredAt: day * DAY },
+          account,
+          (season) => season.dailyXp ?? 0,
+          {},
+          receipt,
+        ),
     );
   }
 
