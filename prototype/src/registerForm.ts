@@ -22,10 +22,11 @@
  * Порог пароля берётся из `authRules.ts` — второй копии этого числа быть не должно.
  */
 
-import { validPassword } from '../../decisions/authRules';
+import { validPassword, validLogin, blockedPublicName } from '../../decisions/authRules';
+import { parseRecoveryEmail } from '../../packages/protocol/src/inputPolicy';
 
 /** Поле формы, на которое надо вернуть курсор. */
-export type RegisterField = 'nick' | 'pass' | 'pass2';
+export type RegisterField = 'nick' | 'pass' | 'pass2' | 'email';
 
 /** Что игрок набрал в форме. */
 export interface RegisterDraft {
@@ -44,9 +45,12 @@ export interface RegisterProblem {
 /** Проверить форму. `null` — форма цела, можно идти в сеть. */
 export function checkRegister(draft: RegisterDraft): RegisterProblem | null {
   if (!draft.nick.trim()) return { key: 'auth.need-name', field: 'nick' };
+  if (!validLogin(draft.nick.trim())) return { key: 'acc.nick.rule', field: 'nick' };
+  if (blockedPublicName(draft.nick.trim())) return { key: 'acc.nick.blocked', field: 'nick' };
   // Правило 2: сначала длина, потом совпадение.
   if (!validPassword(draft.pass)) return { key: 'acc.pass.rule', field: 'pass' };
   if (draft.pass !== draft.pass2) return { key: 'auth.pass-mismatch', field: 'pass2' };
+  if (draft.email.trim() && parseRecoveryEmail(draft.email) === null) return { key: 'acc.email.rule', field: 'email' };
   return null;
 }
 

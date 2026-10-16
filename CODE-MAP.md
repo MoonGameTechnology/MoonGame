@@ -277,6 +277,14 @@ Recovery-письма обоих хостов форматирует `scripts/re
 
 ---
 
+## packages/protocol — общий контракт и правила ввода
+
+| файл | экспорт | назначение |
+|---|---|---|
+| `src/inputPolicy.ts` | `passwordIssue`, `validLoginPassword`, `blockedPublicName`, `closedInput`, `parseRecoveryEmail`, `sanitizeChatText` | общая политика создания пароля, legacy-входа, публичных имён и текстовых полей; серверная проверка и подсказки обоих клиентов |
+
+---
+
 ## packages/server — авторитетный сервер
 
 | файл | экспорт | назначение |

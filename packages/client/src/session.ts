@@ -29,7 +29,7 @@ import {
   authOutcome,
   shouldRegister,
   validLogin,
-  validPassword,
+  validLoginPassword,
   type AuthOutcome,
   type AuthReply,
 } from '../../../decisions/authRules';
@@ -204,7 +204,7 @@ export function createSession(base: string, io: SessionIo): NetSession {
       // the player nothing about WHICH field is wrong. The rules are the server's own
       // (`authRules` mirrors `LOGIN_RE`/`PASSWORD_MIN`), not a second opinion.
       if (!validLogin(loginName)) return { kind: 'invalid', field: 'login' };
-      if (!validPassword(password)) return { kind: 'invalid', field: 'password' };
+      if (!validLoginPassword(password)) return { kind: 'invalid', field: 'password' };
 
       const loginRaw = await post('/auth/login', { login: loginName, password });
       if (!loginRaw) return { kind: 'offline' };

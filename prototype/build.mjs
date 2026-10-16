@@ -4125,8 +4125,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
           </label>
           <label class="cfield"><span data-i18n="welcome.register.pass"></span>
-            <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
+            <input id="crpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="crpassrule" data-i18n-ph="welcome.pass.min.ph">
           </label>
+          <p id="crpassrule" class="csub" data-i18n="acc.pass.rule"></p>
           <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
             <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
           </label>
@@ -4157,8 +4158,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
                callsign at reset time; never submitted anywhere. -->
           <input id="cresetuser" type="text" autocomplete="username" hidden aria-hidden="true" tabindex="-1">
           <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
-            <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
+            <input id="cresetpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="cresetpassrule" data-i18n-ph="welcome.pass.min.ph">
           </label>
+          <p id="cresetpassrule" class="csub" data-i18n="acc.pass.rule"></p>
           <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
             <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
           </label>

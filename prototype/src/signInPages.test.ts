@@ -382,20 +382,34 @@ describe('REFM-218 — регистрация', () => {
 
   it('беда формы называет своё поле и в сеть не идёт', async () => {
     const { env } = await onRegister();
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-paZZ';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-paZZ';
     click('crgo');
     await settle();
     expect([env.status.at(-1), focused]).toEqual([t('auth.pass-mismatch'), 'crpass2']);
     expect(posted('/auth/login')).toEqual([]);
   });
 
+  it.each([
+    ['crnick', 'f_u_c_k', 'acc.nick.blocked'],
+    ['crmail', 'a@b.test\r\nBcc:x@y.test', 'acc.email.rule'],
+  ])('небезопасное поле %s возвращает фокус без запроса', async (id, value, key) => {
+    const { env } = await onRegister();
+    el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+    el(id).value = value;
+    click('crgo');
+    await settle();
+    expect([env.status.at(-1), focused]).toEqual([t(key), id]);
+    expect(posted('/auth/login')).toEqual([]);
+    expect(posted('/auth/register')).toEqual([]);
+  });
+
   it('позывной страницы доходит до сервера, почта едет в регистрацию', async () => {
     const { env } = await onRegister();
     freshAccount();
     el('crmail').value = ' me@mail.test ';
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-pass';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-pass';
     enter('crpass2');
     await settle();
     // Поле обозревателя заполнено ДО адреса сервера: без него регистрация упиралась в
@@ -403,7 +417,7 @@ describe('REFM-218 — регистрация', () => {
     expect(env.nickAtServer).toEqual(['Orion']);
     expect(posted('/auth/register')[0]!.body).toEqual({
       login: 'Orion',
-      password: 'secret-pass',
+      password: 'orbit-secret-pass',
       email: 'me@mail.test',
     });
     expect([cell.get('void.nick'), el('crpass').value, el('crpass2').value]).toEqual([
@@ -417,19 +431,19 @@ describe('REFM-218 — регистрация', () => {
   it('пустая почта на сервер не уходит вовсе', async () => {
     await onRegister();
     freshAccount();
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-pass';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-pass';
     click('crgo');
     await settle();
-    expect(posted('/auth/register')[0]!.body).toEqual({ login: 'Orion', password: 'secret-pass' });
+    expect(posted('/auth/register')[0]!.body).toEqual({ login: 'Orion', password: 'orbit-secret-pass' });
   });
 
   it('отложенный заход в партию доигрывается и после регистрации', async () => {
     const { acc, env } = await onRegister();
     freshAccount();
     acc.pendingJoinAfterAuth.remember('m-7');
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-pass';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-pass';
     click('crgo');
     await settle();
     expect(stages()).toEqual(['cbrowse']);
@@ -521,13 +535,13 @@ describe('REFM-218 — сброс пароля по ссылке', () => {
     const { pages, env } = await boot();
     pages.openReset('tok-1');
     server['/auth/reset'] = () => reply(200, { login: 'Orion', token: 'jwt-reset' });
-    el('cresetpass').value = 'new-secret';
+    el('cresetpass').value = 'orbit-new-secret';
     enter('cresetpass');
     expect(focused).toBe('cresetpass2');
-    el('cresetpass2').value = 'new-secret';
+    el('cresetpass2').value = 'orbit-new-secret';
     enter('cresetpass2');
     await settle();
-    expect(posted('/auth/reset')[0]!.body).toEqual({ token: 'tok-1', password: 'new-secret' });
+    expect(posted('/auth/reset')[0]!.body).toEqual({ token: 'tok-1', password: 'orbit-new-secret' });
     expect(readSession(localStorage, BASE)).toEqual({ login: 'Orion', token: 'jwt-reset' });
     expect([cell.get('void.nick'), env.nick]).toEqual(['Orion', 'Orion']);
     expect([env.notes, env.hub]).toEqual([['✔ ' + t('auth.reset.done')], [undefined]]);
@@ -542,8 +556,8 @@ describe('REFM-218 — сброс пароля по ссылке', () => {
     click('cwgo');
     await settle();
     pages.openReset('tok-1');
-    el('cresetpass').value = 'new-secret';
-    el('cresetpass2').value = 'new-secret';
+    el('cresetpass').value = 'orbit-new-secret';
+    el('cresetpass2').value = 'orbit-new-secret';
     click('cresetgo');
     await settle();
     expect(posted('/auth/reset')).toEqual([]);

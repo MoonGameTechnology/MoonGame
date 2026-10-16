@@ -21,6 +21,23 @@ function appWith(deps: MatchApiDeps) {
 const denyJoin: MatchApiDeps['join'] = () => Promise.resolve({ error: 'E_NO_MATCH' });
 
 describe('SV-2.4 · match API', () => {
+  it('refuses offensive legacy nicknames and malformed choices before claiming a seat', async () => {
+    let claims = 0;
+    const app = appWith({ join: async () => { claims++; return { playerId: 'p1', token: 't' }; } });
+    try {
+      for (const nick of ['f_u_c_k', 'mуdаk', '<img>', 'safe\u202Ename']) {
+        const r = await app.inject({ method: 'GET', url: `/matches/m/join?nick=${encodeURIComponent(nick)}` });
+        expect(r.statusCode).toBe(400);
+        expect(r.json()).toEqual({ error: 'E_BAD_NICKNAME' });
+      }
+      for (const query of ['sci=a&sci=b', 'slot=a&slot=b', 'faction=<script>', 'sci=a,b,c']) {
+        const r = await app.inject({ method: 'GET', url: `/matches/m/join?nick=pilot&${query}` });
+        expect(r.statusCode).toBe(400);
+        expect(r.json()).toEqual({ error: 'E_BAD_REQUEST' });
+      }
+      expect(claims).toBe(0);
+    } finally { await app.close(); }
+  });
   it('POST /matches creates a match and returns its id + seats', async () => {
     const app = appWith({
       createMatch: () => Promise.resolve({ matchId: 'm-1', seats: ['green', 'red'] }),

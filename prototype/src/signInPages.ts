@@ -197,7 +197,7 @@ async function submitRegister(): Promise<void> {
   if (!payload) {
     const problem = checkRegister(form)!;
     game.status(t(problem.key));
-    const focusOn = { nick: crNickInput, pass: crPassInput, pass2: crPass2Input };
+    const focusOn = { nick: crNickInput, pass: crPassInput, pass2: crPass2Input, email: crMailInput };
     focusOn[problem.field].focus();
     return;
   }

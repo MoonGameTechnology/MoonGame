@@ -17,18 +17,15 @@
  *    пароле будет думать, что сломан сервер.
  */
 
-/** Позывной: буквы/цифры/`_`/`-`, 3–24 знака. Зеркало `LOGIN_RE` сервера. */
-export const LOGIN_RE = /^[\p{L}\p{N}_-]{3,24}$/u;
+// One pure policy shared with the server; creation and legacy sign-in differ.
+import { NEW_PASSWORD_MIN, passwordIssue } from '../packages/protocol/src/inputPolicy';
+export { LOGIN_RE, validLogin, validLoginPassword, blockedPublicName } from '../packages/protocol/src/inputPolicy';
 
-/** Минимальная длина пароля — тоже серверное правило, продублированное ради подсказки. */
-export const MIN_PASSWORD = 8;
-
-export function validLogin(login: string): boolean {
-  return LOGIN_RE.test(login);
-}
+/** Минимальная длина НОВОГО пароля, общая с сервером. */
+export const MIN_PASSWORD = NEW_PASSWORD_MIN;
 
 export function validPassword(password: string): boolean {
-  return password.length >= MIN_PASSWORD;
+  return passwordIssue(password) === null;
 }
 
 /** Чем кончилась попытка входа-или-регистрации — в терминах ПРИЧИНЫ, не кодов. */
@@ -37,6 +34,8 @@ export type AuthOutcome =
   | 'created' // такого позывного не было — завели
   | 'wrong-password' // позывной занят, пароль не подошёл
   | 'mail-taken' // почта уже привязана к другой учётке
+  | 'password-rule'
+  | 'nickname-blocked'
   | 'rate-limited' // слишком часто — сервер просит подождать
   | 'register-refused'
   | 'login-refused';
@@ -58,6 +57,8 @@ export function authOutcome(login: AuthReply, register?: AuthReply): AuthOutcome
   if (!register) return 'login-refused';
   if (register.token) return 'created';
   if (register.error === 'E_EMAIL_TAKEN') return 'mail-taken';
+  if (register.error === 'E_PASSWORD_POLICY') return 'password-rule';
+  if (register.error === 'E_NICKNAME_BLOCKED') return 'nickname-blocked';
   // Вот та самая пара: 401 на входе + 409 на регистрации (см. шапку модуля).
   if (register.status === 409) return 'wrong-password';
   if (register.status === 429) return 'rate-limited';

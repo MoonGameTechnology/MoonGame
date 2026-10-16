@@ -1,4 +1,4 @@
-import type { CorpBuildOrder, CorpInfrastructureResult } from '@void/protocol';
+import { blockedPublicName, type CorpBuildOrder, type CorpInfrastructureResult } from '@void/protocol';
 import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } from './store';
 
 /**
@@ -65,8 +65,9 @@ export class CorpService {
 
   /** createCorp — the founder becomes the head. */
   async create(who: CorpActor, name: string): Promise<{ ok: true; corpId: string } | CorpFail> {
+    if (typeof name !== 'string' || name.length > 128) return { ok: false, code: 'E_BAD_NAME' };
     const trimmed = name.trim();
-    if (!NAME_RE.test(trimmed)) return { ok: false, code: 'E_BAD_NAME' };
+    if (!NAME_RE.test(trimmed) || blockedPublicName(trimmed)) return { ok: false, code: 'E_BAD_NAME' };
     const created = await this.store.createCorp(trimmed, who.accountId, who.login);
     if (!created.ok) return created;
     await this.audit(created.corpId, who, 'create', undefined, trimmed);

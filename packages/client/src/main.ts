@@ -133,7 +133,7 @@ function render(model: WelcomeModel): void {
     // Пароль — обычное поле рядом с позывным: у сервера вход ОДИН (`POST /auth/login`),
     // и первый вход им же заводит учётку (`authRules`/`authRequest`, порядок
     // login→register). Отдельного экрана регистрации поэтому нет и не нужно.
-    `<input id="pass" type="password" maxlength="72" placeholder="${esc(t('client.auth.password'))}" autocomplete="current-password" />` +
+    `<input id="pass" type="password" maxlength="128" placeholder="${esc(t('client.auth.password'))}" autocomplete="current-password" />` +
     `<button class="btn" data-act="login">${esc(model.loginLabel)}</button></div>` +
     `<footer>${model.legal.map((l) => `<a data-legal="${l.id}">${esc(l.label)}</a>`).join('<span>·</span>')}</footer>` +
     // Language picker: the ids come from `/localization`, so a new locale file shows up
@@ -171,6 +171,8 @@ function loginPass(): string {
 const AUTH_TEXT: Record<string, string> = {
   'wrong-password': 'client.auth.wrong-password',
   'mail-taken': 'client.auth.mail-taken',
+  'password-rule': 'acc.pass.rule',
+  'nickname-blocked': 'acc.nick.blocked',
   'rate-limited': 'client.auth.rate-limited',
   'register-refused': 'client.auth.refused',
   'login-refused': 'client.auth.refused',

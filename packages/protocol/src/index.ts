@@ -534,3 +534,7 @@ export function parseClientMessage(raw: string): ClientMessage | null {
 export function serializeServerMessage(message: ServerMessage): string {
   return JSON.stringify(message);
 }
+export {
+  LOGIN_RE, NEW_PASSWORD_MIN, PASSWORD_MAX, validLogin, validSeatName, validLoginPassword,
+  passwordIssue, blockedPublicName, parseRecoveryEmail, closedInput, sanitizeChatText,
+} from './inputPolicy';

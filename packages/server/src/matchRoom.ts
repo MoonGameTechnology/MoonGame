@@ -1,3 +1,4 @@
+import { sanitizeChatText } from '@void/protocol';
 import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
@@ -2338,7 +2339,7 @@ export class MatchRoom {
     };
     if (draft.to) ping.to = draft.to;
     if (draft.payload?.building) ping.payload = { building: draft.payload.building };
-    if (draft.label) ping.label = draft.label.slice(0, PING_LABEL_MAX);
+    if (draft.label) ping.label = sanitizeChatText(draft.label, PING_LABEL_MAX);
     await this.ephemeral.set(this.pingKey(ping.id), ping, this.pingTtlMs);
     this.pingWindow.record(playerId, wall);
     this.relayToViewers(ping, { type: 'ping.added', matchId: this.id, ping });
@@ -2393,7 +2394,7 @@ export class MatchRoom {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_CHAT_RATE' });
       return;
     }
-    const text = message.text.trim().slice(0, CHAT_TEXT_MAX);
+    const text = sanitizeChatText(message.text, CHAT_TEXT_MAX);
     if (!text) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_CHAT_TEXT' });
       return;
