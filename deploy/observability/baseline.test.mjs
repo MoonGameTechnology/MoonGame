@@ -43,6 +43,32 @@ describe('OBS-0.1 baseline publication boundary', () => {
     expect(projectSource('matches', { available: [{ mapId: 'duel-1' }], active: [], archived: [] })).toEqual([{ map: 'duel-1', timeScale: null, matches: 1 }]);
   });
 
+  it('keeps every finite positive timeScale, including documented fast-forward profiles', () => {
+    for (const timeScale of [0.5, 1, 24, 100, 200]) {
+      expect(projectSource('matches', { available: [{ mapId: 'duel-1', rules: { timeScale } }] }))
+        .toEqual([{ map: 'duel-1', timeScale, matches: 1 }]);
+    }
+    for (const timeScale of [0, -1, Infinity, NaN, '100']) {
+      expect(projectSource('matches', { available: [{ mapId: 'duel-1', rules: { timeScale } }] }))
+        .toEqual([{ map: 'duel-1', timeScale: null, matches: 1 }]);
+    }
+  });
+
+  it('invalidates a summary missing any required count/total/max series', () => {
+    const summary = {
+      joins: 0, leaves: 0, desyncs: 0, deadLetters: 0, advanceOverflows: 0,
+      actions: { total: 0, ok: 0, rejected: 0 },
+      submitMs: { count: 0, total: 0, max: 0 },
+      broadcastMs: { count: 0, total: 0, max: 0 },
+      deltaBytes: { count: 0, total: 0, max: 0 },
+    };
+    expect(projectSource('summary', summary)).not.toBeNull();
+    for (const field of ['submitMs', 'broadcastMs', 'deltaBytes']) {
+      for (const invalid of [undefined, {}, { count: 0, total: 0 }, { count: 0, total: -1, max: 0 }])
+        expect(projectSource('summary', { ...summary, [field]: invalid })).toBeNull();
+    }
+  });
+
   it('bounds response bodies and refuses redirects before any credentials can be forwarded', async () => {
     let options;
     const response = new Response('x'.repeat(65537));

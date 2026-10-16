@@ -338,6 +338,8 @@ baseline и зафиксировать workload/версию/свободный 
 профиль, границы/единицы/reset/cardinality, bounded read-only baseline CLI и privacy
 проверки. [Замер](reviews/2026-10-16-obs-0-1-baseline.md): 9 комнат ×24, 0 клиентов,
 реальные image IDs/build и CPU/RAM/disk; p95/capacity не объявляются измеренными.
+По ревью CLI сохраняет все конечные положительные timeScale и помечает неполный
+summary invalid при отсутствии обязательных submit/broadcast/delta series.
 
 ### OBS-0.2 · Закрытый стек и provisioning `[ops][sec]` ⏳ — M
 
