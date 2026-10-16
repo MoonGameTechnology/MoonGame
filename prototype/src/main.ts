@@ -5795,7 +5795,8 @@ const hubWallet = __SECTOR_ZERO_ONLY__
       root: $('hubwallet'),
       wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),
       donate: () => {
-        hubNote.textContent = t('donate.soon');
+        hubTab('supply');
+        metaEconomy?.showStore();
       },
       auction: () => hubTab('auction'),
     });

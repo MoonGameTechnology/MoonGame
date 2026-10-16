@@ -155,7 +155,7 @@ export function metaEconomyHtml(
     `<section class="me-section"><h3>${t('supply.recipes')}</h3><div class="me-grid">${view.recipes.map((r) => recipeHtml(view, r, busy)).join('')}</div></section>` +
     `<section class="me-section"><h3>${t('supply.salvage.title')}</h3><div class="me-grid">${salvage || `<p class="me-hint">${t('supply.salvage.empty')}</p>`}</div></section>` +
     `<section class="me-section"><h3>${t('supply.season')}</h3>${view.seasons.map((s) => seasonHtml(s, busy)).join('')}</section>` +
-    `<section class="me-section"><h3>${t('supply.store')}</h3><div class="me-grid">${store || `<p class="me-hint">${t('supply.store.unavailable')}</p>`}</div></section>`
+    `<section class="me-section" data-me-store><h3>${t('supply.store')}</h3><div class="me-grid">${store || `<p class="me-hint">${t('supply.store.unavailable')}</p>`}</div></section>`
   );
 }
 
@@ -175,8 +175,13 @@ const sameSession = (a: Session | null, b: Session | null): boolean =>
   a?.base === b?.base && a?.token === b?.token;
 
 /** No value is cached in the browser. A failed POST retains its id for a safe retry. */
-export function initMetaEconomy(host: MetaEconomyHost): { refresh(): Promise<void> } {
+export function initMetaEconomy(host: MetaEconomyHost): {
+  refresh(): Promise<void>;
+  /** Плашка Суверенов ведёт в магазин: после ближайшей загрузки экран прокручен к нему. */
+  showStore(): void;
+} {
   let view: MetaEconomyView | null = null;
+  let wantStore = false;
   let offers: CommerceOffer[] = [];
   let session: Session | null = null;
   let generation = 0;
@@ -193,6 +198,10 @@ export function initMetaEconomy(host: MetaEconomyHost): { refresh(): Promise<voi
       (view
         ? metaEconomyHtml(view, offers, busy)
         : `<div class="hub-empty">${t('supply.title')}<br>${button('data-me-refresh', t('supply.retry'), busy)}</div>`);
+    if (wantStore && !busy) {
+      wantStore = false;
+      if (view) host.root().querySelector('[data-me-store]')?.scrollIntoView({ block: 'start' });
+    }
   };
   const json = async (auth: Session, path: string, body?: object): Promise<unknown> => {
     const res = await fetch(auth.base + path, {
@@ -370,5 +379,11 @@ export function initMetaEconomy(host: MetaEconomyHost): { refresh(): Promise<voi
         );
     }
   });
-  return { refresh };
+  return {
+    refresh,
+    showStore: () => {
+      wantStore = true;
+      if (!busy) paint();
+    },
+  };
 }

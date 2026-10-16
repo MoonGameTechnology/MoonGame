@@ -340,7 +340,7 @@ describe('MetaEconomy manufacturing', () => {
       ['a', 'b'].map((requestId) =>
         f.service.craft('alice', {
           requestId,
-          recipeId: 'ablative_plating',
+          recipeId: 'siege_platform',
           allowSoulbound: false,
         }),
       ),

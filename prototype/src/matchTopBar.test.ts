@@ -422,10 +422,13 @@ describe('строка статуса', () => {
     expect(tail).toContain(`<b>${t('ally.step.advance')}</b>`);
   });
 
-  it('Суверенов в строке статуса нет; кошелёк забега рисуется каждый кадр', async () => {
+  it('Суверены в строке статуса — без числа, в забеге их нет; кошелёк забега рисуется каждый кадр', async () => {
     const { m, el, env, rec } = await boot();
     m.renderTopBar(0, false, []);
-    expect(el('devline-status').innerHTML).not.toContain('data-donate');
+    const status = el('devline-status').innerHTML;
+    expect(status).toContain('class="dl-donate" data-donate="1"');
+    expect(status).toContain(`aria-label="${t('donate.open')}"`);
+    expect(status).not.toMatch(/dl-donate[^]*<b>/);
     env.toolsHidden = true;
     m.renderTopBar(0, false, []);
     expect(el('devline-status').innerHTML).not.toContain('data-donate');
@@ -469,7 +472,7 @@ describe('строка статуса', () => {
     line.click(hit('[data-solo-play]'));
     expect(rec.missionToggles).toBe(1);
     expect(rec.allyOpens).toBe(1);
-    expect(rec.toasts).toEqual([t('donate.soon')]);
+    expect(rec.toasts).toEqual([t('donate.where')]);
     expect(rec.saves).toEqual([true]);
     // «Продолжить» — темп кнопки ▶ и без нагона: время паузы мир не отыгрывает.
     expect(rec.speeds).toEqual([PLAY * 10]);
