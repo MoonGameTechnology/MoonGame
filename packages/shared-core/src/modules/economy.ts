@@ -284,6 +284,16 @@ export const economyModule: GameModule = {
       // набора считаются ОДНИМ проходом каждый — иначе на каждый узел пришлось бы
       // перебирать все бои и все флоты.
       const fighting = battleLocations(h.state);
+      // Стройки по мирам — один проход по очереди событий, а не проход на каждый мир.
+      // `pendingProduction` берёт свой список в прежнем порядке очереди.
+      const builds = new Map<unknown, GameState['scheduled']>();
+      for (const event of h.state.scheduled) {
+        if (event.type !== 'construction.complete') continue;
+        const planetId = (event.payload as ConstructionPayload).planetId;
+        const list = builds.get(planetId);
+        if (list) list.push(event);
+        else builds.set(planetId, [event]);
+      }
 
       // Sorted (BF-13): several planets credit the same treasury cell — float
       // addition order must not depend on JSONB key order after hibernation.
@@ -308,7 +318,7 @@ export const economyModule: GameModule = {
           mergeBags(
             mergeBags(
               baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
-              pendingProduction(h.state.scheduled, planet, data, h.ctx, from, to, hours),
+              pendingProduction(builds.get(planetId) ?? [], planet, data, h.ctx, from, to, hours),
             ),
             pausedProduction(planet, data),
           ),
