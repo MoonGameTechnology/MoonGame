@@ -7237,7 +7237,7 @@ initSectorZeroShell({
   },
   back: () => {
     openHub();
-    $('hub-solo').focus({ preventScroll: true });
+    $('hub-sector-zero').focus({ preventScroll: true });
   },
   openSettings: () => settings.open(),
   note,

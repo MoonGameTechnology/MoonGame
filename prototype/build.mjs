@@ -4387,7 +4387,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
-      <button id="hub-sector-zero" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
+      <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
