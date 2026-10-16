@@ -230,8 +230,10 @@ describe('три стиля кнопок (UIX-11.1)', () => {
   });
 
   it('карточка мира: «Постройки» и «Юниты» — главные, крепость — вторичная, путь в науку — тихий', () => {
-    const main = read('./main.ts');
-    const tags = [...main.matchAll(/<button class="bw-open[^"]*" data-act="(\w+)"/g)].map(
+    // Карточка мира живёт у своего владельца (`worldCard.ts`, REFM-223).
+    const card = read('./worldCard.ts');
+    expect(read('./main.ts')).not.toContain('<button class="bw-open');
+    const tags = [...card.matchAll(/<button class="bw-open[^"]*" data-act="(\w+)"/g)].map(
       (m) => `${m[1]}:${m[0].match(/btn-\w+/)?.[0]}`,
     );
     expect(tags).toEqual([

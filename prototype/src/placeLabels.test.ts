@@ -23,6 +23,8 @@ const AIM = readFileSync(new URL('./mapAim.ts', import.meta.url), 'utf8');
 const MARKS = readFileSync(new URL('./mapMarks.ts', import.meta.url), 'utf8');
 // Подписи миров (метка тумана, имена на схеме, поле астероидов, выноска мира) — у них (REFM-235).
 const WORLDS = readFileSync(new URL('./mapWorlds.ts', import.meta.url), 'utf8');
+// Карточки мира и тумана в боковой панели — у их владельца (REFM-223).
+const CARD = readFileSync(new URL('./worldCard.ts', import.meta.url), 'utf8');
 
 describe('SZ-map-ids — места называются именами', () => {
   it('ни одна подпись холста не пишет сырой id узла', () => {
@@ -34,7 +36,9 @@ describe('SZ-map-ids — места называются именами', () => 
 
   it('заголовок карточки мира — имя, а не id узла (UIX-5.2)', () => {
     // Карточки тумана («нет телеметрии», «последний снимок») брали в заголовок `p.id`.
-    expect(MAIN.match(/cardHeader\([^,]+,\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
+    expect((MAIN + CARD).match(/cardHeader\([^,]+,\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
+    // Обе карточки тумана и известный мир называют место его именем.
+    expect(CARD.match(/cardHeader\([^,]+,\s*placeName\(p\.id\)/g)?.length).toBe(3);
   });
 
   it('вид сектора под полем астероидов — из данных, а не зашитой строкой', () => {
