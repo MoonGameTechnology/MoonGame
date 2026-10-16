@@ -248,7 +248,7 @@ import { createBattleModel } from '../../packages/client/src/index';
 import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeId, provingGroundState, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
-import { buildLabel, currentBuild } from './updater';
+import { bakedServer, buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
@@ -713,7 +713,7 @@ import { claimIntent, matchIdFrom } from '../../decisions/matchAddress';
 import { httpBase } from '../../decisions/matchQuery';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
-import { resolveAddress } from '../../decisions/serverAddress';
+import { defaultServerField, resolveAddress } from '../../decisions/serverAddress';
 import { radarContacts } from './snapshotIngest';
 import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
@@ -5523,16 +5523,9 @@ const showConnect = (show: boolean): void => {
  *  игрок написанное в его строку статуса. Пришёл ли он по ссылке — отдельный вопрос и
  *  отдельный признак (`cameFromLink`): оверлей держится до впуска в обоих случаях. */
 const connectShown = (): boolean => connectEl.style.display !== 'none';
-srvInput.value =
-  localStorage.getItem('void.server') ??
-  // Default to the SAME ORIGIN so a served page needs no typing: deployed https →
-  // wss://<host>; the game served from the proto-server (http on its port) →
-  // ws://<host>:<port>; a file:// page or the APK (no port) → ws://<host>:8788.
-  (location.protocol === 'https:'
-    ? `wss://${location.host}`
-    : location.port
-      ? `ws://${location.host}`
-      : `ws://${location.hostname || '127.0.0.1'}:8788`);
+// Remembered server, then the one baked into the APK, then the page's own origin
+// (`serverAddress.ts`, rule 8).
+srvInput.value = defaultServerField(localStorage.getItem('void.server'), bakedServer(), location);
 // Remember the side you last commanded, so reopening the link drops you back onto
 // your own seat — the server maps nick→side, so a returning name resumes its own
 // faction (nick-login; full accounts in docs/persistence-accounts-roadmap.md).

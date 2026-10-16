@@ -81,7 +81,7 @@ export function isTrustedApkUrl(url: string): boolean {
 }
 
 interface GlobalWithBuild {
-  __BUILD__?: { versionCode?: unknown; sha?: unknown };
+  __BUILD__?: { versionCode?: unknown; sha?: unknown; server?: unknown };
 }
 
 /** Our own build identity, injected into the APK's index.html at package time. */
@@ -89,6 +89,12 @@ export function currentBuild(): BuildInfo | null {
   const b = (globalThis as GlobalWithBuild).__BUILD__;
   if (!b || typeof b.versionCode !== 'number' || !Number.isFinite(b.versionCode)) return null;
   return { versionCode: b.versionCode, sha: typeof b.sha === 'string' ? b.sha : '' };
+}
+
+/** The game server baked into the APK at package time (`inject-build.mjs`), or null. */
+export function bakedServer(): string | null {
+  const server = (globalThis as GlobalWithBuild).__BUILD__?.server;
+  return typeof server === 'string' && server ? server : null;
 }
 
 interface ReleaseAsset {
