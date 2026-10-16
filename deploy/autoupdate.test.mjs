@@ -25,6 +25,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const run = promisify(execFile);
@@ -35,6 +36,9 @@ const OLD = `${REPO}@sha256:${'a'.repeat(64)}`;
 const NEW = `${REPO}@sha256:${'b'.repeat(64)}`;
 const OLD_ID = 'a'.repeat(12);
 const NEW_ID = 'b'.repeat(12);
+const OLD_EDGE = `${REPO}/caddy@sha256:${'d'.repeat(64)}`;
+const NEW_EDGE = `${REPO}/caddy@sha256:${'e'.repeat(64)}`;
+const pairId = (a,b) => createHash('sha256').update(a+'\n'+b+'\n').digest('hex').slice(0,24);
 
 function stub(dir, name, body) {
   const file = join(dir, name);
@@ -46,11 +50,11 @@ function stub(dir, name, body) {
  *  заглушки там, где поведение проверяется отдельно. */
 function writeRelease(dir, { updateExit = 0, verifyExit = 0, marker = '' } = {}) {
   mkdirSync(dir, { recursive: true });
-  for (const f of ['autoupdate.sh', 'stack.sh', 'moongame.sh', 'env-keys.sh', 'production-preflight.sh']) {
+  for (const f of ['autoupdate.sh', 'stack.sh', 'moongame.sh', 'env-keys.sh', 'production-preflight.sh', 'release-state.sh']) {
     cpSync(join(DEPLOY_DIR, f), join(dir, f));
     chmodSync(join(dir, f), 0o755);
   }
-  for (const f of ['docker-compose.yml', 'docker-compose.release.yml'])
+  for (const f of ['docker-compose.yml', 'docker-compose.release.yml', 'docker-compose.tls.yml', 'docker-compose.release-tls.yml'])
     writeFileSync(join(dir, f), '# stub\n');
   stub(
     dir,
@@ -61,8 +65,12 @@ function writeRelease(dir, { updateExit = 0, verifyExit = 0, marker = '' } = {})
   stub(
     dir,
     'update.sh',
-    `echo "update.sh(${marker || basename(dirname(dir))}) VOID_IMAGE=$VOID_IMAGE STATE_DIR=$STATE_DIR" >> "$LOG"
-[ ${updateExit} -eq 0 ] && printf '%s\\n' "$VOID_IMAGE" > "$STATE_DIR/last-good-image"
+    `echo "update.sh(${marker || basename(dirname(dir))}) VOID_IMAGE=$VOID_IMAGE STATE_DIR=$STATE_DIR VOID_CADDY_IMAGE=\${VOID_CADDY_IMAGE:-}" >> "$LOG"
+if [ ${updateExit} -eq 0 ]; then
+  if [ -n "\${VOID_CADDY_IMAGE:-}" ]; then
+    printf 'version=1\\nserver=%s\\ncaddy=%s\\n' "$VOID_IMAGE" "$VOID_CADDY_IMAGE" > "$STATE_DIR/last-good-release"
+  else printf '%s\\n' "$VOID_IMAGE" > "$STATE_DIR/last-good-image"; fi
+fi
 exit ${updateExit}`,
   );
 }
@@ -81,6 +89,9 @@ function sandbox({
   verifyExit = 0,
   imageRelease = {},
   withCurrent = true,
+  tls = false,
+  remoteEdge = NEW_EDGE,
+  edgeRevision = '1'.repeat(40),
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'void-autodeploy-'));
   const state = join(root, 'state');
@@ -88,10 +99,11 @@ function sandbox({
   const image = join(root, 'image-deploy');
   mkdirSync(join(state, 'releases'), { recursive: true });
   mkdirSync(bin);
-  writeFileSync(join(state, 'server.env'), serverEnv);
+  writeFileSync(join(state, 'server.env'), (tls ? 'DOMAIN=play.example.com\n' : '') + serverEnv);
+  if (tls && lastGood) writeFileSync(join(state, 'last-good-release'), `version=1\nserver=${lastGood}\ncaddy=${OLD_EDGE}\n`);
   if (lastGood) writeFileSync(join(state, 'last-good-image'), `${lastGood}\n`);
 
-  const current = join(state, 'releases', OLD_ID);
+  const current = join(state, 'releases', tls ? pairId(OLD,OLD_EDGE) : OLD_ID);
   writeRelease(join(current, 'deploy'), { verifyExit, marker: 'current' });
   if (withCurrent) symlinkSync(current, join(state, 'current'));
   if (imageRelease)
@@ -104,9 +116,10 @@ function sandbox({
     'docker',
     `echo "docker $*" >> "$LOG"
 case "$1 $2 $3" in
-  "buildx imagetools inspect") echo "\${REMOTE#*@}" ;;
+  "buildx imagetools inspect") if [[ "$4" == */caddy:* ]]; then echo "\${REMOTE_EDGE#*@}"; else echo "\${REMOTE#*@}"; fi ;;
 esac
 case "$1" in
+  image) if [[ "$3" == */caddy@* ]]; then echo "$EDGE_REVISION"; else echo "1111111111111111111111111111111111111111"; fi ;;
   create) echo cid-1 ;;
   cp) [ -d "$IMAGE_DEPLOY" ] || exit 1; cp -r "$IMAGE_DEPLOY" "$3" ;;
 esac
@@ -128,6 +141,8 @@ esac`,
     LOG: log,
     STATE_DIR: state,
     REMOTE: remote,
+    REMOTE_EDGE: remoteEdge,
+    EDGE_REVISION: edgeRevision,
     IMAGE_DEPLOY: imageRelease ? image : join(root, 'nothing'),
     FAKE_NOW: now,
   };
@@ -143,6 +158,7 @@ esac`,
     history: () => read('deploy-history'),
     failed: () => read('failed-images'),
     lastGood: () => read('last-good-image').trim(),
+    pair: () => read('last-good-release'),
     currentTarget: () => basename(readlinkSync(join(state, 'current'))),
     releases: () => readdirSync(join(state, 'releases')).sort(),
   };
@@ -357,5 +373,88 @@ describe('autoupdate.sh — первый перевод и уборка', () => 
     expect(res.code).toBe(0);
     expect(res.stdout).toContain('уже идёт другая выкатка');
     expect(sb.lastGood()).toBe(OLD);
+  });
+});
+
+
+describe('autoupdate.sh — подписанная TLS-пара', () => {
+  it('повторный installer фиксирует уже работающую пару до возможной смены main', async () => {
+    const sb = sandbox({ tls: true, remote: OLD, remoteEdge: OLD_EDGE });
+    expect((await agent(sb, ['--prepare-bootstrap'])).code).toBe(0);
+    expect(readFileSync(join(sb.state, 'prepared-release'), 'utf8')).toContain(`server=${OLD}\ncaddy=${OLD_EDGE}`);
+    const before = sb.readLog().length;
+    expect((await agent(sb, ['--bootstrap'], { REMOTE: NEW, REMOTE_EDGE: NEW_EDGE })).code).toBe(0);
+    expect(sb.readLog().slice(before)).not.toContain('update.sh');
+    expect(sb.currentTarget()).toBe(pairId(OLD, OLD_EDGE));
+  });
+  it('восстанавливает current после прерывания между checkpoint и переключением скриптов', async () => {
+    const sb = sandbox({ tls: true });
+    writeFileSync(join(sb.state, 'last-good-release'), `version=1\nserver=${NEW}\ncaddy=${NEW_EDGE}\n`);
+    const res = await agent(sb);
+    expect(res.code).toBe(0);
+    expect(sb.currentTarget()).toBe(pairId(NEW, NEW_EDGE));
+    expect(sb.readLog()).not.toContain('update.sh');
+    expect(sb.history()).toContain('adopted');
+  });
+  it('обновляет также Caddy без нового server digest и сохраняет отдельную версию пары', async () => {
+    const sb=sandbox({tls:true, remote:OLD});
+    const res=await agent(sb);
+    expect(res.code).toBe(0);
+    expect(sb.readLog()).toContain(`verify ${NEW_EDGE} by current`);
+    expect(sb.readLog()).toContain(`VOID_CADDY_IMAGE=${NEW_EDGE}`);
+    expect(sb.pair()).toContain(`server=${OLD}\ncaddy=${NEW_EDGE}`);
+    expect(sb.currentTarget()).toBe(pairId(OLD,NEW_EDGE));
+  });
+  it('ждёт оба образа одного source SHA, не трогая текущую версию и не блокируя будущий retry', async () => {
+    const sb=sandbox({tls:true,edgeRevision:'2'.repeat(40)});
+    const res=await agent(sb);
+    expect(res.code).toBe(1);
+    expect(res.stdout).toContain('E_DEPLOY_AWAIT_IMAGE_PAIR');
+    expect(sb.readLog()).not.toContain('update.sh(new)');
+    expect(sb.pair()).toContain(`caddy=${OLD_EDGE}`);
+    expect(sb.failed()).toBe('');
+  });
+  it('prepare-bootstrap проверяет и скачивает пару без переключения current или вызова update', async () => {
+    const sb=sandbox({tls:true,lastGood:'',withCurrent:false});
+    const res=await agent(sb,['--prepare-bootstrap']);
+    expect(res.code).toBe(0);
+    expect(sb.readLog()).toContain(`docker pull ${NEW_EDGE}`);
+    expect(sb.readLog()).not.toContain('update.sh(new)');
+    expect(readFileSync(join(sb.state,'prepared-release'),'utf8')).toContain(`server=${NEW}\ncaddy=${NEW_EDGE}`);
+    expect(sb.pair()).toBe('');
+  });
+  it('ошибка выкатки возвращает оба прежних ref и не меняет checkpoint', async () => {
+    const sb=sandbox({tls:true,newUpdateExit:1});
+    const res=await agent(sb);
+    expect(res.code).toBe(1);
+    expect(sb.readLog()).toContain(`update.sh(current) VOID_IMAGE=${OLD}`);
+    expect(sb.readLog()).toContain(`VOID_CADDY_IMAGE=${OLD_EDGE}`);
+    expect(sb.pair()).toContain(`server=${OLD}\ncaddy=${OLD_EDGE}`);
+    expect(sb.failed()).toContain(`${NEW} ${NEW_EDGE}`);
+    expect(sb.currentTarget()).toBe(pairId(OLD,OLD_EDGE));
+  });
+  it('отказ подписи Caddy не запускает pull, update или переключение версии', async () => {
+    const sb = sandbox({ tls: true });
+    stub(join(sb.state, 'current', 'deploy'), 'verify-image.sh',
+      `echo "verify $1" >> "$LOG"\n[[ "$1" != */caddy@* ]]`);
+    const res = await agent(sb);
+    expect(res.code).toBe(1);
+    expect(sb.readLog()).toContain(`verify ${NEW}`);
+    expect(sb.readLog()).not.toContain('docker pull');
+    expect(sb.readLog()).not.toContain('update.sh');
+    expect(sb.currentTarget()).toBe(pairId(OLD, OLD_EDGE));
+    expect(sb.pair()).toContain(`server=${OLD}\ncaddy=${OLD_EDGE}`);
+  });
+  it('bootstrap использует подготовленную пару, даже если тег main успел измениться', async () => {
+    const sb = sandbox({ tls: true, lastGood: '', withCurrent: false });
+    expect((await agent(sb, ['--prepare-bootstrap'])).code).toBe(0);
+    const before = sb.readLog().length;
+    expect((await agent(sb, ['--bootstrap'], { REMOTE: OLD, REMOTE_EDGE: OLD_EDGE })).code).toBe(0);
+    const bootstrap = sb.readLog().slice(before);
+    expect(bootstrap).not.toContain('imagetools inspect');
+    expect(bootstrap).toContain(`VOID_IMAGE=${NEW}`);
+    expect(bootstrap).toContain(`VOID_CADDY_IMAGE=${NEW_EDGE}`);
+    expect(sb.pair()).toContain(`server=${NEW}\ncaddy=${NEW_EDGE}`);
+    expect(existsSync(join(sb.state, 'prepared-release'))).toBe(false);
   });
 });

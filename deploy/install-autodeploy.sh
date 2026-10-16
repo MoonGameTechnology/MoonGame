@@ -4,7 +4,9 @@
 # install-ubuntu.sh.
 #
 #   cd /opt/moongame && sudo -u moongame git pull     # получить этот файл
-#   sudo VOID_REGISTRY_USER=<логин> VOID_REGISTRY_TOKEN=<токен read:packages> \
+#   # Введите read-only registry credentials через read -s или защищённый файл;
+#   # подробная команда — deploy/README.md, раздел «Автодеплой».
+#   sudo --preserve-env=VOID_REGISTRY_USER,VOID_REGISTRY_TOKEN \
 #     bash /opt/moongame/deploy/install-autodeploy.sh
 #
 # Креды нужны, пока пакет образа в GHCR приватный; для публичного пакета их не передают.
@@ -51,14 +53,9 @@ as_service() {
   sudo -u "$SERVICE_USER" env STATE_DIR="$STATE_DIR" DOCKER_CONFIG="$DOCKER_CONFIG_DIR" "$@"
 }
 
-# Хост с TLS-оверлеем (Caddy) фаза 1 не ведёт: агент обновляет только образ сервера, а
-# стек с Caddy собирается из четырёх файлов и второго подписанного образа — это ZTP-2.2.
-# Перевести такой хост наполовину значило бы после первой же выкатки потерять настройки
-# TLS-оверлея у сервера. Поэтому отказ, а не полумера.
-if grep -qE '^DOMAIN=[[:space:]]*[^[:space:]]' "$INSTALL_DIR/deploy/server.env" "$STATE_DIR/server.env" 2>/dev/null \
-  || [ -n "$(docker ps -q --filter label=com.docker.compose.project=deploy --filter label=com.docker.compose.service=caddy 2>/dev/null)" ]; then
-  die "на хосте TLS-оверлей (Caddy): автодеплой его пока не ведёт (ZTP-2.2). Обновление — как раньше, deploy/README.md"
-fi
+# Docker unit can differ on a manually provisioned host; unit files remain root-owned.
+DOCKER_SYSTEMD_UNIT="${DOCKER_SYSTEMD_UNIT:-docker.service}"
+[[ "$DOCKER_SYSTEMD_UNIT" =~ ^[A-Za-z0-9@_.-]+\.service$ ]] || die E_DEPLOY_DOCKER_UNIT
 
 # ---- 1. каталог состояния ----
 say "Каталог состояния: $STATE_DIR"
@@ -85,6 +82,9 @@ adopt "$INSTALL_DIR/deploy/server.env" "$STATE_DIR/server.env"
 [ -f "$STATE_DIR/server.env" ] || die "нет server.env — сначала поставьте сервер install-ubuntu.sh"
 chown "$SERVICE_USER:$SERVICE_USER" "$STATE_DIR/server.env"
 chmod 600 "$STATE_DIR/server.env"
+
+adopt "$INSTALL_DIR/deploy/migration.env" "$STATE_DIR/migration.env"
+if [ -f "$STATE_DIR/migration.env" ]; then chown "$SERVICE_USER:$SERVICE_USER" "$STATE_DIR/migration.env"; chmod 600 "$STATE_DIR/migration.env"; fi
 
 adopt "$INSTALL_DIR/deploy/certs" "$STATE_DIR/certs"
 if [ ! -e "$STATE_DIR/certs" ]; then
@@ -115,7 +115,7 @@ fi
 # Образ, за которым следит агент, и тег можно переопределить для стенда (свой реестр,
 # своя ветка); на проде оба по умолчанию, ghcr.io/moongametechnology/moongame:main.
 # Пишутся в server.env, а не в юнит: оттуда их читают и таймер, и `moongame update`.
-for key in VOID_IMAGE_REPO VOID_TRACK_TAG; do
+for key in VOID_IMAGE_REPO VOID_TRACK_TAG VOID_CADDY_IMAGE_REPO COMPOSE_EXTRA_FILE BACKUP_POLICY; do
   value="${!key:-}"
   [ -n "$value" ] || continue
   sed -i "/^$key=/d" "$STATE_DIR/server.env"
@@ -135,6 +135,14 @@ if [ -n "${VOID_REGISTRY_USER:-}" ] && [ -n "${VOID_REGISTRY_TOKEN:-}" ]; then
   ok "доступ к $REGISTRY сохранён (только для $SERVICE_USER)"
 fi
 
+# Validate recovery posture and stage the signed candidate BEFORE stopping the legacy unit.
+# An unavailable registry/verifier must not interrupt the working game.
+as_service bash -c '. "$1"; production_preflight "$2"' _ "$HERE/production-preflight.sh" "$STATE_DIR/server.env" \
+  || die "production-preflight не пройден; работающий стек не остановлен"
+as_service rm -f "$STATE_DIR/prepared-release" "$STATE_DIR/prepared-image"
+as_service bash "$HERE/autoupdate.sh" --prepare-bootstrap \
+  || die "подготовка подписанного релиза не прошла; работающий стек не остановлен"
+
 # ---- 3. первая выкатка ----
 # Прежний юнит держит `docker compose up` на ЛОКАЛЬНОЙ сборке и с Restart=always: оставь
 # его работать, и через десять секунд после подъёма подписанного образа он вернул бы
@@ -148,7 +156,7 @@ fi
 
 say "Первая выкатка подписанного :main (подпись → подъём → проверка здоровья)..."
 if ! as_service bash "$HERE/autoupdate.sh" --bootstrap; then
-  if [ "$LEGACY_UNIT" = 1 ] && [ ! -s "$STATE_DIR/last-good-image" ]; then
+  if [ "$LEGACY_UNIT" = 1 ]; then
     say "Возвращаем прежний юнит, чтобы сервер не остался лежать..."
     systemctl start "$SERVICE_NAME" || true
   fi
@@ -162,9 +170,9 @@ cat > "$SYSTEMD_DIR/$SERVICE_NAME.service" << EOF
 [Unit]
 Description=Void Dominion Game Server (signed image, autodeploy)
 Documentation=https://github.com/MoonGameTechnology/MoonGame/blob/main/docs/zero-touch-prod/README.md
-After=docker.service network-online.target
+After=$DOCKER_SYSTEMD_UNIT network-online.target
 Wants=network-online.target
-Requires=docker.service
+Requires=$DOCKER_SYSTEMD_UNIT
 
 [Service]
 # Юнит только ПОДНИМАЕТ стек на дайджесте из точки отката и выходит; за упавшим
@@ -187,7 +195,7 @@ cat > "$SYSTEMD_DIR/$SERVICE_NAME-autoupdate.service" << EOF
 [Unit]
 Description=Void Dominion autodeploy: roll out the newest signed :main
 Documentation=https://github.com/MoonGameTechnology/MoonGame/blob/main/docs/zero-touch-prod/README.md
-After=docker.service network-online.target $SERVICE_NAME.service
+After=$DOCKER_SYSTEMD_UNIT network-online.target $SERVICE_NAME.service
 Wants=network-online.target
 
 [Service]
@@ -225,7 +233,11 @@ systemctl enable --now "$SERVICE_NAME-autoupdate.timer" >/dev/null
 
 echo ""
 ok "Автодеплой включён."
-echo "    Сейчас запущено:  $(cat "$STATE_DIR/last-good-image")"
+if [ -f "$STATE_DIR/last-good-release" ]; then
+  echo "    Пара релиза: $STATE_DIR/last-good-release"
+else
+  echo "    Сейчас запущено:  $(cat "$STATE_DIR/last-good-image")"
+fi
 echo "    Окно выкатки:     $(grep -m1 -E '^AUTODEPLOY_WINDOW=' "$STATE_DIR/server.env" | cut -d= -f2-) (часы хоста)"
 echo "    История:          moongame history"
 echo "    Выкатить сейчас:  moongame update"

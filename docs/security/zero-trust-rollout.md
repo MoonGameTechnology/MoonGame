@@ -7,10 +7,16 @@
 `DB_AUTO_MIGRATE=0` и `DB_REQUIRE_LEAST_PRIVILEGE=1` оба игровых хоста отказываются
 стартовать. `prepareRuntimeDatabase` повторно защищает границу до автомиграции и
 проверяет действительные grants. Разработческий startup-migrate остаётся для `PROD=0`.
-Общий deploy-preflight также требует успешную независимую проверку backup/restore;
+Общий deploy-preflight по умолчанию (`BACKUP_POLICY=required`) требует успешную
+независимую проверку backup/restore;
 контракт verifier и порядок запуска — в [руководстве](../../deploy/README.md).
 По результату preflight launcher передаёт `BACKUP_READINESS_VERIFIED=1` только
 текущему запуску. Не копируйте этот маркер в постоянный конфиг.
+При явно принятом владельцем отложенном восстановлении для плейтеста используется
+`BACKUP_POLICY=deferred-playtest`: host preflight предупреждает и выдаёт отдельный
+`BACKUP_READINESS_DEFERRED=1` при `BACKUP_READINESS_VERIFIED=0`. Это не подтверждение
+бэкапов и не отмена разделения DB-ролей, TLS, auth или gate. Возврат к `required`
+снова включает обязательную проверку независимого восстановления.
 
 ## Что даёт эта версия
 

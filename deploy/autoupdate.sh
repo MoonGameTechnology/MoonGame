@@ -42,19 +42,25 @@ HISTORY="$STATE_DIR/deploy-history"
 RELEASES="$STATE_DIR/releases"
 CURRENT="$STATE_DIR/current"
 HEALTH_PORT="${PORT:-8788}"
+. "$HERE/release-state.sh"
+TLS=0
+if release_tls "$ENV_FILE"; then TLS=1; fi
+PAIR_FILE="$STATE_DIR/last-good-release"
 
 # Файлы, без которых версия `deploy/` не способна ни выкатить себя, ни подняться после
 # ребута. Образ без них (собранный до автодеплоя) агент не катит: иначе следующий прогон
 # таймера искал бы себя в каталоге, где его нет.
-REQUIRED_FILES="autoupdate.sh update.sh stack.sh moongame.sh verify-image.sh env-keys.sh production-preflight.sh docker-compose.yml docker-compose.release.yml"
+REQUIRED_FILES="autoupdate.sh update.sh stack.sh moongame.sh verify-image.sh env-keys.sh production-preflight.sh release-state.sh docker-compose.yml docker-compose.release.yml"
 
+if [ "$TLS" = 1 ]; then REQUIRED_FILES+=" docker-compose.tls.yml docker-compose.release-tls.yml"; fi
 MODE=timer
 case "${1:-}" in
   "") ;;
   --now) MODE=now ;;
   --bootstrap) MODE=bootstrap ;;
+  --prepare-bootstrap) MODE=prepare ;;
   *)
-    echo "usage: $0 [--now|--bootstrap]" >&2
+    echo "usage: $0 [--now|--bootstrap|--prepare-bootstrap]" >&2
     exit 2
     ;;
 esac
@@ -77,6 +83,9 @@ IMAGE_REPO="${VOID_IMAGE_REPO:-$(env_value VOID_IMAGE_REPO)}"
 IMAGE_REPO="${IMAGE_REPO:-ghcr.io/moongametechnology/moongame}"
 TRACK_TAG="${VOID_TRACK_TAG:-$(env_value VOID_TRACK_TAG)}"
 TRACK_TAG="${TRACK_TAG:-main}"
+CADDY_REPO="${VOID_CADDY_IMAGE_REPO:-$(env_value VOID_CADDY_IMAGE_REPO)}"
+CADDY_REPO="${CADDY_REPO:-$IMAGE_REPO/caddy}"
+CADDY_REF=""
 
 short() {
   # Короткое имя дайджеста для журнала и каталога версии: первые 12 знаков.
@@ -127,7 +136,7 @@ record() {
   local line
   line="$(date -u +%Y-%m-%dT%H:%M:%SZ) $MODE $(short "$from") -> $(short "$to") $outcome${version:+ version=$version}"
   log "deploy: $(short "$from") → $(short "$to") $outcome${version:+ (сборка $version)}"
-  printf '%s\n' "$line" >> "$HISTORY"
+  printf '%s%s\n' "$line" "${CADDY_REF:+ caddy=$(short "$CADDY_REF")}" >> "$HISTORY"
 }
 
 running_version() {
@@ -155,14 +164,14 @@ load_registry_creds() {
 
 resolve_ref() {
   # Дайджест, на который СЕЙЧАС указывает тег. Без скачивания байтов: только манифест.
-  local digest
-  digest="$(docker buildx imagetools inspect "$IMAGE_REPO:$TRACK_TAG" --format '{{.Manifest.Digest}}')" || return 1
+  local digest repo="${1:-$IMAGE_REPO}"
+  digest="$(docker buildx imagetools inspect "$repo:$TRACK_TAG" --format '{{.Manifest.Digest}}')" || return 1
   digest="$(printf '%s' "$digest" | tr -d '[:space:]')"
   [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
     log "реестр вернул не дайджест: '$digest'"
     return 1
   }
-  printf '%s@%s' "$IMAGE_REPO" "$digest"
+  printf '%s@%s' "$repo" "$digest"
 }
 
 # Достать `deploy/` из образа в каталог версии. Образ НЕ запускается: `docker create`
@@ -202,6 +211,16 @@ make_current() {
   mv -Tf "$CURRENT.tmp" "$CURRENT"
 }
 
+write_prepared() {
+  if [ "$TLS" = 1 ]; then
+    release_pair_write "$STATE_DIR/prepared-release" "$REF" "$CADDY_REF"
+  else
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/prepared-image.XXXXXX")"
+    printf '%s\n' "$REF" > "$temporary"; mv -f "$temporary" "$STATE_DIR/prepared-image"
+  fi
+}
+
 # Хранить две версии: текущую и предыдущую (на неё откатываются). Остальные — мусор.
 prune_releases() {
   local keep_a="$1" keep_b="$2" dir name
@@ -230,7 +249,15 @@ if [ "$MODE" = timer ] && [ "$(env_value AUTODEPLOY)" = "0" ]; then
 fi
 
 PREV="$(cat "$LAST_GOOD" 2>/dev/null || true)"
-if [ -z "$PREV" ] && [ "$MODE" != bootstrap ]; then
+PREV_CADDY=""
+if [ "$TLS" = 1 ]; then
+  PREV=""
+  if [ -e "$PAIR_FILE" ]; then
+    release_pair_read "$PAIR_FILE" || { log E_DEPLOY_RELEASE_PAIR; exit 1; }
+    PREV="$RELEASE_SERVER"; PREV_CADDY="$RELEASE_CADDY"
+  fi
+fi
+if [ -z "$PREV" ] && [ "$MODE" != bootstrap ] && [ "$MODE" != prepare ]; then
   # update.sh пишет точку отката только после удачного подъёма; без неё сломанной сборке
   # некуда было бы откатиться. Первый перевод хоста делает человек, глядя на результат.
   log "нет точки отката ($LAST_GOOD пуст) — не катим. Переведите хост: deploy/install-autodeploy.sh"
@@ -242,17 +269,38 @@ if [ "$MODE" = timer ] && ! in_window "$(env_value AUTODEPLOY_WINDOW)" "$(date +
 fi
 
 load_registry_creds
-if ! REF="$(resolve_ref)"; then
-  log "не удалось узнать дайджест $IMAGE_REPO:$TRACK_TAG — реестр недоступен или нет доступа"
-  exit 1
+if [ "$MODE" = bootstrap ] && [ "$TLS" = 1 ] && [ -e "$STATE_DIR/prepared-release" ]; then
+  release_pair_read "$STATE_DIR/prepared-release" || { log E_DEPLOY_PREPARED_RELEASE; exit 1; }
+  REF="$RELEASE_SERVER"; CADDY_REF="$RELEASE_CADDY"
+elif [ "$MODE" = bootstrap ] && [ "$TLS" = 0 ] && [ -e "$STATE_DIR/prepared-image" ]; then
+  REF="$(cat "$STATE_DIR/prepared-image")"
+  release_ref_valid "$REF" || { log E_DEPLOY_PREPARED_RELEASE; exit 1; }
+else
+  if ! REF="$(resolve_ref)"; then
+    log "не удалось узнать дайджест — реестр недоступен или нет доступа"
+    exit 1
+  fi
+  if [ "$TLS" = 1 ]; then
+    CADDY_REF="$(resolve_ref "$CADDY_REPO")" || { log E_DEPLOY_EDGE_RESOLVE; exit 1; }
+  fi
 fi
-
-if [ "$REF" = "$PREV" ] && [ -e "$CURRENT" ]; then
+REF_KEY="$REF"
+PREV_ID="$(short "$PREV")"
+if [ "$TLS" = 1 ]; then
+  REF_KEY="$REF $CADDY_REF"
+  PREV_ID="$(release_pair_id "$PREV" "$PREV_CADDY")"
+fi
+# A crash can leave the new checkpoint with the old scripts pointer. Adopt the
+# verified release below instead of treating that incomplete handoff as current.
+if [ "$REF" = "$PREV" ] && [ "$CADDY_REF" = "$PREV_CADDY" ] && [ -e "$CURRENT" ] \
+  && [ "$(basename "$(readlink -f "$CURRENT")")" = "$PREV_ID" ]; then
+  # Re-running the installer must still pin its candidate before stopping a unit.
+  if [ "$MODE" = prepare ]; then write_prepared; fi
   [ "$MODE" = timer ] || log "уже на $(short "$REF") — нового нет"
   exit 0
 fi
 
-if [ "$MODE" = timer ] && grep -qxF "$REF" "$FAILED"; then
+if [ "$MODE" = timer ] && grep -qxF "$REF_KEY" "$FAILED"; then
   # Повторять бессмысленно: те же байты поведут себя так же, а каждый заход — рестарт
   # сервера на глазах у игроков. Следующий merge даст новый дайджест.
   exit 0
@@ -268,16 +316,35 @@ if ! "$HERE/verify-image.sh" "$REF"; then
   exit 1
 fi
 
+if [ "$TLS" = 1 ] && ! "$HERE/verify-image.sh" "$CADDY_REF"; then
+  record "$PREV" "$REF" edge-signature-rejected
+  exit 1
+fi
 docker pull "$REF" >/dev/null
 NEW_ID="$(short "$REF")"
+if [ "$TLS" = 1 ]; then
+  docker pull "$CADDY_REF" >/dev/null
+  app_revision="$(docker image inspect "$REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+  edge_revision="$(docker image inspect "$CADDY_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+  if ! [[ "$app_revision" =~ ^[0-9a-f]{40}$ ]] || [ "$app_revision" != "$edge_revision" ]; then
+    log E_DEPLOY_AWAIT_IMAGE_PAIR # Publication can finish at different times; do not blacklist it.
+    exit 1
+  fi
+  NEW_ID="$(release_pair_id "$REF" "$CADDY_REF")"
+fi
 NEW_DIR="$RELEASES/$NEW_ID"
 if ! extract_release "$REF" "$NEW_DIR"; then
   record "$PREV" "$REF" refused-no-deploy
-  printf '%s\n' "$REF" >> "$FAILED"
+  printf '%s\n' "$REF_KEY" >> "$FAILED"
   exit 1
 fi
 
-if [ "$REF" = "$PREV" ]; then
+if [ "$MODE" = prepare ]; then
+  write_prepared
+  log "подписанная версия подготовлена; работающий стек не менялся"
+  exit 0
+fi
+if [ "$REF" = "$PREV" ] && [ "$CADDY_REF" = "$PREV_CADDY" ]; then
   # Первый перевод хоста, который уже работает на этом самом образе: выкатывать нечего,
   # нужно только завести версию и ссылку на неё.
   make_current "$NEW_DIR"
@@ -286,19 +353,22 @@ if [ "$REF" = "$PREV" ]; then
 fi
 
 log "выкатываем $(short "$REF") (было $(short "$PREV"))"
-if STATE_DIR="$STATE_DIR" VOID_IMAGE="$REF" bash "$NEW_DIR/deploy/update.sh"; then
+BOOTSTRAP_FLAG=0
+if [ "$MODE" = bootstrap ]; then BOOTSTRAP_FLAG=1; fi
+if STATE_DIR="$STATE_DIR" VOID_IMAGE="$REF" VOID_CADDY_IMAGE="$CADDY_REF" DEPLOY_BOOTSTRAP="$BOOTSTRAP_FLAG" bash "$NEW_DIR/deploy/update.sh"; then
   make_current "$NEW_DIR"
+  if [ "$MODE" = bootstrap ]; then rm -f "$STATE_DIR/prepared-release" "$STATE_DIR/prepared-image"; fi
   record "$PREV" "$REF" ok "$(running_version)"
-  prune_releases "$NEW_ID" "$(short "$PREV")"
+  prune_releases "$NEW_ID" "$PREV_ID"
   exit 0
 fi
 
 # Не поднялось. update.sh новой версии уже вернул прежний образ и server.env; здесь
 # возвращаем и прежний deploy/ — ещё один подъём тем, чем прод работал до выкатки.
-printf '%s\n' "$REF" >> "$FAILED"
+printf '%s\n' "$REF_KEY" >> "$FAILED"
 outcome=rolled-back
 if [ -n "$PREV" ] && [ -e "$CURRENT/deploy/update.sh" ]; then
-  if ! STATE_DIR="$STATE_DIR" VOID_IMAGE="$PREV" bash "$CURRENT/deploy/update.sh"; then
+  if ! STATE_DIR="$STATE_DIR" VOID_IMAGE="$PREV" VOID_CADDY_IMAGE="$PREV_CADDY" bash "$CURRENT/deploy/update.sh"; then
     outcome=rollback-failed
   fi
 elif [ -z "$PREV" ]; then

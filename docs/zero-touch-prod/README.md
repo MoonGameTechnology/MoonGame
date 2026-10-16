@@ -2,11 +2,12 @@
 
 Папка темы «изменения прода только через автоматизированный, проверенный и записанный
 путь». Здесь объяснение подхода и сверка с тем, что уже есть в репозитории; план с
-кирпичами — в [роадмапе](zero-touch-prod-roadmap.md). Сверено с `main` 2026-10-09.
+кирпичами — в [роадмапе](zero-touch-prod-roadmap.md). Сверено с кодом 2026-10-16.
 
 | Документ | Про что |
 | --- | --- |
 | [zero-touch-prod-roadmap.md](zero-touch-prod-roadmap.md) | План внедрения по фазам: кирпичи ZTP-*, зависимости, критерии готовности |
+| [tls-autodelivery.md](tls-autodelivery.md) | TLS-пара server/Caddy, разовый переход, host-policy, доступ к GHCR и ограничения |
 
 Соседние документы, на которых тема стоит:
 
@@ -16,7 +17,7 @@
 - `operations-roadmap.md` — наблюдаемость (OPS-0.*) и выкатка без разрыва матчей (OPS-1.1).
 - `docs/security/pipeline.md` — цепочка поставки образа: сборка, скан, подпись cosign.
 - `deploy/README.md` — ручная выкатка подписанного образа (SEC-13) и включение автодеплоя
-  (раздел «Автодеплой», ZTP-1.2…1.4).
+  (раздел «Автодеплой», ZTP-1.2…1.5).
 
 ## Что такое Zero Touch Prod
 
@@ -61,9 +62,9 @@ Zero touch не значит «никогда». Значит «никогда �
 | Keyless cosign-подпись по дайджесту + SLSA provenance | `.github/workflows/image.yml` |
 | Деплой проверяет подпись: только дайджест, только `image.yml@refs/heads/main` | `deploy/verify-image.sh` |
 | Обновление: verify → pull → up → `/health` → откат на `.last-good-image` | `deploy/update.sh` |
-| Миграции БД выполняет сервер при старте | `packages/server/src/persistence.ts` |
+| Production-миграции выполняет отдельный migrator до запуска DML-runtime | `deploy/update.sh`, `packages/server/src/databaseAdmin.ts` |
 | `/health` называет запущенную сборку (короткий sha коммита), смоук это проверяет | `packages/server/src/buildVersion.ts`, `image.yml` |
-| Доставка на хост: таймер раз в 5 минут, окно тихих часов, подпись → pull → up → `/health` → откат, журнал выкаток | `deploy/autoupdate.sh`, `deploy/install-autodeploy.sh` |
+| Доставка на хост: таймер раз в 5 минут, окно тихих часов, подписи пары → pull → миграция → up → readiness → откат, журнал выкаток | `deploy/autoupdate.sh`, `deploy/install-autodeploy.sh` |
 | Клиент выкатывает Cloudflare Workers Builds на push в `main` | `wrangler.jsonc` |
 
 Клиент уже zero touch. У сервера есть обе половины: собрать, проверить, подписать и
@@ -74,8 +75,8 @@ Zero touch не значит «никогда». Значит «никогда �
 
 1. **Выкатка сервера на хосте без автодеплоя.** Там человек по-прежнему заходит и
    запускает `moongame update`. Включение автодеплоя — разовое касание: команда от root и
-   токен GitHub на чтение пакетов (пакет образа приватный). Хост с TLS-оверлеем (Caddy)
-   фаза 1 не переводит, его очередь в ZTP-2.2.
+   токен GitHub на чтение обоих пакетов (пакеты приватные). TLS-хост поддержан
+   в ZTP-1.5; включение на конкретной машине отдельно проверяется по runbook.
 2. **Обход гейта.** На хосте без автодеплоя `deploy/update.sh` без `VOID_IMAGE` делает
    `git pull` и собирает образ на хосте — сам скрипт пишет «образ не сканирован и не
    подписан». На хосте с автодеплоем этой ветки нет, `update.sh` отказывает (ZTP-2.1
