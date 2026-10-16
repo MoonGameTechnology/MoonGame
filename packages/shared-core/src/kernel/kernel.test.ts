@@ -452,6 +452,54 @@ describe('kernel — canApply (RULES-1)', () => {
     const first = kernel.canApply(state, a, ctx());
     for (let i = 0; i < 5; i++) expect(kernel.canApply(state, a, ctx())).toBe(first);
   });
+
+  it('связка спрашивается по черновику предыдущего приказа, вход не меняется', () => {
+    const kernel = createKernel([bankModule]);
+    const state = deepFreeze(withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 })));
+    const take = (amount: number) => action('bank.withdraw', { planetId: 'p', amount });
+    expect(kernel.canApplyAll(state, [take(40), take(60)], ctx())).toBeNull();
+    expect(kernel.canApplyAll(state, [take(40), take(61)], ctx())).toBe('E_INSUFFICIENT');
+    expect(kernel.canApplyAll(state, [take(40), take(40), take(40)], ctx())).toBe('E_INSUFFICIENT');
+    expect(kernel.canApplyAll(state, [], ctx())).toBeNull();
+    expect(state.planets.p?.resources.credits).toBe(100);
+  });
+
+  // Черновик шага копирует ключ мира при первом обращении. Проба приказа, который туман не
+  // читает, тумана не копирует; принятый приказ возвращает полную копию, как раньше.
+  it('проба копирует только прочитанное; принятый приказ — полная независимая копия', () => {
+    const kernel = createKernel([bankModule]);
+    let copies = 0;
+    const fog = new Proxy(
+      { p1: { seen: ['p'] } },
+      {
+        ownKeys(target) {
+          copies++;
+          return Reflect.ownKeys(target);
+        },
+      },
+    );
+    const planted = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 }));
+    const state = { ...planted, fog } as unknown as GameState;
+    const a = action('bank.withdraw', { planetId: 'p', amount: 40 });
+
+    expect(kernel.canApply(state, a, ctx())).toBeNull();
+    expect(kernel.canApply(state, action('bank.withdraw', { planetId: 'p', amount: 400 }), ctx())).toBe(
+      'E_INSUFFICIENT',
+    );
+    expect(kernel.canApplyAll(state, [a, a], ctx())).toBeNull();
+    expect(copies).toBe(0);
+
+    const res = expectOk(kernel.applyAction(state, a, ctx()));
+    expect(copies).toBe(1);
+    expect(res.state.fog).not.toBe(fog);
+    expect(res.state.fog).toEqual({ p1: { seen: ['p'] } });
+    expect(Object.keys(res.state)).toEqual(Object.keys(state));
+    for (const key of Object.keys(res.state)) {
+      expect(Object.getOwnPropertyDescriptor(res.state, key)?.get, key).toBeUndefined();
+    }
+    expect(res.state.planets.p?.resources.credits).toBe(60);
+    expect(state.planets.p?.resources.credits).toBe(100);
+  });
 });
 
 // traceHooks — тот же конвейер `h.hook`, разобранный по вкладчикам. Главный инвариант:

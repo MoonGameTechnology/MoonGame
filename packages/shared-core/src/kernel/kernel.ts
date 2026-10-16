@@ -71,6 +71,52 @@ function scheduledInsertPos(arr: readonly ScheduledEvent[], at: number, seq: num
 }
 
 /**
+ * Черновик шага приказа. Ключ верхнего уровня копируется при первом обращении к нему, а не
+ * весь мир заранее. Приказ обычно читает флоты, миры и очередь событий, а туман, герои и
+ * досье не трогает, хотя копия всего мира на FFA-20 к 22-му дню стоит ~3 мс. Отказ и
+ * вопрос «можно ли?» (`canApply`) этим и обходятся: их черновик выбрасывают. Ключ, к
+ * которому обратились, это та же глубокая копия, что при копии целиком, поэтому шаг видит
+ * тот же мир, а состояние вызывающего не меняется (инвариант №2).
+ */
+function lazyDraft(state: GameState): GameState {
+  const base = state as unknown as Record<string, unknown>;
+  const draft: Record<string, unknown> = {};
+  for (const key of Object.keys(base)) {
+    const settle = (value: unknown): unknown => {
+      Object.defineProperty(draft, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+      return value;
+    };
+    Object.defineProperty(draft, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => settle(deepClone(base[key])),
+      set: settle,
+    });
+  }
+  return draft as unknown as GameState;
+}
+
+/** Принятый приказ: черновик становится обычным объектом, ключи, которых шаг не коснулся,
+ *  копируются сейчас. Итог тот же, что при копии всего мира до шага. */
+function settledDraft(draft: GameState): GameState {
+  const src = draft as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(src)) out[key] = src[key];
+  return out as unknown as GameState;
+}
+
+/** Следующий приказ связки (`canApplyAll`) идёт по черновику предыдущего: тот уже копия,
+ *  и его выбросят. */
+function ownDraft(state: GameState): GameState {
+  return state;
+}
+
+/**
  * The immutable microkernel: state container boundary, action dispatcher, world
  * clock, event bus, hook pipelines, capability registry and seeded RNG wiring
  * (docs/modulesystem.md). Compiled once from an ordered list of modules, it then
@@ -132,6 +178,18 @@ export class Kernel {
    * intent at that instant.
    */
   applyAction(state: GameState, action: Action, ctx: Context): ApplyResult {
+    const out = this.apply(state, action, ctx, lazyDraft);
+    return out.ok ? { ok: true, state: settledDraft(out.state), events: out.events } : out;
+  }
+
+  /** The order's step on a draft made by `draft` from `state` (see {@link lazyDraft}).
+   *  A success hands back that draft as is. */
+  private apply(
+    state: GameState,
+    action: Action,
+    ctx: Context,
+    draft: (state: GameState) => GameState,
+  ): ApplyResult {
     const handler = this.actionHandlers.get(action.type);
     if (!handler) {
       // Fail-secure: an unknown action type is rejected, never silently ignored.
@@ -158,7 +216,7 @@ export class Kernel {
       return { ok: false, code: 'E_TIME_GAP' };
     }
 
-    const outcome = this.runStep(state, ctx, ctx.now, (h) => handler(action, h));
+    const outcome = this.runOn(draft(state), ctx, ctx.now, (h) => handler(action, h), false);
     if (!outcome.ok) {
       return { ok: false, code: outcome.code };
     }
@@ -188,7 +246,7 @@ export class Kernel {
    *    поэтому спрашивать можно сколько угодно и в любом порядке.
    */
   canApply(state: GameState, action: Action, ctx: Context): string | null {
-    const out = this.applyAction(state, action, ctx);
+    const out = this.apply(state, action, ctx, lazyDraft);
     return out.ok ? null : out.code;
   }
 
@@ -212,7 +270,7 @@ export class Kernel {
   canApplyAll(state: GameState, actions: readonly Action[], ctx: Context): string | null {
     let draft = state;
     for (const action of actions) {
-      const out = this.applyAction(draft, action, ctx);
+      const out = this.apply(draft, action, ctx, draft === state ? lazyDraft : ownDraft);
       if (!out.ok) return out.code;
       draft = out.state;
     }
