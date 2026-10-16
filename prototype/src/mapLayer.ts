@@ -75,7 +75,7 @@ import type { PreparationJob } from './mapPreparation';
 import { clipPolygon, clipRect, provinceSeeds, type ProvinceSeed } from './provinceMap';
 import { COLOR } from './sideColors';
 import { bakeSignature, ownersSignature } from './staticLayerCache';
-import { TERRAIN_PAD, TerrainRasterCache } from './terrainRasterCache';
+import { floorDensityFor, TERRAIN_PAD, TerrainRasterCache } from './terrainRasterCache';
 import { TerrainGeometryCache } from './terrainGeometryCache';
 import { NEBULAE, STARS } from './viewport';
 
@@ -171,6 +171,9 @@ let mapLayerBakes = 0; // bumps on every bake and move, so the composite knows i
 export let mapView: LayerTransform = { k: 1, tx: 0, ty: 0 };
 /** Next terrain field whose sharp raster a bake could not afford yet; -1 — none. */
 let terrainRefine = -1;
+/** The scene whose floors the frames at rest are making, and its next tile to look at. */
+let floorScene: TerrainEnvironment | null = null;
+let floorNext = 0;
 /** Where the map layer owes that terrain: the strips that moves painted without it, in the
  *  bake's own device pixels (a canvas rect less {@link mapLayerOffset}); `null` — all of it. */
 let terrainOwed: PixelRect[] | null = [];
@@ -289,6 +292,7 @@ export function forgetMapArt(): void {
   roadDrawing = null; // другая карта — другая сеть
   terrainGeometry.clear();
   terrainEnvironment.clear();
+  environmentMade = null;
   terrainRaster.clear();
 }
 
@@ -567,6 +571,58 @@ export function provinceAt(x: number, y: number): string | undefined {
   return undefined;
 }
 
+/** The last terrain scene and what it was made from: the provinces' shape (one object while
+ *  it holds, `territoryGeometry.ts`), what the viewer knows of each, the roads and the map. */
+let environmentMade: { shape: TerritoryShape; place: string; knowledge: string; roads: RoadDrawing;
+  seed: string; environment: TerrainEnvironment } | null = null;
+
+/**
+ * The permitted terrain scene of `geo`. Its cache (`terrainEnvironmentView.ts`) knows a scene by
+ * every vertex of the input, put in canonical order and written out whole — on a 2v2 map half
+ * the CPU of a bake, paid by every bake and every bake in the background, although a zoom or a
+ * pan changes nothing in it. The same shape put at the same place in the world, the same
+ * knowledge and the same roads are the same scene: then the input is not even built.
+ */
+function environmentOf(geo: MapLayerGeometry, roads: RoadDrawing): TerrainEnvironment {
+  const s = game.world();
+  const seed = s.mapId ?? 'terrain';
+  const knowledge = geo.shape.cells.map((cell) => {
+    const id = geo.nodes[cell.idx]!.id;
+    const k = terrainKnowledge(s.planets[id], known(id), memory.get(id));
+    return `${id}:${k.known ? 1 : 0}:${k.kind ?? ''}:${k.terrain ?? ''}`;
+  }).join('|');
+  // Where the shape's coordinates land in the world; camera roundoff only costs a miss.
+  const projection = geo.at;
+  const q = (n: number): number => Math.round(n * 1e6);
+  const place = [geo.place.scale / projection.a, (geo.place.x - projection.x) / projection.a,
+    (geo.place.y - projection.y) / projection.a].map(q).join(',');
+  const made = environmentMade;
+  if (made && made.shape === geo.shape && made.place === place && made.knowledge === knowledge &&
+    made.roads === roads && made.seed === seed)
+    return made.environment;
+  const environment = terrainEnvironment.prepare({
+    seed,
+    cells: geo.shape.cells.map(cell => {
+      const n = geo.nodes[cell.idx]!;
+      return {
+        id: n.id,
+        ...terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id)),
+        poly: cell.poly.map(([x, y]): [number, number] => [
+          (x * geo.place.scale + geo.place.x - projection.x) / projection.a,
+          (y * geo.place.scale + geo.place.y - projection.y) / projection.a,
+        ]),
+      };
+    }),
+    roads: roads.strokes,
+    markers: [
+      ...geo.nodes.map(n => ({ x: n.x, y: n.y, kind: 'capture' as const })),
+      ...roads.marks.map(m => ({ ...m.at, kind: 'fork' as const })),
+    ],
+  });
+  environmentMade = { shape: geo.shape, place, knowledge, roads, seed, environment };
+  return environment;
+}
+
 /**
  * The political map in the space of `geo` (by default, the current camera): glass,
  * provinces, terrain art, roads, the board edge and the overview's node rings, culled to
@@ -640,28 +696,10 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   }
   const fields: TerrainField[] = [];
   const roads = roadDrawingOf(s);
-  if (!geo.environment) {
-    const projection = geo.at;
-    geo.environment = terrainEnvironment.prepare({
-      seed: s.mapId ?? 'terrain',
-      cells: geo.shape.cells.map(cell => {
-        const n = geo.nodes[cell.idx]!;
-        return {
-          id: n.id,
-          ...terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id)),
-          poly: cell.poly.map(([x, y]): [number, number] => [
-            (x * geo.place.scale + geo.place.x - projection.x) / projection.a,
-            (y * geo.place.scale + geo.place.y - projection.y) / projection.a,
-          ]),
-        };
-      }),
-      roads: roads.strokes,
-      markers: [
-        ...geo.nodes.map(n => ({ x: n.x, y: n.y, kind: 'capture' as const })),
-        ...roads.marks.map(m => ({ ...m.at, kind: 'fork' as const })),
-      ],
-    });
-  }
+  if (!geo.environment) geo.environment = environmentOf(geo, roads);
+  // The floors of the terrain (`terrainRasterCache.ts`) are as sharp as the map's size allows.
+  const bounds = mapBounds();
+  terrainRaster.setFloorDensity(floorDensityFor((bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY)));
   // Large fields remain legible in overview and in the simplified renderer.
   // Features belong to spatial tiles once; only the union of KNOWN territory clips them.
   g.save();
@@ -987,6 +1025,43 @@ function flushRaster(source: HTMLCanvasElement): void {
   cx.restore();
 }
 
+/** A floor is the tile's drawing whatever the camera: any projection names its tile. */
+const FLOOR_PROJECTION = { scale: 1, x: 0, y: 0 };
+
+/**
+ * The frames at rest make the floors the known map still lacks (`terrainRasterCache.ts`): of the
+ * tiles exploration revealed since the loading, a few per frame in the share of the frame a
+ * bake in the background gets. Then a later zoom out finds every known tile at least soft,
+ * never missing.
+ */
+function prepareFloors(): void {
+  const scene = provinceGeometry?.environment;
+  if (!scene || mapLayerX.isContextLost?.()) return;
+  if (scene !== floorScene) {
+    floorScene = scene;
+    floorNext = 0;
+  }
+  if (floorNext >= scene.tiles.length) return;
+  const DPR = game.dpr();
+  const at = performance.now();
+  const budget = bakeBudgetMs(game.fps());
+  const owed = terrainRaster.pending;
+  let made = false;
+  while (floorNext < scene.tiles.length && performance.now() - at < budget) {
+    const field = projectTerrainTile(scene.tiles[floorNext]!, FLOOR_PROJECTION);
+    floorNext++;
+    if (terrainRaster.hasFloor(field, DPR)) continue;
+    terrainRaster.beginFrame(1);
+    made = !!terrainRaster.prepareFloor(field, DPR) || made;
+  }
+  terrainRaster.beginFrame(0);
+  terrainRaster.pending = owed;
+  if (floorNext >= scene.tiles.length) terrainRaster.packFloors();
+  // Rastered here, at rest, not by the first frame of the next gesture.
+  const atlas = terrainRaster.floorAtlas;
+  if (made && atlas) flushRaster(atlas);
+}
+
 /** Rule 7: the bake in the background is complete, and it becomes the map layer. */
 function swapBakeJob(job: BakeJob): void {
   [mapLayer, mapSpare] = [mapSpare, mapLayer];
@@ -1171,6 +1246,7 @@ export function blitStaticLayer(now: number): void {
       }
     }
   }
+  if (settled && !bakeJob && terrainRefine < 0) prepareFloors();
   if (!bakeJob && terrainRefine < 0 && now - camMovedAt >= SPARE_KEEP_MS) releaseMapSpare();
   // In motion a pan moves the layer by whole device pixels — a copy, not a resample;
   // what is drawn from bake geometry follows the same rounded transform.
@@ -1220,9 +1296,18 @@ export function mapPreparationJobs(): PreparationJob[] {
     ...game.nodes().map((_, index, nodes) => ({ label: t('map-loading.terrain'), run: () => {
       // A loading slice warms a bounded share of the scene tiles, rather than stamping
       // a separate illustration into each province. No hidden material enters this list.
+      terrainRaster.beginFrame(Infinity); // a frame between the slices may have spent it
       for (let i = index; i < terrainFields.length; i += nodes.length)
         terrainRaster.prepare(terrainFields[i]!, game.dpr());
+      // And the floors of the whole known map, so that no zoom ever finds a tile without one.
+      const tiles = provinceGeometry?.environment?.tiles ?? [];
+      for (let i = index; i < tiles.length; i += nodes.length)
+        terrainRaster.prepareFloor(projectTerrainTile(tiles[i]!, FLOOR_PROJECTION), game.dpr());
     } })),
-    { label: t('map-loading.ready'), run: () => { bakeMapLayer(mapLayerSignature(), false); bgComposite = ''; } },
+    { label: t('map-loading.ready'), run: () => {
+      terrainRaster.packFloors();
+      bakeMapLayer(mapLayerSignature(), false);
+      bgComposite = '';
+    } },
   ];
 }
