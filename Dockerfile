@@ -7,7 +7,7 @@
 # configuration refuses startup, including a bare docker run of this image.
 #
 #   bash deploy/launch.sh --build   # after provisioning deploy/server.env
-#   (or one-click via render.yaml — see docs/multiplayer.md)
+#   See deploy/README.md for the supported production deployment.
 #
 # Multi-stage: a full node:26-slim builder installs deps and bakes the prototype HTML,
 # then a distroless runtime carries only the installed /app and runs `node` as non-root.

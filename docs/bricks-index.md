@@ -1009,7 +1009,7 @@
 | HTTPS-1.2 | ⏳ | srv | `docs/https-roadmap.md` | (Опц.) In-process TLS как запасной путь — S → SE-1.2 |
 | HTTPS-2.1 | ✅ | ops sec | `docs/https-roadmap.md` | Caddy/Nginx-пример с ACME перед сервером (код; домен — deploy-time вход) — M → SE-1.2 |
 | HTTPS-2.2 | ✅ | ops sec | `docs/https-roadmap.md` | Жизненный цикл сертификата (авто-продление + staging via Caddy) / (мониторинг истечения) — S → SE-1… |
-| HTTPS-3.1 | ✅ | ops | `docs/https-roadmap.md` | Render: зафиксировать https-инвариант (работает) / (формализация) — S → SE-1.2 |
+| HTTPS-3.1 | ⏳ | ops | `docs/https-roadmap.md` | Render: совместимый production-путь — S → SE-1.2 |
 | HTTPS-3.2 | ✅ | ops sec | `docs/https-roadmap.md` | Cloudflare/туннель: TLS на крае + скрытие origin (туннель) / (Cloudflare-перед-origin) — M → SE-1.1… |
 | HTTPS-4.1 | ✅ | cli sec | `docs/https-roadmap.md` | wss по умолчанию + блок mixed-content (частично) / — S → SE-7.1 |
 | HTTPS-4.2 | ⏳ | cli docs | `docs/https-roadmap.md` | Сообщения о URL: печатать https/wss |
