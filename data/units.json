@@ -9,7 +9,9 @@
       "hp": 6
     },
     "line": "mid",
-    "traits": [],
+    "traits": [
+      "recon"
+    ],
     "abilities": [
       "long_range_scan"
     ],
@@ -474,7 +476,8 @@
     },
     "hullClass": "light",
     "traits": [
-      "support"
+      "support",
+      "recon"
     ]
   },
   "picket_frigate": {

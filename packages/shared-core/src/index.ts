@@ -720,6 +720,7 @@ export {
   MINE_HIT_MAX,
   MINE_COOLDOWN_HOURS,
 } from './modules/minefield';
+export { isReconFleet, RECON_TRAIT } from './state/recon';
 export {
   isMineFleet,
   mineFleetVisible,
