@@ -9,7 +9,7 @@
  */
 import type { Fleet, GameState, Planet } from '../state/gameState';
 import type { GameData } from '../data/schemas';
-import { effectiveStats } from './loadout';
+import { effectiveStat, effectiveStats } from './loadout';
 import { buildingLevel } from '../data/schemas';
 
 export const INSTANT_REPAIR_CREDITS_PER_HP = 1;
@@ -123,7 +123,7 @@ export function fleetHangarRepairRate(f: Fleet, data: GameData): number {
   for (const st of f.units) {
     const def = data.units[st.unit];
     if (!def || st.count <= 0) continue;
-    best = Math.max(best, effectiveStats(def, st, data).hullRepair ?? 0);
+    best = Math.max(best, effectiveStat(def, st, data, 'hullRepair') ?? 0);
   }
   return best;
 }

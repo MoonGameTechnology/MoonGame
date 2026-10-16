@@ -23,14 +23,24 @@ export const MISSILE_TRAIT = 'missile';
  * флот не спрячется под туманом мины и не пройдёт сквозь бой).
  */
 export function isMineFleet(fleet: Pick<Fleet, 'units'>, data: GameData): boolean {
-  const live = fleet.units.filter((s) => s.count > 0);
-  return live.length > 0 && live.every((s) => defHasTrait(data.units[s.unit], MINE_TRAIT));
+  return onlyLive(fleet, data, MINE_TRAIT);
 }
 
 /** Ракета ли отряд (SM-3.7b): в нём живы только ракеты — как `isMineFleet` у мин. */
 export function isMissileFleet(fleet: Pick<Fleet, 'units'>, data: GameData): boolean {
-  const live = fleet.units.filter((s) => s.count > 0);
-  return live.length > 0 && live.every((s) => defHasTrait(data.units[s.unit], MISSILE_TRAIT));
+  return onlyLive(fleet, data, MISSILE_TRAIT);
+}
+
+/** Есть ли в отряде живые юниты и все ли они с трейтом. Без промежуточного списка: оба
+ *  вопроса задают о каждом флоте почти в каждом проходе хода мира. */
+function onlyLive(fleet: Pick<Fleet, 'units'>, data: GameData, trait: string): boolean {
+  let any = false;
+  for (const s of fleet.units) {
+    if (!(s.count > 0)) continue;
+    if (!defHasTrait(data.units[s.unit], trait)) return false;
+    any = true;
+  }
+  return any;
 }
 
 /**

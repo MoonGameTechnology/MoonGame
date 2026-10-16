@@ -1,6 +1,6 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { FogMemory, GameState, PlanetId, PlanetSnapshot } from '../state/gameState';
-import { observedSwarm } from '../state/swarmIntel';
+import { observedSwarm, swarmFleetIds } from '../state/swarmIntel';
 import { sensorCoverageOf } from '../state/visibility';
 
 /**
@@ -35,10 +35,11 @@ function refreshMemory(h: HandlerContext): void {
   const fog = (state.fog ??= {});
   const active = Object.keys(state.players).filter((id) => state.players[id]?.status === 'active');
   const coverage = sensorCoverageOf(state, active, h.ctx.data);
+  const swarm = swarmFleetIds(state);
   for (const playerId of active) {
     const memory: FogMemory = fog[playerId] ?? (fog[playerId] = {});
     const identified = coverage.get(playerId)!.identify;
-    const contacts = observedSwarm(state, playerId, identified, h.ctx.now);
+    const contacts = observedSwarm(state, playerId, identified, h.ctx.now, swarm);
     if (Object.keys(contacts).length) {
       const intel = (state.swarmIntel ??= {});
       intel[playerId] = { ...intel[playerId], ...contacts };

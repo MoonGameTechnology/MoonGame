@@ -5,16 +5,12 @@ import { fleetNodeAt } from './fleetPosition';
  * cargo and future orders never enter the observer's dossier. */
 export function observedSwarm(
   state: GameState, viewer: string, identified: ReadonlySet<string>, now = state.time,
+  swarm: readonly string[] = swarmFleetIds(state),
 ): Record<string, SwarmContact> {
   const contacts: Record<string, SwarmContact> = {};
-  // Sort only the Swarm's fleets: fog memory calls this for every player on every time
-  // span, and filtering before sorting yields the same order as sorting first.
-  const swarm = Object.keys(state.fleets).filter((id) => {
-    const owner = state.fleets[id]!.owner;
-    return owner !== viewer && state.players[owner]?.faction === 'swarm';
-  });
-  for (const id of swarm.sort()) {
+  for (const id of swarm) {
     const fleet = state.fleets[id]!;
+    if (fleet.owner === viewer) continue;
     const location = fleetNodeAt(state, fleet, state.time);
     if (location === null || !identified.has(location)) continue;
     const counts: Record<string, number> = {};
@@ -26,4 +22,13 @@ export function observedSwarm(
       units: Object.keys(counts).sort().map(unit => ({ unit, count: counts[unit]! })) };
   }
   return contacts;
+}
+
+/** The Swarm's fleet ids, sorted. Fog memory asks {@link observedSwarm} for every player
+ *  on every time span, so it builds this once per refresh instead of once per player:
+ *  filtering before sorting yields the same order as sorting first. */
+export function swarmFleetIds(state: GameState): string[] {
+  return Object.keys(state.fleets)
+    .filter((id) => state.players[state.fleets[id]!.owner]?.faction === 'swarm')
+    .sort();
 }

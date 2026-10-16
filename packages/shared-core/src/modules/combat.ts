@@ -14,6 +14,7 @@ import { hoursToMs, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
+import { peekValues } from '../util/draft';
 import { isCapturable } from '../state/sectorKind';
 import { attacks, combatantKey, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
@@ -542,8 +543,8 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
 
 /** Стоит ли на узле `at` враждебный `fleet` флот с кораблями — хоть свободный, хоть в бою. */
 function hostileFleetAt(h: HandlerContext, fleet: Fleet, at: string): boolean {
-  for (const id of Object.keys(h.state.fleets)) {
-    const f = h.state.fleets[id];
+  // Только чтение: проверка штурма не копирует в черновике приказа каждый флот карты.
+  for (const f of peekValues(h.state.fleets)) {
     if (!f || f.id === fleet.id || f.location !== at || isMineFleet(f, h.ctx.data)) continue;
     if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) return true;
   }
