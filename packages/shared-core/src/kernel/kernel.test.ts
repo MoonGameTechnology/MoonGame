@@ -464,22 +464,27 @@ describe('kernel — canApply (RULES-1)', () => {
     expect(state.planets.p?.resources.credits).toBe(100);
   });
 
-  // Черновик шага копирует ключ мира при первом обращении. Проба приказа, который туман не
-  // читает, тумана не копирует; принятый приказ возвращает полную копию, как раньше.
-  it('проба копирует только прочитанное; принятый приказ — полная независимая копия', () => {
+  // Черновик шага копирует ключ мира при первом обращении, а записи сущностей (миры, флоты,
+  // игроки, туман) по одной сущности. Принятый приказ отдаёт нетронутое общим со входом.
+  it('проба копирует только прочитанное; принятый приказ делит нетронутое со входом', () => {
     const kernel = createKernel([bankModule]);
     let copies = 0;
-    const fog = new Proxy(
-      { p1: { seen: ['p'] } },
-      {
+    const counted = <T extends object>(value: T): T =>
+      new Proxy(value, {
         ownKeys(target) {
           copies++;
           return Reflect.ownKeys(target);
         },
-      },
-    );
+      });
+    const fog = counted({ p1: { seen: ['p'] } });
+    const far = counted(makePlanet('q', 'p2', { credits: 5 }));
     const planted = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 }));
-    const state = { ...planted, fog } as unknown as GameState;
+    const state = deepFreeze({
+      ...planted,
+      planets: { ...planted.planets, q: far },
+      fog,
+    } as unknown as GameState);
+    copies = 0;
     const a = action('bank.withdraw', { planetId: 'p', amount: 40 });
 
     expect(kernel.canApply(state, a, ctx())).toBeNull();
@@ -490,15 +495,59 @@ describe('kernel — canApply (RULES-1)', () => {
     expect(copies).toBe(0);
 
     const res = expectOk(kernel.applyAction(state, a, ctx()));
-    expect(copies).toBe(1);
-    expect(res.state.fog).not.toBe(fog);
-    expect(res.state.fog).toEqual({ p1: { seen: ['p'] } });
+    expect(copies).toBe(0);
+    expect(res.state.fog).toBe(fog);
+    expect(res.state.planets.q).toBe(far);
+    expect(res.state.planets).not.toBe(state.planets);
+    expect(res.state.planets.p).not.toBe(state.planets.p);
     expect(Object.keys(res.state)).toEqual(Object.keys(state));
+    expect(Object.keys(res.state.planets)).toEqual(['p', 'q']);
     for (const key of Object.keys(res.state)) {
       expect(Object.getOwnPropertyDescriptor(res.state, key)?.get, key).toBeUndefined();
     }
     expect(res.state.planets.p?.resources.credits).toBe(60);
     expect(state.planets.p?.resources.credits).toBe(100);
+  });
+
+  // Запись сущностей в черновике — не копия целиком, но для обработчика она обычный объект:
+  // ключи в том же порядке, `in`, удаление, новая сущность, перебор и JSON.
+  it('запись сущностей в черновике ведёт себя как обычный объект', () => {
+    const seen: unknown[] = [];
+    const kernel = createKernel([
+      {
+        id: 'roster',
+        version: '1.0.0',
+        setup(api) {
+          api.onAction('roster.edit', (_a, h) => {
+            const planets = h.state.planets;
+            const before = Object.keys(planets);
+            delete planets.q;
+            planets.r = makePlanet('r', 'p1');
+            planets.p!.resources.credits = 7;
+            seen.push(before, Object.keys(planets), ['p' in planets, 'q' in planets, 'r' in planets]);
+            seen.push(JSON.stringify(Object.values(planets).map((p) => [p.id, p.resources])));
+            seen.push(Object.entries({ ...planets }).map(([id, p]) => id === p.id));
+          });
+        },
+      },
+    ]);
+    let state = baseState();
+    for (const id of ['p', 'q', 's']) state = withPlanet(state, makePlanet(id, 'p1', { credits: 1 }));
+    state = deepFreeze(state);
+
+    const res = expectOk(kernel.applyAction(state, action('roster.edit', {}), ctx()));
+    expect(seen).toEqual([
+      ['p', 'q', 's'],
+      ['p', 's', 'r'],
+      [true, false, true],
+      '[["p",{"credits":7}],["s",{"credits":1}],["r",{}]]',
+      [true, true, true],
+    ]);
+    expect(Object.keys(res.state.planets)).toEqual(['p', 's', 'r']);
+    expect(res.state.planets.s).toEqual(state.planets.s);
+    expect(res.state.planets.p?.resources.credits).toBe(7);
+    expect(Object.keys(state.planets)).toEqual(['p', 'q', 's']);
+    expect(state.planets.p?.resources.credits).toBe(1);
   });
 });
 

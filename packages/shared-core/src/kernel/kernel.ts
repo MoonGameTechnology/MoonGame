@@ -95,37 +95,128 @@ function scheduledInsertPos(arr: readonly ScheduledEvent[], at: number, seq: num
  * вопрос «можно ли?» (`canApply`) этим и обходятся: их черновик выбрасывают. Ключ, к
  * которому обратились, это та же глубокая копия, что при копии целиком, поэтому шаг видит
  * тот же мир, а состояние вызывающего не меняется (инвариант №2).
+ *
+ * Записи сущностей по id (`ENTITY_RECORDS`) копируются так же, но по одной сущности:
+ * заказ стройки читает свой мир, а не все 320 миров карты.
  */
 function lazyDraft(state: GameState): GameState {
   const base = state as unknown as Record<string, unknown>;
   const draft: Record<string, unknown> = {};
   for (const key of Object.keys(base)) {
-    const settle = (value: unknown): unknown => {
-      Object.defineProperty(draft, key, {
-        value,
-        writable: true,
-        enumerable: true,
-        configurable: true,
-      });
-      return value;
-    };
-    Object.defineProperty(draft, key, {
-      enumerable: true,
-      configurable: true,
-      get: () => settle(deepClone(base[key])),
-      set: settle,
-    });
+    const value = base[key];
+    lazyProp(draft, key, () =>
+      ENTITY_RECORDS.has(key) && isRecord(value) ? lazyRecord(value) : deepClone(value),
+    );
   }
+  DRAFT_BASE.set(draft, base);
   return draft as unknown as GameState;
 }
 
-/** Принятый приказ: черновик становится обычным объектом, ключи, которых шаг не коснулся,
- *  копируются сейчас. Итог тот же, что при копии всего мира до шага. */
+/**
+ * Записи мира, которые черновик приказа копирует по одной сущности. Копия всех миров на
+ * FFA-20 к 22-му дню стоит 2,3 мс, тумана 1,1 мс, флотов 0,3 мс, и проверка одного заказа
+ * стройки платила её, чтобы прочитать один мир. Перечень явный: остальные ключи мелкие, и
+ * копия целиком дешевле обёртки.
+ */
+const ENTITY_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
+  'players',
+  'planets',
+  'fleets',
+  'battles',
+  'fog',
+  'heroes',
+]);
+
+/** Место сущности, которую шаг ещё не читал. */
+const HOLE: unknown = Object.freeze({});
+
+/** Ленивая запись → её места и запись вызывающего, из которой она копирует. */
+const RECORDS = new WeakMap<
+  object,
+  { slots: Record<string, unknown>; base: Record<string, unknown> }
+>();
+/** Ленивый черновик → состояние вызывающего. */
+const DRAFT_BASE = new WeakMap<object, Record<string, unknown>>();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Запись с теми же ключами в том же порядке, где сущность копируется при первом чтении.
+ * Места заполнены `HOLE`, а `Proxy` подменяет его копией: ключи, `in`, запись и удаление
+ * идут в сами места, поэтому порядок ключей тот же, что у копии целиком. Геттер на каждую
+ * сущность обходился вчетверо дороже: замыкания на все 320 миров.
+ */
+function lazyRecord(base: Record<string, unknown>): Record<string, unknown> {
+  const slots: Record<string, unknown> = {};
+  for (const id of Object.keys(base)) slots[id] = HOLE;
+  const record = new Proxy(slots, {
+    get(target, id) {
+      const value: unknown = Reflect.get(target, id);
+      if (value !== HOLE) return value;
+      const copy = deepClone(base[id as string]);
+      target[id as string] = copy;
+      return copy;
+    },
+  });
+  RECORDS.set(record, { slots, base });
+  return record;
+}
+
+/** Свойство `key`, которое при первом чтении становится значением `make()`, а при записи до
+ *  чтения становится записанным. Место свойства в порядке ключей не меняется. */
+function lazyProp(target: Record<string, unknown>, key: string, make: () => unknown): void {
+  const settle = (value: unknown): unknown => {
+    Object.defineProperty(target, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    return value;
+  };
+  Object.defineProperty(target, key, {
+    enumerable: true,
+    configurable: true,
+    get: () => settle(make()),
+    set: settle,
+  });
+}
+
+/**
+ * Принятый приказ: черновик становится обычным объектом. Ключи и сущности, которых шаг не
+ * коснулся, переходят в новое состояние как есть, общими с состоянием вызывающего. Это
+ * безопасно, потому что ядро во вход не пишет (инвариант №2): следующий шаг снова копирует
+ * то, к чему обратится. Копия нетронутого стоила принятому приказу копии всего мира, на
+ * FFA-20 к 22-му дню ~3 мс за приказ. Так же делит сущности `applyDelta` у сетевого клиента.
+ */
 function settledDraft(draft: GameState): GameState {
-  const src = draft as unknown as Record<string, unknown>;
+  const target = draft as unknown as Record<string, unknown>;
+  const base = DRAFT_BASE.get(target)!;
   const out: Record<string, unknown> = {};
-  for (const key of Object.keys(src)) out[key] = src[key];
+  for (const key of Object.keys(target)) {
+    const prop = Object.getOwnPropertyDescriptor(target, key)!;
+    if (prop.get) {
+      out[key] = base[key]; // шаг его не тронул
+      continue;
+    }
+    const record = isRecord(prop.value) ? RECORDS.get(prop.value) : undefined;
+    out[key] = record ? settledRecord(record.slots, record.base) : prop.value;
+  }
   return out as unknown as GameState;
+}
+
+function settledRecord(
+  slots: Record<string, unknown>,
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const id of Object.keys(slots)) {
+    const value = slots[id];
+    out[id] = value === HOLE ? base[id] : value;
+  }
+  return out;
 }
 
 /** Следующий приказ связки (`canApplyAll`) идёт по черновику предыдущего: тот уже копия,
@@ -190,6 +281,9 @@ export class Kernel {
    * The pure reducer (docs/roadmap.md, first step): same (state, action,
    * context) always yields the same result. The input state is never mutated;
    * all work happens on a clone, committed only on success.
+   *
+   * The result shares every entity the order did not touch with the input (see
+   * {@link settledDraft}), so neither of them may be edited in place afterwards.
    *
    * In the real-time flow the server first calls `advanceTo(state, now)` to
    * bring the world to the present, then `applyAction` to apply the player's
