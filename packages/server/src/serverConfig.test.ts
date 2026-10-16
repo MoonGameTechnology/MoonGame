@@ -85,6 +85,17 @@ describe('checkProductionReadiness', () => {
     BACKUP_READINESS_VERIFIED: '1',
   };
 
+  it('requires an explicit host attestation for owner-deferred playtest backups', () => {
+    const deferred = { ...FULL, BACKUP_POLICY: 'deferred-playtest', BACKUP_READINESS_VERIFIED: '0', BACKUP_READINESS_DEFERRED: '1' };
+    expect(checkProductionReadiness(deferred).ok).toBe(true);
+    expect(checkProductionReadiness({ ...deferred, BACKUP_READINESS_DEFERRED: '0' }).ok).toBe(false);
+    expect(checkProductionReadiness({ ...deferred, BACKUP_READINESS_VERIFIED: '1' }).ok).toBe(false);
+    expect(checkProductionReadiness({ ...deferred, BACKUP_READINESS_VERIFIED: undefined }).ok).toBe(false);
+    expect(checkProductionReadiness({ ...deferred, DB_REQUIRE_LEAST_PRIVILEGE: '0' }).ok).toBe(false);
+    expect(checkProductionReadiness({ ...FULL, BACKUP_POLICY: 'typo' }).ok).toBe(false);
+    expect(checkProductionReadiness({ ...FULL, BACKUP_READINESS_DEFERRED: '1' }).ok).toBe(false);
+  });
+
   it('PROD unset ⇒ ok, the dev harness is untouched', () => {
     expect(checkProductionReadiness({})).toEqual({ ok: true, missing: [] });
     // Dev-flag-adjacent values that are NOT the trigger stay untouched too.

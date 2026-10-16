@@ -13,7 +13,7 @@ deploy_env_value() {
 production_preflight() {
   local file="$1" prod checker mode owner key
   # Never trust an inherited/stored success from an earlier deployment.
-  unset BACKUP_READINESS_VERIFIED
+  unset BACKUP_READINESS_VERIFIED BACKUP_READINESS_DEFERRED
   prod="$(deploy_env_value "$file" PROD)"
   case "$prod" in
     0|false)
@@ -34,6 +34,15 @@ production_preflight() {
       return 1
     fi
   done
+  case "$(deploy_env_value "$file" BACKUP_POLICY)" in
+    ""|required) ;;
+    deferred-playtest)
+      # An explicit operator decision, never a fabricated successful recovery check.
+      export BACKUP_READINESS_VERIFIED=0 BACKUP_READINESS_DEFERRED=1
+      echo '[!] W_DEPLOY_BACKUP_DEFERRED: independent recovery is not configured; owner-selected playtest policy.' >&2
+      return 0 ;;
+    *) echo '[✗] E_DEPLOY_BACKUP_POLICY: unknown backup policy.' >&2; return 1 ;;
+  esac
   checker="$(deploy_env_value "$file" BACKUP_READINESS_CHECK)"
   # One trusted executable, no shell/eval or command-line fragments from config.
   # It must verify fresh off-host encrypted backup, scheduling and restore evidence.

@@ -246,6 +246,12 @@ function fleetBase(fleet: Fleet, state: GameState, data: GameData, now: number):
   };
 }
 
+/** Есть ли у мира или флота машины в ангаре: обходы баз на каждом отрезке времени
+ *  собирают вид базы только для таких. */
+function withHangar(holder: { hangar?: readonly Squadron[] }): boolean {
+  return (holder.hangar?.length ?? 0) > 0;
+}
+
 /** База по ссылке — или `null`, если её больше нет (снесённый порт, погибший носитель). */
 function baseOf(
   ref: StrikeBase,
@@ -2529,13 +2535,19 @@ export const shuttleModule: GameModule = {
      * (`divert`, SHU-6.4): решение в точке расписания, а не здесь, на нарезке хоста.
      */
     api.on('time.advanced', (_event, h: HandlerContext) => {
+      // Вид базы собирается только там, где есть ангар (`withHangar`): пустой ангар
+      // пропускался и раньше, а вид на каждый мир и флот стоил на каждом отрезке времени.
       const bases: BaseView[] = [
-        ...Object.values(h.state.planets).map((planet) => ({
-          ...planetBase(planet, h.ctx.data),
-          // Ничей мир не держит ангар: вместимость нейтрального мира читается как 0.
-          bay: planet.owner === null ? 0 : planetBase(planet, h.ctx.data).bay,
-        })),
-        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
+        ...Object.values(h.state.planets)
+          .filter(withHangar)
+          .map((planet) => ({
+            ...planetBase(planet, h.ctx.data),
+            // Ничей мир не держит ангар: вместимость нейтрального мира читается как 0.
+            bay: planet.owner === null ? 0 : planetBase(planet, h.ctx.data).bay,
+          })),
+        ...Object.values(h.state.fleets)
+          .filter(withHangar)
+          .map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];
       for (const base of bases) {
         if (base.hangar.length === 0) continue;
@@ -2752,9 +2764,14 @@ export const shuttleModule: GameModule = {
       const strikes = h.state.strikes ?? [];
       if (strikes.length === 0) return;
       const data = h.ctx.data;
+      // Без машин в ангаре перехватывать нечем (сила 0 ниже), поэтому вид базы — только там.
       const bases: BaseView[] = [
-        ...Object.values(h.state.planets).map((planet) => planetBase(planet, data)),
-        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, data, h.ctx.now)),
+        ...Object.values(h.state.planets)
+          .filter(withHangar)
+          .map((planet) => planetBase(planet, data)),
+        ...Object.values(h.state.fleets)
+          .filter(withHangar)
+          .map((fleet) => fleetBase(fleet, h.state, data, h.ctx.now)),
       ];
       for (const base of bases) {
         if (base.owner === null || base.position === null) continue;
@@ -2817,9 +2834,16 @@ export const shuttleModule: GameModule = {
       const span = to - from;
       if (!(span > 0)) return;
       const hour = hourMs(h);
+      // Вид базы — только там, где идёт перезарядка: остальные пропускались и раньше.
+      const rearming = (holder: { sortie?: { rearming: number } }): boolean =>
+        !!holder.sortie && !(holder.sortie.rearming <= 0);
       const bases: BaseView[] = [
-        ...Object.values(h.state.planets).map((planet) => planetBase(planet, h.ctx.data)),
-        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
+        ...Object.values(h.state.planets)
+          .filter(rearming)
+          .map((planet) => planetBase(planet, h.ctx.data)),
+        ...Object.values(h.state.fleets)
+          .filter(rearming)
+          .map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];
       for (const base of bases) {
         const sortie = base.sortie;

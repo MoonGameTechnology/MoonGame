@@ -29,6 +29,7 @@ export function passwordIssue(password: string): PasswordIssue | null {
   if (/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(password)) return 'characters';
   const key = password.normalize('NFKC').toLowerCase().trim();
   if (
+    Array.from(password.trim()).length < NEW_PASSWORD_MIN ||
     Array.from(key).length < NEW_PASSWORD_MIN ||
     /^(.{1,4})\1+$/u.test(key) ||
     /^(?:p[a@4]ssw[o0]rd|qwerty|letmein|admin|welcome|пароль|йцукен)[\d!@#$%^&*._-]*$/u.test(key) ||
@@ -158,7 +159,13 @@ const LEET: Readonly<Record<string, string>> = {
   '8': 'b',
 };
 function fold(text: string, alphabet: Readonly<Record<string, string>>): string {
-  return Array.from(text, (c) => alphabet[c] ?? LEET[c] ?? c).join('');
+  return Array.from(text, (c) => {
+    // Preserve known Cyrillic transliterations (e.g. й → y) before decomposing accents.
+    const mapped = alphabet[c] ?? LEET[c];
+    if (mapped !== undefined) return mapped;
+    const plain = c.normalize('NFKD').replace(/\p{M}/gu, '');
+    return Array.from(plain, (letter) => alphabet[letter] ?? LEET[letter] ?? letter).join('');
+  }).join('');
 }
 const BLOCKED_KEYS = new Set(
   BLOCKED_NAMES.flatMap((word) => [fold(word, VISUAL), fold(word, PHONETIC)]),

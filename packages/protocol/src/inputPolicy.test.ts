@@ -31,6 +31,7 @@ describe('new password policy and legacy authentication', () => {
       'abcdabcdabcd',
       ' '.repeat(12),
       ' '.repeat(11) + 'a',
+      'İ'.repeat(6) + ' '.repeat(6),
       'a' + ' '.repeat(11),
     ])
       expect(passwordIssue(p), p).toBe('weak');
@@ -63,6 +64,10 @@ describe('public names', () => {
   it('detects RU/EN insults, digit suffixes, separators and script/width substitutions', () => {
     for (const name of [
       'Идиот42',
+      'FÜCK',
+      'İdiot',
+      'shít',
+      'huy',
       'Идиот١',
       'ИдиотⅨ',
       'Идиот¼',

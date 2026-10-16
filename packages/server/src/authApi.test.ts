@@ -71,9 +71,19 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
 
   it('allows an existing account to log in with its original legacy password', async () => {
     const users = new MemoryUserStore();
-    await users.createUser('legacy', await hashPassword('old-pass', FAST));
+    const hash = await hashPassword('old-pass', FAST);
+    await users.createUser('legacy', hash);
+    await users.createUser('Идиот', hash);
     const server = authApp({ users });
-    expect((await post(server, '/auth/login', { login: 'legacy', password: 'old-pass' })).statusCode).toBe(200);
+    for (const login of ['LEGACY', 'Идиот']) {
+      expect((await post(server, '/auth/login', { login, password: 'old-pass' })).statusCode).toBe(200);
+      for (const password of ['bad-pass', 'orbit-signal']) {
+        expect((await post(server, '/auth/login', { login, password })).statusCode).toBe(401);
+        const fallback = await post(server, '/auth/register', { login, password });
+        expect(fallback.statusCode).toBe(409);
+        expect(fallback.json()).toEqual({ error: 'E_LOGIN_TAKEN' });
+      }
+    }
   });
 
   it('does not consume a reset link on a weak password and revokes it after a valid reset', async () => {

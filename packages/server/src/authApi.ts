@@ -199,6 +199,11 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       void reply.code(400);
       return { error: 'E_BAD_CREDENTIALS' as const };
     }
+    // Login→register is also the wrong-password path for an existing account.
+    // Preserve that verdict before applying rules intended only for a new identity.
+    if (await deps.users.findUser(creds.login)) {
+      return reply.code(409).send({ error: 'E_LOGIN_TAKEN' as const });
+    }
     if (blockedPublicName(creds.login)) return reply.code(400).send({ error: 'E_NICKNAME_BLOCKED' });
     if (passwordIssue(creds.password)) return reply.code(400).send({ error: 'E_PASSWORD_POLICY' });
     const passHash = await hashPassword(creds.password, deps.scryptParams);

@@ -92,7 +92,7 @@ jobs:
         env:
           IMAGE: ${{ steps.img.outputs.image }}
           SHA: ${{ github.sha }}
-        run: docker build --build-arg GIT_SHA="$SHA" -t "$IMAGE:ci" .
+        run: docker build --label org.opencontainers.image.revision="$SHA" --build-arg GIT_SHA="$SHA" -t "$IMAGE:ci" .
 
       # BLOCKING gate before the image can exist in the registry. Mirrors the
       # `trivy-image` job in security.yml (same pinned scanner, same .trivyignore
@@ -304,7 +304,8 @@ jobs:
       - name: build
         env:
           IMAGE: ${{ steps.img.outputs.image }}
-        run: docker build -t "$IMAGE:ci" -f deploy/caddy/Dockerfile deploy/caddy
+          SHA: ${{ github.sha }}
+        run: docker build --label org.opencontainers.image.revision="$SHA" -t "$IMAGE:ci" -f deploy/caddy/Dockerfile deploy/caddy
 
       - name: scan
         env:

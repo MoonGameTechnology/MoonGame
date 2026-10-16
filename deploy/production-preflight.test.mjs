@@ -37,6 +37,17 @@ async function check(f) {
 }
 
 describe('production deployment data protection preflight', () => {
+  it('records an explicit deferral without claiming a verified backup or running a fake checker', async () => {
+    const f=fixture({ checkExit:1 });
+    writeFileSync(f.envFile,f.config+'BACKUP_POLICY=deferred-playtest\n');
+    const result=await check(f);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('verified=0\n');
+    expect(result.stderr).toContain('W_DEPLOY_BACKUP_DEFERRED');
+    expect(readFileSync(f.calls,'utf8')).toBe('');
+    writeFileSync(f.envFile,f.config+'BACKUP_POLICY=typo\n');
+    expect((await check(f)).code).not.toBe(0);
+  });
   it('runs the trusted recovery verifier before attesting a production launch', async () => {
     const f = fixture();
     const result = await check(f);
