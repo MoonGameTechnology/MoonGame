@@ -2,11 +2,14 @@
 
 Заказ владельца: 2026-10-16. Нужен сайт, на котором видны состояние сервера,
 партии, связь, ошибки и поведение тестеров. **Это план, а не описание работающего
-стенда.** Кодовая база сверена с `0809575d` (`main`, 2026-10-16); конфигурация
-и нагрузка реального VPS в этой сессии не проверялись.
+стенда.** Источники и границы первого выпуска зафиксированы в
+[контракте OBS-0.1](observability-contract-v1.md); там же выбран профиль хранения,
+доступа и уведомлений. [Пассивный on-host baseline](reviews/2026-10-16-obs-0-1-baseline.md)
+не заменяет нагрузочную/24-часовую приёмку будущего мониторинга.
 
 Начальная площадка: Ubuntu 26.04, 4 CPU, 6 GB RAM, 60 GB NVMe. Домен и внешний
-получатель уведомлений пока не выбраны. Пароли, IP конкретного хоста и другие
+получатель внешних уведомлений пока не выбраны: первый профиль — SSH-only и алерты
+только в закрытом пульте (решение владельца 2026-10-16). Пароли, IP конкретного хоста и другие
 секреты в репозиторий не включаются. Цель первого выпуска — видеть плейтест
 через готовую Grafana, затем добавить небольшую страницу состояния партий.
 
@@ -138,7 +141,7 @@ scrape каждые 15 с, без параллельных одинаковых 
 | Доступность | `moongame_source_up{source}`, `moongame_source_last_success_timestamp_seconds` | Gauge, отдельно от Prometheus `up` самого exporter |
 | Версия | `moongame_build_info{version}` | Gauge=1, только текущая версия источника; digest/пины — metadata релиза |
 | Нагрузка | `moongame_matches`, `moongame_connections` | Gauge из JSON `/metrics`; matches — комнаты registry, не обязательно идущие бои |
-| Приказы | `moongame_actions_total{outcome,type}`, `moongame_action_rejects_total{code}` | Counter, типы/коды из ограниченного словаря |
+| Приказы | `moongame_actions_total{outcome}`, `moongame_action_types_total{type}`, `moongame_action_rejects_total{code}` | Counter; отдельных byType и outcome достаточно, cross-tab источник не даёт |
 | Корректность | `moongame_desyncs_total`, `moongame_dead_letters_total`, `moongame_advance_overflows_total` | Counter; рост за окно, а не ненулевое значение навсегда |
 | Задержки v1 | `moongame_submit_duration_seconds_sum`, `_count`, `_max` | Count/sum из SeriesStat, max — накопленный gauge; перевод ms→s |
 | Задержки v2 | `moongame_submit_duration_seconds_bucket`, RTT/FPS buckets | Настоящие histogram observations вне ядра; только после отдельного изменения источника |
@@ -319,11 +322,11 @@ Game не снижать ради Grafana.
 
 ## 8. Последовательность PR и зависимости
 
-Статусы здесь — только план; готовность документа не закрывает реализацию.
+Статусы показывают выполненные срезы; готовность контракта не закрывает runtime-этапы.
 Размеры S/M/L относительные, это не календарное обещание. Один кирпич — один
 обозримый PR; существующие OPS/PTM/SE остаются владельцами общих требований.
 
-### OBS-0.1 · Контракты и baseline `[docs][ops]` ⏳ — S
+### OBS-0.1 · Контракты и baseline `[docs][ops]` ✅ — S
 
 Утвердить минимальные экраны, metric schema/units/labels, source identity/reset,
 target matrix, privacy allowlist, caps, retention и канал алертов. Снять on-host
@@ -331,7 +334,12 @@ baseline и зафиксировать workload/версию/свободный 
 матрица «поле → источник → тип → свежесть → доступ» согласована, неизвестные
 показатели отмечены, принят профиль размещения/TTL и есть воспроизводимый baseline.
 
-### OBS-0.2 · Закрытый стек и provisioning `[ops][sec]` 🔒(OBS-0.1) — M
+**Сделано (2026-10-16):** [контракт v1](observability-contract-v1.md), SSH/local/UI-only
+профиль, границы/единицы/reset/cardinality, bounded read-only baseline CLI и privacy
+проверки. [Замер](reviews/2026-10-16-obs-0-1-baseline.md): 9 комнат ×24, 0 клиентов,
+реальные image IDs/build и CPU/RAM/disk; p95/capacity не объявляются измеренными.
+
+### OBS-0.2 · Закрытый стек и provisioning `[ops][sec]` ⏳ — M
 
 Добавить opt-in Compose overlay, внутреннюю сеть, secret/volume/memory/pid/log
 limits, healthchecks, Grafana datasource provisioning. Digest pins и проверка
@@ -340,7 +348,7 @@ Game volumes. **Готово, когда:** воспроизводимый deplo
 конфигурацию; снаружи доступен только защищённый вход; обход header/порта/API
 отказан, остановка стека не меняет Game readiness. Связка OPS-0.2/SE-8.3.
 
-### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` 🔒(OBS-0.1) — M
+### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` ⏳ — M
 
 Исполнить необходимые требования PTM-3.1: срок и byte budgets, безопасная
 суточная очистка, активный файл/очередь, удаление actor и derived copies,
@@ -349,7 +357,7 @@ allowlist проектируемого technical stream. **Готово, ког�
 проверены, повторный ingest не возвращает удалённое. PTM-3.1 отмечается готовым
 только при выполнении его полного критерия, не за один Loki TTL.
 
-### OBS-1.1 · Game exporter и процессные метрики `[srv][ops]` 🔒(OBS-0.1) — M
+### OBS-1.1 · Game exporter и процессные метрики `[srv][ops]` ⏳ — M
 
 Существующие JSON → allowlist Prometheus; отдельные source_up/freshness, bounded
 scrape, reset semantics и units. **Готово, когда:** fixture и живой production

@@ -38,6 +38,7 @@
 | BAL-16 | 🔶 | core proto | `docs/backlog.md` | Бои за планеты дают очки, порог считается от карты. |
 | BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | BAL-7 | ✅ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
+| OBS-0.1 | ✅ |  | `docs/backlog.md` | [Контракт v1](observability-contract-v1.md): матрица |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
 | SEC-42 | ✅ | sec ops | `docs/backlog.md` | исправленная libssl3t64 в серверном образе: trivy image |
@@ -1127,10 +1128,10 @@
 | PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
-| OBS-0.1 | ⏳ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
-| OBS-0.2 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
-| OBS-0.3 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
-| OBS-1.1 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
+| OBS-0.1 | ✅ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
+| OBS-0.2 | ⏳ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
+| OBS-0.3 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
+| OBS-1.1 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
 | OBS-1.2 | 🔒 | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
 | OBS-1.3 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
 | OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
