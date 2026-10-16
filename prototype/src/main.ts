@@ -5844,9 +5844,14 @@ function createOnlineMatch(mapId: MapId): void {
   if (creatingMatch) return;
   const srv = resolveServer();
   if (!srv) { note(t('acc.server-down')); return; }
-  const buttons = ['setup-network-create', 'match-create-go'].map((id) => $(id) as HTMLButtonElement);
+  // Подписи у двух кнопок свои: «Создать сетевую игру» в настройке схватки, «Создать» на
+  // странице «Матчи» (UIX-17.1). После запроса каждая возвращает свою.
+  const buttons = [
+    { button: $('setup-network-create') as HTMLButtonElement, label: t('setup.network.create') },
+    { button: $('match-create-go') as HTMLButtonElement, label: t('browser.create.go') },
+  ];
   creatingMatch = true;
-  for (const button of buttons) { button.disabled = true; button.textContent = t('setup.network.creating'); }
+  for (const { button } of buttons) { button.disabled = true; button.textContent = t('setup.network.creating'); }
   detach('create match', (async () => {
     try {
       const pass = tokenFor(localStorage, srv.base, srv.nick);
@@ -5866,7 +5871,7 @@ function createOnlineMatch(mapId: MapId): void {
     }
     finally {
       creatingMatch = false;
-      for (const button of buttons) { button.disabled = false; button.textContent = t('setup.network.create'); }
+      for (const { button, label } of buttons) { button.disabled = false; button.textContent = label; }
     }
   })());
 }

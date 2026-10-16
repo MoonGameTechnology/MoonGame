@@ -4,7 +4,8 @@
  * Лента, вкладка и фильтр снаружи не видны, поэтому здесь проверено то, что видно игре:
  * что спрашивается у сервера, какие строки и кнопки встают на экран, что пишется в строку
  * статуса, куда ведут «Войти», «В архив» и пустые состояния, как фильтр сужает список и
- * переживает перезагрузку, что показывает хаб. Страница — маленький поддельный DOM; вход
+ * переживает перезагрузку, когда видна карточка с адресом сервера и когда тикает переопрос
+ * (UIX-17.1), что показывает хаб. Страница — маленький поддельный DOM; вход
  * в партию и экран настройки подменены записью вызовов, проба сервера и хранилище —
  * настоящие. В конце — стык с `main.ts`.
  */
@@ -32,6 +33,15 @@ const reply = (status: number, body: unknown = {}): Reply => ({
 
 type Listener = (e: { target: El }) => void;
 
+/** Стиль узла: `display` и пользовательские свойства (`--lo`/`--hi` дорожки игроков). */
+class Style {
+  display = '';
+  props: Record<string, string> = {};
+  setProperty(name: string, value: string): void {
+    this.props[name] = value;
+  }
+}
+
 /** Узел поддельной страницы: ровно то, чем пользуется модуль. */
 class El {
   id = '';
@@ -41,8 +51,9 @@ class El {
   min = '';
   max = '';
   value = '';
+  title = '';
   hidden = false;
-  style = { display: '' };
+  style = new Style();
   dataset: Record<string, string> = {};
   children: El[] = [];
   parent: El | null = null;
@@ -148,27 +159,33 @@ function buildPage(): El {
   const root = new El('body');
   const add = (parent: El, tag: string, props: Partial<El> = {}): El =>
     parent.appendChild(Object.assign(new El(tag), props));
+  const hidden = (): Style => Object.assign(new Style(), { display: 'none' });
   const browse = add(root, 'div', { id: 'cbrowse' });
-  add(browse, 'div', { className: 'csub' });
-  add(add(browse, 'div', { className: 'cfield' }), 'input', { id: 'csrv' });
-  add(add(browse, 'div', { className: 'cfield' }), 'input', { id: 'cnick' });
-  add(add(browse, 'div', { className: 'crow' }), 'button', { id: 'cgo' });
+  // Позывной — спрятанный носитель состояния, на странице его нет (UIX-17.1).
+  add(add(browse, 'form', { className: 'mcarry', hidden: true }), 'input', { id: 'cnick' });
   for (const tab of ['available', 'active', 'archived'])
-    add(browse, 'button', {
+    add(add(browse, 'button', {
       className: tab === 'available' ? 'mtab active' : 'mtab',
       dataset: { tab },
-    });
-  const filter = add(browse, 'div', { id: 'mfilter' });
+    }), 'i', { className: 'mcount' });
+  // Карточка «Сервер не отвечает» с полем адреса: в разметке спрятана.
+  const card = add(browse, 'div', { id: 'msrv', style: hidden() });
+  add(add(card, 'label', { className: 'cfield' }), 'input', { id: 'csrv' });
+  add(card, 'button', { id: 'cgo' });
+  const filter = add(browse, 'div', { id: 'mfilter', style: hidden() });
   const mode = add(filter, 'div', { id: 'mf-mode' });
   for (const m of ['all', 'pvp', 'pve'])
     add(mode, 'button', { className: 'mfbtn', dataset: { mode: m } });
-  add(filter, 'button', { id: 'mf-map' });
-  add(filter, 'div', { id: 'mf-maps' });
-  add(filter, 'input', { id: 'mf-min' });
-  add(filter, 'input', { id: 'mf-max' });
-  add(filter, 'span', { id: 'mf-range' });
-  add(browse, 'div', { id: 'match-create' });
+  const mapbox = add(filter, 'div', { id: 'mf-mapbox' });
+  add(mapbox, 'button', { id: 'mf-map' });
+  add(mapbox, 'div', { id: 'mf-maps' });
+  const players = add(filter, 'div', { id: 'mf-players' });
+  add(players, 'span', { id: 'mf-range' });
+  const dual = add(players, 'div', { id: 'mf-dual' });
+  add(dual, 'input', { id: 'mf-min' });
+  add(dual, 'input', { id: 'mf-max' });
   add(browse, 'div', { id: 'mlist' });
+  add(browse, 'div', { id: 'match-create', style: hidden() });
   add(root, 'div', { id: 'hub-mine-sec' });
   add(root, 'div', { id: 'hub-mine' });
   return root;
@@ -207,19 +224,29 @@ let connectShown: boolean;
 let clipboard: { writeText(s: string): Promise<void> } | undefined;
 /** Что ушло в консоль как сбой отложенной цепочки (`detach`). */
 let detached: unknown[][];
+/** Поддельный `document`: в нём же фокус — пока игрок правит адрес, переопрос ждёт. */
+let doc: { activeElement: El | null } & Record<string, unknown>;
 
 const $ = (id: string): El => root.all().find((n) => n.id === id)!;
 const of = (name: string): unknown[][] => calls.filter((c) => c[0] === name);
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
 };
-/** Строки списка: подпись и кнопки. */
+/** Строки списка: номер партии, подпись и кнопки. */
 const rows = () =>
   $('mlist')
     .children.filter((c) => c.has('mrow'))
-    .map((r) => ({ info: r.children[0]!.innerHTML, buttons: r.children[1]!.children }));
-const ids = () => rows().map((r) => /class="mid">([^<]*)</.exec(r.info)?.[1]);
+    .map((r) => ({
+      id: r.dataset.match,
+      row: r,
+      info: r.children[0]!.innerHTML,
+      buttons: r.children[1]!.children,
+    }));
+const ids = () => rows().map((r) => r.id);
 const tab = (name: string): El => root.querySelector(`.mtab[data-tab="${name}"]`)!;
+/** Числа на ярлыках вкладок; пустая строка — числа нет. */
+const counts = () =>
+  ['available', 'active', 'archived'].map((name) => tab(name).querySelector('.mcount')!.textContent);
 const matchesFetches = () => fetched.filter((f) => f.url.includes('/matches?'));
 
 beforeEach(() => {
@@ -242,13 +269,15 @@ beforeEach(() => {
     setItem: (k: string, v: string) => void cell.set(k, v),
     removeItem: (k: string) => void cell.delete(k),
   });
-  vi.stubGlobal('document', {
+  doc = {
+    activeElement: null,
     getElementById: (id: string) => root.all().find((n) => n.id === id) ?? null,
     querySelector: (sel: string) => root.querySelector(sel),
     querySelectorAll: (sel: string) => root.querySelectorAll(sel),
     createElement: (tag: string) => new El(tag),
     createTextNode: (text: string) => Object.assign(new El('#text'), { textContent: text }),
-  });
+  };
+  vi.stubGlobal('document', doc);
   vi.stubGlobal('navigator', {
     get clipboard() {
       return clipboard;
@@ -273,12 +302,12 @@ afterEach(() => {
   vi.doUnmock('./setupScreen');
 });
 
-/** Свежая загрузка — как после перезагрузки страницы. */
-async function boot({ player = false } = {}) {
+/** Свежая загрузка — как после перезагрузки страницы. У сборок одна страница (UIX-17.1), поэтому
+ *  загрузка одна. */
+async function boot() {
   vi.resetModules();
   // Перезагрузка строит страницу заново: прежние обработчики остаются со старой.
   root = buildPage();
-  vi.stubGlobal('__PLAYER_BUILD__', player);
   vi.doMock('./matchJoin', () => ({
     openSessionTab: (id: string, seated = false) => void calls.push(['openSessionTab', id, seated]),
   }));
@@ -357,13 +386,19 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(of('status')).toEqual([['status', '']]);
   });
 
-  it('сервер отказал: «сервер недоступен», не тупик — путь в соло', async () => {
+  it('сервер отказал: карточка с адресом, беда названа один раз, не тупик — путь в соло', async () => {
     const mb = await boot();
     server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(500));
     await mb.refreshMatches();
-    expect(status).toBe(t('acc.server-down'));
-    expect($('mlist').innerHTML).toContain(t('acc.server-down'));
+    expect($('msrv').style.display).toBe('');
+    // Карточка и есть сообщение о беде: строку статуса с тем же текстом гасят, под списком его нет.
+    expect(of('status').at(-2)).toEqual(['status', t('acc.server-down')]);
+    expect(status).toBe('');
+    expect($('mlist').innerHTML).not.toContain(t('acc.server-down'));
+    expect($('mlist').innerHTML).not.toContain(t('browser.server-down'));
     expect($('match-create').style.display).toBe('none');
+    expect($('mfilter').style.display).toBe('none');
+    expect(counts()).toEqual(['', '', '']);
     $('msolo-go').click();
     expect(calls.slice(-2)).toEqual([['leaveMatch'], ['openSetup', 'hub']]);
   });
@@ -374,9 +409,28 @@ describe('REFM-217 — лента обозревателя', () => {
       throw new Error('offline');
     };
     await mb.refreshMatches();
-    expect(status).toBe(t('acc.server-down'));
+    expect($('msrv').style.display).toBe('');
     expect(rows()).toEqual([]);
     expect($('msolo-go')).toBeDefined();
+  });
+
+  it('карточка переживает смену вкладок и уходит, как только лента пришла', async () => {
+    const mb = await boot();
+    server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(500));
+    await mb.refreshMatches();
+    tab('active').click();
+    expect($('msrv').style.display).toBe('');
+    server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(200, lists));
+    await mb.refreshMatches();
+    expect($('msrv').style.display).toBe('none');
+    expect(ids()).toEqual(['m2', 'm1']);
+  });
+
+  it('числа на вкладках: сколько строк покажет каждая, у «Доступных» — после фильтра', async () => {
+    await browsing();
+    expect(counts()).toEqual(['3', '2', '1']);
+    root.querySelector('.mfbtn[data-mode="pvp"]')!.click();
+    expect(counts()).toEqual(['2', '2', '1']);
   });
 
   it('строка: карта, день, игроки, правила, режим и окно входа', async () => {
@@ -393,20 +447,41 @@ describe('REFM-217 — лента обозревателя', () => {
     await browsing();
     const [a1, a2, a3] = rows().map((r) => r.info);
     expect(a1).toContain(
-      `<span class="mmode pve">${t('browser.mode.pve')}</span> ${tData('pve_waves')} · `,
+      `<span class="mmode pve">${t('browser.mode.pve')}</span><span class="mmodename">${tData('pve_waves')}</span>`,
     );
     expect(a1).toContain(t('browser.day', { n: 3 }));
-    expect(a1).toContain(t('browser.players', { s: 2, c: 8 }));
+    // Места точками: две занятые из восьми, число рядом, словами — в подсказке.
+    expect(a1).toContain(
+      `<span class="mseats" title="${t('browser.seats', { s: 2, c: 8 })}" aria-label="${t('browser.seats', { s: 2, c: 8 })}">` +
+        '<i class="on"></i>'.repeat(2) +
+        '<i></i>'.repeat(6) +
+        '<b>2/8</b></span>',
+    );
     expect(a1).toContain(ruleSummary({ timeScale: 1, victory: { scoreLimit: 500 } }));
-    expect(a1).toContain(t('browser.running'));
+    // Идущий матч — обычное состояние: «идёт» на каждой строке было шумом.
+    expect(a1).not.toContain(t('browser.running'));
     expect(a1).toContain(
       `<span class="mwin">${t('browser.join-window', { dur: fmtJoinWindow(30 * 3_600_000) })}</span>`,
     );
     expect(a2).toContain(`<span class="mmode pvp">${t('browser.mode.pvp')}</span>`);
     expect(a2).toContain('<span class="mwin soon">');
     expect(a3).toContain(`<span class="mwin shut">${t('acc.join-closed')}</span>`);
-    expect(a3).toContain(t('browser.finished'));
+    expect(a3).toContain(`<span class="mended">${t('browser.finished')}</span>`);
     expect(a3).not.toContain('mmode');
+  });
+
+  it('номера партии в строке нет: он в подсказке строки, для разговора с поддержкой', async () => {
+    await browsing();
+    const first = rows()[0]!;
+    expect(first.info).not.toContain('a1');
+    expect(first.row.title).toBe('a1');
+  });
+
+  it('больше восьми мест — без точек, только число', async () => {
+    lists.available = [row('big', { players: { seated: 7, capacity: 20 } })];
+    await browsing();
+    expect(rows()[0]!.info).toContain('<b>7/20</b>');
+    expect(rows()[0]!.info).not.toContain('<i');
   });
 
   it('на своих вкладках окна входа нет: возвращение им не ограничено', async () => {
@@ -421,6 +496,7 @@ describe('REFM-217 — лента обозревателя', () => {
     const join = rows()[0]!.buttons[0]!;
     expect(join.textContent).toBe(t('browser.join'));
     expect(rows()[0]!.buttons).toHaveLength(1);
+    expect(rows()[0]!.row.className).toBe('mrow');
     join.click();
     expect(calls).toEqual([['openSessionTab', 'a1', false]]);
   });
@@ -434,6 +510,8 @@ describe('REFM-217 — лента обозревателя', () => {
     const [resume, archive] = rows()[1]!.buttons;
     expect(resume!.textContent).toBe(t('browser.resume'));
     expect(archive!.textContent).toBe(t('browser.archive'));
+    // Двум кнопкам на телефоне нужен свой ряд: рядом с картой они сжали бы имя.
+    expect(rows()[1]!.row.className).toBe('mrow mrow-2');
     resume!.click();
     expect(calls).toEqual([['openSessionTab', 'm1', true]]);
   });
@@ -464,15 +542,36 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(ids()).toEqual(['a1', 'a2', 'a3']);
   });
 
-  it('пустая вкладка: «здесь пусто» и путь в соло', async () => {
+  it('открытых матчей нет: так и сказано, и путь в соло', async () => {
+    lists.available = [];
+    await browsing();
+    expect($('mlist').innerHTML).toContain(t('browser.empty.available'));
+    $('msolo-go').click();
+    expect(calls.slice(-2)).toEqual([['leaveMatch'], ['openSetup', 'hub']]);
+    // Свой матч заводят здесь же: «Новый матч» на месте.
+    expect($('match-create').style.display).toBe('');
+  });
+
+  it('своих матчей нет: «Найти матч» ведёт на «Доступные»', async () => {
+    lists.active = [];
+    await browsing();
+    tab('active').click();
+    expect($('mlist').innerHTML).toContain(t('browser.empty.active'));
+    expect($('mlist').innerHTML).not.toContain('msolo-go');
+    $('mfind-go').click();
+    expect(tab('available').has('active')).toBe(true);
+    expect(ids()).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('пустой архив: только сообщение — вкладки стоят прямо над ним', async () => {
     lists.archived = [];
     await browsing();
     tab('archived').click();
-    expect($('mlist').innerHTML).toContain(t('browser.empty'));
-    expect($('msolo-go')).toBeDefined();
+    expect($('mlist').innerHTML).toContain(t('browser.empty.archived'));
+    expect($('mlist').innerHTML).not.toContain('<button');
   });
 
-  it('«Обновить список» перечитывает ленту', async () => {
+  it('«Подключиться» в карточке сервера перечитывает ленту', async () => {
     await browsing();
     $('cgo').click();
     await settle();
@@ -559,7 +658,8 @@ describe('REFM-217 — фильтр «Доступных»', () => {
       map: label.textContent,
       box: label.children[0]!,
     }));
-    expect(boxes.map((b) => b.map)).toEqual(['frontier', 'nexus']);
+    // Имя карты — то же, что в заголовке строки.
+    expect(boxes.map((b) => b.map)).toEqual(['карта frontier', 'карта nexus']);
     boxes[0]!.box.checked = true;
     boxes[0]!.box.fire('change');
     expect(ids()).toEqual(['a2']);
@@ -567,8 +667,8 @@ describe('REFM-217 — фильтр «Доступных»', () => {
     expect(JSON.parse(cell.get('void.filter')!).maps).toEqual(['frontier']);
     // Перерисовка строит галочки заново: те же две, и выбранная стоит.
     expect($('mf-maps').children.map((l) => [l.textContent, l.children[0]!.checked])).toEqual([
-      ['frontier', true],
-      ['nexus', false],
+      ['карта frontier', true],
+      ['карта nexus', false],
     ]);
   });
 
@@ -584,22 +684,49 @@ describe('REFM-217 — фильтр «Доступных»', () => {
     expect($('mf-map').textContent).toBe(t('browser.filter.map.all'));
   });
 
-  it('ползунок игроков считает вместимость', async () => {
+  it('ползунок игроков считает вместимость; полоса — между бегунками', async () => {
     await browsing();
     expect([$('mf-min').min, $('mf-max').max]).toEqual(['4', '8']);
+    expect($('mf-dual').style.props).toEqual({ '--lo': '0', '--hi': '1' });
     $('mf-min').value = '5';
     $('mf-min').fire('input');
     expect(ids()).toEqual(['a1', 'a3']);
     expect($('mf-range').textContent).toBe(t('browser.filter.range', { min: 5, max: 8 }));
+    expect($('mf-dual').style.props).toEqual({ '--lo': '0.25', '--hi': '1' });
+    // Бегунки разъехались наоборот — полоса всё равно от меньшего к большему.
+    $('mf-max').value = '4';
+    $('mf-max').fire('input');
+    expect($('mf-range').textContent).toBe(t('browser.filter.range', { min: 4, max: 5 }));
+    expect($('mf-dual').style.props).toEqual({ '--lo': '0', '--hi': '0.25' });
   });
 
-  it('отфильтровано всё: подсказка ослабить фильтр, без пути в соло', async () => {
+  it('контрол без выбора не показывается: одна карта и одна вместимость', async () => {
+    lists.available = [row('a1', { kind: 'pvp' }), row('a3')];
+    await browsing();
+    expect($('mfilter').style.display).toBe('');
+    expect($('mf-mode').style.display).toBe('');
+    expect($('mf-mapbox').style.display).toBe('none');
+    expect($('mf-players').style.display).toBe('none');
+  });
+
+  it('выбирать не из чего вовсе — панели фильтра нет', async () => {
+    lists.available = [row('a1'), row('a3')];
+    await browsing();
+    expect($('mfilter').style.display).toBe('none');
+    expect(ids()).toEqual(['a1', 'a3']);
+  });
+
+  it('отфильтровано всё: «ничего не найдено» и сброс фильтра, без пути в соло', async () => {
     lists.available = [row('a1', { kind: 'pvp' })];
     await browsing();
     mode('pve').click();
     expect($('mlist').innerHTML).toContain(t('browser.filter.none'));
     expect($('mlist').innerHTML).not.toContain('msolo-go');
     expect($('mfilter').style.display).toBe('');
+    $('mreset-go').click();
+    expect(ids()).toEqual(['a1']);
+    expect(mode('all').has('active')).toBe(true);
+    expect(JSON.parse(cell.get('void.filter')!).mode).toBe('all');
   });
 
   it('на «Активных» фильтра нет: панель спрятана, свои партии видны все', async () => {
@@ -697,31 +824,21 @@ describe('REFM-217 — «Мои партии» хаба', () => {
   });
 });
 
-describe('REFM-217 — сборка игрока', () => {
-  const field = (id: string): El => $(id).closest('.cfield')!;
-
-  it('экран — только вкладки и список: позывной, адрес, «Обновить» и подзаголовок спрятаны', async () => {
-    await boot({ player: true });
-    expect(field('cnick').style.display).toBe('none');
-    expect(field('csrv').style.display).toBe('none');
-    expect($('cgo').closest('.crow')!.style.display).toBe('none');
-    expect($('cbrowse').querySelector('.csub')!.style.display).toBe('none');
+describe('UIX-17.1 — одна страница у обеих сборок', () => {
+  it('позывного и пароля на странице нет, адрес — только когда сервер не ответил', async () => {
+    const mb = await boot();
+    expect($('cnick').closest('.mcarry')!.hidden).toBe(true);
+    await mb.refreshMatches();
+    expect($('msrv').style.display).toBe('none');
   });
 
-  it('ленты нет — всплывает строка адреса, текст беды не дублируется под списком', async () => {
-    const mb = await boot({ player: true });
-    server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(500));
-    await mb.refreshMatches();
-    expect(field('csrv').style.display).toBe('');
-    expect(status).toBe('');
-    expect($('mlist').innerHTML).toContain(t('browser.server-down'));
-    server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(200, lists));
-    await mb.refreshMatches();
-    expect(field('csrv').style.display).toBe('none');
-  });
-
-  it('тихий переопрос раз в 10 с — только пока обозреватель на экране', async () => {
-    await boot({ player: true });
+  it('тихий переопрос раз в 10 с — с первого открытия страницы и только пока она на экране', async () => {
+    // До первого открытия таймера нет вовсе: тому, кто в «Матчи» не заходит, он не нужен.
+    await boot();
+    vi.advanceTimersByTime(30_000);
+    await settle();
+    expect(matchesFetches()).toEqual([]);
+    await browsing();
     vi.advanceTimersByTime(9_999);
     await settle();
     expect(matchesFetches()).toEqual([]);
@@ -739,20 +856,15 @@ describe('REFM-217 — сборка игрока', () => {
     expect(matchesFetches()).toHaveLength(1);
   });
 
-  it('новый адрес сервера перечитывает список сразу', async () => {
-    await boot({ player: true });
+  it('пока игрок правит адрес, переопрос ждёт; новый адрес перечитывает список сразу', async () => {
+    await browsing();
+    doc.activeElement = $('csrv');
+    vi.advanceTimersByTime(20_000);
+    await settle();
+    expect(matchesFetches()).toEqual([]);
     $('csrv').fire('change');
     await settle();
     expect(matchesFetches()).toHaveLength(1);
-  });
-
-  it('в дев-клиенте нет ни переопроса, ни прятанья строк', async () => {
-    await boot();
-    vi.advanceTimersByTime(30_000);
-    await settle();
-    expect(fetched).toEqual([]);
-    expect(field('csrv').style.display).toBe('');
-    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

@@ -389,9 +389,12 @@ describe('три стиля кнопок (UIX-11.1)', () => {
         'ctest:—',
       ].sort(),
     );
-    // Строки обозревателя и «Мои партии» рисует их владелец (REFM-217).
+    // Строки обозревателя, пути вместо пустого списка и «Мои партии» рисует их владелец
+    // (REFM-217, UIX-17.1).
     const browser = read('./matchBrowser.ts');
     expect(browser).toContain('<button class="mbtn btn-second" id="msolo-go">');
+    expect(browser).toContain('<button class="mbtn btn-second" id="mfind-go">');
+    expect(browser).toContain('<button class="mbtn btn-second" id="mreset-go">');
     expect(browser).toContain("join.className = 'mbtn btn-second';");
     expect(browser).toContain("arch.className = 'mbtn btn-quiet';");
     expect(browser).toContain("open.className = 'mbtn btn-second';");

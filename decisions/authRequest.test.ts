@@ -2,28 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 
 describe('откуда берётся пароль', () => {
-  it('ЗАПОЛНЕННОЕ ПОЛЕ И ВЫИГРЫВАЕТ: карточка пуста — берём поле браузера', () => {
-    expect(passwordFrom(undefined, '', 'из-браузера')).toBe('из-браузера');
+  it('явного нет — берём карточку входа', () => {
+    expect(passwordFrom(undefined, 'с-карточки')).toBe('с-карточки');
   });
 
-  it('заполнена карточка — берём её', () => {
-    expect(passwordFrom(undefined, 'с-карточки', '')).toBe('с-карточки');
+  it('карточка пуста — пустая строка, а не undefined: дальше её проверит validPassword', () => {
+    expect(passwordFrom(undefined, '')).toBe('');
   });
 
-  it('заполнены оба — карточка первее: игрок только что печатал в неё', () => {
-    expect(passwordFrom(undefined, 'с-карточки', 'из-браузера')).toBe('с-карточки');
-  });
-
-  it('пусты оба — пустая строка, а не undefined: дальше её проверит validPassword', () => {
-    expect(passwordFrom(undefined, '', '')).toBe('');
-  });
-
-  it('ЯВНЫЙ ПАРОЛЬ ГЛАВНЕЕ ПОЛЕЙ', () => {
-    expect(passwordFrom('явный', 'с-карточки', 'из-браузера')).toBe('явный');
+  it('ЯВНЫЙ ПАРОЛЬ ГЛАВНЕЕ КАРТОЧКИ', () => {
+    expect(passwordFrom('явный', 'с-карточки')).toBe('явный');
   });
 
   it('ЯВНЫЙ ПУСТОЙ — тоже главнее: он обязан дойти до проверки, а не подмениться', () => {
-    expect(passwordFrom('', 'с-карточки', 'из-браузера')).toBe('');
+    expect(passwordFrom('', 'с-карточки')).toBe('');
   });
 });
 

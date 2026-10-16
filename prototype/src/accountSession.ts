@@ -120,7 +120,7 @@ export function sessionToken(base: string): string | null {
   return anyToken(localStorage, base);
 }
 
-/** Probe the server's identity mode and show/hide the password field. */
+/** Probe the server's identity mode. */
 export async function probeAuthMode(base: string): Promise<IdentityMode> {
   // Что означает ответ пробы — `identityProbe.ts` (REFM-154): ответ «не 2xx» это не
   // беда, а «аккаунтов тут нет» (игру часто открывают с обычной раздачи файлов); тело
@@ -128,8 +128,6 @@ export async function probeAuthMode(base: string): Promise<IdentityMode> {
   // консоль); не дошли до сервера — считаем режим позывных, вход и так выдаст
   // настоящую ошибку. Режим аккаунтов включает ровно живое «да».
   authMode = await identityMode(() => fetch(authStatusUrl(base)));
-  const passRow = document.getElementById('cpassrow');
-  if (passRow) passRow.style.display = authMode === 'accounts' ? '' : 'none';
   // Возвращаем то же самое, что положили: после `await` компилятор не видит присвоения
   // модульной переменной и сужает её до начального «не знаю», а читать её сразу после
   // пробы нужно именно здесь.
@@ -157,12 +155,10 @@ export async function ensureSession(
     game.status(t('acc.nick.rule'));
     return null;
   }
-  // Откуда берётся пароль — `authRequest.ts` (REFM-156, правила 1–2): полей ДВА
-  // (приветственная карточка и строка браузера матчей), и оба в разметке сразу —
-  // берём заполненное. Явно переданный пароль не перебивается полями даже пустой:
-  // он обязан дойти до проверки и получить внятную причину.
-  const passInput = document.getElementById('cpass') as HTMLInputElement | null;
-  const password = passwordFrom(passwordArg, game.welcomePassword(), passInput?.value ?? '');
+  // Откуда берётся пароль — `authRequest.ts` (REFM-156, правила 1–2): с приветственной
+  // карточки, а явно переданный не перебивается ею даже пустой — он обязан дойти до
+  // проверки и получить внятную причину.
+  const password = passwordFrom(passwordArg, game.welcomePassword());
   if (!validLoginPassword(password)) {
     reportLogin('pass-rule');
     game.status(t('acc.login-pass.rule'));
