@@ -265,12 +265,76 @@ export class Kernel {
    *
    * A scheduled event whose handler throws is dropped into `failures` (dead-
    * lettered) and the timeline keeps moving — the world never gets stuck.
+   *
+   * Сначала ход идёт одной копией мира (`advanceInPlace`): шаги правят её на месте, а
+   * не копируют всё состояние каждый раз. Шаг отказал — копия выброшена, и тот же ход
+   * идёт заново по шагу на копию (`advanceStepwise`), где отказ шага откатывается сам.
    */
   advanceTo(state: GameState, ctx: Context): AdvanceResult {
     if (ctx.now < state.time) {
       return { ok: false, code: 'E_TIME_BACKWARDS' };
     }
+    return this.advanceInPlace(state, ctx) ?? this.advanceStepwise(state, ctx);
+  }
 
+  /**
+   * Тот же ход, что у `advanceStepwise`, но на ОДНОЙ копии мира на весь вызов. Копия
+   * всего состояния на каждый шаг была главной ценой шага: на FFA-20 к 22-му дню
+   * состояние весит ~0,8 МБ, а шагов за кадр — десятки. Состояние вызывающего не
+   * трогается (копия снимается один раз в начале, инвариант №2).
+   *
+   * Шаг здесь не откатить: прежнего мира уже нет. Поэтому первый же отказ шага
+   * (`h.reject`, исключение, переполнение событий) возвращает `null`, и вызывающий
+   * повторяет ход по шагу на копию — с тем же итогом, что был всегда, и с тем же
+   * списком `failures`. В живых партиях шаги не отказывают, и повтор не случается.
+   *
+   * Чем шаг на месте мог бы разойтись с шагом на копии: копия шага разрывала общие
+   * ссылки. Полезная нагрузка события, отданная наружу или в таймер, — тоже объект
+   * обработчика, поэтому в конце шага нагрузки событий шага и его таймеров снимаются
+   * копией, как их видел бы шаг на копии.
+   */
+  private advanceInPlace(state: GameState, ctx: Context): AdvanceResult | null {
+    const draft = deepClone(state);
+    if (draft.scheduled.length > 1) {
+      draft.scheduled.sort((a, b) => a.at - b.at || a.seq - b.seq);
+    }
+    const events: DomainEvent[] = [];
+    let guard = 0;
+    for (;;) {
+      if (++guard > MAX_ADVANCE_STEPS) {
+        return { ok: true, state: draft, events, failures: [], partial: true };
+      }
+      const next = earliestDue(draft.scheduled, ctx.now);
+      let step: StepResult;
+      if (next && next.at > draft.time) {
+        const from = draft.time;
+        const to = next.at;
+        step = this.runOn(draft, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }), true);
+      } else if (next) {
+        draft.scheduled.shift();
+        const stepTime = Math.max(next.at, draft.time);
+        step = this.runOn(draft, ctx, stepTime, (h) => h.emit(next.type, next.payload), true);
+      } else if (ctx.now > draft.time) {
+        const from = draft.time;
+        const to = ctx.now;
+        step = this.runOn(draft, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }), true);
+      } else {
+        break;
+      }
+      if (!step.ok) {
+        return null;
+      }
+      events.push(...step.events);
+      if (!next) {
+        break;
+      }
+    }
+    return { ok: true, state: draft, events, failures: [] };
+  }
+
+  /** The original advance: every step on its own clone, so a failing step is rolled
+   *  back and dead-lettered. Runs when {@link advanceInPlace} meets a failing step. */
+  private advanceStepwise(state: GameState, ctx: Context): AdvanceResult {
     // Normalize: ensure the scheduled array is (at, seq)-sorted so that
     // earliestDue is O(1).  After this initial sort the kernel's sorted
     // insert (binary-search splice) keeps the invariant for all new events.
@@ -372,7 +436,23 @@ export class Kernel {
     stepTime: number,
     run: (h: HandlerContext) => void,
   ): StepResult {
-    const draft = deepClone(base);
+    return this.runOn(deepClone(base), ctx, stepTime, run, false);
+  }
+
+  /**
+   * The step itself, on `draft` IN PLACE. {@link runStep} hands it a fresh clone;
+   * {@link advanceInPlace} hands it the one copy of the whole advance and sets
+   * `snapshot`: the step's event payloads and its new timers' payloads are then
+   * replaced by copies at the end, so later steps cannot reach them through a
+   * reference the handler kept — as with a clone per step.
+   */
+  private runOn(
+    draft: GameState,
+    ctx: Context,
+    stepTime: number,
+    run: (h: HandlerContext) => void,
+    snapshot: boolean,
+  ): StepResult {
     // Кости шага. Их может НЕ БЫТЬ, и это законное состояние, а не порча: `visibleState`
     // ВЫРЕЗАЕТ поток RNG из проекции под туманом (клиент с ним прокрутил бы будущие бои
     // вперёд сервера), а сетевой клиент этот же кернел зовёт — через `canApply`, чтобы
@@ -382,6 +462,7 @@ export class Kernel {
     // насмерть (карта замирала на первом же выделении флота), у сервера обрушило бы шаг.
     const rng = draft.rng === undefined ? new AbsentRng() : new Rng(draft.rng);
     const emitted: DomainEvent[] = [];
+    const timers: ScheduledEvent[] = [];
     let processed = 0;
 
     // Handlers see the time of THIS step (the event/segment instant), not the
@@ -412,6 +493,7 @@ export class Kernel {
         // Sorted insert keeps the array in (at, seq) order so earliestDue is O(1).
         const pos = scheduledInsertPos(draft.scheduled, safeAt, seq);
         draft.scheduled.splice(pos, 0, event);
+        if (snapshot) timers.push(event);
       },
       hook: <T>(name: string, baseValue: T, args?: unknown): T => {
         const entries = this.hooks.get(name);
@@ -464,6 +546,14 @@ export class Kernel {
     // которого сервер ей не давал).
     if (draft.rng !== undefined) draft.rng = rng.getState();
     draft.time = stepTime;
+    if (snapshot) {
+      for (const timer of timers) timer.payload = deepClone(timer.payload);
+      return {
+        ok: true,
+        state: draft,
+        events: emitted.map((e) => ({ type: e.type, payload: deepClone(e.payload) })),
+      };
+    }
     return { ok: true, state: draft, events: emitted };
   }
 }

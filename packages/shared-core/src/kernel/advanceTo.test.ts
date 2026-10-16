@@ -440,3 +440,59 @@ describe('bug-hunt batch — time-gap guard, no clock rewind, finite schedule', 
     expect(state.scheduled).toHaveLength(0);
   });
 });
+
+// Ход идёт одной копией мира: шаги правят её на месте. Снаружи это должно быть неотличимо
+// от прежнего хода, где каждый шаг работал на своей копии.
+describe('advanceTo — one copy of the world per advance', () => {
+  it('a step that fails after changing the world leaves no trace; the steps before it stay', () => {
+    const spoiler: GameModule = {
+      id: 'spoiler',
+      version: '1.0.0',
+      setup(api) {
+        api.on('spoil', (_event, h) => {
+          h.state.planets.p!.resources.metal = -1;
+          h.schedule(h.state.time + 10, 'spoiled');
+          throw new Error('after the change');
+        });
+      },
+    };
+    const kernel = createKernel([economyModule, spoiler]);
+    const planets = { p: makePlanet('p', { metal: 0 }) };
+    const state = stateWith({
+      planets,
+      scheduled: [sched(0, 100, 'noop'), sched(1, 200, 'spoil'), sched(2, 250, 'noop')],
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(300)));
+    expect(r.failures).toEqual([{ at: 200, type: 'spoil', code: 'E_INTERNAL' }]);
+    // Every span accrued (2 metal per ms × 300 ms); the failed step's −1 and timer are gone.
+    expect(r.state.planets.p?.resources.metal).toBe(600);
+    expect(r.state.scheduled).toEqual([]);
+    expect(r.state.time).toBe(300);
+  });
+
+  it('a payload that points into the world is handed out as it was at its step', () => {
+    const watcher: GameModule = {
+      id: 'watcher',
+      version: '1.0.0',
+      setup(api) {
+        api.on('look', (_event, h) => {
+          const resources = h.state.planets.p!.resources; // the world's own object
+          h.emit('seen', resources);
+          h.schedule(h.state.time + 100, 'recall', resources);
+        });
+        api.on('recall', (event, h) => h.emit('recalled', event.payload));
+      },
+    };
+    const kernel = createKernel([economyModule, watcher]);
+    const state = stateWith({
+      planets: { p: makePlanet('p', { metal: 0 }) },
+      scheduled: [sched(0, 100, 'look')],
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(400)));
+    const payload = (type: string) => r.events.find((e) => e.type === type)?.payload;
+    // Later spans keep accruing into the world, not into what was already handed out.
+    expect(payload('seen')).toEqual({ metal: 200 });
+    expect(payload('recalled')).toEqual({ metal: 200 });
+    expect(r.state.planets.p?.resources.metal).toBe(800);
+  });
+});
