@@ -65,7 +65,17 @@ const data = parseGameData({
     striker: {
       faction: 'x',
       traits: ['shuttle'],
-      stats: { attack: 60, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2, patrolHours: 4, patrolRadius: 60 },
+      stats: {
+        attack: 60,
+        defense: 3,
+        speed: 100,
+        hp: 10,
+        strikeRange: 180,
+        fuel: 3,
+        rearmRounds: 2,
+        patrolHours: 4,
+        patrolRadius: 60,
+      },
     },
     // Контактная мина (SM-3.6) — в неё ракетная мина не целится.
     mine: {
@@ -699,10 +709,22 @@ describe('legendary rocket mine', () => {
     expect(
       Object.values(both.fleets).filter((f) => f.units.some((st) => st.unit === 'mine')),
     ).toHaveLength(1);
-    // Цель входит в радар — ракетная мина, не испорченная соседкой, пускает ракету.
-    const near = structuredClone(both);
-    near.fleets.target!.edge = { from: 'A', to: 'B', t: 0.7 };
-    const launched = run(near, HOUR / 2 + 60_000);
+    // Цель входит в радар — ракетная мина, не испорченная соседкой, пускает ракету. Входит
+    // ходом, а не правкой состояния: спящая мина узнаёт о подходе из нового отрезка пути.
+    const moving = k.applyAction(
+      both,
+      {
+        id: 's:q:move',
+        playerId: 'q',
+        type: 'fleet.move',
+        payload: { fleetId: 'target', to: 'A' },
+        issuedAt: both.time,
+      },
+      { now: both.time, data },
+    );
+    if (!moving.ok) throw new Error(moving.code);
+    // 60 единиц до края радара на скорости 100 — 36 минут.
+    const launched = run(moving.state, HOUR / 2 + 0.6 * HOUR + 60_000);
     expect(missiles(launched)).toHaveLength(1);
     expect(mines(launched)).toHaveLength(0);
   });
@@ -714,6 +736,91 @@ describe('legendary rocket mine', () => {
     expect(radarSignatures(s, 'p', data)).toContainEqual(
       expect.objectContaining({ position: { x: 280, y: 0 } }),
     );
+  });
+});
+
+// Пустой поиск — целый шаг мира. Мина не ищет цель в минуты, когда к её радару заведомо
+// никто не подойдёт, и ловит подход в ту же минуту, что и поиск каждую минуту.
+describe('a rocket mine skips the minutes nobody can reach its radar', () => {
+  const MIN = 60_000;
+  const RADAR = 120;
+  /** Мина в 200 от A и B, третий мир C в 800: дорога C→B→A проходит мимо мины. */
+  function road(): GameState {
+    const s = world();
+    s.planets.B!.links = ['A', 'C'];
+    s.planets.C = { ...s.planets.B!, id: 'C', position: { x: 800, y: 0 }, links: ['B'] };
+    return s;
+  }
+  const scans = (s: GameState) => s.scheduled.filter((e) => e.type === 'rocketMine.scan');
+  const order = (s: GameState, to: string, at: number) => {
+    const moved = act(advance(s, at), 'fleet.move', { fleetId: 'target', to }, 'q');
+    if (!moved.ok) throw new Error(moved.code);
+    return moved.state;
+  };
+  /** Эталон: мина, ищущая каждую минуту, нашла бы цель в первую минуту своей сетки
+   *  (`armedAt + k·минута`), когда цель в радиусе радара. Цель идёт тем же маршрутом в мире
+   *  без мины — её ход от мины не зависит. */
+  const perMinute = (s: GameState, armedAt: number, until: number): number | null => {
+    const [mine] = mines(s);
+    const at = fleetPositionAt(s, mine!, s.time)!;
+    let ghost = structuredClone(s);
+    delete ghost.fleets[mine!.id];
+    delete ghost.ordnance!.controls![mine!.id];
+    ghost.scheduled = ghost.scheduled.filter((e) => e.type !== 'rocketMine.scan');
+    for (let t = armedAt + Math.ceil((s.time - armedAt) / MIN) * MIN; t <= until; t += MIN) {
+      ghost = advance(ghost, Math.max(t, ghost.time));
+      const p = fleetPositionAt(ghost, ghost.fleets.target!, t)!;
+      if ((p.x - at.x) ** 2 + (p.y - at.y) ** 2 <= RADAR * RADAR) return t;
+    }
+    return null;
+  };
+
+  it('sleeps while nobody can reach the radar: one pending search, hours ahead', () => {
+    const s = road();
+    s.fleets.target!.edge = { from: 'A', to: 'B', t: 0.95 }; // 180 от мины, стоит
+    const placed = armed(s);
+    expect(scans(placed)).toHaveLength(1);
+    // Поиск при взводе пуст; следующий — не дальше шести часов вперёд (страховочный предел).
+    expect(placed.ordnance!.controls![mines(placed)[0]!.id]!.nextScanAt).toBe(
+      HOUR / 4 + MIN + 6 * HOUR,
+    );
+    expect(missiles(advance(placed, 3 * HOUR))).toHaveLength(0);
+  });
+
+  it('keeps searching every minute while a world sits inside the radar: fleets appear there', () => {
+    const s = road();
+    s.fleets.target!.edge = { from: 'A', to: 'B', t: 0.95 };
+    s.planets.D = { ...s.planets.A!, id: 'D', position: { x: 250, y: 60 }, links: [] };
+    const placed = armed(s);
+    expect(placed.ordnance!.controls![mines(placed)[0]!.id]!.nextScanAt).toBe(HOUR / 4 + MIN);
+  });
+
+  it('launches on the very minute a per-minute search would, whenever the approach starts', () => {
+    // Старт цели, миг приказа (не на минуте сетки) и куда идёт: подход, подход через узел
+    // (у B начинается новый отрезок) и уход прочь.
+    const cases = [
+      { from: 'A', to: 'B', t: 0.95, at: HOUR / 4 + 7 * MIN + 13_000, dest: 'A' },
+      { from: 'A', to: 'B', t: 0.99, at: HOUR / 2 + 1, dest: 'A' },
+      { from: 'A', to: 'B', t: 0.9, at: HOUR / 4 + 30 * MIN, dest: 'A' },
+      { from: 'B', to: 'C', t: 0.5, at: HOUR, dest: 'A' },
+      { from: 'A', to: 'B', t: 0.96, at: HOUR / 4 + 59_999, dest: 'C' },
+    ];
+    for (const c of cases) {
+      const s = road();
+      s.fleets.target!.edge = { from: c.from, to: c.to, t: c.t };
+      const moving = order(armed(s), c.dest, c.at);
+      const until = c.at + 12 * HOUR;
+      const expected = perMinute(moving, HOUR / 4, until);
+      const done = kernel.advanceTo(moving, { now: until, data });
+      if (!done.ok) throw new Error(done.code);
+      // Ракета к `until` уже могла попасть и уйти с карты — миг пуска стоит в её id.
+      const launched = done.events.find((e) => e.type === 'rocketMine.launched');
+      const missileId = (launched?.payload as { missileId?: string } | undefined)?.missileId;
+      const launchedAt = missileId ? Number(/^fleet:missile:(\d+):/.exec(missileId)![1]) : null;
+      expect(launchedAt, JSON.stringify(c)).toBe(expected);
+      if (c.dest === 'C') expect(expected).toBeNull();
+      else expect(expected).not.toBeNull();
+    }
   });
 });
 
@@ -970,7 +1077,12 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
   // SM-3.7d (решение владельца 2026-10-14): ракета — воздушная цель, а патруль бьёт её и в
   // момент влёта в круг, не дожидаясь своего тика.
   describe('патруль и ракета (SM-3.7d)', () => {
-    const patrolOver = (s: GameState, unit: string, at: { x: number; y: number }, radius: number) => {
+    const patrolOver = (
+      s: GameState,
+      unit: string,
+      at: { x: number; y: number },
+      radius: number,
+    ) => {
       s.strikes = [
         {
           id: 'strike:q:1',
@@ -1027,7 +1139,10 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     it('ракета, пущенная внутри круга, не влетает — до тика патруль молчит', () => {
       const launch = armed();
       const m = missiles(launch)[0]!;
-      const r = fly(patrolOver(launch, 'interceptor', { ...m.flight!.from }, 40), m.flight!.arrivesAt);
+      const r = fly(
+        patrolOver(launch, 'interceptor', { ...m.flight!.from }, 40),
+        m.flight!.arrivesAt,
+      );
       expect(r.events.map((e) => e.type)).not.toContain('shuttle.missileDowned');
     });
 
@@ -1038,7 +1153,10 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       expect(r.events.map((e) => e.type)).not.toContain('shuttle.missileDowned');
       // Удар приказом по видимой ракете — отказ: бить её нечем.
       const k = createKernel([shuttleModule]);
-      const near = advance(launch, m.flight!.departedAt + 0.95 * (m.flight!.arrivesAt - m.flight!.departedAt));
+      const near = advance(
+        launch,
+        m.flight!.departedAt + 0.95 * (m.flight!.arrivesAt - m.flight!.departedAt),
+      );
       near.strikes = [];
       near.planets.B = {
         ...near.planets.B!,
@@ -1048,7 +1166,9 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       };
       const strikeData = parseGameData({
         ...data,
-        buildings: { spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 12 } },
+        buildings: {
+          spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 12 },
+        },
       });
       const res = k.applyAction(
         near,
