@@ -27,7 +27,9 @@ export function spaceBackdropReady(holographic = false): boolean {
 }
 
 /** The sky scaled to cover the viewport once and blended over the flat fill, per skin and
- *  size: a moving frame copies it instead of resampling the whole image again. */
+ *  size: a moving frame copies it instead of resampling the whole image again. The cover keeps
+ *  only the part of the scaled sky the screen can show, parallax included: on a portrait phone
+ *  the whole landscape image was over three screens of pixels, two of them never seen. */
 const covers: Partial<
   Record<'simple' | 'holographic', { size: string; surface: HTMLCanvasElement }>
 > = {};
@@ -37,9 +39,10 @@ function coverOf(
   sky: HTMLImageElement,
   width: number,
   height: number,
+  full: { x: number; y: number; width: number; height: number },
   alpha: number,
 ): HTMLCanvasElement | null {
-  const size = `${width}x${height}`;
+  const size = `${width}x${height}:${full.x},${full.y},${full.width}x${full.height}`;
   const cached = covers[key];
   if (cached?.size === size) return cached.surface;
   if (typeof document === 'undefined') return null;
@@ -62,7 +65,7 @@ function coverOf(
   g.fillStyle = '#02060b';
   g.fillRect(0, 0, width, height);
   g.globalAlpha = alpha;
-  g.drawImage(sky, 0, 0, width, height);
+  g.drawImage(sky, full.x, full.y, full.width, full.height);
   covers[key] = { size, surface };
   return surface;
 }
@@ -94,18 +97,25 @@ export function drawSpaceBackdrop(
   const scale = Math.max((width + 48) / sky.naturalWidth, (height + 48) / sky.naturalHeight);
   const w = sky.naturalWidth * scale;
   const h = sky.naturalHeight * scale;
-  const x = (width - w) / 2 + Math.tanh(panX / 800) * 20;
-  const y = (height - h) / 2 + Math.tanh(panY / 800) * 20;
+  // The part of it the screen can show: the screen and the 24 px either side the parallax
+  // (at most 20 px) may reveal, centred like the image.
+  const cw = Math.min(w, width + 48);
+  const ch = Math.min(h, height + 48);
+  const x = (width - cw) / 2 + Math.tanh(panX / 800) * 20;
+  const y = (height - ch) / 2 + Math.tanh(panY / 800) * 20;
   // The distant room/space stays behind the luminous plotting plane.
   const alpha = holographic ? 0.3 : 1;
-  const cover = dpr ? coverOf(key, sky, Math.ceil(w * dpr), Math.ceil(h * dpr), alpha) : null;
+  const cover = dpr
+    ? coverOf(key, sky, Math.ceil(cw * dpr), Math.ceil(ch * dpr),
+      { x: ((cw - w) / 2) * dpr, y: ((ch - h) / 2) * dpr, width: w * dpr, height: h * dpr }, alpha)
+    : null;
   g.save();
   if (cover && dpr) {
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.drawImage(cover, Math.round(x * dpr), Math.round(y * dpr));
   } else {
     g.globalAlpha = alpha;
-    g.drawImage(sky, x, y, w, h);
+    g.drawImage(sky, x + (cw - w) / 2, y + (ch - h) / 2, w, h);
   }
   g.restore();
 }
