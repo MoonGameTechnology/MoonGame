@@ -17,6 +17,7 @@ import {
   identifiedNodes,
   isVisibleTo,
   sensorCoverage,
+  sensorCoverageOf,
   sightCircles,
   sightRulesOf,
   stackRadarRange,
@@ -1173,6 +1174,62 @@ describe('зрение — только круги (решение владел�
       );
       expect([p.id, identify.has(p.id)]).toEqual([p.id, inside]);
     }
+  });
+
+  it('сетка миров не меняет ответа: опознаны и засечены ровно миры внутри кругов, в порядке карты', () => {
+    // Миры по всей карте, в том числе ровно на границах клеток сетки (кратно 256) и ровно на
+    // краю круга мира (обзор 120 включительно). У p2 радар ур. 3 под двумя множителями —
+    // его квадрат шире всей сетки, и такой круг перебирает все миры. p3 в союзе с p1.
+    const st = circlesState({
+      players: {
+        p1: player('p1'),
+        p2: { ...player('p2'), faction: 'farsight', technologies: { completed: ['long_scan'] } },
+        p3: player('p3'),
+      },
+      diplomacy: { [pairKey('p1', 'p3')]: 'alliance' },
+    });
+    let seed = 7;
+    const next = (): number => (seed = (seed * 48271) % 2147483647) / 2147483647;
+    for (let i = 0; i < 60; i++) {
+      const x = Math.round((next() - 0.5) * 6000);
+      const y = Math.round((next() - 0.5) * 6000);
+      st.planets[`R${i}`] = planet(`R${i}`, i % 9 === 0 ? 'p3' : null, [], at(x, y));
+    }
+    for (let k = -4; k <= 4; k++) st.planets[`EDGE${k}`] = planet(`EDGE${k}`, null, [], at(256 * k, -256 * k));
+    st.planets.RIM = planet('RIM', null, [], at(120, 0)); // ровно обзор мира HOME
+    st.planets.HOME!.buildings = [{ type: 'radar', level: 1, hp: 0 }];
+    st.planets.FORT = planet('FORT', 'p2', [], { ...at(-2100, 1800), buildings: [{ type: 'radar', level: 3, hp: 0 }] });
+    st.fleets = {
+      s1: fleet('s1', 'p1', 'R3', [['scout', 1]]),
+      s3: fleet('s3', 'p3', 'EDGE2', [['cruiser', 1]]),
+    };
+    const bruteForce = (viewer: string): [string[], string[]] => {
+      const circles = sightCircles(st, viewer, data);
+      const identify: string[] = [];
+      const radar: string[] = [];
+      for (const p of Object.values(st.planets)) {
+        const d2 = circles.map((c) => {
+          const dx = p.position.x - c.x;
+          const dy = p.position.y - c.y;
+          return dx * dx + dy * dy;
+        });
+        const sensed = circles.map((c, i) => d2[i]! <= c.signature * c.signature);
+        if (sensed.some(Boolean)) radar.push(p.id);
+        if (circles.some((c, i) => sensed[i] && d2[i]! <= c.identify * c.identify)) identify.push(p.id);
+      }
+      return [identify, radar];
+    };
+    const all = sensorCoverageOf(st, ['p1', 'p2', 'p3'], data);
+    for (const viewer of ['p1', 'p2', 'p3']) {
+      const batch = all.get(viewer)!;
+      const single = sensorCoverage(st, viewer, data);
+      expect([[...batch.identify], [...batch.radar]]).toEqual(bruteForce(viewer));
+      expect([[...single.identify], [...single.radar]]).toEqual(bruteForce(viewer));
+    }
+    expect(all.get('p1')!.identify.has('RIM')).toBe(true);
+    // 700 × (1 + 0,5 + 0,5): квадрат круга — 11 × 11 клеток, больше, чем занято миров.
+    expect(sightCircles(st, 'p2', data).find((c) => c.source.id === 'FORT')!.signature).toBe(1400);
+    expect([...all.get('p1')!.identify]).toEqual([...all.get('p3')!.identify]); // союз делит зрение
   });
 
   it('сломанные числа читаются как общие целиком — карта не слепнет от опечатки', () => {

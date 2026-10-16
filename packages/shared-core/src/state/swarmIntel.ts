@@ -7,9 +7,14 @@ export function observedSwarm(
   state: GameState, viewer: string, identified: ReadonlySet<string>, now = state.time,
 ): Record<string, SwarmContact> {
   const contacts: Record<string, SwarmContact> = {};
-  for (const id of Object.keys(state.fleets).sort()) {
+  // Sort only the Swarm's fleets: fog memory calls this for every player on every time
+  // span, and filtering before sorting yields the same order as sorting first.
+  const swarm = Object.keys(state.fleets).filter((id) => {
+    const owner = state.fleets[id]!.owner;
+    return owner !== viewer && state.players[owner]?.faction === 'swarm';
+  });
+  for (const id of swarm.sort()) {
     const fleet = state.fleets[id]!;
-    if (fleet.owner === viewer || state.players[fleet.owner]?.faction !== 'swarm') continue;
     const location = fleetNodeAt(state, fleet, state.time);
     if (location === null || !identified.has(location)) continue;
     const counts: Record<string, number> = {};
