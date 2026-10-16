@@ -513,7 +513,7 @@ async function createHostedMatch(
       ...(modeId !== undefined ? { modeId } : {}),
       seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
-  if (AUTH && !restoredSnap) initialState = initializeOrdinaryArsenal(initialState, starterArsenal);
+  if (AUTH && !restoredSnap) initialState = initializeOrdinaryArsenal(initialState, data);
   // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
   // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
   // молча вернул бы PvE-сессию к базовым правилам — ровно та «подмена правил под

@@ -1356,8 +1356,8 @@ export class MatchRoom {
     return value;
   }
 
-  submitAction(playerId: PlayerId, action: Action, peer?: RoomPeer): SubmitResult {
-    const front = this.frontGate(playerId, action.id, peer);
+  submitAction(playerId: PlayerId, action: Action, peer?: RoomPeer, throttle = true): SubmitResult {
+    const front = this.frontGate(playerId, action.id, peer, throttle);
     if (front.kind === 'cached') {
       const { receipt } = front;
       return { ok: receipt.ok, seq: receipt.seq, events: [], code: receipt.code };
@@ -1387,10 +1387,16 @@ export class MatchRoom {
     /** Connection-bound work may expire while queued. Check at execution, before
      *  dedup/rate admission or persistence; never cancel a write already started. */
     isCurrent?: () => boolean,
+    /** `throttle: false` — host bookkeeping that must land whatever the player's own
+     *  order budget (a revoke after a sale): skips the per-player rate limit and does
+     *  not spend from it. Dedup and the mailbox bound still apply. Never for orders a
+     *  driver issues on the player's behalf. */
+    options: { throttle?: boolean } = {},
   ): Promise<{ ok: boolean; code?: string }> {
+    const throttle = options.throttle ?? true;
     if (!this.persist) {
       if (isCurrent && !isCurrent()) return { ok: false, code: 'E_FORBIDDEN' };
-      const r = this.submitAction(playerId, action);
+      const r = this.submitAction(playerId, action, undefined, throttle);
       return { ok: r.ok, ...(r.code !== undefined ? { code: r.code } : {}) };
     }
     let out: { ok: boolean; code?: string } = { ok: false, code: 'E_INTERNAL' };
@@ -1400,7 +1406,7 @@ export class MatchRoom {
         out = { ok: false, code: 'E_FORBIDDEN' };
         return;
       }
-      const front = this.frontGate(playerId, action.id); // без пира: у драйвера нет сокета
+      const front = this.frontGate(playerId, action.id, undefined, throttle); // без пира: у драйвера нет сокета
       if (front.kind === 'cached') {
         const { receipt } = front;
         out = { ok: receipt.ok, ...(receipt.code !== undefined ? { code: receipt.code } : {}) };
@@ -1426,7 +1432,12 @@ export class MatchRoom {
    * тем же отказом, а лимит — отказом без квитанции, чтобы повтор после бэкоффа не
    * встретил идемпотентный «уже отвергнуто».
    */
-  private frontGate(playerId: PlayerId, actionId: string, peer?: RoomPeer): FrontDecision {
+  private frontGate(
+    playerId: PlayerId,
+    actionId: string,
+    peer?: RoomPeer,
+    throttle = true,
+  ): FrontDecision {
     const cached = this.receipts.get(actionId);
     if (cached) {
       if (peer) {
@@ -1438,7 +1449,7 @@ export class MatchRoom {
     // F-03: лимит подач на игрока. Перебор отвергается ТРАНЗИЕНТНО — квитанция не
     // пишется, поэтому честный повтор после бэкоффа применяется (идемпотентность не
     // должна превращать лимит в вечный отказ).
-    if (this.rateLimited(playerId)) {
+    if (throttle && this.rateLimited(playerId)) {
       if (peer) this.sendReject(peer, playerId, actionId, 'E_RATE_LIMIT');
       return { kind: 'rate-limited' };
     }

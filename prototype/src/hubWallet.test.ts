@@ -13,9 +13,15 @@ describe('кошелёк главного экрана (UIX-10.2)', () => {
     expect(html).toContain('aria-label="Суверены: 500. Пополнить"');
   });
 
-  it('неизвестный баланс Суверенов скрыт, Варранты остаются', () => {
+  // «Магазин не скрывай» (решение владельца 2026-10-15): плашка остаётся дверью в магазин,
+  // но неизвестный баланс не подменяется ни нулём, ни выдуманным числом.
+  it('без баланса Суверенов плашка — знак и «+» без числа, Варранты остаются', () => {
     const html = hubWalletHtml({ sovereigns: null, warrants: 12 });
-    expect(html).not.toContain('dl-donate');
+    expect(html).toMatch(
+      /class="dl-donate" data-hub-wallet="donate"[^>]*>.*<svg.*<\/svg><\/i><em aria-hidden="true">\+<\/em><\/button>/,
+    );
+    expect(html).not.toContain('<b>');
+    expect(html).toContain('aria-label="Магазин Суверенов"');
     expect(html).toContain('⌖</i>12');
   });
 

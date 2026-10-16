@@ -8,10 +8,10 @@
     "technology_archives": { "nameKey": "meta.material.technology_archives" }
   },
   "recipes": {
-    "ablative_plating": {
-      "defId": "ablative_plating",
-      "ingredients": { "ferroalloys": 25, "technical_composites": 10 },
-      "salvage": { "ferroalloys": 6, "technical_composites": 2 }
+    "siege_platform": {
+      "defId": "siege_platform",
+      "ingredients": { "ferroalloys": 25, "technical_composites": 10, "energy_cells": 8 },
+      "salvage": { "ferroalloys": 6, "technical_composites": 2, "energy_cells": 2 }
     },
     "targeting_array": {
       "defId": "targeting_array",
@@ -100,7 +100,7 @@
           "level": 10,
           "free": {
             "labelKey": "meta.reward.blueprint_choice",
-            "choices": ["ablative_plating", "targeting_array", "shield_booster"]
+            "choices": ["mine_layer", "targeting_array", "shield_booster"]
           },
           "premium": { "labelKey": "meta.reward.ship_skin", "cosmetic": "frontier_cruiser_livery" }
         },

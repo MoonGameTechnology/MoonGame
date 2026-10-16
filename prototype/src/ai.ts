@@ -469,6 +469,15 @@ function hasFacilityFor(p: Planet, unit: string): boolean {
   return p.buildings.some((b) => b.hp > 0 && data.buildings[b.type]?.[flag] === true);
 }
 
+/** Может ли место ставить модуль: снимок арсенала (ARS-3) его перечисляет или снимка нет
+ *  вовсе. Свободное место бот ведёт с полным каталогом, но Хранитель и заместитель на
+ *  месте игрока играют его арсеналом — без этой пробы они заказывали бы чужой модуль
+ *  каждый тик и получали `E_NOT_OWNED`. */
+function ownsModule(state: GameState, ai: string, id: string): boolean {
+  const arsenal = state.players[ai]?.arsenal;
+  return !arsenal || arsenal.modules.includes(id);
+}
+
 /** Сколько НАЗЕМНЫХ юнитов стоит в гарнизоне мира (корабли в гарнизоне не в счёт). */
 function groundCount(p: Planet): number {
   return p.garrison.reduce((n, s) => n + (data.units[s.unit]?.domain === 'ground' ? s.count : 0), 0);
@@ -1798,6 +1807,7 @@ function baseAiOrders(
       if (
         warFooting &&
         data.modules[SIEGE_MODULE] &&
+        ownsModule(state, ai, SIEGE_MODULE) &&
         shipsOwned(lineUnit, SIEGE_MODULE) < (army.siegeCap ?? SIEGE_CAP) &&
         !pendingSiege(base.id) &&
         Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...siegeCost }).every(
@@ -2343,7 +2353,7 @@ function baseAiOrders(
       const fits = Object.keys(data.modules)
         .filter((id) => {
           const md = data.modules[id];
-          if (!md || installed.includes(id)) return false;
+          if (!md || installed.includes(id) || !ownsModule(state, ai, id)) return false;
           if (!moduleAllowed(hull, hullDef, md)) return false;
           return used[md.slot] < hullDef.slots[md.slot] + (bonus?.[md.slot] ?? 0);
         })

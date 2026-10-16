@@ -37,7 +37,7 @@ describe('main-game meta content', () => {
         data,
       ),
     ).toThrow('E_META_MATERIAL');
-    catalog.recipes.ablative_plating!.salvage.ferroalloys = 25;
+    catalog.recipes.siege_platform!.salvage.ferroalloys = 25;
     expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_SALVAGE');
   });
 
