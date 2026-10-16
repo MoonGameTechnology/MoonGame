@@ -1,0 +1,1214 @@
+{
+  "schemaVersion": 1,
+  "mode": "passive-pre-observability",
+  "collectorSha256": "0354cdd85e4600afaed0cf8d6ceb8d5b3867f82a6bac086ee9c1da72070063ea",
+  "repositoryCommit": "1161bc2d0b3cd90c61352a3c5b93ba66858d1406",
+  "logicalCpus": 4,
+  "intervalMs": 15000,
+  "samples": [
+    {
+      "at": "2026-10-16T15:46:08.423Z",
+      "host": {
+        "cpuBusyRatio": null,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4522553344,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46642044928,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:46:23.368Z",
+      "host": {
+        "cpuBusyRatio": 0.02244932149438772,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4521992192,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641889280,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:46:38.372Z",
+      "host": {
+        "cpuBusyRatio": 0.01820611324536492,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4532862976,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641623040,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:46:53.377Z",
+      "host": {
+        "cpuBusyRatio": 0.019869761228919702,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4520140800,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641405952,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:47:08.398Z",
+      "host": {
+        "cpuBusyRatio": 0.020499999999999963,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4522659840,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641348608,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:47:23.369Z",
+      "host": {
+        "cpuBusyRatio": 0.02086811352253759,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4528926720,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641299456,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:47:38.379Z",
+      "host": {
+        "cpuBusyRatio": 0.01719532554257097,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4530339840,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641254400,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:47:53.384Z",
+      "host": {
+        "cpuBusyRatio": 0.01851851851851849,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4526821376,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641172480,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-10-16T15:48:08.381Z",
+      "host": {
+        "cpuBusyRatio": 0.019362376898681366,
+        "memoryTotalBytes": 6207672320,
+        "memoryAvailableBytes": 4522917888,
+        "diskTotalBytes": 63290032128,
+        "diskAvailableBytes": 46641094656,
+        "inodesTotal": 3932160,
+        "inodesFree": 3589735
+      },
+      "containers": {
+        "server": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T15:09:10.538931834Z",
+          "imageId": "sha256:1c51618b04999a264193d85e6464403392114d54a78aeb680993c157d357e823",
+          "memoryCapBytes": 1073741824
+        },
+        "postgres": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:27:00.407741494Z",
+          "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+          "memoryCapBytes": 1073741824
+        },
+        "caddy": {
+          "running": true,
+          "oomKilled": false,
+          "restarts": 0,
+          "startedAt": "2026-10-16T13:46:53.827297791Z",
+          "imageId": "sha256:a8d1d32cfaa5d7d5c57c1fb5b333f0966dce7ce74a4c5fd96d1274c06db01658",
+          "memoryCapBytes": 536870912
+        }
+      },
+      "sources": {
+        "health": {
+          "status": "ok",
+          "value": {
+            "ok": true,
+            "version": "81715959"
+          }
+        },
+        "ready": {
+          "status": "ok",
+          "value": {
+            "ready": true
+          }
+        },
+        "metrics": {
+          "status": "ok",
+          "value": {
+            "matches": 9,
+            "connections": 0
+          }
+        },
+        "summary": {
+          "status": "ok",
+          "value": {
+            "joins": 0,
+            "leaves": 0,
+            "desyncs": 0,
+            "deadLetters": 0,
+            "advanceOverflows": 0,
+            "actionsTotal": 0,
+            "actionsOk": 0,
+            "actionsRejected": 0,
+            "submitSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "broadcastSeconds": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "deltaBytes": {
+              "count": 0,
+              "total": 0,
+              "max": 0
+            },
+            "journal": {
+              "match": {
+                "written": 3,
+                "dropped": 0,
+                "failed": 0
+              },
+              "client": {
+                "written": 14,
+                "dropped": 0,
+                "failed": 0
+              }
+            },
+            "telemetry": {
+              "batches": 7,
+              "events": 14,
+              "droppedEvents": 0,
+              "rejected": 0,
+              "limited": 0,
+              "activeInstalls": 0
+            }
+          }
+        },
+        "matches": {
+          "status": "ok",
+          "value": [
+            {
+              "map": "duel-1",
+              "timeScale": 24,
+              "matches": 3
+            },
+            {
+              "map": "ffa-4",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-2v2",
+              "timeScale": 24,
+              "matches": 2
+            },
+            {
+              "map": "team-3v3",
+              "timeScale": 24,
+              "matches": 2
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "unavailable": [
+    "histogramP95",
+    "schedulerBacklog",
+    "perMatchLiveOps",
+    "dbDetailedHealth",
+    "externalBackupHealth"
+  ]
+}

@@ -915,6 +915,14 @@ BRW-2/3 написаны ровно под это.
 
 ## Кросс-каттинг
 
+## Блок OBS · Пульт плейтестов `[docs]` `[ops]`
+
+- **OBS-0.1** ✅ 2026-10-16 — [Контракт v1](observability-contract-v1.md): матрица
+  источников/доступа/свежести, units/reset/cardinality, профиль SSH/local/UI-only,
+  caps/TTL; bounded read-only baseline CLI с privacy-проверками и
+  [реальным замером](reviews/2026-10-16-obs-0-1-baseline.md). Runtime-стек не установлен.
+  Следующие кирпичи — в [роадмапе пульта](playtest-observability-roadmap.md).
+
 ## Блок HARD · Закалка плейтест-контура (заказ владельца 2026-07-18) `[ops]` `[core]` `[srv]` `[proto]` `[sec]`
 
 > Четыре направления: TLS+домен, автодеплой, реплей-детерминизм в CI, fuzz/property-тесты
