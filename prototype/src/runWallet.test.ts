@@ -152,7 +152,7 @@ describe('шапка забега — проводка в кадре', () => {
     expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
     expect(main).toContain('runOnScreen: () => sectorZeroToolsHidden(),');
     expect(bar).toMatch(/\n {2}runWallet\.render\(\);/);
-    expect(main).toMatch(/\n {2}renderTopBar\(nowReal, preparingMap, missions\);/);
+    expect(main).toMatch(/\n {2}renderTopBar\(missions\);/);
   });
 
   it('ролик в кошельке — те же порция и дневной лимит, что у магазина, по сегодняшним суткам', () => {
