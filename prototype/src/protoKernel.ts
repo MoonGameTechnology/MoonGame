@@ -1,4 +1,4 @@
-import { mapPreset, scoreLimitFor } from './mapCatalog';
+import { mapPreset, victoryFor } from './mapCatalog';
 /**
  * The prototype's kernel assembly point (REFP-21) — the ordered module list, the
  * compiled kernel, the match config (`SCORE_LIMIT`), and the two pure step helpers
@@ -273,12 +273,12 @@ export function setMatchPveBoss(on: boolean): void {
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
   const config: MatchConfig = {
     timeScale: 1,
-    // Порог очков карты — если режим своего не объявил: учебный полигон (§14.9) кончается
+    // Порог и захват карты — если режим своих не объявил: учебный полигон (§14.9) кончается
     // взятием миров противника, и порог «по размеру карты» не должен закончить его раньше.
     victory:
       matchModeId !== undefined && data.modes[matchModeId]?.victory?.scoreLimit !== undefined
         ? {}
-        : { scoreLimit: scoreLimitFor(state ?? {}) },
+        : victoryFor(state ?? {}),
     ...(matchModeId !== undefined ? { modeId: matchModeId } : {}),
     ...(matchTravelSpeed !== 1 ? { travelSpeedFactor: matchTravelSpeed } : {}),
     ...(matchVeteranPower ? { veteranPower: true } : {}),

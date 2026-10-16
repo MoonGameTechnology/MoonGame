@@ -21,7 +21,7 @@ import { checkProductionReadiness } from '../packages/server/src/serverConfig';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
-import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
@@ -591,7 +591,7 @@ async function createHostedMatch(
     config: {
       timeScale: 1,
       ...(sessionModeId !== undefined ? { modeId: sessionModeId } : {}),
-      victory: { scoreLimit: scoreLimitFor(initialState) },
+      victory: victoryFor(initialState),
     },
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value

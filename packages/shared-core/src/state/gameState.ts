@@ -473,6 +473,10 @@ export interface MatchState {
   endedAt?: number;
   reason?: MatchEndReason;
   scores: Record<PlayerId, MatchScore>;
+  /** Battle points accrued so far (BAL-16): +20 per battle won against a player, −4 per
+   *  battle lost to one. Cumulative, unlike the territory snapshot; added into each
+   *  `scores[id].total`. Absent until the first such battle. */
+  battlePoints?: Record<PlayerId, number>;
   /** Session-end reward table (GDD §3.4), written once when the match ends —
    *  every seated player gets a row (participation pays even in defeat). */
   rewards?: Record<PlayerId, PlayerReward>;

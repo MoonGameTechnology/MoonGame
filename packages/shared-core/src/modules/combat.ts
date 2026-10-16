@@ -952,6 +952,9 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   for (const owner of resumeAssaultFor) {
     h.emit('beachhead.landed', { planetId: battle.location, owner });
   }
+  const winners = stalemate
+    ? []
+    : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort();
   h.emit('battle.resolved', {
     battleId: battle.id,
     location: battle.location,
@@ -963,9 +966,20 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     // молча не начислит ничего. Поэтому рядом едет полный список: мир по-прежнему
     // достаётся ПЕРВОМУ (§0.0 №4), а вот трофеи делятся — иначе помощь не окупалась бы
     // вовсе и совместный штурм не имел бы смысла.
-    winners: stalemate
+    winners,
+    // Проигравшие — владельцы сторон решённого боя, у которых не уцелело ни одной стороны
+    // (BAL-16: очки за бой платит победителю и снимает с проигравшего модуль победы, а
+    // список сторон боя к этому событию уже удалён вместе с боем). Ничья и перемирие
+    // проигравших не имеют, как не имеют и победителей.
+    losers: stalemate
       ? []
-      : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort(),
+      : [
+          ...new Set(
+            battle.sides
+              .map((x) => x.owner)
+              .filter((o): o is string => o !== null && !winners.includes(o)),
+          ),
+        ].sort(),
     rounds: battle.round,
     end,
     // Флоты-участники: бой ПРИОСТАНАВЛИВАЕТ их намерения (слияние), и тому, кто их
@@ -1139,7 +1153,8 @@ export const combatModule: GameModule = {
   // враги нового хозяина вступают в новый бой; посадка на борт не уводит трюм в минус
   // (замечания Codex на #1409).
   // 3.6.0: бой «Атаки» втягивает ждавших у мира — возможность `battle.pullIn` (ATK-3).
-  version: '3.6.0',
+  // 3.7.0: `battle.resolved` называет проигравших — `losers` (BAL-16).
+  version: '3.7.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
 

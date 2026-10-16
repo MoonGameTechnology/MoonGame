@@ -35,6 +35,7 @@
 | BAL-3 | 🔶 | proto data | `docs/backlog.md` | Кредиты, энергия и еда — декорации, а не ресурсы. |
 | BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
+| BAL-16 | 🔶 | core proto | `docs/backlog.md` | Бои за планеты дают очки, порог считается от карты. |
 | BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | BAL-7 | ✅ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
@@ -1126,6 +1127,19 @@
 | PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
+| OBS-0.1 | ⏳ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
+| OBS-0.2 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
+| OBS-0.3 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
+| OBS-1.1 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
+| OBS-1.2 | 🔒 | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
+| OBS-1.3 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
+| OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
+| OBS-2.2 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Поведение в Grafana |
+| OBS-2.3 | 🔒 | srv | `docs/playtest-observability-roadmap.md` | Честные гистограммы и backlog |
+| OBS-3.1 | 🔒 | srv proto sec | `docs/playtest-observability-roadmap.md` | Список и карточка партии |
+| OBS-3.2 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Отдельная площадка и восстановление |
+| OBS-4.1 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Приёмка и handoff |
+| OBS-5.1 | 🔒 | docs ops | `docs/playtest-observability-roadmap.md` | Error tracker или аналитическое хранилище |
 | PTM-0.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Журнал по дням, отчёт по партии, сводка не теряется |
 | PTM-0.2 | ✅ | srv ops | `docs/playtest-telemetry-roadmap.md` | Псевдоним игрока в журнале партии |
 | PTM-1.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Приёмник клиентских событий |

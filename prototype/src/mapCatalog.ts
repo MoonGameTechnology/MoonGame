@@ -29,8 +29,11 @@ export const isFrontier = (id: string | undefined): boolean =>
  *  предел через `scoreLimitFor`, победа в матче — из пресета), так что правка одного
  *  места молча разводила полосу прогресса с настоящим порогом конца партии. */
 const SCORE_LIMITS: Record<MapId, number> = {
-  'duel-1': 1100,
-  'ffa-4': 1100,
+  // BAL-16 (резолюция владельца 2026-10-15): порог — очки всей застроенной карты. Половина
+  // карты, взятая без боя, даёт 55–59% порога, остальное добирают выигранные бои (замер
+  // 2026-10-14: 120 партий ботов по 30 дней).
+  'duel-1': 560,
+  'ffa-4': 790,
   'team-2v2': 2200,
   'team-3v3': 3300,
   // Большие FFA — та же доля очков карты, что у фронтира (~0,47 базы): одному из двадцати
@@ -179,6 +182,23 @@ export function teamForStart(mapId: MapId, start: string): string | undefined {
 export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
   const id = state.mapId;
   return (id !== undefined && SCORE_LIMITS[id as MapId]) || SCORE_LIMITS.nexus;
+}
+/** Доля захваченных провинций, которая побеждает сразу (BAL-16, та же резолюция): 80%
+ *  вместо умолчания ядра 60%, иначе на дуэли захват кончал партию на 4-й день, до боёв.
+ *  Карта вне таблицы берёт умолчание режима или ядра. */
+const DOMINATION_PERCENT: Partial<Record<MapId, number>> = { 'duel-1': 0.8, 'ffa-4': 0.8 };
+/** Условия победы карты для конфига матча — один источник для локальной симуляции
+ *  (`protoKernel.ctx`) и сетевого хоста (`netserver.ts`). */
+export function victoryFor(state: Pick<GameState, 'mapId'>): {
+  scoreLimit: number;
+  dominationPercent?: number;
+} {
+  const domination =
+    state.mapId === undefined ? undefined : DOMINATION_PERCENT[state.mapId as MapId];
+  return {
+    scoreLimit: scoreLimitFor(state),
+    ...(domination !== undefined ? { dominationPercent: domination } : {}),
+  };
 }
 /** Geometry comes from the authoritative snapshot, including custom scenarios. */
 export function mapNodesFromState(state: GameState): MapNode[] {
