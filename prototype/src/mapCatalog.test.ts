@@ -68,8 +68,8 @@ describe('Frontier 50', () => {
     expect(scoreLimitFor(restored)).toBeGreaterThan(scoreLimitFor(newGame()));
   });
 
-  it('offers duel, four-player FFA and 2v2 but preserves existing 100-seat snapshots', () => {
-    expect(MAP_IDS).toEqual(['duel-1', 'ffa-4', 'team-2v2', 'team-3v3']);
+  it('offers duel, FFA for 4, 20 and 50, 2v2 and 3v3 but preserves existing 100-seat snapshots', () => {
+    expect(MAP_IDS).toEqual(['duel-1', 'ffa-4', 'team-2v2', 'team-3v3', 'ffa-20', 'ffa-50']);
     const old = newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100') });
     expect(Object.keys(old.planets)).toHaveLength(1675);
     expect(mapPreset('frontier-100').starts).toHaveLength(100);

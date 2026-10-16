@@ -476,6 +476,11 @@ const selectMap = (id) => {
 if (sectorEntry) await click('sz-back');
 await click('cwgo');
 await click('hub-solo');
+// FFA на 20 мест не рисует строку на каждое место: экран спрашивает, сколько ботов позвать.
+selectMap('ffa-20');
+assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 20);
+assert.ok(getEl('setupslots').innerHTML.includes('id="setup-bot-count"'));
+assert.ok(!getEl('setupslots').innerHTML.includes('data-slot='));
 selectMap('ffa-4');
 assert.ok(getEl('setupmaps').innerHTML.includes('data-map="ffa-4" aria-pressed="true"'));
 assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 4);

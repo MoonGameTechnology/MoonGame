@@ -10,13 +10,15 @@ import frontier50 from '../../data/frontier-50.json';
 import frontier100 from '../../data/frontier-100.json';
 import duel from '../../data/maps/duel-1.json';
 import ffa4 from '../../data/maps/ffa-4.json';
+import ffa20 from '../../data/maps/ffa-20.json';
+import ffa50 from '../../data/maps/ffa-50.json';
 import team2v2 from '../../data/maps/team-2v2.json';
 import team3v3 from '../../data/maps/team-3v3.json';
 import { data } from './gameData';
 import { MAP, START_CANDIDATES, type MapNode } from './map';
 
 /** Presets offered for NEW matches. The retired id remains readable for old sessions. */
-export const MAP_IDS = ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3'] as const;
+export const MAP_IDS = ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3', 'ffa-20', 'ffa-50'] as const;
 export const DEFAULT_MAP_ID = MAP_IDS[0];
 export type MapId = (typeof MAP_IDS)[number] | 'nexus' | 'frontier-50' | 'frontier-100';
 export const isCurrentMap = (id: string | undefined): boolean => MAP_IDS.some((map) => map === id);
@@ -31,6 +33,10 @@ const SCORE_LIMITS: Record<MapId, number> = {
   'ffa-4': 1100,
   'team-2v2': 2200,
   'team-3v3': 3300,
+  // Большие FFA — та же доля очков карты, что у фронтира (~0,47 базы): одному из двадцати
+  // или пятидесяти не нужно держать полкарты, чтобы победить по очкам.
+  'ffa-20': 3800,
+  'ffa-50': 9400,
   nexus: 1100,
   'frontier-50': 7500,
   'frontier-100': 15000,
@@ -63,14 +69,36 @@ const nodeId = (i: number): string => `F${i}`;
  *  что модуль читают и тесты, где сборщика с его `define` нет. */
 declare const __SECTOR_ZERO_ONLY__: boolean | undefined;
 
+/** JSON опубликованной карты. Две большие FFA (~300 КБ вместе) в архив Sector Zero не
+ *  кладутся — по той же причине и тем же условием, что фронтир ниже. */
+function authoredMap(id: string): unknown {
+  if (id === 'duel-1') return duel;
+  if (id === 'ffa-4') return ffa4;
+  if (id === 'team-2v2') return team2v2;
+  if (id === 'team-3v3') return team3v3;
+  return typeof __SECTOR_ZERO_ONLY__ !== 'undefined' && __SECTOR_ZERO_ONLY__
+    ? null
+    : id === 'ffa-20'
+      ? ffa20
+      : id === 'ffa-50'
+        ? ffa50
+        : null;
+}
+
+/** Места на экране настройки идут строкой на каждое — пока их не больше этого. На картах
+ *  крупнее (фронтир, FFA на 20 и 50) список не поместится, и экран спрашивает только,
+ *  сколько соперников ИИ позвать. */
+export const SEAT_ROWS_MAX = 10;
+export const seatsByCount = (id: string): boolean => mapPreset(id).starts.length > SEAT_ROWS_MAX;
+
 /** Frozen authored content; instantiate the large retired graph only when requested. */
 export function mapPreset(id: string = 'nexus'): MapPreset {
   const cached = PRESETS.get(id);
   if (cached) return cached;
-  if (id === 'duel-1' || id === 'ffa-4' || id === 'team-2v2' || id === 'team-3v3') {
-    const map = parseMatchMap(
-      id === 'duel-1' ? duel : id === 'ffa-4' ? ffa4 : id === 'team-2v2' ? team2v2 : team3v3,
-    );
+  if (isCurrentMap(id)) {
+    const content = authoredMap(id);
+    if (!content) throw new Error('E_UNKNOWN_MAP');
+    const map = parseMatchMap(content);
     if (validateMatchMap(map, data).length) throw new Error('E_INVALID_MAP');
     const edges = matchMapEdges(map, data);
     const nodes: MapNode[] = Object.entries(map.sectors).map(([id, sector]) => ({
@@ -83,11 +111,11 @@ export function mapPreset(id: string = 'nexus'): MapPreset {
       links: edges.paths.flatMap(([a, b]) => (a === id ? [b] : b === id ? [a] : [])),
     }));
     const preset: MapPreset = {
-      id,
+      id: id as MapId,
       map,
       nodes,
       boundary: [],
-      scoreLimit: SCORE_LIMITS[id],
+      scoreLimit: SCORE_LIMITS[id as MapId],
       starts: Object.keys(map.slots).map((slot) =>
         Object.keys(map.sectors).find((key) => map.sectors[key]!.owner === slot)!,
       ),
