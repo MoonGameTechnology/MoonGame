@@ -1,6 +1,6 @@
 import type { UnitStack } from '../state/gameState';
 import type { GameData, UnitDef } from '../data/schemas';
-import { effectiveStats } from './loadout';
+import { effectiveStat, effectiveStats } from './loadout';
 
 /** Canonical, order-independent signature of a loadout (one instance per module
  *  id, so it's a set): sorted ids joined. Empty/absent loadout → `''`. Two stacks
@@ -138,7 +138,7 @@ export function sumUnitStat(stacks: readonly UnitStack[], data: GameData, stat: 
   for (const s of stacks) {
     const def = data.units[s.unit];
     if (def) {
-      total += s.count * (effectiveStats(def, s, data)[stat] ?? 0);
+      total += s.count * (effectiveStat(def, s, data, stat) ?? 0);
     }
   }
   return total;

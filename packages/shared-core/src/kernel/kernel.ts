@@ -10,6 +10,7 @@ import type {
 import { Rejection } from '../action/types';
 import { Rng } from '../rng/rng';
 import { deepClone } from '../util/clone';
+import { DRAFT_RECORDS, HOLE } from '../util/draft';
 import type {
   ActionHandler,
   EventHandler,
@@ -97,7 +98,8 @@ function scheduledInsertPos(arr: readonly ScheduledEvent[], at: number, seq: num
  * тот же мир, а состояние вызывающего не меняется (инвариант №2).
  *
  * Записи сущностей по id (`ENTITY_RECORDS`) копируются так же, но по одной сущности:
- * заказ стройки читает свой мир, а не все 320 миров карты.
+ * заказ стройки читает свой мир, а не все 320 миров карты. Записи простых значений
+ * (`VALUE_RECORDS`) читаются без копии и копируются целиком при первой записи.
  */
 function lazyDraft(state: GameState): GameState {
   const base = state as unknown as Record<string, unknown>;
@@ -105,7 +107,13 @@ function lazyDraft(state: GameState): GameState {
   for (const key of Object.keys(base)) {
     const value = base[key];
     lazyProp(draft, key, () =>
-      ENTITY_RECORDS.has(key) && isRecord(value) ? lazyRecord(value) : deepClone(value),
+      !isRecord(value)
+        ? deepClone(value)
+        : ENTITY_RECORDS.has(key)
+          ? lazyRecord(value)
+          : VALUE_RECORDS.has(key)
+            ? valueRecord(value)
+            : deepClone(value),
     );
   }
   DRAFT_BASE.set(draft, base);
@@ -127,14 +135,22 @@ const ENTITY_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
   'heroes',
 ]);
 
-/** Место сущности, которую шаг ещё не читал. */
-const HOLE: unknown = Object.freeze({});
+/**
+ * Записи, где под ключом лежит простое значение (строка стойки, `true` договора, id
+ * столицы), а не объект. Стойки на FFA-50 — 2278 пар, и любой приказ, спросивший
+ * «враг ли он?», копировал их все: ~8 мс кадра на ×10. Читать такую запись можно прямо из
+ * входа: изменить значение в ней можно только записью в саму запись, а её ловит `Proxy`.
+ */
+const VALUE_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
+  'diplomacy',
+  'diplomacyOffers',
+  'mapShares',
+  'mapShareOffers',
+  'capital',
+]);
 
-/** Ленивая запись → её места и запись вызывающего, из которой она копирует. */
-const RECORDS = new WeakMap<
-  object,
-  { slots: Record<string, unknown>; base: Record<string, unknown> }
->();
+/** Запись простых значений → то, что она сейчас есть: вход или её копия после записи. */
+const VALUES = new WeakMap<object, () => Record<string, unknown>>();
 /** Ленивый черновик → состояние вызывающего. */
 const DRAFT_BASE = new WeakMap<object, Record<string, unknown>>();
 
@@ -160,7 +176,37 @@ function lazyRecord(base: Record<string, unknown>): Record<string, unknown> {
       return copy;
     },
   });
-  RECORDS.set(record, { slots, base });
+  DRAFT_RECORDS.set(record, { slots, base });
+  return record;
+}
+
+/**
+ * Запись простых значений ({@link VALUE_RECORDS}): чтение, ключи и `in` идут во вход, первая
+ * запись или удаление снимает копию и дальше всё идёт в неё. Цель `Proxy` — пустой свой
+ * объект, а не вход: вход бывает заморожен, и `Proxy` над ним не смел бы отдать значение
+ * копии. Свойства поэтому отдаются настраиваемыми.
+ */
+function valueRecord(base: Record<string, unknown>): Record<string, unknown> {
+  let own: Record<string, unknown> | null = null;
+  const read = (): Record<string, unknown> => own ?? base;
+  const write = (): Record<string, unknown> => (own ??= deepClone(base));
+  const record = new Proxy<Record<string, unknown>>(
+    {},
+    {
+      get: (_target, key) => Reflect.get(read(), key),
+      has: (_target, key) => Reflect.has(read(), key),
+      ownKeys: () => Reflect.ownKeys(read()),
+      getOwnPropertyDescriptor: (_target, key) => {
+        const prop = Reflect.getOwnPropertyDescriptor(read(), key);
+        if (prop) prop.configurable = true;
+        return prop;
+      },
+      set: (_target, key, value) => Reflect.set(write(), key, value),
+      deleteProperty: (_target, key) => Reflect.deleteProperty(write(), key),
+      defineProperty: (_target, key, prop) => Reflect.defineProperty(write(), key, prop),
+    },
+  );
+  VALUES.set(record, read);
   return record;
 }
 
@@ -201,8 +247,9 @@ function settledDraft(draft: GameState): GameState {
       out[key] = base[key]; // шаг его не тронул
       continue;
     }
-    const record = isRecord(prop.value) ? RECORDS.get(prop.value) : undefined;
-    out[key] = record ? settledRecord(record.slots, record.base) : prop.value;
+    const record = isRecord(prop.value) ? DRAFT_RECORDS.get(prop.value) : undefined;
+    const values = isRecord(prop.value) ? VALUES.get(prop.value) : undefined;
+    out[key] = record ? settledRecord(record.slots, record.base) : values ? values() : prop.value;
   }
   return out as unknown as GameState;
 }

@@ -5,6 +5,7 @@ import { createInitialState, type GameState, type Planet } from '../state/gameSt
 import { parseGameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 import { deepFreeze } from '../util/clone';
+import { peek, peekValues } from '../util/draft';
 
 // ---------------------------------------------------------------------------
 // Test fixtures: minimal modules that exercise the kernel's three mechanisms.
@@ -548,6 +549,99 @@ describe('kernel — canApply (RULES-1)', () => {
     expect(res.state.planets.p?.resources.credits).toBe(7);
     expect(Object.keys(state.planets)).toEqual(['p', 'q', 's']);
     expect(state.planets.p?.resources.credits).toBe(1);
+  });
+
+  // Стойки дипломатии и другие записи простых значений черновик не копирует, пока в них не
+  // пишут: вопрос «враг ли он?» читает вход, а приказ без записи отдаёт ту же запись.
+  it('запись простых значений копируется только первой записью', () => {
+    const seen: unknown[] = [];
+    const kernel = createKernel([
+      {
+        id: 'treaty',
+        version: '1.0.0',
+        setup(api) {
+          api.onAction('treaty.read', (_a, h) => {
+            const d = h.state.diplomacy!;
+            seen.push(d['p1|p2'], Object.keys(d), ['p1|p2' in d, 'p1|p3' in d]);
+          });
+          api.onAction('treaty.sign', (_a, h) => {
+            const d = h.state.diplomacy!;
+            d['p1|p3'] = 'alliance';
+            delete d['p1|p2'];
+            seen.push(Object.keys(d), d['p1|p3'], JSON.stringify(d), { ...d });
+          });
+        },
+      },
+    ]);
+    const state = deepFreeze({
+      ...baseState(),
+      diplomacy: { 'p1|p2': 'war', 'p2|p3': 'peace' },
+    } as GameState);
+
+    expect(kernel.canApply(state, action('treaty.read', {}), ctx())).toBeNull();
+    const read = expectOk(kernel.applyAction(state, action('treaty.read', {}), ctx()));
+    expect(read.state.diplomacy).toBe(state.diplomacy);
+
+    const signed = expectOk(kernel.applyAction(state, action('treaty.sign', {}), ctx()));
+    expect(seen).toEqual([
+      'war',
+      ['p1|p2', 'p2|p3'],
+      [true, false],
+      'war',
+      ['p1|p2', 'p2|p3'],
+      [true, false],
+      ['p2|p3', 'p1|p3'],
+      'alliance',
+      '{"p2|p3":"peace","p1|p3":"alliance"}',
+      { 'p2|p3': 'peace', 'p1|p3': 'alliance' },
+    ]);
+    expect(signed.state.diplomacy).toEqual({ 'p2|p3': 'peace', 'p1|p3': 'alliance' });
+    expect(Object.getPrototypeOf(signed.state.diplomacy)).toBe(Object.prototype);
+    expect(state.diplomacy).toEqual({ 'p1|p2': 'war', 'p2|p3': 'peace' });
+  });
+
+  // `peek` читает сущность черновика без копии: нетронутая берётся из входа, тронутая, новая
+  // и удалённая видны такими, какими их оставил шаг. Вне черновика это обычное чтение.
+  it('peek и peekValues читают черновик без копии', () => {
+    const seen: unknown[] = [];
+    const kernel = createKernel([
+      {
+        id: 'scan',
+        version: '1.0.0',
+        setup(api) {
+          api.onAction('scan.run', (_a, h) => {
+            const planets = h.state.planets;
+            seen.push(peek(planets, 'q') === state.planets.q, peek(planets, 'x'));
+            planets.p!.resources.credits = 9;
+            delete planets.s;
+            planets.r = makePlanet('r', 'p1');
+            seen.push(peek(planets, 'p') === planets.p, peek(planets, 's'));
+            seen.push(peekValues(planets).map((p) => [p.id, p.resources.credits]));
+          });
+        },
+      },
+    ]);
+    let state = baseState();
+    for (const id of ['p', 'q', 's'])
+      state = withPlanet(state, makePlanet(id, 'p1', { credits: 1 }));
+    state = deepFreeze(state);
+
+    const res = expectOk(kernel.applyAction(state, action('scan.run', {}), ctx()));
+    expect(seen).toEqual([
+      true,
+      undefined,
+      true,
+      undefined,
+      [
+        ['p', 9],
+        ['q', 1],
+        ['r', undefined],
+      ],
+    ]);
+    // Прочитанный через `peek` мир шаг не копировал: принятый приказ отдаёт его входом.
+    expect(res.state.planets.q).toBe(state.planets.q);
+    expect(peek(state.planets, 'q')).toBe(state.planets.q);
+    expect(peekValues(state.planets)).toEqual(Object.values(state.planets));
   });
 });
 

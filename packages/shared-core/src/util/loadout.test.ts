@@ -5,6 +5,7 @@ import path from 'node:path';
 import { parseGameData, type GameData } from '../data/schemas';
 import { loadGameData } from '../data/loadGameData';
 import {
+  effectiveStat,
   effectiveStats,
   slotUsage,
   canEquip,
@@ -452,5 +453,44 @@ describe('SZE-5.1 — редкость модуля даёт новый пара
     expect(() => mod({ rarity: 'unique', rarityBonus: { unique: { hp: 1 } } })).toThrow();
     expect(() => mod({ rarityBonus: { unique: { utilitySlots: 1 } } })).toThrow();
     expect(() => mod({ rarityBonus: { unique: { hp: 1 } } })).not.toThrow();
+  });
+});
+
+// `effectiveStat` — одна характеристика без мешка всех. Ход мира спрашивает ею радар,
+// прочность и ремонт, поэтому число обязано совпасть с `effectiveStats` до бита: иначе мир
+// тихо разошёлся бы с прежним. Сверка на настоящем каталоге, со звёздами и редкостью.
+describe('effectiveStat — то же число, что effectiveStats', () => {
+  const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../data');
+  const shipped: GameData = loadGameData((name: string): unknown =>
+    JSON.parse(readFileSync(path.join(dataDir, name), 'utf8')),
+  );
+  const moduleIds = Object.keys(shipped.modules);
+  const loadouts: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity'>[] = [
+    {},
+    { modules: [] },
+    { modules: moduleIds, moduleStars: Object.fromEntries(moduleIds.map((id, i) => [id, i % 4])) },
+    ...moduleIds.flatMap((id) =>
+      ['unique', 'mythic', 'legendary'].map((rarity, star) => ({
+        modules: [id, 'no_such_module'],
+        moduleStars: { [id]: star },
+        moduleRarity: { [id]: rarity },
+      })),
+    ),
+  ];
+
+  it('на каждом корпусе, лоадауте и характеристике', () => {
+    let compared = 0;
+    for (const def of Object.values(shipped.units)) {
+      for (const stack of loadouts) {
+        const all = effectiveStats(def, stack, shipped);
+        for (const key of [...Object.keys(all), 'no_such_stat', 'toString']) {
+          expect(effectiveStat(def, stack, shipped, key), key).toBe(
+            Object.hasOwn(all, key) ? all[key] : undefined,
+          );
+          compared++;
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(1000);
   });
 });

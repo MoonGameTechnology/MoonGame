@@ -10,6 +10,7 @@ import {
   trunkPosAt,
 } from '../util/combat';
 import { isMineFleet } from '../state/minefields';
+import { peek } from '../util/draft';
 
 /**
  * Флот дерётся в бою НА ДОРОГЕ: приколот к точке полосы, бой на орбитальной фазе. Для
@@ -52,7 +53,8 @@ function scanLaneIntercepts(h: HandlerContext, fleetId: string): void {
     if (id === fleetId) {
       continue;
     }
-    const other = h.state.fleets[id];
+    // Только чтение: в черновике приказа перебор не копирует каждый флот карты.
+    const other = peek(h.state.fleets, id);
     if (!other || !canMeet(h, other) || !isHostile(h, fleet.owner, other.owner)) {
       continue;
     }
@@ -117,7 +119,7 @@ function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
   // Sorted (BF-13): the schedule's tiebreak follows call order.
   for (const id of Object.keys(h.state.fleets).sort()) {
     if (id === fleetId) continue;
-    const other = h.state.fleets[id];
+    const other = peek(h.state.fleets, id); // только чтение, как у полосы
     if (!other || !canMeet(h, other) || !isHostile(h, fleet.owner, other.owner)) continue;
     if (fleet.battleId && other.battleId) continue; // оба уже в бою
     if (!other.units.some((s) => s.count > 0) || sameLane(fleet, other)) continue;

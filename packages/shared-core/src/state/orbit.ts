@@ -1,6 +1,7 @@
 import { getStance } from './diplomacy';
 import { hasOrbit, isBombardable } from './sectorKind';
 import { isMineFleet } from './minefields';
+import { peek, peekValues } from '../util/draft';
 import type { GameData } from '../data/schemas';
 import type { Fleet, GameState, PlanetId, PlayerId } from './gameState';
 
@@ -44,7 +45,7 @@ export function isActivelyBombarding(
   if (isMineFleet(fleet, data)) {
     return false;
   }
-  const planet = state.planets[fleet.location];
+  const planet = peek(state.planets, fleet.location);
   if (planet === undefined || !hasOrbit(data, planet)) {
     return false;
   }
@@ -72,7 +73,7 @@ function stanceHostile(state: GameState): (a: PlayerId, b: PlayerId) => boolean 
 export function bombardedPlanets(state: GameState, data: GameData): Set<PlanetId> {
   const set = new Set<PlanetId>();
   const hostile = stanceHostile(state);
-  for (const fleet of Object.values(state.fleets)) {
+  for (const fleet of peekValues(state.fleets)) {
     if (isActivelyBombarding(state, fleet, hostile, data)) {
       set.add(fleet.location as PlanetId);
     }
@@ -90,5 +91,8 @@ export function bombardedPlanets(state: GameState, data: GameData): Set<PlanetId
  * avoid an O(fleets) scan per planet.
  */
 export function isBombarded(state: GameState, planetId: PlanetId, data: GameData): boolean {
-  return bombardedPlanets(state, data).has(planetId);
+  const hostile = stanceHostile(state);
+  return peekValues(state.fleets).some(
+    (fleet) => fleet.location === planetId && isActivelyBombarding(state, fleet, hostile, data),
+  );
 }

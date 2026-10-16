@@ -26,6 +26,19 @@ describe('diplomacy — pair key', () => {
   it('distinguishes different pairs', () => {
     expect(pairKey('p1', 'p2')).not.toBe(pairKey('p1', 'p3'));
   });
+
+  // Ключи пар запоминаются, а запомненное сбрасывается на пределе. Ключ — функция двух id,
+  // поэтому ни память, ни её сброс не меняют ответ.
+  it('stays the same string through the key cache and its reset', () => {
+    const wrong: string[] = [];
+    for (let i = 0; i < 70_000; i++) {
+      const id = `x${i}`;
+      if (pairKey('p1', id) !== `p1|${id}` || pairKey(id, 'p1') !== `p1|${id}`) wrong.push(id);
+    }
+    expect(wrong).toEqual([]);
+    expect(pairKey('p2', 'p1')).toBe('p1|p2');
+    expect(pairKey('p1', 'p2')).toBe('p1|p2');
+  });
 });
 
 describe('diplomacy — getStance', () => {

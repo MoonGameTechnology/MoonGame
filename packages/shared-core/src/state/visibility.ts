@@ -1,7 +1,8 @@
 import { buildingLevel, type GameData, type UnitDef } from '../data/schemas';
 import { observedSwarm } from './swarmIntel';
 import { deepClone } from '../util/clone';
-import { effectiveStats } from '../util/loadout';
+import { peekValues } from '../util/draft';
+import { effectiveStat } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
@@ -122,7 +123,7 @@ export function stackRadarRange(
   stack: Pick<UnitStack, 'modules'>,
   data: GameData,
 ): number {
-  return def.radarRange + (effectiveStats(def, stack, data).radarRange ?? 0);
+  return def.radarRange + (effectiveStat(def, stack, data, 'radarRange') ?? 0);
 }
 
 /** Radar reach (distance, in map units) a fleet projects, from its loudest radar-ship.
@@ -261,6 +262,7 @@ function circlesByOwner(
   owners: readonly PlayerId[],
   data: GameData,
   rules: Readonly<SightRules>,
+  planets: readonly Planet[] = peekValues(state.planets),
 ): Map<PlayerId, SightCircle[]> {
   const byOwner = new Map<PlayerId, SightCircle[]>();
   const multOf = new Map<PlayerId, number>();
@@ -284,32 +286,58 @@ function circlesByOwner(
       signature: Math.max(base, radar),
     });
   };
-  for (const planet of Object.values(state.planets)) {
+  for (const planet of planets) {
     const mult = planet.owner === null ? undefined : multOf.get(planet.owner);
     if (mult === undefined) continue;
     const radar = worldRadarRaw(planet, data) * mult;
     circle(planet.owner!, { kind: 'world', id: planet.id }, planet.position, worldSightOf(rules, planet.kind), radar);
   }
-  for (const fleet of Object.values(state.fleets)) {
+  for (const fleet of peekValues(state.fleets)) {
     const mult = multOf.get(fleet.owner);
     if (mult === undefined) continue;
     const ownerId = fleet.owner;
     // Круг стоит там, где КОРАБЛЬ, а не в узле назначения и не в ближайшем узле.
     const pos = fleetPosition(state, fleet);
     if (isMineFleet(fleet, data)) {
-      // Контактная мина не глаз (SM-3.6). Ракетная — глаз и радар своего модуля, как и
-      // прежде, когда она лежала вне `fleets` (SM-3.7a): опознаёт по позиции (`seesByPosition`).
-      const rocket = rocketMineModule(fleet, data);
-      if (rocket && pos) byOwner.get(ownerId)!.push({
-        owner: ownerId, source: { kind: 'mine', id: fleet.id }, ...pos,
-        identify: rocket.def.sightRange, signature: rocket.def.radarRange,
-      });
+      const eye = pos && mineEye(fleet, pos, data);
+      if (eye) byOwner.get(ownerId)!.push(eye);
       continue;
     }
     // Ракета (SM-3.7b) не глаз и не радар: она летит к цели, а не смотрит.
     if (isMissileFleet(fleet, data)) continue;
     if (pos) circle(ownerId, { kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
   }
+  patrolEyes(state, byOwner);
+  // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
+  // light a full-identify zone around their target node until it expires.
+  for (const hero of Object.values(state.heroes ?? {})) {
+    if (!byOwner.has(hero.owner) || hero.alive !== true) continue; // deployed only (BF-24)
+    for (const r of hero.activeReveals ?? []) {
+      const at = state.planets[r.center]?.position;
+      if (r.until > state.time && at) circle(hero.owner, { kind: 'reveal', id: hero.id }, at, r.radius, 0);
+    }
+  }
+  return byOwner;
+}
+
+/** Глаз ракетной мины в точке `pos`, а у контактной — `null`. Контактная мина не глаз
+ *  (SM-3.6). Ракетная — глаз и радар своего модуля, как и прежде, когда она лежала вне
+ *  `fleets` (SM-3.7a): опознаёт по позиции (`positionEyes`). */
+function mineEye(fleet: Fleet, pos: { x: number; y: number }, data: GameData): SightCircle | null {
+  const rocket = rocketMineModule(fleet, data);
+  return rocket
+    ? {
+        owner: fleet.owner,
+        source: { kind: 'mine', id: fleet.id },
+        ...pos,
+        identify: rocket.def.sightRange,
+        signature: rocket.def.radarRange,
+      }
+    : null;
+}
+
+/** Глаза висящих патрулей шаттлов — в списки владельцев из `byOwner`. */
+function patrolEyes(state: GameState, byOwner: Map<PlayerId, SightCircle[]>): void {
   // SHU-6.7: висящий патруль шаттлов — глаза эскадры над её точкой. Круг тот же, в котором
   // патруль бьёт (`patrol.radius`), и это глаза, а не радар: опознание и засечка совпадают,
   // множители радара и блэкаут его не трогают. Только нога `patrol`: эскадра на пути к точке
@@ -337,16 +365,6 @@ function circlesByOwner(
       identify: p.radius, signature: p.radius,
     });
   });
-  // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
-  // light a full-identify zone around their target node until it expires.
-  for (const hero of Object.values(state.heroes ?? {})) {
-    if (!byOwner.has(hero.owner) || hero.alive !== true) continue; // deployed only (BF-24)
-    for (const r of hero.activeReveals ?? []) {
-      const at = state.planets[r.center]?.position;
-      if (r.until > state.time && at) circle(hero.owner, { kind: 'reveal', id: hero.id }, at, r.radius, 0);
-    }
-  }
-  return byOwner;
 }
 
 /** Все круги, которыми видит `viewerId`: его собственные и его блока зрения (союз, обмен
@@ -357,16 +375,24 @@ export function sightCircles(state: GameState, viewerId: PlayerId, data: GameDat
   return bloc.flatMap((memberId) => byOwner.get(memberId)!);
 }
 
-/** Опознаёт ли круг корабль по его ПОЗИЦИИ, а не по ближайшему узлу: ракетная мина и
- *  висящий патруль (SHU-6.7) висят над дорогой вдали от миров, и правило «опознан узел —
- *  виден флот» не видело бы ровно того, что под ними. */
-function seesByPosition(c: SightCircle): boolean {
-  return c.source.kind === 'mine' || c.source.kind === 'patrol';
-}
-
-/** Круги зрителя, опознающие корабль по позиции ({@link seesByPosition}). */
+/** Круги зрителя, опознающие корабль по его ПОЗИЦИИ, а не по ближайшему узлу: ракетная
+ *  мина и висящий патруль (SHU-6.7) висят над дорогой вдали от миров, и правило «опознан
+ *  узел — виден флот» не видело бы ровно того, что под ними. Это круги `mine` и `patrol` из
+ *  `sightCircles` в том же порядке, но собранные без кругов миров и флотов: вопрос «виден
+ *  ли этот флот?» бот задаёт о каждом вражеском флоте, и полный набор кругов на каждый
+ *  вопрос стоил на FFA-50 ~4 мс кадра на ×10. */
 function positionEyes(state: GameState, viewerId: PlayerId, data: GameData): SightCircle[] {
-  return sightCircles(state, viewerId, data).filter(seesByPosition);
+  const bloc = visionBloc(state, viewerId);
+  const byOwner = new Map<PlayerId, SightCircle[]>(bloc.map((id) => [id, []]));
+  for (const fleet of peekValues(state.fleets)) {
+    const out = byOwner.get(fleet.owner);
+    if (!out || !isMineFleet(fleet, data)) continue;
+    const pos = fleetPosition(state, fleet);
+    const eye = pos && mineEye(fleet, pos, data);
+    if (eye) out.push(eye);
+  }
+  patrolEyes(state, byOwner);
+  return bloc.flatMap((id) => byOwner.get(id)!);
 }
 
 /**
@@ -504,8 +530,14 @@ export function sensorCoverageOf(
   data: GameData,
 ): Map<PlayerId, Coverage> {
   const planets = Object.values(state.planets);
+  // Координаты миров — плоскими массивами: проверка круга читает их десятки тысяч раз за
+  // отрезок, и два перехода по ссылкам (мир → позиция) стоили дороже самой проверки.
+  const xs = new Float64Array(planets.length);
+  const ys = new Float64Array(planets.length);
   const cells = new Map<number, number[]>();
   planets.forEach((planet, i) => {
+    xs[i] = planet.position.x;
+    ys[i] = planet.position.y;
     const key = cellKey(
       Math.floor(planet.position.x / COVERAGE_CELL),
       Math.floor(planet.position.y / COVERAGE_CELL),
@@ -515,24 +547,38 @@ export function sensorCoverageOf(
     else cells.set(key, [i]);
   });
   const blocs = viewerIds.map((viewerId) => visionBloc(state, viewerId));
-  const byOwner = circlesByOwner(state, [...new Set(blocs.flat())], data, sightRulesOf(state));
+  const byOwner = circlesByOwner(
+    state,
+    [...new Set(blocs.flat())],
+    data,
+    sightRulesOf(state),
+    planets,
+  );
   const coverage = new Map<PlayerId, Coverage>();
   viewerIds.forEach((viewerId, v) => {
     // 0 — не видно, 1 — засечка, 2 — опознание (опознание всегда и засечка).
     const seen = new Uint8Array(planets.length);
+    // Миры, отмеченные хоть раз: множества ниже собираются из них, а не перебором карты.
+    const hit: number[] = [];
+    let cx = 0;
+    let cy = 0;
+    let signature2 = 0;
+    let identify2 = 0;
+    const check = (i: number): void => {
+      const dx = xs[i]! - cx;
+      const dy = ys[i]! - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > signature2) return;
+      if (seen[i] === 0) hit.push(i);
+      if (d2 <= identify2) seen[i] = 2;
+      else if (seen[i] === 0) seen[i] = 1;
+    };
     for (const memberId of blocs[v]!) {
       for (const c of byOwner.get(memberId)!) {
-        const signature2 = c.signature * c.signature;
-        const identify2 = c.identify * c.identify;
-        const check = (i: number): void => {
-          const at = planets[i]!.position;
-          const dx = at.x - c.x;
-          const dy = at.y - c.y;
-          const d2 = dx * dx + dy * dy;
-          if (d2 > signature2) return;
-          if (d2 <= identify2) seen[i] = 2;
-          else if (seen[i] === 0) seen[i] = 1;
-        };
+        cx = c.x;
+        cy = c.y;
+        signature2 = c.signature * c.signature;
+        identify2 = c.identify * c.identify;
         // Запас в единицу — против округления на краю квадрата; лишний мир отсеет `check`.
         const r = Math.sqrt(signature2) + 1;
         const x0 = Math.floor((c.x - r) / COVERAGE_CELL);
@@ -543,20 +589,23 @@ export function sensorCoverageOf(
           for (let i = 0; i < planets.length; i++) check(i);
           continue;
         }
-        for (let cx = x0; cx <= x1; cx++) {
-          for (let cy = y0; cy <= y1; cy++) {
-            for (const i of cells.get(cellKey(cx, cy)) ?? []) check(i);
+        for (let gx = x0; gx <= x1; gx++) {
+          for (let gy = y0; gy <= y1; gy++) {
+            const cell = cells.get(cellKey(gx, gy));
+            if (cell) for (const i of cell) check(i);
           }
         }
       }
     }
+    // Порядок множеств — порядок `state.planets`, как у перебора карты целиком.
+    hit.sort((a, b) => a - b);
     const identify = new Set<PlanetId>();
     const radar = new Set<PlanetId>();
-    planets.forEach((planet, i) => {
-      if (seen[i] === 0) return;
-      radar.add(planet.id);
-      if (seen[i] === 2) identify.add(planet.id);
-    });
+    for (const i of hit) {
+      const id = planets[i]!.id;
+      radar.add(id);
+      if (seen[i] === 2) identify.add(id);
+    }
     coverage.set(viewerId, { identify, radar });
   });
   return coverage;
