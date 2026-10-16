@@ -244,8 +244,16 @@ export function checkProductionReadiness(env: NodeJS.ProcessEnv): ProdReadiness 
     missing.push('DB_REQUIRE_LEAST_PRIVILEGE=1 (verified runtime grants)');
   // Only the host deployment preflight sets this after running the trusted backup
   // checker. It is an operator attestation, not proof supplied by a game client.
-  if (env.BACKUP_READINESS_VERIFIED !== '1')
-    missing.push('BACKUP_READINESS_VERIFIED=1 (deploy/production-preflight.sh)');
+  const backupPolicy = env.BACKUP_POLICY || 'required';
+  if (backupPolicy === 'deferred-playtest') {
+    if (env.BACKUP_READINESS_DEFERRED !== '1' || env.BACKUP_READINESS_VERIFIED !== '0')
+      missing.push('BACKUP_READINESS_DEFERRED=1 and BACKUP_READINESS_VERIFIED=0 (explicit playtest deferral)');
+  } else {
+    if (backupPolicy !== 'required') missing.push('BACKUP_POLICY=required|deferred-playtest');
+    if (env.BACKUP_READINESS_VERIFIED !== '1')
+      missing.push('BACKUP_READINESS_VERIFIED=1 (deploy/production-preflight.sh)');
+    if (env.BACKUP_READINESS_DEFERRED === '1') missing.push('BACKUP_READINESS_DEFERRED=0 (required backup policy)');
+  }
 
   return { ok: missing.length === 0, missing };
 }

@@ -1525,6 +1525,7 @@
 | ZTP-1.2 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
 | ZTP-1.3 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
 | ZTP-1.4 | ✅ | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |
+| ZTP-1.5 | ✅ | ops srv sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автодоставка подписанной TLS-пары |
 | ZTP-2.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Закрыть сборку на хосте |
 | ZTP-2.2 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Желаемая версия в репо (GitOps) |
 | ZTP-2.3 | ⏳ | docs sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Владельцы зон |

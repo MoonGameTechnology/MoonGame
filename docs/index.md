@@ -185,4 +185,5 @@
 | Документ | Заголовок | Про что |
 | --- | --- | --- |
 | `docs/zero-touch-prod/README.md` | Zero Touch Prod — прод без ручных касаний | Папка темы «изменения прода только через автоматизированный, проверенный и записанный |
+| `docs/zero-touch-prod/tls-autodelivery.md` | TLS-автодоставка: server и Caddy одной парой | ZTP-1.5 расширяет pull-агент: DOMAIN в постоянном server.env выбирает TLS-профиль. |
 | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Zero Touch Prod — технический roadmap | План перевода сервера Void Dominion на прод без ручных касаний: изменения только через |

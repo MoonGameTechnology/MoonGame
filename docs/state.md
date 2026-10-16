@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12240 зелёных** (7 skip, всего 12247 в 979 файлах; PostgreSQL, age и реальный Caddy; прогон 2026-10-16). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12261 зелёных** (7 skip, всего 12268 в 981 файлах; PostgreSQL, age и реальный Caddy; прогон 2026-10-16). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
 
 
 **Стресс-тест 2026-10-11:** устранены heap OOM при выдаче HTML, неограниченная durable-очередь и ложная readiness при отказе БД; добавлены отказ по заполненной очереди без расхода sequence, проверка актуальности peer и защита legacy restore от чужого schema marker без второй копии SQL. Подтверждение места повторяет временные отказы при полной очереди и проверяет сокет и поколение заявки непосредственно при исполнении очереди; disconnect отменяет ещё не начатое подтверждение без квитанции. Recovery-письма форматирует внешний адаптер под локаль получателя; оба хоста инъецируют его в auth API, а серверный пакет передаёт только структурные параметры и не зависит от каталогов локализации. 160 WSS-клиентов за 20 минут записали 9 579 уникальных команд без потерь/дублей/расхождений; при 160 × 0,5 команды/s стенд уже перегружается. Обе игры проверены в Chromium desktop/mobile. [Полный отчёт, профили ресурсов и ограничения](reviews/2026-10-11-full-stress.md).
@@ -8111,7 +8111,7 @@ identity адресует воркфлоу, а сама подпись прив�
 раз, при установке, — починка самого механизма обновления до развёрнутой машины не
 доезжала. Покрыт `deploy/update.test.mjs` (внешние команды — заглушки на `PATH`,
 проверяются набор и порядок вызовов); `vitest.config.ts` видит `deploy/**/*.test.mjs`.
-Автодеплой (ZTP-1.2…1.4, `docs/zero-touch-prod/`): хост, переведённый разовым
+Автодеплой (ZTP-1.2…1.5, `docs/zero-touch-prod/`): хост, переведённый разовым
 `deploy/install-autodeploy.sh` (от root), сам забирает подписанный `:main`. Таймер
 `moongame-autoupdate.timer` раз в 5 минут зовёт `deploy/autoupdate.sh`: дайджест тега →
 `verify-image.sh` → pull → версия `deploy/` ИЗ ЭТОГО ОБРАЗА в
@@ -8123,9 +8123,25 @@ identity адресует воркфлоу, а сама подпись прив�
 Состояние — в `/var/lib/moongame` (`server.env`, `certs/`, `last-good-image`,
 `deploy-history`), стек поднимает только `deploy/stack.sh` (юнит, хелпер и `update.sh`),
 имя проекта Compose закреплено (`name: deploy`). Журнал выкаток — `moongame history`
-(строка на каждую выкатку, откат и отказ подписи) плюс journald. Хост с TLS-оверлеем
-(Caddy) установщик не переводит (его очередь — ZTP-2.2). Покрыты
-`deploy/autoupdate.test.mjs` и `deploy/stack.test.mjs`.
+(строка на каждую выкатку, откат и отказ подписи) плюс journald.
+TLS-хост поддержан в ZTP-1.5: подписи обоих образов, одинаковый OCI revision SHA,
+четыре Compose-оверлея и доверенный абсолютный `COMPOSE_EXTRA_FILE`. Точка отката
+`last-good-release` атомарно хранит server/Caddy refs, каталог пары — 24 знака hash обоих
+refs. `/health` + `/ready` + публичный HTTPS `/ready` проверяются до commit checkpoint;
+сбой возвращает оба образа. Установщик готовит кандидата до остановки прежнего юнита,
+при отказе первого перехода восстанавливает прежний юнит. После остановки старого
+юнита PostgreSQL отдельно поднимается с health-wait ≤60 с до мигратора; Game ждёт
+успешной миграции. `migration.env` остаётся
+отдельным host-файлом; Docker unit можно задать явно. На текущем VPS таймер **не включён**:
+GHCR ответил `unauthorized`, нужен доступ на чтение обоих приватных пакетов и проверка
+кандидата на копии текущих матчей. [Порядок перехода](zero-touch-prod/tls-autodelivery.md).
+Для явно отложенных владельцем бэкапов предусмотрен `BACKUP_POLICY=deferred-playtest`:
+preflight выдаёт предупреждение и `BACKUP_READINESS_DEFERRED=1`, VERIFIED остаётся 0;
+остальные production-защиты обязательны, default `required` требует реальный verifier.
+Покрыты `deploy/autoupdate.test.mjs`, `deploy/stack.test.mjs`, `deploy/tls-release.test.mjs`
+и проверки installer/readiness/preflight; незавершённое переключение `current` после
+записи checkpoint восстанавливается следующим прогоном. GitOps release-PR (ZTP-2.2)
+ещё не реализован.
 
 **Least-privilege и security-поток (SE-3.1/8.1 — частично).** В development остаётся
 startup-migrate, а `PROD=1` требует PostgreSQL и режим `DB_AUTO_MIGRATE=0` +
@@ -8138,8 +8154,8 @@ advisory lock в одной транзакции/клиенте с SET LOCAL ROL
 JWT-ключей и security JSONL HTTP/WS/game/rate со счётчиками и локальными алертами
 (игровые отказы — только пересекающие границу: подделка/повтор конверта, чужое место,
 oversize; обычное «нельзя по правилам» в поток не идёт);
-публичный deploy требует вызова доверенного `BACKUP_READINESS_CHECK` до миграции и
-перезапуска (`production-preflight.sh`, `launch.sh`/`stack.sh`/`update.sh`), не сохранённого
+при default `BACKUP_POLICY=required` публичный deploy требует вызова доверенного
+`BACKUP_READINESS_CHECK` до миграции и перезапуска (`production-preflight.sh`, `launch.sh`/`stack.sh`/`update.sh`), не сохранённого
 «успеха» из старого конфига. Внешнее хранилище/расписание/verifier оператор настраивает
 отдельно; наличие кода не подтверждает готовность живого хоста. Установщик начинает с
 loopback bootstrap и не выводит пароль БД. Caddy удаляет request/headers/uri/error из

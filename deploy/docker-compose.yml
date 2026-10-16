@@ -118,6 +118,8 @@ services:
       # Set only by the host preflight after its independent recovery check succeeds.
       # Do not persist this attestation in server.env; run launch.sh / stack.sh.
       BACKUP_READINESS_VERIFIED: ${BACKUP_READINESS_VERIFIED:-0}
+      BACKUP_READINESS_DEFERRED: ${BACKUP_READINESS_DEFERRED:-0}
+      BACKUP_POLICY: ${BACKUP_POLICY:-required}
       # How many independent sessions this ONE process hosts (proto, proto-2, …):
       # all appear in the in-game match browser; each is durable in Postgres.
       MATCHES: ${MATCHES:-1}

@@ -67,6 +67,7 @@ function sandbox({
   // Настоящий, не заглушка: добор ключей — часть проверяемого поведения.
   writeFileSync(join(deploy, 'env-keys.sh'), readFileSync(ENV_KEYS_SH));
   writeFileSync(join(deploy, 'production-preflight.sh'), readFileSync(join(DEPLOY_DIR, 'production-preflight.sh')));
+  writeFileSync(join(deploy, 'release-state.sh'), readFileSync(join(DEPLOY_DIR, 'release-state.sh')));
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml']) {
     writeFileSync(join(deploy, f), '# stub\n');
   }
@@ -272,7 +273,8 @@ describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRAT
       `--env-file ${join(sb.deploy, 'migration.env')} ${IMAGE} packages/server/dist/${MIGRATE}`,
     );
     expect(migrate).toBeGreaterThan(-1);
-    expect(migrate).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
+    expect(log.indexOf('--wait --wait-timeout 60 postgres')).toBeLessThan(migrate);
+    expect(migrate).toBeLessThan(log.lastIndexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
   });
 
   it('нет файла мигратора → выкатка отменена, стек не тронут', async () => {
@@ -298,7 +300,7 @@ describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRAT
     const log = sb.readLog();
     const migratePrev = log.indexOf(`${prev} packages/server/dist/${MIGRATE}`);
     expect(migratePrev).toBeGreaterThan(-1);
-    expect(migratePrev).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${prev}] compose`));
+    expect(migratePrev).toBeLessThan(log.lastIndexOf(`docker[VOID_IMAGE=${prev}] compose`));
   });
 });
 

@@ -41,7 +41,7 @@ function sandbox({ lastGood = IMAGE, healthOk = true } = {}) {
   mkdirSync(state, { recursive: true });
   mkdirSync(release, { recursive: true });
   mkdirSync(bin);
-  for (const f of ['stack.sh', 'update.sh', 'env-keys.sh', 'production-preflight.sh']) {
+  for (const f of ['stack.sh', 'update.sh', 'env-keys.sh', 'production-preflight.sh', 'release-state.sh']) {
     cpSync(join(DEPLOY_DIR, f), join(release, f));
     chmodSync(join(release, f), 0o755);
   }
@@ -149,12 +149,7 @@ describe('install-autodeploy.sh — что остаётся на машине', 
 
   it('свой реестр пишется в server.env, а не в юнит: `moongame update` видит то же, что таймер', () => {
     expect(installer).not.toMatch(/Environment=VOID_IMAGE_REPO/);
-    expect(installer).toMatch(/for key in VOID_IMAGE_REPO VOID_TRACK_TAG; do/);
-  });
-
-  it('хост с TLS-оверлеем не переводится наполовину', () => {
-    expect(installer).toContain("'^DOMAIN=");
-    expect(installer).toContain('com.docker.compose.service=caddy');
+    expect(installer).toMatch(/for key in VOID_IMAGE_REPO VOID_TRACK_TAG/);
   });
 
   it('каждый файл, который агент требует от версии deploy/, есть в репозитории', () => {
