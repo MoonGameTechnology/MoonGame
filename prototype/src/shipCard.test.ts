@@ -81,7 +81,11 @@ describe('карточка корабля — проводка', () => {
   // корпуса, где про надетое не было ни слова. Наземные плитки остаются со справочником.
   it('плитка корабля ведёт в карточку, наземная — в справочник', () => {
     const main = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
-    expect(main).toContain("def.domain === 'space' ? `data-shipcard=\"${esc(f.id)}|${index}\"` : `data-codex=\"u:${esc(u.unit)}\"`");
+    // Плитки состава рисует карточка флота (`fleetCard.ts`, REFM-224), тап по ним ловит `main.ts`.
+    const card = readFileSync(fileURLToPath(new URL('./fleetCard.ts', import.meta.url)), 'utf8');
+    expect(card).toMatch(
+      /def\.domain === 'space'\s*\?\s*`data-shipcard="\$\{esc\(f\.id\)\}\|\$\{index\}"`\s*:\s*`data-codex="u:\$\{esc\(u\.unit\)\}"`/,
+    );
     expect(main).toMatch(/if \(bEl\.dataset\.shipcard\) \{[\s\S]{0,300}openShipCard\(/);
   });
 });

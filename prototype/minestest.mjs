@@ -11,6 +11,9 @@ import {
 
 // Test-only access to the actual host. No debug exports enter the player build.
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
+// Мина и ракетная мина — у ядра: с REFM-224 \`main.ts\` их не импортирует.
+import { isMineFleet as __isMineFleet } from '../../packages/shared-core/src/state/minefields';
+import { isRocketMineFleet as __isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
 window.__minesTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   prepare: () => {
@@ -28,12 +31,12 @@ window.__minesTest = {
   },
   ord: () => s.ordnance,
   // SM-3.7a: the standing rocket mine is a fleet; its doctrine lives in \`ordnance.controls\`.
-  rockets: () => Object.values(s.fleets).filter((f) => isRocketMineFleet(f, data)).map((f) => f.id),
+  rockets: () => Object.values(s.fleets).filter((f) => __isRocketMineFleet(f, data)).map((f) => f.id),
   mode: (id) => s.ordnance.controls?.[id]?.mode ?? null,
   arm: () => { apply(advance(s, s.ordnance.installations[0].readyAt)); mineControls.refresh(); },
   // Selected the common way, the rocket mine shows its own card and takes no orders.
   rocketCard: () => {
-    const id = Object.keys(s.fleets).find((id) => isRocketMineFleet(s.fleets[id], data));
+    const id = Object.keys(s.fleets).find((id) => __isRocketMineFleet(s.fleets[id], data));
     if (!id) return null;
     setFleetSelection([id]);
     lastPanelHtml = ''; renderPanel();
@@ -42,7 +45,7 @@ window.__minesTest = {
   ordinary: () => {
     s = structuredClone(s);
     // The carrier again: the rocket mine card above left the (now lifted) mine selected.
-    const f = Object.values(s.fleets).find((f) => f.owner === ME && !isMineFleet(f, data));
+    const f = Object.values(s.fleets).find((f) => f.owner === ME && !__isMineFleet(f, data));
     f.units[0].modules = ['mine_layer'];
     setFleetSelection([f.id]);
     lastPanelHtml = ''; renderPanel();
@@ -51,7 +54,7 @@ window.__minesTest = {
   // SM-3.6: armed, the mine is an immobile unit — its own card, never an order target.
   mineCard: () => {
     apply(advance(s, Object.values(s.minefields.installations)[0].readyAt));
-    const id = Object.keys(s.fleets).find((id) => isMineFleet(s.fleets[id], data));
+    const id = Object.keys(s.fleets).find((id) => __isMineFleet(s.fleets[id], data));
     if (!id) return null;
     setFleetSelection([id]);
     lastPanelHtml = ''; renderPanel();

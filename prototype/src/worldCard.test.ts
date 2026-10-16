@@ -559,7 +559,9 @@ describe('стык с main.ts', () => {
     expect(MAIN).toContain(
       'return pick.known ? planetPanelHtml(pick.planet) : unknownPlanetHtml(pick.planet);',
     );
-    expect(MAIN).toContain('hangarSectionHtml(hold, f.id, true)');
+    // Секцию ангара зовёт карточка флота — с REFM-224 она в `fleetCard.ts`.
+    const FLEET = readFileSync(new URL('./fleetCard.ts', import.meta.url), 'utf8');
+    expect(FLEET).toContain('hangarSectionHtml(hold, f.id, true)');
   });
 
   it('копий карточки в main не осталось', () => {
