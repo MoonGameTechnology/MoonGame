@@ -50,6 +50,10 @@ const schema = z
             defensePerPoint: amount,
             objectivesPerPoint: amount,
             stagePoints: z.array(amount).min(1).max(10),
+            // Presence: distinct game days with the player's own orders for each stage,
+            // and the closing share of their tenure that must hold one for the final.
+            stageDays: z.array(z.number().int().min(0).max(100)).min(1).max(10),
+            finalPresence: z.number().gt(0).max(1),
           })
           .strict(),
       })
@@ -65,6 +69,8 @@ const schema = z
             durationDays: amount,
             levels: amount,
             xpPerLevel: amount,
+            /** Season XP for each UTC day the account gives its own orders in a match. */
+            dailyXp: amount.optional(),
             milestones: z.array(z.object({ level: amount, free: grant, premium: grant }).strict()),
             contracts: z.array(
               z
@@ -153,7 +159,10 @@ export function parseMetaEconomyCatalog(
     catalog.rewards.participation.stagePoints.length !== catalog.rewards.stageFractions.length ||
     catalog.rewards.participation.stagePoints.some(
       (points, i, rows) => i > 0 && points <= rows[i - 1]!,
-    )
+    ) ||
+    catalog.rewards.participation.stageDays.length !==
+      catalog.rewards.participation.stagePoints.length ||
+    catalog.rewards.participation.stageDays.some((days, i, rows) => i > 0 && days < rows[i - 1]!)
   ) {
     throw new Error('E_META_PARTICIPATION');
   }

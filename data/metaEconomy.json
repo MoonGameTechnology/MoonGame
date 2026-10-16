@@ -70,7 +70,9 @@
       "logisticsPerPoint": 2,
       "defensePerPoint": 1,
       "objectivesPerPoint": 1,
-      "stagePoints": [1, 3]
+      "stagePoints": [1, 3],
+      "stageDays": [3, 7],
+      "finalPresence": 0.25
     }
   },
   "market": { "minimumAccountXp": 100 },
@@ -82,6 +84,7 @@
       "durationDays": 56,
       "levels": 50,
       "xpPerLevel": 200,
+      "dailyXp": 100,
       "milestones": [
         {
           "level": 1,

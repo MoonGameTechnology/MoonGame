@@ -2930,6 +2930,7 @@ export const en: Record<string, string> = {
   'supply.season': 'Season',
   'supply.season.level': 'Level {level} / {max}',
   'supply.season.xp': 'Season XP: {xp}',
+  'supply.season.daily': '+{xp} XP for each day you give orders in a match',
   'supply.season.free': 'Free track',
   'supply.season.premium': 'Premium track',
   'supply.season.claim': 'Claim',

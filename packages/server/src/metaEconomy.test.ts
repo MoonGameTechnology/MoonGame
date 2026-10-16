@@ -437,6 +437,32 @@ describe('MetaEconomy season', () => {
   });
 });
 
+describe('MetaEconomy season tempo', () => {
+  it('grants the pass daily XP once per UTC day with own orders, whatever the match count', async () => {
+    const f = setup();
+    const season = f.catalog.seasons[0]!;
+    const day = season.startsAt / DAY + 3;
+    const first = await f.service.settleActiveDay('alice', day);
+    expect(first.ok && first.receipt.seasonXp).toBe(season.dailyXp);
+    expect(await f.service.settleActiveDay('alice', day)).toEqual(first);
+    await f.service.settleActiveDay('alice', day + 1);
+    expect((await f.store.read('alice')).season[season.id]!.xp).toBe(2 * season.dailyXp!);
+    expect((await f.service.readModel('alice')).seasons[0]!.dailyXp).toBe(season.dailyXp);
+  });
+
+  it('grants nothing before the season and rejects a malformed day', async () => {
+    const f = setup();
+    const season = f.catalog.seasons[0]!;
+    const early = await f.service.settleActiveDay('alice', season.startsAt / DAY - 1);
+    expect(early.ok && early.receipt.seasonXp).toBeFalsy();
+    for (const day of [-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER])
+      expect(await f.service.settleActiveDay('alice', day)).toEqual({
+        ok: false,
+        code: 'E_META_FACTS',
+      });
+  });
+});
+
 describe('MetaEconomy verified entitlements', () => {
   it('replays an old catalog receipt and refunds its original quantities after a content update', async () => {
     const f = setup();

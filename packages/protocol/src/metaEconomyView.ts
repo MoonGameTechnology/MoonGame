@@ -32,6 +32,8 @@ export interface MetaSeasonView {
   endsAt: number;
   levels: number;
   xpPerLevel: number;
+  /** Season XP for each UTC day with the player's own orders in a match. */
+  dailyXp?: number;
   xp: number;
   level: number;
   premium: boolean;

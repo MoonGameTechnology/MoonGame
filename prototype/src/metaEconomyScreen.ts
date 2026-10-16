@@ -92,6 +92,9 @@ function seasonHtml(season: MetaSeasonView, busy: boolean): string {
     ) +
     `</div><div class="me-amounts"><b>${esc(t('supply.season.level', { level: season.level, max: season.levels }))}</b><span>${esc(t('supply.season.xp', { xp: nfmt(season.xp) }))}</span></div>` +
     (season.archived ? `<p class="me-hint">${t('supply.season.archive')}</p>` : '') +
+    (season.dailyXp && (season.active || !season.archived)
+      ? `<p class="me-hint">${esc(t('supply.season.daily', { xp: nfmt(season.dailyXp) }))}</p>`
+      : '') +
     `<h4>${t('supply.contracts')}</h4>${contracts}<p class="me-hint">${t('supply.season.auto')}</p>` +
     `<details><summary>${t('supply.season.rewards')}</summary><div class="me-track">${milestones}</div></details></section>`
   );
