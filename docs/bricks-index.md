@@ -153,6 +153,7 @@
 | UIX-15.3 | ✅ | proto | `docs/backlog.md` | Профиль командира — вкладками и в палитре хаба. |
 | UIX-15.4 | ✅ | proto | `docs/backlog.md` | Sector Zero — в палитре хаба. |
 | UIX-16.1 | ✅ | proto | `docs/backlog.md` | Стартовое меню — одним экраном. |
+| UIX-17.1 | ✅ | proto | `docs/backlog.md` | Страница «Матчи» — без полей адреса и позывного. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

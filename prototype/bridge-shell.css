@@ -138,8 +138,32 @@ body.holo-ui #connect .ctitle .dia { width: 8px; height: 8px; flex-shrink: 0; bo
 body.holo-ui #connect .cstat { font-size: var(--fs-body); line-height: 1.6; text-align: left; }
 body.holo-ui #connect .cstat:not(:empty) { padding: 12px; background: rgba(140, 109, 53, .08); border-left: 2px solid var(--amber); }
 body.holo-ui #connect :is(.mtab, .mfbtn, .mflabel, .mfval, .mname, .mmeta) { font-family: inherit; }
-body.holo-ui #connect .mrow { border-color: var(--bridge-edge); background: rgba(10, 26, 42, .5); border-radius: 5px; }
-body.holo-ui #connect .mlist { max-height: calc(var(--vph) * .42); }
+/* «Матчи» (UIX-17.1) — окно в палитре хаба шириной с хаб, как настройка схватки (UIX-15.1), а не
+   карточка входа у левого края. Высота постоянная, как у хаба: по высоте содержимого окно прыгало
+   бы при каждой смене вкладки вместе с самими вкладками. Листается середина. */
+body.holo-ui #connect[data-stage="browse"] { padding: 24px 28px; align-items: center; }
+body.holo-ui #connect[data-stage="browse"] :is(.cbox, .cwrap) { width: min(1040px, calc(var(--vpw) * .86)); }
+body.holo-ui #connect[data-stage="browse"] .cwrap { flex: none; height: min(860px, calc(var(--vph) - 48px)); margin: auto; padding: 0; }
+body.holo-ui #connect[data-stage="browse"] .cbox {
+  flex: 1 1 auto;
+  padding: 22px 26px;
+  border: 1px solid var(--sf-panel-edge);
+  border-radius: 18px;
+  background: var(--sf-panel);
+  box-shadow: var(--sf-shadow);
+  backdrop-filter: none;
+}
+body.holo-ui #connect[data-stage="browse"] .cback { margin: 0; }
+body.holo-ui #connect[data-stage="browse"] :is(.cbtn, .mbtn) { border-radius: 12px; }
+body.holo-ui #connect[data-stage="browse"] .mtab { flex: 0 0 auto; padding: 0 18px; }
+body.holo-ui #connect[data-stage="browse"] .mfdrop { flex: 0 1 260px; }
+body.holo-ui #connect[data-stage="browse"] .mfplayers { flex: 1 1 280px; }
+body.holo-ui #connect[data-stage="browse"] :is(.mrow, .mrow.mrow-2) { grid-template-areas: "name btns" "meta btns"; padding: 12px 16px; }
+body.holo-ui #connect[data-stage="browse"] .msrv .cbtn { flex: 0 0 auto; }
+body.holo-ui #connect[data-stage="browse"] .msrv .cfield { margin: 0; font-size: 14px; }
+body.holo-ui #connect[data-stage="browse"] .msrv .cfield input { margin-top: 6px; border-radius: 12px; background: var(--sf-inset); font-size: 15px; }
+body.holo-ui #connect[data-stage="browse"] .mcreate label { flex: none; }
+body.holo-ui #connect[data-stage="browse"] .mcreate .inp { flex: 0 1 320px; }
 
 /* The hub keeps the original live panels and routes, framed as separate screens. */
 body.holo-ui #hub { padding: 24px 28px; gap: 13px; }

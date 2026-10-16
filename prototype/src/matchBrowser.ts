@@ -11,12 +11,14 @@
  *
  * Строку статуса экрана подключения, адрес сервера и хаб модуль получает хуком
  * {@link initMatchBrowser}: они принадлежат `main.ts`, а импорт оттуда был бы циклом.
- * Поля адреса и позывного стоят на экране обозревателя; модуль только прячет их строки
- * в сборке игрока, а значения читает через `resolveServer`.
+ * Позывного и пароля на странице нет (UIX-17.1): их поля — спрятанные носители состояния,
+ * значения приходят со входа и читаются через `resolveServer`. Поле адреса стоит в
+ * карточке «Сервер не отвечает» и видно только при сбое (`browserFallback.ts`, правило 4).
  */
 import { t, tData } from '../../localization/runtime';
-import { clearStatusLine, fallbackFor, showServerRow } from '../../decisions/browserFallback';
+import { fallbackFor, showServerRow, type Fallback } from '../../decisions/browserFallback';
 import { shareAddress } from '../../decisions/matchAddress';
+import { filterControls, seatPips, tabCounts, type FilterControls } from '../../decisions/matchesPage';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome } from '../../decisions/matchQuery';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
@@ -48,8 +50,6 @@ import {
 } from './matchRow';
 import { openSetup } from './setupScreen';
 
-declare const __PLAYER_BUILD__: boolean;
-
 /** Что обозревателю нужно от игры. Живёт в `main.ts`. */
 export interface MatchBrowserHost {
   /** Адрес сервера и позывной; `null` — строка статуса уже сказала, чего не хватает. */
@@ -73,7 +73,6 @@ export interface MatchBrowserHost {
 let game: MatchBrowserHost;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 let srvInput: HTMLInputElement;
-let nickInput: HTMLInputElement;
 
 export interface MatchRow {
   matchId: string;
@@ -93,14 +92,21 @@ export interface MatchRow {
 }
 
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
+/** Прошлый запрос ленты кончился неудачей. Отдельно от строки статуса: её гасит карточка
+ *  «Сервер не отвечает» (`browserFallback.ts`, правило 5), а признак беды должен пережить
+ *  переключение вкладок — иначе карточка с адресом пропала бы посреди набора. */
+let loadFailed = false;
 let listShown = false;
 let activeTab: MatchTab = 'available';
 /** Выбор фильтров (BRW-3). Живёт в модуле, поэтому тихий переопрос раз в десять секунд
  *  его не сбрасывает — перерисовка читает то же состояние. Между заходами он лежит в
  *  `localStorage` рядом с `void.server`/`void.nick`; `null` — ещё не восстанавливали. */
 let matchFilter: FilterState | null = null;
+/** Таймер тихого переопроса заведён (`startPoll`). */
+let pollStarted = false;
 
 export async function refreshMatches(quiet = false): Promise<void> {
+  startPoll();
   const srv = game.resolveServer();
   if (!srv) return;
   // Что переопрос пишет в строку статуса — `matchPoll.ts` (REFM-153): тихий фоновый
@@ -151,9 +157,11 @@ async function loadMatchLists(srv: { base: string; nick: string }): Promise<bool
     }
     localStorage.setItem('void.server', srv.base);
     localStorage.setItem('void.nick', srv.nick);
+    loadFailed = false;
     return true;
   } catch {
     matchLists = null;
+    loadFailed = true;
     return false;
   }
 }
@@ -188,9 +196,20 @@ function saveMatchFilter(): void {
 /**
  * Отрисовать панель фильтров ПО ЛЕНТЕ (BRW-3). Галочки карт и границы ползунка берутся
  * из самой ленты (`matchFilter.ts`, правило 6) — каталога карт в read-model нет. Что
- * значит выбор, решает тот же модуль; здесь только разметка и обработчики.
+ * значит выбор, решает тот же модуль; какие контролы вообще нужны — `matchesPage.ts`,
+ * правило 3. Здесь только разметка и обработчики.
  */
-function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
+function renderFilterPanel(rows: MatchRow[], f: FilterState): FilterControls {
+  const maps = mapsOf(rows);
+  const bounds = playerBounds(rows);
+  const show = filterControls({
+    maps: maps.length,
+    players: bounds,
+    kinds: rows.some((r) => r.kind !== undefined),
+  });
+  $('mf-mode').style.display = show.mode ? '' : 'none';
+  $('mf-mapbox').style.display = show.maps ? '' : 'none';
+  $('mf-players').style.display = show.players ? '' : 'none';
   for (const b of Array.from(document.querySelectorAll('#mf-mode .mfbtn')))
     b.classList.toggle('active', (b as HTMLElement).dataset.mode === f.mode);
   const btn = $('mf-map');
@@ -200,7 +219,7 @@ function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
       : t('browser.filter.map.some', { n: f.maps.size });
   const menu = $('mf-maps');
   menu.textContent = '';
-  for (const id of mapsOf(rows)) {
+  for (const id of maps) {
     const label = document.createElement('label');
     const box = document.createElement('input');
     box.type = 'checkbox';
@@ -212,10 +231,10 @@ function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
       renderMatches();
     });
     label.appendChild(box);
-    label.appendChild(document.createTextNode(id));
+    // Имя карты — то же, что в заголовке строки: «duel-1» в галочке игроку ничего не говорит.
+    label.appendChild(document.createTextNode(game.mapLabel(id)));
     menu.appendChild(label);
   }
-  const bounds = playerBounds(rows);
   const lo = $('mf-min') as HTMLInputElement;
   const hi = $('mf-max') as HTMLInputElement;
   for (const [input, value] of [
@@ -226,135 +245,184 @@ function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
     input.max = String(bounds.max);
     input.value = String(value);
   }
-  $('mf-range').textContent = t('browser.filter.range', { min: f.players.min, max: f.players.max });
+  // Два бегунка на одной дорожке: между ними — выбранный диапазон. Концы могут стоять
+  // наоборот (`matchFilter.ts`, правило 4), полоса считается от меньшего к большему.
+  const span = bounds.max - bounds.min || 1;
+  const at = (v: number): string => String((v - bounds.min) / span);
+  const dual = $('mf-dual');
+  dual.style.setProperty('--lo', at(Math.min(f.players.min, f.players.max)));
+  dual.style.setProperty('--hi', at(Math.max(f.players.min, f.players.max)));
+  $('mf-range').textContent = t('browser.filter.range', {
+    min: Math.min(f.players.min, f.players.max),
+    max: Math.max(f.players.min, f.players.max),
+  });
+  return show;
+}
+
+/** Переключить вкладку страницы и перерисовать её. */
+function openTab(tab: MatchTab): void {
+  activeTab = tab;
+  for (const b of Array.from(document.querySelectorAll('.mtab')))
+    b.classList.toggle('active', (b as HTMLElement).dataset.tab === tab);
+  renderMatches();
+}
+
+/**
+ * Пустое место вместо списка: сообщение и путь дальше (`browserFallback.ts`, правило 1).
+ * «Сервер не отвечает» говорит карточка с адресом над списком, здесь — только путь.
+ */
+function renderEmpty(el: HTMLElement, plan: Extract<Fallback, { kind: 'empty' }>): void {
+  let html = plan.message === 'browser.server-down' ? '' : `<div class="mempty">${t(plan.message)}</div>`;
+  if (plan.next === 'solo')
+    html +=
+      `<div class="msolo"><button class="mbtn btn-second" id="msolo-go">▶ ${t('browser.solo')}</button>` +
+      `<div class="msolo-sub">${t('browser.solo.hint')}</div></div>`;
+  if (plan.next === 'available')
+    html += `<div class="msolo"><button class="mbtn btn-second" id="mfind-go">${t('browser.find')}</button></div>`;
+  el.innerHTML = html;
+  document.getElementById('msolo-go')?.addEventListener('click', () => {
+    game.leaveMatch();
+    openSetup('hub');
+  });
+  document.getElementById('mfind-go')?.addEventListener('click', () => openTab('available'));
+}
+
+/** Строка матча: карта и режим, ниже день, места, правила и окно входа; справа кнопки. */
+function matchRow(m: MatchRow): HTMLElement {
+  // «В архив» / «Восстановить» рядом со входом — только на своих вкладках (`matchRow.ts`). Строке
+  // с двумя кнопками на телефоне нужен свой ряд под них: рядом с картой они сжали бы имя.
+  const action = rowAction(activeTab);
+  const row = document.createElement('div');
+  row.className = action ? 'mrow mrow-2' : 'mrow';
+  // Номер партии в строке не печатается — как в «Моих партиях» хаба: `m-<uuid>` вытеснял
+  // то, ради чего сюда смотрят. Он остаётся подсказкой строки — для разговора с поддержкой.
+  row.dataset.match = m.matchId;
+  row.title = m.matchId;
+  const info = document.createElement('div');
+  info.className = 'minfo';
+  // Режим партии (BRW-4): значок вида + имя пресета. Имя приходит НЕ со строки —
+  // сервер шлёт только id, а человеческое имя даёт `tData()` по тому же слагу
+  // (`pve_waves` → `data.pve-waves`). Что именно печатать, решает `modeLabel()`:
+  // значка нет, пока сервер сам не назвал вид, а без `modeId` строки нет вовсе.
+  const mode = modeLabel(m);
+  let modeHtml = '';
+  if (mode.kind === 'shown') {
+    if (mode.badge) {
+      const kind = mode.badge === 'pve' ? t('browser.mode.pve') : t('browser.mode.pvp');
+      modeHtml += `<span class="mmode ${mode.badge}">${kind}</span>`;
+    }
+    modeHtml += `<span class="mmodename">${esc(tData(mode.modeId))}</span>`;
+  }
+  // Идущий матч — обычное состояние, и «идёт» на каждой строке было шумом: помечен только
+  // завершённый.
+  const ended = m.status === 'ended' ? `<span class="mended">${t('browser.finished')}</span>` : '';
+  // Места — точками, пока их не больше восьми (`matchesPage.ts`, правило 2).
+  const pips = seatPips(m.players.seated, m.players.capacity);
+  const seatsLabel = esc(t('browser.seats', { s: m.players.seated, c: m.players.capacity }));
+  const seats =
+    `<span class="mseats" title="${seatsLabel}" aria-label="${seatsLabel}">` +
+    (pips ? pips.map((on) => (on ? '<i class="on"></i>' : '<i></i>')).join('') : '') +
+    `<b>${m.players.seated}/${m.players.capacity}</b></span>`;
+  // Entry window (SES-2.4): on «Доступные», show how long a newcomer may still take a
+  // seat — the server already drops fully-closed sessions from this tab, so an open
+  // countdown reassures, a soon-to-close one nudges. Unbounded (dev / old server) or
+  // other tabs: omitted. Own «Мои»/«Архив» rows don't gate a reconnect, so no window there.
+  const win = joinWindow(m, activeTab);
+  let windowHtml = '';
+  if (win.kind === 'closed') windowHtml = `<span class="mwin shut">${t('acc.join-closed')}</span>`;
+  else if (win.kind === 'open')
+    windowHtml = `<span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
+  info.innerHTML =
+    `<div class="mname"><b>${esc(game.mapLabel(m.mapId))}</b>${modeHtml}${ended}</div>` +
+    `<div class="mmeta"><span>${t('browser.day', { n: m.days })}</span>${seats}` +
+    `<span>${esc(ruleSummary(m.rules))}</span>${windowHtml}</div>`;
+  row.appendChild(info);
+  const btns = document.createElement('div');
+  btns.className = 'mbtns';
+  const join = document.createElement('button');
+  join.className = 'mbtn btn-second';
+  // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
+  // о возвращении, а не о вступлении.
+  const seated = activeTab === 'active';
+  join.textContent = t(seated ? 'browser.resume' : 'browser.join');
+  join.addEventListener('click', () => openSessionTab(m.matchId, seated));
+  btns.appendChild(join);
+  if (action) {
+    const restore = action === 'restore';
+    const arch = document.createElement('button');
+    arch.className = 'mbtn btn-quiet';
+    arch.textContent = restore ? t('browser.restore') : t('browser.archive');
+    arch.addEventListener('click', () =>
+      detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
+    );
+    btns.appendChild(arch);
+  }
+  row.appendChild(btns);
+  return row;
 }
 
 function renderMatches(): void {
   const el = $('mlist');
-  const failed = game.statusText() === t('acc.server-down');
-  $('match-create').style.display =
-    matchLists && !failed && activeTab === 'available' ? '' : 'none';
-  // Что показать вместо списка — `browserFallback.ts` (REFM-151): никогда не тупик
-  // (соло предлагается всегда — это путь без сервера), «сервер не ответил» и «ещё не
-  // спрашивали» — разные сообщения, у сборки игрока свои тексты, а строка адреса
-  // всплывает ровно пока список не загрузился.
-  const состояние = { loaded: !!matchLists, failed, playerBuild: __PLAYER_BUILD__ };
-  if (__PLAYER_BUILD__) {
-    // The player screen is ONLY the three tabs + the list. The hidden server row
-    // resurfaces exactly while the list can't be loaded (an APK has no useful page
-    // origin — the player types the host's address once, then it hides again), and
-    // the status line is not duplicated under the list's own message.
-    const srvRow = srvInput.closest('.cfield') as HTMLElement | null;
-    if (srvRow) srvRow.style.display = showServerRow(true, состояние.loaded) ? '' : 'none';
-    if (clearStatusLine(true, failed)) game.status('');
-  }
-  // Never a dead end: whatever the server says (unreachable / empty list), the dev
-  // client offers the path that ALWAYS works — a solo skirmish offline. The player
-  // build offers it too, with its own wording: it has no «Обновить список» to point at.
-  const soloCard = (msg: string): void => {
-    el.innerHTML =
-      `<div class="mempty">${msg}</div>` +
-      `<div class="msolo"><button class="mbtn btn-second" id="msolo-go">▶ ${t('browser.solo')}</button>` +
-      `<div class="msolo-sub">${t('browser.solo.hint')}</div></div>`;
-    document.getElementById('msolo-go')?.addEventListener('click', () => {
-      game.leaveMatch();
-      openSetup('hub');
-    });
-  };
-  const все = matchLists?.[activeTab] ?? [];
-  // Фильтр — это ПОИСК сессии, поэтому он живёт только на «Доступных» (решение владельца,
+  const loaded = !!matchLists;
+  // Беда связи — свой неудачный запрос или «сервер недоступен» от сетевого цикла: обрыв
+  // сокета оставляет ленту в памяти, и новую партию над ней предлагать не надо.
+  const failed = loadFailed || game.statusText() === t('acc.server-down');
+  // Фильтр — это ПОИСК сессии, поэтому он сужает только «Доступные» (решение владельца,
   // `matchFilter.ts`, правило 1): свои матчи на двух других вкладках он не трогает, и
   // панель там не показывается. Состояние приводится к сегодняшней ленте на каждой
   // перерисовке (правило 7) — иначе сохранённая галочка на ушедшей карте вычистила бы
-  // список, не показавшись в панели.
-  let rows = все;
-  let hiddenByFilter = 0;
-  if (activeTab === 'available') {
-    matchFilter = matchFilter
-      ? clampFilter(matchFilter, все)
-      : restoreFilter(localStorage.getItem(FILTER_STORE_KEY), все);
-    rows = все.filter((m) => matchesFilter(m, matchFilter as FilterState));
-    hiddenByFilter = все.length - rows.length;
+  // список, не показавшись в панели. Считается и с чужой вкладки: число на ярлыке
+  // «Доступных» — после фильтра (`matchesPage.ts`, правило 1).
+  const available = matchLists?.available ?? [];
+  const f = (matchFilter = matchFilter
+    ? clampFilter(matchFilter, available)
+    : restoreFilter(localStorage.getItem(FILTER_STORE_KEY), available));
+  const found = available.filter((m) => matchesFilter(m, f));
+  const counts = tabCounts(matchLists, found.length);
+  for (const b of Array.from(document.querySelectorAll('.mtab'))) {
+    const n = counts[(b as HTMLElement).dataset.tab as MatchTab];
+    const badge = b.querySelector('.mcount');
+    if (badge) badge.textContent = n === null ? '' : String(n);
   }
-  const план = fallbackFor({ ...состояние, rows: rows.length, hiddenByFilter });
+  const все = matchLists?.[activeTab] ?? [];
+  const rows = activeTab === 'available' ? found : все;
+  const план = fallbackFor({
+    loaded,
+    failed,
+    tab: activeTab,
+    rows: rows.length,
+    hiddenByFilter: все.length - rows.length,
+  });
+  // Карточка «Сервер не отвечает» с адресом — `browserFallback.ts`, правило 4. Она и есть
+  // сообщение о беде, поэтому то же в строке статуса гасится (правило 5).
+  const down = showServerRow({ loaded, failed });
+  $('msrv').style.display = down ? '' : 'none';
+  if (down && game.statusText() === t('acc.server-down')) game.status('');
+  $('match-create').style.display = loaded && !failed && activeTab === 'available' ? '' : 'none';
   // Панель нужна только там, где есть что фильтровать: без загруженной ленты она
   // предлагала бы крутить контролы вместо того, чтобы починить связь.
-  const панель = $('mfilter');
-  панель.style.display = activeTab === 'available' && план.kind !== 'empty' ? '' : 'none';
-  if (activeTab === 'available' && план.kind !== 'empty')
-    renderFilterPanel(все, matchFilter as FilterState);
+  const controls =
+    activeTab === 'available' && план.kind !== 'empty' ? renderFilterPanel(available, f) : null;
+  $('mfilter').style.display = controls?.any ? '' : 'none';
   if (план.kind === 'empty') {
-    soloCard(t(план.message));
+    renderEmpty(el, план);
     return;
   }
   if (план.kind === 'filtered') {
-    // Правило 6 `browserFallback.ts`: это НЕ тупик — путь у игрока прямо над списком,
-    // поэтому одно сообщение и никакой кнопки «в соло».
-    el.innerHTML = `<div class="mempty">${t(план.message)}</div>`;
+    // Правило 6 `browserFallback.ts`: это НЕ тупик — путь у игрока под рукой, сброс
+    // фильтра, поэтому одно сообщение и одна кнопка, без одиночной игры.
+    el.innerHTML =
+      `<div class="mempty">${t(план.message)}</div>` +
+      `<div class="msolo"><button class="mbtn btn-second" id="mreset-go">${t('browser.filter.reset')}</button></div>`;
+    document.getElementById('mreset-go')?.addEventListener('click', () => {
+      matchFilter = restoreFilter(null, available);
+      saveMatchFilter();
+      renderMatches();
+    });
     return;
   }
   el.textContent = '';
-  for (const m of rows) {
-    const row = document.createElement('div');
-    row.className = 'mrow';
-    const info = document.createElement('div');
-    info.className = 'minfo';
-    // Entry window (SES-2.4): on «Доступные», show how long a newcomer may still take a
-    // seat — the server already drops fully-closed sessions from this tab, so an open
-    // countdown reassures, a soon-to-close one nudges. Unbounded (dev / old server) or
-    // other tabs: omitted. Own «Активные»/«Архив» rows don't gate a reconnect, so no
-    // window there.
-    const win = joinWindow(m, activeTab);
-    let windowLine = '';
-    if (win.kind === 'closed') {
-      windowLine = ` · <span class="mwin shut">${t('acc.join-closed')}</span>`;
-    } else if (win.kind === 'open') {
-      windowLine = ` · <span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
-    }
-    // Режим партии (BRW-4): значок вида + имя пресета. Имя приходит НЕ со строки —
-    // сервер шлёт только id, а человеческое имя даёт `tData()` по тому же слагу
-    // (`pve_waves` → `data.pve-waves`). Что именно печатать, решает `modeLabel()`:
-    // значка нет, пока сервер сам не назвал вид, а без `modeId` строки нет вовсе.
-    const mode = modeLabel(m);
-    let modeLine = '';
-    if (mode.kind === 'shown') {
-      const badge =
-        mode.badge === 'pve'
-          ? `<span class="mmode pve">${t('browser.mode.pve')}</span> `
-          : mode.badge === 'pvp'
-            ? `<span class="mmode pvp">${t('browser.mode.pvp')}</span> `
-            : '';
-      modeLine = `${badge}${esc(tData(mode.modeId))} · `;
-    }
-    info.innerHTML =
-      `<div class="mname">${esc(game.mapLabel(m.mapId))} <span class="mid">${esc(m.matchId)}</span></div>` +
-      `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
-      `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
-    row.appendChild(info);
-    const btns = document.createElement('div');
-    btns.className = 'mbtns';
-    const join = document.createElement('button');
-    join.className = 'mbtn btn-second';
-    // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
-    // о возвращении, а не о вступлении.
-    const seated = activeTab === 'active';
-    join.textContent = t(seated ? 'browser.resume' : 'browser.join');
-    join.addEventListener('click', () => openSessionTab(m.matchId, seated));
-    btns.appendChild(join);
-    const action = rowAction(activeTab);
-    if (action) {
-      const restore = action === 'restore';
-      const arch = document.createElement('button');
-      arch.className = 'mbtn btn-quiet';
-      arch.textContent = restore ? t('browser.restore') : t('browser.archive');
-      arch.addEventListener('click', () =>
-        detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
-      );
-      btns.appendChild(arch);
-    }
-    row.appendChild(btns);
-    el.appendChild(row);
-  }
+  for (const m of rows) el.appendChild(matchRow(m));
 }
 
 /**
@@ -464,8 +532,7 @@ export async function refreshMyMatches(): Promise<void> {
  *  (`sizetest.mjs`) мерит обозреватель: сервера там нет. */
 export function showLists(lists: Record<MatchTab, MatchRow[]>): void {
   matchLists = lists;
-  activeTab = 'available';
-  renderMatches();
+  openTab('available');
 }
 
 /** Подключить обозреватель к игре: хуки и обработчики контролов. Зовётся до загрузочного
@@ -473,7 +540,6 @@ export function showLists(lists: Record<MatchTab, MatchRow[]>): void {
 export function initMatchBrowser(host: MatchBrowserHost): void {
   game = host;
   srvInput = $('csrv') as HTMLInputElement;
-  nickInput = $('cnick') as HTMLInputElement;
   // Контролы фильтра (BRW-3). Обработчики вешаются ОДИН раз: живой пересчёт — это
   // перерисовка уже лежащей в памяти ленты, без похода на сервер.
   $('mf-mode').addEventListener('click', (e) => {
@@ -502,45 +568,41 @@ export function initMatchBrowser(host: MatchBrowserHost): void {
     });
   }
 
-  for (const btn of Array.from(document.querySelectorAll('.mtab'))) {
-    btn.addEventListener('click', () => {
-      activeTab = ((btn as HTMLElement).dataset.tab as MatchTab) ?? 'available';
-      for (const b of Array.from(document.querySelectorAll('.mtab'))) {
-        b.classList.toggle('active', b === btn);
-      }
-      renderMatches();
-    });
-  }
-
-  // "Обновить список" reloads the read-model; per-row "Войти"/"В архив" act on a match.
-  $('cgo').addEventListener('click', () => detach('обозреватель: список партий', refreshMatches()));
-
-  // Player build: the match screen is ONLY the tabs + list (Доступные/Активные/Архив).
-  // The callsign comes from the welcome/hub identity step and the server from the page
-  // origin, so their rows are noise here — hidden, NOT removed: the inputs stay in the
-  // DOM as the state carriers resolveServer() reads. The server row resurfaces from
-  // renderMatches only while the list can't be loaded (see there). With no «Обновить
-  // список» button, the open screen keeps itself fresh instead: a quiet 10s re-poll
-  // plus an immediate reload when the player edits the server address.
-  if (__PLAYER_BUILD__) {
-    const browseEl = $('cbrowse');
-    const hide = (n: Element | null): void => {
-      if (n) (n as HTMLElement).style.display = 'none';
-    };
-    hide(browseEl.querySelector('.csub'));
-    hide(nickInput.closest('.cfield'));
-    hide(srvInput.closest('.cfield'));
-    hide($('cgo').closest('.crow'));
-    srvInput.addEventListener('change', () =>
-      detach('обозреватель: список партий', refreshMatches()),
+  for (const btn of Array.from(document.querySelectorAll('.mtab')))
+    btn.addEventListener('click', () =>
+      openTab(((btn as HTMLElement).dataset.tab as MatchTab) ?? 'available'),
     );
-    setInterval(() => {
-      // Уместен ли переопрос прямо сейчас — `matchPoll.ts` (REFM-153): тикает только
-      // список НА ЭКРАНЕ. Поверх закрытого оверлея (матч / ставка) и на приветственном
-      // шаге фоновая неудача написала бы «сервер недоступен» в чужую строку статуса.
-      const shown = (n: HTMLElement): boolean => n.style.display !== 'none';
-      if (pollTick({ overlay: game.connectShown(), browser: shown(browseEl) }) === 'skip') return;
-      detach('обозреватель: тихий переопрос списка', refreshMatches(true));
-    }, 10_000);
-  }
+
+  // Кнопки «Обновить список» нет (UIX-17.1): открытая страница освежается сама — тихий
+  // переопрос раз в десять секунд (`startPoll`). «Подключиться» в карточке «Сервер не
+  // отвечает» и правка адреса там же переспрашивают сразу; «Войти»/«В архив» в строке — про матч.
+  const reload = (): void => detach('обозреватель: список партий', refreshMatches());
+  $('cgo').addEventListener('click', reload);
+  srvInput.addEventListener('change', reload);
+}
+
+/**
+ * Завести тихий переопрос раз в десять секунд — при ПЕРВОМ открытии страницы, а не на
+ * загрузке игры: тому, кто в «Матчи» не заходит (одиночная игра, Sector Zero), таймер не
+ * нужен. Дальше он живёт до конца страницы и молчит, пока список не на экране.
+ */
+function startPoll(): void {
+  if (pollStarted) return;
+  pollStarted = true;
+  const browseEl = $('cbrowse');
+  setInterval(() => {
+    // Уместен ли переопрос прямо сейчас — `matchPoll.ts` (REFM-153): тикает только
+    // список НА ЭКРАНЕ. Поверх закрытого оверлея (матч / ставка) и на приветственном
+    // шаге фоновая неудача написала бы «сервер недоступен» в чужую строку статуса; пока
+    // игрок правит адрес, переопрос ждёт (правило 5) — запрос по недописанному адресу
+    // кончился бы неудачей, и карточка мигнула бы посреди набора.
+    const shown = (n: HTMLElement): boolean => n.style.display !== 'none';
+    const tick = pollTick({
+      overlay: game.connectShown(),
+      browser: shown(browseEl),
+      editing: document.activeElement === srvInput,
+    });
+    if (tick === 'skip') return;
+    detach('обозреватель: тихий переопрос списка', refreshMatches(true));
+  }, 10_000);
 }

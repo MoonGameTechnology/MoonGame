@@ -56,9 +56,12 @@ export interface FilterRow {
   players: { seated: number; capacity: number };
 }
 
-/** Карты, встречающиеся в ленте: без повторов, в стабильном порядке (правило 6). */
+/** Карты, встречающиеся в ленте: без повторов, в стабильном порядке (правило 6). Число
+ *  в id сравнивается как число: иначе `ffa-20` встаёт в меню раньше `ffa-4`. */
 export function mapsOf(rows: readonly FilterRow[]): string[] {
-  return [...new Set(rows.map((r) => r.mapId))].sort();
+  return [...new Set(rows.map((r) => r.mapId))].sort((a, b) =>
+    a.localeCompare(b, 'en', { numeric: true }),
+  );
 }
 
 /** Границы ползунка «Игроков» — от наименьшей вместимости в ленте до наибольшей

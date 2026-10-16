@@ -2744,9 +2744,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .ctitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);}
 #connect .csub{margin:8px 0 18px;color:var(--dim);font-size:var(--fs-body);line-height:1.5;}
 #connect .cfield{display:block;margin:0 0 12px;color:var(--dim);font-size:var(--fs-caption);}
-#setup .inp,#match-create .inp,#setup-bot-count{display:block;width:100%;margin:6px 0 10px;padding:10px 12px;
+#setup .inp,#setup-bot-count{display:block;width:100%;margin:6px 0 10px;padding:10px 12px;
   color:var(--ink);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;font:inherit;min-height:44px;}
-#setup .inp:focus-visible,#match-create .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+#setup .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 #setup-bot-count{max-width:140px;}
 /* «Создать сетевую игру» — вторичная кнопка (.btn-second): здесь только размер и место. */
 #setup-network-create{display:block;width:100%;min-height:44px;padding:0 16px;border-radius:12px;font-size:16px;}
@@ -2775,47 +2775,131 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    row read as a dead strip under the last button — collapse it while it is empty. */
 #connect .cstat:empty{margin-top:0;min-height:0;}
 #connect .clink{display:block;width:100%;margin-top:14px;padding:4px;font-size:var(--fs-body);text-align:center;}
-#connect .mtabs{display:flex;gap:6px;margin-top:16px;}
-#connect .mtab{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-family:var(--sf-font);font-size:var(--fs-caption);cursor:pointer;}
+/* «Матчи» (UIX-17.1, заказ владельца 2026-10-16) — страница в палитре хаба, как настройка схватки
+   (UIX-15.1/16.1): на телефоне весь экран без рамки, на ПК окно (bridge-shell.css). Шапка и вкладки
+   стоят на месте, листается середина, «Новый матч» — у нижнего края. Язык, версия и ссылки подвала
+   живут на приветственном шаге и в хабе, здесь их нет. Строка статуса встаёт под вкладки:
+   «загрузка» — над списком, «неверный адрес» — у карточки сервера. */
+#connect[data-stage="browse"]{padding:0;align-items:stretch;background:var(--sf-panel),#030b14;}
+#connect[data-stage="browse"] .cwrap{display:flex;flex-direction:column;width:100%;margin:0;padding:0;}
+#connect[data-stage="browse"] :is(.clang,.cfoot,.cver,.cupd,.tm-open){display:none;}
+#connect[data-stage="browse"] .cbox{flex:1 1 auto;display:flex;flex-direction:column;gap:12px;width:100%;min-height:0;margin:0;
+  border:0;border-radius:0;background:none;box-shadow:none;color:var(--sf-text);
+  font-family:var(--sf-font);font-variant-numeric:tabular-nums;
+  padding:calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));}
+#connect[data-stage="browse"] #cbrowse{display:contents;}
+#connect[data-stage="browse"] .cstat{order:3;margin:0;}
+#connect[data-stage="browse"] .cstat:empty{display:none;}
+#connect .mhead{order:1;display:flex;align-items:center;gap:14px;}
+#connect .mhead .cback{flex:none;min-height:44px;margin:0;padding:0 4px;}
+#connect .mhead .ctitle{min-width:0;font-size:20px;font-weight:700;line-height:1.3;color:var(--sf-hi);}
+#connect .mhead .ctitle .dia{flex:none;width:10px;height:10px;background:var(--sf-accent);box-shadow:0 0 10px var(--sf-accent);}
+#connect .mtabs{order:2;display:flex;gap:6px;}
+#connect .mtab{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 10px;
+  border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card-off);color:var(--sf-dim);
+  font:600 14px var(--sf-font);white-space:nowrap;cursor:pointer;}
+#connect .mtab:hover{border-color:var(--sf-edge-hi);}
 #connect .mtab.active{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
-/* Панель фильтров над списком (BRW-3) — только на вкладке «Доступные». */
-#connect .mfilter{margin-top:10px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;
-  display:flex;flex-direction:column;gap:7px;}
-#connect .mfrow{display:flex;align-items:center;gap:8px;}
-#connect .mflabel{flex:none;width:64px;color:var(--dim);font-size:var(--fs-caption);}
+/* Число на вкладке — сколько строк она покажет (decisions/matchesPage.ts, правило 1); ленты нет — числа нет. */
+#connect .mcount{min-width:22px;padding:1px 7px;border-radius:999px;background:var(--sf-inset);color:var(--sf-text);
+  font:600 12px/1.4 var(--sf-font);font-style:normal;text-align:center;}
+#connect .mcount:empty{display:none;}
+#connect .mtab.active .mcount{background:color-mix(in srgb,var(--sf-accent) 22%,transparent);color:var(--sf-hi);}
+/* Середина листается целиком: карточка сервера, фильтр и список. */
+#connect .mbody{order:4;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:flex;flex-direction:column;gap:12px;}
+/* «Сервер не отвечает» — адрес виден, только когда он нужен (decisions/browserFallback.ts, правило 4). */
+#connect .msrv{flex:none;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;padding:14px 16px;
+  border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);border-radius:12px;background:var(--sf-card);}
+#connect .msrv > b{flex:1 0 100%;font-size:16px;font-weight:600;line-height:1.35;color:var(--amber);}
+#connect .msrv .cfield{flex:1 1 220px;margin:0;font-size:14px;color:var(--sf-dim);}
+#connect .msrv .cfield input{min-height:46px;border-color:var(--sf-edge);border-radius:12px;background:var(--sf-inset);font-size:16px;}
+#connect .msrv .cbtn{flex:1 0 auto;min-height:46px;padding:0 18px;border-radius:12px;font-size:15px;}
+/* Фильтр «Доступных» (BRW-3) одной полосой: вид, карты, число игроков. Контрол без выбора не
+   показывается (decisions/matchesPage.ts, правило 3). */
+#connect .mfilter{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;}
 #connect .mfseg{display:flex;gap:4px;}
-#connect .mfbtn{padding:5px 10px;border-radius:6px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-family:var(--sf-font);font-size:var(--fs-caption);cursor:pointer;}
+#connect .mfbtn{min-height:44px;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card-off);
+  color:var(--sf-dim);font:600 14px var(--sf-font);cursor:pointer;}
+#connect .mfbtn:hover{border-color:var(--sf-edge-hi);}
 #connect .mfbtn.active{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
-#connect .mfdrop{position:relative;flex:1;min-width:0;}
-#connect .mfwide{width:100%;text-align:left;}
-#connect .mfmenu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;max-height:38vh;overflow-y:auto;
-  padding:6px;border:1px solid var(--line-hi);border-radius:7px;background:rgba(3,12,16,.97);}
-#connect .mfmenu label{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:5px;
-  color:var(--txt,#dfeef2);font-size:var(--fs-body);text-transform:capitalize;cursor:pointer;}
-#connect .mfmenu label:hover{background:rgba(53,214,230,.08);}
-#connect .mfrange{flex:1;min-width:0;accent-color:var(--cyan,#35d6e6);}
-#connect .mfval{flex:none;min-width:52px;text-align:right;color:var(--cyan-dim,#6cc);font-size:var(--fs-caption);}
-#connect .mlist{margin-top:10px;max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-#connect .mempty{padding:18px 8px 8px;text-align:center;color:var(--dim);font-size:var(--fs-body);}
-#connect .msolo{padding:6px 8px 16px;text-align:center;}
-#connect .msolo .mbtn{font-size:var(--fs-body);padding:10px 18px;}
-#connect .msolo-sub{margin-top:6px;color:var(--dim);font-size:var(--fs-caption);}
-#connect .mrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line-hi);
-  border-radius:8px;background:rgba(255,255,255,.02);}
-#connect .minfo{flex:1;min-width:0;}
-#connect .mname{font-size:var(--fs-body);color:var(--txt,#dfeef2);text-transform:capitalize;}
-#connect .mname .mid{font-size:var(--fs-caption);color:var(--dim);text-transform:none;margin-left:6px;}
-#connect .mmeta{margin-top:3px;font-size:var(--fs-caption);color:var(--dim);}
-#connect .mmeta .mmode{font-size:var(--fs-caption);padding:1px 5px;border-radius:3px;border:1px solid currentColor;}
-#connect .mmeta .mmode.pve{color:var(--amber,#e0a942);}
-#connect .mmeta .mmode.pvp{color:var(--cyan-dim,#6cc);}
-#connect .mmeta .mwin{color:var(--cyan-dim,#6cc);}
-#connect .mmeta .mwin.soon{color:var(--amber,#e0a942);}
-#connect .mmeta .mwin.shut{color:var(--dim);text-decoration:line-through;}
-#connect .mbtns{display:flex;gap:6px;flex:none;}
-#connect .mbtn{padding:8px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
+#connect .mfdrop{position:relative;flex:1 1 150px;min-width:0;}
+#connect .mfwide{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;white-space:nowrap;}
+#connect .mfwide::after{content:'▾';flex:none;color:var(--sf-dim);}
+/* Список карт — по ширине имён, от правого края кнопки: в ширину кнопки «2 на 2 · Разорванный
+   предел» ломался на три строки. */
+#connect .mfmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;width:max-content;min-width:100%;
+  max-width:min(360px,calc(100vw - 32px));max-height:38vh;overflow-y:auto;padding:6px;
+  border:1px solid var(--sf-edge-hi);border-radius:12px;background:#06141f;box-shadow:var(--sf-shadow);}
+#connect .mfmenu label{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border-radius:8px;
+  color:var(--sf-text);font-size:15px;cursor:pointer;}
+#connect .mfmenu label:hover{background:var(--sf-sel);}
+#connect .mfmenu input{flex:none;width:18px;height:18px;margin:0;accent-color:var(--sf-accent);}
+/* Число игроков — два бегунка на одной дорожке; между ними выбранный диапазон (--lo/--hi ставит
+   matchBrowser.ts). Концы могут меняться местами (matchFilter.ts, правило 4). */
+#connect .mfplayers{flex:1 1 100%;display:flex;align-items:center;gap:10px;min-width:0;}
+#connect .mflabel{flex:none;font-size:14px;color:var(--sf-dim);}
+#connect .mfval{flex:none;min-width:44px;font-size:14px;font-weight:600;color:var(--sf-text);}
+#connect .mfdual{--lo:0;--hi:1;position:relative;flex:1 1 auto;min-width:120px;height:44px;}
+#connect .mfdual::before{content:'';position:absolute;left:11px;right:11px;top:50%;height:4px;margin-top:-2px;border-radius:2px;
+  background:linear-gradient(90deg,var(--sf-edge) calc(var(--lo) * 100%),var(--sf-accent) calc(var(--lo) * 100%),
+    var(--sf-accent) calc(var(--hi) * 100%),var(--sf-edge) calc(var(--hi) * 100%));}
+#connect .mfrange{position:absolute;inset:0;width:100%;height:100%;margin:0;background:none;pointer-events:none;
+  -webkit-appearance:none;appearance:none;}
+#connect .mfrange:focus-visible{outline:none;}
+#connect .mfrange::-webkit-slider-runnable-track{height:100%;border:0;background:none;}
+#connect .mfrange::-moz-range-track{height:100%;border:0;background:none;}
+#connect .mfrange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;pointer-events:auto;width:22px;height:22px;margin-top:11px;
+  border:2px solid var(--sf-accent);border-radius:50%;background:var(--sf-hi);cursor:pointer;
+  box-shadow:0 0 8px color-mix(in srgb,var(--sf-accent) 60%,transparent);}
+#connect .mfrange::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border:2px solid var(--sf-accent);border-radius:50%;
+  background:var(--sf-hi);cursor:pointer;}
+#connect .mfrange:focus-visible::-webkit-slider-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
+#connect .mfrange:focus-visible::-moz-range-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
+#connect .mlist{flex:none;display:flex;flex-direction:column;gap:8px;}
+#connect .mempty{padding:18px 8px 4px;text-align:center;font-size:15px;line-height:1.45;color:var(--sf-dim);}
+#connect .msolo{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 8px 16px;text-align:center;}
+#connect .msolo .mbtn{min-height:46px;padding:0 20px;}
+#connect .msolo-sub{font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне «Войти»
+   стоит рядом с картой, и строка под ней — во всю ширину; две кнопки своих вкладок — своим рядом.
+   На ПК кнопки справа от обеих строк (bridge-shell.css). */
+#connect .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name btns" "meta meta";
+  align-items:center;gap:6px 12px;padding:12px 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
+#connect .mrow.mrow-2{grid-template-areas:"name name" "meta meta" "btns btns";}
+#connect .mrow:hover{border-color:var(--sf-edge-hi);}
+#connect .minfo{display:contents;}
+#connect .mname{grid-area:name;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:16px;line-height:1.35;}
+#connect .mname b{font-weight:600;color:var(--sf-text);}
+#connect .mmodename{font-size:14px;color:var(--sf-dim);}
+#connect .mmode{padding:0 7px;border:1px solid currentColor;border-radius:999px;font-size:12px;font-weight:700;line-height:1.6;}
+#connect .mmode.pve{color:var(--amber,#e0a942);}
+#connect .mmode.pvp{color:var(--sf-accent);}
+#connect .mended{padding:0 8px;border-radius:999px;background:var(--sf-inset);font-size:12px;line-height:1.6;color:var(--sf-dim);}
+#connect .mmeta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:14px;line-height:1.4;color:var(--sf-dim);}
+#connect .mseats{display:inline-flex;align-items:center;gap:3px;}
+#connect .mseats i{width:9px;height:9px;border:1px solid var(--sf-accent);border-radius:50%;}
+#connect .mseats i.on{background:var(--sf-accent);}
+#connect .mseats b{margin-left:4px;font-weight:600;color:var(--sf-text);}
+#connect .mwin{color:var(--sf-accent);}
+#connect .mwin.soon{color:var(--amber,#e0a942);}
+#connect .mwin.shut{color:var(--sf-dim);text-decoration:line-through;}
+#connect .mbtns{grid-area:btns;justify-self:end;display:flex;gap:6px;}
+#connect .mbtn{min-height:44px;padding:0 16px;border-radius:12px;font-size:15px;white-space:nowrap;}
+/* «Новый матч» — у нижнего края, только над загруженными «Доступными». */
+#connect .mcreate{order:5;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+  padding-top:12px;border-top:1px solid var(--sf-edge);}
+#connect .mcreate label{flex:1 0 100%;font-size:14px;font-weight:600;color:var(--sf-head);}
+#connect .mcreate .inp{flex:1 1 160px;min-width:0;min-height:48px;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:var(--sf-inset);color:var(--sf-text);font:16px var(--sf-font);}
+#connect .mcreate .inp:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+#connect .mcreate .mbtn{flex:0 0 auto;min-height:48px;padding:0 22px;font-size:16px;}
+/* Узкий телефон: три вкладки с числами должны встать в строку. */
+@media (max-width:360px){
+  #connect .mtabs{gap:4px;}
+  #connect .mtab{gap:4px;padding:0 8px;font-size:13px;}
+}
 /* welcome stage — first-launch identity screen (new commander / sign-in) */
 /* The chip above the card and the legal footer below it are absolutely positioned, so
    they carry no height of their own — the padding here RESERVES their strip inside the
@@ -3779,7 +3863,6 @@ ${profileCss}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
   #connect .cbox,#connect .cwrap{width:min(520px,62.5vw);}
-  #connect .mlist{max-height:30.5vh;}
   #connect .ccrest .wm{font-size:clamp(20px,4.33vw,26px);letter-spacing:clamp(3px,1.33vw,8px);}
   #connect .ccrest .wtag{letter-spacing:clamp(2px,.93vw,5px);}
   /* skirmish setup on PC: two card-columns — the match (map choice, start world on the
@@ -4170,53 +4253,52 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         </div>
       </div>
       <div id="cbrowse" style="display:none">
-        <button id="cback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
-        <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
-        <p class="csub" data-i18n="welcome.browse.sub"></p>
-        <label class="cfield"><span data-i18n="welcome.browse.server"></span>
-          <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
-        </label>
-        <form class="authform" onsubmit="return false">
-          <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
-            <input id="cnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-          </label>
-          <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
-            <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
-          </label>
+        <div class="mhead">
+          <button id="cback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
+          <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
+        </div>
+        <!-- Позывной приходит со входа, а не со страницы (UIX-17.1): поле — спрятанный носитель
+             состояния, его читают разбор адреса и вход в партию. Пароль спрашивает только карточка входа. -->
+        <form class="mcarry" hidden onsubmit="return false">
+          <input id="cnick" type="text" autocomplete="off" maxlength="24">
         </form>
-        <div class="crow">
-          <button id="cgo" class="cbtn btn-second" type="button" data-i18n="welcome.browse.go"></button>
-        </div>
         <div class="mtabs">
-          <button class="mtab active" data-tab="available" data-i18n="welcome.browse.tab.available"></button>
-          <button class="mtab" data-tab="active" data-i18n="welcome.browse.tab.active"></button>
-          <button class="mtab" data-tab="archived" data-i18n="welcome.browse.tab.archived"></button>
+          <button class="mtab active" type="button" data-tab="available"><span data-i18n="welcome.browse.tab.available"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="active"><span data-i18n="welcome.browse.tab.active"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="archived"><span data-i18n="welcome.browse.tab.archived"></span><i class="mcount"></i></button>
         </div>
-        <div id="mfilter" class="mfilter" style="display:none">
-          <div class="mfrow">
-            <span class="mflabel" data-i18n="browser.filter.mode"></span>
-            <div class="mfseg" id="mf-mode">
+        <div class="mbody">
+          <!-- Адрес сервера виден, только когда сервер не ответил (browserFallback.ts, правило 4). -->
+          <div id="msrv" class="msrv" style="display:none">
+            <b data-i18n="browser.server-down"></b>
+            <label class="cfield"><span data-i18n="browser.server-addr"></span>
+              <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
+            </label>
+            <button id="cgo" class="cbtn btn-second" type="button" data-i18n="browser.server-retry"></button>
+          </div>
+          <div id="mfilter" class="mfilter" style="display:none">
+            <div class="mfseg" id="mf-mode" role="group" data-i18n-aria="browser.filter.mode">
               <button class="mfbtn active" type="button" data-mode="all" data-i18n="browser.filter.all"></button>
               <button class="mfbtn" type="button" data-mode="pvp" data-i18n="browser.mode.pvp"></button>
               <button class="mfbtn" type="button" data-mode="pve" data-i18n="browser.mode.pve"></button>
             </div>
-          </div>
-          <div class="mfrow">
-            <span class="mflabel" data-i18n="browser.filter.map"></span>
-            <div class="mfdrop">
+            <div class="mfdrop" id="mf-mapbox">
               <button class="mfbtn mfwide" type="button" id="mf-map"></button>
               <div class="mfmenu" id="mf-maps" style="display:none"></div>
             </div>
+            <div class="mfplayers" id="mf-players">
+              <span class="mflabel" data-i18n="browser.filter.players"></span>
+              <span class="mfval" id="mf-range"></span>
+              <div class="mfdual" id="mf-dual">
+                <input id="mf-min" class="mfrange" type="range" min="0" max="0" value="0" data-i18n-aria="browser.filter.min">
+                <input id="mf-max" class="mfrange" type="range" min="0" max="0" value="0" data-i18n-aria="browser.filter.max">
+              </div>
+            </div>
           </div>
-          <div class="mfrow">
-            <span class="mflabel" data-i18n="browser.filter.players"></span>
-            <input id="mf-min" class="mfrange" type="range" min="0" max="0" value="0">
-            <input id="mf-max" class="mfrange" type="range" min="0" max="0" value="0">
-            <span class="mfval" id="mf-range"></span>
-          </div>
+          <div id="mlist" class="mlist"></div>
         </div>
-        <div id="match-create" class="mfilter" style="display:none">
-          <label for="match-create-map" data-i18n="setup.map"></label>
+        <div id="match-create" class="mcreate" style="display:none">
+          <label for="match-create-map" data-i18n="browser.create"></label>
           <select id="match-create-map" class="inp">
             <option value="duel-1" data-i18n="setup.map.duel-1"></option>
             <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
@@ -4225,9 +4307,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <option value="ffa-20" data-i18n="setup.map.ffa-20"></option>
             <option value="ffa-50" data-i18n="setup.map.ffa-50"></option>
           </select>
-          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
+          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go"></button>
         </div>
-        <div id="mlist" class="mlist"></div>
       </div>
       <div id="cstatus" class="cstat"></div>
     </div>

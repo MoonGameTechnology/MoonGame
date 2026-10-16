@@ -22,6 +22,7 @@ const HTTP = 'http://srv.test:8080';
 class Node {
   value = '';
   style = { display: 'none' };
+  dataset: Record<string, string> = {};
   private on = new Map<string, Array<(ev: unknown) => void>>();
   constructor(readonly id: string) {}
   addEventListener(type: string, fn: (ev: unknown) => void): void {
@@ -171,6 +172,8 @@ describe('REFM-218 — стадии и позывной', () => {
     for (const stage of ['welcome', 'register', 'recover', 'reset', 'browse'] as const) {
       pages.showStage(stage);
       expect(stages()).toEqual([`c${stage === 'welcome' ? 'welcome' : stage}`]);
+      // По стадии выбирается раскладка: «Матчи» — страница во весь экран (UIX-17.1).
+      expect(el('connect').dataset.stage).toBe(stage);
     }
   });
 

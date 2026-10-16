@@ -69,9 +69,12 @@ export function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 
   recoverStageEl.style.display = stage === 'recover' ? '' : 'none';
   resetStageEl.style.display = stage === 'reset' ? '' : 'none';
   browseStageEl.style.display = stage === 'browse' ? '' : 'none';
+  // Раскладка экрана — по стадии: «Матчи» — страница во весь экран, а не карточка (UIX-17.1).
+  const connect = document.getElementById('connect');
+  if (connect) connect.dataset.stage = stage;
   // PTM-1.2: карточку входа УВИДЕЛИ — раз за загрузку и только на видимом экране
   // подключения: `showStage('welcome')` зовут и чтобы сбросить скрытый экран на будущее.
-  if (stage === 'welcome' && !loginShown && document.getElementById('connect')?.style.display !== 'none') {
+  if (stage === 'welcome' && !loginShown && connect?.style.display !== 'none') {
     loginShown = true;
     getPlatform().analytics.emit('login_shown');
   }
