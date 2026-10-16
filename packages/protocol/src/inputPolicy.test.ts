@@ -30,6 +30,8 @@ describe('new password policy and legacy authentication', () => {
       'qwerty12345678',
       'abcdabcdabcd',
       ' '.repeat(12),
+      ' '.repeat(11) + 'a',
+      'a' + ' '.repeat(11),
     ])
       expect(passwordIssue(p), p).toBe('weak');
     for (const p of ['valid phrase\u0000here', 'valid phrase\u202Ehere', 'valid phrase\uD800here'])
@@ -61,6 +63,10 @@ describe('public names', () => {
   it('detects RU/EN insults, digit suffixes, separators and script/width substitutions', () => {
     for (const name of [
       'Идиот42',
+      'Идиот١',
+      'ИдиотⅨ',
+      'Идиот¼',
+      'sh1t𐒠',
       'Долбоёб42',
       'У_е_б_о_к',
       'Motherfucker',
@@ -109,6 +115,7 @@ describe('field-specific input handling', () => {
     expect(sanitizeChatText('  hello\u0000\u200B\u202E world\r\nnext\tline  ', 100)).toBe(
       'hello world\nnext\tline',
     );
+    expect(sanitizeChatText('one\u2028two\u2029three', 100)).toBe('one\ntwo\nthree');
     expect(sanitizeChatText('😀😀😀', 2)).toBe('😀😀');
     expect(sanitizeChatText('<b>hello</b> & "quotes"', 100)).toBe('<b>hello</b> & "quotes"');
     expect(sanitizeChatText('\u0000\u200B', 100)).toBe('');

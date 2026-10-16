@@ -29,7 +29,7 @@ export function passwordIssue(password: string): PasswordIssue | null {
   if (/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(password)) return 'characters';
   const key = password.normalize('NFKC').toLowerCase().trim();
   if (
-    !key.trim() ||
+    Array.from(key).length < NEW_PASSWORD_MIN ||
     /^(.{1,4})\1+$/u.test(key) ||
     /^(?:p[a@4]ssw[o0]rd|qwerty|letmein|admin|welcome|пароль|йцукен)[\d!@#$%^&*._-]*$/u.test(key) ||
     ['passwordpassword', 'iloveyou1234', 'letmeinplease', 'correcthorsebatterystaple'].includes(
@@ -166,16 +166,20 @@ const BLOCKED_KEYS = new Set(
 
 export function blockedPublicName(name: string): boolean {
   if (name.length > 256) return true;
-  const text = name.normalize('NFKC').toLowerCase();
-  const tokens = text.split(/[\s_-]+/u);
-  tokens.push(tokens.join(''));
+  // Keep the original numeral categories too: NFKC turns e.g. Ⅸ into IX and ¼ into 1⁄4.
+  const tokens = [name.toLowerCase(), name.normalize('NFKC').toLowerCase()].flatMap((text) => {
+    const parts = text.split(/[\s_-]+/u);
+    return [...parts, parts.join('')];
+  });
   for (const token of tokens) {
+    const chars = Array.from(token);
     let start = 0;
-    let end = token.length;
-    while (start < end && /\d/.test(token[start]!)) start++;
-    while (end > start && /\d/.test(token[end - 1]!)) end--;
-    const candidates = [token, token.slice(start, end), token.replace(/\d/g, '')];
-    for (const candidate of candidates) {
+    let end = chars.length;
+    while (start < end && /\p{N}/u.test(chars[start]!)) start++;
+    while (end > start && /\p{N}/u.test(chars[end - 1]!)) end--;
+    const candidates = [token, chars.slice(start, end).join(''), token.replace(/\p{N}/gu, '')];
+    for (const raw of candidates) {
+      const candidate = raw.normalize('NFKC').toLowerCase();
       if (BLOCKED_KEYS.has(fold(candidate, VISUAL)) || BLOCKED_KEYS.has(fold(candidate, PHONETIC)))
         return true;
     }
@@ -208,8 +212,8 @@ export function closedInput(
 export function sanitizeChatText(text: string, max: number): string {
   return Array.from(
     text
-      .replace(/\r\n?/g, '\n')
-      .replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, (c) => c === '\n' || c === '\t' ? c : '')
+      .replace(/\r\n?|[\p{Zl}\p{Zp}]/gu, '\n')
+      .replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, (c) => (c === '\n' || c === '\t' ? c : ''))
       .trim(),
   )
     .slice(0, max)

@@ -57,7 +57,7 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
   it('enforces new-password rules server-side without rewriting accepted secrets', async () => {
     const users = new MemoryUserStore();
     const server = authApp({ users });
-    for (const password of ['old-pass', '123456789012', 'Password123456!', 'x'.repeat(12), 'valid secret\u202Einput']) {
+    for (const password of ['old-pass', '123456789012', 'Password123456!', 'x'.repeat(12), ' '.repeat(11) + 'a', 'valid secret\u202Einput']) {
       const r = await post(server, '/auth/register', { login: 'newpilot', password });
       expect(r.statusCode).toBe(400);
       expect(r.json()).toEqual({ error: 'E_PASSWORD_POLICY' });
@@ -101,7 +101,7 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
   it('rejects offensive nicknames and obfuscated variants before account creation', async () => {
     const users = new MemoryUserStore();
     const server = authApp({ users });
-    for (const login of ['Идиот42', 'mуdаk', 'f_u_c_k', 'sh1t']) {
+    for (const login of ['Идиот42', 'Идиот١', 'ИдиотⅨ', 'mуdаk', 'f_u_c_k', 'sh1t𐒠', 'sh1t']) {
       const r = await post(server, '/auth/register', { login, password: 'orbit-signal' });
       expect(r.statusCode).toBe(400);
       expect(r.json()).toEqual({ error: 'E_NICKNAME_BLOCKED' });

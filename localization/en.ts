@@ -445,7 +445,7 @@ export const en: Record<string, string> = {
   'acc.login-refused': 'Login refused',
   'acc.mail-taken': 'That email is already in use',
   'acc.nick.rule': 'Account callsign: 3–24 chars — letters, digits, _ or -',
-  'acc.pass.rule': 'Password: 12–128 characters. Common and repeating passwords are not allowed; a long phrase works.',
+  'acc.pass.rule': 'Password: 12–128 characters; outer spaces do not count toward the minimum. Avoid common or repeating passwords; a long phrase works.',
   'acc.login-pass.rule': 'Login password: 8–128 characters.',
   'acc.nick.blocked': 'This callsign contains a disallowed word. Choose another.',
   'acc.email.rule': 'Check the email address.',
