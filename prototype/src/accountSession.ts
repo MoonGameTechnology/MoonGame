@@ -24,7 +24,7 @@ import {
   authOutcome,
   shouldRegister,
   validLogin,
-  validPassword,
+  validLoginPassword,
   type AuthOutcome,
 } from '../../decisions/authRules';
 import {
@@ -83,6 +83,8 @@ const AUTH_REASON: Record<AuthOutcome, string> = {
   created: 'acc.created',
   'wrong-password': 'acc.bad-pass',
   'mail-taken': 'acc.mail-taken',
+  'password-rule': 'acc.pass.rule',
+  'nickname-blocked': 'acc.nick.blocked',
   'rate-limited': 'acc.rate-limited',
   'register-refused': 'acc.register-refused',
   'login-refused': 'acc.login-refused',
@@ -161,9 +163,9 @@ export async function ensureSession(
   // он обязан дойти до проверки и получить внятную причину.
   const passInput = document.getElementById('cpass') as HTMLInputElement | null;
   const password = passwordFrom(passwordArg, game.welcomePassword(), passInput?.value ?? '');
-  if (!validPassword(password)) {
+  if (!validLoginPassword(password)) {
     reportLogin('pass-rule');
-    game.status(t('acc.pass.rule'));
+    game.status(t('acc.login-pass.rule'));
     return null;
   }
   const call = async (

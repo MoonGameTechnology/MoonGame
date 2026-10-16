@@ -63,7 +63,7 @@ describe('вход', () => {
       'POST /auth/login': fail(401, 'E_AUTH'),
       'POST /auth/register': ok({ token: 'T', login: 'Командор' }),
     });
-    const res = await createSession(BASE, net).signIn('Командор', 'longenough');
+    const res = await createSession(BASE, net).signIn('Командор', 'orbit-longenough');
 
     expect(res).toEqual({ kind: 'done', outcome: 'created' });
     // Порядок — это и есть смысл «первый вход заводит учётку»; наоборот он завёл бы
@@ -73,11 +73,30 @@ describe('вход', () => {
 
   it('удачный вход НЕ идёт в регистрацию и запоминает сессию под позывным', async () => {
     const net = io({ 'POST /auth/login': ok({ token: 'T1', login: 'Ash' }) });
-    const res = await createSession(BASE, net).signIn('Ash', 'longenough');
+    const res = await createSession(BASE, net).signIn('Ash', 'orbit-longenough');
 
     expect(res).toEqual({ kind: 'done', outcome: 'ok' });
     expect(net.calls).toEqual(['POST /auth/login']);
     expect(net.mem.get(sessionKey(BASE))).toBe(JSON.stringify({ login: 'Ash', token: 'T1' }));
+  });
+
+  it('старый пароль из восьми символов по-прежнему отправляется на вход', async () => {
+    const net = io({ 'POST /auth/login': ok({ token: 'T', login: 'Ash' }) });
+    expect(await createSession(BASE, net).signIn('Ash', 'old-pass')).toEqual({ kind: 'done', outcome: 'ok' });
+    expect(JSON.parse(net.sent[0] ?? '{}').password).toBe('old-pass');
+    expect(net.calls).toEqual(['POST /auth/login']);
+  });
+
+  it.each([
+    ['E_PASSWORD_POLICY', 'password-rule'],
+    ['E_NICKNAME_BLOCKED', 'nickname-blocked'],
+  ])('показывает причину отказа регистрации %s', async (code, outcome) => {
+    const net = io({
+      'POST /auth/login': fail(401, 'E_AUTH'),
+      'POST /auth/register': fail(400, code),
+    });
+    expect(await createSession(BASE, net).signIn('Ash', 'orbit-signal')).toEqual({ kind: 'done', outcome });
+    expect(net.mem.size).toBe(0);
   });
 
   it('занятый позывной с чужим паролем — это «пароль не подошёл», а не «отказ»', async () => {
@@ -97,7 +116,7 @@ describe('вход', () => {
     const net = io({});
     const session = createSession(BASE, net);
 
-    expect(await session.signIn('ab', 'longenough')).toEqual({ kind: 'invalid', field: 'login' });
+    expect(await session.signIn('ab', 'orbit-longenough')).toEqual({ kind: 'invalid', field: 'login' });
     expect(await session.signIn('Ash', 'short')).toEqual({ kind: 'invalid', field: 'password' });
     expect(net.calls, 'сервер не должен отвечать за подсказку по полю').toEqual([]);
   });
@@ -107,16 +126,16 @@ describe('вход', () => {
       'POST /auth/login': fail(401),
       'POST /auth/register': ok({ token: 'T' }),
     });
-    await createSession(BASE, withMail).signIn('Ash', 'longenough', 'a@b.c');
-    expect(JSON.parse(withMail.sent[0] ?? '{}')).toEqual({ login: 'Ash', password: 'longenough' });
+    await createSession(BASE, withMail).signIn('Ash', 'orbit-longenough', 'a@b.c');
+    expect(JSON.parse(withMail.sent[0] ?? '{}')).toEqual({ login: 'Ash', password: 'orbit-longenough' });
     expect(JSON.parse(withMail.sent[1] ?? '{}')).toEqual({
       login: 'Ash',
-      password: 'longenough',
+      password: 'orbit-longenough',
       email: 'a@b.c',
     });
 
     const noMail = io({ 'POST /auth/login': fail(401), 'POST /auth/register': ok({ token: 'T' }) });
-    await createSession(BASE, noMail).signIn('Ash', 'longenough');
+    await createSession(BASE, noMail).signIn('Ash', 'orbit-longenough');
     // `email: ''` записал бы на учётку пустой адрес — восстановление потом упрётся в него
     // как в «адрес уже задан». Поэтому поля нет вовсе, а не пустого.
     expect(JSON.parse(noMail.sent[1] ?? '{}')).not.toHaveProperty('email');
@@ -221,7 +240,7 @@ describe('занятие места', () => {
 
   it('несостоявшийся вход — «сервер недоступен», а не «пароль не тот»', async () => {
     const net = io({ 'POST /auth/login': null });
-    expect(await createSession(BASE, net).signIn('Ash', 'longenough')).toEqual({ kind: 'offline' });
+    expect(await createSession(BASE, net).signIn('Ash', 'orbit-longenough')).toEqual({ kind: 'offline' });
   });
 
   it('несостоявшееся занятие места не выглядит отказом ЭТОГО матча', async () => {

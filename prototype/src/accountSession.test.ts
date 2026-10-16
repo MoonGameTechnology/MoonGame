@@ -156,7 +156,7 @@ describe('REFM-215 — вход или регистрация', () => {
     const { acc, env } = await boot();
     expect(await acc.ensureSession(BASE, 'ab', 'long-enough')).toBeNull();
     expect(await acc.ensureSession(BASE, 'Ivan')).toBeNull();
-    expect(env.status).toEqual([t('acc.nick.rule'), t('acc.pass.rule')]);
+    expect(env.status).toEqual([t('acc.nick.rule'), t('acc.login-pass.rule')]);
     expect(calls).toEqual([]);
   });
 
@@ -174,7 +174,7 @@ describe('REFM-215 — вход или регистрация', () => {
     cell.clear();
     calls = [];
     expect(await acc.ensureSession(BASE, 'Ivan', '')).toBeNull();
-    expect(env.status).toEqual([t('acc.pass.rule')]);
+    expect(env.status).toEqual([t('acc.login-pass.rule')]);
     expect(calls).toEqual([]);
   });
 

@@ -10,7 +10,7 @@ import {
 } from './auth';
 import { MemoryUserStore } from './store';
 import { registerMatchApi, type MatchApiDeps } from './matchApi';
-import type { ScryptParams } from './password';
+import { hashPassword, type ScryptParams } from './password';
 
 // SE-1.x — the login+password HTTP API: registration, login, uniform failures,
 // rate limiting, and the session gate on the match API.
@@ -27,6 +27,7 @@ afterEach(async () => {
 });
 
 interface AuthAppOptions {
+  users?: MemoryUserStore;
   now?: () => number;
   rateMax?: number;
   rateWindowMs?: number;
@@ -53,9 +54,76 @@ const post = (
   server.inject({ method: 'POST', url, payload: body as object });
 
 describe('SE-1.x · /auth/register + /auth/login', () => {
+  it('enforces new-password rules server-side without rewriting accepted secrets', async () => {
+    const users = new MemoryUserStore();
+    const server = authApp({ users });
+    for (const password of ['old-pass', '123456789012', 'Password123456!', 'x'.repeat(12), 'valid secret\u202Einput']) {
+      const r = await post(server, '/auth/register', { login: 'newpilot', password });
+      expect(r.statusCode).toBe(400);
+      expect(r.json()).toEqual({ error: 'E_PASSWORD_POLICY' });
+      expect(await users.findUser('newpilot')).toBeNull();
+    }
+    const password = '  orbit signal  ';
+    expect((await post(server, '/auth/register', { login: 'newpilot', password })).statusCode).toBe(201);
+    expect((await post(server, '/auth/login', { login: 'newpilot', password })).statusCode).toBe(200);
+    expect((await post(server, '/auth/login', { login: 'newpilot', password: password.trim() })).statusCode).toBe(401);
+  });
+
+  it('allows an existing account to log in with its original legacy password', async () => {
+    const users = new MemoryUserStore();
+    await users.createUser('legacy', await hashPassword('old-pass', FAST));
+    const server = authApp({ users });
+    expect((await post(server, '/auth/login', { login: 'legacy', password: 'old-pass' })).statusCode).toBe(200);
+  });
+
+  it('does not consume a reset link on a weak password and revokes it after a valid reset', async () => {
+    const users = new MemoryUserStore();
+    const hash = await hashPassword('legacy88', FAST);
+    const created = await users.createUser('oldpilot', hash);
+    if (!created.ok) throw new Error('fixture');
+    app = Fastify();
+    registerAuthApi(app, {
+      users, scryptParams: FAST, signSession: async () => 'session',
+      signReset: async () => 'reset-one',
+      verifyReset: async (token) => token === 'reset-one'
+        ? { accountId: created.userId, pwfp: pwFingerprint(hash) } : null,
+      resetBaseUrl: 'https://play.example', sendRecoveryMail: async () => {},
+    });
+    const weak = await post(app, '/auth/reset', { token: 'reset-one', password: 'Password123456!' });
+    expect(weak.statusCode).toBe(400);
+    expect(weak.json()).toEqual({ error: 'E_PASSWORD_POLICY' });
+    expect((await users.findById(created.userId))?.passHash).toBe(hash);
+    const body = { token: 'reset-one', password: 'a quiet orbit above the moon' };
+    expect((await post(app, '/auth/reset', body)).statusCode).toBe(200);
+    expect((await post(app, '/auth/reset', body)).statusCode).toBe(401);
+  });
+
+  it('rejects offensive nicknames and obfuscated variants before account creation', async () => {
+    const users = new MemoryUserStore();
+    const server = authApp({ users });
+    for (const login of ['Идиот42', 'mуdаk', 'f_u_c_k', 'sh1t']) {
+      const r = await post(server, '/auth/register', { login, password: 'orbit-signal' });
+      expect(r.statusCode).toBe(400);
+      expect(r.json()).toEqual({ error: 'E_NICKNAME_BLOCKED' });
+      expect(await users.findUser(login)).toBeNull();
+    }
+    expect((await post(server, '/auth/register', { login: 'Assassin', password: 'orbit-signal' })).statusCode).toBe(201);
+  });
+
+  it('refuses extra fields, arrays, injected email and oversized request bodies', async () => {
+    const server = authApp();
+    for (const extra of [{ role: 'admin' }, { email: '<img>@example.com' }, { email: 'a@x.com\r\nBcc:b@x.com' }]) {
+      const r = await post(server, '/auth/register', { login: 'safeuser', password: 'orbit-signal', ...extra });
+      expect(r.statusCode).toBe(400);
+      expect(r.json()).toEqual({ error: 'E_BAD_CREDENTIALS' });
+    }
+    expect((await post(server, '/auth/register', [])).statusCode).toBe(400);
+    expect((await post(server, '/auth/register', { login: 'safeuser', password: 'x'.repeat(5000) })).statusCode).toBe(413);
+  });
+
   it('registers an account and returns a working session token', async () => {
     const server = authApp();
-    const r = await post(server, '/auth/register', { login: 'Vasya', password: 'longenough' });
+    const r = await post(server, '/auth/register', { login: 'Vasya', password: 'orbit-longenough' });
     expect(r.statusCode).toBe(201);
     const body = r.json() as { accountId: string; login: string; token: string };
     expect(body.login).toBe('Vasya');
@@ -71,14 +139,14 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
 
   it('logs in with the right password; rejects a wrong one and an unknown login UNIFORMLY', async () => {
     const server = authApp();
-    await post(server, '/auth/register', { login: 'alice', password: 'password-1' });
+    await post(server, '/auth/register', { login: 'alice', password: 'orbit-password-1' });
 
-    const ok = await post(server, '/auth/login', { login: 'alice', password: 'password-1' });
+    const ok = await post(server, '/auth/login', { login: 'alice', password: 'orbit-password-1' });
     expect(ok.statusCode).toBe(200);
     expect((ok.json() as { login: string }).login).toBe('alice');
 
-    const wrongPw = await post(server, '/auth/login', { login: 'alice', password: 'password-2' });
-    const noUser = await post(server, '/auth/login', { login: 'nobody99', password: 'password-1' });
+    const wrongPw = await post(server, '/auth/login', { login: 'alice', password: 'orbit-password-2' });
+    const noUser = await post(server, '/auth/login', { login: 'nobody99', password: 'orbit-password-1' });
     // The SAME status and the SAME body — account existence does not leak.
     expect(wrongPw.statusCode).toBe(401);
     expect(noUser.statusCode).toBe(401);
@@ -88,28 +156,28 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
 
   it('login lookup is case-insensitive and keeps the registered display form', async () => {
     const server = authApp();
-    await post(server, '/auth/register', { login: 'Vasya', password: 'longenough' });
-    const dup = await post(server, '/auth/register', { login: 'vasya', password: 'longenough' });
+    await post(server, '/auth/register', { login: 'Vasya', password: 'orbit-longenough' });
+    const dup = await post(server, '/auth/register', { login: 'vasya', password: 'orbit-longenough' });
     expect(dup.statusCode).toBe(409);
     expect(dup.json()).toEqual({ error: 'E_LOGIN_TAKEN' });
 
-    const r = await post(server, '/auth/login', { login: 'VASYA', password: 'longenough' });
+    const r = await post(server, '/auth/login', { login: 'VASYA', password: 'orbit-longenough' });
     expect(r.statusCode).toBe(200);
     expect((r.json() as { login: string }).login).toBe('Vasya'); // display form preserved
   });
 
   it('accepts the suggested cyrillic callsigns («Носорог-1») — the welcome golden path', async () => {
     const server = authApp();
-    const r = await post(server, '/auth/register', { login: 'Носорог-1', password: 'longenough' });
+    const r = await post(server, '/auth/register', { login: 'Носорог-1', password: 'orbit-longenough' });
     expect(r.statusCode).toBe(201);
     expect((r.json() as { login: string }).login).toBe('Носорог-1');
     // …and unicode dedup stays case-insensitive
-    const dup = await post(server, '/auth/register', { login: 'носорог-1', password: 'longenough' });
+    const dup = await post(server, '/auth/register', { login: 'носорог-1', password: 'orbit-longenough' });
     expect(dup.statusCode).toBe(409);
-    const ok = await post(server, '/auth/login', { login: 'НОСОРОГ-1', password: 'longenough' });
+    const ok = await post(server, '/auth/login', { login: 'НОСОРОГ-1', password: 'orbit-longenough' });
     expect(ok.statusCode).toBe(200);
     // spaces/emoji are still out — \p{L}\p{N}_- only
-    const emoji = await post(server, '/auth/register', { login: 'зая🔥', password: 'longenough' });
+    const emoji = await post(server, '/auth/register', { login: 'зая🔥', password: 'orbit-longenough' });
     expect(emoji.statusCode).toBe(400);
   });
 
@@ -118,8 +186,8 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
     for (const bad of [
       { login: 'ok_login', password: 'short' }, // < 8 chars
       { login: 'ok_login', password: 'x'.repeat(129) }, // > 128 chars
-      { login: 'no', password: 'longenough' }, // login too short
-      { login: 'bad name!', password: 'longenough' }, // forbidden chars
+      { login: 'no', password: 'orbit-longenough' }, // login too short
+      { login: 'bad name!', password: 'orbit-longenough' }, // forbidden chars
       { login: 'ok_login' }, // missing password
       {}, // missing everything
     ]) {
@@ -151,7 +219,7 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
   it('rate-limits per IP across register+login, and the window resets', async () => {
     let clock = 1_000;
     const server = authApp({ now: () => clock, rateMax: 3, rateWindowMs: 60_000 });
-    const creds = { login: 'busy_bee', password: 'longenough' };
+    const creds = { login: 'busy_bee', password: 'orbit-longenough' };
     await post(server, '/auth/register', creds);
     await post(server, '/auth/login', creds);
     await post(server, '/auth/login', creds);
@@ -171,7 +239,7 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
   it('admits a whole lobby registering at once from one address (default budget)', async () => {
     const server = authApp();
     for (let i = 0; i < 10; i += 1) {
-      const creds = { login: `recruit_${i}`, password: 'longenough' };
+      const creds = { login: `recruit_${i}`, password: 'orbit-longenough' };
       // Ровно клиентский порядок: сперва вход (уйдёт в 401 — оракула «есть ли логин»
       // на сервере нет), затем регистрация.
       const login = await post(server, '/auth/login', creds);
@@ -195,7 +263,7 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
 
   it('honours an env-tightened budget end to end', async () => {
     const server = authApp(authRateFromEnv({ AUTH_RATE_MAX: '2' }));
-    const creds = { login: 'busy_bee', password: 'longenough' };
+    const creds = { login: 'busy_bee', password: 'orbit-longenough' };
     await post(server, '/auth/register', creds);
     await post(server, '/auth/login', creds);
     expect((await post(server, '/auth/login', creds)).statusCode).toBe(429);
@@ -209,11 +277,11 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
         return Promise.resolve();
       },
     });
-    const r = await post(server, '/auth/register', { login: 'fresh', password: 'longenough' });
+    const r = await post(server, '/auth/register', { login: 'fresh', password: 'orbit-longenough' });
     const body = r.json() as { accountId: string };
     expect(registered).toEqual([body.accountId]);
     // a duplicate login fails registration → the hook does not fire again
-    await post(server, '/auth/register', { login: 'fresh', password: 'longenough' });
+    await post(server, '/auth/register', { login: 'fresh', password: 'orbit-longenough' });
     expect(registered).toHaveLength(1);
   });
 
@@ -221,7 +289,7 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
     const server = authApp({
       onRegistered: () => Promise.reject(new Error('store down')),
     });
-    const r = await post(server, '/auth/register', { login: 'lucky', password: 'longenough' });
+    const r = await post(server, '/auth/register', { login: 'lucky', password: 'orbit-longenough' });
     expect(r.statusCode).toBe(201); // the account exists; the idempotent hook re-runs out of band
     expect((r.json() as { login: string }).login).toBe('lucky');
   });
@@ -266,7 +334,7 @@ describe('SE-1.x · session gate on the match API', () => {
 
   it('join hands the session password fingerprint to the token minting (pwfp binding)', async () => {
     const { server, users, joins } = gatedApp();
-    const reg = await post(server, '/auth/register', { login: 'dave', password: 'longenough' });
+    const reg = await post(server, '/auth/register', { login: 'dave', password: 'orbit-longenough' });
     const { token } = reg.json() as { token: string };
     await server.inject({
       method: 'GET',
@@ -279,7 +347,7 @@ describe('SE-1.x · session gate on the match API', () => {
 
   it('join requires a session; the seat goes to the SESSION login, not a query nick', async () => {
     const { server } = gatedApp();
-    const reg = await post(server, '/auth/register', { login: 'bob', password: 'longenough' });
+    const reg = await post(server, '/auth/register', { login: 'bob', password: 'orbit-longenough' });
     const { token, accountId } = reg.json() as { token: string; accountId: string };
 
     // No session → 401; a ?nick= cannot substitute for identity.
@@ -308,7 +376,7 @@ describe('SE-1.x · session gate on the match API', () => {
     });
     expect(forged.statusCode).toBe(401);
 
-    const reg = await post(server, '/auth/register', { login: 'creator', password: 'longenough' });
+    const reg = await post(server, '/auth/register', { login: 'creator', password: 'orbit-longenough' });
     const { token } = reg.json() as { token: string };
     const created = await server.inject({
       method: 'POST',
@@ -321,7 +389,7 @@ describe('SE-1.x · session gate on the match API', () => {
 
   it('a password change revokes older sessions at the seat gate (pwfp freshness)', async () => {
     const { server, users } = gatedApp();
-    const reg = await post(server, '/auth/register', { login: 'carol', password: 'longenough' });
+    const reg = await post(server, '/auth/register', { login: 'carol', password: 'orbit-longenough' });
     const { token, accountId } = reg.json() as { token: string; accountId: string };
 
     // The fresh session joins fine — its stamped fingerprint matches the stored hash.
@@ -397,10 +465,10 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
   // не проверялись на лимит вообще. Заводишь новый `/auth/*` — допиши строку в таблицу.
   it('лимитирует КАЖДЫЙ auth-роут (компенсация за подавленный js/missing-rate-limiting)', async () => {
     const ROUTES: Array<{ url: string; body: unknown }> = [
-      { url: '/auth/register', body: { login: 'limit_probe', password: 'longenough' } },
-      { url: '/auth/login', body: { login: 'limit_probe', password: 'longenough' } },
+      { url: '/auth/register', body: { login: 'limit_probe', password: 'orbit-longenough' } },
+      { url: '/auth/login', body: { login: 'limit_probe', password: 'orbit-longenough' } },
       { url: '/auth/recover', body: { email: 'limit_probe@example.com' } },
-      { url: '/auth/reset', body: { token: 'irrelevant', password: 'longenough' } },
+      { url: '/auth/reset', body: { token: 'irrelevant', password: 'orbit-longenough' } },
     ];
     for (const route of ROUTES) {
       // Своя копия приложения на каждый роут: лимитер общий на IP, и без этого первый
@@ -420,7 +488,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { release = resolve; });
     const { server, sent } = recoverApp('https://play.example', {}, () => blocked);
-    await post(server, '/auth/register', { login: 'timing', password: 'longenough', email: 'timing@example.com' });
+    await post(server, '/auth/register', { login: 'timing', password: 'orbit-longenough', email: 'timing@example.com' });
     let status: number | undefined;
     const response = post(server, '/auth/recover', { email: 'timing@example.com' }).then((r) => {
       status = r.statusCode;
@@ -449,7 +517,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
         throw new Error('synthetic SMTP outage');
       }
     });
-    await post(server, '/auth/register', { login: 'queue', password: 'longenough', email: 'queue@example.com' });
+    await post(server, '/auth/register', { login: 'queue', password: 'orbit-longenough', email: 'queue@example.com' });
     try {
       await post(server, '/auth/recover', { email: 'queue@example.com' });
       await vi.waitFor(() => expect(sent).toHaveLength(1));
@@ -471,7 +539,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server, sent } = recoverApp();
     await post(server, '/auth/register', {
       login: 'zoe',
-      password: 'oldpassword',
+      password: 'orbit-oldpassword',
       email: 'zoe@example.com',
     });
 
@@ -492,7 +560,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       (await post(server, '/auth/login', { login: 'zoe', password: 'brandnewpass' })).statusCode,
     ).toBe(200);
     expect(
-      (await post(server, '/auth/login', { login: 'zoe', password: 'oldpassword' })).statusCode,
+      (await post(server, '/auth/login', { login: 'zoe', password: 'orbit-oldpassword' })).statusCode,
     ).toBe(401);
   });
 
@@ -526,17 +594,17 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server, sent } = recoverApp();
     await post(server, '/auth/register', {
       login: 'ana',
-      password: 'firstpass1',
+      password: 'orbit-firstpass1',
       email: 'ana@example.com',
     });
     await post(server, '/auth/recover', { email: 'ana@example.com' });
     await vi.waitFor(() => expect(sent).toHaveLength(1));
     const token = tokenFrom(sent[0]!.params.link);
-    expect((await post(server, '/auth/reset', { token, password: 'secondpass1' })).statusCode).toBe(
+    expect((await post(server, '/auth/reset', { token, password: 'orbit-secondpass1' })).statusCode).toBe(
       200,
     );
     // The password (and thus its fingerprint) changed → the same token no longer matches.
-    const again = await post(server, '/auth/reset', { token, password: 'thirdpass12' });
+    const again = await post(server, '/auth/reset', { token, password: 'orbit-thirdpass12' });
     expect(again.statusCode).toBe(401);
     expect(again.json()).toEqual({ error: 'E_AUTH' });
   });
@@ -545,7 +613,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { release = resolve; });
     const { server, sent } = recoverApp('https://play.example', { recoveryCooldownMs: 0 }, () => blocked);
-    await post(server, '/auth/register', { login: 'locale', password: 'longenough', email: 'locale@example.com' });
+    await post(server, '/auth/register', { login: 'locale', password: 'orbit-longenough', email: 'locale@example.com' });
     try {
       for (const locale of ['en', 'ru', 'unsupported', { language: 'en' }, 'x'.repeat(65)])
         await post(server, '/auth/recover', { email: 'locale@example.com', locale });
@@ -560,7 +628,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
           locale: msg.locale,
           params: { link: expect.stringMatching(/^https:\/\/play\.example\/\?reset=/) },
         });
-        expect((await post(server, '/auth/reset', { token: tokenFrom(msg.params.link), password: 'changedpass' })).statusCode)
+        expect((await post(server, '/auth/reset', { token: tokenFrom(msg.params.link), password: 'orbit-changedpass' })).statusCode)
           .toBe(sent.indexOf(msg) === 0 ? 200 : 401);
       }
     } finally { release(); }
@@ -568,8 +636,8 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
 
   it('one recovery mail per account per cooldown, whatever the number of requests', async () => {
     const { server, sent } = recoverApp('https://play.example', { rateMax: 200 });
-    await post(server, '/auth/register', { login: 'inbox', password: 'longenough', email: 'inbox@example.com' });
-    await post(server, '/auth/register', { login: 'other', password: 'longenough', email: 'other@example.com' });
+    await post(server, '/auth/register', { login: 'inbox', password: 'orbit-longenough', email: 'inbox@example.com' });
+    await post(server, '/auth/register', { login: 'other', password: 'orbit-longenough', email: 'other@example.com' });
     for (let i = 0; i < 5; i++) {
       const r = await post(server, '/auth/recover', { email: 'inbox@example.com' });
       expect(r.json()).toEqual({ ok: true }); // the answer does not change: no oracle
@@ -589,7 +657,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
 
   it('an account registered WITHOUT an email has no recovery (nothing sent)', async () => {
     const { server, sent } = recoverApp();
-    await post(server, '/auth/register', { login: 'noemail', password: 'longenough' });
+    await post(server, '/auth/register', { login: 'noemail', password: 'orbit-longenough' });
     await post(server, '/auth/recover', { email: 'noemail@example.com' });
     expect(sent).toHaveLength(0);
   });
@@ -598,12 +666,12 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server } = recoverApp();
     await post(server, '/auth/register', {
       login: 'first',
-      password: 'longenough',
+      password: 'orbit-longenough',
       email: 'shared@example.com',
     });
     const dup = await post(server, '/auth/register', {
       login: 'second',
-      password: 'longenough',
+      password: 'orbit-longenough',
       email: 'Shared@Example.com',
     });
     expect(dup.statusCode).toBe(409);
@@ -612,7 +680,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
 
   it('reset rejects a garbage/forged token uniformly (E_AUTH)', async () => {
     const { server } = recoverApp();
-    const bad = await post(server, '/auth/reset', { token: 'not-a-jwt', password: 'longenough' });
+    const bad = await post(server, '/auth/reset', { token: 'not-a-jwt', password: 'orbit-longenough' });
     expect(bad.statusCode).toBe(401);
     expect(bad.json()).toEqual({ error: 'E_AUTH' });
   });
@@ -621,7 +689,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server } = recoverApp();
     const r = await post(server, '/auth/register', {
       login: 'baddie',
-      password: 'longenough',
+      password: 'orbit-longenough',
       email: 'notanemail',
     });
     expect(r.statusCode).toBe(400);
@@ -632,7 +700,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server, sent, users } = recoverApp();
     const reg = await post(server, '/auth/register', {
       login: 'dan',
-      password: 'oldpassword',
+      password: 'orbit-oldpassword',
       email: 'dan@example.com',
     });
     const preToken = (reg.json() as { token: string }).token;
@@ -662,7 +730,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const { server, sent } = recoverApp('https://play.example///');
     await post(server, '/auth/register', {
       login: 'liv',
-      password: 'longenough',
+      password: 'orbit-longenough',
       email: 'liv@example.com',
     });
     await post(server, '/auth/recover', { email: 'liv@example.com' });
