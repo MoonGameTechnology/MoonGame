@@ -17,6 +17,7 @@ import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
 import { readAssetDir } from '../packages/server/src/staticAssets';
 import { recoveryMailer } from '../scripts/recoveryMailer';
 import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
+import { checkProductionReadiness } from '../packages/server/src/serverConfig';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
@@ -279,6 +280,13 @@ function ipKind(ip: string): 'vm-nat' | 'link-local' | 'cgnat' | 'lan' | 'public
 
 // Durability: with DATABASE_URL set, the match is snapshotted to Postgres and
 // survives a restart; otherwise it's in-memory (a restart loses it, as before).
+// One production policy for both hosts, before connecting or migrating the DB.
+const PROD_FLAG = process.env.PROD === '1' || process.env.PROD === 'true';
+const readiness = checkProductionReadiness(process.env);
+if (!readiness.ok) {
+  process.stderr.write(`PROD=1 refuses to start: missing ${readiness.missing.join(', ')}.\n`);
+  process.exit(1);
+}
 const DATABASE_URL = process.env.DATABASE_URL;
 let pool: InstanceType<typeof Pool> | null = null;
 let matchStore: MatchStore;
@@ -392,47 +400,6 @@ if (AUTH && !authCfg.allowedOrigins) {
     'warning: AUTH is on but ALLOWED_ORIGINS is unset — no Origin allowlist (CSWSH). ' +
       'Set ALLOWED_ORIGINS before exposing this beyond a trusted network.\n',
   );
-}
-// MP-1 fail-secure (audit S1, 2026-07-25): when PROD=1, refuse to boot unless the
-// release-posture switches are all on — same contract as packages/server/src/main.ts.
-// Mirrors checkProductionReadiness() from serverConfig.ts (kept inlined here so the
-// throwaway netserver doesn't grow a new import path into packages/server). `PROD`
-// unset = the existing dev harness, untouched.
-const PROD_FLAG = process.env.PROD === '1' || process.env.PROD === 'true';
-if (PROD_FLAG) {
-  const missing: string[] = [];
-  // Зеркало serverConfig.ts: секрет проверяется и на длину (короткий HS256-секрет
-  // подбирается офлайн по одному токену), а ALLOWED_ORIGINS обязателен — без него
-  // публичный сервер принимает wss-соединение с любой чужой страницы (CSWSH).
-  const MIN_SECRET_LEN = 32;
-  if (!process.env.AUTH_JWT_SECRET) missing.push('AUTH_JWT_SECRET');
-  else if (process.env.AUTH_JWT_SECRET.length < MIN_SECRET_LEN) {
-    missing.push(`AUTH_JWT_SECRET длиной ≥${MIN_SECRET_LEN} (например \`openssl rand -hex 32\`)`);
-  }
-  if (!process.env.ALLOWED_ORIGINS || !process.env.ALLOWED_ORIGINS.split(',').some((o) => o.trim())) {
-    missing.push('ALLOWED_ORIGINS (Origin-allowlist против CSWSH)');
-  }
-  if (!(process.env.GATE === '1' || process.env.GATE === 'true')) missing.push('GATE=1');
-  const tlsNative = Boolean(process.env.TLS_KEY_FILE && process.env.TLS_CERT_FILE);
-  const tlsProxy = process.env.TRUST_PROXY === '1';
-  if (!tlsNative && !tlsProxy) {
-    missing.push('TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)');
-  }
-  if (!(process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'true')) missing.push('SEAT_LOCK=1');
-  // SEC-20, зеркало serverConfig.ts: дефолтный пароль БД из базового compose. Гард `:?`
-  // стоит только в оверлеях, а путь «нативный TLS» (deploy/README.md) поднимается голым
-  // `docker compose up` — там пароль схлопывается в `void`, и раньше стек проходил
-  // проверку прод-готовности целиком.
-  if (/^postgres(?:ql)?:\/\/[^:@/]+:void@/.test(process.env.DATABASE_URL ?? '')) {
-    missing.push('POSTGRES_PASSWORD (в DATABASE_URL дефолтный пароль `void`, задайте свой: `openssl rand -hex 32`)');
-  }
-  if (missing.length) {
-    process.stderr.write(
-      `PROD=1 refuses to start: missing ${missing.join(', ')}. ` +
-        'Set every release-posture switch, or unset PROD for the dev harness.\n',
-    );
-    process.exit(1);
-  }
 }
 // Public-bind + no-auth warning (audit S1): even without PROD=1, a public bind with
 // no AUTH_JWT_SECRET is the open `?nick=` playtest path — surface it loudly so an

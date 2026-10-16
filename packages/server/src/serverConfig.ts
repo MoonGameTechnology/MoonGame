@@ -236,5 +236,16 @@ export function checkProductionReadiness(env: NodeJS.ProcessEnv): ProdReadiness 
     missing.push('POSTGRES_PASSWORD (в DATABASE_URL дефолтный пароль `void`, задайте свой: `openssl rand -hex 32`)');
   }
 
+  // A production boot must not silently choose in-memory storage or migrate as the
+  // database owner. prepareRuntimeDatabase independently checks the actual grants.
+  if (!env.DATABASE_URL?.trim()) missing.push('DATABASE_URL (durable production storage)');
+  if (env.DB_AUTO_MIGRATE !== '0') missing.push('DB_AUTO_MIGRATE=0 (separate migration job)');
+  if (env.DB_REQUIRE_LEAST_PRIVILEGE !== '1')
+    missing.push('DB_REQUIRE_LEAST_PRIVILEGE=1 (verified runtime grants)');
+  // Only the host deployment preflight sets this after running the trusted backup
+  // checker. It is an operator attestation, not proof supplied by a game client.
+  if (env.BACKUP_READINESS_VERIFIED !== '1')
+    missing.push('BACKUP_READINESS_VERIFIED=1 (deploy/production-preflight.sh)');
+
   return { ok: missing.length === 0, missing };
 }

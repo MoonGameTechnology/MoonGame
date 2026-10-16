@@ -1,11 +1,12 @@
-# Deploys the Void Dominion prototype multiplayer server — the in-memory proto
-# server that hosts the prototype's own world AND serves the game HTML (the player
+# Deploys the Void Dominion playable multiplayer server, which hosts the world's
+# authoritative state AND serves the game HTML (the player
 # client at `/`, the dev client at `/dev` — see prototype/build.mjs). One
 # deploy gives a permanent URL: both players just open it (the connect overlay
-# auto-fills the same-origin wss://), pick Azure / Crimson, and play. State is
-# in-memory and the handshake is unauthenticated — this is for testing, not prod.
+# auto-fills the same-origin wss://). Production requires PostgreSQL, hardened
+# runtime grants, authentication and the host recovery preflight; incomplete
+# configuration refuses startup, including a bare docker run of this image.
 #
-#   docker build -t void-dominion . && docker run -p 8788:8788 void-dominion
+#   bash deploy/launch.sh --build   # after provisioning deploy/server.env
 #   (or one-click via render.yaml — see docs/multiplayer.md)
 #
 # Multi-stage: a full node:26-slim builder installs deps and bakes the prototype HTML,
@@ -125,6 +126,9 @@ USER nonroot
 
 ENV HOST=0.0.0.0
 ENV PORT=8788
+# A bare docker run must not accidentally publish the unauthenticated dev harness.
+# Isolated smoke tests explicitly override PROD=0 and publish only on loopback.
+ENV PROD=1
 # ZTP-1.1: the commit this image was built from, reported by GET /health so the running
 # build is visible without logging into the host. image.yml passes it; a local build
 # leaves it empty and /health simply omits the field. Declared this late on purpose: an

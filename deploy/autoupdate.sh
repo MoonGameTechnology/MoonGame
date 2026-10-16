@@ -46,7 +46,7 @@ HEALTH_PORT="${PORT:-8788}"
 # Файлы, без которых версия `deploy/` не способна ни выкатить себя, ни подняться после
 # ребута. Образ без них (собранный до автодеплоя) агент не катит: иначе следующий прогон
 # таймера искал бы себя в каталоге, где его нет.
-REQUIRED_FILES="autoupdate.sh update.sh stack.sh moongame.sh verify-image.sh env-keys.sh docker-compose.yml docker-compose.release.yml"
+REQUIRED_FILES="autoupdate.sh update.sh stack.sh moongame.sh verify-image.sh env-keys.sh production-preflight.sh docker-compose.yml docker-compose.release.yml"
 
 MODE=timer
 case "${1:-}" in

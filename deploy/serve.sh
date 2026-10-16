@@ -21,11 +21,22 @@ fi
 # trailing \r that corrupts the port or silently breaks the token'd git pull.
 strip() { printf '%s' "${1//[$'\r\n']/}"; }
 PORT="$(strip "${PORT:-8788}")"
-# Bind address. Default 0.0.0.0 (LAN/quick path). Behind a TLS reverse-proxy (Caddy,
-# HTTPS-2.1) set HOST=127.0.0.1 so the plain port isn't reachable from the internet.
-HOST="$(strip "${HOST:-0.0.0.0}")"
+# Legacy development entrypoint: loopback by default. A private LAN requires an
+# explicit HOST plus ALLOW_INSECURE_LAN=1. Public deployments use launch.sh.
+HOST="$(strip "${HOST:-127.0.0.1}")"
 SESSION="$(strip "${SESSION:-void}")"
 GIT_TOKEN="$(strip "${GIT_TOKEN:-}")"
+
+# The legacy tmux launcher is development-only. It must never inherit production
+# credentials and bypass the maintained Compose preflight/migration path.
+if [ "${PROD:-}" = 1 ] || [ "${PROD:-}" = true ]; then
+  echo '[✗] E_DEPLOY_PROD_LAUNCHER: use bash deploy/launch.sh (or stack.sh for signed images).' >&2
+  exit 1
+fi
+if [ "$HOST" != 127.0.0.1 ] && [ "$HOST" != ::1 ] && [ "${ALLOW_INSECURE_LAN:-}" != 1 ]; then
+  echo '[✗] E_DEPLOY_DEV_BIND: non-loopback development requires ALLOW_INSECURE_LAN=1.' >&2
+  exit 1
+fi
 
 # Pull the latest code if a token is configured (non-fatal — fall back to local).
 # The token is fed through GIT_ASKPASS (an env var the helper reads), never put in

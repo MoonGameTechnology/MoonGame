@@ -41,14 +41,14 @@ function sandbox({ lastGood = IMAGE, healthOk = true } = {}) {
   mkdirSync(state, { recursive: true });
   mkdirSync(release, { recursive: true });
   mkdirSync(bin);
-  for (const f of ['stack.sh', 'update.sh', 'env-keys.sh']) {
+  for (const f of ['stack.sh', 'update.sh', 'env-keys.sh', 'production-preflight.sh']) {
     cpSync(join(DEPLOY_DIR, f), join(release, f));
     chmodSync(join(release, f), 0o755);
   }
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml'])
     writeFileSync(join(release, f), '# stub\n');
   stub(release, 'verify-image.sh', 'echo "verify $*" >> "$LOG"');
-  writeFileSync(join(state, 'server.env'), 'POSTGRES_PASSWORD=pw\n');
+  writeFileSync(join(state, 'server.env'), 'POSTGRES_PASSWORD=pw\nPROD=0\nSERVER_BIND=127.0.0.1\n');
   if (lastGood) writeFileSync(join(state, 'last-good-image'), `${lastGood}\n`);
 
   const log = join(root, 'calls.log');
@@ -60,6 +60,7 @@ function sandbox({ lastGood = IMAGE, healthOk = true } = {}) {
   stub(bin, 'openssl', 'echo 0123456789abcdef');
   const env = {
     ...process.env,
+    PROD: '0', // Do not inherit Vite's PROD build-mode variable into shell fixtures.
     PATH: `${bin}:${process.env.PATH}`,
     LOG: log,
     STATE_DIR: state,
