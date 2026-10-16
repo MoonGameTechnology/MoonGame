@@ -37,7 +37,7 @@ describe('main-game meta content', () => {
         data,
       ),
     ).toThrow('E_META_MATERIAL');
-    catalog.recipes.ablative_plating!.salvage.ferroalloys = 25;
+    catalog.recipes.siege_platform!.salvage.ferroalloys = 25;
     expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_SALVAGE');
   });
 
@@ -49,5 +49,18 @@ describe('main-game meta content', () => {
     other.commerce.products.rewarded_supply!.premiumSeason = other.seasons[0]!.id;
     expect(() => parseMetaEconomyCatalog(other, data)).toThrow('E_META_AD_PRODUCT');
     expect(() => parseMetaEconomyCatalog({ ...raw(), typo: true }, data)).toThrow();
+  });
+
+  it('requires a presence rule for every stage, never easing towards later stages', () => {
+    const shipped = loadMetaEconomyCatalog(data).rewards.participation;
+    expect(shipped).toMatchObject({ stageDays: [3, 7], finalPresence: 0.25 });
+    for (const stageDays of [[3], [7, 3]]) {
+      const catalog = loadMetaEconomyCatalog(data);
+      catalog.rewards.participation.stageDays = stageDays;
+      expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_PARTICIPATION');
+    }
+    const catalog = loadMetaEconomyCatalog(data);
+    catalog.rewards.participation.finalPresence = 0;
+    expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow();
   });
 });

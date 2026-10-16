@@ -13,6 +13,8 @@ import type { SeatAccounts } from './commanderCredit';
 import type { MetaEconomyCatalog } from './metaEconomyCatalog';
 
 type Metrics = Record<'recon' | 'logistics' | 'defense' | 'objectives', number>;
+type Participation = MetaEconomyCatalog['rewards']['participation'];
+const DAY = 86_400_000;
 const fingerprint = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 /** Conservative facts from a committed server snapshot. Initial visibility,
@@ -48,7 +50,9 @@ export interface MetaRewardDeliveryDeps {
   seats(matchId: string): SeatAccounts;
   settle(facts: MatchRewardFacts): Promise<{ ok: boolean; code?: string }>;
   stageCount: number;
-  participation?: MetaEconomyCatalog['rewards']['participation'];
+  participation?: Participation;
+  /** Season XP for one UTC day of the account's own orders (idempotent per account+day). */
+  activeDay?(accountId: string, day: number): Promise<{ ok: boolean; code?: string }>;
   now?: () => number;
   onError(error: unknown): void;
 }
@@ -64,13 +68,17 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
   stop(): Promise<void>;
 } {
   const now = deps.now ?? Date.now;
-  const thresholds = deps.participation ?? {
-    reconPerPoint: 3,
-    logisticsPerPoint: 2,
-    defensePerPoint: 1,
-    objectivesPerPoint: 1,
-    stagePoints: [1, 3],
-  };
+  // Without a catalog (tests, older wiring) presence is not required.
+  const thresholds: Omit<Participation, 'stageDays' | 'finalPresence'> & Partial<Participation> =
+    deps.participation ?? {
+      reconPerPoint: 3,
+      logisticsPerPoint: 2,
+      defensePerPoint: 1,
+      objectivesPerPoint: 1,
+      stagePoints: [1, 3],
+    };
+  // Days already credited by this process; the command receipt is the durable guard.
+  const creditedDays = new Set<string>();
   let cursor = '';
   let timer: ReturnType<typeof setInterval> | undefined;
   let scanning: Promise<void> | undefined;
@@ -96,17 +104,25 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
           (saved?.response as EconomyObservation | undefined);
         if (!baseline)
           await tx.saveReceipt(baselineKey, 'observation-v1', observation(state, player));
-        const activityCount = (role: keyof Metrics): number =>
-          snapshot.economyActivity?.[JSON.stringify([player, seat.claimedAt ?? 0, role])]?.length ??
-          0;
+        const activity = (role: string): string[] =>
+          snapshot.economyActivity?.[JSON.stringify([player, seat.claimedAt ?? 0, role])] ?? [];
+        const activityCount = (role: keyof Metrics): number => activity(role).length;
+        const orderDays = [...new Set(activity('orders'))].map(Number).filter(Number.isSafeInteger);
         const progress = operationProgress(state, player, baseline ?? observation(state, player), {
           logistics: activityCount('logistics'),
           defense: activityCount('defense'),
           objectives: activityCount('objectives'),
         });
         const output: MatchRewardFacts[] = [];
+        const points = (): number =>
+          Math.floor(progress.recon / thresholds.reconPerPoint) +
+          Math.floor(progress.logistics / thresholds.logisticsPerPoint) +
+          Math.floor(progress.defense / thresholds.defensePerPoint) +
+          Math.floor(progress.objectives / thresholds.objectivesPerPoint);
         // A role may qualify on its own. Natural async pauses and the Steward do
         // not erase a verified accomplishment; previous stage facts retain it.
+        // Each stage also needs that many distinct days of the player's own orders,
+        // so taking a seat, scoring a stage in minutes and leaving pays nothing.
         for (let stage = 1; stage <= deps.stageCount; stage++) {
           const key = `reward-facts:${rewardScope}:stage:${stage}`;
           const previous = await tx.receipt(key);
@@ -117,12 +133,11 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
             output.push(stored);
             continue;
           }
-          const points =
-            Math.floor(progress.recon / thresholds.reconPerPoint) +
-            Math.floor(progress.logistics / thresholds.logisticsPerPoint) +
-            Math.floor(progress.defense / thresholds.defensePerPoint) +
-            Math.floor(progress.objectives / thresholds.objectivesPerPoint);
-          if (points < (thresholds.stagePoints[stage - 1] ?? Infinity)) continue;
+          if (
+            points() < (thresholds.stagePoints[stage - 1] ?? Infinity) ||
+            orderDays.length < (thresholds.stageDays?.[stage - 1] ?? 0)
+          )
+            continue;
           const entry: MatchRewardFacts = {
             matchId,
             accountId,
@@ -135,12 +150,24 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
           await tx.saveReceipt(key, fingerprint(entry), entry);
           output.push(entry);
         }
+        // The final needs a verified accomplishment and the player's own orders in the
+        // closing share of their tenure (claim → elimination or match end): a seat left
+        // to the bots does not collect the full budget when the match ends.
+        const present = (): boolean => {
+          if (thresholds.finalPresence === undefined) return true;
+          const start = seat.claimedAt ?? state.startedAt ?? 0;
+          const eliminated = activity('eliminated').map(Number).filter(Number.isFinite);
+          const end =
+            eliminated.length > 0 ? Math.min(...eliminated) : (state.match.endedAt ?? state.time);
+          const from = end - Math.max(0, end - start) * thresholds.finalPresence;
+          return orderDays.some((day) => (day + 1) * DAY > from);
+        };
         const reward = state.match.rewards?.[player];
-        if (state.match.status === 'ended' && reward && output.length > 0) {
+        if (state.match.status === 'ended' && reward) {
           const key = `reward-facts:${rewardScope}:final`;
           const existing = await tx.receipt(key);
           if (existing) output.push(existing.response as MatchRewardFacts);
-          else {
+          else if (points() >= (thresholds.stagePoints[0] ?? Infinity) && present()) {
             const final: MatchRewardFacts = {
               matchId,
               accountId,
@@ -159,6 +186,17 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
       for (const fact of facts) {
         const result = await deps.settle(fact);
         if (!result.ok) throw new Error(result.code ?? 'E_META_SETTLEMENT');
+      }
+      if (!deps.activeDay) continue;
+      const utcDays =
+        snapshot.economyActivity?.[JSON.stringify([player, seat.claimedAt ?? 0, 'ordersUtc'])];
+      for (const day of (utcDays ?? []).map(Number).filter(Number.isSafeInteger)) {
+        const credited = JSON.stringify([accountId, day]);
+        if (creditedDays.has(credited)) continue;
+        const result = await deps.activeDay(accountId, day);
+        if (!result.ok) throw new Error(result.code ?? 'E_META_SETTLEMENT');
+        if (creditedDays.size >= 100_000) creditedDays.clear();
+        creditedDays.add(credited);
       }
     }
   };

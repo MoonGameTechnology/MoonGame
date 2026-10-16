@@ -157,6 +157,7 @@ const rewardDelivery = createMetaRewardDelivery({
       : nickSeatAccounts(stores.accountStore, stores.userStore, matchId)();
   },
   settle: (facts) => metaEconomy.settle(facts),
+  activeDay: (accountId, day) => metaEconomy.settleActiveDay(accountId, day),
   stageCount: metaCatalog.rewards.stageFractions.length,
   participation: metaCatalog.rewards.participation,
   onError: (error) => process.stderr.write(`meta reward delivery failed: ${String(error)}\n`),
@@ -267,7 +268,7 @@ const loadMatch = createMatchLoader({
 if (!(await stores.store.load('dev'))) {
   const seed = createDevMatch(data, { id: 'dev', time: bootTime });
   const snapshot = snapshotOf(seed);
-  if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, starterArsenal);
+  if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);
   await stores.store.save(snapshot);
 }
 
@@ -370,7 +371,7 @@ const createMatch = async (): Promise<CreatedMatch> => {
   const matchId = newMatchId();
   const seed = createDevMatch(data, { id: matchId, time: Date.now() });
   const snapshot = snapshotOf(seed);
-  if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, starterArsenal);
+  if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);
   await stores.store.save(snapshot);
   matchCount += 1;
   return { matchId, seats: Object.keys(seed.state.players) };

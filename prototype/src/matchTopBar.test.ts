@@ -197,7 +197,6 @@ async function boot(
     desktop: false,
     pc: true,
     net: false,
-    admitted: true,
     unread: 0,
     run: false,
     sectorZero: false,
@@ -223,7 +222,6 @@ async function boot(
     toasts: [] as string[],
     jumps: [] as string[],
     saves: [] as unknown[],
-    floats: [] as Array<[boolean, Record<string, unknown>]>,
     wallet: 0,
     storage: { ...(opts.folded ? { 'vd.swarmDossier.folded': '1' } : {}) } as Record<
       string,
@@ -254,9 +252,6 @@ async function boot(
     get NET() {
       return env.net;
     },
-    get netAdmitted() {
-      return env.admitted;
-    },
   }));
   vi.doMock('./sectorRun', () => ({
     isSectorZeroRun: () => env.sectorZero,
@@ -274,12 +269,6 @@ async function boot(
       return env.soloSave;
     },
     saveSolo: (manual: unknown) => void rec.saves.push(manual),
-  }));
-  vi.doMock('./purseFloats', () => ({
-    initPurseFloats: () => ({
-      watch: (active: boolean, readings: Record<string, unknown>) =>
-        void rec.floats.push([active, readings]),
-    }),
   }));
   vi.doMock('./graphicsPrefs', () => ({ motionOn: () => true, pcUi: () => env.pc }));
   vi.doMock('./allyScreen', () => ({ ALLY_EMBLEM: '⬡' }));
@@ -378,10 +367,10 @@ afterEach(() => {
 describe('строка статуса', () => {
   it('часы — время суток, в забеге Sector Zero — сколько забег идёт', async () => {
     const { m, el } = await boot();
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-head').innerHTML).toBe(`<span id="clock">${clockHM(DAY + 3 * HOUR)}</span>`);
     const run = await boot({ sectorZero: true });
-    run.m.renderTopBar(0, false, []);
+    run.m.renderTopBar([]);
     expect(run.el('devline-head').innerHTML).not.toBe(
       `<span id="clock">${clockHM(DAY + 3 * HOUR)}</span>`,
     );
@@ -389,12 +378,12 @@ describe('строка статуса', () => {
 
   it('чип задач несёт счёт закрытых и открытость панели; ни одной задачи — чипа нет', async () => {
     const { m, el, env } = await boot({ missionsOpen: true });
-    m.renderTopBar(0, false, [mission(true), mission(false)]);
+    m.renderTopBar([mission(true), mission(false)]);
     const tail = el('devline-status').innerHTML;
     expect(tail).toContain('data-missions="1" aria-expanded="true"');
     expect(tail).toContain(`<span>${t('hud.missions.label')}</span><b>1/2</b>`);
     env.missionsOpen = false;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').innerHTML).not.toContain('data-missions');
   });
 
@@ -404,7 +393,7 @@ describe('строка статуса', () => {
       ...env.s,
       pve: { waveNumber: 2, totalWaves: 5, nextWaveAt: env.s.time + 90 * 60_000 },
     } as GameState;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     const tail = el('devline-status').innerHTML;
     expect(tail).toContain(t('hud.wave', { n: 2, m: 5 }));
     expect(tail).toContain(t('hud.wave.next', { in: countdownHMS(90 * 60_000) }));
@@ -412,47 +401,50 @@ describe('строка статуса', () => {
 
   it('чип союзника — только в забеге после встречи, мигает по хуку игры', async () => {
     const { m, el, env } = await boot({ allyStep: 'advance' });
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').innerHTML).not.toContain('data-ally-open');
     env.run = true;
     env.allyPulsing = true;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     const tail = el('devline-status').innerHTML;
     expect(tail).toContain('class="dl-ally pulse" data-ally-open="1"');
     expect(tail).toContain(`<b>${t('ally.step.advance')}</b>`);
   });
 
-  it('Суверенов в строке статуса нет; кошелёк забега рисуется каждый кадр', async () => {
+  it('Суверены в строке статуса — без числа, в забеге их нет; кошелёк забега рисуется каждый кадр', async () => {
     const { m, el, env, rec } = await boot();
-    m.renderTopBar(0, false, []);
-    expect(el('devline-status').innerHTML).not.toContain('data-donate');
+    m.renderTopBar([]);
+    const status = el('devline-status').innerHTML;
+    expect(status).toContain('class="dl-donate" data-donate="1"');
+    expect(status).toContain(`aria-label="${t('donate.open')}"`);
+    expect(status).not.toMatch(/dl-donate[^]*<b>/);
     env.toolsHidden = true;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').innerHTML).not.toContain('data-donate');
     expect(rec.wallet).toBe(2);
   });
 
   it('сохранение одиночной партии: «сохранить» всегда, «продолжить» — только на паузе', async () => {
     const { m, el, env } = await boot({ soloSave: true });
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').innerHTML).toContain('data-solo-save="1"');
     expect(el('devline-status').innerHTML).not.toContain('data-solo-play');
     env.speed = 0;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').innerHTML).toContain('data-solo-play="1"');
     env.net = true;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').innerHTML).not.toContain('data-solo');
   });
 
   it('без перемен узел не перерисовывается; забытая строка рисуется заново', async () => {
     const { m, el } = await boot({ soloSave: true });
-    m.renderTopBar(0, false, []);
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
+    m.renderTopBar([]);
     expect(el('devline-status').htmlWrites).toBe(1);
     expect(el('devline-head').htmlWrites).toBe(1);
     m.forgetStatusLine();
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('devline-status').htmlWrites).toBe(2);
   });
 
@@ -469,7 +461,7 @@ describe('строка статуса', () => {
     line.click(hit('[data-solo-play]'));
     expect(rec.missionToggles).toBe(1);
     expect(rec.allyOpens).toBe(1);
-    expect(rec.toasts).toEqual([t('donate.soon')]);
+    expect(rec.toasts).toEqual([t('donate.where')]);
     expect(rec.saves).toEqual([true]);
     // «Продолжить» — темп кнопки ▶ и без нагона: время паузы мир не отыгрывает.
     expect(rec.speeds).toEqual([PLAY * 10]);
@@ -481,7 +473,7 @@ describe('строка статуса', () => {
 describe('ряд 1 шапки', () => {
   it('позывной, живое место, ✦-чип очков и день с отсчётом — цифрами', async () => {
     const { m, el } = await boot({ nick: '  Капитан ' });
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('tbname').textContent).toBe('Капитан');
     expect(el('tbplace').textContent).toBe(t('hud.place', { p: 2, n: 3 }));
     expect(el('tbscore').textContent).toBe('✦ 120/1000');
@@ -492,11 +484,11 @@ describe('ряд 1 шапки', () => {
 
   it('пустой ввод — имя дома; порог взят — чип светится; без счёта места нет', async () => {
     const { m, el, env } = await boot({ scoreLimit: 120 });
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('tbname').textContent).toBe('Орион');
     expect(el('tbscore').classList.contains('win')).toBe(true);
     env.s = { ...env.s, match: { ...env.s.match, scores: {} } } as GameState;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('tbplace').textContent).toBe('');
   });
 
@@ -514,7 +506,7 @@ describe('ряд 1 шапки', () => {
 describe('плашки ресурсов', () => {
   it('пять ресурсов сессии; пустой и не текущий гаснет; биомасса — только когда она есть', async () => {
     const { m, el, env } = await boot();
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     const chips = el('purse').children;
     expect(chips.map((c) => c.dataset.res)).toEqual([
       'credits',
@@ -526,17 +518,17 @@ describe('плашки ресурсов', () => {
     expect(chips[2]!.className).toBe('res dead');
     expect(chips[0]!.className).toBe('res');
     env.s.players.p1!.resources.biomass = 5;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('purse').children.map((c) => c.dataset.res)).toContain('biomass');
   });
 
   it('кадр меняет число на месте: узел плашки тот же, и клик по нему не теряется', async () => {
     const { m, el, env } = await boot();
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     const metal = el('purse').children[1]!;
     const before = metal.innerHTML;
     env.s.players.p1!.resources.metal = 41;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('purse').children[1]).toBe(metal);
     expect(metal.innerHTML).not.toBe(before);
     expect(metal.innerHTML).toContain('<b>41</b>');
@@ -545,21 +537,10 @@ describe('плашки ресурсов', () => {
   it('долг по ресурсу — ⚠ вместо скорости', async () => {
     const { m, el, env } = await boot();
     env.s.players.p1!.arrears = ['energy'] as never;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     const energy = el('purse').children.find((c) => c.dataset.res === 'energy')!;
     expect(energy.className).toBe('res short');
     expect(energy.innerHTML).toContain('<em class="dn">⚠</em>');
-  });
-
-  it('«+N» под плашками следит только за миром на экране', async () => {
-    const { m, rec, env } = await boot();
-    m.renderTopBar(0, false, []);
-    m.renderTopBar(0, true, []); // карта готовится
-    env.net = true;
-    env.admitted = false;
-    m.renderTopBar(0, false, []); // сеть ещё не впустила
-    expect(rec.floats.map(([active]) => active)).toEqual([true, false, false]);
-    expect(rec.floats[0]![1].metal).toEqual({ stock: 40, perHour: -3 });
   });
 
   it('нажатие по плашке открывает карточку ресурса', async () => {
@@ -573,7 +554,7 @@ describe('плашки ресурсов', () => {
 describe('значки внимания', () => {
   it('ноль прячет значок; мой бой и письма зеркалятся на гамбургер, пока панель закрыта', async () => {
     const { m, el, env, rec } = await boot();
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('msgbadge').style.display).toBe('none');
     expect(el('alertbadge').style.display).toBe('none');
     // Зеркало скрыто разметкой и без внимания не трогается: пустая строка и есть «скрыть».
@@ -583,7 +564,7 @@ describe('значки внимания', () => {
       ...env.s,
       battles: { b1: { id: 'b1', location: 'A', sides: [{ owner: 'p1' }, { owner: 'p2' }] } },
     } as unknown as GameState;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('msgbadge').style.display).toBe('');
     expect(el('msgbadge').textContent).toBe('2');
     expect(el('alertbadge').style.display).toBe('grid');
@@ -592,7 +573,7 @@ describe('значки внимания', () => {
     expect(el('railalert').textContent).toBe('3');
     expect(rec.phone.at(-1)).toEqual([1, 2]);
     el('rail').classList.add('open');
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('railalert').style.display).toBe('none');
   });
 
@@ -602,10 +583,10 @@ describe('значки внимания', () => {
       ...env.s,
       battles: { b2: { id: 'b2', location: 'E', sides: [{ owner: 'p2' }, { owner: 'p3' }] } },
     } as unknown as GameState;
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('alertbadge').style.display).toBe('none');
     env.engaged.add('b2');
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(el('alertbadge').textContent).toBe('1');
   });
 });
@@ -794,14 +775,14 @@ describe('досье Роя', () => {
   it('на телефоне вход — язычок: он открывает досье диалогом, «Закрыть» возвращает фокус', async () => {
     const { m, el, env } = await boot();
     env.s = pve(env.s);
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     const tab = el('swarm-tab');
     expect(tab.hidden).toBe(false);
     expect(el('rail-dossier').style.display).toBe('');
     tab.click();
     const win = el('swarm-dossier');
     expect(win.classList.contains('show')).toBe(true);
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
     expect(tab.hidden).toBe(true); // ручка уже выдвинутой панели не нужна
     m.closeSwarmDossier();
     expect(win.classList.contains('show')).toBe(false);
@@ -829,7 +810,7 @@ describe('досье Роя', () => {
     el('swarm-dossier-body').click(hit('[data-jump]', { dataset: { jump: 'N' } }));
     expect(rec.jumps).toEqual(['N']);
     expect(el('swarm-dossier').classList.contains('show')).toBe(false);
-    m.renderTopBar(0, false, []);
+    m.renderTopBar([]);
   });
 
   it('смена матча прячет досье старого матча', async () => {
@@ -846,9 +827,7 @@ describe('стык с main.ts', () => {
 
   it('main поднимает полосу один раз и зовёт её кадр', () => {
     expect(MAIN.match(/\ninitTopBar\(\{/g)).toHaveLength(1);
-    expect(MAIN).toMatch(
-      /\n {2}renderTopBar\(nowReal, preparingMap, missions\);\n {2}missionPanel\.render\(missions\);/,
-    );
+    expect(MAIN).toMatch(/\n {2}renderTopBar\(missions\);\n {2}missionPanel\.render\(missions\);/);
     expect(MAIN).toMatch(/renderEndScreen\(\);\s*renderSpeedbar\(\);/);
     expect(MAIN).toContain('updateThreatAlerts(); // «враг у ваших рубежей»');
     expect(MAIN).toContain('onToggle: forgetStatusLine,');

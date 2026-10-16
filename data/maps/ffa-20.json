@@ -1,0 +1,4572 @@
+{
+  "id": "ffa-20",
+  "seed": "twenty-lights-20261015",
+  "sectors": {
+    "home_1": {
+      "position": {
+        "x": -4360,
+        "y": -1740
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_1_1": {
+      "position": {
+        "x": -4136,
+        "y": -1890
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_1_2": {
+      "position": {
+        "x": -4241,
+        "y": -1498
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_2": {
+      "position": {
+        "x": -2300,
+        "y": -2850
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_2",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_2_1": {
+      "position": {
+        "x": -2033,
+        "y": -2810
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_2_2": {
+      "position": {
+        "x": -2351,
+        "y": -2585
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_3": {
+      "position": {
+        "x": -220,
+        "y": -3680
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_3",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_3_1": {
+      "position": {
+        "x": -111,
+        "y": -3433
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_3_2": {
+      "position": {
+        "x": -488,
+        "y": -3652
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_4": {
+      "position": {
+        "x": 1890,
+        "y": -3670
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_4",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_4_1": {
+      "position": {
+        "x": 2087,
+        "y": -3485
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_4_2": {
+      "position": {
+        "x": 1632,
+        "y": -3591
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_5": {
+      "position": {
+        "x": 3420,
+        "y": -2340
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_5",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_5_1": {
+      "position": {
+        "x": 3298,
+        "y": -2099
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_5_2": {
+      "position": {
+        "x": 3261,
+        "y": -2558
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_6": {
+      "position": {
+        "x": 4620,
+        "y": -660
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_6",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_6_1": {
+      "position": {
+        "x": 4499,
+        "y": -419
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_6_2": {
+      "position": {
+        "x": 4470,
+        "y": -885
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_7": {
+      "position": {
+        "x": 3990,
+        "y": 1190
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_7",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_7_1": {
+      "position": {
+        "x": 3720,
+        "y": 1197
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_7_2": {
+      "position": {
+        "x": 4075,
+        "y": 934
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_8": {
+      "position": {
+        "x": 3400,
+        "y": 2960
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_8",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_8_1": {
+      "position": {
+        "x": 3141,
+        "y": 3038
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_8_2": {
+      "position": {
+        "x": 3339,
+        "y": 2697
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_9": {
+      "position": {
+        "x": 1620,
+        "y": 3560
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_9",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_9_1": {
+      "position": {
+        "x": 1359,
+        "y": 3630
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_9_2": {
+      "position": {
+        "x": 1588,
+        "y": 3292
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_10": {
+      "position": {
+        "x": -300,
+        "y": 3460
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_10",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_10_1": {
+      "position": {
+        "x": -484,
+        "y": 3262
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_10_2": {
+      "position": {
+        "x": -48,
+        "y": 3364
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_11": {
+      "position": {
+        "x": -2340,
+        "y": 2900
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_11",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_11_1": {
+      "position": {
+        "x": -2338,
+        "y": 2630
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_11_2": {
+      "position": {
+        "x": -2094,
+        "y": 3011
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_12": {
+      "position": {
+        "x": -4180,
+        "y": 1970
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_12",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_12_1": {
+      "position": {
+        "x": -4209,
+        "y": 1702
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_12_2": {
+      "position": {
+        "x": -3911,
+        "y": 1993
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_13": {
+      "position": {
+        "x": -4750,
+        "y": 30
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_13",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_13_1": {
+      "position": {
+        "x": -4610,
+        "y": -201
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_13_2": {
+      "position": {
+        "x": -4569,
+        "y": 230
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_14": {
+      "position": {
+        "x": -2450,
+        "y": -840
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_14",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_14_1": {
+      "position": {
+        "x": -2180,
+        "y": -830
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_14_2": {
+      "position": {
+        "x": -2519,
+        "y": -579
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_15": {
+      "position": {
+        "x": -690,
+        "y": -1750
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_15",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_15_1": {
+      "position": {
+        "x": -448,
+        "y": -1869
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_15_2": {
+      "position": {
+        "x": -686,
+        "y": -1480
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_16": {
+      "position": {
+        "x": 1260,
+        "y": -1820
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_16",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_16_1": {
+      "position": {
+        "x": 1250,
+        "y": -1550
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_16_2": {
+      "position": {
+        "x": 1032,
+        "y": -1964
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_17": {
+      "position": {
+        "x": 2440,
+        "y": -260
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_17",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_17_1": {
+      "position": {
+        "x": 2409,
+        "y": 8
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_17_2": {
+      "position": {
+        "x": 2176,
+        "y": -316
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_18": {
+      "position": {
+        "x": 1560,
+        "y": 1570
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_18",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_18_1": {
+      "position": {
+        "x": 1293,
+        "y": 1529
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_18_2": {
+      "position": {
+        "x": 1669,
+        "y": 1323
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_19": {
+      "position": {
+        "x": -630,
+        "y": 1670
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_19",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_19_1": {
+      "position": {
+        "x": -818,
+        "y": 1476
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_19_2": {
+      "position": {
+        "x": -382,
+        "y": 1563
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_20": {
+      "position": {
+        "x": -2490,
+        "y": 860
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_20",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "opening_20_1": {
+      "position": {
+        "x": -2404,
+        "y": 604
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "opening_20_2": {
+      "position": {
+        "x": -2310,
+        "y": 1061
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "heart": {
+      "position": {
+        "x": -36,
+        "y": -12
+      },
+      "kind": "black_hole",
+      "terrain": "deep_void"
+    },
+    "lights_001": {
+      "position": {
+        "x": 353,
+        "y": 2439
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "lights_002": {
+      "position": {
+        "x": 722,
+        "y": 2077
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "lights_003": {
+      "position": {
+        "x": 927,
+        "y": 2448
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_004": {
+      "position": {
+        "x": 81,
+        "y": 2676
+      },
+      "kind": "pirate_base",
+      "terrain": "nebula",
+      "planetType": "terran",
+      "owner": "npc-lights_004",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "pirate_marauder",
+          "count": 3
+        }
+      ]
+    },
+    "lights_005": {
+      "position": {
+        "x": 487,
+        "y": 2896
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_006": {
+      "position": {
+        "x": 341,
+        "y": 1849
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_007": {
+      "position": {
+        "x": -5,
+        "y": 1985
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_008": {
+      "position": {
+        "x": -287,
+        "y": 2341
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_009": {
+      "position": {
+        "x": 1290,
+        "y": 2509
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_010": {
+      "position": {
+        "x": 796,
+        "y": 3196
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_011": {
+      "position": {
+        "x": -205,
+        "y": 2909
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_012": {
+      "position": {
+        "x": 906,
+        "y": 1593
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_013": {
+      "position": {
+        "x": 1307,
+        "y": 2003
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_014": {
+      "position": {
+        "x": 330,
+        "y": 3283
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_015": {
+      "position": {
+        "x": 1190,
+        "y": 3110
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_016": {
+      "position": {
+        "x": 714,
+        "y": 1287
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_017": {
+      "position": {
+        "x": 972,
+        "y": 3664
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_018": {
+      "position": {
+        "x": 76,
+        "y": 3803
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_019": {
+      "position": {
+        "x": 572,
+        "y": 3942
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "lights_020": {
+      "position": {
+        "x": 161,
+        "y": 4162
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_021": {
+      "position": {
+        "x": 1099,
+        "y": 4198
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_022": {
+      "position": {
+        "x": -3622,
+        "y": -56
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "lights_023": {
+      "position": {
+        "x": -3251,
+        "y": 65
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "lights_024": {
+      "position": {
+        "x": -3917,
+        "y": 203
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_025": {
+      "position": {
+        "x": -2932,
+        "y": -185
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_026": {
+      "position": {
+        "x": -3103,
+        "y": 535
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_027": {
+      "position": {
+        "x": -2821,
+        "y": 170
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "lights_028": {
+      "position": {
+        "x": -2199,
+        "y": -118
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_029": {
+      "position": {
+        "x": 3028,
+        "y": 1748
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "lights_030": {
+      "position": {
+        "x": 2540,
+        "y": 1600
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "lights_031": {
+      "position": {
+        "x": 3282,
+        "y": 2332
+      },
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
+    },
+    "lights_032": {
+      "position": {
+        "x": 3678,
+        "y": 1941
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "lights_033": {
+      "position": {
+        "x": 3655,
+        "y": 2328
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_034": {
+      "position": {
+        "x": 4113,
+        "y": 2459
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_035": {
+      "position": {
+        "x": 3923,
+        "y": 2792
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_036": {
+      "position": {
+        "x": 4508,
+        "y": 1958
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_037": {
+      "position": {
+        "x": 4299,
+        "y": 2786
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_038": {
+      "position": {
+        "x": 2805,
+        "y": 828
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "lights_039": {
+      "position": {
+        "x": 2411,
+        "y": 1120
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_040": {
+      "position": {
+        "x": 2448,
+        "y": 700
+      },
+      "kind": "neutral_base",
+      "terrain": "dust_lane",
+      "planetType": "terran",
+      "owner": "npc-lights_040",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        }
+      ]
+    },
+    "lights_041": {
+      "position": {
+        "x": 3007,
+        "y": 1290
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_042": {
+      "position": {
+        "x": 3122,
+        "y": 624
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "lights_043": {
+      "position": {
+        "x": 3362,
+        "y": 1072
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_044": {
+      "position": {
+        "x": 2136,
+        "y": 1359
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_045": {
+      "position": {
+        "x": 2066,
+        "y": 457
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_046": {
+      "position": {
+        "x": 1855,
+        "y": 800
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_047": {
+      "position": {
+        "x": 1536,
+        "y": 587
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "lights_048": {
+      "position": {
+        "x": 1858,
+        "y": -1
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_049": {
+      "position": {
+        "x": 3226,
+        "y": -1105
+      },
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "barren"
+    },
+    "lights_050": {
+      "position": {
+        "x": 3702,
+        "y": -1093
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "planetType": "dead_world"
+    },
+    "lights_051": {
+      "position": {
+        "x": 3283,
+        "y": -741
+      },
+      "kind": "asteroid",
+      "terrain": "depleted_system"
+    },
+    "lights_052": {
+      "position": {
+        "x": 3464,
+        "y": -1481
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_053": {
+      "position": {
+        "x": 3044,
+        "y": -1461
+      },
+      "kind": "neutral_base",
+      "terrain": "deep_void",
+      "planetType": "terran",
+      "owner": "npc-lights_053",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        }
+      ]
+    },
+    "lights_054": {
+      "position": {
+        "x": 2871,
+        "y": -986
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "lights_055": {
+      "position": {
+        "x": 3882,
+        "y": -1400
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_056": {
+      "position": {
+        "x": 2903,
+        "y": -597
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_057": {
+      "position": {
+        "x": 4166,
+        "y": -1075
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "lights_058": {
+      "position": {
+        "x": 3727,
+        "y": -1817
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_059": {
+      "position": {
+        "x": 4415,
+        "y": -1627
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_060": {
+      "position": {
+        "x": 4397,
+        "y": -2006
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "lights_061": {
+      "position": {
+        "x": 4091,
+        "y": -2298
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_062": {
+      "position": {
+        "x": 4994,
+        "y": -1300
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_063": {
+      "position": {
+        "x": 5129,
+        "y": -880
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_064": {
+      "position": {
+        "x": 4006,
+        "y": -2747
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_065": {
+      "position": {
+        "x": -3662,
+        "y": 584
+      },
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "barren"
+    },
+    "lights_066": {
+      "position": {
+        "x": -3928,
+        "y": 1070
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "planetType": "dead_world"
+    },
+    "lights_067": {
+      "position": {
+        "x": -4094,
+        "y": 545
+      },
+      "kind": "asteroid",
+      "terrain": "depleted_system"
+    },
+    "lights_068": {
+      "position": {
+        "x": -3647,
+        "y": 1344
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_069": {
+      "position": {
+        "x": -4377,
+        "y": 784
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "lights_070": {
+      "position": {
+        "x": -3154,
+        "y": 1210
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_071": {
+      "position": {
+        "x": -4639,
+        "y": 1089
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_072": {
+      "position": {
+        "x": -4765,
+        "y": 550
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_073": {
+      "position": {
+        "x": -5048,
+        "y": 890
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_074": {
+      "position": {
+        "x": -4802,
+        "y": 1665
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_075": {
+      "position": {
+        "x": -5164,
+        "y": 545
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "lights_076": {
+      "position": {
+        "x": -5250,
+        "y": 1395
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "lights_077": {
+      "position": {
+        "x": -5236,
+        "y": 124
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_078": {
+      "position": {
+        "x": -5107,
+        "y": 1879
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "lights_079": {
+      "position": {
+        "x": -4880,
+        "y": 2188
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_080": {
+      "position": {
+        "x": -3879,
+        "y": -560
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "lights_081": {
+      "position": {
+        "x": -3437,
+        "y": -891
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_082": {
+      "position": {
+        "x": -3984,
+        "y": -1072
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_083": {
+      "position": {
+        "x": -4254,
+        "y": -699
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "barren",
+      "owner": "npc-lights_083",
+      "buildings": [
+        {
+          "type": "biomass_pit",
+          "level": 1
+        },
+        {
+          "type": "mine_t1",
+          "level": 1
+        },
+        {
+          "type": "swarm_synapse",
+          "level": 1
+        },
+        {
+          "type": "swarm_hive",
+          "level": 1
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "lights_084": {
+      "position": {
+        "x": -4236,
+        "y": -334
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_085": {
+      "position": {
+        "x": -3738,
+        "y": -1342
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "lights_086": {
+      "position": {
+        "x": -3009,
+        "y": -563
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_087": {
+      "position": {
+        "x": -4501,
+        "y": -1126
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_088": {
+      "position": {
+        "x": -4645,
+        "y": -681
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_089": {
+      "position": {
+        "x": -4959,
+        "y": -918
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_090": {
+      "position": {
+        "x": -5105,
+        "y": -539
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_091": {
+      "position": {
+        "x": -4951,
+        "y": -1488
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_092": {
+      "position": {
+        "x": -4850,
+        "y": -1874
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_093": {
+      "position": {
+        "x": -5317,
+        "y": -1404
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "lights_094": {
+      "position": {
+        "x": -5465,
+        "y": -459
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_095": {
+      "position": {
+        "x": -5585,
+        "y": -13
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_096": {
+      "position": {
+        "x": 624,
+        "y": -2974
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "lights_097": {
+      "position": {
+        "x": 1144,
+        "y": -3426
+      },
+      "kind": "neutral_base",
+      "terrain": "dust_lane",
+      "planetType": "terran",
+      "owner": "npc-lights_097",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        }
+      ]
+    },
+    "lights_098": {
+      "position": {
+        "x": 932,
+        "y": -2368
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_099": {
+      "position": {
+        "x": 414,
+        "y": -3640
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_100": {
+      "position": {
+        "x": 828,
+        "y": -3812
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "lights_101": {
+      "position": {
+        "x": 1380,
+        "y": -3939
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_102": {
+      "position": {
+        "x": 705,
+        "y": -4279
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "lights_103": {
+      "position": {
+        "x": 1131,
+        "y": -4458
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_104": {
+      "position": {
+        "x": 1761,
+        "y": -4256
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_105": {
+      "position": {
+        "x": 29,
+        "y": -4517
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_106": {
+      "position": {
+        "x": -2962,
+        "y": -1896
+      },
+      "kind": "void_station",
+      "terrain": "deep_void"
+    },
+    "lights_107": {
+      "position": {
+        "x": -3516,
+        "y": -1682
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_108": {
+      "position": {
+        "x": -2765,
+        "y": -2253
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_109": {
+      "position": {
+        "x": -3663,
+        "y": -2095
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_110": {
+      "position": {
+        "x": -3299,
+        "y": -2451
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "fortress_world"
+    },
+    "lights_111": {
+      "position": {
+        "x": -3168,
+        "y": -1277
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_112": {
+      "position": {
+        "x": -2751,
+        "y": -1232
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_113": {
+      "position": {
+        "x": -3786,
+        "y": -2560
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_114": {
+      "position": {
+        "x": -3030,
+        "y": -2932
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_115": {
+      "position": {
+        "x": -4190,
+        "y": -2381
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_116": {
+      "position": {
+        "x": -4561,
+        "y": -2452
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_117": {
+      "position": {
+        "x": 2652,
+        "y": -1413
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "lights_118": {
+      "position": {
+        "x": 2442,
+        "y": -1098
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_119": {
+      "position": {
+        "x": 2855,
+        "y": -1807
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_120": {
+      "position": {
+        "x": 1906,
+        "y": -1601
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_121": {
+      "position": {
+        "x": 1906,
+        "y": -1199
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "lights_122": {
+      "position": {
+        "x": 2221,
+        "y": -708
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_123": {
+      "position": {
+        "x": 1810,
+        "y": -776
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "lights_124": {
+      "position": {
+        "x": 1505,
+        "y": -1217
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_125": {
+      "position": {
+        "x": 572,
+        "y": -2353
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
+    },
+    "lights_126": {
+      "position": {
+        "x": 64,
+        "y": -2202
+      },
+      "kind": "debris_field",
+      "terrain": "derelict_graveyard"
+    },
+    "lights_127": {
+      "position": {
+        "x": -198,
+        "y": -2527
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_128": {
+      "position": {
+        "x": -313,
+        "y": -2884
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_129": {
+      "position": {
+        "x": 34,
+        "y": -1841
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_130": {
+      "position": {
+        "x": 402,
+        "y": -1799
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_131": {
+      "position": {
+        "x": 704,
+        "y": -1571
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_132": {
+      "position": {
+        "x": 195,
+        "y": -1413
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic"
+    },
+    "lights_133": {
+      "position": {
+        "x": -184,
+        "y": -1484
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_134": {
+      "position": {
+        "x": 3605,
+        "y": 98
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "lights_135": {
+      "position": {
+        "x": 3480,
+        "y": -246
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "lights_136": {
+      "position": {
+        "x": 3882,
+        "y": -244
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_137": {
+      "position": {
+        "x": 3973,
+        "y": 355
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_138": {
+      "position": {
+        "x": 3687,
+        "y": 634
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_139": {
+      "position": {
+        "x": 3048,
+        "y": -241
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_140": {
+      "position": {
+        "x": 4312,
+        "y": 126
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_141": {
+      "position": {
+        "x": 2814,
+        "y": 116
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_142": {
+      "position": {
+        "x": 4929,
+        "y": 474
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "lights_143": {
+      "position": {
+        "x": 5184,
+        "y": -358
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_144": {
+      "position": {
+        "x": 4858,
+        "y": 1207
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_145": {
+      "position": {
+        "x": 5351,
+        "y": 88
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_146": {
+      "position": {
+        "x": 2031,
+        "y": 2570
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "lights_147": {
+      "position": {
+        "x": 2575,
+        "y": 2622
+      },
+      "kind": "planet",
+      "terrain": "dust_lane",
+      "planetType": "barren",
+      "owner": "npc-lights_147",
+      "buildings": [
+        {
+          "type": "biomass_pit",
+          "level": 1
+        },
+        {
+          "type": "mine_t1",
+          "level": 1
+        },
+        {
+          "type": "swarm_synapse",
+          "level": 1
+        },
+        {
+          "type": "swarm_hive",
+          "level": 1
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "lights_148": {
+      "position": {
+        "x": 2438,
+        "y": 2219
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_149": {
+      "position": {
+        "x": 1874,
+        "y": 2936
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_150": {
+      "position": {
+        "x": 1927,
+        "y": 2005
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_151": {
+      "position": {
+        "x": 2614,
+        "y": 3243
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "lights_152": {
+      "position": {
+        "x": 2050,
+        "y": 3332
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_153": {
+      "position": {
+        "x": 1455,
+        "y": 2858
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_154": {
+      "position": {
+        "x": 2796,
+        "y": 3551
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_155": {
+      "position": {
+        "x": 2138,
+        "y": 3829
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_156": {
+      "position": {
+        "x": 3199,
+        "y": 3495
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_157": {
+      "position": {
+        "x": 2585,
+        "y": 3946
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "lights_158": {
+      "position": {
+        "x": 3119,
+        "y": 3940
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_159": {
+      "position": {
+        "x": 3478,
+        "y": 3777
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_160": {
+      "position": {
+        "x": 3914,
+        "y": 3202
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_161": {
+      "position": {
+        "x": 1736,
+        "y": 4340
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_162": {
+      "position": {
+        "x": 2239,
+        "y": -2459
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "lights_163": {
+      "position": {
+        "x": 2164,
+        "y": -2088
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "lights_164": {
+      "position": {
+        "x": 2739,
+        "y": -2373
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_165": {
+      "position": {
+        "x": 1802,
+        "y": -2145
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_166": {
+      "position": {
+        "x": 2266,
+        "y": -3102
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_167": {
+      "position": {
+        "x": 1743,
+        "y": -3020
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_168": {
+      "position": {
+        "x": 2849,
+        "y": -2913
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_169": {
+      "position": {
+        "x": 1417,
+        "y": -2312
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_170": {
+      "position": {
+        "x": 2684,
+        "y": -3325
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_171": {
+      "position": {
+        "x": 3202,
+        "y": -3162
+      },
+      "kind": "pirate_base",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "npc-lights_171",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "pirate_marauder",
+          "count": 3
+        }
+      ]
+    },
+    "lights_172": {
+      "position": {
+        "x": 2369,
+        "y": -3705
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_173": {
+      "position": {
+        "x": 2998,
+        "y": -3708
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "lights_174": {
+      "position": {
+        "x": 3640,
+        "y": -3049
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_175": {
+      "position": {
+        "x": 3532,
+        "y": -3412
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_176": {
+      "position": {
+        "x": 2675,
+        "y": -4048
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_177": {
+      "position": {
+        "x": 2270,
+        "y": -4183
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_178": {
+      "position": {
+        "x": -931,
+        "y": -2846
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "lights_179": {
+      "position": {
+        "x": -1074,
+        "y": -3234
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "lights_180": {
+      "position": {
+        "x": -1507,
+        "y": -2545
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "lights_181": {
+      "position": {
+        "x": -1407,
+        "y": -3411
+      },
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
+    },
+    "lights_182": {
+      "position": {
+        "x": -593,
+        "y": -3282
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "lights_183": {
+      "position": {
+        "x": -807,
+        "y": -2263
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_184": {
+      "position": {
+        "x": -1161,
+        "y": -3750
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_185": {
+      "position": {
+        "x": -1862,
+        "y": -3489
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_186": {
+      "position": {
+        "x": -1020,
+        "y": -4180
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_187": {
+      "position": {
+        "x": -2103,
+        "y": -3754
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "lights_188": {
+      "position": {
+        "x": -2461,
+        "y": -3400
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_189": {
+      "position": {
+        "x": -615,
+        "y": -4292
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_190": {
+      "position": {
+        "x": -1628,
+        "y": 1834
+      },
+      "kind": "void_station",
+      "terrain": "deep_void"
+    },
+    "lights_191": {
+      "position": {
+        "x": -2173,
+        "y": 1822
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_192": {
+      "position": {
+        "x": -1756,
+        "y": 1432
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_193": {
+      "position": {
+        "x": -1842,
+        "y": 2298
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_194": {
+      "position": {
+        "x": -1278,
+        "y": 2023
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_195": {
+      "position": {
+        "x": -1526,
+        "y": 1142
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "fortress_world"
+    },
+    "lights_196": {
+      "position": {
+        "x": -1759,
+        "y": 810
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_197": {
+      "position": {
+        "x": -2019,
+        "y": 525
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_198": {
+      "position": {
+        "x": -3149,
+        "y": 1845
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "lights_199": {
+      "position": {
+        "x": -2744,
+        "y": 2167
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "lights_200": {
+      "position": {
+        "x": -3296,
+        "y": 2234
+      },
+      "kind": "pirate_base",
+      "terrain": "nebula",
+      "planetType": "terran",
+      "owner": "npc-lights_200",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "pirate_marauder",
+          "count": 3
+        }
+      ]
+    },
+    "lights_201": {
+      "position": {
+        "x": -2857,
+        "y": 1513
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_202": {
+      "position": {
+        "x": -3652,
+        "y": 1706
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_203": {
+      "position": {
+        "x": -2469,
+        "y": 1380
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_204": {
+      "position": {
+        "x": -3803,
+        "y": 2589
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_205": {
+      "position": {
+        "x": -3529,
+        "y": 2856
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_206": {
+      "position": {
+        "x": -3142,
+        "y": 3052
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_207": {
+      "position": {
+        "x": -3489,
+        "y": 3278
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_208": {
+      "position": {
+        "x": -3833,
+        "y": 3160
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "lights_209": {
+      "position": {
+        "x": -4499,
+        "y": 2349
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_210": {
+      "position": {
+        "x": -4383,
+        "y": 2696
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_211": {
+      "position": {
+        "x": -1213,
+        "y": 2756
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "lights_212": {
+      "position": {
+        "x": -985,
+        "y": 3109
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "lights_213": {
+      "position": {
+        "x": -1511,
+        "y": 3062
+      },
+      "kind": "neutral_base",
+      "terrain": "dust_lane",
+      "planetType": "terran",
+      "owner": "npc-lights_213",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar",
+          "level": 1
+        },
+        {
+          "type": "power_plant",
+          "level": 1
+        },
+        {
+          "type": "fabricator",
+          "level": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        }
+      ]
+    },
+    "lights_214": {
+      "position": {
+        "x": -765,
+        "y": 2212
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_215": {
+      "position": {
+        "x": -534,
+        "y": 2660
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_216": {
+      "position": {
+        "x": -1869,
+        "y": 2675
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "lights_217": {
+      "position": {
+        "x": -1639,
+        "y": 3394
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "lights_218": {
+      "position": {
+        "x": -977,
+        "y": 3721
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_219": {
+      "position": {
+        "x": -2112,
+        "y": 3373
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_220": {
+      "position": {
+        "x": -1577,
+        "y": 3882
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "lights_221": {
+      "position": {
+        "x": -2089,
+        "y": 3747
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_222": {
+      "position": {
+        "x": -407,
+        "y": 3931
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_223": {
+      "position": {
+        "x": -2447,
+        "y": 3538
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_224": {
+      "position": {
+        "x": -1847,
+        "y": -1808
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "lights_225": {
+      "position": {
+        "x": -2271,
+        "y": -1707
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "lights_226": {
+      "position": {
+        "x": -1768,
+        "y": -2256
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_227": {
+      "position": {
+        "x": -2121,
+        "y": -2175
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_228": {
+      "position": {
+        "x": -1424,
+        "y": -2037
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "lights_229": {
+      "position": {
+        "x": -1749,
+        "y": -1320
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_230": {
+      "position": {
+        "x": -1199,
+        "y": -1670
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_231": {
+      "position": {
+        "x": -1409,
+        "y": -1119
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "lights_232": {
+      "position": {
+        "x": -996,
+        "y": -1242
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_233": {
+      "position": {
+        "x": -1681,
+        "y": -716
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_234": {
+      "position": {
+        "x": -2070,
+        "y": -461
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_235": {
+      "position": {
+        "x": -387,
+        "y": 240
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "ringworld"
+    },
+    "lights_236": {
+      "position": {
+        "x": -376,
+        "y": -321
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "relic_world"
+    },
+    "lights_237": {
+      "position": {
+        "x": 129,
+        "y": -553
+      },
+      "kind": "void_station",
+      "terrain": "deep_void"
+    },
+    "lights_238": {
+      "position": {
+        "x": -182,
+        "y": 565
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_239": {
+      "position": {
+        "x": 580,
+        "y": 138
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "lights_240": {
+      "position": {
+        "x": -754,
+        "y": -143
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "lights_241": {
+      "position": {
+        "x": -806,
+        "y": 301
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_242": {
+      "position": {
+        "x": -595,
+        "y": 667
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "lights_243": {
+      "position": {
+        "x": 128,
+        "y": 865
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "lights_244": {
+      "position": {
+        "x": 447,
+        "y": -808
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_245": {
+      "position": {
+        "x": 510,
+        "y": 918
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_246": {
+      "position": {
+        "x": 993,
+        "y": 404
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_247": {
+      "position": {
+        "x": -599,
+        "y": -996
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_248": {
+      "position": {
+        "x": -915,
+        "y": -820
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_249": {
+      "position": {
+        "x": 1203,
+        "y": -25
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_250": {
+      "position": {
+        "x": -1064,
+        "y": 682
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_251": {
+      "position": {
+        "x": 602,
+        "y": -1167
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_252": {
+      "position": {
+        "x": 336,
+        "y": 1268
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_253": {
+      "position": {
+        "x": 970,
+        "y": 892
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_254": {
+      "position": {
+        "x": -1415,
+        "y": -98
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_255": {
+      "position": {
+        "x": -1272,
+        "y": -765
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    },
+    "lights_256": {
+      "position": {
+        "x": 1112,
+        "y": -979
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "lights_257": {
+      "position": {
+        "x": -1457,
+        "y": 519
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran"
+    },
+    "lights_258": {
+      "position": {
+        "x": 1423,
+        "y": -485
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "lights_259": {
+      "position": {
+        "x": -1871,
+        "y": 142
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "barren"
+    }
+  },
+  "regions": [
+    {
+      "id": "orin_nebula",
+      "sectors": [
+        "opening_10_2",
+        "opening_18_1",
+        "opening_19_2",
+        "lights_001",
+        "lights_002",
+        "lights_003",
+        "lights_004",
+        "lights_005",
+        "lights_006",
+        "lights_007",
+        "lights_008",
+        "lights_009",
+        "lights_010",
+        "lights_011",
+        "lights_012",
+        "lights_013",
+        "lights_014",
+        "lights_015",
+        "lights_016",
+        "lights_017",
+        "lights_018",
+        "lights_019",
+        "lights_020",
+        "lights_021"
+      ]
+    },
+    {
+      "id": "vella_nebula",
+      "sectors": [
+        "opening_14_2",
+        "opening_20_1",
+        "lights_022",
+        "lights_023",
+        "lights_024",
+        "lights_025",
+        "lights_026",
+        "lights_027",
+        "lights_028"
+      ]
+    },
+    {
+      "id": "talos_storm",
+      "sectors": [
+        "opening_8_2",
+        "lights_029",
+        "lights_030",
+        "lights_031",
+        "lights_032",
+        "lights_033",
+        "lights_034",
+        "lights_035",
+        "lights_036",
+        "lights_037"
+      ]
+    },
+    {
+      "id": "arvena_massif",
+      "sectors": [
+        "opening_7_1",
+        "opening_17_1",
+        "opening_18_2",
+        "lights_038",
+        "lights_039",
+        "lights_040",
+        "lights_041",
+        "lights_042",
+        "lights_043",
+        "lights_044",
+        "lights_045",
+        "lights_046",
+        "lights_047",
+        "lights_048"
+      ]
+    },
+    {
+      "id": "erim_wastes",
+      "sectors": [
+        "opening_6_2",
+        "lights_049",
+        "lights_050",
+        "lights_051",
+        "lights_052",
+        "lights_053",
+        "lights_054",
+        "lights_055",
+        "lights_056",
+        "lights_057",
+        "lights_058",
+        "lights_059",
+        "lights_060",
+        "lights_061",
+        "lights_062",
+        "lights_063",
+        "lights_064"
+      ]
+    },
+    {
+      "id": "tessa_wastes",
+      "sectors": [
+        "opening_12_1",
+        "home_13",
+        "opening_13_2",
+        "lights_065",
+        "lights_066",
+        "lights_067",
+        "lights_068",
+        "lights_069",
+        "lights_070",
+        "lights_071",
+        "lights_072",
+        "lights_073",
+        "lights_074",
+        "lights_075",
+        "lights_076",
+        "lights_077",
+        "lights_078",
+        "lights_079"
+      ]
+    },
+    {
+      "id": "solan_massif",
+      "sectors": [
+        "opening_1_2",
+        "opening_13_1",
+        "lights_080",
+        "lights_081",
+        "lights_082",
+        "lights_083",
+        "lights_084",
+        "lights_085",
+        "lights_086",
+        "lights_087",
+        "lights_088",
+        "lights_089",
+        "lights_090",
+        "lights_091",
+        "lights_092",
+        "lights_093",
+        "lights_094",
+        "lights_095"
+      ]
+    },
+    {
+      "id": "mirra_massif",
+      "sectors": [
+        "opening_4_2",
+        "lights_096",
+        "lights_097",
+        "lights_098",
+        "lights_099",
+        "lights_100",
+        "lights_101",
+        "lights_102",
+        "lights_103",
+        "lights_104",
+        "lights_105"
+      ]
+    },
+    {
+      "id": "morven_expanse",
+      "sectors": [
+        "home_1",
+        "opening_1_1",
+        "lights_106",
+        "lights_107",
+        "lights_108",
+        "lights_109",
+        "lights_110",
+        "lights_111",
+        "lights_112",
+        "lights_113",
+        "lights_114",
+        "lights_115",
+        "lights_116"
+      ]
+    },
+    {
+      "id": "larna_massif",
+      "sectors": [
+        "opening_5_1",
+        "opening_16_1",
+        "opening_17_2",
+        "lights_117",
+        "lights_118",
+        "lights_119",
+        "lights_120",
+        "lights_121",
+        "lights_122",
+        "lights_123",
+        "lights_124"
+      ]
+    },
+    {
+      "id": "expedition_graveyard",
+      "sectors": [
+        "opening_3_1",
+        "opening_15_1",
+        "opening_16_2",
+        "lights_125",
+        "lights_126",
+        "lights_127",
+        "lights_128",
+        "lights_129",
+        "lights_130",
+        "lights_131",
+        "lights_132",
+        "lights_133"
+      ]
+    },
+    {
+      "id": "ardan_nebula",
+      "sectors": [
+        "home_6",
+        "opening_6_1",
+        "home_7",
+        "opening_7_2",
+        "home_17",
+        "lights_134",
+        "lights_135",
+        "lights_136",
+        "lights_137",
+        "lights_138",
+        "lights_139",
+        "lights_140",
+        "lights_141",
+        "lights_142",
+        "lights_143",
+        "lights_144",
+        "lights_145"
+      ]
+    },
+    {
+      "id": "ormina_massif",
+      "sectors": [
+        "home_8",
+        "opening_8_1",
+        "home_9",
+        "opening_9_1",
+        "opening_9_2",
+        "home_18",
+        "lights_146",
+        "lights_147",
+        "lights_148",
+        "lights_149",
+        "lights_150",
+        "lights_151",
+        "lights_152",
+        "lights_153",
+        "lights_154",
+        "lights_155",
+        "lights_156",
+        "lights_157",
+        "lights_158",
+        "lights_159",
+        "lights_160",
+        "lights_161"
+      ]
+    },
+    {
+      "id": "kestrel_nebula",
+      "sectors": [
+        "home_4",
+        "opening_4_1",
+        "home_5",
+        "opening_5_2",
+        "home_16",
+        "lights_162",
+        "lights_163",
+        "lights_164",
+        "lights_165",
+        "lights_166",
+        "lights_167",
+        "lights_168",
+        "lights_169",
+        "lights_170",
+        "lights_171",
+        "lights_172",
+        "lights_173",
+        "lights_174",
+        "lights_175",
+        "lights_176",
+        "lights_177"
+      ]
+    },
+    {
+      "id": "elda_storm",
+      "sectors": [
+        "opening_2_1",
+        "home_3",
+        "opening_3_2",
+        "lights_178",
+        "lights_179",
+        "lights_180",
+        "lights_181",
+        "lights_182",
+        "lights_183",
+        "lights_184",
+        "lights_185",
+        "lights_186",
+        "lights_187",
+        "lights_188",
+        "lights_189"
+      ]
+    },
+    {
+      "id": "vandor_expanse",
+      "sectors": [
+        "opening_11_1",
+        "opening_19_1",
+        "opening_20_2",
+        "lights_190",
+        "lights_191",
+        "lights_192",
+        "lights_193",
+        "lights_194",
+        "lights_195",
+        "lights_196",
+        "lights_197"
+      ]
+    },
+    {
+      "id": "narla_nebula",
+      "sectors": [
+        "home_12",
+        "opening_12_2",
+        "home_20",
+        "lights_198",
+        "lights_199",
+        "lights_200",
+        "lights_201",
+        "lights_202",
+        "lights_203",
+        "lights_204",
+        "lights_205",
+        "lights_206",
+        "lights_207",
+        "lights_208",
+        "lights_209",
+        "lights_210"
+      ]
+    },
+    {
+      "id": "xanor_massif",
+      "sectors": [
+        "home_10",
+        "opening_10_1",
+        "home_11",
+        "opening_11_2",
+        "home_19",
+        "lights_211",
+        "lights_212",
+        "lights_213",
+        "lights_214",
+        "lights_215",
+        "lights_216",
+        "lights_217",
+        "lights_218",
+        "lights_219",
+        "lights_220",
+        "lights_221",
+        "lights_222",
+        "lights_223"
+      ]
+    },
+    {
+      "id": "sabra_nebula",
+      "sectors": [
+        "home_2",
+        "opening_2_2",
+        "home_14",
+        "opening_14_1",
+        "home_15",
+        "opening_15_2",
+        "lights_224",
+        "lights_225",
+        "lights_226",
+        "lights_227",
+        "lights_228",
+        "lights_229",
+        "lights_230",
+        "lights_231",
+        "lights_232",
+        "lights_233",
+        "lights_234"
+      ]
+    },
+    {
+      "id": "dark_heart",
+      "sectors": [
+        "heart",
+        "lights_235",
+        "lights_236",
+        "lights_237",
+        "lights_238",
+        "lights_239",
+        "lights_240",
+        "lights_241",
+        "lights_242",
+        "lights_243",
+        "lights_244",
+        "lights_245",
+        "lights_246",
+        "lights_247",
+        "lights_248",
+        "lights_249",
+        "lights_250",
+        "lights_251",
+        "lights_252",
+        "lights_253",
+        "lights_254",
+        "lights_255",
+        "lights_256",
+        "lights_257",
+        "lights_258",
+        "lights_259"
+      ]
+    }
+  ],
+  "players": {
+    "npc-lights_083": {
+      "name": "Solan Brood",
+      "faction": "swarm",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100,
+        "biomass": 240
+      },
+      "ai": true,
+      "npc": "swarm"
+    },
+    "npc-lights_147": {
+      "name": "Ormina Brood",
+      "faction": "swarm",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100,
+        "biomass": 240
+      },
+      "ai": true,
+      "npc": "swarm"
+    },
+    "npc-lights_171": {
+      "name": "Kestrel Corsairs",
+      "faction": "pirates",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "pirate"
+    },
+    "npc-lights_200": {
+      "name": "Narla Corsairs",
+      "faction": "pirates",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "pirate"
+    },
+    "npc-lights_004": {
+      "name": "Orin Corsairs",
+      "faction": "pirates",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "pirate"
+    },
+    "npc-lights_097": {
+      "name": "Mirra Lighthouse",
+      "faction": "violet",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "neutral"
+    },
+    "npc-lights_040": {
+      "name": "Arvena Exchange",
+      "faction": "violet",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "neutral"
+    },
+    "npc-lights_053": {
+      "name": "Erim Abbey",
+      "faction": "violet",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "neutral"
+    },
+    "npc-lights_213": {
+      "name": "Xanor Arsenal",
+      "faction": "violet",
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "ai": true,
+      "npc": "neutral"
+    }
+  },
+  "slots": {
+    "slot_1": {
+      "team": "slot_1",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_2": {
+      "team": "slot_2",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_3": {
+      "team": "slot_3",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_4": {
+      "team": "slot_4",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_5": {
+      "team": "slot_5",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_6": {
+      "team": "slot_6",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_7": {
+      "team": "slot_7",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_8": {
+      "team": "slot_8",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_9": {
+      "team": "slot_9",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_10": {
+      "team": "slot_10",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_11": {
+      "team": "slot_11",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_12": {
+      "team": "slot_12",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_13": {
+      "team": "slot_13",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_14": {
+      "team": "slot_14",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_15": {
+      "team": "slot_15",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_16": {
+      "team": "slot_16",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_17": {
+      "team": "slot_17",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_18": {
+      "team": "slot_18",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_19": {
+      "team": "slot_19",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_20": {
+      "team": "slot_20",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    }
+  },
+  "fleets": {
+    "fleet_1": {
+      "owner": "slot_1",
+      "location": "home_1",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_2": {
+      "owner": "slot_2",
+      "location": "home_2",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_3": {
+      "owner": "slot_3",
+      "location": "home_3",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_4": {
+      "owner": "slot_4",
+      "location": "home_4",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_5": {
+      "owner": "slot_5",
+      "location": "home_5",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_6": {
+      "owner": "slot_6",
+      "location": "home_6",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_7": {
+      "owner": "slot_7",
+      "location": "home_7",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_8": {
+      "owner": "slot_8",
+      "location": "home_8",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_9": {
+      "owner": "slot_9",
+      "location": "home_9",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_10": {
+      "owner": "slot_10",
+      "location": "home_10",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_11": {
+      "owner": "slot_11",
+      "location": "home_11",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_12": {
+      "owner": "slot_12",
+      "location": "home_12",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_13": {
+      "owner": "slot_13",
+      "location": "home_13",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_14": {
+      "owner": "slot_14",
+      "location": "home_14",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_15": {
+      "owner": "slot_15",
+      "location": "home_15",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_16": {
+      "owner": "slot_16",
+      "location": "home_16",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_17": {
+      "owner": "slot_17",
+      "location": "home_17",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_18": {
+      "owner": "slot_18",
+      "location": "home_18",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_19": {
+      "owner": "slot_19",
+      "location": "home_19",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "fleet_20": {
+      "owner": "slot_20",
+      "location": "home_20",
+      "units": [
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ]
+    },
+    "npc-lights_083-fleet": {
+      "owner": "npc-lights_083",
+      "location": "lights_083",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1,
+          "modules": [
+            "swarm_brood_chamber"
+          ]
+        }
+      ],
+      "landing": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ]
+    },
+    "npc-lights_147-fleet": {
+      "owner": "npc-lights_147",
+      "location": "lights_147",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1,
+          "modules": [
+            "swarm_brood_chamber"
+          ]
+        }
+      ],
+      "landing": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ]
+    },
+    "npc-lights_171-fleet": {
+      "owner": "npc-lights_171",
+      "location": "lights_171",
+      "units": [
+        {
+          "unit": "pirate_cruiser",
+          "count": 3
+        },
+        {
+          "unit": "pirate_skiff",
+          "count": 1
+        }
+      ],
+      "landing": []
+    },
+    "npc-lights_200-fleet": {
+      "owner": "npc-lights_200",
+      "location": "lights_200",
+      "units": [
+        {
+          "unit": "pirate_cruiser",
+          "count": 3
+        },
+        {
+          "unit": "pirate_skiff",
+          "count": 1
+        }
+      ],
+      "landing": []
+    },
+    "npc-lights_004-fleet": {
+      "owner": "npc-lights_004",
+      "location": "lights_004",
+      "units": [
+        {
+          "unit": "pirate_cruiser",
+          "count": 3
+        },
+        {
+          "unit": "pirate_skiff",
+          "count": 1
+        }
+      ],
+      "landing": []
+    },
+    "npc-lights_097-fleet": {
+      "owner": "npc-lights_097",
+      "location": "lights_097",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 3
+        },
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ],
+      "landing": []
+    },
+    "npc-lights_040-fleet": {
+      "owner": "npc-lights_040",
+      "location": "lights_040",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 3
+        },
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ],
+      "landing": []
+    },
+    "npc-lights_053-fleet": {
+      "owner": "npc-lights_053",
+      "location": "lights_053",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 3
+        },
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ],
+      "landing": []
+    },
+    "npc-lights_213-fleet": {
+      "owner": "npc-lights_213",
+      "location": "lights_213",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 3
+        },
+        {
+          "unit": "scout",
+          "count": 1
+        }
+      ],
+      "landing": []
+    }
+  },
+  "techRules": {
+    "ruleset": "main",
+    "starting": [
+      "scout_design"
+    ],
+    "dayGates": true,
+    "exclude": []
+  }
+}

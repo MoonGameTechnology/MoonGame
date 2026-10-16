@@ -7,7 +7,21 @@ const validId = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && value.length <= 256;
 const validDamage = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0;
-type ActivityRole = 'defense' | 'logistics' | 'objectives';
+const DAY = 86_400_000;
+/** `orders` — game days and `ordersUtc` — UTC days on which the player's own client
+ *  order was applied; `eliminated` — game time the seat lost its last world. Presence
+ *  evidence for stage/final rewards and the daily season XP (metaEconomyDelivery). */
+type ActivityRole = 'defense' | 'logistics' | 'objectives' | 'orders' | 'ordersUtc' | 'eliminated';
+
+/** An order the player sent from their own client and the world applied. AI, Steward
+ *  and host bookkeeping submit without a client, so they never count as presence. */
+export interface OwnOrder {
+  playerId: string;
+  /** Game time the order was applied at. */
+  at: number;
+  /** Wall-clock time of the commit (ms), for UTC days. */
+  wall: number;
+}
 
 /** Server-only facts from authoritative engine events, retained after troops, buildings
  * or captured planets are lost. Pass state BEFORE the event batch: a newly claimed AI
@@ -16,6 +30,7 @@ export function captureMetaEconomyActivity(
   existing: Record<string, string[]> | undefined,
   events: readonly DomainEvent[],
   state: GameState,
+  order?: OwnOrder,
 ): Record<string, string[]> {
   const facts: Record<string, string[]> = Object.fromEntries(
     Object.entries(existing ?? {}).map(([scope, ids]) => [
@@ -37,6 +52,11 @@ export function captureMetaEconomyActivity(
     const ids = facts[scope] ?? (facts[scope] = []);
     if (ids.length < MAX_META_ACTIVITY_FACTS_PER_ROLE && !ids.includes(id)) ids.push(id);
   };
+  // A match lasts at most 100 game days, so day sets stay under the per-role bound.
+  if (order && Number.isFinite(order.at) && Number.isFinite(order.wall)) {
+    add(order.playerId, 'orders', String(Math.floor(order.at / DAY)));
+    add(order.playerId, 'ordersUtc', String(Math.floor(order.wall / DAY)));
+  }
   for (const event of events) {
     const payload = event.payload;
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) continue;
@@ -75,6 +95,10 @@ export function captureMetaEconomyActivity(
       )
         continue;
       add(value.owner, 'objectives', value.planetId);
+    } else if (event.type === 'player.eliminated') {
+      // Events carry no time: the batch's start bounds it from below, which only ever
+      // moves the end of the seat's tenure earlier, in the player's favour.
+      add(value.playerId, 'eliminated', String(state.time));
     }
   }
   return facts;

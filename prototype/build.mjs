@@ -359,18 +359,6 @@ body.app-startup-failed > :not(#startup-error):not(#dev-badge){display:none!impo
 .rc-per{font-style:normal;font-size:max(var(--fs-caption),.82em);opacity:.6;margin-left:1px;}
 .res b{color:#e6eeef;font-weight:700;font-size:var(--fs-body);font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
-/* UIX-4.1: «+N» под плашкой ресурса (purseFloats.ts). Живёт в body, а не в плашке: плашку
-   перерисовывает patchPurse и обрезает её overflow. Без движения (.still) число не уплывает,
-   а гаснет на месте. 42 — над листом «Ещё» (41), под окнами (44+). */
-.purse-float{position:fixed;z-index:42;transform:translate(-50%,0);pointer-events:none;white-space:nowrap;
-  font-size:calc(14px * var(--pcz,1));font-weight:700;font-variant-numeric:tabular-nums;
-  text-shadow:0 1px 4px #000,0 0 2px #000;animation:purse-float 1s ease-out forwards;}
-.purse-float.up{color:var(--grn,#5ff0a8);}
-.purse-float.dn{color:var(--red,#ff5a4d);}
-.purse-float.still{animation:purse-fade 1s linear forwards;}
-@keyframes purse-float{0%{opacity:0;transform:translate(-50%,-2px);}15%{opacity:1;}
-  100%{opacity:0;transform:translate(-50%,16px);}}
-@keyframes purse-fade{0%,60%{opacity:1;}100%{opacity:0;}}
 /* player emblem — a console crest the player picks in the main menu (hub), worn in the
    TOP-LEFT corner. Tap → player dossier (bubbles to the .crest handler). */
 #crestmark{width:34px;height:34px;border-radius:50%;flex:0 0 auto;cursor:pointer;padding:0;
@@ -4232,6 +4220,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
             <option value="team-2v2" data-i18n="setup.map.team-2v2"></option>
             <option value="team-3v3" data-i18n="setup.map.team-3v3"></option>
+            <option value="ffa-20" data-i18n="setup.map.ffa-20"></option>
+            <option value="ffa-50" data-i18n="setup.map.ffa-50"></option>
           </select>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
         </div>
@@ -4385,7 +4375,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
-      <button id="hub-sector-zero" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
+      <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->

@@ -8,9 +8,15 @@
   { "kind": "hull", "defId": "shuttle_carrier" },
   { "kind": "hull", "defId": "interceptor" },
   { "kind": "hull", "defId": "landing_shuttle" },
+  { "kind": "hull", "defId": "siege_lance" },
+  { "kind": "hull", "defId": "bomber" },
+  { "kind": "hull", "defId": "heavy_striker" },
   { "kind": "module", "defId": "cargo_bay" },
   { "kind": "module", "defId": "repair_bay" },
   { "kind": "module", "defId": "radar_module" },
   { "kind": "module", "defId": "compact_radar" },
-  { "kind": "module", "defId": "ion_engine" }
+  { "kind": "module", "defId": "ion_engine" },
+  { "kind": "module", "defId": "ablative_plating" },
+  { "kind": "module", "defId": "point_defense_array" },
+  { "kind": "module", "defId": "salvage_rig" }
 ]

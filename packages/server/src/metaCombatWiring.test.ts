@@ -142,3 +142,52 @@ describe('durable combat participation outside the deterministic world', () => {
     expect(room.economyActivitySnapshot).toEqual(expected);
   });
 });
+
+describe('own orders as presence evidence', () => {
+  const DAY = 86_400_000;
+  const order = (id: string) => ({ ...action, id, type: 'test.noop', playerId: 'defender' });
+  const noop: GameModule = {
+    id: 'noop-test',
+    version: '1',
+    setup(api) {
+      api.onAction('test.noop', () => undefined);
+    },
+  };
+  const peer = { send: () => undefined };
+
+  it('records the day of an order sent from the player’s client, never a server driver', () => {
+    const room = new MatchRoom({
+      id: 'match',
+      initialState: state(),
+      data,
+      kernel: createKernel([module, noop]),
+      now: () => 20_741 * DAY + 5,
+    });
+    expect(room.submitAction('defender', order('driver')).ok).toBe(true);
+    expect(room.economyActivitySnapshot).toEqual({});
+    expect(room.submitAction('defender', order('client'), peer).ok).toBe(true);
+    const facts = room.economyActivitySnapshot;
+    expect(facts['["defender",0,"ordersUtc"]']).toEqual(['20741']);
+    expect(facts['["defender",0,"orders"]']).toEqual([String(Math.floor(room.state.time / DAY))]);
+  });
+
+  it('persists the order day with the prospective snapshot of a durable room', async () => {
+    const writes: MatchSnapshot[] = [];
+    const room = new MatchRoom({
+      id: 'match',
+      initialState: state(),
+      data,
+      kernel: createKernel([module, noop]),
+      now: () => 20_741 * DAY + 5,
+      clientActionTypes: ['test.noop'],
+      persist: async (snapshot) => {
+        writes.push(snapshot);
+      },
+    });
+    room.addPeer('defender', peer);
+    const raw = JSON.stringify({ type: 'action', action: order('client') });
+    await room.receive('defender', peer, raw);
+    expect(writes.at(-1)!.economyActivity?.['["defender",0,"ordersUtc"]']).toEqual(['20741']);
+    expect(room.economyActivitySnapshot).toEqual(writes.at(-1)!.economyActivity);
+  });
+});

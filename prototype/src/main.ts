@@ -1925,6 +1925,8 @@ function mapLabel(mapId: string | undefined): string {
   if (mapId === 'ffa-4') return t('setup.map.ffa-4');
   if (mapId === 'team-2v2') return t('setup.map.team-2v2');
   if (mapId === 'team-3v3') return t('setup.map.team-3v3');
+  if (mapId === 'ffa-20') return t('setup.map.ffa-20');
+  if (mapId === 'ffa-50') return t('setup.map.ffa-50');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 
@@ -5795,7 +5797,8 @@ const hubWallet = __SECTOR_ZERO_ONLY__
       root: $('hubwallet'),
       wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),
       donate: () => {
-        hubNote.textContent = t('donate.soon');
+        hubTab('supply');
+        metaEconomy?.showStore();
       },
       auction: () => hubTab('auction'),
     });
@@ -7234,7 +7237,7 @@ initSectorZeroShell({
   },
   back: () => {
     openHub();
-    $('hub-solo').focus({ preventScroll: true });
+    $('hub-sector-zero').focus({ preventScroll: true });
   },
   openSettings: () => settings.open(),
   note,
@@ -7357,7 +7360,7 @@ function frame(nowReal: number) {
   const chain = runChain();
   if (isSectorZeroRun()) playTaskComic(missions, chain);
   // Строка статуса, шапка, плашки ресурсов и значки внимания — у владельца полосы (REFM-222).
-  renderTopBar(nowReal, preparingMap, missions);
+  renderTopBar(missions);
   missionPanel.render(missions);
 
   // Служебное наложение (FPS, задержка, десинк) — `netOverlay.ts` (REFM-192): десинк

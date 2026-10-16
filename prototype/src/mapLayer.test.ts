@@ -484,6 +484,29 @@ describe('REFM-232 — статический слой карты', () => {
       expect(boundaries(current)).toEqual(boundaries(original));
     }
   });
+
+  it('зум и сдвиг не пересобирают сцену среды: её пересобирает только новое знание', async () => {
+    const { ml, fog, env, camera, home } = await boot({ holo: true });
+    home('p1').terrain = 'dense_nebula';
+    ml.mapLayerForInput();
+    const environment = ml.provinceGeometry!.environment!;
+    const { TerrainEnvironmentSceneCache } = await import('./terrainEnvironmentView');
+    const prepare = vi.spyOn(TerrainEnvironmentSceneCache.prototype, 'prepare');
+    for (const view of [{ scale: 2.3, x: 47.25, y: -21.5 }, { scale: 1.4, x: -120, y: 33 }]) {
+      camera.setView(view);
+      ml.forgetMapBake();
+      ml.mapLayerForInput();
+      expect(ml.provinceGeometry!.environment).toBe(environment);
+    }
+    expect(prepare).not.toHaveBeenCalled();
+    const hidden = Object.values(env.world.planets).find(p => !fog.known(p.id))!;
+    hidden.terrain = 'asteroid_field';
+    fog.rememberScan([hidden.id]);
+    ml.forgetMapBake();
+    ml.mapLayerForInput();
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(ml.provinceGeometry!.environment).not.toBe(environment);
+  });
 });
 
 describe('REFM-232 — стык с main.ts', () => {

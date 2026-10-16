@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TerrainRasterCache } from './terrainRasterCache';
+import { FLOOR_BUDGET, FLOOR_DENSITY, floorDensityFor, TerrainRasterCache } from './terrainRasterCache';
 import type { TerrainField } from './holographicSurface';
 
 const field = (dx = 0, dy = 0): TerrainField => ({
@@ -42,6 +42,9 @@ function surfaces() {
     moveTo: noop,
     lineTo: noop,
     clip: noop,
+    rect: noop,
+    clearRect: noop,
+    drawImage: noop,
     stroke: strokes,
   };
   const getContext = vi.fn(() => ctx);
@@ -73,13 +76,15 @@ describe('province raster cache', () => {
     // Political/province metadata is irrelevant to a continuous tile's drawing.
     cache.draw(f.target, { ...environmentField(), color: '#ff0000', phase: 0.5, poly: [[0, 0]] }, 2);
     cache.draw(f.target, environmentField(2, 10, -5), 2, true);
-    expect(f.created).toHaveLength(1);
+    // One raster of the tile, and the floor atlas its first raster filled.
+    expect(f.created).toHaveLength(2);
+    expect(f.created[1]!.width).toBe(2048);
     expect(f.strokes).not.toHaveBeenCalled();
     expect(cache.pending).toBe(true);
     expect(cache.owed(environmentField(2, 10, -5), 2)).toBe(488 * 368);
     cache.beginFrame(1);
     cache.draw(f.target, environmentField(2, 10, -5), 2);
-    expect(f.created).toHaveLength(2);
+    expect(f.created).toHaveLength(3);
     expect(cache.owed(environmentField(2, -80, 36), 2)).toBe(0);
   });
 
@@ -98,7 +103,8 @@ describe('province raster cache', () => {
     expect(f.strokes).not.toHaveBeenCalled();
     cache.beginFrame(1);
     cache.draw(f.target, edited, 1);
-    expect(f.created).toHaveLength(2);
+    // A new raster; the floor takes the old one's cell of the atlas.
+    expect(f.created).toHaveLength(3);
     expect(f.strokes).toHaveBeenCalled();
     expect(cache.owed(edited, 1)).toBe(0);
   });
@@ -153,7 +159,8 @@ describe('province raster cache', () => {
     const cache = new TerrainRasterCache();
     expect(cache.owed(field(), 2)).toBe(248 * 188);
     expect(f.created).toHaveLength(0);
-    expect(cache.prepare(field(), 2)?.pixels).toBe(248 * 188);
+    const made = cache.prepare(field(), 2);
+    expect([made?.width, made?.height]).toEqual([248, 188]);
     expect(cache.owed(field(), 2)).toBe(0);
     expect(cache.owed(field(178.273, -57.199), 2)).toBe(0);
     // The same shape at another scale is shown stretched until its own raster is made.
@@ -279,5 +286,102 @@ describe('province raster cache', () => {
     cache.draw(f.target, field(), 2);
     expect(f.strokes).toHaveBeenCalled();
     expect(f.created).toHaveLength(3);
+  });
+
+  it('draws an evicted tile from its floor in the atlas, never a hole', () => {
+    const f = surfaces();
+    // Room for one sharp raster of a tile at 2×.
+    const cache = new TerrainRasterCache(50_000);
+    const a = environmentField();
+    const b = { ...environmentField(), id: 'environment:1,0' };
+    cache.draw(f.target, a, 2);
+    cache.draw(f.target, b, 2);
+    expect(f.created[0]!.width).toBe(0); // the first tile's raster is evicted
+    expect(cache.hasFloor(a, 2)).toBe(true);
+    cache.beginFrame(0);
+    f.strokes.mockClear();
+    f.drawImage.mockClear();
+    cache.draw(f.target, a, 2);
+    expect(cache.pending).toBe(true); // a sharp raster is still owed
+    expect(f.strokes).not.toHaveBeenCalled();
+    const call = f.drawImage.mock.calls.at(-1)!;
+    expect(call).toHaveLength(9);
+    expect((call[0] as { width: number }).width).toBe(2048);
+    // The floor's box is 120·0.4/2 CSS px wide: five times smaller than the tile's, padding too.
+    expect(call.slice(5)).toEqual([-10, -10, 140, 110]);
+  });
+
+  it('far out uses the floor as the raster: one atlas, no canvas per tile', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    const far = (dx: number) => environmentField(0.1, dx, 0); // 0.2 device px per unit at 2×
+    // The tile's world box at the floor density, and the stroke gutter: (120·0.4 + 8) × (90·0.4 + 8).
+    expect(cache.owed(far(0), 2)).toBe(56 * 44);
+    cache.draw(f.target, far(0), 2);
+    expect(f.created).toHaveLength(1);
+    expect(f.created[0]!.width).toBe(2048);
+    expect(f.strokes).toHaveBeenCalled();
+    expect(cache.owed(far(0), 2)).toBe(0);
+    f.strokes.mockClear();
+    cache.draw(f.target, far(31.4), 2);
+    expect(f.strokes).not.toHaveBeenCalled();
+    expect(f.created).toHaveLength(1);
+    expect(f.drawImage.mock.calls.at(-1)).toHaveLength(9);
+  });
+
+  it('paints floors from vector within the frame budget, and anew for another density', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    const tile = environmentField();
+    cache.beginFrame(0);
+    expect(cache.prepareFloor(tile, 2)).toBeUndefined();
+    expect(cache.pending).toBe(true);
+    cache.beginFrame(1);
+    expect(cache.prepareFloor(tile, 2)?.cell).toEqual({ x: 0, y: 0 });
+    expect(f.strokes).toHaveBeenCalled();
+    cache.beginFrame(0);
+    expect(cache.prepareFloor(tile, 2)).toBeDefined(); // made: no budget needed
+    expect(cache.pending).toBe(false);
+    cache.setFloorDensity(0.2);
+    expect(cache.hasFloor(tile, 2)).toBe(false);
+  });
+
+  it('packs the floors of a whole map tightly once they are made', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    // Twelve tiles of twelve heights, as the loading meets them: a shelf for each.
+    const tiles = Array.from({ length: 12 }, (_, i) => {
+      const base = environmentField(0.1);
+      const box = { x: 0, y: 0, width: 100, height: 20 + ((i * 7) % 12) * 20 };
+      return { ...base, id: `environment:${i},0`, box: { ...base.box, ...box },
+        environment: { ...base.environment!, tile: { ...base.environment!.tile, id: `${i},0`, box } } };
+    });
+    cache.beginFrame(Infinity);
+    for (const tile of tiles) cache.prepareFloor(tile, 2);
+    const grown = f.created.at(-1)!; // the atlas grew as the shelves came
+    expect(grown.height).toBeGreaterThan(256);
+    cache.packFloors();
+    // One shelf as tall as the tallest floor (240·0.4 + 8, and the gutter), to 16 rows.
+    const packed = f.created.at(-1)!;
+    expect(packed).not.toBe(grown);
+    expect([packed.width, packed.height]).toEqual([2048, 112]);
+    expect(grown.width).toBe(0); // the old atlas is given back
+    expect(tiles.every((tile) => cache.hasFloor(tile, 2))).toBe(true);
+    for (const tile of tiles) cache.draw(f.target, tile, 2);
+    for (const call of f.drawImage.mock.calls) {
+      expect(call[0]).toBe(packed);
+      expect((call[2] as number) + (call[4] as number)).toBeLessThanOrEqual(112);
+    }
+    const made = f.created.length;
+    cache.packFloors(); // the same floors are not packed twice
+    expect(f.created).toHaveLength(made);
+  });
+
+  it('gives a huge map softer floors, so that its whole terrain fits the atlas', () => {
+    expect(floorDensityFor(0)).toBe(FLOOR_DENSITY);
+    expect(floorDensityFor(4e6)).toBe(FLOOR_DENSITY); // a duel
+    const hundred = floorDensityFor(76e6); // the frame of the 100-player map
+    expect(hundred).toBeLessThan(FLOOR_DENSITY);
+    expect(hundred * hundred * 76e6 * 1.4).toBeCloseTo(FLOOR_BUDGET, -2);
   });
 });

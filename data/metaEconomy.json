@@ -8,10 +8,10 @@
     "technology_archives": { "nameKey": "meta.material.technology_archives" }
   },
   "recipes": {
-    "ablative_plating": {
-      "defId": "ablative_plating",
-      "ingredients": { "ferroalloys": 25, "technical_composites": 10 },
-      "salvage": { "ferroalloys": 6, "technical_composites": 2 }
+    "siege_platform": {
+      "defId": "siege_platform",
+      "ingredients": { "ferroalloys": 25, "technical_composites": 10, "energy_cells": 8 },
+      "salvage": { "ferroalloys": 6, "technical_composites": 2, "energy_cells": 2 }
     },
     "targeting_array": {
       "defId": "targeting_array",
@@ -70,7 +70,9 @@
       "logisticsPerPoint": 2,
       "defensePerPoint": 1,
       "objectivesPerPoint": 1,
-      "stagePoints": [1, 3]
+      "stagePoints": [1, 3],
+      "stageDays": [3, 7],
+      "finalPresence": 0.25
     }
   },
   "market": { "minimumAccountXp": 100 },
@@ -82,6 +84,7 @@
       "durationDays": 56,
       "levels": 50,
       "xpPerLevel": 200,
+      "dailyXp": 100,
       "milestones": [
         {
           "level": 1,
@@ -100,7 +103,7 @@
           "level": 10,
           "free": {
             "labelKey": "meta.reward.blueprint_choice",
-            "choices": ["ablative_plating", "targeting_array", "shield_booster"]
+            "choices": ["mine_layer", "targeting_array", "shield_booster"]
           },
           "premium": { "labelKey": "meta.reward.ship_skin", "cosmetic": "frontier_cruiser_livery" }
         },

@@ -110,4 +110,6 @@ it.each(MAP_IDS)('AC15: %s simulation is identical with environment preparation 
   expect(decorated.hashes).toEqual(plain.hashes);
   expect(decorated.state).toEqual(plain.state);
   expect(decorated.state.match).toEqual(plain.state.match);
-});
+  // FFA на 50 мест — 800 провинций: два прогона с подготовкой сцены на каждом шаге идут
+  // секунды, а не доли секунды, и стандартных пяти секунд под нагрузкой гейта не хватает.
+}, 60_000);

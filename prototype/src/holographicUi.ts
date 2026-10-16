@@ -6,6 +6,7 @@ import { motionOn, glowOn, uiScalePct } from './graphicsPrefs';
 import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
 import { narrowLayouts, pcScale } from '../../decisions/pcScale';
+import { fitColumns, fitLayout, type FitLayout } from '../../decisions/selectionWindowFit';
 
 /** Где CSS зумит интерфейс (PC-блок `build.mjs`): ПК с мышью от 900 px. Масштаб считается
  *  только там — иначе `--vph` поделили бы на зум, которого у слоёв нет. */
@@ -88,6 +89,41 @@ export function initHolographicUi(host: HolographicHost) {
   let selected = '';
   /** Раскладка окна выбора в прошлом кадре: сменилась — окно возвращают в экран. */
   let selectionLayout = '';
+  /** Для чего подобрана ширина окна (UIX-14.2): узел сведений и раскладка с размером экрана.
+   *  Сведения перерисовываются новым узлом `.pscroll`, поэтому сравнения узлов хватает, чтобы
+   *  мерить только новое содержимое, а не каждый кадр. */
+  const unfitted = { content: null as Element | null, key: '', columns: 0 };
+  let fitted = unfitted;
+  // Подбор под запасным шрифтом врал бы на ширину строк: шрифт пришёл — подобрать заново.
+  document.fonts?.ready
+    .then(() => {
+      fitted = unfitted;
+    })
+    .catch(() => {
+      /* шрифты не пришли — подбор остаётся по запасному */
+    });
+  /** Ширина окна по содержимому (`selectionWindowFit.ts`): ступень — атрибут `data-fit`, ширину
+   *  ступени задаёт `holographic.css`. Окно ставят на ступень и смотрят, не прячет ли оно часть
+   *  сведений: колонки газеты, ушедшие вправо, или низ под рамкой. 0 — у окна своя ширина. */
+  const fitWidth = (layout: FitLayout | null): number => {
+    const content = host.side.querySelector<HTMLElement>('.pscroll');
+    if (!layout || !content) {
+      delete selection.dataset.fit;
+      return 0;
+    }
+    const key = `${layout}|${width}|${height}|${scale}`;
+    if (content !== fitted.content || key !== fitted.key) {
+      const hides = (el: HTMLElement): boolean =>
+        el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+      const columns = fitColumns(layout, (n) => {
+        selection.dataset.fit = String(n);
+        return hides(content) || hides(host.side);
+      });
+      fitted = { content, key, columns };
+    }
+    selection.dataset.fit = String(fitted.columns);
+    return fitted.columns;
+  };
   /** Where the HUD chrome ends: the resource bar, the tab row and the objectives/wave
    *  line on the right. Windows must not open or be dragged above it. */
   let chromeBottom = 12;
@@ -178,16 +214,23 @@ export function initHolographicUi(host: HolographicHost) {
         // окна сужается на её ширину, а не держит пустое место.
         const noLand = fleetConsole && !host.side.querySelector('.fc-land');
         selection.classList.toggle('no-land', noLand);
-        // Любая смена раскладки окна (лист, ряд приказов, консоль, колонка «Десант»)
-        // меняет его ширину, и окно у правого края ушло бы за экран. Пример — плейтест
+        const shown = inGame && (info || commands);
+        selection.style.display = shown ? (fleetConsole ? 'grid' : 'flex') : 'none';
+        // Ширина по содержимому (UIX-14.2) меряется на видимом окне — после `display` и до
+        // замера окна под место открытия ниже.
+        const world = !!host.side.querySelector('.pscroll > .ptabs, .pscroll > .pscan');
+        const fit = shown
+          ? fitWidth(fitLayout({ info, commands, fleetConsole, details: detailsOpen, world }))
+          : 0;
+        // Любая смена раскладки окна (лист, ряд приказов, консоль, колонка «Десант», ступень
+        // ширины) меняет его ширину, и окно у правого края ушло бы за экран. Пример — плейтест
         // 2026-10-09, PT-08: «Курс» прячет лист, узкую карточку утащили к краю, отмена
         // прицела вернула консоль шириной 1229 px, крестик оказался за экраном.
-        const layout = [info, detailsOpen, commands, fleetConsole, noLand].join();
+        const layout = [info, detailsOpen, commands, fleetConsole, noLand, fit].join();
         if (layout !== selectionLayout) {
           selectionLayout = layout;
           windows.refit('holo-selection-window');
         }
-        selection.style.display = inGame && (info || commands) ? (fleetConsole ? 'grid' : 'flex') : 'none';
         // The command header replaces the former dossier header; keep its live
         // orbit, damage and supply notes while removing the duplicate title.
         if (info && commands) {

@@ -19,7 +19,6 @@ import { allyPanelView } from '../../decisions/allyPanel';
 import { devourSieges } from '../../decisions/devourSiege';
 import type { MissionRow } from '../../decisions/missionView';
 import { tempoOf } from '../../decisions/phoneSpeed';
-import type { PurseReading } from '../../decisions/purseDelta';
 import { refugeThreats } from '../../decisions/refugeThreat';
 import { runClockText } from '../../decisions/runClock';
 import type { RunPauseEvent } from '../../decisions/runPause';
@@ -35,15 +34,14 @@ import { note, toast } from './eventFeed';
 import { clockHM, countdownHMS, esc, flowPer, flowRate, kfmt } from './format';
 import { data } from './gameData';
 import { motionOn, pcUi } from './graphicsPrefs';
-import { RES_SVG } from './icons';
+import { RES_SVG, SOV_SVG } from './icons';
 import { jumpToPing } from './mapCamera';
 import { fleetSeen, known, vision } from './mapFog';
 import { displayOf, speedbarRestartShown, speedbarShown, timeControlsShown } from './matchExits';
 import { unreadMsgs } from './messageLog';
-import { NET, netAdmitted } from './netSession';
+import { NET } from './netSession';
 import type { initPhoneSpeed } from './phoneSpeed';
 import { ctx } from './protoKernel';
-import { initPurseFloats } from './purseFloats';
 import {
   chipDead,
   chipShort,
@@ -260,8 +258,6 @@ export function renderSwarmDossier(now = performance.now()): void {
 let devlineHead: HTMLElement;
 let devlineTail: HTMLElement;
 let purse: HTMLElement;
-// UIX-4.1: «+N» под плашками — что и когда решает `decisions/purseDelta.ts`.
-let purseFloats: ReturnType<typeof initPurseFloats>;
 let tbName: HTMLElement;
 let tbPlace: HTMLElement;
 let tbScore: HTMLElement;
@@ -304,7 +300,7 @@ function patchPurse(html: string): void {
  * Кадр шапки: строка статуса и входы в досье Роя, ряд 1, плашки ресурсов и значки внимания.
  * `missions` — строки задач забега этого кадра: их же получают панель задач и комиксы.
  */
-export function renderTopBar(nowReal: number, preparingMap: boolean, missions: MissionRow[]): void {
+export function renderTopBar(missions: MissionRow[]): void {
   const s = game.world();
   const ME = game.me();
   // Status strip below the top bar: the in-game clock plus the donate currency
@@ -382,7 +378,14 @@ export function renderTopBar(nowReal: number, preparingMap: boolean, missions: M
       : '') +
     (soloSaveActive && !NET
       ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>`
-      : '');
+      : '') +
+    // Суверены — приманка (заказ владельца 2026-09-23): золото, блик и «+». Магазин живёт в
+    // «Снабжении» главного экрана (решение 2026-10-15: «магазин не скрывай»), и нажатие
+    // говорит, где он, не выводя из партии. Числа нет, пока у основной игры нет
+    // авторитетного кошелька; в забеге Sector Zero Суверены — в шапке забега (`runWallet`).
+    (game.toolsHidden()
+      ? ''
+      : `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.open')}"><i>${SOV_SVG}</i><em aria-hidden="true">+</em></button>`);
   if (statusHtml !== lastClockText) {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
@@ -444,11 +447,8 @@ export function renderTopBar(nowReal: number, preparingMap: boolean, missions: M
   // единицы округляется до ДЕСЯТОЙ (содержание даёт доли за час, и целое врало бы «0»),
   // фишка гаснет только когда пусто И не течёт, долг вытесняет скорость (при долге она
   // считает производство, которое уже не доходит), а телефон печатает скорость, как ПК.
-  // Показания плашек идут и в «+N» под ними (UIX-4.1, `purseFloats.ts`).
-  const purseReadings: Record<string, PurseReading> = {};
   const chip = (icon: string, key: string) => {
     const stock = r[key] ?? 0;
-    purseReadings[key] = { stock, perHour: inc[key] ?? 0 };
     // Часы забега: в забеге приток — за минуту (решение владельца 2026-09-24).
     const flow = flowRounded(flowRate(inc[key] ?? 0));
     const flowTxt = flowShown(flow)
@@ -471,13 +471,6 @@ export function renderTopBar(nowReal: number, preparingMap: boolean, missions: M
     patchPurse(hudHtml);
     lastHudHtml = hudHtml;
   }
-  // Пока карта готовится или сеть ещё не впустила, мира на экране нет: не с чего и всплывать.
-  purseFloats.watch(
-    game.inMatch() && !(NET && !netAdmitted) && !preparingMap,
-    purseReadings,
-    s.time,
-    nowReal,
-  );
   // Кого зовут значки внимания и куда ложится цифра — `attentionBadges.ts` (REFM-189):
   // ноль ПРЯЧЕТ значок (значок с «0» гонит игрока в пустоту), бой считается моим и когда
   // я его лишь ВИЖУ, а зеркало на гамбургере молчит при открытой панели — там свои значки.
@@ -702,7 +695,7 @@ export function initTopBar(host: TopBarHost): void {
       return;
     }
     if ((event.target as Element).closest('[data-donate]')) {
-      toast(t('donate.soon'));
+      toast(t('donate.where'));
       return;
     }
     if ((event.target as Element).closest('[data-missions]')) {
@@ -717,7 +710,6 @@ export function initTopBar(host: TopBarHost): void {
 
   purse = $('purse');
   purseTpl = document.createElement('template');
-  purseFloats = initPurseFloats(purse);
   // Tap a resource chip → open the resource card (RC-1): stock, net flow, breakdown,
   // and a button to open the market on that resource.
   purse.addEventListener('click', (ev) => {

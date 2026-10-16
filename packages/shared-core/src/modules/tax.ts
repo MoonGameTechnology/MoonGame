@@ -56,6 +56,26 @@ export function inhabitedWorldCount(
   return n;
 }
 
+/**
+ * Обитаемые миры каждого владельца за ОДИН шаг ядра — тот же счёт, что у
+ * {@link inhabitedWorldCount}, но одним проходом по карте. Хук спрашивают на каждый мир
+ * начисления, и пересчёт всей карты на каждый мир стоил квадрат числа провинций. Хук зовёт
+ * только цикл начисления экономики, внутри него хозяева миров не меняются, поэтому счёт
+ * берётся раз на шаг: ключ — контекст шага `h` (как у `sprawl`).
+ */
+const countsOfStep = new WeakMap<object, Map<string, number>>();
+function inhabitedCounts(step: object, data: GameData, state: GameState): Map<string, number> {
+  let counts = countsOfStep.get(step);
+  if (!counts) {
+    counts = new Map();
+    for (const p of Object.values(state.planets))
+      if (p.owner !== null && isInhabited(data, p))
+        counts.set(p.owner, (counts.get(p.owner) ?? 0) + 1);
+    countsOfStep.set(step, counts);
+  }
+  return counts;
+}
+
 /** Суммарная доля прибавки к кредитному доходу мира от его зданий (RULES-2). */
 export function creditsBonusOf(data: GameData, planet: Pick<Planet, 'buildings'>): number {
   let sum = 0;
@@ -80,8 +100,11 @@ export const taxModule: GameModule = {
       const planet = planetId ? h.state.planets[planetId] : undefined;
       if (!planet || !isInhabited(h.ctx.data, planet)) return bag;
       const out: Record<string, number> = { ...bag };
-      out.credits =
-        (out.credits ?? 0) + civicTax(inhabitedWorldCount(h.ctx.data, h.state, planet.owner));
+      const n =
+        planet.owner === null
+          ? 0
+          : (inhabitedCounts(h, h.ctx.data, h.state).get(planet.owner) ?? 0);
+      out.credits = (out.credits ?? 0) + civicTax(n);
       // Сумма объявленных бонусов всех стоящих зданий мира (уровень учитывается —
       // как у `produces`/`radarRange`). Пустая сумма = множитель 1, поэтому каталог
       // без таких зданий ведёт себя ровно как прежде.

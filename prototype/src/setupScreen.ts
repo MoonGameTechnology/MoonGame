@@ -35,7 +35,7 @@ import {
   type SetupConfig,
 } from './game';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
-import { DEFAULT_MAP_ID, fixedSideMode, isCurrentMap, isFrontier, mapPreset, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
+import { DEFAULT_MAP_ID, fixedSideMode, isCurrentMap, isFrontier, mapPreset, seatsByCount, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
 import { metaGrant, type MetaState } from './meta';
 import { mapWorldName } from './planetName';
 import { resetSandboxConfig } from './sandbox';
@@ -337,7 +337,7 @@ function renderSetupSlots(): void {
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`);
-  if (isFrontier(setupMapId)) {
+  if (seatsByCount(setupMapId)) {
     const count = rivalCount(setupSlots);
     setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
     return;
@@ -394,6 +394,8 @@ function renderSetup(): void {
   $('setup-map-info').textContent = t(
     setupMapId === 'duel-1' ? 'setup.map.duel-1-info'
       : setupMapId === 'ffa-4' ? 'setup.map.ffa-4-info'
+      : setupMapId === 'ffa-20' ? 'setup.map.ffa-20-info'
+      : setupMapId === 'ffa-50' ? 'setup.map.ffa-50-info'
       : setupMapId === 'team-2v2' ? 'setup.map.team-2v2-info'
       : setupMapId === 'team-3v3' ? 'setup.map.team-3v3-info'
       : setupMapId === 'frontier-100'

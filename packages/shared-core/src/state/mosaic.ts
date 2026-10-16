@@ -184,6 +184,20 @@ function cellOf(
   let tags: number[] = [BOUNDARY, BOUNDARY, BOUNDARY, BOUNDARY];
   const si = sites[i]!;
   const wi = si.w;
+  // How far the cell still reaches from its own site. A half-plane that holds the whole
+  // disc of that radius cannot cut the cell, and clipping by it would hand back the very
+  // same polygon — so it is skipped, not computed. On a big map that is nearly every
+  // site: a cell only ever touches its neighbours, yet the loop asks all of them.
+  let reach = 0;
+  const measure = (): void => {
+    let r2 = 0;
+    for (const [x, y] of poly) {
+      const d2 = (x - si.x) * (x - si.x) + (y - si.y) * (y - si.y);
+      if (d2 > r2) r2 = d2;
+    }
+    reach = Math.sqrt(r2);
+  };
+  measure();
   for (let j = 0; j < sites.length; j++) {
     if (j === i) continue;
     const sj = sites[j]!;
@@ -192,10 +206,14 @@ function cellOf(
     const a = 2 * (sj.x - si.x);
     const b = 2 * (sj.y - si.y);
     const c = si.x * si.x + si.y * si.y - (sj.x * sj.x + sj.y * sj.y) + (wj - wi);
+    // Every vertex p sits within `reach` of si, so a·p + c ≤ (a·si + c) + |(a,b)|·reach.
+    // The margin of one unit dwarfs the rounding in either sum: a skip is always exact.
+    if (a * si.x + b * si.y + c + Math.sqrt(a * a + b * b) * reach + 1 < 0) continue;
     const next = clipHalfPlaneTagged(poly, tags, a, b, c, j);
     poly = next.poly;
     tags = next.tags;
     if (poly.length === 0) break;
+    measure();
   }
   return { poly, tags };
 }
@@ -285,73 +303,146 @@ export function sealPlan(
   budgetOf: (id: string) => number,
   ids: readonly string[],
 ): SealPlan {
+  // Everything below works on indices into `ids` and `borders`, built once: a 50-seat map
+  // seals ~700 of its ~2300 borders one at a time, and rebuilding strings, maps and
+  // searches per seal cost seconds at match start. The ORDER of decisions is unchanged.
   const keyOf = (b: MosaicBorder): string => `${b.a}|${b.b}`;
-  const sealed = new Set<string>();
-  const openOf = (): MosaicBorder[] => borders.filter((b) => !sealed.has(keyOf(b)));
-
-  const connected = (edges: readonly MosaicBorder[], drop: string | null): boolean => {
-    const reach = ids.filter((id) => budgetOf(id) > 0); // a rift is a hole, not a province
-    if (reach.length < 2) return true;
-    const adj = new Map<string, string[]>(reach.map((id) => [id, []]));
-    for (const e of edges) {
-      if (keyOf(e) === drop) continue;
-      if (!adj.has(e.a) || !adj.has(e.b)) continue;
-      adj.get(e.a)!.push(e.b);
-      adj.get(e.b)!.push(e.a);
+  const index = new Map(ids.map((id, i) => [id, i]));
+  const budget = ids.map((id) => budgetOf(id));
+  const keys = borders.map(keyOf);
+  const ends = borders.map((b) => [index.get(b.a) ?? -1, index.get(b.b) ?? -1] as const);
+  const sealed = new Array<boolean>(borders.length).fill(false);
+  const degree = new Array<number>(ids.length).fill(0);
+  // Each province's borders in the order it would seal them: thinnest first, then by pair.
+  const incident: number[][] = ids.map(() => []);
+  ends.forEach((pair, k) => {
+    for (const end of pair) {
+      if (end < 0) continue;
+      degree[end]!++;
+      incident[end]!.push(k);
     }
-    const seen = new Set<string>([reach[0]!]);
-    const queue = [reach[0]!];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      for (const n of adj.get(cur) ?? []) {
-        if (!seen.has(n)) {
-          seen.add(n);
-          queue.push(n);
-        }
+  });
+  for (const list of incident)
+    list.sort((p, q) =>
+      borders[p]!.length === borders[q]!.length
+        ? keys[p]! < keys[q]!
+          ? -1
+          : 1
+        : borders[p]!.length - borders[q]!.length,
+    );
+  const openOf = (): MosaicBorder[] => borders.filter((_, k) => !sealed[k]);
+
+  // A rift is a hole, not a province: the map must stay whole across the provinces a
+  // fleet can enter. Borders touching a hole never hold the map together.
+  const reach = ids.flatMap((_, i) => (budget[i]! > 0 ? [i] : []));
+  const slot = new Array<number>(ids.length).fill(-1);
+  reach.forEach((i, s) => (slot[i] = s));
+  const links: Array<Array<[number, number]>> = reach.map(() => []);
+  ends.forEach(([a, b], k) => {
+    const sa = a >= 0 ? slot[a]! : -1;
+    const sb = b >= 0 ? slot[b]! : -1;
+    if (sa < 0 || sb < 0) return;
+    links[sa]!.push([sb, k]);
+    links[sb]!.push([sa, k]);
+  });
+
+  // Generation stamps so a search allocates nothing: a slot is "seen from a side" when its
+  // stamp for that side equals the current search's generation.
+  const fromA = new Array<number>(reach.length).fill(0);
+  const fromB = new Array<number>(reach.length).fill(0);
+  const queueA: number[] = [];
+  const queueB: number[] = [];
+  let generation = 0;
+  /** Whether province slots `sa` and `sb` still reach each other over open borders other
+   *  than `skip`. Two searches grow from both ends, the smaller frontier first, until they
+   *  meet or one side runs dry: across a non-bridge they meet within a few hops, and a
+   *  true bridge costs only its smaller side — never a sweep of the whole map per seal. */
+  const linked = (sa: number, sb: number, skip: number): boolean => {
+    generation++;
+    fromA[sa] = generation;
+    fromB[sb] = generation;
+    queueA.length = 0;
+    queueB.length = 0;
+    queueA.push(sa);
+    queueB.push(sb);
+    let headA = 0;
+    let headB = 0;
+    while (headA < queueA.length && headB < queueB.length) {
+      const sideA = queueA.length - headA <= queueB.length - headB;
+      const v = sideA ? queueA[headA++]! : queueB[headB++]!;
+      const mine = sideA ? fromA : fromB;
+      const theirs = sideA ? fromB : fromA;
+      const queue = sideA ? queueA : queueB;
+      for (const [w, k] of links[v]!) {
+        if (k === skip || sealed[k]) continue;
+        if (theirs[w] === generation) return true;
+        if (mine[w] === generation) continue;
+        mine[w] = generation;
+        queue.push(w);
       }
     }
-    return seen.size === reach.length;
+    return false;
+  };
+  /** A border may be sealed only if every province stays reachable without it. The map's
+   *  wholeness never changes while sealing (a border that would cut it is never sealed),
+   *  so it is checked once; after that, only the border's own two ends can come apart. */
+  let whole = true;
+  if (reach.length > 1) {
+    const seen = new Array<boolean>(reach.length).fill(false);
+    const queue = [0];
+    seen[0] = true;
+    for (let head = 0; head < queue.length; head++) {
+      for (const [w] of links[queue[head]!]!) {
+        if (seen[w]) continue;
+        seen[w] = true;
+        queue.push(w);
+      }
+    }
+    whole = queue.length === reach.length;
+  }
+  const sealable = (k: number): boolean => {
+    if (!whole) return false;
+    const [a, b] = ends[k]!;
+    const sa = a >= 0 ? slot[a]! : -1;
+    const sb = b >= 0 ? slot[b]! : -1;
+    return sa < 0 || sb < 0 || linked(sa, sb, k);
   };
 
   for (;;) {
-    const open = openOf();
-    const degree = new Map<string, number>(ids.map((id) => [id, 0]));
-    for (const b of open) {
-      degree.set(b.a, (degree.get(b.a) ?? 0) + 1);
-      degree.set(b.b, (degree.get(b.b) ?? 0) + 1);
-    }
     const over = ids
-      .filter((id) => (degree.get(id) ?? 0) > budgetOf(id))
+      .flatMap((_, i) => (degree[i]! > budget[i]! ? [i] : []))
       .sort((p, q) => {
-        const dp = (degree.get(p) ?? 0) - budgetOf(p);
-        const dq = (degree.get(q) ?? 0) - budgetOf(q);
-        return dp === dq ? (p < q ? -1 : 1) : dq - dp;
+        const dp = degree[p]! - budget[p]!;
+        const dq = degree[q]! - budget[q]!;
+        return dp === dq ? (ids[p]! < ids[q]! ? -1 : 1) : dq - dp;
       });
     if (over.length === 0) break;
 
-    let cut: string | null = null;
-    for (const id of over) {
-      const candidates = open
-        .filter((b) => b.a === id || b.b === id)
-        .sort((p, q) =>
-          p.length === q.length ? (keyOf(p) < keyOf(q) ? -1 : 1) : p.length - q.length,
-        );
-      const pick = candidates.find((b) => connected(open, keyOf(b)));
-      if (pick) {
-        cut = keyOf(pick);
+    let cut = -1;
+    for (const i of over) {
+      const pick = incident[i]!.find((k) => !sealed[k] && sealable(k));
+      if (pick !== undefined) {
+        cut = pick;
         break;
       }
     }
-    if (cut === null) {
+    if (cut < 0) {
       // Nothing left to seal without stranding somebody: report and stop.
-      return { open, sealed: borders.filter((b) => sealed.has(keyOf(b))), overBudget: over };
+      return {
+        open: openOf(),
+        sealed: borders.filter((_, k) => sealed[k]),
+        overBudget: over.map((i) => ids[i]!),
+      };
     }
-    sealed.add(cut);
+    sealed[cut] = true;
+    const [a, b] = ends[cut]!;
+    if (a >= 0) degree[a]!--;
+    if (b >= 0) degree[b]!--;
   }
 
   return {
     open: openOf(),
-    sealed: borders.filter((b) => sealed.has(keyOf(b))),
+    sealed: borders.filter((_, k) => sealed[k]),
     overBudget: [],
   };
 }

@@ -115,6 +115,18 @@ describe('main-game supply screen', () => {
     expect(html).toContain('Архивная дорожка');
   });
 
+  it('names the daily season XP on the pass that receives it', () => {
+    const view = fixture();
+    view.seasons[0]!.dailyXp = 100;
+    const daily = '+100 опыта за каждый день с приказами в партии';
+    expect(metaEconomyHtml(view, [])).toContain(daily);
+    view.seasons[0]!.active = false;
+    expect(metaEconomyHtml(view, [])).not.toContain(daily);
+    delete view.seasons[0]!.dailyXp;
+    view.seasons[0]!.archived = false;
+    expect(metaEconomyHtml(view, [])).not.toContain('за каждый день');
+  });
+
   it('shows known store contents without a fake purchase button or fabricated price', () => {
     const html = metaEconomyHtml(fixture(), [
       {
@@ -131,6 +143,32 @@ describe('main-game supply screen', () => {
     expect(html).toContain('Ферросплавы ×5');
     expect(html).toContain('Покупки временно недоступны.');
     expect(html).not.toContain('data-me-purchase');
+  });
+
+  // Плашка Суверенов ведёт в магазин: экран открывается прокрученным к нему, но только
+  // когда раздел уже нарисован, и только один раз.
+  it('the Sovereigns plate opens the supply screen scrolled to the store once it loads', async () => {
+    const root = fakeRoot();
+    const scrolled: string[] = [];
+    root.querySelector = ((selector: string) => ({
+      value: 'shield_booster',
+      scrollIntoView: () => {
+        scrolled.push(selector);
+      },
+    })) as unknown as typeof root.querySelector;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => response(url.endsWith('/offers') ? { offers: [] } : fixture())),
+    );
+    const screen = initMetaEconomy(host(root));
+    const loading = screen.refresh();
+    screen.showStore();
+    expect(scrolled).toEqual([]);
+    await loading;
+    expect(root.innerHTML).toContain('data-me-store');
+    expect(scrolled).toEqual(['[data-me-store]']);
+    await screen.refresh();
+    expect(scrolled).toHaveLength(1);
   });
 
   it('escapes server-controlled identifiers and names', () => {
