@@ -531,7 +531,7 @@ import {
   youColor,
 } from './mapPalette';
 import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, pirateIntroRect, setView, world, worldDist } from './mapCamera';
-import { fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
+import { fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
@@ -596,10 +596,11 @@ import {
 // `playerOrder` feeds it real actions so `action` steps advance; ONB-2 builds
 // the full guided first match on the same `startTour` primitive.
 import { startTour, type RunningTour } from './spotlightDom';
-import type { TourResult } from './spotlight';
+import type { MapTarget, SpotlightStep, TourResult } from './spotlight';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 // ONB-2 — the guided first match (a data chain over this same engine).
-import { buildFirstMatchTour } from './firstMatchTour';
+import { buildFirstMatchTour, DEFENSE_TECH, PICK_STEPS, raidStarted } from './firstMatchTour';
+import { tutorOrders, tutorStart, tutorWorld } from '../../decisions/tutorialRival';
 import { buildTrainingTour } from './trainingTour';
 import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
@@ -668,6 +669,7 @@ import {
   inspectFleet,
   rallyAim,
   merging,
+  mobileDraft,
   mobileChoices,
   offerChoices,
   pickFleets,
@@ -1514,10 +1516,41 @@ const ORIENTATION_TOUR = __PLAYER_BUILD__
   ? HUD_ORIENTATION_TOUR.filter((step) => step.id !== 'clock')
   : HUD_ORIENTATION_TOUR;
 function launchTour(steps = ORIENTATION_TOUR, onEnd?: (r: TourResult) => void): void {
-  activeTour = startTour(steps, (r) => {
-    activeTour = null;
-    onEnd?.(r);
-  });
+  tourCentered = null;
+  activeTour = startTour(
+    steps,
+    (r) => {
+      activeTour = null;
+      onEnd?.(r);
+    },
+    { mapPoint: tourMapPoint },
+  );
+}
+/** Какую точку карты тур уже подвёл в кадр — подводим раз на цель, а не каждый кадр. */
+let tourCentered: string | null = null;
+/**
+ * Где на экране точка карты, на которую указывает шаг тура (`mapTarget`). Запертый шаг
+ * глушит всё мимо цели, в том числе жесты карты, — поэтому цель за краем экрана камера
+ * подводит сама, один раз на цель: дальше игрок водит камеру как хочет.
+ */
+function tourMapPoint(target: MapTarget): { x: number; y: number; r: number } | null {
+  const fleet = target.kind === 'fleet' ? s.fleets[target.id] : undefined;
+  const planet = target.kind === 'planet' ? s.planets[target.id] : undefined;
+  const mapAt = planet ? planet.position : fleet ? fleetPos(fleet) : null;
+  const canvasAt = planet ? world(planet.position) : fleet ? fleetAnchor(fleet) : null;
+  if (!mapAt || !canvasAt) return null;
+  const box = canvas.getBoundingClientRect();
+  let at = toScreen(canvasAt, box, VW, VH);
+  const key = `${target.kind}:${target.id}`;
+  const margin = 48;
+  const off = at.x < margin || at.y < margin || at.x > window.innerWidth - margin || at.y > window.innerHeight - margin;
+  if (off && tourCentered !== key) {
+    tourCentered = key;
+    centerOn(mapAt, cam.scale);
+    const moved = planet ? world(planet.position) : fleet ? fleetAnchor(fleet) : null;
+    if (moved) at = toScreen(moved, box, VW, VH);
+  }
+  return { x: at.x, y: at.y, r: target.kind === 'planet' ? 30 : 22 };
 }
 interface TourWindow {
   __vdTour?: {
@@ -1561,43 +1594,135 @@ const myScore = (): number => Math.round(s.match?.scores?.[ME]?.total ?? 0);
 // Крепость на развилке (FORT-6.1) — не мир: её постройка не «захват нового мира».
 const myWorldCount = (): number =>
   Object.values(s.planets).filter((p) => p.owner === ME && !isForkSite(p)).length;
-// ONB-2: start a bot-free solo sandbox and arm the guided first match over its HUD.
+// Темп обучения основной игры: часы мира идут быстро, чтобы ни стройка, ни перелёт не
+// держали новичка реальные минуты (заказ владельца 2026-10-16: «обучение ускорено»).
+// ×600 — час мира за 6 секунд: самые долгие ожидания (рейд соперника и ответный перелёт,
+// ~5 часов мира каждый) укладываются в полминуты.
+const TUTORIAL_SPEED = 600;
+/** Сценарий идущего обучения: кто соперник, где дом и мир соперника, сама цепочка — по
+ *  ней решается, когда соперник выходит в рейд (`raidStarted`). */
+let tutor: {
+  bot: string;
+  home: string;
+  rival: string;
+  steps: SpotlightStep[];
+  /** Свой флот у дома — его ведут в атаку. */
+  strike: () => string | null;
+} | null = null;
+/** Идёт партия обучения основной игры (живёт с партией, а не с туром: тур кончается в
+ *  кадр победы, а итог матча читается позже). */
+let guidedMatch = false;
+// ONB-2: обучение основной игры — дуэль с соперником-сценарием и тур над её HUD.
 function startGuidedMatch(): void {
-  prepareGuidedSetup(); // a bot-free solo sandbox on a deterministic homeworld
+  prepareGuidedSetup(); // дуэльная карта, предсказуемый дом игрока и место соперника
+  const setup = buildSetupConfig();
+  const me = setup.seats[0]!;
+  const bot = setup.seats[1]!;
+  // Соперник садится на соседний мир (`tutorStart`): рейд и ответный удар — один перелёт.
+  const rivalAt = tutorStart(newGame({ ...setup, seats: [me] }).planets, me.start) ?? bot.start;
+  const seats = [me, { ...bot, start: rivalAt }];
+  const st = tutorWorld(newGame({ ...setup, seats }), me.id, bot.id);
   pendingGuide = () => {
-    const startScore = myScore();
+    // Мир соперника за радиусом радара, а шпионаж предлагается только по миру с известным
+    // хозяином: обучение даёт игроку то, что в партии дал бы первый же разведчик, — память
+    // о соседе (`rememberScan`). Сам мир по-прежнему в тумане: гарнизон покажет шпионаж.
+    rememberScan([rivalAt]);
     const startWorlds = myWorldCount(); // baseline: home only
-    const startFleets = myFleetCount(); // baseline: none yet
+    const startFleets = myFleetCount(); // baseline: the starting scout
+    const botFleet = (): Fleet | undefined =>
+      Object.values(s.fleets).find((f) => f.owner === bot.id && f.units.some((u) => u.count > 0));
+    const myFleetAtHome = (): string | null =>
+      Object.values(s.fleets)
+        .filter((f) => f.owner === ME && f.location === me.start && !f.movement)
+        .sort((a, b) => unitsIn(b) - unitsIn(a))[0]?.id ?? null;
     startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
-    launchTour(
-      buildFirstMatchTour({
-        mouse: pcUi,
-        homeOpened: () => selPlanet !== null && s.planets[selPlanet]?.owner === ME,
-        cardLayout: () => MOBILE,
-        panelOpen: () => mobileHud.expanded(),
-        shipsTabOpen: () => planetTab === 'ships',
-        hasFleet: () => myFleetCount() > startFleets,
-        capturedWorld: () => myWorldCount() > startWorlds,
-        scoreRose: () => myScore() > startScore + 1,
-      }),
-      onGuidedTourEnded,
-    );
+    const steps = buildFirstMatchTour({
+      mouse: pcUi,
+      cardLayout: () => MOBILE,
+      home: () => me.start,
+      rival: () => rivalAt,
+      strikeFleet: myFleetAtHome,
+      raidFleet: () => botFleet()?.id ?? null,
+      homeOpened: () => selPlanet === me.start,
+      panelOpen: () => mobileHud.expanded(),
+      techOpen: () => techTree.isOpen(),
+      techTab: () => document.querySelector<HTMLElement>('#tech .tt-tab.on')?.dataset.ttab ?? null,
+      techDone: () => s.players[ME]?.technologies?.completed.includes(DEFENSE_TECH) ?? false,
+      shipsTabOpen: () => planetTab === 'ships',
+      buildingsTabOpen: () => planetTab === 'buildings',
+      buildWinOpen: () => buildWin.isOpen(),
+      hasFleet: () => myFleetCount() > startFleets,
+      raidBeaten: () => !botFleet(),
+      rivalOpened: () => selPlanet === rivalAt,
+      fleetSelected: () => selFleet !== null && s.fleets[selFleet]?.owner === ME,
+      moveArmed: () => aiming,
+      draftStaged: () => mobileDraft !== null,
+      capturedWorld: () => myWorldCount() > startWorlds,
+    });
+    tutor = { bot: bot.id, home: me.start, rival: rivalAt, steps, strike: myFleetAtHome };
+    launchTour(steps, onGuidedTourEnded);
   };
   showHub(false);
   showConnect(false);
-  startMatch(buildSetupConfig(), false); // installMatch → maybeStartPendingTour runs the guide
-  // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
-  // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
-  // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
-  // in this bot-free sandbox, so just run it fast: ×300 clears the two real waits
-  // (build the Cruiser the tour points at, 3h; fly it to the nearest neutral world,
-  // ~2.8h) in well under a minute each, instead of ~110s / ~100s at the player's own
-  // ×100 ceiling. Timed/measured empirically — see the ONB-2 roadmap entry.
-  applyTimeSpeed(300);
+  // Соперник — сценарий обучения, а не ИИ: его место не отдаётся `aiOrders`, ходы даёт
+  // `driveTutor` (`decisions/tutorialRival.ts`). installMatch → maybeStartPendingTour
+  // запускает тур.
+  installMatch(st, new Map());
+  guidedMatch = true;
+  enterSolo(false);
+  applyTimeSpeed(TUTORIAL_SPEED);
   note(t('onb.tour.speed'));
+}
+/** Число кораблей во флоте — сильнейший флот у дома идёт в атаку. */
+const unitsIn = (f: Fleet): number => f.units.reduce((n, u) => n + u.count, 0);
+/** Шаг обучения, который игрок видел в прошлом кадре. */
+let tutorStepShown: string | null = null;
+/**
+ * Шаг обучения сменился — карточка постройки, через которую отдан приказ прошлого шага,
+ * своё отработала: закрываем её. Подсказка поверх открытой карточки не рисуется
+ * (`spotlightDom.ts`), и оставленная карточка прятала бы следующий шаг, пока игрок сам не
+ * догадается её закрыть (найдено прогоном: «Улучшить» нажато — и экран молчит).
+ */
+function followTutorStep(): void {
+  const id = tutor && activeTour?.active ? activeTour.stepId : null;
+  if (id === 'course') holdCourseAim();
+  if (id === tutorStepShown) return;
+  tutorStepShown = id;
+  if (!id) return;
+  // Окно остаётся, только если цель нового шага лежит в нём самом («Технологии» →
+  // ветка → узел — три шага одного окна).
+  const step = tutor?.steps.find((x) => x.id === id);
+  const target = step?.target ?? '';
+  for (const win of [codexEl, techWin, buildWinEl])
+    if (win && !target.startsWith(`#${win.id} `)) win.classList.remove('show');
+  // «Нажмите мир/флот на карте»: открытая панель прошлого шага лежит поверх карты и
+  // закрывала бы точку (найдено прогоном: мир соперника оказался под панелью своего мира).
+  if (PICK_STEPS.has(id)) clearSelection();
+}
+/**
+ * Шаг «нажмите мир соперника» держит прицел курса взведённым. Тап в окне подсветки мимо
+ * самого мира — пустой тап карты: он снимает и выбор флота, и прицел (`pickApply.ts`), а
+ * шаг назад обучение не умеет — новичок остался бы перед запертым экраном, где нажатие по
+ * миру только открывает его карточку (найдено прогоном на телефоне).
+ */
+function holdCourseAim(): void {
+  if (mobileDraft) return; // цель уже выбрана — ждём «Отправить приказ»
+  if (!selectedFleetIds().length) {
+    const strike = tutor?.strike();
+    if (!strike) return;
+    setFleetSelection([strike]);
+  }
+  if (!aiming) arm('aiming', true);
+}
+/** Ход соперника обучения: один рейд, когда тур дошёл до урока обороны. */
+function driveTutor(): void {
+  if (!tutor || !activeTour?.active) return;
+  for (const a of tutorOrders(s, tutor.bot, tutor.home, raidStarted(tutor.steps, activeTour.stepId)))
+    apply(order(s, a, s.time));
 }
 // Fold the finished guide into the flag (+funnel); first completion earns XP + a nudge.
 function onGuidedTourEnded(r: TourResult): void {
+  tutor = null; // соперник больше не ходит: обучение кончилось или его пропустили
   const { state, rewarded } = applyTourOutcome(loadOnboard(), r);
   saveOnboard(state);
   if (rewarded) {
@@ -1795,7 +1920,10 @@ const matchEnd = initMatchEnd({
   loadMeta,
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
-  training: isTraining,
+  // Обучение основной игры кончается гарантированной победой над соперником-сценарием:
+  // карьерный опыт за неё фармился бы повтором обучения. Награда обучения — разовый пакет
+  // за первое прохождение (`onGuidedTourEnded`).
+  training: () => isTraining() || guidedMatch,
   // Dev-забег не засчитывается — его разбивки нет, и чужую (прошлого забега) не показываем.
   runSummary: () =>
     sectorDevActive || sectorProgress.lastRun?.attempt !== sectorAttempt ? null : sectorProgress.lastRun,
@@ -5067,7 +5195,14 @@ const endScreenPanel = initEndScreen({
   onLeave: (which, wasNet) => {
     // Уход — через дверь `leaveMatch` (REFM-205): из сетевого матча без дозвона, гайд и
     // первые цели гаснут (матч мог закончиться посреди гайда, ONB-2).
+    const guided = guidedMatch; // дверь выхода снимет признак вместе с партией
     leaveMatch();
+    // Обучение основной игры: «Повторить обучение» — заново, «В меню» — в хаб.
+    if (!wasNet && guided) {
+      if (which === 'again') beginOnboarding();
+      else openHub();
+      return;
+    }
     // «Повторить обучение» — сразу новый полигон; «В меню» — в меню Sector Zero.
     if (!wasNet && isTraining()) {
       if (which === 'again') startTraining();
@@ -6300,6 +6435,7 @@ function saveMeta(st: MetaState): void {
 // camera and log, then hide the setup overlay. `aiPlayers` are the seats the local
 // sim drives. Shared by the normal skirmish and (via a hook) the dev test mode.
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
+  guidedMatch = false; // обучение основной игры ставит признак само, после установки
   leaveSolo();
   forgetAutoAssault();
   leaveRun();
@@ -7294,6 +7430,7 @@ function frame(nowReal: number) {
       solo.checkFleetClashes();
       solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
       solo.runAI();
+      driveTutor(); // соперник обучения основной игры (no-op вне обучения)
     }
   }
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
@@ -7301,6 +7438,7 @@ function frame(nowReal: number) {
   // покадрового насоса здесь тоже нет: приказ исполняется, даже когда вкладка закрыта.
   netShownTime = netViewAt(netView, nowReal, s.time);
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
+  followTutorStep();
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
   if (saneGap(dt) && spinRuns(NET, speed, !!banner || comicQueue.isBusy())) spinOrbits(dt);

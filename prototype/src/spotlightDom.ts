@@ -16,9 +16,11 @@
  */
 import { t } from '../../localization/runtime';
 import {
+  MAP_ANCHOR,
   SpotlightTour,
   frameRects,
   placeBubble,
+  type MapTarget,
   type Rect,
   type SpotlightHost,
   type SpotlightStep,
@@ -52,6 +54,8 @@ interface Overlay {
 }
 
 let overlay: Overlay | null = null;
+/** Узел, который подсветка нашла последним: якорь карты обводится кругом, кнопка — рамкой. */
+let located: Element | null = null;
 
 /**
  * RESIL-2 · Один кадр живой подсветки: что делать, если `refresh()` бросил.
@@ -122,6 +126,14 @@ function ensureOverlay(): Overlay {
   chip.id = 'spotlight-chip';
   chip.style.display = 'none';
   document.body.append(root, chip);
+  // Где началось нажатие — для `pressed` (слушатель один, вешается вместе с оверлеем).
+  document.addEventListener(
+    'pointerdown',
+    (ev) => {
+      downOn = ev.target instanceof Element ? ev.target.closest('button') : null;
+    },
+    true,
+  );
   overlay = { root, dim, ring, bubble, arrow, count, copy, gest, press, next, skip, skipStage, fold, chip };
   return overlay;
 }
@@ -182,6 +194,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   if (!view) {
     o.root.style.display = 'none';
     o.chip.style.display = 'none';
+    document.body.classList.remove('tour-gate');
     return;
   }
   // Свёрнутая подсказка: оверлея нет вовсе (экран свободен), остаётся кнопка
@@ -190,6 +203,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   o.chip.textContent = t('onb.tour.reopen');
   if (view.collapsed) {
     o.root.style.display = 'none';
+    document.body.classList.remove('tour-gate');
     return;
   }
   // The build/ship dossier (#codex) sits BELOW the spotlight (z46 < z50) so its own
@@ -201,6 +215,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   // very next frame after the dossier closes repaints normally.
   if (document.getElementById('codex')?.classList.contains('show')) {
     o.root.style.display = 'none';
+    document.body.classList.remove('tour-gate');
     return;
   }
   o.root.style.display = 'block';
@@ -212,6 +227,9 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   const mode = overlayMode(view.step, !!view.target);
   o.root.classList.toggle('sl-passthrough', mode === 'free');
   o.root.classList.toggle('sl-gate', mode === 'gate');
+  // Запертый шаг гасит плашки поверх карты, которые могли бы лечь на цель (список первых
+  // целей на телефоне лёг на строку выбора флота — нажатие уходило в него).
+  document.body.classList.toggle('tour-gate', mode === 'gate');
   // Шаг «попробуй руками»: тело подсказки не должно ловить жест — без цели она стоит по
   // центру карты, то есть там же, где игрок крутит колесо (`tourGate.ts`, правило 5).
   o.root.classList.toggle('sl-hands', mode === 'free' && !!view.step.hands);
@@ -223,6 +241,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
       if (r) place(d, r); // frameRects yields exactly one rect per dim panel
     });
     o.ring.style.display = 'block';
+    o.ring.classList.toggle('sl-round', located?.matches(MAP_ANCHOR) === true);
     place(o.ring, {
       left: view.target.left - 6,
       top: view.target.top - 6,
@@ -303,6 +322,62 @@ export interface RunningTour {
   /** Force-stop (as if «Пропустить»). */
   stop(): void;
   readonly active: boolean;
+  /** Шаг на экране сейчас; `null` — тур кончился. По нему хост ведёт сценарий
+   *  (обучение основной игры: бот выходит в рейд на шаге обороны). */
+  readonly stepId: string | null;
+}
+
+/** Что хост даёт туру сверх цепочки. */
+export interface TourOptions {
+  /** Где на экране точка карты — центр и радиус в пикселях страницы; `null` — не видна.
+   *  Без этой функции шаги с `mapTarget` остаются без подсветки (как шаг без цели). */
+  mapPoint?: (target: MapTarget) => { x: number; y: number; r: number } | null;
+}
+
+/** Кнопка, на которой началось последнее нажатие (`pointerdown`). */
+let downOn: Element | null = null;
+
+/**
+ * Кнопка подсказки срабатывает, только если нажатие НАЧАЛОСЬ на ней. На телефоне браузер
+ * досылает `click` после касания туда, где касание было: тап по миру двигает шаг, пузырь
+ * встаёт на новое место — и запоздалый `click` попадал в «Пропустить обучение» под
+ * пальцем (найдено прогоном: тап по своему миру молча кончал обучение). Клавиатура
+ * (`detail === 0`) нажатия указателем не делает и проходит как есть.
+ */
+function pressed(button: HTMLElement, act: () => void): (ev: MouseEvent) => void {
+  return (ev) => {
+    const ok = ev.detail === 0 || downOn === button;
+    downOn = null;
+    if (ok) act();
+  };
+}
+
+/** Прозрачный якорь над точкой карты: подсветка обводит его, а нажатие проходит сквозь
+ *  него на холст (`pointer-events:none`), — так «нажмите свой мир» запирается так же,
+ *  как кнопка. */
+function ensureAnchor(): HTMLElement {
+  const found = document.querySelector<HTMLElement>(MAP_ANCHOR);
+  if (found) return found;
+  const node = el('div', 'sl-anchor');
+  node.id = MAP_ANCHOR.slice(1);
+  node.style.display = 'none';
+  document.body.append(node);
+  return node;
+}
+
+/** Поставить якорь над точкой или спрятать (нет точки — нет цели). */
+function placeAnchor(
+  node: HTMLElement,
+  target: MapTarget | null,
+  project: TourOptions['mapPoint'],
+): void {
+  const at = target && project ? project(target) : null;
+  if (!at) {
+    node.style.display = 'none';
+    return;
+  }
+  node.style.display = 'block';
+  place(node, { left: at.x - at.r, top: at.y - at.r, width: at.r * 2, height: at.r * 2 });
 }
 
 let current: SpotlightTour | null = null;
@@ -312,8 +387,13 @@ let current: SpotlightTour | null = null;
  * `notifyAction` the host wires to its action funnel. A new tour supersedes any
  * running one. `onEnd` fires with how it finished (completed / skipped / stopped).
  */
-export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): RunningTour {
+export function startTour(
+  steps: readonly SpotlightStep[],
+  onEnd?: TourEnd,
+  opts: TourOptions = {},
+): RunningTour {
   const o = ensureOverlay();
+  const anchor = ensureAnchor();
   current?.skip(); // one tour at a time
 
   // A highlighted target can sit inside a scrollable panel (the world/fleet sheet)
@@ -325,11 +405,20 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   let scrolledFor: string | null = null;
   const host: SpotlightHost = {
     locate: (sel) => {
-      const node = document.querySelector(sel);
-      if (!node) return null;
-      const r = node.getBoundingClientRect();
-      // A detached / display:none node reports a zero box — treat as absent.
-      if (r.width === 0 && r.height === 0) return null;
+      // Одна кнопка живёт в разных узлах на ПК и на телефоне (`#holo-tech` и вкладка
+      // нижней панели): селектор перечисляет оба места, берётся первое ВИДИМОЕ. Скрытый
+      // узел (display:none, отцепленный) отдаёт нулевую коробку — его как бы нет.
+      let node: Element | null = null;
+      let r: DOMRect | null = null;
+      for (const cand of Array.from(document.querySelectorAll(sel))) {
+        const box = cand.getBoundingClientRect();
+        if (box.width === 0 && box.height === 0) continue;
+        node = cand;
+        r = box;
+        break;
+      }
+      located = node;
+      if (!node || !r) return null;
       if (scrolledFor !== sel) {
         scrolledFor = sel;
         node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -342,16 +431,17 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   let running = true;
   const tour = new SpotlightTour(steps, host, (result) => {
     running = false;
+    anchor.style.display = 'none';
     if (current === tour) current = null;
     onEnd?.(result);
   });
   current = tour;
 
-  o.next.onclick = () => tour.tap();
-  o.skip.onclick = () => tour.skip();
-  o.skipStage.onclick = () => tour.skipStage();
-  o.fold.onclick = () => tour.collapse();
-  o.chip.onclick = () => tour.reopen();
+  o.next.onclick = pressed(o.next, () => tour.tap());
+  o.skip.onclick = pressed(o.skip, () => tour.skip());
+  o.skipStage.onclick = pressed(o.skipStage, () => tour.skipStage());
+  o.fold.onclick = pressed(o.fold, () => tour.collapse());
+  o.chip.onclick = pressed(o.chip, () => tour.reopen());
 
   /** Снять тур, что бы ни сломалось, и главное — УБРАТЬ оверлей с экрана (RESIL-2). */
   const abort = (err: unknown): void => {
@@ -364,13 +454,19 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
       running = false;
       if (current === tour) current = null;
       o.root.style.display = 'none'; // экран отпущен даже если движок в непонятном виде
+      document.body.classList.remove('tour-gate');
     }
   };
 
   const frame = (): void => {
     if (!running) return;
     tourFrame(
-      () => tour.refresh(),
+      () => {
+        // Якорь встаёт над точкой карты ДО того, как движок ищет цель: шаг видит его
+        // в том же кадре, где сдвинулась камера или пролетел флот.
+        placeAnchor(anchor, tour.step?.mapTarget?.() ?? null, opts.mapPoint);
+        tour.refresh();
+      },
       abort,
       () => requestAnimationFrame(frame),
     );
@@ -383,6 +479,9 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
     stop: () => tour.skip(),
     get active() {
       return running;
+    },
+    get stepId() {
+      return tour.step?.id ?? null;
     },
   };
 }

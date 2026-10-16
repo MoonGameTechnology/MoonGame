@@ -32,6 +32,16 @@ export interface Rect {
   height: number;
 }
 
+/** Точка КАРТЫ, на которую указывает шаг: мир или флот. Холст — не узел DOM, поэтому хост
+ *  ставит над точкой прозрачный якорь (`MAP_ANCHOR`) и подсвечивает уже его. */
+export interface MapTarget {
+  kind: 'planet' | 'fleet';
+  id: string;
+}
+
+/** Селектор якоря над точкой карты — цель шага с `mapTarget`. */
+export const MAP_ANCHOR = '#tour-anchor';
+
 /** How a step hands control to the next one. */
 export type StepAdvance =
   | { on: 'tap' } // player presses «Далее/Понятно»
@@ -44,8 +54,14 @@ export type Placement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 /** One guide step, described by data. */
 export interface SpotlightStep {
   id: string;
-  /** CSS selector of the element to highlight, or `null` for a centred bubble. */
+  /** CSS selector of the element to highlight, or `null` for a centred bubble. Через
+   *  запятую — несколько мест (ПК и телефон держат одну кнопку в разных узлах): хост
+   *  берёт первое ВИДИМОЕ. */
   target: string | null;
+  /** Цель — точка карты (мир, флот), а не кнопка. `target` у такого шага — `MAP_ANCHOR`;
+   *  функция зовётся каждый кадр, потому что флот летит, а камера ездит. `null` — точки
+   *  сейчас нет (флот погиб, мир не виден): якорь прячется. */
+  mapTarget?: () => MapTarget | null;
   /** Locale key (msgid) of the bubble copy — resolved through `t()` at paint. */
   copy: string;
   advance: StepAdvance;
@@ -125,6 +141,11 @@ export class SpotlightTour {
 
   get active(): boolean {
     return this.running;
+  }
+
+  /** The step on screen now, or `null` when the tour is not running. */
+  get step(): SpotlightStep | null {
+    return this.running ? this.current : null;
   }
 
   /** Current step index (0-based), or -1 before `start()` / after the end. */

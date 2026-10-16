@@ -19,13 +19,26 @@ import { PHONE_EDGE_LABEL, PHONE_ITEMS } from '../../decisions/phoneNav';
 /** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
 const TOUR_DEPS_STUB = {
   mouse: () => true,
-  homeOpened: () => false,
   cardLayout: () => false,
+  home: () => 'home',
+  rival: () => 'rival',
+  strikeFleet: () => null,
+  raidFleet: () => null,
+  homeOpened: () => false,
   panelOpen: () => false,
+  techOpen: () => false,
+  techTab: () => null,
+  techDone: () => false,
   shipsTabOpen: () => false,
+  buildingsTabOpen: () => false,
+  buildWinOpen: () => false,
   hasFleet: () => false,
+  raidBeaten: () => false,
+  rivalOpened: () => false,
+  fleetSelected: () => false,
+  moveArmed: () => false,
+  draftStaged: () => false,
   capturedWorld: () => false,
-  scoreRose: () => false,
 };
 
 // Гейт локализации. Текст живёт в /localization, в коде — только ключи

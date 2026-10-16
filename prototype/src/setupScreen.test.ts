@@ -344,7 +344,7 @@ describe('REFM-212 — двери гида и сети', () => {
     taken,
   });
 
-  it('гид получает дуэльную карту без соперников на предсказуемом мире', async () => {
+  it('гид получает дуэльную карту, предсказуемый мир и одно место соперника', async () => {
     const { screen } = await boot();
     screen.openSetup();
     pickMap('frontier-50');
@@ -352,7 +352,11 @@ describe('REFM-212 — двери гида и сети', () => {
     screen.prepareGuidedSetup();
     expect(screen.setupMapId).toBe('duel-1');
     const setup = screen.buildSetupConfig();
-    expect(setup.seats.map((s) => [s.id, s.start, s.faction])).toEqual([['p1', DUEL[0], 'amber']]);
+    expect(setup.seats.map((s) => [s.id, s.start, s.ai])).toEqual([
+      ['p1', DUEL[0], false],
+      ['p2', DUEL[1], true],
+    ]);
+    expect(setup.seats[0]!.faction).toBe('amber');
   });
 
   it('сетевой вход: карта и места от сервера, вход заперт до свободного мира', async () => {
@@ -508,7 +512,7 @@ describe('REFM-212 — стык с main.ts: двери вместо присво
     const guided = body('startGuidedMatch');
     const door = guided.indexOf('prepareGuidedSetup();');
     expect(door).toBeGreaterThan(-1);
-    expect(guided.indexOf('startMatch(buildSetupConfig(), false);')).toBeGreaterThan(door);
+    expect(guided.indexOf('const setup = buildSetupConfig();')).toBeGreaterThan(door);
   });
 
   it('сетевой вход открывает экран, затем ставит сетевой режим; опрос отдаёт места владельцу', () => {

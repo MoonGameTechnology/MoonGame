@@ -1,235 +1,349 @@
 import { describe, expect, it } from 'vitest';
-import { buildFirstMatchTour } from './firstMatchTour';
-import { SpotlightTour, type Rect, type SpotlightHost, type TourResult } from './spotlight';
+import {
+  DEFENSE_BRANCH,
+  DEFENSE_BUILDING,
+  DEFENSE_TECH,
+  buildFirstMatchTour,
+  raidStarted,
+  type FirstMatchDeps,
+} from './firstMatchTour';
+import {
+  MAP_ANCHOR,
+  SpotlightTour,
+  type Rect,
+  type SpotlightHost,
+  type TourResult,
+} from './spotlight';
+import { overlayMode } from './tourGate';
+import { data } from './gameData';
 
-// A permissive host: every selector resolves (so `optional` HUD steps highlight
-// rather than skip), and renders are ignored — the test drives the machine.
+// A permissive host: every selector resolves, and renders are ignored — the test drives
+// the machine.
 const RECT: Rect = { left: 0, top: 0, width: 100, height: 40 };
 function anyHost(): SpotlightHost {
   return { locate: () => RECT, render: () => {} };
 }
 
-describe('buildFirstMatchTour — shape', () => {
-  it('walks produce → build → move → capture → score → done', () => {
-    const tour = buildFirstMatchTour({
-      mouse: () => true,
-      homeOpened: () => false,
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    });
-    expect(tour.map((s) => s.id)).toEqual([
+/** Мир, в котором ничего ещё не сделано; `over` подменяет отдельные проверки. */
+function deps(over: Partial<FirstMatchDeps> = {}): FirstMatchDeps {
+  return {
+    mouse: () => true,
+    cardLayout: () => false,
+    home: () => 'home',
+    rival: () => 'rival',
+    strikeFleet: () => 'p1-1',
+    raidFleet: () => 'p2-1',
+    homeOpened: () => false,
+    panelOpen: () => false,
+    techOpen: () => false,
+    techTab: () => null,
+    techDone: () => false,
+    shipsTabOpen: () => false,
+    buildingsTabOpen: () => false,
+    buildWinOpen: () => false,
+    hasFleet: () => false,
+    raidBeaten: () => false,
+    rivalOpened: () => false,
+    fleetSelected: () => false,
+    moveArmed: () => false,
+    draftStaged: () => false,
+    capturedWorld: () => false,
+    ...over,
+  };
+}
+
+const ids = (d: FirstMatchDeps): string[] => buildFirstMatchTour(d).map((s) => s.id);
+
+describe('обучение основной игры — состав', () => {
+  it('камера → экономика → наука → корабль → оборона → разведка → рейд → атака → победа', () => {
+    expect(ids(deps())).toEqual([
       'welcome',
       'nav',
       'home',
       'mine',
+      'tech-open',
+      'tech-branch',
+      'tech-research',
+      'home-ships',
       'ships-tab',
+      'units-open',
       'ship',
       'fleet',
-      'scan',
-      'troops',
+      'tech-wait',
+      'home-build',
+      'build-tab',
+      'build-open',
+      'fort',
+      'spy-open',
       'spy',
+      'raid',
+      'troops',
+      'pick-fleet',
+      'move-btn',
       'course',
       'capture',
-      'score',
-      'done',
     ]);
-    // the "do X" beats advance on real actions; capture/score/fleet/home on live state
-    expect(tour.find((s) => s.id === 'mine')?.advance).toMatchObject({
-      on: 'action',
-      type: 'building.upgrade',
+  });
+
+  it('каждый урок закрывается настоящим приказом, а не «Далее»', () => {
+    const tour = buildFirstMatchTour(deps());
+    const actions = Object.fromEntries(
+      tour
+        .filter((s) => s.advance.on === 'action')
+        .map((s) => [s.id, (s.advance as { type: string }).type]),
+    );
+    expect(actions).toEqual({
+      mine: 'building.upgrade',
+      'tech-research': 'technology.research',
+      ship: 'unit.build',
+      fort: 'building.construct',
+      spy: 'espionage.spy',
+      course: 'fleet.move',
     });
-    expect(tour.find((s) => s.id === 'course')?.advance).toMatchObject({
+    // на телефоне курс уходит кнопкой «Отправить приказ», а мир только ставит цель
+    const phone = buildFirstMatchTour(deps({ cardLayout: () => true }));
+    expect(phone.find((s) => s.id === 'course')!.advance.on).toBe('state');
+    expect(phone.find((s) => s.id === 'send')!.advance).toEqual({
       on: 'action',
       type: 'fleet.move',
     });
-    expect(tour.find((s) => s.id === 'home')?.advance.on).toBe('state');
-    // подсказка про карту: без проверок («Далее») и БЕЗ запрета экрана — её пробуют руками
-    const nav = tour.find((s) => s.id === 'nav');
-    expect(nav?.advance).toEqual({ on: 'tap' });
-    expect(nav?.hands).toBe(true);
-    expect(nav?.gate).toBeUndefined();
-    // жесты показаны плитками под устройство (UIX-8.1), строка шага одна на оба
-    expect(nav?.gestures?.[0]?.anim).toBe('wheel');
-    // «постройте корабль» — это ДВА нажатия по реальным местам панели, а не пустой шаг:
-    // сперва вкладка заказа, потом строка корабля (живой отзыв: «нажимать нечего»)
-    // цели должны существовать в реальной разметке: старый селектор улучшения
-    // (`[data-act="upgrade"]`) не совпадал уже ни с чем, и шаг молча не подсвечивал
-    expect(tour.find((s) => s.id === 'mine')?.target).toBe('[data-codex^="b:mine:"]');
-    expect(tour.find((s) => s.id === 'ships-tab')?.target).toBe('[data-act="tab"][data-arg="ships"]');
-    expect(tour.find((s) => s.id === 'ship')?.target).toBe('[data-buildorder^="unit:"]');
-    expect(tour.find((s) => s.id === 'ship')?.advance).toMatchObject({
-      on: 'action',
-      type: 'unit.build',
+    // «Далее» — только у шагов-объяснений
+    expect(tour.filter((s) => s.advance.on === 'tap').map((s) => s.id)).toEqual([
+      'welcome',
+      'nav',
+      'troops',
+    ]);
+  });
+
+  it('каждый шаг, где есть что нажать, запирает экран на цели (золотая подсветка)', () => {
+    const tour = buildFirstMatchTour(deps());
+    // Шаги «сделай» — запертые; без запрета остаются объяснения и ожидания.
+    const doing = tour.filter(
+      (s) => s.advance.on !== 'tap' && s.target !== null && !['raid', 'capture'].includes(s.id),
+    );
+    expect(doing.length).toBeGreaterThan(12);
+    for (const s of doing) {
+      expect(s.gate, s.id).toBe(true);
+      expect(overlayMode(s, true), s.id).toBe('gate');
+    }
+    // ожидания (стройка, рейд, захват) — экран свободен: смотреть на карту можно
+    for (const id of ['fleet', 'tech-wait', 'raid', 'capture']) {
+      const s = tour.find((x) => x.id === id)!;
+      expect(overlayMode(s, true), id).toBe('free');
+    }
+  });
+
+  it('точки карты подсвечиваются якорем: свой мир, флот, мир соперника', () => {
+    const tour = buildFirstMatchTour(deps());
+    const map = Object.fromEntries(
+      tour.filter((s) => s.mapTarget).map((s) => [s.id, s.mapTarget!()]),
+    );
+    expect(map).toEqual({
+      home: { kind: 'planet', id: 'home' },
+      'home-ships': { kind: 'planet', id: 'home' },
+      'home-build': { kind: 'planet', id: 'home' },
+      'spy-open': { kind: 'planet', id: 'rival' },
+      raid: { kind: 'fleet', id: 'p2-1' },
+      'pick-fleet': { kind: 'fleet', id: 'p1-1' },
+      course: { kind: 'planet', id: 'rival' },
+      capture: { kind: 'planet', id: 'rival' },
     });
-    // запираем экран ровно там, где цель И ЕСТЬ то, что просят нажать
-    expect(tour.filter((s) => s.gate).map((s) => s.id)).toEqual(['mine', 'ships-tab', 'ship']);
-    // а там, где до места ещё надо добраться (выбрать мир, выбрать флот), — не запираем
-    expect(tour.find((s) => s.id === 'home')?.gate).toBeUndefined();
-    expect(tour.find((s) => s.id === 'course')?.gate).toBeUndefined();
-    expect(tour.find((s) => s.id === 'fleet')?.advance.on).toBe('state');
-    // scan/troops/spy are concept-only (nothing to gate a predicate on) — tap-advance
-    // beats, not gated on a real action
-    expect(tour.find((s) => s.id === 'scan')?.advance.on).toBe('tap');
-    expect(tour.find((s) => s.id === 'troops')?.advance.on).toBe('tap');
-    expect(tour.find((s) => s.id === 'spy')?.advance.on).toBe('tap');
-    expect(tour.find((s) => s.id === 'capture')?.advance.on).toBe('state');
-    expect(tour.find((s) => s.id === 'score')?.advance.on).toBe('state');
+    for (const s of tour.filter((x) => x.mapTarget)) expect(s.target, s.id).toContain(MAP_ANCHOR);
+    // на телефоне тап по месту, где мир и флоты, открывает выбор — цель тогда строка выбора
+    expect(tour.find((s) => s.id === 'pick-fleet')!.target).toContain(
+      '.mobile-choices [data-kind="fleet"]',
+    );
+    expect(tour.find((s) => s.id === 'home')!.target).toContain(
+      '.mobile-choices [data-kind="planet"]',
+    );
+    // нет флота — нет точки, якорь прячется, а не указывает в пустоту
+    const none = buildFirstMatchTour(deps({ strikeFleet: () => null }));
+    expect(none.find((s) => s.id === 'pick-fleet')!.mapTarget!()).toBeNull();
+  });
+
+  it('кнопка науки ищется и на ПК, и на телефоне одним шагом', () => {
+    const open = buildFirstMatchTour(deps()).find((s) => s.id === 'tech-open')!;
+    expect(open.target).toContain('#holo-tech');
+    expect(open.target).toContain('[data-phone-tab="science"]');
+  });
+
+  it('цели держатся за реальные данные: технология открывает форт и лежит в своей ветке', () => {
+    const tech = data.technologies[DEFENSE_TECH];
+    expect(tech?.branch).toBe(DEFENSE_BRANCH);
+    expect(tech?.unlocks?.buildings).toContain(DEFENSE_BUILDING);
+    const tour = buildFirstMatchTour(deps());
+    expect(tour.find((s) => s.id === 'tech-research')!.target).toContain(
+      `data-go="${DEFENSE_TECH}"`,
+    );
+    expect(tour.find((s) => s.id === 'fort')!.target).toContain(`data-bw-go="${DEFENSE_BUILDING}"`);
   });
 
   it('на телефоне шаг про карту показывает жесты пальцев, строка та же', () => {
-    const deps = {
-      homeOpened: () => false,
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    };
-    const pc = buildFirstMatchTour({ ...deps, mouse: () => true }).find((s) => s.id === 'nav');
-    const phone = buildFirstMatchTour({ ...deps, mouse: () => false }).find((s) => s.id === 'nav');
+    const pc = buildFirstMatchTour(deps({ mouse: () => true })).find((s) => s.id === 'nav');
+    const phone = buildFirstMatchTour(deps({ mouse: () => false })).find((s) => s.id === 'nav');
     expect(phone?.gestures?.map((g) => g.anim)).toEqual(['pinch', 'swipe', 'double-tap', 'hold']);
     expect(phone?.copy).toBe(pc?.copy);
+    expect(phone?.hands).toBe(true);
   });
 
-  it('карточка мира: шаг «Сведения» между миром и Металлодобычей, на ПК его нет', () => {
-    const deps = {
-      mouse: () => false,
-      homeOpened: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    };
-    const card = buildFirstMatchTour({ ...deps, cardLayout: () => true });
-    expect(card.map((s) => s.id).slice(2, 5)).toEqual(['home', 'details', 'mine']);
-    const details = card.find((s) => s.id === 'details');
-    expect(details?.gate).toBe(true);
-    expect(details?.advance.on).toBe('state');
-    expect(details?.target).toBe('#mobile-sheet .mobile-quick [data-mobile="details"]');
-    const pc = buildFirstMatchTour({ ...deps, cardLayout: () => false });
-    expect(pc.find((s) => s.id === 'details')).toBeUndefined();
+  it('карточка мира: «Сведения» после каждого открытия мира, на ПК их нет', () => {
+    const card = ids(deps({ cardLayout: () => true }));
+    for (const [home, details] of [
+      ['home', 'details'],
+      ['home-ships', 'details-ships'],
+      ['home-build', 'details-build'],
+      ['spy-open', 'details-spy'],
+      ['course', 'send'],
+    ])
+      expect(card[card.indexOf(home!) + 1], home).toBe(details);
+    expect(ids(deps()).some((id) => id.startsWith('details'))).toBe(false);
   });
+});
 
-  it('карточка мира: шаг ждёт «Сведений», раскрытая карточка ведёт к Металлодобыче', () => {
-    let open = false;
-    const tour = buildFirstMatchTour({
-      mouse: () => false,
-      homeOpened: () => true,
-      cardLayout: () => true,
-      panelOpen: () => open,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    });
+describe('обучение основной игры — проход', () => {
+  it('шаг-страховка «откройте мир» засчитывается сразу, если мир уже открыт', () => {
+    const tour = buildFirstMatchTour(deps({ homeOpened: () => true, techOpen: () => false }));
     const t = new SpotlightTour(tour, anyHost());
     t.start();
-    t.tap(); // welcome → nav
-    t.tap(); // nav → home → (мир уже открыт) → details
-    for (let f = 0; f < 10; f++) t.refresh();
-    expect(tour[t.index]?.id).toBe('details');
-    open = true;
-    t.refresh();
+    t.tap(); // welcome
+    t.tap(); // nav → home (уже открыт) → mine
     expect(tour[t.index]?.id).toBe('mine');
+    t.notifyAction('building.upgrade');
+    expect(tour[t.index]?.id).toBe('tech-open');
   });
-});
 
-describe('buildFirstMatchTour — capture is gated on real state', () => {
-  it('does not pass the capture step until a world is actually taken', () => {
-    let homeOpen = false;
-    let shipsTab = false;
-    let fleetRaised = false;
-    let captured = false;
-    let scored = false;
-    const tour = buildFirstMatchTour({
-      mouse: () => true,
-      homeOpened: () => homeOpen,
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => shipsTab,
-      hasFleet: () => fleetRaised,
-      capturedWorld: () => captured,
-      scoreRose: () => scored,
-    });
+  it('полный проход: каждый шаг ждёт своего дела, захват — настоящего захвата', () => {
+    const w = {
+      home: false,
+      tech: false,
+      tab: null as string | null,
+      done: false,
+      ships: false,
+      builds: false,
+      win: false,
+      fleet: false,
+      beaten: false,
+      rival: false,
+      picked: false,
+      armed: false,
+      captured: false,
+    };
+    const tour = buildFirstMatchTour(
+      deps({
+        homeOpened: () => w.home,
+        techOpen: () => w.tech,
+        techTab: () => w.tab,
+        techDone: () => w.done,
+        shipsTabOpen: () => w.ships,
+        buildingsTabOpen: () => w.builds,
+        buildWinOpen: () => w.win,
+        hasFleet: () => w.fleet,
+        raidBeaten: () => w.beaten,
+        rivalOpened: () => w.rival,
+        fleetSelected: () => w.picked,
+        moveArmed: () => w.armed,
+        capturedWorld: () => w.captured,
+      }),
+    );
     let result: TourResult | null = null;
     const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
+    const at = (): string | undefined => tour[t.index]?.id;
+    const idle = (): void => {
+      for (let f = 0; f < 20; f++) t.refresh();
+    };
     t.start();
-
-    t.tap(); // welcome → nav (подсказка про карту)
-    t.tap(); // nav → home
-    for (let f = 0; f < 30; f++) t.refresh(); // panel not opened yet — stays put
-    expect(t.index).toBe(2);
-
-    homeOpen = true;
-    t.refresh(); // homeworld panel opened → home advances to mine
-    t.notifyAction('building.upgrade'); // mine → ships-tab
-
-    for (let f = 0; f < 30; f++) t.refresh(); // вкладка заказа не открыта — стоим на месте
-    expect(t.index).toBe(4);
-
-    shipsTab = true;
-    t.refresh(); // вкладка «Корабли» открыта → шаг заказа корабля
-    expect(t.index).toBe(5);
-    t.notifyAction('unit.build'); // заказ отдан → ждём, пока корабль выйдет на орбиту
-    expect(t.index).toBe(6); // parked on the fleet step — a ship must actually auto-rally
-
-    for (let f = 0; f < 30; f++) t.refresh(); // no fleet yet — stays put
-    expect(t.index).toBe(6);
-
-    fleetRaised = true;
-    t.refresh(); // a built ship auto-rallied → fleet advances to the (informational) scan step
-    expect(t.index).toBe(7);
-    t.tap(); // scan → troops
-    expect(t.index).toBe(8); // parked on the (informational) troops step
-    t.tap(); // troops → spy
-    t.tap(); // spy → course
-    t.notifyAction('fleet.move'); // course → capture
-    expect(t.index).toBe(11); // parked on the capture step
-
-    for (let f = 0; f < 30; f++) t.refresh(); // world not yet taken — stays put
-    expect(t.index).toBe(11);
+    t.tap();
+    t.tap();
+    idle();
+    expect(at()).toBe('home');
+    w.home = true;
+    t.refresh();
+    t.notifyAction('fleet.move'); // чужой приказ шаг не двигает
+    expect(at()).toBe('mine');
+    t.notifyAction('building.upgrade');
+    idle();
+    expect(at()).toBe('tech-open');
+    w.home = false; // окно науки закрыло панель мира
+    w.tech = true;
+    t.refresh();
+    w.tab = 'space';
+    idle();
+    expect(at()).toBe('tech-branch');
+    w.tab = DEFENSE_BRANCH;
+    t.refresh();
+    t.notifyAction('technology.research');
+    w.tech = false; // окно закрывает хост
+    idle();
+    expect(at()).toBe('home-ships'); // мир закрыт — страховка ждёт
+    w.home = true;
+    t.refresh();
+    w.ships = true;
+    t.refresh();
+    expect(at()).toBe('units-open');
+    w.win = true;
+    t.refresh();
+    t.notifyAction('unit.build');
+    w.win = false;
+    idle();
+    expect(at()).toBe('fleet');
+    w.fleet = true;
+    t.refresh();
+    idle();
+    expect(at()).toBe('tech-wait');
+    w.done = true;
+    t.refresh(); // home-build засчитан сразу: мир открыт
+    expect(at()).toBe('build-tab');
+    w.builds = true;
+    t.refresh();
+    w.win = true;
+    t.refresh();
+    expect(at()).toBe('fort');
+    t.notifyAction('building.construct');
+    idle();
+    expect(at()).toBe('spy-open');
+    w.rival = true;
+    t.refresh();
+    t.notifyAction('espionage.spy');
+    idle();
+    expect(at()).toBe('raid');
+    w.beaten = true;
+    t.refresh();
+    t.tap(); // troops
+    idle();
+    expect(at()).toBe('pick-fleet');
+    w.picked = true;
+    t.refresh();
+    expect(at()).toBe('move-btn');
+    w.armed = true;
+    t.refresh();
+    t.notifyAction('fleet.move');
+    idle();
+    expect(at()).toBe('capture');
     expect(result).toBeNull();
+    w.captured = true;
+    t.refresh(); // мир взят — обучение пройдено, итог показывает экран конца матча
+    expect(result).toMatchObject({ completed: true, skipped: false });
+  });
 
-    captured = true;
-    t.refresh(); // world taken → capture advances to score
-    expect(t.index).toBe(12);
-
-    scored = true;
-    t.refresh(); // score moved → score advances to the final beat
-    t.tap(); // done → finish
-    expect(result).not.toBeNull();
-    expect(result!.completed).toBe(true);
-    expect(result!.reachedStep).toBe(13);
+  it('пропуск на середине кончает обучение как пропущенное', () => {
+    let result: TourResult | null = null;
+    const t = new SpotlightTour(buildFirstMatchTour(deps()), anyHost(), (r) => (result = r));
+    t.start();
+    t.tap();
+    t.tap();
+    t.skip();
+    expect(result).toMatchObject({ completed: false, skipped: true, reachedStep: 2 });
   });
 });
 
-describe('buildFirstMatchTour — skippable', () => {
-  it('a skip mid-guide ends the whole chain as skipped', () => {
-    const tour = buildFirstMatchTour({
-      mouse: () => true,
-      homeOpened: () => true, // already open — walk straight onto mine
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    });
-    let result: TourResult | null = null;
-    const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
-    t.start();
-    t.tap(); // welcome → nav
-    t.tap(); // nav → home → (state already true) → mine
-    t.skip();
-    expect(result).not.toBeNull();
-    expect(result!.skipped).toBe(true);
-    expect(result!.completed).toBe(false);
-    expect(t.active).toBe(false);
+describe('рейд соперника', () => {
+  it('начинается, пока строится корабль, и дальше, но не раньше и не после конца тура', () => {
+    const tour = buildFirstMatchTour(deps());
+    expect(raidStarted(tour, 'ship')).toBe(false);
+    expect(raidStarted(tour, 'fleet')).toBe(true);
+    expect(raidStarted(tour, 'fort')).toBe(true);
+    expect(raidStarted(tour, 'course')).toBe(true);
+    expect(raidStarted(tour, null)).toBe(false);
+    expect(raidStarted(tour, 'unknown')).toBe(false);
   });
 });

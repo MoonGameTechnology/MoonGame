@@ -532,11 +532,12 @@ export function buildSetupConfig(): SetupConfig {
   };
 }
 
-/** Гид по первому матчу (ONB-2) готовит свою партию: дуэльную карту без соперников и
- *  предсказуемый родной мир. Остальной выбор экрана гид не трогает. */
+/** Гид по первому матчу (ONB-2) готовит свою партию: дуэльную карту, предсказуемый
+ *  родной мир и одно место соперника — его ведёт сценарий обучения, а не ИИ
+ *  (`decisions/tutorialRival.ts`). Остальной выбор экрана гид не трогает. */
 export function prepareGuidedSetup(): void {
   setupMapId = DEFAULT_MAP_ID;
-  setupSlots = ['human', 'off']; // no rivals — a safe, calm sandbox
+  setupSlots = ['human', 'ai']; // соперник обучения: место есть, ходит сценарий
   setupStart = setupPreset().starts[0]!; // a deterministic homeworld
 }
 

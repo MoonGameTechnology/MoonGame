@@ -3286,24 +3286,39 @@ export const en: Record<string, string> = {
   'onb.recap.rest': 'While you were away',
   'onb.recap.title': 'Return digest',
   'onb.tour.done': '✔ Tutorial complete · +{n} XP. Now play a real match!',
-  'onb.tour.first.capture': 'Take the neutral world: orbit first, then the ground.',
-  'onb.tour.first.course': 'Select your fleet ▲, then press a neighbouring world to set a course.',
+  'onb.tour.first.capture':
+    'No garrison there: a fleet in orbit takes the world by itself.',
+  'onb.tour.first.course': 'Press the rival\'s world: the fleet sets a course for it.',
   'onb.tour.first.details': 'Open «Details»: the world\'s buildings are there.',
-  'onb.tour.first.done': 'Loop complete: produce, build, move, capture, score.',
   'onb.tour.first.fleet':
     'The ship is being built. Once done it moves to orbit: wait for a «▲» at your world.',
+  'onb.tour.first.tech-open':
+    'Open «Technologies»: research unlocks new buildings and ships.',
+  'onb.tour.first.tech-branch':
+    'Technologies come in branches. Open the «Ground» branch.',
+  'onb.tour.first.tech-research': 'Research «Field Fortification»: it unlocks the Fort.',
+  'onb.tour.first.build-tab': 'Buildings are ordered on the «Buildings» tab. Open it.',
+  'onb.tour.first.tech-wait':
+    'Waiting for «Field Fortification»: time runs accelerated.',
+  'onb.tour.first.fort': 'The rival is raiding! Press «Build» on the Fort: it strengthens your defense.',
+  'onb.tour.first.spy-open':
+    'The raid comes from the next world. Press the rival\'s world.',
+  'onb.tour.first.raid':
+    'The rival\'s raid is inbound. Ships in orbit and the fort meet it on their own.',
+  'onb.tour.first.pick-fleet': 'Strike back. Press your fleet at the home world.',
+  'onb.tour.first.units-open': 'Press «Build units»: the ship catalog opens.',
+  'onb.tour.first.build-open': 'Press «Build»: the building catalog opens.',
+  'onb.tour.first.move-btn': 'Press «Move», then choose where to fly.',
+  'onb.tour.first.send': 'Press «Send order»: the fleet heads for the target.',
   'onb.tour.first.home': 'Select your world to open its panel.',
   'onb.tour.first.mine': 'Upgrade the Metal Mine: press its row, then «Upgrade».',
   'onb.tour.first.nav': 'Map controls. They work while this hint is open.',
-  'onb.tour.first.scan': 'Select a fleet: its card shows attack, defense, speed and hold.',
-  'onb.tour.first.ship': 'Press the top ship, then «Build here» on its card.',
+  'onb.tour.first.ship': 'Order a ship: press «Build» on its row.',
   'onb.tour.first.ships-tab': 'Ships are ordered on the «Fleet» tab. Open it.',
-  'onb.tour.first.score': 'Worlds and sectors give points. Reach the threshold to win.',
-  'onb.tour.first.spy':
-    'Scout an enemy world before attacking: «Spy on the world» shows its garrison for 24 h.',
+  'onb.tour.first.spy': 'Scout it: «Spy on the world» shows its garrison for 24 h.',
   'onb.tour.first.troops': 'A garrisoned world falls only to troops: load them with ⇅ «Troops».',
   'onb.tour.first.welcome':
-    'Your first world. We\'ll run the core loop: a couple of minutes, no rivals.',
+    'Five minutes: mining, science, ships, defense, scouting and attack vs a weak rival.',
   'onb.tour.got-it': 'Got it',
   'onb.tour.hud.clock': 'The world runs in real time, even offline. Pause and speed are here.',
   'onb.tour.hud.done': 'Upgrade the Metal Mine, build a fleet and set a course.',

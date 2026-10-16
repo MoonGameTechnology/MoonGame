@@ -28,13 +28,26 @@ const STEP_MAX = 90;
 const first = (mouse: boolean): SpotlightStep[] =>
   buildFirstMatchTour({
     mouse: () => mouse,
-    homeOpened: () => false,
     cardLayout: () => !mouse,
+    home: () => 'home',
+    rival: () => 'rival',
+    strikeFleet: () => null,
+    raidFleet: () => null,
+    homeOpened: () => false,
     panelOpen: () => false,
+    techOpen: () => false,
+    techTab: () => null,
+    techDone: () => false,
     shipsTabOpen: () => false,
+    buildingsTabOpen: () => false,
+    buildWinOpen: () => false,
     hasFleet: () => false,
+    raidBeaten: () => false,
+    rivalOpened: () => false,
+    fleetSelected: () => false,
+    moveArmed: () => false,
+    draftStaged: () => false,
     capturedWorld: () => false,
-    scoreRose: () => false,
   });
 
 const world = trainingState(data);

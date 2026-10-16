@@ -711,13 +711,21 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #spotlight.sl-hands .sl-btns{pointer-events:auto;}
 #spotlight.sl-gate{pointer-events:none;}
 #spotlight.sl-gate .sl-dim{pointer-events:auto;}
-/* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
-   it needs to read as a distinct call-to-action against the cyan HUD, not blend into
-   it as one more glowing panel. */
-#spotlight .sl-ring{position:fixed;border:2px solid var(--amber);border-radius:8px;pointer-events:none;
-  box-shadow:0 0 0 2px rgba(255,180,58,.35),0 0 18px rgba(255,180,58,.55);animation:sl-pulse 1s ease-in-out infinite;}
-@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,180,58,.12),0 0 8px rgba(255,180,58,.2);opacity:.5;}
-  50%{box-shadow:0 0 0 5px rgba(255,180,58,.6),0 0 28px rgba(255,180,58,.95);opacity:1;}}
+/* Золотое свечение, а не обычный циан темы: кольцо значит именно «жать СЮДА» и должно
+   читаться отдельным призывом на циановом HUD, а не ещё одной светящейся панелью (заказ
+   владельца 2026-10-16: «подсвечивалась золотым свечением»). Кольцо не гаснет до
+   прозрачности: в покое оно тоже видно, пульс только добавляет ореол. */
+#spotlight .sl-ring{position:fixed;border:2px solid #ffd45c;border-radius:8px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(255,212,92,.45),0 0 18px rgba(255,200,64,.7),inset 0 0 10px rgba(255,212,92,.35);
+  animation:sl-pulse 1.2s ease-in-out infinite;}
+/* Цель на карте (мир, флот) — круг, как сама отметка на холсте. */
+#spotlight .sl-ring.sl-round{border-radius:50%;}
+@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,212,92,.3),0 0 10px rgba(255,200,64,.4),inset 0 0 6px rgba(255,212,92,.2);opacity:.8;}
+  50%{box-shadow:0 0 0 6px rgba(255,212,92,.65),0 0 30px rgba(255,200,64,1),inset 0 0 14px rgba(255,212,92,.5);opacity:1;}}
+@media (prefers-reduced-motion:reduce){#spotlight .sl-ring{animation:none;opacity:1;}}
+/* Якорь над точкой карты (src/spotlightDom.ts): невидимая коробка, по которой меряется
+   подсветка; нажатие проходит сквозь него на холст. */
+#tour-anchor{position:fixed;pointer-events:none;z-index:1;}
 #spotlight .sl-bubble{position:fixed;pointer-events:auto;max-width:min(320px,82vw);
   background:rgba(4,16,22,.97);border:1px solid var(--cyan);border-radius:10px;padding:13px 15px;
   box-shadow:0 6px 22px rgba(0,0,0,.55);color:var(--ink);}
@@ -900,6 +908,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    Top-right under the top bar; z-32 above the HUD but below toasts/modals. */
 #goals{position:fixed;top:52px;right:14px;z-index:32;display:none;max-width:min(230px,60vw);}
 #goals.show{display:block;}
+/* Запертый шаг обучения (src/spotlightDom.ts): список целей не ложится на подсвеченную цель. */
+body.tour-gate #goals.show{display:none;}
 #pirate-intro{position:fixed;top:calc(var(--tbh) + 78px);left:78px;z-index:32;
   width:min(280px,80vw);padding:12px;background:rgba(4,16,22,.96);border:1px solid #a95e48;
   border-radius:9px;color:var(--ink);font-size:var(--fs-body);line-height:1.5;}
