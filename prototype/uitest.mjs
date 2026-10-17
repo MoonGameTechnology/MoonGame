@@ -198,6 +198,8 @@ import { selectAt as __selectAt } from './mapInput';
 // Точка значка боя — у флотов карты (REFM-235); \`main.ts\` сам её не считает.
 import { battleAnchor as __battleAnchor } from './fleetGeometry';
 import { battleBadgePoint as __battleBadgePoint } from '../../decisions/battleTap';
+// Узел флота — у тумана (\`mapFog.ts\`): с REFM-224 \`main.ts\` его не импортирует.
+import { fleetNode as __fleetNode } from './mapFog';
 module.exports = {
   battleFixture: () => {
     const before = s;
@@ -229,7 +231,7 @@ module.exports = {
     if (kind === 'planet') pickWorld(id);
     else {
       setFleetSelection([id]);
-      if (kind === 'foreign' && vision) vision.identify.add(fleetNode(s.fleets[id]));
+      if (kind === 'foreign' && vision) vision.identify.add(__fleetNode(s.fleets[id]));
     }
     renderPanel();
   },
