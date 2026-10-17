@@ -40,6 +40,7 @@ import {
   SWARM_MEMORY_WINDOW,
   isMineFleet,
   isOrdnanceFleet,
+  isReconFleet,
   isRocketMineFleet,
   mineFleetVisible,
   rocketMinelayer,
@@ -773,6 +774,12 @@ function baseAiOrders(
     Object.values(state.planets).find((p) => p.owner === ai);
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
+  // Флот из одних разведчиков без десанта ничего не берёт: пустой мир ядро ему не отдаёт
+  // ни прилётом, ни с орбиты (`E_RECON_NO_CAPTURE`, решение владельца 2026-10-16), а
+  // гарнизонный и подавно. Без этой проверки бот слал такой флот к ближайшей пустой
+  // провинции и повторял отбиваемый штурм каждые два часа: 117 отказов за дуэль.
+  const reconBare = (f: Fleet): boolean =>
+    isReconFleet(f, data) && !(f.landing ?? []).some((st) => st.count > 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
   // Ничьи планеты держит ополчение (`NEUTRAL_PLANET_MILITIA`), и брать их надо десантом
   // даже в мирное время. Пока такая планета есть, флот грузится дома и без войны.
@@ -963,7 +970,7 @@ function baseAiOrders(
       //     оборонительные, — танк полезнее на чужой земле, ополченец на своей.
       //     ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), а вылет его ОТМЕНЯЕТ: флот, который
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
-      if (here0 && here0.id === base.id && (warFooting || neutralGuarded)) {
+      if (here0 && here0.id === base.id && (warFooting || neutralGuarded || reconBare(f))) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
         let free = liftFree(f);
         let ordered = false;
@@ -1061,6 +1068,7 @@ function baseAiOrders(
         here0.owner !== ai &&
         capturable(here0) &&
         canTraverse(state, ai, here0.owner) &&
+        !reconBare(f) &&
         (!here0.garrison.some((st) => st.count > 0) ||
           // ПРАВИЛО ВЛАДЕЛЬЦА №2 (2026-09-16): штурмовать, только будучи УВЕРЕННЫМ, что
           // наземные силы возьмут гарнизон. Раньше хватало любого бойца в трюме — и
@@ -1129,6 +1137,11 @@ function baseAiOrders(
     }
     const here = state.planets[f.location];
     if (!here) continue;
+    // Разведчикам без десанта брать нечего — домой, за ополчением (погрузка — правило (а)).
+    if (skilled && reconBare(f)) {
+      if (base && f.location !== base.id) out.push(moveFleet(ai, f.id, base.id));
+      continue;
+    }
     let best: Planet | null = null;
     let bestD = Infinity;
     let second: Planet | null = null;
