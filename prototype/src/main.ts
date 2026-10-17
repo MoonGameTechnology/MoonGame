@@ -4690,6 +4690,7 @@ initSetupScreen({
   showConnect,
   openHub: () => openHub(),
   startMatch: (setup) => startMatch(setup),
+  joinMatch: (id, slot, faction, scientists) => connectToMatch(id, slot, faction, scientists),
   mapLabel,
   // Чужой мир на мини-карте — цветом войны из выбранной палитры: так соперник выглядит
   // и на карте партии, и игрок с CVD-палитрой не получит красно-зелёную пару.

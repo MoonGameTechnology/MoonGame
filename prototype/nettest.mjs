@@ -20,7 +20,8 @@
  *  2. игроцкий клиент `/` — та же сборка и тот же документ с той же CSP, что у игрока;
  *  3. сокеты страницы идут через `page.routeWebSocket`: смоук видит каждое соединение и
  *     каждое сообщение, а обрыв устраивает сам, не трогая сервер;
- *  4. позывной → хаб → обозреватель партий → свой мир → «В бой»: место принято, мир пришёл;
+ *  4. позывной → хаб → обозреватель партий → свой мир → «В бой»: место принято, мир пришёл
+ *     в той же странице, без перезагрузки;
  *  5. приказ из интерфейса (исследование) — сервер принял, ответ вернулся на экран;
  *  6. выход на обрыве: приказ без связи ложится в очередь, ‹ уводит в хаб, дозвона нет, и
  *     на новом входе из «Активных» (тот же документ) очередь не догоняет игрока;
@@ -109,7 +110,7 @@ page.on('console', (m) => {
   if (m.type() === 'error' && !m.text().includes('Content Security Policy'))
     consoleErrors.push(m.text());
 });
-/** Нарушения CSP за весь прогон, через все документы (вход в партию — навигация). */
+/** Нарушения CSP за весь прогон, через все документы. */
 const cspSeen = [];
 await page.exposeFunction('__cspReport', (v) => cspSeen.push(v));
 await page.addInitScript(() => {
@@ -240,8 +241,17 @@ try {
     );
     assert(free.length > 0, 'в партии есть свободный мир');
     await page.locator(`#setupmap [data-cand="${free[0]}"]`).click();
-    await Promise.all([page.waitForURL(/\/game\//), page.click('#setupgo')]);
-    await until('впуск в партию', async () => (await overlay()) === 'none');
+    // Вход идёт в ЭТОЙ странице (плейтест 2026-10-17: игра открывалась отдельной страницей
+    // поверх меню): метка документа переживает вход, а адрес партии встаёт в строку.
+    await page.evaluate(() => (window.__sameDoc = true));
+    await page.click('#setupgo');
+    await until('впуск в партию', () => !!welcomeOf(live()[0]));
+    await page.waitForURL(/\/game\//);
+    await until('карта после входа', async () =>
+      (await overlay()) === 'none' &&
+      (await page.evaluate(() => getComputedStyle(document.getElementById('setup')).display)) === 'none',
+    );
+    assert.equal(await page.evaluate(() => window.__sameDoc), true, 'вход без перезагрузки страницы');
 
     const first = live()[0];
     const welcome = welcomeOf(first);
