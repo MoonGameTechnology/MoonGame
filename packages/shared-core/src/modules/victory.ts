@@ -14,6 +14,7 @@ import { isForkSite } from '../state/forkSite';
 import { getStance } from '../state/diplomacy';
 import { isOrdnanceFleet } from '../state/ordnance';
 import { hasFixedSides } from '../action/matchMode';
+import { recordValues } from '../util/records';
 
 /** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
  *  pinned to them by test instead of to copied literals — the same fact now lives in
@@ -59,7 +60,7 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
     scores[playerId] = emptyScore();
   }
 
-  for (const planet of Object.values(h.state.planets)) {
+  for (const planet of recordValues(h.state.planets)) {
     // Крепость на развилке — космический юнит, а не территория (FORT-6.1): провинцией её
     // не считают ни в счёте, ни в выбывании. Иначе игрок, потерявший последнюю планету,
     // жил бы за счёт одной крепости на дороге, которую ещё и не захватить.
@@ -92,7 +93,7 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
     tallyUnits(score, planet.garrison);
   }
 
-  for (const fleet of Object.values(h.state.fleets)) {
+  for (const fleet of recordValues(h.state.fleets)) {
     const score = scores[fleet.owner];
     // Мина — ловушка, а не войско (решение владельца 2026-09-30, SM-3.6): не держит игрока
     // в живых и не идёт в счёт флотов. Летящая ракета — тоже (SM-3.7b).
@@ -105,7 +106,7 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
   }
   // Десант на плацдарме — войска штурмующего, на чьей бы земле он ни стоял (замечание
   // Codex на #1392: с MSB-9 весь штурмующий десант живёт плацдармом до конца боя).
-  for (const planet of Object.values(h.state.planets)) {
+  for (const planet of recordValues(h.state.planets)) {
     for (const b of planet.beachheads ?? []) {
       const score = scores[b.owner];
       if (score) tallyUnits(score, b.units);
@@ -517,7 +518,7 @@ function evaluateVictory(h: HandlerContext): void {
   // O(players × planets) — evaluateVictory runs on every time.advanced span).
   let capturableCount = 0;
   const ownedCapturable = new Map<PlayerId, number>();
-  for (const p of Object.values(h.state.planets)) {
+  for (const p of recordValues(h.state.planets)) {
     if (!isCapturable(h.ctx.data, p) || isForkSite(p)) continue;
     capturableCount += 1;
     if (p.owner !== null) ownedCapturable.set(p.owner, (ownedCapturable.get(p.owner) ?? 0) + 1);

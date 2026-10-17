@@ -3,6 +3,7 @@ import { defHasTrait } from '../data/traits';
 import type { Fleet, GameState } from './gameState';
 import { fleetPositionAt } from './fleetPosition';
 import { deepClone } from '../util/clone';
+import { recordValues } from '../util/records';
 
 export const MINE_SIGNATURE = 0.1;
 export const MINE_DETECTION_RANGE = 24;
@@ -70,7 +71,7 @@ export function mineFleetVisible(state: GameState, mine: Fleet, viewer: string, 
   const at = fleetPositionAt(state, mine, state.time);
   if (!at) return false;
   const reach = mineDetectionRange(mine, data);
-  return Object.values(state.fleets).some((f) => {
+  return recordValues(state.fleets).some((f) => {
     if (f.owner !== viewer || !f.units.some((u) => u.count > 0)) return false;
     if (isMineFleet(f, data) || isMissileFleet(f, data)) return false;
     const pos = fleetPositionAt(state, f, state.time);

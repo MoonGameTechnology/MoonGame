@@ -13,8 +13,8 @@ import {
   mosaicFrame,
   type MosaicSeed,
 } from './mosaic';
-import { FORK_AT, FORK_DETOUR, deriveRoads, type RoadInput } from './roads';
-import type { PlanetRoads, RoadPoint } from './gameState';
+import { FORK_AT, FORK_DETOUR, bypassFork, deriveRoads, forkToward, type RoadInput } from './roads';
+import type { GameState, PlanetRoads, RoadPoint } from './gameState';
 import { createKernel } from '../kernel/kernel';
 import { deepClone } from '../util/clone';
 
@@ -276,6 +276,30 @@ describe('ROADS-1 — сеть приезжает в состояние', () => 
     expect(r.state).not.toBe(state);
     for (const id of ids) expect(r.state.planets[id]!.roads).toBe(state.planets[id]!.roads);
     expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('развилки общей сети запоминаются — и ответы те же, что у сети из JSON', () => {
+    const map = parseMatchMap(JSON.parse(readFileSync(new URL('pve-2.json', mapsDir), 'utf8')));
+    const shared = buildStateFromMap(map, data);
+    // JSON снимает метку общей сети: такую сеть ищут заново на каждый вопрос, как прежде.
+    const plain = JSON.parse(JSON.stringify(shared)) as GameState;
+    let forks = 0;
+    let bypasses = 0;
+    for (const at of Object.keys(shared.planets)) {
+      const exits = Object.keys(shared.planets[at]!.roads?.crossings ?? {});
+      for (const toward of [...exits, 'NOWHERE']) {
+        const fork = forkToward(shared, at, toward);
+        expect(fork).toEqual(forkToward(plain, at, toward));
+        expect(forkToward(shared, at, toward)).toBe(fork); // второй вопрос — та же точка
+        if (fork) forks += 1;
+        for (const to of exits) {
+          const bypass = bypassFork(shared, at, toward, to);
+          expect(bypass).toEqual(bypassFork(plain, at, toward, to));
+          if (bypass) bypasses += 1;
+        }
+      }
+    }
+    expect([forks > 0, bypasses > 0]).toEqual([true, true]);
   });
 
   it('та же карта — та же сеть, байт в байт', () => {

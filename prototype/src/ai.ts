@@ -781,11 +781,14 @@ function baseAiOrders(
   );
   // Отстаю ли я по очкам провинций от кого-то из живых соперников (охота отстающего,
   // см. `huntWeight`). Тот же счёт ниже решает объявление войны.
-  const provinceTotal = (who: string): number =>
-    Object.values(state.planets).reduce(
-      (s, p) => (p.owner === who ? s + provinceScore(data, p) : s),
-      0,
-    );
+  // Счёт всех владельцев одним проходом по карте, в том же порядке сложения: прежде карту
+  // обходили заново на каждого соперника, и на FFA-50 это было ~6 мс кадра на ×10.
+  const provinceTotals = new Map<string, number>();
+  for (const p of Object.values(state.planets)) {
+    if (p.owner !== null)
+      provinceTotals.set(p.owner, (provinceTotals.get(p.owner) ?? 0) + provinceScore(data, p));
+  }
+  const provinceTotal = (who: string): number => provinceTotals.get(who) ?? 0;
   const myProvinces = provinceTotal(ai);
   const trailing = Object.keys(state.players).some(
     (pid) =>

@@ -58,10 +58,20 @@ function seed(h: HandlerContext): void {
         return JSON.stringify([p.fleetId, p.moduleId]);
       }),
   );
-  for (const fleetId of Object.keys(h.state.fleets).sort()) {
+  // Only a growth organ (`brood`) is ever armed, so only fleets fitted with one are walked,
+  // in the same id order: the list of all fleets was sorted and every module of every
+  // fleet checked on each time span, though almost none of them grow anything.
+  const growing: string[] = [];
+  for (const fleetId of Object.keys(h.state.fleets)) {
+    const fleet = h.state.fleets[fleetId]!;
+    if (fleet.units.some((s) => s.modules?.some((m) => h.ctx.data.modules[m]?.brood)))
+      growing.push(fleetId);
+  }
+  for (const fleetId of growing.sort()) {
     const fleet = h.state.fleets[fleetId]!;
     const modules = [...new Set(fleet.units.flatMap((s) => s.modules ?? []))].sort();
     for (const moduleId of modules) {
+      if (!h.ctx.data.modules[moduleId]?.brood) continue;
       if (!pending.has(JSON.stringify([fleetId, moduleId]))) arm(fleet, moduleId, h);
     }
   }

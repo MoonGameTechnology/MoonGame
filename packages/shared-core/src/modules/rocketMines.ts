@@ -39,6 +39,7 @@ import {
   PD_COOLDOWN_MINUTES,
 } from '../util/pointDefense';
 import { canAfford, payCost } from '../util/treasury';
+import { recordValues } from '../util/records';
 
 /** Radar returns coordinates only. No hidden fleet ID is stored in a missile. */
 function targetPoint(
@@ -58,7 +59,7 @@ function targetPoint(
     );
   const emitters: SignalEmitter[] = [];
   const confirmed: { x: number; y: number; id: string }[] = [];
-  for (const fleet of Object.values(h.state.fleets)) {
+  for (const fleet of recordValues(h.state.fleets)) {
     if (fleet.owner === mine.owner) continue; // свой отряд целью не бывает (стойка «союз»)
     const at = fleetPositionAt(h.state, fleet, h.ctx.now);
     if (!at || !inRadius(at, position, def.radarRange)) continue;
@@ -288,10 +289,10 @@ function quietUntil(
   first: number,
   limit: number,
 ): number {
-  for (const planet of Object.values(h.state.planets))
+  for (const planet of recordValues(h.state.planets))
     if (inRadius(planet.position, position, def.radarRange)) return first;
   let wake = limit;
-  for (const fleet of Object.values(h.state.fleets)) {
+  for (const fleet of recordValues(h.state.fleets)) {
     const at = wakeFor(h, mine, position, def, fleet, first, wake);
     if (at !== null) wake = at;
     if (wake === first) break;

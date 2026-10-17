@@ -1232,6 +1232,19 @@ describe('зрение — только круги (решение владел�
     expect([...all.get('p1')!.identify]).toEqual([...all.get('p3')!.identify]); // союз делит зрение
   });
 
+  it('сетка прошлого вызова служит, пока миры те же: новый и заменённый мир видны сразу', () => {
+    const st = circlesState();
+    expect(sensorCoverage(st, 'p1', data).identify.has('NEAR_UNLINKED')).toBe(true);
+    // Станция ставит новый мир в запись посреди хода — в то же состояние.
+    st.planets.STATION = planet('STATION', null, [], at(50));
+    expect(sensorCoverage(st, 'p1', data).identify.has('STATION')).toBe(true);
+    // Мир заменён объектом на другом месте, число миров то же.
+    st.planets.NEAR_UNLINKED = planet('NEAR_UNLINKED', null, [], at(3000));
+    expect(sensorCoverage(st, 'p1', data).identify.has('NEAR_UNLINKED')).toBe(false);
+    st.planets.NEAR_UNLINKED = planet('NEAR_UNLINKED', null, [], at(100));
+    expect(sensorCoverage(st, 'p1', data).identify.has('NEAR_UNLINKED')).toBe(true);
+  });
+
   it('сломанные числа читаются как общие целиком — карта не слепнет от опечатки', () => {
     for (const sight of [
       { world: -1, fleet: 40, radarScale: 1 },

@@ -93,6 +93,7 @@ import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types'
 import { MS_PER_HOUR } from '../util/time';
 import { deepClone } from '../util/clone';
 import { dockHullRate, fleetAtOwnDock, fleetHangarRepairRate } from '../util/repair';
+import { recordValues } from '../util/records';
 import { battleLocations } from '../state/battle';
 
 /** Доля огня цели-ФЛОТА, которой она огрызается на удар челноков (ROS-2.2, §0.2).
@@ -2538,14 +2539,14 @@ export const shuttleModule: GameModule = {
       // Вид базы собирается только там, где есть ангар (`withHangar`): пустой ангар
       // пропускался и раньше, а вид на каждый мир и флот стоил на каждом отрезке времени.
       const bases: BaseView[] = [
-        ...Object.values(h.state.planets)
+        ...recordValues(h.state.planets)
           .filter(withHangar)
           .map((planet) => ({
             ...planetBase(planet, h.ctx.data),
             // Ничей мир не держит ангар: вместимость нейтрального мира читается как 0.
             bay: planet.owner === null ? 0 : planetBase(planet, h.ctx.data).bay,
           })),
-        ...Object.values(h.state.fleets)
+        ...recordValues(h.state.fleets)
           .filter(withHangar)
           .map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];
@@ -2587,13 +2588,13 @@ export const shuttleModule: GameModule = {
           else delete sq.damage;
         }
       };
-      for (const planet of Object.values(h.state.planets)) {
+      for (const planet of recordValues(h.state.planets)) {
         if (!planet.hangar?.length || planet.owner === null || fighting.has(planet.id)) continue;
         mend(planet.hangar, dockHullRate(planet, data));
       }
       // Флот чинит свой ангар ремонтным модулем ВЕЗДЕ вне боя (SHU-5.4), у дока — сверх
       // темпа дока.
-      for (const fleet of Object.values(h.state.fleets)) {
+      for (const fleet of recordValues(h.state.fleets)) {
         if (!fleet.hangar?.length || fleet.battleId) continue;
         if (fleet.location !== null && fighting.has(fleet.location)) continue;
         const docked =
@@ -2646,9 +2647,10 @@ export const shuttleModule: GameModule = {
     api.on('time.advanced', (_event, h: HandlerContext) => {
       const strikes = h.state.strikes ?? [];
       const data = h.ctx.data;
-      const mines = Object.values(h.state.fleets).filter((f) => isMineFleet(f, data));
+      const mines = recordValues(h.state.fleets).filter((f) => isMineFleet(f, data));
       if (strikes.length === 0 && mines.length === 0) return;
-      const missiles = mines.length > 0 ? Object.values(h.state.fleets).filter((f) => isMissileFleet(f, data)) : [];
+      const missiles =
+        mines.length > 0 ? recordValues(h.state.fleets).filter((f) => isMissileFleet(f, data)) : [];
       const seenMines = new Map<string, Set<string>>();
       const minesSeenBy = (owner: string): Set<string> => {
         let seen = seenMines.get(owner);
@@ -2660,7 +2662,7 @@ export const shuttleModule: GameModule = {
       };
       const cooldownMs = (PD_COOLDOWN_MINUTES / 60) * hourMs(h);
 
-      for (const fleet of Object.values(h.state.fleets)) {
+      for (const fleet of recordValues(h.state.fleets)) {
         const pd = fleetPointDefense(fleet, data);
         if (pd <= 0) continue;
         if (fleet.battleId) continue; // в бою зональное ПВО — часть боя
@@ -2766,10 +2768,10 @@ export const shuttleModule: GameModule = {
       const data = h.ctx.data;
       // Без машин в ангаре перехватывать нечем (сила 0 ниже), поэтому вид базы — только там.
       const bases: BaseView[] = [
-        ...Object.values(h.state.planets)
+        ...recordValues(h.state.planets)
           .filter(withHangar)
           .map((planet) => planetBase(planet, data)),
-        ...Object.values(h.state.fleets)
+        ...recordValues(h.state.fleets)
           .filter(withHangar)
           .map((fleet) => fleetBase(fleet, h.state, data, h.ctx.now)),
       ];
@@ -2838,10 +2840,10 @@ export const shuttleModule: GameModule = {
       const rearming = (holder: { sortie?: { rearming: number } }): boolean =>
         !!holder.sortie && !(holder.sortie.rearming <= 0);
       const bases: BaseView[] = [
-        ...Object.values(h.state.planets)
+        ...recordValues(h.state.planets)
           .filter(rearming)
           .map((planet) => planetBase(planet, h.ctx.data)),
-        ...Object.values(h.state.fleets)
+        ...recordValues(h.state.fleets)
           .filter(rearming)
           .map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];

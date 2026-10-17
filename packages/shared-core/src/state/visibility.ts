@@ -3,6 +3,7 @@ import { observedSwarm } from './swarmIntel';
 import { deepClone } from '../util/clone';
 import { peekValues } from '../util/draft';
 import { effectiveStat } from '../util/loadout';
+import { recordValues } from '../util/records';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
@@ -310,7 +311,7 @@ function circlesByOwner(
   patrolEyes(state, byOwner);
   // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
   // light a full-identify zone around their target node until it expires.
-  for (const hero of Object.values(state.heroes ?? {})) {
+  for (const hero of recordValues(state.heroes ?? {})) {
     if (!byOwner.has(hero.owner) || hero.alive !== true) continue; // deployed only (BF-24)
     for (const r of hero.activeReveals ?? []) {
       const at = state.planets[r.center]?.position;
@@ -511,6 +512,48 @@ function cellKey(cx: number, cy: number): number {
   return cx * 0x100000 + cy;
 }
 
+/** Миры на сетке `sensorCoverageOf`: координаты плоскими массивами и номера миров по клеткам. */
+interface PlanetGrid {
+  planets: readonly Planet[];
+  xs: Float64Array;
+  ys: Float64Array;
+  cells: Map<number, number[]>;
+}
+
+/** Сетка прошлого вызова. Ход мира правит одну копию состояния на весь вызов, и память
+ *  тумана за кадр спрашивает зрение десяток раз по тем же мирам. */
+let lastGrid: PlanetGrid | null = null;
+
+/** Сетка миров `planets`. Те же объекты миров в том же порядке — та же сетка: мир на карте
+ *  не двигается, а заменённый или новый мир (станция) — уже другой объект. */
+function planetGrid(planets: readonly Planet[]): PlanetGrid {
+  const last = lastGrid;
+  if (
+    last &&
+    last.planets.length === planets.length &&
+    planets.every((p, i) => p === last.planets[i])
+  ) {
+    return last;
+  }
+  // Координаты миров — плоскими массивами: проверка круга читает их десятки тысяч раз за
+  // отрезок, и два перехода по ссылкам (мир → позиция) стоили дороже самой проверки.
+  const xs = new Float64Array(planets.length);
+  const ys = new Float64Array(planets.length);
+  const cells = new Map<number, number[]>();
+  planets.forEach((planet, i) => {
+    xs[i] = planet.position.x;
+    ys[i] = planet.position.y;
+    const key = cellKey(
+      Math.floor(planet.position.x / COVERAGE_CELL),
+      Math.floor(planet.position.y / COVERAGE_CELL),
+    );
+    const cell = cells.get(key);
+    if (cell) cell.push(i);
+    else cells.set(key, [i]);
+  });
+  return (lastGrid = { planets, xs, ys, cells });
+}
+
 /**
  * {@link sensorCoverage} для многих зрителей за один заход — те же множества в том же
  * порядке (порядке `state.planets`). Память тумана пишет каждого активного игрока на
@@ -529,23 +572,8 @@ export function sensorCoverageOf(
   viewerIds: readonly PlayerId[],
   data: GameData,
 ): Map<PlayerId, Coverage> {
-  const planets = Object.values(state.planets);
-  // Координаты миров — плоскими массивами: проверка круга читает их десятки тысяч раз за
-  // отрезок, и два перехода по ссылкам (мир → позиция) стоили дороже самой проверки.
-  const xs = new Float64Array(planets.length);
-  const ys = new Float64Array(planets.length);
-  const cells = new Map<number, number[]>();
-  planets.forEach((planet, i) => {
-    xs[i] = planet.position.x;
-    ys[i] = planet.position.y;
-    const key = cellKey(
-      Math.floor(planet.position.x / COVERAGE_CELL),
-      Math.floor(planet.position.y / COVERAGE_CELL),
-    );
-    const cell = cells.get(key);
-    if (cell) cell.push(i);
-    else cells.set(key, [i]);
-  });
+  const planets = recordValues(state.planets);
+  const { xs, ys, cells } = planetGrid(planets);
   const blocs = viewerIds.map((viewerId) => visionBloc(state, viewerId));
   const byOwner = circlesByOwner(
     state,
