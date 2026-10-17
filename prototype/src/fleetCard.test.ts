@@ -3,11 +3,13 @@
  *
  * Карточка рисует свой флот (корпус и щит, параметры, метки эффектов, плитки состава, трюм,
  * маршрут, удар по миру и сводку армии рядом), чужой флот (без приказов, неопознанный — одной
- * сигнатурой), консоль ПК, паспорта мин и ракеты и карточку группы, а мир, место, имена,
- * открытую сводку, окно консоли, видимые мины, часы и имя флота берёт у игры хуками. Здесь
+ * сигнатурой), консоль ПК, паспорта мин и ракеты, карточку группы, карточку эскадры в
+ * воздухе и всплывашку надбавок, а мир, место, имена, открытую сводку, окно консоли, видимые
+ * мины, часы, имя флота, эскадру вылета, флот листа и досье берёт у игры хуками. Здесь
  * проверено то, что текстом не проверить: какая карточка достаётся какому флоту, что видно
- * своему и чужому, когда горят ремонт, мины и метки и куда ведут плитки. Каждый тест —
- * свежая загрузка модуля над своим миром. В конце — стык с `main.ts`.
+ * своему и чужому, когда горят ремонт, мины и метки, куда ведут плитки, какой приказ и какие
+ * кнопки у эскадры в воздухе и когда всплывашка открыта. Каждый тест — свежая загрузка
+ * модуля над своим миром. В конце — стык с `main.ts`.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -19,8 +21,11 @@ import {
   type GameState,
   type Planet,
   type Player,
+  type ShuttleStrike,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
+import { statSourceKey } from '../../decisions/statModifiers';
+import type { Dossier } from './dossiers';
 import type { SectorType } from './map';
 import { HOUR } from './time';
 
@@ -110,6 +115,8 @@ async function boot(over: Record<string, unknown> = {}) {
     march: [] as string[],
     troops: [] as string[],
     run: false,
+    panel: null as string | null,
+    relocate: false,
     ...over,
   };
 
@@ -117,7 +124,7 @@ async function boot(over: Record<string, unknown> = {}) {
   // них только эти ответы.
   vi.doMock('./graphicsPrefs', () => ({ pcUi: () => env.pc }));
   vi.doMock('./interaction', () => ({ squadMerge: null, troopsPlan: null }));
-  vi.doMock('./mapAim', () => ({ squadronRelocateSpots: () => [] }));
+  vi.doMock('./mapAim', () => ({ squadronRelocateSpots: () => (env.relocate ? [{}] : []) }));
   vi.doMock('./mapFog', () => ({
     fleetKnown: (f: Fleet) => !env.unknown.includes(f.id),
     fleetNode: (f: Fleet) => f.location,
@@ -171,6 +178,15 @@ async function boot(over: Record<string, unknown> = {}) {
     mapNow: () => env.s.time,
     fleetTitleOf: (id) => `Флот «${id}»`,
     sectorType: (id) => env.types[id],
+    strikeSquadron: (st) => ({
+      id: st.squadronId,
+      units: st.units,
+      ...(st.cargo ? { cargo: st.cargo } : {}),
+    }),
+    strikeFrom: (st) =>
+      st.base.kind === 'planet' ? { planetId: st.base.id } : { fleetId: st.base.id },
+    panelFleet: () => env.panel,
+    dossier: (key) => ({ name: `досье ${key}`, body: '' }) as Dossier,
   });
   /** Карточка флота по id. */
   const card = (id: string): string => m.fleetPanelHtml(env.s.fleets[id]!);
@@ -598,6 +614,365 @@ describe('плитки и надбавки', () => {
   });
 });
 
+/** Свой вылет: три перехватчика с мира A бьют флот F2, долетят через час. */
+const strike = (id: string, extra: Partial<ShuttleStrike> = {}): ShuttleStrike =>
+  ({
+    id,
+    owner: 'p1',
+    base: { kind: 'planet', id: 'A' },
+    squadronId: `sq:${id}`,
+    units: [{ unit: 'interceptor', count: 3 }],
+    target: { kind: 'fleet', id: 'F2' },
+    to: { x: 10, y: 0 },
+    departedAt: 10 * HOUR,
+    arrivesAt: 11 * HOUR,
+    leg: 'out',
+    ...extra,
+  }) as ShuttleStrike;
+
+describe('эскадра в воздухе', () => {
+  /** Кнопка приказа вылета: действие и адрес — id вылета. */
+  const order = (name: string, id: string): string => `${act(name)} data-arg="${id}"`;
+
+  it('удар по флоту: позывной в шапке, приказ, срок под живой патч и кнопки', async () => {
+    const { m } = await boot();
+    const sp = await import('./squadronPanel');
+    const { timeLeft } = await import('./worldQueries');
+    const st = strike('S1');
+    expect(m.strikeTitle(st)).toBe(
+      `${t(sp.SQUADRON_KIND_KEY)} «${sp.squadronCallsignOf('sq:S1')}»`,
+    );
+    const html = m.aloftPanelHtml(st);
+    expect(html).toContain(m.strikeTitle(st));
+    expect(html).toContain('background:#side-p1');
+    expect(html).toContain('data-codex="u:interceptor"');
+    expect(sub(html)).toBe(t('side.aloft.sub'));
+    expect(html).toContain(`<b>${t('side.aloft.order.strike', { name: 'Флот «F2»' })}</b>`);
+    expect(html).toContain(
+      `${t('side.aloft.until.target')} <span class="pn-timer" data-at="${11 * HOUR}">${timeLeft(11 * HOUR)}</span>`,
+    );
+    for (const a of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingrecall'])
+      expect(html).toContain(order(a, 'S1'));
+    // Сесть некуда — перелёта нет; патруля нет — нечего и держать.
+    expect(html).not.toContain(act('aloftrelocate'));
+    expect(html).not.toContain(act('wingkeep'));
+    expect(html).not.toContain(t('side.aloft.returning'));
+  });
+
+  it('чужой вылет карточки не даёт', async () => {
+    const { m } = await boot();
+    expect(m.aloftPanelHtml({ ...strike('S1'), owner: 'p2' })).toBe(
+      `<div class="hint">${t('side.empty')}</div>`,
+    );
+  });
+
+  it('высадка: груз в шапке, приказ «высадить» по имени мира, патруля с грузом нет', async () => {
+    const { m, env } = await boot();
+    const { worldName } = await import('./planetName');
+    const html = m.aloftPanelHtml(
+      strike('S2', {
+        units: [{ unit: 'landing_shuttle', count: 2 }],
+        cargo: [{ unit: 'militia', count: 4 }],
+        target: { kind: 'planet', id: 'N' },
+      }),
+    );
+    expect(sub(html)).toBe(`${t('side.aloft.sub')} · ${t('side.wing.cargo', { n: 4 })}`);
+    expect(html).toContain(t('side.aloft.order.land', { name: worldName(env.s, 'N') }));
+    expect(html).not.toContain(act('aloftpatrol'));
+  });
+
+  it('удар по миру — приказ «удар» по имени мира', async () => {
+    const { m, env } = await boot();
+    const { worldName } = await import('./planetName');
+    const html = m.aloftPanelHtml(
+      strike('S3', { units: [{ unit: 'bomber', count: 2 }], target: { kind: 'planet', id: 'N' } }),
+    );
+    expect(html).toContain(t('side.aloft.order.strike', { name: worldName(env.s, 'N') }));
+  });
+
+  it('потрёпанная эскадра — корпус в шапке', async () => {
+    const { m } = await boot();
+    const { aloftCard } = await import('../../decisions/aloftCard');
+    const { data } = await import('./game');
+    const st = strike('S4', { damage: 10 });
+    const hull = aloftCard(st, { me: 'p1', data, relocate: false, split: true })!.hull;
+    expect(hull).not.toBeNull();
+    expect(sub(m.aloftPanelHtml(st))).toBe(
+      `${t('side.aloft.sub')} · ${t('side.wing.hull', { p: hull! })}`,
+    );
+  });
+
+  it('патруль: путь к точке, висение, «держать» и его снятие', async () => {
+    const { m } = await boot();
+    const patrol = { hours: 3, radius: 40 };
+    const out = m.aloftPanelHtml(strike('P1', { target: { kind: 'point' }, patrol }));
+    expect(out).toContain(`<b>${t('side.aloft.order.patrol-out')}</b>`);
+    expect(out).toContain(t('side.aloft.until.point'));
+    expect(out).toContain(`${order('wingkeep', 'P1')} >${t('side.wing.keep')}</button>`);
+    const held = m.aloftPanelHtml(
+      strike('P2', { target: { kind: 'point' }, leg: 'patrol', patrol: { ...patrol, hold: true } }),
+    );
+    expect(held).toContain(`<b>${t('side.aloft.order.patrol')}</b>`);
+    expect(held).toContain(t('side.aloft.until.patrol'));
+    expect(held).toContain(`${order('wingkeep', 'P2')} >${t('side.wing.keep.off')}</button>`);
+  });
+
+  it('повернувшая домой: строка о возврате, бить и отзывать нечего', async () => {
+    const { m, env } = await boot();
+    const { worldName } = await import('./planetName');
+    const html = m.aloftPanelHtml(strike('H1', { leg: 'back' }));
+    expect(html).toContain(t('side.aloft.order.home', { name: worldName(env.s, 'A') }));
+    expect(html).toContain(t('side.aloft.until.land'));
+    expect(html).toContain(`<div class="row dim">${t('side.aloft.returning')}</div>`);
+    for (const a of ['aloftstrike', 'aloftpatrol', 'wingrecall'])
+      expect(html).not.toContain(act(a));
+  });
+
+  it('перелёт на корабль — по имени флота; кнопка — когда игре есть куда сесть', async () => {
+    const { m, env } = await boot();
+    const st = strike('H2', {
+      leg: 'back',
+      target: { kind: 'base' },
+      base: { kind: 'fleet', id: 'F1' },
+    });
+    expect(m.aloftPanelHtml(st)).toContain(t('side.aloft.order.relocate', { name: 'Флот «F1»' }));
+    expect(m.aloftPanelHtml(st)).not.toContain(act('aloftrelocate'));
+    env.relocate = true;
+    expect(m.aloftPanelHtml(st)).toContain(order('aloftrelocate', 'H2'));
+  });
+
+  it('одну машину делить нечего; без кнопок ряда нет', async () => {
+    const { m } = await boot();
+    expect(
+      m.aloftPanelHtml(strike('S5', { units: [{ unit: 'interceptor', count: 1 }] })),
+    ).not.toContain(act('aloftsplit'));
+    const lone = m.aloftPanelHtml(
+      strike('H3', { leg: 'back', units: [{ unit: 'interceptor', count: 1 }] }),
+    );
+    expect(lone).not.toMatch(/data-act="(?:aloft|wing)/);
+    expect(lone.endsWith(`<div class="row dim">${t('side.aloft.returning')}</div>`)).toBe(true);
+  });
+});
+
+/** Узлы всплывашки и листа без браузера: параметры `stats` стоят в разметке листа, параметр
+ *  на высоте `top` экрана высотой `vh`. У всплывашки рамка в 2 px: 80 содержимого, 82 целиком. */
+function fakeDom(stats: string[], { top = 715, vh = 800 } = {}) {
+  const classes = new Set<string>();
+  const pop = {
+    innerHTML: '',
+    style: {} as Record<string, string>,
+    dataset: {} as Record<string, string>,
+    classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+    replaceChildren() {
+      this.innerHTML = '';
+    },
+    offsetHeight: 82,
+    clientHeight: 80,
+    offsetWidth: 200,
+    scrollHeight: 80,
+  };
+  const anchor = { getBoundingClientRect: () => ({ left: 100, top, width: 60, height: 20 }) };
+  const side = {
+    style: { display: 'flex' },
+    querySelector: (sel: string) =>
+      stats.some((k) => sel === `[data-stat="${k}"]`) ? anchor : null,
+  };
+  const listeners: { type: string; fn: (ev: unknown) => void; capture: unknown }[] = [];
+  vi.stubGlobal('document', {
+    getElementById: (id: string) => (id === 'statpop' ? pop : id === 'side' ? side : null),
+    addEventListener: (type: string, fn: (ev: unknown) => void, capture: unknown) =>
+      listeners.push({ type, fn, capture }),
+  });
+  vi.stubGlobal('innerWidth', 1280);
+  vi.stubGlobal('innerHeight', vh);
+  /** Нажатие на узел, который подходит под селектор `hit`; `null` — мимо всего. */
+  const press = (hit: string | null) =>
+    listeners[0]!.fn({
+      target: {
+        closest: (sel: string) =>
+          hit !== null && sel.split(',').some((x) => x.trim() === hit) ? {} : null,
+      },
+    });
+  return { pop, side, listeners, shown: () => classes.has('show'), press };
+}
+
+describe('всплывашка надбавок', () => {
+  it('атака своего флота — число как в окне, база и строки надбавок от ядра', async () => {
+    const { m, env } = await boot();
+    const { fleetSummary } = await import('./fleetSummary');
+    const { termBody } = await import('./termTip');
+    const { data } = await import('./game');
+    const f = env.s.fleets.F1!;
+    const mods = m.fleetStatModsOf(f)!;
+    const raw = fleetSummary(f, data, env.s.time).attack.capped;
+    const v = m.statPopModel(f, 'atk');
+    expect(v.title).toBe('досье stat:atk');
+    expect(v.desc).toBe(termBody('attack'));
+    expect(v.value).toBe(String(m.shownFire(raw, mods)));
+    expect(v.base).toBe(String(raw));
+    expect(v.tone).toBe(mods.fire.tone);
+    expect(v.plain).toBeUndefined();
+    // Источник надбавки ядро называет само (здесь — сектор), подпись — по его ключу.
+    expect(mods.fire.sources.length).toBeGreaterThan(0);
+    expect(v.rows).toEqual(
+      mods.fire.sources.map((x) => ({ label: t(statSourceKey(x.source)), pct: x.pct })),
+    );
+    expect(v.total).toBe((mods.fire.factor - 1) * 100);
+    const def = m.statPopModel(f, 'def');
+    expect(def.desc).toBe(termBody('defense'));
+    expect(def.base).toBe(String(fleetSummary(f, data, env.s.time).defense));
+  });
+
+  it('чужой флот — одно правило параметра, без строк ядра', async () => {
+    const { m, env } = await boot();
+    const { fleetSummary } = await import('./fleetSummary');
+    const { data } = await import('./game');
+    const f = env.s.fleets.F2!;
+    expect(m.statPopModel(f, 'atk')).toMatchObject({
+      value: String(fleetSummary(f, data, env.s.time).attack.capped),
+      tone: 'neutral',
+      rows: [],
+      total: null,
+      plain: true,
+    });
+  });
+
+  it('ход — с базой и надбавками от ядра', async () => {
+    const { m, env } = await boot();
+    const f = env.s.fleets.F1!;
+    const mods = m.fleetStatModsOf(f)!;
+    expect(m.statPopModel(f, 'spd')).toMatchObject({
+      value: String(Math.round(mods.speed.value)),
+      base: String(Math.round(mods.speed.base)),
+      rows: expect.any(Array),
+      total: (mods.speed.factor - 1) * 100,
+    });
+  });
+
+  it('корпус — «сейчас/всего» и входящий урон; щита нет — словами', async () => {
+    const { m, env } = await boot();
+    const { fleetSummary } = await import('./fleetSummary');
+    const { kfmt } = await import('./format');
+    const { data } = await import('./game');
+    const f = env.s.fleets.F1!;
+    const hull = fleetSummary(f, data, env.s.time).hull;
+    expect(m.statPopModel(f, 'hull')).toMatchObject({
+      value: `${kfmt(hull.cur)}/${kfmt(hull.max)}`,
+      sub: t('stat.pop.incoming'),
+      lessIsBetter: true,
+    });
+    expect(m.statPopModel(f, 'shield')).toMatchObject({
+      value: t('fleet.console.shield.none'),
+      plain: true,
+    });
+  });
+
+  it('линия огня — сколько бортов стреляет из предела', async () => {
+    const { m, env } = await boot();
+    const { COMBAT_UNIT_CAP } = await import('../../packages/shared-core/src/index');
+    expect(m.statPopModel(env.s.fleets.F1!, 'cap')).toMatchObject({
+      value: `2/${COMBAT_UNIT_CAP}`,
+      plain: true,
+    });
+  });
+
+  it('тап по параметру открывает всплывашку у него, повторный — закрывает', async () => {
+    const { m, env } = await boot({ panel: 'F1' });
+    const { statPopHtml } = await import('./fleetConsole');
+    const { anchoredPopover } = await import('../../decisions/anchoredPopover');
+    const dom = fakeDom(['atk', 'def']);
+    m.initStatPop();
+    m.toggleStatPop('atk');
+    expect(m.statPopOpen()).toBe(true);
+    expect(dom.shown()).toBe(true);
+    expect(dom.pop.innerHTML).toBe(statPopHtml(m.statPopModel(env.s.fleets.F1!, 'atk')));
+    // Высота — по содержимому плюс рамка, а не по наложенному пределу: у низа экрана
+    // всплывашка встаёт над параметром ровно на свою высоту.
+    const at = anchoredPopover(
+      { left: 100, top: 715, width: 60, height: 20 },
+      { width: 200, height: 82 },
+      { width: 1280, height: 800 },
+    );
+    expect(at.side).toBe('above');
+    expect(dom.pop.style.left).toBe(`${Math.round(at.left)}px`);
+    expect(dom.pop.style.top).toBe(`${Math.round(at.top)}px`);
+    expect(dom.pop.style.maxHeight).toBe(
+      at.maxHeight === null ? '' : `${Math.floor(at.maxHeight)}px`,
+    );
+    expect(dom.pop.dataset.side).toBe(at.side);
+    // Другой параметр — та же всплывашка с его содержимым.
+    m.toggleStatPop('def');
+    expect(dom.pop.innerHTML).toBe(statPopHtml(m.statPopModel(env.s.fleets.F1!, 'def')));
+    m.toggleStatPop('def');
+    expect(m.statPopOpen()).toBe(false);
+    expect(dom.shown()).toBe(false);
+    expect(dom.pop.innerHTML).toBe('');
+  });
+
+  it('места нет ни сверху, ни снизу — высота зажата пределом', async () => {
+    const { m } = await boot({ panel: 'F1' });
+    const { anchoredPopover } = await import('../../decisions/anchoredPopover');
+    const dom = fakeDom(['atk'], { top: 40, vh: 100 });
+    m.initStatPop();
+    m.toggleStatPop('atk');
+    const at = anchoredPopover(
+      { left: 100, top: 40, width: 60, height: 20 },
+      { width: 200, height: 82 },
+      { width: 1280, height: 100 },
+    );
+    expect(at.maxHeight).not.toBeNull();
+    expect(dom.pop.style.maxHeight).toBe(`${Math.floor(at.maxHeight!)}px`);
+  });
+
+  it('без флота в листе тап ничего не открывает', async () => {
+    const { m } = await boot();
+    const dom = fakeDom(['atk']);
+    m.initStatPop();
+    m.toggleStatPop('atk');
+    expect(m.statPopOpen()).toBe(false);
+    expect(dom.shown()).toBe(false);
+  });
+
+  it('ушёл флот из листа, параметр из разметки или спрятан лист — закрывается сама', async () => {
+    const { m, env } = await boot({ panel: 'F1' });
+    const dom = fakeDom(['atk']);
+    m.initStatPop();
+    m.toggleStatPop('spd');
+    expect(m.statPopOpen()).toBe(false);
+    m.toggleStatPop('atk');
+    env.panel = 'F2';
+    m.renderStatPop();
+    expect(m.statPopOpen()).toBe(false);
+    expect(dom.shown()).toBe(false);
+    env.panel = 'F1';
+    m.toggleStatPop('atk');
+    dom.side.style.display = 'none';
+    m.renderStatPop();
+    expect(m.statPopOpen()).toBe(false);
+  });
+
+  it('клик мимо закрывает, нажатие на параметр или подсказку термина — нет', async () => {
+    const { m } = await boot({ panel: 'F1' });
+    const dom = fakeDom(['atk']);
+    m.initStatPop();
+    expect(dom.listeners).toHaveLength(1);
+    expect(dom.listeners[0]).toMatchObject({ type: 'pointerdown', capture: true });
+    m.toggleStatPop('atk');
+    for (const hit of ['#statpop', '[data-stat]', '.termtip']) {
+      dom.press(hit);
+      expect(m.statPopOpen()).toBe(true);
+    }
+    dom.press(null);
+    expect(m.statPopOpen()).toBe(false);
+    expect(dom.shown()).toBe(false);
+    // Открытая заново — с содержимым: память прошлой разметки ушла вместе с ней.
+    m.toggleStatPop('atk');
+    expect(dom.pop.innerHTML).not.toBe('');
+    m.closeStatPop();
+    expect(m.statPopOpen()).toBe(false);
+  });
+});
+
 describe('стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
@@ -611,6 +986,10 @@ describe('стык с main.ts', () => {
       '  mapNow,\n',
       '  fleetTitleOf,\n',
       'sectorType: sectorTypeOf,',
+      '  strikeSquadron,\n',
+      '  strikeFrom,\n',
+      '  panelFleet,\n',
+      'dossier: (key) => objDossier(key),',
     ]) {
       expect(MAIN).toContain(hook);
     }
@@ -620,6 +999,16 @@ describe('стык с main.ts', () => {
     expect(MAIN).toContain("if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);");
     expect(MAIN).toContain("if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);");
     expect(MAIN).toContain('garrisonTiles: garrisonTilesHtml,');
+    expect(MAIN).toContain('if (aloft) return aloftPanelHtml(aloft);');
+  });
+
+  it('всплывашку main поднимает до подсказок терминов, держит листом и закрывает «Назад»', () => {
+    expect(MAIN.match(/\ninitStatPop\(\);/g)).toHaveLength(1);
+    expect(MAIN.indexOf('\ninitStatPop();')).toBeLessThan(MAIN.indexOf('\ninitTermTips();'));
+    // `renderPanel` зовёт её на обеих ветках: открытый лист и спрятанный.
+    expect(MAIN.match(/\n {4}renderStatPop\(\);\n {4}return;/g)).toHaveLength(1);
+    expect(MAIN.match(/\n {2}renderStatPop\(\);\n\}/g)).toHaveLength(1);
+    expect(MAIN).toContain("{ id: 'statpop', isOpen: statPopOpen, close: closeStatPop }");
   });
 
   it('копий карточки в main не осталось', () => {
@@ -640,6 +1029,16 @@ describe('стык с main.ts', () => {
       'function shownFire',
       'function groundRowsAt',
       'let statModsMemo',
+      'function strikeTitle',
+      'function strikeBaseName',
+      'function aloftOrderText',
+      'function aloftPanelHtml',
+      'function toggleStatPop',
+      'function closeStatPop',
+      'function statPopModel',
+      'function renderStatPop',
+      'let statPop',
+      "$('statpop')",
     ]) {
       expect(MAIN).not.toContain(gone);
     }
