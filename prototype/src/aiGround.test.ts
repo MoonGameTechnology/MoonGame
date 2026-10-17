@@ -190,8 +190,8 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
     const staged = withPlanet(s, home, { garrison: [{ unit: 'militia', count: 9 }] });
     const withFleet: GameState = {
       ...staged,
-      // scout: cargoCapacity 1
-      fleets: { 'f:small': fleetAt('f:small', home, [{ unit: 'scout', count: 1 }]) },
+      // frigate: cargoCapacity 1
+      fleets: { 'f:small': fleetAt('f:small', home, [{ unit: 'frigate', count: 1 }]) },
     };
     expect(loads(aiOrders(withFleet, 'p2', 'expand', 'strong')).reduce((n, l) => n + l.count, 0)).toBe(1);
   });
