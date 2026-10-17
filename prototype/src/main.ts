@@ -471,7 +471,7 @@ import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetI
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder, settleOrder } from './orderPipeline';
 import { startSimLink, workerPort, type SimLink } from './simLink';
-import { autoRetreatAt, cancelWarPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, restoreAutoAssault, soloAutoAssault, warPrompt } from './groupOrders';
+import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
   cancelMobileOrder,
   initCmdActions,
@@ -5165,10 +5165,10 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z50
   { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
-  // Проба по состоянию, а не по классу: `warPrompt` — источник истины, класс лишь его
+  // Проба по состоянию, а не по классу: `orderPromptOpen` (запрос войны или окно погрузки) — источник истины, класс лишь его
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
-  { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
+  { id: 'warprompt', isOpen: orderPromptOpen, close: () => cancelWarPrompt() }, // z48
   // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
   { id: 'abandon', isOpen: () => abandonCard.classList.contains('show'), close: () => closeAbandon() }, // z48
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
@@ -5990,6 +5990,8 @@ if (warPromptEl) {
   warPromptEl.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
     if (tg.classList.contains('wp-yes')) confirmWarPrompt();
+    else if (tg.classList.contains('lp-after')) confirmLoadPrompt('after');
+    else if (tg.classList.contains('lp-now')) confirmLoadPrompt('now');
     else if (tg.id === 'warprompt' || tg.classList.contains('wp-no')) cancelWarPrompt();
   });
 }

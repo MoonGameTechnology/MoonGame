@@ -15,9 +15,12 @@
 import type { Fleet, GameState } from './gameState';
 
 /** A fleet may run its next queued step only when idle — not in transit, not locked in
- *  a battle. (A fleet parked on a lane counts as idle; its next move routes from there.) */
+ *  a battle, not lifting or landing troops. (A fleet parked on a lane counts as idle; its
+ *  next move routes from there.) A lift or a landing is cancelled by departure
+ *  (`army.ts`), so a plan waits for it to finish: «после погрузки — туда» is a plan whose
+ *  head step runs once the hour is over, instead of a move that silently drops the troops. */
 export function fleetIdle(fleet: Fleet): boolean {
-  return !fleet.movement && !fleet.battleId;
+  return !fleet.movement && !fleet.battleId && !fleet.loading?.length && !fleet.unloading?.length;
 }
 
 /** One CC-1 chain step. `move` — fly to a world; `wait` — hold N game-hours;

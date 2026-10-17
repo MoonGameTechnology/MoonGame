@@ -24,6 +24,9 @@ export const RECAP_POLICY: Readonly<Record<string, RecapPolicy>> = {
   'unit.built': 'own',
   'army.load.cancelled': 'own',
   'army.unload.cancelled': 'own',
+  // FOG-LEAK: флот встал у закрытой границы — называет хозяина мира, которого игрок может
+  // не видеть, поэтому это только его новость.
+  'fleet.halted': 'own',
   'building.destroyed': 'seen',
   'fleet.launched': 'seen',
   // MSB-9: высадка на мир — событие КАРТЫ: защитнику это повод привести флот и сорвать её.

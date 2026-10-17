@@ -3175,6 +3175,12 @@ export const en: Record<string, string> = {
   'log.fleet.split': '⊟ fleet split at {at}',
   'log.fleet.split-transit': '⊟ fleet split under way',
   // AUDM-4: the fleet left before loading finished — the troops stayed in the garrison.
+  'loadprompt.title': 'Troops are loading',
+  'loadprompt.body': 'Loading or unloading is under way on {n} {n|fleet|fleets}, ≈{m} min left. Departing cancels it.',
+  'loadprompt.after': 'After loading',
+  'loadprompt.now': 'Cancel it and go',
+  'loadprompt.cancel': 'Cancel',
+  'log.fleet.halted': '⛔ {f} stopped at the border: {to} belongs to {who}, no right of way',
   'log.army.load-cancelled': '⚠ loading cancelled: the fleet left, {n}× {u} stayed at {at}',
   // MSB-9: unloading runs on a timer, and departure cancels it — the troops stay aboard.
   'log.army.unload-cancelled': '⚠ unloading cancelled: the fleet left, {n}× {u} stayed aboard at {at}',

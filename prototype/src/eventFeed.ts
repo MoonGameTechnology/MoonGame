@@ -463,6 +463,19 @@ export function handleEvents(events: DomainEvent[]) {
           p.planetId as string,
         );
         break;
+      case 'fleet.halted':
+        // FOG-LEAK: флот встал у закрытой границы, которой игрок не видел (или она закрылась
+        // в пути). Своё — строка называет хозяина чужого мира.
+        if (!admits('fleet.halted', p)) break;
+        note(
+          t('log.fleet.halted', {
+            f: game.fleetTitleOf(p.fleetId as string),
+            to: game.placeName(p.blocked as string),
+            who: NAME[p.blocker as string] ?? String(p.blocker),
+          }),
+          (p.at as string | null) ?? (p.blocked as string),
+        );
+        break;
       case 'army.unload.cancelled':
         // AUDM-4 и для выгрузки (MSB-9): вылет снял идущую выгрузку, десант остался на борту.
         if (!admits('army.unload.cancelled', p)) break;
