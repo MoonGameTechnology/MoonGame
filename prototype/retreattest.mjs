@@ -25,7 +25,9 @@ import {
   withDiagnostics,
 } from './harnessKit.mjs';
 
-const hooks = `window.__retreatTest = {
+// Приказ атаки нажимает лист (REFM-225): `main.ts` его больше не импортирует.
+const hooks = `import { engageFleet as __engageFleet } from './game';
+window.__retreatTest = {
   state: () => s,
   me: () => ME,
   ids: () => selectedFleetIds(),
@@ -40,7 +42,7 @@ const hooks = `window.__retreatTest = {
     mine.location = away; mine.movement = null;
     foe.location = away; foe.movement = null; foe.battleId = null;
     s.diplomacy = { ...(s.diplomacy ?? {}), [[ME, foe.owner].sort().join('|')]: 'war' };
-    playerOrder(engageFleet(ME, mine.id, foe.id));
+    playerOrder(__engageFleet(ME, mine.id, foe.id));
     return { mine: mine.id, home, away, battle: s.fleets[mine.id]?.battleId ?? null };
   },
   openBattle: (id) => battleWindow.open(id),

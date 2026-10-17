@@ -5,31 +5,34 @@
  * изменилась. Зона, которая поменяла мир, говорит «перерисуй» сбросом кэша, и раньше
  * делала это записью в чужую переменную: 27 копий `lastPanelHtml = ''` и 13 копий
  * `lastCmdHtml = ''`. Теперь это двери `invalidatePanel()` и `invalidateCmdBar()`, а кэш
- * уедет вместе со своей разметкой (REFM-225, REFM-226). Ломается это молча: новая
- * рукописная запись снова привяжет чужую зону к переменной, и переезд разметки упрётся в
- * неё. Компилятор такую запись не остановит, пока кэш живёт в `main.ts`.
+ * уехал вместе со своей разметкой (REFM-225, REFM-226). Ломается это молча: новая
+ * рукописная запись снова привяжет чужую зону к переменной. Импорт переменной компилятор
+ * присвоить не даст, но внутри модуля-хозяина ручную запись не остановит никто.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-// Ряд команд с его кэшем уехал к владельцу (`cmdBar.ts`, REFM-226).
+// Ряд команд с его кэшем уехал к владельцу (`cmdBar.ts`, REFM-226), лист — к своему
+// (`sidePanel.ts`, REFM-225).
 const BAR = readFileSync(new URL('./cmdBar.ts', import.meta.url), 'utf8');
+const PANEL = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
 const bodyIn = (src: string, name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
-const body = (name: string): string => bodyIn(SRC, name);
 const count = (text: string, re: RegExp): number => text.match(re)?.length ?? 0;
 
 describe('REFM-206 — перерисовка по имени', () => {
   it('кэш листа сбрасывает только дверь', () => {
-    expect(body('invalidatePanel')).toContain("lastPanelHtml = '';");
+    expect(bodyIn(PANEL, 'invalidatePanel')).toContain("lastPanelHtml = '';");
     // Кроме объявления и двери, переменную не присваивает никто.
-    expect(count(SRC, /(?<!let )\blastPanelHtml = /g)).toBe(1);
+    expect(count(PANEL, /(?<!let )\blastPanelHtml = /g)).toBe(1);
     // Свои два перехода (лист закрыт — забыть всё; перестроен — запомнить) лист делает сам,
     // внутри `renderPanel`, через `panelCache.ts`.
     const own = /panel: lastPanelHtml\b/g;
-    expect(count(body('renderPanel'), own)).toBe(2);
-    expect(count(SRC, own)).toBe(2);
+    expect(count(bodyIn(PANEL, 'renderPanel'), own)).toBe(2);
+    expect(count(PANEL, own)).toBe(2);
+    // У `main.ts` кэша листа больше нет: перерисовку он заказывает только дверью.
+    expect(SRC).not.toMatch(/\blastPanelHtml\b/);
   });
 
   it('кэш ряда команд сбрасывает только дверь, а нарисованное помнит только разметка ряда', () => {

@@ -53,7 +53,10 @@ window.__patrolTest = {
       home.hangar = deck;
       delete home.sortie;
       pickWorld(home.id);
-      planetTab = 'shuttle';
+      // Вкладка «Эскадрильи» — тапом, как у игрока: вкладка листа — состояние листа (REFM-225).
+      invalidatePanel();
+      renderPanel();
+      side.querySelector('[data-act="tab"][data-arg="shuttle"]').click();
     } else {
       const f = Object.values(s.fleets).find((x) => x.owner === ME && x.location);
       f.units = [{ unit: 'shuttle_carrier', count: 1 }];
@@ -65,7 +68,7 @@ window.__patrolTest = {
       id = f.id;
       setFleetSelection([f.id]);
     }
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
     // Центруем ПОСЛЕ панели: открытая панель сужает поле карты, и центр считается от него.
     centerOn(home.position, cam.scale);
@@ -93,7 +96,7 @@ window.__patrolTest = {
   arrive: () => {
     const st = s.strikes.find((x) => x.target.kind === 'point');
     apply(advance(s, st.arrivesAt));
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
   },
   marks: () => __patrolMarks(s.strikes, { me: ME, now: s.time }),
@@ -102,7 +105,7 @@ window.__patrolTest = {
   leg: (id) => {
     const st = s.strikes.find((x) => x.id === id);
     apply(advance(s, st.arrivesAt));
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
   },
   // Id эскадры, которую положил prepare.
@@ -114,7 +117,7 @@ window.__patrolTest = {
       (x.hangar ?? []).some((q) => q.id === sqId),
     );
     host.hangar.find((q) => q.id === sqId).hold = {};
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
   },
   homeHold: (sqId) => {
