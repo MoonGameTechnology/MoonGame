@@ -78,7 +78,10 @@ window.__relocateTest = {
       from = { kind: 'planet', id: home.id };
       dest = { kind: 'fleet', id: carrier.id };
       pickWorld(home.id);
-      planetTab = 'shuttle';
+      // Вкладка «Эскадрильи» — тапом, как у игрока: вкладка листа — состояние листа (REFM-225).
+      invalidatePanel();
+      renderPanel();
+      side.querySelector('[data-act="tab"][data-arg="shuttle"]').click();
     } else {
       near.owner = ME;
       port(near);
@@ -88,7 +91,7 @@ window.__relocateTest = {
       dest = { kind: 'planet', id: near.id };
       setFleetSelection([carrier.id]);
     }
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
     // Центруем ПОСЛЕ панели и между домом и соседями: открытая панель сужает поле карты,
     // а подходящая и полная база обязаны попасть на экран — не влезли, камера отходит.
@@ -128,7 +131,7 @@ window.__relocateTest = {
   arrive: () => {
     const st = s.strikes.find((x) => x.target.kind === 'base');
     apply(advance(s, st.arrivesAt));
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
   },
   hangar: (base) =>

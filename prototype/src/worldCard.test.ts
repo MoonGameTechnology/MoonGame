@@ -555,8 +555,10 @@ describe('стык с main.ts', () => {
   });
 
   it('панель и карточка флота зовут карточки модуля', () => {
-    expect(MAIN).toContain('if (selFork) return forkPanelHtml(selFork);');
-    expect(MAIN).toContain(
+    // Выбор карточки листа — у хозяина боковой панели (`sidePanel.ts`, REFM-225).
+    const PANEL = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
+    expect(PANEL).toContain('if (selFork) return forkPanelHtml(selFork);');
+    expect(PANEL).toContain(
       'return pick.known ? planetPanelHtml(pick.planet) : unknownPlanetHtml(pick.planet);',
     );
     // Секцию ангара зовёт карточка флота — с REFM-224 она в `fleetCard.ts`.

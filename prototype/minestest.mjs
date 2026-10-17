@@ -27,7 +27,7 @@ window.__minesTest = {
     f.location = null; f.movement = null; f.battleId = null; f.edge = { from: a.id, to: b, t: 0.5 };
     s.players[ME].resources.metal = 1000; s.players[ME].resources.microelectronics = 1000;
     setFleetSelection([f.id]);
-    lastPanelHtml = ''; invalidateCmdBar(); renderPanel(); renderCmdBar();
+    invalidatePanel(); invalidateCmdBar(); renderPanel(); renderCmdBar();
   },
   ord: () => s.ordnance,
   // SM-3.7a: the standing rocket mine is a fleet; its doctrine lives in \`ordnance.controls\`.
@@ -39,8 +39,8 @@ window.__minesTest = {
     const id = Object.keys(s.fleets).find((id) => __isRocketMineFleet(s.fleets[id], data));
     if (!id) return null;
     setFleetSelection([id]);
-    lastPanelHtml = ''; renderPanel();
-    return { card: lastPanelHtml.includes(t('mine.card.rocket-rule')), orderable: selectedFleetIds().length };
+    invalidatePanel(); renderPanel();
+    return { card: side.textContent.includes(t('mine.card.rocket-rule')), orderable: selectedFleetIds().length };
   },
   ordinary: () => {
     s = structuredClone(s);
@@ -48,7 +48,7 @@ window.__minesTest = {
     const f = Object.values(s.fleets).find((f) => f.owner === ME && !__isMineFleet(f, data));
     f.units[0].modules = ['mine_layer'];
     setFleetSelection([f.id]);
-    lastPanelHtml = ''; renderPanel();
+    invalidatePanel(); renderPanel();
   },
   fields: () => s.minefields,
   // SM-3.6: armed, the mine is an immobile unit — its own card, never an order target.
@@ -57,8 +57,8 @@ window.__minesTest = {
     const id = Object.keys(s.fleets).find((id) => __isMineFleet(s.fleets[id], data));
     if (!id) return null;
     setFleetSelection([id]);
-    lastPanelHtml = ''; renderPanel();
-    return { card: lastPanelHtml.includes(t('mine.card.rule')), orderable: selectedFleetIds().length };
+    invalidatePanel(); renderPanel();
+    return { card: side.textContent.includes(t('mine.card.rule')), orderable: selectedFleetIds().length };
   },
   // SM-3.7b: a flying missile is a fleet without orders — its own card, never an order target.
   missileCard: () => {
@@ -71,8 +71,8 @@ window.__minesTest = {
       units: [{ unit: 'missile', count: 1, modules: ['rocket_mine_layer'] }], landing: [], traits: [], battleId: null,
     };
     setFleetSelection([id]);
-    lastPanelHtml = ''; renderPanel();
-    return { card: lastPanelHtml.includes(t('missile.card.rule')), orderable: selectedFleetIds().length };
+    invalidatePanel(); renderPanel();
+    return { card: side.textContent.includes(t('missile.card.rule')), orderable: selectedFleetIds().length };
   }
 };`;
 

@@ -56,6 +56,8 @@ const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chain
 import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { knownOwner as __knownOwner } from './mapLayer';
 import { moveFleet as __moveFleet } from './game';
+// Деление флота отдаёт окно деления листа (REFM-225): \`main.ts\` его больше не импортирует.
+import { splitFleet as __splitFleet } from './game';
 // Стойка — у ядра: с REFM-224 \`main.ts\` её не импортирует.
 import { getStance as __getStance } from '../../packages/shared-core/src/index';
 window.__szTest = {
@@ -67,10 +69,10 @@ window.__szTest = {
   homeOnScreen: () => { const h = pickHome(Object.values(s.planets), ME); return h ? world(h.position) : null; },
   // Выбор мира так же, как его делает \`jumpTo\` (переход по ссылке): сама карточка —
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
-  select: id => { pickWorld(id); lastPanelHtml = ''; renderPanel(); },
+  select: id => { pickWorld(id); invalidatePanel(); renderPanel(); },
   selected: () => selPlanet,
   // Вкладка карточки мира — как тап по ней; живые наземные части гарнизона мира.
-  tab: (x) => { planetTab = x; lastPanelHtml = ''; renderPanel(); },
+  tab: (x) => side.querySelector('[data-act="tab"][data-arg="' + x + '"]').click(),
   ground: (id) => s.planets[id].garrison.filter((st) => st.count > 0 && data.units[st.unit]?.domain === 'ground').length,
   garrisonUnits: (id) => s.planets[id].garrison.filter((st) => st.count > 0).map((st) => st.unit),
   // Открыт ли слой, который закроет Escape/Back.
@@ -120,7 +122,7 @@ window.__szTest = {
     if (!main) return;
     const before = new Set(Object.keys(s.fleets));
     const cruiser = main.units.find((u) => u.unit === 'cruiser');
-    playerOrder(splitFleet(ME, main.id, [{ unit: 'cruiser', count: 2, ...(cruiser?.modules?.length ? { modules: cruiser.modules } : {}) }]));
+    playerOrder(__splitFleet(ME, main.id, [{ unit: 'cruiser', count: 2, ...(cruiser?.modules?.length ? { modules: cruiser.modules } : {}) }]));
     const part = Object.keys(s.fleets).find((id) => !before.has(id)) ?? main.id;
     playerOrder(__moveFleet(ME, part, 'pirate_den'));
   },

@@ -302,9 +302,11 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   // Лист и его Escape спрашивают «выбрано ли что-то» у владельца, а не своей копией списка:
   // в копиях не было развилки, и её карточка не открывалась.
   it('the sheet and its Escape layer ask the owner whether anything is picked', () => {
-    expect(count('hasSelection: hasSelection(),')).toBe(1);
+    // Лист — у хозяина боковой панели (`sidePanel.ts`, REFM-225), его Escape — в `main.ts`.
+    const sheet = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
+    expect(sheet.split('hasSelection: hasSelection(),').length - 1).toBe(1);
     expect(count("{ id: 'side', isOpen: hasSelection,")).toBe(1);
-    expect(main).not.toMatch(/selPlanet !== null \|\| selFleets\.size > 0/);
+    for (const src of [main, sheet]) expect(src).not.toMatch(/selPlanet !== null \|\| selFleets\.size > 0/);
   });
 
   // Ход локального мира и снимок сервера чистят выбор одним вызовом: у снимка была своя
