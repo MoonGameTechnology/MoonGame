@@ -104,8 +104,7 @@ function wired(over: Partial<PingHost> = {}, seed: SessionMsg[] = []) {
     },
     push: (to, text, loc) => pushed.push([to, text, loc]),
     net: () => net,
-    seats: () => ['p1', 'p2', 'p3'],
-    coalitionSize: () => 2,
+    coalition: () => ['p1', 'p2'],
     name: (id) => ({ p1: 'Вы', p2: 'Красные', p3: 'Синие' })[id] ?? id,
     color: (id) => (id === 'p1' ? '#0ff' : '#f00'),
     badge: () => ({ icon: '◆', tag: 'ИИ' }),
@@ -322,6 +321,31 @@ describe('метки — композер', () => {
     expect(stopped).toBe(true);
   });
 
+  it('в окне есть крестик, и он закрывает композер', () => {
+    const w = wired();
+    w.api.openMenu();
+    expect(w.menu.raw.innerHTML).toMatch(/class="pm-close btn-x" data-pmcancel[^>]*>✕</);
+    w.menu.clickOn({ cancel: '1' });
+    expect(w.api.menuOpen()).toBe(false);
+  });
+
+  it('лично метку можно отправить только союзнику — чужих в списке адресатов нет', () => {
+    const w = wired();
+    w.api.openMenu();
+    expect(w.menu.raw.innerHTML).toContain('data-pmdest="p2"');
+    expect(w.menu.raw.innerHTML).not.toContain('data-pmdest="p3"');
+    expect(w.menu.raw.innerHTML).not.toContain('data-pmdest="p1"');
+  });
+
+  it('не-союзнику метка не уходит, даже если адресат пришёл в обход списка', () => {
+    const w = wired();
+    w.api.openMenu();
+    w.api.createTo('p3');
+    expect(w.pushed).toEqual([]);
+    expect(w.notes).toEqual(['Метку можно отправить только союзнику']);
+    expect(w.api.menuOpen()).toBe(false);
+  });
+
   it('тап по фону закрывает композер', () => {
     const w = wired();
     w.api.openMenu();
@@ -454,6 +478,16 @@ describe('метки — попап на карте', () => {
     w.pop.clickOn({ loc: 'C1R1' }, '.pp-jump');
     expect(w.camera).toEqual([['jump', 'C1R1']]);
     expect(w.pop.raw.shown).toBe(false);
+  });
+
+  it('крестик закрывает попап и ничего не снимает', () => {
+    const w = wired({}, [msg()]);
+    w.api.openPop('C1R1');
+    expect(w.pop.raw.innerHTML).toContain('class="pp-close btn-x"');
+    w.pop.clickOn({}, '.pp-close');
+    expect(w.pop.raw.shown).toBe(false);
+    expect(w.messages().length).toBe(1);
+    expect(w.camera).toEqual([]);
   });
 
   it('снятие из попапа убирает свою метку', () => {
