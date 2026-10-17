@@ -86,6 +86,7 @@ async function boot() {
     tour: () => null,
     intro: () => {},
     steward: () => null,
+    forward: () => {},
   });
   const go = await import('./groupOrders');
   go.initGroupOrders({

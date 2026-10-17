@@ -170,6 +170,7 @@ async function boot(opts: { pc?: boolean } = {}) {
     tour: () => null,
     intro: () => {},
     steward: () => null,
+    forward: () => {},
   });
   const inter = await import('./interaction');
   /** Выбрать свои флоты, как рамка или тап. */
