@@ -159,6 +159,15 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     // Пост сети Роя (большой ретранслятор) держит связь, а не штурмует мир, где стоит.
     const post = (f: Fleet): boolean =>
       f.units.some((u) => data.units[u.unit]?.traits.includes(RELAY_POST_TRAIT) ?? false);
+    // Кто стоит на каждом узле живыми отрядами, кроме мин, — одним проходом: проверка «есть
+    // ли здесь враг» перебирала все флоты карты на каждый флот у чужого мира.
+    const ownersAt = new Map<string, Set<string>>();
+    for (const g of Object.values(s.fleets)) {
+      if (g.location == null || !g.units.some((u) => u.count > 0) || isMineFleet(g, data)) continue;
+      const owners = ownersAt.get(g.location);
+      if (owners) owners.add(g.owner);
+      else ownersAt.set(g.location, new Set([g.owner]));
+    }
     for (const f of Object.values(s.fleets)) {
       if (f.location == null || f.movement || f.battleId) continue;
       if (sentinels.has(f.id) || post(f) || isMineFleet(f, data)) continue;
@@ -169,10 +178,8 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
       const here = s.planets[f.location];
       if (!here || here.owner === f.owner) continue; // свой мир штурмовать нечего
       // Мина (SM-3.6) захвату не мешает — как и в ядре (`captureOnArrival`).
-      const enemyHere = Object.values(s.fleets).some(
-        (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0) &&
-          !isMineFleet(g, data),
-      );
+      const owners = ownersAt.get(f.location);
+      const enemyHere = owners !== undefined && owners.size > (owners.has(f.owner) ? 1 : 0);
       if (enemyHere) continue; // ПОЛИТИКА клиента: дать орбитальному бою утихнуть
       // RULES-1. Выше — только политика; ПРАВИЛА (захватываемая провинция, дипломатия,
       // наличие десанта) называет ядро. Проверяется вся ПАРА «низкая орбита → штурм»:
@@ -204,12 +211,21 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     const s = host.state();
     const me = host.me();
     const fleets = Object.values(s.fleets);
+    // Пару ищем только среди флотов того же узла: перебор всех пар карты стоил кадру
+    // ~2 мс на FFA-50. Флоты узла идут в порядке карты, поэтому и пары — тем же порядком.
+    const atNode = new Map<string, Fleet[]>();
+    for (const g of fleets) {
+      if (!g.location) continue;
+      const here = atNode.get(g.location);
+      if (here) here.push(g);
+      else atNode.set(g.location, [g]);
+    }
     for (const f of fleets) {
       if (!f.location || f.movement || shipsEngaged(s, f)) continue;
       // Мина (SM-3.6) — не противник в бою: «Атака» по ней — подрыв, и сводить с ней
       // стоящий рядом флот каждый кадр значило бы взрывать его заряд за зарядом.
       if (isMineFleet(f, data)) continue;
-      for (const g of fleets) {
+      for (const g of atNode.get(f.location)!) {
         if (g.id <= f.id) continue; // пара обрабатывается один раз
         if (!g.location || g.movement || shipsEngaged(s, g) || isMineFleet(g, data)) continue;
         if (f.owner === g.owner || f.location !== g.location) continue;

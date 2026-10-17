@@ -12,6 +12,8 @@
  * клиент, сервер) это обычное чтение записи.
  */
 
+import { recordValues } from './records';
+
 /** Место сущности, которую шаг ещё не читал. */
 export const HOLE: unknown = Object.freeze({});
 
@@ -32,7 +34,7 @@ export function peek<T>(record: Readonly<Record<string, T>>, id: string): T | un
 /** Сущности записи в порядке её ключей, как `Object.values`, — только для чтения. */
 export function peekValues<T>(record: Readonly<Record<string, T>>): T[] {
   const draft = DRAFT_RECORDS.get(record);
-  if (!draft) return Object.values(record);
+  if (!draft) return recordValues(record);
   return Object.keys(draft.slots).map((id) => {
     const value = draft.slots[id];
     return (value === HOLE ? draft.base[id] : value) as T;

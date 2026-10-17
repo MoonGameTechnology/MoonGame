@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deepClone, deepEqual, deepFreeze, shareImmutable } from './clone';
+import { deepClone, deepEqual, deepFreeze, isShared, shareImmutable } from './clone';
 import { hashJson } from '../state/hash';
 
 describe('deepClone', () => {
@@ -132,5 +132,13 @@ describe('shareImmutable — a subtree the clone shares instead of copying (ROAD
     expect(() => shareImmutable(outer)).not.toThrow();
     expect(deepClone(outer)).not.toBe(outer);
     expect(deepClone(outer).inner).toBe(inner);
+  });
+
+  it('isShared tells a marked value from a frozen or revived one', () => {
+    const marked = shareImmutable({ a: { b: 1 } });
+    expect([isShared(marked), isShared(marked.a)]).toEqual([true, true]);
+    expect(isShared(deepFreeze({ a: 1 }))).toBe(false);
+    expect(isShared(JSON.parse(JSON.stringify(marked)) as object)).toBe(false);
+    expect(isShared(deepClone(marked))).toBe(true); // the clone hands the same value back
   });
 });

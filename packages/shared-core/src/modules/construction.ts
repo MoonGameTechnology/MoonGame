@@ -31,6 +31,7 @@ import {
   withBonusSlots,
 } from '../util/loadout';
 import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
+import { recordValues } from '../util/records';
 
 /** Share of the ground assault's round damage that also wears down the planet's
  *  structures (the rest is spent on the defending garrison). Tunable. */
@@ -1504,7 +1505,7 @@ export const constructionModule: GameModule = {
       // Прежде трюм не лечил никто и нигде: раненый десант оставался раненым навсегда,
       // если его не высадить.
       const landingsAt = new Map<string, UnitStack[]>();
-      for (const fleet of Object.values(h.state.fleets)) {
+      for (const fleet of recordValues(h.state.fleets)) {
         if (fleet.movement || fleet.battleId || !fleet.location) continue;
         const host = h.state.planets[fleet.location];
         if (!host || host.owner === null) continue;
@@ -1514,7 +1515,7 @@ export const constructionModule: GameModule = {
         if (bucket.length > 0) landingsAt.set(fleet.location, bucket);
       }
 
-      for (const planet of Object.values(h.state.planets)) {
+      for (const planet of recordValues(h.state.planets)) {
         if (planet.owner === null) continue;
         if (fighting.has(planet.id)) continue;
         const landings = landingsAt.get(planet.id) ?? [];
@@ -1535,7 +1536,7 @@ export const constructionModule: GameModule = {
       // снимает с заражённых построек прочность своим уроном по зданиям
       // (`stats.buildingDamage` в час). Пока идёт бой на узле — войска заняты боем, и
       // зачистки нет. У Роя его органы, понятно, никто не трогает.
-      for (const planet of Object.values(h.state.planets)) {
+      for (const planet of recordValues(h.state.planets)) {
         if (planet.owner === null || fighting.has(planet.id)) continue;
         if (!planet.buildings.some((b) => isInfected(data.buildings[b.type]))) continue;
         if (feedsOnBiomass(h.state, planet.owner, data)) continue;
@@ -1554,7 +1555,7 @@ export const constructionModule: GameModule = {
       //     and hull damage drags the fleet's speed (route.ts) until mended.
       const SHIELD_REGEN = 0.06; // shield-pool fraction restored per game-hour
       const SHIELD_REGEN_DELAY = MS_PER_HOUR; // shields stay down this long after a hit
-      for (const fleet of Object.values(h.state.fleets)) {
+      for (const fleet of recordValues(h.state.fleets)) {
         if (fleet.battleId) continue; // a fleet in combat regenerates nothing
         // Решение владельца 17: пока на узле идёт бой, док не чинит — даже флот, который
         // сам в драку не втянут. Прежде такой флот спокойно чинился посреди сражения.

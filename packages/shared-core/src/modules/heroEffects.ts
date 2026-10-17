@@ -155,13 +155,18 @@ function auraBonus(h: HandlerContext, owner: string, at: PlanetId): number {
   if (here === undefined) return 0;
   const now = h.ctx.now;
   let total = 0;
-  // Sorted (BF-13): float summation order must not follow JSONB key order.
-  for (const id of Object.keys(heroes).sort()) {
+  // Deployed heroes with an aura only, mirroring passiveBonus (bughunt BF-24) — picked
+  // before the sort, which otherwise ordered every hero of the match on each damage share.
+  const casting: string[] = [];
+  for (const id of Object.keys(heroes)) {
     const hero = heroes[id]!;
-    // Deployed heroes only, mirroring passiveBonus (bughunt BF-24).
-    if (hero.owner !== owner || hero.alive !== true) continue;
-    const auras = hero.activeAuras;
-    if (auras === undefined || auras.length === 0) continue;
+    if (hero.owner === owner && hero.alive === true && (hero.activeAuras?.length ?? 0) > 0)
+      casting.push(id);
+  }
+  // Sorted (BF-13): float summation order must not follow JSONB key order.
+  for (const id of casting.sort()) {
+    const hero = heroes[id]!;
+    const auras = hero.activeAuras!;
     const node = h.state.planets[heroNode(h.state, hero)]?.position;
     if (node === undefined) continue;
     const d = distance(node, here);
@@ -230,12 +235,16 @@ function revealZoneFactor(h: HandlerContext, taking: string, at: PlanetId): numb
   if (here === undefined) return 1;
   const now = h.ctx.now;
   let factor = 1;
-  // Sorted (BF-13): float composition order must not follow JSONB key order.
-  for (const id of Object.keys(heroes).sort()) {
+  // Living heroes with a scan only, picked before the sort for the same reason as auras.
+  const scanning: string[] = [];
+  for (const id of Object.keys(heroes)) {
     const hero = heroes[id]!;
-    if (hero.alive !== true) continue;
-    const reveals = hero.activeReveals;
-    if (reveals === undefined || reveals.length === 0) continue;
+    if (hero.alive === true && (hero.activeReveals?.length ?? 0) > 0) scanning.push(id);
+  }
+  // Sorted (BF-13): float composition order must not follow JSONB key order.
+  for (const id of scanning.sort()) {
+    const hero = heroes[id]!;
+    const reveals = hero.activeReveals!;
     const owner = hero.owner;
     // Asked ONCE per hero, not per reveal: the relation can't differ between two scans
     // of the same hero. Neither flag ⇒ neutral to this scan (at peace, in a pact, a

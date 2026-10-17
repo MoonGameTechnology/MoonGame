@@ -2,6 +2,7 @@ import type { ResourceBag } from '../data/schemas';
 import type { GameModule } from '../kernel/module';
 import type { GameState } from '../state/gameState';
 import { isForkSite } from '../state/forkSite';
+import { recordValues } from '../util/records';
 
 /**
  * BAL-10 · Growth tax («налог на рост державы», owner decision 2026-09-30). The
@@ -53,7 +54,7 @@ function provinceCounts(step: object, state: GameState): Map<string, number> {
   let counts = countsOfStep.get(step);
   if (!counts) {
     counts = new Map();
-    for (const p of Object.values(state.planets))
+    for (const p of recordValues(state.planets))
       if (p.owner !== null && !isForkSite(p)) counts.set(p.owner, (counts.get(p.owner) ?? 0) + 1);
     countsOfStep.set(step, counts);
   }

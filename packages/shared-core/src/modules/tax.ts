@@ -3,6 +3,7 @@ import type { GameData, ResourceBag } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import type { GameState, Planet } from '../state/gameState';
 import { allowedBuildings, hasOrbit } from '../state/sectorKind';
+import { recordValues } from '../util/records';
 
 /**
  * FND-2 (game-vision-roadmap.md) · Civic tax — was a port of the prototype's
@@ -68,7 +69,7 @@ function inhabitedCounts(step: object, data: GameData, state: GameState): Map<st
   let counts = countsOfStep.get(step);
   if (!counts) {
     counts = new Map();
-    for (const p of Object.values(state.planets))
+    for (const p of recordValues(state.planets))
       if (p.owner !== null && isInhabited(data, p))
         counts.set(p.owner, (counts.get(p.owner) ?? 0) + 1);
     countsOfStep.set(step, counts);

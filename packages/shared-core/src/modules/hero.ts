@@ -265,12 +265,18 @@ function passiveBonus(
 ): number {
   if (h.state.heroes === undefined) return 0; // hero-less match: keep the hot hooks free
   let total = 0;
-  // Sorted (BF-13): float summation order must not follow JSONB key order.
-  for (const id of Object.keys(h.state.heroes).sort()) {
+  // DEPLOYED heroes only — a reserve hero (alive undefined) must not radiate
+  // passives from the bench (bughunt BF-24). Picked before the sort: this runs on every
+  // damage share and speed check, and sorting all heroes of the match each time cost more
+  // than the bonus itself.
+  const deployed: string[] = [];
+  for (const id of Object.keys(h.state.heroes)) {
     const hero = h.state.heroes[id]!;
-    // DEPLOYED heroes only — a reserve hero (alive undefined) must not radiate
-    // passives from the bench (bughunt BF-24).
-    if (hero.owner !== owner || hero.alive !== true) continue;
+    if (hero.owner === owner && hero.alive === true) deployed.push(id);
+  }
+  // Sorted (BF-13): float summation order must not follow JSONB key order.
+  for (const id of deployed.sort()) {
+    const hero = h.state.heroes[id]!;
     const worn = equippedOf(hero);
     for (const id of hero.passives ?? []) {
       const def = h.ctx.data.heroPassives[id];
