@@ -970,7 +970,7 @@ function baseAiOrders(
       //     оборонительные, — танк полезнее на чужой земле, ополченец на своей.
       //     ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), а вылет его ОТМЕНЯЕТ: флот, который
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
-      if (here0 && here0.id === base.id && (warFooting || neutralGuarded || reconBare(f))) {
+      if (here0 && here0.id === base.id && (warFooting || neutralGuarded)) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
         let free = liftFree(f);
         let ordered = false;
@@ -1137,11 +1137,10 @@ function baseAiOrders(
     }
     const here = state.planets[f.location];
     if (!here) continue;
-    // Разведчикам без десанта брать нечего — домой, за ополчением (погрузка — правило (а)).
-    if (skilled && reconBare(f)) {
-      if (base && f.location !== base.id) out.push(moveFleet(ai, f.id, base.id));
-      continue;
-    }
+    // Разведчикам без десанта брать нечего, а трюма у них нет (решение владельца
+    // 2026-10-17), так что и дома взять бойца не во что: флот стоит, где стоит, —
+    // радарным пикетом, а не в очереди отбиваемых штурмов.
+    if (reconBare(f)) continue;
     let best: Planet | null = null;
     let bestD = Infinity;
     let second: Planet | null = null;

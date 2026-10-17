@@ -30,6 +30,8 @@ import {
   selectedBay,
   repeatOrderHtml,
   moduleGradeHtml,
+  yardQueueHtml,
+  templatesPaneHtml,
   type YardDraft,
   type YardHost,
 } from './shipyard';
@@ -533,7 +535,7 @@ describe('верфь — окно', () => {
   it('заказ уходит в ядро выбранными корпусом, числом, обвесом и миром', () => {
     const win = fakeWin();
     const sent: Action[] = [];
-    const yard = initShipyard(hostOf({ root: () => win, order: (a) => sent.push(a) }));
+    const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
     yard.open();
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cncount]', { cncount: '+' }));
@@ -568,13 +570,103 @@ describe('верфь — окно', () => {
     );
   });
 
+  it('очередь мира стоит над окном: идущий заказ с остатком, ждущие следом, новый подсвечен', () => {
+    const win = fakeWin();
+    let s = rich();
+    const yard = initShipyard(
+      hostOf({
+        root: () => win,
+        state: () => s,
+        order: (a) => {
+          s = applyOrder(s, a, s.time).state;
+        },
+      }),
+    );
+    yard.open();
+    // Пустая очередь — полосы нет вовсе.
+    expect(win.html()).toContain('<div id="cn-queue"></div>');
+    win.fire(click('[data-cnbuild]'));
+    expect(win.html()).toContain('class="cn-qi fresh run"');
+    win.fire(click('[data-cncount]', { cncount: '+' }));
+    // Перерисовка без нового заказа подсветку снимает.
+    expect(win.html()).not.toContain('fresh');
+    win.fire(click('[data-cnbuild]'));
+    const html = win.html();
+    expect(html).toContain('class="cn-qi run"');
+    expect(html).toContain('class="cn-qi fresh"');
+    expect(html).toContain('<b>×2</b>');
+  });
+
+  it('полоса очереди — чистая разметка: пустой мир ничего не рисует', () => {
+    const s = rich();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    expect(yardQueueHtml(s, home, '#0ff')).toBe('');
+    expect(yardQueueHtml(s, '', '#0ff')).toBe('');
+    const after = applyOrder(s, buildShip('p1', home, 'cruiser', 3, []), s.time).state;
+    const html = yardQueueHtml(after, home, '#0ff');
+    expect(html).toContain(t('yard.queue.title', { w: worldName(after, home) }));
+    expect(html).toContain(fmtEta(data.units.cruiser!.buildTimeHours));
+  });
+
+  it('шаблон: сохранить заказ, собрать другой и вернуть шаблон одним нажатием', () => {
+    const win = fakeWin();
+    const sent: Action[] = [];
+    const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
+    yard.open();
+    win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
+    win.fire(click('[data-cncount]', { cncount: '+' }));
+    win.fire(click('[data-cntpl]'));
+    expect(win.html()).toContain(t('yard.tpl.empty'));
+    win.fire(click('[data-cntplsave]'));
+    expect(win.html()).toContain('data-cntpluse="0"');
+    // Тот же заказ второй раз не сохраняется: кнопка гаснет и говорит, что он уже есть.
+    expect(win.html()).toMatch(new RegExp(`data-cntplsave disabled>＋ ${t('yard.tpl.saved')}`));
+    win.fire(click('[data-cntpl]'));
+    win.fire(click('.cn-hbtn', { cnhull: 'frigate' }));
+    win.fire(click('[data-cntpl]'));
+    win.fire(click('[data-cntpluse]', { cntpluse: '0' }));
+    expect(win.html()).not.toContain('class="cn-tpl"'); // панель закрылась
+    win.fire(click('[data-cnbuild]'));
+    const payload = sent[0]!.payload as Record<string, unknown>;
+    expect(payload.unit).toBe('cruiser');
+    expect(payload.count).toBe(2);
+    expect(payload.modules).toEqual(['ion_engine']);
+    // Удаление.
+    win.fire(click('[data-cntpl]'));
+    win.fire(click('[data-cntpldel]', { cntpldel: '0' }));
+    expect(win.html()).toContain(t('yard.tpl.empty'));
+  });
+
+  it('шаблон без корпуса в арсенале партии погашен', () => {
+    const s = rich();
+    s.players.p1!.arsenal = { hulls: ['frigate'], modules: [] } as never;
+    const html = templatesPaneHtml(
+      s,
+      'p1',
+      [{ tab: 'ships', hull: 'cruiser', modules: [], count: 1 }],
+      null,
+      '#0ff',
+    );
+    expect(html).toContain(`data-cntpluse="0" disabled`);
+  });
+
+  it('отказ ядра не сопровождается «заказано»', () => {
+    const win = fakeWin();
+    const notes: string[] = [];
+    const yard = initShipyard(hostOf({ root: () => win, order: () => false, note: (m) => notes.push(m) }));
+    yard.open();
+    win.fire(click('[data-cnbuild]'));
+    expect(notes).toEqual([]);
+    expect(win.html()).not.toContain('data-cnagain');
+  });
+
   it('без своего мира заказ не отправляется вовсе', () => {
     const win = fakeWin();
     const homeless = rich();
     for (const p of Object.values(homeless.planets)) if (p.owner === 'p1') p.owner = null;
     const sent: Action[] = [];
     const yard = initShipyard(
-      hostOf({ root: () => win, state: () => homeless, order: (a) => sent.push(a) }),
+      hostOf({ root: () => win, state: () => homeless, order: (a) => void sent.push(a) }),
     );
     yard.open();
     win.fire(click('[data-cnbuild]'));
@@ -587,7 +679,7 @@ describe('верфь — окно', () => {
     const mine = Object.values(s.planets).filter((p) => p.owner === 'p1');
     const sent: Action[] = [];
     const yard = initShipyard(
-      hostOf({ root: () => win, state: () => s, order: (a) => sent.push(a) }),
+      hostOf({ root: () => win, state: () => s, order: (a) => void sent.push(a) }),
     );
     yard.open();
     // второй свой мир, если он есть; иначе первый — важен сам факт, что value доезжает
@@ -622,7 +714,7 @@ describe('верфь — окно', () => {
   it('чужой клик хозяину не мешает — «нечего делать» ничего не ломает', () => {
     const win = fakeWin();
     const sent: Action[] = [];
-    const yard = initShipyard(hostOf({ root: () => win, order: (a) => sent.push(a) }));
+    const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
     yard.open();
     const before = win.html();
     win.fire(click('.cn-nothing'));
@@ -733,7 +825,7 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
     const sent: Action[] = [];
     const win = fakeWin();
-    const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => sent.push(a) }));
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => void sent.push(a) }));
     yard.open();
     win.fire(click('.cn-tab', { ctab: 'infantry' }));
     win.fire(click('[data-cnbuild]'));
@@ -747,7 +839,7 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     const s = rich();
     const sent: Action[] = [];
     const win = fakeWin();
-    const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => sent.push(a) }));
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => void sent.push(a) }));
     yard.open();
     win.fire(click('.cn-tab', { ctab: 'infantry' }));
     win.fire(click('[data-cnbuild]'));
@@ -795,7 +887,7 @@ describe('верфь — десантный челнок с бойцом (SHU-5.
     const orders: Action[] = [];
     const win = fakeWin();
     const yard = initShipyard(
-      hostOf({ root: () => win, state: () => s, order: (a) => orders.push(a), probe: (a) => canOrder(s, a) }),
+      hostOf({ root: () => win, state: () => s, order: (a) => void orders.push(a), probe: (a) => canOrder(s, a) }),
     );
     yard.open('squads');
     win.fire(click('.cn-hbtn', { cnhull: 'landing_shuttle' }));
@@ -1013,8 +1105,8 @@ describe('производство — модули открытого отсе�
     yard.open();
     win.fire(click('.cn-tab', { ctab: 'support' }));
     win.fire(click('.cn-hbtn', { cnhull: 'scout' })); // один отсек системы
-    win.fire(click('.cn-mod', { cnmod: 'cargo_bay' }));
-    expect(win.html()).toContain('data-cnrm="cargo_bay"');
+    win.fire(click('.cn-mod', { cnmod: 'salvage_rig' }));
+    expect(win.html()).toContain('data-cnrm="salvage_rig"');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
     expect(win.html()).toContain('data-cnrm="ion_engine"');
@@ -1087,13 +1179,14 @@ describe('производство — «Как в прошлый раз» (UIX-
 
   it('кнопка стоит в шапке окна, перед крестиком', () => {
     const html = yardBoxHtml('ships', '', '', '<button data-cnagain></button>');
-    expect(html).toContain('<b>' + t('yard.title') + '</b><button data-cnagain></button><button class="cn-close btn-x">');
+    expect(html).toContain('<b>' + t('yard.title') + '</b><button data-cnagain></button><button class="cn-tplbtn');
+    expect(html).toMatch(/<\/button><button class="cn-close btn-x">✕<\/button><\/div>/);
   });
 
   it('после заказа другой корпус и вкладка — кнопка собирает заказ заново', () => {
     const win = fakeWin();
     const sent: Action[] = [];
-    const yard = initShipyard(hostOf({ root: () => win, order: (a) => sent.push(a) }));
+    const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
     yard.open();
     expect(win.html()).not.toContain('data-cnagain');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
