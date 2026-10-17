@@ -4,7 +4,7 @@ import {
   CAPSULE_DY,
   CAPSULE_STACK,
   capsuleAt,
-  chainPathNodes,
+  chainPathLegs,
   lastStepAtPoint,
   stackIndexes,
   type PathStep,
@@ -22,33 +22,36 @@ const ход = (to: string): PathStep => ({ kind: 'move', to });
 
 describe('линия плана — по каким узлам идёт', () => {
   it('ЛИНИЯ ИДЁТ ПО ЛЕЙНАМ, А НЕ ПО ПРЯМОЙ: иначе она врёт про путь и про время', () => {
-    expect(chainPathNodes([ход('C')], 'A', маршрут)).toEqual(['B', 'C']);
+    expect(chainPathLegs([ход('C')], 'A', маршрут)).toEqual([{ from: 'A', hops: ['B', 'C'] }]);
   });
 
   it('МАРШРУТА НЕТ — СТАВИМ ХОТЯ БЫ ЦЕЛЬ: шаг не должен исчезнуть с карты молча', () => {
-    expect(chainPathNodes([ход('D')], 'A', маршрут)).toEqual(['D']);
+    expect(chainPathLegs([ход('D')], 'A', маршрут)).toEqual([{ from: 'A', hops: ['D'] }]);
   });
 
   it('ШАГИ НЕ-ПЕРЕЛЁТЫ ТОЧКУ НЕ ДВИГАЮТ: ждать и штурмовать — это ТАМ ЖЕ', () => {
     const план: PathStep[] = [{ kind: 'wait' }, ход('B'), { kind: 'assault' }, { kind: 'fire' }];
-    expect(chainPathNodes(план, 'A', маршрут)).toEqual(['B']);
+    expect(chainPathLegs(план, 'A', маршрут)).toEqual([{ from: 'A', hops: ['B'] }]);
   });
 
   it('ПЕРЕЛЁТ «СЮДА ЖЕ» ПРОПУСКАЕТСЯ — иначе точка задвоится нулевым сегментом', () => {
-    expect(chainPathNodes([ход('A')], 'A', маршрут)).toEqual([]);
-    expect(chainPathNodes([ход('B'), ход('B')], 'A', маршрут)).toEqual(['B']);
+    expect(chainPathLegs([ход('A')], 'A', маршрут)).toEqual([]);
+    expect(chainPathLegs([ход('B'), ход('B')], 'A', маршрут)).toEqual([{ from: 'A', hops: ['B'] }]);
   });
 
-  it('перелёты идут подряд, каждый от конца предыдущего', () => {
-    expect(chainPathNodes([ход('B'), ход('C')], 'A', маршрут)).toEqual(['B', 'C']);
+  it('перелёты идут подряд, каждый от конца предыдущего, и не сливаются: в конце каждого флот стоит', () => {
+    expect(chainPathLegs([ход('B'), ход('C')], 'A', маршрут)).toEqual([
+      { from: 'A', hops: ['B'] },
+      { from: 'B', hops: ['C'] },
+    ]);
   });
 
   it('пустой план — пустая линия', () => {
-    expect(chainPathNodes([], 'A', маршрут)).toEqual([]);
+    expect(chainPathLegs([], 'A', маршрут)).toEqual([]);
   });
 
   it('перелёт без цели не рисуется', () => {
-    expect(chainPathNodes([{ kind: 'move' }], 'A', маршрут)).toEqual([]);
+    expect(chainPathLegs([{ kind: 'move' }], 'A', маршрут)).toEqual([]);
   });
 });
 
