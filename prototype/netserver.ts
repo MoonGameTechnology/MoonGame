@@ -1073,7 +1073,12 @@ const server = createMultiplayerServer({
         };
         const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
         if (!room) return null;
-        const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+        // Кресло → ник: занятость и ник из одного ответа хранилища. Ник нужен клиенту в
+        // дипломатии (строка игрока ведёт в его профиль); показывать его можно тем же,
+        // кому этот расклад отдают вообще (ADDR-6, `registerSeatsApi`).
+        const nickOf = new Map(
+          (await accountStore.seatedNicks(id)).map((s) => [s.playerId, s.nick] as const),
+        );
         // The homeworld from the match's setup, never from live ownership (which would
         // retell every capture and loss to whoever reads the layout).
         const starts = networkStartsOf(room.state, NETWORK_MODE);
@@ -1085,7 +1090,8 @@ const server = createMultiplayerServer({
             name: p.name,
             faction: p.faction,
             start: starts[p.id] ?? null,
-            taken: taken.has(p.id),
+            taken: nickOf.has(p.id),
+            nick: nickOf.get(p.id) ?? null,
           })),
         };
       },

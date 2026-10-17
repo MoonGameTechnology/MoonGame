@@ -358,6 +358,10 @@ export interface SeatView {
   /** The seat's homeworld id — the fog-sensitive field, see {@link registerSeatsApi}. */
   start: string | null;
   taken: boolean;
+  /** Who sits in the seat (account login / nick); null for a free one. The client shows
+   *  it in diplomacy and opens that player's profile by it. Absent on a host that does
+   *  not report it — the client then keeps the house name. */
+  nick?: string | null;
 }
 
 /** A match's seating, as the host knows it — independent of who is asking. */

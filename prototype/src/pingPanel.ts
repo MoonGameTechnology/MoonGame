@@ -91,6 +91,16 @@ export function toggleHidden(hidden: ReadonlySet<string>, loc: string): Set<stri
   return next;
 }
 
+/**
+ * Кому можно отправить метку лично. Заказ владельца: «пинги можно отправить только
+ * союзникам или участникам коалиции». Метка — это указание «вот сюда», и слать её
+ * врагу или нейтралу значило бы раскрывать свои планы тому, кто не на твоей стороне.
+ * Поэтому адресаты — коалиция (союзники по договору) без себя, в её же порядке.
+ */
+export function pingRecipients(coalition: readonly string[], me: string): string[] {
+  return [...new Set(coalition)].filter((id) => id !== me);
+}
+
 /** Метки, которые карта должна нарисовать: активные минус спрятанные локально. */
 export function visiblePingLocs(
   messages: readonly SessionMsg[],

@@ -186,6 +186,11 @@ export function targetMatch(id: string): void {
   }
 }
 
+/** Партия, в которую звонит (или уже вошла) сеть. */
+export function netMatchId(): string {
+  return currentMatchId;
+}
+
 /** Кадр в окно замера: интервалы копит `frame()`, сэмпл забирает окно целиком. */
 export function countNetFrame(dt: number): void {
   frameWin = countFrame(frameWin, dt);

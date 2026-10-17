@@ -46,7 +46,6 @@ import {
   conversations,
   diffNetDiplomacy,
   diploOpen,
-  diploSeats,
   diploTab,
   fmtStamp,
   initDiploWindow,
@@ -75,10 +74,12 @@ import {
   netClient,
   netDesync,
   netDesyncCount,
+  netMatchId,
   netView,
   rttEma,
   serverMatchId,
 } from './netSession';
+import { clearSeatNicks, refreshSeatNicks, seatNick } from './seatNicks';
 import {
   closeSeatPicker,
   connectToMatch,
@@ -833,7 +834,26 @@ initDiploWindow({
   jumpToPing,
   openProfile: (login) => profile?.open(login),
   refreshChat: () => chatWin?.refreshIfVisible(),
+  seatNick,
+  refreshNicks: () => pullSeatNicks(),
 });
+
+/** Ники соседей по сетевой партии — из расклада мест сервера (`decisions/seatNicks.ts`).
+ *  В состоянии мира их нет: там имя дома. Пришли новые — перерисовать дипломатию. */
+function pullSeatNicks(force = false): void {
+  if (!NET) return;
+  const srv = resolveServer();
+  if (!srv) return;
+  refreshSeatNicks(
+    srv.base,
+    netMatchId(),
+    srv.nick,
+    () => {
+      if (diploOpen && diploTab === 'diplo') renderDiplo();
+    },
+    force,
+  );
+}
 
 // --- multiplayer (net mode) --------------------------------------------------
 // Сетевой жизненный цикл — `netSession.ts` (REFM-216): признак сети, сокет, клиент места,
@@ -859,6 +879,7 @@ initNetSession({
     if (fanfare) needMapPreparation();
     if (fanfare) snd.play('start');
     ME = playerId ?? ME;
+    pullSeatNicks(true); // кто сидит в соседних креслах — для дипломатии
     disarm('match', MOBILE); // как в соло: выбор, прицелы и окна старой сессии гаснут одной строкой
     endScreen = null; // joining a match must not carry the previous result
     matchEnd.reset(); // переподключение к матчу считает его конец заново
@@ -3500,6 +3521,7 @@ function leaveMatch(): void {
   stopSim();
   speed = 0;
   leaveNetwork();
+  clearSeatNicks();
   stopFirstGoals();
   activeTour?.stop();
 }
@@ -6027,8 +6049,7 @@ const pings = __SECTOR_ZERO_ONLY__
               clearPing: (id) => netClient?.clearPing(id),
             }
           : null,
-      seats: diploSeats,
-      coalitionSize: () => conversations.coalition().length,
+      coalition: () => conversations.coalition(),
       name: (id) => NAME[id] ?? id,
       color: ownerColor,
       badge: seatBadge,

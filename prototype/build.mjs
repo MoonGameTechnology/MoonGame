@@ -1125,8 +1125,14 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .dp-row.open{border-color:var(--cyan-dim);}
 .dp-ic{font-size:18px;width:20px;text-align:center;font-variant-emoji:text;flex:0 0 auto;}
 .dp-name{flex:1;font-size:var(--fs-body);color:#eafffb;font-weight:700;display:flex;align-items:baseline;gap:6px;min-width:0;}
+.dp-prof{padding:0;border:0;background:none;text-align:left;color:var(--cyan);font:inherit;font-weight:700;cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dp-prof:hover{color:#eafffb;}
 .dp-name em{font-style:normal;font-size:var(--fs-caption);color:var(--dim);
   border:1px solid var(--line);border-radius:3px;padding:1px 4px;flex:0 0 auto;}
+/* Ник впереди; дом и подпись сжимаются многоточием (на телефоне строка переносится, см. mobile-strategy.css). */
+.dp-name .dp-prof{flex:0 1 auto;}
+.dp-name .dp-prof+em{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dp-w{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;flex:0 0 auto;}
 .dp-stance{font-size:var(--fs-caption);border:1px solid;border-radius:3px;padding:2px 6px;flex:0 0 auto;font-weight:700;}
 .dp-tag{font-size:var(--fs-caption);color:var(--dim);flex:0 0 auto;}
@@ -1366,6 +1372,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .pp-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:5px;}
 .pp-top b{font-size:var(--fs-caption);font-variant-emoji:text;}
 .pp-top span{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;}
+.pp-top span{margin-left:auto;}
+/* ✕ всплывашки — крестик (.btn-x): вид даёт он, здесь только размер. */
+.pp-close{flex:0 0 auto;align-self:center;width:24px;height:24px;margin:-2px -4px 0 0;padding:0;border-radius:5px;
+  font:inherit;font-size:var(--fs-caption);}
+@media (pointer:coarse){.pp-close{width:30px;height:30px;}}
 .pp-desc{font-size:var(--fs-caption);line-height:1.4;color:#e7d6b8;margin-bottom:7px;word-break:break-word;}
 .pp-desc i{color:var(--dim);}
 .pp-act{display:flex;gap:5px;}
@@ -1379,7 +1390,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu.show{display:flex;}
 #pingmenu .pm-box{width:min(360px,92vw);background:var(--glass);border:1px solid var(--amber);
   border-radius:12px;padding:16px 16px 14px;box-shadow:0 0 30px rgba(0,0,0,.6);}
-#pingmenu .pm-head{font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head>span{flex:1;min-width:0;}
+#pingmenu .pm-close{flex:0 0 auto;width:28px;height:28px;border-radius:6px;font:inherit;} /* вид — .btn-x */
 #pingmenu .pm-head b{color:#eafffb;}
 #pingmenu .pm-sub{color:var(--dim);font-size:var(--fs-caption);line-height:1.5;margin-bottom:11px;}
 #pingmenu .pm-text{width:100%;box-sizing:border-box;margin-bottom:12px;padding:8px 10px;border-radius:6px;
@@ -1392,9 +1405,6 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu .pm-dst.coal{border-color:var(--amber);background:rgba(255,196,90,.08);}
 #pingmenu .pm-dst .pm-ic{flex:0 0 auto;}
 #pingmenu .pm-dst em{margin-left:auto;color:var(--dim);font-weight:400;font-style:normal;font-size:var(--fs-caption);}
-#pingmenu .pm-cancel{display:block;width:100%;margin-top:8px;padding:9px;border-radius:7px;
-  border:1px solid var(--line-hi);background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-body);cursor:pointer;}
-#pingmenu .pm-cancel:hover{color:var(--ink);border-color:var(--cyan-dim);}
 
 /* status strip below the top bar: the in-game clock + the donate currency on the right
    (day/countdown live in the #daycard, victory progress in the #tbscore chip above).

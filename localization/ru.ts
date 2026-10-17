@@ -1520,6 +1520,7 @@ export const ru: Record<string, string> = {
   'diplo.tab.espionage': 'Шпионаж',
   'diplo.tab.messages': 'Сообщения',
   'diplo.win.title': 'Дипломатия',
+  'diplo.profile': 'Открыть профиль игрока',
 
   // --- div — Дивизии: список, мобилизация, конструктор, трюм.
   'div.stat.attack': 'атака',
@@ -3374,7 +3375,8 @@ export const ru: Record<string, string> = {
   'ping.sent.player': '📍 Пинг → {who}',
   'ping.title': 'Пинг',
   'ping.to.coalition': 'В чат коалиции',
-  'ping.to.player': 'В ЛС игроку',
+  'ping.to.player': 'Союзнику в ЛС',
+  'ping.allies-only': 'Метку можно отправить только союзнику',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Чат',
