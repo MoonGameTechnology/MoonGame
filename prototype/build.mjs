@@ -1079,6 +1079,14 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .wp-yes:active{background:rgba(255,90,77,.3);}
 /* ⌂ в экспедиции: три действия столбцом — «Завершить и забрать награду» в треть ряда не влезает */
 #abandon.exit .wp-actions{flex-direction:column;}
+/* окно погрузки — тот же слой подтверждения приказа, но не военный: спокойный циан, три действия столбцом */
+#warprompt.calm{background:rgba(1,10,14,.6);}
+#warprompt.calm .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
+#warprompt.calm .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
+#warprompt.calm .wp-body{color:var(--ink);}
+#warprompt.calm .wp-actions{flex-direction:column;}
+.lp-after{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.16);color:var(--cyan);}
+.lp-now{border:1px solid #7a5a1c;background:rgba(255,190,77,.1);color:#ffc65a;}
 /* сколько заберёт «Завершить» — цветом данных экспедиций, как кошелёк подготовки */
 .wp-reward{font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cur-data);margin:-4px 0 14px;}
 

@@ -8,7 +8,7 @@ import { createInitialState, type Fleet, type GameState, type Planet } from '../
 import { parseGameData, type GameData } from '../data/schemas';
 import { setStance } from '../state/diplomacy';
 import type { Action, AdvanceResult, ApplyResult, Context } from '../action/types';
-import { deepFreeze } from '../util/clone';
+import { deepClone, deepFreeze } from '../util/clone';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -628,5 +628,88 @@ describe('movement — дипломатический обход (D2)', () => {
     const r1 = okApply(kernel.applyAction(mk(), move('F', 'D'), ctx(0)));
     const r2 = okApply(kernel.applyAction(mk(), move('F', 'D'), ctx(0)));
     expect(JSON.stringify(r1.state.fleets.F!.movement)).toBe(JSON.stringify(r2.state.fleets.F!.movement));
+  });
+});
+
+// FOG-LEAK (жалоба владельца 2026-10-17): приказ в неразведанную провинцию отвечал «нет права
+// прохода» и тем выдавал, что там чужая территория. Теперь приказ отбивается только видимой
+// границей, а невидимую флот встречает в пути и останавливается перед ней.
+describe('movement — граница, которой игрок не видит (FOG-LEAK)', () => {
+  // Цепочка A(p1) — B — D, B принадлежит p2, с которым мир. Обхода нет.
+  function line(): Planet[] {
+    const a = planet('A', 'p1', 0, 0);
+    const m = planet('M', null, 30, 0);
+    const b = planet('B', 'p2', 60, 0);
+    const d = planet('D', null, 90, 0);
+    a.links = ['M'];
+    m.links = ['A', 'B'];
+    b.links = ['M', 'D'];
+    d.links = ['B'];
+    return [a, m, b, d];
+  }
+  const peace = { 'p1|p2': 'peace' as const };
+  /** Память тумана игрока p1: он видел только `seen` (снимки — с настоящими владельцами). */
+  function fogged(seen: string[]): GameState {
+    const st: GameState = { ...baseState(line(), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peace };
+    const mem: Record<string, { owner: string | null; garrison: []; buildings: []; at: number }> = {};
+    for (const id of seen) mem[id] = { owner: st.planets[id]!.owner, garrison: [], buildings: [], at: 0 };
+    return { ...st, fog: { p1: mem } };
+  }
+
+  it('видимая граница — отказ, как и раньше', () => {
+    const kernel = createKernel([movementModule]);
+    expect(errCode(kernel.applyAction(fogged(['M', 'B']), move('F', 'D'), ctx(0)))).toBe(
+      'E_NO_RIGHT_OF_WAY',
+    );
+  });
+
+  it('невидимая граница — приказ принят, флот долетает до неё и встаёт перед ней', () => {
+    const kernel = createKernel([movementModule]);
+    const r = okApply(kernel.applyAction(fogged(['M']), move('F', 'D'), ctx(0)));
+    expect(r.state.fleets.F!.movement?.to).toBe('M');
+    expect(r.events.some((e) => e.type === 'fleet.halted')).toBe(false);
+    const a = okAdvance(kernel.advanceTo(r.state, ctx(100 * HOUR)));
+    const f = a.state.fleets.F!;
+    expect(f.location).toBe('M'); // не вошёл в B
+    expect(f.movement).toBeNull();
+    const halted = a.events.find((e) => e.type === 'fleet.halted');
+    expect(halted?.payload).toEqual({ fleetId: 'F', owner: 'p1', at: 'M', blocked: 'B', blocker: 'p2' });
+    // остановка — конец пути: мир M — прибытие, а не транзит
+    expect(a.events.some((e) => e.type === 'fleet.arrived' && (e.payload as { at?: string }).at === 'M')).toBe(true);
+  });
+
+  it('невидимая граница прямо по курсу — приказ принят, флот стоит, хозяин назван', () => {
+    const kernel = createKernel([movementModule]);
+    const st = fogged([]);
+    st.fleets.F!.location = 'M';
+    const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
+    expect(r.state.fleets.F!.location).toBe('M');
+    expect(r.state.fleets.F!.movement).toBeNull();
+    expect(r.events.some((e) => e.type === 'fleet.departed')).toBe(false);
+    expect(r.events.find((e) => e.type === 'fleet.halted')?.payload).toMatchObject({
+      at: 'M',
+      blocked: 'B',
+      blocker: 'p2',
+    });
+  });
+
+  it('устаревшая память («там мирный», а мир уже ничей) не отбивает приказ', () => {
+    const kernel = createKernel([movementModule]);
+    const st = fogged(['M', 'B']);
+    st.planets.B!.owner = null;
+    const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
+    expect(r.state.fleets.F!.movement?.to).toBe('M');
+  });
+
+  it('граница, закрывшаяся в пути, останавливает и без тумана', () => {
+    const kernel = createKernel([movementModule]);
+    const st: GameState = { ...baseState(line(), [fleet('F', 'p1', 'A', ['scout'])]) };
+    st.planets.B!.owner = null;
+    const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
+    const mid = deepClone(r.state);
+    mid.planets.B!.owner = 'p2';
+    mid.diplomacy = peace;
+    const a = okAdvance(kernel.advanceTo(mid, ctx(100 * HOUR)));
+    expect(a.state.fleets.F!.location).toBe('M');
   });
 });

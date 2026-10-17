@@ -466,7 +466,9 @@ const STATE_HASH_EVERY_MS = 3_000;
  *    `scheduled`), a capital designation (the hero-respawn anchor), a steward hold point, a
  *    mine laid (a rival's mine is seen only up close, SM-3.6), a salvage payout (a rival's
  *    treasury), a merge waiting for a fleet still in flight (that fleet may be out of sight)
- *    and a refuge found (what a rival knows, PVR-8.4). */
+ *    and a refuge found (what a rival knows, PVR-8.4).
+ *  · A fleet halted at a closed border (FOG-LEAK): it names the owner of a world its owner
+ *    may not see, so it is the halted fleet's owner's news alone. */
 export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new Map<
   string,
   'owner' | 'playerId'
@@ -487,6 +489,7 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['salvage.paid', 'playerId'],
   ['fleet.merge.pending', 'owner'],
   ['refuge.found', 'owner'],
+  ['fleet.halted', 'owner'],
 ]);
 
 export class MatchRoom {

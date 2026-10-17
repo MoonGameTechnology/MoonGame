@@ -112,7 +112,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 81: порядок тот же; auto-rally 1.1.0 — точка сбора мира-верфи, действие `rally.point` (RALLY-1).
 // 82: порядок тот же; shuttle 1.15.0 — замечания Codex на #1626 (ракета важнее мины, `pd.reload`).
 // 83: порядок тот же; shuttle 1.16.0, rocketMines 3.1.0 — ракета — воздушная цель, выстрел патруля на влёте (SM-3.7d).
-const PINNED_FOR_VERSION = '83';
+// 84: порядок тот же; movement 1.5.0 — право прохода по видимой границе, невидимую флот встречает в пути (FOG-LEAK).
+const PINNED_FOR_VERSION = '84';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
