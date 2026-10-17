@@ -13,7 +13,6 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { t, tData } from '../../localization/runtime';
-import { shareAddress } from '../../decisions/matchAddress';
 import { saveSession } from '../../decisions/sessionStore';
 import { fmtJoinWindow, ruleSummary } from './matchRow';
 
@@ -31,7 +30,7 @@ const reply = (status: number, body: unknown = {}): Reply => ({
   json: async () => body,
 });
 
-type Listener = (e: { target: El }) => void;
+type Listener = (e: { target: El; preventDefault(): void }) => void;
 
 /** Стиль узла: `display` и пользовательские свойства (`--lo`/`--hi` дорожки игроков). */
 class Style {
@@ -116,7 +115,7 @@ class El {
     this.on.set(type, [...(this.on.get(type) ?? []), fn]);
   }
   fire(type: string, target: El = this): void {
-    for (const fn of this.on.get(type) ?? []) fn({ target });
+    for (const fn of this.on.get(type) ?? []) fn({ target, preventDefault: () => {} });
   }
   /** Щелчок всплывает, как в браузере: так работают кнопки режима в `#mf-mode`. */
   click(): void {
@@ -184,6 +183,9 @@ function buildPage(): El {
   const dual = add(players, 'div', { id: 'mf-dual' });
   add(dual, 'input', { id: 'mf-min' });
   add(dual, 'input', { id: 'mf-max' });
+  const num = add(browse, 'form', { id: 'mnum', style: hidden() });
+  add(num, 'input', { id: 'mnum-in' });
+  add(num, 'button', { id: 'mnum-go' });
   add(browse, 'div', { id: 'mlist' });
   add(browse, 'div', { id: 'match-create', style: hidden() });
   add(root, 'div', { id: 'hub-mine-sec' });
@@ -516,6 +518,22 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(calls).toEqual([['openSessionTab', 'm1', true]]);
   });
 
+  it('поле номера: своя партия — возврат на место, чужая — вход, мусор — подсказка', async () => {
+    await browsing();
+    $('mnum-in').value = '№ m1';
+    $('mnum').fire('submit');
+    $('mnum-in').value = 'a1';
+    $('mnum').fire('submit');
+    expect(of('openSessionTab')).toEqual([
+      ['openSessionTab', 'm1', true],
+      ['openSessionTab', 'a1', false],
+    ]);
+    $('mnum-in').value = 'не номер!';
+    $('mnum').fire('submit');
+    expect(of('openSessionTab')).toHaveLength(2);
+    expect(status).toBe(t('browser.number.bad'));
+  });
+
   it('«Архив»: рядом с «Войти» — «Восстановить»', async () => {
     await browsing();
     tab('archived').click();
@@ -758,7 +776,9 @@ describe('REFM-217 — «Мои партии» хаба', () => {
     expect($('hub-mine-sec').hidden).toBe(false);
     expect(cards()).toHaveLength(2);
     const first = cards()[0]!;
-    expect(first.innerHTML).toContain(shareAddress(HTTP, 'm1'));
+    // Под партией — её номер, а не адрес (плейтест 2026-10-17).
+    expect(first.innerHTML).toContain('№ m1');
+    expect(first.innerHTML).not.toContain('/game/');
     expect(first.innerHTML).toContain('▶');
     expect(cards()[1]!.innerHTML).toContain('◼');
     const open = first.children.at(-1)!.children[0]!;
@@ -795,14 +815,14 @@ describe('REFM-217 — «Мои партии» хаба', () => {
     expect(of('hubTab')).toEqual([['hubTab', 'games']]);
   });
 
-  it('адрес партии копируется; без буфера обмена — просьба скопировать из строки', async () => {
+  it('номер партии копируется; без буфера обмена — просьба скопировать из строки', async () => {
     const mb = await boot();
     await mb.refreshMyMatches();
     const copy = () => cards()[0]!.children.at(-1)!.children[1]!;
     expect(copy().textContent).toBe(t('hub.mine.copy'));
     copy().click();
     await settle();
-    expect(of('clipboard')).toEqual([['clipboard', shareAddress(HTTP, 'm1')]]);
+    expect(of('clipboard')).toEqual([['clipboard', 'm1']]);
     expect(of('hubNote')).toEqual([['hubNote', t('hub.mine.copied')]]);
     clipboard = undefined;
     copy().click();

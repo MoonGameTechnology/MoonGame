@@ -485,6 +485,8 @@ export const ru: Record<string, string> = {
   'browser.goal.map': '{p}% карты',
   'browser.goal.score': 'до {n} очк.',
   'browser.join': 'Войти',
+  'browser.number.bad': 'Это не номер партии',
+  'browser.number.ph': 'Номер партии',
   'browser.resume': 'Продолжить',
 
   // ADM-1 — пульт администратора (`/admin`): отдельная страница для того, кто ведёт
@@ -2939,9 +2941,9 @@ export const ru: Record<string, string> = {
   'hub.emblem.close': 'Закрыть',
   'hub.emblem.title': 'Выбор эмблемы',
   'hub.messages.soon': 'Сообщения — скоро',
-  'hub.mine.copied': 'Адрес скопирован',
-  'hub.mine.copy': 'Скопировать адрес',
-  'hub.mine.copy-manual': 'Скопируйте адрес из строки вручную',
+  'hub.mine.copied': 'Номер скопирован',
+  'hub.mine.copy': 'Скопировать номер',
+  'hub.mine.copy-manual': 'Скопируйте номер из строки вручную',
   'hub.mine.empty': 'Сетевых партий пока нет',
   'hub.mine.more': 'Ещё {n} — в списке игр',
   'hub.mine.section': 'Мои партии',

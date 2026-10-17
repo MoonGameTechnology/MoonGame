@@ -481,6 +481,8 @@ export const en: Record<string, string> = {
   'browser.goal.map': '{p}% of the map',
   'browser.goal.score': 'up to {n} pts.',
   'browser.join': 'Join',
+  'browser.number.bad': 'Not a match number',
+  'browser.number.ph': 'Match number',
   'browser.resume': 'Continue',
 
   // ADM-1 — the admin console (`/admin`): a separate page for whoever runs the
@@ -2929,9 +2931,9 @@ export const en: Record<string, string> = {
   'hub.emblem.close': 'Close',
   'hub.emblem.title': 'Choose an emblem',
   'hub.messages.soon': 'Messages — coming soon',
-  'hub.mine.copied': 'Address copied',
-  'hub.mine.copy': 'Copy address',
-  'hub.mine.copy-manual': 'Copy the address from the row by hand',
+  'hub.mine.copied': 'Number copied',
+  'hub.mine.copy': 'Copy number',
+  'hub.mine.copy-manual': 'Copy the number from the row by hand',
   'hub.mine.empty': 'No online matches yet',
   'hub.mine.more': '{n} more — in the games list',
   'hub.mine.section': 'My matches',

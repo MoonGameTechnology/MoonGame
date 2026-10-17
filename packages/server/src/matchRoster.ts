@@ -58,8 +58,11 @@ export function bootRoster(input: BootRosterInput): BootRoster {
     return { raise: [...input.stored], seeded: [] };
   }
   const n = Math.max(1, Math.min(MAX_HOSTED_MATCHES, Math.floor(input.seedCount) || 1));
-  const seeded = Array.from({ length: n }, (_, i) =>
-    i === 0 ? LEGACY_FIRST_MATCH_ID : newMatchId(),
-  );
+  // Стор пуст, поэтому занятыми номерами могут быть только засеянные здесь же.
+  const seeded = [LEGACY_FIRST_MATCH_ID];
+  while (seeded.length < n) {
+    const id = newMatchId();
+    if (!seeded.includes(id)) seeded.push(id);
+  }
   return { raise: [...seeded], seeded };
 }
