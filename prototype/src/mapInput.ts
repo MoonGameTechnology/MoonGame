@@ -76,6 +76,7 @@ import {
 import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import type { RelocateTarget } from '../../decisions/relocateTargets';
 import {
+  decisivePick,
   nextPick,
   retapsSelectedWorld,
   tapCandidates,
@@ -94,6 +95,7 @@ import {
   forkMarkAt,
   nearestLanePoint,
   selectedFleetIds,
+  strikeWorldPos,
 } from './fleetGeometry';
 import {
   castHeroAbility,
@@ -350,6 +352,28 @@ function rightClick(ev: MouseEvent): void {
   tapByTouch = false;
   courseAt(selectedFleetIds(), p.x, p.y);
   game.invalidatePanel();
+}
+
+/** Сколько px от пальца до точки кандидата (`tapCycle.ts`, правило 8). Мир, пойманный
+ *  только площадью провинции, — `Infinity`; крепость на развилке — `NaN`: её точку
+ *  спрашивать не у кого, и такой тап решает список, как прежде. */
+function tapDistance(
+  pick: TapPick,
+  mx: number,
+  my: number,
+  direct: { x: number; y: number } | null,
+  fortress: boolean,
+): number {
+  const at =
+    pick.kind === 'fleet'
+      ? fleetAnchor(game.world().fleets[pick.id]!)
+      : pick.kind === 'strike'
+        ? ((p) => (p ? world(p) : null))(strikeWorldPos(pick.id))
+        : direct
+          ? world(direct)
+          : null;
+  if (at) return Math.hypot(mx - at.x, my - at.y);
+  return pick.kind === 'planet' && !fortress ? Infinity : NaN;
 }
 
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
@@ -797,6 +821,16 @@ export function selectAt(mx: number, my: number) {
         return;
       }
       const choices = tapCandidates(fleetIds, n?.id ?? null, strikeIds);
+      // Явное попадание выбирает сразу, список — только спорному тапу (`tapCycle.ts`,
+      // правило 8): иначе он открывался на каждый тап по флоту и по миру с флотом.
+      const sure = decisivePick(
+        choices.map((pick) => ({ pick, d: tapDistance(pick, mx, my, direct, !!fortress) })),
+      );
+      if (sure && choices.length > 1) {
+        offerChoices([]);
+        applyPick(sure);
+        return;
+      }
       offerChoices(choices.length > 1 ? choices : []);
       if (mobileChoices.length) return;
     }

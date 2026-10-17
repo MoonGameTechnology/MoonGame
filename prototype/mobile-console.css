@@ -338,10 +338,10 @@ body.mobile-ui #tbscore {
   background: none;
 }
 /* the de-boxed chip carries its own 8px of gap now, so the crest no longer pays a second
-   one on the same seam — that padding goes back to the nick, and the emblem sits straight
-   after the ‹ instead of behind 2px of its own */
+   one on the same seam — that padding goes back to the nick. With no ‹ before it (below),
+   the emblem keeps 8px off the screen edge. */
 body.mobile-ui .crest {
-  padding: 0;
+  padding: 0 0 0 8px;
 }
 body.mobile-ui #daycard {
   margin-left: 0;
@@ -356,13 +356,11 @@ body.mobile-ui #crestmark {
   min-width: 44px;
   min-height: 44px;
 }
-/* The ‹ is an 8px glyph. It once sat in a 40px box, was narrowed to 32px to give the row
-   back its air, and is 44px wide again under the 44 × 44 rule (UIX-1.3): the glyph stays the
-   same, only the box around it — the part the thumb hits — grows. The height fills the 48px
-   row, and the hit area runs to the very screen edge, where a miss has nowhere to land. */
+/* На телефоне «‹» в углу нет (владелец, 2026-10-17: «убрать стрелочку слева вверху на
+   телефоне»). Окна закрывает их ✕ и системный «Назад», из партии выводит «Выход в меню» в
+   «Ещё». Ряд отдаёт эти 44 px гербу и нику. */
 body.mobile-ui #topback {
-  width: 44px;
-  min-height: 44px;
+  display: none;
 }
 body.mobile-ui #purse {
   display: grid;
@@ -438,7 +436,7 @@ body.mobile-ui.aim-mode #toasts .toast:not(.jump) {
    растянутая полоса оставляла пустоту левее паузы (владелец, 2026-09-24). Темп и множители —
    две группы. Где ряд не помещается в строку, множители целиком встают второй строкой, а
    обе строки растягиваются на всю его ширину — иначе та же пустота вернулась бы слева.
-   ⌂ в ряду нет: выход на телефоне — «Выход в меню» в «Ещё» и «‹» в углу. */
+   ⌂ в ряду нет: выход на телефоне — «Выход в меню» в «Ещё». */
 body.mobile-ui #speedbar {
   display: none;
   right: max(8px, env(safe-area-inset-right));

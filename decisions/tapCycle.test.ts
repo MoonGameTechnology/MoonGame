@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  decisivePick,
   nextPick,
   retapsSelectedWorld,
   samePick,
@@ -121,5 +122,72 @@ describe('эскадра в воздухе под тапом (SHU-6.14, прав
   it('планшет: эскадра под пальцем важнее флота и мира', () => {
     expect(touchPick('f1', 'p1', null, 'st1')).toEqual(эскадра('st1'));
     expect(touchPick('f1', 'p1', null, null)).toEqual(флот('f1'));
+  });
+});
+
+describe('телефон — явное попадание выбирает без списка (правило 8)', () => {
+  it('ТАП В ЗНАЧОК ФЛОТА НА ОРБИТЕ — ФЛОТ: мир в 15 px не открывает список', () => {
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: 1 },
+        { pick: мир('p1'), d: 15 },
+      ]),
+    ).toEqual(флот('f1'));
+  });
+
+  it('ТАП В САМ МИР — МИР, хотя флот на его орбите тоже в радиусе пальца', () => {
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: 14 },
+        { pick: мир('p1'), d: 2 },
+      ]),
+    ).toEqual(мир('p1'));
+  });
+
+  it('ТАП МЕЖДУ ФЛОТОМ И МИРОМ СПОРНЫЙ — решает список', () => {
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: 7 },
+        { pick: мир('p1'), d: 9 },
+      ]),
+    ).toBeNull();
+  });
+
+  it('МИР ПО ПЛОЩАДИ ПРОВИНЦИИ ПРОИГРЫВАЕТ ФЛОТУ ПОД ПАЛЬЦЕМ: летящий флот выбирается сразу', () => {
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: 20 },
+        { pick: мир('p1'), d: Infinity },
+      ]),
+    ).toEqual(флот('f1'));
+  });
+
+  it('два флота стопкой на одной точке — спорно, список', () => {
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: 3 },
+        { pick: флот('f2'), d: 4 },
+      ]),
+    ).toBeNull();
+  });
+
+  it('точка кандидата неизвестна — спорно, список', () => {
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: NaN },
+        { pick: мир('p1'), d: 9 },
+      ]),
+    ).toBeNull();
+    expect(
+      decisivePick([
+        { pick: флот('f1'), d: 3 },
+        { pick: мир('p1'), d: NaN },
+      ]),
+    ).toBeNull();
+  });
+
+  it('один кандидат — он и выбран, пусто — ничего', () => {
+    expect(decisivePick([{ pick: мир('p1'), d: Infinity }])).toEqual(мир('p1'));
+    expect(decisivePick([])).toBeNull();
   });
 });
