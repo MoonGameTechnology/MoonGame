@@ -1734,7 +1734,6 @@ export const en: Record<string, string> = {
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Invalid server address',
-  'net.connected': '● connected as {who}',
   'net.connecting': 'Connecting: {nick}…',
   'net.error': 'Error: {code}',
   'net.join-closed': 'this match is closed to new players (the entry window has elapsed)',
@@ -1742,7 +1741,6 @@ export const en: Record<string, string> = {
   'net.need-address': 'Enter the server address',
   'net.no-seat': 'Could not get a seat',
   'net.queued-order': 'offline — the order goes out as soon as we reconnect',
-  'net.reconnecting': '● connection lost — reconnecting…',
   'net.reconnecting-order': 'reconnecting — order not sent, try again shortly',
   'net.slot-taken': 'That name is already playing — another tab or device?',
   'net.waiting-host': 'Waiting for the host to start…',

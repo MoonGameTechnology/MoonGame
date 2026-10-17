@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextCycleStep, redialPlan } from './reconnectCycle';
+import { nextCycleStep, reconnectBannerShown, redialPlan } from './reconnectCycle';
 import { RECONNECT_MAX_ATTEMPTS, REAP_WINDOW_MS, reconnectDelayMs } from './reconnect';
 
 describe('очередная попытка переподключения', () => {
@@ -54,5 +54,13 @@ describe('с чего начинается повторный дозвон', () 
 
   it('СЕССИИ НЕТ — ЭКРАН ВХОДА, а не новый круг: попытки с мёртвой сессией не кончатся ничем', () => {
     expect(redialPlan(true, false)).toBe('sign-in-again');
+  });
+});
+
+describe('правило 4 — баннер переподключения', () => {
+  it('первая попытка идёт молча, баннер — когда она не помогла', () => {
+    expect(reconnectBannerShown(1)).toBe(false);
+    expect(reconnectBannerShown(2)).toBe(true);
+    expect(reconnectBannerShown(RECONNECT_MAX_ATTEMPTS)).toBe(true);
   });
 });

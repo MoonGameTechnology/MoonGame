@@ -1741,7 +1741,6 @@ export const ru: Record<string, string> = {
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Неверный адрес сервера',
-  'net.connected': '● подключён как {who}',
   'net.connecting': 'Подключение: {nick}…',
   'net.error': 'Ошибка: {code}',
   'net.join-closed': 'вход в этот матч закрыт (окно приёма новых игроков истекло)',
@@ -1749,7 +1748,6 @@ export const ru: Record<string, string> = {
   'net.need-address': 'Укажите адрес сервера',
   'net.no-seat': 'Место получить не удалось',
   'net.queued-order': 'связи нет — приказ уйдёт сразу после переподключения',
-  'net.reconnecting': '● связь потеряна — переподключение…',
   'net.reconnecting-order': 'переподключение — приказ не отправлен, повторите позже',
   'net.slot-taken': 'Этим именем уже играют — другая вкладка или устройство?',
   'net.waiting-host': 'Ждём, пока хост начнёт…',

@@ -317,13 +317,32 @@ describe('REFM-216 — впуск и снимки', () => {
     lastWs().hear(welcome());
     expect(net.netView).toMatchObject({ t: 5_000, at: 10_000, rate: 0 });
     clock = 11_000;
-    lastWs().hear(resync(1)); // мир прошёл секунду за секунду
-    expect(net.netView).toMatchObject({ t: 6_000, at: 11_000, rate: 1 });
+    lastWs().hear(resync(1)); // второй снимок только начинает отсчёт скорости
+    expect(net.netView).toMatchObject({ t: 6_000, at: 11_000, rate: 0 });
+    clock = 12_000;
+    lastWs().hear(resync(2)); // мир прошёл секунду за секунду
+    expect(net.netView).toMatchObject({ t: 7_000, at: 12_000, rate: 1 });
     // Повторный вход (новый сокет) часы не наследует: прежний темп не тянет картинку.
     clock = 12_000;
     net.connect();
     lastWs().hear(welcome({ state: world(9_000) }));
     expect(net.netView).toMatchObject({ t: 9_000, at: 12_000, rate: 0 });
+  });
+
+  it('часы картинки: переподключение продолжает прежние часы, а не меряет скорость заново', async () => {
+    const { net } = await boot();
+    net.connect();
+    lastWs().hear(welcome());
+    clock = 11_000;
+    lastWs().hear(resync(1));
+    clock = 12_000;
+    lastWs().hear(resync(2));
+    lastWs().onclose?.();
+    clock = 15_000;
+    vi.advanceTimersByTime(1_000);
+    lastWs().onopen?.();
+    lastWs().hear(welcome({ seq: 5, state: world(10_000) }));
+    expect(net.netView).toMatchObject({ t: 10_000, at: 15_000, rate: 1 });
   });
 
   it('баннер ожидания ставит и снимает снимок, чужой баннер не трогает', async () => {
@@ -414,6 +433,7 @@ describe('REFM-216 — обрыв и переподключение', () => {
     const { net, env } = await joined();
     const client = net.netClient;
     lastWs().hear({ type: 'pong', serverTime: 1, clientTime: clock - 30 });
+    const notesBefore = env.notes.length;
     lastWs().onclose?.();
     expect([net.NET, net.netAdmitted, net.reconnecting, net.rttEma]).toEqual([
       false,
@@ -421,8 +441,8 @@ describe('REFM-216 — обрыв и переподключение', () => {
       true,
       null,
     ]);
-    expect(env.notes).toContain(t('net.reconnecting'));
-    expect(env.banner).toBe(t('acc.reconnecting'));
+    // Первая попытка — молча: ни тоста об обрыве, ни баннера (`reconnectCycle.ts`, правило 4).
+    expect([env.notes.length, env.banner]).toEqual([notesBefore, null]);
     client!.sendAction({ type: 'noop', playerId: 'p2', issuedAt: 0, payload: {} } as never);
     expect(lastWs().sentOf('action')).toEqual([]);
     vi.advanceTimersByTime(999);
@@ -430,6 +450,9 @@ describe('REFM-216 — обрыв и переподключение', () => {
     vi.advanceTimersByTime(1);
     expect(FakeWs.all).toHaveLength(2);
     expect(lastWs().url).toBe(`${BASE}/matches/proto?nick=Orion`);
+    // Первая попытка не помогла — теперь обрыв уже не моргание, и баннер встаёт.
+    lastWs().onclose?.();
+    expect(env.banner).toBe(t('acc.reconnecting'));
     // Пинг и замер погасли вместе с сокетом: до впуска нового провода их нет.
     vi.advanceTimersByTime(30_000);
     expect(FakeWs.all.flatMap((ws) => [...ws.sentOf('ping'), ...ws.sentOf('perf')])).toHaveLength(
@@ -508,6 +531,8 @@ describe('REFM-216 — обрыв и переподключение', () => {
     expect(env.connect).toEqual([true]);
     vi.advanceTimersByTime(60_000);
     expect(FakeWs.all).toHaveLength(9);
+    // Мир на экране по-прежнему серверный: локальные часы по нему не пойдут (ложная победа).
+    expect([net.NET, net.netWorld]).toEqual([false, true]);
   });
 
   it('аккаунты: дозвон берёт свежий билет по сессии', async () => {
@@ -560,8 +585,10 @@ describe('REFM-216 — выход из сети', () => {
     const { net, env } = await joined();
     const ws = lastWs();
     ws.hear({ type: 'pong', serverTime: 1, clientTime: clock - 50 });
+    expect(net.netWorld).toBe(true);
     net.leaveNetwork();
-    expect([net.NET, net.netAdmitted, net.netClient, net.rttEma, ws.closed]).toEqual([
+    expect([net.NET, net.netAdmitted, net.netWorld, net.netClient, net.rttEma, ws.closed]).toEqual([
+      false,
       false,
       false,
       null,
@@ -569,11 +596,7 @@ describe('REFM-216 — выход из сети', () => {
       true,
     ]);
     ws.onclose?.();
-    expect([env.notes.includes(t('net.reconnecting')), env.banner, env.connect]).toEqual([
-      false,
-      null,
-      [],
-    ]);
+    expect([env.banner, env.connect]).toEqual([null, []]);
     // Пинг и замер прежней партии не доживают до следующего дозвона.
     net.connect();
     vi.advanceTimersByTime(60_000);
@@ -597,10 +620,13 @@ describe('REFM-216 — выход из сети', () => {
   it('выход на обрыве гасит дозвон и снимает только свой баннер', async () => {
     const { net, env } = await joined();
     lastWs().onclose?.();
+    vi.advanceTimersByTime(1_000);
+    lastWs().onclose?.(); // первая попытка не помогла — баннер стоит
+    expect(env.banner).toBe(t('acc.reconnecting'));
     net.leaveNetwork();
     expect(env.banner).toBeNull();
     vi.advanceTimersByTime(60_000);
-    expect(FakeWs.all).toHaveLength(1);
+    expect(FakeWs.all).toHaveLength(2);
     env.banner = '⏳ ждём хоста';
     net.leaveNetwork();
     expect(env.banner).toBe('⏳ ждём хоста');
@@ -710,6 +736,17 @@ describe('REFM-216 — стык с main.ts', () => {
   const hook = (name: string): string =>
     new RegExp(`\\n {2}${name}: \\([^)]*\\) => \\{([\\s\\S]*?)\\n {2}\\},\\n`).exec(MAIN)?.[1] ??
     '';
+
+  it('серверный мир не идёт по локальным часам и на обрыве: ложной победы нет', () => {
+    // На обрыве `NET` гаснет, а мир на экране — туманный снимок сервера, где чужие миры
+    // ничьи. Локальный ход по нему выбивал «безземельных» соперников (плейтест 2026-10-17).
+    expect(MAIN).toContain('const simRunning = simRuns(netWorld, speed,');
+    expect(MAIN).not.toMatch(/simRuns\(NET\b/);
+    expect(MAIN).toContain('return netWorld ? netShownTime');
+    expect(MAIN).toMatch(/function installMatch\([^)]*\): void \{\n {2}leaveNetwork\(\);/);
+    const ORD = readFileSync(new URL('./orderPipeline.ts', import.meta.url), 'utf8');
+    expect(ORD).toContain('reconnecting: reconnecting || (netWorld && !NET)');
+  });
 
   it('сокет, клиент, таймеры и дозвон живут только у владельца', () => {
     expect(MAIN).not.toMatch(/new (WebSocket|MultiplayerClient)\(/);
