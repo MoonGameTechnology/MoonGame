@@ -3,9 +3,8 @@
 // Что здесь закрепляется. Ядро перестало отдавать пустой мир флоту из одних разведчиков
 // (`E_RECON_NO_CAPTURE`), а бот об этом не знал: слал такой флот к ближайшей пустой
 // провинции и оттуда каждые два часа отдавал отбиваемый штурм. Замер на дуэли: 117
-// отказов за матч, и треть своего времени разведчики стояли на чужих мирах. Теперь
-// разведчик без десанта едет домой, дома берёт ополченца (трюм разведчика — один боец),
-// и с ним пустой мир берётся штурмом, как и разрешает правило.
+// отказов за матч. Трюма у разведчика нет (решение владельца 2026-10-17), поэтому взять
+// бойца ему не во что: флот из одних разведчиков не штурмует и никуда не едет за десантом.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES, SECTOR_TYPES } from './game';
 import { data } from './gameData';
@@ -54,13 +53,11 @@ const ordersFor = (s: GameState, type: string): Action[] =>
   );
 
 describe('бот знает, что разведчик без десанта мир не берёт', () => {
-  it('на пустой провинции не штурмует, а летит домой', () => {
+  it('на пустой провинции не штурмует и стоит на месте', () => {
     const s = game2();
     const st = withFleet(s, fleetAt(emptyProvince(s), [{ unit: 'scout', count: 2 }]));
     expect(ordersFor(st, 'fleet.assault')).toHaveLength(0);
-    const moves = ordersFor(st, 'fleet.move');
-    expect(moves).toHaveLength(1);
-    expect((moves[0]!.payload as { to: string }).to).toBe(homeOf(s, 'p2'));
+    expect(ordersFor(st, 'fleet.move')).toHaveLength(0);
   });
 
   it('с ополченцем на борту пустую провинцию штурмует', () => {
@@ -72,20 +69,14 @@ describe('бот знает, что разведчик без десанта м�
     expect(ordersFor(st, 'fleet.assault')).toHaveLength(1);
   });
 
-  it('дома, без войны и без ничьих гарнизонов, берёт ополченца в трюм', () => {
-    // Остальной флот грузится дома только под атаку или под ничий гарнизон (правило
-    // владельца №5); разведчику без бойца брать нечего вовсе, поэтому он грузится всегда.
+  it('дома бойца в трюм не берёт: трюма у разведчика нет', () => {
     const s = game2();
     const home = homeOf(s, 'p2');
-    const planets = Object.fromEntries(
-      Object.entries(s.planets).map(([id, p]) => [id, p.owner === null ? { ...p, garrison: [] } : p]),
-    );
     const staged: GameState = {
       ...s,
-      planets: { ...planets, [home]: { ...s.planets[home]!, garrison: [{ unit: 'militia', count: 9 }] } },
+      planets: { ...s.planets, [home]: { ...s.planets[home]!, garrison: [{ unit: 'militia', count: 9 }] } },
     };
-    const loads = ordersFor(withFleet(staged, fleetAt(home, [{ unit: 'scout', count: 1 }])), 'army.load');
-    expect(loads.map((a) => a.payload)).toEqual([{ fleetId: 'f:r', unit: 'militia', count: 1 }]);
+    expect(ordersFor(withFleet(staged, fleetAt(home, [{ unit: 'scout', count: 1 }])), 'army.load')).toHaveLength(0);
   });
 
   it('один боевой корабль в отряде делает флот обычным — пустой мир он занимает', () => {

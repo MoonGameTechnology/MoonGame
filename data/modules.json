@@ -24,7 +24,10 @@
       "metal": 45
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "excludeTraits": [
+        "recon"
+      ]
     }
   },
   "repair_bay": {
@@ -52,7 +55,10 @@
       "metal": 60
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "excludeTraits": [
+        "recon"
+      ]
     }
   },
   "radar_module": {

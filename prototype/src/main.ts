@@ -5758,6 +5758,9 @@ function frame(nowReal: number) {
     renderSplitDialog();
     if (nowReal - lastHeroCardRefresh >= 1000) {
       shipyard.refreshHeroes();
+      // Очередь мира в «Производстве»: в сетевой партии заказ встаёт, когда его примет
+      // сервер, — полоса подхватывает это без нажатия.
+      shipyard.refreshQueue();
       lastHeroCardRefresh = nowReal;
     }
     holographic.layoutWindows();

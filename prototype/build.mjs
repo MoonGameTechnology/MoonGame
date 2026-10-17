@@ -2320,6 +2320,40 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* «Как в прошлый раз» (UIX-7.3): rebuilds the last order; a long hull name is cut, not wrapped */
 .cn-again{margin-left:auto;min-width:0;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cn-again+.cn-close{margin-left:0;flex:none;}
+/* «Шаблоны» (2026-10-17): toggle in the header + a pane under it; the queue strip below
+   the tabs shows the chosen world's unit lane, hidden while it is empty */
+.cn-tplbtn{flex:none;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;}
+#constructor .cn-head>b+.cn-tplbtn{margin-left:auto;}
+.cn-tplbtn.on{color:var(--cyan);border-color:var(--cyan-dim);}
+#constructor .cn-head .cn-tplbtn+.cn-close{margin-left:0;flex:none;}
+.cn-tpl{flex:none;display:flex;flex-direction:column;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);max-height:34vh;overflow:auto;}
+.cn-tplrow{display:flex;align-items:center;gap:6px;}
+.cn-tpluse{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;
+  background:rgba(255,255,255,.02);color:var(--ink);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;text-align:left;}
+.cn-tpluse:hover{border-color:var(--cyan-dim);}
+.cn-tpluse:disabled{opacity:.45;cursor:not-allowed;}
+.cn-tplrow.on .cn-tpluse{border-color:var(--cyan);}
+.cn-tpn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cn-tpms{margin-left:auto;display:flex;gap:3px;flex:none;}
+.cn-tpm{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;}
+.cn-tpm svg{width:16px;height:16px;}
+.cn-tpldel{flex:none;width:28px;height:28px;border-radius:6px;}
+.cn-tplnone{font-size:var(--fs-caption);color:var(--dim);padding:2px 0;}
+.cn-tplsave{align-self:flex-start;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);}
+#cn-queue{flex:none;}
+#cn-queue:empty{display:none;}
+.cn-queue{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);min-width:0;}
+.cn-qh{flex:none;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}
+.cn-qlist{display:flex;gap:6px;overflow-x:auto;min-width:0;scrollbar-width:none;}
+.cn-qi{position:relative;flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--line);border-radius:7px;
+  overflow:hidden;font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
+.cn-qi b{color:#eafffb;}
+.cn-qi.run{border-color:var(--cyan-dim);}
+.cn-qt{color:var(--cyan);}
+.cn-qbar{position:absolute;left:0;bottom:0;height:2px;background:var(--cyan);}
+.cn-qi.fresh{animation:cn-qfresh 1.2s ease-out 1;}
+@keyframes cn-qfresh{0%{border-color:var(--grn);box-shadow:0 0 10px var(--grn);}100%{box-shadow:none;}}
+@media (prefers-reduced-motion:reduce){.cn-qi.fresh{animation:none;border-color:var(--grn);}}
 .cn-tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
 .cn-tab{padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -2495,6 +2529,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cn-tabs{gap:5px;padding:9px 10px;}
   .cn-tab{padding:9px 12px;font-size:var(--fs-caption);}
   .cn-close{width:36px;height:36px;}
+  .cn-tpl-k{display:none;}
+  .cn-tplbtn{min-width:36px;min-height:36px;}
+  .cn-tpldel{width:36px;height:36px;}
   .cn-pal{grid-template-columns:repeat(2,1fr);}
   .cn-hbtn{padding:9px 12px;}
   .cn-step button{width:38px;height:38px;}

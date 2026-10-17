@@ -791,6 +791,9 @@ export const ModuleAllowedSchema = z.object({
   domain: z.enum(['space', 'ground']).optional(),
   traits: z.array(z.string()).default([]),
   units: z.array(z.string()).default([]),
+  /** Hulls carrying ANY of these traits are refused (a cargo bay → never on a `recon`
+   *  scout, owner decision 2026-10-17). */
+  excludeTraits: z.array(z.string()).default([]),
 });
 /** A module's effect. Two separate channels (kept apart on the balance axis):
  *  `stats` = flat additive stat deltas (×count); `enables` = action/ability flags
