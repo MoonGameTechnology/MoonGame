@@ -126,7 +126,7 @@ let seatpickMatch: string | null = null;
  *  ОДНА точка на оба захода — открытие экрана и его тихий переопрос. Разъехавшись, они
  *  отличались бы правами: переопрос молча слеп бы там, где открытие работает, и игрок
  *  видел бы застывший список вместо живого. */
-function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
+export function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
   const pass = tokenFor(localStorage, base, nick);
   return fetch(
     seatsUrl(base, matchId, nick),

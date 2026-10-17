@@ -39,7 +39,6 @@ import {
   conversations,
   diffNetDiplomacy,
   diploOpen,
-  diploSeats,
   diploTab,
   fmtStamp,
   initDiploWindow,
@@ -68,10 +67,12 @@ import {
   netClient,
   netDesync,
   netDesyncCount,
+  netMatchId,
   netView,
   rttEma,
   serverMatchId,
 } from './netSession';
+import { clearSeatNicks, refreshSeatNicks, seatNick } from './seatNicks';
 import {
   closeSeatPicker,
   connectToMatch,
@@ -426,7 +427,7 @@ import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetI
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder, settleOrder } from './orderPipeline';
 import { startSimLink, workerPort, type SimLink } from './simLink';
-import { autoRetreatAt, cancelWarPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, restoreAutoAssault, soloAutoAssault, warPrompt } from './groupOrders';
+import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
   cancelMobileOrder,
   initCmdActions,
@@ -762,7 +763,26 @@ initDiploWindow({
   jumpToPing,
   openProfile: (login) => profile?.open(login),
   refreshChat: () => chatWin?.refreshIfVisible(),
+  seatNick,
+  refreshNicks: () => pullSeatNicks(),
 });
+
+/** Ники соседей по сетевой партии — из расклада мест сервера (`decisions/seatNicks.ts`).
+ *  В состоянии мира их нет: там имя дома. Пришли новые — перерисовать дипломатию. */
+function pullSeatNicks(force = false): void {
+  if (!NET) return;
+  const srv = resolveServer();
+  if (!srv) return;
+  refreshSeatNicks(
+    srv.base,
+    netMatchId(),
+    srv.nick,
+    () => {
+      if (diploOpen && diploTab === 'diplo') renderDiplo();
+    },
+    force,
+  );
+}
 
 // --- multiplayer (net mode) --------------------------------------------------
 // Сетевой жизненный цикл — `netSession.ts` (REFM-216): признак сети, сокет, клиент места,
@@ -788,6 +808,7 @@ initNetSession({
     if (fanfare) needMapPreparation();
     if (fanfare) snd.play('start');
     ME = playerId ?? ME;
+    pullSeatNicks(true); // кто сидит в соседних креслах — для дипломатии
     disarm('match', MOBILE); // как в соло: выбор, прицелы и окна старой сессии гаснут одной строкой
     endScreen = null; // joining a match must not carry the previous result
     matchEnd.reset(); // переподключение к матчу считает его конец заново
@@ -2795,6 +2816,7 @@ function leaveMatch(): void {
   stopSim();
   speed = 0;
   leaveNetwork();
+  clearSeatNicks();
   stopFirstGoals();
   activeTour?.stop();
 }
@@ -4460,10 +4482,10 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z50
   { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
-  // Проба по состоянию, а не по классу: `warPrompt` — источник истины, класс лишь его
+  // Проба по состоянию, а не по классу: `orderPromptOpen` (запрос войны или окно погрузки) — источник истины, класс лишь его
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
-  { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
+  { id: 'warprompt', isOpen: orderPromptOpen, close: () => cancelWarPrompt() }, // z48
   // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
   { id: 'abandon', isOpen: () => abandonCard.classList.contains('show'), close: () => closeAbandon() }, // z48
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
@@ -5053,6 +5075,9 @@ function frame(nowReal: number) {
     renderSplitDialog();
     if (nowReal - lastHeroCardRefresh >= 1000) {
       shipyard.refreshHeroes();
+      // Очередь мира в «Производстве»: в сетевой партии заказ встаёт, когда его примет
+      // сервер, — полоса подхватывает это без нажатия.
+      shipyard.refreshQueue();
       lastHeroCardRefresh = nowReal;
     }
     holographic.layoutWindows();
@@ -5282,6 +5307,8 @@ if (warPromptEl) {
   warPromptEl.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
     if (tg.classList.contains('wp-yes')) confirmWarPrompt();
+    else if (tg.classList.contains('lp-after')) confirmLoadPrompt('after');
+    else if (tg.classList.contains('lp-now')) confirmLoadPrompt('now');
     else if (tg.id === 'warprompt' || tg.classList.contains('wp-no')) cancelWarPrompt();
   });
 }
@@ -5317,8 +5344,7 @@ const pings = __SECTOR_ZERO_ONLY__
               clearPing: (id) => netClient?.clearPing(id),
             }
           : null,
-      seats: diploSeats,
-      coalitionSize: () => conversations.coalition().length,
+      coalition: () => conversations.coalition(),
       name: (id) => NAME[id] ?? id,
       color: ownerColor,
       badge: seatBadge,

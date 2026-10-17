@@ -1520,6 +1520,7 @@ export const ru: Record<string, string> = {
   'diplo.tab.espionage': 'Шпионаж',
   'diplo.tab.messages': 'Сообщения',
   'diplo.win.title': 'Дипломатия',
+  'diplo.profile': 'Открыть профиль игрока',
 
   // --- div — Дивизии: список, мобилизация, конструктор, трюм.
   'div.stat.attack': 'атака',
@@ -2418,6 +2419,14 @@ export const ru: Record<string, string> = {
   'yard.queue.ahead': 'Впереди {n} {n|заказ|заказа|заказов}, ближайший готов через {eta}',
   'yard.queue.now': 'Начнётся сразу',
   'yard.queue.waiting': 'Впереди {n} {n|заказ|заказа|заказов}',
+  'yard.queue.title': 'Очередь · {w}',
+  'yard.tpl.title': 'Шаблоны',
+  'yard.tpl.empty': 'Шаблонов нет. Соберите заказ и сохраните его.',
+  'yard.tpl.save': 'Сохранить текущий',
+  'yard.tpl.saved': 'Текущий сохранён',
+  'yard.tpl.delete': 'Удалить шаблон',
+  'yard.tpl.unavailable': 'Корпус недоступен в этой партии',
+  'yard.tpl.trimmed': 'Часть модулей шаблона недоступна и снята',
   'yard.slots.none': 'Модулей не несёт',
   'yard.stats': 'Характеристики',
   'yard.where': 'Где строить',
@@ -3177,6 +3186,12 @@ export const ru: Record<string, string> = {
   'log.fleet.split': '⊟ флот разделён · {at}',
   'log.fleet.split-transit': '⊟ флот разделён в пути',
   // AUDM-4: флот ушёл раньше, чем закончилась погрузка, — десант остался в гарнизоне.
+  'loadprompt.title': 'Идёт погрузка десанта',
+  'loadprompt.body': 'Погрузка или выгрузка идёт у {n} {n|флота|флотов|флотов}, осталось ≈{m} мин. Вылет её отменит.',
+  'loadprompt.after': 'После погрузки',
+  'loadprompt.now': 'Сбросить и лететь',
+  'loadprompt.cancel': 'Отмена',
+  'log.fleet.halted': '⛔ {f} встал у границы: {to} принадлежит {who}, прохода нет',
   'log.army.load-cancelled': '⚠ погрузка отменена: флот ушёл, {n}× {u} остались · {at}',
   // MSB-9: выгрузка идёт по таймеру, и вылет её снимает — десант остался на борту.
   'log.army.unload-cancelled': '⚠ выгрузка отменена: флот ушёл, {n}× {u} остались на борту · {at}',
@@ -3360,7 +3375,8 @@ export const ru: Record<string, string> = {
   'ping.sent.player': '📍 Пинг → {who}',
   'ping.title': 'Пинг',
   'ping.to.coalition': 'В чат коалиции',
-  'ping.to.player': 'В ЛС игроку',
+  'ping.to.player': 'Союзнику в ЛС',
+  'ping.allies-only': 'Метку можно отправить только союзнику',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Чат',

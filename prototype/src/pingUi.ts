@@ -16,7 +16,14 @@
 import { t } from '../../localization/runtime';
 import { COALITION, type SessionMsg } from './conversations';
 import { esc } from './format';
-import { canEditPing, canRemovePing, pingRows, toggleHidden, type PingRow } from './pingPanel';
+import {
+  canEditPing,
+  canRemovePing,
+  pingRecipients,
+  pingRows,
+  toggleHidden,
+  type PingRow,
+} from './pingPanel';
 import { stickToPoint } from './screenAnchor';
 
 /** Длина описания метки — столько же стоит в `maxlength` поля ввода. */
@@ -52,14 +59,14 @@ export function pingMenuHtml(where: string, coalitionSize: number, dms: readonly
   );
   return (
     `<div class="pm-box">` +
-    `<div class="pm-head">📍 ${t('ping.title')} · <b>${esc(where)}</b></div>` +
+    `<div class="pm-head"><span>📍 ${t('ping.title')} · <b>${esc(where)}</b></span>` +
+    `<button class="pm-close btn-x" data-pmcancel aria-label="${t('card.close')}">✕</button></div>` +
     `<div class="pm-sub">${t('ping.note')}</div>` +
     `<input id="pm-text" class="pm-text" maxlength="${PING_DESC_MAX}" placeholder="${t('ping.desc.ph')}" autocomplete="off">` +
     `<div class="pm-lbl">${t('ping.to.coalition')}</div>${coal}` +
     (dms.length
       ? `<div class="pm-lbl">${t('ping.to.player')}</div>${dms.map((d) => btn(d)).join('')}`
       : '') +
-    `<button class="pm-cancel" data-pmcancel>${t('ping.cancel')}</button>` +
     `</div>`
   );
 }
@@ -119,7 +126,8 @@ export function pingPopHtml(
   mine: boolean,
 ): string {
   return (
-    `<div class="pp-top"><b style="color:${color}">📍 ${esc(who)}</b><span>${esc(where)}</span></div>` +
+    `<div class="pp-top"><b style="color:${color}">📍 ${esc(who)}</b><span>${esc(where)}</span>` +
+    `<button class="pp-close btn-x" aria-label="${t('card.close')}">✕</button></div>` +
     `<div class="pp-desc">${text ? esc(text) : `<i>${t('ping.no-desc')}</i>`}</div>` +
     `<div class="pp-act"><button class="pp-jump" data-loc="${esc(loc)}">${t('chat.jump')}</button>` +
     (mine ? `<button class="pp-del" data-loc="${esc(loc)}">${t('ping.remove')}</button>` : '') +
@@ -160,9 +168,8 @@ export interface PingHost {
   push(to: string, text: string, loc: string): void;
   /** Сеть, если матч сетевой. */
   net(): PingNet | null;
-  /** Собеседники для личных меток (себя отфильтрует модуль) и размер коалиции. */
-  seats(): string[];
-  coalitionSize(): number;
+  /** Коалиция: я и союзники. Личную метку можно отправить только им (`pingRecipients`). */
+  coalition(): string[];
   name(id: string): string;
   color(id: string): string;
   badge(id: string): { icon: string; tag: string };
@@ -228,17 +235,14 @@ export function initPingUi(host: PingHost): PingUi {
     if (el) {
       el.innerHTML = pingMenuHtml(
         host.provinceName(loc),
-        host.coalitionSize(),
-        host
-          .seats()
-          .filter((id) => id !== host.me())
-          .map((id) => ({
-            id,
-            color: host.color(id),
-            icon: host.badge(id).icon,
-            name: host.name(id),
-            tag: host.badge(id).tag,
-          })),
+        host.coalition().length,
+        pingRecipients(host.coalition(), host.me()).map((id) => ({
+          id,
+          color: host.color(id),
+          icon: host.badge(id).icon,
+          name: host.name(id),
+          tag: host.badge(id).tag,
+        })),
       );
       el.classList.add('show');
       (el.querySelector('#pm-text') as HTMLInputElement | null)?.focus();
@@ -266,6 +270,13 @@ export function initPingUi(host: PingHost): PingUi {
       else host.push(COALITION, desc || fallback, loc);
       host.note(t('ping.sent.coalition'));
     } else {
+      // Адресата проверяем и здесь, а не только разметкой: союз мог распасться, пока
+      // окно было открыто.
+      if (!pingRecipients(host.coalition(), host.me()).includes(dest)) {
+        host.note(t('ping.allies-only'));
+        closeMenu();
+        return;
+      }
       host.push(dest, desc || fallback, loc);
       host.note(t('ping.sent.player', { who: host.name(dest) }));
     }
@@ -414,6 +425,7 @@ export function initPingUi(host: PingHost): PingUi {
       host.jump(jump);
       return;
     }
+    if (tg.closest('.pp-close')) return void closePop();
     const del = (tg.closest('.pp-del') as HTMLElement | null)?.dataset.loc;
     if (del) remove(del);
   });

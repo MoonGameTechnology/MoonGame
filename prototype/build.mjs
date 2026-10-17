@@ -1079,6 +1079,14 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .wp-yes:active{background:rgba(255,90,77,.3);}
 /* ⌂ в экспедиции: три действия столбцом — «Завершить и забрать награду» в треть ряда не влезает */
 #abandon.exit .wp-actions{flex-direction:column;}
+/* окно погрузки — тот же слой подтверждения приказа, но не военный: спокойный циан, три действия столбцом */
+#warprompt.calm{background:rgba(1,10,14,.6);}
+#warprompt.calm .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
+#warprompt.calm .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
+#warprompt.calm .wp-body{color:var(--ink);}
+#warprompt.calm .wp-actions{flex-direction:column;}
+.lp-after{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.16);color:var(--cyan);}
+.lp-now{border:1px solid #7a5a1c;background:rgba(255,190,77,.1);color:#ffc65a;}
 /* сколько заберёт «Завершить» — цветом данных экспедиций, как кошелёк подготовки */
 .wp-reward{font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cur-data);margin:-4px 0 14px;}
 
@@ -1117,8 +1125,14 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .dp-row.open{border-color:var(--cyan-dim);}
 .dp-ic{font-size:18px;width:20px;text-align:center;font-variant-emoji:text;flex:0 0 auto;}
 .dp-name{flex:1;font-size:var(--fs-body);color:#eafffb;font-weight:700;display:flex;align-items:baseline;gap:6px;min-width:0;}
+.dp-prof{padding:0;border:0;background:none;text-align:left;color:var(--cyan);font:inherit;font-weight:700;cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dp-prof:hover{color:#eafffb;}
 .dp-name em{font-style:normal;font-size:var(--fs-caption);color:var(--dim);
   border:1px solid var(--line);border-radius:3px;padding:1px 4px;flex:0 0 auto;}
+/* Ник впереди; дом и подпись сжимаются многоточием (на телефоне строка переносится, см. mobile-strategy.css). */
+.dp-name .dp-prof{flex:0 1 auto;}
+.dp-name .dp-prof+em{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dp-w{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;flex:0 0 auto;}
 .dp-stance{font-size:var(--fs-caption);border:1px solid;border-radius:3px;padding:2px 6px;flex:0 0 auto;font-weight:700;}
 .dp-tag{font-size:var(--fs-caption);color:var(--dim);flex:0 0 auto;}
@@ -1358,6 +1372,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .pp-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:5px;}
 .pp-top b{font-size:var(--fs-caption);font-variant-emoji:text;}
 .pp-top span{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;}
+.pp-top span{margin-left:auto;}
+/* ✕ всплывашки — крестик (.btn-x): вид даёт он, здесь только размер. */
+.pp-close{flex:0 0 auto;align-self:center;width:24px;height:24px;margin:-2px -4px 0 0;padding:0;border-radius:5px;
+  font:inherit;font-size:var(--fs-caption);}
+@media (pointer:coarse){.pp-close{width:30px;height:30px;}}
 .pp-desc{font-size:var(--fs-caption);line-height:1.4;color:#e7d6b8;margin-bottom:7px;word-break:break-word;}
 .pp-desc i{color:var(--dim);}
 .pp-act{display:flex;gap:5px;}
@@ -1371,7 +1390,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu.show{display:flex;}
 #pingmenu .pm-box{width:min(360px,92vw);background:var(--glass);border:1px solid var(--amber);
   border-radius:12px;padding:16px 16px 14px;box-shadow:0 0 30px rgba(0,0,0,.6);}
-#pingmenu .pm-head{font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head>span{flex:1;min-width:0;}
+#pingmenu .pm-close{flex:0 0 auto;width:28px;height:28px;border-radius:6px;font:inherit;} /* вид — .btn-x */
 #pingmenu .pm-head b{color:#eafffb;}
 #pingmenu .pm-sub{color:var(--dim);font-size:var(--fs-caption);line-height:1.5;margin-bottom:11px;}
 #pingmenu .pm-text{width:100%;box-sizing:border-box;margin-bottom:12px;padding:8px 10px;border-radius:6px;
@@ -1384,9 +1405,6 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu .pm-dst.coal{border-color:var(--amber);background:rgba(255,196,90,.08);}
 #pingmenu .pm-dst .pm-ic{flex:0 0 auto;}
 #pingmenu .pm-dst em{margin-left:auto;color:var(--dim);font-weight:400;font-style:normal;font-size:var(--fs-caption);}
-#pingmenu .pm-cancel{display:block;width:100%;margin-top:8px;padding:9px;border-radius:7px;
-  border:1px solid var(--line-hi);background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-body);cursor:pointer;}
-#pingmenu .pm-cancel:hover{color:var(--ink);border-color:var(--cyan-dim);}
 
 /* status strip below the top bar: the in-game clock + the donate currency on the right
    (day/countdown live in the #daycard, victory progress in the #tbscore chip above).
@@ -2320,6 +2338,40 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* «Как в прошлый раз» (UIX-7.3): rebuilds the last order; a long hull name is cut, not wrapped */
 .cn-again{margin-left:auto;min-width:0;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cn-again+.cn-close{margin-left:0;flex:none;}
+/* «Шаблоны» (2026-10-17): toggle in the header + a pane under it; the queue strip below
+   the tabs shows the chosen world's unit lane, hidden while it is empty */
+.cn-tplbtn{flex:none;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;}
+#constructor .cn-head>b+.cn-tplbtn{margin-left:auto;}
+.cn-tplbtn.on{color:var(--cyan);border-color:var(--cyan-dim);}
+#constructor .cn-head .cn-tplbtn+.cn-close{margin-left:0;flex:none;}
+.cn-tpl{flex:none;display:flex;flex-direction:column;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);max-height:34vh;overflow:auto;}
+.cn-tplrow{display:flex;align-items:center;gap:6px;}
+.cn-tpluse{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;
+  background:rgba(255,255,255,.02);color:var(--ink);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;text-align:left;}
+.cn-tpluse:hover{border-color:var(--cyan-dim);}
+.cn-tpluse:disabled{opacity:.45;cursor:not-allowed;}
+.cn-tplrow.on .cn-tpluse{border-color:var(--cyan);}
+.cn-tpn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cn-tpms{margin-left:auto;display:flex;gap:3px;flex:none;}
+.cn-tpm{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;}
+.cn-tpm svg{width:16px;height:16px;}
+.cn-tpldel{flex:none;width:28px;height:28px;border-radius:6px;}
+.cn-tplnone{font-size:var(--fs-caption);color:var(--dim);padding:2px 0;}
+.cn-tplsave{align-self:flex-start;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);}
+#cn-queue{flex:none;}
+#cn-queue:empty{display:none;}
+.cn-queue{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);min-width:0;}
+.cn-qh{flex:none;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}
+.cn-qlist{display:flex;gap:6px;overflow-x:auto;min-width:0;scrollbar-width:none;}
+.cn-qi{position:relative;flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--line);border-radius:7px;
+  overflow:hidden;font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
+.cn-qi b{color:#eafffb;}
+.cn-qi.run{border-color:var(--cyan-dim);}
+.cn-qt{color:var(--cyan);}
+.cn-qbar{position:absolute;left:0;bottom:0;height:2px;background:var(--cyan);}
+.cn-qi.fresh{animation:cn-qfresh 1.2s ease-out 1;}
+@keyframes cn-qfresh{0%{border-color:var(--grn);box-shadow:0 0 10px var(--grn);}100%{box-shadow:none;}}
+@media (prefers-reduced-motion:reduce){.cn-qi.fresh{animation:none;border-color:var(--grn);}}
 .cn-tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
 .cn-tab{padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -2495,6 +2547,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cn-tabs{gap:5px;padding:9px 10px;}
   .cn-tab{padding:9px 12px;font-size:var(--fs-caption);}
   .cn-close{width:36px;height:36px;}
+  .cn-tpl-k{display:none;}
+  .cn-tplbtn{min-width:36px;min-height:36px;}
+  .cn-tpldel{width:36px;height:36px;}
   .cn-pal{grid-template-columns:repeat(2,1fr);}
   .cn-hbtn{padding:9px 12px;}
   .cn-step button{width:38px;height:38px;}

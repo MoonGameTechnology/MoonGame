@@ -103,6 +103,7 @@
 | AUDM-3 | ⏳ | data | `docs/backlog.md` | Дальность удара шаттлов против длины проходов. |
 | AUDM-4 | ✅ | proto | `docs/backlog.md` | Погрузка десанта отменяется молча. |
 | AUDM-5 | ⏳ | docs | `docs/backlog.md` | Карта механик устарела. |
+| AUDM-6 | ✅ | core proto | `docs/backlog.md` | Приказ флоту с погрузкой и граница в тумане |
 | TRN-3 | ⏳ | proto data | `docs/backlog.md` | Учебные соединения и объявленная контратака (§14.2, §14.9). |
 | TRN-4 | ⏳ | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |

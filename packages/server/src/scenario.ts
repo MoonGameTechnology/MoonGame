@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '83'; // SM-3.7d: ракета — воздушная цель. Членство и
+export const MODULE_MANIFEST_VERSION = '84'; // FOG-LEAK: право прохода по видимой границе.
+// Членство и порядок не тронуты; `movement` 1.5.0 — приказ отбивается только границей, которую
+// игрок видит, а невидимую флот встречает в пути и встаёт перед ней (`fleet.halted`). Партия
+// на 83 провела бы флот сквозь закрывшуюся в пути границу.
+// export const MODULE_MANIFEST_VERSION = '83'; // SM-3.7d: ракета — воздушная цель. Членство и
 // порядок не тронуты; `shuttle` 1.16.0 — патруль и удар бьют ракету `shuttleDamage`, патруль
 // стреляет и на влёте ракеты в круг, включая последний отрезок до цели; `rocketMines` 3.1.0
 // отдаёт отрезки полёта возможности `missile.flew`. Партия на 82 сбивала бы ракеты иначе.

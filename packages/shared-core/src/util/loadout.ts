@@ -177,12 +177,14 @@ export function slotUsage(modules: readonly string[], data: GameData): SlotCount
 }
 
 /** Does hull `def` (unit id `unit`) satisfy a module's `allowed` predicate? All
- *  present fields must hold (domain match, ALL required traits, id in the list). */
+ *  present fields must hold (domain match, ALL required traits, NONE of the excluded
+ *  traits, id in the list). */
 export function moduleAllowed(unit: string, def: UnitDef, m: ModuleDef): boolean {
   const a = m.allowed;
   if (!a) return true;
   if (a.domain && def.domain !== a.domain) return false;
   if (a.traits.length > 0 && !a.traits.every((t) => def.traits.includes(t))) return false;
+  if (a.excludeTraits.some((t) => def.traits.includes(t))) return false;
   if (a.units.length > 0 && !a.units.includes(unit)) return false;
   return true;
 }

@@ -245,6 +245,16 @@ describe('serverChainActions — the pure driver core', () => {
     expect(serverChainActions(chained(fighting, [{ kind: 'assault' }]), 0)).toEqual([]);
   });
 
+  it('a fleet lifting or landing troops waits for the hour — departure would drop them', () => {
+    const claim = { unit: 'marine', count: 1, startAt: 0, doneAt: HOUR };
+    const lifting = fleet('F', { loading: [{ ...claim, from: 'A' }] });
+    expect(serverChainActions(chained(lifting, [{ kind: 'move', to: 'B' }]), 0)).toEqual([]);
+    const landing = fleet('F', { unloading: [{ ...claim, to: 'A' }] });
+    expect(serverChainActions(chained(landing, [{ kind: 'move', to: 'B' }]), 0)).toEqual([]);
+    const done = serverChainActions(chained(fleet('F'), [{ kind: 'move', to: 'B' }]), HOUR);
+    expect(done[0]?.actions.map((a) => a.type)).toEqual(['fleet.move']);
+  });
+
   it('iterates fleets in sorted id order (JSONB scrambles key order between hosts)', () => {
     const s = stateWith([fleet('Z'), fleet('Q')]) as ChState;
     s.orders = { Z: { steps: [{ kind: 'assault' }] }, Q: { steps: [{ kind: 'assault' }] } };

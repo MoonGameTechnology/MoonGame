@@ -1511,6 +1511,7 @@ export const en: Record<string, string> = {
   'diplo.tab.espionage': 'Espionage',
   'diplo.tab.messages': 'Messages',
   'diplo.win.title': 'Diplomacy',
+  'diplo.profile': 'Open player profile',
 
   // --- div — Дивизии: список, мобилизация, конструктор, трюм.
   'div.stat.attack': 'attack',
@@ -2410,6 +2411,14 @@ export const en: Record<string, string> = {
   'yard.queue.ahead': '{n} {n|order|orders} ahead, next done in {eta}',
   'yard.queue.now': 'Starts right away',
   'yard.queue.waiting': '{n} {n|order|orders} ahead',
+  'yard.queue.title': 'Queue · {w}',
+  'yard.tpl.title': 'Templates',
+  'yard.tpl.empty': 'No templates. Set up an order and save it.',
+  'yard.tpl.save': 'Save current',
+  'yard.tpl.saved': 'Current saved',
+  'yard.tpl.delete': 'Delete template',
+  'yard.tpl.unavailable': 'Hull unavailable in this match',
+  'yard.tpl.trimmed': 'Some template modules are unavailable and were removed',
   'yard.slots.none': 'Carries no modules',
   'yard.stats': 'Stats',
   'yard.where': 'Where to build',
@@ -3167,6 +3176,12 @@ export const en: Record<string, string> = {
   'log.fleet.split': '⊟ fleet split at {at}',
   'log.fleet.split-transit': '⊟ fleet split under way',
   // AUDM-4: the fleet left before loading finished — the troops stayed in the garrison.
+  'loadprompt.title': 'Troops are loading',
+  'loadprompt.body': 'Loading or unloading is under way on {n} {n|fleet|fleets}, ≈{m} min left. Departing cancels it.',
+  'loadprompt.after': 'After loading',
+  'loadprompt.now': 'Cancel it and go',
+  'loadprompt.cancel': 'Cancel',
+  'log.fleet.halted': '⛔ {f} stopped at the border: {to} belongs to {who}, no right of way',
   'log.army.load-cancelled': '⚠ loading cancelled: the fleet left, {n}× {u} stayed at {at}',
   // MSB-9: unloading runs on a timer, and departure cancels it — the troops stay aboard.
   'log.army.unload-cancelled': '⚠ unloading cancelled: the fleet left, {n}× {u} stayed aboard at {at}',
@@ -3351,7 +3366,8 @@ export const en: Record<string, string> = {
   'ping.sent.player': '📍 Ping → {who}',
   'ping.title': 'Ping',
   'ping.to.coalition': 'To the coalition chat',
-  'ping.to.player': "To a player's DM",
+  'ping.to.player': 'To an ally (DM)',
+  'ping.allies-only': 'Pings go to allies only',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',

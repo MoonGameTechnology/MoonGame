@@ -129,6 +129,8 @@ async function boot() {
     jumps: [] as string[],
     chatRefresh: 0,
     sent: [] as Array<[string, string, string?]>,
+    nicks: {} as Record<string, string>,
+    nickPulls: 0,
   };
   log.initMessageLog({
     now: () => env.s.time,
@@ -162,6 +164,8 @@ async function boot() {
     jumpToPing: (id) => void env.jumps.push(id),
     openProfile: (login) => void env.profiles.push(login),
     refreshChat: () => void env.chatRefresh++,
+    seatNick: (id) => env.nicks[id],
+    refreshNicks: () => void env.nickPulls++,
   });
   return { win, log, interaction, env };
 }
@@ -247,6 +251,49 @@ describe('REFM-214 — ростер', () => {
     tap('diplo', { '.dp-fchip[data-ftype]': { ftype: 'human' } });
     tap('diplo', { '.dp-fchip[data-ftype]': { ftype: 'human' } });
     expect(el('diplo').innerHTML).not.toContain('class="dp-actions"');
+  });
+});
+
+describe('ник игрока в ростере', () => {
+  it('без ника строка как прежде: имя дома, без ссылки', async () => {
+    const { win } = await boot();
+    win.openDiplo('diplo');
+    expect(el('diplo').innerHTML).not.toContain('dp-prof');
+    expect(rosterNames()).toContain('Вега');
+  });
+
+  it('открытие окна переспрашивает ники', async () => {
+    const { win, env } = await boot();
+    win.openDiplo('diplo');
+    expect(env.nickPulls).toBe(1);
+  });
+
+  it('ник человека идёт первым и кликабелен, у бота ника нет', async () => {
+    const { win, env } = await boot();
+    env.nicks = { p1: 'orion', p2: 'bot-nick', p3: 'vega_42' };
+    win.openDiplo('diplo');
+    const html = el('diplo').innerHTML;
+    expect(html).toContain('<button class="dp-prof" data-prof="p3"');
+    expect(html).toContain('>vega_42</button> <em>Вега · ');
+    expect(html).not.toContain('data-prof="p2"');
+  });
+
+  it('клик по нику открывает профиль игрока и не раскрывает строку; свой — свой профиль', async () => {
+    const { win, env } = await boot();
+    env.nicks = { p1: 'orion', p3: 'vega_42' };
+    win.openDiplo('diplo');
+    tap('diplo', { '.dp-prof': { prof: 'p3' }, '.dp-row': { seat: 'p3' } });
+    tap('diplo', { '.dp-prof': { prof: 'p1' } });
+    expect(env.profiles).toEqual(['vega_42', undefined]);
+    expect(el('diplo').innerHTML).not.toContain('class="dp-actions"');
+  });
+
+  it('досье карточки места ведёт в профиль по нику, а не по имени дома', async () => {
+    const { win, env } = await boot();
+    env.nicks = { p3: 'vega_42' };
+    win.openSeatCard('p3');
+    tap('playercard', { '.pc-dossier': {} });
+    expect(env.profiles).toEqual(['vega_42']);
   });
 });
 

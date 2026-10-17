@@ -12,7 +12,7 @@
  * задачи с цепочкой главы модуль получает хуками {@link initMapMarks}: они живут в
  * `main.ts`, и импорт оттуда был бы циклом. Рисовалки зовёт кадр `renderMap()`.
  */
-import type { Fleet, GameState } from '../../packages/shared-core/src/index';
+import { legEndT, roadAhead, type Fleet, type GameState } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { isMissileFleet, isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
 import { rgba } from '../../packages/client/src/holoDraw';
@@ -29,7 +29,7 @@ import type { MissionRow } from '../../decisions/missionView';
 import { ALLY_EMBLEM } from './allyScreen';
 import { BADGE_DY, badgeCount, badgePulse, groupByAnchor, shownOrders, type AnchoredOrder } from './chainBadges';
 import { chainAbilityHoldH, chainMenuAnchor, chainMode, chainRoute, chainStart, chainTravelH } from './chainComposer';
-import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
+import { capsuleAt, chainPathLegs, lastStepAtPoint, stackIndexes, type PathLeg } from './chainPathLayout';
 import { chainTimeline, draftFinish, stepGlyph, stepHours } from './chainPlanner';
 import type { SessionMsg } from './conversations';
 import { fleetAnchor, fleetOriginPx, fleetPos } from './fleetGeometry';
@@ -373,6 +373,22 @@ export function drawPings(now: number): void {
   }
 }
 
+/** Дорога одного перелёта плана — тем же правилом развилок, что водит флот ядро
+ *  (`roadAhead`, ROADS-2): мимо промежуточного мира флот идёт по развилке, в конце
+ *  перелёта — стоит в мире. Пути нет (правило 2) — хотя бы центры хопов. */
+function legRoad(s: GameState, leg: PathLeg): Array<{ x: number; y: number }> {
+  const [to, next] = leg.hops;
+  const road = to
+    ? roadAhead(
+        s,
+        { from: leg.from, to, path: leg.hops.slice(1), endT: legEndT(s, leg.from, to, next, 0, 1) },
+        0,
+      )
+    : [];
+  if (road.length) return road;
+  return leg.hops.flatMap((id) => (s.planets[id] ? [s.planets[id]!.position] : []));
+}
+
 /** TGT-1: standing order markers — a breathing crosshair on every world an OWN
  *  chained fleet is planned against (last move leg; a legless plan anchors at the
  *  fleet's spot). The ◎ badge above the ring is the tap handle (screen hit-boxes,
@@ -391,15 +407,17 @@ function drawChainPath(
   const s = game.world();
   const cx = game.ctx();
   if (!steps.length || !fromId) return;
-  const start = fleetOriginPx(f);
+  // Летящий флот начинает план там, где кончается его маршрут (`drawFleetRoutes`): отрезок
+  // до цели текущего перелёта уже нарисован, а прямая от флота к следующему миру срезала бы
+  // его и разошлась с ним прямо у флота. Конец маршрута от времени не зависит.
+  const head = f.movement ? roadAhead(s, f.movement, 0).at(-1) : undefined;
+  const start = head ? world(head) : fleetOriginPx(f);
   if (!start) return;
   const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
-  // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).
+  // Полилиния: по дорогам каждого перелёта (правило 1 `chainPathLayout.ts`).
   const pts: Array<{ x: number; y: number }> = [start];
-  for (const hop of chainPathNodes(steps, fromId, chainRoute)) {
-    const pl = s.planets[hop];
-    if (pl) pts.push(world(pl.position));
-  }
+  for (const leg of chainPathLegs(steps, fromId, chainRoute))
+    for (const p of legRoad(s, leg)) pts.push(world(p));
   cx.save();
   cx.globalAlpha = alpha;
   if (pts.length > 1) {
