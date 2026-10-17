@@ -4174,7 +4174,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div></div>
 <div id="diplo"></div>
 <div id="pingpop"></div>
-<!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (main.ts, renderStatPop) -->
+<!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (fleetCard.ts, renderStatPop) -->
 <div id="statpop" role="dialog" aria-live="polite"></div>
   <div id="pingpanel"></div>
 <div id="tgted"></div>

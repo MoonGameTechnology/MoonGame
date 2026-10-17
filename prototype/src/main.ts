@@ -8,7 +8,6 @@ import {
   setRocketMineMode,
   splitAloft,
 } from '../../decisions/actions';
-import { aloftCard, type AloftCard } from '../../decisions/aloftCard';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
@@ -160,27 +159,21 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
+import type { ConsoleStat } from './fleetConsole';
+import { initTermTips } from './termTip';
 import {
-  statSourceKey,
-  type StatBreakdown,
-} from '../../decisions/statModifiers';
-import { anchoredPopover } from '../../decisions/anchoredPopover';
-import {
-  STAT_TERM,
-  statPopHtml,
-  type ConsoleStat,
-  type StatPopRow,
-  type StatPopView,
-} from './fleetConsole';
-import { initTermTips, termBody } from './termTip';
-import {
+  aloftPanelHtml,
+  closeStatPop,
   fleetLandShown,
   fleetPanelHtml,
-  fleetStatModsOf,
   garrisonTilesHtml,
   initFleetCard,
-  shownFire,
+  initStatPop,
+  renderStatPop,
+  statPopOpen,
+  strikeTitle,
   taskGroupPanelHtml,
+  toggleStatPop,
   unitTileHtml,
   veteranPowerOn,
 } from './fleetCard';
@@ -204,13 +197,11 @@ import {
 import {
   buildingLevel,
   buildingMaxLevel,
-  COMBAT_UNIT_CAP,
   effectiveStats,
   sightCircles,
   type SightCircle,
   type Squadron,
   type ShuttleStrike,
-  type StrikeBase,
   missingHull,
   squadronFerryRange,
   squadronPatrol,
@@ -238,7 +229,7 @@ import { skinIcon } from './holographicIcons';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
-import { fleetSummary, stackHullPct } from './fleetSummary';
+import { stackHullPct } from './fleetSummary';
 import { shipCardModel, stackBonusSlots } from '../../decisions/shipCard';
 import { shipCardHtml } from './shipCard';
 import { catalogPortraitHtml } from './shipArt';
@@ -252,15 +243,12 @@ import {
 // SHU-4.3 — эскадра глазами игрока: карточка соединения, делёж, слияние, десант.
 import {
   splitOne,
-  squadronCallsignOf,
-  SQUADRON_KIND_KEY,
 } from './squadronPanel';
 import { pickPanel } from './panelSelect';
 import {
   forkPanelHtml,
   initWorldCard,
   planetPanelHtml,
-  unitRows,
   unknownPlanetHtml,
   type PlanetTab,
 } from './worldCard';
@@ -363,10 +351,6 @@ import { arrivalHours } from './travelEta';
 import { toScreen } from './screenAnchor';
 import { pickHome } from './openingView';
 import { houseDisplayName, seatAiProfile } from './setupSeats';
-import {
-  actionButton,
-  cardHeader as kitCardHeader,
-} from './panelKit';
 import { barPct } from './buildProgress';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
@@ -381,7 +365,6 @@ import {
 // REFM-2: the pure presentation formatters live in `format.ts` now (no state, no DOM)
 import {
   esc,
-  kfmt,
   hl,
   cost,
   displayUnit,
@@ -754,10 +737,6 @@ const BUILD_UNITS = [
 // A small glyph per province KIND, drawn above each province so its type reads at a
 // glance (planet / asteroid / nebula / wreck-field / storm / …). Text glyphs only.
 let ME = 'p1';
-
-/** Total count across a stack of units (ships, garrison or landing troops). */
-const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
-  stacks.reduce((a, s) => a + s.count, 0);
 
 // --- state -------------------------------------------------------------------
 
@@ -2005,18 +1984,6 @@ function renderMap(now: number) {
 
 // --- side panel --------------------------------------------------------------
 
-// Кирпичики панели (кнопка, шапка, вкладка, колонки, строки состава) живут в
-// `panelKit.ts` (REFM-35) — там же правила экранирования и «disabled, а не спрятать».
-const btn = actionButton;
-
-function cardHeader(color: string, title: string, sub: string, titleAct?: string, badge?: string): string {
-  return kitCardHeader(color, title, sub, {
-    compact: pcUi(),
-    ...(titleAct ? { titleAct } : {}),
-    ...(badge ? { badge } : {}),
-  });
-}
-
 // Карточка мира, ангар и карточки эскадр — у владельца, `worldCard.ts` (REFM-223). Отсюда —
 // то, что принадлежит игре: мир, место, имена, открытая вкладка, плитки гарнизона и карта узлов.
 initWorldCard({
@@ -2033,8 +2000,9 @@ initWorldCard({
 });
 
 // Карточка флота, группы, мин и ракеты, плитки юнитов — у владельца, `fleetCard.ts` (REFM-224).
-// Отсюда — то, что принадлежит игре: мир, место, имена, открытая сводка армии, окно консоли,
-// видимые мины, часы карты, имя флота и тип сектора.
+// Карточка эскадры в воздухе и всплывашка надбавок — там же. Отсюда — то, что принадлежит
+// игре: мир, место, имена, открытая сводка армии, окно консоли, видимые мины, часы карты,
+// имя флота, тип сектора, эскадра вылета и её база, флот листа и досье параметра.
 initFleetCard({
   world: () => s,
   me: () => ME,
@@ -2045,6 +2013,10 @@ initFleetCard({
   mapNow,
   fleetTitleOf,
   sectorType: sectorTypeOf,
+  strikeSquadron,
+  strikeFrom,
+  panelFleet,
+  dossier: (key) => objDossier(key),
 });
 
 /** Где стоит эта эскадра — мир или носитель. Адрес ВЫВОДИТСЯ из состояния, а не
@@ -2107,77 +2079,6 @@ function aimSquadron(): {
   return found ? { ...found, aloft: null } : null;
 }
 
-/** Имя эскадры в воздухе — тот же позывной, что у её карточки в ангаре и над значком. */
-function strikeTitle(st: ShuttleStrike): string {
-  return `${t(SQUADRON_KIND_KEY)} «${squadronCallsignOf(st.squadronId)}»`;
-}
-
-/** Имя базы в строке приказа: мир — по имени места, корабль — по имени флота. */
-function strikeBaseName(base: StrikeBase): string {
-  return base.kind === 'planet' ? placeName(base.id) : fleetTitleOf(base.id);
-}
-
-/** Чем занята эскадра (`aloftCard.ts`, правило 7) и что отсчитывает таймер. Ключи стоят
- *  литералами в каждой ветке: разбор гейта локализации видит только литеральные ключи. */
-function aloftOrderText(card: AloftCard): { what: string; until: string } {
-  const o = card.order;
-  if (o.kind === 'fleet')
-    return { what: t('side.aloft.order.strike', { name: fleetTitleOf(o.id) }), until: t('side.aloft.until.target') };
-  if (o.kind === 'planet')
-    return { what: t('side.aloft.order.strike', { name: placeName(o.id) }), until: t('side.aloft.until.target') };
-  if (o.kind === 'land')
-    return { what: t('side.aloft.order.land', { name: placeName(o.id) }), until: t('side.aloft.until.target') };
-  if (o.kind === 'patrol-out')
-    return { what: t('side.aloft.order.patrol-out'), until: t('side.aloft.until.point') };
-  if (o.kind === 'patrol') return { what: t('side.aloft.order.patrol'), until: t('side.aloft.until.patrol') };
-  if (o.kind === 'relocate')
-    return { what: t('side.aloft.order.relocate', { name: strikeBaseName(o.base) }), until: t('side.aloft.until.land') };
-  return { what: t('side.aloft.order.home', { name: strikeBaseName(o.base) }), until: t('side.aloft.until.land') };
-}
-
-/**
- * КАРТОЧКА ЭСКАДРЫ В ВОЗДУХЕ (SHU-6.14) — заказ владельца 2026-10-11: «такие же космические
- * юниты: выделив, их можно разделить и изменить приказ». Что предлагать — `aloftCard.ts`;
- * здесь разметка. Кнопки те же, что у карточки в ангаре, и называются так же: игрок
- * узнаёт приказ по слову, а не по месту. Адрес — id вылета.
- */
-function aloftPanelHtml(st: ShuttleStrike): string {
-  const sq = strikeSquadron(st);
-  const card = aloftCard(st, {
-    me: ME,
-    data,
-    relocate: squadronRelocateSpots(sq, strikeFrom(st), st).length > 0,
-    split: splitOne(sq) !== null,
-  });
-  if (!card) return `<div class="hint">${t('side.empty')}</div>`;
-  const cargo = card.cargo.reduce((n, c) => n + c.count, 0);
-  const notes = [
-    t('side.aloft.sub'),
-    ...(cargo > 0 ? [t('side.wing.cargo', { n: cargo })] : []),
-    ...(card.hull !== null ? [t('side.wing.hull', { p: card.hull })] : []),
-  ];
-  const text = aloftOrderText(card);
-  // Отсчёт патчит `updatePanelLive` (`.pn-timer`): в разметке только срок, и панель не
-  // перестраивается каждый кадр под пальцем.
-  const timer = `<span class="pn-timer" data-at="${card.until}">${esc(timeLeft(card.until))}</span>`;
-  let h = cardHeader(ownerColor(ME), strikeTitle(st), notes.join(' · '));
-  h += `<div class="row"><b>${esc(text.what)}</b></div>`;
-  h += `<div class="row dim">${esc(text.until)} ${timer}</div>`;
-  h += unitRows(card.stacks);
-  // Повернувшая домой бить снова не может (правило 3): без строки игрок искал бы кнопку.
-  if (card.returning) h += `<div class="row dim">${esc(t('side.aloft.returning'))}</div>`;
-  const buttons =
-    (card.canStrike ? btn('aloftstrike', card.strikeId, t('side.wing.strike'), true) : '') +
-    (card.canPatrol ? btn('aloftpatrol', card.strikeId, t('side.wing.patrol'), true) : '') +
-    (card.canRelocate ? btn('aloftrelocate', card.strikeId, t('side.wing.relocate'), true) : '') +
-    (card.canSplit ? btn('aloftsplit', card.strikeId, t('side.wing.split'), true) : '') +
-    (card.hold !== null
-      ? btn('wingkeep', card.strikeId, card.hold ? t('side.wing.keep.off') : t('side.wing.keep'), true)
-      : '') +
-    (card.canRecall ? btn('wingrecall', card.strikeId, t('side.wing.recall'), true) : '');
-  return buttons ? `${h}<div class="row">${buttons}</div>` : h;
-}
-
 /** Свои эскадры в воздухе под тапом, ближайшая первой (SHU-6.14): тот же отбор, что у
  *  флотов (`tapTargets.ts`), точка — значок на трассе (`strikeWorldPos`). */
 function strikesUnderTap(mx: number, my: number, r: number): string[] {
@@ -2211,126 +2112,9 @@ function consoleFleet(): Fleet | null {
 }
 
 
-// --- Всплывашка надбавок: тап по параметру флота (заказ владельца 2026-09-27) ----------
-// Узел один на оба листа — консоль ПК и карточку телефона: параметры в обоих несут
-// `data-stat`, всплывашка встаёт у нажатого (`anchoredPopover.ts`). Лист пересобирается
-// каждый кадр, поэтому держится не узел, а пара «флот + параметр»: ушёл флот из листа
-// или параметр из разметки — всплывашка закрывается сама, висеть над пустым местом ей
-// не на чем.
-const statPopEl = $('statpop');
-let statPop: { fleetId: string; stat: ConsoleStat } | null = null;
-let lastStatPopHtml = '';
-
-/** Тап по параметру: открыть его всплывашку, повторный тап по нему же — закрыть. */
-function toggleStatPop(stat: ConsoleStat): void {
-  const id = panelFleet();
-  const same = statPop?.fleetId === id && statPop?.stat === stat;
-  statPop = id && !same ? { fleetId: id, stat } : null;
-  renderStatPop();
-}
-
-function closeStatPop(): void {
-  statPop = null;
-  renderStatPop();
-}
-
-/** Что показать про параметр. Числа — те же, что в окне (`shownFire`, ход из модели),
- *  строки — источники из ядра. Без ответа ядра остаётся одно правило параметра: строк,
- *  которых ядро не назвало, всплывашка не выдумывает. */
-function statPopModel(f: Fleet, stat: ConsoleStat): StatPopView {
-  const d = objDossier(`stat:${stat}`);
-  // Правило — статья словаря со ссылками: термины в ней раскрываются следующей подсказкой.
-  const head = { title: d?.name ?? '', desc: termBody(STAT_TERM[stat]) };
-  const mods = fleetStatModsOf(f);
-  const sm = fleetSummary(f, data, s.time);
-  const plain = (value: string): StatPopView => ({ ...head, value, tone: 'neutral', rows: [], total: null, plain: true });
-  const rows = (b: StatBreakdown): StatPopRow[] =>
-    b.sources.map((x) => ({ label: t(statSourceKey(x.source)), pct: x.pct }));
-  const total = (b: StatBreakdown): number => (b.factor - 1) * 100;
-  if (stat === 'atk' || stat === 'def') {
-    const raw = stat === 'atk' ? sm.attack.capped : sm.defense;
-    const value = String(shownFire(raw, mods));
-    if (!mods) return plain(value);
-    return { ...head, value, tone: mods.fire.tone, base: String(raw), rows: rows(mods.fire), total: total(mods.fire) };
-  }
-  if (stat === 'spd') {
-    const spd = mods ? mods.speed.value : sm.speed;
-    if (!mods || spd <= 0) return plain(spd > 0 ? String(Math.round(spd)) : '—');
-    return {
-      ...head,
-      value: String(Math.round(spd)),
-      tone: mods.speed.tone,
-      base: String(Math.round(mods.speed.base)),
-      rows: rows(mods.speed),
-      total: total(mods.speed),
-    };
-  }
-  if (stat === 'hull' || stat === 'shield') {
-    const pool = stat === 'hull' ? sm.hull : sm.shield;
-    const value = pool.max > 0 ? `${kfmt(pool.cur)}/${kfmt(pool.max)}` : t('fleet.console.shield.none');
-    if (!mods || pool.max <= 0) return plain(value);
-    return {
-      ...head,
-      value,
-      tone: mods.incoming.tone,
-      sub: t('stat.pop.incoming'),
-      rows: rows(mods.incoming),
-      total: total(mods.incoming),
-      lessIsBetter: true,
-    };
-  }
-  return plain(`${Math.min(sumUnits(f.units), COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}`);
-}
-
-/** Держит всплывашку в согласии с листом: зовётся каждым `renderPanel`. */
-function renderStatPop(): void {
-  const pop = statPop;
-  const f = pop && panelFleet() === pop.fleetId ? s.fleets[pop.fleetId] : undefined;
-  const anchor =
-    pop && f && side.style.display !== 'none'
-      ? side.querySelector<HTMLElement>(`[data-stat="${pop.stat}"]`)
-      : null;
-  if (!pop || !f || !anchor) {
-    statPop = null;
-    if (lastStatPopHtml) {
-      statPopEl.classList.remove('show');
-      statPopEl.replaceChildren();
-      lastStatPopHtml = '';
-    }
-    return;
-  }
-  const html = statPopHtml(statPopModel(f, pop.stat));
-  if (html !== lastStatPopHtml) {
-    statPopEl.innerHTML = html;
-    lastStatPopHtml = html;
-  }
-  statPopEl.classList.add('show');
-  const a = anchor.getBoundingClientRect();
-  // Высота — по содержимому, а не по уже наложенному пределу: иначе всплывашка,
-  // однажды зажатая у края, так и осталась бы зажатой после прокрутки листа.
-  const border = statPopEl.offsetHeight - statPopEl.clientHeight;
-  const at = anchoredPopover(
-    { left: a.left, top: a.top, width: a.width, height: a.height },
-    { width: statPopEl.offsetWidth, height: statPopEl.scrollHeight + border },
-    { width: innerWidth, height: innerHeight },
-  );
-  statPopEl.style.left = `${Math.round(at.left)}px`;
-  statPopEl.style.top = `${Math.round(at.top)}px`;
-  statPopEl.style.maxHeight = at.maxHeight === null ? '' : `${Math.floor(at.maxHeight)}px`;
-  statPopEl.dataset.side = at.side;
-}
-
-// Клик мимо закрывает. Сам параметр не в счёт: его тап — это переключение (делегат листа).
-// Подсказка термина из её текста (`termTip.ts`) тоже не «мимо»: она про ту же всплывашку.
-document.addEventListener(
-  'pointerdown',
-  (ev) => {
-    if (!statPop) return;
-    if ((ev.target as Element | null)?.closest?.('#statpop, [data-stat], .termtip')) return;
-    closeStatPop();
-  },
-  true,
-);
+// Всплывашка надбавок параметра флота — у владельца, `fleetCard.ts` (REFM-224): здесь только
+// её слушатель «клик мимо». Он встаёт до подсказок терминов, как и стоял.
+initStatPop();
 
 // Слова-термины с подсказкой (UIX-9.4): во всплывашке параметра, в окне производства, в
 // справочнике. Подсказки — свои узлы в `body`, слушатели — на документе.
@@ -5416,7 +5200,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
   // Всплывашка надбавок стоит над окном флота: Back закрывает её, а не выделение под ней.
-  { id: 'statpop', isOpen: () => statPop !== null, close: closeStatPop }, // z43
+  { id: 'statpop', isOpen: statPopOpen, close: closeStatPop }, // z43
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin?.isOpen() ?? false, close: () => chatWin?.close() }, // z27
   { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => offerChoices([]) },
