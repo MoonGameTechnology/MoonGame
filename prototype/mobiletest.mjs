@@ -25,7 +25,7 @@ window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
   ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: __mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
-  fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
+  fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, loc:f.location, p:fleetAnchor(f) })),
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
   notices: () => __noticeFlashes.length,
@@ -66,7 +66,12 @@ async function drag(x, y, dx, dy) {
   await pause();
 }
 async function chooseFleet(f) {
-  await p.touchscreen.tap(f.p.x, f.p.y);
+  // Тап ровно между флотом на орбите и его миром спорный — открывается список «флот или
+  // провинция». Тап в сам значок флота выбирает флот сразу (`tapCycle.ts`, правило 8).
+  const home = (await p.evaluate(() => window.__mobileTest.worlds())).find((w) => w.id === f.loc);
+  assert(home, 'the fleet stands on a world');
+  const between = { x: (f.p.x + home.p.x) / 2, y: (f.p.y + home.p.y) / 2 };
+  await p.touchscreen.tap(between.x, between.y);
   await pause();
   let choices = (await ui()).choices;
   const provinceIndex = choices.findIndex((x) => x.kind === 'planet');
@@ -93,21 +98,14 @@ async function chooseFleet(f) {
     'the card that opens carries the same name as the chooser row',
   );
   // Второй тап по выбранной провинции снимает выбор, а не открывает список заново.
-  await p.touchscreen.tap(f.p.x, f.p.y);
+  await p.touchscreen.tap(between.x, between.y);
   await pause();
   assert.equal((await ui()).planet, null, 're-tap on the selected province clears the selection');
   assert.equal((await ui()).choices.length, 0, 're-tap does not reopen the chooser');
   const current = (await p.evaluate(() => window.__mobileTest.fleets())).find((x) => x.id === f.id);
   await p.touchscreen.tap(current.p.x, current.p.y);
   await pause();
-  choices = (await ui()).choices;
-  if (choices.length)
-    await p
-      .locator(
-        `[data-mobile="choose"][data-index="${choices.findIndex((c) => c.kind === 'fleet' && c.id === f.id)}"]`,
-      )
-      .tap();
-  await pause();
+  assert.equal((await ui()).choices.length, 0, 'a tap right on the fleet needs no chooser');
   assert.deepEqual((await ui()).ids, [f.id]);
 }
 async function pinch() {
