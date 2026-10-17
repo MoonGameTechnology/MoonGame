@@ -67,6 +67,8 @@ export interface OrderPipelineHost {
   intro(id: string): void;
   /** Окно вахты, если оно есть в этой сборке. */
   steward(): Repaintable | null;
+  /** Мир считает отдельный поток (`simLink.ts`): принятый приказ уходит и ему. */
+  forward(action: Action): void;
 }
 
 let game: OrderPipelineHost;
@@ -140,18 +142,27 @@ export function playerOrder(action: Action): boolean {
   const out = order(s, action, s.time);
   apply(out);
   sandboxBuildRestore(before, !out.error);
-  if (out.error) {
+  if (!out.error) game.forward(action);
+  return settleOrder(action.type, out.error);
+}
+
+/**
+ * Рассказать об исходе своего приказа в соло: отказ слышен и пишется в ленту, принятый учит
+ * тур и поднимает вставку. Тот же рассказ — у своих приказов, которые выдали драйверы
+ * отдельного потока расчёта, и у приказа, который экран принял, а поток отверг.
+ */
+export function settleOrder(type: string, error?: string): boolean {
+  if (error) {
     game.refusalSound(); // тёмный сбой — отказ слышен, не только виден
-    game.note('✖ ' + errText(out.error));
+    game.note('✖ ' + errText(error));
     return false;
-  } else {
-    // an accepted intent advances `action` steps
-    if (plan.tour === 'on-accept') game.tour()?.notifyAction(action.type);
-    // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
-    // `introTrigger.ts` (REFM-100).
-    const intro = introFor(action.type, !!game.tour()?.active, NET);
-    if (intro) game.intro(intro);
   }
+  // an accepted intent advances `action` steps
+  game.tour()?.notifyAction(type);
+  // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
+  // `introTrigger.ts` (REFM-100).
+  const intro = introFor(type, !!game.tour()?.active, NET);
+  if (intro) game.intro(intro);
   return true;
 }
 

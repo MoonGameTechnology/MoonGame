@@ -20,6 +20,23 @@ const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.m
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
 
+/** Отдельный поток расчёта соло-мира (`simWorker.ts`) — строкой в бандл экрана: так поток
+ *  поднимается и в однофайловой сборке, открытой с диска (`simLink.ts`). Пока он за флагом
+ *  дев-сборки (`?sim=worker`), поэтому сборка игрока его не несёт. */
+const simWorkerSource = (
+  await build({
+    entryPoints: ['prototype/src/simWorker.ts'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    minify: true,
+    legalComments: 'none',
+    write: false,
+    define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
+  })
+).outputFiles[0].text;
+
 const bundleOptions = (playerBuild) => ({
   entryPoints: ['prototype/src/bootstrap.ts'],
   bundle: true,
@@ -30,7 +47,11 @@ const bundleOptions = (playerBuild) => ({
   minify: true,
   legalComments: 'none',
   write: false,
-  define: { __PLAYER_BUILD__: String(playerBuild), __SECTOR_ZERO_ONLY__: 'false' },
+  define: {
+    __PLAYER_BUILD__: String(playerBuild),
+    __SECTOR_ZERO_ONLY__: 'false',
+    ...(playerBuild ? {} : { __SIM_WORKER_SRC__: JSON.stringify(simWorkerSource) }),
+  },
 });
 
 const bundle = async (playerBuild) => (await build(bundleOptions(playerBuild))).outputFiles[0].text;
