@@ -29,6 +29,7 @@ import {
   type UnitStack,
 } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
+import { isReconFleet } from '../../packages/shared-core/src/state/recon';
 import { isMissileFleet, isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
 import { t, tData } from '../../localization/runtime';
 import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
@@ -813,12 +814,18 @@ function fleetStrikeHtml(f: Fleet, here: Planet, inOrbit: boolean, nShips: numbe
   );
   // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
   // спрашивает — там, где его требует ядро: на защищённом мире без него ответ
-  // `E_NO_TROOPS`, и живая кнопка обещала бы заведомый отказ (правило 4).
+  // `E_NO_TROOPS`, у флота из одних разведчиков — `E_RECON_NO_CAPTURE`, и живая кнопка
+  // обещала бы заведомый отказ (правило 4).
   at += btn(
     'assault',
     '',
     t('side.strike.assault'),
-    assaultEnabled(inOrbit, sumUnits(f.landing ?? []) > 0, sumUnits(here.garrison) > 0),
+    assaultEnabled(
+      inOrbit,
+      sumUnits(f.landing ?? []) > 0,
+      sumUnits(here.garrison) > 0,
+      isReconFleet(f, data),
+    ),
   );
   at += `</div>`;
   at += `<div class="hint">${t('side.strike.hint')}</div>`;

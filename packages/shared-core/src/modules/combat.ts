@@ -55,6 +55,7 @@ import { legT } from '../state/fleetPosition';
 import { fleetHoldFree } from '../state/shuttle';
 import { crossingT } from '../state/roads';
 import { isMineFleet } from '../state/minefields';
+import { isReconFleet } from '../state/recon';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
@@ -530,9 +531,13 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
   // вступает в бой тем же путём, что десантный челнок (`beachhead.landed`), а флот
   // свободен. Прежде десант дрался ИЗ ТРЮМА, и флот был заперт в наземном бою до конца.
   const defended = (planet.garrison ?? []).some((s) => s.count > 0);
-  if (joined || defended) {
+  // Разведчик провинцию не берёт (решение владельца 2026-10-16): флот из одних
+  // разведчиков занимает пустой мир только десантом из трюма — высадкой, как защищённый.
+  const recon = isReconFleet(fleet, h.ctx.data);
+  if (joined || defended || recon) {
     if (!(fleet.landing ?? []).some((s) => s.count > 0)) {
-      return 'E_NO_TROOPS'; // a defended world needs a landing force
+      // a defended world needs a landing force; an empty one — any warship or troops
+      return joined || defended ? 'E_NO_TROOPS' : 'E_RECON_NO_CAPTURE';
     }
     beginAssaultLanding(h, fleet, at);
     return null;
@@ -1155,7 +1160,8 @@ export const combatModule: GameModule = {
   // (замечания Codex на #1409).
   // 3.6.0: бой «Атаки» втягивает ждавших у мира — возможность `battle.pullIn` (ATK-3).
   // 3.7.0: `battle.resolved` называет проигравших — `losers` (BAL-16).
-  version: '3.7.0',
+  // 3.8.0: флот из одних разведчиков пустой мир с орбиты не занимает — только высадкой.
+  version: '3.8.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
 

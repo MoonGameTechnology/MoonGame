@@ -2,6 +2,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import { getStance } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
 import { isMineFleet } from '../state/minefields';
+import { isReconFleet } from '../state/recon';
 
 /**
  * Capture-on-arrival (map-roadmap.md M2.2). A fleet that reaches an undefended,
@@ -35,6 +36,11 @@ import { isMineFleet } from '../state/minefields';
  * round the world by a side road (through the fork of its trail) does not take it — no
  * `fleet.transit` fires there — and neither does a fleet that stops on the province's
  * roads, at the fork included (`fleet.parked` is deliberately NOT listened to).
+ *
+ * RECON (owner decision 2026-10-16): a fleet of scouts only (`isReconFleet`) takes
+ * nothing on arrival, whatever its hold carries. On duel-1 cheap scout runners decided
+ * the match by walking into every empty province; a landing force aboard takes the world
+ * by an assault landing instead (`combat.ts`, `assaultPlanet`).
  */
 
 function tryCapture(h: HandlerContext, payload: unknown): void {
@@ -46,6 +52,7 @@ function tryCapture(h: HandlerContext, payload: unknown): void {
   if (!isCapturable(h.ctx.data, planet)) return;
   if (planet.owner !== null && getStance(h.state, fleet.owner, planet.owner) !== 'war') return;
   if (planet.garrison.some((s) => s.count > 0)) return; // ≥1 garrison unit → assault only
+  if (isReconFleet(fleet, h.ctx.data)) return; // разведчик провинцию не берёт
   // Мина захвату не мешает (решение владельца 2026-09-30): она не гарнизон, а ловушка.
   const contested = Object.values(h.state.fleets).some(
     (g) => g.owner !== fleet.owner && g.location === at && g.units.some((u) => u.count > 0) &&
@@ -62,7 +69,8 @@ function tryCapture(h: HandlerContext, payload: unknown): void {
 export const captureOnArrivalModule: GameModule = {
   id: 'capture-on-arrival',
   // 0.3.0: мина захвату не мешает (SM-3.6).
-  version: '0.3.0',
+  // 0.4.0: флот из одних разведчиков прилётом не берёт.
+  version: '0.4.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => tryCapture(h, event.payload));
     api.on('fleet.transit', (event, h) => tryCapture(h, event.payload));

@@ -1602,7 +1602,7 @@ export const en: Record<string, string> = {
     'Fleet recon: antenna {r}, the radar module +{m} fits this hull only. {a} attack, {d} defense, {hp} hull, {n} bays.',
   'dossier.unit.picket-frigate.name': 'Picket Frigate',
   'dossier.unit.scout.desc':
-    'Light recon hull: speed {sp}, signature {sig}, its own compact radar +{m}.',
+    'Speed {sp}, signature {sig}, compact radar +{m}. Does not capture worlds.',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
     'Carrier: a {bay}-place hold for shuttles and troops, {a} attack, {d} defense, {hp} hull. Shuttles launch and land on the move. Lose the hull, lose everything aboard.',
@@ -2637,6 +2637,7 @@ export const en: Record<string, string> = {
   'err.own-order': 'that is your own order',
   'err.own-planet': 'this is your own world',
   'err.port-damaged': 'the spaceport is damaged',
+  'err.recon-no-capture': 'scouts cannot take a world: bring troops or a warship',
   'err.requires': 'unlock the preceding node first',
   'err.same-fleet': 'that is the same fleet',
   'err.same-stance': 'the stance is already that',
