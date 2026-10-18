@@ -20,6 +20,7 @@
  *    Два соседних смещения на единицу, и оба легко перепутать.)
  */
 import type { Action, GameData, GameState } from '../../packages/shared-core/src/index';
+import { matchCost } from '../../packages/shared-core/src/index';
 import { buildBuilding, buildUnit, upgradeBuilding } from './game';
 import type { BuildKind, BuildLane, QueuedBuild } from './buildQueue';
 import { landerCost } from '../../decisions/landerTroops';
@@ -52,16 +53,19 @@ export function queuedCost(
 ): Record<string, number> | undefined {
   if (q.kind === 'unit') {
     // Десантный челнок стоит вместе со своим бойцом (SHU-5.2).
+    // Цена партии за один корабль, потом × число — в том же порядке, что у ядра.
     const per =
-      data.units[q.id] && q.troop ? landerCost(data, q.id, q.troop) : data.units[q.id]?.cost;
+      data.units[q.id] && q.troop
+        ? landerCost(data, q.id, q.troop, state)
+        : matchCost(state, data.units[q.id]?.cost);
     if (!per) return undefined;
     const n = q.count ?? 1;
     return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));
   }
-  if (q.kind === 'building') return data.buildings[q.id]?.cost;
+  if (q.kind === 'building') return matchCost(state, data.buildings[q.id]?.cost);
   // Апгрейд: цена перехода с ТЕКУЩЕГО уровня постройки (см. шапку про смещение).
   const inst = state.planets[planetId]?.buildings.find((b) => b.type === q.id);
-  return inst ? data.buildings[q.id]?.upgrades[inst.level - 1]?.cost : undefined;
+  return inst ? matchCost(state, data.buildings[q.id]?.upgrades[inst.level - 1]?.cost) : undefined;
 }
 
 /**

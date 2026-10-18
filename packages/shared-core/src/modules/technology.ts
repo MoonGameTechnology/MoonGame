@@ -19,6 +19,7 @@ import type {
   UnitStack,
 } from '../state/gameState';
 import { scientistsOf } from '../state/gameState';
+import { matchCost, matchHours } from '../util/pricing';
 import { canAfford, payCost } from '../util/treasury';
 import { isForkSite } from '../state/forkSite';
 
@@ -349,15 +350,16 @@ function startResearch(action: Action, h: HandlerContext): void {
   if (lock) {
     return h.reject(lock);
   }
-  if (!canAfford(player.resources, def.cost)) {
+  const cost = matchCost(h.state, def.cost);
+  if (!canAfford(player.resources, cost)) {
     return h.reject('E_INSUFFICIENT');
   }
-  payCost(player.resources, def.cost);
+  payCost(player.resources, cost);
   const completesAt = scheduleCompletion(
     h,
     payload.technology,
     action.playerId,
-    def.researchTimeHours,
+    matchHours(h.state, def.researchTimeHours),
   );
   active.push({ technology: payload.technology, startedAt: h.ctx.now, completesAt });
   h.emit('technology.research.started', {

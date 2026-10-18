@@ -21,6 +21,7 @@ import {
   BASE_RESEARCH_SLOTS,
 } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { matchCost, matchHours } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { DAY, HOUR } from './time';
@@ -272,7 +273,8 @@ export function techTreeHtml(
       lastTier = td.tier;
       listHtml += `<div class="tt-tierh">${t('tech.tier', { n: roman(td.tier) })}</div>`;
     }
-    const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
+    const price = matchCost(state, td.cost);
+    const affordable = Object.entries(price).every(([k, v]) => (res[k] ?? 0) >= v);
     // Правое поле строки — ОДНО состояние: сделано / идёт / можно взять / причина замка.
     const right =
       st.st === 'done'
@@ -288,8 +290,8 @@ export function techTreeHtml(
       `<div class="tt-item st-${st.st}" data-tech="${id}">` +
       `<div class="tt-ih"><b>${esc(tData(td.name))}</b>${right}</div>` +
       (techFx(td) ? `<div class="tt-ifx">${techFx(td)}</div>` : '') +
-      `<div class="tt-ifoot"><span>${techCost(td.cost, res)}</span>` +
-      `<span class="tt-idur">${fmtDur(td.researchTimeHours)}</span></div>` +
+      `<div class="tt-ifoot"><span>${techCost(price, res)}</span>` +
+      `<span class="tt-idur">${fmtDur(matchHours(state, td.researchTimeHours))}</span></div>` +
       (st.st === 'res'
         ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
         : '') +
@@ -333,7 +335,8 @@ export function techTreeHtml(
     const condRows = (td.conditions ?? [])
       .map((c) => `<span>${techCondOk(state, me, c) ? '☑' : '⚗'} <b>${esc(techCondText(c))}</b></span>`)
       .join('');
-    const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
+    const price = matchCost(state, td.cost);
+    const affordable = Object.entries(price).every(([k, v]) => (res[k] ?? 0) >= v);
     const tag =
       st.st === 'done'
         ? `<span class="tt-tag">${t('tech.state.done')}</span>`
@@ -362,7 +365,7 @@ export function techTreeHtml(
       `<div class="tt-mtags">${tag}</div></div></div>` +
       (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
       `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost, res)} · ${fmtDur(td.researchTimeHours)}</b></span>` +
+      `<span>💰 <b>${techCost(price, res)} · ${fmtDur(matchHours(state, td.researchTimeHours))}</b></span>` +
       (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
       (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
       (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +

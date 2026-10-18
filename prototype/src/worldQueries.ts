@@ -113,13 +113,13 @@ export function constructionLabel(p: ConstructionPayload): string {
   return t('queue.unknown');
 }
 export function buildDurationHours(p: ConstructionPayload): number {
-  return coreBuildDurationHours(p, data);
+  return coreBuildDurationHours(p, data, game.world());
 }
 export function timeLeft(at: number): string {
   return fmtEta(hoursLeft(at, game.world().time, HOUR));
 }
 export function progressPct(active: ActiveBuild): number {
-  return coreProgressPct(active, game.world().time, data, HOUR);
+  return coreProgressPct(active, game.world().time, data, HOUR, game.world());
 }
 export function queuedLabel(q: QueuedBuild): string {
   if (q.kind === 'unit') {

@@ -10,6 +10,7 @@ import {
   BASE_RESEARCH_SLOTS,
   buildingLevel,
   buildingMaxLevel,
+  matchCost,
   HERO_ACTIVE_CAP,
   abilityRange,
   getStance,
@@ -668,6 +669,10 @@ function baseAiOrders(
   pinned: ReadonlySet<string>,
 ): Action[] {
   const out: Action[] = [];
+  // Пороги бота — в ценах ПАРТИИ (резолюция владельца 2026-10-18): в основной игре всё
+  // дороже, и «хватит на крейсер с запасом» значит больше металла, чем по каталогу. Правило
+  // пересчёта то же, что у ядра (`matchCost`); без цен партии порог прежний.
+  const pad = (res: string, n: number): number => matchCost(state, { [res]: n })[res] ?? n;
   if (!state.players[ai] || state.players[ai]!.status === 'defeated') return out; // seat not in play / eliminated
   // The defensive family: both Steward postures HOLD (no expansion, no war
   // declarations); «Активная оборона» merely adds the counterstrike/fire-watch
@@ -1318,8 +1323,8 @@ function baseAiOrders(
         );
       });
       if (queued) continue;
-      const cost = data.buildings[b]?.cost ?? {};
-      if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60)) continue;
+      const cost = matchCost(state, data.buildings[b]?.cost) ?? {};
+      if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60))) continue;
       const site = [
         base,
         ...Object.values(state.planets)
@@ -1344,8 +1349,8 @@ function baseAiOrders(
         return q.kind === 'building' && q.planetId === planetId && q.building === b;
       });
     const affordable = (b: string): boolean => {
-      const cost = data.buildings[b]?.cost ?? {};
-      return Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
+      const cost = matchCost(state, data.buildings[b]?.cost) ?? {};
+      return Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60));
     };
     /** Разрешает ли ЯДРО это здание здесь и сейчас, если отвлечься от денег.
      *
@@ -1385,10 +1390,10 @@ function baseAiOrders(
       yard.level < buildingMaxLevel(yardDef) &&
       incomeChain.every(has)
     ) {
-      const cost = buildingLevel(yardDef, yard.level + 1).cost;
+      const cost = matchCost(state, buildingLevel(yardDef, yard.level + 1).cost);
       const order = upgradeBuilding(ai, base.id, 'shipyard');
       if (
-        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60) &&
+        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60)) &&
         canOrder(state, order) === null
       )
         out.push(order);
@@ -1426,7 +1431,7 @@ function baseAiOrders(
     // 30-му дню копился до ~44k, а кредитов не было. Порядок: улучшить дома
     // переработку, налоговую и фабрикатор, потом поставить переработку на своём мире без
     // неё — она стоит один металл и даёт кредиты. Одна стройка за тик, как у шахт.
-    if (!trailing && (pl.resources.metal ?? 0) >= LEADER_METAL_SURPLUS) {
+    if (!trailing && (pl.resources.metal ?? 0) >= pad('metal', LEADER_METAL_SURPLUS)) {
       const pendingUpgrade = (planetId: string, b: string): boolean =>
         state.scheduled.some((e) => {
           if (e.type !== 'construction.complete') return false;
@@ -1439,8 +1444,8 @@ function baseAiOrders(
           const inst = base.buildings.find((x) => x.type === b);
           if (!def || !inst || inst.level >= buildingMaxLevel(def)) continue;
           if (pendingUpgrade(base.id, b)) continue;
-          const cost = buildingLevel(def, inst.level + 1).cost;
-          if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60))
+          const cost = matchCost(state, buildingLevel(def, inst.level + 1).cost);
+          if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60)))
             continue;
           const order = upgradeBuilding(ai, base.id, b);
           if (canOrder(state, order) === null) return order;
@@ -1477,13 +1482,14 @@ function baseAiOrders(
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
     if (!swarmInhabitant && (skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
-      const costOf = (id: string): Record<string, number> => data.technologies[id]?.cost ?? {};
+      const costOf = (id: string): Record<string, number> =>
+        matchCost(state, data.technologies[id]?.cost) ?? {};
       /** Чего не хватает на узел — с запасом `ORDER_RESERVE`, как у заказов войск. Прежний
        *  запас 60 на всё держал и микроэлектронику, а её у бота 40–150, и узлы второго
        *  тира (30–80 микроэлектроники) за 14 дней не брались почти никогда. */
       const shortOf = (id: string): string[] =>
         Object.entries(costOf(id))
-          .filter(([r, v]) => (pl.resources[r] ?? 0) < v + (ORDER_RESERVE[r] ?? 0))
+          .filter(([r, v]) => (pl.resources[r] ?? 0) < v + pad(r, ORDER_RESERVE[r] ?? 0))
           .map(([r]) => r);
       // Доктрина: узлы своей ветки идут вперёд цены (ранг `doctrineRanks`). Без доктрины
       // ранг у всех один, и порядок прежний — по цене.
@@ -1529,7 +1535,7 @@ function baseAiOrders(
         (id) =>
           rank(id) < Math.min(2, pick !== undefined ? rank(pick) : 2) &&
           shortOf(id).every((r) => {
-            const gap = (costOf(id)[r] ?? 0) + (ORDER_RESERVE[r] ?? 0) - (pl.resources[r] ?? 0);
+            const gap = (costOf(id)[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0) - (pl.resources[r] ?? 0);
             return (flow[r] ?? 0) > 0 && gap <= (flow[r] ?? 0) * DOCTRINE_SAVE_HOURS;
           }),
       );
@@ -1559,9 +1565,9 @@ function baseAiOrders(
     // out ⇒ the metal flows to economy/garrisons instead.
     if (
       ownFleets < (warFooting ? 8 : 4) &&
-      (pl.resources.metal ?? 0) > 220 &&
-      (pl.resources.credits ?? 0) > 120 &&
-      (pl.resources.microelectronics ?? 0) >= 3 // ECON-7: warships need the hi-tech good
+      (pl.resources.metal ?? 0) > pad('metal', 220) &&
+      (pl.resources.credits ?? 0) > pad('credits', 120) &&
+      (pl.resources.microelectronics ?? 0) >= pad('microelectronics', 3) // ECON-7: warships need the hi-tech good
     ) {
       // Корпус ветки в слот линейного корабля (армия под ветку): первое, что примет ядро,
       // пока таких у места меньше, чем крейсеров, — армия выходит смешанной. Целиком своим
@@ -1609,10 +1615,10 @@ function baseAiOrders(
       const baseMilitia = base.garrison
         .filter((s) => s.unit === militiaUnit)
         .reduce((n, s) => n + s.count, 0);
-      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasFacilityFor(base, militiaUnit)) {
+      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > pad('metal', 120) && hasFacilityFor(base, militiaUnit)) {
         out.push(buildUnit(ai, base.id, militiaUnit, 2));
       }
-      if (ownFleets < 8 && (pl.resources.metal ?? 0) > 140) {
+      if (ownFleets < 8 && (pl.resources.metal ?? 0) > pad('metal', 140)) {
         out.push(buildUnit(ai, base.id, scoutUnit, 1));
       }
     }
@@ -1643,12 +1649,12 @@ function baseAiOrders(
         });
       // `troop` — боец десантного челнока (SHU-5.2): платится вместе с машиной.
       const affordableUnit = (unit: string, count: number, troop?: string): boolean => {
-        const hull = data.units[unit]?.cost ?? {};
-        const extra = troop !== undefined ? (data.units[troop]?.cost ?? {}) : {};
+        const hull = matchCost(state, data.units[unit]?.cost) ?? {};
+        const extra = troop !== undefined ? (matchCost(state, data.units[troop]?.cost) ?? {}) : {};
         return Object.keys({ ...hull, ...extra }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
-            ((hull[r] ?? 0) + (extra[r] ?? 0)) * count + (ORDER_RESERVE[r] ?? 0),
+            ((hull[r] ?? 0) + (extra[r] ?? 0)) * count + pad(r, ORDER_RESERVE[r] ?? 0),
         );
       };
       // 1. Дома — оба цеха: КАЗАРМЫ открывают пехоту, ЗАВОД — технику (ROS-1.1).
@@ -1793,11 +1799,11 @@ function baseAiOrders(
             return q.kind === 'upgrade' && q.planetId === base.id && q.building === 'shipyard';
           });
           if (yard && def && !upgrading && yard.level < buildingMaxLevel(def)) {
-            const cost = buildingLevel(def, yard.level + 1).cost;
+            const cost = matchCost(state, buildingLevel(def, yard.level + 1).cost);
             const order = upgradeBuilding(ai, base.id, 'shipyard');
             if (
               Object.keys(cost).every(
-                (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+                (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0),
               ) &&
               canOrder(state, order) === null
             ) {
@@ -1818,17 +1824,18 @@ function baseAiOrders(
       // Бот держит пару таких крейсеров на войне: без них миры он рушил бы только
       // `attack × BOMBARD_FRACTION` линейных корпусов. Заднюю линию теперь держит
       // шаттл-носитель выше.
-      const siegeCost = data.modules[SIEGE_MODULE]?.cost ?? {};
+      const lineCost = matchCost(state, data.units[lineUnit]?.cost) ?? {};
+      const siegeCost = matchCost(state, data.modules[SIEGE_MODULE]?.cost) ?? {};
       if (
         warFooting &&
         data.modules[SIEGE_MODULE] &&
         ownsModule(state, ai, SIEGE_MODULE) &&
         shipsOwned(lineUnit, SIEGE_MODULE) < (army.siegeCap ?? SIEGE_CAP) &&
         !pendingSiege(base.id) &&
-        Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...siegeCost }).every(
+        Object.keys({ ...lineCost, ...siegeCost }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
-            (data.units[lineUnit]?.cost[r] ?? 0) + (siegeCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+            (lineCost[r] ?? 0) + (siegeCost[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0),
         )
       ) {
         out.push(buildShip(ai, base.id, lineUnit, 1, [SIEGE_MODULE]));
@@ -1839,16 +1846,16 @@ function baseAiOrders(
       // борту, поэтому нужен ровно там, где идут вылеты: на войне, пара на империю.
       // Погрузка предпочитает флот с ангаром (`pickHoldFleet`). Проба `canOrder` — на
       // случай арсенала без модуля: тогда заказа нет, а не отказ ядра каждый тик.
-      const repairCost = data.modules[REPAIR_MODULE]?.cost ?? {};
+      const repairCost = matchCost(state, data.modules[REPAIR_MODULE]?.cost) ?? {};
       if (
         warFooting &&
         data.modules[REPAIR_MODULE] &&
         shipsOwned(lineUnit, REPAIR_MODULE) < REPAIR_BAY_CAP &&
         !pendingSiege(base.id, REPAIR_MODULE) &&
-        Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...repairCost }).every(
+        Object.keys({ ...lineCost, ...repairCost }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
-            (data.units[lineUnit]?.cost[r] ?? 0) + (repairCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+            (lineCost[r] ?? 0) + (repairCost[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0),
         ) &&
         canOrder(state, buildShip(ai, base.id, lineUnit, 1, [REPAIR_MODULE])) === null
       ) {

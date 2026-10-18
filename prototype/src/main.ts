@@ -200,6 +200,7 @@ import {
   buildingLevel,
   buildingMaxLevel,
   effectiveStats,
+  matchCost,
   sightCircles,
   type SightCircle,
   type Squadron,
@@ -2312,7 +2313,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       if (inst.level >= max) return '';
       const code = canOrder(s, upgradeBuilding(ME, p.id, id));
       if (code !== null && code !== 'E_INSUFFICIENT') return '';
-      const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
+      const c = def ? matchCost(s, buildingLevel(def, inst.level + 1).cost) : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
     const buildable = canBuildHere(p, id, data, feedsOnBiomass(s, ME, data));
@@ -2321,10 +2322,10 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
     if (!buildable || buildingLocked(p.id, id)) return '';
     if (level > 1) return ''; // листаешь будущие уровни — строится всё равно первый
-    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
+    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(matchCost(s, data.buildings[id]?.cost), myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, s.players[ME]?.faction)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, s.players[ME]?.faction)} ${t('codex.build-here')} · ${cost(matchCost(s, data.units[id]?.cost), myRes())}</button>`;
   }
   return '';
 }

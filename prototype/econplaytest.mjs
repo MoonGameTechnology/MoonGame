@@ -15,6 +15,9 @@ const DAYS = Math.max(5, Number(process.argv[2] ?? 40) || 40);
 const SEATS_N = Math.max(2, Math.min(10, Number(process.argv[3] ?? 4) || 4));
 const SEEDS = Math.max(1, Number(process.argv[4] ?? 3) || 3);
 const POSTURE = process.argv[5] ?? 'expand'; // 'expand' (war) | 'defend' (peaceful builders)
+// Опубликованная карта (`duel-1`, `ffa-4`…): старты и число мест — её, а цены — её
+// `pricing` (основная игра). Нет аргумента — «Нексус», как прежде.
+const MAP = process.argv[6];
 
 const res = await build({
   entryPoints: ['prototype/src/game.ts'],
@@ -35,7 +38,10 @@ const {
   HOUR,
   DAY,
   START_CANDIDATES,
+  networkSeats,
+  matchCost,
 } = mod.exports;
+const SEATS = MAP !== undefined ? networkSeats('ffa', MAP).length : SEATS_N;
 
 const STEP = 2 * HOUR; // AI decision cadence (mirrors the netserver driver)
 const HOUSES = [
@@ -51,6 +57,12 @@ const config = { timeScale: 1, victory: { scoreLimit: 100_000_000, endsAt: DAYS 
 const ctx = (now) => ({ now, data, config });
 
 function seats(n) {
+  if (MAP !== undefined) {
+    return networkSeats('ffa', MAP).map((s, i) => {
+      const [faction, name] = HOUSES[i % HOUSES.length];
+      return { ...s, name: `${name} ${i + 1}`, faction, ai: true };
+    });
+  }
   return Array.from({ length: n }, (_, i) => {
     const [faction, name] = HOUSES[i % HOUSES.length];
     return { id: `p${i + 1}`, name: `${name} ${i + 1}`, faction, start: START_CANDIDATES[i], ai: true };
@@ -66,7 +78,7 @@ function buildingCost(building, level = 1) {
 }
 
 function runMatch(seed, n) {
-  let state = newGame({ seats: seats(n), seed });
+  let state = newGame({ seats: seats(n), seed, ...(MAP !== undefined ? { mapId: MAP } : {}) });
   const ids = Object.keys(state.players);
 
   // Per-player hourly stock series + arrears-hours + spend/faucet ledger.
@@ -84,7 +96,7 @@ function runMatch(seed, n) {
       if (e.type === 'building.constructed' || e.type === 'building.upgraded') {
         const owner = p.owner ?? ownerOfPlanet(state, p.planetId);
         if (owner && spend[owner]) {
-          const cost = buildingCost(p.building, p.level ?? 1);
+          const cost = matchCost(state, buildingCost(p.building, p.level ?? 1));
           for (const [r, v] of Object.entries(cost))
             spend[owner].building[r] = (spend[owner].building[r] ?? 0) + v;
           built[owner][p.building] = (built[owner][p.building] ?? 0) + 1;
@@ -92,7 +104,7 @@ function runMatch(seed, n) {
       } else if (e.type === 'unit.built') {
         const owner = p.owner ?? ownerOfPlanet(state, p.planetId);
         if (owner && spend[owner]) {
-          const cost = data.units[p.unit]?.cost ?? {};
+          const cost = matchCost(state, data.units[p.unit]?.cost ?? {});
           const cnt = p.count ?? 1;
           for (const [r, v] of Object.entries(cost))
             spend[owner].unit[r] = (spend[owner].unit[r] ?? 0) + v * cnt;
@@ -257,7 +269,7 @@ for (let day = 1; day <= Math.min(DAYS, Math.floor(maxDay)); day++) {
 const fmt = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
 const lines = [];
 lines.push(
-  `━━ ECON playtest ━━ ${runs.length} матчей · ${SEATS_N} сторон · поза «${POSTURE}» · ${DAYS}д цель · ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+  `━━ ECON playtest ━━ ${runs.length} матчей · ${SEATS} сторон${MAP ? ` · ${MAP}` : ''} · поза «${POSTURE}» · ${DAYS}д цель · ${((Date.now() - t0) / 1000).toFixed(1)}s`,
 );
 lines.push(
   `  длина: avg ${mean(runs.map((r) => r.lengthDays)).toFixed(1)}д · боёв ${runs.reduce((s, r) => s + r.battles, 0)} · закончились ${runs.filter((r) => r.ended).length}/${runs.length}`,
@@ -317,7 +329,7 @@ writeFileSync(
   JSON.stringify(
     {
       days: DAYS,
-      seats: SEATS_N,
+      seats: SEATS,
       seeds: runs.length,
       finalStock: Object.fromEntries(RES.map((r) => [r, { med: med(agg.finalStock[r]), mean: mean(agg.finalStock[r]) }])),
       peakStock: Object.fromEntries(RES.map((r) => [r, med(agg.peakStock[r])])),

@@ -28,6 +28,7 @@ export {
   STEWARD_POSTURES,
   MAX_STEWARD_HOLD_POINTS,
   techInMatch,
+  matchCost,
 } from '../../packages/shared-core/src/index';
 
 // --- assembling the match ----------------------------------------------------

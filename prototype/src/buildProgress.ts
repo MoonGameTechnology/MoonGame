@@ -17,6 +17,7 @@
  *    назвать время стройки; полоса обязана показать 100%, а не NaN.
  */
 import type { GameData, GameState } from '../../packages/shared-core/src/index';
+import { matchHours } from '../../packages/shared-core/src/index';
 import type { ActiveBuild, BuildLane, ConstructionPayload } from './buildQueue';
 
 /** Полезная нагрузка события стройки, если она вообще похожа на неё. */
@@ -59,7 +60,16 @@ export function activeConstruction(
  * `upgrades[L - 2]`: нулевой элемент описывает переход на второй уровень (см. шапку).
  * Неизвестное — ноль часов, и полоса честно покажет «готово».
  */
-export function buildDurationHours(p: ConstructionPayload, data: GameData): number {
+export function buildDurationHours(
+  p: ConstructionPayload,
+  data: GameData,
+  match: Pick<GameState, 'pricing'> = {},
+): number {
+  return matchHours(match, catalogHours(p, data));
+}
+
+/** Срок по каталогу — до множителя партии (`matchHours`). */
+function catalogHours(p: ConstructionPayload, data: GameData): number {
   if (p.kind === 'unit' && p.unit) return data.units[p.unit]?.buildTimeHours ?? 0;
   if (p.kind === 'upgrade' && p.building && typeof p.level === 'number') {
     return data.buildings[p.building]?.upgrades[p.level - 2]?.buildTimeHours ?? 0;
@@ -79,8 +89,9 @@ export function progressPct(
   now: number,
   data: GameData,
   hourMs: number,
+  match: Pick<GameState, 'pricing'> = {},
 ): number {
-  return barPct(active.at, buildDurationHours(active.payload, data) * hourMs, now);
+  return barPct(active.at, buildDurationHours(active.payload, data, match) * hourMs, now);
 }
 
 /**

@@ -9,7 +9,7 @@
 // есть «правила поменялись под матчем», которые `resolveMatchConfig` отказывается
 // допускать для неизвестного режима; допустить их через чёрный ход было бы странно.
 import { describe, expect, it } from 'vitest';
-import { newGame, type SetupConfig } from './matchSetup';
+import { networkSeats, newGame, type SetupConfig } from './matchSetup';
 import { START_CANDIDATES } from './map';
 
 const seats: SetupConfig['seats'] = [
@@ -41,5 +41,23 @@ describe('BRW-0 — режим сессии в состоянии', () => {
     const pvp = newGame({ seats, modeId: 'standard' });
     expect([pve.mapId, pve.modeId]).toEqual(['frontier-50', 'pve_waves']);
     expect([pvp.mapId, pvp.modeId]).toEqual(['nexus', 'standard']);
+  });
+});
+
+describe('цены основной игры — стартовый запас', () => {
+  // Карта основной игры закрепляет цены партии (`pricing`), и стартовый запас места растёт
+  // вместе с ними, но слабее (резолюция владельца 2026-10-18). «Нексус» без цен — прежний
+  // запас.
+  it('на карте основной игры запас растёт по `pricing.start`', () => {
+    const state = newGame({ seats: networkSeats('ffa', 'duel-1'), mapId: 'duel-1' });
+    const seat = Object.values(state.players).find((p) => p.faction !== 'swarm')!;
+    expect(state.pricing?.start).toBeDefined();
+    expect(seat.resources).toEqual({ credits: 520, metal: 480, food: 120, energy: 90, microelectronics: 80 });
+  });
+
+  it('без цен партии — прежний запас', () => {
+    const state = newGame({ seats });
+    expect(state.pricing).toBeUndefined();
+    expect(state.players.p1?.resources).toEqual({ credits: 260, metal: 320, food: 120, energy: 90, microelectronics: 40 });
   });
 });
