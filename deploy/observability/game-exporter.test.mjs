@@ -1,5 +1,5 @@
 /* global Response */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { mkdtemp, writeFile, chmod, symlink, rm, readdir, readFile } from 'node:fs/promises';
@@ -170,6 +170,40 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
     const response = await fetch(base + '/metrics');
     expect(response.headers.get('content-type')).toContain('text/plain');
     expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it.each(['headers', 'body'])('reports hanging %s before the 2s consumer scrape deadline', async (phase) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const untilAbort = (signal) => new Promise((_, reject) => {
+        const abort = () => reject(new Error('PRIVATE'));
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
+      });
+      const request = vi.fn((_url, { signal }) => phase === 'headers'
+        ? untilAbort(signal)
+        : Promise.resolve({
+          ok: true, status: 200,
+          body: { async *[Symbol.asyncIterator]() { yield Buffer.from('{'); await untilAbort(signal); } },
+        }));
+      let settled = false;
+      const pending = createExporter({ request }).scrape().then((output) => { settled = true; return output; });
+      await vi.advanceTimersByTimeAsync(1499);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      // Assert before awaiting: a regression to 2000ms must fail, not hang the test.
+      expect(settled).toBe(true);
+      const output = await pending;
+      expect(output.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(4);
+      expect(output).not.toContain('PRIVATE');
+      expect(output).not.toContain('moongame_source_last_success_timestamp_seconds');
+      expect(vi.getTimerCount()).toBe(0);
+      expect(() => createExporter({ timeoutMs: 2000 })).not.toThrow();
+      expect(() => createExporter({ timeoutMs: 2001 })).toThrow('E_OBS_CONFIG');
+    } finally {
+      try { await vi.runAllTimersAsync(); }
+      finally { vi.useRealTimers(); }
+    }
   });
 
   it('reads a bounded private plain secret and refuses symlinks or world-readable files', async () => {

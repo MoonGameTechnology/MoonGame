@@ -129,8 +129,9 @@ async function sourceJson(source, port, token, request, timeoutMs) {
   finally { clearTimeout(timer); }
 }
 
-/** One shared scrape in flight, fresh projections only; retain timestamps, never old game values. */
-export function createExporter({ sourcePort = 8788, token, request = fetch, now = Date.now, timeoutMs = 2000 } = {}) {
+/** Shared scrape, fresh projections only. The 1500ms default leaves response headroom
+ *  below the consumer's 2s deadline; explicit local overrides still have a 2s cap. */
+export function createExporter({ sourcePort = 8788, token, request = fetch, now = Date.now, timeoutMs = 1500 } = {}) {
   if (!Number.isInteger(sourcePort) || sourcePort < 1 || sourcePort > 65535 || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2000) throw new Error('E_OBS_CONFIG');
   const lastSuccess = new Map(); let inFlight, rejectedSeries = 0;
   const scrape = () => {
