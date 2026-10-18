@@ -235,7 +235,7 @@ export class MemoryUserStore implements UserStore {
     const mail = email?.toLowerCase();
     if (mail && this.byEmail(mail)) return Promise.resolve({ ok: false, code: 'E_EMAIL_TAKEN' });
     const userId = randomUUID();
-    this.byLogin.set(key, { userId, login, passHash, ...(mail ? { email: mail } : {}) });
+    this.byLogin.set(key, { userId, login, passHash, registrationReward: true, ...(mail ? { email: mail } : {}) });
     return Promise.resolve({ ok: true, userId });
   }
 

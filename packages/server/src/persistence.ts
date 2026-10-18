@@ -1,3 +1,4 @@
+import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from './registrationRewardStore';
 import { createCorporateServices } from './corporateTransactions';
 import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
@@ -71,6 +72,7 @@ import {
 export interface Stores {
   corporateServices?: ReturnType<typeof createCorporateServices>;
   profileStore: ProfileStore;
+  registrationRewards: RegistrationRewardStore;
   store: MatchStore;
   receiptStore: ReceiptStore;
   /** Nick→seat identity. Durable (Postgres) alongside the match itself, so a returning
@@ -128,14 +130,18 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     const market = new MemoryMetaMarket(memoryArsenal, undefined, faucet);
     const economy = new MemoryMetaEconomyStore(memoryArsenal, memoryDrops, market);
     market.setEconomy(economy);
+    const users = new MemoryUserStore();
+    const profiles = new MemoryProfileStore();
+    const commanders = new MemoryCommanderStore();
     return {
-      profileStore: new MemoryProfileStore(),
+      profileStore: profiles,
+      registrationRewards: new MemoryRegistrationRewardStore(users, profiles, commanders),
       store: memoryMatches,
       receiptStore: new MemoryReceiptStore(),
       accountStore: new MemoryAccountStore(),
-      userStore: new MemoryUserStore(),
+      userStore: users,
       corpStore: new MemoryCorpStore(),
-      commanderStore: new MemoryCommanderStore(),
+      commanderStore: commanders,
       challengeStore: new MemoryAvaChallengeStore(),
       rosterStore: new MemoryAvaRosterStore(),
       resultStore: new MemoryAvaResultStore(),
@@ -164,6 +170,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   return {
     corporateServices: createCorporateServices(pool),
     profileStore: new PostgresProfileStore(pool),
+    registrationRewards: new PostgresRegistrationRewardStore(pool),
     store: new PostgresMatchStore(pool),
     receiptStore: new PostgresReceiptStore(pool),
     accountStore: new PostgresAccountStore(pool), // shares the pool; closed by pool.end()

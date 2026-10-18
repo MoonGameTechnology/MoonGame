@@ -39,6 +39,8 @@ import p38 from '../../docs/mockups/player-profile/assets/portrait-38.webp';
 import p39 from '../../docs/mockups/player-profile/assets/portrait-39.webp';
 import p40 from '../../docs/mockups/player-profile/assets/portrait-40.webp';
 import medals from '../../docs/mockups/player-profile/assets/medals.webp';
+import contribution from '../assets/contribution-medal.svg';
+export const CONTRIBUTION_MEDAL = contribution;
 export const PORTRAITS = [
   p1,
   p2,
