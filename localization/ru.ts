@@ -604,6 +604,8 @@ export const ru: Record<string, string> = {
   'auth.need-mail': 'Введите почту',
   'auth.need-name': 'Введите имя командира',
   'auth.pass-mismatch': 'Пароли не совпадают',
+  'auth.password.hide': 'Скрыть пароль',
+  'auth.password.show': 'Показать пароль',
   'auth.recover.sent': 'Проверьте почту',
   'auth.reset.bad-link': 'Ссылка недействительна или устарела',
   'auth.reset.done': 'Пароль изменён',

@@ -1,0 +1,18 @@
+apiVersion: 1
+prune: true
+datasources:
+  - name: Prometheus
+    uid: moongame-prometheus
+    type: prometheus
+    access: proxy
+    url: http://obs-prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: GET
+      timeInterval: 15s
+      queryTimeout: 10s
+      prometheusType: Prometheus
+      cacheLevel: Low
+# No Loki datasource until a query-only boundary is implemented (OBS-2.1).
+# editable:false alone does not stop writes through Grafana's datasource proxy.

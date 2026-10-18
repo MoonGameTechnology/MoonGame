@@ -50,7 +50,7 @@ Grafana не заменяет служебные дела, модерацию и
 | `packages/server/src/telemetryApi.ts`, `packages/protocol/src/telemetry.ts` | `POST /telemetry`: словарь, лимиты, серверный actor, счётчики приёмника | Клиентские данные недоверенные; install не равен человеку; окно activeInstalls — 5 минут |
 | `prototype/analytics.mjs`, `prototype/analyticsReport.mjs`, `prototype/report.mjs` | Разбор воронки, связи, когорт и игровых журналов, дедуп клиентских событий | Сейчас CLI, а не постоянно работающая БД аналитики или веб-сервис |
 | `packages/server/src/operatorAccess.ts`, `deploy/Caddyfile` | Метрики только direct loopback без forwarding или bearer; публичный Caddy блокирует `/metrics` и `/metrics/*` | Контейнерный exporter использует серверный секрет; браузеру его не передавать |
-| `deploy/docker-compose.yml`, TLS overlay | Постоянные тома БД/журналов, лимиты ресурсов и Docker logs; Caddy | Нет готового observability Compose-стека, Grafana provisioning и удалённого сборщика |
+| `deploy/docker-compose.yml`, TLS/observability overlays | Тома БД/журналов, Caddy; opt-in закрытый Grafana/Prometheus/Loki/Alloy bootstrap и provisioning (OBS-0.2) | VPS rollout, Game/host/DB wiring, dashboards и удалённый сборщик ещё не приняты |
 
 `/metrics/recent` читает текущий файл целиком; постоянным сборщиком его не опрашивать.
 `/metrics/health` содержит накопленные за процесс max/min и ошибки, поэтому не
@@ -344,7 +344,7 @@ baseline и зафиксировать workload/версию/свободный 
 По ревью CLI сохраняет все конечные положительные timeScale и помечает неполный
 summary invalid при отсутствии обязательных submit/broadcast/delta series.
 
-### OBS-0.2 · Закрытый стек и provisioning `[ops][sec]` ⏳ — M
+### OBS-0.2 · Закрытый стек и provisioning `[ops][sec]` ✅ — M
 
 Добавить opt-in Compose overlay, внутреннюю сеть, secret/volume/memory/pid/log
 limits, healthchecks, Grafana datasource provisioning. Digest pins и проверка
@@ -352,6 +352,15 @@ limits, healthchecks, Grafana datasource provisioning. Digest pins и прове
 Game volumes. **Готово, когда:** воспроизводимый deploy и restart сохраняют
 конфигурацию; снаружи доступен только защищённый вход; обход header/порта/API
 отказан, остановка стека не меняет Game readiness. Связка OPS-0.2/SE-8.3.
+
+**Сделано (2026-10-18):** opt-in overlay, internal сеть, только loopback Grafana,
+non-root/read-only/caps, memory/PID/log caps, private file secret, HTTP healthchecks,
+digest pins и CI Trivy/KICS. Root CLI управляет только четырьмя `obs-*`, требует
+disk guard timer; restart сохраняет состояние. Контейнерный smoke проверяет
+auth/header/proxy/write/snapshot/Viewer границы, persistence и неизменность Game
+Compose config. [Runbook](../deploy/observability/README.md) отделяет реализацию от
+ещё не проведённых VPS root/systemd, внешних сетевых проверок и 24h/on-off приёмки.
+Game targets и Loki ingest не включены.
 
 ### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` ⏳ — M
 
@@ -375,7 +384,7 @@ Fixture и живой production bundle с WS join/остановкой/рест
 [Запуск и границы](../deploy/observability/GAME-EXPORTER.md): Compose wiring,
 metrics-only credential и приёмка реального VPS остаются отдельными работами.
 
-### OBS-1.2 · Хост, БД и backup health `[ops]` 🔒(OBS-0.2) — S
+### OBS-1.2 · Хост, БД и backup health `[ops]` ⏳ — S
 
 Node exporter, ограниченный DB exporter, фиксированные textfile jobs для
 backup/restore/контейнеров. **Готово, когда:** проверенные изменения источников

@@ -17,7 +17,9 @@ Corp поддерживает отдельный процесс/БД через 
 суточные игровые/клиентские JSONL и CLI-отчёты `metrics`/`analytics`).
 Горизонтального масштаба, централизованного хранилища телеметрии и полноценного
 служебного контура нет; экономические события v0 пишутся после commit.
-OTel/Prometheus/Grafana/Sentry — нет.
+Opt-in bootstrap Prometheus/Grafana/Loki/Alloy реализован в OBS-0.2
+([runbook](../deploy/observability/README.md)); Game/host/DB wiring и VPS-приёмка
+ещё не выполнены. OTel/Sentry не подключены.
 SBOM/сканеры есть (SEC-0). Контент — `data/*.json` + manifest (валидируется), но без пайплайна
 публикации/версий без даунтайма.
 
