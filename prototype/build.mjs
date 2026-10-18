@@ -2934,6 +2934,12 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .mfrange:focus-visible::-webkit-slider-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
 #connect .mfrange:focus-visible::-moz-range-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
 #connect .mlist{flex:none;display:flex;flex-direction:column;gap:8px;}
+#connect .mnum{flex:none;display:flex;gap:8px;}
+#connect .mnum input{flex:1;min-width:0;min-height:44px;padding:0 12px;background:rgba(2,10,14,.9);
+  border:1px solid var(--line-hi);border-radius:7px;color:var(--ink);font:var(--fs-body)/1.4 var(--sf-font);
+  font-variant-numeric:tabular-nums;}
+#connect .mnum input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.2);}
+#connect .mnum .mbtn{flex:none;}
 #connect .mempty{padding:18px 8px 4px;text-align:center;font-size:15px;line-height:1.45;color:var(--sf-dim);}
 #connect .msolo{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 8px 16px;text-align:center;}
 #connect .msolo .mbtn{min-height:46px;padding:0 20px;}
@@ -3552,7 +3558,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hm-list{display:flex;flex-direction:column;gap:8px;}
 #hub .hm-row .hm-body{flex:1;min-width:0;}
 #hub .hm-row .hm-addr{font-size:var(--fs-caption);color:var(--dim);margin-top:6px;
-  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;}
+  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;font-variant-numeric:tabular-nums;}
 #hub .hm-row .hm-btns{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}
 /* «Продолжить» и «Копировать адрес» — классами .btn-second/.btn-quiet (UIX-11.2): правило
    #connect .mbtn сюда не доходит, и без них это были кнопки браузера по умолчанию. */
@@ -4371,6 +4377,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
               </div>
             </div>
           </div>
+          <!-- Вход по номеру партии (плейтест 2026-10-17): номер диктуют и копируют вместо адреса. -->
+          <form id="mnum" class="mnum" style="display:none" onsubmit="return false">
+            <input id="mnum-in" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="80" data-i18n-ph="browser.number.ph" data-i18n-aria="browser.number.ph">
+            <button id="mnum-go" class="mbtn btn-second" type="submit" data-i18n="browser.join"></button>
+          </form>
           <div id="mlist" class="mlist"></div>
         </div>
         <div id="match-create" class="mcreate" style="display:none">

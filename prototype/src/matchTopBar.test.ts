@@ -191,7 +191,6 @@ async function boot(
     mobile: false,
     aiSeats: 2,
     speedControl: true,
-    holographic: false,
     allyPulsing: false,
     missionsOpen: false,
     desktop: false,
@@ -250,6 +249,9 @@ async function boot(
   }));
   vi.doMock('./netSession', () => ({
     get NET() {
+      return env.net;
+    },
+    get netWorld() {
       return env.net;
     },
   }));
@@ -335,7 +337,6 @@ async function boot(
     mobile: () => env.mobile,
     aiSeats: () => env.aiSeats,
     speedControl: () => env.speedControl,
-    holographic: () => env.holographic,
     phoneSpeed: () => ({ sync: (...args: unknown[]) => void rec.sync.push(args) }) as never,
     phoneBadges: (battles, unread) => void rec.phone.push([battles, unread]),
     allyPulsing: () => env.allyPulsing,
@@ -725,14 +726,21 @@ describe('полоса скорости', () => {
     expect(rec.sync.at(-1)![0]).toBe(false);
   });
 
-  it('ПК без дев-управления временем прячет полосу; голографический интерфейс её держит', async () => {
-    const { m, el, env } = await boot({ speedControl: false });
+  it('ПК без дев-управления временем прячет полосу: пустой коробки в углу карты нет', async () => {
+    const { m, el } = await boot({ speedControl: false });
     m.renderSpeedbar();
     expect(el('speedbar').style.display).toBe('none');
     expect(el('spd-ctl').style.display).toBe('none');
-    env.holographic = true;
+  });
+
+  it('в сети управления временем нет и на ПК с дев-выключателем — полоса гаснет целиком', async () => {
+    const { m, el, env } = await boot({ speedControl: true });
     m.renderSpeedbar();
-    expect(el('speedbar').style.display).toBe('');
+    expect(el('spd-ctl').style.display).toBe('');
+    env.net = true;
+    m.renderSpeedbar();
+    expect(el('spd-ctl').style.display).toBe('none');
+    expect(el('speedbar').style.display).toBe('none');
   });
 
   it('▶▶▶ дев-забега — свой темп и видна только в дев-забеге', async () => {

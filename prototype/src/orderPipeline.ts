@@ -26,7 +26,7 @@ import type { HeroNews } from './heroNews';
 import { heroDisplayName } from './heroStaff';
 import { pruneSelection } from './interaction';
 import { introFor } from './introTrigger';
-import { NET, netClient, reconnecting } from './netSession';
+import { NET, netClient, netWorld, reconnecting } from './netSession';
 import { isBuildAction, sandboxConfig } from './sandbox';
 import { stewMetrics, type StewardMetrics } from './stewardScreen';
 import { decisionsField, diffFields, stewardReport, type StewardEvent } from './stewardLog';
@@ -123,7 +123,9 @@ export function playerOrder(action: Action): boolean {
   // трогает локальный редьюсер (иначе следующий снимок сотрёт «принятый» приказ), при
   // оборванной связи приказ честно отвергается (сервер о нём не узнает), а обучение
   // учится в сети на намерении, в соло — только на принятом приказе.
-  const plan = orderPlan({ net: NET, hasClient: !!netClient, reconnecting });
+  // Серверный мир без связи (`netWorld` без `NET`) — тот же обрыв, даже когда цикл
+  // переподключения сдался: локальный редьюсер по туманному снимку не применяется никогда.
+  const plan = orderPlan({ net: NET, hasClient: !!netClient, reconnecting: reconnecting || (netWorld && !NET) });
   if (plan.route === 'send' || plan.route === 'queue') {
     // Один и тот же вызов: живой провод отправляет сразу, оборванный — кладёт в очередь
     // транспорта (NETA2-5), и она уйдёт на реконнектном welcome. Разница только в том,

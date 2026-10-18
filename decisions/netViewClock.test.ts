@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { BLEND_MS, LEAD_MS, NET_VIEW_IDLE, netViewAt, netViewSnapshot } from './netViewClock';
+import {
+  BLEND_MS,
+  LEAD_MS,
+  NET_VIEW_IDLE,
+  SETTLE_CAP_MS,
+  SNAP_MS,
+  netViewAt,
+  netViewFollow,
+  netViewSettled,
+  netViewSnapshot,
+  type NetViewShown,
+} from './netViewClock';
 
 /** Снимки раз в `every` реальных мс при мире, идущем со скоростью `rate`. */
 function feed(n: number, every: number, rate: number, t0 = 1_000_000, real0 = 0) {
@@ -79,5 +90,62 @@ describe('netViewClock', () => {
     const fresh = netViewSnapshot(c, 5, 4000);
     expect(fresh.rate).toBe(0);
     expect(netViewAt(fresh, 4500, 0)).toBe(5);
+  });
+
+  it('правило 5: опоздавший приветственный снимок не завышает скорость', () => {
+    // Мир идёт ×1, снимки раз в секунду, но приветствие разбирали 400 мс — оно «пришло» в 400.
+    let c = netViewSnapshot(NET_VIEW_IDLE, 1_000_000, 400);
+    c = netViewSnapshot(c, 1_001_000, 1000);
+    expect(c.rate).toBe(0); // второй снимок только начинает отсчёт
+    c = netViewSnapshot(c, 1_002_000, 2000);
+    expect(c.rate).toBeCloseTo(1, 6);
+  });
+
+  it('правило 6: карта ждёт калибровки, но не дольше SETTLE_CAP_MS', () => {
+    let c = netViewSnapshot(NET_VIEW_IDLE, 1_000_000, 0);
+    expect(netViewSettled(NET_VIEW_IDLE, 0)).toBe(false);
+    expect(netViewSettled(c, 1500)).toBe(false);
+    c = netViewSnapshot(c, 1_001_000, 1000);
+    c = netViewSnapshot(c, 1_002_000, 2000);
+    expect(netViewSettled(c, 2000)).toBe(true);
+    const paused = netViewSnapshot(NET_VIEW_IDLE, 5, 0);
+    expect(netViewSettled(paused, SETTLE_CAP_MS - 1)).toBe(false);
+    expect(netViewSettled(paused, SETTLE_CAP_MS)).toBe(true);
+  });
+
+  it('правило 7: кадр не едет назад и не замирает на неровных снимках', () => {
+    // Снимки ×1 раз в ~1 с с разбросом ±150 мс, кадр каждые 16 мс.
+    let c = feed(3, 1000, 1);
+    let shown: NetViewShown | null = null;
+    let worstStall = 0;
+    let stall = 0;
+    const jitter = [150, -120, 90, -150, 60, 140, -80, 0, 130, -140];
+    let next = 3000 + jitter[0]!;
+    let k = 0;
+    for (let now = 2000; now < 13_000; now += 16) {
+      if (now >= next) {
+        c = netViewSnapshot(c, 1_000_000 + (3000 + k * 1000), now);
+        k++;
+        next = 3000 + k * 1000 + jitter[k % jitter.length]!;
+      }
+      const prevTime: number = shown === null ? -Infinity : (shown as NetViewShown).time;
+      shown = netViewFollow(shown, c, now, 0);
+      expect(shown.time).toBeGreaterThanOrEqual(prevTime);
+      stall = shown.time - prevTime < 1 ? stall + 16 : 0;
+      worstStall = Math.max(worstStall, stall);
+    }
+    expect(worstStall).toBeLessThan(100);
+    // И держится рядом с правдой: не дальше трёх десятых секунды хода мира.
+    expect(Math.abs(shown!.time - netViewAt(c, 13_000, 0))).toBeLessThan(300);
+  });
+
+  it('правило 7: большой разрыв и стоящий мир — скачок к оценке', () => {
+    const c = feed(3, 1000, 1);
+    const far: NetViewShown = { time: c.t! - SNAP_MS * 2, at: 1990 };
+    expect(netViewFollow(far, c, 2000, 0).time).toBeCloseTo(netViewAt(c, 2000, 0), 6);
+    const paused = netViewSnapshot(c, c.t!, 3000);
+    const ahead: NetViewShown = { time: c.t! + 500, at: 2990 };
+    expect(netViewFollow(ahead, paused, 3000, 0).time).toBe(paused.t);
+    expect(netViewFollow(null, c, 2000, 0).time).toBeCloseTo(netViewAt(c, 2000, 0), 6);
   });
 });

@@ -32,7 +32,7 @@ import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { operatorTokenFromEnv } from './operatorAccess';
 import { createMatchLoader } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
-import { newMatchId } from './matchId';
+import { freeMatchId } from './matchId';
 import {
   registerMatchApi,
   registerOpenMatchesFeed,
@@ -368,7 +368,7 @@ const identify: MatchApiDeps['identify'] = verifySession
 // optional (a host may seed out of band), so the deps field alone reads as possibly-undefined.
 const createMatch = async (): Promise<CreatedMatch> => {
   if (matchCount >= MAX_MATCHES) throw new Error('match capacity reached'); // → 500, bounded
-  const matchId = newMatchId();
+  const matchId = await freeMatchId(async (id) => (await stores.store.load(id)) !== null);
   const seed = createDevMatch(data, { id: matchId, time: Date.now() });
   const snapshot = snapshotOf(seed);
   if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);

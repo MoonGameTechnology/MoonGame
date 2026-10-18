@@ -69,6 +69,7 @@ import {
   netDesyncCount,
   netMatchId,
   netView,
+  netWorld,
   rttEma,
   serverMatchId,
 } from './netSession';
@@ -563,7 +564,14 @@ import {
   spinRuns,
   stepBacklog,
 } from '../../decisions/simClock';
-import { NET_VIEW_IDLE, netViewAt, netViewSnapshot } from '../../decisions/netViewClock';
+import {
+  NET_VIEW_IDLE,
+  netViewAt,
+  netViewFollow,
+  netViewSettled,
+  netViewSnapshot,
+  type NetViewShown,
+} from '../../decisions/netViewClock';
 import { mountLocaleMenu } from './localeMenu';
 import { mapLod, mapSpacing, type MapLod } from '../../packages/client/src/mapLod';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
@@ -821,7 +829,8 @@ initNetSession({
     // инлайновый display пуст, `inMatch()` читал «настройка открыта», и ‹, Back и
     // Escape «закрывали» её поверх живой партии вместо выхода (нашёл `smoke:net`).
     setupEl.style.display = 'none';
-    note(t('net.connected', { who: NAME[ME] ?? ME }));
+    // Тоста «подключён как …» нет: игрок и так видит свою партию, а служебная строка о
+    // соединении была шумом (плейтест 2026-10-17).
   },
   takeSnapshot: (snap, plan) => {
     // Дипломатию, пропущенную в обрыве, досказывает только переподключение
@@ -865,13 +874,17 @@ initNetSession({
 });
 // Часы картинки в сети (`netViewClock.ts`): снимок сервера приходит раз в секунду, и без
 // досчёта флоты на карте двигались бы рывками раз в секунду при любом FPS. Часы ведёт
-// `netSession.ts` (`netView`), показанное время досчитывает кадр.
+// `netSession.ts` (`netView`), показанное время досчитывает кадр: он следует за оценкой
+// часов и назад не едет (правило 7).
 let netShownTime = 0;
+let netShown: NetViewShown | null = null;
 /** Игровое «сейчас» ДЛЯ КАРТИНКИ движения: в соло — время мира (оно и так идёт каждый
  *  кадр), в сети — время снимка, досчитанное до этого кадра. Только для того, ГДЕ рисовать
  *  движущееся; правила, приказы и таймеры читают `s.time`. */
 function mapNow(): number {
-  return NET ? netShownTime : simLink ? simShownTime : s.time;
+  // Серверный мир рисуется по часам картинки и на обрыве (`netWorld`): иначе флоты на миг
+  // отъезжали бы ко времени последнего снимка и прыгали обратно на переподключении.
+  return netWorld ? netShownTime : simLink ? simShownTime : s.time;
 }
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
@@ -900,7 +913,7 @@ function simEligible(): boolean {
   return (
     SIM_WORKER_WANTED &&
     !simBroken &&
-    !NET &&
+    !netWorld &&
     soloSaveActive &&
     !s.pve &&
     inMatch() &&
@@ -2698,7 +2711,6 @@ initTopBar({
   mobile: () => MOBILE,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,
-  holographic: () => holographic.active(),
   phoneSpeed: () => phoneSpeed,
   phoneBadges: (battles, unread) => phoneNav.badges(battles, unread),
   allyPulsing: () => performance.now() < allyPulseUntil,
@@ -3973,6 +3985,7 @@ initSetupScreen({
   showConnect,
   openHub: () => openHub(),
   startMatch: (setup) => startMatch(setup),
+  joinMatch: (id, slot, faction, scientists) => connectToMatch(id, slot, faction, scientists),
   mapLabel,
   // Чужой мир на мини-карте — цветом войны из выбранной палитры: так соперник выглядит
   // и на карте партии, и игрок с CVD-палитрой не получит красно-зелёную пару.
@@ -3996,6 +4009,7 @@ function saveMeta(st: MetaState): void {
 // camera and log, then hide the setup overlay. `aiPlayers` are the seats the local
 // sim drives. Shared by the normal skirmish and (via a hook) the dev test mode.
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
+  leaveNetwork(); // свой мир — уже не сетевая партия: гаснут и дозвон, и признак серверного мира
   leaveSolo();
   stopSim(); // поток считал мир прошлого матча
   forgetAutoAssault();
@@ -4998,7 +5012,9 @@ function frame(nowReal: number) {
       simBroken = true;
     }
   }
-  const simRunning = simRuns(NET, speed, !!banner || comicQueue.isBusy(), !!endScreen);
+  // `netWorld`, а не `NET`: на обрыве мир на экране всё ещё серверный, под туманом, и
+  // локальный ход по нему выбил бы «безземельных» соперников и объявил ложную победу.
+  const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy(), !!endScreen);
   if (simRunning && simLink) {
     simBacklog = stepBacklog(simBacklog, dt, speed, HOUR);
     if (!simLink.busy && simBacklog > 0) {
@@ -5030,7 +5046,10 @@ function frame(nowReal: number) {
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
   // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
   // покадрового насоса здесь тоже нет: приказ исполняется, даже когда вкладка закрыта.
-  netShownTime = netViewAt(netView, nowReal, s.time);
+  // Новые часы (вход, другая партия) — кадр начинает с их оценки, а не догоняет её от прошлой.
+  if (netView.t === null || netView.bornAt > (netShown?.at ?? -Infinity)) netShown = null;
+  netShown = netViewFollow(netShown, netView, nowReal, s.time);
+  netShownTime = netShown.time;
   // На паузе картинка стоит на мире: досчитывать вперёд нечего.
   if (!simRunning) {
     simBacklog = 0;
@@ -5040,8 +5059,8 @@ function frame(nowReal: number) {
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
-  if (saneGap(dt) && spinRuns(NET, speed, !!banner || comicQueue.isBusy())) spinOrbits(dt);
-  if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(NET, speed, !!banner || comicQueue.isBusy())) hologramTime += dt;
+  if (saneGap(dt) && spinRuns(netWorld, speed, !!banner || comicQueue.isBusy())) spinOrbits(dt);
+  if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(netWorld, speed, !!banner || comicQueue.isBusy())) hologramTime += dt;
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
   const ended = matchEnd.check();
   if (ended) endScreen = ended;
@@ -5082,7 +5101,14 @@ function frame(nowReal: number) {
     }
     holographic.layoutWindows();
     updateMobileHud();
-    if (mapPreparation.active && mapPreparation.ready && !cx.isContextLost?.()) {
+    // В сети заставка держится и до калибровки часов картинки (`netViewClock.ts`, правило 6):
+    // иначе флоты при входе сперва стоят, а потом трогаются рывком.
+    if (
+      mapPreparation.active &&
+      mapPreparation.ready &&
+      !cx.isContextLost?.() &&
+      (!netWorld || netViewSettled(netView, nowReal))
+    ) {
       hideMapLoading(); // reveal only after the first complete frame, never a blank canvas
       maybeStartPendingTour();
     }
