@@ -39,8 +39,8 @@ SSH-туннель к Grafana на loopback; публичного операто
 
 | Target / путь | Клиент и credential | Доступ / сеть | Период / timeout |
 | --- | --- | --- | --- |
-| Game `/health`, `/ready` | ограниченный Game exporter, без пользовательского токена | Внутренняя сеть; публичные probes сохраняют нынешний контракт | 15 с / 2 с |
-| Game `/metrics`, `/metrics/summary` | Game exporter, host `METRICS_TOKEN` ≥32 символов | Внутренняя сеть; Caddy продолжает запрещать публичные `/metrics*` | 15 с / 2 с |
+| Game `/health`, `/ready` | ограниченный Game exporter, без пользовательского токена | Внутренняя сеть; публичные probes сохраняют нынешний контракт | 15 с / default 1500 мс, cap 2 с |
+| Game `/metrics`, `/metrics/summary` | Game exporter, host `METRICS_TOKEN` ≥32 символов | Внутренняя сеть; Caddy продолжает запрещать публичные `/metrics*` | 15 с / default 1500 мс, cap 2 с |
 | Game `/metrics/recent`, `/metrics/health` | Не опрашивать в scrape | Первый читает raw файл целиком, второй содержит накопленные alert/max | Нет periodic scrape |
 | Game exporter `:9108/metrics` | Prometheus | Только наблюдательная сеть, без host-port | 15 с / 2 с |
 | node_exporter `:9100/metrics` | Prometheus, allowlist collectors | Хостовые числа без процессов/env/SSH/Docker socket в контейнере | 15 с / 2 с |
@@ -152,6 +152,13 @@ literal loopback четыре Game routes. Ports настраиваются чи
 plain token file, bounded refresh и отсутствие автоматического Compose wiring.
 Таблица target matrix выше сохраняет целевой сетевой профиль; текущий CLI не
 включает его и не разрешает remote scrape с широким bootstrap credential.
+
+Default source deadline — 1500 мс на headers+body, сохраняя 500 мс для ответа
+exporter при consumer scrape deadline 2 с. Явный локальный `timeoutMs` override
+ограничен прежним cap 2000 мс; будущий wiring обязан оставить запас между
+фактическим source timeout и большим consumer deadline. Равные 2 с/2 с могут
+скрыть `source_up=0` за timeout всего scrape. Это проверяют deterministic
+fake-timer fixtures для зависших headers и body.
 
 `moongame_client_fps_{sum,count,max}` и `moongame_client_rtt_seconds_{sum,count,max}`
 — конкретные имена FPS/RTT. `moongame_exporter_rejected_series_total` считает

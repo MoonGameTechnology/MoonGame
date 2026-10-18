@@ -35,7 +35,12 @@ Game и не публикуйте его через прокси. Для кон�
 
 Потребитель опрашивает exporter каждые 15 секунд. Каждый `GET /metrics` выполняет
 четыре запроса параллельно; конкурентные scrapes делят один in-flight refresh.
-На источник: общий timeout 2 с, включая body, ≤64 KiB JSON, без retries.
+На источник: timeout по умолчанию 1500 мс, включая headers/body, ≤64 KiB JSON,
+без retries. Это оставляет 500 мс для формирования/доставки ответа до принятого
+scrape deadline потребителя 2 с: иначе timeout источника мог бы скрыть и сам
+`source_up=0` за timeout всего exporter. Явный локальный API override `timeoutMs`
+допускает максимум 2000 мс; при таком override будущий consumer должен получить
+больший deadline с запасом. Одинаковые source/consumer deadlines недопустимы.
 Exposition ограничена 5000 samples и 1 MiB. На ошибке конкретного источника
 `moongame_source_up{source}` равен 0, его игровые значения отсутствуют, прежний
 `moongame_source_last_success_timestamp_seconds` не меняется. До первого успеха
@@ -70,7 +75,9 @@ pnpm exec vitest run deploy/observability/game-exporter*.test.mjs
 ```
 
 Fixtures проверяют privacy, schema drift, units, no-samples, caps, redirect,
-timeout после headers, single-flight, stale и private secret. Live-тест собирает
+timeout после headers, single-flight, stale и private secret. Fake-timer тесты
+проверяют зависшие headers и body: `source_up=0` готов к 1500 мс, до 2-секундного
+deadline потребителя. Live-тест собирает
 тот же `prototype/netserver.ts → packages/server/dist/proto-server.mjs`, который
 запускает Docker CMD: настоящий WebSocket join меняет gauges/counters, остановка
 Game убирает значения, рестарты Game/exporter не создают двойного счёта.
