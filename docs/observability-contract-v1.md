@@ -97,6 +97,12 @@ Game Prometheus-имена ниже реализованы в standalone OBS-1.1
 | `moongame_host_memory_{total,available}_bytes` → `/proc/meminfo` | G, bytes | Именно MemAvailable, не MemFree |
 | `moongame_host_root_{size,available}_bytes`, `moongame_host_root_{inodes,free_inodes}` → `statfs('/')` | G, bytes / count | Root FS; IO пока не измеряется |
 | `moongame_observer_sample_timestamp_seconds` → atomic textfile publication | G, Unix seconds | Dashboard скрывает данные при age≥45s; error сохраняет старый timestamp |
+| `moongame_container_{source_up,present,resources_up}{container}` → fixed host timer | G,0/1; container=game/postgres/proxy/grafana/prometheus/loki/alloy | Ошибка Docker — source_up0, present отсутствует; absent — present0; cgroup failure — resources_up0 |
+| `moongame_container_{state,health}{container}` → inspect projection | G, enum | state:0created/1running/2paused/3restarting/4exited/5dead/6removing; health:-1none/0unhealthy/1healthy/2starting |
+| `moongame_container_{restart_count,oom_killed,started_timestamp_seconds}{container}` → inspect | G, count /0–1 /Unix seconds | RestartCount только automatic за жизнь текущего контейнера; не журнал ручных рестартов |
+| `moongame_container_{memory_bytes,memory_working_set_bytes,memory_limit_bytes,cpu_limit_cores}{container}` → cgroup v2 | G, bytes /cores | current включает cache; working set=max(0,current-inactive_file); limit0=unlimited, процент не строится |
+| `moongame_container_{cpu_seconds_total,cpu_throttled_seconds_total,memory_limit_hits_total,oom_kills_total}{container}` → cgroup v2 | C, seconds /events | Сброс при пересоздании; CPU rate относительно quota, не число матчей |
+| `moongame_container_sample_timestamp_seconds` → atomic containers.prom | G, Unix seconds | Отдельный15s producer; age≥45s скрывает текущие значения, ошибка записи не обновляет timestamp |
 | DB up/connections → ограниченный DB exporter | G, 0/1 / connections | Game ready проверяет только свой store, не заменяет весь DB health |
 | backup/restore last success → независимые verified job markers | G, Unix seconds | Сейчас not_configured; наличие локального файла не даёт success |
 | p95 submit/broadcast/RTT → H buckets в OBS-2.3 | H, seconds | Пока not_implemented; из avg/max/slow JSONL вычислять запрещено |
@@ -118,7 +124,7 @@ counters источника; его рестарт не добавляет offse
 но exporter не получает socket ради него. Persisted summary и live counters
 не суммируются; сравнение baseline с новым startedAt помечается reset/incomparable.
 
-Labels только environment/instance/service/source/stream/outcome/type/code/version/le/mode;
+Labels только environment/instance/service/source/stream/outcome/type/code/version/le/mode/container;
 на ряд разрешены только перечисленные для него значения. Бюджет всего стенда
 ≤25 000 active series, ≤256 известных action types и ≤64 reject codes (+other).
 Никаких matchId/playerId/actor/install/session/IP/URL/query/текста исключения в labels.
@@ -143,7 +149,7 @@ Raw игровые JSONL не являются technical stream. До OBS-0.3/2.
 | Raw JSONL | 7 UTC-дней или 1 GiB, что наступит раньше | Очистка/удаление субъекта — OBS-0.3; сейчас не исполняется |
 | Derived product aggregates | Не дольше исходного 7-дневного окна; erase + пересчёт/checkpoint | Worker ещё не установлен; D1 после реализации, D7/D30 unavailable |
 | Grafana / Alloy | State ≤256 MiB / positions+spool ≤256 MiB | Не установлены |
-| RAM caps после первого VPS запуска | Grafana512, Prometheus384, Loki384, Alloy256, Game/node/DB exporter по64MiB | План1728MiB; текущий объединённый observer вместо трёх exporter —1600MiB. Report worker отдельно ≤256MiB |
+| RAM caps после первого VPS запуска | Grafana768, Prometheus384, Loki384, Alloy256, Game/node/DB exporter по64MiB, container timer96MiB | План2080MiB; текущий объединённый observer вместо трёх exporter —1952MiB. Report worker отдельно ≤256MiB |
 | Monitoring CPU/disk | В среднем <0.5 core, диск ≤6 GiB; Game лимиты не уменьшать | Нужна on/off и 24 ч приёмка после установки |
 | Запас хоста | ≥12 GiB свободно; local backup budget ≤8 GiB при его включении | Бэкапы отложены; не считать бюджет готовым backup |
 

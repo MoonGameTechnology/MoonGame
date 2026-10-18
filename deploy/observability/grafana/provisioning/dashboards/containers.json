@@ -1,0 +1,939 @@
+{
+  "uid": "moongame-containers",
+  "title": "MoonGame — контейнеры",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "moongame",
+    "containers"
+  ],
+  "links": [
+    {
+      "title": "Обзор плейтеста",
+      "type": "link",
+      "url": "/d/moongame-overview"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Возраст данных сборщика",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Норма <45 секунд. Если старше — остальные текущие показатели скрываются. Нет данных означает, что сборщик ещё не подключён.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - moongame_container_sample_timestamp_seconds",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Нет данных",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 45
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Доступность источников",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_source_up and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Ошибка сбора",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Доступен",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Наличие контейнеров",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_present and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Отсутствует",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Найден",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Состояние контейнеров",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_state and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Создан",
+                  "color": "orange"
+                },
+                "1": {
+                  "text": "Работает",
+                  "color": "green"
+                },
+                "2": {
+                  "text": "Приостановлен",
+                  "color": "orange"
+                },
+                "3": {
+                  "text": "Перезапускается",
+                  "color": "orange"
+                },
+                "4": {
+                  "text": "Остановлен",
+                  "color": "red"
+                },
+                "5": {
+                  "text": "Не работает",
+                  "color": "red"
+                },
+                "6": {
+                  "text": "Удаляется",
+                  "color": "orange"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Проверки здоровья",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Healthcheck — отдельная проверка приложения. Состояние «работает» само по себе не доказывает исправность. Для остановленных/приостановленных контейнеров прежний health не показывается как текущий.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_health and on(container) (moongame_container_state == 1) and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "Не настроена",
+                  "color": "gray"
+                },
+                "0": {
+                  "text": "Ошибка",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Исправен",
+                  "color": "green"
+                },
+                "2": {
+                  "text": "Запускается",
+                  "color": "orange"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Доступность измерений ресурсов",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_resources_up and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Нет измерений",
+                  "color": "orange"
+                },
+                "1": {
+                  "text": "Измеряются",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Память относительно лимита",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Вся память cgroup, включая файловый кэш. Это значение сравнивает ядро с лимитом; docker stats обычно вычитает неактивный кэш. При отсутствии лимита — нет данных.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(100 * moongame_container_memory_bytes / (moongame_container_memory_limit_bytes > 0)) and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "Нет данных",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Память без неактивного файлового кэша",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "description": "memory.current минус memory.stat inactive_file (не ниже нуля): рабочий набор, как в docker stats на cgroup v2. Соседняя панель доли лимита учитывает весь кэш; высокий процент сам по себе ещё не означает OOM.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_memory_working_set_bytes and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Лимиты памяти",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_container_memory_limit_bytes > 0) and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "CPU относительно квоты",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "description": "100% = выделенная CPU-квота контейнера. При отсутствии квоты — нет данных. Для rate нужны минимум две выборки.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(100 * rate(moongame_container_cpu_seconds_total[2m]) / (moongame_container_cpu_limit_cores > 0)) and on(container) (moongame_container_resources_up == 1) and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "CPU: используемые ядра",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "description": "1 = одно полностью занятое ядро. Сброс counter после пересоздания обрабатывается rate().",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(moongame_container_cpu_seconds_total[2m]) and on(container) (moongame_container_resources_up == 1) and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Автоматические перезапуски Docker",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Docker RestartCount текущего контейнера: не полный журнал рестартов. Ручной restart может не увеличить счётчик; пересоздание его обнуляет.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_restart_count and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Последний запуск контейнера",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_container_started_timestamp_seconds > 0) * 1000 and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "Убийства из-за нехватки памяти",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "description": "memory.events oom_kill за жизнь cgroup; после пересоздания сбрасывается. Отсутствие OOM не исключает торможение у лимита памяти.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_oom_kills_total and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "Достижения лимита памяти",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "description": "memory.events max: сколько раз расход пытался превысить лимит. Может сопровождаться reclaim и задержками без OOM-kill.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_memory_limit_hits_total and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "title": "Ограничение CPU, секунд в секунду",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(moongame_container_cpu_throttled_seconds_total[2m]) and on(container) (moongame_container_resources_up == 1) and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Последняя остановка из-за OOM",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Docker State.OOMKilled: причина последней остановки, доступна и для остановленного контейнера; не журнал всех OOM. После следующего запуска флаг может сброситься.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_container_oom_killed and on() (time() - moongame_container_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Нет флага OOM",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "Остановлен из-за OOM",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}
