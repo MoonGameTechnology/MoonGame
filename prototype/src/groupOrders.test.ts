@@ -86,6 +86,7 @@ async function boot() {
     tour: () => null,
     intro: () => {},
     steward: () => null,
+    forward: () => {},
   });
   const go = await import('./groupOrders');
   go.initGroupOrders({
@@ -284,6 +285,7 @@ describe('REFM-228 — авто-штурм и отход', () => {
     const sent: Action[] = [];
     vi.doMock('./netSession', () => ({
       NET: true,
+      netWorld: true,
       reconnecting: false,
       netClient: { sendAction: (a: Action) => sent.push(a) },
     }));

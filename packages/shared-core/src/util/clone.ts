@@ -117,6 +117,14 @@ export function shareImmutable<T>(value: T): T {
 }
 
 /**
+ * Whether {@link shareImmutable} marked `value`: then it and everything under it is frozen for
+ * the rest of the match, so an answer derived from it can be remembered by its identity.
+ */
+export function isShared(value: object): boolean {
+  return (value as Marked)[SHARED] === true;
+}
+
+/**
  * Recursively freezes an object graph. Used in tests to assert the reducer
  * never mutates its input, and available to callers that want a hard
  * immutability guarantee on a snapshot.

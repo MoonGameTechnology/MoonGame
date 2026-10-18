@@ -6,6 +6,7 @@ import { fleetTravelSpeed, planRoute, routeDistance } from '../state/route';
 import { forkAt, forkTAtStart, laneRoadLength, legEndT, snapToFork } from '../state/roads';
 import { corridorVeto, isCorridorEdge } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
+import { knownOwner } from '../state/knownOwner';
 
 /**
  * Контракт возможности `fleet.course` (RETR-1): «дай этому флоту курс на узел».
@@ -68,15 +69,56 @@ class RouteCache {
   }
 }
 
-/** True when any hop enters territory its mover is at PEACE with (D2 gate predicate). */
-function crossesPeace(state: GameState, playerId: string, hops: readonly PlanetId[]): boolean {
-  for (const hop of hops) {
-    const owner = state.planets[hop]?.owner ?? null;
-    if (owner !== null && owner !== playerId && getStance(state, playerId, owner) === 'peace') {
-      return true;
-    }
-  }
-  return false;
+/** Is `owner`'s territory closed to `playerId` — a player it is at PEACE with (D2)? */
+function closedTo(state: GameState, playerId: PlayerId, owner: PlayerId | null): boolean {
+  return owner !== null && owner !== playerId && getStance(state, playerId, owner) === 'peace';
+}
+
+/** The world's REAL owner closes it to the mover — the rule the flight itself obeys. */
+function trulyClosed(state: GameState, playerId: PlayerId, id: PlanetId): boolean {
+  return closedTo(state, playerId, state.planets[id]?.owner ?? null);
+}
+
+/**
+ * FOG-LEAK (owner's report 2026-10-17): an ORDER is refused only for a border the
+ * player can SEE — closed both on their own map (`knownOwner`) and in truth. Judged by
+ * the real owner alone, «нет права прохода» to an unexplored province told the player
+ * that somebody's territory lay there, and the solo war prompt even named whose.
+ *
+ * Requiring both halves keeps the order gate strictly MORE permissive than before:
+ * nothing that used to pass is refused now, so bots and scripts lose no moves. A
+ * border the player cannot see is met in flight instead (`haltAtBorder`).
+ */
+function knownClosed(state: GameState, playerId: PlayerId, id: PlanetId): boolean {
+  return trulyClosed(state, playerId, id) && closedTo(state, playerId, knownOwner(state, playerId, id));
+}
+
+/** True when any hop enters a border closed to its mover that the mover can see
+ *  (D2 gate predicate, `knownClosed`). */
+function crossesPeace(state: GameState, playerId: PlayerId, hops: readonly PlanetId[]): boolean {
+  return hops.some((hop) => knownClosed(state, playerId, hop));
+}
+
+/**
+ * FOG-LEAK: the leg about to start runs into territory closed to the fleet — a border
+ * the order could not refuse because the player did not see it, or one that closed
+ * while the fleet was on its way (the world changed hands, peace was signed). The fleet
+ * stops where it stands, BEFORE entering, and its owner hears whose border it is: at
+ * the border that is no longer a secret. Returns true when it halted.
+ *
+ * Only the owner's name travels (`fleet.halted` is owner-only news on the wire, like a
+ * cancelled lift); the world itself stays in the fog — no garrison, no buildings.
+ */
+function haltAtBorder(h: HandlerContext, fleet: Fleet, at: PlanetId | null, next: PlanetId): boolean {
+  if (!trulyClosed(h.state, fleet.owner, next)) return false;
+  h.emit('fleet.halted', {
+    fleetId: fleet.id,
+    owner: fleet.owner,
+    at,
+    blocked: next,
+    blocker: h.state.planets[next]!.owner,
+  });
+  return true;
 }
 
 /** Euclidean length of the lane between two nodes (0 if either is missing). */
@@ -394,7 +436,8 @@ function planJourney(
  */
 export const movementModule: GameModule = {
   id: 'movement',
-  version: '1.4.0',
+  // 1.5.0 — право прохода по видимой границе, невидимую флот встречает в пути (FOG-LEAK).
+  version: '1.5.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -477,14 +520,9 @@ export const movementModule: GameModule = {
       // soon as bots' walk-in captures peppered the lanes — one peace-owned node on
       // the unique shortest path read as «no route anywhere», even to own worlds.
       if (crossesPeace(h.state, playerId, plan.hops)) {
-        const detour = planJourney(h.state, routes, fleet, payload as MovePayload, (id) => {
-          const owner = h.state.planets[id]?.owner ?? null;
-          return (
-            owner !== null &&
-            owner !== playerId &&
-            getStance(h.state, playerId, owner) === 'peace'
-          );
-        });
+        const detour = planJourney(h.state, routes, fleet, payload as MovePayload, (id) =>
+          knownClosed(h.state, playerId, id),
+        );
         // Re-check the detour: the veto exempts the DESTINATION node on purpose
         // (landing on a peace-locked world must reject as right-of-way, so the
         // client can offer the war declaration — not as a bogus «no route»).
@@ -494,6 +532,14 @@ export const movementModule: GameModule = {
         plan = detour;
       }
       const origin = fleet.location ?? fleet.edge?.from ?? null;
+      // FOG-LEAK: the very first leg already runs into a border the player did not see.
+      // The order stands (refusing it would be the leak); the fleet simply stays put. A
+      // re-tasked fleet was just halted on its lane above and now RESTS there, so it
+      // announces the park a real stop would.
+      if (haltAtBorder(h, fleet, fleet.location, plan.hops[0]!)) {
+        if (fleet.edge) h.emit('fleet.parked', { fleetId: fleet.id, edge: fleet.edge });
+        return null;
+      }
       if (!beginLeg(h, fleet, plan.fromId, plan.hops, plan.startT, plan.parkT)) {
         return 'E_FLEET_IMMOBILE';
       }
@@ -626,7 +672,8 @@ export const movementModule: GameModule = {
         h.emit('fleet.fork', { fleetId, at, from: mv.from, to: next });
         if (fleet.battleId) return;
         const startT = forkTAtStart(h.state, at, next);
-        if (!beginLeg(h, fleet, at, remaining, startT, parkT)) {
+        // A closed border ahead stops the fleet at the fork, as a stop ordered there would.
+        if (haltAtBorder(h, fleet, null, next) || !beginLeg(h, fleet, at, remaining, startT, parkT)) {
           // Nothing left to fly — the journey ends AT this fork (a stop ordered there,
           // ROADS-3) — or it cannot go on (speed 0 / a node gone): stop at the fork, on the
           // road ahead.
@@ -642,6 +689,10 @@ export const movementModule: GameModule = {
 
       if (remaining.length === 0) {
         h.emit('fleet.arrived', { fleetId, at }); // final destination (a node)
+      } else if (haltAtBorder(h, fleet, at, remaining[0]!)) {
+        // FOG-LEAK: the road on crosses a closed border — the journey ends HERE, so this
+        // world is an arrival (collisions, capture, merges), not a transit.
+        h.emit('fleet.arrived', { fleetId, at });
       } else {
         // Intermediate hop: announce for collision checks, then continue. If a
         // collision starts a battle, it nulls this fleet's movement and this

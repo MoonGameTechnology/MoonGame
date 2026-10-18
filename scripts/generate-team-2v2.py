@@ -16,8 +16,8 @@ that turn); areas that hold a single prize sit on the x = 0 axis, the same dista
 from both teams. The province grid itself stays an irregular sample, so the four
 start districts still differ in shape.
 
-A derelict graveyard is a rare find: one wreck area with a single graveyard
-province, ringed by plain debris fields — not a terrain to fill a quarter with.
+Wrecks are a rare find (owner, 2026-10-14): the wreck area holds ONE graveyard and ONE
+debris field beside it; the rest of the area is plain open space with dead worlds.
 """
 import collections
 import json
@@ -153,10 +153,11 @@ LADDER = {
     'western_expanse': EXPANSE, 'eastern_expanse': EXPANSE,
     'ash_massif': MASSIF, 'iron_massif': MASSIF,
     'drift_nebula': NEBULA, 'veil_nebula': NEBULA,
-    # One graveyard, one more hulk field, then thinning debris (§5.5).
+    # One graveyard and one debris field beside it; wrecks are rare, so the rim of the
+    # area is plain open space rather than more debris (owner, 2026-10-14).
     'expedition_graveyard': [(1, 'graveyard', 'derelict_graveyard'),
                              (1, 'debris_field', 'derelict_graveyard'),
-                             (None, 'debris_field', 'empty_space')],
+                             (None, 'dead_world', 'empty_space')],
     'depleted_node': [(2, 'dead_world', 'depleted_system'), (1, 'asteroid', 'depleted_system'),
                       (None, 'dead_world', 'deep_void')],
     'storm_front': [(4, 'ion_storm', 'ion_storm'), (3, 'solar_flare', 'solar_flare_zone'),

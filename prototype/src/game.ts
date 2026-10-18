@@ -27,6 +27,7 @@ export {
   stewardActive,
   STEWARD_POSTURES,
   MAX_STEWARD_HOLD_POINTS,
+  techInMatch,
 } from '../../packages/shared-core/src/index';
 
 // --- assembling the match ----------------------------------------------------

@@ -64,18 +64,23 @@ let browseStageEl: HTMLElement;
 /** Стадии экрана подключения. Последняя, `browse`, — обозреватель партий: его страница
  *  не здесь, но переключатель у стадий один. */
 export function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 'browse'): void {
+  for (const hide of hidePasswords) hide();
   welcomeStageEl.style.display = stage === 'welcome' ? '' : 'none';
   registerStageEl.style.display = stage === 'register' ? '' : 'none';
   recoverStageEl.style.display = stage === 'recover' ? '' : 'none';
   resetStageEl.style.display = stage === 'reset' ? '' : 'none';
   browseStageEl.style.display = stage === 'browse' ? '' : 'none';
+  // Раскладка экрана — по стадии: «Матчи» — страница во весь экран, а не карточка (UIX-17.1).
+  const connect = document.getElementById('connect');
+  if (connect) connect.dataset.stage = stage;
   // PTM-1.2: карточку входа УВИДЕЛИ — раз за загрузку и только на видимом экране
   // подключения: `showStage('welcome')` зовут и чтобы сбросить скрытый экран на будущее.
-  if (stage === 'welcome' && !loginShown && document.getElementById('connect')?.style.display !== 'none') {
+  if (stage === 'welcome' && !loginShown && connect?.style.display !== 'none') {
     loginShown = true;
     getPlatform().analytics.emit('login_shown');
   }
 }
+let hidePasswords: Array<() => void> = [];
 let loginShown = false;
 
 // A fresh callsign for a brand-new commander. Deterministic on purpose (no random/
@@ -130,7 +135,7 @@ async function welcomeSignIn(nick: string): Promise<void> {
     game.setNick(nick);
     const srv = game.resolveServer();
     if (!srv) return;
-    const session = await ensureSession(srv.base, nick);
+    const session = await ensureSession(srv.base, nick, wPassInput.value);
     if (!session) {
       wPassInput.focus(); // ensureSession already explained why in the status line
       return;
@@ -197,7 +202,12 @@ async function submitRegister(): Promise<void> {
   if (!payload) {
     const problem = checkRegister(form)!;
     game.status(t(problem.key));
-    const focusOn = { nick: crNickInput, pass: crPassInput, pass2: crPass2Input };
+    const focusOn = {
+      nick: crNickInput,
+      pass: crPassInput,
+      pass2: crPass2Input,
+      email: crMailInput,
+    };
     focusOn[problem.field].focus();
     return;
   }
@@ -347,6 +357,25 @@ export function initSignInPages(host: SignInPagesHost): void {
   crecMailInput = $('crecmail') as HTMLInputElement;
   cresetPassInput = $('cresetpass') as HTMLInputElement;
   cresetPass2Input = $('cresetpass2') as HTMLInputElement;
+
+  hidePasswords = [wPassInput, crPassInput, crPass2Input, cresetPassInput, cresetPass2Input].map(
+    (input) => {
+      const button = $(input.id + '-visibility');
+      const setVisible = (visible: boolean): void => {
+        input.type = visible ? 'text' : 'password';
+        const key = visible ? 'auth.password.hide' : 'auth.password.show';
+        button.ariaLabel = visible ? t('auth.password.hide') : t('auth.password.show');
+        button.title = button.ariaLabel;
+        button.dataset.i18nAria = key;
+        button.dataset.i18nTitle = key;
+        button.dataset.visible = String(visible);
+      };
+      const hide = () => setVisible(false);
+      hide();
+      button.addEventListener('click', () => setVisible(input.type === 'password'));
+      return hide;
+    },
+  );
 
   passwordReset =
     typeof __SECTOR_ZERO_ONLY__ !== 'undefined' && __SECTOR_ZERO_ONLY__

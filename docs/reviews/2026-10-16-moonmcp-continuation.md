@@ -1,6 +1,6 @@
 # Continuing MoonMCP pentest — 2026-10-16 (local docker stack + prod blackbox addendum)
 
-Дополнение к [промежуточному пентесту 2026-10-14](2026-10-14-moonmcp-interim-pentest.md). Два контура: (A) локальный docker-стенд владельца (`deploy-*`, Fastify `deploy-server-1` на `127.0.0.1:8788`) — глубокий белый ящик по WS-экономике; (B) краткое подтверждение из [production blackbox отчёта](BLACKBOX-REPORT.md). Стенды **не** смешиваются.
+Дополнение к [промежуточному пентесту 2026-10-14](2026-10-14-moonmcp-interim-pentest.md). Два контура: (A) локальный docker-стенд владельца (`deploy-*`, Fastify `deploy-server-1` на `127.0.0.1:8788`) — глубокий белый ящик по WS-экономике; (B) краткое подтверждение из [production blackbox отчёта](2026-10-16-prod-blackbox.md). Стенды **не** смешиваются.
 
 ## A. Локальный docker-стенд (white-box, live)
 
@@ -47,7 +47,7 @@
 
 ## B. Production blackbox (addendum 2026-10-16)
 
-Полный отчёт: [BLACKBOX-REPORT.md](BLACKBOX-REPORT.md) (external probing, `https://77-221-140-87.sslip.io/`, build `81715959`).
+Полный отчёт: [2026-10-16-prod-blackbox.md](2026-10-16-prod-blackbox.md) (external probing, `https://77-221-140-87.sslip.io/`, build `81715959`).
 
 - External surface: только 22/80/443 (проверено check-host.net с ≥2 нод; локальный «тысячи портов» артефакт NAT). Postgres/Redis **не** торчат наружу.
 - TLS 1.3 + HSTS + строгий CSP (`default-src 'none'`, sha256, `frame-ancestors 'none'`); CORS locked к origin.

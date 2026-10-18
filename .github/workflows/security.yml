@@ -656,10 +656,9 @@ jobs:
     # nobody was scanning — their refs are READ OUT OF THE COMPOSE FILES here (not a
     # second hardcoded list), so a digest bump in deploy/ can't drift away from what CI
     # actually scans.
-    # С SEC-31 сюда попадает только `postgres`: caddy мы собираем сами, у него в compose
-    # больше нет строки `image:`, и его сканирует своя джоба `trivy-caddy` выше. Список
-    # по-прежнему выводится из файлов, а не задан руками, поэтому смена вида ссылки
-    # переносит образ между джобами автоматически, без правки здесь.
+    # Сюда попадают postgres и opt-in стек наблюдаемости (OBS-0.2). Caddy мы собираем
+    # сами, у него в базовом compose нет строки `image:`, и его сканирует своя джоба
+    # `trivy-caddy` выше. Список выводится из файлов, а не задан руками.
     # Informational on landing (the SEC-6 pattern): third-party base images carry CVEs
     # we don't control, so this becomes blocking only after the first triage — otherwise
     # an upstream advisory would redden `main` with nothing to fix in this repo.
@@ -692,7 +691,8 @@ jobs:
           # отчёт не меняется. Поймано на себе — пин distroless отставал на пересборку,
           # и заметить это было нечем.
           refs=$(
-            { grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
+            { grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml \
+                deploy/docker-compose.observability.yml |
                 awk '{print $2}'
               grep -hE '^FROM[[:space:]]' Dockerfile deploy/caddy/Dockerfile | awk '{print $2}'
             } | sort -u
@@ -753,15 +753,16 @@ jobs:
           if [ "$stale" = 1 ]; then
             echo "::warning::Апстрим пересобрал образ. Обновите дайджест там, где он записан — deploy/docker-compose*.yml (сторонние образы прода) или Dockerfile (базы нашего образа), см. docs/security/image-pinning.md — и перечитайте записи триажа в docs/security/pipeline.md: часть открытых CVE могла закрыться."
           fi
-      - name: trivy image — postgres/caddy referenced by deploy/
+      - name: trivy image — third-party images referenced by deploy/
         id: scan
         continue-on-error: true
         run: |
           set +e
           mkdir -p trivy-deps-sarif
-          # Only the two base compose files: docker-compose.release.yml pins OUR image,
-          # which trivy-image already scans at build time.
-          refs=$(grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
+          # Third-party images, including the opt-in observability overlay. Release
+          # overlays pin OUR images, which their own build jobs already scan.
+          refs=$(grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml \
+            deploy/docker-compose.observability.yml |
             awk '{print $2}' | sort -u)
           echo "refs to scan:"; echo "$refs"
           rc=0
@@ -923,9 +924,16 @@ jobs:
             docker-compose.release.yml docker-compose.release-tls.yml \
             docker-compose.corporations.yml docker-compose.corporations-release.yml
 
+          # OBS-0.2: scan both supported monitoring combinations as effective stacks,
+          # keeping interpolated operator credentials out of the scanner artifacts.
+          gen base+observability docker-compose.yml docker-compose.observability.yml
+          gen release+observability docker-compose.yml docker-compose.tls.yml \
+            docker-compose.release.yml docker-compose.release-tls.yml \
+            docker-compose.observability.yml
+
           n=$(find kics-src -name '*.yaml' -size +0 | wc -l)
           echo "copied=$n" >> "$GITHUB_OUTPUT"
-          echo "expected=7" >> "$GITHUB_OUTPUT"
+          echo "expected=9" >> "$GITHUB_OUTPUT"
           ls -l kics-src
       - name: kics
         id: scan
@@ -953,7 +961,7 @@ jobs:
           # "0". Сравнение вырождалось в `[ 0 -ge 0 ]` и ПРОХОДИЛО: ноль просканированных
           # compose-файлов уходил как «✅ просканировано». Поэтому число целей
           # проверяется ОТДЕЛЬНО и раньше, а не через дефолт подстановки.
-          [ "${COPIED:-0}" -ge "${EXPECTED:-7}" ] || ok=false
+          [ "${COPIED:-0}" -ge "${EXPECTED:-9}" ] || ok=false
           [ "$scanned" -ge "${COPIED:-1}" ] || ok=false
           echo "{\"key\":\"kics\",\"ok\":$ok,\"exit\":$rc,\"scanned\":$scanned}" > status-kics.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
@@ -1006,8 +1014,8 @@ jobs:
           # «Целей не нашлось» — отдельный случай, и раньше он проваливался мимо гейта по
           # той же причине, что и сентинел: `${COPIED:-1}` не защищает от строки "0".
           # Сообщение тоже своё: тут виноват не KICS, а исчезнувший glob.
-          if [ "${COPIED:-0}" -lt "${EXPECTED:-7}" ]; then
-            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-7} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
+          if [ "${COPIED:-0}" -lt "${EXPECTED:-9}" ]; then
+            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-9} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
             exit 1
           fi
           if [ "$SCANNED" -lt "$COPIED" ]; then

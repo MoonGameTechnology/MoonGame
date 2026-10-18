@@ -27,10 +27,10 @@
 
 | Поверхность                              | TLS сейчас          | Чем обеспечен                                                                            |
 | ---------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------- |
-| **Render** (`render.yaml`, Path D)       | ✅ `https`/`wss`    | TLS на крае Render; оверлей авто-подставляет same-origin `wss://` (`multiplayer.md:163`) |
+| **Render** (прежний Path D)             | ⏳ путь удалён     | One-click blueprint не обеспечивал durable-БД и production-preflight; [актуальный Path D](multiplayer.md#path-d--hosted-truly-just-a-link-no-local-server) |
 | **cloudflared / ngrok туннель** (Path C) | ✅ `wss`            | TLS на крае туннеля (`multiplayer.md:141-152`)                                           |
-| **VPS через `deploy/serve.sh`**          | ❌ `http`/`ws`      | `pnpm host` биндит `0.0.0.0:PORT` напрямую, без прокси                                   |
-| **`docker run -p 8788:8788`**            | ❌ `http`/`ws`      | `Dockerfile` слушает 8788 plain (`ENV PORT=8788`)                                        |
+| **`deploy/serve.sh`**                   | локальный dev      | Loopback по умолчанию, production запрещён; публичный VPS запускается через штатный launcher |
+| **`docker run -p 8788:8788` без настроек** | отказ запуска    | `PROD=1` в образе требует durable-БД, безопасные роли, auth/TLS и recovery-attestation |
 | **LAN (Path A)**                         | ❌ `ws`             | прямой `ws://<LAN-IP>:8788`                                                              |
 | **APK debug (Path B)**                   | ❌ `ws` (cleartext) | `mobile/capacitor.config.json`: `androidScheme:"http"`, `cleartext:true`                 |
 | **Оверлей коннекта**                     | ✅ авто-upgrade     | на `https`-странице сам апгрейдит `ws://`→`wss://` (`multiplayer.md:225`)                |
@@ -126,12 +126,14 @@ Node слушает loopback plain-HTTP; in-process TLS — только зап�
 
 ## Фаза 3 · Managed/edge — формализовать уже работающее `[ops]`
 
-### HTTPS-3.1 · Render: зафиксировать https-инвариант `[ops]` ✅ (работает) / ⏳ (формализация) — S → SE-1.2
+### HTTPS-3.1 · Render: совместимый production-путь `[ops]` ⏳ — S → SE-1.2
 
-**Факт:** Render даёт `https://<app>.onrender.com`, оверлей сам подставляет same-origin `wss://`.
-**Подзадачи (формализация):** healthCheck по `https`; убедиться, что нет смешанного контента;
-комментарий в `render.yaml`, что TLS — на крае Render.
-**Готово, когда:** задокументировано; деплой проверен на отсутствие plaintext-путей.
+**Факт:** прежний one-click blueprint удалён: одного edge-TLS недостаточно для текущего
+production-контракта. **Подзадачи:** отдельная durable-БД, runtime/migration-роли,
+независимый backup/restore verifier и workflow, который безопасно передаёт его результат
+игровому процессу; затем healthCheck и отсутствие смешанного контента.
+**Готово, когда:** полный production-путь реализован и проверен; до этого Render не
+рекламируется как поддерживаемый one-click деплой.
 
 ### HTTPS-3.2 · Cloudflare/туннель: TLS на крае + скрытие origin `[ops][sec]` ✅ (туннель) / ⏳ (Cloudflare-перед-origin) — M → SE-1.1, SE-1.3
 
@@ -225,7 +227,7 @@ PWA/secure-context на LAN — опциональный рецепт `mkcert` (
   форвард-протокола (`forwardedHttps`, HTTPS-1.1) — обе на месте. → остаётся HTTPS-4.1.
 - `Dockerfile:71-73` `ENV HOST=0.0.0.0`, `EXPOSE 8788` plain → за прокси (HTTPS-2.1).
 - `deploy/serve.sh` — бинд `0.0.0.0` напрямую → `127.0.0.1` + прокси (HTTPS-2.1); + новый `deploy/Caddyfile`.
-- `render.yaml` — добавить комментарий про edge-TLS, health по https (HTTPS-3.1).
+- Managed Render deployment — новый совместимый workflow вместо удалённого blueprint (HTTPS-3.1).
 - `mobile/capacitor.config.json:6-7` — `androidScheme:"http"`+`cleartext:true` → release без cleartext (HTTPS-5.1).
 - `prototype/netserver.ts` (печать share-URL ~615 / raw ws ~666), `prototype/doctor.mjs:102-113` — печать https/wss (HTTPS-4.2).
 - `prototype/build.mjs` (инпут адреса `#csrv`, ~1946) — плейсхолдер `wss://` первым (HTTPS-4.1).

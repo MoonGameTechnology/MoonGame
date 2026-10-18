@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { FPS_GAP_MS, advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
+import {
+  FPS_GAP_MS,
+  advanceTarget,
+  fpsNext,
+  saneGap,
+  simRuns,
+  spinRuns,
+  stepBacklog,
+} from './simClock';
 
 const ЧАС = 3_600_000;
 
@@ -76,6 +84,29 @@ describe('часы кадра — насколько двигать время',
     expect(advanceTarget(7, 0, 1, ЧАС)).toBe(7);
     expect(advanceTarget(7, -500, 1, ЧАС)).toBe(7);
     expect(advanceTarget(7, Number.NaN, 1, ЧАС)).toBe(7);
+  });
+});
+
+describe('часы кадра — шаг отдельного потока расчёта', () => {
+  it('кадры копят к шагу столько же, сколько сдвинули бы мир сами', () => {
+    const три = stepBacklog(stepBacklog(stepBacklog(0, 16, 1, ЧАС), 16, 1, ЧАС), 16, 1, ЧАС);
+    expect(три).toBeCloseTo(advanceTarget(0, 48, 1, ЧАС), 6);
+  });
+
+  it('ШАГ НЕ РАСТЁТ БЕЗ КОНЦА: медленный поток получает не больше одного правдоподобного кадра', () => {
+    // Устройство считает мир медленнее, чем тот идёт: пока шаг в пути, кадры копят дальше.
+    let накоплено = 0;
+    for (let кадр = 0; кадр < 600; кадр++) накоплено = stepBacklog(накоплено, 16, 2, ЧАС);
+    expect(накоплено).toBe(advanceTarget(0, FPS_GAP_MS, 2, ЧАС));
+  });
+
+  it('разрыв кадра не прибавляет больше одного правдоподобного кадра (AUD-23)', () => {
+    expect(stepBacklog(0, 30 * 60_000, 1, ЧАС)).toBe(advanceTarget(0, FPS_GAP_MS, 1, ЧАС));
+  });
+
+  it('нулевой и отрицательный разрыв ничего не копят', () => {
+    expect(stepBacklog(5, 0, 1, ЧАС)).toBe(5);
+    expect(stepBacklog(5, -16, 1, ЧАС)).toBe(5);
   });
 });
 

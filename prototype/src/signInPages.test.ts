@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { t, LOCALE } from '../../localization/runtime';
-import { readSession } from '../../decisions/sessionStore';
+import { readSession, saveSession } from '../../decisions/sessionStore';
 
 const BASE = 'ws://srv.test:8080';
 const HTTP = 'http://srv.test:8080';
@@ -21,7 +21,11 @@ const HTTP = 'http://srv.test:8080';
 /** Поле или блок страницы: всё, что модуль у них трогает. */
 class Node {
   value = '';
+  type = 'password';
+  ariaLabel = '';
+  title = '';
   style = { display: 'none' };
+  dataset: Record<string, string> = {};
   private on = new Map<string, Array<(ev: unknown) => void>>();
   constructor(readonly id: string) {}
   addEventListener(type: string, fn: (ev: unknown) => void): void {
@@ -171,6 +175,8 @@ describe('REFM-218 — стадии и позывной', () => {
     for (const stage of ['welcome', 'register', 'recover', 'reset', 'browse'] as const) {
       pages.showStage(stage);
       expect(stages()).toEqual([`c${stage === 'welcome' ? 'welcome' : stage}`]);
+      // По стадии выбирается раскладка: «Матчи» — страница во весь экран (UIX-17.1).
+      expect(el('connect').dataset.stage).toBe(stage);
     }
   });
 
@@ -335,6 +341,58 @@ describe('REFM-218 — приветствие', () => {
     expect(cell.has('void.nick')).toBe(false);
   });
 
+  it.each(['click', 'enter'])(
+    'сохранённая сессия не пускает с пустым паролем через %s',
+    async (via) => {
+      const { env } = await bootAccounts();
+      saveSession(localStorage, BASE, { login: 'Orion', token: 'jwt-cached' });
+      el('cwnick').value = 'Orion';
+      el('cwpass').value = '';
+      if (via === 'click') click('cwgo');
+      else enter('cwpass');
+      await settle();
+      expect([env.status.at(-1), focused, env.hub, env.joins]).toEqual([
+        t('acc.login-pass.rule'),
+        'cwpass',
+        [],
+        [],
+      ]);
+      expect(posted('/auth/login')).toEqual([]);
+    },
+  );
+
+  it('сохранённая сессия не заменяет проверку неверного пароля', async () => {
+    const { acc, env } = await bootAccounts();
+    saveSession(localStorage, BASE, { login: 'Orion', token: 'jwt-cached' });
+    acc.pendingJoinAfterAuth.remember('m-7', 'p2', 'azure', ['sc-1']);
+    server['/auth/login'] = () => reply(401);
+    server['/auth/register'] = () => reply(409);
+    el('cwnick').value = 'Orion';
+    el('cwpass').value = 'wrong-pass';
+    click('cwgo');
+    await settle();
+    expect(posted('/auth/login')[0]?.body).toEqual({ login: 'Orion', password: 'wrong-pass' });
+    expect([env.status.at(-1), focused, env.hub, env.joins]).toEqual([
+      t('acc.bad-pass'),
+      'cwpass',
+      [],
+      [],
+    ]);
+  });
+
+  it('явный вход проверяет верный пароль и заменяет сохранённую сессию', async () => {
+    const { env } = await bootAccounts();
+    saveSession(localStorage, BASE, { login: 'Orion', token: 'jwt-cached' });
+    server['/auth/login'] = () => reply(200, { token: 'jwt-fresh' });
+    el('cwnick').value = 'Orion';
+    el('cwpass').value = 'secret-pass';
+    click('cwgo');
+    await settle();
+    expect(posted('/auth/login')[0]?.body).toEqual({ login: 'Orion', password: 'secret-pass' });
+    expect(readSession(localStorage, BASE)).toEqual({ login: 'Orion', token: 'jwt-fresh' });
+    expect(env.hub).toEqual([undefined]);
+  });
+
   it('второй Enter, пока первый вход летит, второго запроса не шлёт', async () => {
     await bootAccounts();
     let answer!: (r: Reply) => void;
@@ -382,20 +440,34 @@ describe('REFM-218 — регистрация', () => {
 
   it('беда формы называет своё поле и в сеть не идёт', async () => {
     const { env } = await onRegister();
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-paZZ';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-paZZ';
     click('crgo');
     await settle();
     expect([env.status.at(-1), focused]).toEqual([t('auth.pass-mismatch'), 'crpass2']);
     expect(posted('/auth/login')).toEqual([]);
   });
 
+  it.each([
+    ['crnick', 'f_u_c_k', 'acc.nick.blocked'],
+    ['crmail', 'a@b.test\r\nBcc:x@y.test', 'acc.email.rule'],
+  ])('небезопасное поле %s возвращает фокус без запроса', async (id, value, key) => {
+    const { env } = await onRegister();
+    el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+    el(id).value = value;
+    click('crgo');
+    await settle();
+    expect([env.status.at(-1), focused]).toEqual([t(key), id]);
+    expect(posted('/auth/login')).toEqual([]);
+    expect(posted('/auth/register')).toEqual([]);
+  });
+
   it('позывной страницы доходит до сервера, почта едет в регистрацию', async () => {
     const { env } = await onRegister();
     freshAccount();
     el('crmail').value = ' me@mail.test ';
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-pass';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-pass';
     enter('crpass2');
     await settle();
     // Поле обозревателя заполнено ДО адреса сервера: без него регистрация упиралась в
@@ -403,7 +475,7 @@ describe('REFM-218 — регистрация', () => {
     expect(env.nickAtServer).toEqual(['Orion']);
     expect(posted('/auth/register')[0]!.body).toEqual({
       login: 'Orion',
-      password: 'secret-pass',
+      password: 'orbit-secret-pass',
       email: 'me@mail.test',
     });
     expect([cell.get('void.nick'), el('crpass').value, el('crpass2').value]).toEqual([
@@ -417,19 +489,22 @@ describe('REFM-218 — регистрация', () => {
   it('пустая почта на сервер не уходит вовсе', async () => {
     await onRegister();
     freshAccount();
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-pass';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-pass';
     click('crgo');
     await settle();
-    expect(posted('/auth/register')[0]!.body).toEqual({ login: 'Orion', password: 'secret-pass' });
+    expect(posted('/auth/register')[0]!.body).toEqual({
+      login: 'Orion',
+      password: 'orbit-secret-pass',
+    });
   });
 
   it('отложенный заход в партию доигрывается и после регистрации', async () => {
     const { acc, env } = await onRegister();
     freshAccount();
     acc.pendingJoinAfterAuth.remember('m-7');
-    el('crpass').value = 'secret-pass';
-    el('crpass2').value = 'secret-pass';
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass2').value = 'orbit-secret-pass';
     click('crgo');
     await settle();
     expect(stages()).toEqual(['cbrowse']);
@@ -521,13 +596,16 @@ describe('REFM-218 — сброс пароля по ссылке', () => {
     const { pages, env } = await boot();
     pages.openReset('tok-1');
     server['/auth/reset'] = () => reply(200, { login: 'Orion', token: 'jwt-reset' });
-    el('cresetpass').value = 'new-secret';
+    el('cresetpass').value = 'orbit-new-secret';
     enter('cresetpass');
     expect(focused).toBe('cresetpass2');
-    el('cresetpass2').value = 'new-secret';
+    el('cresetpass2').value = 'orbit-new-secret';
     enter('cresetpass2');
     await settle();
-    expect(posted('/auth/reset')[0]!.body).toEqual({ token: 'tok-1', password: 'new-secret' });
+    expect(posted('/auth/reset')[0]!.body).toEqual({
+      token: 'tok-1',
+      password: 'orbit-new-secret',
+    });
     expect(readSession(localStorage, BASE)).toEqual({ login: 'Orion', token: 'jwt-reset' });
     expect([cell.get('void.nick'), env.nick]).toEqual(['Orion', 'Orion']);
     expect([env.notes, env.hub]).toEqual([['✔ ' + t('auth.reset.done')], [undefined]]);
@@ -542,8 +620,8 @@ describe('REFM-218 — сброс пароля по ссылке', () => {
     click('cwgo');
     await settle();
     pages.openReset('tok-1');
-    el('cresetpass').value = 'new-secret';
-    el('cresetpass2').value = 'new-secret';
+    el('cresetpass').value = 'orbit-new-secret';
+    el('cresetpass2').value = 'orbit-new-secret';
     click('cresetgo');
     await settle();
     expect(posted('/auth/reset')).toEqual([]);
@@ -587,5 +665,37 @@ describe('REFM-218 — проводка в main.ts', () => {
     expect(init).toBeLessThan(MAIN.indexOf('if (bootReset) {'));
     expect(MAIN.match(/startAuthProbe\(/g)).toHaveLength(1);
     expect(MAIN).toMatch(/initAccountSession\(\{[\s\S]*?\n {2}welcomePassword,\n/);
+  });
+});
+
+describe('password visibility', () => {
+  it.each(['cwpass', 'crpass', 'crpass2', 'cresetpass', 'cresetpass2'])(
+    'toggles only %s without changing the password or submitting',
+    async (id) => {
+      await boot();
+      const input = el(id);
+      const button = el(id + '-visibility');
+      input.value = 'Проверка-Strong-123';
+      const requests = calls.length;
+      expect(input.type).toBe('password');
+      click(button.id);
+      expect(input.type).toBe('text');
+      expect(button.ariaLabel).toBe(t('auth.password.hide'));
+      expect(el(id === 'cwpass' ? 'crpass' : 'cwpass').type).toBe('password');
+      click(button.id);
+      expect(input.type).toBe('password');
+      expect(button.ariaLabel).toBe(t('auth.password.show'));
+      expect(input.value).toBe('Проверка-Strong-123');
+      expect(calls).toHaveLength(requests);
+    },
+  );
+
+  it('hides revealed passwords when changing auth stages', async () => {
+    const { pages } = await boot();
+    click('cwpass-visibility');
+    expect(el('cwpass').type).toBe('text');
+    pages.showStage('register');
+    expect(el('cwpass').type).toBe('password');
+    expect(el('cwpass-visibility').ariaLabel).toBe(t('auth.password.show'));
   });
 });

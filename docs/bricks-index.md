@@ -35,8 +35,10 @@
 | BAL-3 | 🔶 | proto data | `docs/backlog.md` | Кредиты, энергия и еда — декорации, а не ресурсы. |
 | BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
+| BAL-16 | 🔶 | core proto | `docs/backlog.md` | Бои за планеты дают очки, порог считается от карты. |
 | BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | BAL-7 | ✅ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
+| OBS-0.1 | ✅ |  | `docs/backlog.md` | [Контракт v1](observability-contract-v1.md): матрица |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
 | SEC-42 | ✅ | sec ops | `docs/backlog.md` | исправленная libssl3t64 в серверном образе: trivy image |
@@ -61,9 +63,9 @@
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-221 | ⏳ | proto | `docs/backlog.md` | Обучение и справка |
-| REFM-222 | ⏳ | proto | `docs/backlog.md` | Верхняя полоса |
-| REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
-| REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
+| REFM-222 | ✅ | proto | `docs/backlog.md` | Верхняя полоса |
+| REFM-223 | ✅ | proto | `docs/backlog.md` | Карточка мира |
+| REFM-224 | ✅ | proto | `docs/backlog.md` | Карточка флота |
 | REFM-225 | ⏳ | proto | `docs/backlog.md` | Хозяин боковой панели |
 | REFM-226 | ✅ | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
 | REFM-227 | ✅ | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
@@ -101,6 +103,7 @@
 | AUDM-3 | ⏳ | data | `docs/backlog.md` | Дальность удара шаттлов против длины проходов. |
 | AUDM-4 | ✅ | proto | `docs/backlog.md` | Погрузка десанта отменяется молча. |
 | AUDM-5 | ⏳ | docs | `docs/backlog.md` | Карта механик устарела. |
+| AUDM-6 | ✅ | core proto | `docs/backlog.md` | Приказ флоту с погрузкой и граница в тумане |
 | TRN-3 | ⏳ | proto data | `docs/backlog.md` | Учебные соединения и объявленная контратака (§14.2, §14.9). |
 | TRN-4 | ⏳ | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
@@ -118,6 +121,7 @@
 | UIX-4.2 | ⏳ | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
 | UIX-4.3 | ⏳ | srv | `docs/backlog.md` | Push только о своём и срочном. |
 | UIX-4.4 | 🔒 | proto | `docs/backlog.md` | Подписка на push в клиенте. |
+| UIX-4.5 | ✅ | proto | `docs/backlog.md` | Без падающих цифр у ресурсов. |
 | UIX-5.1 | ✅ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |
 | UIX-5.2 | ✅ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
 | UIX-5.3 | ✅ | proto | `docs/backlog.md` | Английский в русской версии и грамматика. |
@@ -132,8 +136,8 @@
 | UIX-8.1 | ✅ | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
 | UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
 | UIX-9.1 | ✅ | proto | `docs/backlog.md` | ПК: горячие клавиши. |
-| UIX-9.2 | ⏳ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |
-| UIX-9.3 | ⏳ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
+| UIX-9.2 | ✅ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |
+| UIX-9.3 | ✅ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
 | UIX-9.4 | ✅ | proto | `docs/backlog.md` | ПК: подписи значков и термины. |
 | UIX-10.1 | ✅ | proto | `docs/backlog.md` | Хаб: одна главная дверь. |
 | UIX-10.2 | ✅ | proto | `docs/backlog.md` | Хаб: кошелёк и дверь в аукцион. |
@@ -144,11 +148,13 @@
 | UIX-13.3 | ✅ | proto cli | `docs/backlog.md` | Верфь: редкость и уровень прокачки модулей. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | UIX-14.1 | ✅ | proto | `docs/backlog.md` | Окно мира без дублей: шапка фактов и одно число на вкладку. |
+| UIX-14.2 | ✅ | proto | `docs/backlog.md` | Окно выбора на ПК — по содержимому. |
 | UIX-15.1 | ✅ | proto | `docs/backlog.md` | Настройка схватки и выбор места — в палитре хаба. |
 | UIX-15.2 | ✅ | proto | `docs/backlog.md` | Совет учёных — в палитре хаба. |
 | UIX-15.3 | ✅ | proto | `docs/backlog.md` | Профиль командира — вкладками и в палитре хаба. |
 | UIX-15.4 | ✅ | proto | `docs/backlog.md` | Sector Zero — в палитре хаба. |
 | UIX-16.1 | ✅ | proto | `docs/backlog.md` | Стартовое меню — одним экраном. |
+| UIX-17.1 | ✅ | proto | `docs/backlog.md` | Страница «Матчи» — без полей адреса и позывного. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
@@ -1006,7 +1012,7 @@
 | HTTPS-1.2 | ⏳ | srv | `docs/https-roadmap.md` | (Опц.) In-process TLS как запасной путь — S → SE-1.2 |
 | HTTPS-2.1 | ✅ | ops sec | `docs/https-roadmap.md` | Caddy/Nginx-пример с ACME перед сервером (код; домен — deploy-time вход) — M → SE-1.2 |
 | HTTPS-2.2 | ✅ | ops sec | `docs/https-roadmap.md` | Жизненный цикл сертификата (авто-продление + staging via Caddy) / (мониторинг истечения) — S → SE-1… |
-| HTTPS-3.1 | ✅ | ops | `docs/https-roadmap.md` | Render: зафиксировать https-инвариант (работает) / (формализация) — S → SE-1.2 |
+| HTTPS-3.1 | ⏳ | ops | `docs/https-roadmap.md` | Render: совместимый production-путь — S → SE-1.2 |
 | HTTPS-3.2 | ✅ | ops sec | `docs/https-roadmap.md` | Cloudflare/туннель: TLS на крае + скрытие origin (туннель) / (Cloudflare-перед-origin) — M → SE-1.1… |
 | HTTPS-4.1 | ✅ | cli sec | `docs/https-roadmap.md` | wss по умолчанию + блок mixed-content (частично) / — S → SE-7.1 |
 | HTTPS-4.2 | ⏳ | cli docs | `docs/https-roadmap.md` | Сообщения о URL: печатать https/wss |
@@ -1124,6 +1130,19 @@
 | PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
+| OBS-0.1 | ✅ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
+| OBS-0.2 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
+| OBS-0.3 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
+| OBS-1.1 | ✅ | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
+| OBS-1.2 | ⏳ | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
+| OBS-1.3 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
+| OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
+| OBS-2.2 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Поведение в Grafana |
+| OBS-2.3 | ⏳ | srv | `docs/playtest-observability-roadmap.md` | Честные гистограммы и backlog |
+| OBS-3.1 | 🔒 | srv proto sec | `docs/playtest-observability-roadmap.md` | Список и карточка партии |
+| OBS-3.2 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Отдельная площадка и восстановление |
+| OBS-4.1 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Приёмка и handoff |
+| OBS-5.1 | 🔒 | docs ops | `docs/playtest-observability-roadmap.md` | Error tracker или аналитическое хранилище |
 | PTM-0.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Журнал по дням, отчёт по партии, сводка не теряется |
 | PTM-0.2 | ✅ | srv ops | `docs/playtest-telemetry-roadmap.md` | Псевдоним игрока в журнале партии |
 | PTM-1.1 | ✅ | srv proto | `docs/playtest-telemetry-roadmap.md` | Приёмник клиентских событий |
@@ -1365,9 +1384,9 @@
 | SV-3.2 | ⏳ | srv | `docs/server-roadmap.md` | Interest management при масштабе |
 | SV-4.1 | ⏳ | srv | `docs/server-roadmap.md` | Фан-аут между инстансами |
 | MSVC-0 | ✅ | srv | `docs/service-resilience-roadmap.md` | Фундамент исходящих вызовов |
-| MSVC-1 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Контракт Inventory/settlement и совместимость |
-| MSVC-2 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Inventory/settlement |
-| MSVC-3 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Auction |
+| MSVC-1 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Контракт Meta/Economy и совместимость |
+| MSVC-2 | 🔒 | srv | `docs/service-resilience-roadmap.md` | Самостоятельный Meta/Economy |
+| MSVC-3 | ⏳ | srv sec | `docs/service-resilience-roadmap.md` | Отдельный Commerce service |
 | MSVC-4 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Фоновые потребители по измеренной нагрузке |
 | MSVC-5 | ⏳ | ops | `docs/service-resilience-roadmap.md` | Автоматизированное учение отказов |
 | MSVC-6 | ⏳ | srv | `docs/service-resilience-roadmap.md` | Доменные правила и границы слоёв |
@@ -1508,6 +1527,7 @@
 | ZTP-1.2 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
 | ZTP-1.3 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
 | ZTP-1.4 | ✅ | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |
+| ZTP-1.5 | ✅ | ops srv sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автодоставка подписанной TLS-пары |
 | ZTP-2.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Закрыть сборку на хосте |
 | ZTP-2.2 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Желаемая версия в репо (GitOps) |
 | ZTP-2.3 | ⏳ | docs sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Владельцы зон |

@@ -13,6 +13,8 @@ const RATE_MAX_IPS = 10_000;
 export interface MetaMarketApiDeps {
   market: MetaMarket;
   identify(request: FastifyRequest): Promise<Identity | null>;
+  canTrade?(accountId: string): Promise<boolean>;
+  onChanged?(identity: Identity): Promise<void>;
   /** Инъекция часов и лимитов для детерминированных тестов (как в `corpApi`). */
   now?: () => number;
   rateMax?: number;
@@ -60,22 +62,48 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
   const writeGate = async (
     request: FastifyRequest,
     reply: FastifyReply,
+    requireTrading = true,
   ): Promise<Identity | null> => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
       return null;
     }
-    return who(request, reply);
+    const identity = await who(request, reply);
+    if (identity && requireTrading && deps.canTrade && !(await deps.canTrade(identity.accountId))) {
+      void reply.code(403);
+      return null;
+    }
+    return identity;
+  };
+
+  const gateError = (reply: FastifyReply): { error: string } => ({
+    error:
+      reply.statusCode === 429
+        ? 'E_RATE_LIMIT'
+        : reply.statusCode === 403
+          ? 'E_LEVEL_REQUIRED'
+          : 'E_AUTH',
+  });
+
+  const changed = async (identity: Identity): Promise<void> => {
+    if (!deps.onChanged) return;
+    try {
+      await deps.onChanged(identity);
+    } catch (err) {
+      app.log.error({ err }, 'meta-market committed change sync failed');
+    }
   };
 
   app.get('/meta-market', async (request, reply) =>
     guarded(reply, async () => {
       const identity = await who(request, reply);
       if (!identity) return { error: 'E_AUTH' as const };
-      const [balance, listings, history] = await Promise.all([
+      const [balance, listings, history, materialListings, canTrade] = await Promise.all([
         deps.market.balance(identity.accountId),
         deps.market.listings(),
         deps.market.history(identity.accountId),
+        deps.market.materialListings(),
+        deps.canTrade ? deps.canTrade(identity.accountId) : Promise.resolve(true),
       ]);
       return {
         balance,
@@ -85,6 +113,11 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
           mine: listing.sellerId === identity.accountId,
         })),
         history,
+        canTrade,
+        materialListings: materialListings.map((listing) => ({
+          ...listing,
+          mine: listing.sellerId === identity.accountId,
+        })),
       };
     }),
   );
@@ -93,7 +126,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
     guarded(reply, async () => {
       const identity = await writeGate(request, reply);
       if (!identity) {
-        return { error: reply.statusCode === 429 ? ('E_RATE_LIMIT' as const) : ('E_AUTH' as const) };
+        return gateError(reply);
       }
       const body = request.body as { itemId?: unknown; price?: unknown } | null;
       if (typeof body?.itemId !== 'string' || typeof body.price !== 'number') {
@@ -115,24 +148,110 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
     guarded(reply, async () => {
       const identity = await writeGate(request, reply);
       if (!identity) {
-        return { error: reply.statusCode === 429 ? ('E_RATE_LIMIT' as const) : ('E_AUTH' as const) };
+        return gateError(reply);
       }
-      const id = (request.body as { listingId?: unknown } | null)?.listingId;
-      if (typeof id !== 'string') {
+      const body = request.body as { listingId?: unknown; tradeId?: unknown } | null;
+      const id = body?.listingId;
+      const tradeId = body?.tradeId;
+      if (
+        typeof id !== 'string' ||
+        (tradeId !== undefined &&
+          (typeof tradeId !== 'string' || tradeId.length < 1 || tradeId.length > 128))
+      ) {
         void reply.code(400);
         return { error: 'E_BAD_REQUEST' as const };
       }
-      const result = await deps.market.buy(identity.accountId, id);
+      const listing = deps.onChanged
+        ? (await deps.market.listings()).find((lot) => lot.id === id)
+        : undefined;
+      const result = await deps.market.buy(identity.accountId, id, tradeId as string | undefined);
+      if (result.ok) {
+        await changed(identity);
+        if (listing) await changed({ accountId: listing.sellerId, login: listing.sellerLogin });
+      }
       if (!result.ok) void reply.code(result.code === 'E_NO_LISTING' ? 404 : 409);
+      return result.ok ? result : { error: result.code };
+    }),
+  );
+
+  app.post('/meta-market/material/list', async (request, reply) =>
+    guarded(reply, async () => {
+      const identity = await writeGate(request, reply);
+      if (!identity) return gateError(reply);
+      const body = request.body as {
+        materialId?: unknown;
+        quantity?: unknown;
+        price?: unknown;
+        requestId?: unknown;
+      } | null;
+      if (
+        typeof body?.materialId !== 'string' ||
+        typeof body.quantity !== 'number' ||
+        typeof body.price !== 'number' ||
+        typeof body.requestId !== 'string'
+      ) {
+        void reply.code(400);
+        return { error: 'E_BAD_REQUEST' };
+      }
+      const result = await deps.market.listMaterials(
+        identity.accountId,
+        identity.login,
+        body.materialId,
+        body.quantity,
+        body.price,
+        body.requestId,
+      );
+      if (!result.ok)
+        void reply.code(
+          result.code === 'E_BAD_REQUEST' || result.code === 'E_BAD_PRICE' ? 400 : 409,
+        );
+      return result.ok ? result : { error: result.code };
+    }),
+  );
+
+  app.post('/meta-market/material/buy', async (request, reply) =>
+    guarded(reply, async () => {
+      const identity = await writeGate(request, reply);
+      if (!identity) return gateError(reply);
+      const body = request.body as { listingId?: unknown; tradeId?: unknown } | null;
+      if (typeof body?.listingId !== 'string' || typeof body.tradeId !== 'string') {
+        void reply.code(400);
+        return { error: 'E_BAD_REQUEST' };
+      }
+      const result = await deps.market.buyMaterial(
+        identity.accountId,
+        body.listingId,
+        body.tradeId,
+      );
+      if (result.ok) await changed(identity);
+      if (!result.ok)
+        void reply.code(
+          result.code === 'E_NO_LISTING' ? 404 : result.code === 'E_BAD_REQUEST' ? 400 : 409,
+        );
+      return result.ok ? result : { error: result.code };
+    }),
+  );
+
+  app.post('/meta-market/material/cancel', async (request, reply) =>
+    guarded(reply, async () => {
+      const identity = await writeGate(request, reply, false);
+      if (!identity) return gateError(reply);
+      const listingId = (request.body as { listingId?: unknown } | null)?.listingId;
+      if (typeof listingId !== 'string') {
+        void reply.code(400);
+        return { error: 'E_BAD_REQUEST' };
+      }
+      const result = await deps.market.cancelMaterial(identity.accountId, listingId);
+      if (!result.ok) void reply.code(result.code === 'E_FORBIDDEN' ? 403 : 404);
       return result.ok ? result : { error: result.code };
     }),
   );
 
   app.post('/meta-market/cancel', async (request, reply) =>
     guarded(reply, async () => {
-      const identity = await writeGate(request, reply);
+      const identity = await writeGate(request, reply, false);
       if (!identity) {
-        return { error: reply.statusCode === 429 ? ('E_RATE_LIMIT' as const) : ('E_AUTH' as const) };
+        return gateError(reply);
       }
       const id = (request.body as { listingId?: unknown } | null)?.listingId;
       if (typeof id !== 'string') {

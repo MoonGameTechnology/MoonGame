@@ -46,7 +46,11 @@ case "${1:-}" in
     ;;
   version)
     # Что запущено: дайджест из точки отката и то, что сервер сам говорит о сборке.
-    echo "образ:   $(as_service cat "$STATE_DIR/last-good-image" 2>/dev/null || echo '—')"
+    if pair="$(as_service cat "$STATE_DIR/last-good-release" 2>/dev/null)"; then
+      printf 'пара релиза:\n%s\n' "$pair"
+    else
+      echo "образ:   $(as_service cat "$STATE_DIR/last-good-image" 2>/dev/null || echo '—')"
+    fi
     echo "/health: $(curl -fsS --max-time 3 "http://127.0.0.1:${PORT:-8788}/health" 2>/dev/null || echo 'не отвечает')"
     systemctl list-timers "$SERVICE_NAME-autoupdate.timer" --no-pager 2>/dev/null | sed -n '1,2p' || true
     ;;

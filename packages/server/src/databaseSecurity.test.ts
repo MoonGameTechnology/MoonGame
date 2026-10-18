@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createInitialState } from '@void/shared-core';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   APP_TABLES,
   migrateDatabase,
@@ -14,7 +15,7 @@ import {
   provisionDatabase,
   retireDatabaseLogin,
 } from './databaseSecurity';
-import { migrate, PostgresUserStore } from './store/postgres';
+import { migrate, PostgresUserStore, PostgresMatchStore, PostgresAccountStore } from './store/postgres';
 
 it('requires an explicit DML grant decision when a migration introduces a table', () => {
   const sql = readFileSync(new URL('./store/postgres.ts', import.meta.url), 'utf8');
@@ -48,6 +49,18 @@ it('rejects injectable role names and non-hex credentials before connecting', as
 });
 
 const base = process.env.DATABASE_URL;
+
+it.each([
+  { PROD: '1' },
+  { PROD: 'true', DB_AUTO_MIGRATE: '1', DB_REQUIRE_LEAST_PRIVILEGE: '1' },
+  { PROD: '1', DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '0' },
+])('refuses production before opening a migration connection: %j', async (env) => {
+  const connect = vi.fn();
+  const end = vi.fn().mockResolvedValue(undefined);
+  await expect(prepareRuntimeDatabase({ connect, end } as unknown as Pool, env)).rejects.toThrow('E_DB_BOOT');
+  expect(connect).not.toHaveBeenCalled();
+  expect(end).toHaveBeenCalledOnce();
+});
 // Dedicated databases and unique cluster-wide role names: never mutate void_test or a live DB.
 describe.skipIf(!base)('least privilege and expand/contract rotation on real PostgreSQL', () => {
   const suffix = randomBytes(6).toString('hex');
@@ -58,6 +71,11 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
   const pass = randomBytes(32).toString('hex');
   const pass2 = randomBytes(32).toString('hex');
   const migrationPass = randomBytes(32).toString('hex');
+  const snapshot = {
+    matchId: 'existing-match', dataVersion: 'test', seq: 17, status: 'ongoing' as const,
+    state: createInitialState({ seed: 'existing-match', version: { data: 'test', manifest: 'test' } }),
+    clock: { wallTime: 1000, gameTime: 24000, timeScale: 24, running: true },
+  };
   const root = new Pool({ connectionString: base, max: 1 });
   let admin: Pool;
   const pools: Pool[] = [];
@@ -87,6 +105,8 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     expect(await new PostgresUserStore(admin).createUser('existing', 'hash')).toMatchObject({
       ok: true,
     });
+    await new PostgresMatchStore(admin).save(snapshot);
+    await new PostgresAccountStore(admin).resolveSeat('existing-match', 'existing', ['p1']);
     await provisionDatabase(admin, config());
     expect(
       (await root.query("SELECT count(*)::int AS n FROM pg_roles WHERE rolname='injected'")).rows[0]
@@ -123,6 +143,13 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       const runtime = connect(app, pass);
       await prepareRuntimeDatabase(runtime, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' });
       expect(await new PostgresUserStore(runtime).findUser('existing')).toMatchObject({ passHash: 'hash' });
+      // The pre-cutover match, clock, sequence and seat survive provisioning,
+      // backup/restore and a fresh runtime connection; subsequent saves still work.
+      const matches = new PostgresMatchStore(runtime);
+      expect(await matches.load(snapshot.matchId)).toEqual(snapshot);
+      expect(await new PostgresAccountStore(runtime).seatOf(snapshot.matchId, 'existing')).toBe('p1');
+      await matches.save({ ...snapshot, seq: 18 });
+      expect((await matches.load(snapshot.matchId))?.seq).toBe(18);
       await expect(runtime.query('ALTER TABLE users ADD COLUMN forbidden_restore int')).rejects.toMatchObject({ code: '42501' });
       await expect(runtime.query('SET ROLE vd_schema')).rejects.toMatchObject({ code: '42501' });
     } finally { rmSync(dir, { recursive: true, force: true }); }

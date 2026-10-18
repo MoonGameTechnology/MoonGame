@@ -26,6 +26,23 @@
 #   * ACME staging: add a global `{ acme_ca https://acme-staging-v02.api.letsencrypt.org/directory }`
 #     block to avoid Let's Encrypt production rate limits while iterating (HTTPS-2.2).
 
+{
+	# Runtime proxy errors can include a full request, including WS query tokens.
+	# Keep event/logger/status diagnostics, but never persist request objects or
+	# free-form upstream errors. This covers runtime logs, not just access logs.
+	log default {
+		format filter {
+			wrap json
+			fields {
+				request delete
+				headers delete
+				uri delete
+				error delete
+			}
+		}
+	}
+}
+
 {$DOMAIN} {
 	encode zstd gzip
 	# SE-7.1: HSTS ставит ТОТ, КТО ТЕРМИНИРУЕТ TLS. Приложение ставит его само, только

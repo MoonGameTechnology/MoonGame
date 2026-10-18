@@ -52,13 +52,23 @@ fi
 # Учётка мигратора (`DB_MIGRATION_URL`, docs/security/zero-trust-rollout.md) лежит в
 # отдельном файле рядом с `server.env`, но игровому контейнеру не передаётся.
 MIGRATION_ENV="${MIGRATION_ENV:-$(dirname "$ENV_FILE")/migration.env}"
+. "$DEPLOY_DIR/release-state.sh"
+TLS=0
+DOMAIN="$(release_effective "$ENV_FILE" DOMAIN)"
+if [ -n "$DOMAIN" ]; then
+  TLS=1
+  [ -n "$STATE_DIR" ] || { echo E_DEPLOY_TLS_STATE >&2; exit 1; }
+  [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]] || { echo E_DEPLOY_TLS_DOMAIN >&2; exit 1; }
+fi
+PAIR_FILE="${STATE_DIR:-$REPO_DIR}/last-good-release"
+
 
 # Подъём стека на подписанном образе. На хосте автодеплоя — тем же stack.sh, которым его
 # поднимает юнит после ребута: два разных способа собрать стек рано или поздно разъехались
 # бы, и перезагрузка поднимала бы не то, что выкатили.
 release_up() {
   if [ -n "$STATE_DIR" ]; then
-    VOID_IMAGE="$1" STATE_DIR="$STATE_DIR" bash "$DEPLOY_DIR/stack.sh" up
+    VOID_IMAGE="$1" VOID_CADDY_IMAGE="${2:-}" STATE_DIR="$STATE_DIR" bash "$DEPLOY_DIR/stack.sh" up
   else
     VOID_IMAGE="$1" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
   fi
@@ -105,6 +115,15 @@ migrate_db() {
     echo "[✗] DB_AUTO_MIGRATE=0, а файла мигратора $MIGRATION_ENV нет (DB_MIGRATION_URL)." >&2
     return 1
   fi
+  # Stopping the legacy systemd unit stops the database as well. Wait for
+  # PostgreSQL alone before running the migration; never boot Game prematurely.
+  if [ -n "$STATE_DIR" ]; then
+    if ! STATE_DIR="$STATE_DIR" VOID_IMAGE="$1" VOID_CADDY_IMAGE="${2:-${VOID_CADDY_IMAGE:-}}" \
+      bash "$DEPLOY_DIR/stack.sh" db-up; then echo E_DEPLOY_DATABASE_UNAVAILABLE >&2; return 1; fi
+  else
+    if ! VOID_IMAGE="$1" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" \
+      up -d --no-build --pull missing --wait --wait-timeout 60 postgres; then echo E_DEPLOY_DATABASE_UNAVAILABLE >&2; return 1; fi
+  fi
   echo "[*] Миграция схемы образом $1..."
   docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
     --memory 512m --pids-limit 64 --network "${DB_NETWORK:-deploy_default}" \
@@ -114,8 +133,9 @@ migrate_db() {
 health_ok() {
   local i
   for ((i = 1; i <= HEALTH_TRIES; i++)); do
-    if curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1; then
-      return 0
+    if curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1 \
+      && curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/ready" >/dev/null 2>&1; then
+      if [ "$TLS" = 0 ] || curl -fsS --max-time 5 "https://${DOMAIN}/ready" >/dev/null 2>&1; then return 0; fi
     fi
     sleep 2
   done
@@ -131,6 +151,19 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   fi
 
   PREV_IMAGE="$(cat "$LAST_GOOD" 2>/dev/null || true)"
+  PREV_CADDY=""
+  if [ "$TLS" = 1 ]; then
+    release_ref_valid "${VOID_CADDY_IMAGE:-}" || { echo E_DEPLOY_RELEASE_PAIR >&2; exit 1; }
+    "$DEPLOY_DIR/verify-image.sh" "$VOID_CADDY_IMAGE" || { echo E_DEPLOY_EDGE_SIGNATURE >&2; exit 1; }
+    if [ -e "$PAIR_FILE" ]; then
+      release_pair_read "$PAIR_FILE" || { echo E_DEPLOY_RELEASE_PAIR >&2; exit 1; }
+      PREV_IMAGE="$RELEASE_SERVER"; PREV_CADDY="$RELEASE_CADDY"
+    elif [ "${DEPLOY_BOOTSTRAP:-0}" != 1 ]; then
+      echo E_DEPLOY_NO_PAIR_ROLLBACK >&2; exit 1
+    else
+      PREV_IMAGE="" # The root installer owns the initial legacy-unit recovery.
+    fi
+  fi
 
   # Добор ключей нужен и здесь — это РЕКОМЕНДОВАННЫЙ путь обновления, и без него OPS-2
   # чинил бы только менее безопасную сборку из исходников. Оговорка: этот путь намеренно
@@ -143,17 +176,25 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   backup_env
   ensure_env_keys "$ENV_FILE"
 
+  . "$DEPLOY_DIR/production-preflight.sh"
+  if ! production_preflight "$ENV_FILE"; then restore_env; exit 1; fi
+
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
+  if [ "$TLS" = 1 ]; then docker pull "$VOID_CADDY_IMAGE"; fi
   if ! migrate_db "$VOID_IMAGE"; then
     echo "[✗] Миграция не прошла — обновление ОТМЕНЕНО, сервер не тронут." >&2
     restore_env
     exit 1
   fi
-  release_up "$VOID_IMAGE"
-
-  if health_ok; then
-    write_last_good "$VOID_IMAGE"
+  rollout_ok=0
+  if release_up "$VOID_IMAGE" "${VOID_CADDY_IMAGE:-}" && health_ok; then rollout_ok=1; fi
+  if [ "$rollout_ok" = 1 ]; then
+    if [ "$TLS" = 1 ]; then
+      release_pair_write "$PAIR_FILE" "$VOID_IMAGE" "$VOID_CADDY_IMAGE"
+    else
+      write_last_good "$VOID_IMAGE"
+    fi
     echo "[✓] Обновление завершено, /health отвечает."
     exit 0
   fi
@@ -163,8 +204,8 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   if [ -n "$PREV_IMAGE" ]; then
     echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
     # Порядок отката из runbook: мигратор прежнего образа, потом прежний сервер.
-    migrate_db "$PREV_IMAGE" || echo "[!] Миграция прежним образом не прошла." >&2
-    release_up "$PREV_IMAGE"
+    migrate_db "$PREV_IMAGE" "$PREV_CADDY" || echo "[!] Миграция прежним образом не прошла." >&2
+    release_up "$PREV_IMAGE" "$PREV_CADDY"
     health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
       || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
   else
@@ -218,6 +259,9 @@ run_as_owner git -C "$REPO_DIR" merge --ff-only "origin/$BRANCH"
 backup_env
 ensure_env_keys "$ENV_FILE"
 
+. "$DEPLOY_DIR/production-preflight.sh"
+if ! production_preflight "$ENV_FILE"; then restore_env; exit 1; fi
+
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
 PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
@@ -226,6 +270,16 @@ echo "[*] Пересобираем образ (сервер пока работ�
 # Тоже от владельца: в группе docker состоит служебный пользователь (его туда завёл
 # установщик), а не тот, кто набрал `moongame update`.
 run_as_owner docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
+
+# The source-build path also needs a separate migration before the runtime starts.
+if [ "$(env_value DB_AUTO_MIGRATE)" = 0 ]; then
+  BUILT_IMAGE="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images server)"
+  [ -n "$BUILT_IMAGE" ] && migrate_db "$BUILT_IMAGE" || {
+    restore_env
+    echo '[✗] Миграция не прошла — работающий сервер не перезапущен.' >&2
+    exit 1
+  }
+fi
 
 echo "[*] Перезапускаем сервер на новом образе..."
 sudo systemctl restart "$SERVICE_NAME"

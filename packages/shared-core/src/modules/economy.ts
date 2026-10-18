@@ -189,8 +189,13 @@ function pausedProduction(planet: Planet, data: GameData): ResourceBag {
 /** Daily upkeep owed per owner for every unit in the world — ship stacks,
  *  landing troops and planet garrisons — aggregated in ONE pass over fleets and
  *  planets (O(world), not O(players × world)). An owner with no upkeep-bearing
- *  units has no entry. */
-function upkeepByOwner(state: GameState, data: GameData): Map<string, ResourceBag> {
+ *  units has no entry. `planetIds` are the planet ids sorted, as the production pass
+ *  already sorted them for the same span: nothing between the two adds a world. */
+function upkeepByOwner(
+  state: GameState,
+  data: GameData,
+  planetIds: readonly string[],
+): Map<string, ResourceBag> {
   const out = new Map<string, ResourceBag>();
   const addStacks = (owner: string, stacks: UnitStack[]) => {
     for (const stack of stacks) {
@@ -216,7 +221,7 @@ function upkeepByOwner(state: GameState, data: GameData): Map<string, ResourceBa
     addStacks(fleet.owner, fleet.units);
     if (fleet.landing) addStacks(fleet.owner, fleet.landing);
   }
-  for (const pid of Object.keys(state.planets).sort()) {
+  for (const pid of planetIds) {
     const planet = state.planets[pid]!;
     // Десант на плацдарме содержит его владелец, на чьей бы земле он ни стоял: с MSB-9 весь
     // штурмующий десант живёт плацдармом до конца боя, и без этой строки штурм снимал
@@ -284,10 +289,21 @@ export const economyModule: GameModule = {
       // набора считаются ОДНИМ проходом каждый — иначе на каждый узел пришлось бы
       // перебирать все бои и все флоты.
       const fighting = battleLocations(h.state);
+      // Стройки по мирам — один проход по очереди событий, а не проход на каждый мир.
+      // `pendingProduction` берёт свой список в прежнем порядке очереди.
+      const builds = new Map<unknown, GameState['scheduled']>();
+      for (const event of h.state.scheduled) {
+        if (event.type !== 'construction.complete') continue;
+        const planetId = (event.payload as ConstructionPayload).planetId;
+        const list = builds.get(planetId);
+        if (list) list.push(event);
+        else builds.set(planetId, [event]);
+      }
 
       // Sorted (BF-13): several planets credit the same treasury cell — float
       // addition order must not depend on JSONB key order after hibernation.
-      for (const planetId of Object.keys(h.state.planets).sort()) {
+      const planetIds = Object.keys(h.state.planets).sort();
+      for (const planetId of planetIds) {
         const planet = h.state.planets[planetId];
         if (!planet || planet.owner === null) {
           continue; // neutral / unclaimed sectors do not produce
@@ -308,7 +324,7 @@ export const economyModule: GameModule = {
           mergeBags(
             mergeBags(
               baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
-              pendingProduction(h.state.scheduled, planet, data, h.ctx, from, to, hours),
+              pendingProduction(builds.get(planetId) ?? [], planet, data, h.ctx, from, to, hours),
             ),
             pausedProduction(planet, data),
           ),
@@ -322,7 +338,7 @@ export const economyModule: GameModule = {
         }
       }
 
-      const upkeepPerOwner = upkeepByOwner(h.state, data);
+      const upkeepPerOwner = upkeepByOwner(h.state, data, planetIds);
       for (const playerId of Object.keys(h.state.players).sort()) {
         const player = h.state.players[playerId];
         if (!player) {

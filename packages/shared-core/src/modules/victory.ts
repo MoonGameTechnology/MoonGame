@@ -14,6 +14,7 @@ import { isForkSite } from '../state/forkSite';
 import { getStance } from '../state/diplomacy';
 import { isOrdnanceFleet } from '../state/ordnance';
 import { hasFixedSides } from '../action/matchMode';
+import { recordValues } from '../util/records';
 
 /** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
  *  pinned to them by test instead of to copied literals — the same fact now lives in
@@ -31,13 +32,21 @@ export const DEFAULT_COALITION_FACTOR = 0.7;
  *  finale ranked by score (GDD §3.1/§3.2). Any other speed falls back to the ×1 cap. */
 const SESSION_MAX_DAYS: Record<number, number> = { 1: 100, 2: 60, 4: 30 };
 const DEFAULT_SESSION_DAYS = 100;
+/** Очки за решённый бой за планету игрока (BAL-16, резолюции владельца 2026-10-10 и
+ *  2026-10-15): победа даёт фиксированные +40, проигрыш отнимает 5% текущего счёта.
+ *  Процент бьёт лидера сильнее отстающего — при счёте 450 проигранный бой стоит 23 очка,
+ *  при 250 — 13, — поэтому отыграться проще (замер 2026-10-14: 120 партий по 30 дней на
+ *  дуэли и FFA на четверых). Счёт планет остаётся снимком, а боевые очки копятся в
+ *  `match.battlePoints` и входят в `total` при каждом подсчёте. */
+export const BATTLE_WIN_POINTS = 40;
+export const BATTLE_LOSS_PERCENT = 5;
 
 function emptyScore(): MatchScore {
   return { controlledPlanets: 0, fleets: 0, units: 0, total: 0 };
 }
 
-/** Adds a unit list to the headcount only (the alive check). Military never scores —
- *  only territory and structures do (GDD §8.1). */
+/** Adds a unit list to the headcount only (the alive check). An army never scores by
+ *  existing — territory, structures and WON battles do (GDD §8.1, BAL-16). */
 function tallyUnits(score: MatchScore, stacks: readonly UnitStack[]): void {
   for (const stack of stacks) {
     score.units += stack.count;
@@ -51,7 +60,7 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
     scores[playerId] = emptyScore();
   }
 
-  for (const planet of Object.values(h.state.planets)) {
+  for (const planet of recordValues(h.state.planets)) {
     // Крепость на развилке — космический юнит, а не территория (FORT-6.1): провинцией её
     // не считают ни в счёте, ни в выбывании. Иначе игрок, потерявший последнюю планету,
     // жил бы за счёт одной крепости на дороге, которую ещё и не захватить.
@@ -84,7 +93,7 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
     tallyUnits(score, planet.garrison);
   }
 
-  for (const fleet of Object.values(h.state.fleets)) {
+  for (const fleet of recordValues(h.state.fleets)) {
     const score = scores[fleet.owner];
     // Мина — ловушка, а не войско (решение владельца 2026-09-30, SM-3.6): не держит игрока
     // в живых и не идёт в счёт флотов. Летящая ракета — тоже (SM-3.7b).
@@ -97,14 +106,54 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
   }
   // Десант на плацдарме — войска штурмующего, на чьей бы земле он ни стоял (замечание
   // Codex на #1392: с MSB-9 весь штурмующий десант живёт плацдармом до конца боя).
-  for (const planet of Object.values(h.state.planets)) {
+  for (const planet of recordValues(h.state.planets)) {
     for (const b of planet.beachheads ?? []) {
       const score = scores[b.owner];
       if (score) tallyUnits(score, b.units);
     }
   }
 
+  // Боевые очки (BAL-16) — накопленные, а не снимок: выигранный бой не отнимается тем, что
+  // флот потом ушёл или погиб.
+  for (const [playerId, points] of Object.entries(h.state.match.battlePoints ?? {})) {
+    const score = scores[playerId];
+    if (score) score.total += points;
+  }
+
   return scores;
+}
+
+/** Начислить очки за решённый бой (BAL-16): стороне победителя +40, поделённые между её
+ *  игроками поровну — совместный штурм союзников не должен чеканить двойные очки, тот же
+ *  довод, что у трофеев (`salvage.ts`); каждый проигравший теряет 5% своего счёта ДО боя.
+ *  Платит только бой ЗА ПЛАНЕТУ игрока — штурм или оборона, где её владелец сам дрался
+ *  (резолюция 2026-10-15): охота за флотами и разведчиками в открытом космосе или у чужой
+ *  планеты очков не даёт. И только между игроками: ополчение ничьих миров и обитатели
+ *  карты (`npc`), как и Рой забега, очков не дают и не снимают. Ничья и перемирие
+ *  проигравших не имеют — `combat.ts` отдаёт пустые списки. */
+function awardBattlePoints(h: HandlerContext, payload: unknown): void {
+  if (h.state.match.status === 'ended') return;
+  const p = payload as Record<string, unknown>;
+  const npcPlayerId = h.state.pve?.npcPlayerId;
+  const players = new Set(playablePlayerIds(h.state).filter((id) => id !== npcPlayerId));
+  const pick = (raw: unknown): PlayerId[] =>
+    Array.isArray(raw)
+      ? raw.filter((id): id is PlayerId => typeof id === 'string' && players.has(id))
+      : [];
+  const winners = pick(p['winners']);
+  const losers = pick(p['losers']);
+  if (winners.length === 0 || losers.length === 0) return;
+  const location = typeof p['location'] === 'string' ? h.state.planets[p['location']] : undefined;
+  const host = location?.owner ?? null;
+  if (host === null || (!winners.includes(host) && !losers.includes(host))) return;
+  const before = computeScores(h);
+  const book = (h.state.match.battlePoints ??= {});
+  const share = Math.floor(BATTLE_WIN_POINTS / winners.length);
+  for (const id of winners) book[id] = (book[id] ?? 0) + share;
+  for (const id of losers) {
+    const total = Math.max(0, before[id]?.total ?? 0);
+    book[id] = (book[id] ?? 0) - Math.round((total * BATTLE_LOSS_PERCENT) / 100);
+  }
 }
 
 function highestScore(
@@ -469,7 +518,7 @@ function evaluateVictory(h: HandlerContext): void {
   // O(players × planets) — evaluateVictory runs on every time.advanced span).
   let capturableCount = 0;
   const ownedCapturable = new Map<PlayerId, number>();
-  for (const p of Object.values(h.state.planets)) {
+  for (const p of recordValues(h.state.planets)) {
     if (!isCapturable(h.ctx.data, p) || isForkSite(p)) continue;
     capturableCount += 1;
     if (p.owner !== null) ownedCapturable.set(p.owner, (ownedCapturable.get(p.owner) ?? 0) + 1);
@@ -539,12 +588,16 @@ export const victoryModule: GameModule = {
   // 1.7.0: летящая ракета не идёт в счёт флотов и юнитов (SM-3.7b).
   // 1.8.0: последний союз в фиксированном 2v2 побеждает совместно.
   // 1.9.0: fixed teams use the persisted roster and the resolved mode for every PvP ending.
-  version: '1.9.0',
+  // 1.10.0: бой за планету игрока: победителю +40, проигравшему −5% его счёта (BAL-16).
+  version: '1.10.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));
     api.on('fleet.destroyed', (_event, h) => evaluateVictory(h));
-    api.on('battle.resolved', (_event, h) => evaluateVictory(h));
+    api.on('battle.resolved', (event, h) => {
+      awardBattlePoints(h, event.payload);
+      evaluateVictory(h);
+    });
     api.on('unit.built', (_event, h) => evaluateVictory(h));
     // The end of a PvE hold-out (PVR-2.5): `pveModule` schedules this beat AT the
     // deadline, so the run is judged at that instant. Matched by name — the bus, not an

@@ -16,6 +16,13 @@
  *    выключать нечего.
  * 4. **Нет имени — подписи нет.** Область без ключа на карту не выходит: сырой id игроку
  *    не показывается, а полноту имён держит тест карты.
+ * 5. **Подписи не наезжают друг на друга и не уходят за край экрана.** На узком экране
+ *    телефона средние точки соседних областей сходятся ближе длины их имён, и подписи
+ *    ложились одна на другую (жалоба владельца 2026-10-14 на «странную» карту 2 на 2).
+ *    Подпись пробует по порядку: свою точку одной строкой, свою точку двумя строками,
+ *    сдвиг на строку вверх или вниз. Свободного места нет — подпись не рисуется: лучше
+ *    без одного имени, чем две нечитаемые. Подпись, вылезающая за боковой край экрана,
+ *    сдвигается внутрь.
  *
  * Импорт — из `core`, а не `runtime`: клиент грузит одну локаль (LOC-6), как в
  * `provinceName.ts`.
@@ -63,4 +70,66 @@ export function regionLabels(
 /** Непрозрачность подписей при детализации провинций `provinceDetail` 0..1 (правило 3). */
 export function regionLabelAlpha(provinceDetail: number): number {
   return Math.max(0, Math.min(1, 1 - provinceDetail));
+}
+
+/** Подпись, разложенная на экране: строки сверху вниз и центр блока строк. */
+export interface PlacedRegionLabel {
+  id: string;
+  lines: string[];
+  x: number;
+  y: number;
+}
+
+/** Две строки из имени: разрыв по пробелу, ближайшему к середине. Без пробела — `null`. */
+function twoLines(text: string): string[] | null {
+  let best = -1;
+  for (let i = text.indexOf(' '); i >= 0; i = text.indexOf(' ', i + 1))
+    if (best < 0 || Math.abs(i - text.length / 2) < Math.abs(best - text.length / 2)) best = i;
+  return best < 0 ? null : [text.slice(0, best), text.slice(best + 1)];
+}
+
+/**
+ * Разложить подписи в экранных координатах (правило 5). `labels` — уже на экране, в
+ * порядке важности: раньше стоящая занимает место первой. `measure` — ширина строки в
+ * пикселях тем шрифтом, которым подпись нарисуют.
+ */
+export function layoutRegionLabels(
+  labels: readonly { id: string; text: string; x: number; y: number }[],
+  measure: (text: string) => number,
+  view: { width: number },
+  lineHeight: number,
+  margin = 6,
+): PlacedRegionLabel[] {
+  const taken: { left: number; right: number; top: number; bottom: number }[] = [];
+  const out: PlacedRegionLabel[] = [];
+  const gapX = 6;
+  const gapY = 2;
+  for (const label of labels) {
+    const layouts = [[label.text], twoLines(label.text)].filter((l): l is string[] => l !== null);
+    let placed: PlacedRegionLabel | null = null;
+    for (const shift of [0, -1, 1, -2, 2]) {
+      for (const lines of layouts) {
+        const width = Math.max(...lines.map(measure));
+        // Строка шире экрана — только если короче разложить нельзя.
+        if (width + 2 * margin > view.width && lines !== layouts.at(-1)) continue;
+        const height = lines.length * lineHeight;
+        let x = label.x;
+        // Только подпись, чья точка на экране: дальнюю область краем не притягиваем.
+        if (x >= 0 && x <= view.width)
+          x = width + 2 * margin >= view.width ? view.width / 2
+            : Math.min(view.width - margin - width / 2, Math.max(margin + width / 2, x));
+        const y = label.y + shift * (lineHeight + 2 * gapY);
+        const box = { left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2 };
+        const clash = taken.some((o) => box.left < o.right + gapX && box.right > o.left - gapX &&
+          box.top < o.bottom + gapY && box.bottom > o.top - gapY);
+        if (clash) continue;
+        taken.push(box);
+        placed = { id: label.id, lines, x, y };
+        break;
+      }
+      if (placed) break;
+    }
+    if (placed) out.push(placed);
+  }
+  return out;
 }

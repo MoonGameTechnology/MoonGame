@@ -1,7 +1,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { FogMemory, GameState, PlanetId, PlanetSnapshot } from '../state/gameState';
-import { observedSwarm } from '../state/swarmIntel';
-import { identifiedNodes } from '../state/visibility';
+import { observedSwarm, swarmFleetIds } from '../state/swarmIntel';
+import { sensorCoverageOf } from '../state/visibility';
 
 /**
  * Visibility — fog-of-war MEMORY (variant B). The security projection
@@ -27,15 +27,19 @@ function snapshot(state: GameState, planetId: PlanetId, now: number): PlanetSnap
   return snap;
 }
 
-/** Refresh every active player's memory with what they currently identify. */
+/** Refresh every active player's memory with what they currently identify. Sensors are
+ *  read for all of them in one pass (`sensorCoverageOf`): nothing below changes what any
+ *  player identifies, so the sets match a per-player `identifiedNodes` exactly. */
 function refreshMemory(h: HandlerContext): void {
   const state = h.state;
   const fog = (state.fog ??= {});
-  for (const playerId of Object.keys(state.players)) {
-    if (state.players[playerId]?.status !== 'active') continue;
+  const active = Object.keys(state.players).filter((id) => state.players[id]?.status === 'active');
+  const coverage = sensorCoverageOf(state, active, h.ctx.data);
+  const swarm = swarmFleetIds(state);
+  for (const playerId of active) {
     const memory: FogMemory = fog[playerId] ?? (fog[playerId] = {});
-    const identified = identifiedNodes(state, playerId, h.ctx.data);
-    const contacts = observedSwarm(state, playerId, identified, h.ctx.now);
+    const identified = coverage.get(playerId)!.identify;
+    const contacts = observedSwarm(state, playerId, identified, h.ctx.now, swarm);
     if (Object.keys(contacts).length) {
       const intel = (state.swarmIntel ??= {});
       intel[playerId] = { ...intel[playerId], ...contacts };

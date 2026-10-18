@@ -34,6 +34,8 @@ import {
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
 // Прочность постройки по уровню — у миров карты (REFM-235); \`main.ts\` сам её не зовёт.
 import { hpOfLevel as __hpOfLevel } from './game';
+// Метки патрулей — у решения: с REFM-223 \`main.ts\` их не импортирует.
+import { patrolMarks as __patrolMarks } from '../../decisions/patrolMarks';
 window.__patrolTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // База — свой мир с целым портом или свой «Носитель» у него; в ангаре два перехватчика.
@@ -94,7 +96,7 @@ window.__patrolTest = {
     lastPanelHtml = '';
     renderPanel();
   },
-  marks: () => patrolMarks(s.strikes, { me: ME, now: s.time }),
+  marks: () => __patrolMarks(s.strikes, { me: ME, now: s.time }),
   // Мир доходит до конца ЭТОЙ ноги вылета: висение кончилось — разворот, вернулся — посадка
   // (и у удерживаемого патруля — новый взлёт в ту же минуту).
   leg: (id) => {

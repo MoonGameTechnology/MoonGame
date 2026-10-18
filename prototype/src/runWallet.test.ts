@@ -134,8 +134,10 @@ describe('кошелёк: ролик только по раскрытой кно
 describe('шапка забега — проводка в кадре', () => {
   // Кадр — единственное место, где признак забега доходит до шапки.
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  // Кошелёк поднимает оболочка Sector Zero (REFM-211), перерисовывает кадр `main.ts`.
+  // Кошелёк поднимает оболочка Sector Zero (REFM-211), перерисовывает кадр верхней полосы
+  // (`matchTopBar.ts`, REFM-222).
   const shell = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
+  const bar = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 
   it('поля основной игры прячутся в забеге и возвращаются вне его', () => {
     // Каждое поле — вместе со своим дублем в другом месте интерфейса (кнопка «Производство»
@@ -149,7 +151,8 @@ describe('шапка забега — проводка в кадре', () => {
     // Признак забега для интерфейса — `sectorZeroToolsHidden` в `main.ts`, оболочка зовёт его хуком.
     expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
     expect(main).toContain('runOnScreen: () => sectorZeroToolsHidden(),');
-    expect(main).toMatch(/\n {2}runWallet\.render\(\);/);
+    expect(bar).toMatch(/\n {2}runWallet\.render\(\);/);
+    expect(main).toMatch(/\n {2}renderTopBar\(missions\);/);
   });
 
   it('ролик в кошельке — те же порция и дневной лимит, что у магазина, по сегодняшним суткам', () => {
@@ -159,9 +162,21 @@ describe('шапка забега — проводка в кадре', () => {
     expect(shell).toContain("apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),");
   });
 
-  it('плашка-заглушка Суверенов в строке статуса в забеге не рисуется', () => {
-    expect(main).toMatch(
-      /\(sectorZeroToolsHidden\(\)\s*\? ''\s*: `<button type="button" class="dl-donate"/,
+  it('основная игра не показывает выдуманные Суверены, кошелёк забега остаётся из профиля', () => {
+    // Неподтверждённый баланс не подменяется числом вне забега. Сама плашка с «+» осталась
+    // дверью в магазин (решение владельца 2026-10-15), но числа на ней нет.
+    expect(main).not.toMatch(/\bSOVEREIGNS\b/);
+    expect(bar).not.toMatch(/\bSOVEREIGNS\b/);
+    // Строка статуса — у владельца верхней полосы (`matchTopBar.ts`, REFM-222).
+    const status = bar.slice(bar.indexOf('  const statusHtml ='), bar.indexOf('  if (statusHtml !== lastClockText)'));
+    expect(status).toContain('data-solo-save');
+    expect(status).toContain('data-donate="1"');
+    expect(status).not.toMatch(/dl-donate[^\n]*<b>/);
+    expect(main).toContain('wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),');
+    // Отдельный настоящий баланс Sector Zero по-прежнему приходит из профиля.
+    expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
+    expect(runWalletHtml({ research: 0, warrants: 0, sovereigns: 7 })).toMatch(
+      /tw-sovereigns[^>]*><i aria-hidden="true"><svg.*<\/svg><\/i>7<\/button>/,
     );
   });
 });

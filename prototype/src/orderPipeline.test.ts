@@ -49,6 +49,7 @@ async function boot() {
     tour: null as { active: boolean; notifyAction(type: string): void } | null,
     stewardOpen: false,
     repaints: 0,
+    forwarded: [] as string[],
   };
   const pipe = await import('./orderPipeline');
   pipe.initOrderPipeline({
@@ -64,6 +65,7 @@ async function boot() {
     tour: () => env.tour,
     intro: (id) => env.intros.push(id),
     steward: () => ({ isOpen: () => env.stewardOpen, repaint: () => env.repaints++ }),
+    forward: (action) => env.forwarded.push(action.type),
   });
   const home = Object.values(world.planets).find((p) => p.owner === 'p1')!;
   const fleet = Object.values(world.fleets).find((f) => f.owner === 'p1')!;
@@ -105,6 +107,8 @@ describe('REFM-240 — приказ игрока в соло', () => {
     expect(env.taught).toEqual(['fleet.move']);
     expect(env.refusals).toBe(0);
     expect(env.intros).toEqual([]);
+    // Мир считает отдельный поток — принятый приказ уходит и ему (`simLink.ts`).
+    expect(env.forwarded).toEqual(['fleet.move']);
   });
 
   it('принятый приказ поднимает вставку обучения; тур читается уже после урока', async () => {
@@ -144,6 +148,17 @@ describe('REFM-240 — приказ игрока в соло', () => {
     expect(env.refusals).toBe(1);
     expect(env.notes).toEqual([['✖ ' + refusalText(code!), undefined]]);
     expect(env.intros).toEqual([]);
+    expect(env.forwarded).toEqual([]); // отвергнутый экраном приказ потоку не уходит
+  });
+
+  it('исход приказа из отдельного потока рассказывается так же, как свой', async () => {
+    const { pipe, env } = await boot();
+    env.tour = { active: true, notifyAction: (type) => env.taught.push(type) };
+    expect(pipe.settleOrder('fleet.retreat')).toBe(true);
+    expect(pipe.settleOrder('fleet.move', 'E_NO_ROUTE')).toBe(false);
+    expect(env.taught).toEqual(['fleet.retreat']);
+    expect(env.refusals).toBe(1);
+    expect(env.notes).toEqual([['✖ ' + refusalText('E_NO_ROUTE'), undefined]]);
   });
 
   it('песочница с бесплатной стройкой возвращает казну, без неё стройка платная', async () => {

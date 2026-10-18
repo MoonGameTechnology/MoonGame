@@ -14,6 +14,7 @@ import { hoursToMs, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
+import { peekValues } from '../util/draft';
 import { isCapturable } from '../state/sectorKind';
 import { attacks, combatantKey, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
@@ -54,6 +55,7 @@ import { legT } from '../state/fleetPosition';
 import { fleetHoldFree } from '../state/shuttle';
 import { crossingT } from '../state/roads';
 import { isMineFleet } from '../state/minefields';
+import { isReconFleet } from '../state/recon';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
@@ -529,9 +531,13 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
   // вступает в бой тем же путём, что десантный челнок (`beachhead.landed`), а флот
   // свободен. Прежде десант дрался ИЗ ТРЮМА, и флот был заперт в наземном бою до конца.
   const defended = (planet.garrison ?? []).some((s) => s.count > 0);
-  if (joined || defended) {
+  // Разведчик провинцию не берёт (решение владельца 2026-10-16): флот из одних
+  // разведчиков занимает пустой мир только десантом из трюма — высадкой, как защищённый.
+  const recon = isReconFleet(fleet, h.ctx.data);
+  if (joined || defended || recon) {
     if (!(fleet.landing ?? []).some((s) => s.count > 0)) {
-      return 'E_NO_TROOPS'; // a defended world needs a landing force
+      // a defended world needs a landing force; an empty one — any warship or troops
+      return joined || defended ? 'E_NO_TROOPS' : 'E_RECON_NO_CAPTURE';
     }
     beginAssaultLanding(h, fleet, at);
     return null;
@@ -542,8 +548,8 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
 
 /** Стоит ли на узле `at` враждебный `fleet` флот с кораблями — хоть свободный, хоть в бою. */
 function hostileFleetAt(h: HandlerContext, fleet: Fleet, at: string): boolean {
-  for (const id of Object.keys(h.state.fleets)) {
-    const f = h.state.fleets[id];
+  // Только чтение: проверка штурма не копирует в черновике приказа каждый флот карты.
+  for (const f of peekValues(h.state.fleets)) {
     if (!f || f.id === fleet.id || f.location !== at || isMineFleet(f, h.ctx.data)) continue;
     if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) return true;
   }
@@ -952,6 +958,9 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   for (const owner of resumeAssaultFor) {
     h.emit('beachhead.landed', { planetId: battle.location, owner });
   }
+  const winners = stalemate
+    ? []
+    : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort();
   h.emit('battle.resolved', {
     battleId: battle.id,
     location: battle.location,
@@ -963,9 +972,20 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     // молча не начислит ничего. Поэтому рядом едет полный список: мир по-прежнему
     // достаётся ПЕРВОМУ (§0.0 №4), а вот трофеи делятся — иначе помощь не окупалась бы
     // вовсе и совместный штурм не имел бы смысла.
-    winners: stalemate
+    winners,
+    // Проигравшие — владельцы сторон решённого боя, у которых не уцелело ни одной стороны
+    // (BAL-16: очки за бой платит победителю и снимает с проигравшего модуль победы, а
+    // список сторон боя к этому событию уже удалён вместе с боем). Ничья и перемирие
+    // проигравших не имеют, как не имеют и победителей.
+    losers: stalemate
       ? []
-      : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort(),
+      : [
+          ...new Set(
+            battle.sides
+              .map((x) => x.owner)
+              .filter((o): o is string => o !== null && !winners.includes(o)),
+          ),
+        ].sort(),
     rounds: battle.round,
     end,
     // Флоты-участники: бой ПРИОСТАНАВЛИВАЕТ их намерения (слияние), и тому, кто их
@@ -1139,7 +1159,9 @@ export const combatModule: GameModule = {
   // враги нового хозяина вступают в новый бой; посадка на борт не уводит трюм в минус
   // (замечания Codex на #1409).
   // 3.6.0: бой «Атаки» втягивает ждавших у мира — возможность `battle.pullIn` (ATK-3).
-  version: '3.6.0',
+  // 3.7.0: `battle.resolved` называет проигравших — `losers` (BAL-16).
+  // 3.8.0: флот из одних разведчиков пустой мир с орбиты не занимает — только высадкой.
+  version: '3.8.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
 

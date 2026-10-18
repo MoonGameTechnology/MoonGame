@@ -385,6 +385,15 @@ body.holo-ui #holo-selection-window.has-info #side .phead{position:static;column
 /* Вкладки мира — полосой во всю ширину: сведения над ними, список под ними, оба — колонками. */
 body.holo-ui #holo-selection-window.has-info #side .ptabs{column-span:all;margin:8px 0 10px;}
 body.holo-ui #holo-selection-window.has-info #side .pcols{columns:auto;column-rule:none;}
+/* ОКНО ПО СОДЕРЖИМОМУ (UIX-14.2; заказ владельца 2026-10-16: «окно растянуто, хотя контента там
+   для этого нет»). Ступень выбирает `holographicUi.ts` по `decisions/selectionWindowFit.ts`:
+   колонок газеты ровно столько, чтобы сведения влезли по высоте. Одна, две и три колонки —
+   440, 560 и 810 px, четыре — прежние 1040. Рядом с приказами одна колонка — 760 px, две —
+   прежние 1040. Окно мира, консоль флота и подробности меряют себя сами — ступени у них нет. */
+body.holo-ui #holo-selection-window.has-info:not(.has-commands)[data-fit="1"]{width:min(440px,calc(var(--vpw) - 24px));}
+body.holo-ui #holo-selection-window.has-info:not(.has-commands)[data-fit="2"]{width:min(560px,calc(var(--vpw) - 24px));}
+body.holo-ui #holo-selection-window.has-info:not(.has-commands)[data-fit="3"]{width:min(810px,calc(var(--vpw) - 150px));}
+body.holo-ui #holo-selection-window.has-info.has-commands[data-fit="1"]{width:min(760px,calc(var(--vpw) - 150px));}
 body.holo-ui #holo-selection-window.details-open{width:min(1180px,calc(var(--vpw) - 120px));}
 /* ОКНО МИРА — по содержимому (переработка 2026-09-29; заказ владельца: «если для окна не
    так много информации, то пусть сжимаются»). Ширина идёт от числа блоков открытой вкладки:

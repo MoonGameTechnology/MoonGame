@@ -1,6 +1,6 @@
 import type { GameState, Planet, PlanetId, PlanetRoads, RoadPoint, RoadTrail } from './gameState';
 import type { MosaicBorderSegment } from './mosaic';
-import { shareImmutable } from '../util/clone';
+import { isShared, shareImmutable } from '../util/clone';
 
 /**
  * Roads inside provinces (ROADS-1, `docs/roads-roadmap.md` §0.3).
@@ -236,8 +236,31 @@ export function deriveRoads(input: RoadInput): Record<PlanetId, PlanetRoads> {
 /** The fork of `at`'s trail that serves `toward`; null when that trail runs straight or
  *  through the world, or `at` has no roads. */
 export function forkToward(state: GameState, at: PlanetId, toward: PlanetId): RoadPoint | null {
-  const trail = state.planets[at]?.roads?.trails.find((t) => t.exits.includes(toward));
-  return trail?.fork ?? null;
+  const roads = state.planets[at]?.roads;
+  return (roads && trailToward(roads, toward)?.fork) ?? null;
+}
+
+/** Which trail of a shared network serves each neighbour, by the network itself. */
+const TRAILS = new WeakMap<PlanetRoads, Map<PlanetId, RoadTrail | null>>();
+
+/**
+ * The trail of `roads` that serves `toward`. A shared network ({@link shareRoadNetwork})
+ * never changes for the whole match, so its answer is remembered: a ship's position asks it
+ * twice per lane, and the world step asks for every moving fleet several times a span (on
+ * FFA-50 that search was ~3% of a late-game frame). The share mark survives the per-step
+ * clone, so the memory does too. An unshared network (a state straight from JSON) is
+ * searched every time, as before.
+ */
+function trailToward(roads: PlanetRoads, toward: PlanetId): RoadTrail | undefined {
+  if (!isShared(roads)) return roads.trails.find((t) => t.exits.includes(toward));
+  let byExit = TRAILS.get(roads);
+  if (!byExit) TRAILS.set(roads, (byExit = new Map()));
+  let trail = byExit.get(toward);
+  if (trail === undefined) {
+    trail = roads.trails.find((t) => t.exits.includes(toward)) ?? null;
+    byExit.set(toward, trail);
+  }
+  return trail ?? undefined;
 }
 
 /**
@@ -253,7 +276,8 @@ export function bypassFork(
   to: PlanetId,
 ): RoadPoint | null {
   if (from === to) return null;
-  const trail = state.planets[at]?.roads?.trails.find((t) => t.exits.includes(from));
+  const roads = state.planets[at]?.roads;
+  const trail = roads && trailToward(roads, from);
   return trail?.fork && trail.exits.includes(to) ? trail.fork : null;
 }
 

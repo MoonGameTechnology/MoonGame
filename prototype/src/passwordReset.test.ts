@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { t, setLocale } from '../../localization/runtime';
 import {
   validateNewPassword,
   stripResetParam,
@@ -74,7 +74,7 @@ describe('сброс пароля — правила нового пароля',
   });
 
   it('ровно минимальная длина уже годится — граница включительная', () => {
-    const p = 'x'.repeat(MIN_PASSWORD);
+    const p = 'orbit-signal'.slice(0, MIN_PASSWORD);
     expect(validateNewPassword(p, p).ok).toBe(true);
   });
 
@@ -221,6 +221,18 @@ describe('сброс пароля — сцена', () => {
     await w.api.submit();
     expect(w.success).toEqual([]);
     expect(w.status.at(-1)).toBeTruthy();
+  });
+
+  it('новое правило сервера оставляет ссылку пригодной для исправления пароля', async () => {
+    const w = wired({}, { ok: false, body: { error: 'E_PASSWORD_POLICY' } });
+    w.api.open('ТОКЕН', 'https://void.example/g?reset=ТОКЕН');
+    w.pass.value = w.pass2.value = 'достаточно-длинный';
+    await w.api.submit();
+    expect(w.status.at(-1)).toBe(t('acc.pass.rule'));
+    expect(w.pass.focused()).toBeGreaterThan(0);
+    expect(w.success).toEqual([]);
+    await w.api.submit();
+    expect(w.sent[1]?.[0]).toBe('ТОКЕН');
   });
 
   it('сеть не дошла — тоже отказ, без входа', async () => {

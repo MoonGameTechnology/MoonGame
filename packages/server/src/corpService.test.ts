@@ -47,7 +47,7 @@ describe('CORP-0 · create / apply / accept / decline', () => {
   it('creating a corp makes the founder its head; bad names are rejected', async () => {
     const store = new MemoryCorpStore();
     const service = new CorpService({ store });
-    for (const bad of ['ab', ' a', 'x'.repeat(25), 'два%знака', '']) {
+    for (const bad of ['ab', ' a', 'x'.repeat(25), 'два%знака', '', 'Д_у_р_а_к', 'fuck you', 'mуdаk', 'safe\u202Ename']) {
       expect(await service.create(HEAD, bad)).toEqual({ ok: false, code: 'E_BAD_NAME' });
     }
     const created = await service.create(HEAD, '  Красная Гвардия  '); // trimmed, cyrillic ok

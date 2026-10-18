@@ -13,12 +13,18 @@ const INPUT = readFileSync(new URL('./mapInput.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 // События мира разбирает лента (`eventFeed.ts`, REFM-230); чип мигает дверью `main.ts`.
 const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
+// Чип связи в строке статуса и доклад об угрозе докам — у верхней полосы (`matchTopBar.ts`,
+// REFM-222); окно и мигание чипа — двери `main.ts`.
+const TOPBAR = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 
 describe('глава IV — проводка интерфейса', () => {
   it('окно есть в разметке; вход — чип строки статуса', () => {
     expect(BUILD).toContain('<div id="ally"></div>');
-    expect(MAIN).toMatch(/closest\('\[data-ally-open\]'\)\) \{ allyScreen\.open\(\); return; \}/);
-    expect(MAIN).toMatch(
+    expect(TOPBAR).toMatch(
+      /closest\('\[data-ally-open\]'\)\) \{\s*game\.openAlly\(\);\s*return;\s*\}/,
+    );
+    expect(MAIN).toMatch(/openAlly: \(\) => allyScreen\.open\(\),/);
+    expect(TOPBAR).toMatch(
       /const allyView = sectorRunActive \? allyPanelView\(s, ME, data\) : null;/,
     );
   });
@@ -63,8 +69,8 @@ describe('глава VI — проводка интерфейса (PVR-8.4, PVR-
     expect(FEED).toMatch(
       /case 'refuge\.found':\s*if \(p\.owner === ME\) note\(t\('refuge\.signal'\)/,
     );
-    expect(MAIN).toMatch(
-      /note\(t\('refuge\.threat'\), toRefuge\[0\]!\.at\);\s*allyPulseUntil = performance\.now\(\) \+ /,
+    expect(TOPBAR).toMatch(
+      /note\(t\('refuge\.threat'\), toRefuge\[0\]!\.at\);\s*game\.pulseAlly\(\);/,
     );
   });
 

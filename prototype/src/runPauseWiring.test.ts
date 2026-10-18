@@ -16,13 +16,17 @@ import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+// Обработчик полосы скорости — у владельца верхней полосы (`matchTopBar.ts`, REFM-222): правило
+// паузы и её поводы остаются в `main.ts` и доходят до полосы дверями `runPauseShown`/`runPauseEvent`.
+const TOPBAR = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 const body = (name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
 
 describe('YAG-6.2 — каждый повод паузы доходит до правила', () => {
   it('кнопка, уход со страницы и пауза площадки зовут одно правило', () => {
     expect(body('runPauseEvent')).toContain('runPauseStep(');
-    expect(SRC).toContain("runPauseEvent('toggle')");
+    expect(TOPBAR).toContain("game.runPauseEvent('toggle')");
+    expect(SRC).toMatch(/initTopBar\(\{[\s\S]*?\n {2}runPauseShown,\n {2}runPauseEvent,\n/);
     expect(SRC).toContain("addEventListener('pagehide', () => runPauseEvent('hidden'))");
     expect(SRC).toMatch(/if \(document\.visibilityState === 'hidden'\) runPauseEvent\('hidden'\);/);
     expect(SRC).toContain(
@@ -45,14 +49,15 @@ describe('YAG-6.2 — каждый повод паузы доходит до п�
 
 describe('пауза забега — в полосе скорости (решение владельца 2026-09-24)', () => {
   it('«‖» полосы в забеге идёт через правило паузы, а не ставит темп напрямую', () => {
-    expect(SRC).toMatch(
-      /if \(b\.id === 'spd-pause' && runPauseShown\(\)\) \{\s+runPauseEvent\('toggle'\);\s+return;/,
+    expect(TOPBAR).toMatch(
+      /if \(b\.id === 'spd-pause' && game\.runPauseShown\(\)\) \{\s+game\.runPauseEvent\('toggle'\);\s+return;/,
     );
   });
 
   it('второй кнопки паузы в строке статуса больше нет', () => {
     expect(BUILD).toContain('<div id="devline"><span id="devline-head"></span><span id="devline-status"></span></div>');
     expect(SRC).not.toContain('data-run-pause');
+    expect(TOPBAR).not.toContain('data-run-pause');
   });
 
   it('у «‖» есть подпись для мыши и скринридера', () => {

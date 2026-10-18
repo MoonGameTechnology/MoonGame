@@ -4,8 +4,9 @@
  * Кирпич спрашивает, что даёт лидеру ускорение: территория, постройки или флот. **Один
  * из трёх ответов даёт сам код, до всякого прогона: флот в счёт не входит вовсе.**
  * `computeScores` (`modules/victory.ts`) считает флоты и юниты в отдельные счётчики
- * (`fleets`/`units`) и НИКОГДА не прибавляет их к `total` — «military never scores»
- * (GDD §8.1). Значит вопрос сводится к двум слагаемым, и мерить надо их.
+ * (`fleets`/`units`) и НИКОГДА не прибавляет их к `total`: армия очков не даёт тем, что
+ * она есть. С BAL-16 к территории и постройкам добавилось третье слагаемое — очки за
+ * выигранные и проигранные бои (`match.battlePoints`), накопленные, а не снимок.
  *
  * 1. **Разложение обязано СХОДИТЬСЯ со счётом ядра.** Иначе это вторая формула счёта, и
  *    она разъедется с первой — ровно то, чем этот проект уже наелся (блок CONV). Сходимость
@@ -32,18 +33,21 @@ export interface ScoreParts {
   territory: number;
   /** Σ `scoreValue × level` построек на них — вложенное, и потому теряемое. */
   buildings: number;
+  /** Очки за бои с игроками (BAL-16): +20 за победу, −4 за поражение, накоплено. */
+  battle: number;
   /** Сколько провинций держит (не очки — счётчик). */
   planets: number;
   /** Флоты и юниты — СЧЁТЧИКИ, в `total` не входят (см. шапку). */
   fleets: number;
   units: number;
-  /** `territory + buildings` — то же число, что `match.scores[seat].total` (правило 1). */
+  /** `territory + buildings + battle` — то же число, что `match.scores[seat].total` (правило 1). */
   total: number;
 }
 
 const empty = (): ScoreParts => ({
   territory: 0,
   buildings: 0,
+  battle: 0,
   planets: 0,
   fleets: 0,
   units: 0,
@@ -78,6 +82,11 @@ export function scoreParts(state: GameState, data: GameData): Record<PlayerId, S
     for (const stack of fleet.landing ?? []) parts.units += stack.count;
   }
 
-  for (const parts of Object.values(out)) parts.total = parts.territory + parts.buildings;
+  for (const [playerId, points] of Object.entries(state.match.battlePoints ?? {})) {
+    const parts = out[playerId];
+    if (parts) parts.battle = points;
+  }
+  for (const parts of Object.values(out))
+    parts.total = parts.territory + parts.buildings + parts.battle;
   return out;
 }

@@ -129,6 +129,9 @@ NOLOGIN-владелец, DML-группа по списку игровых та
 `DB_AUTO_MIGRATE=0` + `DB_REQUIRE_LEAST_PRIVILEGE=1` проверяет реальные права,
 запрещает DDL/постороннее наследование и сверяет отпечаток миграции. Настоящий PostgreSQL
 проверяет перенос существующих данных, запреты и expand/contract-ротацию.
+Под `PROD=1` этот режим обязателен, отказ происходит до startup-migrate; deployment
+preflight проверяет также готовность независимого backup/restore перед перезапуском.
+`launch.sh` сохраняет TLS/host-policy, а установщик начинает с loopback-only bootstrap.
 **Осталось:** включение на живом хосте и миграционный job перед автодеплоем.
 [Порядок переноса и отката](security/zero-trust-rollout.md).
 

@@ -42,7 +42,7 @@ import {
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, displayUnit, cost as priceHtml, fmtDur, fmtEta } from './format';
-import { activeConstruction, hoursLeft } from './buildProgress';
+import { activeConstruction, hoursLeft, progressPct } from './buildProgress';
 import { HOUR } from './time';
 import { motionOn } from './graphicsPrefs';
 import { unitIconHtml } from './icons';
@@ -52,6 +52,16 @@ import { worldName } from './planetName';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
+import {
+  addTemplate,
+  fitTemplate,
+  parseTemplates,
+  removeTemplate,
+  sameTemplate,
+  MAX_TEMPLATES,
+  type BuildTemplate,
+} from '../../decisions/buildTemplates';
+import { readRaw, writeRaw } from './prefs';
 import {
   isLander,
   landerTroopCandidates,
@@ -515,6 +525,50 @@ export function unitLaneAhead(
   return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
 }
 
+/**
+ * Очередь юнитов мира над телом окна (заказ владельца 2026-10-17: «нажимаю построить, и
+ * непонятно, прожалось или нет»). Идущий заказ — с остатком и полосой, ждущие — следом,
+ * в порядке ядра. Пустая строка — очереди нет, и полосы нет вовсе (пустую панель окно не
+ * рисует). `fresh` — подсветить последний заказ: он только что встал.
+ */
+export function yardQueueHtml(
+  state: GameState,
+  planetId: string,
+  color: string,
+  fresh = false,
+): string {
+  if (!planetId) return '';
+  const active = activeConstruction(state, planetId, 'units');
+  const queued = (state.planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit');
+  const items: string[] = [];
+  const chip = (unit: string, count: number, tail: string, extra = ''): string => {
+    const label = `${displayUnit(unit)} ×${count}`;
+    return (
+      `<span class="cn-qi${extra}" title="${esc(label)}">${unitIconHtml(unit, data, color, 16)}` +
+      `<b>×${count}</b>${tail}</span>`
+    );
+  };
+  if (active?.payload.unit) {
+    const pct = Math.round(progressPct(active, state.time, data, HOUR));
+    const eta = fmtEta(hoursLeft(active.at, state.time, HOUR));
+    items.push(
+      chip(
+        active.payload.unit,
+        active.payload.count ?? 1,
+        `<span class="cn-qt">${eta}</span><span class="cn-qbar" style="width:${pct}%"></span>`,
+        ' run',
+      ),
+    );
+  }
+  for (const q of queued) if (q.unit) items.push(chip(q.unit, q.count ?? 1, ''));
+  if (!items.length) return '';
+  if (fresh) items[items.length - 1] = items[items.length - 1]!.replace('class="cn-qi', 'class="cn-qi fresh');
+  return (
+    `<div class="cn-queue" role="status"><span class="cn-qh">${t('yard.queue.title', { w: esc(worldName(state, planetId)) })}</span>` +
+    `<div class="cn-qlist">${items.join('')}</div></div>`
+  );
+}
+
 /** Подпись под корпусом: сколько у него слотов и сколько из них куплено звёздами корабля —
  *  «по размеру корпуса» про купленные было бы неправдой. */
 function slotCountText(slots: LoadoutModel['slots']): string {
@@ -644,13 +698,80 @@ export function orderBarHtml(
 
 /** The window chrome: title, close, the tabs, whichever pane is open and, under it, the
  *  order bar — outside the scrolling body, so it never leaves the screen. */
-export function yardBoxHtml(tab: YardTab, body: string, order = '', again = ''): string {
+export function yardBoxHtml(
+  tab: YardTab,
+  body: string,
+  order = '',
+  again = '',
+  queue = '',
+  templates = '',
+): string {
   const tabBtn = (k: YardTab, label: string): string =>
     `<button class="cn-tab${tab === k ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
   return (
-    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b>${again}<button class="cn-close btn-x">✕</button></div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b>${again}${tab === 'heroes' ? '' : templateToggleHtml(templates !== '')}<button class="cn-close btn-x">✕</button></div>` +
     `<div class="cn-tabs">${YARD_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
+    templates +
+    `<div id="cn-queue">${queue}</div>` +
     `<div id="constructorbody">${body}</div>${order}</div>`
+  );
+}
+
+/** Вкладки, на которых собирается заказ, — у них и бывают шаблоны. */
+const TEMPLATE_TABS = YARD_TABS.map(([k]) => k).filter((k) => k !== 'heroes');
+/** Ключ хранилища шаблонов: они общие для всех партий на этом устройстве. */
+export const TEMPLATES_KEY = 'vd.yard.templates.v1';
+
+function templateToggleHtml(open: boolean): string {
+  const label = t('yard.tpl.title');
+  return (
+    `<button class="cn-tplbtn btn-quiet${open ? ' on' : ''}" data-cntpl aria-expanded="${open}" aria-label="${label}" title="${label}">` +
+    `<span aria-hidden="true">▤</span><span class="cn-tpl-k"> ${label}</span></button>`
+  );
+}
+
+/** Шаблон заказа из черновика окна. */
+export function templateOf(tab: YardTab, draft: YardDraft): BuildTemplate {
+  return {
+    tab,
+    hull: draft.hull,
+    modules: [...draft.modules],
+    count: draft.count,
+    ...(draft.troop && isLander(data.units[draft.hull]) ? { troop: draft.troop } : {}),
+  };
+}
+
+/**
+ * Панель шаблонов под шапкой: строка на шаблон (корпус, число, значки модулей), крестик
+ * удаления и «Сохранить текущий». Шаблон, корпуса которого в этой партии нет, стоит
+ * погашенным: удалять его незачем, в другой партии он пригодится.
+ */
+export function templatesPaneHtml(
+  state: GameState,
+  me: string,
+  list: readonly BuildTemplate[],
+  current: BuildTemplate | null,
+  color: string,
+): string {
+  const snap = state.players[me]?.arsenal;
+  const rows = list
+    .map((tpl, i) => {
+      const ok = fitTemplate(tpl, hullsOfTab(tpl.tab as YardTab), data, snap) !== null;
+      const mods = tpl.modules.map((m) => `<span class="cn-tpm" title="${esc(tData(data.modules[m]?.name ?? m))}">${moduleIcon(m)}</span>`).join('');
+      const name = `${esc(displayUnit(tpl.hull))} ×${tpl.count}`;
+      const on = current !== null && sameTemplate(tpl, current);
+      return (
+        `<div class="cn-tplrow${on ? ' on' : ''}"><button class="cn-tpluse" data-cntpluse="${i}" ${ok ? '' : `disabled title="${t('yard.tpl.unavailable')}"`}>` +
+        `${unitIconHtml(tpl.hull, data, color, 16)}<span class="cn-tpn">${name}</span><span class="cn-tpms">${mods}</span></button>` +
+        `<button class="cn-tpldel btn-x" data-cntpldel="${i}" aria-label="${t('yard.tpl.delete')}" title="${t('yard.tpl.delete')}">✕</button></div>`
+      );
+    })
+    .join('');
+  const saved = current !== null && list.some((tpl) => sameTemplate(tpl, current));
+  const canSave = current !== null && !saved && list.length < MAX_TEMPLATES;
+  return (
+    `<div class="cn-tpl">${rows || `<div class="cn-tplnone">${t('yard.tpl.empty')}</div>`}` +
+    `<button class="cn-tplsave btn-quiet" data-cntplsave ${canSave ? '' : 'disabled'}>＋ ${t(saved ? 'yard.tpl.saved' : 'yard.tpl.save')}</button></div>`
   );
 }
 
@@ -695,8 +816,9 @@ export interface YardHost {
   me(): string;
   /** Your side tint, for the hull silhouettes. */
   youColor(): string;
-  /** Submit a player order through the host's usual path (gate, net, replay). */
-  order(action: Action): void;
+  /** Submit a player order through the host's usual path (gate, net, replay). `false` —
+   *  the order was refused on the spot (solo); the host has already said why. */
+  order(action: Action): boolean | void;
   /** Проба ядра (`canOrder`): кого можно посадить в десантный челнок (SHU-5.2). Без
    *  неё список бойцов — все кандидаты, и отказ, если он будет, скажет ядро. */
   probe?(action: Action): string | null;
@@ -724,6 +846,7 @@ export interface YardHost {
 export function initShipyard(host: YardHost): {
   open: (nextTab?: YardTab) => void;
   refreshHeroes: () => void;
+  refreshQueue: () => void;
   render: () => void;
   close: () => void;
 } {
@@ -736,6 +859,27 @@ export function initShipyard(host: YardHost): {
   let paintedTab: YardTab | null = null;
   /** Последний заказ за эту партию — для «Как в прошлый раз». */
   let last: LastOrder | null = null;
+  /** Открыта ли панель шаблонов. */
+  let tplOpen = false;
+  let templates: BuildTemplate[] = parseTemplates(readRaw(TEMPLATES_KEY), data, TEMPLATE_TABS);
+  const saveTemplates = (): void => writeRaw(TEMPLATES_KEY, JSON.stringify(templates));
+  /** Очередь, нарисованная в полосе: мир и число заказов — по ним видно, что заказ встал. */
+  let queueSig = { planet: '', n: 0 };
+  /** Что сейчас стоит в полосе (своя строка: `innerHTML` браузер сериализует иначе). */
+  let queuePainted = '';
+  const queueCount = (planetId: string): number =>
+    (activeConstruction(host.state(), planetId, 'units') ? 1 : 0) +
+    (host.state().planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit').length;
+  /** Полоса очереди мира черновика; заказ, прибавившийся на том же мире, подсвечен. */
+  function queueHtml(): string {
+    if (tab === 'heroes') return '';
+    const n = draft.planet ? queueCount(draft.planet) : 0;
+    // Подсветка — один раз, на той отрисовке, где заказ впервые виден.
+    const fresh = draft.planet === queueSig.planet && n > queueSig.n;
+    queueSig = { planet: draft.planet, n };
+    queuePainted = yardQueueHtml(host.state(), draft.planet, host.youColor(), fresh);
+    return queuePainted;
+  }
 
   const hullsOf = (): string[] => hullsOfTab(tab);
   /** Бойцы десантного челнока для черновика (SHU-5.2); `undefined` — корпус не десантный. */
@@ -773,7 +917,18 @@ export function initShipyard(host: YardHost): {
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const keep =
       paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
-    host.root().innerHTML = yardBoxHtml(tab, body, order, repeatOrderHtml(last, tab, draft));
+    const tplPane =
+      tplOpen && tab !== 'heroes'
+        ? templatesPaneHtml(host.state(), host.me(), templates, templateOf(tab, draft), host.youColor())
+        : '';
+    host.root().innerHTML = yardBoxHtml(
+      tab,
+      body,
+      order,
+      repeatOrderHtml(last, tab, draft),
+      queueHtml(),
+      tplPane,
+    );
     const scroller = host.root().querySelector('#constructorbody');
     if (scroller && keep) scroller.scrollTop = keep;
     paintedTab = tab;
@@ -863,6 +1018,50 @@ export function initShipyard(host: YardHost): {
       paint();
       return;
     }
+    if (tg.closest('[data-cntpl]')) {
+      tplOpen = !tplOpen;
+      paint();
+      return;
+    }
+    const use = (tg.closest('[data-cntpluse]') as HTMLElement | null)?.dataset.cntpluse;
+    if (use !== undefined) {
+      const tpl = templates[Number(use)];
+      const fit = tpl && fitTemplate(tpl, hullsOfTab(tpl.tab as YardTab), data, host.state().players[host.me()]?.arsenal);
+      if (!fit) {
+        host.note('✖ ' + t('yard.tpl.unavailable'));
+        return;
+      }
+      if (fit.modules.length < tpl!.modules.length) host.note(t('yard.tpl.trimmed'));
+      tab = fit.tab as YardTab;
+      draft = {
+        ...draft,
+        hull: fit.hull,
+        modules: fit.modules,
+        count: fit.count,
+        troop: fit.troop,
+        slot: undefined,
+        unfit: false,
+      };
+      tplOpen = false;
+      paint();
+      return;
+    }
+    const del = (tg.closest('[data-cntpldel]') as HTMLElement | null)?.dataset.cntpldel;
+    if (del !== undefined) {
+      templates = removeTemplate(templates, Number(del));
+      saveTemplates();
+      paint();
+      return;
+    }
+    if (tg.closest('[data-cntplsave]')) {
+      const r = addTemplate(templates, templateOf(tab, draft));
+      if (r.ok) {
+        templates = r.list;
+        saveTemplates();
+      }
+      paint();
+      return;
+    }
     const nextTab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab;
     if (nextTab) {
       tab = nextTab as YardTab;
@@ -927,9 +1126,11 @@ export function initShipyard(host: YardHost): {
     if (tg.closest('[data-cnbuild]')) {
       if (draft.planet) {
         const troop = isLander(data.units[draft.hull]) ? draft.troop : undefined;
-        host.order(
+        const sent = host.order(
           buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, troop),
         );
+        // Отказ ядра хозяин уже назвал; «заказано» рядом с ним читалось бы как успех.
+        if (sent === false) return;
         host.note(t('yard.ordered', { n: String(draft.count), hull: displayUnit(draft.hull) }));
         last = { tab, draft: { ...draft, slot: undefined, unfit: false } };
         paint(); // очередь мира и нехватка в полосе — уже с этим заказом
@@ -978,6 +1179,14 @@ export function initShipyard(host: YardHost): {
         Array.from(host.root().querySelectorAll<HTMLElement>('button')).find((el) =>
           focusAttrs.every(([name, value]) => el.getAttribute(name) === value))?.focus({ preventScroll: true });
       }
+    },
+    refreshQueue: () => {
+      if (tab === 'heroes' || !host.root().classList.contains('show')) return;
+      const el = host.root().querySelector('#cn-queue');
+      if (!el) return;
+      const before = queuePainted;
+      const html = queueHtml();
+      if (html !== before) el.innerHTML = html;
     },
     render: paint,
     close,

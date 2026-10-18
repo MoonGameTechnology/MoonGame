@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { CorpErrorCode, CorpService } from './corpService';
 import type { Identity } from './matchApi';
 import { slidingWindowIpLimiter } from './rateLimit';
+import { closedInput } from '@void/protocol';
 
 /**
  * CORP-0 — the corporation HTTP API. Every route requires a session (`Authorization:
@@ -167,14 +168,14 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     return { accountIds: result.accountIds };
   });
 
-  app.post('/corps', async (request, reply) => {
+  app.post('/corps', { bodyLimit: 2048 }, async (request, reply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
       return { error: 'E_RATE_LIMIT' as const };
     }
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
-    const name = (request.body as { name?: unknown } | null)?.name;
+    const name = closedInput(request.body, ['name']) ? request.body.name : undefined;
     if (typeof name !== 'string') return failed(reply, 'E_BAD_NAME');
     const result = await service.create(who, name);
     if (!result.ok) return failed(reply, result.code);

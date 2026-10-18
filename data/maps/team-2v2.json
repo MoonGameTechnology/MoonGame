@@ -908,7 +908,7 @@
         "x": 409,
         "y": -1879
       },
-      "kind": "debris_field",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "reach_69": {
@@ -925,7 +925,7 @@
         "x": -543,
         "y": -1845
       },
-      "kind": "debris_field",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "reach_71": {
@@ -933,7 +933,7 @@
         "x": -356,
         "y": -2148
       },
-      "kind": "debris_field",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "reach_72": {

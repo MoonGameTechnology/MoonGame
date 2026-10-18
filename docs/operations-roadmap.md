@@ -11,12 +11,24 @@
 Game пока ведёт комнаты одним процессом (durable-Postgres — opt-in по `DATABASE_URL`);
 Corp поддерживает отдельный процесс/БД через `CORPORATIONS_URL`, без подтверждения
 живого cutover. [Роадмап сервисов](service-resilience-roadmap.md) продолжает эти границы
-для Inventory/settlement, Auction и workers. Деплой-артефакты есть
-(`Dockerfile`, `render.yaml`, `deploy/docker-compose.yml`) и базовая наблюдаемость тоже
-(структурные pino-логи, минимальный `/metrics`). Горизонтального масштаба, игровой
-телеметрии и модерации нет; OTel/Prometheus/Grafana/Sentry — нет.
+для единого Meta/Economy (включая Auction), отдельного Commerce и workers. Деплой-артефакты есть
+(`Dockerfile`, `deploy/docker-compose.yml`) и базовая наблюдаемость тоже
+(структурные pino-логи, операторский JSON `/metrics`, `/metrics/summary`,
+суточные игровые/клиентские JSONL и CLI-отчёты `metrics`/`analytics`).
+Горизонтального масштаба, централизованного хранилища телеметрии и полноценного
+служебного контура нет; экономические события v0 пишутся после commit.
+Opt-in bootstrap Prometheus/Grafana/Loki/Alloy реализован в OBS-0.2
+([runbook](../deploy/observability/README.md)); Game/host/DB wiring и VPS-приёмка
+ещё не выполнены. OTel/Sentry не подключены.
 SBOM/сканеры есть (SEC-0). Контент — `data/*.json` + manifest (валидируется), но без пайплайна
 публикации/версий без даунтайма.
+
+**План первого операторского сайта (2026-10-16):**
+[пульт плейтестов — Grafana/Prometheus/Loki/Alloy](playtest-observability-roadmap.md).
+Там зафиксированы реальные источники, read-only границы, бюджеты VPS 6 GB,
+retention, алерты, последовательность PR и приёмка. Это уточнение OPS-0.* и
+SE-8.3, не отметка их реализации; полный OTel/SIEM не требуется для первого
+ограниченного технического дашборда.
 
 ## Зависимости
 

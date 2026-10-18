@@ -27,6 +27,11 @@ export const APP_TABLES = [
   'meta_wallets',
   'meta_market_listings',
   'meta_market_ledger',
+  'meta_economy_accounts',
+  'meta_economy_receipts',
+  'meta_material_listings',
+  'meta_market_receipts',
+  'meta_entitlement_nonces',
   'drop_claims',
   'drop_meta',
   'commander_xp',
@@ -87,6 +92,9 @@ async function migrateLocked(pool: Pool): Promise<void> {
 /** Legacy dev boots still migrate. The hardened process NEVER receives migration creds. */
 export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv): Promise<void> {
   try {
+    if ((env.PROD === '1' || env.PROD === 'true') &&
+        (env.DB_AUTO_MIGRATE !== '0' || env.DB_REQUIRE_LEAST_PRIVILEGE !== '1'))
+      throw new Error('E_DB_RUNTIME_ROLE');
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1' && env.DB_AUTO_MIGRATE !== '0')
       throw new Error('E_DB_RUNTIME_ROLE');
     if (env.DB_AUTO_MIGRATE !== '0') await migrateLocked(pool);

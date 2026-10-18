@@ -10,6 +10,7 @@ import type {
 import { Rejection } from '../action/types';
 import { Rng } from '../rng/rng';
 import { deepClone } from '../util/clone';
+import { DRAFT_RECORDS, HOLE } from '../util/draft';
 import type {
   ActionHandler,
   EventHandler,
@@ -47,6 +48,24 @@ const MAX_ADVANCE_STEPS = 100_000;
  *  time, so modules can accrue rate-based quantities (resources) by formula. */
 const TIME_ADVANCED = 'time.advanced';
 
+/**
+ * Где остановить мир внутри отрезка. Перед каждым отрезком `time.advanced` ядро спрашивает
+ * конвейер хука `time.stop` (база `Infinity`, аргументы `{ from, to }`): подписчик, которому
+ * нужен шаг мира раньше `to`, возвращает меньший миг — свой, если он раньше пришедшего. Миг
+ * в `(from, to]` режет отрезок там, и на этот миг идёт шаг с событием `time.stopped { at }`:
+ * после событий очереди, назначенных на тот же миг, как шёл бы поиск, поставленный в очередь
+ * заранее. Подписчик не пишет в состояние: он только читает мир на начало отрезка.
+ *
+ * Зачем. Шаг мира — это отрезок времени для всех модулей: экономика, туман, счёт. Событие в
+ * очереди режет время, даже если ничего не меняет. Ракетная мина, рядом с которой стоит
+ * чужой флот, раньше ставила поиск в очередь каждую игровую минуту, и на FFA-20 к 22-му дню
+ * такие пустые поиски давали семь шагов мира из десяти. Внутри отрезка мир меняется только
+ * со временем (позиции идут по своим записям), поэтому миг, когда поиск что-то найдёт, можно
+ * узнать заранее и остановить мир ровно там, а не каждую минуту.
+ */
+const TIME_STOP = 'time.stop';
+const TIME_STOPPED = 'time.stopped';
+
 /** Earliest scheduled event with `at <= now`. The `scheduled` array is kept
  *  sorted by `(at, seq)`, so this is O(1) — just check the head. */
 function earliestDue(scheduled: readonly ScheduledEvent[], now: number): ScheduledEvent | null {
@@ -68,6 +87,189 @@ function scheduledInsertPos(arr: readonly ScheduledEvent[], at: number, seq: num
     }
   }
   return lo;
+}
+
+/**
+ * Черновик шага приказа. Ключ верхнего уровня копируется при первом обращении к нему, а не
+ * весь мир заранее. Приказ обычно читает флоты, миры и очередь событий, а туман, герои и
+ * досье не трогает, хотя копия всего мира на FFA-20 к 22-му дню стоит ~3 мс. Отказ и
+ * вопрос «можно ли?» (`canApply`) этим и обходятся: их черновик выбрасывают. Ключ, к
+ * которому обратились, это та же глубокая копия, что при копии целиком, поэтому шаг видит
+ * тот же мир, а состояние вызывающего не меняется (инвариант №2).
+ *
+ * Записи сущностей по id (`ENTITY_RECORDS`) копируются так же, но по одной сущности:
+ * заказ стройки читает свой мир, а не все 320 миров карты. Записи простых значений
+ * (`VALUE_RECORDS`) читаются без копии и копируются целиком при первой записи.
+ */
+function lazyDraft(state: GameState): GameState {
+  const base = state as unknown as Record<string, unknown>;
+  const draft: Record<string, unknown> = {};
+  for (const key of Object.keys(base)) {
+    const value = base[key];
+    lazyProp(draft, key, () =>
+      !isRecord(value)
+        ? deepClone(value)
+        : ENTITY_RECORDS.has(key)
+          ? lazyRecord(value)
+          : VALUE_RECORDS.has(key)
+            ? valueRecord(value)
+            : deepClone(value),
+    );
+  }
+  DRAFT_BASE.set(draft, base);
+  return draft as unknown as GameState;
+}
+
+/**
+ * Записи мира, которые черновик приказа копирует по одной сущности. Копия всех миров на
+ * FFA-20 к 22-му дню стоит 2,3 мс, тумана 1,1 мс, флотов 0,3 мс, и проверка одного заказа
+ * стройки платила её, чтобы прочитать один мир. Перечень явный: остальные ключи мелкие, и
+ * копия целиком дешевле обёртки.
+ */
+const ENTITY_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
+  'players',
+  'planets',
+  'fleets',
+  'battles',
+  'fog',
+  'heroes',
+]);
+
+/**
+ * Записи, где под ключом лежит простое значение (строка стойки, `true` договора, id
+ * столицы), а не объект. Стойки на FFA-50 — 2278 пар, и любой приказ, спросивший
+ * «враг ли он?», копировал их все: ~8 мс кадра на ×10. Читать такую запись можно прямо из
+ * входа: изменить значение в ней можно только записью в саму запись, а её ловит `Proxy`.
+ */
+const VALUE_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
+  'diplomacy',
+  'diplomacyOffers',
+  'mapShares',
+  'mapShareOffers',
+  'capital',
+]);
+
+/** Запись простых значений → то, что она сейчас есть: вход или её копия после записи. */
+const VALUES = new WeakMap<object, () => Record<string, unknown>>();
+/** Ленивый черновик → состояние вызывающего. */
+const DRAFT_BASE = new WeakMap<object, Record<string, unknown>>();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Запись с теми же ключами в том же порядке, где сущность копируется при первом чтении.
+ * Места заполнены `HOLE`, а `Proxy` подменяет его копией: ключи, `in`, запись и удаление
+ * идут в сами места, поэтому порядок ключей тот же, что у копии целиком. Геттер на каждую
+ * сущность обходился вчетверо дороже: замыкания на все 320 миров.
+ */
+function lazyRecord(base: Record<string, unknown>): Record<string, unknown> {
+  const slots: Record<string, unknown> = {};
+  for (const id of Object.keys(base)) slots[id] = HOLE;
+  const record = new Proxy(slots, {
+    get(target, id) {
+      const value: unknown = Reflect.get(target, id);
+      if (value !== HOLE) return value;
+      const copy = deepClone(base[id as string]);
+      target[id as string] = copy;
+      return copy;
+    },
+  });
+  DRAFT_RECORDS.set(record, { slots, base });
+  return record;
+}
+
+/**
+ * Запись простых значений ({@link VALUE_RECORDS}): чтение, ключи и `in` идут во вход, первая
+ * запись или удаление снимает копию и дальше всё идёт в неё. Цель `Proxy` — пустой свой
+ * объект, а не вход: вход бывает заморожен, и `Proxy` над ним не смел бы отдать значение
+ * копии. Свойства поэтому отдаются настраиваемыми.
+ */
+function valueRecord(base: Record<string, unknown>): Record<string, unknown> {
+  let own: Record<string, unknown> | null = null;
+  const read = (): Record<string, unknown> => own ?? base;
+  const write = (): Record<string, unknown> => (own ??= deepClone(base));
+  const record = new Proxy<Record<string, unknown>>(
+    {},
+    {
+      get: (_target, key) => Reflect.get(read(), key),
+      has: (_target, key) => Reflect.has(read(), key),
+      ownKeys: () => Reflect.ownKeys(read()),
+      getOwnPropertyDescriptor: (_target, key) => {
+        const prop = Reflect.getOwnPropertyDescriptor(read(), key);
+        if (prop) prop.configurable = true;
+        return prop;
+      },
+      set: (_target, key, value) => Reflect.set(write(), key, value),
+      deleteProperty: (_target, key) => Reflect.deleteProperty(write(), key),
+      defineProperty: (_target, key, prop) => Reflect.defineProperty(write(), key, prop),
+    },
+  );
+  VALUES.set(record, read);
+  return record;
+}
+
+/** Свойство `key`, которое при первом чтении становится значением `make()`, а при записи до
+ *  чтения становится записанным. Место свойства в порядке ключей не меняется. */
+function lazyProp(target: Record<string, unknown>, key: string, make: () => unknown): void {
+  const settle = (value: unknown): unknown => {
+    Object.defineProperty(target, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    return value;
+  };
+  Object.defineProperty(target, key, {
+    enumerable: true,
+    configurable: true,
+    get: () => settle(make()),
+    set: settle,
+  });
+}
+
+/**
+ * Принятый приказ: черновик становится обычным объектом. Ключи и сущности, которых шаг не
+ * коснулся, переходят в новое состояние как есть, общими с состоянием вызывающего. Это
+ * безопасно, потому что ядро во вход не пишет (инвариант №2): следующий шаг снова копирует
+ * то, к чему обратится. Копия нетронутого стоила принятому приказу копии всего мира, на
+ * FFA-20 к 22-му дню ~3 мс за приказ. Так же делит сущности `applyDelta` у сетевого клиента.
+ */
+function settledDraft(draft: GameState): GameState {
+  const target = draft as unknown as Record<string, unknown>;
+  const base = DRAFT_BASE.get(target)!;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(target)) {
+    const prop = Object.getOwnPropertyDescriptor(target, key)!;
+    if (prop.get) {
+      out[key] = base[key]; // шаг его не тронул
+      continue;
+    }
+    const record = isRecord(prop.value) ? DRAFT_RECORDS.get(prop.value) : undefined;
+    const values = isRecord(prop.value) ? VALUES.get(prop.value) : undefined;
+    out[key] = record ? settledRecord(record.slots, record.base) : values ? values() : prop.value;
+  }
+  return out as unknown as GameState;
+}
+
+function settledRecord(
+  slots: Record<string, unknown>,
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const id of Object.keys(slots)) {
+    const value = slots[id];
+    out[id] = value === HOLE ? base[id] : value;
+  }
+  return out;
+}
+
+/** Следующий приказ связки (`canApplyAll`) идёт по черновику предыдущего: тот уже копия,
+ *  и его выбросят. */
+function ownDraft(state: GameState): GameState {
+  return state;
 }
 
 /**
@@ -127,11 +329,26 @@ export class Kernel {
    * context) always yields the same result. The input state is never mutated;
    * all work happens on a clone, committed only on success.
    *
+   * The result shares every entity the order did not touch with the input (see
+   * {@link settledDraft}), so neither of them may be edited in place afterwards.
+   *
    * In the real-time flow the server first calls `advanceTo(state, now)` to
    * bring the world to the present, then `applyAction` to apply the player's
    * intent at that instant.
    */
   applyAction(state: GameState, action: Action, ctx: Context): ApplyResult {
+    const out = this.apply(state, action, ctx, lazyDraft);
+    return out.ok ? { ok: true, state: settledDraft(out.state), events: out.events } : out;
+  }
+
+  /** The order's step on a draft made by `draft` from `state` (see {@link lazyDraft}).
+   *  A success hands back that draft as is. */
+  private apply(
+    state: GameState,
+    action: Action,
+    ctx: Context,
+    draft: (state: GameState) => GameState,
+  ): ApplyResult {
     const handler = this.actionHandlers.get(action.type);
     if (!handler) {
       // Fail-secure: an unknown action type is rejected, never silently ignored.
@@ -158,7 +375,7 @@ export class Kernel {
       return { ok: false, code: 'E_TIME_GAP' };
     }
 
-    const outcome = this.runStep(state, ctx, ctx.now, (h) => handler(action, h));
+    const outcome = this.runOn(draft(state), ctx, ctx.now, (h) => handler(action, h), false);
     if (!outcome.ok) {
       return { ok: false, code: outcome.code };
     }
@@ -188,7 +405,7 @@ export class Kernel {
    *    поэтому спрашивать можно сколько угодно и в любом порядке.
    */
   canApply(state: GameState, action: Action, ctx: Context): string | null {
-    const out = this.applyAction(state, action, ctx);
+    const out = this.apply(state, action, ctx, lazyDraft);
     return out.ok ? null : out.code;
   }
 
@@ -212,7 +429,7 @@ export class Kernel {
   canApplyAll(state: GameState, actions: readonly Action[], ctx: Context): string | null {
     let draft = state;
     for (const action of actions) {
-      const out = this.applyAction(draft, action, ctx);
+      const out = this.apply(draft, action, ctx, draft === state ? lazyDraft : ownDraft);
       if (!out.ok) return out.code;
       draft = out.state;
     }
@@ -265,12 +482,84 @@ export class Kernel {
    *
    * A scheduled event whose handler throws is dropped into `failures` (dead-
    * lettered) and the timeline keeps moving — the world never gets stuck.
+   *
+   * Сначала ход идёт одной копией мира (`advanceInPlace`): шаги правят её на месте, а
+   * не копируют всё состояние каждый раз. Шаг отказал — копия выброшена, и тот же ход
+   * идёт заново по шагу на копию (`advanceStepwise`), где отказ шага откатывается сам.
    */
   advanceTo(state: GameState, ctx: Context): AdvanceResult {
     if (ctx.now < state.time) {
       return { ok: false, code: 'E_TIME_BACKWARDS' };
     }
+    return this.advanceInPlace(state, ctx) ?? this.advanceStepwise(state, ctx);
+  }
 
+  /**
+   * Тот же ход, что у `advanceStepwise`, но на ОДНОЙ копии мира на весь вызов. Копия
+   * всего состояния на каждый шаг была главной ценой шага: на FFA-20 к 22-му дню
+   * состояние весит ~0,8 МБ, а шагов за кадр — десятки. Состояние вызывающего не
+   * трогается (копия снимается один раз в начале, инвариант №2).
+   *
+   * Шаг здесь не откатить: прежнего мира уже нет. Поэтому первый же отказ шага
+   * (`h.reject`, исключение, переполнение событий) возвращает `null`, и вызывающий
+   * повторяет ход по шагу на копию — с тем же итогом, что был всегда, и с тем же
+   * списком `failures`. В живых партиях шаги не отказывают, и повтор не случается.
+   *
+   * Чем шаг на месте мог бы разойтись с шагом на копии: копия шага разрывала общие
+   * ссылки. Полезная нагрузка события, отданная наружу или в таймер, — тоже объект
+   * обработчика, поэтому в конце шага нагрузки событий шага и его таймеров снимаются
+   * копией, как их видел бы шаг на копии.
+   */
+  private advanceInPlace(state: GameState, ctx: Context): AdvanceResult | null {
+    const draft = deepClone(state);
+    if (draft.scheduled.length > 1) {
+      draft.scheduled.sort((a, b) => a.at - b.at || a.seq - b.seq);
+    }
+    const events: DomainEvent[] = [];
+    // Остановка, чей шаг ещё впереди: он идёт после событий, назначенных на тот же миг.
+    let halt: number | null = null;
+    let guard = 0;
+    for (;;) {
+      if (++guard > MAX_ADVANCE_STEPS) {
+        return { ok: true, state: draft, events, failures: [], partial: true };
+      }
+      const next = earliestDue(draft.scheduled, ctx.now);
+      if (next && next.at <= draft.time) {
+        draft.scheduled.shift();
+        const stepTime = Math.max(next.at, draft.time);
+        const step = this.runOn(draft, ctx, stepTime, (h) => h.emit(next.type, next.payload), true);
+        if (!step.ok) return null;
+        events.push(...step.events);
+        continue;
+      }
+      if (halt !== null) {
+        const at = halt;
+        halt = null;
+        const step = this.runOn(draft, ctx, at, (h) => h.emit(TIME_STOPPED, { at }), true);
+        if (!step.ok) return null;
+        events.push(...step.events);
+        continue;
+      }
+      const end = next ? next.at : ctx.now;
+      if (!(end > draft.time)) break;
+      const from = draft.time;
+      const stop = this.stopWithin(draft, ctx, from, end);
+      if (stop === undefined) return null;
+      const to = stop ?? end;
+      const span = this.runOn(draft, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }), true);
+      if (!span.ok) return null;
+      events.push(...span.events);
+      halt = stop;
+      // Последний отрезок до `now` завершает ход, как и раньше: то, что его шаги поставили в
+      // очередь на этот же миг, ждёт следующего хода. Отрезок с остановкой — не последний.
+      if (!next && halt === null && draft.time >= ctx.now) break;
+    }
+    return { ok: true, state: draft, events, failures: [] };
+  }
+
+  /** The original advance: every step on its own clone, so a failing step is rolled
+   *  back and dead-lettered. Runs when {@link advanceInPlace} meets a failing step. */
+  private advanceStepwise(state: GameState, ctx: Context): AdvanceResult {
     // Normalize: ensure the scheduled array is (at, seq)-sorted so that
     // earliestDue is O(1).  After this initial sort the kernel's sorted
     // insert (binary-search splice) keeps the invariant for all new events.
@@ -283,6 +572,8 @@ export class Kernel {
         : state;
     const events: DomainEvent[] = [];
     const failures: AdvanceFailure[] = [];
+    // Остановка, чей шаг ещё впереди: он идёт после событий, назначенных на тот же миг.
+    let halt: number | null = null;
     let guard = 0;
 
     for (;;) {
@@ -298,6 +589,11 @@ export class Kernel {
       }
 
       const next = earliestDue(committed.scheduled, ctx.now);
+      if (halt !== null && !(next && next.at <= committed.time)) {
+        committed = this.stopStep(committed, ctx, halt, events, failures);
+        halt = null;
+        continue;
+      }
       if (next) {
         // Accrue continuous time up to the event FIRST, then loop to re-read the
         // head. `accrue` emits `time.advanced`, whose handlers may legitimately
@@ -306,7 +602,7 @@ export class Kernel {
         // dispatch a stale one (events out of (at, seq) order). Once accrued, the
         // head is due at the current instant and handled by the branch below.
         if (next.at > committed.time) {
-          committed = this.accrue(committed, ctx, next.at, events, failures);
+          [committed, halt] = this.accrue(committed, ctx, next.at, events, failures);
           continue;
         }
         // Head is due now (at === committed.time): remove it (index 0 in sorted
@@ -331,9 +627,11 @@ export class Kernel {
         continue;
       }
 
-      // No more due events — accrue the final span up to the target time.
+      // No more due events — accrue the final span up to the target time. A `time.stop`
+      // inside it ends the span early, and the loop goes on from there.
       if (ctx.now > committed.time) {
-        committed = this.accrue(committed, ctx, ctx.now, events, failures);
+        [committed, halt] = this.accrue(committed, ctx, ctx.now, events, failures);
+        if (halt !== null) continue;
       }
       break;
     }
@@ -341,22 +639,86 @@ export class Kernel {
     return { ok: true, state: committed, events, failures };
   }
 
-  /** Emits a `time.advanced` span [committed.time, to] as one atomic step. */
+  /** Emits a `time.advanced` span [committed.time, end] as one atomic step — or a shorter
+   *  one up to a `time.stop`, whose instant comes back second: its `time.stopped` step runs
+   *  once the events due on that instant have fired ({@link stopStep}). */
   private accrue(
     committed: GameState,
     ctx: Context,
-    to: number,
+    end: number,
     events: DomainEvent[],
     failures: AdvanceFailure[],
-  ): GameState {
+  ): [GameState, number | null] {
     const from = committed.time;
+    const stop = this.stopWithin(committed, ctx, from, end);
+    if (stop === undefined) failures.push({ at: from, type: TIME_STOP, code: 'E_INTERNAL' });
+    const to = stop ?? end;
     const seg = this.runStep(committed, ctx, to, (h) => h.emit(TIME_ADVANCED, { from, to }));
     if (seg.ok) {
       events.push(...seg.events);
-      return seg.state;
+      return [seg.state, stop ?? null];
     }
     failures.push({ at: to, type: TIME_ADVANCED, code: seg.code });
-    return { ...committed, time: to };
+    return [{ ...committed, time: to }, stop ?? null];
+  }
+
+  /** The `time.stopped` step of a stop at `at` ({@link TIME_STOP}). */
+  private stopStep(
+    committed: GameState,
+    ctx: Context,
+    at: number,
+    events: DomainEvent[],
+    failures: AdvanceFailure[],
+  ): GameState {
+    const step = this.runStep(committed, ctx, at, (h) => h.emit(TIME_STOPPED, { at }));
+    if (step.ok) {
+      events.push(...step.events);
+      return step.state;
+    }
+    failures.push({ at, type: TIME_STOPPED, code: step.code });
+    return committed;
+  }
+
+  /**
+   * Миг внутри отрезка `(from, end]`, где мир надо остановить ({@link TIME_STOP}), или `null`,
+   * если нигде. `undefined` — подписчик хука упал: ход на месте отдаёт работу пошаговому, а
+   * тот записывает отказ и идёт без остановки (мир не застревает, инвариант №4).
+   *
+   * Подписчик видит мир на начало отрезка, а писать ему нечем: `emit`, `schedule`, `reject`
+   * и кости здесь отказывают.
+   */
+  private stopWithin(
+    state: GameState,
+    ctx: Context,
+    from: number,
+    end: number,
+  ): number | null | undefined {
+    const entries = this.hooks.get(TIME_STOP);
+    if (!entries) return null;
+    const refuse = (): never => {
+      throw new Rejection('E_READ_ONLY');
+    };
+    const h: HandlerContext = {
+      state,
+      ctx: ctx.now === from ? ctx : { ...ctx, now: from },
+      rng: new AbsentRng(),
+      emit: refuse,
+      schedule: refuse,
+      reject: refuse,
+      hook: <T>(name: string, baseValue: T, args?: unknown): T => {
+        let value: unknown = baseValue;
+        for (const entry of this.hooks.get(name) ?? []) value = entry.fn(value, args ?? null, h);
+        return value as T;
+      },
+      capability: <T>(name: string): T | undefined => this.capabilities.get(name) as T | undefined,
+    };
+    let at: unknown = Infinity;
+    try {
+      for (const entry of entries) at = entry.fn(at, { from, to: end }, h);
+    } catch {
+      return undefined;
+    }
+    return typeof at === 'number' && at > from && at <= end ? at : null;
   }
 
   /**
@@ -372,7 +734,23 @@ export class Kernel {
     stepTime: number,
     run: (h: HandlerContext) => void,
   ): StepResult {
-    const draft = deepClone(base);
+    return this.runOn(deepClone(base), ctx, stepTime, run, false);
+  }
+
+  /**
+   * The step itself, on `draft` IN PLACE. {@link runStep} hands it a fresh clone;
+   * {@link advanceInPlace} hands it the one copy of the whole advance and sets
+   * `snapshot`: the step's event payloads and its new timers' payloads are then
+   * replaced by copies at the end, so later steps cannot reach them through a
+   * reference the handler kept — as with a clone per step.
+   */
+  private runOn(
+    draft: GameState,
+    ctx: Context,
+    stepTime: number,
+    run: (h: HandlerContext) => void,
+    snapshot: boolean,
+  ): StepResult {
     // Кости шага. Их может НЕ БЫТЬ, и это законное состояние, а не порча: `visibleState`
     // ВЫРЕЗАЕТ поток RNG из проекции под туманом (клиент с ним прокрутил бы будущие бои
     // вперёд сервера), а сетевой клиент этот же кернел зовёт — через `canApply`, чтобы
@@ -382,6 +760,7 @@ export class Kernel {
     // насмерть (карта замирала на первом же выделении флота), у сервера обрушило бы шаг.
     const rng = draft.rng === undefined ? new AbsentRng() : new Rng(draft.rng);
     const emitted: DomainEvent[] = [];
+    const timers: ScheduledEvent[] = [];
     let processed = 0;
 
     // Handlers see the time of THIS step (the event/segment instant), not the
@@ -412,6 +791,7 @@ export class Kernel {
         // Sorted insert keeps the array in (at, seq) order so earliestDue is O(1).
         const pos = scheduledInsertPos(draft.scheduled, safeAt, seq);
         draft.scheduled.splice(pos, 0, event);
+        if (snapshot) timers.push(event);
       },
       hook: <T>(name: string, baseValue: T, args?: unknown): T => {
         const entries = this.hooks.get(name);
@@ -464,6 +844,14 @@ export class Kernel {
     // которого сервер ей не давал).
     if (draft.rng !== undefined) draft.rng = rng.getState();
     draft.time = stepTime;
+    if (snapshot) {
+      for (const timer of timers) timer.payload = deepClone(timer.payload);
+      return {
+        ok: true,
+        state: draft,
+        events: emitted.map((e) => ({ type: e.type, payload: deepClone(e.payload) })),
+      };
+    }
     return { ok: true, state: draft, events: emitted };
   }
 }

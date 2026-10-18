@@ -40,6 +40,7 @@ import {
   SWARM_MEMORY_WINDOW,
   isMineFleet,
   isOrdnanceFleet,
+  isReconFleet,
   isRocketMineFleet,
   mineFleetVisible,
   rocketMinelayer,
@@ -469,6 +470,15 @@ function hasFacilityFor(p: Planet, unit: string): boolean {
   return p.buildings.some((b) => b.hp > 0 && data.buildings[b.type]?.[flag] === true);
 }
 
+/** Может ли место ставить модуль: снимок арсенала (ARS-3) его перечисляет или снимка нет
+ *  вовсе. Свободное место бот ведёт с полным каталогом, но Хранитель и заместитель на
+ *  месте игрока играют его арсеналом — без этой пробы они заказывали бы чужой модуль
+ *  каждый тик и получали `E_NOT_OWNED`. */
+function ownsModule(state: GameState, ai: string, id: string): boolean {
+  const arsenal = state.players[ai]?.arsenal;
+  return !arsenal || arsenal.modules.includes(id);
+}
+
 /** Сколько НАЗЕМНЫХ юнитов стоит в гарнизоне мира (корабли в гарнизоне не в счёт). */
 function groundCount(p: Planet): number {
   return p.garrison.reduce((n, s) => n + (data.units[s.unit]?.domain === 'ground' ? s.count : 0), 0);
@@ -764,6 +774,12 @@ function baseAiOrders(
     Object.values(state.planets).find((p) => p.owner === ai);
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
+  // Флот из одних разведчиков без десанта ничего не берёт: пустой мир ядро ему не отдаёт
+  // ни прилётом, ни с орбиты (`E_RECON_NO_CAPTURE`, решение владельца 2026-10-16), а
+  // гарнизонный и подавно. Без этой проверки бот слал такой флот к ближайшей пустой
+  // провинции и повторял отбиваемый штурм каждые два часа: 117 отказов за дуэль.
+  const reconBare = (f: Fleet): boolean =>
+    isReconFleet(f, data) && !(f.landing ?? []).some((st) => st.count > 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
   // Ничьи планеты держит ополчение (`NEUTRAL_PLANET_MILITIA`), и брать их надо десантом
   // даже в мирное время. Пока такая планета есть, флот грузится дома и без войны.
@@ -772,11 +788,14 @@ function baseAiOrders(
   );
   // Отстаю ли я по очкам провинций от кого-то из живых соперников (охота отстающего,
   // см. `huntWeight`). Тот же счёт ниже решает объявление войны.
-  const provinceTotal = (who: string): number =>
-    Object.values(state.planets).reduce(
-      (s, p) => (p.owner === who ? s + provinceScore(data, p) : s),
-      0,
-    );
+  // Счёт всех владельцев одним проходом по карте, в том же порядке сложения: прежде карту
+  // обходили заново на каждого соперника, и на FFA-50 это было ~6 мс кадра на ×10.
+  const provinceTotals = new Map<string, number>();
+  for (const p of Object.values(state.planets)) {
+    if (p.owner !== null)
+      provinceTotals.set(p.owner, (provinceTotals.get(p.owner) ?? 0) + provinceScore(data, p));
+  }
+  const provinceTotal = (who: string): number => provinceTotals.get(who) ?? 0;
   const myProvinces = provinceTotal(ai);
   const trailing = Object.keys(state.players).some(
     (pid) =>
@@ -1049,6 +1068,7 @@ function baseAiOrders(
         here0.owner !== ai &&
         capturable(here0) &&
         canTraverse(state, ai, here0.owner) &&
+        !reconBare(f) &&
         (!here0.garrison.some((st) => st.count > 0) ||
           // ПРАВИЛО ВЛАДЕЛЬЦА №2 (2026-09-16): штурмовать, только будучи УВЕРЕННЫМ, что
           // наземные силы возьмут гарнизон. Раньше хватало любого бойца в трюме — и
@@ -1117,6 +1137,10 @@ function baseAiOrders(
     }
     const here = state.planets[f.location];
     if (!here) continue;
+    // Разведчикам без десанта брать нечего, а трюма у них нет (решение владельца
+    // 2026-10-17), так что и дома взять бойца не во что: флот стоит, где стоит, —
+    // радарным пикетом, а не в очереди отбиваемых штурмов.
+    if (reconBare(f)) continue;
     let best: Planet | null = null;
     let bestD = Infinity;
     let second: Planet | null = null;
@@ -1798,6 +1822,7 @@ function baseAiOrders(
       if (
         warFooting &&
         data.modules[SIEGE_MODULE] &&
+        ownsModule(state, ai, SIEGE_MODULE) &&
         shipsOwned(lineUnit, SIEGE_MODULE) < (army.siegeCap ?? SIEGE_CAP) &&
         !pendingSiege(base.id) &&
         Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...siegeCost }).every(
@@ -2343,7 +2368,7 @@ function baseAiOrders(
       const fits = Object.keys(data.modules)
         .filter((id) => {
           const md = data.modules[id];
-          if (!md || installed.includes(id)) return false;
+          if (!md || installed.includes(id) || !ownsModule(state, ai, id)) return false;
           if (!moduleAllowed(hull, hullDef, md)) return false;
           return used[md.slot] < hullDef.slots[md.slot] + (bonus?.[md.slot] ?? 0);
         })

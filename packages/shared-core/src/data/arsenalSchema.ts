@@ -36,6 +36,9 @@ export const ArsenalOriginSchema = z.enum([
   'auction',
   'lootbox',
   'rent',
+  'commerce',
+  'ad',
+  'season',
 ]);
 
 /** Upgrade grades (EC-2.1: заточка +1/+2/+3). */

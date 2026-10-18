@@ -170,6 +170,7 @@ async function boot(opts: { pc?: boolean } = {}) {
     tour: () => null,
     intro: () => {},
     steward: () => null,
+    forward: () => {},
   });
   const inter = await import('./interaction');
   /** Выбрать свои флоты, как рамка или тап. */
@@ -344,6 +345,7 @@ describe('REFM-236 — слушатели холста', () => {
       'dblclick',
       'pointermove',
       'pointerleave',
+      'contextmenu',
     ]);
     expect(listeners.find((l) => l.type === 'wheel')!.options).toEqual({ passive: false });
   });
@@ -441,6 +443,48 @@ describe('REFM-236 — тап по карте (`selectAt`)', () => {
     expect(orders()).toEqual([bare(game.moveFleet('p1', fleet.id, next.id))]);
     expect(inter.aiming).toBe(false);
     expect(env.panel).toBe(1);
+  });
+
+  /** Правый клик мышью в точке холста (UIX-9.2). */
+  const rmb = (p: { x: number; y: number }, kind: 'mouse' | 'touch' = 'mouse') => ({
+    button: 2,
+    pointerType: kind,
+    clientX: p.x,
+    clientY: p.y,
+  });
+
+  it('ПКМ на ПК с выбранным флотом — «Курс сюда» без взвода прицела (UIX-9.2)', async () => {
+    const { fire, env, game, fleet, next, at, select } = await boot({ pc: true });
+    select(fleet.id);
+    const ev = rmb(at(next));
+    fire('contextmenu', ev);
+    expect(orders()).toEqual([bare(game.moveFleet('p1', fleet.id, next.id))]);
+    expect(env.panel).toBe(1);
+  });
+
+  it('ПКМ ничего не выбирает: ни нажатие, ни клик без выбранных флотов', async () => {
+    const { fire, env, fleet, anchor, ptr } = await boot({ pc: true });
+    const a = anchor(fleet.id);
+    fire('pointerdown', { ...ptr(1, a), button: 2 });
+    fire('pointerup', { ...ptr(1, a), button: 2 });
+    fire('contextmenu', rmb(a));
+    expect([env.selected.length, env.cleared, orders().length]).toEqual([0, 0, 0]);
+  });
+
+  it('взведённый прицел правой кнопкой не стреляет', async () => {
+    const { fire, inter, fleet, next, at, select } = await boot({ pc: true });
+    select(fleet.id);
+    inter.arm('merging', true);
+    fire('contextmenu', rmb(at(next)));
+    expect(orders()).toEqual([]);
+  });
+
+  it('на раскладке телефона и пальцем правый клик флот не посылает', async () => {
+    const { fire, fleet, next, at, select } = await boot();
+    select(fleet.id);
+    fire('contextmenu', rmb(at(next)));
+    fire('contextmenu', rmb(at(next), 'touch'));
+    expect(orders()).toEqual([]);
   });
 
   it('на телефоне «Курс» ставит цель черновика и ничего не отправляет', async () => {

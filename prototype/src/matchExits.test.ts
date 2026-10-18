@@ -63,40 +63,34 @@ describe('speedbarShown', () => {
     expect(speedbarShown(false, true, false)).toBe(true);
   });
 
-  it('follows the dev toggle on a PC', () => {
+  // На ПК полоса видна, пока ей есть что нести: управление временем или перезапуск.
+  it('shows the bar on a PC only when it carries something', () => {
     expect(speedbarShown(true, true, false)).toBe(true);
-    expect(speedbarShown(true, false, false)).toBe(false);
-  });
-
-  // Правило 6: в забеге полоса несёт его темп — ПК-игрок без дев-выключателя тоже её видит.
-  it('shows the bar in a Sector Zero run on a PC without the dev toggle', () => {
     expect(speedbarShown(true, false, true)).toBe(true);
-    expect(speedbarShown(false, false, true)).toBe(true);
+    expect(speedbarShown(true, false, false)).toBe(false);
   });
 });
 
 describe('timeControlsShown', () => {
-  it('follows the dev toggle on a PC regardless of mode', () => {
-    expect(timeControlsShown(true, true, false, true, false)).toBe(true);
-    expect(timeControlsShown(true, false, false, false, false)).toBe(false);
-    expect(timeControlsShown(true, false, true, true, false)).toBe(false);
+  it('follows the dev toggle on a PC in solo', () => {
+    expect(timeControlsShown(true, true, false, false)).toBe(true);
+    expect(timeControlsShown(true, false, false, false)).toBe(false);
   });
 
-  // Правило 5: в сети временем распоряжается сервер — игроцкой сборке ускорять нечего.
-  it('hides the controls on a phone only in a net player build', () => {
-    expect(timeControlsShown(false, false, true, true, false)).toBe(false);
+  // Правило 5: в сети временем распоряжается сервер — ни на ПК, ни на телефоне.
+  it('hides the controls in a network match everywhere, dev toggle included', () => {
+    expect(timeControlsShown(true, true, true, false)).toBe(false);
+    expect(timeControlsShown(false, false, true, false)).toBe(false);
   });
 
-  it('keeps the controls on a phone in solo, and in any non-player build', () => {
-    expect(timeControlsShown(false, false, false, true, false)).toBe(true);
-    expect(timeControlsShown(false, false, true, false, false)).toBe(true);
-    expect(timeControlsShown(false, false, false, false, false)).toBe(true);
+  it('keeps the controls on a phone in solo', () => {
+    expect(timeControlsShown(false, false, false, false)).toBe(true);
   });
 
   // Правило 6: ускорение забега — часть продукта, а не дев-инструмент.
-  it('shows the run tempo in a Sector Zero run, PC player build included', () => {
-    expect(timeControlsShown(true, false, false, true, true)).toBe(true);
-    expect(timeControlsShown(false, false, false, true, true)).toBe(true);
+  it('shows the run tempo in a Sector Zero run on a PC without the dev toggle', () => {
+    expect(timeControlsShown(true, false, false, true)).toBe(true);
+    expect(timeControlsShown(false, false, false, true)).toBe(true);
   });
 });
 
@@ -117,20 +111,25 @@ describe('rule 6 in the markup', () => {
 
 describe('rule 6 in the frame', () => {
   // Кадр — единственное место, где признак забега доходит до полосы: без него CSS выше не
-  // сработает, а правила получат «не забег».
+  // сработает, а правила получат «не забег». Кадр полосы — у её владельца (`matchTopBar.ts`,
+  // REFM-222); признак забега и тумблер разработчика он берёт хуками `main.ts`.
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  const bar = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 
-  it('marks the bar in a run and passes the run to both rules', () => {
-    expect(main).toContain('const run = sectorZeroToolsHidden();');
-    expect(main).toContain("speedbarEl.classList.toggle('spd-run', run);");
-    expect(main).toContain(
-      'timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__, run)',
+  it('marks the bar in a run and passes the run to the time controls', () => {
+    expect(bar).toContain('const run = game.toolsHidden();');
+    expect(bar).toContain("speedbarEl.classList.toggle('spd-run', run);");
+    expect(bar).toContain(
+      'timeControlsShown(pcUi(), game.speedControl(), netWorld, run)',
     );
-    expect(main).toContain('speedbarShown(pcUi(), devSpeedControl, run)');
+    expect(bar).toContain("speedbarShown(pcUi(), showSpdCtl === '', restartShown)");
+    expect(main).toContain('toolsHidden: sectorZeroToolsHidden,');
+    expect(main).toContain('speedControl: () => devSpeedControl,');
+    expect(main).toMatch(/renderEndScreen\(\);\s*renderSpeedbar\(\);/);
   });
 
   it('▶▶▶ — только в дев-забеге, и в игроцкой сборке её нет вовсе', () => {
-    expect(main).toContain('if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);');
+    expect(bar).toContain('if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);');
     const markup = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
     expect(markup).toMatch(/<!--dev-only--><button id="spd-dev"[^>]*hidden>▶▶▶<\/button><!--\/dev-only-->/);
   });

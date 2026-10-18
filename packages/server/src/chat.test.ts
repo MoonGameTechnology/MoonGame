@@ -87,6 +87,19 @@ const say = (channel: string, text: string, to?: string): string =>
   JSON.stringify(to === undefined ? { type: 'chat.send', channel, text } : { type: 'chat.send', channel, to, text });
 
 describe('session chat relay', () => {
+  it('sanitizes controls before relay/history, preserving literal plain-text markup', async () => {
+    const room = makeRoom();
+    const g = new Peer();
+    room.addPeer('green', g);
+    await room.receive('green', g, say('session', '  hello\u0000\u200B\u202E world  '));
+    await room.receive('green', g, say('session', '<img src=x onerror=alert(1)>'));
+    expect(g.chatTexts()).toEqual(['hello world', '<img src=x onerror=alert(1)>']);
+    const late = new Peer();
+    room.addPeer('blue', late);
+    expect(late.chatTexts()).toEqual(g.chatTexts());
+    await room.receive('green', g, say('session', '\u0000\u200B'));
+    expect(g.ofType('error').at(-1)?.code).toBe('E_CHAT_TEXT');
+  });
   it('session channel reaches every seat, including the sender (the echo renders it)', async () => {
     const room = makeRoom();
     const g = new Peer();

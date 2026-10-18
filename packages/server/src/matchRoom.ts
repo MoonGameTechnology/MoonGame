@@ -1,3 +1,4 @@
+import { sanitizeChatText } from '@void/protocol';
 import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
@@ -45,6 +46,7 @@ import { arsenalSnapshotOf } from './arsenal';
 import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
 import { detach } from './detach';
+import { captureMetaEconomyActivity, type OwnOrder } from './metaEconomyActivity';
 
 export interface RoomPeer {
   /** `compress: false` keeps this one message out of socket compression (a `ws` option). */
@@ -464,7 +466,9 @@ const STATE_HASH_EVERY_MS = 3_000;
  *    `scheduled`), a capital designation (the hero-respawn anchor), a steward hold point, a
  *    mine laid (a rival's mine is seen only up close, SM-3.6), a salvage payout (a rival's
  *    treasury), a merge waiting for a fleet still in flight (that fleet may be out of sight)
- *    and a refuge found (what a rival knows, PVR-8.4). */
+ *    and a refuge found (what a rival knows, PVR-8.4).
+ *  · A fleet halted at a closed border (FOG-LEAK): it names the owner of a world its owner
+ *    may not see, so it is the halted fleet's owner's news alone. */
 export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new Map<
   string,
   'owner' | 'playerId'
@@ -485,6 +489,7 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['salvage.paid', 'playerId'],
   ['fleet.merge.pending', 'owner'],
   ['refuge.found', 'owner'],
+  ['fleet.halted', 'owner'],
 ]);
 
 export class MatchRoom {
@@ -521,6 +526,8 @@ export class MatchRoom {
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
   private readonly persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
+  /** Server-side participation evidence, never part of the deterministic state or wire view. */
+  private economyActivity: Record<string, string[]> = {};
   /** Opt-in action-layer front-door (see options.gate). */
   private readonly gate?: ActionGate;
   /** Player-action deny-list (see options.denyPlayerActions). */
@@ -794,6 +801,10 @@ export class MatchRoom {
     const wallTime = this.now();
     return { wallTime, gameTime: this.clock(wallTime), timeScale: this.timeScale,
       running: this.isClockRunning && this.stateValue.match.status !== 'ended' };
+  }
+
+  get economyActivitySnapshot(): Record<string, string[]> {
+    return structuredClone(this.economyActivity);
   }
 
   /** Re-evaluate running/paused after a connection change: freeze or resume the
@@ -1349,8 +1360,8 @@ export class MatchRoom {
     return value;
   }
 
-  submitAction(playerId: PlayerId, action: Action, peer?: RoomPeer): SubmitResult {
-    const front = this.frontGate(playerId, action.id, peer);
+  submitAction(playerId: PlayerId, action: Action, peer?: RoomPeer, throttle = true): SubmitResult {
+    const front = this.frontGate(playerId, action.id, peer, throttle);
     if (front.kind === 'cached') {
       const { receipt } = front;
       return { ok: receipt.ok, seq: receipt.seq, events: [], code: receipt.code };
@@ -1380,10 +1391,16 @@ export class MatchRoom {
     /** Connection-bound work may expire while queued. Check at execution, before
      *  dedup/rate admission or persistence; never cancel a write already started. */
     isCurrent?: () => boolean,
+    /** `throttle: false` — host bookkeeping that must land whatever the player's own
+     *  order budget (a revoke after a sale): skips the per-player rate limit and does
+     *  not spend from it. Dedup and the mailbox bound still apply. Never for orders a
+     *  driver issues on the player's behalf. */
+    options: { throttle?: boolean } = {},
   ): Promise<{ ok: boolean; code?: string }> {
+    const throttle = options.throttle ?? true;
     if (!this.persist) {
       if (isCurrent && !isCurrent()) return { ok: false, code: 'E_FORBIDDEN' };
-      const r = this.submitAction(playerId, action);
+      const r = this.submitAction(playerId, action, undefined, throttle);
       return { ok: r.ok, ...(r.code !== undefined ? { code: r.code } : {}) };
     }
     let out: { ok: boolean; code?: string } = { ok: false, code: 'E_INTERNAL' };
@@ -1393,7 +1410,7 @@ export class MatchRoom {
         out = { ok: false, code: 'E_FORBIDDEN' };
         return;
       }
-      const front = this.frontGate(playerId, action.id); // без пира: у драйвера нет сокета
+      const front = this.frontGate(playerId, action.id, undefined, throttle); // без пира: у драйвера нет сокета
       if (front.kind === 'cached') {
         const { receipt } = front;
         out = { ok: receipt.ok, ...(receipt.code !== undefined ? { code: receipt.code } : {}) };
@@ -1419,7 +1436,12 @@ export class MatchRoom {
    * тем же отказом, а лимит — отказом без квитанции, чтобы повтор после бэкоффа не
    * встретил идемпотентный «уже отвергнуто».
    */
-  private frontGate(playerId: PlayerId, actionId: string, peer?: RoomPeer): FrontDecision {
+  private frontGate(
+    playerId: PlayerId,
+    actionId: string,
+    peer?: RoomPeer,
+    throttle = true,
+  ): FrontDecision {
     const cached = this.receipts.get(actionId);
     if (cached) {
       if (peer) {
@@ -1431,7 +1453,7 @@ export class MatchRoom {
     // F-03: лимит подач на игрока. Перебор отвергается ТРАНЗИЕНТНО — квитанция не
     // пишется, поэтому честный повтор после бэкоффа применяется (идемпотентность не
     // должна превращать лимит в вечный отказ).
-    if (this.rateLimited(playerId)) {
+    if (throttle && this.rateLimited(playerId)) {
       if (peer) this.sendReject(peer, playerId, actionId, 'E_RATE_LIMIT');
       return { kind: 'rate-limited' };
     }
@@ -1474,10 +1496,17 @@ export class MatchRoom {
     action: Action,
     receipt: ActionReceipt,
     peer?: RoomPeer,
+    order = this.ownOrder(plan, action, peer),
   ): void {
     // RPL-2: граница, которой мир ДЕЙСТВИТЕЛЬНО достиг (throttled-догон не доходит до
     // `now`) — пустой догон границей не считается, чтобы журнал не пух.
     if (plan.state.time > this.stateValue.time) this.record?.({ at: plan.state.time });
+    this.economyActivity = captureMetaEconomyActivity(
+      this.economyActivity,
+      plan.events,
+      this.stateValue,
+      order,
+    );
     this.stateValue = plan.state;
     if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
     if (plan.events.length > 0 || plan.kind === 'applied') {
@@ -1491,6 +1520,14 @@ export class MatchRoom {
     // равно банкуются. Идемпотентно, поэтому зовётся на каждом коммите.
     this.observeEndIfNeeded();
     if (plan.kind === 'rejected' && peer) this.sendRejection(peer, receipt);
+  }
+
+  /** Presence evidence for meta rewards: an applied order from the player's own
+   *  connection. Drivers (AI, Steward, host bookkeeping) submit without a peer. */
+  private ownOrder(plan: CommittablePlan, action: Action, peer?: RoomPeer): OwnOrder | undefined {
+    return peer && plan.kind === 'applied'
+      ? { playerId: action.playerId, at: plan.at, wall: this.now() }
+      : undefined;
   }
 
   /**
@@ -1660,6 +1697,7 @@ export class MatchRoom {
     const from = this.stateValue.time;
     const r = this.computeAdvance(this.stateValue, now);
     if (!r.ok) return { ok: false, code: r.code };
+    this.economyActivity = captureMetaEconomyActivity(this.economyActivity, r.events, this.stateValue);
     this.stateValue = r.state;
     // RPL-2: the boundary the world ACTUALLY reached (a throttled advance stops
     // short of `now`) — a no-op advance is not a boundary, keep the log compact.
@@ -1773,7 +1811,12 @@ export class MatchRoom {
 
   /** Builds a durable snapshot of a specific `(state, seq)` — used by the committed
    *  path to persist a prospective result BEFORE committing it. */
-  private snapshot(state: GameState, seq: number): MatchSnapshot {
+  private snapshot(
+    state: GameState,
+    seq: number,
+    events: readonly DomainEvent[] = [],
+    order?: OwnOrder,
+  ): MatchSnapshot {
     const clock = this.clockSnapshot;
     return {
       matchId: this.id,
@@ -1781,6 +1824,7 @@ export class MatchRoom {
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
       state,
+      economyActivity: captureMetaEconomyActivity(this.economyActivity, events, this.stateValue, order),
       ...(clock ? { clock: { ...clock, running: clock.running && state.match.status !== 'ended' } } : {}),
     };
   }
@@ -1930,13 +1974,14 @@ export class MatchRoom {
       const receipt: ActionReceipt = ok
         ? { actionId: action.id, playerId, seq, ok: true }
         : { actionId: action.id, playerId, seq, ok: false, code: plan.code };
-      if (!(await this.persistGuarded(this.snapshot(plan.state, seq), receipt, action.id, peer))) {
+      const order = this.ownOrder(plan, action, peer); // one wall reading for both writes
+      if (!(await this.persistGuarded(this.snapshot(plan.state, seq, plan.events, order), receipt, action.id, peer))) {
         return TRANSIENT_VERDICT;
       }
       this.seq = seq;
       this.retainReceipt(receipt);
       observeCommitted = () => this.observeAction(receipt, action.type, true); // durable: persist already wrote the receipt
-      this.commitPlan(plan, action, receipt, peer);
+      this.commitPlan(plan, action, receipt, peer, order);
       return ok ? { ok: true } : { ok: false, code: plan.code, durable: true };
     } finally {
       this.committing = false;
@@ -2297,7 +2342,7 @@ export class MatchRoom {
     };
     if (draft.to) ping.to = draft.to;
     if (draft.payload?.building) ping.payload = { building: draft.payload.building };
-    if (draft.label) ping.label = draft.label.slice(0, PING_LABEL_MAX);
+    if (draft.label) ping.label = sanitizeChatText(draft.label, PING_LABEL_MAX);
     await this.ephemeral.set(this.pingKey(ping.id), ping, this.pingTtlMs);
     this.pingWindow.record(playerId, wall);
     this.relayToViewers(ping, { type: 'ping.added', matchId: this.id, ping });
@@ -2352,7 +2397,7 @@ export class MatchRoom {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_CHAT_RATE' });
       return;
     }
-    const text = message.text.trim().slice(0, CHAT_TEXT_MAX);
+    const text = sanitizeChatText(message.text, CHAT_TEXT_MAX);
     if (!text) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_CHAT_TEXT' });
       return;

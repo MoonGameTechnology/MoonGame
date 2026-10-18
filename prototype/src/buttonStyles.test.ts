@@ -230,8 +230,10 @@ describe('три стиля кнопок (UIX-11.1)', () => {
   });
 
   it('карточка мира: «Постройки» и «Юниты» — главные, крепость — вторичная, путь в науку — тихий', () => {
-    const main = read('./main.ts');
-    const tags = [...main.matchAll(/<button class="bw-open[^"]*" data-act="(\w+)"/g)].map(
+    // Карточка мира живёт у своего владельца (`worldCard.ts`, REFM-223).
+    const card = read('./worldCard.ts');
+    expect(read('./main.ts')).not.toContain('<button class="bw-open');
+    const tags = [...card.matchAll(/<button class="bw-open[^"]*" data-act="(\w+)"/g)].map(
       (m) => `${m[1]}:${m[0].match(/btn-\w+/)?.[0]}`,
     );
     expect(tags).toEqual([
@@ -384,12 +386,16 @@ describe('три стиля кнопок (UIX-11.1)', () => {
         'cback:btn-quiet',
         'cgo:btn-second',
         'match-create-go:btn-main',
+        'mnum-go:btn-second',
         'ctest:—',
       ].sort(),
     );
-    // Строки обозревателя и «Мои партии» рисует их владелец (REFM-217).
+    // Строки обозревателя, пути вместо пустого списка и «Мои партии» рисует их владелец
+    // (REFM-217, UIX-17.1).
     const browser = read('./matchBrowser.ts');
     expect(browser).toContain('<button class="mbtn btn-second" id="msolo-go">');
+    expect(browser).toContain('<button class="mbtn btn-second" id="mfind-go">');
+    expect(browser).toContain('<button class="mbtn btn-second" id="mreset-go">');
     expect(browser).toContain("join.className = 'mbtn btn-second';");
     expect(browser).toContain("arch.className = 'mbtn btn-quiet';");
     expect(browser).toContain("open.className = 'mbtn btn-second';");

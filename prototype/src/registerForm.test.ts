@@ -11,13 +11,19 @@ import {
 
 const draft = (over: Partial<RegisterDraft> = {}): RegisterDraft => ({
   nick: 'ivan',
-  pass: 'longenough1',
-  pass2: 'longenough1',
+  pass: 'orbit-longenough1',
+  pass2: 'orbit-longenough1',
   email: '',
   ...over,
 });
 
 describe('регистрация — проверка формы', () => {
+  it('объясняет запрет имени, формата и опасной почты до отправки', () => {
+    expect(checkRegister(draft({ nick: 'mуdаk' }))).toEqual({ key: 'acc.nick.blocked', field: 'nick' });
+    expect(checkRegister(draft({ nick: '<img>' }))).toEqual({ key: 'acc.nick.rule', field: 'nick' });
+    expect(checkRegister(draft({ email: 'a@x.com\r\nBcc:b@x.com' })))
+      .toEqual({ key: 'acc.email.rule', field: 'email' });
+  });
   it('целая форма проходит', () => {
     expect(checkRegister(draft())).toBeNull();
   });
@@ -36,7 +42,7 @@ describe('регистрация — проверка формы', () => {
   it('порог длины — общий с authRules, второй копии числа нет', () => {
     const short = 'a'.repeat(MIN_PASSWORD - 1);
     expect(checkRegister(draft({ pass: short, pass2: short }))?.field).toBe('pass');
-    const ok = 'a'.repeat(MIN_PASSWORD);
+    const ok = 'orbit-signal'.slice(0, MIN_PASSWORD);
     expect(checkRegister(draft({ pass: ok, pass2: ok }))).toBeNull();
   });
 
@@ -47,10 +53,10 @@ describe('регистрация — проверка формы', () => {
 
 describe('регистрация — что уходит на сервер', () => {
   it('ПУСТАЯ ПОЧТА НЕ УХОДИТ ВОВСЕ: пустая строка — это «почта задана и она пустая»', () => {
-    expect(registerPayload(draft())).toEqual({ nick: 'ivan', pass: 'longenough1' });
+    expect(registerPayload(draft())).toEqual({ nick: 'ivan', pass: 'orbit-longenough1' });
     expect(registerPayload(draft({ email: '   ' }))).toEqual({
       nick: 'ivan',
-      pass: 'longenough1',
+      pass: 'orbit-longenough1',
     });
   });
 

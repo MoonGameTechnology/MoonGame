@@ -4,6 +4,7 @@ import type { SessionClaim } from './auth';
 import { hashPassword, verifyPassword, decoyHash, type ScryptParams } from './password';
 import type { UserStore } from './store';
 import { slidingWindowIpLimiter } from './rateLimit';
+import { validLogin, validLoginPassword, passwordIssue, blockedPublicName, parseRecoveryEmail, closedInput } from '@void/protocol';
 
 /**
  * SE-1.x — login+password authentication over HTTP: `POST /auth/register` and
@@ -103,28 +104,8 @@ export interface AuthApiDeps {
   scryptParams?: ScryptParams;
 }
 
-/** Login: 3–24 chars — any unicode letters/digits plus `_`/`-`. It doubles as the
- *  display nick and the seat identity, and the game's suggested callsigns are
- *  cyrillic with a dash («Носорог-1»), so ASCII-only here would reject the golden
- *  path. `\p{L}\p{N}` keeps it log-safe (no spaces/emoji/control chars); dedup is
- *  case-insensitive via lower(login) in the stores. */
-const LOGIN_RE = /^[\p{L}\p{N}_-]{3,24}$/u;
-/** Password: 8–128 chars. The cap bounds the KDF input (DoS hygiene); no composition
- *  rules — length beats complexity theatre. */
-const PASSWORD_MIN = 8;
-const PASSWORD_MAX = 128;
-/** Recovery email: a pragmatic shape check (one `@`, a dotted domain, no whitespace) +
- *  a length cap — real validity is proven only by a deliverable message, not a regex. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMAIL_MAX = 254;
-
-/** Parse an OPTIONAL email field: `undefined` = not supplied (fine — registration stays
- *  emailless), a valid string = accepted, `null` = supplied but malformed (a 400). */
-function parseEmail(v: unknown): string | null | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  if (typeof v !== 'string' || v.length > EMAIL_MAX || !EMAIL_RE.test(v)) return null;
-  return v;
-}
+/** Bound all auth bodies before parsing or password hashing. */
+const AUTH_BODY_LIMIT = 4096;
 
 /**
  * Per-IP attempt budget for the auth routes (register/login/recover/reset SHARE it).
@@ -137,9 +118,9 @@ function parseEmail(v: unknown): string | null | undefined {
  * instead of the attacker: at the previous value of 10 the fifth player to register
  * from a shared address got a 429 (measured — ten browsers, 0.7 s apart, 4 got in).
  *
- * It remains a real brake: every attempt costs one scrypt derivation, failures are
- * uniform, and 40/min against an 8-char minimum is nowhere near a feasible online
- * guess. Deployments that terminate at a proxy for many players (or want it tighter)
+ * Login failures still burn a scrypt derivation and return a uniform answer.
+ * Legacy sign-ins retain the 8-character floor; new/reset passwords use the shared
+ * creation policy. Deployments that terminate at a proxy for many players (or want it tighter)
  * override both numbers — see `AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS` in the hosts.
  */
 const RATE_MAX = 40;
@@ -179,14 +160,13 @@ interface Creds {
   password: string;
 }
 
-function parseCreds(body: unknown): Creds | null {
-  if (typeof body !== 'object' || body === null) return null;
+function parseCreds(body: unknown, fields: readonly string[]): Creds | null {
+  if (!closedInput(body, fields)) return null;
   const { login, password } = body as { login?: unknown; password?: unknown };
-  if (typeof login !== 'string' || !LOGIN_RE.test(login)) return null;
+  if (typeof login !== 'string' || !validLogin(login)) return null;
   if (
     typeof password !== 'string' ||
-    password.length < PASSWORD_MIN ||
-    password.length > PASSWORD_MAX
+    !validLoginPassword(password)
   ) {
     return null;
   }
@@ -208,17 +188,24 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
   // "unknown login" path costs one scrypt derivation, same as "wrong password".
   const decoy = decoyHash(deps.scryptParams);
 
-  app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/auth/register', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
       return { error: 'E_RATE_LIMIT' as const };
     }
-    const creds = parseCreds(request.body);
-    const email = parseEmail((request.body as { email?: unknown } | null)?.email);
+    const creds = parseCreds(request.body, ['login', 'password', 'email']);
+    const email = parseRecoveryEmail((request.body as { email?: unknown } | null)?.email);
     if (!creds || email === null) {
       void reply.code(400);
       return { error: 'E_BAD_CREDENTIALS' as const };
     }
+    // Login→register is also the wrong-password path for an existing account.
+    // Preserve that verdict before applying rules intended only for a new identity.
+    if (await deps.users.findUser(creds.login)) {
+      return reply.code(409).send({ error: 'E_LOGIN_TAKEN' as const });
+    }
+    if (blockedPublicName(creds.login)) return reply.code(400).send({ error: 'E_NICKNAME_BLOCKED' });
+    if (passwordIssue(creds.password)) return reply.code(400).send({ error: 'E_PASSWORD_POLICY' });
     const passHash = await hashPassword(creds.password, deps.scryptParams);
     const created = await deps.users.createUser(creds.login, passHash, email);
     if (!created.ok) {
@@ -241,12 +228,12 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     return { accountId: created.userId, login: creds.login, token };
   });
 
-  app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/auth/login', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
       return { error: 'E_RATE_LIMIT' as const };
     }
-    const creds = parseCreds(request.body);
+    const creds = parseCreds(request.body, ['login', 'password']);
     if (!creds) {
       void reply.code(400);
       return { error: 'E_BAD_CREDENTIALS' as const };
@@ -335,12 +322,12 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       }
     };
 
-    app.post('/auth/recover', async (request: FastifyRequest, reply: FastifyReply) => {
+    app.post('/auth/recover', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
       if (rateLimited(request.ip)) {
         void reply.code(429);
         return { error: 'E_RATE_LIMIT' as const };
       }
-      const email = parseEmail((request.body as { email?: unknown } | null)?.email);
+      const email = closedInput(request.body, ['email', 'locale']) ? parseRecoveryEmail(request.body.email) : null;
       if (!email) {
         void reply.code(400);
         return { error: 'E_BAD_CREDENTIALS' as const };
@@ -358,23 +345,23 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       return { ok: true as const };
     });
 
-    app.post('/auth/reset', async (request: FastifyRequest, reply: FastifyReply) => {
+    app.post('/auth/reset', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
       if (rateLimited(request.ip)) {
         void reply.code(429);
         return { error: 'E_RATE_LIMIT' as const };
       }
-      const body = (request.body ?? {}) as { token?: unknown; password?: unknown };
+      const body = closedInput(request.body, ['token', 'password']) ? request.body : {};
       const token = typeof body.token === 'string' ? body.token : '';
       const password = body.password;
       if (
-        !token ||
+        !token || token.length > 2048 ||
         typeof password !== 'string' ||
-        password.length < PASSWORD_MIN ||
-        password.length > PASSWORD_MAX
+        !validLoginPassword(password)
       ) {
         void reply.code(400);
         return { error: 'E_BAD_CREDENTIALS' as const };
       }
+      if (passwordIssue(password)) return reply.code(400).send({ error: 'E_PASSWORD_POLICY' });
       const claim = await verifyReset(token);
       // Single-use: re-fetch the account and re-check the fingerprint against the CURRENT
       // hash — a token already spent (or minted before another change) no longer matches.

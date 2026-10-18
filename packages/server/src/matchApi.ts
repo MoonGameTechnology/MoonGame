@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { MatchRegistry } from './matchRegistry';
 import { slidingWindowIpLimiter } from './rateLimit';
+import { validSeatName } from '@void/protocol';
 
 /**
  * SV-2.4 — the minimal match create/join HTTP API, so players can actually enter a match
@@ -252,14 +253,19 @@ function preferencesFrom(query: unknown): {
   preferredSlot?: string;
   preferredFaction?: string;
   preferredScientists?: string[];
-} {
-  const q = (query ?? {}) as { slot?: string; faction?: string; sci?: string };
-  const scientists = q.sci
+} | null {
+  const q = (query ?? {}) as { slot?: unknown; faction?: unknown; sci?: unknown };
+  const id = (value: unknown): value is string | undefined => value === undefined ||
+    (typeof value === 'string' && (value === '' || /^[A-Za-z0-9_.:-]{1,64}$/.test(value)));
+  if (!id(q.slot) || !id(q.faction) ||
+      (q.sci !== undefined && (typeof q.sci !== 'string' || q.sci.length > 129))) return null;
+  const scientists = typeof q.sci === 'string' && q.sci
     ? q.sci
         .split(',')
         .map((x) => x.trim())
         .filter((x) => x !== '')
     : [];
+  if (scientists.length > 2 || scientists.some((value) => !id(value))) return null;
   return {
     ...(q.slot ? { preferredSlot: q.slot } : {}),
     ...(q.faction ? { preferredFaction: q.faction } : {}),
@@ -273,6 +279,8 @@ function preferencesFrom(query: unknown): {
       return { error: 'E_RATE_LIMIT' as const };
     }
     const { id } = request.params as { id: string };
+    const preferences = preferencesFrom(request.query);
+    if (!preferences) return reply.code(400).send({ error: 'E_BAD_REQUEST' });
     if (identify) {
       // Authenticated path: the seat belongs to the SESSION's account — a query nick
       // is ignored, so nobody joins as somebody else.
@@ -285,7 +293,7 @@ function preferencesFrom(query: unknown): {
         nick: who.login,
         accountId: who.accountId,
         pwfp: who.pwfp,
-        ...preferencesFrom(request.query),
+        ...preferences,
       });
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
@@ -295,12 +303,13 @@ function preferencesFrom(query: unknown): {
       void reply.code(400);
       return { error: 'E_NICK_REQUIRED' as const };
     }
+    if (!validSeatName(nick)) return reply.code(400).send({ error: 'E_BAD_NICKNAME' });
     // Предпочтения применяются и здесь. Ник-путь — это LAN/дев-рукопожатие без аккаунтов,
     // но выбор игрока от способа опознания не зависит: REL-7 (`?slot=`) старше учёток.
     // Раньше эта ветка звала `join` с одним ником, молча теряя место, дом и совет — ровно
     // тот класс ошибки, на котором погорел ENTRY-1 (реализация принимала меньше, чем ей
     // передавали, и разъезд не проявлялся, пока играли на другом пути).
-    const result = await deps.join(id, { nick: nick.trim(), ...preferencesFrom(request.query) });
+    const result = await deps.join(id, { nick: nick.trim(), ...preferences });
     if ('error' in result) void reply.code(STATUS[result.error]);
     return result;
   });
@@ -349,6 +358,10 @@ export interface SeatView {
   /** The seat's homeworld id — the fog-sensitive field, see {@link registerSeatsApi}. */
   start: string | null;
   taken: boolean;
+  /** Who sits in the seat (account login / nick); null for a free one. The client shows
+   *  it in diplomacy and opens that player's profile by it. Absent on a host that does
+   *  not report it — the client then keeps the house name. */
+  nick?: string | null;
 }
 
 /** A match's seating, as the host knows it — independent of who is asking. */

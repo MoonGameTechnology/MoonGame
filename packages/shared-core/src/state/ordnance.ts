@@ -22,7 +22,11 @@ export { isMissileFleet, MISSILE_TRAIT } from './minefields';
  *  projection: the mine itself is visible up close, its doctrine and warhead never. */
 export interface RocketMineControl {
   mode: RocketMineMode;
+  /** Следующий поиск по таймеру: мина спит до него (никто не дойдёт до радара раньше). */
   nextScanAt?: number;
+  /** Мина следит: с этой минуты её сетки каждую минуту проверяет хук `time.stop`, а не
+   *  таймер, и мир останавливается только в минуту, когда цель есть. */
+  watch?: number;
   /** Warhead strength is fixed when the charge is installed. */
   damage: number;
 }

@@ -38,7 +38,7 @@
 | `docs/deep-technical-roadmap.md` | Глубокий технический roadmap | Артефакт-план: что строить дальше, в каком порядке, какие инженерные риски заранее закрывать и какие решения дадут масштаб, честный multiplayer и высокий FPS. |
 | `docs/development-approach-review-2026-08-25.md` | Обзор подхода к разработке Void Dominion — 2026-08-25 | Датированный инженерный обзор текущего процесса. Это аналитический снимок, а не |
 | `docs/documentation-connectivity-2026-07-26.md` | Отчёт: связность и подход документации — 2026-07-26 | Оценка того, как построена документация Void Dominion: подход, связность, |
-| `docs/economy-roadmap.md` | Экономика: валюты, аукцион, заточка — технический roadmap | Статус: исследовательский / north-star-смежный («а там ближе посмотрим»). Это |
+| `docs/economy-roadmap.md` | Экономика: валюты, аукцион, заточка — технический roadmap | Статус: бесплатный игровой контур v0 реализован; платный запуск и последующие |
 | `docs/engineering-review.md` | Void Dominion — инженерный разбор и план развития | Документ подготовлен после полного чтения кодовой базы (на момент написания ~7 600 строк |
 | `docs/engineering-risks.md` | Engineering risks and decisions | This is a working checklist for the non-obvious problems that will matter once Void Dominion moves from prototype to always-on multiplayer. |
 | `docs/fortress-roadmap.md` | Крепости: космическая крепость и форт на планете — технический roadmap | Две РАЗНЫЕ сущности, которые легко спутать по имени. Космическая крепость — это |
@@ -61,12 +61,14 @@
 | `docs/map-visual-continuity-rule.md` | Правило визуальной непрерывности карты | Отображение местностей с учётом соседних провинций, геометрии областей и дорог. |
 | `docs/matchmaking-roadmap.md` | Матчмейкинг и жизненный цикл матча — технический roadmap | Блок 5/7 из tech-research.md (🔴-пробел «матчмейкинг/лобби» + Этап 5 игровой цикл). |
 | `docs/mechanics-roadmap.md` | Карта механик — индекс/роадмап | Единый обзор игровых механик: что в коде, что спроектировано, как они связаны и в |
+| `docs/meta-economy.md` | Мета-экономика v0: устройство и эксплуатация | Реализованный срез экономического роадмапа, каталог meta-v0.1: снабжение, |
 | `docs/metagame.md` | Метаигра: два контура карт и два контура сессий | Долгосрочный замысел («north-star»). Записан, чтобы фиксировать направление — |
 | `docs/metrics-roadmap.md` | Metrics roadmap — что и зачем измеряем | Метрики Void Dominion: что снимаем на плейтестах, как ловим десинки/баги, |
 | `docs/missiles-roadmap.md` | Ракеты и ядерное оружие — технический roadmap | Ракеты (вкл. ядерные) — отдельный тип юнита: неуправляемый одноразовый снаряд. Запустил |
 | `docs/modulesystem.md` | Модульная архитектура | Как устроена гибкость ядра: микроядро + подключаемые модули. |
 | `docs/multiplayer.md` | Multiplayer slice | This is the server-authoritative multiplayer slice (Stage 3; the critical path to an online session is closed). Implemented and code-verified: per-player fog-o… |
 | `docs/multiside-combat-roadmap.md` | Многосторонний бой: когда в одной точке больше двоих — технический roadmap | Что это и зачем. Раньше бой в ядре был строго парным: у Battle |
+| `docs/observability-contract-v1.md` | OBS-0.1 — контракт пульта и профиль первого VPS | Решение 2026-10-16 для пульта плейтестов. |
 | `docs/onboarding-roadmap.md` | Обучение новичка (онбординг) · технический роадмап | Инженерная карта сборки обучения нового игрока. Жанр (Bytro-style |
 | `docs/open-questions-visuals-content-pings.md` | Открытые вопросы — визуал, новый контент, система пингов | Отдельный артефакт под заход «графика территорий + новые типы планет/секторов + |
 | `docs/open-questions.md` | Открытые вопросы (для обсуждения) | Артефакт по просьбе: «вопросы не задавай — запиши в отдельный файл, обсудим |
@@ -76,6 +78,7 @@
 | `docs/ping-system.md` | Система пингов (тактические метки для союзников) | Ветка claude/ping-system. Игрок ставит метки на карте, чтобы предлагать союзникам |
 | `docs/platform-adapters.md` | HTML5 platform adapters — единая сборка для игровых платформ | Решение о границе: одна HTML5-сборка Void Dominion на общем ядре плюс тонкий слой |
 | `docs/playtest-hardening-roadmap.md` | Закалка плейтест-контура — технический roadmap | Заказ владельца (2026-07-18): четыре кирпича инфраструктурной зрелости — TLS+домен, |
+| `docs/playtest-observability-roadmap.md` | Пульт плейтестов MoonGame — план наблюдаемости | Заказ владельца: 2026-10-16. Нужен сайт, на котором видны состояние сервера, |
 | `docs/playtest-telemetry-roadmap.md` | Наблюдение за сетевыми тестами: метрики и поведение игроков — roadmap | Заказ владельца (2026-10-14): «в ближайшее время будут реальные сетевые тесты, поэтому |
 | `docs/playtest-template.md` | Шаблон плейтеста (2 человека) — чеклист | Заполняется после каждого живого теста на двоих. Цель — чтобы у каждого теста |
 | `docs/pr-merge-rule.md` | Единое правило: почему PR не вливается | Собрано по итогам суток, за которые PR висели по пяти разным причинам подряд. Документ |
@@ -164,8 +167,9 @@
 | `docs/reviews/2026-10-11-full-stress.md` | Void Dominion / Averion: Sector Zero — стресс-тест 2026-10-11 | Вывод: удалось воспроизвести аварии приложения и прокси, перегрузку durable-очереди и ложную готовность при отказе БД. Для приложения подготовлены исправления … |
 | `docs/reviews/2026-10-11-remediation-dast.md` | Исправления full-stack аудита и активный DAST — 2026-10-11 | Итог: устранены пять подтверждённых дефектов из аудита 2026-10-10 |
 | `docs/reviews/2026-10-14-moonmcp-interim-pentest.md` | Промежуточный пентест Void Dominion (MoonMCP) — 2026-10-14 | Промежуточный white-box и live-аудит локального сервера: проверенные защитные механизмы, открытые риски, границы покрытия и дальнейшие действия. |
-| `docs/reviews/2026-10-16-moonmcp-continuation.md` | Продолжение MoonMCP-пентеста — 2026-10-16 | Контейнерный white-box WS-экономики и находка W-1 (мультисессия места), production blackbox-аддендум: внешняя поверхность 22/80/443, JWT/CORS/limits позитив. |
-| `docs/reviews/2026-10-16-prod-blackbox.md` | Production blackbox-пентест Void Dominion — 2026-10-16 | Внешние проверки prod-сервера: только 22/80/443, JWT/WS/CORS/rate-limits работают, находки L1 (leaks списка мест), L2 (дубли WS), I3/I4 (инфо). |
+| `docs/reviews/2026-10-16-moonmcp-continuation.md` | Continuing MoonMCP pentest — 2026-10-16 (local docker stack + prod blackbox add… | Дополнение к промежуточному пентесту 2026-10-14. Два контура: (A) локальный docker-стенд владельца (deploy-, Fastify deploy-server-1 на 127.0.0.1:8788) — глубо… |
+| `docs/reviews/2026-10-16-obs-0-1-baseline.md` | OBS-0.1 — пассивный baseline VPS, 16 октября 2026 | Контракт и воспроизведение: OBS-0.1 v1. |
+| `docs/reviews/2026-10-16-prod-blackbox.md` | Void Dominion — Production Server Blackbox Pentest Report | Date: 2026-10-16 |
 | `docs/reviews/README.md` | Журнал ревью и аудитов | Постоянная папка, куда складываются находки роли «поиск багов / стандартизация / |
 | `docs/reviews/map-visual-continuity-2026-10-14.md` | Приёмка непрерывного окружения карты — 2026-10-14 | Проверена первая реализация правила визуальной непрерывности |
 
@@ -173,6 +177,7 @@
 
 | Документ | Заголовок | Про что |
 | --- | --- | --- |
+| `docs/security/anti-fraud-multiaccount-policy.md` | Anti-Fraud и мультиаккаунты — политика и архитектура | Проектное решение для основной многопользовательской Void Dominion: защита экономики, матчей и корпораций от злоупотреблений идентичностями. |
 | `docs/security/audit-2026-06-27.md` | Аудит безопасности Void Dominion (Nygame) | Дата: 2026-06-27 |
 | `docs/security/ci-variables.md` | CI-переменные и секреты: защита пайплайна | Безопасность пайплайна начинается с защиты переменных окружения и секретов. |
 | `docs/security/defense-in-depth-2026-07-26.md` | Defense-in-Depth — анализ защиты в глубину — 2026-07-26 | Оценка того, построена ли защита в глубину (defense-in-depth) в приложении |
@@ -189,4 +194,5 @@
 | Документ | Заголовок | Про что |
 | --- | --- | --- |
 | `docs/zero-touch-prod/README.md` | Zero Touch Prod — прод без ручных касаний | Папка темы «изменения прода только через автоматизированный, проверенный и записанный |
+| `docs/zero-touch-prod/tls-autodelivery.md` | TLS-автодоставка: server и Caddy одной парой | ZTP-1.5 расширяет pull-агент: DOMAIN в постоянном server.env выбирает TLS-профиль. |
 | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Zero Touch Prod — технический roadmap | План перевода сервера Void Dominion на прод без ручных касаний: изменения только через |

@@ -1536,6 +1536,7 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('salvage.paid', { playerId, location: 'node1', resources: { metal: 40 } });
         h.emit('fleet.merge.pending', { from: 'f9', into: 'f1', owner, at: 'node1' });
         h.emit('refuge.found', { owner, at: 'node1' });
+        h.emit('fleet.halted', { fleetId: 'f1', owner, at: 'node1', blocked: 'far', blocker: 'p3' });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
       // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
@@ -1682,6 +1683,8 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'salvage.paid',
       'fleet.merge.pending',
       'refuge.found',
+      // FOG-LEAK: a halted fleet names the owner of a world its owner may not see.
+      'fleet.halted',
     ];
     // Every entry of the server's list is exercised here, so a new one can't skip this test.
     expect([...OWNER_ONLY_EVENTS.keys()].sort()).toEqual([...intel].sort());

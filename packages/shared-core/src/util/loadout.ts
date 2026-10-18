@@ -110,6 +110,44 @@ export function effectiveStats(
   return out;
 }
 
+/** Одна характеристика из {@link effectiveStats} — то же число теми же сложениями в том же
+ *  порядке, но без мешка всех характеристик на каждый стек. Ход мира спрашивает так радар,
+ *  прочность и ремонт каждого флота на каждом отрезке времени, и мешки на FFA-50 стоили
+ *  ~6 мс кадра на ×10. */
+export function effectiveStat(
+  def: UnitDef,
+  stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity'>,
+  data: GameData,
+  key: string,
+): number | undefined {
+  let value = ownStat(def.stats, key);
+  const mods = stack.modules;
+  if (!mods) return value;
+  const stars = stack.moduleStars;
+  for (const id of mods) {
+    const m = data.modules[id];
+    if (!m) continue;
+    const star = stars?.[id] ?? 0;
+    const mult = star > 0 ? moduleStarMultiplier(star, data) : 1;
+    const v = ownStat(m.effects.stats, key);
+    if (v !== undefined) value = (value ?? 0) + v * mult;
+    const rarity = stack.moduleRarity?.[id];
+    if (rarity !== undefined) {
+      const bonus = ownStat(moduleRarityBonus(m, rarity), key);
+      if (bonus !== undefined) value = (value ?? 0) + bonus * mult;
+    }
+  }
+  if (value !== undefined && (WHOLE_STATS as readonly string[]).includes(key))
+    value = Math.round(value);
+  return value;
+}
+
+/** Значение собственного перечислимого ключа — то, что `{ ...bag }` и `Object.entries`
+ *  видят в {@link effectiveStats}. */
+function ownStat(bag: Record<string, number>, key: string): number | undefined {
+  return Object.prototype.propertyIsEnumerable.call(bag, key) ? bag[key] : undefined;
+}
+
 /** Прибавка редкости модуля на ступени `rarity` (SZE-5.1): сумма `rarityBonus` всех
  *  ступеней выше базовой и не выше `rarity`, в порядке лестницы — детерминированно.
  *  Ступень не выше базовой, неизвестная ступень или модуль без таблицы — пустая прибавка. */
@@ -139,12 +177,14 @@ export function slotUsage(modules: readonly string[], data: GameData): SlotCount
 }
 
 /** Does hull `def` (unit id `unit`) satisfy a module's `allowed` predicate? All
- *  present fields must hold (domain match, ALL required traits, id in the list). */
+ *  present fields must hold (domain match, ALL required traits, NONE of the excluded
+ *  traits, id in the list). */
 export function moduleAllowed(unit: string, def: UnitDef, m: ModuleDef): boolean {
   const a = m.allowed;
   if (!a) return true;
   if (a.domain && def.domain !== a.domain) return false;
   if (a.traits.length > 0 && !a.traits.every((t) => def.traits.includes(t))) return false;
+  if (a.excludeTraits.some((t) => def.traits.includes(t))) return false;
   if (a.units.length > 0 && !a.units.includes(unit)) return false;
   return true;
 }
@@ -268,7 +308,7 @@ export function bestFleetStat(
   for (const st of stacks) {
     const def = data.units[st.unit];
     if (!def || !(st.count > 0)) continue;
-    const v = effectiveStats(def, st, data)[stat] ?? 0;
+    const v = effectiveStat(def, st, data, stat) ?? 0;
     if (v > best) best = v;
   }
   return best;

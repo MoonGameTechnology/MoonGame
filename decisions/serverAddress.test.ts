@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAddress, resolveBase, socketBase } from './serverAddress';
+import { defaultServerField, resolveAddress, resolveBase, socketBase } from './serverAddress';
 
 describe('адрес сокета из набранного', () => {
   it('ws:// и wss:// проходят как есть', () => {
@@ -97,5 +97,31 @@ describe('только адрес — восстановлению и сброс
   it('пустой и битый адрес называются вслух, как и при входе', () => {
     expect(resolveBase('  ', false)).toEqual({ kind: 'need-address', key: 'net.need-address' });
     expect(resolveBase('ws://', false)).toEqual({ kind: 'bad-address', key: 'net.bad-address' });
+  });
+});
+
+describe('поле адреса до ввода (правило 8)', () => {
+  const apk = { protocol: 'http:', host: 'localhost', hostname: 'localhost', port: '' };
+  const PLAYTEST = 'https://playtest.example';
+
+  it('запомненный адрес сильнее вшитого', () => {
+    expect(defaultServerField('wss://mine.example', PLAYTEST, apk)).toBe('wss://mine.example');
+  });
+
+  it('APK без запомненного адреса идёт на вшитый сервер, а не на ws://localhost:8788', () => {
+    expect(defaultServerField(null, PLAYTEST, apk)).toBe(PLAYTEST);
+    expect(resolveBase(defaultServerField(null, PLAYTEST, apk), false)).toEqual({
+      kind: 'ok',
+      base: 'wss://playtest.example',
+    });
+  });
+
+  it('без вшитого адреса — тот же origin, что у страницы', () => {
+    const https = { protocol: 'https:', host: 'void.example', hostname: 'void.example', port: '' };
+    const proto = { protocol: 'http:', host: 'lan:8788', hostname: 'lan', port: '8788' };
+    expect(defaultServerField(null, null, https)).toBe('wss://void.example');
+    expect(defaultServerField(null, null, proto)).toBe('ws://lan:8788');
+    expect(defaultServerField(null, null, apk)).toBe('ws://localhost:8788');
+    expect(defaultServerField(null, null, { ...apk, hostname: '' })).toBe('ws://127.0.0.1:8788');
   });
 });

@@ -67,6 +67,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('досье скрывает неподтверждённый баланс Суверенов', () => {
+  expect(profileHtml(view({ sovereigns: null }))).not.toContain('pf-cur');
+});
+
 describe('публичный профиль и устаревшие ответы', () => {
   const publicData = (login: string) => ({ ...defaultAppearance(), login, xp: 70, progress: { matches: 2, wins: 1 } });
   const tick = () => new Promise((r) => setTimeout(r, 0));

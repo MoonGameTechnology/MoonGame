@@ -427,7 +427,7 @@ Canvas-рендер: маска знания объединяет провинц
 | --- | --- | --- | --- | --- |
 | **Астероидный массив** | `dead_world` или `asteroid` как цель | теснина массива (предложена, бюджет 2) | `asteroid_field` (3) | `asteroid_cluster` (1) — тупик с металлом |
 | **Туманное облако** | `dense_nebula` (3) | `nebula` (4) | `empty_space` (5) | — |
-| **Кладбище экспедиции** | `graveyard` на `derelict_graveyard` (2) | `derelict_graveyard` (2) | `debris_field`, `empty_space` | — |
+| **Кладбище экспедиции** | `graveyard` на `derelict_graveyard` (2) | одно `debris_field` на `derelict_graveyard` (2) | `empty_space` — обломки редки (владелец 2026-10-14) | — |
 | **Выработанный узел** | `depleted_system` (5) — связей много, добычи мало | `empty_space` (5) | `deep_void` (6) | — |
 | **Штормовой фронт** | `ion_storm` (2) полосой | `solar_flare_zone` (4) | `empty_space` (5) | проходы между полосами |
 | **Открытый простор** | — | `deep_void` (6) | `empty_space` (5) | — соединительная ткань между областями |

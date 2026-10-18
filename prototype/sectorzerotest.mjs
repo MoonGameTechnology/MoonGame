@@ -56,6 +56,8 @@ const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chain
 import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { knownOwner as __knownOwner } from './mapLayer';
 import { moveFleet as __moveFleet } from './game';
+// Стойка — у ядра: с REFM-224 \`main.ts\` её не импортирует.
+import { getStance as __getStance } from '../../packages/shared-core/src/index';
 window.__szTest = {
   run: () => isSectorZeroRun(),
   home: () => Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null,
@@ -136,13 +138,13 @@ window.__szTest = {
   // PVR-6.24: набор корабля героя на флагмане экспедиции.
   flagship: () => s.fleets['sector-zero:flagship']?.units?.[0]?.modules ?? null,
   // YAG-7.3: с кем я в войне, строки ленты о смене стойки с ними и реплики от них в треде.
-  atWar: () => Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war'),
+  atWar: () => Object.keys(s.players).filter((id) => id !== ME && __getStance(s, ME, id) === 'war'),
   warLines: () => {
-    const foes = Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war');
+    const foes = Object.keys(s.players).filter((id) => id !== ME && __getStance(s, ME, id) === 'war');
     return eventLog.map((e) => e.text).filter((text) => foes.some((id) => text.startsWith(\`\${NAME[id]} → \`)));
   },
   warReplies: () => {
-    const foes = Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war');
+    const foes = Object.keys(s.players).filter((id) => id !== ME && __getStance(s, ME, id) === 'war');
     return sessionMessages.filter((m) => m.sys && foes.includes(m.from)).length;
   },
   // Конец забега победой — как его ставит модуль победы ядра.
@@ -607,9 +609,7 @@ try {
     await leave();
     // Забег из шага 1 сохранён — «Продолжить» идёт ДРУГИМ путём кода (восстановление
     // снимка), и флаг забега там ставится в своём месте: его тоже надо поймать.
-    // Archived entry stays wired for saved sessions, but is hidden from the main hub.
-    assert.equal(await page.locator('#hub-sector-zero').isVisible(), false);
-    await page.evaluate(() => document.getElementById('hub-sector-zero').click());
+    await page.locator('#hub-sector-zero').click();
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
     assert.equal(await page.locator('#sz-save-label').isVisible(), true, 'сохранённый забег подписан');
     assert.equal(await singlePlayer(), 1, '«Одиночная игра» — один раз и при сохранённом забеге');

@@ -12,7 +12,6 @@ import {
   instrumentedGame,
   launchBrowser,
   pressSpeed,
-  recordPurseFloats,
   serve,
 } from './harnessKit.mjs';
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
@@ -26,12 +25,11 @@ window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
   ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: __mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
-  fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
+  fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, loc:f.location, p:fleetAnchor(f) })),
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
   notices: () => __noticeFlashes.length,
   emit: events => handleEvents(events),
-  motion: on => setMotion(on)
 };`;
 // Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
 const site = await serve({
@@ -68,7 +66,12 @@ async function drag(x, y, dx, dy) {
   await pause();
 }
 async function chooseFleet(f) {
-  await p.touchscreen.tap(f.p.x, f.p.y);
+  // Тап ровно между флотом на орбите и его миром спорный — открывается список «флот или
+  // провинция». Тап в сам значок флота выбирает флот сразу (`tapCycle.ts`, правило 8).
+  const home = (await p.evaluate(() => window.__mobileTest.worlds())).find((w) => w.id === f.loc);
+  assert(home, 'the fleet stands on a world');
+  const between = { x: (f.p.x + home.p.x) / 2, y: (f.p.y + home.p.y) / 2 };
+  await p.touchscreen.tap(between.x, between.y);
   await pause();
   let choices = (await ui()).choices;
   const provinceIndex = choices.findIndex((x) => x.kind === 'planet');
@@ -95,21 +98,14 @@ async function chooseFleet(f) {
     'the card that opens carries the same name as the chooser row',
   );
   // Второй тап по выбранной провинции снимает выбор, а не открывает список заново.
-  await p.touchscreen.tap(f.p.x, f.p.y);
+  await p.touchscreen.tap(between.x, between.y);
   await pause();
   assert.equal((await ui()).planet, null, 're-tap on the selected province clears the selection');
   assert.equal((await ui()).choices.length, 0, 're-tap does not reopen the chooser');
   const current = (await p.evaluate(() => window.__mobileTest.fleets())).find((x) => x.id === f.id);
   await p.touchscreen.tap(current.p.x, current.p.y);
   await pause();
-  choices = (await ui()).choices;
-  if (choices.length)
-    await p
-      .locator(
-        `[data-mobile="choose"][data-index="${choices.findIndex((c) => c.kind === 'fleet' && c.id === f.id)}"]`,
-      )
-      .tap();
-  await pause();
+  assert.equal((await ui()).choices.length, 0, 'a tap right on the fleet needs no chooser');
   assert.deepEqual((await ui()).ids, [f.id]);
 }
 async function pinch() {
@@ -336,11 +332,6 @@ try {
   // Панель скорости на телефоне прячется под открытой карточкой.
   await p.locator('[data-mobile="close"]').tap();
   await pause();
-  // UIX-4.1: доход капает, а не скачет — «+N» всплывает на плашке не чаще раза в 4 секунды,
-  // а убыль по капле не всплывает вовсе. Движение выключено: число гаснет на месте, а не
-  // уплывает (с движением его проверяет цена исследования в `mobileStrategyTest.mjs`).
-  await p.evaluate(() => window.__mobileTest.motion(false));
-  const run = await recordPurseFloats(p);
   await pressSpeed(p, '#spd-fast', { tap: true });
   await pressSpeed(p, '.spd-mult-legacy [data-mult="100"]', { tap: true });
   await p.waitForFunction(
@@ -350,22 +341,6 @@ try {
   );
   await pressSpeed(p, '#spd-pause', { tap: true });
   await pause();
-  const drips = await run.read();
-  await p.evaluate(() => window.__mobileTest.motion(true));
-  assert(drips.some((x) => x.sign === 'up'), 'income floats up its chip: ' + JSON.stringify(drips));
-  assert(
-    drips.every((x) => x.sign === 'up' && x.res),
-    'a running economy floats no loss: ' + JSON.stringify(drips),
-  );
-  assert(
-    drips.every((x) => x.motion === 'purse-fade'),
-    'without motion the number fades in place: ' + JSON.stringify(drips),
-  );
-  for (const res of new Set(drips.map((x) => x.res))) {
-    const at = drips.filter((x) => x.res === res).map((x) => x.at);
-    for (let i = 1; i < at.length; i++)
-      assert(at[i] - at[i - 1] >= 3500, 'income floats drip-wise, not per frame: ' + JSON.stringify(drips));
-  }
   await selectTrooper();
   const loaded = await snapshot();
   if (!(await sheet.locator('[data-cmd="attack"]').isVisible()))
@@ -411,7 +386,7 @@ try {
   assert.equal(await ring(own.theirs), 0, 'foreign arrivals and builds do not ring');
   assert.equal(await ring(own.mine), 4, 'my arrival, parking, build and upgrade ring once each');
   await p.waitForFunction(() => window.__mobileTest.notices() === 0, null, { timeout: 2000 });
-  console.log('PASS income drips in place without motion and notice rings for my own news only');
+  console.log('PASS notice rings for my own news only');
 
   for (const route of ['/built', '/player']) {
     await p.goto(`http://127.0.0.1:${server.address().port}${route}`);

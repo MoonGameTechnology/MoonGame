@@ -35,7 +35,7 @@ import { clientPlan, liveSocket, seatKey } from '../../decisions/netClientReuse'
 import { dialIdentity, dialUrl, seatTicketKey } from '../../decisions/netDial';
 import { NET_VIEW_IDLE, netViewSnapshot } from '../../decisions/netViewClock';
 import { isReconnectBanner, welcomePlan, type WelcomePlan } from '../../decisions/netWelcome';
-import { nextCycleStep, redialPlan } from '../../decisions/reconnectCycle';
+import { nextCycleStep, reconnectBannerShown, redialPlan } from '../../decisions/reconnectCycle';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { closeAction, isCurrentSocket } from '../../decisions/socketFate';
 import {
@@ -96,6 +96,13 @@ export let NET = false;
 // the correct playerId. Until then, the map must NOT render — the default `ME = 'p1'`
 // would paint a spawn at p1's start before the server assigns the real seat.
 export let netAdmitted = false;
+/** Мир на экране пришёл с сервера: держится от впуска до выхода из партии, ПЕРЕЖИВАЯ обрыв.
+ *  `NET` на обрыве гаснет, а мир остаётся серверным — и это снимок под туманом войны:
+ *  чужие миры за пределами зрения в нём ничьи. Пусти по такому миру локальные часы, и модуль
+ *  победы увидит соперников без земли, выбьет их и объявит игроку победу, которой нет (плейтест
+ *  2026-10-17). Поэтому локальный ход, локальный редьюсер и часы соло смотрят на этот признак, а
+ *  не на `NET`. Гасит его только {@link leaveNetwork}. */
+export let netWorld = false;
 /** The match this client is in / will (re)connect to. Set when joining from the menu
  *  ({@link targetMatch}); `connect()` (and auto-reconnect) dial `/matches/<currentMatchId>`. */
 let currentMatchId = 'proto';
@@ -168,6 +175,11 @@ export function initNetSession(host: NetSessionHost): void {
   }
 }
 
+/** Server match identity for account-scoped, read-only result receipts. */
+export function serverMatchId(): string | null {
+  return NET && netAdmitted ? currentMatchId : null;
+}
+
 /** Партия, в которую звонить. Новая цель начинает с чистого цикла: прежний дозвон гаснет,
  *  счётчик попыток обнуляется, а выход игрока из прошлой партии больше не держит. */
 export function targetMatch(id: string): void {
@@ -179,6 +191,11 @@ export function targetMatch(id: string): void {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+}
+
+/** Партия, в которую звонит (или уже вошла) сеть. */
+export function netMatchId(): string {
+  return currentMatchId;
 }
 
 /** Кадр в окно замера: интервалы копит `frame()`, сэмпл забирает окно целиком. */
@@ -227,6 +244,7 @@ export function leaveNetwork(): void {
   userClosed = true;
   NET = false;
   netAdmitted = false;
+  netWorld = false;
   reconnecting = false;
   reconnectAttempts = 0;
   if (reconnectTimer) {
@@ -292,6 +310,7 @@ function netClientFor(seat: string): MultiplayerClient {
           // Server accepted us — NOW we're really in the match.
           socketAdmitted = true;
           netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
+          netWorld = true;
           reconnecting = false; // a fresh welcome ends any reconnect cycle
           reconnectAttempts = 0;
           NET = true;
@@ -317,8 +336,11 @@ function netClientFor(seat: string): MultiplayerClient {
             frameWin = FRAME_WINDOW_EMPTY;
           }, PERF_SAMPLE_MS);
         }
+        // Часы картинки начинают с нуля только на НОВОМ входе. Переподключение к той же
+        // партии продолжает их со старой скоростью: иначе флоты после обрыва стояли бы, пока
+        // скорость меряется заново, и трогались рывком (`netViewClock.ts`, правила 5–6).
         netView = netViewSnapshot(
-          plan.admit ? NET_VIEW_IDLE : netView,
+          plan.fanfare ? NET_VIEW_IDLE : netView,
           snap.state.time,
           performance.now(),
         );
@@ -443,8 +465,9 @@ export function connect(): void {
     if (fate === 'reconnect') {
       NET = false;
       netAdmitted = false;
-      // unexpected drop → auto-rejoin our seat (the match keeps running server-side)
-      game.note(t('net.reconnecting'));
+      // unexpected drop → auto-rejoin our seat (the match keeps running server-side).
+      // Молча: тоста об обрыве нет, а баннер встаёт, только если первая попытка не помогла
+      // (`reconnectCycle.ts`, правило 4).
       // Клиент переживает обрыв (NETA2-5): с этой секунды приказы копятся у него в
       // очереди и уйдут сами на реконнектном `welcome` — под свежей сессией и свежим
       // `clientSeq`, поэтому подделать их обрывом нельзя.
@@ -514,7 +537,7 @@ function scheduleReconnect(): void {
     game.showConnect(true);
     return;
   }
-  game.setBanner(t('acc.reconnecting'));
+  if (reconnectBannerShown(reconnectAttempts)) game.setBanner(t('acc.reconnecting'));
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     // Accounts mode (SES-2.5): the join token is short-lived (15 min), so a redial

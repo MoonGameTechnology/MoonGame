@@ -64,11 +64,15 @@ function callArgs(src: string, at: number, name: string): string {
 describe('проводка: ворота стройки клиента спрашивают, КТО строит', () => {
   // Параметр `eatsBiomass` обязателен, поэтому забытый вызов ловит typecheck. Литерал
   // `false` на его месте typecheck пропустит, а для Роя он спрячет его же органы.
-  it('каждый вызов canBuildHere / buildsAnything в main.ts передаёт feedsOnBiomass(s, ME, data)', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-    const calls = [...src.matchAll(/\b(canBuildHere|buildsAnything)\(/g)].map((m) =>
-      callArgs(src, m.index!, m[1]!),
-    );
+  // Кнопка окна построек уехала в карточку мира (`worldCard.ts`, REFM-223): ворота проверяются
+  // в обоих файлах.
+  it('каждый вызов canBuildHere / buildsAnything в main.ts и worldCard.ts передаёт feedsOnBiomass(s, ME, data)', () => {
+    const calls = ['./main.ts', './worldCard.ts'].flatMap((file) => {
+      const src = readFileSync(new URL(file, import.meta.url), 'utf8');
+      return [...src.matchAll(/\b(canBuildHere|buildsAnything)\(/g)].map((m) =>
+        callArgs(src, m.index!, m[1]!),
+      );
+    });
     expect(calls.length).toBeGreaterThanOrEqual(3);
     for (const args of calls) expect(args.trimEnd()).toMatch(/,\s*feedsOnBiomass\(s, ME, data\)$/);
   });

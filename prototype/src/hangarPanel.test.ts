@@ -197,13 +197,18 @@ describe('перегрузка предлагается и со стороны �
   });
 });
 
-// Само ПОДКЛЮЧЕНИЕ вкладки живёт в `main.ts`, у которого юнит-обвязки нет, — поэтому
-// сканом исходника, как в `rankScreen.test.ts`. Именно подключения и не хватало:
+// Само ПОДКЛЮЧЕНИЕ вкладки живёт в карточке мира (`worldCard.ts`, REFM-223) — сканом
+// исходника, как в `rankScreen.test.ts`. Именно подключения и не хватало:
 // решение (`transferOffer`) было верным и покрытым, а звать его со стороны мира было
 // некому, и для игрока механики не существовало.
 describe('вкладка мира «Эскадра» подключена к перегрузке', () => {
-  const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  const tab = src.slice(src.indexOf("planetTab === 'shuttle'"), src.indexOf("planetTab === 'shuttle'") + 2000);
+  const src = readFileSync(new URL('./worldCard.ts', import.meta.url), 'utf8');
+  const at = src.indexOf("game.planetTab() === 'shuttle'");
+  const tab = src.slice(at, at + 2000);
+
+  it('ветка вкладки найдена: пустой срез прошёл бы любые проверки ниже', () => {
+    expect(at).toBeGreaterThan(0);
+  });
 
   it('вкладка спрашивает, есть ли у мира носитель', () => {
     expect(tab).toContain('dockedCarrier(');

@@ -1,3 +1,4 @@
+import { validSeatName } from '@void/protocol';
 import { boundedReadiness } from './readiness';
 import type { SecurityAudit } from './securityAudit';
 import { playablePlayerIds } from '@void/shared-core';
@@ -744,7 +745,7 @@ export function createMultiplayerServer(
           // direct `?player=` handshake would bypass the lock, so it is refused
           // (the same way `auth` refuses both dev handshakes).
           const nick = url.searchParams.get('nick');
-          if (!nick || !accountStore) {
+          if (!nick || !validSeatName(nick) || !accountStore) {
             refuseUpgrade(401);
             return;
           }
@@ -793,6 +794,7 @@ export function createMultiplayerServer(
           // Insecure dev handshake: `?player=` directly, or `?nick=` via the account store.
           playerId = url.searchParams.get('player') ?? '';
           const nick = url.searchParams.get('nick');
+          if (nick && !validSeatName(nick)) { refuseUpgrade(400); return; }
           if (!playerId && nick && accountStore) {
             // Entry window (SES-2.3), same gate as the seat-lock path: a first-time nick
             // is refused once the window closed; a returning seat-holder is not.

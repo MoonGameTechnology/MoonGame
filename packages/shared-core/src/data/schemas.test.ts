@@ -186,6 +186,24 @@ describe('game data schema (docs/architecture.md §2)', () => {
     }
   });
 
+  it('у разведчика нет трюма, грузового отсека и ремонтного ангара (решение владельца 2026-10-17)', () => {
+    const data = parseGameData(loadShippedBundle());
+    for (const id of ['scout', 'scout_drone']) {
+      const def = data.units[id]!;
+      expect(def.traits, id).toContain('recon');
+      expect(def.stats.cargoCapacity ?? 0, id).toBe(0);
+      for (const mod of ['cargo_bay', 'repair_bay'])
+        expect(moduleAllowed(id, def, data.modules[mod]!), `${id} + ${mod}`).toBe(false);
+    }
+    expect(canEquip('scout', data.units.scout!, [], 'cargo_bay', data)).toEqual({
+      ok: false,
+      code: 'E_NOT_ALLOWED',
+    });
+    // Остальным кораблям отсеки по-прежнему положены.
+    expect(canEquip('frigate', data.units.frigate!, [], 'cargo_bay', data)).toEqual({ ok: true });
+    expect(canEquip('frigate', data.units.frigate!, [], 'repair_bay', data)).toEqual({ ok: true });
+  });
+
   it('у разведчика свой радар — компактный, меньше и слабее (решение владельца 2026-09-24)', () => {
     // «Можно и разведчику, но ему отдельный, свой, поменьше и послабее».
     const data = parseGameData(loadShippedBundle());
@@ -569,8 +587,8 @@ describe('game data schema (docs/architecture.md §2)', () => {
 
   it('applies defaults for omitted optional fields', () => {
     const data = parseGameData(loadShippedBundle());
-    // scout_drone declares no traits in JSON → schema default [].
-    expect(data.units.scout_drone?.traits).toEqual([]);
+    // frigate declares no traits in JSON → schema default [].
+    expect(data.units.frigate?.traits).toEqual([]);
     // a custom `chance` is preserved, not defaulted to 1.
     expect(data.events.void_anomaly?.chance).toBeCloseTo(0.15);
   });

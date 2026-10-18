@@ -249,6 +249,26 @@ describe('createMultiplayerServer', () => {
     }
   });
 
+  it('rejects unsafe legacy nicknames before assigning a seat', async () => {
+    const store = new MemoryAccountStore();
+    const assign = vi.spyOn(store, 'resolveSeat');
+    const server = createMultiplayerServer({ room: makeRoom(), accountStore: store });
+    const url = await server.listen();
+    try {
+      for (const nick of ['f_u_c_k', '<img>', 'pilot\u202E']) {
+        const ws = new WebSocket(`${url}?nick=${encodeURIComponent(nick)}`);
+        ws.on('error', () => {});
+        const [, response] = await once(ws, 'unexpected-response');
+        expect(response.statusCode).toBe(400);
+        response.resume();
+        ws.terminate();
+      }
+      expect(assign).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
   it('nick-login: seats a nick and returns the SAME side on reconnect', async () => {
     const server = createMultiplayerServer({ room: makeRoom(), accountStore: new MemoryAccountStore() });
     const url = await server.listen();

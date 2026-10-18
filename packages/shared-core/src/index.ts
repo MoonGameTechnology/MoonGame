@@ -209,6 +209,8 @@ export {
   worldRadarReach,
   fleetRadarReach,
 } from './state/visibility';
+// FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
+export { knownOwner } from './state/knownOwner';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export type {
   Coverage,
@@ -720,6 +722,7 @@ export {
   MINE_HIT_MAX,
   MINE_COOLDOWN_HOURS,
 } from './modules/minefield';
+export { isReconFleet, RECON_TRAIT } from './state/recon';
 export {
   isMineFleet,
   mineFleetVisible,

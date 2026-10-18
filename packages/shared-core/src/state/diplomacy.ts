@@ -30,11 +30,34 @@ export const DEFAULT_STANCE: DiplomaticStance = 'war';
  *  never appears in one and two ids can't concatenate into an ambiguous key. */
 const PAIR_SEP = '|';
 
+/** Pair keys already built. `getStance` is asked on every world step for every pair
+ *  of players (bloc vision, victory, approval), and concatenating a fresh string and
+ *  hashing it cost three times the lookup itself: ~20 ms of a ×10 frame on FFA-50 by
+ *  day 12. The key is a pure function of the two ids, so the cache cannot change it;
+ *  the cap only keeps a long-running server from growing it without bound. */
+const PAIR_KEYS = new Map<PlayerId, Map<PlayerId, string>>();
+const PAIR_KEYS_MAX = 65_536;
+let pairKeyCount = 0;
+
 /** Canonical, order-independent key for the unordered pair {a, b}: the two ids
  *  sorted and joined by {@link PAIR_SEP}. So `pairKey(a, b) === pairKey(b, a)` —
  *  the stance is stored once per pair. */
 export function pairKey(a: PlayerId, b: PlayerId): string {
-  return a <= b ? `${a}${PAIR_SEP}${b}` : `${b}${PAIR_SEP}${a}`;
+  let row = PAIR_KEYS.get(a);
+  if (row === undefined) PAIR_KEYS.set(a, (row = new Map()));
+  let key = row.get(b);
+  if (key === undefined) {
+    if (pairKeyCount >= PAIR_KEYS_MAX) {
+      PAIR_KEYS.clear();
+      PAIR_KEYS.set(a, row);
+      row.clear();
+      pairKeyCount = 0;
+    }
+    key = a <= b ? `${a}${PAIR_SEP}${b}` : `${b}${PAIR_SEP}${a}`;
+    row.set(b, key);
+    pairKeyCount += 1;
+  }
+  return key;
 }
 
 /** Whether `id` is one of the two parties a pair key names. The projection uses

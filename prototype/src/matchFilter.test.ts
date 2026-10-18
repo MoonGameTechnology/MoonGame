@@ -43,6 +43,11 @@ describe('фильтр браузера — карты', () => {
     );
     expect(mapsOf([])).toEqual([]);
   });
+
+  it('число в id карты сравнивается как число: FFA на 4 раньше FFA на 20 и 50', () => {
+    const ids = ['ffa-50', 'ffa-20', 'duel-1', 'ffa-4'].map((mapId) => row({ mapId }));
+    expect(mapsOf(ids)).toEqual(['duel-1', 'ffa-4', 'ffa-20', 'ffa-50']);
+  });
 });
 
 describe('фильтр браузера — режим', () => {

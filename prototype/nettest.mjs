@@ -20,7 +20,8 @@
  *  2. игроцкий клиент `/` — та же сборка и тот же документ с той же CSP, что у игрока;
  *  3. сокеты страницы идут через `page.routeWebSocket`: смоук видит каждое соединение и
  *     каждое сообщение, а обрыв устраивает сам, не трогая сервер;
- *  4. позывной → хаб → обозреватель партий → свой мир → «В бой»: место принято, мир пришёл;
+ *  4. позывной → хаб → обозреватель партий → свой мир → «В бой»: место принято, мир пришёл
+ *     в той же странице, без перезагрузки;
  *  5. приказ из интерфейса (исследование) — сервер принял, ответ вернулся на экран;
  *  6. выход на обрыве: приказ без связи ложится в очередь, ‹ уводит в хаб, дозвона нет, и
  *     на новом входе из «Активных» (тот же документ) очередь не догоняет игрока;
@@ -109,7 +110,7 @@ page.on('console', (m) => {
   if (m.type() === 'error' && !m.text().includes('Content Security Policy'))
     consoleErrors.push(m.text());
 });
-/** Нарушения CSP за весь прогон, через все документы (вход в партию — навигация). */
+/** Нарушения CSP за весь прогон, через все документы. */
 const cspSeen = [];
 await page.exposeFunction('__cspReport', (v) => cspSeen.push(v));
 await page.addInitScript(() => {
@@ -240,8 +241,17 @@ try {
     );
     assert(free.length > 0, 'в партии есть свободный мир');
     await page.locator(`#setupmap [data-cand="${free[0]}"]`).click();
-    await Promise.all([page.waitForURL(/\/game\//), page.click('#setupgo')]);
-    await until('впуск в партию', async () => (await overlay()) === 'none');
+    // Вход идёт в ЭТОЙ странице (плейтест 2026-10-17: игра открывалась отдельной страницей
+    // поверх меню): метка документа переживает вход, а адрес партии встаёт в строку.
+    await page.evaluate(() => (window.__sameDoc = true));
+    await page.click('#setupgo');
+    await until('впуск в партию', () => !!welcomeOf(live()[0]));
+    await page.waitForURL(/\/game\//);
+    await until('карта после входа', async () =>
+      (await overlay()) === 'none' &&
+      (await page.evaluate(() => getComputedStyle(document.getElementById('setup')).display)) === 'none',
+    );
+    assert.equal(await page.evaluate(() => window.__sameDoc), true, 'вход без перезагрузки страницы');
 
     const first = live()[0];
     const welcome = welcomeOf(first);
@@ -329,14 +339,14 @@ try {
     await page.locator('#setupmaps [data-map]').first().waitFor({ state: 'visible' });
     assert.deepEqual(await page.locator('#setupmaps [data-map]').evaluateAll(
       (chips) => chips.map((chip) => chip.getAttribute('data-map')),
-    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3']);
+    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3', 'ffa-20', 'ffa-50']);
     await page.click('#setupcancel');
     assert.deepEqual(await page.locator('#match-create-map option:not([hidden])').evaluateAll(
       (options) => options.map((option) => option.value),
-    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3']);
-    for (const id of ['hub-sector-zero', 'hub-proving-ground'])
-      assert.equal(await page.locator(`#${id}`).isVisible(), false);
-    console.log('✓ карты: меню предлагает 1 на 1, FFA на четверых и 2 на 2');
+    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3', 'ffa-20', 'ffa-50']);
+    assert.equal(await page.locator('#hub-sector-zero').isVisible(), true);
+    assert.equal(await page.locator('#hub-proving-ground').isVisible(), false);
+    console.log('✓ карты: меню предлагает 1 на 1, FFA на 4, 20 и 50 игроков, 2 на 2 и 3 на 3');
 
     // --- дев-клиент ---------------------------------------------------------------------
     // Его отдаёт тот же сервер, но другим маршрутом, и политика ему нужна своя — по его

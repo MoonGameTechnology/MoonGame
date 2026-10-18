@@ -17,6 +17,11 @@ describe('когда тикает фоновый переопрос списка
   it('ни того, ни другого — тем более молчим', () => {
     expect(pollTick({ overlay: false, browser: false })).toBe('skip');
   });
+
+  it('ПОКА ИГРОК ПРАВИТ АДРЕС, ПЕРЕОПРОС ЖДЁТ: недописанный адрес не спрашивают', () => {
+    expect(pollTick({ overlay: true, browser: true, editing: true })).toBe('skip');
+    expect(pollTick({ overlay: true, browser: true, editing: false })).toBe('poll');
+  });
 });
 
 describe('что переопрос пишет в строку статуса', () => {

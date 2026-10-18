@@ -107,6 +107,10 @@ export interface DiploWindowHost {
   openProfile(login?: string): void;
   /** Перерисовать плавающий чат, если он открыт. */
   refreshChat(): void;
+  /** Ник игрока в кресле (сеть); `undefined` — неизвестен: соло, бот, старый сервер. */
+  seatNick(id: string): string | undefined;
+  /** Переспросить ники у сервера (сам решает, пора ли). */
+  refreshNicks(): void;
 }
 
 let game: DiploWindowHost;
@@ -348,6 +352,7 @@ function toggleMapShare(target: string): void {
 export function openDiplo(tab: 'diplo' | 'msgs' | 'intel'): void {
   diploOpen = true;
   diploTab = tab;
+  game.refreshNicks(); // кто-то мог сесть в партию, пока окно было закрыто
   renderDiplo();
   document.getElementById('diplo')?.classList.add('show');
 }
@@ -532,7 +537,7 @@ function diploRowsHtml(): string {
       return (
         `<div class="dp-row${expanded ? ' open' : ''}${isMe ? ' me' : ''}"${isMe ? '' : ` data-seat="${id}"`}>` +
         `<span class="dp-ic" style="color:${col}">${bdg.icon}</span>` +
-        `<span class="dp-name">${esc(NAME[id] ?? id)} <em>${bdg.tag}</em></span>` +
+        diploNameHtml(id, NAME[id] ?? id, bdg.tag) +
         `<span class="dp-w" title="${t('comms.provinces')}">⬣ ${w}</span>` +
         stanceTag +
         favBar +
@@ -541,6 +546,17 @@ function diploRowsHtml(): string {
       );
     })
     .join('');
+}
+
+/** Имя в строке дипломатии. Ник живого игрока известен (сеть) — он идёт первым и
+ *  открывает профиль, а имя дома уходит в подпись; без ника строка как прежде. */
+function diploNameHtml(id: string, house: string, tag: string): string {
+  const nick = isAiSeat(id) ? undefined : game.seatNick(id);
+  if (!nick) return `<span class="dp-name">${esc(house)} <em>${tag}</em></span>`;
+  return (
+    `<span class="dp-name"><button class="dp-prof" data-prof="${esc(id)}" title="${t('diplo.profile')}">${esc(nick)}</button>` +
+    ` <em>${esc(house)} · ${tag}</em></span>`
+  );
 }
 
 // --- conversations (messages tab: list of chats + the open thread) -----------
@@ -712,7 +728,9 @@ export function initDiploWindow(host: DiploWindowHost): void {
       // Match dossier → career dossier: close this card, open the profile sheet.
       if (tg.closest('.pc-dossier')) {
         const seat = playerCardEl.dataset.seat;
-        const login = seat ? game.state().players[seat]?.name : undefined;
+        // Логин — ник кресла: имя игрока в мире у сетевой партии — имя дома, и по нему
+        // профиль открывался бы пустым.
+        const login = seat ? (game.seatNick(seat) ?? game.state().players[seat]?.name) : undefined;
         playerCardEl.classList.remove('show');
         delete playerCardEl.dataset.seat;
         game.openProfile(login);
@@ -763,6 +781,13 @@ export function initDiploWindow(host: DiploWindowHost): void {
     diploEl.addEventListener('click', (e) => {
       const tg = e.target as HTMLElement;
       if (tg.id === 'diplo' || tg.closest('.dp-close')) return closeDiplo();
+      // Ник в строке — профиль игрока, а не раскрытие строки под ним.
+      const prof = (tg.closest('.dp-prof') as HTMLElement | null)?.dataset.prof;
+      if (prof) {
+        const nick = game.seatNick(prof);
+        if (nick) game.openProfile(prof === game.me() ? undefined : nick);
+        return;
+      }
       const tab = (tg.closest('.dp-tab') as HTMLElement | null)?.dataset.tab;
       if (tab) {
         diploTab = tab as 'diplo' | 'msgs' | 'intel';

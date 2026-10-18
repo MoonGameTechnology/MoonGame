@@ -18,7 +18,7 @@ import { drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { t, tData } from '../../localization/runtime';
 import { isEmplacementFleet } from '../../decisions/emplacement';
-import { regionLabelAlpha, regionLabels } from '../../decisions/regionName';
+import { layoutRegionLabels, regionLabelAlpha, regionLabels } from '../../decisions/regionName';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { fleetAnchor } from './fleetGeometry';
 import { nodeView } from './fogView';
@@ -29,7 +29,7 @@ import { BUILD_ICON, KIND_ICON } from './icons';
 import { isCurrentMap, mapPreset } from './mapCatalog';
 import { selFork, selPlanet } from './interaction';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
-import { visible, world } from './mapCamera';
+import { viewWidth, visible, world } from './mapCamera';
 import { fleetSeen, known, memory, seesDetails } from './mapFog';
 import { roadDrawingOf } from './mapLayer';
 import { targetBrackets } from './mapOverlays';
@@ -98,15 +98,21 @@ function drawRegionLabels(lod: MapLod): void {
   cx.font = '300 12px ui-sans-serif, system-ui, sans-serif';
   if ('letterSpacing' in cx) cx.letterSpacing = '2px';
   cx.lineJoin = 'round';
-  for (const label of labels) {
+  cx.lineWidth = 2;
+  cx.strokeStyle = 'rgba(4,10,12,.35)';
+  cx.fillStyle = 'rgba(200,226,236,.5)';
+  // Подписи не ложатся одна на другую и не уходят за край экрана (правило 5).
+  const onScreen = labels.flatMap((label) => {
     const c = world(label);
-    if (!visible(c, 240)) continue;
-    const text = label.text.toUpperCase();
-    cx.lineWidth = 2;
-    cx.strokeStyle = 'rgba(4,10,12,.35)';
-    cx.strokeText(text, c.x, c.y);
-    cx.fillStyle = 'rgba(200,226,236,.5)';
-    cx.fillText(text, c.x, c.y);
+    return visible(c, 240) ? [{ id: label.id, text: label.text.toUpperCase(), x: c.x, y: c.y }] : [];
+  });
+  const lineHeight = 16;
+  for (const label of layoutRegionLabels(onScreen, (text) => cx.measureText(text).width, { width: viewWidth() }, lineHeight)) {
+    label.lines.forEach((line, i) => {
+      const y = label.y + (i - (label.lines.length - 1) / 2) * lineHeight;
+      cx.strokeText(line, label.x, y);
+      cx.fillText(line, label.x, y);
+    });
   }
   cx.restore();
 }

@@ -26,6 +26,8 @@ import { createErrorReporter, installErrorReporter } from './platform/errorRepor
 import { telemetryTarget } from '../../decisions/telemetryEndpoint';
 import { appLoadedProps } from '../../decisions/sessionAnalytics';
 import { anyToken } from '../../decisions/sessionStore';
+import { DEV_NOTICE_KEY, devNoticeAckValue, needsDevNotice } from '../../decisions/devNotice';
+import { readRaw, writeRaw } from './prefs';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
@@ -67,6 +69,34 @@ function revealBoot(): void {
   document.body.classList.toggle('holo-available', holo);
   document.body.classList.toggle('holo-ui', holo);
   document.body.classList.remove('app-booting');
+  offerDevNotice();
+}
+
+/**
+ * Окно «игра в разработке» (`decisions/devNotice.ts`): поверх входа, пока игра грузится
+ * под ним, и только до согласия с текущей версией текста. Под автоматикой
+ * (`navigator.webdriver` — смоук-харнесы на Playwright) окно не показывается: оно
+ * перекрыло бы кнопки, которые харнесы нажимают, а проверяет его отдельный тест решения.
+ */
+function offerDevNotice(): void {
+  const dialog = document.getElementById('dev-notice');
+  const ack = document.getElementById('dev-notice-ack');
+  // Старый WebView без Dialog API: само имя `HTMLDialogElement` там бросает — окно не
+  // показываем вовсе (плашка остаётся), запуск игры важнее.
+  if (typeof HTMLDialogElement === 'undefined') return;
+  if (!(dialog instanceof HTMLDialogElement) || !ack || navigator.webdriver) return;
+  if (!needsDevNotice(readRaw(DEV_NOTICE_KEY))) return;
+  // Esc закрыл бы модальный диалог без согласия — окно закрывает только кнопка.
+  dialog.addEventListener('cancel', (event) => event.preventDefault());
+  ack.addEventListener(
+    'click',
+    () => {
+      writeRaw(DEV_NOTICE_KEY, devNoticeAckValue());
+      dialog.close();
+    },
+    { once: true },
+  );
+  dialog.showModal();
 }
 // Архиву площадки нечем подписать разметку, пока не скачан язык, — там покров снимается
 // после загрузки текстов (ниже), чтобы не показать кнопки без подписей.
@@ -133,7 +163,11 @@ function telemetrySink(): ReturnType<typeof createBrowserTelemetrySink> | undefi
         return null;
       }
     },
-    build: /^[0-9a-f]{7,40}$/i.test(sha) ? `apk-${sha.slice(0, 12)}` : __PLAYER_BUILD__ ? 'web' : 'dev',
+    build: /^[0-9a-f]{7,40}$/i.test(sha)
+      ? `apk-${sha.slice(0, 12)}`
+      : __PLAYER_BUILD__
+        ? 'web'
+        : 'dev',
   });
   return sink;
 }
@@ -223,6 +257,9 @@ loaderReady()
       // быть виден, покров его не прячет.
       document.body.classList.remove('app-booting');
       document.body.classList.add('app-startup-failed');
+      // Модальное окно «в разработке» лежит в верхнем слое и делает фон инертным —
+      // экран ошибки и его «Повторить» под ним были бы недоступны.
+      (document.getElementById('dev-notice') as HTMLDialogElement | null)?.close?.();
       const panel = document.getElementById('startup-error');
       if (panel) panel.hidden = false;
       const kinds = ['TypeError', 'ReferenceError', 'RangeError', 'SyntaxError', 'SecurityError'];

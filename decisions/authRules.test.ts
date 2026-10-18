@@ -25,10 +25,11 @@ describe('учётные данные — позывной', () => {
 });
 
 describe('учётные данные — пароль', () => {
-  it('порог — восемь знаков', () => {
-    expect(MIN_PASSWORD).toBe(8);
+  it('новый пароль — от двенадцати знаков, простые варианты запрещены', () => {
+    expect(MIN_PASSWORD).toBe(12);
     expect(validPassword('1234567')).toBe(false);
-    expect(validPassword('12345678')).toBe(true);
+    expect(validPassword('12345678')).toBe(false);
+    expect(validPassword('orbit-signal')).toBe(true);
   });
 
   it('пустой пароль не проходит', () => {

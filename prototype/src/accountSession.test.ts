@@ -29,7 +29,6 @@ const BASE = 'ws://srv.test:8080';
 const HTTP = 'http://srv.test:8080';
 
 let cell: Map<string, string>;
-let page: Map<string, { style: { display: string }; value: string }>;
 let calls: Call[];
 let server: (url: string) => Reply;
 let href: string;
@@ -43,10 +42,6 @@ const reply = (status: number, body?: unknown): Reply => ({
     return body;
   },
 });
-const el = (id: string) => {
-  if (!page.has(id)) page.set(id, { style: { display: 'unset' }, value: '' });
-  return page.get(id)!;
-};
 /** Что ушло в теле запроса по этому пути. */
 const sent = (path: string): Record<string, string> => {
   const call = calls.find((c) => c.url === `${HTTP}${path}`);
@@ -55,7 +50,6 @@ const sent = (path: string): Record<string, string> => {
 
 beforeEach(() => {
   cell = new Map();
-  page = new Map();
   calls = [];
   server = () => {
     throw new Error('сервер не должны были спрашивать');
@@ -67,7 +61,6 @@ beforeEach(() => {
     setItem: (k: string, v: string) => void cell.set(k, v),
     removeItem: (k: string) => void cell.delete(k),
   });
-  vi.stubGlobal('document', { getElementById: el });
   vi.stubGlobal('fetch', async (url: string, init?: Call['init']) => {
     calls.push({ url, init });
     return server(url);
@@ -113,21 +106,19 @@ describe('REFM-215 — режим сервера', () => {
     expect(acc.authMode).toBe('unknown');
   });
 
-  it('живое «да» включает аккаунты и показывает строку пароля обозревателя', async () => {
+  it('живое «да» включает аккаунты', async () => {
     const { acc } = await boot();
     server = () => reply(200, { enabled: true });
     expect(await acc.probeAuthMode(BASE)).toBe('accounts');
     expect(acc.authMode).toBe('accounts');
     expect(calls.map((c) => c.url)).toEqual([`${HTTP}/auth/status`]);
-    expect(el('cpassrow').style.display).toBe('');
   });
 
-  it('404 — аккаунтов нет и строка пароля спрятана; обрыв — снова «не знаю»', async () => {
+  it('404 — аккаунтов нет; обрыв — снова «не знаю»', async () => {
     const { acc } = await boot();
     server = () => reply(404);
     expect(await acc.probeAuthMode(BASE)).toBe('nicks');
     expect(acc.authMode).toBe('nicks');
-    expect(el('cpassrow').style.display).toBe('none');
     server = () => {
       throw new TypeError('Failed to fetch');
     };
@@ -156,25 +147,20 @@ describe('REFM-215 — вход или регистрация', () => {
     const { acc, env } = await boot();
     expect(await acc.ensureSession(BASE, 'ab', 'long-enough')).toBeNull();
     expect(await acc.ensureSession(BASE, 'Ivan')).toBeNull();
-    expect(env.status).toEqual([t('acc.nick.rule'), t('acc.pass.rule')]);
+    expect(env.status).toEqual([t('acc.nick.rule'), t('acc.login-pass.rule')]);
     expect(calls).toEqual([]);
   });
 
-  it('пароль — с карточки, иначе из строки обозревателя; явный не перебивается даже пустой', async () => {
+  it('пароль — с карточки; явный не перебивается ею даже пустой', async () => {
     const { acc, env } = await boot();
     server = () => reply(200, { token: 'T' });
-    el('cpass').value = 'browser-pass';
-    await acc.ensureSession(BASE, 'Ivan');
-    expect(sent('/auth/login').password).toBe('browser-pass');
-    cell.clear();
-    calls = [];
     env.welcomePass = 'welcome-pass';
     await acc.ensureSession(BASE, 'Ivan');
     expect(sent('/auth/login').password).toBe('welcome-pass');
     cell.clear();
     calls = [];
     expect(await acc.ensureSession(BASE, 'Ivan', '')).toBeNull();
-    expect(env.status).toEqual([t('acc.pass.rule')]);
+    expect(env.status).toEqual([t('acc.login-pass.rule')]);
     expect(calls).toEqual([]);
   });
 

@@ -67,26 +67,32 @@ describe('обстрел и штурм — правила 3 и 4', () => {
   it('штурм не спрашивает КОРАБЛИ: высаживается десант, а не корпуса', () => {
     // Транспорт без единого боевого корабля обязан сохранить своё единственное дело:
     // корабли не при чём — важен десант (и то лишь там, где мир защищён).
-    expect(assaultEnabled(true, true, true)).toBe(true);
-    expect(assaultEnabled(false, true, true)).toBe(false); // без ближней орбиты — никак
+    expect(assaultEnabled(true, true, true, false)).toBe(true);
+    expect(assaultEnabled(false, true, true, false)).toBe(false); // без ближней орбиты — никак
   });
 
   it('на ЗАЩИЩЁННОМ мире пустой трюм гасит кнопку: ядро ответит E_NO_TROOPS', () => {
     // Ровно та тихая ошибка, ради которой заведён модуль: кнопка выглядит доступной,
     // игрок жмёт, ядро отказывает, а снаружи это «ничего не произошло».
-    expect(assaultEnabled(true, false, true)).toBe(false);
+    expect(assaultEnabled(true, false, true, false)).toBe(false);
   });
 
   it('на НЕзащищённом мире десант не нужен: пустой мир занимают, а не штурмуют', () => {
     // Прятать кнопку тут значило бы отнять законный приказ — ядро такой штурм примет
     // и просто займёт мир (`capturePlanet`, ветка «undefended → occupy»).
-    expect(assaultEnabled(true, false, false)).toBe(true);
-    expect(assaultEnabled(true, true, false)).toBe(true);
+    expect(assaultEnabled(true, false, false, false)).toBe(true);
+    expect(assaultEnabled(true, true, false, false)).toBe(true);
+  });
+
+  it('флоту из одних разведчиков десант нужен и на пустом мире: ядро ответит E_RECON_NO_CAPTURE', () => {
+    // Разведчик мир не занимает (решение владельца 2026-10-16); десант с него — занимает.
+    expect(assaultEnabled(true, false, false, true)).toBe(false);
+    expect(assaultEnabled(true, true, false, true)).toBe(true);
   });
 
   it('там, где обстрел запрещён пустым составом, штурм всё равно разрешён', () => {
     expect(bombardEnabled(true, 0, true)).toBe(false);
-    expect(assaultEnabled(true, true, true)).toBe(true);
+    expect(assaultEnabled(true, true, true, false)).toBe(true);
   });
 });
 

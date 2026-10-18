@@ -151,6 +151,29 @@ describe('достижимость содержимого на гейтиров�
     expect(day1.length).toBeGreaterThan(0);
   });
 
+  // «Широкий старт» (решение владельца 2026-10-15): обычная партия начинается со всего,
+  // что было в ней до арсенала, кроме редкого. Каждый корабль и каждый ПРОСТОЙ модуль —
+  // в стартовом наборе; снабжением (дроп, мастерская, сезон) открываются только редкие.
+  it('в стартовом наборе каждый корабль и каждый простой модуль', () => {
+    const starter = loadStarterArsenal(data);
+    const hulls = new Set(starter.filter((t) => t.kind === 'hull').map((t) => t.defId));
+    const modules = new Set(starter.filter((t) => t.kind === 'module').map((t) => t.defId));
+    expect(gated().filter((id) => !KNOWN_UNREACHABLE.includes(id) && !hulls.has(id))).toEqual([]);
+    const simple = Object.entries(data.modules)
+      .filter(([, m]) => m.rarity === 'simple')
+      .map(([id]) => id);
+    expect(simple.length).toBeGreaterThan(0);
+    expect(simple.filter((id) => !modules.has(id))).toEqual([]);
+  });
+
+  // Выпавший чертёж того, что и так есть у каждого аккаунта, — пустая находка: её
+  // нельзя ни применить, ни продать (у покупателя такой же).
+  it('дроп не выдаёт того, что уже лежит в стартовом наборе', () => {
+    const starter = new Set(loadStarterArsenal(data).map((t) => `${t.kind}:${t.defId}`));
+    const duds = loadDropTables(data).pool.filter((e) => starter.has(`${e.kind}:${e.defId}`));
+    expect(duds).toEqual([]);
+  });
+
   it('список известных недостижимых не растёт молча', () => {
     const have = reachable();
     expect(KNOWN_UNREACHABLE.filter((id) => !(id in data.units))).toEqual([]);

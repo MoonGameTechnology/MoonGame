@@ -20,6 +20,7 @@ import {
 } from '../util/combat';
 import { splitVolley } from '../util/volley';
 import { fireOnGarrison, shipGroundDamage } from '../util/groundFire';
+import { recordValues } from '../util/records';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
 export const BOMBARD_FRACTION = 0.5;
@@ -65,7 +66,7 @@ function nearOrbitHostiles(
   localFleets?: readonly Fleet[],
 ): Fleet[] {
   const candidates =
-    localFleets ?? Object.values(h.state.fleets).filter((f) => f.location === planetId);
+    localFleets ?? recordValues(h.state.fleets).filter((f) => f.location === planetId);
   const hostiles: Fleet[] = [];
   for (const f of candidates) {
     if (f.orbit !== 'near' || f.battleId) {
@@ -121,7 +122,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
 
   // Pre-index fleets by location — O(fleets).
   const fleetsByLocation = new Map<string, Fleet[]>();
-  for (const f of Object.values(h.state.fleets)) {
+  for (const f of recordValues(h.state.fleets)) {
     if (f.location !== null) {
       const arr = fleetsByLocation.get(f.location);
       if (arr) arr.push(f);

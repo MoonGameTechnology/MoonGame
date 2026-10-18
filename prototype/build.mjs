@@ -11,6 +11,13 @@ import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
 
+// A native button keeps keyboard activation and never submits the password form.
+const passwordToggle = (
+  id,
+) => `<button id="${id}-visibility" class="cpass-toggle" type="button" aria-controls="${id}" data-i18n-aria="auth.password.show" data-i18n-title="auth.password.show">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="cpass-slash" d="m3 3 18 18"/></svg>
+</button>`;
+
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
 const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
@@ -19,6 +26,23 @@ const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
+
+/** Отдельный поток расчёта соло-мира (`simWorker.ts`) — строкой в бандл экрана: так поток
+ *  поднимается и в однофайловой сборке, открытой с диска (`simLink.ts`). Пока он за флагом
+ *  дев-сборки (`?sim=worker`), поэтому сборка игрока его не несёт. */
+const simWorkerSource = (
+  await build({
+    entryPoints: ['prototype/src/simWorker.ts'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    minify: true,
+    legalComments: 'none',
+    write: false,
+    define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
+  })
+).outputFiles[0].text;
 
 const bundleOptions = (playerBuild) => ({
   entryPoints: ['prototype/src/bootstrap.ts'],
@@ -30,7 +54,11 @@ const bundleOptions = (playerBuild) => ({
   minify: true,
   legalComments: 'none',
   write: false,
-  define: { __PLAYER_BUILD__: String(playerBuild), __SECTOR_ZERO_ONLY__: 'false' },
+  define: {
+    __PLAYER_BUILD__: String(playerBuild),
+    __SECTOR_ZERO_ONLY__: 'false',
+    ...(playerBuild ? {} : { __SIM_WORKER_SRC__: JSON.stringify(simWorkerSource) }),
+  },
 });
 
 const bundle = async (playerBuild) => (await build(bundleOptions(playerBuild))).outputFiles[0].text;
@@ -165,7 +193,7 @@ body.app-starting #map{visibility:hidden;}
    \`holo-ui\`) и без подписей, а через полсекунды — новый. Покров снимает \`bootstrap.ts\`,
    уже поставив классы консоли и подписи. */
 body.app-booting > *{visibility:hidden!important;}
-body.app-startup-failed > :not(#startup-error){display:none!important;}
+body.app-startup-failed > :not(#startup-error):not(#dev-badge){display:none!important;}
 /* AUD-29: the tab that lost Sector Zero to another tab looks like a stopped start, too. */
 #startup-error,#tab-taken{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:18px;padding:24px;
@@ -178,6 +206,28 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #startup-retry,#tab-taken button{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;
   color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
 #startup-retry:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
+/* «Игра в разработке»: плашка видна на любом экране, но не ловит касания и не занимает
+   места в раскладке; окно согласия — один раз на устройство (\`decisions/devNotice.ts\`). */
+#dev-badge{position:fixed;z-index:100001;left:50%;transform:translateX(-50%);
+  bottom:max(2px,env(safe-area-inset-bottom));pointer-events:none;user-select:none;
+  font:600 var(--fs-caption)/1.2 var(--sf-font);white-space:nowrap;
+  color:var(--amber);opacity:.5;text-shadow:0 0 4px #000,0 0 2px #000;}
+/* Телефон: снизу стоит панель вкладок — плашка уходит в правый край, в поле экрана. */
+@media (max-width:720px),(max-height:500px){
+  #dev-badge{left:auto;bottom:auto;top:50%;right:max(1px,env(safe-area-inset-right));
+    transform:translateY(-50%);writing-mode:vertical-rl;}
+}
+/* Окно — \`<dialog>\` через \`showModal()\`: верхний слой и инертный фон, так что Tab и
+   автофокус входа (\`fillWelcome\`) не уходят к полям под окном. */
+#dev-notice{width:min(400px,calc(100% - 40px));max-width:none;padding:22px 22px 18px;margin:auto;
+  background:#091b20;border:1px solid var(--amber);border-radius:12px;color:var(--ink);text-align:center;
+  box-shadow:0 0 40px rgba(0,0,0,.6);}
+#dev-notice::backdrop{background:rgba(2,8,14,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#dev-notice h2{margin:0 0 10px;font-size:18px;line-height:1.3;color:var(--amber);}
+#dev-notice p{margin:0 0 18px;font-size:15px;line-height:1.5;}
+#dev-notice-ack{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;cursor:pointer;
+  color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
+#dev-notice-ack:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 
 /* themed scrollbars — angular neon thumb on a dark grid track, in the HUD's tactical key.
    Firefox gets the colour pair; WebKit gets the full glow/gradient treatment. */
@@ -337,18 +387,6 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 .rc-per{font-style:normal;font-size:max(var(--fs-caption),.82em);opacity:.6;margin-left:1px;}
 .res b{color:#e6eeef;font-weight:700;font-size:var(--fs-body);font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
-/* UIX-4.1: «+N» под плашкой ресурса (purseFloats.ts). Живёт в body, а не в плашке: плашку
-   перерисовывает patchPurse и обрезает её overflow. Без движения (.still) число не уплывает,
-   а гаснет на месте. 42 — над листом «Ещё» (41), под окнами (44+). */
-.purse-float{position:fixed;z-index:42;transform:translate(-50%,0);pointer-events:none;white-space:nowrap;
-  font-size:calc(14px * var(--pcz,1));font-weight:700;font-variant-numeric:tabular-nums;
-  text-shadow:0 1px 4px #000,0 0 2px #000;animation:purse-float 1s ease-out forwards;}
-.purse-float.up{color:var(--grn,#5ff0a8);}
-.purse-float.dn{color:var(--red,#ff5a4d);}
-.purse-float.still{animation:purse-fade 1s linear forwards;}
-@keyframes purse-float{0%{opacity:0;transform:translate(-50%,-2px);}15%{opacity:1;}
-  100%{opacity:0;transform:translate(-50%,16px);}}
-@keyframes purse-fade{0%,60%{opacity:1;}100%{opacity:0;}}
 /* player emblem — a console crest the player picks in the main menu (hub), worn in the
    TOP-LEFT corner. Tap → player dossier (bubbles to the .crest handler). */
 #crestmark{width:34px;height:34px;border-radius:50%;flex:0 0 auto;cursor:pointer;padding:0;
@@ -1048,6 +1086,14 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .wp-yes:active{background:rgba(255,90,77,.3);}
 /* ⌂ в экспедиции: три действия столбцом — «Завершить и забрать награду» в треть ряда не влезает */
 #abandon.exit .wp-actions{flex-direction:column;}
+/* окно погрузки — тот же слой подтверждения приказа, но не военный: спокойный циан, три действия столбцом */
+#warprompt.calm{background:rgba(1,10,14,.6);}
+#warprompt.calm .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
+#warprompt.calm .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
+#warprompt.calm .wp-body{color:var(--ink);}
+#warprompt.calm .wp-actions{flex-direction:column;}
+.lp-after{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.16);color:var(--cyan);}
+.lp-now{border:1px solid #7a5a1c;background:rgba(255,190,77,.1);color:#ffc65a;}
 /* сколько заберёт «Завершить» — цветом данных экспедиций, как кошелёк подготовки */
 .wp-reward{font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cur-data);margin:-4px 0 14px;}
 
@@ -1086,8 +1132,14 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .dp-row.open{border-color:var(--cyan-dim);}
 .dp-ic{font-size:18px;width:20px;text-align:center;font-variant-emoji:text;flex:0 0 auto;}
 .dp-name{flex:1;font-size:var(--fs-body);color:#eafffb;font-weight:700;display:flex;align-items:baseline;gap:6px;min-width:0;}
+.dp-prof{padding:0;border:0;background:none;text-align:left;color:var(--cyan);font:inherit;font-weight:700;cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dp-prof:hover{color:#eafffb;}
 .dp-name em{font-style:normal;font-size:var(--fs-caption);color:var(--dim);
   border:1px solid var(--line);border-radius:3px;padding:1px 4px;flex:0 0 auto;}
+/* Ник впереди; дом и подпись сжимаются многоточием (на телефоне строка переносится, см. mobile-strategy.css). */
+.dp-name .dp-prof{flex:0 1 auto;}
+.dp-name .dp-prof+em{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dp-w{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;flex:0 0 auto;}
 .dp-stance{font-size:var(--fs-caption);border:1px solid;border-radius:3px;padding:2px 6px;flex:0 0 auto;font-weight:700;}
 .dp-tag{font-size:var(--fs-caption);color:var(--dim);flex:0 0 auto;}
@@ -1327,6 +1379,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .pp-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:5px;}
 .pp-top b{font-size:var(--fs-caption);font-variant-emoji:text;}
 .pp-top span{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;}
+.pp-top span{margin-left:auto;}
+/* ✕ всплывашки — крестик (.btn-x): вид даёт он, здесь только размер. */
+.pp-close{flex:0 0 auto;align-self:center;width:24px;height:24px;margin:-2px -4px 0 0;padding:0;border-radius:5px;
+  font:inherit;font-size:var(--fs-caption);}
+@media (pointer:coarse){.pp-close{width:30px;height:30px;}}
 .pp-desc{font-size:var(--fs-caption);line-height:1.4;color:#e7d6b8;margin-bottom:7px;word-break:break-word;}
 .pp-desc i{color:var(--dim);}
 .pp-act{display:flex;gap:5px;}
@@ -1340,7 +1397,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu.show{display:flex;}
 #pingmenu .pm-box{width:min(360px,92vw);background:var(--glass);border:1px solid var(--amber);
   border-radius:12px;padding:16px 16px 14px;box-shadow:0 0 30px rgba(0,0,0,.6);}
-#pingmenu .pm-head{font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head>span{flex:1;min-width:0;}
+#pingmenu .pm-close{flex:0 0 auto;width:28px;height:28px;border-radius:6px;font:inherit;} /* вид — .btn-x */
 #pingmenu .pm-head b{color:#eafffb;}
 #pingmenu .pm-sub{color:var(--dim);font-size:var(--fs-caption);line-height:1.5;margin-bottom:11px;}
 #pingmenu .pm-text{width:100%;box-sizing:border-box;margin-bottom:12px;padding:8px 10px;border-radius:6px;
@@ -1353,9 +1412,6 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu .pm-dst.coal{border-color:var(--amber);background:rgba(255,196,90,.08);}
 #pingmenu .pm-dst .pm-ic{flex:0 0 auto;}
 #pingmenu .pm-dst em{margin-left:auto;color:var(--dim);font-weight:400;font-style:normal;font-size:var(--fs-caption);}
-#pingmenu .pm-cancel{display:block;width:100%;margin-top:8px;padding:9px;border-radius:7px;
-  border:1px solid var(--line-hi);background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-body);cursor:pointer;}
-#pingmenu .pm-cancel:hover{color:var(--ink);border-color:var(--cyan-dim);}
 
 /* status strip below the top bar: the in-game clock + the donate currency on the right
    (day/countdown live in the #daycard, victory progress in the #tbscore chip above).
@@ -2289,6 +2345,40 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* «Как в прошлый раз» (UIX-7.3): rebuilds the last order; a long hull name is cut, not wrapped */
 .cn-again{margin-left:auto;min-width:0;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cn-again+.cn-close{margin-left:0;flex:none;}
+/* «Шаблоны» (2026-10-17): toggle in the header + a pane under it; the queue strip below
+   the tabs shows the chosen world's unit lane, hidden while it is empty */
+.cn-tplbtn{flex:none;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;}
+#constructor .cn-head>b+.cn-tplbtn{margin-left:auto;}
+.cn-tplbtn.on{color:var(--cyan);border-color:var(--cyan-dim);}
+#constructor .cn-head .cn-tplbtn+.cn-close{margin-left:0;flex:none;}
+.cn-tpl{flex:none;display:flex;flex-direction:column;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);max-height:34vh;overflow:auto;}
+.cn-tplrow{display:flex;align-items:center;gap:6px;}
+.cn-tpluse{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;
+  background:rgba(255,255,255,.02);color:var(--ink);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;text-align:left;}
+.cn-tpluse:hover{border-color:var(--cyan-dim);}
+.cn-tpluse:disabled{opacity:.45;cursor:not-allowed;}
+.cn-tplrow.on .cn-tpluse{border-color:var(--cyan);}
+.cn-tpn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cn-tpms{margin-left:auto;display:flex;gap:3px;flex:none;}
+.cn-tpm{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;}
+.cn-tpm svg{width:16px;height:16px;}
+.cn-tpldel{flex:none;width:28px;height:28px;border-radius:6px;}
+.cn-tplnone{font-size:var(--fs-caption);color:var(--dim);padding:2px 0;}
+.cn-tplsave{align-self:flex-start;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);}
+#cn-queue{flex:none;}
+#cn-queue:empty{display:none;}
+.cn-queue{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);min-width:0;}
+.cn-qh{flex:none;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}
+.cn-qlist{display:flex;gap:6px;overflow-x:auto;min-width:0;scrollbar-width:none;}
+.cn-qi{position:relative;flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--line);border-radius:7px;
+  overflow:hidden;font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
+.cn-qi b{color:#eafffb;}
+.cn-qi.run{border-color:var(--cyan-dim);}
+.cn-qt{color:var(--cyan);}
+.cn-qbar{position:absolute;left:0;bottom:0;height:2px;background:var(--cyan);}
+.cn-qi.fresh{animation:cn-qfresh 1.2s ease-out 1;}
+@keyframes cn-qfresh{0%{border-color:var(--grn);box-shadow:0 0 10px var(--grn);}100%{box-shadow:none;}}
+@media (prefers-reduced-motion:reduce){.cn-qi.fresh{animation:none;border-color:var(--grn);}}
 .cn-tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
 .cn-tab{padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -2464,6 +2554,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cn-tabs{gap:5px;padding:9px 10px;}
   .cn-tab{padding:9px 12px;font-size:var(--fs-caption);}
   .cn-close{width:36px;height:36px;}
+  .cn-tpl-k{display:none;}
+  .cn-tplbtn{min-width:36px;min-height:36px;}
+  .cn-tpldel{width:36px;height:36px;}
   .cn-pal{grid-template-columns:repeat(2,1fr);}
   .cn-hbtn{padding:9px 12px;}
   .cn-step button{width:38px;height:38px;}
@@ -2567,6 +2660,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #endscreen .es-xp .lvl{display:block;margin-top:3px;font-size:var(--fs-caption);color:var(--cyan);font-weight:400;}
 /* Итог забега Sector Zero по частям (PVR-5.4): забег и задачи — строками, сумма — внизу. */
 #endscreen .es-run{text-align:left;margin:12px 0 4px;border:1px solid var(--line-hi);border-radius:8px;padding:8px 10px;background:rgba(6,18,22,.6);}
+#endscreen .es-rewards h3{margin:0 0 9px;font-size:var(--fs-body);color:var(--cyan);}
 #endscreen .es-run ul{list-style:none;margin:0;padding:0;display:grid;gap:5px;}
 #endscreen .es-run li{display:flex;justify-content:space-between;gap:10px;font-size:var(--fs-body);color:var(--dim);}
 #endscreen .es-run li b{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;}
@@ -2733,9 +2827,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .ctitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);}
 #connect .csub{margin:8px 0 18px;color:var(--dim);font-size:var(--fs-body);line-height:1.5;}
 #connect .cfield{display:block;margin:0 0 12px;color:var(--dim);font-size:var(--fs-caption);}
-#setup .inp,#match-create .inp,#setup-bot-count{display:block;width:100%;margin:6px 0 10px;padding:10px 12px;
+#setup .inp,#setup-bot-count{display:block;width:100%;margin:6px 0 10px;padding:10px 12px;
   color:var(--ink);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;font:inherit;min-height:44px;}
-#setup .inp:focus-visible,#match-create .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+#setup .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 #setup-bot-count{max-width:140px;}
 /* «Создать сетевую игру» — вторичная кнопка (.btn-second): здесь только размер и место. */
 #setup-network-create{display:block;width:100%;min-height:44px;padding:0 16px;border-radius:12px;font-size:16px;}
@@ -2758,53 +2852,151 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   border-radius:7px;color:var(--ink);font:var(--fs-body)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;}
 #connect .cwlogin input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.2);}
 #connect .cwlogin .cbtn{flex:0 0 auto;min-width:92px;}
+#connect .password-field{position:relative;margin-top:5px;}
+#connect .password-field input{margin-top:0;padding-right:52px;min-height:46px;}
+#connect .cpass-toggle{position:absolute;right:2px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
+  width:44px;height:44px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dim);cursor:pointer;}
+#connect .cpass-toggle:hover{color:var(--cyan);}
+#connect .cpass-toggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-3px;}
+#connect .cpass-slash{display:none;}
+#connect .cpass-toggle[data-visible="true"] .cpass-slash{display:block;}
 #connect .cstat{margin-top:14px;min-height:16px;font-size:var(--fs-body);color:var(--amber);text-align:center;}
 /* The status line reserves its row so an appearing message doesn't shove the card's
    buttons down. On a freshly opened welcome card there IS no message, and the reserved
    row read as a dead strip under the last button — collapse it while it is empty. */
 #connect .cstat:empty{margin-top:0;min-height:0;}
 #connect .clink{display:block;width:100%;margin-top:14px;padding:4px;font-size:var(--fs-body);text-align:center;}
-#connect .mtabs{display:flex;gap:6px;margin-top:16px;}
-#connect .mtab{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-family:var(--sf-font);font-size:var(--fs-caption);cursor:pointer;}
+/* «Матчи» (UIX-17.1, заказ владельца 2026-10-16) — страница в палитре хаба, как настройка схватки
+   (UIX-15.1/16.1): на телефоне весь экран без рамки, на ПК окно (bridge-shell.css). Шапка и вкладки
+   стоят на месте, листается середина, «Новый матч» — у нижнего края. Язык, версия и ссылки подвала
+   живут на приветственном шаге и в хабе, здесь их нет. Строка статуса встаёт под вкладки:
+   «загрузка» — над списком, «неверный адрес» — у карточки сервера. */
+#connect[data-stage="browse"]{padding:0;align-items:stretch;background:var(--sf-panel),#030b14;}
+#connect[data-stage="browse"] .cwrap{display:flex;flex-direction:column;width:100%;margin:0;padding:0;}
+#connect[data-stage="browse"] :is(.clang,.cfoot,.cver,.cupd,.tm-open){display:none;}
+#connect[data-stage="browse"] .cbox{flex:1 1 auto;display:flex;flex-direction:column;gap:12px;width:100%;min-height:0;margin:0;
+  border:0;border-radius:0;background:none;box-shadow:none;color:var(--sf-text);
+  font-family:var(--sf-font);font-variant-numeric:tabular-nums;
+  padding:calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));}
+#connect[data-stage="browse"] #cbrowse{display:contents;}
+#connect[data-stage="browse"] .cstat{order:3;margin:0;}
+#connect[data-stage="browse"] .cstat:empty{display:none;}
+#connect .mhead{order:1;display:flex;align-items:center;gap:14px;}
+#connect .mhead .cback{flex:none;min-height:44px;margin:0;padding:0 4px;}
+#connect .mhead .ctitle{min-width:0;font-size:20px;font-weight:700;line-height:1.3;color:var(--sf-hi);}
+#connect .mhead .ctitle .dia{flex:none;width:10px;height:10px;background:var(--sf-accent);box-shadow:0 0 10px var(--sf-accent);}
+#connect .mtabs{order:2;display:flex;gap:6px;}
+#connect .mtab{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 10px;
+  border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card-off);color:var(--sf-dim);
+  font:600 14px var(--sf-font);white-space:nowrap;cursor:pointer;}
+#connect .mtab:hover{border-color:var(--sf-edge-hi);}
 #connect .mtab.active{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
-/* Панель фильтров над списком (BRW-3) — только на вкладке «Доступные». */
-#connect .mfilter{margin-top:10px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;
-  display:flex;flex-direction:column;gap:7px;}
-#connect .mfrow{display:flex;align-items:center;gap:8px;}
-#connect .mflabel{flex:none;width:64px;color:var(--dim);font-size:var(--fs-caption);}
+/* Число на вкладке — сколько строк она покажет (decisions/matchesPage.ts, правило 1); ленты нет — числа нет. */
+#connect .mcount{min-width:22px;padding:1px 7px;border-radius:999px;background:var(--sf-inset);color:var(--sf-text);
+  font:600 12px/1.4 var(--sf-font);font-style:normal;text-align:center;}
+#connect .mcount:empty{display:none;}
+#connect .mtab.active .mcount{background:color-mix(in srgb,var(--sf-accent) 22%,transparent);color:var(--sf-hi);}
+/* Середина листается целиком: карточка сервера, фильтр и список. */
+#connect .mbody{order:4;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:flex;flex-direction:column;gap:12px;}
+/* «Сервер не отвечает» — адрес виден, только когда он нужен (decisions/browserFallback.ts, правило 4). */
+#connect .msrv{flex:none;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;padding:14px 16px;
+  border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);border-radius:12px;background:var(--sf-card);}
+#connect .msrv > b{flex:1 0 100%;font-size:16px;font-weight:600;line-height:1.35;color:var(--amber);}
+#connect .msrv .cfield{flex:1 1 220px;margin:0;font-size:14px;color:var(--sf-dim);}
+#connect .msrv .cfield input{min-height:46px;border-color:var(--sf-edge);border-radius:12px;background:var(--sf-inset);font-size:16px;}
+#connect .msrv .cbtn{flex:1 0 auto;min-height:46px;padding:0 18px;border-radius:12px;font-size:15px;}
+/* Фильтр «Доступных» (BRW-3) одной полосой: вид, карты, число игроков. Контрол без выбора не
+   показывается (decisions/matchesPage.ts, правило 3). */
+#connect .mfilter{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;}
 #connect .mfseg{display:flex;gap:4px;}
-#connect .mfbtn{padding:5px 10px;border-radius:6px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-family:var(--sf-font);font-size:var(--fs-caption);cursor:pointer;}
+#connect .mfbtn{min-height:44px;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card-off);
+  color:var(--sf-dim);font:600 14px var(--sf-font);cursor:pointer;}
+#connect .mfbtn:hover{border-color:var(--sf-edge-hi);}
 #connect .mfbtn.active{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
-#connect .mfdrop{position:relative;flex:1;min-width:0;}
-#connect .mfwide{width:100%;text-align:left;}
-#connect .mfmenu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;max-height:38vh;overflow-y:auto;
-  padding:6px;border:1px solid var(--line-hi);border-radius:7px;background:rgba(3,12,16,.97);}
-#connect .mfmenu label{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:5px;
-  color:var(--txt,#dfeef2);font-size:var(--fs-body);text-transform:capitalize;cursor:pointer;}
-#connect .mfmenu label:hover{background:rgba(53,214,230,.08);}
-#connect .mfrange{flex:1;min-width:0;accent-color:var(--cyan,#35d6e6);}
-#connect .mfval{flex:none;min-width:52px;text-align:right;color:var(--cyan-dim,#6cc);font-size:var(--fs-caption);}
-#connect .mlist{margin-top:10px;max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-#connect .mempty{padding:18px 8px 8px;text-align:center;color:var(--dim);font-size:var(--fs-body);}
-#connect .msolo{padding:6px 8px 16px;text-align:center;}
-#connect .msolo .mbtn{font-size:var(--fs-body);padding:10px 18px;}
-#connect .msolo-sub{margin-top:6px;color:var(--dim);font-size:var(--fs-caption);}
-#connect .mrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line-hi);
-  border-radius:8px;background:rgba(255,255,255,.02);}
-#connect .minfo{flex:1;min-width:0;}
-#connect .mname{font-size:var(--fs-body);color:var(--txt,#dfeef2);text-transform:capitalize;}
-#connect .mname .mid{font-size:var(--fs-caption);color:var(--dim);text-transform:none;margin-left:6px;}
-#connect .mmeta{margin-top:3px;font-size:var(--fs-caption);color:var(--dim);}
-#connect .mmeta .mmode{font-size:var(--fs-caption);padding:1px 5px;border-radius:3px;border:1px solid currentColor;}
-#connect .mmeta .mmode.pve{color:var(--amber,#e0a942);}
-#connect .mmeta .mmode.pvp{color:var(--cyan-dim,#6cc);}
-#connect .mmeta .mwin{color:var(--cyan-dim,#6cc);}
-#connect .mmeta .mwin.soon{color:var(--amber,#e0a942);}
-#connect .mmeta .mwin.shut{color:var(--dim);text-decoration:line-through;}
-#connect .mbtns{display:flex;gap:6px;flex:none;}
-#connect .mbtn{padding:8px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
+#connect .mfdrop{position:relative;flex:1 1 150px;min-width:0;}
+#connect .mfwide{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;white-space:nowrap;}
+#connect .mfwide::after{content:'▾';flex:none;color:var(--sf-dim);}
+/* Список карт — по ширине имён, от правого края кнопки: в ширину кнопки «2 на 2 · Разорванный
+   предел» ломался на три строки. */
+#connect .mfmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;width:max-content;min-width:100%;
+  max-width:min(360px,calc(100vw - 32px));max-height:38vh;overflow-y:auto;padding:6px;
+  border:1px solid var(--sf-edge-hi);border-radius:12px;background:#06141f;box-shadow:var(--sf-shadow);}
+#connect .mfmenu label{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border-radius:8px;
+  color:var(--sf-text);font-size:15px;cursor:pointer;}
+#connect .mfmenu label:hover{background:var(--sf-sel);}
+#connect .mfmenu input{flex:none;width:18px;height:18px;margin:0;accent-color:var(--sf-accent);}
+/* Число игроков — два бегунка на одной дорожке; между ними выбранный диапазон (--lo/--hi ставит
+   matchBrowser.ts). Концы могут меняться местами (matchFilter.ts, правило 4). */
+#connect .mfplayers{flex:1 1 100%;display:flex;align-items:center;gap:10px;min-width:0;}
+#connect .mflabel{flex:none;font-size:14px;color:var(--sf-dim);}
+#connect .mfval{flex:none;min-width:44px;font-size:14px;font-weight:600;color:var(--sf-text);}
+#connect .mfdual{--lo:0;--hi:1;position:relative;flex:1 1 auto;min-width:120px;height:44px;}
+#connect .mfdual::before{content:'';position:absolute;left:11px;right:11px;top:50%;height:4px;margin-top:-2px;border-radius:2px;
+  background:linear-gradient(90deg,var(--sf-edge) calc(var(--lo) * 100%),var(--sf-accent) calc(var(--lo) * 100%),
+    var(--sf-accent) calc(var(--hi) * 100%),var(--sf-edge) calc(var(--hi) * 100%));}
+#connect .mfrange{position:absolute;inset:0;width:100%;height:100%;margin:0;background:none;pointer-events:none;
+  -webkit-appearance:none;appearance:none;}
+#connect .mfrange:focus-visible{outline:none;}
+#connect .mfrange::-webkit-slider-runnable-track{height:100%;border:0;background:none;}
+#connect .mfrange::-moz-range-track{height:100%;border:0;background:none;}
+#connect .mfrange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;pointer-events:auto;width:22px;height:22px;margin-top:11px;
+  border:2px solid var(--sf-accent);border-radius:50%;background:var(--sf-hi);cursor:pointer;
+  box-shadow:0 0 8px color-mix(in srgb,var(--sf-accent) 60%,transparent);}
+#connect .mfrange::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border:2px solid var(--sf-accent);border-radius:50%;
+  background:var(--sf-hi);cursor:pointer;}
+#connect .mfrange:focus-visible::-webkit-slider-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
+#connect .mfrange:focus-visible::-moz-range-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
+#connect .mlist{flex:none;display:flex;flex-direction:column;gap:8px;}
+#connect .mnum{flex:none;display:flex;gap:8px;}
+#connect .mnum input{flex:1;min-width:0;min-height:44px;padding:0 12px;background:rgba(2,10,14,.9);
+  border:1px solid var(--line-hi);border-radius:7px;color:var(--ink);font:var(--fs-body)/1.4 var(--sf-font);
+  font-variant-numeric:tabular-nums;}
+#connect .mnum input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.2);}
+#connect .mnum .mbtn{flex:none;}
+#connect .mempty{padding:18px 8px 4px;text-align:center;font-size:15px;line-height:1.45;color:var(--sf-dim);}
+#connect .msolo{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 8px 16px;text-align:center;}
+#connect .msolo .mbtn{min-height:46px;padding:0 20px;}
+#connect .msolo-sub{font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне «Войти»
+   стоит рядом с картой, и строка под ней — во всю ширину; две кнопки своих вкладок — своим рядом.
+   На ПК кнопки справа от обеих строк (bridge-shell.css). */
+#connect .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name btns" "meta meta";
+  align-items:center;gap:6px 12px;padding:12px 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
+#connect .mrow.mrow-2{grid-template-areas:"name name" "meta meta" "btns btns";}
+#connect .mrow:hover{border-color:var(--sf-edge-hi);}
+#connect .minfo{display:contents;}
+#connect .mname{grid-area:name;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:16px;line-height:1.35;}
+#connect .mname b{font-weight:600;color:var(--sf-text);}
+#connect .mmodename{font-size:14px;color:var(--sf-dim);}
+#connect .mmode{padding:0 7px;border:1px solid currentColor;border-radius:999px;font-size:12px;font-weight:700;line-height:1.6;}
+#connect .mmode.pve{color:var(--amber,#e0a942);}
+#connect .mmode.pvp{color:var(--sf-accent);}
+#connect .mended{padding:0 8px;border-radius:999px;background:var(--sf-inset);font-size:12px;line-height:1.6;color:var(--sf-dim);}
+#connect .mmeta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:14px;line-height:1.4;color:var(--sf-dim);}
+#connect .mseats{display:inline-flex;align-items:center;gap:3px;}
+#connect .mseats i{width:9px;height:9px;border:1px solid var(--sf-accent);border-radius:50%;}
+#connect .mseats i.on{background:var(--sf-accent);}
+#connect .mseats b{margin-left:4px;font-weight:600;color:var(--sf-text);}
+#connect .mwin{color:var(--sf-accent);}
+#connect .mwin.soon{color:var(--amber,#e0a942);}
+#connect .mwin.shut{color:var(--sf-dim);text-decoration:line-through;}
+#connect .mbtns{grid-area:btns;justify-self:end;display:flex;gap:6px;}
+#connect .mbtn{min-height:44px;padding:0 16px;border-radius:12px;font-size:15px;white-space:nowrap;}
+/* «Новый матч» — у нижнего края, только над загруженными «Доступными». */
+#connect .mcreate{order:5;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+  padding-top:12px;border-top:1px solid var(--sf-edge);}
+#connect .mcreate label{flex:1 0 100%;font-size:14px;font-weight:600;color:var(--sf-head);}
+#connect .mcreate .inp{flex:1 1 160px;min-width:0;min-height:48px;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:var(--sf-inset);color:var(--sf-text);font:16px var(--sf-font);}
+#connect .mcreate .inp:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+#connect .mcreate .mbtn{flex:0 0 auto;min-height:48px;padding:0 22px;font-size:16px;}
+/* Узкий телефон: три вкладки с числами должны встать в строку. */
+@media (max-width:360px){
+  #connect .mtabs{gap:4px;}
+  #connect .mtab{gap:4px;padding:0 8px;font-size:13px;}
+}
 /* welcome stage — first-launch identity screen (new commander / sign-in) */
 /* The chip above the card and the legal footer below it are absolutely positioned, so
    they carry no height of their own — the padding here RESERVES their strip inside the
@@ -3381,7 +3573,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hm-list{display:flex;flex-direction:column;gap:8px;}
 #hub .hm-row .hm-body{flex:1;min-width:0;}
 #hub .hm-row .hm-addr{font-size:var(--fs-caption);color:var(--dim);margin-top:6px;
-  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;}
+  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;font-variant-numeric:tabular-nums;}
 #hub .hm-row .hm-btns{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}
 /* «Продолжить» и «Копировать адрес» — классами .btn-second/.btn-quiet (UIX-11.2): правило
    #connect .mbtn сюда не доходит, и без них это были кнопки браузера по умолчанию. */
@@ -3494,6 +3686,7 @@ ${profileCss}
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
 #hp-arsenal{overflow-y:auto;gap:10px;}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:var(--fs-caption)}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
+#hp-supply{overflow-y:auto;gap:16px;padding-bottom:24px}.me-section{display:flex;flex-direction:column;gap:10px}.me-section h3,.me-section h4{margin:0}.me-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.me-head h2{margin:0;color:var(--cyan);font-size:20px}.me-hint{margin:0;color:var(--dim);font-size:var(--fs-caption);line-height:1.45}.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}.me-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--glass)}.me-card.me-goal{border-color:var(--cyan)}.me-card h4{margin:0}.me-amounts{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.me-amounts span,.me-row span{color:var(--dim)}.me-row{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-caption)}.me-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}#hp-supply button{min-height:40px;padding:8px 12px;border:1px solid var(--cyan-dim);border-radius:6px;background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer}#hp-supply button:disabled{opacity:.45;cursor:default}#hp-supply button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.me-badge{color:var(--cyan);font-size:var(--fs-caption)}.me-bound{color:#e8b869;font-size:var(--fs-caption);margin:0}.me-error{color:#ef9b9b}.me-track{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}.me-level{border-top:1px solid var(--line);padding-top:10px}.me-track details>summary{cursor:pointer;padding:8px 0}.me-material-list{display:grid;gap:6px}.me-select{width:100%;padding:8px;background:#07131b;color:var(--ink);border:1px solid var(--line);border-radius:6px}.me-reward{margin:0;padding-left:18px;font-size:var(--fs-caption);color:var(--dim)}
 .ar-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid var(--line);}
 .ar-fchip{padding:3px 9px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -3767,7 +3960,6 @@ ${profileCss}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
   #connect .cbox,#connect .cwrap{width:min(520px,62.5vw);}
-  #connect .mlist{max-height:30.5vh;}
   #connect .ccrest .wm{font-size:clamp(20px,4.33vw,26px);letter-spacing:clamp(3px,1.33vw,8px);}
   #connect .ccrest .wtag{letter-spacing:clamp(2px,.93vw,5px);}
   /* skirmish setup on PC: two card-columns — the match (map choice, start world on the
@@ -3916,6 +4108,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <code id="startup-code"></code>
   <button id="startup-retry" type="button" data-i18n="startup.retry"></button>
 </section>
+<div id="dev-badge" data-i18n="dev-notice.badge"></div>
+<dialog id="dev-notice" aria-labelledby="dev-notice-title" aria-describedby="dev-notice-body">
+  <h2 id="dev-notice-title" data-i18n="dev-notice.title"></h2>
+  <p id="dev-notice-body" data-i18n="dev-notice.body"></p>
+  <button id="dev-notice-ack" type="button" data-i18n="dev-notice.ack"></button>
+</dialog>
 <canvas id="map" tabindex="-1"></canvas>
 <section id="comic" role="dialog" aria-modal="true" tabindex="-1" data-i18n-aria="sector-zero.comic.title">
   <button id="comic-skip" type="button" data-i18n="sector-zero.comic.skip"></button>
@@ -4052,7 +4250,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div></div>
 <div id="diplo"></div>
 <div id="pingpop"></div>
-<!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (main.ts, renderStatPop) -->
+<!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (fleetCard.ts, renderStatPop) -->
 <div id="statpop" role="dialog" aria-live="polite"></div>
   <div id="pingpanel"></div>
 <div id="tgted"></div>
@@ -4090,8 +4288,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
             <button id="cwgo" class="cbtn btn-second" type="button" data-i18n="welcome.go"></button>
           </div>
-          <div id="cwpassrow" class="cwlogin" style="display:none">
+          <div id="cwpassrow" class="cwlogin password-field" style="display:none">
             <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
+            ${passwordToggle('cwpass')}
           </div>
         </form>
       </div>
@@ -4106,12 +4305,19 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <label class="cfield"><span data-i18n="welcome.register.mail"></span>
             <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
           </label>
-          <label class="cfield"><span data-i18n="welcome.register.pass"></span>
-            <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
-          </label>
-          <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
+          <div class="cfield"><label for="crpass" data-i18n="welcome.register.pass"></label>
+            <div class="password-field">
+            <input id="crpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="crpassrule" data-i18n-ph="welcome.pass.min.ph">
+              ${passwordToggle('crpass')}
+            </div>
+          </div>
+          <p id="crpassrule" class="csub" data-i18n="acc.pass.rule"></p>
+          <div class="cfield"><label for="crpass2" data-i18n="welcome.register.pass2"></label>
+            <div class="password-field">
             <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-          </label>
+              ${passwordToggle('crpass2')}
+            </div>
+          </div>
         </form>
         <div class="crow">
           <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
@@ -4138,74 +4344,86 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
                should have (optionally hidden) username fields»). Filled from the saved
                callsign at reset time; never submitted anywhere. -->
           <input id="cresetuser" type="text" autocomplete="username" hidden aria-hidden="true" tabindex="-1">
-          <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
-            <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
-          </label>
-          <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
+          <div class="cfield"><label for="cresetpass" data-i18n="welcome.reset.pass"></label>
+            <div class="password-field">
+            <input id="cresetpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="cresetpassrule" data-i18n-ph="welcome.pass.min.ph">
+              ${passwordToggle('cresetpass')}
+            </div>
+          </div>
+          <p id="cresetpassrule" class="csub" data-i18n="acc.pass.rule"></p>
+          <div class="cfield"><label for="cresetpass2" data-i18n="welcome.reset.pass2"></label>
+            <div class="password-field">
             <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-          </label>
+              ${passwordToggle('cresetpass2')}
+            </div>
+          </div>
         </form>
         <div class="crow">
           <button id="cresetgo" class="cbtn btn-main" type="button" data-i18n="welcome.reset.go"></button>
         </div>
       </div>
       <div id="cbrowse" style="display:none">
-        <button id="cback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
-        <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
-        <p class="csub" data-i18n="welcome.browse.sub"></p>
-        <label class="cfield"><span data-i18n="welcome.browse.server"></span>
-          <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
-        </label>
-        <form class="authform" onsubmit="return false">
-          <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
-            <input id="cnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-          </label>
-          <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
-            <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
-          </label>
+        <div class="mhead">
+          <button id="cback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
+          <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
+        </div>
+        <!-- Позывной приходит со входа, а не со страницы (UIX-17.1): поле — спрятанный носитель
+             состояния, его читают разбор адреса и вход в партию. Пароль спрашивает только карточка входа. -->
+        <form class="mcarry" hidden onsubmit="return false">
+          <input id="cnick" type="text" autocomplete="off" maxlength="24">
         </form>
-        <div class="crow">
-          <button id="cgo" class="cbtn btn-second" type="button" data-i18n="welcome.browse.go"></button>
-        </div>
         <div class="mtabs">
-          <button class="mtab active" data-tab="available" data-i18n="welcome.browse.tab.available"></button>
-          <button class="mtab" data-tab="active" data-i18n="welcome.browse.tab.active"></button>
-          <button class="mtab" data-tab="archived" data-i18n="welcome.browse.tab.archived"></button>
+          <button class="mtab active" type="button" data-tab="available"><span data-i18n="welcome.browse.tab.available"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="active"><span data-i18n="welcome.browse.tab.active"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="archived"><span data-i18n="welcome.browse.tab.archived"></span><i class="mcount"></i></button>
         </div>
-        <div id="mfilter" class="mfilter" style="display:none">
-          <div class="mfrow">
-            <span class="mflabel" data-i18n="browser.filter.mode"></span>
-            <div class="mfseg" id="mf-mode">
+        <div class="mbody">
+          <!-- Адрес сервера виден, только когда сервер не ответил (browserFallback.ts, правило 4). -->
+          <div id="msrv" class="msrv" style="display:none">
+            <b data-i18n="browser.server-down"></b>
+            <label class="cfield"><span data-i18n="browser.server-addr"></span>
+              <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
+            </label>
+            <button id="cgo" class="cbtn btn-second" type="button" data-i18n="browser.server-retry"></button>
+          </div>
+          <div id="mfilter" class="mfilter" style="display:none">
+            <div class="mfseg" id="mf-mode" role="group" data-i18n-aria="browser.filter.mode">
               <button class="mfbtn active" type="button" data-mode="all" data-i18n="browser.filter.all"></button>
               <button class="mfbtn" type="button" data-mode="pvp" data-i18n="browser.mode.pvp"></button>
               <button class="mfbtn" type="button" data-mode="pve" data-i18n="browser.mode.pve"></button>
             </div>
-          </div>
-          <div class="mfrow">
-            <span class="mflabel" data-i18n="browser.filter.map"></span>
-            <div class="mfdrop">
+            <div class="mfdrop" id="mf-mapbox">
               <button class="mfbtn mfwide" type="button" id="mf-map"></button>
               <div class="mfmenu" id="mf-maps" style="display:none"></div>
             </div>
+            <div class="mfplayers" id="mf-players">
+              <span class="mflabel" data-i18n="browser.filter.players"></span>
+              <span class="mfval" id="mf-range"></span>
+              <div class="mfdual" id="mf-dual">
+                <input id="mf-min" class="mfrange" type="range" min="0" max="0" value="0" data-i18n-aria="browser.filter.min">
+                <input id="mf-max" class="mfrange" type="range" min="0" max="0" value="0" data-i18n-aria="browser.filter.max">
+              </div>
+            </div>
           </div>
-          <div class="mfrow">
-            <span class="mflabel" data-i18n="browser.filter.players"></span>
-            <input id="mf-min" class="mfrange" type="range" min="0" max="0" value="0">
-            <input id="mf-max" class="mfrange" type="range" min="0" max="0" value="0">
-            <span class="mfval" id="mf-range"></span>
-          </div>
+          <!-- Вход по номеру партии (плейтест 2026-10-17): номер диктуют и копируют вместо адреса. -->
+          <form id="mnum" class="mnum" style="display:none" onsubmit="return false">
+            <input id="mnum-in" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="80" data-i18n-ph="browser.number.ph" data-i18n-aria="browser.number.ph">
+            <button id="mnum-go" class="mbtn btn-second" type="submit" data-i18n="browser.join"></button>
+          </form>
+          <div id="mlist" class="mlist"></div>
         </div>
-        <div id="match-create" class="mfilter" style="display:none">
-          <label for="match-create-map" data-i18n="setup.map"></label>
+        <div id="match-create" class="mcreate" style="display:none">
+          <label for="match-create-map" data-i18n="browser.create"></label>
           <select id="match-create-map" class="inp">
             <option value="duel-1" data-i18n="setup.map.duel-1"></option>
             <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
             <option value="team-2v2" data-i18n="setup.map.team-2v2"></option>
             <option value="team-3v3" data-i18n="setup.map.team-3v3"></option>
+            <option value="ffa-20" data-i18n="setup.map.ffa-20"></option>
+            <option value="ffa-50" data-i18n="setup.map.ffa-50"></option>
           </select>
-          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
+          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go"></button>
         </div>
-        <div id="mlist" class="mlist"></div>
       </div>
       <div id="cstatus" class="cstat"></div>
     </div>
@@ -4355,7 +4573,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
-      <button id="hub-sector-zero" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
+      <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
@@ -4372,7 +4590,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
-    <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
+    <div class="hub-panel" id="hp-arsenal" style="display:none"><button id="arsenal-supply" class="hub-solo" type="button" data-i18n="hub.tile.supply"></button><div id="arsenal-items"></div></div>
+    <div class="hub-panel" id="hp-supply" style="display:none"></div>
     <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
@@ -4386,6 +4605,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
+        <button class="hub-tile" id="hub-supply" type="button"><span class="ht-ic">⚒</span><span data-i18n="hub.tile.supply"></span></button>
         <button class="hub-tile" id="hub-auction" type="button"><span class="ht-ic">⌖</span><span data-i18n="hub.tile.auction"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
         <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>
@@ -4560,7 +4780,9 @@ const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
 writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
-console.log('wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)');
+console.log(
+  'wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)',
+);
 console.log(
   'wrote prototype/dist/void-dominion.html (' + (devHtml.length / 1024).toFixed(0) + ' KB)',
 );

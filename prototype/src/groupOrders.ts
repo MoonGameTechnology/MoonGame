@@ -17,10 +17,18 @@
  * (`orderPipeline.ts`), сеть читается у `netSession.ts`, меню десанта — у владельца выбора.
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
-import { findHealthyStack, planRoute, sumUnitStat } from '../../packages/shared-core/src/index';
+import {
+  findHealthyStack,
+  knownOwner,
+  MAX_CHAIN_STEPS,
+  planRoute,
+  sumUnitStat,
+  type ChainStep,
+} from '../../packages/shared-core/src/index';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { t } from '../../localization/runtime';
 import { assaultSteps } from '../../decisions/assaultOrder';
+import { afterLoadSteps, splitByLoading, type DeferredOrder } from '../../decisions/loadingOrders';
 import { mergePlan } from '../../decisions/mergeOrders';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
@@ -104,6 +112,24 @@ export interface WarPrompt {
 // A staged move that would cross territory of a player you're at PEACE with: held
 // until you confirm in the war-prompt (declaring war opens the route) or cancel.
 export let warPrompt: WarPrompt | null = null;
+
+/** Приказ группе, отложенный до ответа окна погрузки (`loadingOrders.ts`). */
+interface LoadPrompt {
+  /** Весь выбор: «сбросить и лететь» отдаёт приказ им всем. */
+  fleetIds: string[];
+  /** Флоты с идущей погрузкой или выгрузкой — им «после погрузки» ставит план. */
+  busy: string[];
+  order: DeferredOrder | { kind: 'edge'; edge: { from: string; to: string; t: number } };
+  minutesLeft: number;
+}
+// Приказ флоту, который ещё грузит десант: вылет снял бы погрузку, поэтому сперва окно —
+// поставить приказ в план после погрузки или сбросить её и лететь. Живёт в том же слое
+// `#warprompt`, что и запрос войны: одно окно подтверждения приказа, а не два.
+let loadPrompt: LoadPrompt | null = null;
+/** Открыто ли окно подтверждения приказа — запрос войны или окно погрузки. */
+export function orderPromptOpen(): boolean {
+  return warPrompt !== null || loadPrompt !== null;
+}
 
 // --- часовая погрузка десанта: ТЕПЕРЬ ЭТО ПРАВИЛО МИРА, а не клиента ----------
 // Здесь ЖИЛА очередь `pendingLoads` — заказ час висел в памяти вкладки и только потом
@@ -237,19 +263,18 @@ function peaceBlockers(from: string | null, toId: string): string[] {
   if (!from || from === toId) return [];
   const s = game.world();
   const ME = game.me();
-  const peaceLocked = (id: string): boolean => {
-    const owner = s.planets[id]?.owner ?? null;
-    return owner != null && !canTraverse(s, ME, owner);
-  };
+  // FOG-LEAK: и закрыт, и виден — тем же правилом, каким ядро отбило приказ. Хозяин
+  // неразведанного мира в окно войны не попадает: соло держит полный мир, и настоящий
+  // владелец здесь назвал бы того, кого игрок не видел.
+  const locked = (owner: string | null): boolean => owner != null && !canTraverse(s, ME, owner);
+  const peaceLocked = (id: string): boolean =>
+    locked(s.planets[id]?.owner ?? null) && locked(knownOwner(s, ME, id));
   // The same veto predicate the kernel replans with; planRoute exempts the
   // destination, so a reachable-by-detour move reports at most the DESTINATION's
   // owner (landing on their world genuinely needs the war declaration).
   const route = planRoute(s, from, toId, peaceLocked) ?? planRoute(s, from, toId) ?? [toId];
   const set = new Set<string>();
-  for (const hop of route) {
-    const owner = s.planets[hop]?.owner ?? null;
-    if (owner != null && !canTraverse(s, ME, owner)) set.add(owner);
-  }
+  for (const hop of route) if (peaceLocked(hop)) set.add(s.planets[hop]!.owner!);
   return [...set];
 }
 /** Живые флоты из выбора: ссылка могла пережить сам флот (погиб, слился, доставлен). */
@@ -259,11 +284,12 @@ function livingFleets(fleetIds: readonly string[]): Fleet[] {
 }
 /** Order every selected fleet to a world. If the route crosses PEACE territory, stage
  *  a war-declaration prompt instead of dispatching (confirm → declare war + advance). */
-export function tryMoveGroup(fleetIds: string[], destId: string): void {
+export function tryMoveGroup(fleetIds: string[], destId: string, askLoading = true): void {
   const ME = game.me();
   // Отсев участников и сбор виновников — `warPrompt.ts` (REFM-57).
   const movers = moveMovers(livingFleets(fleetIds), destId);
   if (!movers.length) return;
+  if (askLoading && stageLoadPrompt(movers, { kind: 'move', to: destId })) return;
   const blockers = collectBlockers(movers, (id) =>
     // ядро пропускает — объезд есть, виновников по этому флоту нет
     peaceBlocked(moveFleet(ME, id, destId))
@@ -280,19 +306,22 @@ export function tryMoveGroup(fleetIds: string[], destId: string): void {
 /** PC ШТУРМ: send every selected fleet at `destId` (someone else's capturable world)
  *  and assault on arrival. A peaceful target/route stages the war prompt first —
  *  worded as "this is a friendly faction's world". */
-export function tryAssaultGroup(fleetIds: string[], destId: string): void {
+export function tryAssaultGroup(fleetIds: string[], destId: string, askLoading = true): void {
   const s = game.world();
   const ME = game.me();
   // Штурмуют ВСЕ выбранные: стоящий у цели штурмует с места (`warPrompt.ts`, REFM-57).
   const movers = assaultMovers(livingFleets(fleetIds));
   if (!movers.length) return;
+  if (askLoading && stageLoadPrompt(movers, { kind: 'assault', to: destId })) return;
   const blockers = collectBlockers(movers, (id) =>
     peaceBlocked(moveFleet(ME, id, destId)) ? peaceBlockers(fleetNode(s.fleets[id]!), destId) : [],
   );
   // Штурм — не просто ход: даже по свободному маршруту нельзя высадиться на мир
   // НЕвраждебного игрока (ядро: `E_FORBIDDEN`). Спросить об этом ядро нельзя — флот
   // ещё не там, — поэтому владелец цели проверяется здесь и ТОЛЬКО здесь.
-  const target = assaultTargetBlocker(s.planets[destId]?.owner, ME, (owner) =>
+  // Владелец цели — тот, кого игрок ВИДИТ (FOG-LEAK): неразведанный мир окно войны не
+  // называет; если он чужой, флот встретит границу в пути.
+  const target = assaultTargetBlocker(knownOwner(s, ME, destId), ME, (owner) =>
     canTraverse(s, ME, owner),
   );
   const all = target && !blockers.includes(target) ? [...blockers, target] : blockers;
@@ -415,8 +444,10 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
 export function tryMoveEdgeGroup(
   fleetIds: string[],
   edge: { from: string; to: string; t: number },
+  askLoading = true,
 ): void {
   const ME = game.me();
+  if (askLoading && stageLoadPrompt(fleetIds, { kind: 'edge', edge })) return;
   // Марш упирается в ОБА конца лейна (`warOrders.ts`, REFM-59), а не только в «куда».
   const blockers = collectBlockers(fleetIds, (id) => {
     if (!peaceBlocked(moveFleetEdge(ME, id, edge))) return [];
@@ -450,9 +481,59 @@ export function confirmWarPrompt(): void {
   }
   game.note(t('log.war.declared'));
 }
+/** Закрыть окно подтверждения приказа без приказа: и запрос войны, и окно погрузки. */
 export function cancelWarPrompt(): void {
   warPrompt = null;
+  loadPrompt = null;
   hideWarPrompt();
+}
+
+/** Есть ли в выборе флот с идущей погрузкой — тогда приказ ждёт ответа окна. */
+function stageLoadPrompt(fleetIds: string[], order: LoadPrompt['order']): boolean {
+  const split = splitByLoading(livingFleets(fleetIds), game.world().time);
+  if (!split.busy.length) return false;
+  loadPrompt = { fleetIds: [...fleetIds], busy: split.busy, order, minutesLeft: split.minutesLeft };
+  renderLoadPrompt();
+  return true;
+}
+
+/** Ответ окна погрузки. `after` — занятым флотам приказ встаёт в план после погрузки,
+ *  свободные уходят сразу; `now` — приказ всем сразу, вылет снимает погрузку. */
+export function confirmLoadPrompt(choice: 'after' | 'now'): void {
+  const lp = loadPrompt;
+  if (!lp) return;
+  loadPrompt = null;
+  hideWarPrompt();
+  const ME = game.me();
+  let ids = lp.fleetIds;
+  if (choice === 'after' && lp.order.kind !== 'edge') {
+    const plans = (game.world() as { orders?: Record<string, { steps: ChainStep[] }> }).orders;
+    for (const id of lp.busy) {
+      playerOrder(orderChain(ME, id, afterLoadSteps(lp.order, plans?.[id]?.steps ?? [], MAX_CHAIN_STEPS)));
+    }
+    ids = ids.filter((id) => !lp.busy.includes(id));
+    if (!ids.length) return;
+  }
+  const o = lp.order;
+  if (o.kind === 'edge') tryMoveEdgeGroup(ids, o.edge, false);
+  else if (o.kind === 'assault') tryAssaultGroup(ids, o.to, false);
+  else tryMoveGroup(ids, o.to, false);
+}
+
+function renderLoadPrompt(): void {
+  const el = document.getElementById('warprompt');
+  if (!el || !loadPrompt) return;
+  // Точку на лейне в план не поставить — шаг плана умеет только мир (`loadingOrders.ts`).
+  const after =
+    loadPrompt.order.kind === 'edge' ? '' : `<button class="lp-after">${t('loadprompt.after')}</button>`;
+  el.innerHTML =
+    `<div class="wpbox">` +
+    `<div class="wp-head">⏳ ${t('loadprompt.title')}</div>` +
+    `<div class="wp-body">${t('loadprompt.body', { n: loadPrompt.busy.length, m: loadPrompt.minutesLeft })}</div>` +
+    `<div class="wp-actions">${after}<button class="lp-now">${t('loadprompt.now')}</button>` +
+    `<button class="wp-no">${t('loadprompt.cancel')}</button></div>` +
+    `</div>`;
+  el.classList.add('show', 'calm');
 }
 function renderWarPrompt(): void {
   const el = document.getElementById('warprompt');
@@ -470,10 +551,11 @@ function renderWarPrompt(): void {
     `<div class="wp-actions"><button class="wp-no">${t(text.no)}</button>` +
     `<button class="wp-yes">${t(text.yes)}</button></div>` +
     `</div>`;
+  el.classList.remove('calm');
   el.classList.add('show');
 }
 function hideWarPrompt(): void {
-  document.getElementById('warprompt')?.classList.remove('show');
+  document.getElementById('warprompt')?.classList.remove('show', 'calm');
 }
 
 /** Order `movers` to merge into `anchorId`. Co-located & idle fleets fuse at once;

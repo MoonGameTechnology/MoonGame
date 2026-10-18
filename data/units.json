@@ -9,7 +9,9 @@
       "hp": 6
     },
     "line": "mid",
-    "traits": [],
+    "traits": [
+      "recon"
+    ],
     "abilities": [
       "long_range_scan"
     ],
@@ -457,8 +459,7 @@
       "attack": 5,
       "defense": 4,
       "speed": 64,
-      "hp": 12,
-      "cargoCapacity": 1
+      "hp": 12
     },
     "line": "mid",
     "cost": {
@@ -474,7 +475,8 @@
     },
     "hullClass": "light",
     "traits": [
-      "support"
+      "support",
+      "recon"
     ]
   },
   "picket_frigate": {

@@ -440,3 +440,186 @@ describe('bug-hunt batch — time-gap guard, no clock rewind, finite schedule', 
     expect(state.scheduled).toHaveLength(0);
   });
 });
+
+// Ход идёт одной копией мира: шаги правят её на месте. Снаружи это должно быть неотличимо
+// от прежнего хода, где каждый шаг работал на своей копии.
+describe('advanceTo — one copy of the world per advance', () => {
+  it('a step that fails after changing the world leaves no trace; the steps before it stay', () => {
+    const spoiler: GameModule = {
+      id: 'spoiler',
+      version: '1.0.0',
+      setup(api) {
+        api.on('spoil', (_event, h) => {
+          h.state.planets.p!.resources.metal = -1;
+          h.schedule(h.state.time + 10, 'spoiled');
+          throw new Error('after the change');
+        });
+      },
+    };
+    const kernel = createKernel([economyModule, spoiler]);
+    const planets = { p: makePlanet('p', { metal: 0 }) };
+    const state = stateWith({
+      planets,
+      scheduled: [sched(0, 100, 'noop'), sched(1, 200, 'spoil'), sched(2, 250, 'noop')],
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(300)));
+    expect(r.failures).toEqual([{ at: 200, type: 'spoil', code: 'E_INTERNAL' }]);
+    // Every span accrued (2 metal per ms × 300 ms); the failed step's −1 and timer are gone.
+    expect(r.state.planets.p?.resources.metal).toBe(600);
+    expect(r.state.scheduled).toEqual([]);
+    expect(r.state.time).toBe(300);
+  });
+
+  it('a payload that points into the world is handed out as it was at its step', () => {
+    const watcher: GameModule = {
+      id: 'watcher',
+      version: '1.0.0',
+      setup(api) {
+        api.on('look', (_event, h) => {
+          const resources = h.state.planets.p!.resources; // the world's own object
+          h.emit('seen', resources);
+          h.schedule(h.state.time + 100, 'recall', resources);
+        });
+        api.on('recall', (event, h) => h.emit('recalled', event.payload));
+      },
+    };
+    const kernel = createKernel([economyModule, watcher]);
+    const state = stateWith({
+      planets: { p: makePlanet('p', { metal: 0 }) },
+      scheduled: [sched(0, 100, 'look')],
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(400)));
+    const payload = (type: string) => r.events.find((e) => e.type === type)?.payload;
+    // Later spans keep accruing into the world, not into what was already handed out.
+    expect(payload('seen')).toEqual({ metal: 200 });
+    expect(payload('recalled')).toEqual({ metal: 200 });
+    expect(r.state.planets.p?.resources.metal).toBe(800);
+  });
+});
+
+// `time.stop`: подписчик хука останавливает мир внутри отрезка — там, где ему нужен шаг
+// (`time.stopped`), а не на каждом событии в очереди. Подписчик только читает мир.
+describe('advanceTo — time.stop cuts a span where a module needs a step', () => {
+  const stopAt = (at: unknown): GameModule => ({
+    id: 'stopper',
+    version: '1.0.0',
+    setup(api) {
+      api.hook<unknown>('time.stop', (value, args) => {
+        const { from, to } = args as { from: number; to: number };
+        return typeof at === 'number' && at > from && at <= to
+          ? Math.min(value as number, at)
+          : value;
+      });
+      api.on('time.stopped', (event, h) => {
+        h.state.planets.p!.resources.stops = (h.state.planets.p!.resources.stops ?? 0) + 1;
+        h.emit('seen', { at: (event.payload as { at: number }).at, time: h.ctx.now });
+      });
+    },
+  });
+  const spans = (events: { type: string; payload: unknown }[]) =>
+    events
+      .filter((e) => e.type === TIME_ADVANCED || e.type === 'time.stopped')
+      .map((e) =>
+        e.type === TIME_ADVANCED
+          ? (e.payload as { from: number; to: number })
+          : { stopped: (e.payload as { at: number }).at },
+      );
+
+  it('splits the span at the stop, runs the stop step, and goes on to now', () => {
+    const kernel = createKernel([economyModule, stopAt(300)]);
+    const state = deepFreeze(stateWith({ planets: { p: makePlanet('p', { metal: 0 }) } }));
+    const r = okAdvance(kernel.advanceTo(state, ctx(1000)));
+    expect(spans(r.events)).toEqual([
+      { from: 0, to: 300 },
+      { stopped: 300 },
+      { from: 300, to: 1000 },
+    ]);
+    expect(r.events.find((e) => e.type === 'seen')?.payload).toEqual({ at: 300, time: 300 });
+    expect(r.state.planets.p?.resources).toEqual({ metal: 2000, stops: 1 });
+    expect(r.failures).toEqual([]);
+  });
+
+  it('a stop before a queued event: the event still fires on its own instant', () => {
+    const kernel = createKernel([economyModule, stopAt(300)]);
+    const state = stateWith({
+      planets: { p: makePlanet('p', { metal: 0 }) },
+      scheduled: [sched(0, 800, 'x')],
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(1000)));
+    expect(spans(r.events)).toEqual([
+      { from: 0, to: 300 },
+      { stopped: 300 },
+      { from: 300, to: 800 },
+      { from: 800, to: 1000 },
+    ]);
+    expect(domainTypes(r.events)).toEqual(['time.stopped', 'seen', 'x']);
+  });
+
+  it('a stop on the instant of a queued event steps after that event, on either path', () => {
+    // Второй прогон идёт пошагово: событие `boom` падает, и ход на месте отдаёт работу.
+    const boom: GameModule = {
+      id: 'boom',
+      version: '1.0.0',
+      setup(api) {
+        api.on('boom', () => {
+          throw new Error('boom');
+        });
+      },
+    };
+    for (const queue of [[sched(0, 800, 'x')], [sched(0, 100, 'boom'), sched(1, 800, 'x')]]) {
+      const kernel = createKernel([economyModule, stopAt(800), boom]);
+      const state = stateWith({ planets: { p: makePlanet('p', { metal: 0 }) }, scheduled: queue });
+      const r = okAdvance(kernel.advanceTo(state, ctx(1000)));
+      expect(domainTypes(r.events).filter((t) => t !== 'boom')).toEqual([
+        'x',
+        'time.stopped',
+        'seen',
+      ]);
+      expect(spans(r.events).slice(-3)).toEqual([
+        { from: queue.length === 1 ? 0 : 100, to: 800 },
+        { stopped: 800 },
+        { from: 800, to: 1000 },
+      ]);
+      expect(r.state.planets.p?.resources).toEqual({ metal: 2000, stops: 1 });
+      expect(r.failures.map((f) => f.type)).toEqual(queue.length === 1 ? [] : ['boom']);
+    }
+  });
+
+  it('a stop exactly at the end of the span still gets its step', () => {
+    const kernel = createKernel([economyModule, stopAt(1000)]);
+    const r = okAdvance(
+      kernel.advanceTo(stateWith({ planets: { p: makePlanet('p', { metal: 0 }) } }), ctx(1000)),
+    );
+    expect(spans(r.events)).toEqual([{ from: 0, to: 1000 }, { stopped: 1000 }]);
+  });
+
+  it('ignores an instant outside the span or not a number', () => {
+    for (const at of [0, -5, 1001, Number.NaN, '300']) {
+      const kernel = createKernel([economyModule, stopAt(at)]);
+      const r = okAdvance(
+        kernel.advanceTo(stateWith({ planets: { p: makePlanet('p', { metal: 0 }) } }), ctx(1000)),
+      );
+      expect(spans(r.events), String(at)).toEqual([{ from: 0, to: 1000 }]);
+    }
+  });
+
+  it('a subscriber that writes or throws stops nothing: recorded, and the world moves on', () => {
+    const writes: GameModule = {
+      id: 'writer',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('time.stop', (value, _args, h) => {
+          h.schedule(500, 'sneaky');
+          return value;
+        });
+      },
+    };
+    const kernel = createKernel([economyModule, writes]);
+    const state = deepFreeze(stateWith({ planets: { p: makePlanet('p', { metal: 0 }) } }));
+    const r = okAdvance(kernel.advanceTo(state, ctx(1000)));
+    expect(r.failures).toEqual([{ at: 0, type: 'time.stop', code: 'E_INTERNAL' }]);
+    expect(spans(r.events)).toEqual([{ from: 0, to: 1000 }]);
+    expect(r.state.scheduled).toEqual([]);
+    expect(r.state.planets.p?.resources.metal).toBe(2000);
+  });
+});

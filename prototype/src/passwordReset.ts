@@ -13,9 +13,10 @@
  * пароля, чисткой ссылки и разбором ответа сервера.
  */
 import { t } from '../../localization/runtime';
+import { MIN_PASSWORD, validPassword } from '../../decisions/authRules';
 
 /** Минимальная длина нового пароля — то же правило, что показывает подсказка. */
-export const MIN_PASSWORD = 8;
+export { MIN_PASSWORD };
 
 /** Куда вернуть фокус, если новый пароль не принят. */
 export type PassField = 'pass' | 'pass2';
@@ -26,7 +27,7 @@ export function validateNewPassword(
   pass: string,
   repeat: string,
 ): { ok: true } | { ok: false; key: string; focus: PassField } {
-  if (pass.length < MIN_PASSWORD) return { ok: false, key: 'acc.pass.rule', focus: 'pass' };
+  if (!validPassword(pass)) return { ok: false, key: 'acc.pass.rule', focus: 'pass' };
   if (pass !== repeat) return { ok: false, key: 'auth.pass-mismatch', focus: 'pass2' };
   return { ok: true };
 }
@@ -102,6 +103,11 @@ export function initPasswordReset(host: PasswordResetHost): {
     host.setBusy(true);
     try {
       const res = await host.submit(resetToken, pass.value);
+      if (res?.body && typeof res.body === 'object' && (res.body as { error?: unknown }).error === 'E_PASSWORD_POLICY') {
+        host.status(t('acc.pass.rule'));
+        pass.focus();
+        return;
+      }
       const outcome = res ? parseResetOutcome(res.ok, res.body) : { ok: false as const };
       if (!outcome.ok) {
         host.status(t('auth.reset.bad-link'));

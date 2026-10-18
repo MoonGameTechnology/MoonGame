@@ -9,6 +9,7 @@ import { COALITION, type SessionMsg } from './conversations';
 import {
   canEditPing,
   canRemovePing,
+  pingRecipients,
   pingRows,
   toggleHidden,
   visiblePingLocs,
@@ -91,5 +92,15 @@ describe('PING-PANEL — сокрытие ЛОКАЛЬНОЕ', () => {
   it('карта рисует активные МИНУС спрятанные', () => {
     expect(visiblePingLocs(FEED, ME, new Set())).toEqual(['A', 'B']);
     expect(visiblePingLocs(FEED, ME, new Set(['A']))).toEqual(['B']);
+  });
+});
+
+describe('pingRecipients — личная метка только союзнику', () => {
+  it('адресаты — коалиция без себя, в её порядке и без повторов', () => {
+    expect(pingRecipients([ME, ALLY, 'p3', ALLY], ME)).toEqual([ALLY, 'p3']);
+  });
+
+  it('без союзников лично отправить некому', () => {
+    expect(pingRecipients([ME], ME)).toEqual([]);
   });
 });

@@ -27,6 +27,26 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 STATE_DIR="${STATE_DIR:-/var/lib/moongame}"
 ENV_FILE="$STATE_DIR/server.env"
 LAST_GOOD="$STATE_DIR/last-good-image"
+# One checkpoint is authoritative for a TLS pair, including after reboot.
+. "$HERE/release-state.sh"
+TLS=0
+if release_tls "$ENV_FILE"; then
+  TLS=1
+  if [ -n "${VOID_IMAGE:-}" ] || [ -n "${VOID_CADDY_IMAGE:-}" ]; then
+    release_ref_valid "${VOID_IMAGE:-}" && release_ref_valid "${VOID_CADDY_IMAGE:-}" || { echo E_DEPLOY_RELEASE_PAIR >&2; exit 1; }
+  else
+    release_pair_read "$STATE_DIR/last-good-release" || { echo E_DEPLOY_RELEASE_PAIR >&2; exit 1; }
+    VOID_IMAGE="$RELEASE_SERVER"
+    VOID_CADDY_IMAGE="$RELEASE_CADDY"
+  fi
+  export VOID_CADDY_IMAGE
+fi
+EXTRA="$(release_effective "$ENV_FILE" COMPOSE_EXTRA_FILE)"
+if [ -n "$EXTRA" ]; then
+  if [[ "$EXTRA" != /* ]] || [ -L "$EXTRA" ] || [ ! -f "$EXTRA" ]; then echo E_DEPLOY_EXTRA_FILE >&2; exit 1; fi
+  owner="$(stat -c %u "$EXTRA")"; mode="$(stat -c %a "$EXTRA")"
+  if (( (8#$mode & 0022) != 0 )) || { [ "$owner" != 0 ] && [ "$owner" != "$(id -u)" ]; }; then echo E_DEPLOY_EXTRA_FILE >&2; exit 1; fi
+fi
 
 # Образ берётся из точки отката, если его не передали явно (так делает update.sh, когда
 # поднимает НОВЫЙ дайджест, ещё не ставший точкой отката).
@@ -44,22 +64,34 @@ esac
 export VOID_IMAGE
 
 compose() {
-  docker compose --env-file "$ENV_FILE" \
-    -f "$HERE/docker-compose.yml" -f "$HERE/docker-compose.release.yml" "$@"
+  local files=(-f "$HERE/docker-compose.yml")
+  if [ "$TLS" = 1 ]; then files+=(-f "$HERE/docker-compose.tls.yml"); fi
+  files+=(-f "$HERE/docker-compose.release.yml")
+  if [ "$TLS" = 1 ]; then files+=(-f "$HERE/docker-compose.release-tls.yml"); fi
+  if [ -n "$EXTRA" ]; then files+=(-f "$EXTRA"); fi
+  docker compose --env-file "$ENV_FILE" "${files[@]}" "$@"
 }
 
 case "${1:-}" in
-  up)
+  up|db-up)
+    . "$HERE/production-preflight.sh"
+    production_preflight "$ENV_FILE"
     # `--pull missing`, а не `always` из оверлея: образ уже проверен и скачан тем, кто
     # его выкатывал, а дайджест не даёт подменить байты. С `always` перезагрузка при
     # недоступном реестре оставила бы игру лежать — ровно когда её некому поднять.
-    compose up -d --no-build --pull missing
+    if [ "$1" = db-up ]; then
+      # The legacy unit stops PostgreSQL too. Recover only the database before
+      # the migration job; Game must not start against the old schema.
+      compose up -d --no-build --pull missing --wait --wait-timeout 60 postgres
+    else
+      compose up -d --no-build --pull missing
+    fi
     ;;
   down)
     compose down
     ;;
   "")
-    echo "usage: $0 up|down|<docker compose args>" >&2
+    echo "usage: $0 up|db-up|down|<docker compose args>" >&2
     exit 2
     ;;
   *)

@@ -9,9 +9,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-/** Файлы, где рисуются кнопки шпионажа: карточка мира в `main.ts`, ростер, карточка места
- *  и вкладка «Шпионаж» — в окне дипломатии (`diploWindow.ts`, REFM-214). */
-const FILES = ['main.ts', 'diploWindow.ts'];
+/** Файлы, где рисуются кнопки шпионажа: карточка мира (`worldCard.ts`, REFM-223), ростер,
+ *  карточка места и вкладка «Шпионаж» — в окне дипломатии (`diploWindow.ts`, REFM-214).
+ *  `main.ts` остаётся в списке: новая дверь там тоже обязана спросить режим. */
+const FILES = ['main.ts', 'worldCard.ts', 'diploWindow.ts'];
 const src = Object.fromEntries(
   FILES.map((f) => [f, readFileSync(new URL(`./${f}`, import.meta.url), 'utf8').split('\n')]),
 );

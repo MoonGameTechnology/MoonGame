@@ -40,9 +40,8 @@ describe('главный экран хаба (UIX-10.1)', () => {
         /<button id="([\w-]+)" class="hub-mode" type="button"><b data-i18n="([\w.-]+)"><\/b><span data-i18n="([\w.-]+)"><\/span><\/button>/g,
       ),
     ];
-    expect(modes.map((m) => m[1])).toEqual(['hub-solo', 'hub-play']);
-    for (const id of ['hub-sector-zero', 'hub-proving-ground'])
-      expect(HOME).toContain(`id="${id}" hidden style="display:none"`);
+    expect(modes.map((m) => m[1])).toEqual(['hub-solo', 'hub-play', 'hub-sector-zero']);
+    expect(HOME).toContain('id="hub-proving-ground" hidden style="display:none"');
     for (const [, , name, desc] of modes) {
       for (const loc of [ru, en]) {
         expect(loc[desc!], desc).toBeTruthy();
@@ -72,7 +71,7 @@ describe('главный экран хаба (UIX-10.1)', () => {
     expect(MAIN).toContain(
       "document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));",
     );
-    expect(MAIN).toContain("new Set(['meta', 'auction', 'rank', 'friends'])");
+    expect(MAIN).toContain("new Set(['meta', 'auction', 'rank', 'friends', 'supply'])");
     expect(MAIN).toContain("const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;");
   });
 

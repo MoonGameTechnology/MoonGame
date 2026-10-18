@@ -35,6 +35,7 @@
 | `packages/client` (Vite) | PWA-оболочка: welcome + живая карта + `?join=` | `pnpm --filter @void/client dev` |
 | `deploy/backup.sh` / `deploy/restore.sh` | отдельные задания PostgreSQL backup/restore; опциональный подписанный age-комплект `.vdbak` | backup/restore worker |
 | `deploy/backup-repository/s3.mjs` | независимая S3-доставка `.vdbak` и получение конкретной версии с проверкой подписи; SDK исключён из production-зависимостей игры | отдельный worker, [runbook](deploy/backup-repository/README.md) |
+| `deploy/observability/game-exporter.mjs` | отдельный bounded JSON→Prometheus collector; источники и HTTP listener только literal loopback, без чтения GameState/JSONL/БД | локальный процесс, [runbook](deploy/observability/GAME-EXPORTER.md); Compose wiring отдельно |
 
 **Практическое следствие.** Правку серверного поведения, которая должна доехать до
 игроков, кладут в `prototype/netserver.ts` (или в общий код `packages/server/src/**`,
@@ -277,6 +278,14 @@ Recovery-письма обоих хостов форматирует `scripts/re
 
 ---
 
+## packages/protocol — общий контракт и правила ввода
+
+| файл | экспорт | назначение |
+|---|---|---|
+| `src/inputPolicy.ts` | `passwordIssue`, `validLoginPassword`, `blockedPublicName`, `closedInput`, `parseRecoveryEmail`, `sanitizeChatText` | общая политика создания пароля, legacy-входа, публичных имён и текстовых полей; серверная проверка и подсказки обоих клиентов |
+
+---
+
 ## packages/server — авторитетный сервер
 
 | файл | экспорт | назначение |
@@ -303,6 +312,15 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `arsenal.ts` | `StarterArsenalTemplate`, `validateStarterArsenal` | ARS-2 starter arsenal |
 | `arsenalApi.ts` | `ArsenalApiDeps` | API арсенала |
 | `dropRoller.ts` | `DropTables`, `validateDropTables` | ARS-4 salvage/shards |
+| `metaEconomy.ts` / `metaEconomyCatalog.ts` | `MetaEconomy`, строгий каталог v0 | награды, крафт, разбор, сезон, entitlements вне ядра |
+| `metaEconomyStore.ts` / `memoryEconomyLock.ts` | общий transaction boundary | inventory/drop/wallet/materials/receipt: Memory + PostgreSQL |
+| `metaEconomyDelivery.ts` / `metaEconomyObservation.ts` / `metaEconomyActivity.ts` | durable факты и доставка | baseline + события сохраняются со snapshot; повтор/рестарт без новой выдачи |
+| `metaEconomyApi.ts` / `metaCommerce.ts` | session API / внутренний signed API | supply goal, craft, season, read-only receipts; Commerce grant отдельно от клиента |
+| `metaMarket.ts` / `metaMarketApi.ts` | Auction внутри Meta/Economy | предметы и material escrow, кошельки/комиссия/receipt одной транзакцией |
+| `mainGameArsenal.ts` | ordinary match initialization/sync | владение ограничивает новые постройки; существующие корабли неизменны |
+| `commerceMain.ts` / `commerceMigrateMain.ts` | отдельный процесс и миграция | собственная БД/роль; [runbook](docs/meta-economy.md) |
+| `commerceService.ts` / `commerceStore.ts` / `commercePostgres.ts` | orders, proof, outbox | verified provider adapters, retry/status/refund; runtime adapters отключены |
+| `commerceServer.ts` / `commerceTransport.ts` / `commerceCatalog.ts` | HTTP / подпись / предложения | отдельные ключи, audience/capability, nonce, четыре известных состава |
 | `avaOrchestrator.ts` | `AvaSessionSpec` | AvA-оркестратор |
 | `avaMapPool.ts` | `pickAvaMap` | AvA-карты |
 | `avaApi.ts` / `avaService.ts` | AvA API/service | AvA-логика |
@@ -372,6 +390,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `medals.json` | медали |
 | `events.json` | тёмные события |
 | `dropTables.json` | таблицы дропа (ARS-4) |
+| `metaEconomy.json` | серверный каталог v0: материалы, рецепты, сезон, лимиты; вне `GameData` |
 | `starterArsenal.json` | starter arsenal (ARS-2) |
 | `maps/` | карты (MatchMap JSON) |
 

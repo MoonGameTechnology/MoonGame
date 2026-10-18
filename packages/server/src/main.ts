@@ -17,7 +17,14 @@ import {
   loadStarterArsenal,
 } from './scenario';
 import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
-import { awardMatchDrops, salvageFromEvents } from './dropRoller';
+import { salvageFromEvents } from './dropRoller';
+import { MetaEconomy } from './metaEconomy';
+import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
+import { registerMetaEconomyApi } from './metaEconomyApi';
+import { createMetaRewardDelivery } from './metaEconomyDelivery';
+import { commerceOffers } from './commerceCatalog';
+import { registerMetaCommerce } from './metaCommerce';
+import { initializeOrdinaryArsenal, syncAccountArsenal } from './mainGameArsenal';
 import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
@@ -25,7 +32,7 @@ import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { operatorTokenFromEnv } from './operatorAccess';
 import { createMatchLoader } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
-import { newMatchId } from './matchId';
+import { freeMatchId } from './matchId';
 import {
   registerMatchApi,
   registerOpenMatchesFeed,
@@ -131,6 +138,32 @@ const starterArsenal = loadStarterArsenal(data);
 // ARS-4: the F2P drop loop — chances/pool/pity/salvage are data, validated at boot.
 const dropTables = loadDropTables(data);
 const stores = await createStores();
+const metaCatalog = loadMetaEconomyCatalog(data);
+let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
+const metaEconomy = new MetaEconomy({ store: stores.metaEconomy, catalog: metaCatalog, dropTables, now: Date.now,
+  onEvent: (event) => {
+    process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
+    void refreshGrantedArsenal(event.accountId).catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
+  },
+});
+const rewardDelivery = createMetaRewardDelivery({
+  store: stores.metaEconomy,
+  matches: stores.store,
+  seats: (matchId) => async () => {
+    if (!auth || !signSession) return {};
+    const session = await stores.sessionStore.byMatch(matchId);
+    return session
+      ? Object.fromEntries(Object.entries(session.seats).map(([account, player]) => [player, account]))
+      : nickSeatAccounts(stores.accountStore, stores.userStore, matchId)();
+  },
+  settle: (facts) => metaEconomy.settle(facts),
+  activeDay: (accountId, day) => metaEconomy.settleActiveDay(accountId, day),
+  stageCount: metaCatalog.rewards.stageFractions.length,
+  participation: metaCatalog.rewards.participation,
+  onError: (error) => process.stderr.write(`meta reward delivery failed: ${String(error)}\n`),
+});
+stores.store = rewardDelivery.matches;
+rewardDelivery.start();
   const corporationsEndpoint = corporateEndpoint(process.env);
   const remoteAva = corporationsEndpoint
     ? useRemoteCorporations(stores, corporationsEndpoint)
@@ -216,34 +249,14 @@ const loadMatch = createMatchLoader({
           void deliverAvaResults().catch((err: unknown) => {
             process.stderr.write(`ava result delivery failed: ${String(err)}\n`);
         });
-        // ARS-4 drop roll: place-weighted, pity-guarded, exactly-once per
-        // (match, account); one telemetry JSONL line per rolled account.
+        // Meta rewards and the pity-guarded drop are delivered independently
+        // from committed snapshots; this observer retains commander XP only.
         if (rewards) {
-          const entries = Object.entries(rewards).flatMap(([playerId, reward]) => {
-            const accountId = seatAccount[playerId];
-            return accountId ? [{ accountId, reward }] : [];
-          });
           // Commander XP (SES-2): та же банковка, что у обычного матча, но карта мест —
           // РОСТЕР сессии, а не посадочные записи: AvA-игрок, ни разу не подключившийся,
           // кресло в матче держит, а посадочной записи не оставил, и по позывному его
           // не найти.
           bankXp(async () => seatAccount, rewards);
-          void awardMatchDrops(
-            {
-              drops: stores.dropStore,
-              arsenal: stores.arsenalStore,
-              tables: dropTables,
-              now: Date.now(),
-                log: (record) =>
-                  process.stdout.write(`${JSON.stringify({ t: 'drop', ...record })}\n`),
-            },
-            matchId,
-            entries,
-          ).catch((err) => {
-            process.stderr.write(
-              `drop roll failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
-            );
-          });
         }
       },
     };
@@ -254,10 +267,20 @@ const loadMatch = createMatchLoader({
 // first connection (dev continuity — a real match is created via the SV-2.4 /matches API).
 if (!(await stores.store.load('dev'))) {
   const seed = createDevMatch(data, { id: 'dev', time: bootTime });
-  await stores.store.save(snapshotOf(seed));
+  const snapshot = snapshotOf(seed);
+  if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);
+  await stores.store.save(snapshot);
 }
 
 const registry = new LazyRoomRegistry({ load: loadMatch });
+const refreshAccountArsenal = async (who: { accountId: string; login: string }): Promise<void> => {
+  await syncAccountArsenal({ ...who, arsenal: stores.arsenalStore, accounts: stores.accountStore, registry,
+    isOrdinary: async (id) => !(await stores.sessionStore.byMatch(id)) });
+};
+refreshGrantedArsenal = async (accountId) => {
+  const user = await stores.userStore.findById(accountId);
+  if (user) await refreshAccountArsenal({ accountId, login: user.login });
+};
 
 // The dev-grade match create/join API (SV-2.4): a nick claims a seat first-come (shared
 // with the ?nick= WS login) and gets a short-lived join token for the authenticated
@@ -345,9 +368,11 @@ const identify: MatchApiDeps['identify'] = verifySession
 // optional (a host may seed out of band), so the deps field alone reads as possibly-undefined.
 const createMatch = async (): Promise<CreatedMatch> => {
   if (matchCount >= MAX_MATCHES) throw new Error('match capacity reached'); // → 500, bounded
-  const matchId = newMatchId();
+  const matchId = await freeMatchId(async (id) => (await stores.store.load(id)) !== null);
   const seed = createDevMatch(data, { id: matchId, time: Date.now() });
-  await stores.store.save(snapshotOf(seed));
+  const snapshot = snapshotOf(seed);
+  if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);
+  await stores.store.save(snapshot);
   matchCount += 1;
   return { matchId, seats: Object.keys(seed.state.players) };
 };
@@ -404,7 +429,7 @@ const matchApi: MatchApiDeps = {
     // Комнату могло не поднять (снимок недоступен) — тогда вход всё равно состоится,
     // просто без применённого выбора: отказывать во входе из-за этого нельзя.
     // Отказ на любом шаге отпускает кресло, которое забронировал этот вход (PT-09).
-    const room = claim.ok && claim.claim ? await registry.resolve?.(matchId) : undefined;
+    const room = claim.ok ? await registry.resolve?.(matchId) : undefined;
     const seat = await admitSeat({
       matchId,
       claim,
@@ -416,6 +441,10 @@ const matchApi: MatchApiDeps = {
       if (!seat.ok)
         return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
     if (room) await stores.store.save(snapshotOf(room));
+    if (accountId && !ava) {
+      await grantStarterArsenal(stores.arsenalStore, accountId, starterArsenal, Date.now());
+      await refreshAccountArsenal({ accountId, login: nick });
+    }
     return {
       playerId: seat.playerId,
       token: await signToken(matchId, seat.playerId, accountId, pwfp),
@@ -534,6 +563,7 @@ const server = createMultiplayerServer({
     // per-endpoint budgets on top (defence in depth on the auth path).
     if (auth && signSession) {
       void app.register(async (scope) => {
+        registerMetaCommerce(scope, metaEconomy, stores.metaEconomy);
         await scope.register(rateLimit, { max: 100, timeWindow: '1 minute' });
         registerAuthApi(scope, {
           users: stores.userStore,
@@ -588,6 +618,11 @@ const server = createMultiplayerServer({
             }
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
+          registerMetaEconomyApi(scope, { economy: metaEconomy, identify, onChanged: refreshAccountArsenal });
+          scope.get('/commerce/offers', async (_request, reply) => {
+            reply.header('cache-control', 'no-store');
+            return { offers: commerceOffers() };
+          });
             registerProfileApi(scope, {
               profiles: stores.profileStore,
               users: stores.userStore,
@@ -597,7 +632,9 @@ const server = createMultiplayerServer({
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с
           // атомарной передачей и сжиганием комиссии. Пишущие маршруты под per-IP
           // лимитом (EC-0.3 wash-trading), фаусет по умолчанию выключен.
-          registerMetaMarketApi(scope, { market: stores.metaMarket, identify });
+          registerMetaMarketApi(scope, { market: stores.metaMarket, identify,
+            onChanged: refreshAccountArsenal,
+            canTrade: async (accountId) => (await stores.commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
           // Friends (FRIENDS-1) — roster + requests, session-gated. Presence is read
@@ -805,6 +842,7 @@ const shutdown = (): void => {
   // умирал, не дойдя до `process.exit`, и оркестратор добивал его по таймауту SIGKILL.
   server
     .close()
+    .then(() => rewardDelivery.stop())
     .then(() => stores.close())
     .then(() => process.exit(0))
     .catch((err: unknown) => {

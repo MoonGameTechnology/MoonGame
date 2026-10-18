@@ -13,7 +13,6 @@ import { readFileSync } from 'node:fs';
 
 import { t, tData } from '../../localization/runtime';
 import { entryOffer, type MatchSeat } from '../../decisions/entrySetup';
-import { joinHref } from '../../decisions/seatJoin';
 import type { SetupConfig } from './game';
 import { mapPreset } from './mapCatalog';
 import { metaGrant, parseMetaState } from './meta';
@@ -151,6 +150,7 @@ async function boot(net = false) {
     hubs: 0,
     connect: [] as boolean[],
     started: [] as SetupConfig[],
+    joined: [] as unknown[][],
   };
   screen.initSetupScreen({
     seats: SEATS,
@@ -162,6 +162,7 @@ async function boot(net = false) {
     showConnect: (show) => void env.connect.push(show),
     openHub: () => void env.hubs++,
     startMatch: (setup) => void env.started.push(setup),
+    joinMatch: (...args) => void env.joined.push(args),
     mapLabel: (id) => `map:${id}`,
     sideColors: () => ({ you: YOU, rival: RIVAL }),
   });
@@ -384,10 +385,13 @@ describe('REFM-212 — двери гида и сети', () => {
     ]);
     tap('setupmap', { 'data-cand': NEXUS[0]! });
     expect([el('setupgo').disabled, el('setupgo').textContent]).toEqual([false, t('seatpick.go')]);
-    // Вход — адресом с выбранным креслом, а не локальным стартом.
+    // Вход — в этой же странице с выбранным креслом, а не локальным стартом и не переходом.
+    const polls = env.polls;
     el('setupgo').click();
     expect(env.started).toHaveLength(0);
-    expect(location.href).toBe(joinHref('/', 'm1', 'p1', 'azure', ['overseer', 'polymath']));
+    expect(env.joined).toEqual([['m1', 'p1', 'azure', ['overseer', 'polymath']]]);
+    expect(location.href).toBe('');
+    expect([env.polls, el('setupgo').disabled]).toEqual([polls + 1, true]);
   });
 
   it('опрос: занятый выбранный мир сбрасывает выбор; опоздавший ответ отбрасывается', async () => {
@@ -525,5 +529,8 @@ describe('REFM-212 — стык с main.ts: двери вместо присво
     expect(MAIN).toContain('net: () => NET,');
     expect(MAIN).toContain('stopNetPoll: () => stopNetSetupPoll(),');
     expect(MAIN).toContain('startMatch: (setup) => startMatch(setup),');
+    expect(MAIN).toContain(
+      'joinMatch: (id, slot, faction, scientists) => connectToMatch(id, slot, faction, scientists),',
+    );
   });
 });

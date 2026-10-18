@@ -15,6 +15,7 @@
  * Форма REFM: разметка и подсчёт места чистые (`endScreenHtml`, `placementOf`), уход из
  * матча — дело хоста (сеть, туры, хаб), модуль только сообщает, что выбрал игрок.
  */
+import { createMatchRewardsPanel, type MatchRewardsReader } from './metaMatchRewards';
 import { missionLabelN } from '../../decisions/missionView';
 import { chapterChain, linkedAlly, type ChapterStepId } from '../../decisions/chapterChain';
 import type { GameState } from '../../packages/shared-core/src/index';
@@ -83,6 +84,8 @@ export function endScreenHtml(
     double?: { research: number; warrants: number } | null;
     /** Итог нажатия ×2 — удвоено или почему нет. */
     note?: string;
+    /** Already committed main-game grants; never a claim action. */
+    rewardsHtml?: string;
   },
 ): string {
   const sc = state.match?.scores ?? {};
@@ -146,6 +149,7 @@ export function endScreenHtml(
     `</div>` +
     operationResultHtml(state, me) +
     xpLine +
+    (view.rewardsHtml ?? '') +
     double +
     note +
     `<div class="es-acts">` +
@@ -288,10 +292,12 @@ export interface EndScreenHost {
   onLeave(which: EndAction, wasNet: boolean): void;
   /** ×2 к награде забега; нет — кнопки нет. */
   double?: EndScreenDouble;
+  rewards?: MatchRewardsReader;
 }
 
 /** Собрать панель. `render()` зовётся каждым кадром — она сама решает, показываться ли. */
 export function initEndScreen(host: EndScreenHost): { render: () => void } {
+  const rewards = host.rewards ? createMatchRewardsPanel(host.rewards, render) : null;
   let lastHtml = ''; // кадр за кадром одна и та же разметка — не трогаем DOM зря
   /** Итог нажатия ×2 — живёт, пока панель на экране. */
   let note = '';
@@ -299,6 +305,7 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
   let watching = false;
 
   const hide = (): void => {
+    rewards?.show(false);
     const root = host.root();
     if (root.style.display !== 'none') {
       root.style.display = 'none';
@@ -313,12 +320,14 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
     if (host.hubVisible()) return hide();
     const end = host.end();
     if (!end || end.dismissed) return hide();
+    rewards?.show(host.net() && !end.training && end.runReward === undefined && !end.runSummary);
     const html = endScreenHtml(host.state(), host.me(), end, {
       net: host.net(),
       worldsFallback: host.worldsFallback(),
       fmtStamp: host.fmtStamp,
       double: host.double?.offer() ?? null,
       note,
+      rewardsHtml: rewards?.html(),
     });
     const root = host.root();
     if (html !== lastHtml) {
@@ -332,6 +341,7 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
     const act = (ev.target as Element).closest('[data-es]') as HTMLElement | null;
     if (!act) return;
     const which = act.dataset.es;
+    if (which === 'rewards-refresh') { rewards?.refresh(); render(); return; }
     if (which === 'board') {
       host.dismiss(); // спрятать панель, оставить замерший стол
       return;
@@ -356,6 +366,7 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
       return;
     }
     const wasNet = host.net();
+    rewards?.show(false);
     host.clearEnd(); // уходим из законченного матча — итог не должен всплыть над хабом
     lastHtml = '';
     host.onLeave(which === 'again' || which === 'replay' ? which : 'menu', wasNet);

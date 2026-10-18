@@ -3,6 +3,21 @@
 Этот документ описывает доступные механизмы и порядок их включения. Проверка исходников
 и локальное учение не подтверждают конфигурацию работающего сервера.
 
+Под `PROD=1` разделение runtime/migration теперь обязательно: без `DATABASE_URL`,
+`DB_AUTO_MIGRATE=0` и `DB_REQUIRE_LEAST_PRIVILEGE=1` оба игровых хоста отказываются
+стартовать. `prepareRuntimeDatabase` повторно защищает границу до автомиграции и
+проверяет действительные grants. Разработческий startup-migrate остаётся для `PROD=0`.
+Общий deploy-preflight по умолчанию (`BACKUP_POLICY=required`) требует успешную
+независимую проверку backup/restore;
+контракт verifier и порядок запуска — в [руководстве](../../deploy/README.md).
+По результату preflight launcher передаёт `BACKUP_READINESS_VERIFIED=1` только
+текущему запуску. Не копируйте этот маркер в постоянный конфиг.
+При явно принятом владельцем отложенном восстановлении для плейтеста используется
+`BACKUP_POLICY=deferred-playtest`: host preflight предупреждает и выдаёт отдельный
+`BACKUP_READINESS_DEFERRED=1` при `BACKUP_READINESS_VERIFIED=0`. Это не подтверждение
+бэкапов и не отмена разделения DB-ролей, TLS, auth или gate. Возврат к `required`
+снова включает обязательную проверку независимого восстановления.
+
 ## Что даёт эта версия
 
 | Граница доверия | Механизм | Ограничение |
@@ -24,7 +39,7 @@ SSH/firewall остаются отдельными задачами. Полны�
 зашифрованный бэкап, окно обслуживания и выключенный `AUTODEPLOY=0`.
 
 - `vd_schema`: постоянный владелец, `NOLOGIN`, без superuser/CREATEDB/CREATEROLE.
-- `vd_runtime`: `NOLOGIN`, DML только на 32 игровых таблицах и доступ к их
+- `vd_runtime`: `NOLOGIN`, DML только на allowlist игровых таблиц и доступ к их
   последовательностям; только SELECT на служебный отпечаток `vd_schema_revision`.
 - `vd_app_<имя>`: сменяемая LOGIN-роль приложения, член только `vd_runtime`.
 - `vd_migrate_<имя>`: отдельная LOGIN-роль мигратора, член `vd_schema`.
@@ -63,6 +78,7 @@ DB_RUNTIME_USER=vd_app_v1
 DB_RUNTIME_PASSWORD=<32 случайных байта в hex>
 DB_AUTO_MIGRATE=0
 DB_REQUIRE_LEAST_PRIVILEGE=1
+BACKUP_READINESS_CHECK=/usr/local/lib/moongame/verify-recovery
 ```
 
 Пароли/имена здесь должны совпадать с фактически созданными. Для запуска без Compose

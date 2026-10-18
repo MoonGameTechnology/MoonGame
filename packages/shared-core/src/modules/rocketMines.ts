@@ -15,6 +15,7 @@ import {
   rocketMineModule,
   ROCKET_MINE_TRAIT,
   ROCKET_MINE_UNIT,
+  type RocketMineControl,
   type RocketMineMode,
 } from '../state/ordnance';
 import { MINE_TRAIT } from '../state/minefields';
@@ -22,10 +23,10 @@ import { defHasTrait } from '../data/traits';
 import { flightPointAt, fleetNodeAt, fleetPositionAt } from '../state/fleetPosition';
 import type { MissileFlew } from './shuttle';
 import { isCorridorEdge } from '../state/corridor';
-import { laneRoad } from '../state/roads';
+import { laneRoad, polylineLength } from '../state/roads';
 import { distance } from '../state/route';
 import { getStance } from '../state/diplomacy';
-import { sightCircles } from '../state/visibility';
+import { sightCircles, type SightCircle } from '../state/visibility';
 import { detectSignals, fleetSignalStrength, type SignalEmitter } from '../state/radarSignals';
 import { nextFleetSeq, requireOwnedUnengagedFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
@@ -38,6 +39,7 @@ import {
   PD_COOLDOWN_MINUTES,
 } from '../util/pointDefense';
 import { canAfford, payCost } from '../util/treasury';
+import { recordValues } from '../util/records';
 
 /** Radar returns coordinates only. No hidden fleet ID is stored in a missile. */
 function targetPoint(
@@ -47,21 +49,28 @@ function targetPoint(
   def: RocketMineDef,
   mode: RocketMineMode,
 ): { x: number; y: number } | null {
-  const circles = sightCircles(h.state, mine.owner, h.ctx.data);
+  // Круги зрения владельца собираются, только когда в радаре кто-то есть: хук `time.stop`
+  // спрашивает мину о каждой минуте, а пустой радар — обычный ответ.
+  let circles: SightCircle[] | null = null;
   const identified = (at: { x: number; y: number }): boolean =>
-    inRadius(at, position, def.sightRange) || circles.some((c) => inRadius(at, c, c.identify));
+    inRadius(at, position, def.sightRange) ||
+    (circles ??= sightCircles(h.state, mine.owner, h.ctx.data)).some((c) =>
+      inRadius(at, c, c.identify),
+    );
   const emitters: SignalEmitter[] = [];
   const confirmed: { x: number; y: number; id: string }[] = [];
-  for (const fleet of Object.values(h.state.fleets)) {
+  for (const fleet of recordValues(h.state.fleets)) {
+    if (fleet.owner === mine.owner) continue; // свой отряд целью не бывает (стойка «союз»)
+    const at = fleetPositionAt(h.state, fleet, h.ctx.now);
+    if (!at || !inRadius(at, position, def.radarRange)) continue;
     // IFF for own/allied fleets. Other contacts' hidden owner is NOT a radar gate.
     const stance = getStance(h.state, mine.owner, fleet.owner);
     if (stance === 'alliance' || !fleet.units.some((u) => u.count > 0)) continue;
     // A mine (SM-3.7a) or a missile (SM-3.7b) is not a target: the warhead is for ships, and
     // a missile is shot down by point defense and shuttles only (owner's resolution 2026-10-06).
     if (isOrdnanceFleet(fleet, h.ctx.data)) continue;
-    const at = fleetPositionAt(h.state, fleet, h.ctx.now);
     const location = fleetNodeAt(h.state, fleet, h.ctx.now);
-    if (!at || !location || !inRadius(at, position, def.radarRange)) continue;
+    if (!location) continue;
     const known = identified(at);
     if (known && stance !== 'war') continue;
     if (mode === 'confirmed') {
@@ -99,9 +108,7 @@ function targetPoint(
       const p = c.position ?? h.state.planets[c.location]?.position;
       return p ? [p] : [];
     })
-    .sort(
-      (a, b) => distance(a, position) - distance(b, position) || a.x - b.x || a.y - b.y,
-    );
+    .sort((a, b) => distance(a, position) - distance(b, position) || a.x - b.x || a.y - b.y);
   return points[0] ?? null;
 }
 
@@ -116,13 +123,17 @@ function missileHull(data: GameData, layerId: string): number {
 
 /** A standing rocket mine of `owner` under `id` — its own fleet, never a prototype key. */
 function ownMine(h: HandlerContext, id: string, owner: string): Fleet | null {
-  const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, id) ? h.state.fleets[id] : undefined;
+  const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, id)
+    ? h.state.fleets[id]
+    : undefined;
   return fleet && fleet.owner === owner && isRocketMineFleet(fleet, h.ctx.data) ? fleet : null;
 }
 
 /** A flying missile under `id` — a fleet of the missile unit, never a prototype key. */
 function missileFleet(h: HandlerContext, id: string): Fleet | null {
-  const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, id) ? h.state.fleets[id] : undefined;
+  const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, id)
+    ? h.state.fleets[id]
+    : undefined;
   return fleet && fleet.flight && isMissileFleet(fleet, h.ctx.data) ? fleet : null;
 }
 
@@ -176,8 +187,188 @@ function scan(h: HandlerContext, mine: Fleet): void {
     scheduleFlight(h, missile);
     h.emit('rocketMine.launched', { owner: mine.owner, mineId: mine.id, missileId: missile.id });
   } else {
-    control.nextScanAt = h.ctx.now + Math.max(1, Math.ceil(hoursToMs(h.ctx, def.scanHours)));
-    h.schedule(control.nextScanAt, 'rocketMine.scan', { mineId: mine.id, at: control.nextScanAt });
+    const first = h.ctx.now + scanStep(h, def);
+    settle(h, mine, position, def, control, first);
+  }
+}
+
+/**
+ * Как мина ждёт следующую минуту своей сетки `first`. Если до радара никто не дойдёт, она
+ * спит до первой минуты, когда кто-то может, — по таймеру (`nextScanAt`). Иначе следит
+ * (`watch`): минуты проверяет хук `time.stop`, и мир останавливается только там, где поиск
+ * найдёт цель. Раньше такая мина ставила таймер на каждую минуту, и каждая минута была
+ * шагом мира со всей экономикой и туманом.
+ */
+function settle(
+  h: HandlerContext,
+  mine: Fleet,
+  position: { x: number; y: number },
+  def: RocketMineDef,
+  control: RocketMineControl,
+  first: number,
+): void {
+  const wake = quietUntil(
+    h,
+    mine,
+    position,
+    def,
+    first,
+    first + MAX_QUIET_STEPS * scanStep(h, def),
+  );
+  if (wake === first) {
+    delete control.nextScanAt;
+    control.watch = first;
+    return;
+  }
+  delete control.watch;
+  control.nextScanAt = wake;
+  h.schedule(wake, 'rocketMine.scan', { mineId: mine.id, at: wake });
+}
+
+/** Первая минута сетки следящей мины, не раньше `since` (сетка — `watch + k·шаг`). */
+function gridFrom(watch: number, step: number, since: number): number {
+  return watch >= since ? watch : watch + Math.ceil((since - watch) / step) * step;
+}
+
+/** Нашёл бы поиск мины цель в миг `at`, если до него мир меняется только со временем.
+ *  Тот же `targetPoint`, на виде мира, сдвинутом в этот миг. */
+function targetAt(
+  h: HandlerContext,
+  mine: Fleet,
+  def: RocketMineDef,
+  mode: RocketMineMode,
+  at: number,
+): boolean {
+  const view: HandlerContext = {
+    ...h,
+    state: { ...h.state, time: at },
+    ctx: { ...h.ctx, now: at },
+  };
+  const position = fleetPositionAt(view.state, mine, at);
+  return !!position && targetPoint(view, mine, position, def, mode) !== null;
+}
+
+/** Шаг поиска цели — игровая минута данных (`scanHours`). */
+function scanStep(h: HandlerContext, def: RocketMineDef): number {
+  return Math.max(1, Math.ceil(hoursToMs(h.ctx, def.scanHours)));
+}
+
+/** Самый долгий сон мины без единого поиска — страховка на случай, если когда-нибудь
+ *  появится способ сдвинуть отряд, которого `quietUntil` не знает. Шесть игровых часов. */
+const MAX_QUIET_STEPS = 360;
+
+/**
+ * Первая минута сетки поиска мины (`first`, `first + шаг`, …), в которую чужой отряд может
+ * оказаться в радиусе её радара, но не позже `limit`.
+ *
+ * Мина ищет цель раз в игровую минуту, и раньше каждая минута была шагом мира — с полным
+ * копированием состояния и начислением экономики, тумана и счёта за отрезок. На FFA-20 к
+ * 12-му дню пустые поиски мин давали девять шагов из десяти, и мир тормозил тем сильнее, чем
+ * больше мин ставили боты. Цель же бывает только в радиусе радара (оба режима это требуют),
+ * поэтому минуты, в которые туда заведомо никто не попадёт, мина пропускает. Пропуск не
+ * меняет правило: в минуту, когда цель есть, мина ищет — как и раньше.
+ *
+ * Почему пропуск честен. Позиция отряда — функция его записи (`fleetPositionAt`): стоит на
+ * узле или на дороге, идёт по отрезку пути. Запись меняется только шагом мира, и каждое
+ * изменение здесь учтено:
+ * · новый отрезок пути объявляет `fleet.leg` — мина пересчитывает срок (`wakeFor`);
+ * · стоянку на дороге новым отрядом (орудия крепости на развилке) объявляет `fleet.parked`;
+ * · остановка оставляет отряд там, где он был, — подходов становится только меньше;
+ * · всё, что появляется или переносится скачком (постройка флота, возрождение и прыжок героя,
+ *   волна Роя, ложная цель), появляется на мире — поэтому мина, у которой мир в радиусе
+ *   радара, не спит вовсе;
+ * · отделившийся отряд стоит или идёт ровно там, где его родитель.
+ * Свои отряды мины не цель никогда, мины и ракеты — тоже; все прочие считаются, даже
+ * союзные: союз может распасться.
+ */
+function quietUntil(
+  h: HandlerContext,
+  mine: Fleet,
+  position: { x: number; y: number },
+  def: RocketMineDef,
+  first: number,
+  limit: number,
+): number {
+  for (const planet of recordValues(h.state.planets))
+    if (inRadius(planet.position, position, def.radarRange)) return first;
+  let wake = limit;
+  for (const fleet of recordValues(h.state.fleets)) {
+    const at = wakeFor(h, mine, position, def, fleet, first, wake);
+    if (at !== null) wake = at;
+    if (wake === first) break;
+  }
+  return wake;
+}
+
+/**
+ * Первая минута сетки `first + k·шаг` (не позже `limit`), когда `fleet` может быть в радиусе
+ * радара мины, — или `null`, если до `limit` не может. Позиция проверяется настоящей
+ * `fleetPositionAt`, а пропуск между проверками — по скорости отрезка: отряд на дороге не
+ * может приблизиться к мине быстрее, чем идёт по дороге.
+ */
+function wakeFor(
+  h: HandlerContext,
+  mine: Fleet,
+  position: { x: number; y: number },
+  def: RocketMineDef,
+  fleet: Fleet,
+  first: number,
+  limit: number,
+): number | null {
+  if (fleet.owner === mine.owner || isOrdnanceFleet(fleet, h.ctx.data)) return null;
+  const step = scanStep(h, def);
+  const leg = fleet.flight ?? fleet.movement;
+  // Сколько пути в единицах карты отряд проходит за мс на своём отрезке: верхняя граница
+  // того, насколько он приблизится к мине.
+  let rate = 0;
+  let endsAt = -Infinity;
+  if (fleet.flight) {
+    const fl = fleet.flight;
+    rate = Math.sqrt((fl.to.x - fl.from.x) ** 2 + (fl.to.y - fl.from.y) ** 2);
+    rate /= fl.arrivesAt - fl.departedAt;
+    endsAt = fl.arrivesAt;
+  } else if (fleet.movement && fleet.location === null) {
+    const mv = fleet.movement;
+    const road = laneRoad(h.state, mv.from, mv.to);
+    const share = Math.abs((mv.endT ?? 1) - (mv.startT ?? 0));
+    rate = ((road ? polylineLength(road) : 0) * share) / (mv.arrivesAt - mv.departedAt);
+    endsAt = mv.arrivesAt;
+  }
+  for (let t = first; t <= limit;) {
+    const at = fleetPositionAt(h.state, fleet, t);
+    if (!at) return null;
+    if (inRadius(at, position, def.radarRange)) return t;
+    // Стоящий отряд или дошедший до конца отрезка дальше не сдвинется — до нового шага мира.
+    if (!leg || t >= endsAt) return null;
+    const gap = Math.sqrt((at.x - position.x) ** 2 + (at.y - position.y) ** 2) - def.radarRange;
+    const skip = rate > 0 && Number.isFinite(rate) ? Math.floor(gap / rate / step) : 1;
+    t += Math.max(1, skip) * step;
+  }
+  return null;
+}
+
+/** Перенести поиск мины раньше, если `fleet` теперь может войти в её радар до назначенного
+ *  поиска: отряд встал на новый отрезок пути или новым отрядом на дорогу. Старый поиск
+ *  остаётся в очереди и гаснет сам — его `at` больше не совпадёт с `nextScanAt`. */
+function rescheduleFor(h: HandlerContext, fleetId: string): void {
+  const fleet = h.state.fleets[fleetId];
+  const controls = h.state.ordnance?.controls;
+  if (!fleet || !controls) return;
+  for (const mineId of Object.keys(controls).sort()) {
+    const control = controls[mineId]!;
+    const mine = h.state.fleets[mineId];
+    const def = mine && rocketMineModule(mine, h.ctx.data)?.def;
+    const position = mine && fleetPositionAt(h.state, mine, h.ctx.now);
+    if (!mine || !def || !position || control.nextScanAt === undefined) continue;
+    const step = scanStep(h, def);
+    // Первая минута сетки мины после «сейчас»: сетка — `nextScanAt` минус целые шаги.
+    let first = control.nextScanAt - Math.floor((control.nextScanAt - h.ctx.now) / step) * step;
+    if (first <= h.ctx.now) first += step;
+    if (first >= control.nextScanAt) continue;
+    const at = wakeFor(h, mine, position, def, fleet, first, control.nextScanAt - step);
+    if (at === null) continue;
+    control.nextScanAt = at;
+    h.schedule(at, 'rocketMine.scan', { mineId, at });
   }
 }
 
@@ -271,7 +462,12 @@ export const rocketMinesModule: GameModule = {
   // часть — в `ordnance.warheads`; мина не целится в ракеты, и взрыв их не задевает.
   // 3.1.0: шаг полёта ракеты и последний отрезок до цели (перед попаданием) уходят возможности
   //        `missile.flew` — тем, кто ловит ракету на влёте (SM-3.7d, замечание Codex на #1644).
-  version: '3.1.0',
+  // 3.2.0: мина не ищет цель в минуты, когда к её радару заведомо никто не подойдёт
+  //        (`quietUntil`): пустой поиск был шагом мира каждую минуту.
+  // 3.3.0: мина, к которой цель может подойти, не ставит поиск в очередь каждую минуту, а
+  //        сторожит (`watch`): хук `time.stop` останавливает мир в ту минуту сетки, где поиск
+  //        найдёт цель, и поиск идёт на `time.stopped`. Пуски в те же минуты.
+  version: '3.3.0',
   setup(api) {
     api.onAction('fleet.deployRocketMine', (action, h) => {
       const p = action.payload as { fleetId?: string; mode?: string } | null;
@@ -318,8 +514,7 @@ export const rocketMinesModule: GameModule = {
           f.owner === action.playerId &&
           (isRocketMineFleet(f, h.ctx.data) || isMissileFleet(f, h.ctx.data)),
       ).length;
-      const active =
-        standing + ord.installations.filter((m) => m.owner === action.playerId).length;
+      const active = standing + ord.installations.filter((m) => m.owner === action.playerId).length;
       if (active >= layer.def.maxActive) return h.reject('E_MINE_LIMIT');
       if (!canAfford(player.resources, layer.def.cost)) return h.reject('E_INSUFFICIENT');
       payCost(player.resources, layer.def.cost);
@@ -410,6 +605,60 @@ export const rocketMinesModule: GameModule = {
       const control = h.state.ordnance?.controls?.[p.mineId];
       if (mine && control?.nextScanAt === p.at && h.ctx.now === p.at) scan(h, mine);
     });
+    // Следящие мины: первая минута отрезка, в которую поиск какой-нибудь из них найдёт цель,
+    // останавливает мир (`time.stop`). Читается мир на начало отрезка: внутри него меняются
+    // только позиции, а их `targetAt` берёт на свою минуту.
+    api.hook<number>('time.stop', (value, args, h) => {
+      const { from, to } = args as { from: number; to: number };
+      const controls = h.state.ordnance?.controls;
+      if (!controls) return value;
+      let stop = value;
+      for (const [mineId, control] of Object.entries(controls)) {
+        if (control.watch === undefined) continue;
+        const mine = h.state.fleets[mineId];
+        const def = mine && rocketMineModule(mine, h.ctx.data)?.def;
+        if (!mine || !def) continue;
+        const step = scanStep(h, def);
+        for (let t = gridFrom(control.watch, step, from + 1); t <= to && t < stop; t += step)
+          if (targetAt(h, mine, def, control.mode, t)) stop = t;
+      }
+      return stop;
+    });
+    // Мир остановлен: следящие мины, чья минута сетки пришлась на этот миг, ищут по-настоящему.
+    api.on('time.stopped', (_event, h) => {
+      const controls = h.state.ordnance?.controls;
+      if (!controls) return;
+      for (const mineId of Object.keys(controls).sort()) {
+        const control = controls[mineId];
+        const mine = h.state.fleets[mineId];
+        const def = mine && rocketMineModule(mine, h.ctx.data)?.def;
+        if (control?.watch === undefined || !mine || !def) continue;
+        if (gridFrom(control.watch, scanStep(h, def), h.ctx.now) === h.ctx.now) scan(h, mine);
+      }
+    });
+    // Конец отрезка: следящая мина, к радару которой больше никто не может подойти, снова
+    // засыпает по таймеру. Минуты до этого мига уже проверил хук; мигу `now` ещё может
+    // достаться свой шаг `time.stopped`, поэтому срок считается с него.
+    api.on('time.advanced', (_event, h) => {
+      const controls = h.state.ordnance?.controls;
+      if (!controls) return;
+      for (const mineId of Object.keys(controls).sort()) {
+        const control = controls[mineId]!;
+        if (control.watch === undefined) continue;
+        const mine = h.state.fleets[mineId];
+        const def = mine && rocketMineModule(mine, h.ctx.data)?.def;
+        const position = mine && fleetPositionAt(h.state, mine, h.ctx.now);
+        if (!mine || !def || !position) continue;
+        settle(
+          h,
+          mine,
+          position,
+          def,
+          control,
+          gridFrom(control.watch, scanStep(h, def), h.ctx.now),
+        );
+      }
+    });
     api.on('rocketMine.flight', (event, h) => {
       const { missileId } = event.payload as { missileId: string };
       const missile = missileFleet(h, missileId);
@@ -434,7 +683,12 @@ export const rocketMinesModule: GameModule = {
       // Последний отрезок — от последнего шага до цели: влёт в круг патруля в последнюю минуту
       // (или весь полёт короче минуты) тоже встречает выстрел, и до попадания (Codex на #1644).
       const fl = missile.flight!;
-      h.capability<MissileFlew>('missile.flew')?.(h, missileId, flightPointAt(fl, lastStepAt(h, fl)), fl.to);
+      h.capability<MissileFlew>('missile.flew')?.(
+        h,
+        missileId,
+        flightPointAt(fl, lastStepAt(h, fl)),
+        fl.to,
+      );
       if (!missileFleet(h, missileId)) return; // сбита на подлёте
       const to = missile.flight!.to;
       const def = missileModule(missile, h.ctx.data)?.def;
@@ -490,8 +744,17 @@ export const rocketMinesModule: GameModule = {
         });
         // A mine or a missile destroyed by shuttles leaves its controls or warhead behind —
         // the private record of a fleet that is gone must not outlive it in the state.
-        for (const id of Object.keys(ord.controls ?? {})) if (!h.state.fleets[id]) delete ord.controls![id];
-        for (const id of Object.keys(ord.warheads ?? {})) if (!h.state.fleets[id]) delete ord.warheads![id];
+        for (const id of Object.keys(ord.controls ?? {}))
+          if (!h.state.fleets[id]) delete ord.controls![id];
+        for (const id of Object.keys(ord.warheads ?? {}))
+          if (!h.state.fleets[id]) delete ord.warheads![id];
+      });
+    // Отряд встал на новый отрезок пути или на дорогу — спящая мина могла проспать его
+    // подход: срок поиска пересчитывается от его новой записи (`quietUntil`).
+    for (const type of ['fleet.leg', 'fleet.parked'])
+      api.on(type, (event, h) => {
+        const { fleetId } = (event.payload ?? {}) as { fleetId?: unknown };
+        if (typeof fleetId === 'string') rescheduleFor(h, fleetId);
       });
   },
 };

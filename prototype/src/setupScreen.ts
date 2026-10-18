@@ -23,7 +23,6 @@ import {
   type EntryOffer,
 } from '../../decisions/entrySetup';
 import { nearestHit } from '../../decisions/pointerPick';
-import { joinHref } from '../../decisions/seatJoin';
 import { esc } from './format';
 import {
   data,
@@ -35,7 +34,7 @@ import {
   type SetupConfig,
 } from './game';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
-import { DEFAULT_MAP_ID, fixedSideMode, isCurrentMap, isFrontier, mapPreset, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
+import { DEFAULT_MAP_ID, fixedSideMode, isCurrentMap, isFrontier, mapPreset, seatsByCount, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
 import { metaGrant, type MetaState } from './meta';
 import { mapWorldName } from './planetName';
 import { resetSandboxConfig } from './sandbox';
@@ -75,6 +74,8 @@ export interface SetupScreenHost {
   openHub(): void;
   /** Старт схватки по собранной настройке. */
   startMatch(setup: SetupConfig): void;
+  /** Войти в сетевую партию с выбранным местом — в ЭТОЙ же странице. */
+  joinMatch(matchId: string, slot: string, faction: string | undefined, scientists: readonly string[]): void;
   /** Подпись карты — та же, что в строке обозревателя партий. */
   mapLabel(mapId: string): string;
   /** Цвета карты матча: твой (настройка «свой цвет») и соперника (выбранная палитра).
@@ -337,7 +338,7 @@ function renderSetupSlots(): void {
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`);
-  if (isFrontier(setupMapId)) {
+  if (seatsByCount(setupMapId)) {
     const count = rivalCount(setupSlots);
     setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
     return;
@@ -394,6 +395,8 @@ function renderSetup(): void {
   $('setup-map-info').textContent = t(
     setupMapId === 'duel-1' ? 'setup.map.duel-1-info'
       : setupMapId === 'ffa-4' ? 'setup.map.ffa-4-info'
+      : setupMapId === 'ffa-20' ? 'setup.map.ffa-20-info'
+      : setupMapId === 'ffa-50' ? 'setup.map.ffa-50-info'
       : setupMapId === 'team-2v2' ? 'setup.map.team-2v2-info'
       : setupMapId === 'team-3v3' ? 'setup.map.team-3v3-info'
       : setupMapId === 'frontier-100'
@@ -719,19 +722,17 @@ export function initSetupScreen(host: SetupScreenHost): void {
     renderSetup();
   });
   setupGoEl.addEventListener('click', () => {
-    // В сетевом режиме экран не запускает матч — он собирает выбор в адрес входа
-    // (`seatJoin.ts`), а мир приходит от сервера. Тот же переход, что раньше делало окно
-    // выбора дома: `location.href`, а не новая вкладка (её блокирует браузер).
+    // В сетевом режиме экран не запускает матч — он отдаёт выбор входу в партию, а мир
+    // приходит от сервера. Вход идёт в ЭТОЙ странице, как возвращение в свою партию: раньше
+    // здесь был переход по адресу, и игра загружалась заново отдельной страницей поверх
+    // меню (плейтест 2026-10-17). Экран прячет вход в партию (`enter` в `main.ts`); до
+    // впуска кнопка заперта, чтобы второе нажатие не звонило второй раз.
     if (netSetup) {
       const slot = slotForWorld(setupStart);
       if (!slot) return; // кнопка и так заперта, но выбор мог протухнуть между рендерами
-      location.href = joinHref(
-        location.pathname,
-        netSetup.matchId,
-        slot,
-        setupFaction || null,
-        setupScientists,
-      );
+      game.stopNetPoll();
+      (setupGoEl as HTMLButtonElement).disabled = true;
+      game.joinMatch(netSetup.matchId, slot, setupFaction || undefined, setupScientists);
       return;
     }
     const sandbox = !__PLAYER_BUILD__ && ($('setupsandbox') as HTMLInputElement).checked;

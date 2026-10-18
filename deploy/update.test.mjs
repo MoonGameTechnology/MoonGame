@@ -66,6 +66,8 @@ function sandbox({
   chmodSync(join(deploy, 'update.sh'), 0o755);
   // Настоящий, не заглушка: добор ключей — часть проверяемого поведения.
   writeFileSync(join(deploy, 'env-keys.sh'), readFileSync(ENV_KEYS_SH));
+  writeFileSync(join(deploy, 'production-preflight.sh'), readFileSync(join(DEPLOY_DIR, 'production-preflight.sh')));
+  writeFileSync(join(deploy, 'release-state.sh'), readFileSync(join(DEPLOY_DIR, 'release-state.sh')));
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml']) {
     writeFileSync(join(deploy, f), '# stub\n');
   }
@@ -112,11 +114,13 @@ exit 0`,
 
   const env = {
     ...process.env,
+    PROD: '0', // Do not inherit Vite's PROD build-mode variable into shell fixtures.
     PATH: `${bin}:${process.env.PATH}`,
     LOG: log,
     HEALTH_COUNT: counter,
     HEALTH_FAIL_FIRST: String(healthFailFirst),
     HEALTH_TRIES: '1',
+    ALLOW_INSECURE_LAN: '1', // Existing fixtures explicitly exercise the legacy dev path.
   };
   return {
     root,
@@ -144,7 +148,7 @@ describe('deploy/update.sh — сборка из исходников', () => {
     const sb = sandbox({ branch: 'playtest' });
     const res = await runUpdate(sb);
 
-    expect(res.code).toBe(0);
+    expect(res.code, res.stderr).toBe(0);
     const log = sb.readLog();
     // Ключевая проверка переезда: скрипт лежит в deploy/, а git обязан работать
     // на КОРНЕ клона — иначе `-C` указал бы в deploy/ и обновление не сработало бы.
@@ -194,6 +198,15 @@ describe('deploy/update.sh — сборка из исходников', () => {
 });
 
 describe('deploy/update.sh — путь подписанного образа', () => {
+  it('refuses missing recovery readiness before pull/migration/restart, preserving configuration', async () => {
+    const before = 'PROD=1\nDB_AUTO_MIGRATE=0\nDB_REQUIRE_LEAST_PRIVILEGE=1\n';
+    const sb = sandbox({ serverEnv: before });
+    const res = await runUpdate(sb, { PROD: '1', VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain('E_DEPLOY_BACKUP_CHECK');
+    expect(sb.readLog()).not.toMatch(/docker\[|systemctl/);
+    expect(sb.readEnvFile()).toBe(before);
+  });
   const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:deadbeef';
 
   it('непроверенная подпись → сервер не тронут', async () => {
@@ -260,7 +273,8 @@ describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRAT
       `--env-file ${join(sb.deploy, 'migration.env')} ${IMAGE} packages/server/dist/${MIGRATE}`,
     );
     expect(migrate).toBeGreaterThan(-1);
-    expect(migrate).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
+    expect(log.indexOf('--wait --wait-timeout 60 postgres')).toBeLessThan(migrate);
+    expect(migrate).toBeLessThan(log.lastIndexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
   });
 
   it('нет файла мигратора → выкатка отменена, стек не тронут', async () => {
@@ -286,7 +300,7 @@ describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRAT
     const log = sb.readLog();
     const migratePrev = log.indexOf(`${prev} packages/server/dist/${MIGRATE}`);
     expect(migratePrev).toBeGreaterThan(-1);
-    expect(migratePrev).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${prev}] compose`));
+    expect(migratePrev).toBeLessThan(log.lastIndexOf(`docker[VOID_IMAGE=${prev}] compose`));
   });
 });
 

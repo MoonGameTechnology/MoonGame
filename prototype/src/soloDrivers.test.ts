@@ -192,7 +192,7 @@ describe('соло-драйверы — память проб авто-штур�
 
   it('ключ различает час мира, орбиту, место и владельца', () => {
     const base = autoProbeKey(fleetLike(), 1000, 'p2');
-    expect(autoProbeKey(fleetLike(), 2000, 'p2')).not.toBe(base);
+    expect(autoProbeKey(fleetLike(), HOUR + 1000, 'p2')).not.toBe(base);
     expect(autoProbeKey(fleetLike({ orbit: 'near' }), 1000, 'p2')).not.toBe(base);
     expect(autoProbeKey(fleetLike({ location: 'C2R2' }), 1000, 'p2')).not.toBe(base);
     expect(autoProbeKey(fleetLike(), 1000, 'p3')).not.toBe(base);
@@ -200,6 +200,10 @@ describe('соло-драйверы — память проб авто-штур�
 
   it('ничего не изменилось — ключ тот же (иначе память проб бесполезна)', () => {
     expect(autoProbeKey(fleetLike(), 1000, 'p2')).toBe(autoProbeKey(fleetLike(), 1000, 'p2'));
+  });
+
+  it('кадры одного часа мира — один ключ: иначе проба шла бы каждый кадр', () => {
+    expect(autoProbeKey(fleetLike(), HOUR - 1, 'p2')).toBe(autoProbeKey(fleetLike(), 0, 'p2'));
   });
 
   it('мир без владельца отличается от мира с владельцем', () => {
@@ -363,6 +367,40 @@ describe('соло-драйверы — столкновения флотов', 
     const h = harness({}, twoIdleEnemies());
     h.api.checkFleetClashes();
     expect(h.others.filter((a) => a.type === 'fleet.engage').length).toBe(1);
+  });
+
+  /** Те же двое, но в мире: ядро бой отвергает. */
+  function twoIdleAtPeace(): GameState {
+    const s = twoIdleEnemies();
+    const foe = Object.values(s.fleets).find((f) => f.owner !== 'p1')!.owner;
+    setStance(s, 'p1', foe, 'peace');
+    return s;
+  }
+  const engages = (h: ReturnType<typeof harness>) =>
+    h.others.filter((a) => a.type === 'fleet.engage').length;
+
+  it('отвергнутая пара не пережимается каждый кадр — до нового часа мира', () => {
+    const h = harness({}, twoIdleAtPeace());
+    for (let frame = 0; frame < 5; frame++) {
+      h.setState(at(h.state(), h.state().time + 60_000));
+      h.api.checkFleetClashes();
+    }
+    expect(engages(h)).toBe(1);
+    h.setState(at(h.state(), h.state().time + HOUR));
+    h.api.checkFleetClashes();
+    expect(engages(h)).toBe(2);
+  });
+
+  it('сменились отношения — попытка сразу, не дожидаясь нового часа', () => {
+    const h = harness({}, twoIdleAtPeace());
+    h.api.checkFleetClashes();
+    const next = structuredClone(h.state()) as GameState;
+    const foe = Object.values(next.fleets).find((f) => f.owner !== 'p1')!.owner;
+    setStance(next, 'p1', foe, 'war');
+    h.setState(next);
+    h.api.checkFleetClashes();
+    expect(engages(h)).toBe(2);
+    expect(Object.values(h.state().fleets).some((f) => f.battleId)).toBe(true);
   });
 
   it('свои флоты между собой не сводятся', () => {
