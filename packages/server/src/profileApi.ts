@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { medalGrade, parseAppearance, type PlayerProfile } from '@void/protocol';
+import { PROFILE_MEDALS, medalGrade, parseAppearance, type PlayerProfile } from '@void/protocol';
 import type { Identity } from './matchApi';
 import type { CommanderStore, UserStore } from './store';
 import type { ProfileStore } from './profileStore';
@@ -15,13 +15,21 @@ export interface ProfileApiDeps {
 /** Public to other signed-in players; deliberately excludes email, currency and private match state. */
 export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): void {
   const limited = slidingWindowIpLimiter({ now: Date.now, max: 120, windowMs: 60_000 });
-  const view = async (id: string, login: string): Promise<PlayerProfile> => {
+  const view = async (id: string, login: string, owner = true): Promise<PlayerProfile> => {
     const [appearance, progress, xp] = await Promise.all([
       deps.profiles.appearance(id),
       deps.profiles.progress(id),
       deps.commanders.xpOf(id),
     ]);
-    return { login, xp, progress, ...appearance };
+    if (owner) return { login, xp, progress, ...appearance };
+    const publicProgress: PlayerProfile['progress'] = {};
+    for (const id of appearance.slots) {
+      if (!id) continue;
+      const grade = medalGrade(id, progress);
+      const medal = PROFILE_MEDALS.find((m) => m.id === id)!;
+      if (grade) publicProgress[medal.metric] = Math.max(publicProgress[medal.metric] ?? 0, medal.goals[3 - grade]!);
+    }
+    return { login, xp, progress: publicProgress, ...appearance };
   };
   app.get<{ Querystring: { login?: string } }>('/profiles', async (request, reply) => {
     if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
@@ -35,7 +43,7 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
         ? await deps.users.findById(who.accountId)
         : await deps.users.findUser(login);
     if (!user) return reply.code(404).send({ error: 'E_NO_PROFILE' });
-    return view(user.userId, user.login);
+    return view(user.userId, user.login, user.userId === who.accountId);
   });
   app.post('/profiles/me', { bodyLimit: 2048 }, async (request, reply) => {
     if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });

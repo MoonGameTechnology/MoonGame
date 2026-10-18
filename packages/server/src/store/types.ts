@@ -152,6 +152,8 @@ export interface UserRecord {
   login: string;
   /** Password hash in the self-describing `scrypt$…` format (see password.ts). */
   passHash: string;
+  /** Durable logout-all nonce. Empty on accounts predating revocation. */
+  sessionNonce?: string;
   /** Optional recovery email (lower-cased on store, unique when present). Absent on
    *  accounts created before recovery shipped, and on any registration that skipped it —
    *  such an account simply has no self-service password reset. */
@@ -184,6 +186,8 @@ export interface UserStore {
   loginsOf(userIds: readonly string[]): Promise<Record<string, string>>;
   /** Set a new password hash (the /auth/reset endpoint). No-op if the account is gone. */
   setPassword(userId: string, passHash: string): Promise<void>;
+  /** Atomically revoke every session and join token without changing the password. */
+  revokeSessions(userId: string): Promise<void>;
   /** Atomic single-use reset: update only while the hash is still the one verified. */
   setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean>;
   close?(): Promise<void>;

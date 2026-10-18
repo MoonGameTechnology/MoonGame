@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { SessionClaim } from './auth';
+import type { SessionClaim, SessionTokenResult } from './auth';
 import { hashPassword, verifyPassword, decoyHash, type ScryptParams } from './password';
-import type { UserStore } from './store';
+import type { UserRecord, UserStore } from './store';
 import { slidingWindowIpLimiter } from './rateLimit';
 import { validLogin, validLoginPassword, passwordIssue, blockedPublicName, parseRecoveryEmail, closedInput } from '@void/protocol';
 
@@ -40,6 +40,12 @@ export type RecoveryMailer = (msg: RecoveryMail) => Promise<void>;
 export const pwFingerprint = (passHash: string): string =>
   createHash('sha256').update(passHash).digest('base64url').slice(0, 22);
 
+/** Password + durable logout nonce; legacy accounts retain their original fingerprint.
+ * Reset links deliberately use pwFingerprint alone, so logout cannot cancel recovery. */
+export function sessionFingerprint(user: Pick<UserRecord, 'passHash' | 'sessionNonce'>): string {
+  return pwFingerprint(user.sessionNonce ? `${user.passHash}:${user.sessionNonce}` : user.passHash);
+}
+
 /** Re-check a signature-verified session against the CURRENT password: the account must
  *  still exist and its password hash must still fingerprint to the session's stamped `pwfp`.
  *  A password change (today, a `/auth/reset`) breaks the match, so an older session — a
@@ -51,7 +57,7 @@ export async function liveSession(
   users: Pick<UserStore, 'findById'>,
 ): Promise<SessionClaim | null> {
   const user = await users.findById(claim.accountId);
-  if (!user || pwFingerprint(user.passHash) !== claim.pwfp) return null;
+  if (!user || sessionFingerprint(user) !== claim.pwfp) return null;
   return claim;
 }
 
@@ -64,11 +70,13 @@ export async function currentPwfp(
   accountId: string,
 ): Promise<string | null> {
   const user = await users.findById(accountId);
-  return user ? pwFingerprint(user.passHash) : null;
+  return user ? sessionFingerprint(user) : null;
 }
 
 export interface AuthApiDeps {
   users: UserStore;
+  verifySession?(token: string): Promise<SessionTokenResult>;
+  onSessionsRevoked?(accountId: string): void | Promise<void>;
   /** Mint a session token for an authenticated account (from serverConfig). `pwfp` binds
    *  the session to the current password (see `liveSession`) so a reset revokes it. */
   signSession(accountId: string, login: string, pwfp: string): Promise<string>;
@@ -207,7 +215,12 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     if (blockedPublicName(creds.login)) return reply.code(400).send({ error: 'E_NICKNAME_BLOCKED' });
     if (passwordIssue(creds.password)) return reply.code(400).send({ error: 'E_PASSWORD_POLICY' });
     const passHash = await hashPassword(creds.password, deps.scryptParams);
-    const created = await deps.users.createUser(creds.login, passHash, email);
+    let created = await deps.users.createUser(creds.login, passHash, email);
+    // Recovery is optional. Do not expose whether a private address belongs to an
+    // existing account, and never reassign it: create the new account without it.
+    // Both paths return the same public account/token shape; the form explains this.
+    if (!created.ok && created.code === 'E_EMAIL_TAKEN')
+      created = await deps.users.createUser(creds.login, passHash);
     if (!created.ok) {
       void reply.code(409);
       return { error: created.code }; // E_LOGIN_TAKEN | E_EMAIL_TAKEN
@@ -253,9 +266,27 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       void reply.code(401);
       return { error: 'E_AUTH' as const };
     }
-    const token = await deps.signSession(user.userId, user.login, pwFingerprint(user.passHash));
+    const token = await deps.signSession(user.userId, user.login, sessionFingerprint(user));
     return { accountId: user.userId, login: user.login, token };
   });
+
+  if (deps.verifySession) {
+    const verify = deps.verifySession;
+    app.post('/auth/logout', { bodyLimit: AUTH_BODY_LIMIT }, async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      if (request.body !== undefined && !closedInput(request.body, []))
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const header = request.headers.authorization;
+      const verified = header?.startsWith('Bearer ') ? await verify(header.slice(7).trim()) : null;
+      const who = verified?.ok ? await liveSession(verified.claim, deps.users) : null;
+      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+      // Commit before closing sockets/acknowledging. Store failures must never claim success.
+      await deps.users.revokeSessions(who.accountId);
+      await deps.onSessionsRevoked?.(who.accountId);
+      return reply.code(204).send();
+    });
+  }
 
   // --- Password recovery (SE-1.x): request a reset link, then spend it -----------------
   // Mounted only when the deployment wired reset-token signing + a client origin. Both
@@ -381,13 +412,13 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       if (deps.onPasswordChanged) {
         try {
           await deps.onPasswordChanged(user.userId);
-        } catch (err) {
-          request.log.error({ err }, 'password change: revoking connections failed');
+        } catch {
+          request.log.error({ code: 'E_REVOKE_CONNECTIONS' }, 'password change: revoking connections failed');
         }
       }
       // Reset IS a login: hand back a fresh session (stamped with the NEW password's
       // fingerprint, so it survives while every pre-reset session is now revoked).
-      const sessionToken = await deps.signSession(user.userId, user.login, pwFingerprint(passHash));
+      const sessionToken = await deps.signSession(user.userId, user.login, sessionFingerprint({ ...user, passHash }));
       return { accountId: user.userId, login: user.login, token: sessionToken };
     });
   }

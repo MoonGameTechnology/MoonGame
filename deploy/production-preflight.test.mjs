@@ -37,6 +37,17 @@ async function check(f) {
 }
 
 describe('production deployment data protection preflight', () => {
+  it('blocks public release without privacy evidence and rejects playtest backup deferral', async () => {
+    for (const extra of ['PUBLIC_RELEASE=1\n', 'PUBLIC_RELEASE=1\nBACKUP_POLICY=deferred-playtest\n', 'PUBLIC_RELEASE=1\nPROD=0\nSERVER_BIND=127.0.0.1\n']) {
+      const f = fixture();
+      writeFileSync(f.envFile, f.config + extra);
+      const result = await check(f);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('E_PRIVACY_RELEASE');
+      expect(readFileSync(f.calls, 'utf8')).toBe('');
+    }
+  });
+
   it('records an explicit deferral without claiming a verified backup or running a fake checker', async () => {
     const f=fixture({ checkExit:1 });
     writeFileSync(f.envFile,f.config+'BACKUP_POLICY=deferred-playtest\n');

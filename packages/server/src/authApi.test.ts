@@ -672,7 +672,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     expect(sent).toHaveLength(0);
   });
 
-  it('a duplicate recovery email is refused (E_EMAIL_TAKEN), case-insensitively', async () => {
+  it('registration does not reveal or reassign an existing recovery address', async () => {
     const { server } = recoverApp();
     await post(server, '/auth/register', {
       login: 'first',
@@ -684,8 +684,11 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       password: 'orbit-longenough',
       email: 'Shared@Example.com',
     });
-    expect(dup.statusCode).toBe(409);
-    expect(dup.json()).toEqual({ error: 'E_EMAIL_TAKEN' });
+    expect(dup.statusCode).toBe(201);
+    expect(dup.json()).toMatchObject({ login: 'second', token: expect.any(String) });
+    expect(dup.json()).not.toHaveProperty('email');
+    const recovery = await post(server, '/auth/recover', { email: 'shared@example.com' });
+    expect(recovery.statusCode).toBe(200);
   });
 
   it('reset rejects a garbage/forged token uniformly (E_AUTH)', async () => {

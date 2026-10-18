@@ -261,6 +261,13 @@ export class MemoryUserStore implements UserStore {
     return Promise.resolve(out);
   }
 
+  revokeSessions(userId: string): Promise<void> {
+    for (const rec of this.byLogin.values()) {
+      if (rec.userId === userId) rec.sessionNonce = randomUUID();
+    }
+    return Promise.resolve();
+  }
+
   setPassword(userId: string, passHash: string): Promise<void> {
     for (const rec of this.byLogin.values()) {
       if (rec.userId === userId) rec.passHash = passHash;

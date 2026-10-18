@@ -187,6 +187,9 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     expect(await store.findUser('existing')).toMatchObject({ login: 'existing' });
     expect(await store.createUser('new', 'hash')).toMatchObject({ ok: true });
     expect(await store.findUser('new')).toMatchObject({ login: 'new' });
+    const account = (await store.findUser('new'))!;
+    await store.revokeSessions(account.userId);
+    expect((await store.findById(account.userId))?.sessionNonce).toBeTruthy();
     for (const query of [
       'CREATE TABLE public.forbidden(id int)',
       'ALTER TABLE users ADD COLUMN forbidden int',
