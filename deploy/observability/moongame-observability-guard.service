@@ -7,7 +7,7 @@ Requires=docker.service
 Type=oneshot
 User=root
 # Change this path if the checkout lives elsewhere. It must match stack.mjs up.
-ExecStart=/usr/bin/node /opt/moongame/deploy/observability/stack.mjs guard --state-dir /var/lib/moongame-observability --env-file /opt/moongame/deploy/server.env
+ExecStart=/usr/bin/node /opt/moongame/deploy/observability/stack.mjs guard --state-dir /var/lib/moongame-observability
 TimeoutStartSec=150
 NoNewPrivileges=true
 ProtectSystem=strict

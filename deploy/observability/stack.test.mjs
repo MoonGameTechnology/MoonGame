@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile, readFile, symlink, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   BUDGETS,
   SERVICES,
@@ -15,6 +16,7 @@ import {
 // Real files exercise permissions, symlinks and exclusive writes. Only root ownership
 // is modelled so these security regressions also run on unprivileged CI workers.
 const ownership = vi.hoisted(() => new Map());
+const pathAliases = vi.hoisted(() => new Map());
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -23,9 +25,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       ownership.set(String(path), uid);
     },
     lstat: async (path) =>
-      Object.assign(Object.create(await actual.lstat(path)), {
+      Object.assign(Object.create(await actual.lstat(pathAliases.get(String(path)) ?? path)), {
         uid: ownership.get(String(path)) ?? 0,
       }),
+    readlink: async (path) => actual.readlink(pathAliases.get(String(path)) ?? path),
     open: async (...args) => {
       const handle = await actual.open(...args);
       return {
@@ -162,36 +165,31 @@ describe('OBS-0.2 fixed service plans', () => {
     expect(plan.env).toEqual({ OBS_STATE_DIR: options.stateDir, OBS_GRAFANA_ADMIN_USER: 'alice' });
   });
 
-  it.each(['restart', 'stop', 'status'])(
-    '%s never expands to project teardown or Game',
-    (action) => {
-      const plan = composePlan(action, options);
-      expect(plan.args.slice(-4)).toEqual(SERVICES);
-      for (const forbidden of [
-        'down',
-        '--volumes',
-        '-v',
-        '--remove-orphans',
-        'server',
-        'postgres',
-        'caddy',
-      ])
-        expect(plan.args).not.toContain(forbidden);
-    },
-  );
+  it.each(['restart', 'status'])('%s never expands to project teardown or Game', (action) => {
+    const plan = composePlan(action, options);
+    expect(plan.args.slice(-4)).toEqual(SERVICES);
+    for (const forbidden of [
+      'down',
+      '--volumes',
+      '-v',
+      '--remove-orphans',
+      'server',
+      'postgres',
+      'caddy',
+    ])
+      expect(plan.args).not.toContain(forbidden);
+  });
 
   it('rejects unrecognized actions and relative file paths', () => {
     expect(() => composePlan('down', options)).toThrow('E_OBS_CONFIG');
     expect(() => composePlan('up', { ...options, stateDir: './state' })).toThrow('E_OBS_CONFIG');
-    expect(() => composePlan('stop', { ...options, envFile: './server.env' })).toThrow(
+    expect(() => composePlan('status', { ...options, envFile: './server.env' })).toThrow(
       'E_OBS_CONFIG',
     );
   });
 
-  it('can construct an emergency stop without the bootstrap account', () => {
-    expect(
-      composePlan('stop', { ...options, adminUser: undefined }).env.OBS_GRAFANA_ADMIN_USER,
-    ).toBe('operator-unavailable');
+  it('does not expose a Compose-based emergency stop', () => {
+    expect(() => composePlan('stop', options)).toThrow('E_OBS_CONFIG');
   });
 });
 
@@ -227,6 +225,11 @@ describe('OBS-0.2 CLI boundary', () => {
 });
 
 describe('OBS-0.2 root controller with real private files', () => {
+  const ids = Object.fromEntries(
+    SERVICES.map((service, index) => [service, String(index + 1).repeat(64)]),
+  );
+  const defaultEnv = fileURLToPath(new URL('../server.env', import.meta.url));
+  const canonicalEnv = '/var/lib/moongame/server.env';
   let directory, stateDir, envFile, runner;
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'obs-stack-test-'));
@@ -237,10 +240,17 @@ describe('OBS-0.2 root controller with real private files', () => {
     runner = vi.fn(async (binary, args) => {
       if (binary === 'systemctl') return '';
       if (binary === 'du') return `0\t${args.at(-1)}`;
+      if (binary === 'id') return '2001';
       if (args[0] === 'context') return 'unix:///var/run/docker.sock';
       if (args[0] === 'info') return '["name=seccomp"]';
       if (args[0] === 'version') return '28.0.0';
       if (args[0] === 'create') return 'a'.repeat(64);
+      if (args[0] === 'ps') {
+        const service = SERVICES.find((name) =>
+          args.includes(`label=com.docker.compose.service=${name}`),
+        );
+        return ids[service] ?? '';
+      }
       if (args[0] === 'cp') {
         await writeFile(args.at(-1), Buffer.alloc(2048, 1), { mode: 0o644 });
         return '';
@@ -251,6 +261,7 @@ describe('OBS-0.2 root controller with real private files', () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     ownership.clear();
+    pathAliases.clear();
     await rm(directory, { recursive: true, force: true });
   });
   const args = (action, stateDir, envFile) => [
@@ -381,10 +392,9 @@ describe('OBS-0.2 root controller with real private files', () => {
         stopped: 1,
       });
       expect(runner.mock.calls.some(([, command]) => command[0] === 'version')).toBe(false);
-      const stop = runner.mock.calls.find(
-        ([, command]) => command[0] === 'compose' && command.includes('stop'),
-      );
-      expect(stop[1].slice(-4)).toEqual(SERVICES);
+      const stop = runner.mock.calls.find(([, command]) => command[0] === 'stop');
+      expect(stop[1].slice(3)).toEqual(Object.values(ids));
+      expect(runner.mock.calls.some(([, command]) => command[0] === 'compose')).toBe(false);
     },
   );
 
@@ -394,12 +404,101 @@ describe('OBS-0.2 root controller with real private files', () => {
     await expect(runStack(args('guard', stateDir, envFile), runner)).rejects.toThrow(
       /^E_OBS_MEASURE$/,
     );
-    const stop = runner.mock.calls.find(
-      ([, command]) => command[0] === 'compose' && command.includes('stop'),
-    );
-    expect(stop[1].slice(-4)).toEqual(SERVICES);
+    const stop = runner.mock.calls.find(([, command]) => command[0] === 'stop');
+    expect(stop[1].slice(3)).toEqual(Object.values(ids));
     const marker = JSON.parse(await readFile(join(stateDir, 'guard-status.json'), 'utf8'));
     expect(marker).toMatchObject({ stopped: 1, measurementError: 1 });
     expect(Object.values(marker).every((value) => typeof value === 'number')).toBe(true);
+  });
+
+  it('stops by immutable container IDs when the env file disappears', async () => {
+    await runStack(args('init', stateDir, envFile), runner);
+    await rm(envFile);
+    runner.mockClear();
+    await expect(runStack(args('guard', stateDir, envFile), runner)).rejects.toThrow(
+      /^E_OBS_MEASURE$/,
+    );
+    const discoveries = runner.mock.calls.filter(([, command]) => command[0] === 'ps');
+    expect(discoveries).toHaveLength(4);
+    for (const [, command] of discoveries) {
+      expect(command).toContain('label=com.docker.compose.project=deploy');
+      expect(
+        SERVICES.some((service) => command.includes(`label=com.docker.compose.service=${service}`)),
+      ).toBe(true);
+    }
+    expect(runner).toHaveBeenCalledWith('docker', ['stop', '--time', '20', ...Object.values(ids)], {
+      timeout: 60000,
+    });
+    expect(runner.mock.calls.some(([, command]) => command[0] === 'compose')).toBe(false);
+    const marker = JSON.parse(await readFile(join(stateDir, 'guard-status.json'), 'utf8'));
+    expect(marker).toMatchObject({ measurementError: 1, stopped: 1, stopError: 0 });
+  });
+
+  it('rejects malformed discovery IDs and never passes them to docker stop', async () => {
+    const normal = runner.getMockImplementation();
+    runner.mockImplementation(async (binary, command) => {
+      const value = await normal(binary, command);
+      return command[0] === 'ps' && command.includes('label=com.docker.compose.service=obs-grafana')
+        ? `${value}\nserver; printf stolen`
+        : value;
+    });
+    await expect(runStack(args('stop', stateDir, envFile), runner)).rejects.toThrow(/^E_OBS_STOP$/);
+    const stop = runner.mock.calls.find(([, command]) => command[0] === 'stop');
+    expect(stop[1]).toEqual(['stop', '--time', '20', ...Object.values(ids)]);
+  });
+
+  it('reports restart failure when the subsequent readiness wait fails', async () => {
+    await runStack(args('init', stateDir, envFile), runner);
+    const normal = runner.getMockImplementation();
+    runner.mockImplementation(async (binary, command) => {
+      if (command[0] === 'compose' && command.includes('up')) throw new Error('E_OBS_COMMAND');
+      return normal(binary, command);
+    });
+    await expect(runStack(args('restart', stateDir, envFile), runner)).rejects.toThrow(
+      /^E_OBS_COMMAND$/,
+    );
+    const operations = runner.mock.calls.filter(([, command]) => command[0] === 'compose');
+    expect(operations.at(-2)[1]).toContain('restart');
+    expect(operations.at(-1)[1]).toEqual(
+      expect.arrayContaining(['up', '--no-deps', '--wait', '-d', ...SERVICES]),
+    );
+  });
+
+  it('accepts the installer service account without trusting arbitrary file owners', async () => {
+    ownership.set(envFile, 2001);
+    await expect(runStack(args('init', stateDir, envFile), runner)).resolves.toEqual({
+      initialized: 1,
+    });
+    ownership.set(envFile, 2002);
+    await expect(runStack(args('up', stateDir, envFile), runner)).rejects.toThrow(/^E_OBS_CONFIG$/);
+  });
+
+  it('accepts only the canonical adopted checkout symlink for the default env file', async () => {
+    const checkoutLink = join(directory, 'checkout-server.env');
+    await symlink(canonicalEnv, checkoutLink);
+    pathAliases.set(defaultEnv, checkoutLink);
+    pathAliases.set('/var/lib/moongame', directory);
+    pathAliases.set(canonicalEnv, envFile);
+    ownership.set('/var/lib/moongame', 2001);
+    ownership.set(canonicalEnv, 2001);
+    const defaults = ['init', '--state-dir', stateDir, '--admin-user', 'alice'];
+    await expect(runStack(defaults, runner)).resolves.toEqual({ initialized: 1 });
+    await rm(checkoutLink);
+    await symlink(envFile, checkoutLink);
+    await expect(runStack(defaults, runner)).rejects.toThrow(/^E_OBS_CONFIG$/);
+  });
+
+  it('finds canonical host env state when an extracted release has no checkout env file', async () => {
+    pathAliases.set(defaultEnv, join(directory, 'absent-checkout-env'));
+    pathAliases.set('/var/lib/moongame', directory);
+    pathAliases.set(canonicalEnv, envFile);
+    ownership.set('/var/lib/moongame', 2001);
+    ownership.set(canonicalEnv, 2001);
+    await runStack(['init', '--state-dir', stateDir, '--admin-user', 'alice'], runner);
+    await runStack(['up', '--state-dir', stateDir], runner);
+    const up = runner.mock.calls.find(
+      ([, command]) => command[0] === 'compose' && command.includes('up'),
+    );
+    expect(up[1][up[1].indexOf('--env-file') + 1]).toBe(canonicalEnv);
   });
 });

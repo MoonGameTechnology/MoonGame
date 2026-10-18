@@ -10,6 +10,7 @@ import {
   unlink,
   statfs,
   open,
+  readlink,
 } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { execFile } from 'node:child_process';
@@ -21,6 +22,8 @@ import { isAbsolute, resolve, join, parse } from 'node:path';
 const exec = promisify(execFile);
 const DEPLOY = fileURLToPath(new URL('../', import.meta.url));
 const DEFAULT_STATE = '/var/lib/moongame-observability';
+const DEFAULT_ENV = join(DEPLOY, 'server.env');
+const AUTODEPLOY_ENV = '/var/lib/moongame/server.env';
 export const PROBE_IMAGE =
   'prom/prometheus:v3.13.4@sha256:87861b8cf91579109319ebc300f3f1060e6da9c05d6ae8ad15a20c879e84e32e';
 export const SERVICES = Object.freeze(['obs-grafana', 'obs-prometheus', 'obs-loki', 'obs-alloy']);
@@ -106,15 +109,14 @@ export function parseArgs(args) {
   return {
     action,
     stateDir: absolutePath(options.get('--state-dir') ?? DEFAULT_STATE),
-    envFile: absolutePath(options.get('--env-file') ?? join(DEPLOY, 'server.env')),
+    envFile: absolutePath(options.get('--env-file') ?? DEFAULT_ENV),
     adminUser,
   };
 }
 
 /** Service allowlist is part of the safety boundary: never restart/down the project. */
 export function composePlan(action, { stateDir, envFile, adminUser }) {
-  if (!['up', 'restart', 'stop', 'status', 'config'].includes(action))
-    throw failure('E_OBS_CONFIG');
+  if (!['up', 'restart', 'status', 'config'].includes(action)) throw failure('E_OBS_CONFIG');
   const args = [
     'compose',
     '--project-name',
@@ -131,7 +133,6 @@ export function composePlan(action, { stateDir, envFile, adminUser }) {
   if (action === 'up')
     args.push('up', '--no-deps', '--wait', '--wait-timeout', '180', '-d', ...SERVICES);
   if (action === 'restart') args.push('restart', '--no-deps', ...SERVICES);
-  if (action === 'stop') args.push('stop', '--timeout', '20', ...SERVICES);
   if (action === 'status') args.push('ps', '--all', '--format', 'json', ...SERVICES);
   if (action === 'config') args.push('config', '--quiet');
   return {
@@ -213,7 +214,8 @@ async function noLinks(path, missingFinal = false, trustedParents = false) {
     if (
       trustedParents &&
       i < components.length - 1 &&
-      (info.uid !== 0 || (info.mode & 0o022 && !(info.mode & 0o1000)))
+      (!(trustedParents instanceof Set ? trustedParents.has(info.uid) : info.uid === 0) ||
+        (info.mode & 0o022 && !(info.uid === 0 && info.mode & 0o1000)))
     )
       throw failure('E_OBS_STATE');
   }
@@ -262,13 +264,50 @@ async function metadata(stateDir) {
   return data;
 }
 
-async function verifyState(stateDir, envFile) {
+async function environmentPath(path) {
+  let info;
+  try {
+    info = await lstat(path);
+  } catch (error) {
+    // Extracted autodeploy releases do not contain server.env; it is host state.
+    if (error.code !== 'ENOENT' || path !== DEFAULT_ENV) throw failure('E_OBS_CONFIG');
+    await lstat(AUTODEPLOY_ENV);
+    return AUTODEPLOY_ENV;
+  }
+  if (!info.isSymbolicLink()) return path;
+  // install-autodeploy.sh adopts this one file and leaves this exact absolute link.
+  if (path !== DEFAULT_ENV || (await readlink(path)) !== AUTODEPLOY_ENV)
+    throw failure('E_OBS_CONFIG');
+  return AUTODEPLOY_ENV;
+}
+
+async function verifyEnvironment(path, run) {
+  let serviceUid;
+  try {
+    const value = await run('id', ['-u', '--', 'moongame']);
+    if (/^\d+$/.test(value) && Number.isSafeInteger(Number(value))) serviceUid = Number(value);
+  } catch {
+    /* A manual root-owned deployment need not have the service account. */
+  }
+  const owners = new Set([0, ...(serviceUid === undefined ? [] : [serviceUid])]);
+  await noLinks(path, false, owners);
+  const info = await lstat(path);
+  if (
+    !info.isFile() ||
+    info.nlink !== 1 ||
+    !owners.has(info.uid) ||
+    (info.mode & 0o7777) !== 0o600 ||
+    info.size > 65536
+  )
+    throw failure('E_OBS_CONFIG');
+}
+
+async function verifyState(stateDir, envFile, run) {
   await noLinks(stateDir, false, true);
   await checkEntry(stateDir, 0, 0o700, true);
   for (const [directory, [uid, mode]] of Object.entries(DIRECTORIES))
     await checkEntry(join(stateDir, directory), uid, mode, true);
-  const envInfo = await checkEntry(envFile, 0, 0o600, false);
-  if (envInfo.size > 65536) throw failure('E_OBS_CONFIG');
+  await verifyEnvironment(envFile, run);
   const secret = join(stateDir, 'secrets/grafana_admin_password');
   const secretInfo = await checkEntry(secret, 472, 0o400, false);
   if (secretInfo.size !== 65) throw failure('E_OBS_STATE');
@@ -316,7 +355,7 @@ async function initialize(options, run) {
   const metadataPath = join(options.stateDir, 'administrator.json');
   try {
     await lstat(metadataPath);
-    const data = await verifyState(options.stateDir, options.envFile);
+    const data = await verifyState(options.stateDir, options.envFile, run);
     if (data.adminUser !== options.adminUser) throw failure('E_OBS_CONFIG');
     return;
   } catch (error) {
@@ -370,7 +409,47 @@ async function initialize(options, run) {
     }) + '\n',
     { flag: 'wx', mode: 0o600 },
   );
-  await verifyState(options.stateDir, options.envFile);
+  await verifyState(options.stateDir, options.envFile, run);
+}
+
+async function emergencyStop(run) {
+  const ids = new Set();
+  let invalid = false;
+  for (const service of SERVICES) {
+    try {
+      const text = await run('docker', [
+        'ps',
+        '--all',
+        '--no-trunc',
+        '--filter',
+        'label=com.docker.compose.project=deploy',
+        '--filter',
+        `label=com.docker.compose.service=${service}`,
+        '--format',
+        '{{.ID}}',
+      ]);
+      const rows = text.split('\n').filter(Boolean);
+      if (rows.length > 16) {
+        invalid = true;
+        continue;
+      }
+      for (const id of rows) {
+        if (/^[a-f0-9]{64}$/.test(id)) ids.add(id);
+        else invalid = true;
+      }
+    } catch {
+      invalid = true;
+    }
+  }
+  // No env file, Compose parsing, current checkout state or caller-supplied IDs.
+  if (ids.size) {
+    try {
+      await run('docker', ['stop', '--time', '20', ...ids], { timeout: 60000 });
+    } catch {
+      invalid = true;
+    }
+  }
+  if (invalid) throw failure('E_OBS_STOP');
 }
 
 async function measure(stateDir, run) {
@@ -446,9 +525,24 @@ export async function guardStack({ measure: sample, stop, record }) {
 }
 
 async function executeStack(args, run) {
-  const options = parseArgs(args);
+  let options = parseArgs(args);
   if (process.geteuid?.() !== 0) throw failure('E_OBS_ROOT');
   await localDocker(run, { requireVersion: ['init', 'up', 'restart'].includes(options.action) });
+  if (options.action === 'stop') {
+    await emergencyStop(run);
+    return { stopped: 1 };
+  }
+  if (options.action === 'guard')
+    return guardStack({
+      measure: async () => {
+        const envFile = await environmentPath(options.envFile);
+        await verifyState(options.stateDir, envFile, run);
+        return measure(options.stateDir, run);
+      },
+      stop: () => emergencyStop(run),
+      record: (marker) => recordGuard(options.stateDir, marker),
+    });
+  options = { ...options, envFile: await environmentPath(options.envFile) };
   const compose = async (action, adminUser) => {
     const plan = composePlan(action, { ...options, adminUser });
     return run(plan.binary, plan.args, {
@@ -460,21 +554,7 @@ async function executeStack(args, run) {
     await initialize(options, run);
     return { initialized: 1 };
   }
-  if (options.action === 'guard')
-    return guardStack({
-      measure: async () => {
-        await verifyState(options.stateDir, options.envFile);
-        return measure(options.stateDir, run);
-      },
-      stop: () => compose('stop'),
-      record: (marker) => recordGuard(options.stateDir, marker),
-    });
-  // Emergency stop does not depend on healthy storage, a readable password or a probe.
-  if (options.action === 'stop') {
-    await compose('stop');
-    return { stopped: 1 };
-  }
-  const data = await verifyState(options.stateDir, options.envFile);
+  const data = await verifyState(options.stateDir, options.envFile, run);
   if (options.action === 'status') {
     // Compose JSON contains only requested fields; never emit Config.Env or health log text.
     const text = await compose('status', data.adminUser);
@@ -509,6 +589,7 @@ async function executeStack(args, run) {
   }
   await compose('config', data.adminUser);
   await compose(options.action, data.adminUser);
+  if (options.action === 'restart') await compose('up', data.adminUser);
   return { started: 1 };
 }
 

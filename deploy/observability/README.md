@@ -15,10 +15,16 @@ Loki datasource отсутствует до query-only границы OBS-2.1: `
 Remote Docker, rootless и userns-remap не поддерживаются. До Engine28 loopback
 published ports могли быть доступны с того же L2. Checkout и конфиги должны
 быть на хосте daemon. Пример ниже предполагает checkout `/opt/moongame`.
+Несекретные конфиги `*.yml`/`config.alloy`/provisioning должны читаться UID
+контейнеров (обычно 0644, каталоги 0755); это отдельно от приватных state/env/secret.
 
-Обновите checkout до принятого PR. `deploy/server.env` должен быть обычным
-root:root файлом 0600, без symlink/hardlink. Контроллер передаёт его Compose явно,
-содержимое не печатает. Затем:
+Обновите checkout до принятого PR. Env должен быть приватным обычным файлом 0600,
+без hardlink, owner root или UID штатного сервисного аккаунта `moongame`.
+По умолчанию используется `deploy/server.env`. Поддерживается только штатная
+финальная ссылка этого пути на `/var/lib/moongame/server.env`; если checkout env
+отсутствует в извлечённом release, выбирается тот же постоянный файл.
+Произвольные symlink/чужие UID не принимаются. Явный `--env-file` задаёт реальный
+абсолютный путь без ссылок. Контроллер передаёт его Compose, содержимое не печатает. Затем:
 
 ```bash
 cd /opt/moongame
@@ -96,6 +102,10 @@ node deploy/observability/stack.mjs stop
 node deploy/observability/stack.mjs restart
 ```
 
+`stop` находит только project=`deploy`/четыре разрешённых service по Docker labels
+и останавливает валидированные полные container IDs, без env/Compose. Утрата env
+не мешает emergency stop; guard при ошибке измерения использует тот же путь.
+`restart` ожидает HTTP readiness перед успешным результатом.
 `stop` сохраняет состояние, останавливает только четыре service. **Не используйте
 `compose down`**: проект `deploy` общий с игрой. Game readiness не зависит от
 мониторинга. После budget stop разберите причину/маркер, проверьте резерв, выполните
@@ -110,7 +120,7 @@ probe и `PROBE_IMAGE`; не заменяйте helper непроверенны�
 
 ```bash
 umask 022
-pnpm exec vitest run deploy/observability/stack.test.mjs
+pnpm exec vitest run deploy/observability/stack.test.mjs deploy/observability/compose.test.mjs
 node deploy/observability/smoke.mjs
 ```
 

@@ -59,8 +59,15 @@ services:
       GF_LOG_LEVEL: warn
     secrets: [grafana_admin_password]
     volumes:
-      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/grafana:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - type: bind
+        source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/grafana
+        target: /var/lib/grafana
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./observability/grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+        bind: { create_host_path: false }
     healthcheck:
       test: [CMD, curl, -fsS, --max-time, '2', -o, /dev/null, http://127.0.0.1:3000/api/health]
       interval: 15s
@@ -83,8 +90,15 @@ services:
       - --query.max-samples=100000
       # Admin API, lifecycle and remote-write receiver stay disabled (defaults).
     volumes:
-      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/prometheus:/prometheus
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - type: bind
+        source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/prometheus
+        target: /prometheus
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./observability/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+        bind: { create_host_path: false }
     healthcheck:
       test:
         [
@@ -111,9 +125,20 @@ services:
     mem_limit: 384m
     command: [-config.file=/etc/loki/config.yml]
     volumes:
-      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/loki:/loki
-      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/probe:/probe:ro
-      - ./observability/loki.yml:/etc/loki/config.yml:ro
+      - type: bind
+        source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/loki
+        target: /loki
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/probe
+        target: /probe
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./observability/loki.yml
+        target: /etc/loki/config.yml
+        read_only: true
+        bind: { create_host_path: false }
     healthcheck:
       test:
         [
@@ -146,9 +171,20 @@ services:
       - --disable-reporting
       - /etc/alloy/config.alloy
     volumes:
-      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/alloy:/var/lib/alloy
-      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/probe:/probe:ro
-      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+      - type: bind
+        source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/alloy
+        target: /var/lib/alloy
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/probe
+        target: /probe
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./observability/config.alloy
+        target: /etc/alloy/config.alloy
+        read_only: true
+        bind: { create_host_path: false }
     healthcheck:
       test:
         [

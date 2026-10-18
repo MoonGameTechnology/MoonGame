@@ -2,9 +2,10 @@
 
 Решение 2026-10-16 для [пульта плейтестов](playtest-observability-roadmap.md).
 Контракт v1 принят в рамках реализации OBS-0.1; схема источников сверена с `main`
-`1161bc2d`. OBS-0.2 добавил [закрытый bootstrap стек](../deploy/observability/README.md)
-с проверенным локальным provisioning; это не утверждение о rollout на VPS,
-Game exporters, сборе логов или очистке. Изменение значения/единиц существующего
+`1161bc2d`. OBS-1.1 добавил локальный Game exporter, а OBS-0.2 —
+[закрытый bootstrap стек](../deploy/observability/README.md) с проверенным локальным
+provisioning. Это не утверждение о rollout на VPS, node/DB exporters, сборе логов
+или очистке. Изменение значения/единиц существующего
 поля требует новой версии контракта; добавление метрик допускается через allowlist.
 
 ## Принятый профиль и экраны
@@ -62,8 +63,9 @@ metrics-only scope и отрицательные проверки raw endpoints.
 
 ## Матрица полей, типов и единиц
 
-Все Prometheus-имена ниже проектируемые; baseline JSON хранит разрешённую
-проекцию существующих источников, а не подменяет exporter. `G` — gauge,
+Game Prometheus-имена ниже реализованы в standalone OBS-1.1; host/DB/backup и
+будущие histogram/backlog включаются отдельными этапами. Baseline JSON хранит
+разрешённую проекцию источников и остаётся отдельным инструментом. `G` — gauge,
 `C` — monotonic process counter, `H` — будущая настоящая histogram.
 Доступ для всех строк — только оператор через внутренний scrape.
 
@@ -142,6 +144,28 @@ Raw игровые JSONL не являются technical stream. До OBS-0.3/2.
 Внешнее хранение и публичный доступ не включены этим профилем. TTL требует
 удаления spool/derived copies и не заменяет права доступа или erasure.
 
+## Локальный Game exporter — OBS-1.1
+
+`node deploy/observability/game-exporter.mjs` слушает 127.0.0.1:9108; читает только
+literal loopback четыре Game routes. Ports настраиваются числом, URL/hostname не
+принимаются. [Runbook](../deploy/observability/GAME-EXPORTER.md) описывает private
+plain token file, bounded refresh и отсутствие автоматического Compose wiring.
+Таблица target matrix выше сохраняет целевой сетевой профиль; текущий CLI не
+включает его и не разрешает remote scrape с широким bootstrap credential.
+
+`moongame_client_fps_{sum,count,max}` и `moongame_client_rtt_seconds_{sum,count,max}`
+— конкретные имена FPS/RTT. `moongame_exporter_rejected_series_total` считает
+отклонённые неизвестные action rows при проекции (не события Game); keys не
+сохраняются. Избранные действующие reject codes имеют статический каталог,
+остальные numeric counts суммируются в `other`. Отсутствующие/невалидные
+обязательные counters/series/maps или несогласованные action totals делают
+summary invalid. Null client samples и отсутствующие необязательные
+journal/telemetry не заменяются измеренным нулём; present-invalid optional поля
+отвергаются.
+
+Fixture + live production-bundle проверки закрывают OBS-1.1. Установка на VPS,
+network wiring к Prometheus и ресурсная/24h приёмка этим не подтверждаются.
+
 ## Воспроизводимый baseline и приёмка
 
 ```bash
@@ -179,6 +203,6 @@ p95, стоимость будущего мониторинга или SLO. Пе
 workload, образ, карты/timeScale и профиль выборки. При смене образа/эпохи снять
 новую контрольную точку; тяжёлые тесты/сборку во время замера не запускать.
 
-OBS-0.1 закрывается наличием этого контракта, принятого UI-only/SSH/local профиля,
-проверенного инструмента и честного on-host baseline. OBS-0.2/0.3/1.1 становятся
-доступны; остальные этапы и их внешние зависимости этим не закрываются.
+OBS-0.1 закрыт наличием этого контракта, принятого UI-only/SSH/local профиля,
+проверенного инструмента и честного on-host baseline. OBS-1.1 реализован выше;
+OBS-0.2/0.3 и остальные этапы с внешними зависимостями этим не закрываются.

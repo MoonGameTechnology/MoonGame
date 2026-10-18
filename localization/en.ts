@@ -600,6 +600,8 @@ export const en: Record<string, string> = {
   'auth.need-mail': 'Enter an email',
   'auth.need-name': 'Enter a commander name',
   'auth.pass-mismatch': 'Passwords do not match',
+  'auth.password.hide': 'Hide password',
+  'auth.password.show': 'Show password',
   'auth.recover.sent': 'Check your email',
   'auth.reset.bad-link': 'The link is invalid or expired',
   'auth.reset.done': 'Password changed',
