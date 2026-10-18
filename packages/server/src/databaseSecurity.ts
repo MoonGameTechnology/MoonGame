@@ -39,6 +39,7 @@ export const APP_TABLES = [
   'player_profiles',
   'profile_progress',
   'profile_credits',
+  'registration_rewards',
   'push_subscriptions',
   'friend_edges',
 ] as const;

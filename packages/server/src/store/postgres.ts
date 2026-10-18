@@ -392,6 +392,13 @@ const SCHEMA_SQL = `
       account_id text NOT NULL,
       PRIMARY KEY (match_id, account_id)
     );
+    -- Existing accounts stay ineligible; only the new registration writer opts in.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_reward boolean NOT NULL DEFAULT false;
+    CREATE TABLE IF NOT EXISTS registration_rewards (
+      account_id text PRIMARY KEY REFERENCES users(id),
+      xp integer NOT NULL CHECK (xp >= 0),
+      accepted boolean NOT NULL DEFAULT false
+    );
 
     -- ONB-5: one Web Push subscription per account (a fresh subscribe replaces the
     -- old row — single-device, multi-device fan-out is a later brick).
@@ -756,7 +763,7 @@ export class PostgresUserStore implements UserStore {
     const userId = randomUUID();
     try {
       await this.pool.query(
-        `INSERT INTO users (id, login, pass_hash, email) VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO users (id, login, pass_hash, email, registration_reward) VALUES ($1, $2, $3, $4, true)`,
         [userId, login, passHash, email?.toLowerCase() ?? null],
       );
       return { ok: true, userId };
@@ -775,7 +782,7 @@ export class PostgresUserStore implements UserStore {
   // `no-sql-string-interpolation` guard stays satisfied). All three share `rowToUser`.
   async findUser(login: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE lower(login) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE lower(login) = lower($1)`,
       [login],
     );
     return rowToUser(r.rows[0]);
@@ -783,7 +790,7 @@ export class PostgresUserStore implements UserStore {
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE email IS NOT NULL AND lower(email) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE email IS NOT NULL AND lower(email) = lower($1)`,
       [email],
     );
     return rowToUser(r.rows[0]);
@@ -791,7 +798,7 @@ export class PostgresUserStore implements UserStore {
 
   async findById(userId: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE id = $1`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE id = $1`,
       [userId],
     );
     return rowToUser(r.rows[0]);
@@ -830,6 +837,7 @@ interface UserRow {
   pass_hash: string;
   session_nonce: string;
   email: string | null;
+  registration_reward: boolean;
 }
 
 function rowToUser(row: UserRow | undefined): UserRecord | null {
@@ -839,6 +847,7 @@ function rowToUser(row: UserRow | undefined): UserRecord | null {
     login: row.login,
     passHash: row.pass_hash,
     ...(row.session_nonce ? { sessionNonce: row.session_nonce } : {}),
+    registrationReward: row.registration_reward,
     ...(row.email ? { email: row.email } : {}),
   };
 }

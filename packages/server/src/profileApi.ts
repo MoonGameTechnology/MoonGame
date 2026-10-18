@@ -3,12 +3,14 @@ import { PROFILE_MEDALS, medalGrade, parseAppearance, type PlayerProfile } from 
 import type { Identity } from './matchApi';
 import type { CommanderStore, UserStore } from './store';
 import type { ProfileStore } from './profileStore';
+import type { RegistrationRewardStore } from './registrationRewardStore';
 import { slidingWindowIpLimiter } from './rateLimit';
 
 export interface ProfileApiDeps {
   profiles: ProfileStore;
   users: Pick<UserStore, 'findUser' | 'findById'>;
   commanders: Pick<CommanderStore, 'xpOf'>;
+  registrationRewards?: RegistrationRewardStore;
   identify(request: FastifyRequest): Promise<Identity | null>;
 }
 
@@ -59,4 +61,26 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     await deps.profiles.save(who.accountId, appearance);
     return view(who.accountId, user.login);
   });
+  if (deps.registrationRewards) {
+    const rewards = deps.registrationRewards;
+    app.get('/profiles/rewards/registration', async (request, reply) => {
+      if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      const who = await deps.identify(request);
+      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+      reply.header('cache-control', 'no-store');
+      return { reward: await rewards.ensure(who.accountId) };
+    });
+    app.post('/profiles/rewards/registration/accept', { bodyLimit: 256 }, async (request, reply) => {
+      if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      const who = await deps.identify(request);
+      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+      const body = request.body as { equip?: unknown } | null;
+      if (!body || typeof body.equip !== 'boolean' || Object.keys(body).some((key) => key !== 'equip'))
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const result = await rewards.accept(who.accountId, body.equip);
+      if (!result.ok) return reply.code(result.code === 'E_NO_REWARD' ? 404 : 409).send({ error: result.code });
+      reply.header('cache-control', 'no-store');
+      return { reward: result.reward };
+    });
+  }
 }

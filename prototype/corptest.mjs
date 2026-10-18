@@ -54,12 +54,17 @@ try {
       const signIn = async () => {
         if (await page.locator('#hub').isVisible()) return;
         await page.locator('#cwpass').waitFor({ state: 'visible' });
+        if (!(await page.locator('#cwnick').isVisible())) await page.click('#clogin');
         await page.fill('#cwnick', `Builder${locale}`);
         await page.fill('#cwpass', password);
         await page.click('#cwgo');
         await page.locator('#hub').waitFor({ state: 'visible' });
       };
       await signIn();
+      // New accounts acknowledge their welcome award before navigating the hub.
+      await page.locator('#registration-reward[open]').waitFor();
+      await page.click('#registration-reward [data-reward="accept"]');
+      await page.locator('#registration-reward').waitFor({ state: 'hidden' });
       await page.click('[data-hub="ally"]');
       await page.click('#ccorp');
       if (await page.locator('#intro .in-ok').isVisible()) {

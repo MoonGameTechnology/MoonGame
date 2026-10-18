@@ -1,4 +1,5 @@
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
+import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from '../packages/server/src/registrationRewardStore';
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
 import { MemoryDropStore } from '../packages/server/src/store';
 import { MetaEconomy } from '../packages/server/src/metaEconomy';
@@ -297,6 +298,7 @@ let userStore: UserStore;
 let friendStore: FriendStore;
 let commanderStore: CommanderStore;
 let profileStore: ProfileStore;
+let registrationRewards: RegistrationRewardStore;
 let corpStore: CorpStore;
 // EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
 // из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
@@ -316,6 +318,7 @@ if (DATABASE_URL) {
   friendStore = new PostgresFriendStore(pool);
   commanderStore = new PostgresCommanderStore(pool);
   profileStore = new PostgresProfileStore(pool);
+  registrationRewards = new PostgresRegistrationRewardStore(pool);
   corpStore = new PostgresCorpStore(pool);
   arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
@@ -328,6 +331,7 @@ if (DATABASE_URL) {
   friendStore = new MemoryFriendStore();
   commanderStore = new MemoryCommanderStore();
   profileStore = new MemoryProfileStore();
+  registrationRewards = new MemoryRegistrationRewardStore(userStore, profileStore, commanderStore);
   corpStore = new MemoryCorpStore();
   const memoryArsenal = new MemoryArsenalStore();
   const memoryMarket = new MemoryMetaMarket(memoryArsenal, undefined, metaFaucet);
@@ -1106,7 +1110,11 @@ const server = createMultiplayerServer({
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
         users: userStore,
-        onRegistered: async (accountId) => { await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now()); },
+        onRegistered: async (accountId) => {
+          try { await registrationRewards.ensure(accountId); }
+          catch { process.stderr.write(`registration reward deferred for ${accountId}\n`); }
+          await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now());
+        },
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
         verifySession: authCfg.verifySession!,
@@ -1174,7 +1182,7 @@ const server = createMultiplayerServer({
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
-      registerProfileApi(app, { profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
+      registerProfileApi(app, { registrationRewards, profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
       registerLeaderboardApi(app, {
         commanders: commanderStore,
         users: userStore,

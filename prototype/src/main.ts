@@ -430,6 +430,7 @@ import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
+import { initRegistrationReward } from './registrationReward';
 import { PORTRAITS } from './profileArt';
 import { parseAppearance } from '../../packages/protocol/src/playerProfile';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -4023,7 +4024,9 @@ function enterBrowse(): void {
 // настройки. Social sign-in is a guest stub (accounts AC-1.1) with a "скоро" note.
 const hubEl = $('hub');
 const hubNote = $('hub-note');
+let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
 function showHub(show: boolean): void {
+  if (!show) registrationReward?.close();
   hubEl.style.display = show ? 'flex' : 'none';
 }
 const HUB_PANELS: Record<string, string> = {
@@ -4263,6 +4266,12 @@ const profile = __SECTOR_ZERO_ONLY__
       },
     });
 const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
+if (!__SECTOR_ZERO_ONLY__) registrationReward = initRegistrationReward({
+  identity: profileKey,
+  visible: () => hubEl.style.display !== 'none',
+  authorizedBase: hubAuthorizedBase,
+  changed: async () => { await Promise.all([syncProfileAppearance(), syncCommanderFromServer()]); },
+});
 function profileKey(): string {
   return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
 }
@@ -4348,6 +4357,7 @@ function openHub(note = ''): void {
   refreshHubDoor(); // после позывного: пройденное обучение помнится по нику (`onboardKey`)
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
   detach('хаб: портрет аккаунта', syncProfileAppearance());
+  if (registrationReward) detach('registration reward', registrationReward.show());
 }
 
 // Страницы входа — у своего владельца (`signInPages.ts`, REFM-218): приветствие и вход
