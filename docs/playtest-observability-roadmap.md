@@ -369,7 +369,8 @@ scrape, reset semantics и units. **Готово, когда:** fixture и жи�
 entrypoint дают известные gauges/counters; schema drift, timeout, рестарт
 Game/exporter и пропущенный endpoint не дают ложных нулей или двойного счёта.
 **Сделано 2026-10-18:** standalone loopback-only Node collector
-`deploy/observability/game-exporter.mjs`, фиксированные четыре sources, 2 с/64 KiB,
+`deploy/observability/game-exporter.mjs`, фиксированные четыре sources, default
+1500 мс (cap 2 с)/64 KiB; запас до consumer 2 с проверен hanging headers/body fixtures,
 single-flight, ≤5000 samples/1 MiB, allowlist и caps labels, без offsets/cache.
 Fixture и живой production bundle с WS join/остановкой/рестартом покрыты тестами.
 [Запуск и границы](../deploy/observability/GAME-EXPORTER.md): Compose wiring,

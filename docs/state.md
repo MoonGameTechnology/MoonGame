@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12331 зелёных** (134 skip — прогон без PostgreSQL, реального Caddy и age; всего 12465 в 994 файлах: 989 passed, 5 skipped; прогон 2026-10-18, база 6767bfc7 + OBS-1.1 локальный Game exporter). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12337 зелёных** (134 skip — прогон без PostgreSQL, реального Caddy и age; всего 12471 в 994 файлах: 989 passed, 5 skipped; прогон 2026-10-18, база 8ee57f68 + запас deadline Game exporter). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
 
 
 **Стресс-тест 2026-10-11:** устранены heap OOM при выдаче HTML, неограниченная durable-очередь и ложная readiness при отказе БД; добавлены отказ по заполненной очереди без расхода sequence, проверка актуальности peer и защита legacy restore от чужого schema marker без второй копии SQL. Подтверждение места повторяет временные отказы при полной очереди и проверяет сокет и поколение заявки непосредственно при исполнении очереди; disconnect отменяет ещё не начатое подтверждение без квитанции. Recovery-письма форматирует внешний адаптер под локаль получателя; оба хоста инъецируют его в auth API, а серверный пакет передаёт только структурные параметры и не зависит от каталогов локализации. 160 WSS-клиентов за 20 минут записали 9 579 уникальных команд без потерь/дублей/расхождений; при 160 × 0,5 команды/s стенд уже перегружается. Обе игры проверены в Chromium desktop/mobile. [Полный отчёт, профили ресурсов и ограничения](reviews/2026-10-11-full-stress.md).
@@ -7750,8 +7750,10 @@ timeScale сохраняется; отсутствие обязательной 
 
 **OBS-1.1 (2026-10-18) готов:** отдельный [Game exporter](../deploy/observability/GAME-EXPORTER.md)
 на Node, listener 127.0.0.1:9108 и только loopback Game sources; четыре фиксированных
-JSON routes → allowlist Prometheus, timeout 2 с/body 64 KiB/single-flight,
-5000 samples/1 MiB. Source_up/freshness отделены от exporter liveness, source failure
+JSON routes → allowlist Prometheus, default timeout 1500 мс (cap 2 с)/body 64 KiB/
+single-flight, 5000 samples/1 MiB. Запас до consumer deadline 2 с проверен
+fake-timer fixtures для зависших headers/body; явный timeout override требует
+большего consumer deadline с запасом. Source_up/freshness отделены от exporter liveness, source failure
 убирает игровые значения без ложных нулей; count/sum/max имеют явные units и no_samples,
 Game/exporter resets не добавляют offsets. Статические action/reject catalogs проверены
 по исходникам; неизвестные keys/identity/GameState/raw journal не публикуются.
