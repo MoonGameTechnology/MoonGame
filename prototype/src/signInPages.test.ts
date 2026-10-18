@@ -21,6 +21,9 @@ const HTTP = 'http://srv.test:8080';
 /** Поле или блок страницы: всё, что модуль у них трогает. */
 class Node {
   value = '';
+  type = 'password';
+  ariaLabel = '';
+  title = '';
   style = { display: 'none' };
   dataset: Record<string, string> = {};
   private on = new Map<string, Array<(ev: unknown) => void>>();
@@ -490,7 +493,10 @@ describe('REFM-218 — регистрация', () => {
     el('crpass2').value = 'orbit-secret-pass';
     click('crgo');
     await settle();
-    expect(posted('/auth/register')[0]!.body).toEqual({ login: 'Orion', password: 'orbit-secret-pass' });
+    expect(posted('/auth/register')[0]!.body).toEqual({
+      login: 'Orion',
+      password: 'orbit-secret-pass',
+    });
   });
 
   it('отложенный заход в партию доигрывается и после регистрации', async () => {
@@ -596,7 +602,10 @@ describe('REFM-218 — сброс пароля по ссылке', () => {
     el('cresetpass2').value = 'orbit-new-secret';
     enter('cresetpass2');
     await settle();
-    expect(posted('/auth/reset')[0]!.body).toEqual({ token: 'tok-1', password: 'orbit-new-secret' });
+    expect(posted('/auth/reset')[0]!.body).toEqual({
+      token: 'tok-1',
+      password: 'orbit-new-secret',
+    });
     expect(readSession(localStorage, BASE)).toEqual({ login: 'Orion', token: 'jwt-reset' });
     expect([cell.get('void.nick'), env.nick]).toEqual(['Orion', 'Orion']);
     expect([env.notes, env.hub]).toEqual([['✔ ' + t('auth.reset.done')], [undefined]]);
@@ -656,5 +665,37 @@ describe('REFM-218 — проводка в main.ts', () => {
     expect(init).toBeLessThan(MAIN.indexOf('if (bootReset) {'));
     expect(MAIN.match(/startAuthProbe\(/g)).toHaveLength(1);
     expect(MAIN).toMatch(/initAccountSession\(\{[\s\S]*?\n {2}welcomePassword,\n/);
+  });
+});
+
+describe('password visibility', () => {
+  it.each(['cwpass', 'crpass', 'crpass2', 'cresetpass', 'cresetpass2'])(
+    'toggles only %s without changing the password or submitting',
+    async (id) => {
+      await boot();
+      const input = el(id);
+      const button = el(id + '-visibility');
+      input.value = 'Проверка-Strong-123';
+      const requests = calls.length;
+      expect(input.type).toBe('password');
+      click(button.id);
+      expect(input.type).toBe('text');
+      expect(button.ariaLabel).toBe(t('auth.password.hide'));
+      expect(el(id === 'cwpass' ? 'crpass' : 'cwpass').type).toBe('password');
+      click(button.id);
+      expect(input.type).toBe('password');
+      expect(button.ariaLabel).toBe(t('auth.password.show'));
+      expect(input.value).toBe('Проверка-Strong-123');
+      expect(calls).toHaveLength(requests);
+    },
+  );
+
+  it('hides revealed passwords when changing auth stages', async () => {
+    const { pages } = await boot();
+    click('cwpass-visibility');
+    expect(el('cwpass').type).toBe('text');
+    pages.showStage('register');
+    expect(el('cwpass').type).toBe('password');
+    expect(el('cwpass-visibility').ariaLabel).toBe(t('auth.password.show'));
   });
 });
