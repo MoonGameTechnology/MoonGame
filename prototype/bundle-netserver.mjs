@@ -39,6 +39,11 @@ export async function bundleNetserver() {
     bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
   });
   await build({
+    entryPoints: ['scripts/account-erasure.ts'],
+    outfile: 'packages/server/dist/account-erasure.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
+  });
+  await build({
     entryPoints: ['packages/server/src/corporationMain.ts'],
     outfile: 'packages/server/dist/corporation-server.mjs',
     bundle: true, format: 'esm', platform: 'node', target: 'node22',

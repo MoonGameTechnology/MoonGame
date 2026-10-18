@@ -1,0 +1,100 @@
+{
+  "sourceSha": "2c99903b1ff97a713b1814f7ae029ee366964430",
+  "sourceFilesSha256": {
+    "deploy/account-erasure-drill.mjs": "2b6c399a5ca412b3015095aac6cd267fcb5460505b600efd557d7ffa94e309ca",
+    "scripts/account-erasure.ts": "1cf25f90ade9bbbe1afd4c9aa3442aa767645df87112f7951cff03e8cdf7cb03",
+    "packages/server/src/accountErasureWorker.ts": "a084a06cd18a8a4235e1f73efbb90d327cab9f29b577b8ec858aae0d799dcbf9",
+    "packages/server/src/accountErasure.ts": "24c14a9b2a3c4f2650bf80806739f1541d93af84b8032c26f2e672b235759dc7",
+    "packages/server/src/legacyReceiptOwnership.ts": "47e43fc25f4cff41509d0df2f51fbe994652773499969628c9795baebce0ed06",
+    "packages/server/src/databaseSecurity.ts": "a37b5f18ee400d507855f0f1e47321c1e16d3b602264ccb233d4e80988633345",
+    "deploy/backup.sh": "e38b96b5bd6963f974b74a42831d1e41ff9cfd08246140590634d1ab4cbbaa2b",
+    "deploy/restore.sh": "3dbcbcb8173b081794050dddd488c85b3c5c729a82aa0f2bb48aab4eb5b9061e"
+  },
+  "syntheticOnly": true,
+  "topology": "game and corporations in one PostgreSQL database",
+  "startedAt": "2026-10-18T13:16:33.029Z",
+  "checks": [
+    {
+      "name": "standard build contains the maintenance executable",
+      "ok": true
+    },
+    {
+      "name": "real HTTP registration; empty password cannot log in; least-privilege runtime boots",
+      "ok": true
+    },
+    {
+      "name": "encrypted and signed snapshot predates the deletion request",
+      "ok": true
+    },
+    {
+      "name": "password guard, durable request, lost-response retry and immediate login revocation",
+      "ok": true
+    },
+    {
+      "name": "maintenance refuses a live runtime connection",
+      "ok": true
+    },
+    {
+      "name": "single-database erasure removes private rows/log linkage; other player and shared corporation survive",
+      "ok": true
+    },
+    {
+      "name": "old signed snapshot restores data but runtime refuses to boot before erasure replay",
+      "ok": true
+    },
+    {
+      "name": "external ledger replays idempotently; deleted account stays blocked, other player logs in",
+      "ok": true
+    }
+  ],
+  "postgresImage": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+  "postgresVersion": "16.15",
+  "backupSha256": "d4dbb495c952a2093c0a6db3d58e609b67eb720215f784950a08e7a36fd2773e",
+  "restoreMilliseconds": 664,
+  "ok": true,
+  "finishedAt": "2026-10-18T13:16:44.521Z",
+  "android": [
+    {
+      "appId": "com.voiddominion.syntheticdrill",
+      "versionCode": 1,
+      "certificateSha256": "5b8401e09189a8b26059ee2634363d903677e631d5e3c3cec56c4413c31224c3",
+      "apkSha256": "6e397589c564a9c7f6a1f34bd52959f94ab8f7b653b4853e815f77a95b2434a1",
+      "permissions": [
+        "android.permission.INTERNET",
+        "com.voiddominion.syntheticdrill.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+      ],
+      "checkedAt": "2026-10-18T12:55:55.917Z"
+    },
+    {
+      "appId": "com.voiddominion.syntheticdrill",
+      "versionCode": 2,
+      "certificateSha256": "5b8401e09189a8b26059ee2634363d903677e631d5e3c3cec56c4413c31224c3",
+      "apkSha256": "b915a336c6754b9a93bce8f310d9f5fc0e6a36e928abf5230ba04072a675c333",
+      "permissions": [
+        "android.permission.INTERNET",
+        "com.voiddominion.syntheticdrill.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+      ],
+      "checkedAt": "2026-10-18T12:58:24.057Z"
+    }
+  ],
+  "androidBuildTools37Smoke": {
+    "syntheticOnly": true,
+    "releaseApproval": false,
+    "sourceSha": "8fde43f4bc39c7dc66841fe80e2b5a3b1eae6be8",
+    "appId": "com.voiddominion.syntheticdrill",
+    "versionCode": 1,
+    "certificateSha256": "ea042d5d7327570ad3a9ad1af182e32cadff44317a1f37f451cd7b4c48ed4a51",
+    "apkSha256": "66b28aed7f58142f4a3208eeb1221bf5534121fde770cd5f1c1fbbec014b48b8",
+    "permissions": [
+      "android.permission.INTERNET",
+      "com.voiddominion.syntheticdrill.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ],
+    "checkedAt": "2026-10-18T13:38:59.654Z",
+    "buildTools": "37.0.0",
+    "sourceFilesSha256": {
+      "mobile/rustore-config.mjs": "dff4ffefb7903cc443114e215054e8f40a891d0757c821d2788bce6f86fcd0fe",
+      "mobile/verify-rustore.mjs": "907297e5b1ba5633e5dc07c1130e9c504c5063c8d8ff419930885a19da04db5b",
+      "mobile/rustore-smoke.mjs": "4d791e4112cedb9bf7374a4d5c47f30d94325d250dadcb087a246cd07dc3a0d2"
+    }
+  }
+}

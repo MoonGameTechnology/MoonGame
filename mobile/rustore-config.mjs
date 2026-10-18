@@ -27,3 +27,37 @@ export function policyDocument(text, expectedHash) {
   const escaped = text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>Политика конфиденциальности</title><style>body{max-width:50rem;margin:2rem auto;padding:1rem}pre{white-space:pre-wrap;font:1rem/1.6 system-ui}</style></head><body><pre>${escaped}</pre></body></html>`;
 }
+
+/** Verify the exact inert document, including the reviewed text, after APK packaging. */
+export function verifyPolicyDocument(html, expectedHash) {
+  const encoded = html.match(/<pre>([\s\S]*)<\/pre>/)?.[1];
+  if (encoded === undefined) throw Error('E_RUSTORE_POLICY_ASSET');
+  const text = encoded.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
+  if (policyDocument(text, expectedHash) !== html) throw Error('E_RUSTORE_POLICY_ASSET');
+}
+
+/** Build-tools 37 labels certificates by scheme (V3.0 Signer:) instead of
+ * Signer #1. Require exactly one signer and the approved certificate in every
+ * certificate line; unknown formats and rotation to another key fail closed. */
+export function verifySigningCertificate(output, expectedHash) {
+  const counts = [...output.matchAll(/^Number of signers: (\d+)\r?$/gm)];
+  const lines = output.split(/\r?\n/).filter(line => line.includes('certificate SHA-256 digest:'));
+  if (counts.length !== 1 || counts[0][1] !== '1' || !lines.length || /CN=Android Debug/i.test(output) ||
+      lines.some(line => line.match(/^(?:Signer #1|V[1-4](?:\.\d+)? Signer:) certificate SHA-256 digest: ([a-fA-F0-9]{64})$/)?.[1].toLowerCase() !== expectedHash))
+    throw Error('E_RUSTORE_CERTIFICATE');
+}
+
+/** AndroidX Core declares this package-local signature permission to protect
+ * non-exported dynamic receivers on older Android versions. Never allow a
+ * similarly named foreign permission or a weakened protectionLevel. */
+export function verifyPermissions(permissions, manifest, appId) {
+  const internal = `${appId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`;
+  const allowed = ['android.permission.INTERNET', 'android.permission.ACCESS_NETWORK_STATE', internal];
+  if (!permissions.includes('android.permission.INTERNET') || permissions.some(p => !allowed.includes(p)))
+    throw Error('E_RUSTORE_PERMISSIONS');
+  const declarations = manifest.split(/(?=^\s*E: )/m).filter(block => /^\s*E: permission(?:\s|$)/m.test(block));
+  if (declarations.length > 1 || (permissions.includes(internal) && declarations.length !== 1) ||
+      declarations.some(block => block.match(/^\s*A: android:name(?:\([^)]*\))?="([^"]+)"/m)?.[1] !== internal ||
+        !/android:protectionLevel[^\n]*=\(type 0x11\)0x2(?:\s|$)/.test(block)))
+    throw Error('E_RUSTORE_PERMISSION_PROTECTION');
+}
