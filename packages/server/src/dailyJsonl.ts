@@ -7,7 +7,7 @@
 // Pure observation: nothing here feeds back into any room.
 
 import { mkdirSync } from 'node:fs';
-import { appendFile } from 'node:fs/promises';
+import { appendFile, opendir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface DailyJsonlStats {
@@ -25,6 +25,8 @@ export interface DailyJsonlOptions {
   /** Delay before a scheduled flush (ms). 0 ⇒ next macrotask. */
   flushDelayMs?: number;
   now?: () => number;
+  /** Operational telemetry only, never statutory audit evidence. Default: 30 UTC days. */
+  retentionDays?: number;
 }
 
 /** `2026-10-14` for a UTC instant. */
@@ -40,12 +42,18 @@ export class DailyJsonl {
   private readonly maxQueued: number;
   private readonly flushDelayMs: number;
   private readonly now: () => number;
+  private prunedDay: string | undefined;
+  private pruneErrorDay: string | undefined;
+  private readonly retentionDays: number;
 
   constructor(private readonly options: DailyJsonlOptions) {
     this.maxQueued = options.maxQueued ?? 10_000;
     this.flushDelayMs = options.flushDelayMs ?? 250;
     this.now = options.now ?? Date.now;
-    mkdirSync(options.dir, { recursive: true });
+    this.retentionDays = options.retentionDays ?? 30;
+    if (!/^[a-z][a-z0-9-]*$/.test(options.prefix) || !Number.isInteger(this.retentionDays) || this.retentionDays < 1)
+      throw new Error('E_JOURNAL_CONFIG');
+    mkdirSync(options.dir, { recursive: true, mode: 0o700 });
   }
 
   /** The file a line written right now lands in. */
@@ -70,6 +78,10 @@ export class DailyJsonl {
       this.stats_.failed++;
       return;
     }
+    if (Buffer.byteLength(line, 'utf8') > 64 * 1024) {
+      this.stats_.dropped++;
+      return;
+    }
     const t = typeof record.t === 'number' ? record.t : this.now();
     this.queue.push({ day: utcDay(t), line });
     this.schedule();
@@ -85,10 +97,11 @@ export class DailyJsonl {
     }
     const prev = this.flushing ?? Promise.resolve();
     const run = prev.then(() => this.drain());
-    this.flushing = run.finally(() => {
-      if (this.flushing === run) this.flushing = undefined;
+    const completion = run.finally(() => {
+      if (this.flushing === completion) this.flushing = undefined;
     });
-    return run;
+    this.flushing = completion;
+    return completion;
   }
 
   private fileFor(day: string): string {
@@ -111,13 +124,36 @@ export class DailyJsonl {
     return byDay;
   }
 
+  private async prune(): Promise<void> {
+    const day = utcDay(this.now());
+    if (this.prunedDay === day) return;
+    const cutoff = utcDay(this.now() - this.retentionDays * 86_400_000);
+    const names = new RegExp(`^${this.options.prefix}-([0-9]{4}-[0-9]{2}-[0-9]{2})\\.jsonl$`);
+    const entries = await opendir(this.options.dir);
+    for await (const entry of entries) {
+      const match = names.exec(entry.name);
+      if (entry.isFile() && match && match[1]! < cutoff) {
+        // No symlink traversal, no recursive removal, no match on foreign prefixes.
+        await unlink(join(this.options.dir, entry.name));
+      }
+    }
+    this.prunedDay = day;
+  }
+
   private async drain(): Promise<void> {
     for (const [day, text] of this.takeByDay()) {
       try {
-        await appendFile(this.fileFor(day), text);
+        await appendFile(this.fileFor(day), text, { mode: 0o600 });
         this.stats_.written += countLines(text);
       } catch {
         this.stats_.failed += countLines(text);
+      }
+    }
+    try { await this.prune(); } catch {
+      const day = utcDay(this.now());
+      if (this.pruneErrorDay !== day) {
+        this.pruneErrorDay = day;
+        process.stderr.write('{"kind":"privacy.retention_error","code":"E_JOURNAL_RETENTION"}\n');
       }
     }
   }

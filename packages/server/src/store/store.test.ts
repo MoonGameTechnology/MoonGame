@@ -330,6 +330,20 @@ function receiptStoreContract(name: string, make: () => ReceiptStore, uniq: (p: 
 /** SE-1.x — login+password accounts, run against BOTH adapters. */
 function userStoreContract(name: string, make: () => UserStore, uniq: (p: string) => string): void {
   describe(`UserStore — ${name}`, () => {
+    it('persists a new revocation nonce without changing credentials or another account', async () => {
+      const store = make();
+      const created = await store.createUser(uniq('logout-owner'), 'unchanged');
+      const other = await store.createUser(uniq('logout-other'), 'other');
+      if (!created.ok || !other.ok) throw new Error('fixture');
+      await store.revokeSessions(created.userId);
+      const first = (await store.findById(created.userId))?.sessionNonce;
+      expect(first).toBeTruthy();
+      await store.revokeSessions(created.userId);
+      expect((await make().findById(created.userId))?.sessionNonce ?? (await store.findById(created.userId))?.sessionNonce).not.toBe(first);
+      expect((await store.findById(created.userId))?.passHash).toBe('unchanged');
+      expect((await store.findById(other.userId))?.sessionNonce).toBeUndefined();
+    });
+
     it('atomically consumes the expected password hash once', async () => {
       const store = make();
       const created = await store.createUser(uniq('reset-race'), 'old');

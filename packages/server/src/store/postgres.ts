@@ -104,6 +104,7 @@ const SCHEMA_SQL = `
     );
     -- existing DBs predating recovery: add the optional recovery-email column in place
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS session_nonce text NOT NULL DEFAULT '';
     -- logins are unique case-insensitively: Vasya and vasya are one account
     CREATE UNIQUE INDEX IF NOT EXISTS users_login_idx ON users (lower(login));
     -- recovery emails are unique case-insensitively WHEN present (the reset lookup key)
@@ -774,7 +775,7 @@ export class PostgresUserStore implements UserStore {
   // `no-sql-string-interpolation` guard stays satisfied). All three share `rowToUser`.
   async findUser(login: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email FROM users WHERE lower(login) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE lower(login) = lower($1)`,
       [login],
     );
     return rowToUser(r.rows[0]);
@@ -782,7 +783,7 @@ export class PostgresUserStore implements UserStore {
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email FROM users WHERE email IS NOT NULL AND lower(email) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE email IS NOT NULL AND lower(email) = lower($1)`,
       [email],
     );
     return rowToUser(r.rows[0]);
@@ -790,7 +791,7 @@ export class PostgresUserStore implements UserStore {
 
   async findById(userId: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email FROM users WHERE id = $1`,
+      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE id = $1`,
       [userId],
     );
     return rowToUser(r.rows[0]);
@@ -805,6 +806,10 @@ export class PostgresUserStore implements UserStore {
     const out: Record<string, string> = {};
     for (const row of r.rows) out[row.id] = row.login;
     return out;
+  }
+
+  async revokeSessions(userId: string): Promise<void> {
+    await this.pool.query('UPDATE users SET session_nonce = $2 WHERE id = $1', [userId, randomUUID()]);
   }
 
   async setPassword(userId: string, passHash: string): Promise<void> {
@@ -823,6 +828,7 @@ interface UserRow {
   id: string;
   login: string;
   pass_hash: string;
+  session_nonce: string;
   email: string | null;
 }
 
@@ -832,6 +838,7 @@ function rowToUser(row: UserRow | undefined): UserRecord | null {
     userId: row.id,
     login: row.login,
     passHash: row.pass_hash,
+    ...(row.session_nonce ? { sessionNonce: row.session_nonce } : {}),
     ...(row.email ? { email: row.email } : {}),
   };
 }

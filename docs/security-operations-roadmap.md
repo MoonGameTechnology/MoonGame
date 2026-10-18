@@ -29,6 +29,10 @@
 - CI SAST/SCA/DAST/image scans проверяют выпуск. Они не являются SIEM наблюдения
   за работающей игрой и не подтверждают runtime реагирование.
 
+[Защита ПДн и подготовка к релизу в РФ](security/rf-personal-data-readiness.md):
+реестр обработки, регламенты обращений/инцидентов, сроки и privacy evidence gate.
+Оператор и размещение хранилищ пока не подтверждены; правовой допуск не выдан.
+
 ## Отдельные среды и владельцы
 
 [Карта PNG](diagrams/security-operations.png) · [PDF](diagrams/security-operations.pdf) ·

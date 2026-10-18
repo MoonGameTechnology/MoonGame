@@ -258,3 +258,14 @@ describe('занятие места', () => {
     expect(await createSession(BASE, net).join('m1')).toEqual({ ok: false, reason: 'failed' });
   });
 });
+
+it('waits for server logout and retains the token on network failure', async () => {
+  const net = io({ 'POST /auth/logout': [null, { ok: true, status: 204, body: null }] });
+  net.mem.set(sessionKey(BASE), JSON.stringify({ login: 'Pilot', token: 'secret' }));
+  const session = createSession(BASE, net);
+  expect(await session.signOut()).toBe(false);
+  expect(session.login()).toBe('Pilot');
+  expect(await session.signOut()).toBe(true);
+  expect(session.login()).toBeNull();
+  expect(net.headers[0]).toEqual({ authorization: 'Bearer secret' });
+});

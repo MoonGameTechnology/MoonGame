@@ -217,7 +217,8 @@ import {
 } from './worldCard';
 import { buildRoster } from './planetTabs';
 import { tileLock, type TileLock } from './catalogTile';
-import { clearSession, tokenFor } from '../../decisions/sessionStore';
+import { tokenFor } from '../../decisions/sessionStore';
+import { signOutEverywhere } from './accountSession';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { canBuildHere } from '../../decisions/buildGate';
 import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
@@ -3719,11 +3720,15 @@ $('hub-proving-ground').addEventListener('click', () => startProvingGround());
 $('hub-msg').addEventListener('click', () => {
   hubNote.textContent = t('hub.messages.soon');
 });
-$('hub-logout').addEventListener('click', () => {
+$('hub-logout').addEventListener('click', async () => {
   // «Сменить командира» must really switch identity: drop this server's session so
   // the next sign-in authenticates the NEW callsign instead of replaying the old JWT.
   const srv = resolveServer();
-  if (srv) clearSession(localStorage, srv.base);
+  if (srv && !(await signOutEverywhere(srv.base))) {
+    hubNote.textContent = t('auth.logout.failed');
+    return;
+  }
+  leaveMatch();
   statusEl.textContent = '';
   showHub(false);
   showConnect(true);

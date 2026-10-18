@@ -226,8 +226,10 @@ function wire(model: WelcomeModel): void {
         void submitLogin();
         break;
       case 'signOut':
-        session.signOut();
-        location.reload(); // экран строится из t() на импорте — проще перезайти начисто
+        void session.signOut().then((ok) => {
+          if (ok) location.reload();
+          else setStatus(t('auth.logout.failed'));
+        });
         break;
       case 'refresh':
         void showMatches();

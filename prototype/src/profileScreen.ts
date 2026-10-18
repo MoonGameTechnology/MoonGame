@@ -247,7 +247,7 @@ export function initProfile(host: ProfileHost): {
       const studio = profileStudioHtml(custom, state, profileCareerHtml(view, preview));
       root.innerHTML = profileHtml({ ...view, studio }) + profileSaveBarHtml(state);
     } else {
-      const grid = `<div class="pf-grid">${pfCell(t('profile.matches'), ready ? String(custom.progress.matches ?? 0) : null)}${pfCell(t('profile.wins'), ready ? String(custom.progress.wins ?? 0) : null)}${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div>`;
+      const grid = `<div class="pf-grid">${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div>`;
       root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div></div></div><div class="pf-body">${profileStudioHtml(custom, state, grid)}</div>`;
     }
     const body = root.querySelector?.('.pf-body');

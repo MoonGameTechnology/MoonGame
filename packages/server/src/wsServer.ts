@@ -407,7 +407,8 @@ export function createMultiplayerServer(
       void reply.code(status).send({ error: status === 429 ? 'E_RATE_LIMIT' : 'E_BAD_REQUEST' });
       return;
     }
-    request.log.error(error);
+    // SQL/transport errors may contain email, payloads or credential-bearing URLs.
+    request.log.error({ code: 'E_INTERNAL', requestId: request.id }, 'request failed');
     void reply.code(500).send({ error: 'E_INTERNAL' });
   });
 

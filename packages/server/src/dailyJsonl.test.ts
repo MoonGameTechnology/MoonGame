@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { writeFileSync, statSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -121,4 +121,19 @@ describe('DailyJsonl', () => {
     await Promise.all([a, b]);
     expect(readLines(join(dir, 'match-2026-10-14.jsonl')).map((r) => r.i)).toEqual([1, 2]);
   });
+});
+
+it('expires only its own old telemetry files and keeps new files private', async () => {
+  const dir = tempDir();
+  writeFileSync(join(dir, 'match-2026-09-01.jsonl'), 'old');
+  writeFileSync(join(dir, 'client-2026-09-01.jsonl'), 'foreign');
+  writeFileSync(join(dir, 'evidence.txt'), 'hold');
+  symlinkSync(join(dir, 'evidence.txt'), join(dir, 'match-2026-09-02.jsonl'));
+  const log = new DailyJsonl({ dir, prefix: 'match', now: () => DAY1 });
+  log.write({ kind: 'today' });
+  log.write({ oversized: 'x'.repeat(64 * 1024) });
+  await log.flush();
+  expect(readdirSync(dir).sort()).toEqual(['client-2026-09-01.jsonl', 'evidence.txt', 'match-2026-09-02.jsonl', 'match-2026-10-14.jsonl']);
+  expect(statSync(log.currentFile()).mode & 0o777).toBe(0o600);
+  expect(log.stats().dropped).toBe(1);
 });

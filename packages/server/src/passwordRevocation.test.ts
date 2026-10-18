@@ -11,6 +11,7 @@ import {
   signResetToken,
   signSessionToken,
   verifyResetToken,
+  verifySessionToken,
   type JoinClaim,
 } from './auth';
 import { hashPassword, type ScryptParams } from './password';
@@ -63,6 +64,8 @@ async function harness(opts: { accountPwfp?: (id: string) => Promise<string | nu
     httpRoutes: (app) =>
       registerAuthApi(app, {
         users,
+        verifySession: (token) => verifySessionToken(token, { ...sessionSign, algorithms: ['HS256'] }),
+        onSessionsRevoked: (id) => { revokeAccountConnections(registry, id); },
         signSession: (accountId, login, pwfp) =>
           signSessionToken({ accountId, login, pwfp }, sessionSign, { ttlSeconds: 3600 }),
         signReset: (accountId, pwfp) =>
@@ -127,7 +130,7 @@ function rejectStatus(target: string): Promise<number> {
 
 /** Spend a reset token for `accountId` (bound to its current password) via the real route. */
 async function resetPassword(h: Harness, accountId: string, password: string): Promise<number> {
-  const fp = await currentPwfp(h.users, accountId);
+  const fp = pwFingerprint((await h.users.findById(accountId))!.passHash);
   const token = await signResetToken({ accountId, pwfp: fp! }, resetSign, { ttlSeconds: 900 });
   const res = await fetch(`${h.httpBase}/auth/reset`, {
     method: 'POST',
@@ -238,4 +241,40 @@ describe('password reset revokes game connections', () => {
     const t = await joinToken({ matchId: 'm1', playerId: 'green', ...alice });
     expect(await rejectStatus(`${broken.wsBase}/m1?token=${t}`)).toBeGreaterThanOrEqual(400);
   });
+});
+
+it('logout revokes sessions, open sockets and previously minted join tokens, but permits a fresh password login', async () => {
+  const h = await harness();
+  const alice = await account(h, 'LogoutPilot', 'orbit-signal');
+  const token = await signSessionToken({ ...alice, login: 'LogoutPilot' }, sessionSign, { ttlSeconds: 3600 });
+  const oldJoin = await joinToken({ ...alice, matchId: 'm1', playerId: 'green' });
+  const ws = await connect(h, 'm1', oldJoin);
+  const closed = once(ws, 'close');
+  const response = await fetch(`${h.httpBase}/auth/logout`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  expect(response.status).toBe(204);
+  await closed;
+  expect(await rejectStatus(`${h.wsBase}/m1?token=${oldJoin}`)).toBe(401);
+  expect((await fetch(`${h.httpBase}/auth/logout`, { method: 'POST', headers: { authorization: `Bearer ${token}` } })).status).toBe(401);
+  const fresh = await fetch(`${h.httpBase}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ login: 'LogoutPilot', password: 'orbit-signal' }) });
+  expect(fresh.status).toBe(200);
+  const body = await fresh.json() as { token: string };
+  expect(body.token).not.toBe(token);
+  expect((await fetch(`${h.httpBase}/auth/logout`, { method: 'POST', headers: { authorization: `Bearer ${body.token}` } })).status).toBe(204);
+  expect(await resetPassword(h, alice.accountId, 'another orbit signal')).toBe(200);
+});
+
+it('logout refuses forged identity and never acknowledges a failed durable revocation', async () => {
+  const h = await harness();
+  const alice = await account(h, 'FailPilot', 'orbit-signal');
+  const token = await signSessionToken({ ...alice, login: 'FailPilot' }, sessionSign, { ttlSeconds: 3600 });
+  expect((await fetch(`${h.httpBase}/auth/logout`, { method: 'POST' })).status).toBe(401);
+  expect((await fetch(`${h.httpBase}/auth/logout`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ accountId: 'somebody-else' }),
+  })).status).toBe(400);
+  h.users.revokeSessions = async () => { throw new Error('private database diagnostic'); };
+  const failure = await fetch(`${h.httpBase}/auth/logout`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  expect(failure.status).toBe(500);
+  expect(await failure.json()).toEqual({ error: 'E_INTERNAL' });
+  expect(await currentPwfp(h.users, alice.accountId)).toBe(alice.pwfp);
 });

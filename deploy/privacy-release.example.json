@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "operator": {
+    "name": "",
+    "address": "",
+    "contactEmail": ""
+  },
+  "approvedBy": "",
+  "reviewedAt": "",
+  "evidence": {
+    "policy": {
+      "path": "",
+      "sha256": ""
+    },
+    "lawfulBases": {
+      "path": "",
+      "sha256": ""
+    },
+    "processors": {
+      "path": "",
+      "sha256": ""
+    },
+    "rknNotification": {
+      "path": "",
+      "sha256": ""
+    },
+    "threatModel": {
+      "path": "",
+      "sha256": ""
+    },
+    "protectionMeasures": {
+      "path": "",
+      "sha256": ""
+    },
+    "subjectRequests": {
+      "path": "",
+      "sha256": ""
+    },
+    "erasureRestoreDrill": {
+      "path": "",
+      "sha256": ""
+    },
+    "incidentDrill": {
+      "path": "",
+      "sha256": ""
+    },
+    "retention": {
+      "path": "",
+      "sha256": ""
+    },
+    "consents": {
+      "path": "",
+      "sha256": ""
+    },
+    "minors": {
+      "path": "",
+      "sha256": ""
+    },
+    "chatClassification": {
+      "path": "",
+      "sha256": ""
+    },
+    "paymentsAndAdvertising": {
+      "path": "",
+      "sha256": ""
+    }
+  },
+  "stores": [
+    {
+      "role": "backups",
+      "country": "",
+      "provider": "",
+      "evidence": {
+        "path": "",
+        "sha256": ""
+      }
+    },
+    {
+      "role": "corporations",
+      "country": "",
+      "provider": "",
+      "evidence": {
+        "path": "",
+        "sha256": ""
+      }
+    },
+    {
+      "role": "game",
+      "country": "",
+      "provider": "",
+      "evidence": {
+        "path": "",
+        "sha256": ""
+      }
+    },
+    {
+      "role": "telemetry",
+      "country": "",
+      "provider": "",
+      "evidence": {
+        "path": "",
+        "sha256": ""
+      }
+    }
+  ]
+}

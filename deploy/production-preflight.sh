@@ -15,6 +15,10 @@ production_preflight() {
   # Never trust an inherited/stored success from an earlier deployment.
   unset BACKUP_READINESS_VERIFIED BACKUP_READINESS_DEFERRED
   prod="$(deploy_env_value "$file" PROD)"
+  if [ "$(deploy_env_value "$file" PUBLIC_RELEASE)" = 1 ] && [ "$prod" != 1 ] && [ "$prod" != true ]; then
+    echo '[✗] E_PRIVACY_RELEASE: public launch requires explicit PROD=1.' >&2
+    return 1
+  fi
   case "$prod" in
     0|false)
       case "$(deploy_env_value "$file" SERVER_BIND)" in
@@ -34,6 +38,21 @@ production_preflight() {
       return 1
     fi
   done
+  # Public launch is distinct from a TLS-protected playtest. Unknown values fail closed.
+  case "$(deploy_env_value "$file" PUBLIC_RELEASE)" in
+    ""|0) ;;
+    1)
+      if [ "$(deploy_env_value "$file" BACKUP_POLICY)" = deferred-playtest ]; then
+        echo '[✗] E_PRIVACY_RELEASE: public launch cannot defer independent backups.' >&2
+        return 1
+      fi
+      local privacy_manifest
+      privacy_manifest="$(deploy_env_value "$file" PRIVACY_RELEASE_MANIFEST)"
+      if ! python3 "$(dirname "${BASH_SOURCE[0]}")/privacy-readiness.py" "$privacy_manifest"; then
+        return 1
+      fi ;;
+    *) echo '[✗] E_PRIVACY_RELEASE: invalid PUBLIC_RELEASE.' >&2; return 1 ;;
+  esac
   case "$(deploy_env_value "$file" BACKUP_POLICY)" in
     ""|required) ;;
     deferred-playtest)

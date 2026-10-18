@@ -120,6 +120,23 @@ export function sessionToken(base: string): string | null {
   return anyToken(localStorage, base);
 }
 
+/** Acknowledged server logout; failures leave the session available for a retry. */
+export async function signOutEverywhere(base: string): Promise<boolean> {
+  const token = sessionToken(base);
+  if (token) {
+    try {
+      const response = await fetch(`${httpBase(base)}/auth/logout`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.status !== 204 && response.status !== 401) return false;
+    } catch { return false; }
+  }
+  clearSession(localStorage, base);
+  pendingJoinToken = null;
+  return true;
+}
+
 /** Probe the server's identity mode. */
 export async function probeAuthMode(base: string): Promise<IdentityMode> {
   // Что означает ответ пробы — `identityProbe.ts` (REFM-154): ответ «не 2xx» это не
