@@ -11,6 +11,13 @@ import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
 
+// A native button keeps keyboard activation and never submits the password form.
+const passwordToggle = (
+  id,
+) => `<button id="${id}-visibility" class="cpass-toggle" type="button" aria-controls="${id}" data-i18n-aria="auth.password.show" data-i18n-title="auth.password.show">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="cpass-slash" d="m3 3 18 18"/></svg>
+</button>`;
+
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
 const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
@@ -2845,6 +2852,14 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   border-radius:7px;color:var(--ink);font:var(--fs-body)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;}
 #connect .cwlogin input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.2);}
 #connect .cwlogin .cbtn{flex:0 0 auto;min-width:92px;}
+#connect .password-field{position:relative;margin-top:5px;}
+#connect .password-field input{margin-top:0;padding-right:52px;min-height:46px;}
+#connect .cpass-toggle{position:absolute;right:2px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
+  width:44px;height:44px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dim);cursor:pointer;}
+#connect .cpass-toggle:hover{color:var(--cyan);}
+#connect .cpass-toggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-3px;}
+#connect .cpass-slash{display:none;}
+#connect .cpass-toggle[data-visible="true"] .cpass-slash{display:block;}
 #connect .cstat{margin-top:14px;min-height:16px;font-size:var(--fs-body);color:var(--amber);text-align:center;}
 /* The status line reserves its row so an appearing message doesn't shove the card's
    buttons down. On a freshly opened welcome card there IS no message, and the reserved
@@ -4273,8 +4288,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
             <button id="cwgo" class="cbtn btn-second" type="button" data-i18n="welcome.go"></button>
           </div>
-          <div id="cwpassrow" class="cwlogin" style="display:none">
+          <div id="cwpassrow" class="cwlogin password-field" style="display:none">
             <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
+            ${passwordToggle('cwpass')}
           </div>
         </form>
       </div>
@@ -4289,13 +4305,19 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <label class="cfield"><span data-i18n="welcome.register.mail"></span>
             <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
           </label>
-          <label class="cfield"><span data-i18n="welcome.register.pass"></span>
+          <div class="cfield"><label for="crpass" data-i18n="welcome.register.pass"></label>
+            <div class="password-field">
             <input id="crpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="crpassrule" data-i18n-ph="welcome.pass.min.ph">
-          </label>
+              ${passwordToggle('crpass')}
+            </div>
+          </div>
           <p id="crpassrule" class="csub" data-i18n="acc.pass.rule"></p>
-          <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
+          <div class="cfield"><label for="crpass2" data-i18n="welcome.register.pass2"></label>
+            <div class="password-field">
             <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-          </label>
+              ${passwordToggle('crpass2')}
+            </div>
+          </div>
         </form>
         <div class="crow">
           <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
@@ -4322,13 +4344,19 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
                should have (optionally hidden) username fields»). Filled from the saved
                callsign at reset time; never submitted anywhere. -->
           <input id="cresetuser" type="text" autocomplete="username" hidden aria-hidden="true" tabindex="-1">
-          <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
+          <div class="cfield"><label for="cresetpass" data-i18n="welcome.reset.pass"></label>
+            <div class="password-field">
             <input id="cresetpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="cresetpassrule" data-i18n-ph="welcome.pass.min.ph">
-          </label>
+              ${passwordToggle('cresetpass')}
+            </div>
+          </div>
           <p id="cresetpassrule" class="csub" data-i18n="acc.pass.rule"></p>
-          <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
+          <div class="cfield"><label for="cresetpass2" data-i18n="welcome.reset.pass2"></label>
+            <div class="password-field">
             <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-          </label>
+              ${passwordToggle('cresetpass2')}
+            </div>
+          </div>
         </form>
         <div class="crow">
           <button id="cresetgo" class="cbtn btn-main" type="button" data-i18n="welcome.reset.go"></button>
@@ -4752,7 +4780,9 @@ const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
 writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
-console.log('wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)');
+console.log(
+  'wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)',
+);
 console.log(
   'wrote prototype/dist/void-dominion.html (' + (devHtml.length / 1024).toFixed(0) + ' KB)',
 );
