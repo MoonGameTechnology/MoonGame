@@ -1131,10 +1131,10 @@
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
 | OBS-0.1 | ✅ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
-| OBS-0.2 | ⏳ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
+| OBS-0.2 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
 | OBS-0.3 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
 | OBS-1.1 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
-| OBS-1.2 | 🔒 | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
+| OBS-1.2 | ⏳ | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
 | OBS-1.3 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
 | OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
 | OBS-2.2 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Поведение в Grafana |

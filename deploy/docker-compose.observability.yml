@@ -1,0 +1,177 @@
+# OBS-0.2: opt-in bootstrap, never part of Game readiness.
+# Use observability/stack.mjs: it prepares non-root ownership, file secrets and
+# the HTTP probe from the pinned Prometheus image before starting these services.
+# Only Grafana is published, on loopback. No Docker socket, Game logs or DB access.
+x-obs: &obs
+  profiles: [observability]
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  cpus: 0.25
+  networks: [observability]
+  environment: &obs-env # Keep internal service traffic local even on hosts with an HTTP proxy.
+    NO_PROXY: localhost,127.0.0.1,obs-prometheus,obs-alloy,obs-loki,obs-grafana
+    no_proxy: localhost,127.0.0.1,obs-prometheus,obs-alloy,obs-loki,obs-grafana
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+  logging:
+    driver: json-file
+    options:
+      max-size: '5m'
+      max-file: '2'
+
+services:
+  obs-grafana:
+    <<: *obs
+    image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
+    user: '472:472'
+    mem_limit: 256m
+    ports: ['127.0.0.1:3000:3000']
+    environment:
+      <<: *obs-env
+      GF_SECURITY_ADMIN_USER: ${OBS_GRAFANA_ADMIN_USER:?use observability/stack.mjs init}
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_SECURITY_DISABLE_GRAVATAR: 'true'
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_SECURITY_CONTENT_SECURITY_POLICY: 'true'
+      GF_SECURITY_ALLOW_EMBEDDING: 'false'
+      GF_SERVER_ROOT_URL: http://localhost:3000/
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_AUTH_PROXY_ENABLED: 'false'
+      GF_AUTH_JWT_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_USERS_ALLOW_ORG_CREATE: 'false'
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_SNAPSHOTS_ENABLED: 'false'
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: 'false'
+      GF_SNAPSHOTS_PUBLIC_MODE: 'false'
+      GF_PUBLIC_DASHBOARDS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      GF_PLUGINS_PLUGIN_ADMIN_ENABLED: 'false'
+      GF_NEWS_NEWS_FEED_ENABLED: 'false'
+      GF_SECURITY_DATA_SOURCE_PROXY_WHITELIST: obs-prometheus:9090
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: warn
+    secrets: [grafana_admin_password]
+    volumes:
+      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/grafana:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    healthcheck:
+      test: [CMD, curl, -fsS, --max-time, '2', -o, /dev/null, http://127.0.0.1:3000/api/health]
+      interval: 15s
+      timeout: 3s
+      start_period: 60s
+      retries: 5
+
+  obs-prometheus:
+    <<: *obs
+    image: prom/prometheus:v3.13.4@sha256:87861b8cf91579109319ebc300f3f1060e6da9c05d6ae8ad15a20c879e84e32e
+    user: '65534:65534'
+    mem_limit: 384m
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=1500MB
+      - --query.timeout=10s
+      - --query.max-concurrency=4
+      - --query.max-samples=100000
+      # Admin API, lifecycle and remote-write receiver stay disabled (defaults).
+    volumes:
+      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/prometheus:/prometheus
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+      test:
+        [
+          CMD,
+          /bin/busybox,
+          wget,
+          -Y,
+          'off',
+          -q,
+          -T,
+          '2',
+          -O,
+          /dev/null,
+          http://127.0.0.1:9090/-/ready,
+        ]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  obs-loki:
+    <<: *obs
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
+    user: '10001:10001'
+    mem_limit: 384m
+    command: [-config.file=/etc/loki/config.yml]
+    volumes:
+      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/loki:/loki
+      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/probe:/probe:ro
+      - ./observability/loki.yml:/etc/loki/config.yml:ro
+    healthcheck:
+      test:
+        [
+          CMD,
+          /probe/busybox,
+          wget,
+          -Y,
+          'off',
+          -q,
+          -T,
+          '2',
+          -O,
+          /dev/null,
+          http://127.0.0.1:3100/ready,
+        ]
+      interval: 15s
+      timeout: 3s
+      start_period: 45s
+      retries: 5
+
+  obs-alloy:
+    <<: *obs
+    image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
+    user: '473:473'
+    mem_limit: 128m
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+    volumes:
+      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/alloy:/var/lib/alloy
+      - ${OBS_STATE_DIR:?use observability/stack.mjs init}/probe:/probe:ro
+      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+    healthcheck:
+      test:
+        [
+          CMD,
+          /probe/busybox,
+          wget,
+          -Y,
+          'off',
+          -q,
+          -T,
+          '2',
+          -O,
+          /dev/null,
+          http://127.0.0.1:12345/-/ready,
+        ]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+networks:
+  observability:
+    internal: true
+
+secrets:
+  grafana_admin_password:
+    file: ${OBS_STATE_DIR:?use observability/stack.mjs init}/secrets/grafana_admin_password

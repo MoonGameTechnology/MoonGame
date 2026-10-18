@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 2s
+  evaluation_interval: 15s
+  external_labels:
+    environment: playtest
+    instance: game-1
+
+# Bootstrap self-observation only. Game/node/DB targets are enabled by later OBS
+# bricks; absence of a collector must not be presented as a healthy Game.
+scrape_configs:
+  - job_name: prometheus
+    sample_limit: 5000
+    body_size_limit: 1MB
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: prometheus
+  - job_name: alloy
+    sample_limit: 5000
+    body_size_limit: 1MB
+    static_configs:
+      - targets: ['obs-alloy:12345']
+        labels:
+          service: alloy
