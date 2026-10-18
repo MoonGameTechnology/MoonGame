@@ -109,6 +109,7 @@ services:
       # PTM-0.2: salt of the analytics pseudonym in the match journal (≥32 chars). Unset ⇒
       # the journal carries no `actor`, so players can't be linked across matches and days.
       ANALYTICS_SALT: ${ANALYTICS_SALT:-}
+      ACCOUNT_DELETION_ENABLED: ${ACCOUNT_DELETION_ENABLED:-0}
       # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
       # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
       # plain `docker compose up` against the public interface is safe. Override

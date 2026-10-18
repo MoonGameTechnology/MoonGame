@@ -1,0 +1,10 @@
+[Unit]
+Description=MoonGame account erasure (maintenance window)
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/moongame/account-erasure.env
+ExecStart=/bin/bash /opt/moongame/deploy/account-erasure.sh
+UMask=0077
+TimeoutStartSec=30min

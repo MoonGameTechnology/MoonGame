@@ -4,6 +4,18 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  'privacy.close': 'Close privacy policy',
+  "account.delete.title": "Delete account",
+  "account.delete.warning": "Your account, profile and personal progress will be deleted. Shared match results will be de-identified. Sign-in will be disabled after confirmation. See the privacy policy for processing and backup retention periods.",
+  "account.delete.confirm": "I understand the consequences and confirm deletion",
+  "account.delete.password": "Current password",
+  "account.delete.send": "Confirm deletion",
+  "account.delete.cancel": "Cancel",
+  "account.delete.pending": "Deletion request accepted. Sign-in is disabled. Data will be processed within the periods stated in the privacy policy.",
+  "account.delete.failed": "Could not confirm that the request was accepted. Please try again.",
+  "account.delete.password-error": "Check your current password and sign-in session.",
+  "account.delete.unavailable": "Account deletion is temporarily unavailable. Please try again later.",
+
   "setup.map.team-2v2": "2v2 · Broken Reach",
   "setup.map.team-2v2-info": "85 provinces · 2 teams · 2 pirate bases · 2 Swarm hives · 4 neutral bots",
   "setup.teams.fixed-2v2": "1 ally and 2 opponents · starting worlds determine teams",
@@ -3084,7 +3096,6 @@ export const en: Record<string, string> = {
 
 
   'hub.tile.auction': 'Auction',
-  'hub.tile.account': 'Account',
   'hub.tile.chat': 'Chat',
   'hub.tile.community': 'Community',
   'hub.tile.help': 'Codex',

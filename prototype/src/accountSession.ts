@@ -309,3 +309,29 @@ export function askSignIn(
   pendingJoinAfterAuth.remember(id, slot, faction, scientists);
   game.showSignIn(srv);
 }
+
+/** A 202 means queued, never that all backups have already been erased. */
+export async function requestAccountDeletion(base: string, password: string): Promise<'pending' | 'failed' | 'password' | 'unavailable'> {
+  const token = sessionToken(base);
+  if (!token || !validLoginPassword(password)) return 'password';
+  try {
+    const key = `vd.deletion.${httpBase(base)}`;
+    const session = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))), n => n.toString(16).padStart(2, '0')).join('');
+    const old = JSON.parse(localStorage.getItem(key) ?? 'null') as { session?: string; requestId?: string } | null;
+    const requestId = old?.session === session && typeof old.requestId === 'string' ? old.requestId : crypto.randomUUID();
+    localStorage.setItem(key, JSON.stringify({ session, requestId }));
+    const response = await fetch(`${httpBase(base)}/auth/delete-account`, {
+      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ password, confirm: 'DELETE', requestId }), signal: AbortSignal.timeout(15_000),
+    });
+    if (response.status === 401) return 'password';
+    if (response.status === 503) return 'unavailable';
+    if (response.status !== 202) return 'failed';
+    const body = await response.json() as { status?: unknown; requestId?: unknown };
+    if (body.status !== 'pending' || body.requestId !== requestId) return 'failed';
+    clearSession(localStorage, base);
+    localStorage.removeItem(key);
+    pendingJoinToken = null;
+    return 'pending';
+  } catch { return 'failed'; }
+}

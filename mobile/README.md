@@ -145,3 +145,10 @@ Requirements: JDK 17, Android SDK (set `ANDROID_HOME`), and accepted SDK license
 - App id `com.voiddominion.prototype`, name "Void Dominion".
 - CI action versions are tag-pinned for now; SHA-pin them with the pipeline-hardening
   brick (SD-6.1) alongside the other workflows.
+
+
+## Канал RuStore
+
+Для сетевой игры подготовлен отдельный release workflow. См.
+[инструкцию выпуска и удаления аккаунтов](../docs/security/rustore-preparation.md).
+Debug APK и `debug.keystore` не используются для магазина. Публикация пока выключена.

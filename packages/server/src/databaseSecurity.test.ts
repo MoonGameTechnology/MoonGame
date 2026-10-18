@@ -140,9 +140,21 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       const archive = join(dir, readdirSync(dir).find((name) => name.endsWith('.sql.gz'))!);
       await admin.query("DELETE FROM users WHERE login='existing'");
       await run('bash', ['deploy/restore.sh', archive], { env });
+      const blocked = connect(app, pass);
+      await expect(prepareRuntimeDatabase(blocked, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' })).rejects.toThrow('E_DB_BOOT');
+      pools.pop(); // failed boot closed it
+      // Empty fixture deletion ledger: the worker's replay is covered separately.
+      await admin.query('UPDATE account_erasure_guard SET required=false WHERE id=1');
       const runtime = connect(app, pass);
       await prepareRuntimeDatabase(runtime, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' });
       expect(await new PostgresUserStore(runtime).findUser('existing')).toMatchObject({ passHash: 'hash' });
+      await expect(runtime.query('UPDATE account_erasure_guard SET required=false')).rejects.toMatchObject({ code: '42501' });
+      await expect(runtime.query('DELETE FROM account_deletions')).rejects.toMatchObject({ code: '42501' });
+      await new PostgresUserStore(runtime).createUser('delete-fixture', 'hash');
+      const stored = await new PostgresUserStore(runtime).findUser('delete-fixture');
+      const deletion = await new PostgresUserStore(runtime).requestDeletion(stored!);
+      expect(deletion).toBeTruthy();
+      expect(await new PostgresUserStore(runtime).deletionStatus(stored!.userId, deletion!)).toBe(true);
       // The pre-cutover match, clock, sequence and seat survive provisioning,
       // backup/restore and a fresh runtime connection; subsequent saves still work.
       const matches = new PostgresMatchStore(runtime);
@@ -172,6 +184,8 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       await expect(prepareRuntimeDatabase(runtime, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' })).rejects.toThrow('E_DB_BOOT');
       pools.pop(); // fail-closed boot already closed it
       await migrateDatabase(admin);
+      expect((await admin.query('SELECT required FROM account_erasure_guard WHERE id=1')).rows[0].required).toBe(true);
+      await admin.query('UPDATE account_erasure_guard SET required=false WHERE id=1');
       await prepareRuntimeDatabase(connect(app, pass), { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' });
       expect((await admin.query("SELECT column_name FROM information_schema.columns WHERE table_name='matches' AND column_name='clock'")).rows).toHaveLength(1);
     } finally { await migrateDatabase(admin); rmSync(dir, { recursive: true, force: true }); }

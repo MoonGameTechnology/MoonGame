@@ -3598,6 +3598,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   box-shadow:inset 0 1px 0 rgba(53,214,230,.07);
   font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;min-height:70px;
   transition:border-color .15s ease,background .15s ease,transform .1s ease;}
+#hub #hub-delete-account[hidden]{display:none;}
 #hub .hub-tile .ht-ic{font-size:19px;color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.3);}
 #hub .hub-tile:hover{border-color:var(--cyan-dim);
   background:linear-gradient(180deg,rgba(10,28,34,.8),rgba(4,14,19,.68));}
@@ -4612,11 +4613,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>
         <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>
         <button class="hub-tile" id="hub-upd" type="button" style="display:none"><span class="ht-ic">⟳</span><span data-i18n="hub.tile.updates"></span></button>
-        <button class="hub-tile" data-more="Аккаунт" type="button"><span class="ht-ic">◉</span><span data-i18n="hub.tile.account"></span></button>
+        <button class="hub-tile" id="hub-delete-account" hidden type="button"><span class="ht-ic">◉</span><span data-i18n="account.delete.title"></span></button>
         <button class="hub-tile" data-more="Сообщество" type="button"><span class="ht-ic">◍</span><span data-i18n="hub.tile.community"></span></button>
         <button class="hub-tile" data-more="Поддержка" type="button"><span class="ht-ic">⚠</span><span data-i18n="hub.tile.support"></span></button>
         <button class="hub-tile" data-more="Уведомления" type="button"><span class="ht-ic">◔</span><span data-i18n="hub.tile.notifications"></span></button>
         <button class="hub-tile" data-more="Чат" type="button"><span class="ht-ic">▭</span><span data-i18n="hub.tile.chat"></span></button>
+        <a class="hub-tile" id="hub-privacy" data-i18n="welcome.privacy"></a>
         <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
     </div>

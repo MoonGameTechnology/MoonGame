@@ -156,6 +156,8 @@ export interface UserRecord {
   passHash: string;
   /** Durable logout-all nonce. Empty on accounts predating revocation. */
   sessionNonce?: string;
+  /** Account is disabled while its durable erasure request is being processed. */
+  deletionRequestedAt?: string;
   /** Optional recovery email (lower-cased on store, unique when present). Absent on
    *  accounts created before recovery shipped, and on any registration that skipped it —
    *  such an account simply has no self-service password reset. */
@@ -165,6 +167,9 @@ export interface UserRecord {
 /** Accounts for login+password auth. Lookup is case-insensitive on `login` (and on
  *  `email` for recovery). */
 export interface UserStore {
+  /** Atomically disable the account and queue erasure, guarded against password/session races. */
+  deletionStatus?(accountId: string, requestId: string): Promise<boolean>;
+  requestDeletion?(user: UserRecord, requestId?: string): Promise<string | null>;
   /** Create an account; fail-secure duplicate handling: an existing login (any case)
    *  → `E_LOGIN_TAKEN`, never an overwrite. `email` (optional) enables password recovery;
    *  it is stored lower-cased and rejected as `E_EMAIL_TAKEN` if already in use. */

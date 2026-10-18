@@ -112,6 +112,7 @@ echo "[✓] Дамп полный"
 
 # ACLs were intentionally omitted by pg_dump. Restore the dedicated runtime grants
 # atomically with the data; an absent/unsafe role aborts the entire transaction.
+cat "$DEPLOY_DIR/restore-erasure.sql" >> "$WORK/dump.sql"
 cat "$DEPLOY_DIR/restore-acl.sql" >> "$WORK/dump.sql"
 
 # ---- 3. применение одной транзакцией ----

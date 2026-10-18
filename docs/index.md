@@ -89,7 +89,7 @@
 | `docs/roads-roadmap.md` | Дороги и развилки — технический роадмап (ROADS) | Дорога между провинциями перестаёт быть прямой между центрами: она идёт по сети дорог, а |
 | `docs/rocket-mine-design.md` | Легендарная способность «Ракетная мина» | Реализовано 2026-09-27 для Sector Zero: модуль rocketMines в серверном и |
 | `docs/roster-roadmap.md` | Ростер и оборона — технический roadmap | Заказ владельца 2026-09-09 (одиннадцать пунктов). Разбор одного разговора: чем |
-| `docs/rustore-release-roadmap.md` | RuStore-релиз — технический roadmap | Требования RuStore-модерации × реальное состояние Void Dominion (сверено с кодом |
+| `docs/rustore-release-roadmap.md` | RuStore-релиз — технический roadmap | Актуальная техническая подготовка сетевого player-клиента на 2026-10-18: |
 | `docs/sector-zero-economy-roadmap.md` | Sector Zero — экономика развития [docs] | Статус: роадмап. §0 — решения владельца 2026-09-20, они действуют. Кирпичи ниже — |
 | `docs/sector-zero-map-concepts.md` | Void Dominion: Sector Zero — концепты карт кампании | Статус: Draft / приложение по дизайну карт. Шесть обсуждённых концептов для проверки, а не готовые игровые карты. Количество провинций, размещение объектов, пр… |
 | `docs/sector-zero-roadmap.md` | Void Dominion: Sector Zero — единый роадмап продукта | Статус: Draft. Это ЕДИНЫЙ дом всего, что относится к продукту Sector Zero: |
@@ -176,7 +176,9 @@
 | `docs/security/image-pinning.md` | Image Pinning и обновление sha256-дайджестов | Все образы должны быть пинены по sha256-дайджесту, а не по тегу. |
 | `docs/security/pipeline-architecture-2026-07-26.md` | Отчёт: архитектура CI/CD-пайплайна — 2026-07-26 | Оценка того, как построен пайплайн (не «что сканирует» — это |
 | `docs/security/pipeline.md` | DevSecOps-пайплайн — зачем эти сканеры и как с ними жить | Учебно-боевой слой безопасности в CI (GitHub Actions, .github/workflows/security.yml; |
+| `docs/security/privacy-policy-template.md` | Политика конфиденциальности игры Void Dominion — шаблон | НЕ ПУБЛИКОВАТЬ до заполнения и утверждения оператором. Метки [ЗАПОЛНИТЬ] |
 | `docs/security/rf-personal-data-readiness.md` | Персональные данные игры: защита и подготовка к запуску в РФ | Рабочий реестр обработки и критерии допуска Galactic War / Sector Zero к публичному релизу. Технические меры, решения оператора и доказательства проверяются ра… |
+| `docs/security/rustore-preparation.md` | Подготовка сетевой игры к RuStore | Обновлено: 2026-10-18. Это подготовка существующего player-клиента Void Dominion; |
 | `docs/security/scanner-coverage-2026-07-26.md` | Отчёт: охват сканеров безопасности — 2026-07-26 | Глубокий анализ DevSecOps-пайплайна Void Dominion: инвентаризация сканеров, |
 | `docs/security/security-master-plan.md` | Security Master Plan — «самое безопасное приложение и игра» | Зонтичный план над тремя техническими треками безопасности проекта. Он не |
 | `docs/security/setup-github-secrets.md` | Настройка секретов и переменных в GitHub | Этот гайд поясняет, как правильно настроить CI/CD пайплайн в GitHub для безопасной работы. |

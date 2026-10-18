@@ -546,6 +546,9 @@ const server = createMultiplayerServer({
   accountStore, // dev ?nick= WS login (when auth is off)
   seatLock: SEAT_LOCK, // REL-5: nick+ticket identity; `?player=` alone is refused when on
   httpRoutes: (app) => {
+    app.get('/auth/status', async (_request, reply) => reply.header('Cache-Control', 'no-store').send({
+      enabled: !!auth, accountDeletion: !!auth && !!process.env.DATABASE_URL && process.env.ACCOUNT_DELETION_ENABLED === '1',
+    }));
     // The open-matches feed is PUBLIC and read-only — browsing joinable matches precedes
     // login and works with or without auth. Joining still needs a session (SE-1.x).
     registerOpenMatchesFeed(app, {
@@ -570,6 +573,7 @@ const server = createMultiplayerServer({
           sendRecoveryMail,
           signSession,
           verifySession,
+          accountDeletionEnabled: process.env.ACCOUNT_DELETION_ENABLED === '1' && !!process.env.DATABASE_URL,
           onSessionsRevoked: (accountId) => { revokeAccountConnections(registry, accountId); },
           // A new password closes the account's open game sockets in every live match.
           onPasswordChanged: (accountId) => {

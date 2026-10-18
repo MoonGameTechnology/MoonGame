@@ -258,6 +258,7 @@ import { buildRoster } from './planetTabs';
 import { tileLock, type TileLock } from './catalogTile';
 import { tokenFor } from '../../decisions/sessionStore';
 import { signOutEverywhere } from './accountSession';
+import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { canBuildHere } from '../../decisions/buildGate';
 import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
@@ -4357,6 +4358,7 @@ function openHub(note = ''): void {
   refreshHubDoor(); // после позывного: пройденное обучение помнится по нику (`onboardKey`)
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
   detach('хаб: портрет аккаунта', syncProfileAppearance());
+  detach('account deletion capability', refreshAccountDeletion());
   if (registrationReward) detach('registration reward', registrationReward.show());
 }
 
@@ -4415,11 +4417,17 @@ for (const id of ['clang', 'hub-lang', 'sz-lang'])
     },
   });
 localizeStaticDom(); // static markup is canonical-Russian; translate it in place
-for (const a of Array.from(document.querySelectorAll('.cfoot a'))) {
+mountPrivacyLinks();
+for (const a of Array.from(document.querySelectorAll('.cfoot a:not([href])'))) {
   a.addEventListener('click', () => {
     statusEl.textContent = t('soon.generic', { what: (a.textContent ?? '').trim() });
   });
 }
+
+const refreshAccountDeletion = mountAccountDeletion(() => resolveServer()?.base ?? null, () => {
+  leaveMatch(); showHub(false); showConnect(true); showStage('welcome');
+  statusEl.textContent = t('account.delete.pending');
+}, () => !__SECTOR_ZERO_ONLY__ && authMode === 'accounts');
 
 // hub interactions
 $('hub-play').addEventListener('click', () => hubTab('games'));

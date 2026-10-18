@@ -1,0 +1,83 @@
+name: RuStore release candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rustore-release
+  cancel-in-progress: false
+jobs:
+  apk:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: rustore
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Prepare approved release configuration
+        env:
+          RELEASE_CONFIG: ${{ secrets.RUSTORE_RELEASE_CONFIG }}
+        run: |
+          umask 077
+          test -n "$RELEASE_CONFIG"
+          printf '%s' "$RELEASE_CONFIG" > "$RUNNER_TEMP/rustore.json"
+          echo "RUSTORE_CONFIG_FILE=$RUNNER_TEMP/rustore.json" >> "$GITHUB_ENV"
+      - name: Install locked dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          npm ci --prefix mobile
+      - name: Build clean release profile
+        working-directory: mobile
+        run: |
+          node prepare-rustore.mjs
+          npx --no-install cap add android
+          npx --no-install cap sync android
+          npm run assets
+          node patch-android.mjs
+          node patch-rustore.mjs
+          cd android
+          ./gradlew assembleRelease --no-daemon
+      - name: Sign and verify APK
+        working-directory: mobile
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RUSTORE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RUSTORE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RUSTORE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          KEYSTORE_FILE="$RUNNER_TEMP/rustore-release.keystore"
+          trap 'rm -f "$KEYSTORE_FILE"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          export AAPT="$BUILD_TOOLS/aapt" APKSIGNER="$BUILD_TOOLS/apksigner"
+          "$BUILD_TOOLS/zipalign" -P 16 -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/rustore-aligned.apk"
+          mkdir -p release
+          "$APKSIGNER" sign --ks "$KEYSTORE_FILE" --ks-key-alias "$KEY_ALIAS" --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD --out release/void-dominion-rustore.apk "$RUNNER_TEMP/rustore-aligned.apk"
+          "$BUILD_TOOLS/zipalign" -c -P 16 4 release/void-dominion-rustore.apk
+          node verify-rustore.mjs release/void-dominion-rustore.apk
+      - name: Upload verified candidate (no store publication)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rustore-release-candidate
+          path: mobile/release/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove protected material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/rustore.json" "$RUNNER_TEMP/rustore-release.keystore" "$RUNNER_TEMP/rustore-aligned.apk"

@@ -12,6 +12,10 @@ deploy_env_value() {
 
 production_preflight() {
   local file="$1" prod checker mode owner key
+  if [ -e "${STATE_DIR:-/var/lib/moongame}/account-erasure.pending" ]; then
+    echo '[✗] E_ERASURE_MAINTENANCE: finish account erasure before starting/updating runtimes.' >&2
+    return 1
+  fi
   # Never trust an inherited/stored success from an earlier deployment.
   unset BACKUP_READINESS_VERIFIED BACKUP_READINESS_DEFERRED
   prod="$(deploy_env_value "$file" PROD)"
@@ -44,6 +48,21 @@ production_preflight() {
     1)
       if [ "$(deploy_env_value "$file" BACKUP_POLICY)" = deferred-playtest ]; then
         echo '[✗] E_PRIVACY_RELEASE: public launch cannot defer independent backups.' >&2
+        return 1
+      fi
+      if [ "$(deploy_env_value "$file" ACCOUNT_DELETION_ENABLED)" != 1 ]; then
+        echo '[✗] E_ERASURE_READINESS: public accounts require in-app deletion.' >&2
+        return 1
+      fi
+      local erasure_checker
+      erasure_checker="$(deploy_env_value "$file" ERASURE_READINESS_CHECK)"
+      if [[ "$erasure_checker" != /* ]] || [ -L "$erasure_checker" ] || [ ! -f "$erasure_checker" ] || [ ! -x "$erasure_checker" ]; then
+        echo '[✗] E_ERASURE_READINESS: configure a protected erasure readiness checker.' >&2
+        return 1
+      fi
+      mode="$(stat -c %a "$erasure_checker")"; owner="$(stat -c %u "$erasure_checker")"
+      if (( (8#$mode & 0022) != 0 )) || { [ "$owner" != 0 ] && [ "$owner" != "$(id -u)" ]; } || ! "$erasure_checker"; then
+        echo '[✗] E_ERASURE_READINESS: scheduled erasure is not ready.' >&2
         return 1
       fi
       local privacy_manifest
