@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { analyticsActor } from './analyticsActor';
+import { backfillLegacyReceiptOwnership } from './legacyReceiptOwnership';
 import {
   eraseAccountDatabase,
   requireOfflineDatabase,
@@ -189,8 +190,9 @@ export async function runAccountErasure(options: {
   replay?: boolean;
 }): Promise<number> {
   const { game, corporations, ledger, logDir, analyticsSalts } = options;
+  const pools = [...new Set([corporations, game])];
   let replay = options.replay === true;
-  for (const pool of [game, corporations]) {
+  for (const pool of pools) {
     const db = await pool.connect();
     try {
       await requireOfflineDatabase(db);
@@ -201,9 +203,10 @@ export async function runAccountErasure(options: {
       db.release();
     }
   }
-  for (const pool of [game, corporations])
+  for (const pool of pools)
     await pool.query('UPDATE account_erasure_guard SET required=true WHERE id=1');
   const entries = await validateErasureConfiguration(options);
+  for (const pool of pools) await backfillLegacyReceiptOwnership(pool);
   const queued = await game.query<{ account_id: string }>(
     'SELECT account_id FROM account_deletions WHERE completed_at IS NULL ORDER BY requested_at',
   );
@@ -241,8 +244,7 @@ export async function runAccountErasure(options: {
     }
     await durableReplace(ledger, JSON.stringify(entries));
     await eraseAccountLogs(logDir, entry.pending, analyticsSalts);
-    await eraseAccountDatabase(corporations, entry.pending);
-    await eraseAccountDatabase(game, entry.pending);
+    for (const pool of pools) await eraseAccountDatabase(pool, entry.pending);
     // A restored dump can predate the queue row itself. Recreate the reservation
     // from the independent ledger before reopening registration.
     await game.query(
@@ -256,7 +258,7 @@ export async function runAccountErasure(options: {
     await durableReplace(ledger, JSON.stringify(entries));
     processed++;
   }
-  for (const pool of [game, corporations])
+  for (const pool of pools)
     await pool.query('UPDATE account_erasure_guard SET required=false WHERE id=1');
   return processed;
 }

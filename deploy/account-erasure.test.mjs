@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-it('retains maintenance through a failed start and retries it even with an empty queue', () => {
+it.each([false, true])('retains maintenance through failed start (external worker: %s)', externalWorker => {
   const dir = mkdtempSync(join(tmpdir(), 'erasure-hooks-'));
   const bin = join(dir, 'bin'); mkdirSync(bin);
   const script = (path, body) => writeFileSync(path, '#!/bin/bash\nset -eu\n' + body, { mode: 0o700 });
@@ -15,6 +15,7 @@ it('retains maintenance through a failed start and retries it even with an empty
   script(stop, 'echo stop >> "$STATE_DIR/calls"\n');
   script(start, 'echo start >> "$STATE_DIR/calls"\n[[ -e "$STATE_DIR/allow-start" ]]\n');
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, STATE_DIR: dir, ERASURE_CHECKOUT: dir, ERASURE_STOP_HOOK: stop, ERASURE_START_HOOK: start };
+  if (externalWorker) env.ERASURE_WORKER_HOOK = join(bin, 'node');
   const run = extra => spawnSync('bash', [resolve('deploy/account-erasure.sh')], { env: { ...env, ...extra }, encoding: 'utf8' });
   try {
     expect(run().status).toBe(1);
