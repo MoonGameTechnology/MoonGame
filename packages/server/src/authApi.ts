@@ -77,6 +77,8 @@ export interface AuthApiDeps {
   users: UserStore;
   verifySession?(token: string): Promise<SessionTokenResult>;
   onSessionsRevoked?(accountId: string): void | Promise<void>;
+  /** Enabled only after the maintenance worker and restore barrier have been provisioned. */
+  accountDeletionEnabled?: boolean;
   /** Mint a session token for an authenticated account (from serverConfig). `pwfp` binds
    *  the session to the current password (see `liveSession`) so a reset revokes it. */
   signSession(accountId: string, login: string, pwfp: string): Promise<string>;
@@ -272,6 +274,29 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
 
   if (deps.verifySession) {
     const verify = deps.verifySession;
+    app.post('/auth/delete-account', { bodyLimit: AUTH_BODY_LIMIT }, async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      if (!deps.accountDeletionEnabled || !deps.users.requestDeletion)
+        return reply.code(503).send({ error: 'E_DELETION_UNAVAILABLE' });
+      if (!closedInput(request.body, ['password', 'confirm']))
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const body = request.body as { password?: unknown; confirm?: unknown };
+      if (typeof body.password !== 'string' || !validLoginPassword(body.password) || body.confirm !== 'DELETE')
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const header = request.headers.authorization;
+      const verified = header?.startsWith('Bearer ') ? await verify(header.slice(7).trim()) : null;
+      const who = verified?.ok ? await liveSession(verified.claim, deps.users) : null;
+      const found = who ? await deps.users.findById(who.accountId) : null;
+      const user = found ? { ...found } : null;
+      if (!user || !(await verifyPassword(body.password as string, user.passHash)))
+        return reply.code(401).send({ error: 'E_AUTH' });
+      const requestId = await deps.users.requestDeletion(user);
+      if (!requestId) return reply.code(409).send({ error: 'E_SESSION_CHANGED' });
+      await deps.onSessionsRevoked?.(user.userId);
+      // Accepted means queued, never a claim that all copies are already erased.
+      return reply.code(202).send({ requestId, status: 'pending' });
+    });
     app.post('/auth/logout', { bodyLimit: AUTH_BODY_LIMIT }, async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });

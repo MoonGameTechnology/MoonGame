@@ -258,6 +258,7 @@ import { buildRoster } from './planetTabs';
 import { tileLock, type TileLock } from './catalogTile';
 import { tokenFor } from '../../decisions/sessionStore';
 import { signOutEverywhere } from './accountSession';
+import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { canBuildHere } from '../../decisions/buildGate';
 import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
@@ -4405,11 +4406,17 @@ for (const id of ['clang', 'hub-lang', 'sz-lang'])
     },
   });
 localizeStaticDom(); // static markup is canonical-Russian; translate it in place
-for (const a of Array.from(document.querySelectorAll('.cfoot a'))) {
+mountPrivacyLinks();
+for (const a of Array.from(document.querySelectorAll('.cfoot a:not([href])'))) {
   a.addEventListener('click', () => {
     statusEl.textContent = t('soon.generic', { what: (a.textContent ?? '').trim() });
   });
 }
+
+mountAccountDeletion(() => resolveServer()?.base ?? null, () => {
+  leaveMatch(); showHub(false); showConnect(true); showStage('welcome');
+  statusEl.textContent = t('account.delete.pending');
+});
 
 // hub interactions
 $('hub-play').addEventListener('click', () => hubTab('games'));

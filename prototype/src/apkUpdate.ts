@@ -14,7 +14,7 @@
  *    случается десятки раз в час, поэтому без порога это стало бы стуком по API.
  */
 import { t } from '../../localization/runtime';
-import { buildLabel, checkForUpdateDetailed, currentBuild } from './updater';
+import { buildLabel, checkForUpdateDetailed, currentBuild, isRuStoreBuild } from './updater';
 import type { UpdateCheck, UpdateInfo } from './updater';
 import { detach } from './detach';
 
@@ -60,6 +60,7 @@ const el = (id: string): HTMLElement | null => document.getElementById(id);
  * делает: ни кнопок, ни таймеров, ни сетевых запросов.
  */
 export function initApkUpdater(): void {
+  if (isRuStoreBuild()) return;
   const myBuild = currentBuild();
   if (!myBuild) return;
 

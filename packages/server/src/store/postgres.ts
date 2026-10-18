@@ -105,6 +105,15 @@ const SCHEMA_SQL = `
     -- existing DBs predating recovery: add the optional recovery-email column in place
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS session_nonce text NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at timestamptz;
+    CREATE TABLE IF NOT EXISTS account_erasure_guard (id integer PRIMARY KEY CHECK(id=1), required boolean NOT NULL);
+    INSERT INTO account_erasure_guard VALUES(1,false) ON CONFLICT DO NOTHING;
+    CREATE TABLE IF NOT EXISTS account_deletions (
+      account_id text PRIMARY KEY,
+      request_id text NOT NULL UNIQUE,
+      requested_at timestamptz NOT NULL DEFAULT now(),
+      completed_at timestamptz
+    );
     -- logins are unique case-insensitively: Vasya and vasya are one account
     CREATE UNIQUE INDEX IF NOT EXISTS users_login_idx ON users (lower(login));
     -- recovery emails are unique case-insensitively WHEN present (the reset lookup key)
@@ -746,6 +755,19 @@ export class PostgresCommanderStore implements CommanderStore {
 export class PostgresUserStore implements UserStore {
   constructor(private readonly pool: Pool) {}
 
+  async requestDeletion(user: UserRecord): Promise<string | null> {
+    const requestId = randomUUID();
+    const result = await this.pool.query<{ request_id: string }>(`
+      WITH disabled AS (
+        UPDATE users SET deletion_requested_at = now(), session_nonce = $4
+        WHERE id = $1 AND pass_hash = $2 AND session_nonce = $3
+          AND deletion_requested_at IS NULL RETURNING id
+      ) INSERT INTO account_deletions(account_id, request_id)
+        SELECT id, $4 FROM disabled RETURNING request_id
+    `, [user.userId, user.passHash, user.sessionNonce ?? '', requestId]);
+    return result.rows[0]?.request_id ?? null;
+  }
+
   async createUser(
     login: string,
     passHash: string,
@@ -775,7 +797,7 @@ export class PostgresUserStore implements UserStore {
   // `no-sql-string-interpolation` guard stays satisfied). All three share `rowToUser`.
   async findUser(login: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE lower(login) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE lower(login) = lower($1) AND deletion_requested_at IS NULL`,
       [login],
     );
     return rowToUser(r.rows[0]);
@@ -783,7 +805,7 @@ export class PostgresUserStore implements UserStore {
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE email IS NOT NULL AND lower(email) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE email IS NOT NULL AND lower(email) = lower($1) AND deletion_requested_at IS NULL`,
       [email],
     );
     return rowToUser(r.rows[0]);
@@ -791,7 +813,7 @@ export class PostgresUserStore implements UserStore {
 
   async findById(userId: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE id = $1`,
+      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE id = $1 AND deletion_requested_at IS NULL`,
       [userId],
     );
     return rowToUser(r.rows[0]);
@@ -800,7 +822,7 @@ export class PostgresUserStore implements UserStore {
   async loginsOf(userIds: readonly string[]): Promise<Record<string, string>> {
     if (userIds.length === 0) return {};
     const r = await this.pool.query<{ id: string; login: string }>(
-      `SELECT id, login FROM users WHERE id = ANY($1::text[])`,
+      `SELECT id, login FROM users WHERE id = ANY($1::text[]) AND deletion_requested_at IS NULL`,
       [[...userIds]],
     );
     const out: Record<string, string> = {};
@@ -817,7 +839,7 @@ export class PostgresUserStore implements UserStore {
   }
   async setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean> {
     const result = await this.pool.query(
-      `UPDATE users SET pass_hash = $3 WHERE id = $1 AND pass_hash = $2`,
+      `UPDATE users SET pass_hash = $3 WHERE id = $1 AND pass_hash = $2 AND deletion_requested_at IS NULL`,
       [userId, expectedHash, passHash],
     );
     return result.rowCount === 1;

@@ -8,6 +8,8 @@ export const APP_TABLES = [
   'seats',
   'receipts',
   'users',
+  'account_deletions',
+  'account_erasure_guard',
   'corps',
   'corp_gateway_nonces',
   'corp_members',
@@ -98,6 +100,8 @@ export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv)
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1' && env.DB_AUTO_MIGRATE !== '0')
       throw new Error('E_DB_RUNTIME_ROLE');
     if (env.DB_AUTO_MIGRATE !== '0') await migrateLocked(pool);
+    const erasure = await pool.query<{ required: boolean }>('SELECT required FROM account_erasure_guard WHERE id=1');
+    if (erasure.rows[0]?.required !== false) throw Error('E_ERASURE_RESTORE_REQUIRED');
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1') {
       if (env.DB_AUTO_MIGRATE !== '0') throw new Error('E_DB_RUNTIME_ROLE');
       const { rows } = await pool.query<{ unsafe: boolean }>(`

@@ -1099,7 +1099,7 @@ const server = createMultiplayerServer({
     });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
-    app.get('/auth/status', async () => ({ enabled: AUTH }));
+    app.get('/auth/status', async () => ({ enabled: AUTH, accountDeletion: AUTH && !!pool && process.env.ACCOUNT_DELETION_ENABLED === '1' }));
     if (AUTH) {
       // Register/login (SE-1.x contour, shared with the production entry): scrypt
       // hashes, uniform-401 + decoy timing, per-IP rate limit — hands out the
@@ -1110,6 +1110,7 @@ const server = createMultiplayerServer({
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
         verifySession: authCfg.verifySession!,
+        accountDeletionEnabled: !!pool && process.env.ACCOUNT_DELETION_ENABLED === '1',
         onSessionsRevoked: (accountId) => { revokeAccountConnections(registry, accountId); },
         // Новый пароль закрывает открытые игровые сокеты аккаунта во всех партиях.
         onPasswordChanged: (accountId) => {

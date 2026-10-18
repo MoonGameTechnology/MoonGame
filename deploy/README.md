@@ -880,3 +880,10 @@ bash deploy/serve.sh
 ```bash
 sudo bash deploy/install-ubuntu.sh
 ```
+
+
+## Удаление аккаунтов и восстановление
+
+После restore runtime требует replay внешнего реестра удалений. Порядок настройки
+обработчика, таймера, обслуживания и восстановления: [подготовка RuStore](../docs/security/rustore-preparation.md).
+Не обходить `account_erasure_guard`; сначала миграция и replay на обеих БД.

@@ -1,0 +1,28 @@
+import { createHash } from 'node:crypto';
+export function validateRelease(config, now = Date.now()) {
+  const fail = () => { throw Error('E_RUSTORE_RELEASE_CONFIG'); };
+  if (!config || !/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){2,}$/.test(config.appId ?? '') ||
+      ['com.voiddominion.prototype', 'com.voiddominion.player'].includes(config.appId)) fail();
+  if (!Number.isSafeInteger(config.versionCode) || config.versionCode <= 0 || config.versionCode > 2100000000 ||
+      !Number.isSafeInteger(config.previousVersionCode) || config.previousVersionCode < 0 || config.versionCode <= config.previousVersionCode ||
+      !/^[0-9][0-9A-Za-z.-]{0,39}$/.test(config.versionName ?? '')) fail();
+  for (const key of ['server', 'privacyUrl']) {
+    let url; try { url = new URL(config[key]); } catch { fail(); }
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.search) fail();
+    if (key === 'server' && url.pathname !== '/') fail();
+  }
+  if (new URL(config.server).origin !== new URL(config.privacyUrl).origin) fail();
+  for (const key of ['policySha256', 'certificateSha256', 'privacyEvidenceSha256', 'erasureRestoreDrillSha256'])
+    if (!/^[a-f0-9]{64}$/.test(config[key] ?? '')) fail();
+  const reviewed = Date.parse(config.reviewedAt);
+  if (!Number.isFinite(reviewed) || now < reviewed || now - reviewed > 30 * 86400000 ||
+      typeof config.approvedBy !== 'string' || !config.approvedBy.trim() || /TODO|TBD|example|заполн/i.test(config.approvedBy)) fail();
+  return config;
+}
+export function policyDocument(text, expectedHash) {
+  if (Buffer.byteLength(text) > 128 * 1024 || text.length < 500 || !/[а-яё]{3}/i.test(text) ||
+      /\bTODO\b|\bTBD\b|НЕ ПУБЛИКОВАТЬ|\[ЗАПОЛНИТЬ(?:\]|:)/i.test(text) || createHash('sha256').update(text).digest('hex') !== expectedHash)
+    throw Error('E_RUSTORE_POLICY');
+  const escaped = text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>Политика конфиденциальности</title><style>body{max-width:50rem;margin:2rem auto;padding:1rem}pre{white-space:pre-wrap;font:1rem/1.6 system-ui}</style></head><body><pre>${escaped}</pre></body></html>`;
+}

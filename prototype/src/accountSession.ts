@@ -309,3 +309,23 @@ export function askSignIn(
   pendingJoinAfterAuth.remember(id, slot, faction, scientists);
   game.showSignIn(srv);
 }
+
+/** A 202 means queued, never that all backups have already been erased. */
+export async function requestAccountDeletion(base: string, password: string): Promise<'pending' | 'failed' | 'password' | 'unavailable'> {
+  const token = sessionToken(base);
+  if (!token || !validLoginPassword(password)) return 'password';
+  try {
+    const response = await fetch(`${httpBase(base)}/auth/delete-account`, {
+      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ password, confirm: 'DELETE' }), signal: AbortSignal.timeout(15_000),
+    });
+    if (response.status === 401) return 'password';
+    if (response.status === 503) return 'unavailable';
+    if (response.status !== 202) return 'failed';
+    const body = await response.json() as { status?: unknown; requestId?: unknown };
+    if (body.status !== 'pending' || typeof body.requestId !== 'string') return 'failed';
+    clearSession(localStorage, base);
+    pendingJoinToken = null;
+    return 'pending';
+  } catch { return 'failed'; }
+}

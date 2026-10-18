@@ -223,6 +223,17 @@ export class MemoryCommanderStore implements CommanderStore {
 export class MemoryUserStore implements UserStore {
   private readonly byLogin = new Map<string, UserRecord>();
 
+  requestDeletion(user: UserRecord): Promise<string | null> {
+    const rec = this.byLogin.get(user.login.toLowerCase());
+    if (!rec || rec.userId !== user.userId || rec.deletionRequestedAt ||
+        rec.passHash !== user.passHash || rec.sessionNonce !== user.sessionNonce)
+      return Promise.resolve(null);
+    const requestId = randomUUID();
+    rec.deletionRequestedAt = new Date().toISOString();
+    rec.sessionNonce = requestId;
+    return Promise.resolve(requestId);
+  }
+
   createUser(
     login: string,
     passHash: string,
@@ -240,16 +251,18 @@ export class MemoryUserStore implements UserStore {
   }
 
   findUser(login: string): Promise<UserRecord | null> {
-    return Promise.resolve(this.byLogin.get(login.toLowerCase()) ?? null);
+    const user = this.byLogin.get(login.toLowerCase());
+    return Promise.resolve(user && !user.deletionRequestedAt ? user : null);
   }
 
   findUserByEmail(email: string): Promise<UserRecord | null> {
-    return Promise.resolve(this.byEmail(email.toLowerCase()));
+    const user = this.byEmail(email.toLowerCase());
+    return Promise.resolve(user && !user.deletionRequestedAt ? user : null);
   }
 
   findById(userId: string): Promise<UserRecord | null> {
     for (const rec of this.byLogin.values()) {
-      if (rec.userId === userId) return Promise.resolve(rec);
+      if (rec.userId === userId && !rec.deletionRequestedAt) return Promise.resolve(rec);
     }
     return Promise.resolve(null);
   }
@@ -257,7 +270,7 @@ export class MemoryUserStore implements UserStore {
   loginsOf(userIds: readonly string[]): Promise<Record<string, string>> {
     const want = new Set(userIds);
     const out: Record<string, string> = {};
-    for (const rec of this.byLogin.values()) if (want.has(rec.userId)) out[rec.userId] = rec.login;
+    for (const rec of this.byLogin.values()) if (want.has(rec.userId) && !rec.deletionRequestedAt) out[rec.userId] = rec.login;
     return Promise.resolve(out);
   }
 
@@ -277,7 +290,7 @@ export class MemoryUserStore implements UserStore {
 
   setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean> {
     for (const rec of this.byLogin.values()) {
-      if (rec.userId === userId && rec.passHash === expectedHash) {
+      if (rec.userId === userId && rec.passHash === expectedHash && !rec.deletionRequestedAt) {
         rec.passHash = passHash;
         return Promise.resolve(true);
       }

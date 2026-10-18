@@ -81,7 +81,12 @@ export function isTrustedApkUrl(url: string): boolean {
 }
 
 interface GlobalWithBuild {
-  __BUILD__?: { versionCode?: unknown; sha?: unknown; server?: unknown };
+  __BUILD__?: { versionCode?: unknown; sha?: unknown; server?: unknown; channel?: unknown; privacyUrl?: unknown };
+}
+
+/** Store builds receive updates through their distribution channel. */
+export function isRuStoreBuild(): boolean {
+  return (globalThis as GlobalWithBuild).__BUILD__?.channel === 'rustore';
 }
 
 /** Our own build identity, injected into the APK's index.html at package time. */
@@ -163,6 +168,7 @@ export type UpdateCheck =
   | { kind: 'update'; info: UpdateInfo; local: number }; // a newer build is available
 
 export async function checkForUpdateDetailed(fetchImpl: typeof fetch = fetch): Promise<UpdateCheck> {
+  if (isRuStoreBuild()) return { kind: 'dormant' };
   const local = currentBuild();
   if (!local) return { kind: 'dormant' };
   let res: Response;
@@ -186,5 +192,5 @@ export async function checkForUpdateDetailed(fetchImpl: typeof fetch = fetch): P
 
 /** Human label for a build ("alpha-1a2b3c4" / "player-1a2b3c4", or "сборка N" when no SHA). */
 export function buildLabel(b: BuildInfo): string {
-  return b.sha ? `${RELEASE_TAG}-${b.sha}` : `сборка ${b.versionCode}`;
+  return b.sha ? `${isRuStoreBuild() ? 'rustore' : RELEASE_TAG}-${b.sha}` : `сборка ${b.versionCode}`;
 }

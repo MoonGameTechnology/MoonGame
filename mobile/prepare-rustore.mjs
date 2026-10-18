@@ -1,0 +1,22 @@
+// Executed only in a CLEAN release workspace before cap add android.
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { validateRelease, policyDocument } from './rustore-config.mjs';
+const config = validateRelease(JSON.parse(readFileSync(process.env.RUSTORE_CONFIG_FILE, 'utf8')));
+if (existsSync('android')) throw Error('E_RUSTORE_DIRTY_ANDROID');
+const policyResponse = await fetch(config.privacyUrl, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+if (!policyResponse.ok || !policyResponse.headers.get('content-type')?.startsWith('text/plain')) throw Error('E_RUSTORE_POLICY_HTTP');
+const policy = policyDocument(await policyResponse.text(), config.policySha256);
+const auth = await fetch(new URL('/auth/status', config.server), { redirect: 'error', signal: AbortSignal.timeout(15000) });
+if (!auth.ok) throw Error('E_RUSTORE_AUTH_HTTP');
+const status = await auth.json();
+if (status.enabled !== true || status.accountDeletion !== true) throw Error('E_RUSTORE_DELETION_UNAVAILABLE');
+execFileSync(process.execPath, ['sync-www.mjs', 'player'], { stdio: 'inherit' });
+let html = readFileSync('www/index.html', 'utf8');
+if (!html.includes('</head>') || html.includes('window.__BUILD__')) throw Error('E_RUSTORE_BUILD_STAMP');
+const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const identity = { versionCode: config.versionCode, sha, server: config.server, channel: 'rustore', privacyUrl: 'privacy.html' };
+html = html.replace('</head>', `<script>window.__BUILD__=${JSON.stringify(identity)};</script></head>`);
+writeFileSync('www/index.html', html);
+writeFileSync('www/privacy.html', policy);
+writeFileSync('capacitor.config.json', JSON.stringify({ appId: config.appId, appName: 'Void Dominion', webDir: 'www', server: { androidScheme: 'https', cleartext: false } }, null, 2));
