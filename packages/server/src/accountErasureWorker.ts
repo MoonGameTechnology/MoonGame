@@ -146,10 +146,14 @@ export async function runAccountErasure(options: {
   const { game, corporations, ledger, logDir, analyticsSalts } = options;
   if (!analyticsSalts.length || analyticsSalts.some((s) => s.length < 32))
     throw Error('E_ERASURE_SALT_HISTORY');
+  let replay = options.replay === true;
   for (const pool of [game, corporations]) {
     const db = await pool.connect();
     try {
       await requireOfflineDatabase(db);
+      const guard = await db.query<{ required: boolean }>('SELECT required FROM account_erasure_guard WHERE id=1');
+      if (typeof guard.rows[0]?.required !== 'boolean') throw Error('E_ERASURE_GUARD');
+      replay ||= guard.rows[0].required;
     } finally {
       db.release();
     }
@@ -193,7 +197,7 @@ export async function runAccountErasure(options: {
   for (const entry of entries) {
     if (
       entry.completed &&
-      !options.replay &&
+      !replay &&
       !queued.rows.some((r) => r.account_id === entry.accountId)
     )
       continue;
@@ -222,9 +226,14 @@ export async function runAccountErasure(options: {
     await eraseAccountLogs(logDir, entry.pending, analyticsSalts);
     await eraseAccountDatabase(corporations, entry.pending);
     await eraseAccountDatabase(game, entry.pending);
-    await game.query('UPDATE account_deletions SET completed_at=now() WHERE account_id=$1', [
-      entry.accountId,
-    ]);
+    // A restored dump can predate the queue row itself. Recreate the reservation
+    // from the independent ledger before reopening registration.
+    await game.query(
+      `INSERT INTO account_deletions(account_id,request_id,login_hash,completed_at)
+       VALUES($1,$2,encode(sha256(convert_to(lower($3::text),'UTF8')),'hex'),now())
+       ON CONFLICT(account_id) DO UPDATE SET completed_at=now(),login_hash=excluded.login_hash`,
+      [entry.accountId, randomUUID(), entry.pending.login],
+    );
     entry.completedAt = new Date().toISOString();
     entry.completed = true; // restricted restore ledger; retain through backup lifetime only
     await durableReplace(ledger, JSON.stringify(entries));

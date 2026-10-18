@@ -14,10 +14,10 @@ async function main(): Promise<void> {
   });
   try {
     if (process.argv.includes('--pending')) {
-      const result = await game.query(
-        'SELECT 1 FROM account_deletions WHERE completed_at IS NULL LIMIT 1',
-      );
-      process.exitCode = result.rowCount ? 0 : 3;
+      const result = await game.query('SELECT 1 FROM account_deletions WHERE completed_at IS NULL LIMIT 1');
+      const guards = await Promise.all([game, corporations].map(pool => pool.query<{ required: boolean }>('SELECT required FROM account_erasure_guard WHERE id=1')));
+      if (guards.some(g => typeof g.rows[0]?.required !== 'boolean')) throw Error('E_ERASURE_GUARD');
+      process.exitCode = result.rowCount || guards.some(g => g.rows[0]!.required) ? 0 : 3;
       return;
     }
     const count = await runAccountErasure({

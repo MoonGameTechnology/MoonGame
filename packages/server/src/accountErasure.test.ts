@@ -204,6 +204,8 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
     expect(
       (await game.query('SELECT completed_at FROM account_deletions')).rows[0].completed_at,
     ).toBeTruthy();
+    expect(await store.createUser('ACTIVE', 'different-hash')).toEqual({ ok: false, code: 'E_LOGIN_TAKEN' });
+    expect(await store.createUser('newpilot', 'different-hash', subject.email)).toMatchObject({ ok: true });
     expect(await runAccountErasure(options)).toBe(0);
     // Simulate restoring a corporation snapshot without restoring the game users table.
     await corporations.query('INSERT INTO player_profiles VALUES($1,$2)', [
@@ -211,8 +213,12 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
       { portrait: 'old' },
     ]);
     await corporations.query('UPDATE matches SET state=$1', [{ name: 'active', accountId: id }]);
+    await game.query('DELETE FROM account_deletions'); // snapshot predates the request
     await corporations.query('UPDATE account_erasure_guard SET required=true');
+    // Even the ordinary scheduled path must replay when a restored guard is set.
+    expect(await runAccountErasure(options)).toBe(1);
     expect(await runAccountErasure({ ...options, replay: true })).toBe(1);
+    expect(await store.createUser('ACTIVE', 'new-owner')).toEqual({ ok: false, code: 'E_LOGIN_TAKEN' });
     expect((await corporations.query('SELECT * FROM player_profiles')).rowCount).toBe(0);
     expect((await corporations.query('SELECT state FROM matches')).rows[0].state.name).toBe(
       '[deleted]',

@@ -112,8 +112,13 @@ const SCHEMA_SQL = `
       account_id text PRIMARY KEY,
       request_id text NOT NULL UNIQUE,
       requested_at timestamptz NOT NULL DEFAULT now(),
-      completed_at timestamptz
+      completed_at timestamptz,
+      login_hash text
     );
+    ALTER TABLE account_deletions ADD COLUMN IF NOT EXISTS login_hash text;
+    UPDATE account_deletions d SET login_hash=encode(sha256(convert_to(lower(u.login),'UTF8')),'hex')
+      FROM users u WHERE u.id=d.account_id AND d.login_hash IS NULL;
+    CREATE INDEX IF NOT EXISTS account_deletions_login_idx ON account_deletions(login_hash);
     -- logins are unique case-insensitively: Vasya and vasya are one account
     CREATE UNIQUE INDEX IF NOT EXISTS users_login_idx ON users (lower(login));
     -- recovery emails are unique case-insensitively WHEN present (the reset lookup key)
@@ -761,9 +766,9 @@ export class PostgresUserStore implements UserStore {
       WITH disabled AS (
         UPDATE users SET deletion_requested_at = now(), session_nonce = $4
         WHERE id = $1 AND pass_hash = $2 AND session_nonce = $3
-          AND deletion_requested_at IS NULL RETURNING id
-      ) INSERT INTO account_deletions(account_id, request_id)
-        SELECT id, $4 FROM disabled RETURNING request_id
+          AND deletion_requested_at IS NULL RETURNING id,login
+      ) INSERT INTO account_deletions(account_id, request_id, login_hash)
+        SELECT id, $4, encode(sha256(convert_to(lower(login),'UTF8')),'hex') FROM disabled RETURNING request_id
     `, [user.userId, user.passHash, user.sessionNonce ?? '', requestId]);
     return result.rows[0]?.request_id ?? null;
   }
@@ -777,6 +782,14 @@ export class PostgresUserStore implements UserStore {
   > {
     const userId = randomUUID();
     try {
+      // Historical snapshots can carry a callsign without an account ID. Reserve
+      // it through the deletion-ledger/backup lifetime so replay cannot touch a
+      // new person who reuses that name. The digest is still protected PDn.
+      const reserved = await this.pool.query(
+        "SELECT 1 FROM account_deletions WHERE login_hash=encode(sha256(convert_to(lower($1::text),'UTF8')),'hex') LIMIT 1",
+        [login],
+      );
+      if (reserved.rowCount) return { ok: false, code: 'E_LOGIN_TAKEN' };
       await this.pool.query(
         `INSERT INTO users (id, login, pass_hash, email) VALUES ($1, $2, $3, $4)`,
         [userId, login, passHash, email?.toLowerCase() ?? null],
