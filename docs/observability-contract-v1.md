@@ -10,8 +10,11 @@ provisioning. Это не утверждение о rollout на VPS, node/DB ex
 
 ## Принятый профиль и экраны
 
-Один VPS, отдельные процессы/тома/лимиты мониторинга. Первый доступ — только
-SSH-туннель к Grafana на loopback; публичного операторского ingress нет.
+Один VPS, отдельные процессы/тома/лимиты мониторинга. Исходный доступ —
+SSH-туннель к Grafana на loopback. Дополнение владельца2026-10-18:
+[профиль первого VPS](../deploy/observability/VPS.md) допускает отдельный HTTPS
+site с обязательным клиентским сертификатом и персональным Grafana login;
+Prometheus/Loki/Alloy и Game metrics наружу не публикуются.
 Владелец явно выбрал **уведомления только в закрытом пульте**, без внешних
 сообщений. Contact point и внешний dead-man отложены: отсутствие всего VPS
 таким контуром не обнаруживается снаружи. Не записывать фиктивный успешный test-send.
@@ -89,7 +92,11 @@ Game Prometheus-имена ниже реализованы в standalone OBS-1.1
 | `moongame_journal_{written,dropped,failed}_total{stream}` → journal.match/client | C, lines; stream=`match,client` | Написанная строка не подтверждает доставку в Loki |
 | `moongame_telemetry_{batches,events,dropped_events,rejected,limited}_total` → telemetry | C, соответствующие events/requests | Приём != аналитический дедуп; не считать raw строки уникальными событиями |
 | `moongame_active_installs` → telemetry.activeInstalls | G, browser installs | Скользящие 5 мин; не пользователи онлайн |
-| CPU busy, available RAM, FS bytes/inodes, IO → node_exporter | G / host counters, seconds/bytes/count | До включения exporter baseline использует /proc + statfs; IO не измерен CLI |
+| `moongame_host_cpu_seconds_total{mode}` → host observer `os.cpus()` | C, seconds; mode=user/nice/sys/idle/irq | Сумма по CPU, ms→seconds; busy — отношение rates, не loadavg |
+| `moongame_host_cpu_count`, `moongame_host_load1` → host observer | G, CPUs / runnable tasks | Весь VPS, не отдельный матч |
+| `moongame_host_memory_{total,available}_bytes` → `/proc/meminfo` | G, bytes | Именно MemAvailable, не MemFree |
+| `moongame_host_root_{size,available}_bytes`, `moongame_host_root_{inodes,free_inodes}` → `statfs('/')` | G, bytes / count | Root FS; IO пока не измеряется |
+| `moongame_observer_sample_timestamp_seconds` → atomic textfile publication | G, Unix seconds | Dashboard скрывает данные при age≥45s; error сохраняет старый timestamp |
 | DB up/connections → ограниченный DB exporter | G, 0/1 / connections | Game ready проверяет только свой store, не заменяет весь DB health |
 | backup/restore last success → независимые verified job markers | G, Unix seconds | Сейчас not_configured; наличие локального файла не даёт success |
 | p95 submit/broadcast/RTT → H buckets в OBS-2.3 | H, seconds | Пока not_implemented; из avg/max/slow JSONL вычислять запрещено |
@@ -111,7 +118,7 @@ counters источника; его рестарт не добавляет offse
 но exporter не получает socket ради него. Persisted summary и live counters
 не суммируются; сравнение baseline с новым startedAt помечается reset/incomparable.
 
-Labels только environment/instance/service/source/stream/outcome/type/code/version/le;
+Labels только environment/instance/service/source/stream/outcome/type/code/version/le/mode;
 на ряд разрешены только перечисленные для него значения. Бюджет всего стенда
 ≤25 000 active series, ≤256 известных action types и ≤64 reject codes (+other).
 Никаких matchId/playerId/actor/install/session/IP/URL/query/текста исключения в labels.
@@ -136,12 +143,13 @@ Raw игровые JSONL не являются technical stream. До OBS-0.3/2.
 | Raw JSONL | 7 UTC-дней или 1 GiB, что наступит раньше | Очистка/удаление субъекта — OBS-0.3; сейчас не исполняется |
 | Derived product aggregates | Не дольше исходного 7-дневного окна; erase + пересчёт/checkpoint | Worker ещё не установлен; D1 после реализации, D7/D30 unavailable |
 | Grafana / Alloy | State ≤256 MiB / positions+spool ≤256 MiB | Не установлены |
-| RAM caps | Grafana 256, Prometheus 384, Loki 384, Alloy 128, Game/node/DB exporter по 64 MiB | Всего 1344 MiB; report worker отдельно ≤256 MiB |
+| RAM caps после первого VPS запуска | Grafana512, Prometheus384, Loki384, Alloy256, Game/node/DB exporter по64MiB | План1728MiB; текущий объединённый observer вместо трёх exporter —1600MiB. Report worker отдельно ≤256MiB |
 | Monitoring CPU/disk | В среднем <0.5 core, диск ≤6 GiB; Game лимиты не уменьшать | Нужна on/off и 24 ч приёмка после установки |
 | Запас хоста | ≥12 GiB свободно; local backup budget ≤8 GiB при его включении | Бэкапы отложены; не считать бюджет готовым backup |
 
 Малые когорты/неполные UTC-окна показываются с n и качеством, не как ноль.
-Внешнее хранение и публичный доступ не включены этим профилем. TTL требует
+Внешнее хранение не включено; публичный HTTPS ingress допускается только отдельным
+профилем выше с client certificate + login. TTL требует
 удаления spool/derived copies и не заменяет права доступа или erasure.
 
 ## Локальный Game exporter — OBS-1.1

@@ -260,15 +260,17 @@ observability services и возвращает предыдущую конфиг
 
 | Новый компонент | Стартовый cap RAM | Хранение / предел |
 | --- | ---: | --- |
-| Grafana | 256 MiB | Provisioning в Git; state volume ≤256 MiB, backup конфигурации отдельно |
+| Grafana | 512 MiB | Provisioning в Git; state volume ≤256 MiB, backup конфигурации отдельно |
 | Prometheus | 384 MiB | 7 дней и retention.size 1.5 GB; volume budget 2.5 GiB с WAL/head запасом |
 | Loki | 384 MiB | 72 ч через compactor retention; volume budget 2 GiB |
-| Alloy | 128 MiB | positions/spool ≤256 MiB, потеря/задержка измеряются |
+| Alloy | 256 MiB | positions/spool ≤256 MiB, потеря/задержка измеряются |
 | Game exporter | 64 MiB | Cache только текущего scrape, без долговременной БД |
 | node_exporter | 64 MiB | Host textfile маркеры атомарные, без истории в exporter |
 | DB exporter, если включён | 64 MiB | Ограниченный набор метрик, отдельная DB-роль |
 
-Новый always-on бюджет — до 1.35 GiB; вместе с прежними caps около 3.85 GiB,
+После первого VPS запуска caps уточнены: плановый always-on бюджет до1.69GiB
+(включая три отдельных exporter), вместе с прежними caps около4.19GiB.
+Текущий объединённый observer вместо трёх exporter даёт cap1.56GiB;
 остаток — ОС, page cache и пики. Report worker до 256 MiB с CPU/time limit,
 не параллелится сам с собой. Бюджет наблюдаемости на диске — до 6 GiB, исходных
 JSONL — до 1 GiB/7 дней с первым наступившим пределом, локальных backup — до
@@ -358,9 +360,20 @@ non-root/read-only/caps, memory/PID/log caps, private file secret, HTTP healthch
 digest pins и CI Trivy/KICS. Root CLI управляет только четырьмя `obs-*`, требует
 disk guard timer; restart сохраняет состояние. Контейнерный smoke проверяет
 auth/header/proxy/write/snapshot/Viewer границы, persistence и неизменность Game
-Compose config. [Runbook](../deploy/observability/README.md) отделяет реализацию от
-ещё не проведённых VPS root/systemd, внешних сетевых проверок и 24h/on-off приёмки.
-Game targets и Loki ingest не включены.
+Compose config. Первый VPS и Game/host wiring описаны отдельным
+[профилем](../deploy/observability/VPS.md); DB exporter, Loki ingest и24h/on-off
+приёмка не включены.
+
+### OBS-0.4 · Первый VPS и защищённый браузерный вход `[ops][sec]` ✅ — M
+
+По явному выбору владельца: персональный клиентский сертификат + Viewer password
+через отдельный HTTPS site Caddy. Host-side observer переиспользует OBS-1.1,
+пишет только atomic numeric allowlist в readonly Alloy textfile mount; без
+сетевого bearer, Docker/DB credentials и Game volumes в monitoring containers.
+Provisioned RU обзор показывает host/Game метрики, источник и45s freshness.
+[Runbook](../deploy/observability/VPS.md), [отчёт VPS](reviews/2026-10-18-obs-vps-bootstrap.md) фиксируют версии,
+проверки TLS/header/Viewer/write/stale/restart и оставшиеся ограничения.
+Этот bootstrap не закрывает отдельные критерии OBS-1.2/1.3/4.1.
 
 ### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` ⏳ — M
 

@@ -174,7 +174,9 @@ export async function readToken(path) {
     const bytes = Buffer.alloc(4098);
     const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
     const value = bytes.subarray(0, bytesRead).toString('utf8').replace(/\n$/, '');
-    if (!/^[A-Za-z0-9._~+/=-]{32,4096}$/.test(value)) throw new Error();
+    // Include the installer's token alphabet; still exclude whitespace/control
+    // bytes so an existing credential cannot inject an HTTP header.
+    if (!/^[A-Za-z0-9._~+/=:,@%-]{32,4096}$/.test(value)) throw new Error();
     return value;
   } catch { throw new Error('E_OBS_CONFIG'); }
   finally { await file?.close(); }
