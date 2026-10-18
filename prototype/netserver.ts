@@ -1,3 +1,4 @@
+import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
 import { MemoryDropStore } from '../packages/server/src/store';
 import { MetaEconomy } from '../packages/server/src/metaEconomy';
@@ -1021,22 +1022,13 @@ const server = createMultiplayerServer({
     // `?n=20` defaults to the last 20. Operator-only: these lines are pre-fog.
     app.get('/metrics/recent', async (req, reply) => {
       if (!operator(req)) return reply.callNotFound();
-      const n = Math.min(Number((req.query as { n?: string }).n ?? '20') || 20, 200);
+      const n = tailCount((req.query as { n?: unknown }).n);
+      if (n === null) return reply.code(400).send({ error: 'E_BAD_REQUEST' });
       try {
         await matchLog.flush();
-        const file = matchLog.currentFile();
-        const lines = readFileSync(file, 'utf8').trimEnd().split('\n');
-        // A crash can leave one torn line mid-file; it must not hide every line after it.
-        const recent = lines.slice(-n).flatMap((l) => {
-          try {
-            return [JSON.parse(l) as unknown];
-          } catch {
-            return [];
-          }
-        });
-        return { file, total: lines.length, recent };
+        return await jsonlTail(matchLog.currentFile(), n);
       } catch {
-        return { file: matchLog.currentFile(), total: 0, recent: [] };
+        return reply.code(503).send({ error: 'E_JOURNAL_UNAVAILABLE' });
       }
     });
     // Одна проверка сессии на все аккаунтные API: подпись валидна И пароль не менялся
@@ -1117,6 +1109,8 @@ const server = createMultiplayerServer({
         onRegistered: async (accountId) => { await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now()); },
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
+        verifySession: authCfg.verifySession!,
+        onSessionsRevoked: (accountId) => { revokeAccountConnections(registry, accountId); },
         // Новый пароль закрывает открытые игровые сокеты аккаунта во всех партиях.
         onPasswordChanged: (accountId) => {
           revokeAccountConnections(registry, accountId);

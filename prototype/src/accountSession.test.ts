@@ -335,3 +335,14 @@ describe('REFM-215 — проводка в main.ts', () => {
     expect(NETS.match(/holdJoinToken\(join\.token\);/g)).toHaveLength(1);
   });
 });
+
+describe('acknowledged logout', () => {
+  it.each([204, 401, 500])('response %s only clears the local token after revocation or expiry', async (status) => {
+    const { acc } = await boot();
+    cell.set(sessionKey(BASE), JSON.stringify({ login: 'Pilot', token: 'private-token' }));
+    server = () => reply(status);
+    expect(await acc.signOutEverywhere(BASE)).toBe(status !== 500);
+    expect(acc.sessionToken(BASE)).toBe(status === 500 ? 'private-token' : null);
+    expect(calls[0]).toMatchObject({ url: `${HTTP}/auth/logout`, init: { method: 'POST', headers: { authorization: 'Bearer private-token' } } });
+  });
+});

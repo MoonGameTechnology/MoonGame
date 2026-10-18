@@ -4304,6 +4304,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           </label>
           <label class="cfield"><span data-i18n="welcome.register.mail"></span>
             <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
+            <small data-i18n="auth.email.attachment"></small>
           </label>
           <div class="cfield"><label for="crpass" data-i18n="welcome.register.pass"></label>
             <div class="password-field">

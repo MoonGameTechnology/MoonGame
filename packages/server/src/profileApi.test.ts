@@ -115,10 +115,11 @@ describe('profile API authority and public projection', () => {
         url: '/profiles?login=alice',
         headers: { authorization: 'Bob' },
       });
-      expect(seen.json()).toEqual(saved.json());
+      expect(seen.json()).toEqual({ ...saved.json(), progress: { wins: 1 } });
+      expect(saved.json().progress).toEqual({ wins: 1, matches: 1 });
       expect(seen.body).not.toMatch(/private|email|passHash|accountId|sovereigns/);
       expect(await profiles.appearance(bob)).toEqual(defaultAppearance());
-      await profiles.credit('promotion', [{ accountId: alice, progress: { wins: 9 } }]);
+      await profiles.credit('promotion', [{ accountId: alice, progress: { wins: 13, explored: 999 } }]);
       const updated = (
         await app.inject({
           method: 'GET',
@@ -128,6 +129,8 @@ describe('profile API authority and public projection', () => {
       ).json();
       expect(updated.slots[6]).toBe('first');
       expect(medalGrade('first', updated.progress)).toBe(2);
+      expect(updated.progress).toEqual({ wins: 10 });
+      expect((await profiles.progress(alice)).wins).toBe(14);
     } finally {
       await app.close();
     }

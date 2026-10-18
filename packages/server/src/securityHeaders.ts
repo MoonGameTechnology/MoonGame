@@ -140,6 +140,7 @@ export function securityHeaders(options: SecurityHeaderOptions = {}): Record<str
 /** Заголовки для не-HTML ответов — API и метрик (правило 7). */
 export function apiSecurityHeaders(https = false): Record<string, string> {
   return {
+    'cache-control': 'no-store',
     'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer',

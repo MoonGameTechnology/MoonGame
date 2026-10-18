@@ -569,6 +569,8 @@ const server = createMultiplayerServer({
           users: stores.userStore,
           sendRecoveryMail,
           signSession,
+          verifySession,
+          onSessionsRevoked: (accountId) => { revokeAccountConnections(registry, accountId); },
           // A new password closes the account's open game sockets in every live match.
           onPasswordChanged: (accountId) => {
             revokeAccountConnections(registry, accountId);

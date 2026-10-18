@@ -114,7 +114,7 @@ export interface NetSession {
   /** The signed-in callsign, or null when there is no live session for this server. */
   login(): string | null;
   signIn(login: string, password: string, email?: string): Promise<SignInResult>;
-  signOut(): void;
+  signOut(): Promise<boolean>;
   matches(): Promise<MatchesResult>;
   join(matchId: string, prefer?: SeatPreference): Promise<JoinAttempt>;
 }
@@ -229,8 +229,16 @@ export function createSession(base: string, io: SessionIo): NetSession {
       return { kind: 'done', outcome };
     },
 
-    signOut() {
+    async signOut() {
+      const token = readSession(io.store, base)?.token;
+      if (token) {
+        const response = await io.http(`${httpBase(base)}/auth/logout`, {
+          method: 'POST', headers: { authorization: `Bearer ${token}` },
+        });
+        if (!response || (response.status !== 204 && response.status !== 401)) return false;
+      }
       clearSession(io.store, base);
+      return true;
     },
 
     async matches() {
