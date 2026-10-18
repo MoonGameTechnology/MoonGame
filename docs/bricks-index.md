@@ -1135,7 +1135,7 @@
 | OBS-0.4 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Первый VPS и защищённый браузерный вход |
 | OBS-0.3 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
 | OBS-1.1 | ✅ | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
-| OBS-1.2 | ⏳ | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
+| OBS-1.2 | 🔶 | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
 | OBS-1.3 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
 | OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
 | OBS-2.2 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Поведение в Grafana |

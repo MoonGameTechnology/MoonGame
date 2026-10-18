@@ -27,9 +27,9 @@ services:
     <<: *obs
     image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
     user: '472:472'
-    # Current upstream minimum is 512MiB. The old 256MiB profile could not finish
-    # unified-storage/API initialization on the first real VPS deployment.
-    mem_limit: 512m
+    # 512MiB stalled under browser asset loading (cgroup reclaim, no OOM kill).
+    # Keep the Go heap target at 448MiB and leave room for native memory/cache.
+    mem_limit: 768m
     cpus: 1.0
     ports: ['127.0.0.1:3000:3000']
     environment:

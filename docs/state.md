@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12407 зелёных** (135 skip — локальный прогон без PostgreSQL, реального Caddy и age; всего12542 в1000 файлах:995 passed,5 skipped;2026-10-18, база a9fbcba9 + OBS VPS). Прогон ограничен `VITEST_MAX_WORKERS=2` на общем игровом VPS. Предыдущий DAST отражён в [отчёте](reviews/2026-10-11-remediation-dast.md); on-host TLS/session/stale/stop/restart проверки мониторинга — в [отчёте первого VPS](reviews/2026-10-18-obs-vps-bootstrap.md). Без DATABASE_URL durable-тесты и backup drills пропускаются; в CI PostgreSQL есть.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12439 зелёных** (142 skip, всего12581 в1006 файлах;1001 passed/5 skipped, прогон2026-10-18, база ce9713a8 + OBS containers). Без test PostgreSQL DSN, age и реального test Caddy соответствующие проверки пропущены; on-host container/dashboard/stale проверки описаны в [профиле VPS](../deploy/observability/VPS.md).
 
 
 **Стресс-тест 2026-10-11:** устранены heap OOM при выдаче HTML, неограниченная durable-очередь и ложная readiness при отказе БД; добавлены отказ по заполненной очереди без расхода sequence, проверка актуальности peer и защита legacy restore от чужого schema marker без второй копии SQL. Подтверждение места повторяет временные отказы при полной очереди и проверяет сокет и поколение заявки непосредственно при исполнении очереди; disconnect отменяет ещё не начатое подтверждение без квитанции. Recovery-письма форматирует внешний адаптер под локаль получателя; оба хоста инъецируют его в auth API, а серверный пакет передаёт только структурные параметры и не зависит от каталогов локализации. 160 WSS-клиентов за 20 минут записали 9 579 уникальных команд без потерь/дублей/расхождений; при 160 × 0,5 команды/s стенд уже перегружается. Обе игры проверены в Chromium desktop/mobile. [Полный отчёт, профили ресурсов и ограничения](reviews/2026-10-11-full-stress.md).
@@ -7801,9 +7801,15 @@ CI Trivy/KICS и fail-closed disk guard. Root CLI меняет только че
 отдельный Viewer login, host-side observer без входящего порта, atomic allowlist
 textfile → Alloy → Prometheus и provisioned RU обзор с отсечкой stale45s.
 Game/host метрики подключены; raw journal/PII/GameState и DB credentials в стек
-не передаются. Caps уточнены после реального старта: Grafana512MiB,
-Alloy256MiB; общий gate и [on-host проверки](reviews/2026-10-18-obs-vps-bootstrap.md)
-отражены в отчёте запуска.
+не передаются. OBS-1.2 частично: отдельный фиксированный root timer передаёт
+числовые state/health/present, restart, CPU/RAM/limits/throttling/OOM семи контейнеров
+через `containers.prom`; dashboard `moongame-containers` скрывает данные старше45s,
+не даёт Docker socket в Grafana и различает missing/source/resource errors.
+Caps: Grafana768MiB после UI reclaim stall при512MiB, Alloy256MiB;
+контейнерный timer96MiB, общий текущий OBS cap1952MiB. Working set отделён от
+памяти с файловым кэшем. Семь источников,17 dashboard queries и stale/resume
+проверены на VPS; [исходный bootstrap отчёт](reviews/2026-10-18-obs-vps-bootstrap.md)
+остаётся историческим замером до этого расширения.
 DB exporter/backup markers, оконные алерты, очищенный Loki ingest, browser smoke
 и24h/on-off приёмка остаются отдельными работами; это не завершение OBS-1.2/1.3/4.1.
 

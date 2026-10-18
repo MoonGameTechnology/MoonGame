@@ -51,6 +51,66 @@ Observer ограничен64MiB/0.1CPU/32tasks, доступом только �
 в собственные runtime/state dirs. Стек сохраняет отдельные caps/guard OBS-0.2.
 При ротации Game bearer заменить root-файл и перезапустить только observer.
 
+## Контейнеры: фиксированный host timer
+
+`container-observer.mjs` — доверенное root-задание на хосте, не часть Grafana/Alloy
+и не HTTP-служба. Через локальный Unix socket выполняет только `docker container ls`
+и `docker container inspect --format` для семи фиксированных имён Compose:
+`deploy-server-1`, `deploy-postgres-1`, `deploy-caddy-1` и четырёх `deploy-obs-*-1`.
+Проекция inspect содержит только ID/PID для локального cgroup lookup, state,
+health, RestartCount, OOMKilled и StartedAt. ID/PID и физические имена не
+публикуются. Env, labels, команды, logs и mount paths не запрашиваются в проекции.
+Docker root socket остаётся привилегией доверенного host job, не sandbox;
+скомпрометированный root-код способен обойти собственный allowlist. Не выдавать
+этот socket или право редактирования кода пользовательскому/наблюдательному сервису.
+
+Поддержаны rootful Docker cgroup v2 layouts `/system.slice/docker-ID.scope` и
+`/docker/ID`; PID/cgroup сверяются, а после чтения проверяется та же эпоха запуска.
+Из cgroup читаются CPU seconds/throttling, memory.current/max/stat/events. В панели
+различаются вся charged memory (включая кэш) и working set (current минус
+inactive_file, как в Docker CLI). Высокая charged memory из-за кэша сама по себе
+не доказывает нехватку RAM. `memory.events max` показывает попытки превысить лимит;
+OOM-kill — отдельный counter. Нулевой лимит означает unlimited, не нулевую ёмкость:
+процент без лимита не строится. CPU rate в ядрах:1 = одно полностью занятое ядро;
+процент относительно quota при отсутствии quota недоступен.
+
+Для установки после host observer:
+
+```bash
+install -m 0644 /opt/moongame-ops/deploy/observability/moongame-container-observer.{service,timer} /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now moongame-container-observer.timer
+systemctl start moongame-container-observer.service
+```
+
+Код и ops-каталог должны принадлежать root; `/var/lib/moongame-metrics` создаёт
+существующий host observer. Job имеет96MiB/0.2CPU/64tasks, timeout30s и только
+AF_UNIX. Каждый Docker вызов ограничен1500ms/64KiB, вызовы последовательны,
+сборы не перекрываются. `containers.prom` ≤64KiB заменяется атомарно, Alloy читает
+его через существующий readonly mount. Новых портов и контейнеров нет.
+
+Dashboard `moongame-containers` (ссылка из `moongame-overview`) содержит17 панелей.
+Есть отдельные source_up, present и resources_up: отказ Docker не равен отсутствию
+контейнера; отсутствие healthcheck не зелёный health; остановленный контейнер не
+получает выдуманное нулевое потребление. Timestamp независим от host observer;
+при возрасте≥45s текущие значения скрываются, возраст остаётся виден.
+RestartCount — автоматические рестарты Docker за жизнь текущего контейнера,
+не журнал всех ручных рестартов. StartedAt дополняет его; пересоздание обнуляет
+cgroup counters, `rate()` учитывает resets. История событий между15s выборками
+и долговременный аудит пересозданий не реализованы.
+
+Проверено на VPS2026-10-18: семь источников/ресурсов доступны,17 PromQL queries
+успешны; пауза producer46.8s скрыла состояния, возобновление вернуло семь строк,
+Game ready оставался200. Один успешный job: peak около26MiB, CPU около0.64s;
+это точечный замер, не24h/on-off soak. Fixture tests проверяют missing/ошибку
+Docker, cgroup failure, остановку/пересоздание/reset и numeric/label allowlists.
+Графический Android/browser smoke отдельно не выполнен.
+
+Grafana Alerting поддерживает правила, no-data/error policy, contact points и
+маршрутизацию уведомлений. Настройка выполняется отдельным Admin; обычный Viewer
+наблюдает. Этот шаг не создаёт rules/contact points и не отправляет сообщений.
+Внешний dead-man нужен отдельно, чтобы видеть полную потерю этого VPS.
+
 ## Вход через HTTPS
 
 Используется существующий подписанный Caddy, отдельный hostname. DNS должен
@@ -102,7 +162,7 @@ Stop/restart только OBS сохраняет Grafana dashboard/users/TSDB; `
 контейнеры, units — observer и guard; Game release не удаляет ops-конфигурацию.
 
 Это первый обзор, не завершение OBS-1.2/1.3/4.1: нет отдельной DB monitoring
-роли, container accounting, backup/restore markers, оконных алертов/внешнего
+роли, backup/restore markers, оконных алертов/внешнего
 dead-man, histogram p95, карточек партий и24h/on-off soak. Host RAM/CPU не
 выдаются за расход конкретной комнаты. Отчёт реального запуска хранить отдельно.
 

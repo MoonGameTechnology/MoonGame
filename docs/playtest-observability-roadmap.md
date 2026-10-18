@@ -398,12 +398,21 @@ Fixture и живой production bundle с WS join/остановкой/рест
 [Запуск и границы](../deploy/observability/GAME-EXPORTER.md): Compose wiring,
 metrics-only credential и приёмка реального VPS остаются отдельными работами.
 
-### OBS-1.2 · Хост, БД и backup health `[ops]` ⏳ — S
+### OBS-1.2 · Хост, БД и backup health `[ops]` 🔶 — S
 
 Node exporter, ограниченный DB exporter, фиксированные textfile jobs для
 backup/restore/контейнеров. **Готово, когда:** проверенные изменения источников
 отражаются в числах; missing marker виден; мониторинговые роли не меняют БД,
 не читают секреты/игровые таблицы и не дают Docker API в Grafana.
+**Сделано 2026-10-18:** host/Game bridge и отдельный root timer с фиксированным
+allowlist семи контейнеров → atomic numeric textfile → существующий Alloy.
+Provisioned RU dashboard `moongame-containers`: state/health/present, restart,
+CPU quota/rate/throttling, RAM/limits/working set, OOM/limit hits,45s freshness.
+Нет socket/env/logs в monitoring containers. Grafana cap поднят до768MiB после
+реального UI reclaim stall при512MiB; Go heap target448MiB сохранён.
+[Запуск, проверка и семантика](../deploy/observability/VPS.md).
+**Остаток:** отдельная DB monitoring role/exporter, backup/restore markers и
+полная on/off/24h приёмка. Уведомления этим шагом не включаются.
 
 ### OBS-1.3 · Grafana и алерты первого выпуска `[ops][docs]` 🔒(OBS-1.2) — M
 

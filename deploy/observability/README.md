@@ -83,15 +83,18 @@ Viewer не имеет административных операций; нас
 
 | Service    | RAM cap |   CPU cap | Каталог / бюджет                     |
 | ---------- | ------: | --------: | ------------------------------------ |
-| Grafana    |  512MiB | 1.00 core | `grafana/`, 256MiB                   |
+| Grafana    |  768MiB | 1.00 core | `grafana/`, 256MiB                   |
 | Prometheus |  384MiB | 0.25 core | `prometheus/`, 2.5GiB; TSDB7d/1500MB |
 | Loki       |  384MiB | 0.25 core | `loki/`, 2GiB; compactor72h          |
 | Alloy      |  256MiB | 0.50 core | `alloy/`, 256MiB                     |
 
 У каждого: non-root, read-only rootfs, capabilities dropped, no-new-privileges,
-128PID, tmpfs16MiB, logs2×5MiB. Общий RAM cap1536MiB; средний CPU<0.5core
+128PID, tmpfs16MiB, logs2×5MiB. Общий RAM cap1792MiB; средний CPU<0.5core
 ещё требует замера. Контейнеры не получают Docker socket, DB credentials и тома Game.
-Только доверенный root CLI использует Docker; HTTP endpoint управления нет.
+Только доверенный root CLI и фиксированный host timer из [профиля VPS](VPS.md)
+используют Docker; HTTP endpoint управления нет. С host/Game observer64MiB и
+container timer96MiB текущий общий RAM cap1952MiB. Grafana768MiB оставляет
+запас сверх Go heap target448MiB: прежние512MiB давали reclaim stalls при загрузке UI.
 
 Таймер каждые 60s измеряет `du -sb`/`statfs`: warning80%, stop90% бюджета,
 <12GiB free или неизвестное измерение. Общий state budget6GiB. Приватный numeric
