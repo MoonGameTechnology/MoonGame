@@ -35,6 +35,7 @@
 | `packages/client` (Vite) | PWA-оболочка: welcome + живая карта + `?join=` | `pnpm --filter @void/client dev` |
 | `deploy/backup.sh` / `deploy/restore.sh` | отдельные задания PostgreSQL backup/restore; опциональный подписанный age-комплект `.vdbak` | backup/restore worker |
 | `deploy/backup-repository/s3.mjs` | независимая S3-доставка `.vdbak` и получение конкретной версии с проверкой подписи; SDK исключён из production-зависимостей игры | отдельный worker, [runbook](deploy/backup-repository/README.md) |
+| `deploy/observability/game-exporter.mjs` | отдельный bounded JSON→Prometheus collector; источники и HTTP listener только literal loopback, без чтения GameState/JSONL/БД | локальный процесс, [runbook](deploy/observability/GAME-EXPORTER.md); Compose wiring отдельно |
 
 **Практическое следствие.** Правку серверного поведения, которая должна доехать до
 игроков, кладут в `prototype/netserver.ts` (или в общий код `packages/server/src/**`,

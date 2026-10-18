@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12327 зелёных** (127 skip — прогон без PostgreSQL и реального Caddy, их тесты гоняет CI; всего 12454 в 992 файлах; прогон 2026-10-17, база b949177 + сетевая партия без ложной победы и прыжков юнитов, номер партии из цифр). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12331 зелёных** (134 skip — прогон без PostgreSQL, реального Caddy и age; всего 12465 в 994 файлах: 989 passed, 5 skipped; прогон 2026-10-18, база 6767bfc7 + OBS-1.1 локальный Game exporter). Исправления аудита проверены общим гейтом и отдельным контейнерным DAST ([результаты](reviews/2026-10-11-remediation-dast.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
 
 
 **Стресс-тест 2026-10-11:** устранены heap OOM при выдаче HTML, неограниченная durable-очередь и ложная readiness при отказе БД; добавлены отказ по заполненной очереди без расхода sequence, проверка актуальности peer и защита legacy restore от чужого schema marker без второй копии SQL. Подтверждение места повторяет временные отказы при полной очереди и проверяет сокет и поколение заявки непосредственно при исполнении очереди; disconnect отменяет ещё не начатое подтверждение без квитанции. Recovery-письма форматирует внешний адаптер под локаль получателя; оба хоста инъецируют его в auth API, а серверный пакет передаёт только структурные параметры и не зависит от каталогов локализации. 160 WSS-клиентов за 20 минут записали 9 579 уникальных команд без потерь/дублей/расхождений; при 160 × 0,5 команды/s стенд уже перегружается. Обе игры проверены в Chromium desktop/mobile. [Полный отчёт, профили ресурсов и ограничения](reviews/2026-10-11-full-stress.md).
@@ -7744,9 +7744,20 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 read-only CLI `deploy/observability/baseline.mjs`: любой конечный положительный
 timeScale сохраняется; отсутствие обязательной timing/size series делает source invalid.
 Принят SSH/local профиль с
-уведомлениями только в закрытом пульте. Grafana/exporters/Loki, lifecycle-очистка,
+уведомлениями только в закрытом пульте. Grafana/node/DB exporters/Loki, lifecycle-очистка,
 нагрузочная ёмкость и внешние алерты этим не реализованы; следующие OBS-этапы
 остаются отдельными задачами.
+
+**OBS-1.1 (2026-10-18) готов:** отдельный [Game exporter](../deploy/observability/GAME-EXPORTER.md)
+на Node, listener 127.0.0.1:9108 и только loopback Game sources; четыре фиксированных
+JSON routes → allowlist Prometheus, timeout 2 с/body 64 KiB/single-flight,
+5000 samples/1 MiB. Source_up/freshness отделены от exporter liveness, source failure
+убирает игровые значения без ложных нулей; count/sum/max имеют явные units и no_samples,
+Game/exporter resets не добавляют offsets. Статические action/reject catalogs проверены
+по исходникам; неизвестные keys/identity/GameState/raw journal не публикуются.
+Fixture и live production bundle с настоящим WS join и рестартами зелёные.
+Установка на VPS, Compose wiring, scoped network credential и ресурсная приёмка
+остаются отдельными работами.
 
 **✅ Этап 1 (ядро) — готово целиком:** **54 модуля** на микроядре (шина/хуки/манифест,
 seeded RNG + golden, `advanceTo`; список — §3, разбор — §5): экономика + рынок + торговец экспедиции,
