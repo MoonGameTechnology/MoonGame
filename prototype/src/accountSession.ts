@@ -144,10 +144,10 @@ export async function ensureSession(
   passwordArg?: string,
   emailArg?: string,
 ): Promise<string | null> {
-  // Only OUR OWN cached session counts — a token minted for a different callsign
-  // (or a legacy unbound one) is ignored and replaced by a fresh login below.
+  // Automatic resume can reuse only OUR OWN cached session. An explicit password
+  // (including an empty one) means a submitted form and must be checked below.
   const mine = tokenFor(localStorage, base, login);
-  if (mine) return mine;
+  if (passwordArg === undefined && mine) return mine;
   // Правила логина и пароля — в `authRules.ts` (REFM-47): зеркало серверных, чтобы
   // игрок увидел ПРИЧИНУ, а не сухой одинаковый отказ.
   if (!validLogin(login)) {

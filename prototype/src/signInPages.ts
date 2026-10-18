@@ -133,7 +133,7 @@ async function welcomeSignIn(nick: string): Promise<void> {
     game.setNick(nick);
     const srv = game.resolveServer();
     if (!srv) return;
-    const session = await ensureSession(srv.base, nick);
+    const session = await ensureSession(srv.base, nick, wPassInput.value);
     if (!session) {
       wPassInput.focus(); // ensureSession already explained why in the status line
       return;

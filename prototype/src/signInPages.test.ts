@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { t, LOCALE } from '../../localization/runtime';
-import { readSession } from '../../decisions/sessionStore';
+import { readSession, saveSession } from '../../decisions/sessionStore';
 
 const BASE = 'ws://srv.test:8080';
 const HTTP = 'http://srv.test:8080';
@@ -336,6 +336,58 @@ describe('REFM-218 — приветствие', () => {
     await settle();
     expect([env.status.at(-1), focused, env.hub]).toEqual([t('acc.bad-pass'), 'cwpass', []]);
     expect(cell.has('void.nick')).toBe(false);
+  });
+
+  it.each(['click', 'enter'])(
+    'сохранённая сессия не пускает с пустым паролем через %s',
+    async (via) => {
+      const { env } = await bootAccounts();
+      saveSession(localStorage, BASE, { login: 'Orion', token: 'jwt-cached' });
+      el('cwnick').value = 'Orion';
+      el('cwpass').value = '';
+      if (via === 'click') click('cwgo');
+      else enter('cwpass');
+      await settle();
+      expect([env.status.at(-1), focused, env.hub, env.joins]).toEqual([
+        t('acc.login-pass.rule'),
+        'cwpass',
+        [],
+        [],
+      ]);
+      expect(posted('/auth/login')).toEqual([]);
+    },
+  );
+
+  it('сохранённая сессия не заменяет проверку неверного пароля', async () => {
+    const { acc, env } = await bootAccounts();
+    saveSession(localStorage, BASE, { login: 'Orion', token: 'jwt-cached' });
+    acc.pendingJoinAfterAuth.remember('m-7', 'p2', 'azure', ['sc-1']);
+    server['/auth/login'] = () => reply(401);
+    server['/auth/register'] = () => reply(409);
+    el('cwnick').value = 'Orion';
+    el('cwpass').value = 'wrong-pass';
+    click('cwgo');
+    await settle();
+    expect(posted('/auth/login')[0]?.body).toEqual({ login: 'Orion', password: 'wrong-pass' });
+    expect([env.status.at(-1), focused, env.hub, env.joins]).toEqual([
+      t('acc.bad-pass'),
+      'cwpass',
+      [],
+      [],
+    ]);
+  });
+
+  it('явный вход проверяет верный пароль и заменяет сохранённую сессию', async () => {
+    const { env } = await bootAccounts();
+    saveSession(localStorage, BASE, { login: 'Orion', token: 'jwt-cached' });
+    server['/auth/login'] = () => reply(200, { token: 'jwt-fresh' });
+    el('cwnick').value = 'Orion';
+    el('cwpass').value = 'secret-pass';
+    click('cwgo');
+    await settle();
+    expect(posted('/auth/login')[0]?.body).toEqual({ login: 'Orion', password: 'secret-pass' });
+    expect(readSession(localStorage, BASE)).toEqual({ login: 'Orion', token: 'jwt-fresh' });
+    expect(env.hub).toEqual([undefined]);
   });
 
   it('второй Enter, пока первый вход летит, второго запроса не шлёт', async () => {
