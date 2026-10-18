@@ -130,8 +130,10 @@ SIEM или DR из [security-operations-roadmap.md](security-operations-roadmap
 
 ### Метрики v1
 
-Имена ниже — проектируемый контракт, отсутствующие поля не считаются реализованными.
-Exporter должен валидировать вход и отдавать только allowlist, с timeout 2 с,
+Имена ниже — контракт v1; Game-часть реализована отдельным локальным
+[exporter](../deploy/observability/GAME-EXPORTER.md) в OBS-1.1, остальные источники
+включаются своими этапами. Отсутствующие поля не считаются реализованными.
+Exporter валидирует вход и отдаёт только allowlist, с timeout 2 с,
 scrape каждые 15 с, без параллельных одинаковых запросов и бесконечных retries.
 При ошибке — `source_up=0`, freshness stale и отсутствие свежих игровых значений;
 последний успешный ответ нельзя выдавать за текущий.
@@ -162,7 +164,8 @@ FPS/RTT — выборочные клиентские данные; показы
 **Cardinality:** labels только environment, стабильный instance, service, stream,
 ограниченные type/code/outcome и bucket; active build — один. Никаких actor,
 install, session, matchId, playerId, IP, URL с query, eventId или текста ошибки
-в Prometheus labels. Неизвестное значение → `other` и отдельный счётчик.
+в Prometheus labels. Неизвестный reject code → `other`; неизвестный action type
+отбрасывается со счётчиком отклонённых рядов, не публикуя сам ключ.
 Стартовый бюджет всего стенда — не более 25 000 активных series; лимиты scrape,
 длина ответа и max samples заданы и проверены. Ротация build не создаёт
 неограниченный каталог версий в exporter.
@@ -359,12 +362,18 @@ allowlist проектируемого technical stream. **Готово, ког�
 проверены, повторный ingest не возвращает удалённое. PTM-3.1 отмечается готовым
 только при выполнении его полного критерия, не за один Loki TTL.
 
-### OBS-1.1 · Game exporter и процессные метрики `[srv][ops]` ⏳ — M
+### OBS-1.1 · Game exporter и процессные метрики `[srv][ops]` ✅ — M
 
 Существующие JSON → allowlist Prometheus; отдельные source_up/freshness, bounded
 scrape, reset semantics и units. **Готово, когда:** fixture и живой production
 entrypoint дают известные gauges/counters; schema drift, timeout, рестарт
 Game/exporter и пропущенный endpoint не дают ложных нулей или двойного счёта.
+**Сделано 2026-10-18:** standalone loopback-only Node collector
+`deploy/observability/game-exporter.mjs`, фиксированные четыре sources, 2 с/64 KiB,
+single-flight, ≤5000 samples/1 MiB, allowlist и caps labels, без offsets/cache.
+Fixture и живой production bundle с WS join/остановкой/рестартом покрыты тестами.
+[Запуск и границы](../deploy/observability/GAME-EXPORTER.md): Compose wiring,
+metrics-only credential и приёмка реального VPS остаются отдельными работами.
 
 ### OBS-1.2 · Хост, БД и backup health `[ops]` 🔒(OBS-0.2) — S
 
@@ -373,7 +382,7 @@ backup/restore/контейнеров. **Готово, когда:** прове�
 отражаются в числах; missing marker виден; мониторинговые роли не меняют БД,
 не читают секреты/игровые таблицы и не дают Docker API в Grafana.
 
-### OBS-1.3 · Grafana и алерты первого выпуска `[ops][docs]` 🔒(OBS-1.1) — M
+### OBS-1.3 · Grafana и алерты первого выпуска `[ops][docs]` 🔒(OBS-1.2) — M
 
 Также требует OBS-0.2/1.2. Обзор/сервер/связь/ошибки, provenance, RU подписи,
 оконные rules/no-data, contact point, runbooks, dead-man. **Готово, когда:**
@@ -398,7 +407,7 @@ Game; отставание/потери видны, данные без секр
 результат; превышение бюджета отмечает отчёт incomplete. Сырые события
 не переносятся в новую БД только ради дашборда.
 
-### OBS-2.3 · Честные гистограммы и backlog `[srv]` 🔒(OBS-1.1) — M
+### OBS-2.3 · Честные гистограммы и backlog `[srv]` ⏳ — M
 
 Инструментировать вне ядра submit/broadcast, scheduler backlog и slow/dropped
 connections по существующим транспортным точкам, не угадывать их из summaries.
