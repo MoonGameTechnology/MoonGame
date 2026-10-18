@@ -7743,10 +7743,17 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 и [пассивный on-host baseline](reviews/2026-10-16-obs-0-1-baseline.md), bounded
 read-only CLI `deploy/observability/baseline.mjs`: любой конечный положительный
 timeScale сохраняется; отсутствие обязательной timing/size series делает source invalid.
-Принят SSH/local профиль с
-уведомлениями только в закрытом пульте. Grafana/node/DB exporters/Loki, lifecycle-очистка,
-нагрузочная ёмкость и внешние алерты этим не реализованы; следующие OBS-этапы
-остаются отдельными задачами.
+Принят SSH/local профиль с уведомлениями только в закрытом пульте.
+
+**OBS-0.2 (2026-10-18) готов:** opt-in `deploy/docker-compose.observability.yml`
+поднимает закрытые Grafana/Prometheus/Loki/Alloy, только Grafana127.0.0.1:3000.
+Private file secret, non-root/read-only/caps/limits, HTTP probes, provisioning,
+digest pins и CI Trivy/KICS. `deploy/observability/stack.mjs` — доверенный root CLI
+с allowlist четырёх service и fail-closed disk guard timer; Game/DB не меняет.
+Контейнерный smoke подтверждает auth/header/proxy/write/Viewer запреты и restart
+persistence. [Runbook](../deploy/observability/README.md): Game/host/DB targets,
+дашборды/алерты, очищенный Loki ingest, root/systemd rollout на VPS и 24h soak
+ещё не приняты; это не полная приёмка OPS-0.2/SE-8.3.
 
 **OBS-1.1 (2026-10-18) готов:** отдельный [Game exporter](../deploy/observability/GAME-EXPORTER.md)
 на Node, listener 127.0.0.1:9108 и только loopback Game sources; четыре фиксированных

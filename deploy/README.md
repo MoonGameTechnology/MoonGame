@@ -2,6 +2,9 @@
 
 Полный пакет скриптов и документации для однокликовой установки игрового сервера на Ubuntu.
 
+Закрытый opt-in Grafana/Prometheus/Loki/Alloy для плейтестов:
+[мониторинг через SSH](observability/README.md).
+
 Разделение ролей БД, отдельные миграции, ротация JWT и security-алерты:
 [контролируемое внедрение](../docs/security/zero-trust-rollout.md).
 

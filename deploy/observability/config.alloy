@@ -1,0 +1,5 @@
+// OBS-0.2 bootstrap: no file discovery, Docker socket, Game JSONL or Loki writer.
+// Technical-stream ingestion requires OBS-0.3 redaction and OBS-2.1 acceptance.
+logging {
+  level = "warn"
+}

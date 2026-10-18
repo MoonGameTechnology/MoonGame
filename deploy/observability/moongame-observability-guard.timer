@@ -1,0 +1,11 @@
+[Unit]
+Description=Check MoonGame observability disk budgets every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=moongame-observability-guard.service
+
+[Install]
+WantedBy=timers.target

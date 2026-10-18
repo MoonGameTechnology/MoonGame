@@ -1,0 +1,19 @@
+[Unit]
+Description=MoonGame observability disk budget guard
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+# Change this path if the checkout lives elsewhere. It must match stack.mjs up.
+ExecStart=/usr/bin/node /opt/moongame/deploy/observability/stack.mjs guard --state-dir /var/lib/moongame-observability
+TimeoutStartSec=150
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/moongame-observability
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+UMask=0077

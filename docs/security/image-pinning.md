@@ -154,7 +154,8 @@ SEC-35) зовут его одинаково, поэтому при бампе �
 
 ## Сторонние образы прода (`deploy/docker-compose*.yml`)
 
-Прод — это не только наш образ: рядом крутятся БД и (на публичном хосте) TLS-прокси.
+Прод — это не только наш образ: рядом крутятся БД и (на публичном хосте) TLS-прокси;
+OBS-0.2 добавляет четыре opt-in образа закрытого мониторинга.
 Их пины и обновление — здесь; их CVE каждую неделю проверяет джоба `trivy-deps`
 (`security.yml`), которая читает ссылки **прямо из compose-файлов**, поэтому бамп
 дайджеста автоматически меняет и то, что сканируется.
@@ -162,6 +163,15 @@ SEC-35) зовут его одинаково, поэтому при бампе �
 | Образ | Дайджест | Снят | Файл |
 |-------|----------|------|------|
 | `postgres:16-alpine` | `sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea` | 2026-09-26 (апстрим пересобрал тег 2026-09-21) | `docker-compose.yml` |
+| `grafana/grafana:13.2.4` | `sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f` | 2026-10-18 | `docker-compose.observability.yml` |
+| `prom/prometheus:v3.13.4` | `sha256:87861b8cf91579109319ebc300f3f1060e6da9c05d6ae8ad15a20c879e84e32e` | 2026-10-18 | `docker-compose.observability.yml`; `PROBE_IMAGE` в `observability/stack.mjs` |
+| `grafana/loki:3.7.8` | `sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193` | 2026-10-18 | `docker-compose.observability.yml` |
+| `grafana/alloy:v1.20.1` | `sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f` | 2026-10-18 | `docker-compose.observability.yml` |
+
+Новые OBS refs включены в оба прохода `trivy-deps` (freshness и scan), а две
+effective monitoring Compose-комбинации — в KICS. Лицензии, проверка probe при
+бампе и локальный smoke описаны в [runbook](../../deploy/observability/README.md).
+Это не подпись наших образов: `verify-image.sh` не применяется к upstream refs.
 
 _Про postgres: 2026-09-13 (SEC-40) пин был актуален, а `libuuid 2.42.1-r0` и
 `libcrypto3/libssl3 3.5.7-r0` в отчёте `trivy-deps` ждали пересборки апстрима — перепин их
