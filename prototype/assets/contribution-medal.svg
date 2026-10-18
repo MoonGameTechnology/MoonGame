@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 240" fill="none">
+  <defs>
+    <linearGradient id="ribbon" x1="45" y1="18" x2="135" y2="92" gradientUnits="userSpaceOnUse"><stop stop-color="#153744"/><stop offset=".48" stop-color="#358d93"/><stop offset=".55" stop-color="#1a626d"/><stop offset="1" stop-color="#0d2937"/></linearGradient>
+    <linearGradient id="bronze" x1="42" y1="86" x2="132" y2="213" gradientUnits="userSpaceOnUse"><stop stop-color="#ffdf9f"/><stop offset=".22" stop-color="#ba7d45"/><stop offset=".49" stop-color="#f4c984"/><stop offset=".72" stop-color="#86502b"/><stop offset="1" stop-color="#dca463"/></linearGradient>
+    <radialGradient id="enamel"><stop stop-color="#24515e"/><stop offset="1" stop-color="#071c2b"/></radialGradient>
+    <filter id="shadow" x="-30%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity=".45"/></filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M48 14h84v55L90 94 48 69z" fill="url(#ribbon)" stroke="#071c29" stroke-width="3"/>
+    <path d="M56 16h6v58l-6-4zm62 0h6v54l-6 4z" fill="#dcb77a"/>
+    <path d="M79 16h6v70l-6-4zm16 0h6v66l-6 4z" fill="#61c3bf" opacity=".8"/>
+    <path d="M46 16h88v5H46z" fill="url(#bronze)"/>
+    <rect x="66" y="29" width="48" height="21" rx="3" fill="url(#bronze)" stroke="#e9c998"/>
+    <path d="M79 34v11m11-11v11m11-11v11" stroke="#473524" stroke-width="3"/>
+    <circle cx="90" cy="91" r="9" stroke="url(#bronze)" stroke-width="6"/>
+    <path d="m90 96 17 13 21 3 7 20 14 17-9 21-2 21-22 6-26 18-26-18-22-6-2-21-9-21 14-17 7-20 21-3z" fill="url(#bronze)" stroke="#f3cb8c" stroke-width="1.5"/>
+    <circle cx="90" cy="153" r="45" fill="url(#enamel)" stroke="#714726" stroke-width="3"/>
+    <circle cx="90" cy="153" r="39" stroke="#d4ac70" stroke-width="1" opacity=".65"/>
+    <path d="M77 185c-19-7-28-24-23-43m49 43c19-7 28-24 23-43" stroke="url(#bronze)" stroke-width="2"/>
+    <g fill="url(#bronze)">
+      <path d="M57 167c-10-2-12-9-11-14 9 2 11 8 11 14zm6 10c-10 2-15-4-16-9 10-1 14 3 16 9zm8 7c-8 6-15 3-18-1 8-6 14-4 18 1zm52-17c10-2 12-9 11-14-9 2-11 8-11 14zm-6 10c10 2 15-4 16-9-10-1-14 3-16 9zm-8 7c8 6 15 3 18-1-8-6-14-4-18 1z"/>
+      <path d="m90 121 7 21 22 1-18 13 6 21-17-13-17 13 6-21-18-13 22-1z"/>
+    </g>
+    <path d="m90 133 4 14 14 1-12 8 4 13-10-8-10 8 4-13-12-8 14-1z" fill="#f6dda8"/>
+    <path d="M73 118c-9 7-14 17-14 27" stroke="#fff0c6" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+    <path d="M78 196h24" stroke="#f5d6a4" stroke-width="2"/>
+  </g>
+</svg>

@@ -103,7 +103,7 @@ describe('profile tabs, collection order and save bar (UIX-15.3)', () => {
       (m) => m[1],
     );
     expect(order[0]).toBe('service');
-    expect(order).toHaveLength(12);
+    expect(order).toHaveLength(13);
     const card = /<button data-medal="service"[^>]*>/.exec(profileStudioHtml(veteran, state))?.[0];
     expect(card).toContain('--p:25%'); // 25 of the 100 matches for grade II
     expect(card).not.toContain('locked');

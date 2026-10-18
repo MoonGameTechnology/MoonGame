@@ -592,6 +592,8 @@ const server = createMultiplayerServer({
           // "an empty arsenal" never exists. Idempotent end to end (deterministic
           // item ids + first-write-wins grant), so a crashed grant re-runs safely.
           onRegistered: async (accountId) => {
+            try { await stores.registrationRewards.ensure(accountId); }
+            catch { process.stderr.write(`registration reward deferred for ${accountId}\n`); }
             try {
                 await grantStarterArsenal(
                   stores.arsenalStore,
@@ -631,6 +633,7 @@ const server = createMultiplayerServer({
           });
             registerProfileApi(scope, {
               profiles: stores.profileStore,
+              registrationRewards: stores.registrationRewards,
               users: stores.userStore,
               commanders: stores.commanderStore,
               identify,

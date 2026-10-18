@@ -147,6 +147,8 @@ export interface CommanderStore {
 /** A stored account: identity for the login+password authentication (SE-1.x). */
 export interface UserRecord {
   userId: string;
+  /** Durable eligibility; absent/false for accounts predating the registration reward. */
+  registrationReward?: boolean;
   /** The login as the user typed it at registration (display form). Uniqueness is
    *  CASE-INSENSITIVE — `Vasya` and `vasya` are the same account. */
   login: string;
@@ -166,7 +168,8 @@ export interface UserRecord {
  *  `email` for recovery). */
 export interface UserStore {
   /** Atomically disable the account and queue erasure, guarded against password/session races. */
-  requestDeletion?(user: UserRecord): Promise<string | null>;
+  deletionStatus?(accountId: string, requestId: string): Promise<boolean>;
+  requestDeletion?(user: UserRecord, requestId?: string): Promise<string | null>;
   /** Create an account; fail-secure duplicate handling: an existing login (any case)
    *  → `E_LOGIN_TAKEN`, never an overwrite. `email` (optional) enables password recovery;
    *  it is stored lower-cased and rejected as `E_EMAIL_TAKEN` if already in use. */

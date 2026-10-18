@@ -6,8 +6,8 @@ global:
     environment: playtest
     instance: game-1
 
-# Bootstrap self-observation only. Game/node/DB targets are enabled by later OBS
-# bricks; absence of a collector must not be presented as a healthy Game.
+# The observer target is empty until the optional host-side bridge is enabled.
+# Dashboards gate its samples on an explicit <=45s producer timestamp.
 scrape_configs:
   - job_name: prometheus
     sample_limit: 5000
@@ -16,6 +16,8 @@ scrape_configs:
       - targets: ['localhost:9090']
         labels:
           service: prometheus
+          environment: playtest
+          instance: game-1
   - job_name: alloy
     sample_limit: 5000
     body_size_limit: 1MB
@@ -23,3 +25,19 @@ scrape_configs:
       - targets: ['obs-alloy:12345']
         labels:
           service: alloy
+          environment: playtest
+          instance: game-1
+  - job_name: observer
+    metrics_path: /api/v0/component/prometheus.exporter.unix.host/metrics
+    sample_limit: 5000
+    body_size_limit: 1MB
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'moongame_.*|node_textfile_scrape_error'
+        action: keep
+    static_configs:
+      - targets: ['obs-alloy:12345']
+        labels:
+          service: observer
+          environment: playtest
+          instance: game-1

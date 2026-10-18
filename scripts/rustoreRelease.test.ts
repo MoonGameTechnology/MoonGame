@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { it, expect } from 'vitest';
 
 // Import the actual build script through Node, as .mjs sits outside TS project roots.
@@ -10,6 +13,7 @@ const run = (source: string) =>
   });
 it('rejects incomplete release settings and escaping/rollback inputs', () => {
   const config = {
+    commerceMode: 'disabled',
     appId: 'org.moongame.rustore',
     versionCode: 2,
     previousVersionCode: 1,
@@ -29,6 +33,8 @@ it('rejects incomplete release settings and escaping/rollback inputs', () => {
     );
   expect(() => invoke(config)).not.toThrow();
   for (const patch of [
+    { commerceMode: 'enabled' },
+    { commerceMode: undefined },
     { versionCode: 1 },
     { appId: 'com.voiddominion.player' },
     { server: 'http://game.example.org' },
@@ -58,4 +64,31 @@ it('bundles reviewed policy as inert text and rejects placeholders/hash mismatch
       `import {policyDocument} from './mobile/rustore-config.mjs'; policyDocument(${JSON.stringify(text)}, '${'f'.repeat(64)}');`,
     ),
   ).toThrow();
+});
+
+it('verifies a player bundle larger than the default child-process output buffer', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'rustore-apk-'));
+  const bin = join(dir, 'bin'); mkdirSync(bin);
+  const cert = 'b'.repeat(64);
+  const config = {
+    commerceMode: 'disabled', appId: 'org.moongame.rustore', versionCode: 2, previousVersionCode: 1,
+    versionName: '1.0', server: 'https://game.example.org', privacyUrl: 'https://game.example.org/privacy.txt',
+    policySha256: 'a'.repeat(64), certificateSha256: cert, privacyEvidenceSha256: 'c'.repeat(64),
+    erasureRestoreDrillSha256: 'd'.repeat(64), approvedBy: 'Release reviewer', reviewedAt: new Date().toISOString(),
+  };
+  const script = (name: string, source: string): string => {
+    const path = join(bin, name);
+    writeFileSync(path, '#!/usr/bin/env node\n' + source, { mode: 0o700 }); return path;
+  };
+  const aapt = script('aapt', `const kind=process.argv[3]; console.log(kind==='badging' ? "package: name='org.moongame.rustore' versionCode='2' versionName='1.0'" : kind==='permissions' ? "uses-permission: name='android.permission.INTERNET'" : ['debuggable','allowBackup','usesCleartextTraffic'].map(n=>'android:'+n+'=(type 0x12)0x0').join('\\n'));`);
+  const signer = script('apksigner', `console.log('Signer #1 certificate SHA-256 digest: ${cert}');`);
+  script('unzip', `process.stdout.write(process.argv[4].endsWith('index.html') ? 'x'.repeat(20*1024*1024)+'"channel":"rustore","privacyUrl":"privacy.html"' : "default-src 'none'");`);
+  const apk = join(dir, 'candidate.apk'); const configFile = join(dir, 'config.json');
+  writeFileSync(apk, 'synthetic APK fixture'); writeFileSync(configFile, JSON.stringify(config));
+  try {
+    execFileSync(process.execPath, ['mobile/verify-rustore.mjs', apk], { env: {
+      ...process.env, PATH: `${bin}:${process.env.PATH}`, AAPT: aapt, APKSIGNER: signer, RUSTORE_CONFIG_FILE: configFile,
+    }, stdio: 'pipe' });
+    expect(JSON.parse(readFileSync(apk + '.verification.json', 'utf8'))).toMatchObject({ certificateSha256: cert, versionCode: 2 });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

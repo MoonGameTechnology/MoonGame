@@ -57,6 +57,7 @@ const PERSONAL_ROWS = [
   'DELETE FROM player_profiles WHERE account_id=$1',
   'DELETE FROM profile_progress WHERE account_id=$1',
   'DELETE FROM profile_credits WHERE account_id=$1',
+  'DELETE FROM registration_rewards WHERE account_id=$1',
   'DELETE FROM commander_xp WHERE account_id=$1',
   'DELETE FROM medals WHERE account_id=$1',
   'DELETE FROM player_ready WHERE account_id=$1',
@@ -69,7 +70,8 @@ const PERSONAL_ROWS = [
   'DELETE FROM meta_market_ledger WHERE account_id=$1',
   'DELETE FROM meta_economy_accounts WHERE account_id=$1',
   'DELETE FROM meta_market_receipts WHERE account_id=$1',
-  'DELETE FROM meta_economy_receipts WHERE position($1 in receipt_key)>0',
+  'DELETE FROM meta_economy_receipts WHERE account_ids=ARRAY[$1]::text[]',
+  'UPDATE meta_economy_receipts SET account_ids=array_remove(account_ids,$1) WHERE $1=ANY(account_ids)',
   'DELETE FROM drop_claims WHERE account_id=$1',
   'DELETE FROM drop_meta WHERE account_id=$1',
 ] as const;
@@ -125,6 +127,8 @@ export async function eraseAccountDatabase(pool: Pool, subject: ErasureSubject):
   const db = await pool.connect();
   try {
     await requireOfflineDatabase(db);
+    const legacy = await db.query('SELECT 1 FROM meta_economy_receipts WHERE account_ids IS NULL LIMIT 1');
+    if (legacy.rowCount) throw Error('E_ERASURE_LEGACY_RECEIPTS');
     await db.query('BEGIN');
     await db.query("SET LOCAL lock_timeout='5s'");
     await db.query("SET LOCAL statement_timeout='120s'");

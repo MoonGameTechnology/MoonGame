@@ -1,5 +1,13 @@
-// OBS-0.2 bootstrap: no file discovery, Docker socket, Game JSONL or Loki writer.
+// No Docker socket, Game JSONL, environment or Loki writer. The optional host
+// bridge writes only allowlisted scalars; an empty directory means no data.
 // Technical-stream ingestion requires OBS-0.3 redaction and OBS-2.1 acceptance.
 logging {
   level = "warn"
+}
+
+prometheus.exporter.unix "host" {
+  set_collectors = ["textfile"]
+  textfile {
+    directory = "/run/moongame-metrics"
+  }
 }

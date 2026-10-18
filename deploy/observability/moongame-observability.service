@@ -1,0 +1,18 @@
+[Unit]
+Description=MoonGame private observability stack (VPS profile)
+After=moongame-docker.service moongame-observer.service moongame-observability-guard.service
+Requires=moongame-docker.service
+Wants=moongame-observer.service moongame-observability-guard.timer
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+EnvironmentFile=/etc/moongame-observability/stack.env
+ExecStart=/usr/bin/node /opt/moongame-ops/deploy/observability/stack.mjs up
+ExecStop=/usr/bin/node /opt/moongame-ops/deploy/observability/stack.mjs stop
+TimeoutStartSec=420
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

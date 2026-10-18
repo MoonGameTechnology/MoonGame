@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import Fastify from 'fastify';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, lstat, chown, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { registerAuthApi, sessionFingerprint } from './authApi';
@@ -10,7 +10,8 @@ import { MemoryUserStore } from './store/memory';
 import { migrate, PostgresUserStore } from './store/postgres';
 import { hashPassword } from './password';
 import { eraseAccountDatabase, scrubPersonalJson, type ErasureSubject } from './accountErasure';
-import { runAccountErasure, eraseAccountLogs } from './accountErasureWorker';
+import { runAccountErasure, eraseAccountLogs, durableReplace, validateErasureConfiguration } from './accountErasureWorker';
+import { PostgresMetaEconomyStore } from './metaEconomyStore';
 import { analyticsActor } from './analyticsActor';
 
 const subject: ErasureSubject = {
@@ -107,12 +108,15 @@ it('requires the current password, explicit confirmation and a durable queue bef
     expect(await users.findById(made.userId)).not.toBeNull();
     expect(revoked).not.toHaveBeenCalled();
     enqueue.mockRestore();
-    const response = await send({ password, confirm: 'DELETE' });
+    const requestId = randomUUID();
+    const response = await send({ password, confirm: 'DELETE', requestId });
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({ status: 'pending' });
     expect(response.headers['cache-control']).toBe('no-store');
     expect(await users.findById(made.userId)).toBeNull();
     expect(revoked).toHaveBeenCalledWith(made.userId);
+    expect((await send({ password, confirm: 'DELETE', requestId })).json()).toEqual({ status: 'pending', requestId });
+    expect((await send({ password, confirm: 'DELETE', requestId: randomUUID() })).statusCode).toBe(401);
     expect((await send({ password, confirm: 'DELETE' })).statusCode).toBe(401);
   } finally {
     await app.close();
@@ -139,7 +143,14 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
   });
   afterAll(async () => {
     await Promise.all([game?.end(), corporations?.end()]);
-    for (const name of names) await admin?.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+    for (const name of names) {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const live = await admin.query('SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1', [name]);
+        if (live.rows[0].n === 0) break;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+    }
     await admin?.end();
   });
   it('atomically disables sessions, erases both stores, preserves other players and replays after restore', async () => {
@@ -150,6 +161,7 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
     const record = await store.findById(made.userId);
     if (!record) throw Error('fixture');
     const id = made.userId;
+    await game.query('INSERT INTO registration_rewards (account_id, xp) VALUES ($1, 25)', [id]);
     for (const pool of [game, corporations]) {
       await pool.query('INSERT INTO player_profiles VALUES($1,$2)', [id, { portrait: 'test' }]);
       await pool.query('INSERT INTO meta_wallets VALUES($1,42)', [id]);
@@ -168,6 +180,8 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
         [id],
       );
     }
+    await new PostgresMetaEconomyStore(game).transaction([id], tx => tx.saveReceipt('meta:hashed-opaque-key', 'opaque-fingerprint', { ok: true }));
+    await new PostgresMetaEconomyStore(game).transaction([id, 'other'], tx => tx.saveReceipt('meta:shared-opaque-key', 'shared-fingerprint', { accountId: id, other: 'other' }));
     const request = await store.requestDeletion(record);
     expect(request).toBeTruthy();
     expect(await store.findById(id)).toBeNull();
@@ -177,7 +191,7 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
     const damaged = join(logs, 'client-broken.jsonl');
     await writeFile(damaged, '{"partial":', { mode: 0o600 });
     await expect(runAccountErasure(options)).rejects.toThrow('E_ERASURE_LOG_TRUNCATED');
-    expect(await readFile(ledger, 'utf8')).toContain(id);
+    expect(await readFile(ledger, 'utf8')).toBe('[]'); // rejected during validation before mutation
     for (const pool of [game, corporations])
       expect((await pool.query('SELECT required FROM account_erasure_guard')).rows[0].required).toBe(true);
     expect((await game.query('SELECT completed_at FROM account_deletions')).rows[0].completed_at).toBeNull();
@@ -201,9 +215,12 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
         ticket_hash: null,
       });
     }
+    expect((await game.query('SELECT * FROM registration_rewards WHERE account_id=$1', [id])).rowCount).toBe(0);
     expect(
       (await game.query('SELECT completed_at FROM account_deletions')).rows[0].completed_at,
     ).toBeTruthy();
+    expect((await game.query("SELECT * FROM meta_economy_receipts WHERE receipt_key='meta:hashed-opaque-key'")).rowCount).toBe(0);
+    expect((await game.query("SELECT account_ids FROM meta_economy_receipts WHERE receipt_key='meta:shared-opaque-key'")).rows[0].account_ids).toEqual(['other']);
     expect(await store.createUser('ACTIVE', 'different-hash')).toEqual({ ok: false, code: 'E_LOGIN_TAKEN' });
     expect(await store.createUser('newpilot', 'different-hash', subject.email)).toMatchObject({ ok: true });
     expect(await runAccountErasure(options)).toBe(0);
@@ -240,4 +257,23 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
       await live.end();
     }
   });
+});
+
+it('preserves journal ownership and removes ledger temporaries after failed replacement', async () => {
+  const { logs, ledger } = await fixture();
+  const file = join(logs, 'events.jsonl');
+  await writeFile(file, '{"event":"other"}\n', { mode: 0o600 });
+  if (process.getuid?.() === 0) await chown(file, 65532, 65532);
+  const before = await lstat(file);
+  await eraseAccountLogs(logs, subject, [salt]);
+  const after = await lstat(file);
+  expect([after.uid, after.gid, after.mode & 0o777]).toEqual([before.uid, before.gid, 0o600]);
+  // Renaming a regular temp over a directory must fail and clean up the temp.
+  const directory = join(logs, 'cannot-replace'); await mkdir(directory);
+  await expect(durableReplace(directory, 'private subject')).rejects.toThrow();
+  expect((await readdir(logs)).some(name => name.endsWith('.tmp'))).toBe(false);
+  await rm(directory, { recursive: true });
+  await expect(validateErasureConfiguration({ ledger, logDir: logs, analyticsSalts: [] })).rejects.toThrow('E_ERASURE_SALT_HISTORY');
+  await writeFile(file, '{"broken":', { mode: 0o600 });
+  await expect(validateErasureConfiguration({ ledger, logDir: logs, analyticsSalts: [salt] })).rejects.toThrow('E_ERASURE_LOG_TRUNCATED');
 });

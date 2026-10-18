@@ -340,6 +340,8 @@ const SCHEMA_SQL = `
       fingerprint text NOT NULL,
       response jsonb NOT NULL
     );
+    ALTER TABLE meta_economy_receipts ADD COLUMN IF NOT EXISTS account_ids text[];
+    CREATE INDEX IF NOT EXISTS meta_economy_receipts_accounts_idx ON meta_economy_receipts USING gin(account_ids);
     CREATE TABLE IF NOT EXISTS meta_material_listings (
       id text PRIMARY KEY,
       seller_id text NOT NULL,
@@ -405,6 +407,13 @@ const SCHEMA_SQL = `
       match_id text NOT NULL,
       account_id text NOT NULL,
       PRIMARY KEY (match_id, account_id)
+    );
+    -- Existing accounts stay ineligible; only the new registration writer opts in.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_reward boolean NOT NULL DEFAULT false;
+    CREATE TABLE IF NOT EXISTS registration_rewards (
+      account_id text PRIMARY KEY REFERENCES users(id),
+      xp integer NOT NULL CHECK (xp >= 0),
+      accepted boolean NOT NULL DEFAULT false
     );
 
     -- ONB-5: one Web Push subscription per account (a fresh subscribe replaces the
@@ -760,8 +769,11 @@ export class PostgresCommanderStore implements CommanderStore {
 export class PostgresUserStore implements UserStore {
   constructor(private readonly pool: Pool) {}
 
-  async requestDeletion(user: UserRecord): Promise<string | null> {
-    const requestId = randomUUID();
+  async deletionStatus(accountId: string, requestId: string): Promise<boolean> {
+    const result = await this.pool.query('SELECT 1 FROM account_deletions WHERE account_id=$1 AND request_id=$2', [accountId, requestId]);
+    return Boolean(result.rowCount);
+  }
+  async requestDeletion(user: UserRecord, requestId: string = randomUUID()): Promise<string | null> {
     const result = await this.pool.query<{ request_id: string }>(`
       WITH disabled AS (
         UPDATE users SET deletion_requested_at = now(), session_nonce = $4
@@ -791,7 +803,7 @@ export class PostgresUserStore implements UserStore {
       );
       if (reserved.rowCount) return { ok: false, code: 'E_LOGIN_TAKEN' };
       await this.pool.query(
-        `INSERT INTO users (id, login, pass_hash, email) VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO users (id, login, pass_hash, email, registration_reward) VALUES ($1, $2, $3, $4, true)`,
         [userId, login, passHash, email?.toLowerCase() ?? null],
       );
       return { ok: true, userId };
@@ -810,7 +822,7 @@ export class PostgresUserStore implements UserStore {
   // `no-sql-string-interpolation` guard stays satisfied). All three share `rowToUser`.
   async findUser(login: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE lower(login) = lower($1) AND deletion_requested_at IS NULL`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE lower(login) = lower($1) AND deletion_requested_at IS NULL`,
       [login],
     );
     return rowToUser(r.rows[0]);
@@ -818,7 +830,7 @@ export class PostgresUserStore implements UserStore {
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE email IS NOT NULL AND lower(email) = lower($1) AND deletion_requested_at IS NULL`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE email IS NOT NULL AND lower(email) = lower($1) AND deletion_requested_at IS NULL`,
       [email],
     );
     return rowToUser(r.rows[0]);
@@ -826,7 +838,7 @@ export class PostgresUserStore implements UserStore {
 
   async findById(userId: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE id = $1 AND deletion_requested_at IS NULL`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE id = $1 AND deletion_requested_at IS NULL`,
       [userId],
     );
     return rowToUser(r.rows[0]);
@@ -865,6 +877,7 @@ interface UserRow {
   pass_hash: string;
   session_nonce: string;
   email: string | null;
+  registration_reward: boolean;
 }
 
 function rowToUser(row: UserRow | undefined): UserRecord | null {
@@ -874,6 +887,7 @@ function rowToUser(row: UserRow | undefined): UserRecord | null {
     login: row.login,
     passHash: row.pass_hash,
     ...(row.session_nonce ? { sessionNonce: row.session_nonce } : {}),
+    registrationReward: row.registration_reward,
     ...(row.email ? { email: row.email } : {}),
   };
 }

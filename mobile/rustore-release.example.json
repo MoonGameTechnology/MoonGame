@@ -10,5 +10,6 @@
   "reviewedAt": "",
   "approvedBy": "",
   "privacyEvidenceSha256": "",
-  "erasureRestoreDrillSha256": ""
+  "erasureRestoreDrillSha256": "",
+  "commerceMode": ""
 }

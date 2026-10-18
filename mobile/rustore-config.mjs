@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 export function validateRelease(config, now = Date.now()) {
   const fail = () => { throw Error('E_RUSTORE_RELEASE_CONFIG'); };
+  if (config?.commerceMode !== 'disabled') fail();
   if (!config || !/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){2,}$/.test(config.appId ?? '') ||
       ['com.voiddominion.prototype', 'com.voiddominion.player'].includes(config.appId)) fail();
   if (!Number.isSafeInteger(config.versionCode) || config.versionCode <= 0 || config.versionCode > 2100000000 ||

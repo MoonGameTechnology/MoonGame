@@ -3,9 +3,11 @@
 Opt-in Grafana OSS, Prometheus, Loki и Alloy для одного VPS.
 [План](../../docs/playtest-observability-roadmap.md) и
 [контракт](../../docs/observability-contract-v1.md) задают границы.
-Это проверенная локально реализация, **не отчёт о запуске на игровом VPS**.
-Prometheus собирает только себя и Alloy. Game/host/DB wiring, дашборды,
-алерты и нагрузочная приёмка — следующие OBS-этапы. Alloy не читает файлы игры.
+Это bootstrap-реализация; первый VPS может включить отдельный
+[профиль HTTPS и host/Game wiring](VPS.md). По умолчанию Prometheus собирает
+себя, Alloy и пустой textfile target; provisioned обзор показывает «нет данных»,
+пока не включён host bridge. DB exporter, алерты и нагрузочная приёмка —
+следующие OBS-этапы. Alloy не читает файлы игры.
 Loki datasource отсутствует до query-only границы OBS-2.1: `editable:false`
 само по себе не запрещает запись через datasource proxy.
 
@@ -69,7 +71,8 @@ Anonymous, self-signup, auth-proxy/JWT, public dashboards, snapshots и уста
 плагинов отключены. Datasource разрешает только `obs-prometheus:9090`;
 admin/lifecycle/write API Prometheus не включены. Grafana OSS login не является MFA.
 3000 опубликован только на IPv4 loopback, 9090/3100/12345 не опубликованы.
-Не добавляйте их в Caddy/firewall; публичный HTTPS/MFA ingress — отдельный этап.
+Не добавляйте их в Caddy/firewall. Отдельный opt-in HTTPS ingress с клиентским
+сертификатом и Grafana login описан в [VPS.md](VPS.md).
 
 Смена bootstrap password файла **не меняет пароль существующей Grafana DB**.
 Ротируйте через интерфейс учётной записи или поддерживаемый admin reset CLI;
@@ -80,13 +83,13 @@ Viewer не имеет административных операций; нас
 
 | Service    | RAM cap |   CPU cap | Каталог / бюджет                     |
 | ---------- | ------: | --------: | ------------------------------------ |
-| Grafana    |  256MiB | 0.25 core | `grafana/`, 256MiB                   |
+| Grafana    |  512MiB | 1.00 core | `grafana/`, 256MiB                   |
 | Prometheus |  384MiB | 0.25 core | `prometheus/`, 2.5GiB; TSDB7d/1500MB |
 | Loki       |  384MiB | 0.25 core | `loki/`, 2GiB; compactor72h          |
-| Alloy      |  128MiB | 0.25 core | `alloy/`, 256MiB                     |
+| Alloy      |  256MiB | 0.50 core | `alloy/`, 256MiB                     |
 
 У каждого: non-root, read-only rootfs, capabilities dropped, no-new-privileges,
-128PID, tmpfs16MiB, logs2×5MiB. Общий RAM cap1152MiB; средний CPU<0.5core
+128PID, tmpfs16MiB, logs2×5MiB. Общий RAM cap1536MiB; средний CPU<0.5core
 ещё требует замера. Контейнеры не получают Docker socket, DB credentials и тома Game.
 Только доверенный root CLI использует Docker; HTTP endpoint управления нет.
 

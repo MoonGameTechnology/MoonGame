@@ -1,5 +1,5 @@
 import { t } from '../../localization/runtime';
-import { requestAccountDeletion } from './accountSession';
+import { requestAccountDeletion, sessionToken } from './accountSession';
 
 export function mountPrivacyLinks(): void {
   const url = (globalThis as { __BUILD__?: { privacyUrl?: string } }).__BUILD__?.privacyUrl;
@@ -26,10 +26,26 @@ export function mountPrivacyLinks(): void {
   }
 }
 
-export function mountAccountDeletion(base: () => string | null, accepted: () => void): void {
-  document.getElementById('hub-delete-account')?.addEventListener('click', () => {
+export function mountAccountDeletion(base: () => string | null, accepted: () => void, allowed: () => boolean = () => true): () => Promise<void> {
+  const button = document.getElementById('hub-delete-account');
+  let generation = 0;
+  const refresh = async (): Promise<void> => {
+    const current = ++generation;
+    if (button) button.hidden = true;
     const server = base();
-    if (!server) return;
+    if (!button || !allowed() || !server || !sessionToken(server)) return;
+    try {
+      const response = await fetch(`${server.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:').replace(/\/$/, '')}/auth/status`, { signal: AbortSignal.timeout(5000) });
+      const status = response.ok ? await response.json() as { enabled?: unknown; accountDeletion?: unknown } : null;
+      if (current === generation && server === base() && sessionToken(server) && allowed())
+        button.hidden = !(status?.enabled === true && status.accountDeletion === true);
+    } catch { /* Leave hidden until capability can be confirmed. */ }
+  };
+  if (button) button.hidden = true;
+  button?.addEventListener('click', () => {
+    if (button.hidden || !allowed()) return;
+    const server = base();
+    if (!server || !sessionToken(server)) return;
     const dialog = document.createElement('dialog');
     dialog.style.cssText =
       'max-width:32rem;width:90%;padding:1.5rem;color:inherit;background:var(--panel,#17202b);border:1px solid currentColor';
@@ -111,4 +127,5 @@ export function mountAccountDeletion(base: () => string | null, accepted: () => 
     dialog.showModal();
     password.focus();
   });
+  return refresh;
 }

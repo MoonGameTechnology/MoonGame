@@ -223,12 +223,16 @@ export class MemoryCommanderStore implements CommanderStore {
 export class MemoryUserStore implements UserStore {
   private readonly byLogin = new Map<string, UserRecord>();
 
-  requestDeletion(user: UserRecord): Promise<string | null> {
+  private readonly deletionRequests = new Map<string, string>();
+  deletionStatus(accountId: string, requestId: string): Promise<boolean> {
+    return Promise.resolve(this.deletionRequests.get(accountId) === requestId);
+  }
+  requestDeletion(user: UserRecord, requestId: string = randomUUID()): Promise<string | null> {
     const rec = this.byLogin.get(user.login.toLowerCase());
     if (!rec || rec.userId !== user.userId || rec.deletionRequestedAt ||
         rec.passHash !== user.passHash || rec.sessionNonce !== user.sessionNonce)
       return Promise.resolve(null);
-    const requestId = randomUUID();
+    this.deletionRequests.set(user.userId, requestId);
     rec.deletionRequestedAt = new Date().toISOString();
     rec.sessionNonce = requestId;
     return Promise.resolve(requestId);
@@ -246,7 +250,7 @@ export class MemoryUserStore implements UserStore {
     const mail = email?.toLowerCase();
     if (mail && this.byEmail(mail)) return Promise.resolve({ ok: false, code: 'E_EMAIL_TAKEN' });
     const userId = randomUUID();
-    this.byLogin.set(key, { userId, login, passHash, ...(mail ? { email: mail } : {}) });
+    this.byLogin.set(key, { userId, login, passHash, registrationReward: true, ...(mail ? { email: mail } : {}) });
     return Promise.resolve({ ok: true, userId });
   }
 

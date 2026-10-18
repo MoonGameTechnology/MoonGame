@@ -14,11 +14,20 @@ export const PROFILE_MEDALS = [
   { id: 'flawless', metric: 'intactWins', goals: [1, 10, 30] },
   { id: 'legend', metric: 'wins', goals: [100, 250, 500] },
   { id: 'explorer', metric: 'explored', goals: [100, 250, 500] },
+  { id: 'contribution', metric: 'registered', goals: [1] },
 ] as const;
 export type ProfileMedalId = (typeof PROFILE_MEDALS)[number]['id'];
 export type ProfileMetric = (typeof PROFILE_MEDALS)[number]['metric'];
 export type ProfileProgress = Partial<Record<ProfileMetric, number>>;
 export type MedalGrade = 1 | 2 | 3;
+/** Registration grants only class III; higher classes have no invented unlock rules. */
+export const REGISTRATION_REWARD = { medalId: 'contribution', grade: 3, xp: 25 } as const;
+export interface RegistrationReward {
+  medalId: 'contribution';
+  grade: 3;
+  xp: number;
+  accepted: boolean;
+}
 export interface ProfileAppearance {
   /** 1-based shipped asset index. Never an arbitrary image URL. */
   portrait: number;
@@ -36,9 +45,9 @@ export function defaultAppearance(): ProfileAppearance {
 export function medalGrade(id: ProfileMedalId, progress: ProfileProgress): MedalGrade | null {
   const medal = PROFILE_MEDALS.find((m) => m.id === id)!;
   const value = progress[medal.metric] ?? 0;
-  return value >= medal.goals[2]
+  return medal.goals[2] !== undefined && value >= medal.goals[2]
     ? 1
-    : value >= medal.goals[1]
+    : medal.goals[1] !== undefined && value >= medal.goals[1]
       ? 2
       : value >= medal.goals[0]
         ? 3

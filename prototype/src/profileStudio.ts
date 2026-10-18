@@ -7,7 +7,7 @@ import {
 import { tunicFit, profileMetricKey } from '../../decisions/playerProfile';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { PORTRAITS, MEDAL_ATLAS } from './profileArt';
+import { PORTRAITS, MEDAL_ATLAS, CONTRIBUTION_MEDAL } from './profileArt';
 
 export const gradeRoman = (grade: number): string => ['', 'I', 'II', 'III'][grade] ?? '';
 export const portraitName = (id: number): string => t(`profile.portrait.${id}`);
@@ -19,6 +19,7 @@ export function medalName(id: ProfileMedalId, profile: PlayerProfile): string {
   );
 }
 function emblem(id: ProfileMedalId, profile: PlayerProfile): string {
+  if (id === 'contribution') return `<span class="ps-medal" style="background-image:url('${CONTRIBUTION_MEDAL}');background-size:100% 100%" aria-hidden="true"></span>`;
   const index = PROFILE_MEDALS.findIndex((m) => m.id === id);
   return `<span class="ps-medal" style="background-image:url('${MEDAL_ATLAS}');background-position:${((index % 4) * 100) / 3}% ${Math.floor(index / 4) * 50}%" aria-hidden="true"><i>${gradeRoman(medalGrade(id, profile.progress) ?? 3)}</i></span>`;
 }
@@ -71,10 +72,11 @@ export function profileStudioHtml(profile: PlayerProfile, state: StudioState, ca
   const collection = `<h3>${t('profile.collection')}</h3><p>${t('profile.auto-grade')}</p><div class="ps-collection">${earnedFirst
     .map((m) => {
       const grade = medalGrade(m.id, profile.progress);
-      const target = grade === 1 ? m.goals[2] : m.goals[grade === 2 ? 2 : grade === 3 ? 1 : 0];
+      const next = grade === null ? m.goals[0] : grade === 3 ? m.goals[1] : grade === 2 ? m.goals[2] : undefined;
+      const target = next ?? m.goals[m.goals.length - 1]!;
       const progress = profile.progress[m.metric] ?? 0;
       const share = Math.min(100, Math.round((progress / target) * 100));
-      return `<button data-medal="${m.id}" ${disabled || grade === null ? 'disabled' : ''} class="${grade === null ? 'locked' : ''}" style="--p:${share}%" aria-pressed="${profile.slots[state.selected] === m.id}">${emblem(m.id, profile)}<span><b>${esc(medalName(m.id, profile))}</b><small>${t(profileMetricKey(m.metric))}</small><small>${progress} / ${target} · ${t(grade === 1 ? 'profile.highest' : grade === null ? 'profile.locked' : 'profile.next-grade')}</small></span></button>`;
+      return `<button data-medal="${m.id}" ${disabled || grade === null ? 'disabled' : ''} class="${grade === null ? 'locked' : ''}" style="--p:${share}%" aria-pressed="${profile.slots[state.selected] === m.id}">${emblem(m.id, profile)}<span><b>${esc(medalName(m.id, profile))}</b><small>${t(profileMetricKey(m.metric))}</small><small>${progress} / ${target} · ${t(grade === 1 ? 'profile.highest' : grade === null ? 'profile.locked' : next === undefined ? 'profile.awarded' : 'profile.next-grade')}</small></span></button>`;
     })
     .join('')}</div>`;
   const publicMedals = `<div class="ps-public-medals">${worn.length ? worn.map((id) => `<div>${emblem(id, profile)}<span>${esc(medalName(id, profile))}</span></div>`).join('') : `<p>${t('profile.no-worn')}</p>`}</div>`;

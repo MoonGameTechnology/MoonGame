@@ -13,7 +13,9 @@ for hook in "$ERASURE_STOP_HOOK" "$ERASURE_START_HOOK"; do
 done
 exec 9>"${STATE_DIR:-/var/lib/moongame}/autoupdate.lock"
 flock -n 9 || exit 0
-if node packages/server/account-erasure.mjs --pending; then
+marker="${STATE_DIR:-/var/lib/moongame}/account-erasure.pending"
+# A failed start must retry the entire maintenance/replay cycle, even with no queue.
+if [[ -e "$marker" ]] || node packages/server/account-erasure.mjs --pending; then
   :
 else
   result=$?
@@ -27,7 +29,7 @@ fi
 # NO restart trap: a failed erasure must stay in maintenance until retried.
 touch "${STATE_DIR:-/var/lib/moongame}/account-erasure.pending"
 "$ERASURE_STOP_HOOK"
-node packages/server/account-erasure.mjs
-rm -f "${STATE_DIR:-/var/lib/moongame}/account-erasure.pending"
+node packages/server/account-erasure.mjs --replay
 "$ERASURE_START_HOOK"
+rm -f "$marker"
 touch "${STATE_DIR:-/var/lib/moongame}/account-erasure.last-success"

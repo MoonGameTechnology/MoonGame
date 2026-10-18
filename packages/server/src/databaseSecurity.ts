@@ -41,6 +41,7 @@ export const APP_TABLES = [
   'player_profiles',
   'profile_progress',
   'profile_credits',
+  'registration_rewards',
   'push_subscriptions',
   'friend_edges',
 ] as const;
@@ -126,12 +127,19 @@ export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv)
       );
       if (revision[0]?.fingerprint !== schemaFingerprint()) throw new Error('E_DB_SCHEMA_REVISION');
       for (const table of APP_TABLES) {
+        const maintenance = table === 'account_erasure_guard' || table === 'account_deletions';
+        const required = table === 'account_erasure_guard' ? ['SELECT'] : table === 'account_deletions' ? ['SELECT', 'INSERT'] : ['SELECT','INSERT','UPDATE','DELETE'];
         const { rows: all } = await pool.query<{ ok: boolean }>(
           `SELECT bool_and(has_table_privilege(current_user, $1, privilege)) AS ok
-           FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS privilege`,
-          [`public.${table}`],
+           FROM unnest($2::text[]) AS privilege`,
+          [`public.${table}`, required],
         );
         if (!all[0]?.ok) throw new Error('E_DB_RUNTIME_ROLE');
+        if (maintenance) {
+          const forbidden = table === 'account_erasure_guard' ? 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER' : 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER';
+          const check = await pool.query<{ unsafe: boolean }>('SELECT has_table_privilege(current_user,$1,$2) AS unsafe', [`public.${table}`, forbidden]);
+          if (check.rows[0]?.unsafe) throw new Error('E_DB_RUNTIME_ROLE');
+        }
       }
     }
   } catch {
@@ -181,6 +189,10 @@ async function grantData(client: PoolClient): Promise<void> {
       DML,
     ]);
   }
+  // Queue submission and guard inspection are the only runtime maintenance capabilities.
+  await client.query('REVOKE ALL ON account_erasure_guard, account_deletions FROM vd_runtime');
+  await client.query('GRANT SELECT ON account_erasure_guard TO vd_runtime');
+  await client.query('GRANT SELECT, INSERT ON account_deletions TO vd_runtime');
   // Only sequences owned by our tables, never sequences belonging to another application.
   const { rows } = await client.query<{ name: string }>(
     `

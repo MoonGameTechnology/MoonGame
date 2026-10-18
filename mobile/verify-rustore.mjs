@@ -5,7 +5,7 @@ import { validateRelease } from './rustore-config.mjs';
 const config = validateRelease(JSON.parse(readFileSync(process.env.RUSTORE_CONFIG_FILE, 'utf8')));
 const apk = process.argv[2]; if (!apk) throw Error('E_RUSTORE_APK');
 const aapt = process.env.AAPT ?? 'aapt';
-const run = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' });
+const run = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const badging = run(aapt, ['dump', 'badging', apk]);
 if (!badging.includes(`package: name='${config.appId}' versionCode='${config.versionCode}' versionName='${config.versionName}'`) || badging.includes('application-debuggable')) throw Error('E_RUSTORE_IDENTITY');
 const permissions = [...run(aapt, ['dump', 'permissions', apk]).matchAll(/uses-permission(?:-sdk-23)?: name='([^']+)'/g)].map(m => m[1]);

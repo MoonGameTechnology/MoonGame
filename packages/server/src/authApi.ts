@@ -279,19 +279,26 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
       if (!deps.accountDeletionEnabled || !deps.users.requestDeletion)
         return reply.code(503).send({ error: 'E_DELETION_UNAVAILABLE' });
-      if (!closedInput(request.body, ['password', 'confirm']))
+      if (!closedInput(request.body, ['password', 'confirm', 'requestId']))
         return reply.code(400).send({ error: 'E_BAD_REQUEST' });
-      const body = request.body as { password?: unknown; confirm?: unknown };
+      const body = request.body as { password?: unknown; confirm?: unknown; requestId?: unknown };
       if (typeof body.password !== 'string' || !validLoginPassword(body.password) || body.confirm !== 'DELETE')
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      if (body.requestId !== undefined && (typeof body.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)))
         return reply.code(400).send({ error: 'E_BAD_REQUEST' });
       const header = request.headers.authorization;
       const verified = header?.startsWith('Bearer ') ? await verify(header.slice(7).trim()) : null;
+      // A signed original session plus the caller's unguessable request ID can
+      // acknowledge a committed deletion, but never revive the revoked session.
+      if (verified?.ok && typeof body.requestId === 'string' &&
+          await deps.users.deletionStatus?.(verified.claim.accountId, body.requestId))
+        return reply.code(202).send({ requestId: body.requestId, status: 'pending' });
       const who = verified?.ok ? await liveSession(verified.claim, deps.users) : null;
       const found = who ? await deps.users.findById(who.accountId) : null;
       const user = found ? { ...found } : null;
       if (!user || !(await verifyPassword(body.password as string, user.passHash)))
         return reply.code(401).send({ error: 'E_AUTH' });
-      const requestId = await deps.users.requestDeletion(user);
+      const requestId = await deps.users.requestDeletion(user, body.requestId as string | undefined);
       if (!requestId) return reply.code(409).send({ error: 'E_SESSION_CHANGED' });
       await deps.onSessionsRevoked?.(user.userId);
       // Accepted means queued, never a claim that all copies are already erased.

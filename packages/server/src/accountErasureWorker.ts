@@ -24,21 +24,21 @@ async function privateFile(path: string): Promise<void> {
     throw Error('E_ERASURE_FILE_MODE');
 }
 
-async function durableReplace(path: string, content: string): Promise<void> {
+export async function durableReplace(path: string, content: string): Promise<void> {
   const temp = `${path}.${randomUUID()}.tmp`;
-  const file = await open(temp, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+  const owner = await lstat(path);
   try {
-    await file.writeFile(content);
-    await file.sync();
+    const file = await open(temp, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+    try {
+      await file.chown(owner.uid, owner.gid);
+      await file.writeFile(content);
+      await file.sync();
+    } finally { await file.close(); }
+    await rename(temp, path);
+    const directory = await open(dirname(path), constants.O_RDONLY);
+    try { await directory.sync(); } finally { await directory.close(); }
   } finally {
-    await file.close();
-  }
-  await rename(temp, path);
-  const directory = await open(dirname(path), constants.O_RDONLY);
-  try {
-    await directory.sync();
-  } finally {
-    await directory.close();
+    await unlink(temp).catch(error => { if (error.code !== 'ENOENT') throw error; });
   }
 }
 
@@ -92,8 +92,10 @@ export async function eraseAccountLogs(
   }
   for (const path of paths) {
     const temp = `${path}.${randomUUID()}.tmp`;
+    const owner = await lstat(path);
     const file = await open(temp, 'wx', 0o600);
     try {
+      await file.chown(owner.uid, owner.gid);
       for await (const row of records(path)) {
         const raw = JSON.stringify(row);
         const ownSeat =
@@ -117,13 +119,14 @@ export async function eraseAccountLogs(
         await file.writeFile(`${JSON.stringify(row)}\n`);
       }
       await file.sync();
+      await file.close();
+      await rename(temp, path);
     } catch (error) {
       await unlink(temp).catch(() => undefined);
       throw error;
     } finally {
       await file.close();
     }
-    await rename(temp, path);
   }
   const directory = await open(dir, constants.O_RDONLY);
   try {
@@ -133,31 +136,12 @@ export async function eraseAccountLogs(
   }
 }
 
-/** Called under the deployment lock with BOTH runtime services stopped. The
- * external ledger survives DB restores. No credential or subject enters stdout. */
-export async function runAccountErasure(options: {
-  game: Pool;
-  corporations: Pool;
-  ledger: string;
-  logDir: string;
-  analyticsSalts: string[];
-  replay?: boolean;
-}): Promise<number> {
-  const { game, corporations, ledger, logDir, analyticsSalts } = options;
-  if (!analyticsSalts.length || analyticsSalts.some((s) => s.length < 32))
+export async function validateErasureConfiguration(options: {
+  ledger: string; logDir: string; analyticsSalts: string[];
+}): Promise<Tombstone[]> {
+  const { ledger, logDir, analyticsSalts } = options;
+  if (!Array.isArray(analyticsSalts) || !analyticsSalts.length || analyticsSalts.some(s => typeof s !== 'string' || s.length < 32))
     throw Error('E_ERASURE_SALT_HISTORY');
-  let replay = options.replay === true;
-  for (const pool of [game, corporations]) {
-    const db = await pool.connect();
-    try {
-      await requireOfflineDatabase(db);
-      const guard = await db.query<{ required: boolean }>('SELECT required FROM account_erasure_guard WHERE id=1');
-      if (typeof guard.rows[0]?.required !== 'boolean') throw Error('E_ERASURE_GUARD');
-      replay ||= guard.rows[0].required;
-    } finally {
-      db.release();
-    }
-  }
   // Provision an empty [] file explicitly. A missing ledger after restore is an
   // error; auto-creating it could resurrect every previously deleted account.
   const ledgerDir = await lstat(dirname(ledger));
@@ -182,17 +166,50 @@ export async function runAccountErasure(options: {
     )
   )
     throw Error('E_ERASURE_LEDGER');
-  const entries: Tombstone[] = parsed;
+  const logStat = await lstat(logDir);
+  if (!logStat.isDirectory() || logStat.isSymbolicLink() || logStat.mode & 0o077)
+    throw Error('E_ERASURE_LOG_DIRECTORY');
+  for (const name of await readdir(logDir)) {
+    if (!name.endsWith('.jsonl')) throw Error('E_ERASURE_LOG_INVENTORY');
+    const path = join(logDir, name);
+    await privateFile(path);
+    for await (const row of records(path)) void row;
+  }
+  return parsed as Tombstone[];
+}
+
+/** Called under the deployment lock with BOTH runtime services stopped. The
+ * external ledger survives DB restores. No credential or subject enters stdout. */
+export async function runAccountErasure(options: {
+  game: Pool;
+  corporations: Pool;
+  ledger: string;
+  logDir: string;
+  analyticsSalts: string[];
+  replay?: boolean;
+}): Promise<number> {
+  const { game, corporations, ledger, logDir, analyticsSalts } = options;
+  let replay = options.replay === true;
+  for (const pool of [game, corporations]) {
+    const db = await pool.connect();
+    try {
+      await requireOfflineDatabase(db);
+      const guard = await db.query<{ required: boolean }>('SELECT required FROM account_erasure_guard WHERE id=1');
+      if (typeof guard.rows[0]?.required !== 'boolean') throw Error('E_ERASURE_GUARD');
+      replay ||= guard.rows[0].required;
+    } finally {
+      db.release();
+    }
+  }
+  for (const pool of [game, corporations])
+    await pool.query('UPDATE account_erasure_guard SET required=true WHERE id=1');
+  const entries = await validateErasureConfiguration(options);
   const queued = await game.query<{ account_id: string }>(
     'SELECT account_id FROM account_deletions WHERE completed_at IS NULL ORDER BY requested_at',
   );
   for (const row of queued.rows)
     if (!entries.some((e) => e.accountId === row.account_id))
       entries.push({ accountId: row.account_id, replacement: `deleted:${randomUUID()}` });
-  // Persist maintenance in both databases before any destructive operation.
-  // Runtime startup must also stay blocked after a host/container restart.
-  for (const pool of [game, corporations])
-    await pool.query('UPDATE account_erasure_guard SET required=true WHERE id=1');
   let processed = 0;
   for (const entry of entries) {
     if (
