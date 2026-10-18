@@ -393,7 +393,9 @@ describe('REFM-241 — стык с main.ts', () => {
 
   it('кадр и слой «Назад» читают подготовку модуля', () => {
     expect(MAIN).toMatch(/const preparingMap = prepareEnteringMap\(\);/);
-    expect(MAIN).toMatch(/if \(mapPreparation\.active && mapPreparation\.ready && /);
+    expect(MAIN).toMatch(/mapPreparation\.active &&\s+mapPreparation\.ready &&/);
+    // В сети заставка ждёт и калибровки часов картинки (`netViewClock.ts`, правило 6).
+    expect(MAIN).toContain('(!netWorld || netViewSettled(netView, nowReal))');
     expect(MAIN).toMatch(
       /\{ id: 'maploading', isOpen: \(\) => mapPreparation\.active, close: leaveLoadingMap \}/,
     );

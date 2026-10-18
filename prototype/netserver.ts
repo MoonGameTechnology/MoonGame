@@ -51,7 +51,7 @@ import {
   MatchRegistry,
   sessionMeta,
   type MatchMeta,
-  newMatchId,
+  freeMatchId,
   pveOrders,
   MetricsAggregator,
   DailyJsonl,
@@ -891,7 +891,7 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  * До этого сессии существовали только как «комнаты» из `MATCHES=N`, поэтому `?join=proto`
  * значил «первая комната ЭТОГО сервера», а не «партия #4821»: перезапуск отдал бы то же
  * имя другому миру, и закладка игрока указала бы не туда. Здесь партия рождается в момент
- * запроса и получает собственный id (`newMatchId()` — то же правило, что у канонического
+ * запроса и получает собственный id (`freeMatchId()` — то же правило, что у канонического
  * хоста), а `hosted` пополняется, иначе её таймеры не остановит и состояние не сбросит на
  * диск выход по SIGINT (см. конец файла).
  */
@@ -899,7 +899,11 @@ const MAX_HOSTED = 64; // потолок сессий в одном процес
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
 async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Promise<HostedMatch> {
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
-  const h = await createHostedMatch(newMatchId(), mapId, modeId);
+  // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
+  const id = await freeMatchId(async (candidate) =>
+    registry.has(candidate) || (await matchStore.load(candidate)) !== null,
+  );
+  const h = await createHostedMatch(id, mapId, modeId);
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в

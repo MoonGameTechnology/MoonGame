@@ -386,6 +386,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
         'cback:btn-quiet',
         'cgo:btn-second',
         'match-create-go:btn-main',
+        'mnum-go:btn-second',
         'ctest:—',
       ].sort(),
     );

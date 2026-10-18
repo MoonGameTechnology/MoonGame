@@ -485,6 +485,8 @@ export const ru: Record<string, string> = {
   'browser.goal.map': '{p}% карты',
   'browser.goal.score': 'до {n} очк.',
   'browser.join': 'Войти',
+  'browser.number.bad': 'Это не номер партии',
+  'browser.number.ph': 'Номер партии',
   'browser.resume': 'Продолжить',
 
   // ADM-1 — пульт администратора (`/admin`): отдельная страница для того, кто ведёт
@@ -1741,7 +1743,6 @@ export const ru: Record<string, string> = {
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Неверный адрес сервера',
-  'net.connected': '● подключён как {who}',
   'net.connecting': 'Подключение: {nick}…',
   'net.error': 'Ошибка: {code}',
   'net.join-closed': 'вход в этот матч закрыт (окно приёма новых игроков истекло)',
@@ -1749,7 +1750,6 @@ export const ru: Record<string, string> = {
   'net.need-address': 'Укажите адрес сервера',
   'net.no-seat': 'Место получить не удалось',
   'net.queued-order': 'связи нет — приказ уйдёт сразу после переподключения',
-  'net.reconnecting': '● связь потеряна — переподключение…',
   'net.reconnecting-order': 'переподключение — приказ не отправлен, повторите позже',
   'net.slot-taken': 'Этим именем уже играют — другая вкладка или устройство?',
   'net.waiting-host': 'Ждём, пока хост начнёт…',
@@ -2941,9 +2941,9 @@ export const ru: Record<string, string> = {
   'hub.emblem.close': 'Закрыть',
   'hub.emblem.title': 'Выбор эмблемы',
   'hub.messages.soon': 'Сообщения — скоро',
-  'hub.mine.copied': 'Адрес скопирован',
-  'hub.mine.copy': 'Скопировать адрес',
-  'hub.mine.copy-manual': 'Скопируйте адрес из строки вручную',
+  'hub.mine.copied': 'Номер скопирован',
+  'hub.mine.copy': 'Скопировать номер',
+  'hub.mine.copy-manual': 'Скопируйте номер из строки вручную',
   'hub.mine.empty': 'Сетевых партий пока нет',
   'hub.mine.more': 'Ещё {n} — в списке игр',
   'hub.mine.section': 'Мои партии',

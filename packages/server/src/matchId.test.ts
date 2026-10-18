@@ -1,22 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { newMatchId } from './matchId';
+import { freeMatchId, newMatchId } from './matchId';
 
 describe('идентификатор партии (ADDR-1)', () => {
-  it('ЭТО НЕ ПОРЯДКОВЫЙ НОМЕР В ПРОЦЕССЕ — форма id не оставляет места счётчику', () => {
+  it('номер из восьми цифр без ведущего нуля (правила 1–2)', () => {
+    for (let i = 0; i < 200; i++) expect(newMatchId()).toMatch(/^[1-9][0-9]{7}$/);
+  });
+
+  it('ЭТО НЕ ПОРЯДКОВЫЙ НОМЕР — соседний номер не следует из прошлого', () => {
     // Ровно то, от чего уводит ADDR-1: `proto`, `proto-2`, … — это «комната №N ЭТОГО
-    // процесса», а не адрес партии. Перезапуск хоста выдал бы те же имена другим мирам,
-    // и закладка игрока указала бы не туда.
-    expect(newMatchId()).toMatch(
-      /^m-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    // процесса», а не адрес партии.
+    const ids = Array.from({ length: 50 }, () => Number(newMatchId()));
+    const steps = ids.slice(1).filter((id, i) => id === ids[i]! + 1);
+    expect(steps).toHaveLength(0);
   });
 
-  it('каждый вызов даёт НОВЫЙ идентификатор', () => {
-    const ids = new Set(Array.from({ length: 1000 }, () => newMatchId()));
-    expect(ids.size).toBe(1000);
+  it('свободный номер обходит занятые (правило 3)', async () => {
+    const seen = new Set<string>();
+    let calls = 0;
+    const id = await freeMatchId((candidate) => {
+      calls++;
+      seen.add(candidate);
+      return calls < 3; // первые два номера заняты
+    });
+    expect(calls).toBe(3);
+    expect(seen.has(id)).toBe(true);
   });
 
-  it('префикс `m-` стабилен: id опознаётся как адрес партии, а не как случайная строка', () => {
-    expect(newMatchId().startsWith('m-')).toBe(true);
+  it('асинхронная проверка (стор) — тоже', async () => {
+    const taken = new Set<string>();
+    for (let i = 0; i < 300; i++) taken.add(await freeMatchId(async (c) => taken.has(c)));
+    expect(taken.size).toBe(300);
+  });
+
+  it('свободного нет — честный отказ, а не чужой номер', async () => {
+    await expect(freeMatchId(() => true)).rejects.toThrow('no free match id');
   });
 });

@@ -344,7 +344,7 @@ describe('REFM-238 — стык с main.ts', () => {
   it('фазу орбит крутит кадр дверью, а робот прокрутки обнуляет её той же дверью', () => {
     expect(MAIN).not.toMatch(/\borbitPhase\s*[-+]?=[^=]/);
     expect(MAIN).toContain(
-      'if (saneGap(dt) && spinRuns(NET, speed, !!banner || comicQueue.isBusy())) spinOrbits(dt);',
+      'if (saneGap(dt) && spinRuns(netWorld, speed, !!banner || comicQueue.isBusy())) spinOrbits(dt);',
     );
     expect(PAN).toContain('spinOrbits(-__orbitPhase);');
     expect(PAN).not.toMatch(/\borbitPhase\s*=/);

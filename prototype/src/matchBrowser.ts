@@ -17,10 +17,10 @@
  */
 import { t, tData } from '../../localization/runtime';
 import { fallbackFor, showServerRow, type Fallback } from '../../decisions/browserFallback';
-import { shareAddress } from '../../decisions/matchAddress';
+import { matchNumberText, parseMatchNumber } from '../../decisions/matchNumber';
 import { filterControls, seatPips, tabCounts, type FilterControls } from '../../decisions/matchesPage';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
-import { archiveUrl, httpBase, matchesUrl, queryOutcome } from '../../decisions/matchQuery';
+import { archiveUrl, matchesUrl, queryOutcome } from '../../decisions/matchQuery';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
 import { tokenFor } from '../../decisions/sessionStore';
 import { probeAuthMode } from './accountSession';
@@ -399,6 +399,8 @@ function renderMatches(): void {
   $('msrv').style.display = down ? '' : 'none';
   if (down && game.statusText() === t('acc.server-down')) game.status('');
   $('match-create').style.display = loaded && !failed && activeTab === 'available' ? '' : 'none';
+  // Вход по номеру — там же, где новая партия: только когда сервер ответил.
+  $('mnum').style.display = loaded && !failed ? '' : 'none';
   // Панель нужна только там, где есть что фильтровать: без загруженной ленты она
   // предлагала бы крутить контролы вместо того, чтобы починить связь.
   const controls =
@@ -430,13 +432,12 @@ function renderMatches(): void {
  *
  * Обозреватель отвечает на «куда пойти играть», этот список — на «где я уже играю и куда
  * вернуться». Какие партии сюда попадают, в каком порядке и что значит пустота — решает
- * `decisions/myMatches.ts`; здесь только разметка, адрес и переходы.
+ * `decisions/myMatches.ts`; здесь только разметка, номер и переходы.
  *
- * Адрес строится на адресе СЕРВЕРА (`shareAddress`, правило 7 `matchAddress.ts`): в APK
- * страница приходит с локального сервера Capacitor, и адрес из `location.origin` привёл
- * бы получателя в его собственный телефон.
+ * Под партией — её НОМЕР, а не адрес (`matchNumber.ts`, плейтест 2026-10-17): его копируют
+ * и вводят в поле «Номер партии» обозревателя.
  */
-function renderMyMatches(serverHttp: string): void {
+function renderMyMatches(): void {
   const el = document.getElementById('hub-mine');
   if (!el) return;
   const view = myMatches(matchLists, HUB_MY_MATCHES);
@@ -458,20 +459,18 @@ function renderMyMatches(serverHttp: string): void {
   }
   el.textContent = '';
   for (const m of view.rows) {
-    const addr = serverHttp ? shareAddress(serverHttp, m.matchId) : '';
     const card = document.createElement('div');
     card.className = 'hub-card hm-row';
     card.innerHTML =
       `<div class="hc-ic">${m.status === 'ended' ? '◼' : '▶'}</div>` +
       `<div class="hm-body">` +
-      // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
-      // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
-      // смотрят (какая партия, какой день, сколько игроков).
+      // Номер стоит ниже отдельной строкой: в заголовке он вытеснял бы то, ради чего
+      // сюда смотрят (какая партия, какой день, сколько игроков).
       `<div class="hc-t">${esc(game.mapLabel(m.mapId))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
-      (addr ? `<div class="hm-addr">${esc(addr)}</div>` : '') +
+      `<div class="hm-addr">${esc(matchNumberText(m.matchId))}</div>` +
       `</div>`;
     const btns = document.createElement('div');
     btns.className = 'hm-btns';
@@ -482,23 +481,21 @@ function renderMyMatches(serverHttp: string): void {
     open.textContent = t('browser.resume');
     open.addEventListener('click', () => openSessionTab(m.matchId, true));
     btns.appendChild(open);
-    if (addr) {
-      const copy = document.createElement('button');
-      copy.className = 'mbtn btn-quiet';
-      copy.textContent = t('hub.mine.copy');
-      copy.addEventListener('click', () => {
-        // Буфер обмена может быть недоступен (нет разрешения, небезопасный контекст) —
-        // тогда честно зовём скопировать из строки: адрес в ней и написан, целиком.
-        void (navigator.clipboard?.writeText(addr) ?? Promise.reject(new Error('no clipboard')))
-          .then(() => {
-            game.hubNote(t('hub.mine.copied'));
-          })
-          .catch(() => {
-            game.hubNote(t('hub.mine.copy-manual'));
-          });
-      });
-      btns.appendChild(copy);
-    }
+    const copy = document.createElement('button');
+    copy.className = 'mbtn btn-quiet';
+    copy.textContent = t('hub.mine.copy');
+    copy.addEventListener('click', () => {
+      // Буфер обмена может быть недоступен (нет разрешения, небезопасный контекст) —
+      // тогда честно зовём скопировать из строки: номер в ней и написан, целиком.
+      void (navigator.clipboard?.writeText(m.matchId) ?? Promise.reject(new Error('no clipboard')))
+        .then(() => {
+          game.hubNote(t('hub.mine.copied'));
+        })
+        .catch(() => {
+          game.hubNote(t('hub.mine.copy-manual'));
+        });
+    });
+    btns.appendChild(copy);
     card.appendChild(btns);
     el.appendChild(card);
   }
@@ -525,7 +522,7 @@ function renderMyMatches(serverHttp: string): void {
 export async function refreshMyMatches(): Promise<void> {
   const srv = game.resolveServer();
   if (srv) await loadMatchLists(srv);
-  renderMyMatches(srv ? httpBase(srv.base) : '');
+  renderMyMatches();
 }
 
 /** Положить готовую ленту и показать «Доступные», без похода на сервер. Ею харнес размеров
@@ -567,6 +564,19 @@ export function initMatchBrowser(host: MatchBrowserHost): void {
       renderMatches();
     });
   }
+
+  // Вход по номеру партии: своя партия — возвращение, чужая — выбор места, как у строки.
+  const numIn = $('mnum-in') as HTMLInputElement;
+  $('mnum').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = parseMatchNumber(numIn.value);
+    if (!id) {
+      game.status(t('browser.number.bad'));
+      return;
+    }
+    const seated = (matchLists?.active ?? []).some((m) => m.matchId === id);
+    openSessionTab(id, seated);
+  });
 
   for (const btn of Array.from(document.querySelectorAll('.mtab')))
     btn.addEventListener('click', () =>

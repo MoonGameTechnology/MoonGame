@@ -39,7 +39,7 @@ import { jumpToPing } from './mapCamera';
 import { fleetSeen, known, vision } from './mapFog';
 import { displayOf, speedbarRestartShown, speedbarShown, timeControlsShown } from './matchExits';
 import { unreadMsgs } from './messageLog';
-import { NET } from './netSession';
+import { NET, netWorld } from './netSession';
 import type { initPhoneSpeed } from './phoneSpeed';
 import { ctx } from './protoKernel';
 import {
@@ -100,8 +100,6 @@ export interface TopBarHost {
   aiSeats(): number;
   /** Разработчик включил управление временем. */
   speedControl(): boolean;
-  /** Голографический интерфейс ПК включён. */
-  holographic(): boolean;
   /** Кнопка скорости телефона. */
   phoneSpeed(): Pick<ReturnType<typeof initPhoneSpeed>, 'sync'>;
   /** Значки «Событий» и «Ещё» телефона. */
@@ -606,8 +604,9 @@ export function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void 
 /** Кадр полосы скорости: перезапуск, управление временем и кнопка скорости телефона. */
 export function renderSpeedbar(): void {
   // Player build: the button (and the skirmish it restarts into) doesn't exist.
+  const restartShown = !__PLAYER_BUILD__ && speedbarRestartShown(netWorld, game.aiSeats());
   if (!__PLAYER_BUILD__) {
-    const restart = displayOf(speedbarRestartShown(NET, game.aiSeats()));
+    const restart = displayOf(restartShown);
     restartBtn.style.display = restart;
     restartSep.style.display = restart;
   }
@@ -616,10 +615,10 @@ export function renderSpeedbar(): void {
   speedbarEl.classList.toggle('spd-run', run);
   if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);
   const showSpdCtl = displayOf(
-    timeControlsShown(pcUi(), game.speedControl(), NET, __PLAYER_BUILD__, run),
+    timeControlsShown(pcUi(), game.speedControl(), netWorld, run),
   );
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
-  const showBar = displayOf(game.holographic() || speedbarShown(pcUi(), game.speedControl(), run));
+  const showBar = displayOf(speedbarShown(pcUi(), showSpdCtl === '', restartShown));
   if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
   // Телефон прячет полосу за кнопкой скорости (UIX-3.2): кнопка есть, пока есть управление
   // временем; на ней темп по скорости мира и множитель партии (в забеге множителей нет).

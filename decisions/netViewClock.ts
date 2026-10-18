@@ -22,6 +22,21 @@
  * 4. **Время назад или сменившийся матч — начать заново.** Снимок раньше прошлого бывает
  *    только при переподключении или входе в другую партию: старая скорость и невязка там
  *    ничего не значат.
+ * 5. **Первый снимок скорость не меряет.** Приветственный снимок — весь мир целиком, и пока
+ *    его разбирают (после загрузки страницы, на телефоне), реальный момент его прихода
+ *    опаздывает. Промежуток до следующего снимка тогда короче настоящего, и скорость
+ *    завышалась в разы: флоты убегали вперёд, а со следующим снимком стояли или ехали назад
+ *    (плейтест 2026-10-17, замер — флот отскакивал на 4 px и замирал на 0,4 с). Отсчёт
+ *    начинается со второго снимка.
+ * 6. **Карта открывается, когда часы откалиброваны.** Пока скорость не измерена, картинка
+ *    стоит, а потом трогается — для игрока это и есть «юниты подпрыгивают при входе».
+ *    Поэтому заставка входа держится, пока скорость не известна, но не дольше
+ *    {@link SETTLE_CAP_MS}: партия на паузе скорости не даст никогда.
+ * 7. **Кадр СЛЕДУЕТ за оценкой, а не прыгает к ней** ({@link netViewFollow}). Оценка
+ *    времени дёргается с каждым снимком — сеть приносит их неровно. Кадр идёт со скоростью
+ *    мира и мягко подправляет шаг по невязке: отстал — чуть быстрее, убежал — чуть
+ *    медленнее, но НАЗАД не едет никогда. Скачок к оценке — только когда разрыв больше
+ *    {@link SNAP_MS} хода мира (вход, долгий обрыв) или мир стоит.
  *
  * Модуль не решает, ЧТО рисовать: позиции по-прежнему считает ядро (`legT`,
  * `fleetPositionAt`) — ему лишь дают другое «сейчас», и оно само держит флот в пределах
@@ -39,6 +54,15 @@ export const BLEND_MS = 400;
  *  сравним с самим промежутком, и оценка прыгала бы. */
 export const MIN_SAMPLE_MS = 150;
 
+/** Дольше этого заставка входа калибровку часов не ждёт (правило 6): три пульса сервера. */
+export const SETTLE_CAP_MS = 3000;
+
+/** За сколько реального времени кадр выбирает невязку с оценкой (правило 7). */
+export const CATCH_MS = 600;
+
+/** Разрыв больше этого хода мира (в реальных мс) кадр не догоняет, а перескакивает (правило 7). */
+export const SNAP_MS = 2000;
+
 /** Вес свежего замера в сглаженной скорости. */
 const RATE_WEIGHT = 0.3;
 
@@ -55,10 +79,20 @@ export interface NetViewClock {
   readonly sampledT: number;
   /** Досчитанное время минус время снимка в момент его прихода — гасится (правило 3). */
   readonly err: number;
+  /** Реальный момент первого снимка этих часов (правило 6). */
+  readonly bornAt: number;
 }
 
 /** Часы до первого снимка. */
-export const NET_VIEW_IDLE: NetViewClock = { t: null, at: 0, rate: 0, sampledAt: 0, sampledT: 0, err: 0 };
+export const NET_VIEW_IDLE: NetViewClock = {
+  t: null,
+  at: 0,
+  rate: 0,
+  sampledAt: Number.NaN,
+  sampledT: 0,
+  err: 0,
+  bornAt: 0,
+};
 
 /** Какое игровое время рисовать в реальный момент `now`. До первого снимка — `fallback`. */
 export function netViewAt(clock: NetViewClock, now: number, fallback: number): number {
@@ -71,10 +105,15 @@ export function netViewAt(clock: NetViewClock, now: number, fallback: number): n
 
 /** Пришёл снимок с игровым временем `t` в реальный момент `now`. */
 export function netViewSnapshot(clock: NetViewClock, t: number, now: number): NetViewClock {
-  if (clock.t === null || t < clock.t) return { t, at: now, rate: 0, sampledAt: now, sampledT: t, err: 0 };
+  // Правило 5: у первого снимка отсчёта скорости нет — его начнёт второй.
+  if (clock.t === null || t < clock.t)
+    return { t, at: now, rate: 0, sampledAt: Number.NaN, sampledT: t, err: 0, bornAt: now };
   let { rate, sampledAt, sampledT } = clock;
   const span = now - sampledAt;
-  if (span >= MIN_SAMPLE_MS) {
+  if (Number.isNaN(sampledAt)) {
+    sampledAt = now;
+    sampledT = t;
+  } else if (span >= MIN_SAMPLE_MS) {
     const measured = (t - sampledT) / span;
     // Пауза — сразу ноль (иначе сглаживание ещё долго гнало бы картинку вперёд);
     // первый замер берётся как есть.
@@ -87,5 +126,37 @@ export function netViewSnapshot(clock: NetViewClock, t: number, now: number): Ne
   const limit = rate * BLEND_MS;
   const shown = netViewAt(clock, now, t);
   const err = Math.min(limit, Math.max(-limit, shown - t));
-  return { t, at: now, rate, sampledAt, sampledT, err };
+  return { t, at: now, rate, sampledAt, sampledT, err, bornAt: clock.bornAt };
+}
+
+/** Правило 6: можно открывать карту — скорость измерена или ждать её больше нечего. */
+export function netViewSettled(clock: NetViewClock, now: number): boolean {
+  return clock.t !== null && (clock.rate > 0 || now - clock.bornAt >= SETTLE_CAP_MS);
+}
+
+/** Что кадр показал в прошлый раз (правило 7). */
+export interface NetViewShown {
+  /** Показанное игровое время. */
+  readonly time: number;
+  /** Реальный момент этого кадра. */
+  readonly at: number;
+}
+
+/**
+ * Правило 7: игровое время кадра в реальный момент `now`. `prev` — прошлый кадр (`null` —
+ * первого не было), `fallback` — время до первого снимка.
+ */
+export function netViewFollow(
+  prev: NetViewShown | null,
+  clock: NetViewClock,
+  now: number,
+  fallback: number,
+): NetViewShown {
+  const target = netViewAt(clock, now, fallback);
+  if (clock.t === null || prev === null || clock.rate <= 0) return { time: target, at: now };
+  const gap = target - prev.time;
+  if (Math.abs(gap) > clock.rate * SNAP_MS) return { time: target, at: now };
+  const dt = Math.max(0, now - prev.at);
+  const step = dt * clock.rate + gap * Math.min(1, dt / CATCH_MS);
+  return { time: prev.time + Math.max(0, step), at: now };
 }
