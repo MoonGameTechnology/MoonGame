@@ -131,7 +131,7 @@ export function composePlan(action, { stateDir, envFile, adminUser }) {
     'observability',
   ];
   if (action === 'up')
-    args.push('up', '--no-deps', '--wait', '--wait-timeout', '180', '-d', ...SERVICES);
+    args.push('up', '--no-deps', '--wait', '--wait-timeout', '300', '-d', ...SERVICES);
   if (action === 'restart') args.push('restart', '--no-deps', ...SERVICES);
   if (action === 'status') args.push('ps', '--all', '--format', 'json', ...SERVICES);
   if (action === 'config') args.push('config', '--quiet');
@@ -547,7 +547,7 @@ async function executeStack(args, run) {
     const plan = composePlan(action, { ...options, adminUser });
     return run(plan.binary, plan.args, {
       env: plan.env,
-      timeout: action === 'up' ? 240000 : 120000,
+      timeout: action === 'up' ? 360000 : 120000,
     });
   };
   if (options.action === 'init') {

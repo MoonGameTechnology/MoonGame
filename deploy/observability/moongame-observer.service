@@ -1,0 +1,36 @@
+[Unit]
+Description=MoonGame sanitized host and Game metrics bridge
+After=network.target moongame-docker.service
+
+[Service]
+Type=simple
+User=moon-observer
+Group=moon-observer
+ExecStart=/usr/bin/node /opt/moongame-ops/deploy/observability/observer.mjs
+ExecStartPre=/usr/bin/install -m 0600 /run/credentials/moongame-observer.service/game-token /run/moongame-observer/game-token
+Environment=OBS_METRICS_DIR=/var/lib/moongame-metrics
+Environment=GAME_EXPORTER_TOKEN_FILE=/run/moongame-observer/game-token
+LoadCredential=game-token:/etc/moongame-observability/game-token
+StateDirectory=moongame-metrics
+StateDirectoryMode=0755
+RuntimeDirectory=moongame-observer
+RuntimeDirectoryMode=0700
+Restart=on-failure
+RestartSec=5
+MemoryMax=64M
+CPUQuota=10%
+TasksMax=32
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

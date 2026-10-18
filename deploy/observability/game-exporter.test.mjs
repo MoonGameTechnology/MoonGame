@@ -206,6 +206,22 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
     }
   });
 
+  it.each([':', ',', '@', '%'])('accepts installer-supported token character %s', async (character) => {
+    const dir = await mkdtemp(join(tmpdir(), 'obs-secret-'));
+    closes.push(() => rm(dir, { recursive: true, force: true }));
+    const path = join(dir, 'token'), token = 'a'.repeat(32) + character;
+    await writeFile(path, token + '\n', { mode: 0o600 });
+    expect(await readToken(path)).toBe(token);
+  });
+
+  it.each(['\r\nHeader: value', ' ', '\0', '"'])('refuses header-unsafe token suffix %j', async (suffix) => {
+    const dir = await mkdtemp(join(tmpdir(), 'obs-secret-'));
+    closes.push(() => rm(dir, { recursive: true, force: true }));
+    const path = join(dir, 'token');
+    await writeFile(path, 'a'.repeat(32) + suffix, { mode: 0o600 });
+    await expect(readToken(path)).rejects.toThrow('E_OBS_CONFIG');
+  });
+
   it('reads a bounded private plain secret and refuses symlinks or world-readable files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'obs-secret-'));
     closes.push(() => rm(dir, { recursive: true, force: true }));

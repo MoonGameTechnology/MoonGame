@@ -1,0 +1,593 @@
+{
+  "uid": "moongame-overview",
+  "title": "MoonGame — обзор плейтеста",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "moongame",
+    "playtest"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Свежесть сбора, секунд",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - moongame_observer_sample_timestamp_seconds",
+          "instant": true,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 45
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 2,
+      "title": "Источники игры: 1 — доступны",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_source_up) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Четыре источника: health, ready, metrics, summary. Ноль означает отказ источника; отсутствие данных — сбор не настроен или устарел."
+    },
+    {
+      "id": 3,
+      "title": "Готовность игры и БД",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_game_ready) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 4,
+      "title": "Комнаты в реестре",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_matches) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 5,
+      "title": "Подключения игроков",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 7,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_connections) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 6,
+      "title": "Действия в секунду",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 7,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by(outcome) (rate(moongame_actions_total[2m]))) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 7,
+      "title": "CPU всего VPS, %",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(100 * (1 - sum(rate(moongame_host_cpu_seconds_total{mode=\"idle\"}[2m])) / sum(rate(moongame_host_cpu_seconds_total[2m])))) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 8,
+      "title": "Доступная RAM VPS",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 14,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_host_memory_available_bytes) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 9,
+      "title": "Свободное место на диске",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 14,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_host_root_available_bytes) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 10,
+      "title": "Ошибки корректности за 5 минут",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(increase(moongame_desyncs_total[5m])) + sum(increase(moongame_dead_letters_total[5m])) + sum(increase(moongame_advance_overflows_total[5m]))) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Нет данных при отсутствии или устаревании источника. Обновление каждые 15 секунд."
+    },
+    {
+      "id": 11,
+      "title": "Обработка приказа: среднее за 5 минут",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 21,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(moongame_submit_duration_seconds_sum[5m])) / sum(rate(moongame_submit_duration_seconds_count[5m]))) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Среднее по измеренным приказам. Это не p95. Без приказов — нет данных."
+    },
+    {
+      "id": 12,
+      "title": "Рассылка: среднее за 5 минут",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 21,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(moongame_broadcast_duration_seconds_sum[5m])) / sum(rate(moongame_broadcast_duration_seconds_count[5m]))) and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Среднее по измеренным рассылкам. Это не p95."
+    },
+    {
+      "id": 13,
+      "title": "Версия сервера",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_build_info and on() (time() - moongame_observer_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "legendFormat": "{{version}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.version}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 99,
+      "type": "text",
+      "title": "Границы первого запуска",
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Локальный мониторинг на игровом VPS. При отказе всего VPS пульт также недоступен. Внешние уведомления и бэкапы не настроены. CPU/RAM относятся ко всему VPS. Логи, персональные данные, состояния отдельных матчей и p95 здесь не собираются. Данные старше 45 секунд скрываются из игровых панелей; проверьте свежесть и источники."
+      }
+    }
+  ]
+}

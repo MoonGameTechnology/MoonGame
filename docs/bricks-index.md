@@ -1132,6 +1132,7 @@
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
 | OBS-0.1 | ✅ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
 | OBS-0.2 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
+| OBS-0.4 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Первый VPS и защищённый браузерный вход |
 | OBS-0.3 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
 | OBS-1.1 | ✅ | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
 | OBS-1.2 | ⏳ | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
