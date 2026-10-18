@@ -6,6 +6,9 @@
 связанные [OPS-0/1](operations-roadmap.md), [MSVC-7/8/9](service-resilience-roadmap.md),
 [служебные дела](staff-case-roadmap.md) и [карта сервисов](service-architecture-map.md).
 
+Матрица правовых и технических проверок перед публичным релизом —
+[чек-лист аудита и комплаенса РФ](compliance/rf-compliance-audit-checklist.md).
+
 ## Что уже есть
 
 - `deploy/backup.sh`/`restore.sh`: age-шифрование, проверка полноты/целостности,

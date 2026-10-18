@@ -119,6 +119,12 @@
 | `docs/yandex-games-card.md` | Sector Zero на Яндекс Играх — карточка и живая проверка | Материал к подаче (YAG-5.2 в yandex-games-roadmap.md): что |
 | `docs/yandex-games-roadmap.md` | Релиз PvE в Яндекс Играх — технический roadmap | Этот документ подчинён platform-adapters.md (PR #1038, |
 
+## docs/compliance/
+
+| Документ | Заголовок | Про что |
+| --- | --- | --- |
+| `docs/compliance/rf-compliance-audit-checklist.md` | Void Dominion / Averion — чек-лист аудита и комплаенса РФ | Версия: 1.0 · Дата правовой сверки: 16.10.2026 |
+
 ## docs/explanations/
 
 | Документ | Заголовок | Про что |
@@ -160,7 +166,10 @@
 | `docs/reviews/2026-10-10-zta.md` | ZTA и защита в глубину — проверка 2026-10-10 | Проверен свежий main 87af555fcee9fa027eff4b1b23bf8a7b89b31658 и подготовленные |
 | `docs/reviews/2026-10-11-full-stress.md` | Void Dominion / Averion: Sector Zero — стресс-тест 2026-10-11 | Вывод: удалось воспроизвести аварии приложения и прокси, перегрузку durable-очереди и ложную готовность при отказе БД. Для приложения подготовлены исправления … |
 | `docs/reviews/2026-10-11-remediation-dast.md` | Исправления full-stack аудита и активный DAST — 2026-10-11 | Итог: устранены пять подтверждённых дефектов из аудита 2026-10-10 |
+| `docs/reviews/2026-10-14-moonmcp-interim-pentest.md` | Промежуточный пентест Void Dominion (MoonMCP) — 2026-10-14 | Промежуточный white-box и live-аудит локального сервера: проверенные защитные механизмы, открытые риски, границы покрытия и дальнейшие действия. |
+| `docs/reviews/2026-10-16-moonmcp-continuation.md` | Continuing MoonMCP pentest — 2026-10-16 (local docker stack + prod blackbox add… | Дополнение к промежуточному пентесту 2026-10-14. Два контура: (A) локальный docker-стенд владельца (deploy-, Fastify deploy-server-1 на 127.0.0.1:8788) — глубо… |
 | `docs/reviews/2026-10-16-obs-0-1-baseline.md` | OBS-0.1 — пассивный baseline VPS, 16 октября 2026 | Контракт и воспроизведение: OBS-0.1 v1. |
+| `docs/reviews/2026-10-16-prod-blackbox.md` | Void Dominion — Production Server Blackbox Pentest Report | Date: 2026-10-16 |
 | `docs/reviews/README.md` | Журнал ревью и аудитов | Постоянная папка, куда складываются находки роли «поиск багов / стандартизация / |
 | `docs/reviews/map-visual-continuity-2026-10-14.md` | Приёмка непрерывного окружения карты — 2026-10-14 | Проверена первая реализация правила визуальной непрерывности |
 
