@@ -76,5 +76,25 @@
       ],
       "checkedAt": "2026-10-18T12:58:24.057Z"
     }
-  ]
+  ],
+  "androidBuildTools37Smoke": {
+    "syntheticOnly": true,
+    "releaseApproval": false,
+    "sourceSha": "8fde43f4bc39c7dc66841fe80e2b5a3b1eae6be8",
+    "appId": "com.voiddominion.syntheticdrill",
+    "versionCode": 1,
+    "certificateSha256": "ea042d5d7327570ad3a9ad1af182e32cadff44317a1f37f451cd7b4c48ed4a51",
+    "apkSha256": "66b28aed7f58142f4a3208eeb1221bf5534121fde770cd5f1c1fbbec014b48b8",
+    "permissions": [
+      "android.permission.INTERNET",
+      "com.voiddominion.syntheticdrill.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ],
+    "checkedAt": "2026-10-18T13:38:59.654Z",
+    "buildTools": "37.0.0",
+    "sourceFilesSha256": {
+      "mobile/rustore-config.mjs": "dff4ffefb7903cc443114e215054e8f40a891d0757c821d2788bce6f86fcd0fe",
+      "mobile/verify-rustore.mjs": "907297e5b1ba5633e5dc07c1130e9c504c5063c8d8ff419930885a19da04db5b",
+      "mobile/rustore-smoke.mjs": "4d791e4112cedb9bf7374a4d5c47f30d94325d250dadcb087a246cd07dc3a0d2"
+    }
+  }
 }

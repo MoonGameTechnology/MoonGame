@@ -36,6 +36,17 @@ export function verifyPolicyDocument(html, expectedHash) {
   if (policyDocument(text, expectedHash) !== html) throw Error('E_RUSTORE_POLICY_ASSET');
 }
 
+/** Build-tools 37 labels certificates by scheme (V3.0 Signer:) instead of
+ * Signer #1. Require exactly one signer and the approved certificate in every
+ * certificate line; unknown formats and rotation to another key fail closed. */
+export function verifySigningCertificate(output, expectedHash) {
+  const counts = [...output.matchAll(/^Number of signers: (\d+)\r?$/gm)];
+  const lines = output.split(/\r?\n/).filter(line => line.includes('certificate SHA-256 digest:'));
+  if (counts.length !== 1 || counts[0][1] !== '1' || !lines.length || /CN=Android Debug/i.test(output) ||
+      lines.some(line => line.match(/^(?:Signer #1|V[1-4](?:\.\d+)? Signer:) certificate SHA-256 digest: ([a-fA-F0-9]{64})$/)?.[1].toLowerCase() !== expectedHash))
+    throw Error('E_RUSTORE_CERTIFICATE');
+}
+
 /** AndroidX Core declares this package-local signature permission to protect
  * non-exported dynamic receivers on older Android versions. Never allow a
  * similarly named foreign permission or a weakened protectionLevel. */
