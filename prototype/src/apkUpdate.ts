@@ -6,7 +6,7 @@
  * Само сравнение версий и разбор релиза давно лежат в `updater.ts`; здесь остаётся
  * DOM-проводка плюс ровно два решения, которые стоит проверять тестом, а не глазами:
  *
- *  · **что сказать игроку про исход проверки** — «ты на свежей версии» и «до GitHub не
+ *  · **что сказать игроку про исход проверки** — «ты на свежей версии» и «до сайта не
  *    достучались» обязаны читаться по-разному, иначе ручная проверка бесполезна: она
  *    молчит одинаково и когда всё хорошо, и когда сеть отвалилась;
  *  · **когда вообще проверять** — приложение дёргает проверку на запуске, при каждом
@@ -14,7 +14,7 @@
  *    случается десятки раз в час, поэтому без порога это стало бы стуком по API.
  */
 import { t } from '../../localization/runtime';
-import { buildLabel, checkForUpdateDetailed, currentBuild, isRuStoreBuild } from './updater';
+import { buildLabel, checkForUpdateDetailed, currentBuild, isRuStoreBuild, isTrustedApkUrl } from './updater';
 import type { UpdateCheck, UpdateInfo } from './updater';
 import { detach } from './detach';
 
@@ -72,6 +72,8 @@ export function initApkUpdater(): void {
   const showUpdate = (u: UpdateInfo): void => {
     const ver = el('ub-ver');
     if (ver) ver.textContent = buildLabel(u);
+    const notes = el('ub-notes');
+    if (notes) notes.textContent = u.notes;
     const go = el('ub-go') as HTMLAnchorElement | null;
     if (go) go.href = u.apkUrl;
     const bar = el('updbar');
@@ -105,7 +107,8 @@ export function initApkUpdater(): void {
   el('ub-go')?.addEventListener('click', (e) => {
     const native = (globalThis as { VoidNative?: { open?: (u: string) => void } }).VoidNative;
     const url = (el('ub-go') as HTMLAnchorElement | null)?.href;
-    if (native?.open && url) {
+    if (!url || !isTrustedApkUrl(url)) { e.preventDefault(); return; }
+    if (native?.open) {
       e.preventDefault();
       native.open(url);
     }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Android release publication every five minutes
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=5min
+RandomizedDelaySec=15s
+Unit=moongame-apk-publish.service
+
+[Install]
+WantedBy=timers.target

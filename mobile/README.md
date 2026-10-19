@@ -33,17 +33,19 @@ approval to publish. See [the drill report](../docs/reviews/rustore-release-dril
 
 ## Install on a phone (easiest)
 
-Every push to `main` that touches the game refreshes **two rolling prereleases**
-(one per client profile, see `prototype/build.mjs`) at stable links:
+The public download source is our VPS over HTTPS, configured once in
+`mobile/distribution.json`:
 
-- **Player client** (`appId com.voiddominion.player`) — for regular players: no dev
-  test mode, no single-player skirmish, no time controls; the main path is
-  callsign → match browser → join a running session. Tutorial works offline.
-  - Releases page: https://github.com/MoonGameTechnology/MoonGame/releases/tag/player
-  - Direct APK: https://github.com/MoonGameTechnology/MoonGame/releases/download/player/void-dominion-player.apk
-- **Dev client** (`appId com.voiddominion.prototype`) — everything, as before:
-  - Releases page: https://github.com/MoonGameTechnology/MoonGame/releases/tag/alpha
-  - Direct APK: https://github.com/MoonGameTechnology/MoonGame/releases/download/alpha/void-dominion-alpha.apk
+- **Player client** (`com.voiddominion.player`):
+  https://77-221-140-87.sslip.io/downloads/android/player/latest.apk
+- **Dev client** (`com.voiddominion.prototype`):
+  https://77-221-140-87.sslip.io/downloads/android/alpha/latest.apk
+
+The desktop hub offers the player APK and a locally generated QR of the same
+stable link. No third-party QR service is contacted. The promotion is hidden on
+touch phones and removed from packaged APKs; the Yandex archive excludes its markup.
+GitHub rolling releases remain build inputs/archive and a migration path for old
+installed APKs, whose hardcoded updater cannot be changed without installing a new APK.
 
 The two APKs have **different application ids**, so a host can install both side by
 side; each updates from its own release lane (the in-app updater picks the lane baked
@@ -74,38 +76,28 @@ needs a real (secret) keystore — a later step.
 
 ## In-app auto-update
 
-Install once; after that the app checks for updates itself — no need to hunt the release
-page. On launch (when online) and via **«Проверить обновления»** on the welcome screen,
-the app checks its own rolling release lane (`alpha` for the dev APK, `player` for the
-player APK) and, if a newer build exists, shows a
-**«Доступна новая сборка»** banner. Tapping **«Обновить»** opens the APK in the **system
-browser**, which downloads it and offers to install; because every build shares the
-committed debug signature, it installs straight over the top, keeping your data.
+Install a new site-aware APK once; subsequent checks read only our HTTPS site:
+`/downloads/android/{alpha|player}/latest.json`. The public JSON contains
+`versionCode`, `versionName`, `apkUrl`, `notes`, `sha`, `apkSha256`, `appId` and
+`signerSha256`. The APK URL is immutable and belongs to the same origin/lane.
+The app prompts only when the remote Android versionCode is strictly larger;
+notes are plain text and the action is **«Скачать обновление»**. The native bridge
+opens the system browser; Android installation always requires the user's approval.
+Application IDs, WebView origin and `mobile/debug.keystore` are unchanged, so a
+compatible update installs over the existing app and retains its local data.
 
-> An earlier version tried to download + install the APK entirely in-app (WebView
-> `DownloadListener` → `DownloadManager` → `FileProvider` install intent). That path was
-> unreliable across devices (the installer often never appeared), so the update action now
-> just hands the URL to the browser — robust everywhere, one extra tap.
+Checks run at launch, foreground return (15min throttle), every4h, and manually.
+Timeout5s/body16KiB, malformed JSON, unavailable site and older/equal versions never
+block boot. Requests omit credentials, reject redirects and bypass caches.
+RuStore builds remain on their store update channel and never check sideload versions.
 
-How it's wired (all four pieces ship together so the running build and the published
-build are compared on the same integer):
-
-- **versionCode = git commit count** (monotonic), `versionName = <lane>-<sha>` (lane =
-  `alpha` | `player`) — stamped into the APK by `patch-updater.mjs` and baked into the
-  web layer as `window.__BUILD__` by `inject-build.mjs` (CI `Compute build version`
-  step → `$GITHUB_ENV`).
-- The same `window.__BUILD__` carries `server` — the game server the connect screen's
-  address field starts on until the player connects elsewhere (`VOID_SERVER` in
-  `android.yml`, today the playtest server; rule 8 in `decisions/serverAddress.ts`). That
-  server's `ALLOWED_ORIGINS` must list `http://localhost`, the APK's WebView origin.
-- The release **body** carries a machine marker `<!-- void:versionCode=N void:sha=X -->`.
-- `prototype/src/updater.ts` reads `window.__BUILD__`, fetches the release via the
-  CORS-enabled GitHub REST API, compares versionCode, and surfaces the banner. It is
-  **dormant in the browser / dev build** (no `__BUILD__`), where content is always live.
-- The native side (`patch-updater.mjs` → `MainActivity.java`) exposes a tiny
-  `window.VoidNative.open(url)` bridge that fires an `ACTION_VIEW` intent — so «Обновить»
-  opens the APK URL in the system browser. The web layer falls back to a plain `<a href>`
-  when the bridge is absent (a real browser / dev build).
+CI stamps versionCode=git commit count and versionName=lane-SHA into both Gradle and
+`window.__BUILD__`, verifies the actual APK signer/package/versions, then attaches
+`version.json` to the rolling release. Non-increasing publication is refused.
+The unprivileged VPS timer downloads/verifies each new release and switches one
+pointer shared by JSON and the stable APK link only after all checks pass. No
+SSH deploy credential or public upload endpoint is required. Old releases remain
+usable during failed publication. See the [publication runbook](../deploy/apk/README.md).
 
 > Authenticity caveat: the debug keystore is committed (public), so the signature proves
 > only "built by this pipeline's key", not a secret identity. Fine for an alpha; a real
@@ -136,8 +128,7 @@ npm run apk          # sync → brand (icon/splash + landscape) → ./gradlew as
 `capacitor-assets generate --android` (icons + splash from `assets/`), then
 `node patch-android.mjs` (enables rotation — `fullUser` + in-place `configChanges`
 so rotating never reloads the WebView / drops game state), then `node patch-updater.mjs`
-(wires the in-app updater: install permission + FileProvider + MainActivity download/
-install hook, and stamps `versionCode`/`versionName` from `VOID_VC`/`VOID_VN` when set).
+(wires the MainActivity system-browser bridge and stamps `versionCode`/`versionName` from `VOID_VC`/`VOID_VN` when set).
 A local build leaves `versionCode 1` and ships no `window.__BUILD__`, so its updater stays
 dormant — those are injected by CI from the git commit count; the native hook still
 compiles locally, which is the point of running it here.

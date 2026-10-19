@@ -22,6 +22,12 @@ on:
     paths:
       - 'prototype/**'
       - 'mobile/**'
+      - 'localization/**'
+      - 'decisions/**'
+      - 'data/**'
+      - 'packages/shared-core/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
       - '.github/workflows/android.yml'
 
 # contents: write lets the build publish the APKs to the rolling releases.
@@ -30,6 +36,10 @@ on:
 permissions:
   contents: write
   id-token: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-apk:
@@ -180,6 +190,15 @@ jobs:
             echo "::error::APK signature does not match mobile/debug.keystore — updates would break (uninstall required on every phone). Refusing to ship."
             exit 1
           fi
+          {
+            echo "VOID_SIGNER_CERT_SHA256=$KS_CERT"
+            echo "AAPT=$ANDROID_HOME/build-tools/$BT/aapt"
+            echo "APKSIGNER=$ANDROID_HOME/build-tools/$BT/apksigner"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate the site release manifest from the verified APK
+        run: |
+          node mobile/apk-manifest.mjs mobile/android/app/build/outputs/apk/debug/app-debug.apk version.json
 
       # SLSA-style build provenance (SEC-7): a keyless cosign signature over the exact
       # APK bytes, tying them to this workflow run + commit (Fulcio cert) with a public
@@ -218,6 +237,7 @@ jobs:
             mobile/android/app/build/outputs/apk/debug/app-debug.apk
             mobile/android/app/build/outputs/apk/debug/app-debug.apk.sig
             mobile/android/app/build/outputs/apk/debug/app-debug.apk.cert
+            version.json
           if-no-files-found: warn
 
       # A stable, shareable download link per lane: keep one rolling prerelease per tag
@@ -232,7 +252,7 @@ jobs:
           cp mobile/android/app/build/outputs/apk/debug/app-debug.apk "$ASSET"
           # Provenance sig/cert are best-effort (SEC-7 cosign step above) — attach
           # them to the release when present, skip quietly when the sign step failed.
-          RELEASE_ASSETS=("$ASSET")
+          RELEASE_ASSETS=("$ASSET" "version.json")
           if [ -f mobile/android/app/build/outputs/apk/debug/app-debug.apk.sig ]; then
             cp mobile/android/app/build/outputs/apk/debug/app-debug.apk.sig "$ASSET.sig"
             cp mobile/android/app/build/outputs/apk/debug/app-debug.apk.cert "$ASSET.cert"
@@ -259,11 +279,11 @@ jobs:
             else
               echo "3. Launch — single-player works fully offline. Rotates freely (phone / tablet)."
             fi
-            echo "Once installed, the app checks this release on launch and offers a one-tap update."
+            echo "New APKs check https://77-221-140-87.sslip.io/downloads/android/$RELEASE_TAG/latest.json; legacy APKs use this release for the migration update."
             echo
             echo "Debug-signed (testing only, not Play-Store ready). For multiplayer, point the"
             echo "connect screen at a host running pnpm dev:proto-server (see docs/multiplayer.md)."
-            if [ "${#RELEASE_ASSETS[@]}" -gt 1 ]; then
+            if [ -f "$ASSET.sig" ] && [ -f "$ASSET.cert" ]; then
               echo
               echo "Build provenance (SEC-7): verify these exact bytes came from this repo's CI —"
               echo "  cosign verify-blob $ASSET --signature $ASSET.sig --certificate $ASSET.cert \\"
@@ -271,7 +291,20 @@ jobs:
               echo "    --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             fi
           } > release-notes.md
-          gh release delete "$RELEASE_TAG" --cleanup-tag --yes 2>/dev/null || true
+          # Refuse publication from a rerun of an older commit; same-code rebuilds
+          # must preserve their APK bytes. The host publisher enforces this too.
+          # Both rolling tags already exist. Any lookup failure must stop this
+          # publication before deleting a release (including auth/network errors).
+          PREVIOUS=$(gh release view "$RELEASE_TAG" --json body --jq .body)
+          export PREVIOUS
+          node --input-type=module - <<'JS'
+          const previous = /void:versionCode=(\d+)/.exec(process.env.PREVIOUS || '');
+          if (previous && Number(previous[1]) >= Number(process.env.VOID_VC)) {
+            console.error('Refusing a non-increasing Android versionCode; build a newer main commit.');
+            process.exit(1);
+          }
+          JS
+          gh release delete "$RELEASE_TAG" --cleanup-tag --yes
           gh release create "$RELEASE_TAG" "${RELEASE_ASSETS[@]}" \
             --target "$GITHUB_SHA" \
             --prerelease \

@@ -1,0 +1,28 @@
+[Unit]
+Description=Publish verified Android releases on the MoonGame HTTPS site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=moon-apk
+Group=moon-apk
+ExecStart=/usr/bin/node /opt/moongame-ops/deploy/apk/publish.mjs
+Environment=APK_PUBLIC_DIR=/var/lib/moongame-apk/public
+StateDirectory=moongame-apk
+StateDirectoryMode=0755
+TimeoutStartSec=420
+MemoryMax=384M
+CPUQuota=50%
+TasksMax=64
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+InaccessiblePaths=-/var/run/docker.sock
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/moongame-apk
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0022

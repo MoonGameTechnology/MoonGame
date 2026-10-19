@@ -6208,6 +6208,7 @@ if (!bootJoinId && !bootReset && document.body.dataset.entry === 'sector-zero')
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
 // в `apkUpdate.ts`. Вне APK вызов тихо ничего не делает.
+if (currentBuild()) document.getElementById('hub-android')?.remove();
 if (!__SECTOR_ZERO_ONLY__) initApkUpdater();
 
 // --- corporation cabinet (AVA-C1/C2) -----------------------------------------

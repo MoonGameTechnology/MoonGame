@@ -3106,6 +3106,10 @@ export const en: Record<string, string> = {
   'locale.pick.aria': 'Language: {lang}',
   'hub.tile.support': 'Support',
   'hub.tile.tutorial': 'Tutorial',
+  'hub.android.title': 'Android app',
+  'hub.android.download': 'Download APK',
+  'hub.android.scan': 'Open on your phone',
+  'hub.android.qr': 'Download the Android app with this code',
   'hub.tile.updates': 'Updates',
   'hub.wallet.auction': 'Warrants: {n}. Open the auction',
 
@@ -4126,10 +4130,10 @@ export const en: Record<string, string> = {
   'upd.build': 'build {b}',
   'upd.checking': 'check: {msg}',
   'upd.current': '✓ up to date · local {l} · server {r}',
-  'upd.go': 'Update',
-  'upd.http-error': '✗ GitHub answered {s}',
+  'upd.go': 'Download update',
+  'upd.http-error': '✗ update site answered {s}',
   'upd.later': 'Later',
-  'upd.no-network': "✗ can't reach GitHub (network / VPN?)",
+  'upd.no-network': "✗ can't reach the update site",
 
   // --- welcome — Экран приветствия: вход, регистрация, восстановление, список матчей, подвал.
   'welcome.apple': 'Sign in with Apple',

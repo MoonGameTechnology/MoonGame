@@ -3116,6 +3116,10 @@ export const ru: Record<string, string> = {
   'locale.pick.aria': 'Язык: {lang}',
   'hub.tile.support': 'Поддержка',
   'hub.tile.tutorial': 'Обучение',
+  'hub.android.title': 'Приложение для Android',
+  'hub.android.download': 'Скачать APK',
+  'hub.android.scan': 'Откройте на телефоне',
+  'hub.android.qr': 'QR-код для скачивания приложения',
   'hub.tile.updates': 'Обновления',
   'hub.wallet.auction': 'Варранты: {n}. Открыть аукцион',
 
@@ -4133,10 +4137,10 @@ export const ru: Record<string, string> = {
   'upd.build': 'сборка {b}',
   'upd.checking': 'проверка: {msg}',
   'upd.current': '✓ актуально · локально {l} · сервер {r}',
-  'upd.go': 'Обновить',
-  'upd.http-error': '✗ GitHub ответил {s}',
+  'upd.go': 'Скачать обновление',
+  'upd.http-error': '✗ сайт ответил {s}',
   'upd.later': 'Позже',
-  'upd.no-network': '✗ нет связи с GitHub (сеть / VPN?)',
+  'upd.no-network': '✗ нет связи с сайтом обновлений',
 
   // --- welcome — Экран приветствия: вход, регистрация, восстановление, список матчей, подвал.
   'welcome.apple': 'Войти через Apple',

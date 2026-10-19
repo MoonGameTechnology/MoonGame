@@ -48,7 +48,7 @@ if (html.includes('window.__BUILD__')) {
 }
 
 // JSON.stringify keeps the values safely quoted/escaped inside the inline script.
-const tag = `<script>window.__BUILD__=${JSON.stringify({ versionCode, sha, server })};</script>`;
+const tag = `<script>window.__BUILD__=${JSON.stringify({ versionCode, versionName: process.env.VOID_VN, sha, server })};</script>`;
 if (!html.includes('</head>')) {
   throw new Error('inject-build: no </head> in the HTML to anchor the build tag');
 }

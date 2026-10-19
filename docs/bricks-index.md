@@ -17,6 +17,7 @@
 
 | ID | Ст. | Зоны | Где | Заголовок |
 | --- | --- | --- | --- | --- |
+| APK-SITE-1 | ✅ |  | `docs/backlog.md` | Один HTTPS source на VPS для sideload update и desktop |
 | FOG-11 | ✅ | core srv proto | `docs/backlog.md` | Свой бой виден целиком. |
 | FOG-12 | ✅ | proto | `docs/backlog.md` | Чужой захват и гибель чужого флота — не новость. |
 | FOG-13 | ✅ | proto | `docs/backlog.md` | Первый шаг партии журнал судит по её же зрению. |

@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12439 зелёных** (142 skip, всего12581 в1006 файлах;1001 passed/5 skipped, прогон2026-10-18, база ce9713a8 + OBS containers). Без test PostgreSQL DSN, age и реального test Caddy соответствующие проверки пропущены; on-host container/dashboard/stale проверки описаны в [профиле VPS](../deploy/observability/VPS.md).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 12492 зелёных** (136 skip, всего12628 в1013 файлах;1007 passed/6 skipped, прогон2026-10-19, базаeb4a4caa + APK site). Без test PostgreSQL DSN, age и полного test Android SDK соответствующие проверки пропущены; реальная установка на физический Android не выполнялась. Сценарии update/download/QR и проверки APK на VPS описаны в [runbook](../deploy/apk/README.md).
 
 
 **Стресс-тест 2026-10-11:** устранены heap OOM при выдаче HTML, неограниченная durable-очередь и ложная readiness при отказе БД; добавлены отказ по заполненной очереди без расхода sequence, проверка актуальности peer и защита legacy restore от чужого schema marker без второй копии SQL. Подтверждение места повторяет временные отказы при полной очереди и проверяет сокет и поколение заявки непосредственно при исполнении очереди; disconnect отменяет ещё не начатое подтверждение без квитанции. Recovery-письма форматирует внешний адаптер под локаль получателя; оба хоста инъецируют его в auth API, а серверный пакет передаёт только структурные параметры и не зависит от каталогов локализации. 160 WSS-клиентов за 20 минут записали 9 579 уникальных команд без потерь/дублей/расхождений; при 160 × 0,5 команды/s стенд уже перегружается. Обе игры проверены в Chromium desktop/mobile. [Полный отчёт, профили ресурсов и ограничения](reviews/2026-10-11-full-stress.md).
@@ -947,14 +947,18 @@ Sector Zero: `decisions/sectorZeroMenu.ts`, `decisions/sectorZeroProgress.ts` (�
   ширине), выбор стартового мира в сетапе ловит тап по ближайшему кандидату, cmdbar
   влезает в узкий экран (подписи 10px, перенос), пинч-зум страницы разрешён (a11y —
   жесты карты и так живут на canvas/touch-action:none).
-  **Автообновление (плейтест):** APK сравнивает свой baked `window.__BUILD__`
-  (versionCode = счётчик коммитов, инжект CI) с маркером СВОЕГО rolling-релиза —
-  `alpha` для дев-APK, `player` для player-APK (`updater.ts` резолвит лейн из
-  `__PLAYER_BUILD__`-define; GitHub REST, все отказы → «нет обновления»); `#updbar` —
-  **глобальный fixed-баннер** (z-96, поверх welcome/хаба/матча — раньше жил внутри
-  `#connect`, и путь возвращающегося игрока через хаб его никогда не видел), «Обновить»
-  отдаёт APK-ассет системному браузеру через `window.VoidNative.open`
-  (`mobile/patch-updater.mjs`), подпись стабильна (закоммиченный debug.keystore).
+  **Обновление APK с нашего сайта:** baked `window.__BUILD__` (versionCode = счётчик
+  коммитов, versionName = lane-SHA) сравнивается с HTTPS `latest.json` своего лейна
+  на VPS. `updater.ts` принимает только возрастающий code и immutable APK того же
+  origin/lane; timeout5s/body16KiB, offline/ошибки не блокируют игру. Глобальный
+  `#updbar` показывает versionName и plain-text изменения, «Скачать обновление»
+  отдаёт URL системному браузеру через `VoidNative.open`; Android требует согласия
+  на установку. Прежние appId/ключ/WebView origin сохранены, RuStore не обращается
+  за sideload updates. В desktop-хабе блок Android и локально сгенерированный QR
+  ведут на один `player/latest.apk`; в APK промо удаляется при старте, из архива площадки исключено.
+  Непривилегированный host timer проверяет digest/сертификат/package/версии и
+  атомарно переключает JSON+APK; старые release markers нужны для одного перехода
+  старых клиентов. [Публикация и проверка](../deploy/apk/README.md).
   Тихая проверка: на старте, при возврате приложения в форграунд
   (`visibilitychange`) и раз в 4ч — с троттлингом 15 мин; ручная — кнопка на
   `#connect` (диагностика в `cver`) и **тайл «Обновления» в хабе** (диагностика в
@@ -5498,7 +5502,8 @@ guided sandbox) в player-клиенте живо — идёт на фикс-т�
 APK собирается в двух лейнах (matrix в `android.yml`): дев — rolling-релиз `alpha`
 (`com.voiddominion.prototype`, как раньше), player — rolling-релиз `player`
 (`void-dominion-player.apk`, свой `com.voiddominion.player` — ставится рядом с
-дев-версией); каждый APK автообновляется из своего лейна.
+дев-версией); каждый sideload APK проверяет `latest.json` своего лейна на нашем
+VPS. GitHub releases используются сборкой/host publisher и для миграции старых APK.
 
 - **Реальное ядро** в браузере: `createKernel([sector, planetType, tax, faction, hunger,
 economy, movement, hero, heroEffects, orbital, combat, intercept, captureOnArrival,

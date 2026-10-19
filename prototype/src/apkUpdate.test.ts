@@ -9,6 +9,7 @@ import type { UpdateCheck } from './updater';
 
 const info = {
   versionCode: 42,
+  versionName: 'alpha-deadbee',
   sha: 'deadbee',
   apkUrl: 'https://example.invalid/app.apk',
   notes: 'rolling',

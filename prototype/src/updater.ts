@@ -1,196 +1,106 @@
-// In-app APK auto-update for the sideloaded Android build.
-//
-// This is DORMANT in the browser / dev build: only the packaged APK carries a baked
-// build identity (`window.__BUILD__`, injected into index.html at package time by CI —
-// see mobile/inject-build.mjs). In the browser the content is always live, so there is
-// nothing to update and every entry point below short-circuits to "no update".
-//
-// Flow (APK only):
-//   1. read our own build  → window.__BUILD__ = { versionCode, sha }
-//   2. fetch the rolling "alpha" GitHub release via the CORS-enabled REST API
-//      (api.github.com sends Access-Control-Allow-Origin: *, so the WebView can read it;
-//       the release *asset* download endpoints do not, which is why we read the version
-//       out of the release BODY rather than fetching a separate version.json asset)
-//   3. compare versionCode → if the release is strictly newer, surface it
-//   4. "Обновить" navigates the WebView to the APK asset URL. GitHub serves the asset
-//      with Content-Disposition: attachment, so the WebView treats it as a download and
-//      fires the native DownloadListener (MainActivity), which downloads it and launches
-//      the system installer. Outside the APK that navigation is just a browser download.
-//
-// CI bakes a monotonic versionCode (commit count) and the short SHA into BOTH the APK
-// (mobile/patch-updater.mjs → build.gradle) and the release body marker, so the running
-// build and the published build are compared on the same integer.
+// Optional sideload updates from our HTTPS site. Never a dependency of game boot.
+// RuStore builds keep their store channel; browser builds do not check APK versions.
+import distribution from '../../mobile/distribution.json';
 
 export interface BuildInfo {
-  /** Monotonic Android versionCode (commit count at build time). */
   versionCode: number;
-  /** Short git SHA, for display ("alpha-<sha>"). */
   sha: string;
+  versionName?: string;
 }
-
 export interface UpdateInfo extends BuildInfo {
-  /** Direct download URL of the rolling release's APK asset. */
+  versionName: string;
   apkUrl: string;
-  /** Full release body (shown to the player as "what's new"). */
   notes: string;
 }
-
-// Release lane: the PLAYER APK updates from its own rolling release (tag `player`,
-// asset `void-dominion-player.apk`), the dev APK from `alpha` — same repo, same body
-// marker format, published side by side by .github/workflows/android.yml.
-// `__PLAYER_BUILD__` is the build-profile define (see main.ts); vitest imports this
-// module with NO define, so resolve it defensively — tests exercise the dev lane.
 declare const __PLAYER_BUILD__: boolean | undefined;
-const RELEASE_TAG =
-  typeof __PLAYER_BUILD__ !== 'undefined' && __PLAYER_BUILD__ === true ? 'player' : 'alpha';
-
-/** Rolling prerelease of this build's lane — a stable tag whose APK asset URL never changes.
- *
- *  Путь пишется КАНОНИЧЕСКИЙ, а не «тот, что пока редиректит». Репозиторий уже дважды
- *  переезжал (`moonwuk/nygame` → `Moonwuk/MoonGame` → `MoonGameTechnology/MoonGame`), и
- *  API GitHub всё это время послушно отдавал 301 — то есть обновление АПК работало по
- *  цепочке редиректов. Опасность не в том, что цепочка порвётся, а в том, что старое имя
- *  можно занять: `isTrustedApkUrl` ниже пускает любой github.com-хост, поэтому чужой
- *  репозиторий под освободившимся именем скормил бы установщику свой APK, пройдя
- *  аллоулист. Ссылаемся на текущее имя. */
-const RELEASE_API = `https://api.github.com/repos/MoonGameTechnology/MoonGame/releases/tags/${RELEASE_TAG}`;
-const APK_ASSET = `void-dominion-${RELEASE_TAG}.apk`;
-
-/**
- * The APK download must come from GitHub's own release-asset hosts over HTTPS. The version
- * check reads a URL out of the release JSON and hands it to the system browser to install;
- * this allowlist means a tampered/malformed release body can't redirect the install to an
- * arbitrary origin. (The release JSON already arrives over a TLS-validated api.github.com
- * connection — this is defense-in-depth on the one value we then act on.)
- */
-export function isTrustedApkUrl(url: string): boolean {
-  let u: URL;
-  try {
-    u = new URL(url);
-  } catch {
-    return false;
-  }
-  if (u.protocol !== 'https:') return false;
-  const h = u.hostname.toLowerCase();
-  return (
-    h === 'github.com' ||
-    h.endsWith('.github.com') ||
-    h === 'githubusercontent.com' ||
-    h.endsWith('.githubusercontent.com')
-  );
-}
-
+export const RELEASE_LANE = typeof __PLAYER_BUILD__ !== 'undefined' && __PLAYER_BUILD__ === true ? 'player' : 'alpha';
+export const DOWNLOAD_ROOT = `${distribution.origin}${distribution.basePath}`;
+export const VERSION_URL = `${DOWNLOAD_ROOT}/${RELEASE_LANE}/latest.json`;
+const validCode = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0 && n <= 2100000000;
 interface GlobalWithBuild {
-  __BUILD__?: { versionCode?: unknown; sha?: unknown; server?: unknown; channel?: unknown; privacyUrl?: unknown };
+  __BUILD__?: { versionCode?: unknown; versionName?: unknown; sha?: unknown; server?: unknown; channel?: unknown; privacyUrl?: unknown };
 }
-
-/** Store builds receive updates through their distribution channel. */
 export function isRuStoreBuild(): boolean {
   return (globalThis as GlobalWithBuild).__BUILD__?.channel === 'rustore';
 }
-
-/** Our own build identity, injected into the APK's index.html at package time. */
 export function currentBuild(): BuildInfo | null {
   const b = (globalThis as GlobalWithBuild).__BUILD__;
-  if (!b || typeof b.versionCode !== 'number' || !Number.isFinite(b.versionCode)) return null;
-  return { versionCode: b.versionCode, sha: typeof b.sha === 'string' ? b.sha : '' };
+  if (!b || !validCode(b.versionCode)) return null;
+  return { versionCode: b.versionCode, sha: typeof b.sha === 'string' ? b.sha : '',
+    ...(typeof b.versionName === 'string' ? { versionName: b.versionName } : {}) };
 }
-
-/** The game server baked into the APK at package time (`inject-build.mjs`), or null. */
 export function bakedServer(): string | null {
   const server = (globalThis as GlobalWithBuild).__BUILD__?.server;
   return typeof server === 'string' && server ? server : null;
 }
 
-interface ReleaseAsset {
-  name?: unknown;
-  browser_download_url?: unknown;
+/** Only immutable APKs from this application's lane at the configured HTTPS origin. */
+export function isTrustedApkUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const base = `${distribution.basePath}/${RELEASE_LANE}/`;
+    return u.origin === distribution.origin && !u.username && !u.password && !u.search && !u.hash &&
+      u.pathname.startsWith(base) && new RegExp(`^[1-9][0-9]*-[a-f0-9]{7,40}/void-dominion-${RELEASE_LANE}\\.apk$`).test(u.pathname.slice(base.length));
+  } catch { return false; }
 }
-
-/**
- * Parse the GitHub release JSON into the fields we need, or null if it is unusable.
- * The versionCode is read from a machine marker the build embeds in the release body
- * (`void:versionCode=<n>`); the APK URL from this lane's asset (`APK_ASSET`).
- */
-export function parseRelease(release: unknown): UpdateInfo | null {
-  if (!release || typeof release !== 'object') return null;
-  const r = release as { body?: unknown; assets?: unknown };
-  const body = typeof r.body === 'string' ? r.body : '';
-
-  const vcMatch = /void:versionCode=(\d+)/.exec(body) ?? /versionCode[^\d]{0,6}(\d+)/i.exec(body);
-  if (!vcMatch) return null;
-  const versionCode = Number(vcMatch[1]);
-  if (!Number.isFinite(versionCode)) return null;
-
-  const shaMatch = /void:sha=([0-9a-f]+)/i.exec(body) ?? /\b([0-9a-f]{7,40})\b/.exec(body);
-  const sha = shaMatch ? shaMatch[1]! : '';
-
-  const assets: ReleaseAsset[] = Array.isArray(r.assets) ? (r.assets as ReleaseAsset[]) : [];
-  const apk = assets.find(
-    (a) => !!a && a.name === APK_ASSET && typeof a.browser_download_url === 'string',
-  );
-  if (!apk) return null;
-
-  // Only trust an asset URL served from GitHub over HTTPS — never redirect an install elsewhere.
-  const apkUrl = apk.browser_download_url as string;
-  if (!isTrustedApkUrl(apkUrl)) return null;
-
-  return { versionCode, sha, apkUrl, notes: body };
+export function parseVersion(value: unknown): UpdateInfo | null {
+  if (!value || typeof value !== 'object') return null;
+  const r = value as Record<string, unknown>;
+  if (!validCode(r.versionCode) || typeof r.versionName !== 'string' || !r.versionName.trim() || r.versionName.length > 80 ||
+      typeof r.sha !== 'string' || !/^[a-f0-9]{7,40}$/.test(r.sha) ||
+      typeof r.notes !== 'string' || r.notes.length > 8192 || typeof r.apkUrl !== 'string' || !isTrustedApkUrl(r.apkUrl)) return null;
+  const expected = `${DOWNLOAD_ROOT}/${RELEASE_LANE}/${r.versionCode}-${r.sha}/void-dominion-${RELEASE_LANE}.apk`;
+  if (r.apkUrl !== expected) return null;
+  return { versionCode: r.versionCode, versionName: r.versionName, sha: r.sha, apkUrl: r.apkUrl, notes: r.notes };
 }
-
-/** True when `remote` is a strictly newer build than `local`. */
-export function isNewer(local: BuildInfo, remote: UpdateInfo): boolean {
-  return remote.versionCode > local.versionCode;
-}
-
-/**
- * Check the rolling release for a newer build. Returns the update if one is available,
- * else null — and null on EVERY failure path (no baked build = browser/dev, offline,
- * rate-limited, bad JSON, older-or-equal release). The updater must never throw into the
- * boot path, so all errors collapse to "no update".
- */
-export async function checkForUpdate(fetchImpl: typeof fetch = fetch): Promise<UpdateInfo | null> {
-  const r = await checkForUpdateDetailed(fetchImpl);
-  return r.kind === 'update' ? r.info : null;
-}
-
-/**
- * Every distinct outcome of an update check, so the UI can tell "you're up to date" apart
- * from "the check failed" (they used to collapse to the same null). Powers the manual
- * "Проверить обновления" diagnostic.
- */
+export function isNewer(local: BuildInfo, remote: UpdateInfo): boolean { return remote.versionCode > local.versionCode; }
 export type UpdateCheck =
-  | { kind: 'dormant' } // no baked build (browser / dev) — nothing to update
-  | { kind: 'offline'; error: string } // fetch threw (no network / VPN / DNS)
-  | { kind: 'http'; status: number } // reached GitHub but it answered non-2xx
-  | { kind: 'unparsable' } // got a response we couldn't read a version out of
-  | { kind: 'current'; local: number; remote: number } // already on the newest build
-  | { kind: 'update'; info: UpdateInfo; local: number }; // a newer build is available
+  | { kind: 'dormant' }
+  | { kind: 'offline'; error: string }
+  | { kind: 'http'; status: number }
+  | { kind: 'unparsable' }
+  | { kind: 'current'; local: number; remote: number }
+  | { kind: 'update'; info: UpdateInfo; local: number };
 
+async function readVersion(res: Response): Promise<UpdateInfo | null> {
+  const reader = res.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = []; let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 16384) return null;
+      chunks.push(value);
+    }
+    const body = new Uint8Array(bytes); let offset = 0;
+    for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+    return parseVersion(JSON.parse(new TextDecoder().decode(body)));
+  } finally { await reader.cancel().catch(() => {}); }
+}
 export async function checkForUpdateDetailed(fetchImpl: typeof fetch = fetch): Promise<UpdateCheck> {
   if (isRuStoreBuild()) return { kind: 'dormant' };
   const local = currentBuild();
   if (!local) return { kind: 'dormant' };
-  let res: Response;
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 5000);
   try {
-    res = await fetchImpl(RELEASE_API, { headers: { Accept: 'application/vnd.github+json' } });
-  } catch (e) {
-    return { kind: 'offline', error: e instanceof Error ? e.message : String(e) };
-  }
-  if (!res.ok) return { kind: 'http', status: res.status };
-  let remote: UpdateInfo | null;
-  try {
-    remote = parseRelease(await res.json());
-  } catch {
-    remote = null;
-  }
-  if (!remote) return { kind: 'unparsable' };
-  return isNewer(local, remote)
-    ? { kind: 'update', info: remote, local: local.versionCode }
-    : { kind: 'current', local: local.versionCode, remote: remote.versionCode };
+    const res = await fetchImpl(VERSION_URL, { cache: 'no-store', credentials: 'omit', redirect: 'error',
+      headers: { Accept: 'application/json' }, signal: abort.signal });
+    if (!res.ok) return { kind: 'http', status: res.status };
+    let remote: UpdateInfo | null;
+    try { remote = await readVersion(res); } catch { remote = null; }
+    if (!remote) return { kind: 'unparsable' };
+    return isNewer(local, remote) ? { kind: 'update', info: remote, local: local.versionCode }
+      : { kind: 'current', local: local.versionCode, remote: remote.versionCode };
+  } catch { return { kind: 'offline', error: 'E_UPDATE_UNAVAILABLE' }; }
+  finally { clearTimeout(timer); }
 }
-
-/** Human label for a build ("alpha-1a2b3c4" / "player-1a2b3c4", or "сборка N" when no SHA). */
-export function buildLabel(b: BuildInfo): string {
-  return b.sha ? `${isRuStoreBuild() ? 'rustore' : RELEASE_TAG}-${b.sha}` : `сборка ${b.versionCode}`;
+export async function checkForUpdate(fetchImpl: typeof fetch = fetch): Promise<UpdateInfo | null> {
+  const result = await checkForUpdateDetailed(fetchImpl);
+  return result.kind === 'update' ? result.info : null;
+}
+export function buildLabel(build: BuildInfo): string {
+  return build.versionName || (build.sha ? `${isRuStoreBuild() ? 'rustore' : RELEASE_LANE}-${build.sha}` : String(build.versionCode));
 }
