@@ -259,7 +259,9 @@ export function sideRowHtml(
   );
 }
 
-/** Полоса «запас прочности»: доли сторон цветами владельцев. Меньше двух долей — нет. */
+/** Полоса «запас прочности»: доли сторон цветами владельцев. Меньше двух долей — нет.
+ *  Свою долю отличает не только цвет (UIX-12.1): она заштрихована, а в подписи стоит
+ *  метка «Вы» — при цветослепоте зелёный и красный сливаются. */
 function balanceHtml(sides: readonly Side[], view: BattleView): string {
   const shares = powerShares(sides);
   if (shares.length < 2) return '';
@@ -267,13 +269,18 @@ function balanceHtml(sides: readonly Side[], view: BattleView): string {
   return (
     `<div class="bw-balance"><p class="bw-sub">${esc(t('battle.win.balance'))}</p><div class="bw-bal">` +
     sides
-      .map((s, i) => `<i style="flex:${(shares[i] ?? 0).toFixed(4)};background:${col(s)}"></i>`)
+      .map(
+        (s, i) =>
+          `<i${s.mine ? ' class="mine"' : ''} style="flex:${(shares[i] ?? 0).toFixed(4)};background:${col(s)}"></i>`,
+      )
       .join('') +
     `</div><div class="bw-legend">` +
     sides
       .map(
         (s, i) =>
-          `<span${s.mine ? ' class="mine"' : ''}><i style="background:${col(s)}"></i>${esc(ownerLabel(s, view))} ${Math.round((shares[i] ?? 0) * 100)}%</span>`,
+          `<span${s.mine ? ' class="mine"' : ''}><i style="background:${col(s)}"></i>` +
+          (s.mine ? `<em class="bw-you">${esc(t('battle.win.you'))}</em>` : '') +
+          `${esc(ownerLabel(s, view))} ${Math.round((shares[i] ?? 0) * 100)}%</span>`,
       )
       .join('') +
     `</div></div>`
