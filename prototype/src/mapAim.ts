@@ -38,6 +38,7 @@ import {
   targetPipRadius,
 } from '../../decisions/aimPreview';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
+import { courseReach, type ReachCandidate } from '../../decisions/courseReach';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { engageRoster } from '../../decisions/engageRoster';
 import { nearestHit } from '../../decisions/pointerPick';
@@ -298,6 +299,68 @@ export function relocateSpotPx(base: StrikeBase): { x: number; y: number } | nul
   }
   const f = s.fleets[base.id];
   return f ? fleetAnchor(f) : null;
+}
+
+/** Сроки пути до всех миров для флота на узле `from`. Маршрут — поиск по графу на каждый
+ *  мир, поэтому кадр пересчитывает список, только когда сменились флот, его узел или
+ *  состав (по составу считается скорость). */
+let reachMemo: { key: string; list: ReachCandidate[] } | null = null;
+function reachCandidates(f: Fleet, from: string): ReachCandidate[] {
+  const key = `${f.id}|${from}|${JSON.stringify(f.units)}`;
+  if (reachMemo?.key === key) return reachMemo.list;
+  const s = game.world();
+  const rules = ctx(s.time);
+  const list = game
+    .nodes()
+    .map((n) => ({ id: n.id, hours: n.id === from ? null : estimateTravelHours(s, rules, from, n.id, f) }));
+  reachMemo = { key, list };
+  return list;
+}
+
+/** UIX-7.2: пока «Курс» взведён — кольцо и срок пути у ближайших миров, куда дойдёт первый
+ *  выбранный флот, ещё до наведения. Какие миры — решает `courseReach.ts`; срок тот же, что
+ *  у острия превью (`estimateTravelHours`, `etaText`), и мир под указателем пропускается:
+ *  его срок уже напечатан у острия. */
+export function drawCourseReach(): void {
+  if (!aiming) return;
+  const s = game.world();
+  const f = s.fleets[selectedFleetIds()[0] ?? ''];
+  const from = f ? fleetNode(f) : null;
+  if (!f || !from) return;
+  const MAP = game.nodes();
+  const staged = mobileDraft?.target;
+  const aimed = game.mobile()
+    ? staged?.kind === 'planet'
+      ? staged.id
+      : null
+    : aimPointer
+      ? (nearestHit(MAP, (n) => world(n), aimPointer.x, aimPointer.y, tapRadius('node', tapByTouch))?.id ?? null)
+      : null;
+  const marks = courseReach(reachCandidates(f, from), aimed);
+  if (marks.length === 0) return;
+  const cx = game.ctx();
+  cx.save();
+  cx.setLineDash([]);
+  cx.lineWidth = 1.2;
+  cx.strokeStyle = rgba(LOCK, 0.55);
+  cx.font = '12px ui-monospace,Menlo,monospace';
+  cx.textAlign = 'center';
+  for (const m of marks) {
+    const p = s.planets[m.id];
+    if (!p) continue;
+    const c = world(p.position);
+    cx.beginPath();
+    cx.arc(c.x, c.y, 16, 0, TAU);
+    cx.stroke();
+    cx.lineWidth = 3;
+    cx.strokeStyle = 'rgba(4,10,16,0.85)';
+    cx.strokeText(etaText(m.hours), c.x, c.y + 30);
+    cx.fillStyle = rgba(LOCK, 0.95);
+    cx.fillText(etaText(m.hours), c.x, c.y + 30);
+    cx.lineWidth = 1.2;
+    cx.strokeStyle = rgba(LOCK, 0.55);
+  }
+  cx.restore();
 }
 
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
