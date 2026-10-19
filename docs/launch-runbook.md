@@ -67,8 +67,9 @@ pnpm host   # сборка клиента + сервер на 0.0.0.0:8788, пе
   (сверено 2026-10-19). Если деплой снова начнёт падать за ~3 с без шагов, Pages выключились
   в настройках: Settings → Pages → Source «GitHub Actions» (подробно — комментарий в
   `pages.yml`).
-- **Клиент из веба (Cloudflare)** — воркер `moongame` раздаёт статику без своего кода
-  (`wrangler.jsonc` в корне). Workers Builds выкладывает его на каждый push в `main`
+- **Клиент из веба (Cloudflare)** — воркер раздаёт статику без своего кода
+  (`wrangler.jsonc` в корне, имя в нём — `moongame`; сборки и превью в Cloudflare идут под
+  именем `void-dominion`). Workers Builds выкладывает его на каждый push в `main`
   командой `npx wrangler deploy`, а пуш в любую другую ветку — превью командой
   `npx wrangler preview`. Сайт обе команды собирают сами: `build.command` в
   `wrangler.jsonc` — `pnpm run site` (сборка прототипа + `scripts/stage-site.mjs`), так
@@ -78,8 +79,9 @@ pnpm host   # сборка клиента + сервер на 0.0.0.0:8788, пе
   партий сюда не едет — только клиент, а адрес сервера вшивается в страницы на сборке
   (`GAME_SERVER` в `build.command`, `scripts/siteServer.mjs`), и поле «сервер» стартует на
   нём. Сервер пускает такую страницу, только если её origin есть в `ALLOWED_ORIGINS` на
-  хосте сервера (и для `/auth`, `/matches` по CORS, и для рукопожатия WS). В PR превью — это проверка «Workers Builds:
-  moongame»: мерж её не ждёт, а лог сборки виден только в дашборде Cloudflare.
+  хосте сервера (и для `/auth`, `/matches` по CORS, и для рукопожатия WS). В PR превью — это
+  проверка «Workers Builds: void-dominion»: мерж её не ждёт, а лог сборки виден только в
+  дашборде Cloudflare.
 - **Android APK** — `android.yml` собирает два APK: dev (rolling-релиз `alpha`) и player
   (rolling-релиз `player`, свой applicationId, ставится рядом с dev). В каждом встроен
   автоапдейтер своего релиза. Адрес сервера вшит на сборке (`VOID_SERVER`, сейчас VPS
