@@ -1849,6 +1849,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #battlewinbody .bw-balance{margin-bottom:10px;}
 #battlewinbody .bw-bal{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05);}
 #battlewinbody .bw-bal i{display:block;min-width:3px;transition:flex .6s ease;}
+/* UIX-12.1: своя доля отличается штриховкой, а не только цветом */
+#battlewinbody .bw-bal i.mine{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.38) 0 3px,transparent 3px 7px) !important;}
 #battlewinbody .bw-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:var(--fs-body);color:var(--dim);}
 #battlewinbody .bw-legend span{display:inline-flex;align-items:center;gap:5px;}
 #battlewinbody .bw-legend span.mine{color:var(--cyan);font-weight:700;}

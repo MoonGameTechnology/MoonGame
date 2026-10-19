@@ -163,6 +163,21 @@ describe('окно боя', () => {
     ).not.toContain('bw-bal');
   });
 
+  it('свою долю полосы отличает не только цвет: штриховка и «Вы» в подписи (UIX-12.1)', () => {
+    const a = side('p1', 'attacker', true);
+    const b = side('p2', 'defender');
+    a.hull = { current: 100, max: 100 };
+    b.hull = { current: 100, max: 100 };
+    const html = battleWindowHtml(battle([a, b]), [], { color: () => '#888888' });
+    const bar = html.slice(html.indexOf('bw-bal'), html.indexOf('bw-legend'));
+    expect(bar.match(/<i class="mine"/g)).toHaveLength(1);
+    const legend = html.slice(html.indexOf('bw-legend'));
+    const own = legend.slice(legend.indexOf('<span class="mine">'));
+    expect(own.slice(0, own.indexOf('</span>'))).toContain(t('battle.win.you'));
+    // У чужой стороны метки нет: «Вы» встречается в подписи ровно раз.
+    expect(legend.slice(0, legend.indexOf('</div>')).split(t('battle.win.you')).length - 1).toBe(1);
+  });
+
   it('владелец назван словами хоста, а не именем из состояния (UIX-5.3)', () => {
     // В состоянии имя дома — английское имя данных; окно стояло на нём и в русской версии:
     // «Azure Compact · флот» в строке стороны и в легенде полосы сил.
