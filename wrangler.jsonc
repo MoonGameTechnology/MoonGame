@@ -9,8 +9,9 @@
   // Wrangler runs this before it reads the assets directory, for `deploy` and `preview`
   // alike. The dashboard build command covers production builds only: preview builds
   // skipped it and failed on a missing `prototype/dist/site`.
+  // GAME_SERVER: the match server the site sends players to (scripts/siteServer.mjs).
   "build": {
-    "command": "pnpm run site",
+    "command": "GAME_SERVER=wss://77-221-140-87.sslip.io pnpm run site",
   },
   "assets": {
     // Staged by `scripts/stage-site.mjs`: only the player-facing pages of prototype/dist.
