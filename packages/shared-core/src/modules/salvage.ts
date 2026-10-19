@@ -32,7 +32,8 @@
  * point exists so that mechanic needs no edit here.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { BuildingInstance } from '../state/gameState';
+import type { BuildingInstance, GameState } from '../state/gameState';
+import { matchCost } from '../util/pricing';
 import type { GameData } from '../data/schemas';
 import { refundCost } from '../util/treasury';
 import { receivesResource } from '../util/infestation';
@@ -53,12 +54,13 @@ function addBag(pool: Pool, bag: Readonly<Record<string, unknown>> | undefined, 
 
 /** What raising this building actually cost: its base price plus every upgrade paid
  *  for up to its current level (level 1 = base only). */
-function addInvested(pool: Pool, data: GameData, b: BuildingInstance): void {
+function addInvested(pool: Pool, state: Pick<GameState, 'pricing'>, data: GameData, b: BuildingInstance): void {
   const def = data.buildings[b.type];
   if (!def) return;
-  addBag(pool, def.cost);
+  // Цена партии, а не каталога: обломки — доля того, что за здание заплачено.
+  addBag(pool, matchCost(state, def.cost));
   const paidUpgrades = Math.max(0, Math.floor(b.level) - 1);
-  for (const up of (def.upgrades ?? []).slice(0, paidUpgrades)) addBag(pool, up.cost);
+  for (const up of (def.upgrades ?? []).slice(0, paidUpgrades)) addBag(pool, matchCost(state, up.cost));
 }
 
 /** Hand `pool × share` to each winner, split between them. Splitting (rather than
@@ -107,7 +109,7 @@ export const salvageModule: GameModule = {
       const count = p['count'];
       if (typeof at !== 'string' || typeof unit !== 'string') return;
       if (typeof count !== 'number' || !(count > 0)) return;
-      addBag(entryAt(h, at).pool, h.ctx.data.units[unit]?.cost, count);
+      addBag(entryAt(h, at).pool, matchCost(h.state, h.ctx.data.units[unit]?.cost), count);
     });
 
     api.on('battle.resolved', (event, h) => {
@@ -143,7 +145,7 @@ export const salvageModule: GameModule = {
       // kind of order-dependence invariant #6 allows (and `salvage` sits directly
       // before `construction` in both kernels for exactly this reason).
       const pool: Pool = {};
-      for (const b of planet.buildings) addInvested(pool, h.ctx.data, b);
+      for (const b of planet.buildings) addInvested(pool, h.state, h.ctx.data, b);
       payOut(h, pool, winners, planetId);
     });
 

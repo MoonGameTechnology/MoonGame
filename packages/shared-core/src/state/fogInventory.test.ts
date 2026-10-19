@@ -64,6 +64,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // PVR-6.17: дерево технологий матча — тоже правила стола из режима; окно технологий
   // каждого игрока рисует по ним, какие узлы есть и заперты ли дни.
   techRules: 'public',
+  // Цены партии — тоже правила стола: окно стройки каждого игрока показывает по ним цену.
+  pricing: 'public',
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
@@ -215,6 +217,7 @@ function maximalState(): GameState {
     modeId: 'pve_waves',
     sight: { world: 330, fleet: 90, radarScale: 2.5 },
     techRules: { dayGates: false, exclude: ['ai_stewardship'] },
+    pricing: { cost: { metal: 1.5 }, hours: 2, start: { metal: 1.5 } },
     startedAt: 0,
     match: {
       status: 'ongoing',

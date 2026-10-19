@@ -664,6 +664,15 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     }
   }
 
+  if (map.pricing) {
+    const { cost, hours, start } = map.pricing;
+    base.pricing = {
+      ...(cost ? { cost: { ...cost } } : {}),
+      ...(hours !== undefined ? { hours } : {}),
+      ...(start ? { start: { ...start } } : {}),
+    };
+  }
+
   // per-sector links from the resolved adjacency (sorted = JSON-stable), plus the
   // borders terrain shut — a derived map publishes those so the renderer can draw the
   // barrier without re-deriving the geometry (M4.3).

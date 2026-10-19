@@ -778,6 +778,7 @@ export function planetPanelHtml(p: Planet): string {
       s.players[ME]?.resources ?? {},
       data,
       s.players[ME]?.technologies?.completed ?? [],
+      s,
     );
     if (fortress.show) {
       const off = fortress.enabled ? '' : ' disabled';
@@ -835,6 +836,7 @@ export function forkPanelHtml(fork: { province: string; trail: number }): string
     s.players[ME]?.resources ?? {},
     data,
     s.players[ME]?.technologies?.completed ?? [],
+    s,
   );
   if (raise.show) {
     const off = raise.enabled ? '' : ' disabled';

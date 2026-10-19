@@ -20,7 +20,13 @@
  * вместо слотов честный счётчик «построено: N») и «Черта: заражено» (каталог
  * прототипа не несёт черт зданий). Оба — остаток в бэклоге, не ложь на экране.
  */
-import { BASE_BUILDING_DEFENSE, buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/index';
+import {
+  BASE_BUILDING_DEFENSE,
+  buildingLevel,
+  buildingMaxLevel,
+  matchCost,
+  matchHours,
+} from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
@@ -260,8 +266,8 @@ export function buildScreenHtml(
     const nextLvl = st.st === 'built' ? st.level + 1 : 1;
     const lv = nextLvl <= maxLvl ? buildingLevel(def, nextLvl) : null;
     const foot = lv
-      ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(lv.cost, res)}</span>` +
-        `<span class="bw-dur">${fmtDur(lv.buildTimeHours)}</span></div>`
+      ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(matchCost(state, lv.cost), res)}</span>` +
+        `<span class="bw-dur">${fmtDur(matchHours(state, lv.buildTimeHours))}</span></div>`
       : '';
     // Рамка строки — что с ней можно сделать: улучшаемое горит, как доступное к стройке.
     const look =
@@ -325,7 +331,7 @@ export function unitScreenHtml(
     .map((id) => {
       const def = data.units[id];
       if (!def) return '';
-      if (isLander(def)) return landerRowHtml(me, planetId, id, res, probe, lockText, unitArt(state, me, id));
+      if (isLander(def)) return landerRowHtml(state, me, planetId, id, res, probe, lockText, unitArt(state, me, id));
       const code = probe(buildUnit(me, planetId, id, 1));
       if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
       const locked = code !== null && code !== 'E_INSUFFICIENT';
@@ -336,7 +342,7 @@ export function unitScreenHtml(
       return (
         `<div class="bw-item st-${locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
-        `<div class="bw-foot"><span>${cost(def.cost, res)}</span><span class="bw-dur">${fmtDur(def.buildTimeHours)}</span></div></div>`
+        `<div class="bw-foot"><span>${cost(matchCost(state, def.cost), res)}</span><span class="bw-dur">${fmtDur(matchHours(state, def.buildTimeHours))}</span></div></div>`
       );
     })
     .join('');
@@ -362,6 +368,7 @@ function unitArt(state: GameState, me: string, id: string): string {
  * (`orderableTroops`); некого — строка заперта кодом первого кандидата своей фракции.
  */
 function landerRowHtml(
+  state: GameState,
   me: string,
   planetId: string,
   id: string,
@@ -386,10 +393,10 @@ function landerRowHtml(
   const pick = troops
     .map((g) => {
       const short = probe(order(g)) !== null; // E_INSUFFICIENT: цена видна, кнопка серая
-      const hours = orderHours(data, id, g);
+      const hours = matchHours(state, orderHours(data, id, g));
       return (
         `<div class="bw-foot"><button class="bw-take btn-main" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
-        `<span>${cost(landerCost(data, id, g), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`
+        `<span>${cost(landerCost(data, id, g, state), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`
       );
     })
     .join('');

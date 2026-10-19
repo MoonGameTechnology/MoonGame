@@ -993,6 +993,10 @@ export interface GameState {
    *  (`data.modes[id].technology`), закреплённые на первом шаге часов — как `sight`. Нет
    *  поля ⇒ дерево сетевого матча (`DEFAULT_TECH_RULES`, `modules/technology.ts`). */
   techRules?: TechRules;
+  /** Цены партии (`util/pricing.ts`): множители, которые карта основной игры
+   *  закрепляет при создании партии. Нет поля ⇒ цены и сроки каталога (Sector Zero и
+   *  всё, что создано до резолюции владельца 2026-10-18). */
+  pricing?: MatchPricing;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -1763,6 +1767,16 @@ export interface SightRules {
   fleet: number;
   /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
   radarScale: number;
+}
+
+/** Множители цен партии (`MatchMap.pricing`, `util/pricing.ts`). */
+export interface MatchPricing {
+  /** Множитель цены по ресурсу: строка каталога × множитель. Нет ресурса ⇒ ×1. */
+  cost?: Record<string, number>;
+  /** Множитель сроков постройки и исследования. Нет ⇒ ×1. */
+  hours?: number;
+  /** Множитель стартового запаса места по ресурсу. Нет ресурса ⇒ ×1. */
+  start?: Record<string, number>;
 }
 
 /** Правила дерева технологий матча (PVR-6.17). */

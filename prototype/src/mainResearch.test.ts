@@ -4,7 +4,7 @@ import { data } from './gameData';
 import { order, advance, canOrder, traceHooks } from './protoKernel';
 import { HOUR } from './time';
 import { buildBuilding, buildUnit, researchTech, spawnHero } from '../../decisions/actions';
-import { technologyLock, techInMatch, technologiesUnlocking } from '../../packages/shared-core/src/index';
+import { matchHours, technologyLock, techInMatch, technologiesUnlocking } from '../../packages/shared-core/src/index';
 import { TECH_BRANCHES, techTreeHtml } from './techTree';
 import { aiOrders } from './ai';
 import type { MapId } from './mapCatalog';
@@ -82,7 +82,8 @@ describe('main-game research progression', () => {
     expect(canOrder(s, buildBuilding('p1', 'home_1', 'barracks'))).toBeNull();
     expect(canOrder(s, buildBuilding('p1', 'home_1', 'spaceport'))).toBe('E_TECH_LOCKED');
     const r = order(s, researchTech('p1', 'spaceport_infrastructure'), s.time);
-    expect(r.error).toBeUndefined(); s = advance(r.state, 3 * HOUR).state;
+    const hours = matchHours(s, data.technologies.spaceport_infrastructure!.researchTimeHours);
+    expect(r.error).toBeUndefined(); s = advance(r.state, (hours + 1) * HOUR).state;
     expect(canOrder(s, buildBuilding('p1', 'home_1', 'spaceport'))).toBeNull();
   });
 

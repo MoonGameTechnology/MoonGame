@@ -1467,6 +1467,18 @@ export const TechnologyRulesSchema = z
   })
   .strict();
 
+/** Цены партии, которые объявляет карта (`MatchMap.pricing`, `util/pricing.ts`):
+ *  множители к цене каталога по ресурсу, к срокам постройки и исследования и к
+ *  стартовому запасу места. Резолюция владельца 2026-10-18 делает корабли, юниты, здания
+ *  и технологии дорогими только в основной игре, а каталог у неё общий с Sector Zero. */
+export const MatchPricingSchema = z
+  .object({
+    cost: z.record(z.string(), z.number().positive()).optional(),
+    hours: z.number().positive().optional(),
+    start: z.record(z.string(), z.number().positive()).optional(),
+  })
+  .strict();
+
 /**
  * A game mode — the named preset of rules a match runs under (docs/game-modes-roadmap.md
  * GM-0.1). A mode is DATA: "3v3 against the Swarm" is a JSON entry plus an optional

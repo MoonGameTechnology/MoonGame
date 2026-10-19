@@ -1,5 +1,6 @@
 import type { GameModule } from '../kernel/module';
 import type { GameState, Planet, UnitStack } from '../state/gameState';
+import { matchHours } from '../util/pricing';
 import type { GameData, ResourceBag } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import { bombardedPlanets } from '../state/orbit';
@@ -87,6 +88,7 @@ function mergeBags(a: ResourceBag, b: ResourceBag): ResourceBag {
  *  exact amount as a rate over the FULL span so `rate × hours` reproduces it exactly. */
 function pendingProduction(
   scheduled: GameState['scheduled'],
+  pricing: Pick<GameState, 'pricing'>,
   planet: Planet,
   data: GameData,
   ctx: Context,
@@ -132,7 +134,7 @@ function pendingProduction(
       const def = data.buildings[p.building];
       if (!def) continue;
       const level1 = buildingLevel(def, 1);
-      addRamped(level1.produces, event.at, hoursToMs(ctx, level1.buildTimeHours));
+      addRamped(level1.produces, event.at, hoursToMs(ctx, matchHours(pricing, level1.buildTimeHours)));
     } else if (p.kind === 'upgrade' && typeof p.building === 'string' && typeof p.level === 'number') {
       const def = data.buildings[p.building];
       const instance = planet.buildings.find((b) => b.type === p.building);
@@ -144,7 +146,7 @@ function pendingProduction(
       for (const res of resources) {
         delta[res] = (target.produces[res] ?? 0) - (current.produces[res] ?? 0);
       }
-      addRamped(delta, event.at, hoursToMs(ctx, target.buildTimeHours));
+      addRamped(delta, event.at, hoursToMs(ctx, matchHours(pricing, target.buildTimeHours)));
     }
   }
   return out;
@@ -324,7 +326,7 @@ export const economyModule: GameModule = {
           mergeBags(
             mergeBags(
               baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
-              pendingProduction(builds.get(planetId) ?? [], planet, data, h.ctx, from, to, hours),
+              pendingProduction(builds.get(planetId) ?? [], h.state, planet, data, h.ctx, from, to, hours),
             ),
             pausedProduction(planet, data),
           ),

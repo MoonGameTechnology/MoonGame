@@ -825,7 +825,9 @@ function connectLive(url: string): void {
       case 'pick': {
         const unit = target.dataset.unit;
         if (!unit) return;
-        const made = createLoadoutEditor(unit, HUD_DATA, live.players[me]?.resources ?? {});
+        const made = createLoadoutEditor(unit, HUD_DATA, live.players[me]?.resources ?? {}, {
+          pricing: live.pricing,
+        });
         if (!made.ok) {
           setNetStatus(t('client.rejected', { text: refusalText(made.code) }));
           return;

@@ -9,6 +9,9 @@ export { playablePlayerIds } from './state/playableSeats';
 // Determinism
 export { Rng, seedRng, type RngState } from './rng/rng';
 
+// Цены партии (основная игра дороже каталога, резолюция владельца 2026-10-18)
+export { matchCost, matchHours, matchStart } from './util/pricing';
+
 // State model
 export {
   createInitialState,
@@ -21,6 +24,7 @@ export {
   type FogMemory,
   type SightRules,
   type TechRules,
+  type MatchPricing,
   type Hero,
   type HeroSiege,
   type TempLane,
