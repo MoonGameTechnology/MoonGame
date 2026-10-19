@@ -1682,6 +1682,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #log{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:10px 14px;
   font:var(--fs-caption)/1.6 var(--sf-font);font-variant-numeric:tabular-nums;color:#73b6a2;scrollbar-width:thin;}
 #log div::before{content:"> ";color:var(--grn-dim);}
+/* UIX-4.2: «Ждёт решения» над журналом — бои и письма с кнопкой «Показать» */
+#log-pending:empty{display:none;}
+#log-pending{padding:10px 14px;border-bottom:1px solid var(--line-hi);display:flex;flex-direction:column;gap:6px;}
+.lw-pend-title{font-size:var(--fs-caption);color:var(--cyan);}
+.lw-pend-row{display:flex;align-items:center;gap:10px;font-size:var(--fs-body);color:var(--fg,#d8f3ee);}
+.lw-pend-row span{flex:1;min-width:0;}
+.lw-pend-show{flex:none;min-height:44px;padding:0 14px;}
 
 /* technologies + steward + heroes windows (modal, mirror #logwin) */
 #tech,#steward,#battlewin{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
@@ -4188,7 +4195,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </nav>
 <!-- floating chat window (desktop only) — content rendered by renderChat() in main.ts -->
 <div id="chatwin" class="desk-only"></div>
-<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close btn-x">✕</button></div><div id="log"></div></div></div>
+<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close btn-x">✕</button></div><div id="log-pending"></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
 <div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="techbody"></div></div></div>
 <div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>

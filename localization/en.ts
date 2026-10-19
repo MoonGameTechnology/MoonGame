@@ -4178,6 +4178,11 @@ export const en: Record<string, string> = {
 
   // --- win — Заголовки окон матча (сводки, технологии, хранитель, конструкторы).
   'win.log.recap': 'Return digest',
+  'win.log.pending.battle-mine': 'Your battle: {place}',
+  'win.log.pending.battle-seen': 'Battle nearby: {place}',
+  'win.log.pending.letters': '{n} unread {n|message|messages}',
+  'win.log.pending.show': 'Show',
+  'win.log.pending.title': 'Needs your decision',
   'win.log.title': 'Events',
   'win.scipick.close': 'Close',
   'win.scipick.title': 'Science council',

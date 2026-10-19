@@ -38,9 +38,14 @@ import {
   dispatchChat,
   initMessageLog,
   pushMsg,
+  readMessages,
   replaceMessages,
   sessionMessages,
+  unreadMsgs,
 } from './messageLog';
+import { pendingDecisions } from '../../decisions/pendingDecisions';
+import { battleConcernsMe } from './attentionBadges';
+import { pendingHtml } from './pendingPanel';
 import {
   closeDiplo,
   conversations,
@@ -49,6 +54,7 @@ import {
   diploTab,
   fmtStamp,
   initDiploWindow,
+  openDiplo,
   openPlayerCard,
   openSeatCard,
   renderDiplo,
@@ -1013,6 +1019,7 @@ let lastPanelHtml = '';
 let lastSplitHtml = '';
 let lastObjDescHtml = '';
 let lastLogHtml = '';
+let lastPendHtml = '';
 // --- fog of war (renderer projection; always on) -----------------------------
 // Client-side projection just for the renderer — NOT the real security boundary
 // (that is `visibleState` in shared-core). Зрение кадра и память разведки — `mapFog.ts`.
@@ -1040,6 +1047,7 @@ if (typeof ResizeObserver !== 'undefined')
     if (h > 0) document.body.style.setProperty('--sheeth', sheetHeightVar(h));
   }).observe(side);
 const logEl = $('log');
+const logPendEl = $('log-pending');
 // «Флот потерян» / «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): без флота
 // игрок минутами смотрел, как Рой штурмует его планету. Карточка встаёт в кадре, когда кораблей
 // стало ноль (`decisions/fleetLost.ts`), и та же открывается кнопкой рельса в любой момент
@@ -3573,6 +3581,18 @@ document.getElementById('rail-log')?.addEventListener('click', () => logWin?.cla
 logWin?.addEventListener('click', (e) => {
   const tg = e.target as HTMLElement;
   if (tg.id === 'logwin' || tg.classList.contains('lw-close')) logWin.classList.remove('show');
+  // UIX-4.2: «Показать» у пункта «Ждёт решения» — бой: окно боя и камера к его миру;
+  // письма — вкладка сообщений (чтение гасит значок, как у кнопки ✉).
+  const show = tg.closest<HTMLElement>('[data-pending]');
+  if (!show) return;
+  logWin.classList.remove('show');
+  if (show.dataset.pending === 'battle') {
+    if (show.dataset.loc) focusWorld(show.dataset.loc);
+    if (show.dataset.id) battleWindow.open(show.dataset.id);
+  } else {
+    readMessages();
+    openDiplo('msgs');
+  }
 });
 
 // --- technologies window -----------------------------------------------------
@@ -5874,6 +5894,26 @@ function frame(nowReal: number) {
   } else if (needsClearing(lastFpsText)) {
     fpsEl.textContent = CLEARED;
     lastFpsText = CLEARED;
+  }
+  // UIX-4.2: над журналом — то, что ждёт решения (`pendingDecisions.ts`). Бои — те же,
+  // что считает значок тревоги на кнопке «События» (`attentionBadges.ts`).
+  const pendHtml = pendingHtml(
+    pendingDecisions(
+      Object.values(s.battles)
+        .filter((b) => battleConcernsMe(b, ME, known) || !!vision?.engaged.battles.has(b.id))
+        .map((b) => ({
+          id: b.id,
+          location: b.location,
+          mine: b.sides.some((sd) => sd.owner === ME),
+          ...(b.nextRoundAt !== undefined ? { nextRoundAt: b.nextRoundAt } : {}),
+        })),
+      unreadMsgs,
+    ),
+    placeName,
+  );
+  if (pendHtml !== lastPendHtml) {
+    logPendEl.innerHTML = pendHtml;
+    lastPendHtml = pendHtml;
   }
   const logHtml = logLines.map((l) => `<div>${esc(l)}</div>`).join('');
   if (logHtml !== lastLogHtml) {
