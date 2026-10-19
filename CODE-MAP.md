@@ -27,7 +27,7 @@
 
 | Что запускается | Кто это на самом деле | Когда |
 |---|---|---|
-| `packages/server/dist/proto-server.mjs` | **прод**: `Dockerfile` `CMD`; собирается на этапе build из `prototype/netserver.ts` (`RUN node prototype/bundle-netserver.mjs`, `Dockerfile:62`) | контейнер, `moongame`/compose |
+| `packages/server/dist/proto-server.mjs` | **прод**: `Dockerfile` `CMD`; собирается на этапе build из `prototype/netserver.ts` (`RUN node prototype/bundle-netserver.mjs`, `Dockerfile:71`) | контейнер, `moongame`/compose |
 | `prototype/netserver.mjs` | тот же хост для разработки: собирает бандл и запускает его | `pnpm dev:proto-server` |
 | `prototype/host.mjs` | одной командой для живого теста: собирает HTML, поднимает хост на 0.0.0.0 и печатает LAN-адрес для друзей | `pnpm host` |
 | `scripts/server.ts` → `packages/server/src/main.ts:startServer` | **канонический** сервер пакета (Fastify + WS + persist + clockDriver); `packages/server/dev.mjs` собирает внешний entry, который инъецирует почтовый адаптер. В проде пока НЕ запускается | `pnpm dev:server` |
@@ -271,7 +271,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 |---|---|---|
 | `gate.ts` | `ActionGate`, `createActionGate` | гейт: envelope validation → zod payload → auth → idempotency → sequence |
 | `envelope.ts` | `createActionEnvelope`, `parseActionEnvelope` | обёртка `action.v1` |
-| `payloadSchemas.ts` | per-type zod schemas | валидация payload по типу действия |
+| `shared-core/src/actions/payloadSchemas.ts` | `actionPayloadSchemas`, `isValidActionPayload`, `CLIENT_ACTION_TYPES` | zod-схема payload по типу действия; гейт получает валидатор параметром |
 | `receipts.ts` | `ReceiptStore`, idempotency receipts | идемпотентность (durable, bounded, rate-limited) |
 | `sequence.ts` | per-session `clientSeq` gate | строгая последовательность |
 | `errors.ts` | `E_*` stable error codes | fail-secure коды |
