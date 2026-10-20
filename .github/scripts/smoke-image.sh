@@ -30,12 +30,15 @@ base="http://127.0.0.1:$port"
 
 # Порт публикуем только на loopback: раннер одноразовый, но открывать наружу нечего.
 # Без --rm — контейнер нужен живым после падения, чтобы снять с него логи.
-cid=$(docker run -d -e PROD=0 -p "127.0.0.1:$port:8788" "$image")
+cid=$(docker run -d -e PROD=0 --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=16m,mode=1777 \
+  --mount type=volume,dst=/app/playtest-logs \
+  -p "127.0.0.1:$port:8788" "$image")
 if [ -z "$cid" ]; then
   echo "::error::smoke: образ не запустился вообще (docker run не отдал контейнер)"
   exit 1
 fi
-trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+trap 'docker rm -fv "$cid" >/dev/null 2>&1 || true' EXIT
 
 fail() {
   echo "::error::smoke: $1 — образ собран и просканирован, но не работает"

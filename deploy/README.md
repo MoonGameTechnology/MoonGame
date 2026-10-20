@@ -803,6 +803,8 @@ Dockerfile/k8s/terraform/cloudformation/helm/ARM, Docker Compose в список
 - [ ] `security_opt: [no-new-privileges:true]` — процесс не получит привилегии через setuid;
 - [ ] `cap_drop: [ALL]`, обратно — только доказанно нужное (`caddy` → `NET_BIND_SERVICE` под 80/443);
 - [ ] `mem_limit` + `pids_limit` — утечка/форк-бомба упирается в стенку, а не в весь VPS;
+- [ ] у `server` корневая ФС только для чтения; JSONL — в постоянном `void-logs`,
+      временные файлы — в ограниченном `tmpfs /tmp` с `noexec,nosuid`;
 - [ ] порт наружу только там, где это осознанно (`postgres` — `127.0.0.1`, не `0.0.0.0`);
 - [ ] сторонний образ — по дайджесту (`image:tag@sha256:…`), пин записан в `docs/security/image-pinning.md`;
 - [ ] секрет не имеет «рабочего» дефолта на **любом не-локальном** пути. Критерий — не
@@ -816,15 +818,6 @@ Dockerfile/k8s/terraform/cloudformation/helm/ARM, Docker Compose в список
 
 Что осознанно **не** включено и почему:
 
-- **`read_only: true` для `server`** — препятствие СНЯТО, но шаг ещё не сделан. Раньше
-  `netserver.mjs` транспилировал сервер в `/app/packages/server/dist` на КАЖДОМ старте,
-  и записываемая корневая ФС была неизбежна. Бандл теперь печётся при сборке образа
-  (`prototype/bundle-netserver.mjs`), рантайм запускает готовый файл — стартовая запись
-  в `/app` исчезла. Остался единственный писатель, `/app/playtest-logs` (JSONL матчей),
-  и он закрывается томом или `tmpfs`. То есть `read_only: true` стал реалистичным
-  следующим кирпичом, а не архитектурным тупиком. Пока не включён — не проверен на живом
-  хосте. Образ и так работает от non-root (uid 65532) — это то, что дал бы `read_only`
-  в основном.
 - **`cap_drop: [ALL]` для `postgres`** — официальный энтрипойнт стартует от root
   (chown/initdb каталога данных) и только потом роняет привилегии до `postgres`.
   Урезание capabilities требует вернуть ровно `CHOWN`, `DAC_OVERRIDE`, `FOWNER`,

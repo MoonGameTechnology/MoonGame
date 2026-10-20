@@ -201,22 +201,16 @@ describe('password reset revokes game connections', () => {
     expect(h.rooms.m1!.state.players.green).toBeDefined();
   });
 
-  it('a reset between the check and the seat still closes the socket', async () => {
-    // The first lookup sees the old password; by the time the socket is in the room the
-    // reset has landed (and swept the rooms without it), so the re-check closes it.
+  it('a reset between checks is refused before disclosing a welcome snapshot', async () => {
+    // The first lookup sees the old password; the recheck must fail before addPeer
+    // sends private match state, rather than admitting and subsequently evicting.
     let lookups = 0;
     const h = await harness({
       accountPwfp: async () => (lookups++ === 0 ? alice.pwfp : 'after-reset'),
     });
     const alice = await account(h, 'alice', 'old-password');
     const token = await joinToken({ matchId: 'm1', playerId: 'green', ...alice });
-    const ws = new WebSocket(`${h.wsBase}/m1?token=${token}`);
-    open.push(ws);
-    const got: ServerMessage[] = [];
-    ws.on('message', (raw) => got.push(JSON.parse(String(raw)) as ServerMessage));
-    const [code, reason] = (await once(ws, 'close')) as [number, Buffer];
-    expect([code, String(reason)]).toEqual([1000, 'E_SESSION_REVOKED']);
-    expect(got[0]).toMatchObject({ type: 'welcome' });
+    expect(await rejectStatus(`${h.wsBase}/m1?token=${token}`)).toBe(401);
     expect(h.rooms.m1!.connectedPlayers()).toEqual([]);
   });
 

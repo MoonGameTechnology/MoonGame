@@ -378,6 +378,27 @@ describe('MatchRoom · mailbox serializes lobby start', () => {
 // owns it, an internal arsenal.sync commits first (a real, broadcast action), then
 // the original build proceeds against the refreshed snapshot.
 describe('MatchRoom · LARS-1 live arsenal sync', () => {
+  it('a reassigned seat reads its new owner’s arsenal, never the kicked account’s items', async () => {
+    const store = new MemoryArsenalStore();
+    for (const [itemId, kind, defId] of [
+      ['old-hull', 'hull', 'cruiser'],
+      ['old-module', 'module', 'targeting_array'],
+    ] as const) {
+      await store.grant({ itemId, accountId: 'old-owner', kind, defId, form: 'blueprint',
+        soulbound: false, origin: 'craft', acquiredAt: 0 });
+    }
+    const room = await roomWithSnapshot(store);
+    const oldPeer = new MemoryPeer();
+    room.addPeer('green', oldPeer, undefined, undefined, 'old-owner');
+    room.evict('green');
+    const nextPeer = new MemoryPeer();
+    room.addPeer('green', nextPeer, undefined, undefined, 'new-owner');
+
+    await room.receive('green', nextPeer, raw(build('cruiser', ['targeting_array'])));
+    expect(nextPeer.rejections().some((r) => r.code === 'E_NOT_OWNED')).toBe(true);
+    expect(room.state.players.green?.arsenal?.modules).not.toContain('targeting_array');
+  });
+
   function build(unit: string, modules: string[] = [], n = 1): Action {
     return {
       id: `t:green:${n}`,

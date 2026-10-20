@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createServer as http } from 'node:http';
 import { createServer as https } from 'node:https';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,6 +59,15 @@ describe('container liveness over verified TLS', () => {
         false,
       );
       expect(await healthcheck({ ...env, HEALTHCHECK_CA_FILE: cert })).toBe(false);
+      // Verify in a fresh process: Node reads its global TLS override at runtime.
+      const probe = `import { healthcheck } from ${JSON.stringify(new URL('./healthcheck.mjs', import.meta.url).href)};
+        console.log(await healthcheck(${JSON.stringify({ ...env, HEALTHCHECK_CA_FILE: cert })}));`;
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        ['--input-type=module', '-e', probe],
+        { env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: '0', NODE_NO_WARNINGS: '1' } },
+      );
+      expect(stdout.trim()).toBe('false');
     } finally {
       if (server) await new Promise((r) => server.close(r));
       rmSync(dir, { recursive: true, force: true });

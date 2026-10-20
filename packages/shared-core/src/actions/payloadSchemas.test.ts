@@ -264,6 +264,13 @@ describe('SV-1.2 · action payload schemas', () => {
     }
   });
 
+  it.each(['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty'])(
+    'rejects inherited action name %s without throwing',
+    (type) => {
+      expect(isValidActionPayload(type, {})).toBe(false);
+    },
+  );
+
   it('rejects internal and unknown action types (not client-submittable)', () => {
     expect(isValidActionPayload('arrive', { fleetId: 'f1', at: 'p1' })).toBe(false);
     expect(isValidActionPayload('fleet.arrival', { fleetId: 'f1' })).toBe(false);
