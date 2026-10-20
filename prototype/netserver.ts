@@ -25,6 +25,12 @@ import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
 import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
+// UIX-4.4 (часть 1): push до игроков — тот же приёмник подписки и та же рассылка «своё и
+// срочное», что у канонического хоста; без VAPID в окружении не монтируется ничего.
+import { registerPushApi } from '../packages/server/src/pushApi';
+import { configureWebPush, sendPush, vapidFromEnv } from '../packages/server/src/push';
+import { createPushDispatcher } from '../packages/server/src/pushDispatch';
+import { MemoryPushStore, PostgresPushStore, type PushStore } from '../packages/server/src/store';
 import { MemoryPlayerActivityStore, PostgresPlayerActivityStore } from '../packages/server/src/playerActivity';
 import { registerPlayerActivityApi } from '../packages/server/src/playerActivityApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
@@ -310,6 +316,7 @@ const metaFaucet = Number(process.env.META_MARKET_FAUCET ?? 0) || 0;
 let metaMarket: MetaMarket;
 let arsenalStore: ArsenalStore;
 let metaEconomyStore: MetaEconomyStore;
+let pushStore: PushStore;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   await prepareRuntimeDatabase(pool, process.env);
@@ -325,6 +332,7 @@ if (DATABASE_URL) {
   arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
   metaEconomyStore = new PostgresMetaEconomyStore(pool);
+  pushStore = new PostgresPushStore(pool);
 } else {
   matchStore = new MemoryMatchStore();
   accountStore = new MemoryAccountStore();
@@ -340,8 +348,20 @@ if (DATABASE_URL) {
   arsenalStore = memoryArsenal;
   metaMarket = memoryMarket;
   metaEconomyStore = new MemoryMetaEconomyStore(memoryArsenal, new MemoryDropStore(), memoryMarket);
+  pushStore = new MemoryPushStore();
 }
 metaMarket.setEconomy(metaEconomyStore);
+// UIX-4.4 (часть 1): ключи VAPID из окружения. Нет ключей — нет ни маршрута ключа, ни
+// рассылки: подписаться было бы нечем, слать некому.
+const vapid = vapidFromEnv(process.env);
+if (vapid) configureWebPush(vapid);
+const pushDispatch = vapid
+  ? createPushDispatcher({
+      store: pushStore,
+      send: sendPush,
+      onError: (m) => process.stderr.write(`${m}\n`),
+    })
+  : null;
 const metaCatalog = loadMetaEconomyCatalog(data);
 const starterArsenal = loadStarterArsenal(data);
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
@@ -506,6 +526,7 @@ async function createHostedMatch(
   let lastEconAt = initialState.time;
   const observe = (ev: RoomObservation): void => {
     metrics.observe(ev);
+    pushDispatch?.(id, ev); // UIX-4.3: своё и срочное — тем, кого нет в игре
     if (worthLogging(ev)) {
       matchLog.write(journalRecord(id, ev, actorOf));
     }
@@ -1199,6 +1220,13 @@ const server = createMultiplayerServer({
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
       registerProfileApi(app, { registrationRewards, profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
+      // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа
+      // монтируется только при заданных VAPID.
+      registerPushApi(app, {
+        store: pushStore,
+        identify: identifySession,
+        ...(vapid ? { vapidPublicKey: vapid.publicKey } : {}),
+      });
       registerLeaderboardApi(app, {
         commanders: commanderStore,
         users: userStore,
