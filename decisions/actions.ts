@@ -267,6 +267,14 @@ export const setHoldPoint = (playerId: string, planetId: string, on: boolean) =>
 /** MAPSHARE-1: предложить / принять / расторгнуть договор об обмене картами. */
 export const shareMap = (playerId: string, target: string, on: boolean) =>
   act(playerId, 'diplomacy.mapshare', { target, on });
+/** COAL-1: отказаться от предложения стойки, которое сделал `target`. */
+export const declineOffer = (playerId: string, target: string) =>
+  act(playerId, 'diplomacy.decline', { target });
+/** COAL-1: выйти из своей коалиции. */
+export const leaveCoalition = (playerId: string) => act(playerId, 'coalition.leave', {});
+/** COAL-1: эмблема и описание своей коалиции. */
+export const editCoalition = (playerId: string, emblem: string, description: string) =>
+  act(playerId, 'coalition.edit', { emblem, description });
 export const declareWar = (playerId: string, target: string, stance: DiplomaticStance = 'war') =>
   act(playerId, 'diplomacy.declare', { target, stance });
 /** Steal a time-boxed intel window on another commander (SPY-1 core module):

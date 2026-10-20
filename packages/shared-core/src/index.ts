@@ -188,6 +188,13 @@ export {
   type DiplomaticRelation,
   type DiplomacyCapability,
 } from './state/diplomacy';
+export {
+  COALITION_EMBLEMS,
+  COALITION_DESC_MAX,
+  coalitionCapacity,
+  coalitionOf,
+  type Coalition,
+} from './state/coalition';
 export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {
   visibleState,

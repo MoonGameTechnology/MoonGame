@@ -24,6 +24,8 @@
 import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { t, tData } from '../../localization/runtime';
 import {
+  coalitionCapacity,
+  coalitionOf,
   getOffer,
   getStance,
   isForkSite,
@@ -42,6 +44,7 @@ import {
   botFavour,
   data,
   declareWar,
+  declineOffer,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
@@ -468,15 +471,33 @@ function mapShareBtnHtml(id: string): string {
   const cls = offerClass('dp-map', live, aff);
   return `<button class="${cls}" data-mapseat="${id}"${offerDisabled(aff, atWar) ? ' disabled' : ''} title="${esc(title)}">🗺 ${label}</button>`;
 }
-function seatDiploActionsHtml(id: string): string {
+/**
+ * COAL-1: почему союз с местом сейчас невозможен — ключ подсказки или null. Боты не
+ * вступают в коалиции; член чужой коалиции сначала выходит из неё; полная коалиция
+ * никого не принимает. Ядро отобьёт то же самое, кнопка лишь не обещает лишнего.
+ */
+function allianceBar(id: string): string | null {
+  if (isAiSeat(id)) return 'comms.bots-no-coalition';
+  const s = game.state();
+  const ME = game.me();
+  if (getStance(s, ME, id) === 'alliance') return null;
+  const mine = coalitionOf(s, ME);
+  const theirs = coalitionOf(s, id);
+  if (mine && theirs && mine.id !== theirs.id) return 'err.coalition-other';
+  const joining = mine ?? theirs;
+  if (joining && joining.members.length >= coalitionCapacity(s)) return 'err.coalition-full';
+  return null;
+}
+/** Кнопки стоек и договора карт для места — общие у ростера, карточки и лички. */
+function stanceButtonsHtml(id: string): string {
   const s = game.state();
   const ME = game.me();
   const NAME = game.names();
   const st = getStance(s, ME, id);
   return (
-    `<div class="dp-actions">` +
     STANCES.map((sk) => {
-      const barred = sk === 'alliance' && isAiSeat(id); // боты не вступают в коалиции
+      const barKey = sk === 'alliance' ? allianceBar(id) : null;
+      const barred = barKey !== null;
       // Чей ход — `offerAffordance.ts` (REFM-201), та же формула, что у кнопки карт.
       // ЗДЕСЬ подавитель — запрет: предложить коалицию боту нельзя вовсе, поэтому и
       // аффорданса быть не должно. Текущая стойка помечается ОТДЕЛЬНО (`sk === st`).
@@ -484,16 +505,80 @@ function seatDiploActionsHtml(id: string): string {
       const mark = offerMark(aff);
       const cls = offerClass('dp-act', sk === st, aff);
       const label = mark ? `${mark} ${stanceRu(sk)}` : stanceRu(sk);
-      const title = barred
-        ? t('comms.bots-no-coalition')
-        : aff === 'accept'
-          ? t('comms.offer.incoming', { who: NAME[id] ?? id })
-          : aff === 'waiting'
-            ? t('comms.offer.sent')
-            : '';
+      const title =
+        barKey === 'comms.bots-no-coalition'
+          ? t('comms.bots-no-coalition')
+          : barKey === 'err.coalition-other'
+            ? t('err.coalition-other')
+            : barKey === 'err.coalition-full'
+              ? t('err.coalition-full')
+              : aff === 'accept'
+                ? t('comms.offer.incoming', { who: NAME[id] ?? id })
+                : aff === 'waiting'
+                  ? t('comms.offer.sent')
+                  : '';
       return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${game.stanceCol(sk)}"${offerDisabled(aff, barred) ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
-    }).join('') +
-    mapShareBtnHtml(id) +
+    }).join('') + mapShareBtnHtml(id)
+  );
+}
+/**
+ * COAL-1: дипломатия внутри лички. Входящее предложение — карточка с «принять» и
+ * «отказаться», своё — пометка «ждём ответа»; ниже кнопки нового предложения.
+ */
+function threadDiploHtml(id: string): string {
+  const s = game.state();
+  const ME = game.me();
+  if (!s.players[id] || id === ME) return '';
+  const who = esc(game.names()[id] ?? id);
+  const cards: string[] = [];
+  const incoming = (what: string, accept: string, kind: 'stance' | 'map'): string =>
+    `<div class="dp-offer in"><span>${t('diplo.offer.in', { who, what })}</span>` +
+    accept +
+    `<button class="dp-dec" data-decline="${kind}" data-seat="${id}">✕ ${t('diplo.offer.decline')}</button></div>`;
+  const inSt = getOffer(s, id, ME);
+  if (inSt) {
+    cards.push(
+      incoming(
+        stanceRu(inSt),
+        `<button class="dp-act dp-acc" data-stance="${inSt}" data-seat="${id}" style="--sc:${game.stanceCol(inSt)}">✓ ${t('diplo.offer.accept')}</button>`,
+        'stance',
+      ),
+    );
+  }
+  if (hasMapShareOffer(s, id, ME) && !hasMapShare(s, ME, id)) {
+    cards.push(
+      incoming(
+        t('comms.mapshare'),
+        `<button class="dp-map dp-acc" data-mapseat="${id}">✓ ${t('diplo.offer.accept')}</button>`,
+        'map',
+      ),
+    );
+  }
+  const outSt = getOffer(s, ME, id);
+  if (outSt)
+    cards.push(
+      `<div class="dp-offer out">⏳ ${t('diplo.offer.out', { what: stanceRu(outSt) })}</div>`,
+    );
+  if (hasMapShareOffer(s, ME, id)) {
+    cards.push(
+      `<div class="dp-offer out">⏳ ${t('diplo.offer.out', { what: t('comms.mapshare') })}</div>`,
+    );
+  }
+  return (
+    `<div class="dp-tdip">${cards.join('')}` +
+    `<div class="dp-propose"><span>${t('diplo.offer.make')}</span>${stanceButtonsHtml(id)}</div></div>`
+  );
+}
+/** COAL-1: отказ от предложения места — стойки или обмена картами. */
+function declineFrom(seat: string, kind: string | undefined): void {
+  const ME = game.me();
+  if (kind === 'map') game.playerOrder(shareMap(ME, seat, false));
+  else game.playerOrder(declineOffer(ME, seat));
+}
+function seatDiploActionsHtml(id: string): string {
+  return (
+    `<div class="dp-actions">` +
+    stanceButtonsHtml(id) +
     (espionageShown(game.sectorZeroToolsHidden())
       ? `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
         `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>`
@@ -572,6 +657,7 @@ export const conversations = initConversations({
   seatBadge,
   fmtStamp,
   ownerColor: (owner) => game.ownerColor(owner),
+  threadDiploHtml,
 });
 
 /** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — активные окна интела
@@ -662,6 +748,15 @@ export function renderDiplo(): void {
     body +
     `</div>`;
   if (diploTab === 'msgs') scrollFeedToEnd();
+}
+/** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
+ *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */
+export function refreshThreadDiplo(): void {
+  if (!diploOpen || diploTab !== 'msgs') return;
+  const list = document.querySelector('#diplo .dp-cvlist');
+  if (list) list.outerHTML = conversations.listHtml();
+  const box = document.querySelector('#diplo .dp-tdip');
+  if (box) box.outerHTML = threadDiploHtml(conversations.current());
 }
 /** Patch just the open thread's feed (so a new line doesn't wipe a half-typed reply). */
 export function renderDiploFeed(): void {
@@ -816,6 +911,13 @@ export function initDiploWindow(host: DiploWindowHost): void {
       if (tg.closest('.dp-fclear')) {
         diploStanceFilter.clear();
         diploTypeFilter.clear();
+        renderDiplo();
+        return;
+      }
+      // COAL-1: «отказаться» в карточке предложения внутри лички.
+      const dec = tg.closest('[data-decline]') as HTMLElement | null;
+      if (dec?.dataset.seat) {
+        declineFrom(dec.dataset.seat, dec.dataset.decline);
         renderDiplo();
         return;
       }

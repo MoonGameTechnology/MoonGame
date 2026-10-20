@@ -14,6 +14,7 @@
 export const SECTOR_ZERO_ABSENT_TOOLS = {
   chat: 'rail-chat',
   mail: 'rail-msgs',
+  coalitions: 'rail-coal',
   pings: 'rail-pings',
   corp: 'railcorp',
   market: 'rail-market',

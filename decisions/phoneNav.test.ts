@@ -68,6 +68,7 @@ describe('нижняя панель телефона (UIX-3.1)', () => {
     expect(ids).toEqual([
       'diplomacy',
       'mail',
+      'coalitions',
       'pings',
       'market',
       'corporation',
@@ -132,7 +133,7 @@ describe('своя раскладка панели (UIX-3.3)', () => {
   it('снятое с панели окно уходит в «Ещё» на своё место в порядке, ничего не теряется (правило 7)', () => {
     const bar = ['diplomacy', 'mail', 'events'] as const;
     const more = phoneMoreItems(bar, () => true).map((item) => item.id);
-    expect(more.slice(0, 3)).toEqual(['production', 'science', 'pings']);
+    expect(more.slice(0, 3)).toEqual(['production', 'science', 'coalitions']);
     expect(new Set([...bar, ...more])).toEqual(new Set(PHONE_ITEMS.map((item) => item.id)));
   });
 

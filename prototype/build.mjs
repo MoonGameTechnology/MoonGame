@@ -1105,6 +1105,66 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #diplo{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #diplo.show{display:flex;}
+/* COAL-1: окно коалиций — та же стеклянная коробка, что у дипломатии */
+#coalwin{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#coalwin.show{display:flex;}
+#coalwin .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
+  box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#coalwin .dp-head .cw-title{font-size:var(--fs-body);color:var(--cyan);margin-right:auto;}
+.cw-body{overflow:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;}
+.cw-cap{font-size:var(--fs-caption);color:var(--dim);}
+.cw-hint{font-size:var(--fs-caption);color:var(--ink);border:1px dashed var(--line);border-radius:7px;padding:7px 9px;line-height:1.5;}
+.cw-list{display:flex;flex-direction:column;gap:6px;min-height:90px;}
+.cw-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;text-align:left;
+  border:1px solid var(--line);background:rgba(53,214,230,.03);color:var(--ink);cursor:pointer;font:inherit;}
+.cw-row:hover{background:rgba(53,214,230,.08);}
+.cw-row.mine{border-color:var(--amber);}
+.cw-emb,.cw-big{flex:0 0 auto;display:grid;place-items:center;color:var(--amber);font-variant-emoji:text;
+  border:1px solid rgba(255,190,77,.45);background:rgba(255,190,77,.08);}
+.cw-emb{width:36px;height:36px;border-radius:8px;font-size:20px;}
+.cw-big{width:58px;height:58px;border-radius:12px;font-size:34px;}
+.cw-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.cw-name{font-weight:700;font-size:var(--fs-body);color:#eafffb;}
+.cw-name em{font-style:normal;font-weight:400;color:var(--amber);font-size:var(--fs-caption);}
+.cw-members,.cw-desc{font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cw-members b{font-weight:600;}
+.cw-seats{flex:0 0 auto;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);
+  border:1px solid var(--cyan-dim);border-radius:999px;padding:2px 8px;align-self:center;}
+.cw-seats.full{color:var(--amber);border-color:var(--amber);}
+.cw-hero .cw-seats{align-self:flex-start;}
+.cw-back{align-self:flex-start;background:transparent;border:0;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);cursor:pointer;padding:2px 0;}
+.cw-hero{display:flex;align-items:center;gap:12px;}
+.cw-sec{font-size:var(--fs-caption);color:var(--dim);font-weight:700;margin-top:4px;}
+.cw-mems{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:5px;}
+.cw-mem{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:var(--fs-body);color:var(--ink);}
+.cw-mem.empty{color:var(--dim);border-style:dashed;justify-content:center;}
+.cw-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.cw-pick{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
+.cw-eb{height:38px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:20px;
+  font-variant-emoji:text;cursor:pointer;}
+.cw-eb.on{color:var(--amber);border-color:var(--amber);background:rgba(255,190,77,.12);}
+#cw-text{width:100%;box-sizing:border-box;resize:vertical;background:#06181c;color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:7px 9px;font:var(--fs-body) var(--sf-font);}
+#cw-text:focus{outline:none;border-color:var(--cyan-dim);}
+.cw-text{font-size:var(--fs-body);color:var(--ink);line-height:1.5;white-space:pre-wrap;}
+.cw-acts{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;}
+.cw-save,.cw-leave{padding:7px 12px;border-radius:7px;font:700 var(--fs-caption) var(--sf-font);cursor:pointer;background:transparent;}
+.cw-save{border:1px solid var(--cyan);color:var(--cyan);}
+.cw-leave{border:1px solid var(--line);color:var(--dim);}
+.cw-leave.sure{border-color:#ff6b6b;color:#ff8f8f;}
+/* COAL-1: дипломатия внутри лички — висящие предложения и кнопки нового */
+.dp-tdip{border-top:1px solid var(--line-hi);padding:7px 10px;display:flex;flex-direction:column;gap:6px;}
+.dp-offer{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:var(--fs-caption);color:var(--ink);
+  border:1px solid var(--line);border-radius:7px;padding:6px 8px;}
+.dp-offer span{flex:1 1 140px;}
+.dp-offer.in{border-color:var(--amber);background:rgba(255,190,77,.07);}
+.dp-offer.out{color:var(--dim);}
+.dp-dec{padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);cursor:pointer;}
+.dp-propose{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
+.dp-cvnone{font-size:var(--fs-caption);color:var(--dim);padding:8px 6px;line-height:1.5;}
 #diplo .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
   border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
   box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
@@ -2722,6 +2782,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */
   #diplo .dp-head b{display:none;}
   #diplo .dp-tab{padding:6px 9px;}
+  /* COAL-1: карточка предложения — текст строкой, «принять/отказаться» поровну под ним */
+  .dp-offer span{flex-basis:100%;}
+  .dp-offer .dp-acc,.dp-offer .dp-dec{flex:1;}
   #side{right:0;left:0;bottom:0;top:auto;width:auto;max-height:50vh;z-index:28;clip-path:none;
     border-left:0;border-right:0;border-top:1px solid var(--cyan);
     padding-bottom:env(safe-area-inset-bottom,0px);}
@@ -3440,7 +3503,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
    clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
+  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#coalwin,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 }
 /* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
@@ -4084,7 +4147,7 @@ span.ar-fchip{cursor:default;}
     --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
-  #settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
+  #settings,#warprompt,#abandon,#diplo,#coalwin,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
      весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
@@ -4124,6 +4187,7 @@ span.ar-fchip{cursor:default;}
   #settings .setbox{width:min(380px,61vw);max-height:57vh;}
   #warprompt .wpbox{width:min(360px,61vw);}
   #diplo .dpbox{width:53.4vw;max-height:58.5vh;}
+  #coalwin .dpbox{width:min(460px,40vw);max-height:58.5vh;}
   .dp-convo{height:min(41vh,440px);}
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
@@ -4368,6 +4432,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-dossier" type="button" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
     <button id="rail-diplo">⬡<span class="rlbl" data-i18n="rail.diplo.title"></span></button>
     <button id="rail-msgs">✉<span class="rlbl" data-i18n="rail.msgs.title"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-coal">⛨<span class="rlbl" data-i18n="rail.coal.title"></span></button>
     <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
     <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>
     <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
@@ -4450,6 +4515,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div class="wp-actions"><button type="button" id="abandon-stay" class="wp-no"></button><button type="button" id="abandon-menu" class="wp-no" data-i18n="run.exit.menu" hidden></button><button type="button" id="abandon-go" class="wp-yes" data-i18n="run.abandon.go"></button></div>
 </div></div>
 <div id="diplo"></div>
+<div id="coalwin" role="dialog" data-i18n-aria="coal.win.title"></div>
 <div id="pingpop"></div>
 <!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (fleetCard.ts, renderStatPop) -->
 <div id="statpop" role="dialog" aria-live="polite"></div>
