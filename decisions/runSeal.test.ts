@@ -5,6 +5,7 @@ import { RUN_SAVE_VERSION, type RunSave } from './runSave';
 import {
   parseSealedPortableRun,
   parseSealedRunSave,
+  sealedRunProfileSeed,
   serializeSealedPortableRun,
   serializeSealedRunSave,
 } from './runSeal';
@@ -101,6 +102,39 @@ describe('печать забега Sector Zero', () => {
     expect(
       parseSealedPortableRun(serializeSealedPortableRun(portable, seed), 'profile-seed-2'),
     ).toBeNull();
+  });
+
+  it('полный снимок несёт seed профиля внутри печати для восстановления без метаданных', () => {
+    const raw = serializeSealedRunSave(run, seed);
+    expect(JSON.parse(raw).profileSeed).toBe(seed);
+    expect(sealedRunProfileSeed(raw)).toBe(seed);
+    expect(parseSealedRunSave(raw, seed)).toEqual(run);
+  });
+
+  it('seed восстанавливается только из целого снимка, а не из неподписанной подсказки', () => {
+    const raw = serializeSealedRunSave(run, seed);
+    for (const value of [
+      edit(raw, { profileSeed: 'forged-seed' }),
+      edit(raw, { profileSeed: undefined }),
+      edit(raw, { seal: undefined }),
+      JSON.stringify({ ...run, profileSeed: seed }),
+      sealProgress({ ...run, profileSeed: seed }, LOCAL_SEAL),
+      serializeSealedPortableRun({ ...portable, ...run }, seed),
+      serializeSealedRunSave({ ...run, v: 999 }, seed),
+      null,
+      undefined,
+      '',
+      '{broken',
+      '[]',
+    ]) {
+      expect(sealedRunProfileSeed(value)).toBeNull();
+    }
+  });
+
+  it('старые подписанные снимки без подсказки читаются с уже известным seed профиля', () => {
+    const old = sealProgress(run, `sector-zero.run.v1:${seed}`);
+    expect(parseSealedRunSave(old, seed)).toEqual(run);
+    expect(sealedRunProfileSeed(old)).toBeNull();
   });
 
   it('домены полного снимка, дескриптора и профиля разделены даже при совместимой форме', () => {

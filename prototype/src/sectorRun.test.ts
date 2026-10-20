@@ -363,9 +363,9 @@ describe('REFM-210 — журнал забега', () => {
     expect(after.profile.sectorProgress.warrants).toBe(earned);
   });
 
-  it('подписанный финал возвращает награду, даже если резерв попытки не сохранился', async () => {
+  it.each([true, false])('подписанный финал возвращает награду, даже если резерв попытки не сохранился (профиль существовал=%s)', async (hadProfile) => {
     const env = await boot();
-    expect(await env.profile.persistSectorProgress()).toBe(true);
+    if (hadProfile) expect(await env.profile.persistSectorProgress()).toBe(true);
     const baseline = cell.get('sector-zero.progress.v1');
     const seed = env.profile.sectorProgress.seed;
     const storage = localStorage;

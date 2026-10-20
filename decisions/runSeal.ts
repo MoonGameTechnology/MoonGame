@@ -7,6 +7,8 @@
  * Привязка к seed профиля не даёт перенести сохранение в другой профиль. Раздельные
  * домены не дают подставить профиль или дескриптор вместо точного снимка. Как и печать
  * профиля, это защита от простой правки хранилища, а не серверная проверка игры.
+ * Полный снимок несёт seed внутри подписанного тела: если профиль вообще ни разу
+ * не записался, его identity можно вернуть из целого журнала до засчёта награды.
  *
  * Старые неподписанные сохранения не принимаются: отличить честное от подделки по
  * содержимому невозможно. После проверки печати существующие разборщики проверяют
@@ -21,12 +23,32 @@ const portableBinding = (seed: string): string => `sector-zero.portable.v1:${see
 
 /** Точный снимок для хранилища, запечатанный для профиля этого забега. */
 export function serializeSealedRunSave<T>(save: RunSave<T>, seed: string): string {
-  return sealProgress(save, runBinding(seed));
+  return sealProgress({ ...save, profileSeed: seed }, runBinding(seed));
 }
 
 /** Только целый снимок этого профиля; неподписанное или сомнительное — `null`. */
 export function parseSealedRunSave(raw: string | null | undefined, seed: string): RunSave | null {
   return checkSeal(raw ?? null, runBinding(seed)) === 'sealed' ? parseRunSave(raw) : null;
+}
+
+/**
+ * Identity для восстановления только при отсутствии обеих копий профиля. Подсказке
+ * внутри JSON доверять нельзя: она становится seed лишь после проверки всей печати
+ * в домене полного снимка с этой привязкой и проверки формы снимка.
+ * Старые подписанные снимки без подсказки по-прежнему читаются с известным seed,
+ * но неизвестную identity из них восстановить нельзя.
+ */
+export function sealedRunProfileSeed(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string' || raw === '') return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const seed = (value as { profileSeed?: unknown }).profileSeed;
+  return typeof seed === 'string' && seed !== '' && parseSealedRunSave(raw, seed) ? seed : null;
 }
 
 /** Переносимый дескриптор для хранилища с отдельным доменом печати. */

@@ -23,9 +23,12 @@ import {
   freshSectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { TAB_OWNER_KEY } from '../../decisions/tabLock';
+import { RUN_SAVE_VERSION } from '../../decisions/runSave';
+import { serializeSealedRunSave } from '../../decisions/runSeal';
 import { t } from '../../localization/runtime';
 import { data } from './game';
 import type { GamePlatform } from './platform/types';
+import { RUN_SAVE_KEY } from './runSaveLocal';
 
 const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
 
@@ -134,6 +137,78 @@ describe('REFM-209 — профиль пишется с печатью и под
     await profile.progressWrite;
     const { profile: next } = await reload();
     expect(next.sectorProgress.sovereigns).toBe(after);
+  });
+
+  it('без обеих копий профиля восстанавливает только seed из целого подписанного журнала', async () => {
+    const journal = serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed');
+    cell.set(RUN_SAVE_KEY, journal);
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).toBe('journal-seed');
+    expect(profile.sectorProgress.warrants).toBe(0);
+    expect(profile.sectorProgress.sovereigns).toBe(0);
+    expect(checkSeal(cell.get(SECTOR_ZERO_PROGRESS_KEY)!, LOCAL_SEAL)).toBe('sealed');
+    expect(cell.get(SECTOR_ZERO_SHADOW_KEY)).toBe(cell.get(SECTOR_ZERO_PROGRESS_KEY));
+    expect(cell.get(RUN_SAVE_KEY)).toBe(journal);
+  });
+
+  it.each(['edited', 'unsigned'] as const)('правленая подсказка seed или снятая печать (%s) не создают профиль журнала', async (kind) => {
+    const raw = serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed');
+    const forged = JSON.parse(raw);
+    if (kind === 'edited') forged.profileSeed = 'forged-seed';
+    else delete forged.seal;
+    cell.set(RUN_SAVE_KEY, JSON.stringify(forged));
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).not.toBe('journal-seed');
+    expect(profile.sectorProgress.seed).not.toBe('forged-seed');
+    expect(profile.sectorProgress.warrants).toBe(0);
+    expect(cell.has(SECTOR_ZERO_PROGRESS_KEY)).toBe(false);
+    expect(cell.has(SECTOR_ZERO_SHADOW_KEY)).toBe(false);
+  });
+
+  it.each([SECTOR_ZERO_PROGRESS_KEY, SECTOR_ZERO_SHADOW_KEY])('существующий профиль %s с другим seed имеет приоритет над подписанным журналом', async (key) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    cell.set(key, sealProgress({
+      ...freshSectorZeroProgress(data, 'existing-profile-seed'),
+      warrants: 7,
+    }, LOCAL_SEAL));
+    cell.set(RUN_SAVE_KEY, serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed'));
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).toBe('existing-profile-seed');
+    expect(profile.sectorProgress.warrants).toBe(7);
+  });
+
+  it.each([SECTOR_ZERO_PROGRESS_KEY, SECTOR_ZERO_SHADOW_KEY])('даже непроверенная существующая запись %s не разрешает восстановление identity из журнала', async (key) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    cell.set(key, '{broken');
+    cell.set(RUN_SAVE_KEY, serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed'));
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).not.toBe('journal-seed');
+    expect(profile.sectorProgress.warrants).toBe(0);
+    expect(cell.get(key)).toBe('{broken');
   });
 
   it('правленая руками основная копия не берётся: профиль встаёт из теневой и переписывается', async () => {

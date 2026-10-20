@@ -54,6 +54,7 @@ import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { metaUnlocks } from '../../decisions/runAnalytics';
 import type { RunDifficulty } from '../../decisions/runDifficulty';
 import type { RunSaveStore } from '../../decisions/runSave';
+import { sealedRunProfileSeed } from '../../decisions/runSeal';
 import {
   SECTOR_ZERO_PROGRESS_KEY,
   changeSectorZeroProgress,
@@ -191,6 +192,19 @@ async function loadSectorProfile(): Promise<LocalProfile> {
     if (!(await preserveUnverifiedProfile()) && ownsSectorZero()) noteWrite(false);
   }
   const pick = pickLocalProfile(main, shadow, syncMark.sealed === true);
+  // The first profile write can fail while its signed run journal succeeds. Only
+  // when both profile slots are absent may that verified journal restore identity;
+  // it must never replace an existing profile, even an unreadable one.
+  if (main === null && shadow === null) {
+    const seed = sealedRunProfileSeed(await runSaveStore.load());
+    if (seed !== null) {
+      return {
+        raw: JSON.stringify(freshSectorZeroProgress(data, seed)),
+        from: 'none',
+        rewrite: true,
+      };
+    }
+  }
   // Правка руками не прощается молча: причина — в журнал, а игроку ничего (наказаний нет).
   if (pick.from === 'shadow' || (pick.from === 'none' && main))
     console.warn('E_PROFILE_SEAL', pick.from);
