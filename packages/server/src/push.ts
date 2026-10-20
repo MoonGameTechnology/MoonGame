@@ -1,15 +1,15 @@
 import webpush from 'web-push';
 import type { PushSubscriptionRecord } from './store';
 import type { Recap } from '@void/shared-core';
+import type { PushNoticePayload } from './pushRule';
 
 /**
  * ONB-5 · Web Push — the send side. `buildRecap` (`@void/shared-core`) already
  * builds the "пока тебя не было" return digest; this is the thin adapter that
  * turns one into a push payload and hands it to `web-push` against a stored
- * subscription. No trigger logic here (deciding WHEN a digest is worth pushing,
- * per-account cooldown, etc.) — that is a separate, larger follow-up that needs
- * to track match membership + online/offline per account; this file is the
- * reusable primitive it will call.
+ * subscription. No trigger logic here: WHEN a push is worth sending is
+ * `pushRule.ts`, and who gets it (seat → account, away from the game) is
+ * `pushDispatch.ts` (UIX-4.3); this file is the primitive both send through.
  */
 
 export interface VapidConfig {
@@ -71,7 +71,7 @@ export type SendPushResult =
  *  digests to many accounts. */
 export async function sendPush(
   sub: PushSubscriptionRecord,
-  payload: DigestPushPayload,
+  payload: DigestPushPayload | PushNoticePayload,
 ): Promise<SendPushResult> {
   try {
     await webpush.sendNotification(

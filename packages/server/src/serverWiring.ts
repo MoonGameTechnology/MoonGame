@@ -49,6 +49,9 @@ export interface MatchLoaderDeps {
   /** LARS-1 live ownership read (see `MatchRoom.arsenalStore`) — shared by every
    *  loaded room (a live re-read is keyed per-account, not per-room). */
   arsenalStore?: ArsenalStore;
+  /** Every room observation, tagged with its match — the UIX-4.3 push dispatcher reads
+   *  joins, leaves and event batches from it. Observation-only: never feeds back. */
+  onObservation?: (matchId: string, event: RoomObservation) => void;
 }
 
 /** Per-match wiring extras (see {@link MatchLoaderDeps.matchExtras}). */
@@ -128,6 +131,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
         if (deps.onTerminalState) detach('profile progress', deps.onTerminalState(matchId, room.state));
       }
       if (event.kind === 'events') extras?.onEvents?.(event.events);
+      deps.onObservation?.(matchId, event);
     };
 
     const room = createDevMatch(data, {
