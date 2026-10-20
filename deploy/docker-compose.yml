@@ -110,6 +110,13 @@ services:
       # the journal carries no `actor`, so players can't be linked across matches and days.
       ANALYTICS_SALT: ${ANALYTICS_SALT:-}
       ACCOUNT_DELETION_ENABLED: ${ACCOUNT_DELETION_ENABLED:-0}
+      # Push-уведомления игрокам (UIX-4.3/4.4): пара ключей VAPID и контакт отправителя
+      # (`mailto:` или `https:`). Все три пусты ⇒ push выключен целиком: нет ни `/sw.js`, ни
+      # `/push/key`, ни рассылки. Ключи держите ПОСТОЯННЫМИ: новая пара обнуляет все
+      # подписки игроков. Как сгенерировать — deploy/server.env.example.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
       # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
       # plain `docker compose up` against the public interface is safe. Override
