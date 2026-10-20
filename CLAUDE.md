@@ -35,7 +35,8 @@ Monorepo (pnpm workspaces):
   read-model (`GET /matches`), JWT join-token auth + Origin allowlist (`auth.ts`), and the
   `@void/action-layer` gate — auth/gate switched by env (`AUTH_JWT_SECRET`, `GATE=1`,
   `ALLOWED_ORIGINS`). Hosted by `packages/server/src/main.ts`; the prototype host
-  (`prototype/netserver.ts`) carries the same slice for playtests. Not yet: OIDC identity,
+  (`prototype/netserver.ts`) carries the same slice and is what players actually reach: the
+  Docker image runs it as `packages/server/dist/proto-server.mjs`. Not yet: OIDC identity,
   multi-process scale (pg-boss). (`MultiplayerClient` already sends `action.v1` envelopes.)
 - `packages/client` — client (Stage 4). Direction is a **PWA-first web client** (TWA Android +
   Capacitor iOS), not React Native — see `docs/cross-platform-roadmap.md` (decision record). Holds
@@ -57,8 +58,8 @@ Monorepo (pnpm workspaces):
   (`decisions/README.md`). «Что показать вместо списка», «куда вести игрока после отказа»,
   «можно ли нажимать кнопку» — чистая функция + типы + тест рядом, ни DOM, ни сети, ни
   таймеров. Устроена как `/localization`: лежит в корне, оба клиента импортируют
-  относительным путём, настраивать сборку не надо. Сегодня 130 модулей, их импортируют
-  43 файла прототипа и 6 файлов `packages/client` (без тестов, сверено 2026-09-26). **Заводя клиентское решение, клади его СЮДА,
+  относительным путём, настраивать сборку не надо. Сегодня 195 модулей, их импортируют
+  107 файлов `prototype/src` и 7 файлов `packages/client` (без тестов, сверено 2026-10-19). **Заводя клиентское решение, клади его СЮДА,
   а не внутрь `prototype/src`** — поток REFM вынес больше сотни таких решений внутрь
   прототипа, и каждое улучшало ровно тот клиент, который планируется заменить. Правила
   МИРА сюда не кладут: они в `packages/shared-core`.

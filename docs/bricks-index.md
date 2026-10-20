@@ -821,13 +821,13 @@
 | TRN-2 | ✅ | proto data | `docs/backlog-archive.md` | Этапы §14.4 с подсказками «что, зачем, где». |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
-| AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
+| AC-0.3 | ⏳ | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
 | AC-1.1 | ⏳ | srv sec | `docs/accounts-roadmap.md` | OAuth/OIDC-вход |
 | AC-1.2 | ⏳ | srv sec | `docs/accounts-roadmap.md` | Email magic-link (без пароля) |
-| AC-1.3 | 🔒 | srv sec | `docs/accounts-roadmap.md` | JWT для WS-рукопожатия |
+| AC-1.3 | ✅ | srv sec | `docs/accounts-roadmap.md` | JWT для WS-рукопожатия |
 | AC-2.1 | 🔒 | srv | `docs/accounts-roadmap.md` | Привязка нескольких identity к аккаунту |
-| AC-2.2 | 🔒 | srv sec | `docs/accounts-roadmap.md` | Восстановление доступа и защита от захвата |
-| AC-2.3 | ⏳ | srv docs | `docs/accounts-roadmap.md` | Приватность аккаунта (GDPR-база) |
+| AC-2.2 | 🔶 | srv sec | `docs/accounts-roadmap.md` | Восстановление доступа и защита от захвата |
+| AC-2.3 | 🔶 | srv docs | `docs/accounts-roadmap.md` | Приватность аккаунта (GDPR-база) |
 | ARS-0 | ✅ | docs | `docs/arsenal-roadmap.md` | Развилки за владельцем — решено (2026-07-14) |
 | ARS-1 | ✅ | data core | `docs/arsenal-roadmap.md` | Схема предмета/чертежа — реализовано |
 | ARS-2 | ✅ | srv | `docs/arsenal-roadmap.md` | ArsenalStore + стартовый набор — реализовано |
@@ -876,7 +876,7 @@
 | CP2.2 | ✅ | cli | `docs/cross-platform-roadmap.md` | Service Worker + app-shell |
 | CP2.3 | ✅ | cli | `docs/cross-platform-roadmap.md` | Кэш снапшота (IndexedDB) |
 | CP2.4 | ⏳ | cli | `docs/cross-platform-roadmap.md` | Install UX и Lighthouse-бюджет |
-| CP2.5 | 🔒 | cli srv | `docs/cross-platform-roadmap.md` | Авто-обновление + force-update handshake |
+| CP2.5 | ⏳ | cli srv | `docs/cross-platform-roadmap.md` | Авто-обновление + force-update handshake |
 | CP3.1 | 🔒 | cli | `docs/cross-platform-roadmap.md` | Предпросмотр-прогон |
 | CP3.2 | 🔒 | cli | `docs/cross-platform-roadmap.md` | Сверка предпросмотр ↔ сервер |
 | CP3.3 | 🔒 | cli | `docs/cross-platform-roadmap.md` | «Что будет, если…» |
@@ -1105,7 +1105,7 @@
 | OPS-4.3 | ⏳ | srv cli sec | `docs/operations-roadmap.md` | Сервис заявок и два служебных пульта |
 | OPS-4.4 | 🔒 | srv sec | `docs/operations-roadmap.md` | Временные полномочия по делу |
 | OPS-4.5 | 🔒 | srv sec ops | `docs/operations-roadmap.md` | Аудит и проверки злоупотреблений сотрудников |
-| PA-0.1 | 🔒 | sec srv | `docs/persistence-accounts-roadmap.md` | Честная аутентификация (ник → JWT/сессии) |
+| PA-0.1 | 🔶 | sec srv | `docs/persistence-accounts-roadmap.md` | Честная аутентификация (ник → JWT/сессии) |
 | PA-0.3 | 🔒 | sec ops | `docs/persistence-accounts-roadmap.md` | (= SE-3) |
 | PA-0.4 | 🔒 | sec ops | `docs/persistence-accounts-roadmap.md` | (= PE-3.1 / SE-9) |
 | PA-1.1 | ✅ | data srv | `docs/persistence-accounts-roadmap.md` | Схема матчей + мест — реализовано |
