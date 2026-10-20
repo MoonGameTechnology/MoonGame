@@ -2291,6 +2291,11 @@ function openShipCard(fleetId: string, index: number): void {
   el.classList.add('show');
 }
 
+/** Выбранный мир партии для справочника. Из хаба — никакого: после выхода из партии
+ *  `selPlanet` остаётся от неё, и карточка предложила бы строить в скрытой партии. */
+function codexWorld(): string | null {
+  return document.body.classList.contains('hub-open') ? null : selPlanet;
+}
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -2298,9 +2303,10 @@ function openCodex(key: string): void {
   // BUILD-1: карточка здания листает уровни (`b:id:уровень`). Без уровня в ключе
   // показывается ТЕКУЩИЙ построенный на выбранном мире (если есть) — владелец
   // открывает свою постройку и видит её, а не абстрактный первый уровень.
+  const world = codexWorld();
   const builtLvl =
-    kind === 'b' && selPlanet
-      ? s.planets[selPlanet]?.buildings.find((b) => b.type === id)?.level
+    kind === 'b' && world
+      ? s.planets[world]?.buildings.find((b) => b.type === id)?.level
       : undefined;
   const level = Number(lvl) || builtLvl || 1;
   el.innerHTML = `<div class="cxbox">${codexHtml(kind, id, level)}${codexBuildBtn(kind, id, level)}<button class="cx-close">${t('codex.close')}</button></div>`;
@@ -2309,7 +2315,8 @@ function openCodex(key: string): void {
 /** A "Build here" action inside the codex when the selected province can raise this
  *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
 function codexBuildBtn(kind: string, id: string, level = 1): string {
-  const p = selPlanet ? s.planets[selPlanet] : null;
+  const world = codexWorld();
+  const p = world ? s.planets[world] : null;
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
     // BUILD-1: у ПОСТРОЕННОГО здания карточка предлагает «Улучшить» — той же пробой

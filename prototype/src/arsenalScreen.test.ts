@@ -280,6 +280,19 @@ describe('арсенал — подробности модуля', () => {
     expect(html).toContain('Верфи хватает одной копии.');
   });
 
+  it('у копии видны заточка и прочность: продаётся и разбирается именно эта', () => {
+    const graded = copy({
+      itemId: 'inst-1',
+      defId: 'targeting_array',
+      form: 'instance',
+      grade: 2,
+      durability: 3,
+    });
+    const html = arsenalDetailHtml(state({ module: 'targeting_array', items: [dropA, graded] }));
+    expect(html).toContain('Награда за партию, 9 окт., заточка +2, прочность 3');
+    expect(html).toContain('data-ar-sell="inst-1"');
+  });
+
   it('одна копия предупреждает, что продажа уберёт модуль с верфи', () => {
     const html = arsenalDetailHtml(
       state({
@@ -337,6 +350,22 @@ describe('арсенал — подробности корабля', () => {
     expect(html).toContain('data-ar-module="targeting_array"');
     expect(html).toContain('ar-mchip r-unique miss" data-ar-module="siege_platform"');
     expect(html).toContain('data-ar-codex="u:cruiser"');
+  });
+
+  it('корабль из таблицы наград виден пунктиром, с шансом получить', () => {
+    const pool: MetaDropOddsView['pool'] = [
+      ...drops.pool,
+      { kind: 'hull', defId: 'pirate_cruiser', weight: 10 },
+    ];
+    const s = state({
+      tab: 'hulls',
+      hull: 'pirate_cruiser',
+      view: view({ drops: { ...drops, pool } }),
+    });
+    expect(arsenalHtml(s)).toContain('ar-hc miss" data-ar-hull="pirate_cruiser"');
+    const html = arsenalDetailHtml(s);
+    expect(html).toContain('Как получить');
+    expect(html).toContain('Награда за сетевую партию');
   });
 
   it('корабль без отсеков так и говорит', () => {
@@ -426,6 +455,14 @@ describe('арсенал — вкладка', () => {
     expect(host.root().innerHTML).toContain('Арсенал хранится в аккаунте');
     host.root().fire({ arSignIn: '' });
     expect(signIn).toHaveBeenCalledOnce();
+  });
+
+  it('гость не видит кэш прошлой сессии — только стартовый набор', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const host = hostOf({ authorizedBase: async () => null, readCache: () => [dropA] });
+    await initArsenal(host).refresh();
+    expect(host.root().innerHTML).toContain('Арсенал хранится в аккаунте');
+    expect(host.root().innerHTML).toContain('miss" data-ar-module="targeting_array"');
   });
 
   it('кэш красится до сети, ответ сервера заменяет коллекцию и пишет кэш', async () => {

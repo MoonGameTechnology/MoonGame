@@ -16,9 +16,10 @@ import { splitSupport } from './supportShips';
  * «Арсенал» хаба (переделка по макету, заказ владельца 2026-10-19): что экран показывает и
  * что разрешает, без разметки.
  *
- * 1. **Каталог — что арсенал вообще перечисляет.** Корабли — стартовый набор аккаунта плюс
- *    всё, чем игрок уже владеет. Модули — каждый, который встаёт хотя бы на один из этих
- *    кораблей или на флагман, плюс то, что уже лежит в коллекции. Крепостные щиты и выводки
+ * 1. **Каталог — что арсенал вообще перечисляет.** Корабли — стартовый набор аккаунта, всё,
+ *    чем игрок уже владеет, и то, что сервер может выдать наградой (таблица наград): такой
+ *    корабль виден до получения. Модули — каждый, который встаёт хотя бы на один из этих
+ *    кораблей или на флагман, плюс то, что лежит в коллекции или в таблице наград. Крепостные щиты и выводки
  *    Роя сюда не попадают сами: ни один корабль игрока их не несёт. Новый модуль для кораблей
  *    игрока появляется правкой `data/modules.json`, без списка в коде. Предмет, которого нет
  *    в данных клиента, не показывается: карточку ему рисовать не из чего (так же поступает
@@ -71,19 +72,20 @@ export function modulesFor(hull: string, modules: readonly string[], data: GameD
 export function arsenalCatalog(input: {
   starter: readonly StarterEntry[];
   items: readonly ArsenalItem[];
+  /** Что сервер может выдать наградой (`MetaEconomyView.drops.pool`). */
+  obtainable?: readonly StarterEntry[];
   data: GameData;
 }): { hulls: string[]; modules: string[] } {
-  const { starter, items, data } = input;
+  const { starter, items, obtainable = [], data } = input;
+  const entries = [...starter, ...items, ...obtainable];
   const hulls: string[] = [];
-  for (const entry of [...starter, ...items])
+  for (const entry of entries)
     if (entry.kind === 'hull' && data.units[entry.defId] && !hulls.includes(entry.defId))
       hulls.push(entry.defId);
-  const owned = new Set(
-    [...starter, ...items].filter((i) => i.kind === 'module').map((i) => i.defId),
-  );
+  const listed = new Set(entries.filter((i) => i.kind === 'module').map((i) => i.defId));
   const carriers = [...hulls, FLAGSHIP_HULL];
   const modules = Object.keys(data.modules).filter(
-    (id) => owned.has(id) || carriers.some((h) => hullCarries(h, id, data)),
+    (id) => listed.has(id) || carriers.some((h) => hullCarries(h, id, data)),
   );
   return { hulls, modules };
 }
@@ -160,7 +162,7 @@ export function percent(part: number, whole: number): number {
 const REST_PLACE = 100;
 
 export interface DropOdds {
-  /** Доля этого модуля среди наград, %; null — модуля нет в пуле. */
+  /** Доля этого предмета среди наград, %; null — предмета нет в пуле. */
   share: number | null;
   /** Шанс по местам: `to: null` — «остальные места». */
   places: Array<{ from: number; to: number | null; chance: number }>;
@@ -168,11 +170,15 @@ export interface DropOdds {
   dryRun: number | null;
 }
 
-/** Правило 4: шансы награды для модуля по таблице сервера. */
-export function dropOdds(drops: MetaDropOddsView, defId: string): DropOdds {
+/** Правило 4: шансы награды для модуля или корабля по таблице сервера. */
+export function dropOdds(
+  drops: MetaDropOddsView,
+  defId: string,
+  kind: 'hull' | 'module' = 'module',
+): DropOdds {
   const total = drops.pool.reduce((s, l) => s + l.weight, 0);
   const own = drops.pool
-    .filter((l) => l.kind === 'module' && l.defId === defId)
+    .filter((l) => l.kind === kind && l.defId === defId)
     .reduce((s, l) => s + l.weight, 0);
   const rows = [...drops.byPlace].sort((a, b) => a.maxPlace - b.maxPlace);
   let from = 1;

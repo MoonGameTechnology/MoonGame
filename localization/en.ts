@@ -662,6 +662,8 @@ export const en: Record<string, string> = {
   'arsenal.copy.sellable': 'Can be sold',
   'arsenal.copy.bound': 'Personal, cannot be sold',
   'arsenal.copy.no-sale': 'Cannot be sold',
+  'arsenal.copy.grade': 'grade +{n}',
+  'arsenal.copy.durability': 'durability {n}',
   'arsenal.from.starter': 'Starter kit',
   'arsenal.from.drop': 'Match reward',
   'arsenal.from.craft': 'Crafted in the workshop',
