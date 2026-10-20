@@ -25,6 +25,8 @@ import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
 import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
+import { MemoryPlayerActivityStore, PostgresPlayerActivityStore } from '../packages/server/src/playerActivity';
+import { registerPlayerActivityApi } from '../packages/server/src/playerActivityApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
 import { StaggeredAi } from './src/aiScheduler';
@@ -1050,6 +1052,12 @@ const server = createMultiplayerServer({
       const who = bearer ? await authCfg.verifySession!(bearer) : null;
       return who?.ok ? liveSession(who.claim, userStore) : null;
     };
+    if (AUTH) registerPlayerActivityApi(app, {
+      store: pool ? new PostgresPlayerActivityStore(pool) : new MemoryPlayerActivityStore(),
+      identify: identifySession,
+      operator,
+      ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
+    });
     telemetryStats = registerTelemetryApi(app, {
       log: clientLog,
       ...(AUTH ? { identify: identifySession } : {}),

@@ -2,7 +2,8 @@
 
 Отдельный read-only процесс Node ≥20 на игровом Linux-хосте. Он преобразует
 существующие JSON-источники в Prometheus exposition и не меняет Game, его
-readiness, журнал или БД. Это локальный bootstrap; автоматическая установка
+readiness или журнал; не получает DB credentials. Источник activity сам выполняет
+свою retention-очистку в Game. Это локальный bootstrap; автоматическая установка
 на VPS и подключение к контейнерному Prometheus сюда не входят.
 
 ```bash
@@ -11,7 +12,7 @@ curl --fail http://127.0.0.1:9108/metrics
 ```
 
 Exporter слушает **только 127.0.0.1**, по умолчанию порт 9108. Он читает только
-`http://127.0.0.1:8788/health`, `/ready`, `/metrics`, `/metrics/summary`.
+`http://127.0.0.1:8788/health`, `/ready`, `/metrics`, `/metrics/summary`, `/metrics/activity`.
 `GAME_EXPORTER_PORT` и `GAME_EXPORTER_SOURCE_PORT` меняют только числовые порты
 (1–65535). Настройки URL/hostname/public bind отсутствуют. `GET /health` проверяет
 жизнь самого exporter, а `GET /metrics` обновляет источники. Иные пути, query и
@@ -30,13 +31,13 @@ root/пользователю exporter и недоступен группе/ос
 
 Текущий `METRICS_TOKEN` разрешает также raw `/metrics/recent`. Поэтому source
 остаётся literal loopback, redirect запрещён, credential отправляется только
-двум фиксированным `/metrics`-путям. Не подключайте этот bootstrap к удалённому
+трём фиксированным `/metrics`-путям. Не подключайте этот bootstrap к удалённому
 Game и не публикуйте его через прокси. Для контейнерной/удалённой интеграции
 нужен отдельный принятый transport и metrics-only credential с отрицательными
 проверками raw endpoints; один allowlist самого collector не сужает украденный ключ.
 
 Потребитель опрашивает exporter каждые 15 секунд. Каждый `GET /metrics` выполняет
-четыре запроса параллельно; конкурентные scrapes делят один in-flight refresh.
+пять запросов параллельно; конкурентные scrapes делят один in-flight refresh.
 На источник: timeout по умолчанию 1500 мс, включая headers/body, ≤64 KiB JSON,
 без retries. Это оставляет 500 мс для формирования/доставки ответа до принятого
 scrape deadline потребителя 2 с: иначе timeout источника мог бы скрыть и сам
@@ -84,3 +85,6 @@ deadline потребителя. Live-тест собирает
 запускает Docker CMD: настоящий WebSocket join меняет gauges/counters, остановка
 Game убирает значения, рестарты Game/exporter не создают двойного счёта.
 Это локальная проверка без PostgreSQL и контейнеров, не on-host capacity/24h приёмка.
+
+Суточные gauges, ограниченный date label и точность присутствия —
+[активность игроков](PLAYER-ACTIVITY.md).

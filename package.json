@@ -40,6 +40,7 @@
     "smoke:browser": "node prototype/browsertest.mjs",
     "smoke:browser:install": "node prototype/browsertest.mjs --install",
     "smoke:context": "node prototype/contexttest.mjs",
+    "smoke:player-activity": "node prototype/playeractivitytest.mjs",
     "smoke:zoom": "node prototype/zoomtest.mjs",
     "smoke:frontier": "node prototype/frontiertest.mjs",
     "smoke:retreat": "node prototype/retreattest.mjs",

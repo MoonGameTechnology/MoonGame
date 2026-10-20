@@ -58,6 +58,8 @@ function reportLogin(result: LoginResult): void {
 /** Что сессии нужно от игры: строка статуса и лента из `main.ts`, карточка входа — со
  *  страниц входа (`signInPages.ts`). */
 export interface AccountSessionHost {
+  /** Notify optional foreground observation after a session changes. */
+  sessionChanged?(): void;
   /** Строка статуса экрана подключения: почему не пустили. */
   status(text: string): void;
   note(text: string): void;
@@ -68,6 +70,7 @@ export interface AccountSessionHost {
 }
 
 let game: AccountSessionHost;
+export function notifySessionChanged(): void { game?.sessionChanged?.(); }
 
 /** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
 const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
@@ -133,6 +136,7 @@ export async function signOutEverywhere(base: string): Promise<boolean> {
     } catch { return false; }
   }
   clearSession(localStorage, base);
+  notifySessionChanged();
   pendingJoinToken = null;
   return true;
 }
@@ -208,6 +212,7 @@ export async function ensureSession(
     reportLogin(token ? (outcome === 'created' ? 'created' : 'ok') : outcome);
     if (token) {
       saveSession(localStorage, base, { login, token });
+      notifySessionChanged();
       if (outcome === 'created') game.note('✔ ' + t('acc.created'));
       return token;
     }

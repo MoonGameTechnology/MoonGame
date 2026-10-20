@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 12539 зелёных** (136 skip, 1017 файлов; прогон 2026-10-20 на `7d78d1ca` + UIX-7.1).
+**Тесты: 12686 зелёных** (10 skip, 1020 файлов; CI-прогон с PostgreSQL 2026-10-20 на `52f3ed0e`).
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -411,6 +411,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Пульт `src/admin.ts` — своя сборка на `/admin` (только с `ADMIN_LOGINS`): состав партии и «Снять».
 - События `TELEMETRY_EVENTS` (`packages/protocol/src/telemetry.ts`) уходят в `POST /telemetry`
   (`playtest-logs/client-*.jsonl`); сводка — `pnpm run analytics`.
+- Авторизованный foreground pulse и union интервалов дают уникальные аккаунты/время по
+  суткам UTC; источник `/metrics/activity`, экран Grafana `/d/moongame-player-activity`.
+  30-дневное хранение, erasure и точность — [runbook](../deploy/observability/PLAYER-ACTIVITY.md).
 
 **Харнесы и проверки.**
 - `prototype/uitest.mjs` (настоящий бандл на фейковом DOM/canvas) идёт в гейте через
