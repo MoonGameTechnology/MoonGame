@@ -27,6 +27,7 @@ function setup(options: { authenticated?: boolean; rateMax?: number } = {}) {
     salvage: vi.fn(async () => ok),
     selectPass: vi.fn(async () => ok),
     chooseSeasonReward: vi.fn(async () => ok),
+    buyOffer: vi.fn(async () => ok),
   };
   const app = Fastify();
   apps.push(app);
@@ -153,6 +154,25 @@ describe('main economy HTTP boundary', () => {
       ).toBe(400);
     }
     expect(economy.craft).not.toHaveBeenCalled();
+  });
+
+  it('buys a store offer for the session owner only and passes no price from the client', async () => {
+    const { app, economy } = setup();
+    const buy = { requestId: 'buy-1', offerId: 'premium_30' };
+    for (const extra of [{ price: 0 }, { accountId: 'victim' }, { sovereigns: 999 }]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/meta-economy/store/buy',
+        payload: { ...buy, ...extra },
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    expect(economy.buyOffer).not.toHaveBeenCalled();
+    vi.mocked(economy.buyOffer).mockResolvedValueOnce({ ok: false, code: 'E_SOVEREIGNS' });
+    const poor = await app.inject({ method: 'POST', url: '/meta-economy/store/buy', payload: buy });
+    expect(poor.statusCode).toBe(409);
+    expect(poor.json()).toEqual({ error: 'E_SOVEREIGNS' });
+    expect(economy.buyOffer).toHaveBeenCalledWith('session-owner', buy);
   });
 
   it('limits writes and returns stable errors without database details', async () => {

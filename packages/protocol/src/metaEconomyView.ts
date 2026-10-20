@@ -71,6 +71,26 @@ export interface MetaDropOddsView {
   pool: Array<{ kind: 'hull' | 'module'; defId: string; weight: number }>;
 }
 
+/** One shelf of the Sovereign store, priced for THIS account (owned modules leave the price). */
+export interface MetaStoreOfferView {
+  id: string;
+  category: 'premium' | 'modules' | 'materials';
+  /** Sovereigns to pay now. */
+  price: number;
+  /** Price before the pack discount, when a discount applies. */
+  fullPrice?: number;
+  premiumDays?: number;
+  premiumSeason?: string;
+  modules?: Array<{ defId: string; owned: boolean }>;
+  materials?: Record<string, number>;
+  /** Lifetime purchases allowed per account; absent = unlimited. */
+  limit?: number;
+  bought: number;
+  /** `owned` — every module or the season track is already open; `limit` — bought out;
+   *  `season` — the season is not running. Absent while the offer can be bought. */
+  blocked?: 'owned' | 'limit' | 'season';
+}
+
 export interface MetaEconomyView {
   catalogVersion: string;
   materials: MetaMaterialView[];
@@ -82,6 +102,11 @@ export interface MetaEconomyView {
   cosmetics: string[];
   /** Absent from a server that predates the arsenal's odds disclosure. */
   drops?: MetaDropOddsView;
+  /** Sovereigns ◆ on the account. Absent from a server without the store. */
+  sovereigns?: number;
+  /** Premium account expiry (epoch ms), or null without premium. */
+  premiumUntil?: number | null;
+  store?: MetaStoreOfferView[];
 }
 
 export interface MetaCommandReceipt {
@@ -92,6 +117,10 @@ export interface MetaCommandReceipt {
   itemIds?: string[];
   seasonXp?: number;
   warrants?: number;
+  /** Sovereigns paid for a store offer. */
+  sovereignsSpent?: number;
+  /** Premium account expiry after the purchase. */
+  premiumUntil?: number;
   soulbound?: boolean;
   drop?: { kind: 'hull' | 'module'; defId: string; forced: boolean } | null;
   dropOdds?: { chance: number; pity: number; forced: boolean; tablesHash: string };
@@ -146,4 +175,8 @@ export interface MetaSeasonChoiceCommand {
   seasonId: string;
   level: number;
   defId: string;
+}
+export interface MetaStoreBuyCommand {
+  requestId: string;
+  offerId: string;
 }
