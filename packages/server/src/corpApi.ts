@@ -124,8 +124,8 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
       const result = await service.infrastructure(who, id);
       if (!result.ok) return reply.code(403).send({ error: result.code });
       return result.infrastructure;
-    } catch (error) {
-      request.log.error(error);
+    } catch {
+      request.log.error({ code: 'E_INTERNAL', requestId: request.id }, 'corporation infrastructure request failed');
       return reply.code(500).send({ error: 'E_INTERNAL' });
     }
   });
@@ -144,8 +144,8 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
       const result = await service.infrastructure(who, id, { buildingId: body.buildingId, expectedLevel: body.expectedLevel });
       if (!result.ok) return reply.code(result.code === 'E_FORBIDDEN' ? 403 : 409).send({ error: result.code });
       return result.infrastructure;
-    } catch (error) {
-      request.log.error(error);
+    } catch {
+      request.log.error({ code: 'E_INTERNAL', requestId: request.id }, 'corporation infrastructure build failed');
       return reply.code(500).send({ error: 'E_INTERNAL' });
     }
   });

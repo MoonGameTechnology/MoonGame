@@ -540,7 +540,15 @@ const server = createMultiplayerServer({
   auth,
   // A join token is bound to the account's password: a reset refuses the old one here.
   ...(auth
-    ? { accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId) }
+    ? {
+        accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId),
+        accountSeat: async (matchId: string, accountId: string) => {
+          const ava = await avaOrchestrator.resolveAvaSeat(matchId, accountId);
+          if (ava) return ava.ok ? ava.playerId : null;
+          const user = await stores.userStore.findById(accountId);
+          return user ? accountStore.seatOf(matchId, user.login) : null;
+        },
+      }
     : {}),
   allowedOrigins,
   securityAudit,

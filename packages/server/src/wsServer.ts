@@ -13,7 +13,7 @@ import { WebSocket, WebSocketServer, type PerMessageDeflateOptions } from 'ws';
 import type { MatchRoom } from './matchRoom';
 import { InMemoryRoomRegistry, type RoomRegistry } from './roomRegistry';
 import type { AccountStore } from './store';
-import { verifyJoinToken, type JoinTokenVerifyConfig } from './auth';
+import { verifyJoinToken, type JoinTokenVerifyConfig, type JoinClaim } from './auth';
 import { serializeServerMessage, type ServerErrorCode } from './protocol';
 import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
@@ -74,6 +74,10 @@ export interface MultiplayerServerOptions {
    *  token minted before a password reset is refused (401), like the session it came
    *  from. A lookup error refuses too. Both hosts wire it whenever accounts exist. */
   accountPwfp?: (accountId: string) => Promise<string | null>;
+  /** Current durable seat of an account in a match. A kick/reassignment invalidates
+   *  its old join token even while the signature and password fingerprint are live.
+   *  Hosts with accounts wire this; dev token-only harnesses may omit it. */
+  accountSeat?: (matchId: string, accountId: string) => Promise<string | null>;
   /** Seat lock (REL-5) — protect the nick-login path without accounts. On a nick's
    *  FIRST join the server mints a random seat ticket, stores only its sha256 in the
    *  account store and hands the plaintext to that client in `welcome.seatTicket`;
@@ -687,6 +691,26 @@ export function createMultiplayerServer(
           rejectUpgrade(socket, 404);
           return;
         }
+        // Authenticate before loading/advancing a persisted match. Anonymous or
+        // revoked callers must not make the lazy registry perform expensive work.
+        let joinClaim: JoinClaim | undefined;
+        if (auth) {
+          const token = url.searchParams.get('token');
+          const verified = token ? await verifyJoinToken(token, auth) : null;
+          if (!verified?.ok) { refuseUpgrade(401); return; }
+          if (verified.claim.matchId !== matchId) { refuseUpgrade(403); return; }
+          joinClaim = verified.claim;
+          if (options.accountPwfp && (!joinClaim.accountId || !joinClaim.pwfp ||
+              await options.accountPwfp(joinClaim.accountId) !== joinClaim.pwfp)) {
+            refuseUpgrade(401);
+            return;
+          }
+          if (options.accountSeat && (!joinClaim.accountId ||
+              await options.accountSeat(matchId, joinClaim.accountId) !== joinClaim.playerId)) {
+            refuseUpgrade(403);
+            return;
+          }
+        }
         // Load-on-demand for a lazy registry (an evicted match reloads here); an eager
         // registry has no `resolve`, so fall back to the in-memory `get`.
         const room = registry.resolve
@@ -708,38 +732,29 @@ export function createMultiplayerServer(
         // Plaintext seat ticket minted THIS join (seat lock) — delivered once in
         // `welcome.seatTicket`; the server keeps only the hash.
         let mintedTicket: string | undefined;
-        // The password fingerprint the join token was checked against (auth + revocation only).
-        let stampedPwfp: string | undefined;
-        if (auth) {
+        if (joinClaim) {
           // Authenticated handshake (SE-0.1): the join token is the SOLE identity —
           // `?player=`/`?nick=` are ignored so they can't bypass it. The token rides in
           // `?token=` (fully browser-settable on the WS URL, unlike request headers).
-          const token = url.searchParams.get('token');
-          if (!token) {
-            refuseUpgrade(401);
-            return;
-          }
-          const verified = await verifyJoinToken(token, auth);
-          if (!verified.ok) {
-            refuseUpgrade(401); // bad/expired/forged — no reason leaked
-            return;
-          }
-          if (verified.claim.matchId !== matchId) {
-            refuseUpgrade(403); // a token for a different match
-            return;
-          }
-          // A password reset revokes sessions by fingerprint; the join token minted from
-          // such a session must die with it, not live out its TTL.
+          // Recheck after loading (which may await persistence/catch-up). Capture a
+          // room revision first: a concurrent kick/logout/reset may finish its sweep
+          // before this lookup returns, while this socket is not registered yet.
+          const revision = room.admissionRevision;
           if (options.accountPwfp) {
-            const { accountId: owner, pwfp } = verified.claim;
+            const { accountId: owner, pwfp } = joinClaim;
             if (!owner || !pwfp || (await options.accountPwfp(owner)) !== pwfp) {
               refuseUpgrade(401);
               return;
             }
-            stampedPwfp = pwfp;
           }
-          playerId = verified.claim.playerId;
-          accountId = verified.claim.accountId;
+          if (options.accountSeat && (!joinClaim.accountId ||
+              await options.accountSeat(matchId, joinClaim.accountId) !== joinClaim.playerId)) {
+            refuseUpgrade(403);
+            return;
+          }
+          if (room.admissionRevision !== revision) { refuseUpgrade(401); return; }
+          playerId = joinClaim.playerId;
+          accountId = joinClaim.accountId;
           verifiedIdentity = true;
         } else if (options.seatLock) {
           // Seat lock (REL-5): nick+ticket is the SOLE identity on this path — the
@@ -846,7 +861,6 @@ export function createMultiplayerServer(
             mintedTicket,
             accountId,
             verifiedIdentity,
-            stampedPwfp,
           );
         });
       } catch {
@@ -879,8 +893,6 @@ export function createMultiplayerServer(
       /** Личность доказана рукопожатием (токен/билет) — только тогда комната разрешит
        *  перехватить занятое кресло. */
       verifiedIdentity = false,
-      /** The password fingerprint the join token was checked against (revocation only). */
-      stampedPwfp?: string,
     ) => {
       sockets.add(ws);
       alive.set(ws, true);
@@ -909,23 +921,6 @@ export function createMultiplayerServer(
         )
       ) {
         registry.retain?.(room.id); // keep the match resident while this socket is connected
-        // A password change that landed between the check above and `addPeer` swept the
-        // rooms before this socket was in one. Checked again now that it is registered: a
-        // change from here on finds it in the sweep, an earlier one shows up in the lookup.
-        const owner = accountId;
-        const lookup = options.accountPwfp;
-        if (stampedPwfp !== undefined && owner !== undefined && lookup) {
-          const stamped = stampedPwfp;
-          detach('повторная сверка пароля', (async () => {
-            let current: string | null;
-            try {
-              current = await lookup(owner);
-            } catch {
-              current = null; // the store failed: fail-secure, the session is not proven live
-            }
-            if (current !== stamped) room.evictAccount(owner, 'E_SESSION_REVOKED');
-          })());
-        }
         // ENTRY-3 (правило 6): место закрепляется не заявкой, а ПОПАДАНИЕМ НА КАРТУ —
         // `addPeer` вернул true, значит игрок принят и получил мир. До этого момента
         // заявка временная и истекает, иначе взявший место по ссылке и не пришедший

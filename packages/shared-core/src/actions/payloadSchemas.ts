@@ -304,6 +304,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
  *  with no schema (an internal scheduled action, or an unknown type) returns false — the
  *  gate then rejects it, so a client can only submit the actions it is meant to. */
 export function isValidActionPayload(type: string, payload: unknown): boolean {
+  // Wire action names must be entries in the catalog, never Object.prototype members.
+  if (!Object.hasOwn(actionPayloadSchemas, type)) return false;
   const schema = actionPayloadSchemas[type];
   if (!schema) return false;
   return schema.safeParse(payload).success;

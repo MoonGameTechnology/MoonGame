@@ -936,7 +936,14 @@ const server = createMultiplayerServer({
   // The join token is also bound to the account's password: after a reset the old one
   // is refused here (and the reset itself closes the account's open sockets, below).
   ...(AUTH
-    ? { auth: authCfg.auth, accountPwfp: (accountId: string) => currentPwfp(userStore, accountId) }
+    ? {
+        auth: authCfg.auth,
+        accountPwfp: (accountId: string) => currentPwfp(userStore, accountId),
+        accountSeat: async (matchId: string, accountId: string) => {
+          const user = await userStore.findById(accountId);
+          return user ? accountStore.seatOf(matchId, user.login) : null;
+        },
+      }
     : {}),
   // TLS-2 (playtest-hardening): за https-прокси хост обязан уважать Origin-allowlist
   // (CSWSH) и реальные клиентские IP из X-Forwarded-For — без этой проводки env в

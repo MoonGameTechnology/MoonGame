@@ -85,6 +85,18 @@ function room(): MatchRoom {
   });
 }
 
+it('a kicked peer cannot submit buffered messages before its socket finishes closing', async () => {
+  const r = room();
+  const peer = new MemoryPeer();
+  expect(r.addPeer('p1', peer)).toBe(true);
+  expect(r.evict('p1')).toBe(1);
+  expect(r.peerCount).toBe(0);
+  await r.receive('p1', peer, JSON.stringify({
+    type: 'action', matchId: r.id, action: action('after-kick', 'p1', 'Stolen'),
+  }));
+  expect(r.state.players.p1?.name).toBe('One');
+});
+
 describe('MatchRoom — player-action deny-list (AVA-8)', () => {
   function deniedRoom(): MatchRoom {
     return new MatchRoom({
