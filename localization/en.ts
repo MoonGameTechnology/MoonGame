@@ -1643,6 +1643,7 @@ export const en: Record<string, string> = {
   'coal.save': 'Save',
   'coal.leave': 'Leave the coalition',
   'coal.leave.confirm': 'Leave for sure? Alliances turn to peace',
+  'coal.fixed': 'Team modes have no coalitions: the mode sets the sides.',
   'coal.back': '← All coalitions',
   'diplo.profile': 'Open player profile',
 

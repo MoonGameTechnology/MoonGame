@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '84'; // FOG-LEAK: право прохода по видимой границе.
+export const MODULE_MANIFEST_VERSION = '85'; // COAL-1: коалиции. Членство и порядок не
+// тронуты; `diplomacy` 1.4.0 — союз заключается только внутри коалиции (`state.coalitions`,
+// вместимость 15% мест), новые действия `diplomacy.decline`, `coalition.leave`,
+// `coalition.edit`. Партия на 84 собрала бы союз сверх потолка.
+// export const MODULE_MANIFEST_VERSION = '84'; // FOG-LEAK: право прохода по видимой границе.
 // Членство и порядок не тронуты; `movement` 1.5.0 — приказ отбивается только границей, которую
 // игрок видит, а невидимую флот встречает в пути и встаёт перед ней (`fleet.halted`). Партия
 // на 83 провела бы флот сквозь закрывшуюся в пути границу.

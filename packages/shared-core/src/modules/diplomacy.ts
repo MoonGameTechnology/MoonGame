@@ -87,7 +87,7 @@ function leaveCoalition(h: HandlerContext, me: PlayerId, except: PlayerId | null
  */
 export const diplomacyModule: GameModule = {
   id: 'diplomacy',
-  version: '1.3.0',
+  version: '1.4.0',
   setup(api) {
     api.provideCapability<DiplomacyCapability>('diplomacy', {
       getRelation: (state, a, b) => stanceToRelation(getStance(state, a, b)),
@@ -349,12 +349,10 @@ export const diplomacyModule: GameModule = {
           if (id !== playerId) setMapShare(h.state, playerId, id, false);
         }
       }
-      // COAL-1: выбывший освобождает место в коалиции; союз оставшихся между собой цел.
-      if (coalitionOf(h.state, playerId)) {
-        const c = coalitionOf(h.state, playerId)!;
-        removeMember(h.state, playerId);
-        h.emit('coalition.left', { playerId, coalitionId: c.id });
-      }
+      // COAL-1: выбывший освобождает место в коалиции, а его союзы с оставшимися
+      // сменяются миром — чат и метки союзников читают стойку, а не состав. Союз
+      // оставшихся между собой цел.
+      leaveCoalition(h, playerId, null);
     });
   },
 };

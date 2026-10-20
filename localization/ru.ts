@@ -1651,6 +1651,7 @@ export const ru: Record<string, string> = {
   'coal.save': 'Сохранить',
   'coal.leave': 'Выйти из коалиции',
   'coal.leave.confirm': 'Точно выйти? Союзы станут миром',
+  'coal.fixed': 'В командном режиме коалиций нет: стороны задаёт режим.',
   'coal.back': '← Все коалиции',
   'diplo.profile': 'Открыть профиль игрока',
 

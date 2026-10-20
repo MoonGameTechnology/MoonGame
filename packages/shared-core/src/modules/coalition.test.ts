@@ -166,7 +166,7 @@ describe('COAL-1 — выход из коалиции', () => {
     expect(coalitionOf(s, 'p2')?.members).toEqual(['p2', 'p3']);
   });
 
-  it('выбывший освобождает место, союз оставшихся цел', () => {
+  it('выбывший освобождает место и теряет союзы, союз оставшихся цел', () => {
     const killer: GameModule = {
       id: 'test-killer',
       version: '1',
@@ -183,6 +183,8 @@ describe('COAL-1 — выход из коалиции', () => {
     const s = ok(k.applyAction(three, act('p1', 'test.kill', { id: 'p3' }), ctx()));
     expect(coalitionOf(s, 'p1')?.members).toEqual(['p1', 'p2']);
     expect(getStance(s, 'p1', 'p2')).toBe('alliance');
+    expect(getStance(s, 'p3', 'p1')).toBe('peace');
+    expect(getStance(s, 'p3', 'p2')).toBe('peace');
   });
 
   it('выйти, не состоя в коалиции, нельзя', () => {

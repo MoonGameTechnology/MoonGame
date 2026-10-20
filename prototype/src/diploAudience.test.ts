@@ -39,14 +39,12 @@ describe('diploAudience — текст смены стойки', () => {
 });
 
 describe('diploAudience — адрес треда', () => {
-  // Сторож РАСХОЖДЕНИЯ 2 из шапки: тред адресуется по `b`, а не по собеседнику.
-  // Тест фиксирует текущее поведение — включая случай, где `b` это сам игрок.
-  it('тред ключуется по `b`, автор — `a` (текущее поведение)', () => {
-    expect(stanceThread(ME, FOE)).toEqual({ key: FOE, from: ME });
+  it('своё объявление — в тред цели, автор — я', () => {
+    expect(stanceThread(ME, FOE, ME)).toEqual({ key: FOE, from: ME });
   });
 
-  it('когда стойку меняют МНЕ, тред уходит на моё же место — расхождение задокументировано', () => {
-    expect(stanceThread(FOE, ME)).toEqual({ key: ME, from: FOE });
+  it('когда стойку меняют МНЕ, реплика ложится в тред того, кто её сменил', () => {
+    expect(stanceThread(FOE, ME, ME)).toEqual({ key: FOE, from: FOE });
   });
 });
 
