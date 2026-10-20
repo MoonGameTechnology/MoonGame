@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type TerrainEnvironmentInput, type TerrainEnvironmentTile } from '../../decisions/terrainEnvironment';
-import { projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
+import { knownEnvironment, projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
 
 function input(): TerrainEnvironmentInput {
   return {
@@ -32,6 +32,17 @@ describe('terrain knowledge boundary', () => {
       expect(terrainKnowledge(live, false, {})).toEqual({ known: false });
     }
     expect(terrainKnowledge({ kind: 'rift' }, false, { environment: {} })).toEqual({ known: true });
+  });
+
+  it('hands the permitted environment itself, with the same boundary as the copy', () => {
+    const live = { kind: 'planet', terrain: 'nebula' };
+    const memory = { environment: { kind: 'asteroid' } };
+    expect(knownEnvironment(live, true, memory)).toBe(live);
+    expect(knownEnvironment(live, false, memory)).toBe(memory.environment);
+    expect(knownEnvironment(live, false)).toBeUndefined();
+    expect(knownEnvironment(undefined, true, memory)).toBeUndefined();
+    // A snapshot restored with a null environment knows nothing either.
+    expect(knownEnvironment(live, false, { environment: null as never })).toBeUndefined();
   });
 });
 
