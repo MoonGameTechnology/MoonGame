@@ -323,7 +323,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   power diagram (`territory.ts`, кэш `territoryGeometry.ts`), `holoDraw.ts`, LOD `mapLod.ts`.
 - Политическая карта печётся в offscreen-холст (`mapLayer.ts`, правила —
   `decisions/mapLayerView.ts`): пан сдвигает выпечку, зум растягивает, чёткость — фоновой
-  перепечкой полосами. До первого кадра заставка `mapLoading.ts` готовит карту порциями.
+  перепечкой полосами. Устройство, которому целая выпечка стоит дольше 50 мс, жест ею не
+  останавливает: приближение растягивает выпечку без предела, полосы ждут покоя (правило 8).
+  До первого кадра заставка `mapLoading.ts` готовит карту порциями.
 - Местность — общая среда в мировых координатах (`decisions/terrainEnvironment.ts`); правило —
   [map-visual-continuity-rule.md](map-visual-continuity-rule.md).
 - Корабль — контур по фракции владельца и id юнита (`shipGlyphs.ts`), флот — силуэт доминанта с

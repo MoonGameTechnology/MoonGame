@@ -31,6 +31,7 @@ import {
   backgroundContextEvents,
   holographicFrame,
   livingLevel,
+  mapCostly,
   mapSettled,
   mapView,
   provinceGeometry,
@@ -132,7 +133,7 @@ export function blitBorderLayer(detail: number, borders: ClassifiedBorders): boo
   // Rule 4: not in the frame that baked the map anew, unless it waited one already.
   const baked = geo !== borderBake && !borderWaited;
   borderBake = geo;
-  const judged = { fresh, transform: rel, dpr: DPR, settled: mapSettled, sharp: mapView.k === 1 };
+  const judged = { fresh, transform: rel, dpr: DPR, settled: mapSettled, sharp: mapView.k === 1, costly: mapCostly };
   let action = borderLayerAction({ ...judged, baked });
   borderWaited = baked && action !== borderLayerAction(judged);
   // Rule 5: a layer over few borders holds nothing — the frame strokes them, and the layer
