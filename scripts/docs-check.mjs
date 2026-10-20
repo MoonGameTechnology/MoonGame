@@ -38,8 +38,10 @@ const ROOT = normalize(join(import.meta.dirname, '..'));
 /** Каталоги, в которые обход не заходит (не наш контент / артефакты). */
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.claude']);
 
-/** Датированные исторические снапшоты — ссылки в них не проверяются (см. шапку). */
-const HISTORICAL = [normalize('docs/reviews')];
+/** Датированные исторические снапшоты — ссылки в них не проверяются (см. шапку).
+ *  `docs/archive` — прежние полные тексты живых доков, снятые при сжатии в снимок
+ *  (первый — `state-2026-10-19.md`, 2026-10-19): верны на свою дату, их не правят. */
+const HISTORICAL = [normalize('docs/reviews'), normalize('docs/archive')];
 
 /** Осознанные forward-ссылки на ещё не созданные файлы (причина + дата). */
 const ALLOW = new Set([
@@ -61,7 +63,7 @@ const STANDALONE = new Set([]);
 /** Каталоги ДАТИРОВАННЫХ снапшотов: их не требуют достижимыми и они не делают
  *  достижимым чужое. Ссылка из отчёта от 27 июня не означает, что документ найдёт
  *  тот, кто читает доки сегодня. */
-const DATED = [normalize('docs/reviews'), normalize('docs/research')];
+const DATED = [normalize('docs/reviews'), normalize('docs/research'), normalize('docs/archive')];
 
 /** Словарь зон backlog'а — зеркалит легенду «## Зоны» в docs/backlog.md. */
 const ZONES = new Set(['core', 'act', 'srv', 'cli', 'proto', 'data', 'docs', 'sec', 'ops']);
