@@ -22,6 +22,7 @@
  *    равно нельзя.
  */
 import { t, localizeStaticDom } from '../../localization/runtime';
+import { resolveBase } from '../../decisions/serverAddress';
 import { detach } from './detach';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -55,13 +56,18 @@ interface MatchLists {
   archived?: MatchRow[];
 }
 
-let token: string | null = null;
+interface AdminSession {
+  base: string;
+  token: string;
+}
+let session: AdminSession | null = null;
+let authGeneration = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 /** Адрес сервера: поле, если его заполнили, иначе тот хост, что отдал эту страницу. */
-function base(): string {
-  const typed = el<HTMLInputElement>('a-server').value.trim();
-  return (typed || location.origin).replace(/\/+$/, '');
+function base(typed = el<HTMLInputElement>('a-server').value): string | null {
+  const step = resolveBase(typed.trim() || location.origin, location.protocol === 'https:');
+  return step.kind === 'ok' ? step.base.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:') : null;
 }
 
 function say(key: string, vars?: Record<string, string | number>): void {
@@ -72,13 +78,21 @@ function say(key: string, vars?: Record<string, string | number>): void {
 async function call(
   path: string,
   init: RequestInit = {},
+  server = base(),
 ): Promise<{ status: number; body: unknown } | null> {
+  if (!server) return null;
+  // The field may change while a request or the refresh timer is pending. A bearer
+  // belongs only to its issuing server, never to the current contents of the field.
+  if (session && session.base !== server) {
+    signOut();
+    return null;
+  }
   try {
-    const res = await fetch(`${base()}${path}`, {
+    const res = await fetch(`${server}${path}`, {
       ...init,
       headers: {
         ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}),
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(session ? { authorization: `Bearer ${session.token}` } : {}),
       },
     });
     return { status: res.status, body: await res.json().catch(() => null) };
@@ -89,17 +103,24 @@ async function call(
 
 /** Вход: сессия, затем подтверждение полномочия (правило 1). */
 async function signIn(): Promise<void> {
+  signOut();
+  const generation = authGeneration;
+  const server = base();
+  if (!server) return say('admin.err.server');
   const login = el<HTMLInputElement>('a-login').value.trim();
   const password = el<HTMLInputElement>('a-pass').value;
+  el<HTMLInputElement>('a-pass').value = '';
   say('admin.signing');
   const auth = await call('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ login, password }),
-  });
+  }, server);
+  if (generation !== authGeneration || server !== base()) return;
   if (!auth) return say('admin.err.server');
   if (auth.status !== 200) return say('admin.err.creds');
-  token = (auth.body as { token?: string } | null)?.token ?? null;
-  if (!token) return say('admin.err.creds');
+  const token = (auth.body as { token?: unknown } | null)?.token;
+  if (typeof token !== 'string' || !token) return say('admin.err.creds');
+  session = { base: server, token };
   await confirmAuthority();
 }
 
@@ -107,16 +128,18 @@ async function signIn(): Promise<void> {
  *  Позывной берётся из ОТВЕТА, а не из поля ввода: после перезагрузки страницы поле
  *  пустое, а сессия жива, и «вы вошли как » без имени выглядело бы поломкой. */
 async function confirmAuthority(): Promise<void> {
+  const checking = session;
+  if (!checking) return;
   const who = await call('/admin/whoami');
+  if (session !== checking || base() !== checking.base) return;
   if (!who) return say('admin.err.server');
   if (who.status !== 200) {
     // 403 «не администратор» и 404 «администраторов на хосте нет вовсе» — для
     // вошедшего человека это одно и то же: командовать он не может.
-    token = null;
-    sessionStorage.removeItem(SESSION_KEY);
+    signOut();
     return say('admin.err.no-authority');
   }
-  sessionStorage.setItem(SESSION_KEY, token ?? '');
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(checking));
   el('a-gate').style.display = 'none';
   el('a-panel').style.display = 'block';
   el('a-who').textContent = t('admin.who', {
@@ -129,7 +152,8 @@ async function confirmAuthority(): Promise<void> {
 }
 
 function signOut(): void {
-  token = null;
+  session = null;
+  authGeneration++;
   sessionStorage.removeItem(SESSION_KEY);
   if (timer !== null) {
     clearInterval(timer);
@@ -264,6 +288,17 @@ el<HTMLSelectElement>('a-match').onchange = () => detach('пульт: соста
 // Перезагрузка страницы не должна означать повторный вход (правило 2).
 const saved = sessionStorage.getItem(SESSION_KEY);
 if (saved) {
-  token = saved;
-  detach('пульт: проверка сохранённого доступа', confirmAuthority());
+  try {
+    const parsed = JSON.parse(saved) as Partial<AdminSession> | null;
+    if (typeof parsed?.base === 'string' && base(parsed.base) === parsed.base &&
+        typeof parsed.token === 'string' && parsed.token) {
+      session = { base: parsed.base, token: parsed.token };
+      el<HTMLInputElement>('a-server').value = parsed.base;
+      detach('пульт: проверка сохранённого доступа', confirmAuthority());
+    } else sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Old tokens carried no server binding. Require a fresh sign-in rather than
+    // sending one to whichever origin happens to host the admin page now.
+    sessionStorage.removeItem(SESSION_KEY);
+  }
 }

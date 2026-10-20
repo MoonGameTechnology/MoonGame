@@ -544,10 +544,12 @@ export class MatchRoom {
   /** True while a batch of server orders is in flight: without it a tick could read a
    *  state whose previous batch has not been applied yet and re-issue the same moves. */
   private serverOrdersBusy = false;
-  /** playerId → accountId for the room's life (see `addPeer`'s `accountId` param).
-   *  Only ever set, never cleared on disconnect — the same seat is always the same
-   *  account for a given match. */
+  /** playerId → accountId until the seat is explicitly released (see `evict`).
+   *  Ordinary disconnects keep the binding; a kick lets the next owner replace it. */
   private readonly playerAccountId = new Map<PlayerId, string>();
+  /** Changes on identity/seat revocation, including when no peer is connected.
+   *  An async handshake must not admit a lookup made before that revocation. */
+  private admissionVersion = 0;
   /** The actor mailbox (SV-0.2): serializes state-touching operations whose critical
    *  section spans an `await` — a committed submit (its persist) and a lobby `start`
    *  — so one runs fully before the next, and neither interleaves with the other's
@@ -885,7 +887,11 @@ export class MatchRoom {
   }
 
   hasPlayer(playerId: PlayerId): boolean {
-    return this.stateValue.players[playerId] !== undefined;
+    return Object.hasOwn(this.stateValue.players, playerId) && this.stateValue.players[playerId] !== undefined;
+  }
+
+  get admissionRevision(): number {
+    return this.admissionVersion;
   }
 
   addPeer(
@@ -906,8 +912,8 @@ export class MatchRoom {
       return false;
     }
     // LARS-1: remember which account this seat is, for the live arsenal-ownership
-    // read at unit.build admission (options.arsenalStore). Never trust a later,
-    // different value for the same seat within one room's life.
+    // read at unit.build admission (options.arsenalStore). Only a seat release
+    // (`evict`) clears this binding for the next owner.
     if (accountId && !this.playerAccountId.has(playerId))
       this.playerAccountId.set(playerId, accountId);
     // Одно живое соединение на кресло — но выигрывает НОВОЕ, а не старое.
@@ -967,8 +973,7 @@ export class MatchRoom {
       this.hashDueAt.set(playerId, this.now() + phase * STATE_HASH_EVERY_MS);
     }
     // Кто именно сидит на этом сокете. Отдельно от `playerAccountId`: та карта хранит
-    // ПЕРВОГО владельца кресла на всю жизнь комнаты (и правильно делает — это договор
-    // арсенала), а для перехвата нужен тот, кто сидит сейчас.
+    // владельца до ЯВНОГО освобождения кресла, а для перехвата нужен тот, кто сидит сейчас.
     this.peerAccountId.set(peer, accountId);
     this.observe?.({ kind: 'join', playerId, ...(accountId ? { accountId } : {}) });
     if (this.manualStart && this.host === null) this.host = playerId; // first in hosts
@@ -1064,14 +1069,16 @@ export class MatchRoom {
    * с кодом, потом закрытие.
    *
    * Отсоединение — НЕ выход из партии: место в мире остаётся, за ним доигрывает ИИ, и
-   * следующий вошедший садится в это кресло. Уборку `peers` делает обычный путь
-   * `removePeer` по событию закрытия сокета — дублировать её здесь значило бы посчитать
-   * `leave` дважды в метриках.
+   * следующий вошедший садится в это кресло. Сокет снимается СИНХРОННО, чтобы уже
+   * отправленные кадры не дошли до ядра после кика; повторный `removePeer` по событию
+   * закрытия ничего не делает и не удваивает метрики.
    *
    * Возвращает число закрытых соединений (0 — игрока сейчас нет на связи; кик от этого
    * не перестаёт быть выполненным, он про кресло, а не про сокет).
    */
   evict(playerId: PlayerId, code: ServerErrorCode = 'E_KICKED'): number {
+    this.admissionVersion += 1;
+    this.playerAccountId.delete(playerId);
     const playerPeers = this.peers.get(playerId);
     if (!playerPeers) return 0;
     let closed = 0;
@@ -1080,6 +1087,8 @@ export class MatchRoom {
       // 1000 «normal closure»: это не сбой связи, и клиенту не за что цепляться
       // авто-переподключением — причину он уже получил кадром выше.
       peer.close?.(1000, code);
+      // Already-buffered messages may arrive before the close handshake completes.
+      this.removePeer(playerId, peer);
       closed += 1;
     }
     return closed;
@@ -1100,6 +1109,7 @@ export class MatchRoom {
    * вернётся в своё кресло с новой сессией.
    */
   evictAccount(accountId: string, code: ServerErrorCode): number {
+    this.admissionVersion += 1;
     let closed = 0;
     for (const [playerId, playerPeers] of [...this.peers]) {
       for (const peer of [...playerPeers]) {

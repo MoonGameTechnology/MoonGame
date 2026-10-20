@@ -42,8 +42,11 @@ export function registerMetaEconomyApi(app: FastifyInstance, deps: MetaEconomyAp
     reply.header('cache-control', 'no-store');
     try {
       return await run();
-    } catch (err) {
-      app.log.error({ err }, 'meta-economy request failed');
+    } catch {
+      app.log.error(
+        { code: 'E_UNAVAILABLE', requestId: reply.request.id },
+        'meta-economy request failed',
+      );
       return reply.code(503).send({ error: 'E_UNAVAILABLE' });
     }
   };
@@ -82,8 +85,11 @@ export function registerMetaEconomyApi(app: FastifyInstance, deps: MetaEconomyAp
         if (deps.onChanged) {
           try {
             await deps.onChanged(who);
-          } catch (err) {
-            app.log.error({ err }, 'meta-economy live catalog refresh failed');
+          } catch {
+            app.log.error(
+              { code: 'E_META_ECONOMY_SYNC', requestId: request.id },
+              'meta-economy live catalog refresh failed',
+            );
           }
         }
         return result;

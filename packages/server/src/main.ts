@@ -64,7 +64,8 @@ import { registerMetaMarketApi } from './metaMarketApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
 import { registerPushApi } from './pushApi';
-import { configureWebPush, vapidFromEnv } from './push';
+import { configureWebPush, sendPush, vapidFromEnv } from './push';
+import { createPushDispatcher } from './pushDispatch';
 import { loadMedalCatalog } from './medalCatalog';
 import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
@@ -193,6 +194,17 @@ const loadMatch = createMatchLoader({
   // read before that — a module bought mid-match becomes buildable without a new
   // match/snapshot (LARS-0.2: only the build catalog goes live).
   arsenalStore: stores.arsenalStore,
+  // UIX-4.3: the push trigger — own urgent news to a seat whose player is away. Only with
+  // VAPID configured: no keys ⇒ no subscriptions could exist, nothing to send.
+  ...(vapid
+    ? {
+        onObservation: createPushDispatcher({
+          store: stores.pushStore,
+          send: sendPush,
+          onError: (m) => process.stderr.write(`${m}\n`),
+        }),
+      }
+    : {}),
   onStall: (matchId) =>
     process.stderr.write(
       `match ${matchId}: world clock stalled (a same-instant scheduling loop) — ` +
@@ -540,7 +552,15 @@ const server = createMultiplayerServer({
   auth,
   // A join token is bound to the account's password: a reset refuses the old one here.
   ...(auth
-    ? { accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId) }
+    ? {
+        accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId),
+        accountSeat: async (matchId: string, accountId: string) => {
+          const ava = await avaOrchestrator.resolveAvaSeat(matchId, accountId);
+          if (ava) return ava.ok ? ava.playerId : null;
+          const user = await stores.userStore.findById(accountId);
+          return user ? accountStore.seatOf(matchId, user.login) : null;
+        },
+      }
     : {}),
   allowedOrigins,
   securityAudit,

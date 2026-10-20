@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createActionEnvelope,
-  type ActionSession,
-} from './envelope';
+import { isValidActionPayload } from '@void/shared-core';
+import { createActionEnvelope, type ActionSession } from './envelope';
 import { ActionGate } from './gate';
 
 const session: ActionSession = { matchId: 'match-1', playerId: 'p1', sessionId: 'mobile' };
@@ -80,11 +78,23 @@ describe('ActionGate', () => {
     });
   });
 
+  it('rejects inherited action names without consuming the real client sequence', () => {
+    const gate = new ActionGate({ payloadValidator: isValidActionPayload });
+    for (const type of ['__proto__', 'constructor', 'toString']) {
+      const raw = envelope(1);
+      raw.action.type = type;
+      expect(gate.admit(raw, session)).toEqual({ ok: false, code: 'E_BAD_PAYLOAD' });
+    }
+    expect(gate.admit(envelope(1), session)).toMatchObject({
+      ok: true,
+      value: { status: 'accepted' },
+    });
+  });
+
   it('rejects a malformed payload at the gate when a validator is configured (SV-1.2)', () => {
     // Only `{ to: string }` payloads are valid here; anything else is E_BAD_PAYLOAD.
     const gate = new ActionGate({
-      payloadValidator: (_type, payload) =>
-        typeof (payload as { to?: unknown }).to === 'string',
+      payloadValidator: (_type, payload) => typeof (payload as { to?: unknown }).to === 'string',
     });
     const bad = gate.admit(envelope(1, { nope: true }), session);
     expect(bad).toEqual({ ok: false, code: 'E_BAD_PAYLOAD' });
