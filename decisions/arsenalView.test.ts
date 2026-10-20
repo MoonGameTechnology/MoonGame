@@ -46,6 +46,10 @@ const item = (over: Partial<ArsenalItem> & Pick<ArsenalItem, 'itemId' | 'defId'>
 describe('arsenalView — каталог', () => {
   const { hulls, modules } = arsenalCatalog({ starter, items: [], data });
 
+  it('у корабля и модуля не бывает одного id: владение ищется по defId', () => {
+    expect(Object.keys(data.units).filter((id) => id in data.modules)).toEqual([]);
+  });
+
   it('корабли — стартовый набор аккаунта, в его порядке', () => {
     expect(hulls).toEqual(starter.filter((s) => s.kind === 'hull').map((s) => s.defId));
   });
