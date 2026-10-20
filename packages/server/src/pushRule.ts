@@ -1,4 +1,5 @@
 import type { DomainEvent } from '@void/shared-core';
+import type { PushKind } from './store';
 
 /**
  * UIX-4.3 · WHEN a push is worth sending, and what it carries. Pielot (2014): every
@@ -38,6 +39,15 @@ export interface PushNoticePayload extends PushNotice {
   /** How many more notices this push stands for. */
   more: number;
 }
+
+/** Which settings switch governs a key (UIX-4.4): won and lost are one switch, «battles». */
+export const KIND_OF: Record<PushKey, PushKind> = {
+  'push.attacked': 'attacked',
+  'push.battle-won': 'battle',
+  'push.battle-lost': 'battle',
+  'push.built': 'built',
+  'push.researched': 'researched',
+};
 
 /** Lower is more urgent: an attack outranks a finished battle, which outranks economy. */
 const RANK: Record<PushKey, number> = {

@@ -177,9 +177,7 @@ export interface UserStore {
     login: string,
     passHash: string,
     email?: string,
-  ): Promise<
-    { ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }
-  >;
+  ): Promise<{ ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }>;
   findUser(login: string): Promise<UserRecord | null>;
   /** Look up by recovery email (case-insensitive). Null when no account carries it — the
    *  recover route treats null and found identically (anti-enumeration). */
@@ -277,7 +275,12 @@ export const DEFAULT_FEED_LIMIT = 50;
 export interface CorpStore {
   /** Settle elapsed construction/income, optionally order a level. Membership,
    * debit, queue and audit commit together; only the head may spend influence. */
-  infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult>;
+  infrastructure(
+    corpId: string,
+    actor: string,
+    now: number,
+    order?: CorpBuildOrder,
+  ): Promise<CorpInfrastructureResult>;
   /** Create a corp with `head` as its Глава — atomic, so a duplicate name or an
    *  already-membered founder can't slip in between check and insert. */
   createCorp(
@@ -341,13 +344,7 @@ export interface CorpStore {
  *  lifecycle: a `locked` matchup whose war has ended transitions exactly once to
  *  `ended` (S7 archive — the outcome is recorded and influence awarded). */
 export type AvaChallengeStatus =
-  | 'pending'
-  | 'accepted'
-  | 'declined'
-  | 'expired'
-  | 'locked'
-  | 'cancelled'
-  | 'ended';
+  'pending' | 'accepted' | 'declined' | 'expired' | 'locked' | 'cancelled' | 'ended';
 
 /** One S0→S2 challenge row (AVA-4). An ACCEPTED row IS the S2 matchup contract —
  *  the roster phase (AVA-6) builds on it. */
@@ -515,12 +512,12 @@ export interface AvaSession {
  *  `create` fails atomically if either already exists so a re-run never double-builds. */
 export interface AvaSessionStore {
   /** Durable ended snapshots are the outbox: a crash before enqueue cannot lose a result. */
-  pendingResults?(limit?: number): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>>;
+  pendingResults?(
+    limit?: number,
+  ): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>>;
   markResultDelivered?(matchId: string): Promise<void>;
   markResultRetry?(matchId: string): Promise<void>;
-  create(
-    session: AvaSession,
-  ): Promise<{ ok: true } | { ok: false; code: 'E_SESSION_EXISTS' }>;
+  create(session: AvaSession): Promise<{ ok: true } | { ok: false; code: 'E_SESSION_EXISTS' }>;
   byMatch(matchId: string): Promise<AvaSession | null>;
   byMatchup(matchupId: string): Promise<AvaSession | null>;
   /** AVA-8 (S6): sessions whose peace period is over (`warAt` ≤ now) and whose war has
@@ -684,7 +681,15 @@ export interface DropStore {
 export interface PushSubscriptionRecord {
   endpoint: string;
   keys: { p256dh: string; auth: string };
+  /** UIX-4.4: which kinds of push the player allowed (settings switches). Absent ⇒
+   *  every kind — a subscription stored before the switches existed keeps working. */
+  kinds?: PushKind[];
 }
+
+/** The kinds of push a player can switch off one by one (UIX-4.4). A browser must show
+ *  every push it receives, so the filter lives HERE, before sending — not in the client. */
+export const PUSH_KINDS = ['attacked', 'battle', 'built', 'researched'] as const;
+export type PushKind = (typeof PUSH_KINDS)[number];
 
 /** ONB-5 · Push subscriptions (one active endpoint per account — a fresh subscribe
  *  from a new device/browser replaces the old one; multi-device fan-out is a later
@@ -724,12 +729,23 @@ export interface FriendStore {
   edgesOf(accountId: string): Promise<FriendEdge[]>;
   /** Open a pending edge. Fail-secure: a pair that already has ANY row (pending
    *  either way, or accepted) is `E_EXISTS` — never a second row, never an overwrite. */
-  request(from: FriendParty, to: FriendParty, at: number): Promise<{ ok: true } | { ok: false; code: 'E_EXISTS' }>;
+  request(
+    from: FriendParty,
+    to: FriendParty,
+    at: number,
+  ): Promise<{ ok: true } | { ok: false; code: 'E_EXISTS' }>;
   /** Accept the pending edge addressed TO `accountId`. Only the ASKED side may accept
    *  — accepting your own request would be a self-serve friendship. */
-  accept(accountId: string, otherId: string, at: number): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
+  accept(
+    accountId: string,
+    otherId: string,
+    at: number,
+  ): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
   /** Remove the edge whatever it is: decline, withdraw, or unfriend. Either side may. */
-  drop(accountId: string, otherId: string): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
+  drop(
+    accountId: string,
+    otherId: string,
+  ): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
   close?(): Promise<void>;
 }
 

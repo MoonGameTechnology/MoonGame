@@ -79,3 +79,5 @@ export {
   PostgresReceiptStore,
   PostgresUserStore,
 } from './postgres';
+// UIX-4.4: the switchable push kinds — a value, so the API and the dispatcher share one list.
+export { PUSH_KINDS, type PushKind } from './types';

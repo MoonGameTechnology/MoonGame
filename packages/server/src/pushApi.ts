@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Identity } from './matchApi';
-import type { PushStore, PushSubscriptionRecord } from './store';
+import { PUSH_KINDS, type PushKind, type PushStore, type PushSubscriptionRecord } from './store';
 import { slidingWindowIpLimiter } from './rateLimit';
 
 /**
@@ -8,7 +8,8 @@ import { slidingWindowIpLimiter } from './rateLimit';
  * a subscription is bound to the account that owns it, never a query param.
  *
  *   GET  /push/key           the VAPID public key the client subscribes with
- *   POST /push/subscribe     {endpoint, keys:{p256dh, auth}}  — replaces any prior sub
+ *   POST /push/subscribe     {endpoint, keys:{p256dh, auth}, kinds?}  — replaces any prior sub;
+ *                            `kinds` — the push kinds the player allowed (UIX-4.4), absent = all
  *   POST /push/unsubscribe   drop the stored subscription
  */
 
@@ -56,8 +57,24 @@ function isSubscription(body: unknown): body is PushSubscriptionRecord {
     return false;
   }
   if (url.protocol !== 'https:') return false;
-  return ALLOWED_PUSH_HOSTS.some((re) => re.test(url.hostname));
+  if (!ALLOWED_PUSH_HOSTS.some((re) => re.test(url.hostname))) return false;
+  // UIX-4.4: the optional per-kind switches — known kinds only, no repeats.
+  const kinds = (body as { kinds?: unknown }).kinds;
+  if (kinds === undefined) return true;
+  return (
+    Array.isArray(kinds) &&
+    kinds.length <= PUSH_KINDS.length &&
+    new Set(kinds).size === kinds.length &&
+    kinds.every((k) => PUSH_KINDS.includes(k as PushKind))
+  );
 }
+
+/** Only the fields we store — anything else the client sent is dropped, not persisted. */
+const recordOf = (b: PushSubscriptionRecord): PushSubscriptionRecord => ({
+  endpoint: b.endpoint,
+  keys: { p256dh: b.keys.p256dh, auth: b.keys.auth },
+  ...(b.kinds ? { kinds: [...b.kinds] } : {}),
+});
 
 const RATE_MAX = 10;
 const RATE_WINDOW_MS = 60_000;
@@ -99,7 +116,7 @@ export function registerPushApi(app: FastifyInstance, deps: PushApiDeps): void {
       void reply.code(400);
       return { error: 'E_BAD_SUBSCRIPTION' as const };
     }
-    await deps.store.save(who.accountId, request.body);
+    await deps.store.save(who.accountId, recordOf(request.body));
     return { ok: true };
   });
 
