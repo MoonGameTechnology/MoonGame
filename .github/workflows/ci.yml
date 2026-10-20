@@ -175,6 +175,12 @@ jobs:
       # собран с `__SECTOR_ZERO_ONLY__`, и его кода не повторяет ни одна другая сборка:
       # смоук выше открывает `void-dominion.html`. Поза та же — не блокирует, а сбой
       # всплывает аннотацией; `--install` идемпотентен и лишь подтверждает Chromium.
+      - name: Player foreground activity smoke
+        run: |
+          pnpm run smoke:browser:install
+          pnpm run prototype
+          pnpm run smoke:player-activity
+
       - name: Platform archive smoke (non-blocking)
         run: |
           if ! pnpm run smoke:browser:install; then

@@ -1,6 +1,7 @@
 # Закрытый стек наблюдаемости — OBS-0.2
 
 Opt-in Grafana OSS, Prometheus, Loki и Alloy для одного VPS.
+[Игроки по дням и время онлайн](PLAYER-ACTIVITY.md) — отдельный provisioned экран.
 [План](../../docs/playtest-observability-roadmap.md) и
 [контракт](../../docs/observability-contract-v1.md) задают границы.
 Это bootstrap-реализация; первый VPS может включить отдельный

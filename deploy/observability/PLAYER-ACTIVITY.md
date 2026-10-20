@@ -1,0 +1,81 @@
+# Активность игроков — OBS-2.4
+
+Экран `/d/moongame-player-activity` использует существующий Prometheus datasource.
+Дополнительная служба аналитики и доступ Grafana к игровой БД не нужны.
+
+## Что измеряется
+
+Уникальный игрок — **аккаунт**, приславший foreground-сигнал в календарные сутки UTC.
+Анонимные открытия, старые APK без этой функции и сама WebSocket-сессия сюда не
+входят. Разные аккаунты одного человека различить нельзя. Начало сбора сохраняется
+в БД; прежняя история не выдумывается.
+
+Клиенты `prototype/` (браузер и APK) и `packages/client` отправляют
+`POST /activity/pulse` раз в30с с действующей сессией при видимом приложении.
+Скрытие, pagehide и выход закрывают случайный канал страницы. Тело≤256байт:
+channel (32hex), возрастающий sequence и active. Личность/время ставит сервер.
+Origin, IP/account/global limits и максимум8 каналов на аккаунт ограничивают поток.
+Timeout5с, без cookies/redirect/retries; отказ наблюдения не блокирует игру.
+
+Время — объединение подтверждённых интервалов между сигналами одного аккаунта:
+вкладки/устройства не удваивают его. Полночь делится по UTC; разрыв>70с не
+начисляется. Потеря последнего сигнала обычно оставляет до30с неподтверждёнными;
+при других потерях/задержках недосчёт может быть больше. Это время видимого
+приложения, а не доказанное время действий. «Заходы» включают возвраты и новые
+каналы, не равны уникальным людям или WS-reconnect. Онлайн — аккаунты с активным
+каналом и сигналом≤70с; аварийное закрытие может оставлять этот хвост. Sequence и
+tombstone не дают запоздавшему старту открыть уже закрытый канал. Разрыв sequence
+начинает новый заход без начисления неподтверждённого промежутка. Первый pulse
+отправляется сразу после входа или сброса пароля, без ожидания таймера.
+
+## Хранение и границы
+
+`player_activity_channels`: account FK, случайный канал, sequence, active, seen_ms.
+`player_activity_days`: account FK, UTC day, union int8multirange и заходы.
+Лимит1024 непересекающихся интервала на аккаунт/день. `player_activity_state`
+содержит только дату начала сбора. IP, ник, почта, User-Agent и raw events не пишутся.
+
+Дневные строки — последние30 календарных дней, включая текущий неполный.
+Просроченные каналы сразу исключаются из онлайна; физическая очистка — не чаще
+раза в час при pulse/scrape (штатный observer опрашивает раз в15с). После остановки
+Game/observer очистка возобновляется при следующем обращении. Erasure и FK cascade
+удаляют обе персональные таблицы; отчёт пересчитывается без аккаунта. Мигратор,
+runtime и restore ACL включают таблицы. Основания, география и копии входят в
+общий реестр ПДн; установка дашборда не утверждает юридическую готовность.
+
+`GET /metrics/activity` — существующий operator boundary; публичный Caddy закрывает
+`/metrics*`. Exporter получает≤64KiB и отдаёт только gauges:
+
+| Metric | Единица |
+| --- | --- |
+| `moongame_players_online` | Уникальные активные аккаунты |
+| `moongame_player_activity_since_timestamp_seconds` | Unix seconds начала сбора |
+| `moongame_player_activity_sample_timestamp_seconds` | Unix seconds снимка |
+| `moongame_player_activity_daily_players{day}` | Аккаунты в сутки |
+| `moongame_player_activity_daily_visits{day}` | Заходы/возвраты |
+| `moongame_player_activity_daily_online_seconds{day}` | Подтверждённые игроко-секунды |
+
+`day` — ISO UTC date текущего30-дневного окна, ≤30 значений/≤90 daily samples на
+instance. Идентификаторов игроков в Prometheus нет. Daily gauges читаются instant:
+7-дневный TSDB retention не ограничивает30-дневный отчёт из БД. История онлайна
+ограничена retention Prometheus. При source error/stale>45с показатели скрываются,
+не заменяются нулём. Среднее время = игроко-секунды / уникальные аккаунты.
+
+## Обновление существующего VPS
+
+1. Штатно выпустить main: мигратор добавляет таблицы/ACL до нового Game. Функция не
+   меняет состояние матчей; обычный rollout может оборвать WS с переподключением.
+2. Скопировать новый `game-exporter.mjs` в `/opt/moongame-ops/deploy/observability/`
+   и перезапустить только `moongame-observer.service`. Источник/секрет прежние;
+   новый пятый источник — `/metrics/activity`.
+3. Скопировать `grafana/provisioning/dashboards/player-activity.json` в существующий
+   provisioning directory; Grafana подхватывает файл без перезапуска.
+4. Проверить защищённый источник, textfile, Prometheus source_up/freshness и экран.
+   Обновить APK; браузеру загрузить новый клиент. Не добавлять synthetic accounts
+   в production ради красивого графика.
+
+Проверки: `playerActivity.test.ts` (union, UTC, offline, reorder, persistence,
+erasure, auth), `player-activity.test.mjs` (allowlist/caps/stale/provisioning),
+`pnpm run smoke:player-activity` после `pnpm run prototype` (desktop/phone браузеры).
+On-host Grafana проверяется через HTTPS+mTLS+login с fixture frames, подменёнными
+**только в браузере проверки**, без записи в рабочий Prometheus.

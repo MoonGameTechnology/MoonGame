@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 12491 зелёных** (143 skip, 1009 файлов; прогон 2026-10-19 на `4d2a60c4`).
+**Тесты: 12686 зелёных** (10 skip, 1020 файлов; CI-прогон с PostgreSQL 2026-10-20 на `52f3ed0e`).
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -321,6 +321,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   [map-visual-continuity-rule.md](map-visual-continuity-rule.md).
 - Корабль — контур по фракции владельца и id юнита (`shipGlyphs.ts`), флот — силуэт доминанта с
   плашкой числа (`decisions/fleetTally.ts`); портреты WebP — `shipArt.ts`, `prototype/art/`.
+- Кадр жеста не мусорит в куче холста: слои флотов и миров держат один `save()` на слой, блоки
+  на объект возвращают свойства руками, ширины текста берутся из кэша (`fleetCountBadge.ts`).
+  С `save()` на каждый флот мусор при быстром зуме рос быстрее, чем слабый телефон его убирал,
+  и вкладка падала.
 
 **Окна и HUD.**
 - `main.ts` — хозяин мира и проводки; интерфейс разнесён по модулям `init*(host)` (больше 80) с
@@ -331,6 +335,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   Уже 720 px или ниже 520 px на сенсорном — телефон: `mobileHud.ts`, `mobile-*.css`.
 - Телефон: нижняя панель «Карта · три окна на выбор · Ещё» (`decisions/phoneNav.ts`), скорость
   одной кнопкой (`decisions/phoneSpeed.ts`), приказ — черновик цели и отправка (`mobileOrders.ts`).
+  Свой мир с одним своим флотом — одна карточка с вкладками «Флот» / «Мир», открытая на
+  вкладке прошлого раза (`decisions/worldFleetTabs.ts`, `worldFleetCard.ts`).
 - Клавиши ПК по `KeyboardEvent.code` — `decisions/hotkeys.ts` и `pcHotkeys.ts`. Back и Escape:
   стопка слоёв — `backLayers.ts`, Back без слоёв (предупредить, выйти вторым) — `backGesture.ts`.
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
@@ -379,8 +385,17 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Профиль `sector-zero.progress.v1` с печатью (`decisions/profileSeal.ts`), правила —
   `decisions/sectorZeroProgress.ts` (полка `shelf`, снимок в забег `prepareSectorZeroRun`);
   заточка детерминирована (`decisions/sectorZeroForge.ts`), витрина — `decisions/sectorZeroShop.ts`.
-- Забег: снимок `void.run.v1` и дескриптор `void.run.portable.v1`; «идёт» меняет только
-  `setRunActive`; спрятанное в забеге — `decisions/sectorZeroTools.ts`.
+- Забег: снимок `void.run.v1` и дескриптор `void.run.portable.v1` запечатаны для сида профиля
+  (`decisions/runSeal.ts`); неподписанные старые забеги не продолжаются, засчитанный прогресс
+  сохраняется. Журнал конца удаляется только после подтверждённой записи основной копии
+  профиля; при отказе меню повторяет идемпотентный расчёт и не оживляет завершённый мир.
+  Если профиль ещё не записался ни в основную копию, ни в тень, проверенная печать полного
+  снимка восстанавливает его сид и позволяет засчитать первую попытку после перезагрузки.
+  «Идёт» меняет только `setRunActive`; спрятанное — `decisions/sectorZeroTools.ts`.
+- В игру принимаются только целые подписанные профиль или тень. Неподписанный исходник
+  резервируется в `sector-zero.progress.unverified.v1`; без подтверждения резервной записи
+  основная не заменяется. Его баланс не переносится в игру/облако. Облачный конверт
+  запечатан целиком; из старого конверта принимается только подписанный профиль без забега.
 
 **Площадки: Яндекс Игры, APK, RuStore.**
 - Контракт `GamePlatform` (`src/platform/types.ts`), адаптеры `web.ts` и `yandex.ts`; `host.ts`
@@ -396,6 +411,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Пульт `src/admin.ts` — своя сборка на `/admin` (только с `ADMIN_LOGINS`): состав партии и «Снять».
 - События `TELEMETRY_EVENTS` (`packages/protocol/src/telemetry.ts`) уходят в `POST /telemetry`
   (`playtest-logs/client-*.jsonl`); сводка — `pnpm run analytics`.
+- Авторизованный foreground pulse и union интервалов дают уникальные аккаунты/время по
+  суткам UTC; источник `/metrics/activity`, экран Grafana `/d/moongame-player-activity`.
+  30-дневное хранение, erasure и точность — [runbook](../deploy/observability/PLAYER-ACTIVITY.md).
 
 **Харнесы и проверки.**
 - `prototype/uitest.mjs` (настоящий бандл на фейковом DOM/canvas) идёт в гейте через

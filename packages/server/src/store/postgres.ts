@@ -106,6 +106,27 @@ const SCHEMA_SQL = `
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS session_nonce text NOT NULL DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at timestamptz;
+    CREATE TABLE IF NOT EXISTS player_activity_channels (
+      account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel text NOT NULL CHECK(channel ~ '^[a-f0-9]{32}$'),
+      seen_ms bigint NOT NULL,
+      sequence integer NOT NULL,
+      active boolean NOT NULL,
+      PRIMARY KEY(account_id,channel)
+    );
+    CREATE INDEX IF NOT EXISTS player_activity_seen_idx ON player_activity_channels(seen_ms);
+    CREATE TABLE IF NOT EXISTS player_activity_days (
+      account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day date NOT NULL,
+      spans int8multirange NOT NULL DEFAULT '{}',
+      visits integer NOT NULL DEFAULT 0 CHECK(visits>=0),
+      PRIMARY KEY(account_id,day)
+    );
+    CREATE INDEX IF NOT EXISTS player_activity_day_idx ON player_activity_days(day);
+    CREATE TABLE IF NOT EXISTS player_activity_state (
+      id integer PRIMARY KEY CHECK(id=1), since_ms bigint NOT NULL
+    );
+    INSERT INTO player_activity_state VALUES(1,(extract(epoch FROM clock_timestamp())*1000)::bigint) ON CONFLICT DO NOTHING;
     CREATE TABLE IF NOT EXISTS account_erasure_guard (id integer PRIMARY KEY CHECK(id=1), required boolean NOT NULL);
     INSERT INTO account_erasure_guard VALUES(1,false) ON CONFLICT DO NOTHING;
     CREATE TABLE IF NOT EXISTS account_deletions (

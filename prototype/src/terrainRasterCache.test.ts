@@ -88,6 +88,24 @@ describe('province raster cache', () => {
     expect(cache.owed(environmentField(2, -80, 36), 2)).toBe(0);
   });
 
+  it('screens the raster over the political fill and puts the blend back without save()', () => {
+    // A save() per field per frame leaves heap garbage that only a major GC frees.
+    const f = surfaces();
+    const blends: string[] = [];
+    const saves = vi.fn();
+    const target = {
+      ...f.target,
+      globalCompositeOperation: 'source-over',
+      save: saves,
+      restore: saves,
+      drawImage: () => blends.push(target.globalCompositeOperation),
+    };
+    new TerrainRasterCache().draw(target as unknown as CanvasRenderingContext2D, environmentField(), 2);
+    expect(blends).toEqual(['screen']);
+    expect(target.globalCompositeOperation).toBe('source-over');
+    expect(saves).not.toHaveBeenCalled();
+  });
+
   it('invalidates edited terrain, roads or fog masks by tile fingerprint without showing stale pixels', () => {
     const f = surfaces();
     const cache = new TerrainRasterCache();

@@ -3566,6 +3566,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   font-size:26px;font-weight:300;color:var(--sf-accent);}
 #hub .hub-mode:hover{border-color:var(--sf-edge-hi);}
 #hub .hub-mode:active{transform:translateY(1px);}
+#hub .hub-discord{text-decoration:none;}
+#hub .hub-discord:focus-visible{outline:2px solid var(--sf-accent);outline-offset:3px;}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 #solo-replace{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:#000b;padding:20px;}
@@ -4776,6 +4778,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
+      ${external ? '' : `<a id="hub-discord" class="hub-mode hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer"><b data-i18n="hub.discord"></b><span data-i18n="hub.discord.desc"></span></a>`}
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>

@@ -237,6 +237,23 @@ export function drawFleets(now: number, lod: MapLod): void {
   heroPortraitHits = [];
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
+  // One save for the fleet layer, none per fleet: every save leaves ~0.8 KB on the browser's
+  // heap that only a major GC frees, and a fast pinch on a phone leaves no idle time for one —
+  // with a save per fleet the garbage outgrew the phone and the WebView was killed. The
+  // blocks below change plain properties instead, and put back by hand what the next fleet
+  // draws with: the screen transform, the glow and the line joins.
+  cx.save();
+  const screen = cx.getTransform();
+  const { lineJoin, shadowBlur, shadowColor } = cx;
+  const unglow = (): void => {
+    cx.shadowBlur = shadowBlur;
+    cx.shadowColor = shadowColor;
+  };
+  const atScreen = (): void => {
+    cx.setTransform(screen.a, screen.b, screen.c, screen.d, screen.e, screen.f);
+    unglow();
+    cx.lineJoin = lineJoin; // drawShipShape rounds the joins
+  };
   for (const f of Object.values(s.fleets)) {
     // Мину рисует `drawMinefields` своим знаком (SM-3.6), ракету — `drawMissiles` (SM-3.7b).
     if (isOrdnanceFleet(f, data)) continue;
@@ -263,7 +280,6 @@ export function drawFleets(now: number, lod: MapLod): void {
       if (target) {
         const pc = world(target.position);
         const spark = fxBreath(now, { period: 90, base: 0.45, amp: 0.55, phase: phaseOfId(f.id) });
-        cx.save();
         cx.strokeStyle = rgba('#ffb15f', 0.3 + 0.3 * spark);
         cx.lineWidth = 1.2 + spark;
         cx.shadowColor = '#ffb15f';
@@ -272,7 +288,7 @@ export function drawFleets(now: number, lod: MapLod): void {
         cx.moveTo(A.x, A.y);
         cx.lineTo(pc.x, pc.y);
         cx.stroke();
-        cx.restore();
+        unglow();
       }
     }
 
@@ -299,7 +315,7 @@ export function drawFleets(now: number, lod: MapLod): void {
     // На удалении остаётся внешний контур ТОГО ЖЕ корпуса. Внутренняя детализация,
     // карго и счёт плавно исчезают, но фрегат не превращается в общий треугольник.
     if (detail < 1) {
-      cx.save();
+      const alpha = cx.globalAlpha;
       cx.globalAlpha = chevronAlpha(detail);
       cx.translate(A.x, A.y);
       cx.rotate(A.ang + Math.PI / 2);
@@ -310,7 +326,8 @@ export function drawFleets(now: number, lod: MapLod): void {
       cx.fillStyle = rgba(col, 0.28);
       cx.strokeStyle = rgba(col, 0.95);
       drawShipShape(cx, shape, false);
-      cx.restore();
+      cx.globalAlpha = alpha;
+      atScreen();
     }
     // Крепость — одно сооружение: счёт «×N» у неё читался бы как N крепостей.
     const emplacement = isEmplacementFleet(f, data);
@@ -334,7 +351,6 @@ export function drawFleets(now: number, lod: MapLod): void {
     const domStack = dom ? f.units.find((st) => st.unit === dom.unit && st.count > 0) : undefined;
     const domShield =
       dom && domStack ? (effectiveStats(dom.def, domStack, data).shield ?? 0) > 0 : false;
-    cx.save();
     cx.translate(A.x, A.y);
     cx.rotate(A.ang + Math.PI / 2);
     cx.shadowColor = col;
@@ -356,20 +372,19 @@ export function drawFleets(now: number, lod: MapLod): void {
     cx.fillStyle = rgba(col, 0.24);
     cx.strokeStyle = rgba(col, 0.95);
     drawShipShape(cx, shape, true);
-    cx.restore();
+    atScreen();
 
     if (f.owner === ME && chainStepsOf(f.id)) {
       // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
       // one glance tells which fleets are already "spoken for".
       const pu = fxBreath(now, { period: 300, base: 0.5, amp: 0.5, phase: phaseOfId(f.id) });
-      cx.save();
       cx.strokeStyle = rgba(ownerColor(ME), 0.3 + 0.4 * pu);
       cx.lineWidth = 1.3;
       cx.setLineDash([4, 4]);
       cx.beginPath();
       cx.arc(A.x, A.y, 12.5, 0, TAU);
       cx.stroke();
-      cx.restore();
+      cx.setLineDash([]);
     }
     // Радиус артиллерии и линию огня рисует слой RANGE-UX (`drawCombatRanges` поверх
     // `combatRanges.ts`) — ровно для тех же выбранных флотов. Здесь стояла ВТОРАЯ копия
@@ -391,6 +406,7 @@ export function drawFleets(now: number, lod: MapLod): void {
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
   }
+  cx.restore();
 
   // Draw portraits after hulls, in screen pixels; they never rotate with the ships.
   for (const [fleetId, hero] of heroesByFleet) {

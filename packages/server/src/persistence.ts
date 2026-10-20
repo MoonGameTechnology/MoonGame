@@ -1,5 +1,6 @@
 import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from './registrationRewardStore';
 import { createCorporateServices } from './corporateTransactions';
+import { MemoryPlayerActivityStore, PostgresPlayerActivityStore, type PlayerActivityStore } from './playerActivity';
 import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
@@ -70,6 +71,7 @@ import {
  * creates tables on boot unless DB_AUTO_MIGRATE=0 selects the separate migration job. See `docs/infra-sizing-roadmap.md`, blocker #1.
  */
 export interface Stores {
+  playerActivity: PlayerActivityStore;
   corporateServices?: ReturnType<typeof createCorporateServices>;
   profileStore: ProfileStore;
   registrationRewards: RegistrationRewardStore;
@@ -134,6 +136,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     const profiles = new MemoryProfileStore();
     const commanders = new MemoryCommanderStore();
     return {
+      playerActivity: new MemoryPlayerActivityStore(),
       profileStore: profiles,
       registrationRewards: new MemoryRegistrationRewardStore(users, profiles, commanders),
       store: memoryMatches,
@@ -168,6 +171,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const economy = new PostgresMetaEconomyStore(pool);
   market.setEconomy(economy);
   return {
+    playerActivity: new PostgresPlayerActivityStore(pool),
     corporateServices: createCorporateServices(pool),
     profileStore: new PostgresProfileStore(pool),
     registrationRewards: new PostgresRegistrationRewardStore(pool),

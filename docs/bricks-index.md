@@ -40,6 +40,7 @@
 | BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | BAL-7 | ✅ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
 | OBS-0.1 | ✅ |  | `docs/backlog.md` | [Контракт v1](observability-contract-v1.md): матрица |
+| OBS-2.4 | ✅ | srv proto ops | `docs/backlog.md` | активность аккаунтов и время онлайн |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
 | SEC-42 | ✅ | sec ops | `docs/backlog.md` | исправленная libssl3t64 в серверном образе: trivy image |
@@ -131,7 +132,7 @@
 | UIX-6.2 | ✅ | proto | `docs/backlog.md` | Прогноз в окне боя. |
 | UIX-6.3 | ✅ | core proto | `docs/backlog.md` | Прогноз боя трёх сторон и больше. |
 | ATK-3 | ✅ | core proto | `docs/backlog.md` | «Атака» у того же мира заводит бой мимо втягивания. |
-| UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
+| UIX-7.1 | ✅ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
 | UIX-7.2 | ✅ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ✅ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
 | UIX-8.1 | ✅ | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
@@ -1141,6 +1142,7 @@
 | OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
 | OBS-2.2 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Поведение в Grafana |
 | OBS-2.3 | ⏳ | srv | `docs/playtest-observability-roadmap.md` | Честные гистограммы и backlog |
+| OBS-2.4 | ✅ | srv proto ops | `docs/playtest-observability-roadmap.md` | Активность аккаунтов по дням |
 | OBS-3.1 | 🔒 | srv proto sec | `docs/playtest-observability-roadmap.md` | Список и карточка партии |
 | OBS-3.2 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Отдельная площадка и восстановление |
 | OBS-4.1 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Приёмка и handoff |

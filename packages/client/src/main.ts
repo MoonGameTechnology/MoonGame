@@ -19,6 +19,9 @@ import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt } from './matchInput';
 import { browserIo, createSession, type NetSession } from './session';
+import { startPlayerActivity } from './playerActivity';
+import { anyToken } from '../../../decisions/sessionStore';
+import { httpBase } from '../../../decisions/matchQuery';
 import { browserUpdateIo, watchForUpdate } from './appUpdate';
 import { indexedDbStore, isRestorable, rememberLatest } from './snapshotCache';
 import { socketBase } from '../../../decisions/serverAddress';
@@ -198,6 +201,7 @@ async function submitLogin(): Promise<void> {
     return;
   }
   if (res.outcome === 'ok' || res.outcome === 'created') {
+    activity.refresh();
     setStatus(t(res.outcome === 'created' ? 'client.auth.created' : 'client.auth.hello', { nick }));
     void showMatches();
     return;
@@ -415,6 +419,10 @@ function serverBase(): string {
 }
 
 const session: NetSession = createSession(serverBase(), browserIo());
+const activity = startPlayerActivity(()=>{
+  const base=serverBase(); const token=anyToken(localStorage,base);
+  return token ? {base:httpBase(base),token} : null;
+});
 
 /** Одна строка списка. Всё, что показано, приезжает из read-model сервера
  *  (`@void/protocol`) — клиент ничего про партию не выводит сам. */

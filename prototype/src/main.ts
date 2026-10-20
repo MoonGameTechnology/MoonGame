@@ -9,6 +9,7 @@ import {
   splitAloft,
 } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
+import { startPlayerActivity } from '../../packages/client/src/playerActivity';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
@@ -46,6 +47,9 @@ import {
 import { pendingDecisions } from '../../decisions/pendingDecisions';
 import { battleConcernsMe } from './attentionBadges';
 import { pendingHtml } from './pendingPanel';
+import { tabPick, tabsForSelection } from '../../decisions/worldFleetTabs';
+import type { TapPick } from '../../decisions/tapCycle';
+import { pairFacts, rememberCardTab } from './worldFleetCard';
 import {
   closeDiplo,
   conversations,
@@ -662,7 +666,7 @@ import { claimIntent, matchIdFrom } from '../../decisions/matchAddress';
 import { httpBase } from '../../decisions/matchQuery';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
-import { defaultServerField, resolveAddress } from '../../decisions/serverAddress';
+import { defaultServerField, resolveAddress, resolveBase } from '../../decisions/serverAddress';
 import { radarContacts } from './snapshotIngest';
 import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
@@ -1166,15 +1170,7 @@ const mobileHud = initMobileHud({
   },
   choose: (pick) => {
     offerChoices([]);
-    if (pick.kind === 'fleet') setFleetSelection([pick.id]);
-    else if (pick.kind === 'strike') {
-      pickStrike(pick.id);
-      invalidatePanel();
-    } else {
-      clearSelection();
-      pickWorld(pick.id);
-      markSelection(lastReal);
-    }
+    choosePhonePick(pick);
   },
   ping: () => side.querySelector<HTMLButtonElement>('[data-act="ping"]')?.click(),
   summary: () => side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click(),
@@ -1182,7 +1178,36 @@ const mobileHud = initMobileHud({
     openDossier(key);
   },
   resized: () => revealMobileSelection(),
+  // UIX-7.1: вкладка переключает выбор между флотом и его миром и запоминается.
+  tab: (tab) => {
+    const cur = cardTabs();
+    if (!cur) return;
+    rememberCardTab(tab);
+    choosePhonePick(tabPick(cur.pair, tab));
+  },
 });
+/** Выбор с карточки телефона — строкой списка или вкладкой «Флот» / «Мир». */
+function choosePhonePick(pick: TapPick): void {
+  if (pick.kind === 'fleet') setFleetSelection([pick.id]);
+  else if (pick.kind === 'strike') {
+    pickStrike(pick.id);
+    invalidatePanel();
+  } else {
+    clearSelection();
+    pickWorld(pick.id);
+    markSelection(lastReal);
+  }
+}
+/** Вкладки карточки для текущего выбора (`worldFleetTabs.ts`, правило 3). */
+function cardTabs() {
+  const ids = selectedFleetIds();
+  const sel = selPlanet
+    ? ({ kind: 'planet', id: selPlanet } as const)
+    : ids.length === 1
+      ? ({ kind: 'fleet', id: ids[0]! } as const)
+      : null;
+  return tabsForSelection(sel, pairFacts(s, ME));
+}
 
 // Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
 // wears in the in-match top-bar corner. Client-side only (localStorage) — never match
@@ -2741,7 +2766,13 @@ function updateMobileHud(): void {
     }
   }
   offerChoices(choices.map(({ kind, id }) => ({ kind, id })));
-  mobileHud.update(key, !!mobileOrderKind() || pickMode || !!chainMode, cmdMore, choices);
+  mobileHud.update(
+    key,
+    !!mobileOrderKind() || pickMode || !!chainMode,
+    cmdMore,
+    choices,
+    selStrike ? null : (cardTabs()?.active ?? null),
+  );
 }
 
 // Ряд команд — разметка, поповеры, полоска «Приказ» и кэш разметки — живёт в `cmdBar.ts`
@@ -4627,7 +4658,9 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 
 // Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
 // загрузочного блока: его ветка по ссылке может попросить войти.
+let activity: ReturnType<typeof startPlayerActivity> | undefined;
 initAccountSession({
+  sessionChanged: () => activity?.refresh(),
   status: (text) => {
     statusEl.textContent = text;
   },
@@ -5059,6 +5092,13 @@ function resolveServer(): { base: string; nick: string } | null {
   if (step.kind !== 'need-nick') statusEl.textContent = t(step.key);
   return null;
 }
+
+if (!__SECTOR_ZERO_ONLY__) activity = startPlayerActivity(() => {
+  const step=resolveBase(srvInput.value,location.protocol==='https:');
+  const base=step.kind==='ok' ? step.base : null;
+  const token=base ? sessionToken(base) : null;
+  return base && token ? {base:httpBase(base),token} : null;
+});
 
 // MUST stay a hoisted function declaration — NOT a `const` arrow. The boot block
 // (~900 lines above) does `await probeAuthMode(...)` during module evaluation, and an
