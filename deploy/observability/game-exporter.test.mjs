@@ -103,11 +103,11 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
     } });
     const text = await exporter.scrape();
     expect(text).not.toContain('secret');
-    expect(observed.map(([url]) => new URL(url).pathname).sort()).toEqual(['/health', '/metrics', '/metrics/summary', '/ready']);
+    expect(observed.map(([url]) => new URL(url).pathname).sort()).toEqual(['/health', '/metrics', '/metrics/activity', '/metrics/summary', '/ready']);
     expect(observed.every(([, opts]) => opts.redirect === 'error')).toBe(true);
     expect(observed.find(([url]) => url.endsWith('/health'))[1].headers).toEqual({});
     expect(observed.find(([url]) => url.endsWith('/metrics'))[1].headers).toEqual({ Authorization: 'Bearer secret' });
-    expect(text.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(4);
+    expect(text.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(5);
     expect(() => createExporter({ sourcePort: 1.5 })).toThrow('E_OBS_CONFIG');
   });
 
@@ -118,7 +118,7 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
     const output = await createExporter({ sourcePort: source.address().port, token: 'SECRET' }).scrape();
     expect(output).not.toContain('SECRET');
     expect(leaked).toBe(0);
-    expect(output.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(4);
+    expect(output.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(5);
     expect(output).not.toContain('moongame_source_last_success_timestamp_seconds');
   });
 
@@ -140,7 +140,7 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
     const options = { sourcePort: server.address().port, now: () => timestamp * 1000 };
     const exporter = createExporter(options);
     const first = await Promise.all([exporter.scrape(), exporter.scrape()]);
-    expect(calls).toBe(4); expect(first[0]).toBe(first[1]);
+    expect(calls).toBe(5); expect(first[0]).toBe(first[1]);
     expect(first[0]).toContain('moongame_game_ready 0');
     expect(first[0]).toContain('moongame_joins_total 7');
     failed = true; timestamp = 120;
@@ -194,7 +194,7 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
       // Assert before awaiting: a regression to 2000ms must fail, not hang the test.
       expect(settled).toBe(true);
       const output = await pending;
-      expect(output.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(4);
+      expect(output.match(/moongame_source_up\{source="\w+"\} 0/g)).toHaveLength(5);
       expect(output).not.toContain('PRIVATE');
       expect(output).not.toContain('moongame_source_last_success_timestamp_seconds');
       expect(vi.getTimerCount()).toBe(0);

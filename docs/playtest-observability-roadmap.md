@@ -447,6 +447,16 @@ connections по существующим транспортным точкам,
 p95 отображается с достаточным n, legacy JSON API не сломан; on/off нагрузка
 не ухудшается сверх бюджета. Реализовать только нужные для алертов ряды.
 
+### OBS-2.4 · Активность аккаунтов по дням `[srv][proto][ops]` ✅ — M
+
+Авторизованные foreground-сигналы раз в30с; union интервалов нескольких вкладок/устройств,
+UTC-midnight, offline/reorder, Postgres persistence и удаление. Отдельный Grafana экран:
+DAU аккаунтов, заходы/возвраты, игроко-часы, среднее и текущий онлайн. Только bounded
+суточные gauges без player labels; 30-дневные строки и erasure.
+[Runbook и точность](../deploy/observability/PLAYER-ACTIVITY.md). CI и настоящий Chromium
+проверяют источник/клиента; Grafana проверен через HTTPS+mTLS с browser-only fixtures.
+Это не закрывает воронки/когорты OBS-2.2 и lifecycle сырых журналов OBS-0.3.
+
 ### OBS-3.1 · Список и карточка партии `[srv][proto][sec]` 🔒(OBS-1.3) — M
 
 Read-only versioned Ops API + небольшая RU/EN-страница, scope оператора,

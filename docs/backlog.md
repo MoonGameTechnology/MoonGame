@@ -939,6 +939,9 @@ BRW-2/3 написаны ровно под это.
   Ревью CLI: сохранены все конечные положительные timeScale; неполные обязательные
   submit/broadcast/delta series помечают summary invalid.
   Следующие кирпичи — в [роадмапе пульта](playtest-observability-roadmap.md).
+- **OBS-2.4** ✅ 2026-10-20 `[srv][proto][ops]` — активность аккаунтов и время онлайн
+  по суткам UTC в Grafana; foreground heartbeat, union, 30-дневный Postgres и erasure.
+  [Runbook](../deploy/observability/PLAYER-ACTIVITY.md); воронки OBS-2.2 остаются отдельно.
 
 ## Блок HARD · Закалка плейтест-контура (заказ владельца 2026-07-18) `[ops]` `[core]` `[srv]` `[proto]` `[sec]`
 

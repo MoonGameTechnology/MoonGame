@@ -17,7 +17,7 @@ import { t, LOCALE } from '../../localization/runtime';
 import { httpBase } from '../../decisions/matchQuery';
 import { resolveBase } from '../../decisions/serverAddress';
 import { saveSession } from '../../decisions/sessionStore';
-import { authMode, ensureSession, pendingJoinAfterAuth, probeAuthMode } from './accountSession';
+import { authMode, ensureSession, notifySessionChanged, pendingJoinAfterAuth, probeAuthMode } from './accountSession';
 import { detach } from './detach';
 import { getPlatform } from './platform/host';
 import { revealSignup } from './identityProbe';
@@ -402,7 +402,10 @@ export function initSignInPages(host: SignInPagesHost): void {
           },
           onSuccess: (login, token) => {
             const base = serverBase();
-            if (base) saveSession(localStorage, base, { login, token });
+            if (base) {
+              saveSession(localStorage, base, { login, token });
+              notifySessionChanged();
+            }
             localStorage.setItem('void.nick', login);
             game.setNick(login);
             game.note('✔ ' + t('auth.reset.done'));

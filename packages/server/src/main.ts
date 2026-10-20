@@ -7,6 +7,7 @@ import { useRemoteCorporations } from './corporateRemote';
 import { securityAuditFromEnv } from './securityAudit';
 import rateLimit from '@fastify/rate-limit';
 import { registerProfileApi } from './profileApi';
+import { registerPlayerActivityApi } from './playerActivityApi';
 import { creditProfileMatch } from './profileCredit';
 import { nickSeatAccounts } from './commanderCredit';
 import {
@@ -29,7 +30,7 @@ import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
-import { operatorTokenFromEnv } from './operatorAccess';
+import { isOperatorRequest, operatorTokenFromEnv } from './operatorAccess';
 import { createMatchLoader } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { freeMatchId } from './matchId';
@@ -612,6 +613,12 @@ const server = createMultiplayerServer({
         // Corporations (CORP-0) — session-gated on every route: the acting identity
         // comes from the session, so the API only exists where sessions do.
         if (identify) {
+          registerPlayerActivityApi(scope, {
+            store: stores.playerActivity,
+            identify,
+            operator: (req) => isOperatorRequest({remoteAddress:req.raw.socket.remoteAddress,headers:req.headers},operatorTokenFromEnv(process.env)),
+            ...(allowedOrigins ? { allowedOrigins } : {}),
+          });
             registerCorporateMaintenance(scope, process.env.CORPORATIONS_MAINTENANCE === '1');
             if (corporationsEndpoint) {
               registerCorporateGateway(scope, corporationsEndpoint, identify);

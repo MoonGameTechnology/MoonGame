@@ -52,6 +52,8 @@ export function scrubPersonalJson(
 
 // Every statement is a fixed literal; account data is exclusively bound parameters.
 const PERSONAL_ROWS = [
+  'DELETE FROM player_activity_channels WHERE account_id=$1',
+  'DELETE FROM player_activity_days WHERE account_id=$1',
   'DELETE FROM friend_edges WHERE lo_id=$1 OR hi_id=$1',
   'DELETE FROM push_subscriptions WHERE account_id=$1',
   'DELETE FROM player_profiles WHERE account_id=$1',

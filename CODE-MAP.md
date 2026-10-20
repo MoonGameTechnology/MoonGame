@@ -337,6 +337,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `medalApi.ts` / `medalService.ts` / `medalCatalog.ts` | medals | медали |
 | `push.ts` / `pushApi.ts` | `VapidConfig`, push API | push-уведомления |
 | `metrics.ts` | `SeriesStat` | метрики |
+| `playerActivity.ts` / `playerActivityApi.ts` | account-day intervals, pulse, operator snapshot | Foreground presence и union времени; [runbook](deploy/observability/PLAYER-ACTIVITY.md) |
 | `password.ts` | `ScryptParams` | scrypt hashing |
 | `ephemeral.ts` | `EphemeralStore` | ephemeral state |
 | `roomRegistry.ts` | `RoomRegistry` | интерфейс реестра |
