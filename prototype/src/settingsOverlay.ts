@@ -20,6 +20,8 @@ import {
   type PhoneItemId,
 } from '../../decisions/phoneNav';
 import { phoneIcon } from './phoneIcons';
+import { PUSH_KIND_LABEL, PUSH_KINDS, type PushKind } from '../../decisions/pushNotice';
+import type { PushView } from './pushSetup';
 
 /** Снимок всех настроек на момент отрисовки. */
 export interface SettingsView {
@@ -56,6 +58,8 @@ export interface SettingsView {
   uiScale?: number;
   /** Окна на местах нижней панели телефона (UIX-3.3). Нет — нет и редактора: у ПК панели нет. */
   phoneBar?: readonly PhoneItemId[];
+  /** Push-уведомления (UIX-4.4). Нет — браузер их не умеет, и вкладки нет. */
+  push?: PushView;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -108,7 +112,7 @@ function rangeRow(
 /** Вкладки окна (UX-SET-1, заказ владельца 2026-09-23: «разнеси по вкладкам звук,
  *  графику и т. д.»). Справка по управлению жила отдельно и раньше — таблица клавиш
  *  длинная и в общем списке прятала под собой кнопку «Готово» (UX-KEYS-1). */
-export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls';
+export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls' | 'push';
 
 /** Вкладки по порядку кнопок; первая — та, на которой окно открывается. Каждая настройка
  *  живёт ровно в одной вкладке (сторож в тесте), иначе её было бы две правды на экране. */
@@ -121,9 +125,17 @@ export const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; key: string }> = [
 
 const DEFAULT_TAB: SettingsTab = SETTINGS_TABS[0]!.id;
 
+/** «Уведомления» (UIX-4.4) — последней и только там, где браузер умеет push. */
+export const PUSH_TAB: { id: SettingsTab; key: string } = { id: 'push', key: 'settings.tab.push' };
+
+/** Вкладки этого окна: постоянные плюс «Уведомления», когда они есть. */
+export function tabsFor(view: SettingsView): ReadonlyArray<{ id: SettingsTab; key: string }> {
+  return view.push ? [...SETTINGS_TABS, PUSH_TAB] : SETTINGS_TABS;
+}
+
 /** Вкладка по её id из разметки; чужое значение — вкладка по умолчанию. */
-function tabOf(id: string | undefined): SettingsTab {
-  return SETTINGS_TABS.find((x) => x.id === id)?.id ?? DEFAULT_TAB;
+function tabOf(id: string | undefined, tabs = SETTINGS_TABS): SettingsTab {
+  return tabs.find((x) => x.id === id)?.id ?? DEFAULT_TAB;
 }
 
 /** «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож —
@@ -180,7 +192,7 @@ export function settingsBoxHtml(
 ): string {
   // Кнопки вкладок — по образцу WAI-ARIA «tabs»: в Tab-обходе только выбранная
   // (остальные — стрелками), панель подписана своей вкладкой.
-  const tabs = SETTINGS_TABS.map(
+  const tabs = tabsFor(view).map(
     ({ id, key }) =>
       `<button type="button" role="tab" id="set-tab-${id}" data-settab="${id}" aria-controls="set-panel"` +
       ` aria-selected="${tab === id}" tabindex="${tab === id ? 0 : -1}"${tab === id ? ' class="on"' : ''}>${t(key)}</button>`,
@@ -210,7 +222,30 @@ function tabHtml(
       return mapHtml(view);
     case 'controls':
       return controlsHtml(view, barSlot);
+    case 'push':
+      return pushHtml(view.push);
   }
+}
+
+/** «Уведомления» (UIX-4.4): общий выключатель и четыре вида. Без входа и при запрете в
+ *  браузере выключателей нет — есть только то, что игроку сделать. */
+function pushHtml(push: PushView | undefined): string {
+  if (!push || push.state === 'unsupported') return '';
+  if (push.state === 'guest') return `<p class="set-bar-hint">${t('settings.push.guest')}</p>`;
+  if (push.state === 'blocked') return `<p class="set-bar-hint">${t('settings.push.blocked')}</p>`;
+  const on = push.state === 'on';
+  const failed = push.failed
+    ? `<p class="set-bar-hint" role="alert">${t('settings.push.failed')}</p>`
+    : '';
+  const kinds = on
+    ? `<div class="pc-sec">${t('settings.push.kinds')}</div>` +
+      PUSH_KINDS.map((k) =>
+        switchRow(`push-${k}`, t(PUSH_KIND_LABEL[k]), '', push.kinds.includes(k)),
+      ).join('')
+    : '';
+  return (
+    switchRow('push', t('settings.push.on'), t('settings.push.on.hint'), on) + failed + kinds
+  );
 }
 
 /** «Звук» (SND-1): тумблер синтезированных откликов и громкость. */
@@ -331,6 +366,10 @@ export interface SettingsHost {
   resetColors(): void;
   /** Новая раскладка нижней панели телефона (есть там, где есть {@link SettingsView.phoneBar}). */
   setPhoneBar?(bar: readonly PhoneItemId[]): void;
+  /** Включить или выключить push (есть там, где есть {@link SettingsView.push}). */
+  setPush?(on: boolean): Promise<void>;
+  /** Выключатель одного вида push. */
+  setPushKind?(kind: PushKind, on: boolean): Promise<void>;
 }
 
 /** Собрать оверлей. `open()` зовут и хаб, и рельса матча. */
@@ -363,11 +402,12 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       barSlot,
     );
     for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-settab]'))) {
-      b.addEventListener('click', () => select(tabOf(b.dataset.settab)));
+      b.addEventListener('click', () => select(tabOf(b.dataset.settab, tabsFor(host.view()))));
       // Стрелки ходят по кругу, Home/End — к краям (образец WAI-ARIA «tabs»).
       b.addEventListener('keydown', (e: KeyboardEvent) => {
-        const at = SETTINGS_TABS.findIndex((x) => x.id === tab);
-        const n = SETTINGS_TABS.length;
+        const list = tabsFor(host.view());
+        const at = list.findIndex((x) => x.id === tab);
+        const n = list.length;
         const to =
           e.key === 'ArrowRight' ? (at + 1) % n
           : e.key === 'ArrowLeft' ? (at + n - 1) % n
@@ -376,7 +416,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
           : -1;
         if (to < 0) return;
         e.preventDefault();
-        select(SETTINGS_TABS[to]!.id);
+        select(list[to]!.id);
       });
     }
 
@@ -395,6 +435,18 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     toggle('starfield', host.setStarfield);
     toggle('motion', host.setMotion);
     toggle('fps', host.setFps);
+    // Push: ответ приходит после разрешения браузера и сервера — перерисовка по нему, а
+    // не по галочке (отказ браузера оставляет выключатель выключенным).
+    const pushToggle = q<HTMLInputElement>('set-push');
+    pushToggle?.addEventListener('change', () => {
+      pushToggle.disabled = true;
+      (host.setPush?.(pushToggle.checked) ?? Promise.resolve()).then(render, render);
+    });
+    for (const k of PUSH_KINDS) {
+      toggle(`push-${k}`, (on) => {
+        host.setPushKind?.(k, on).catch(() => undefined); // отказ сервера покажет перерисовка
+      });
+    }
     toggle('snd', host.setSound, (on) => {
       if (on) host.previewSound(); // включил — сразу слышно, ЧТО включил
     });

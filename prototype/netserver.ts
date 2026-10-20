@@ -942,6 +942,12 @@ async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Pro
   return h;
 }
 
+// UIX-4.4 (часть 2): service worker push-уведомлений (`build.mjs` → `dist/sw.js`). Только там,
+// где push правда работает — есть ключи VAPID и вход в аккаунт (подписка привязана к нему);
+// иначе нет ни `/sw.js`, ни разрешения воркера в политике документа.
+const swPath = 'prototype/dist/sw.js';
+const serviceWorker = vapid && AUTH && existsSync(swPath) ? readFileSync(swPath, 'utf8') : undefined;
+
 const server = createMultiplayerServer({
   securityAudit,
   registry,
@@ -949,6 +955,7 @@ const server = createMultiplayerServer({
   port,
   indexHtml,
   ...(assets ? { assets } : {}),
+  ...(serviceWorker !== undefined ? { serviceWorker } : {}),
   accountStore, // `?nick=` WS login resolves its seat here
   seatLock: SEAT_LOCK, // REL-5: nick+ticket identity; `?player=` refused when on
   // Accounts (SES-2.5): with AUTH on, the WS handshake requires a verified join token

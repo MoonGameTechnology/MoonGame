@@ -44,6 +44,10 @@ export interface MultiplayerServerOptions {
   /** Картинки, вынесенные сборкой из документа (`readAssetDir`): имя файла → байты.
    *  Отдаются по `/assets/<имя>` с годовым кэшем — имя несёт хеш содержимого. */
   assets?: ReadonlyMap<string, Buffer>;
+  /** Service worker push-уведомлений (UIX-4.4): текст скрипта, отдаётся по `/sw.js`.
+   *  С ним документы разрешают свой воркер (`worker-src 'self'`); нет — нет ни маршрута,
+   *  ни разрешения. */
+  serviceWorker?: string;
   /** Кому разрешено встраивать документ в свой iframe (SE-7.1, правило 5). По умолчанию
    *  никому. Площадка-портал (`YAG`) показывает игру в своём фрейме — её origin
    *  перечисляется здесь, а не вырезанием заголовка. */
@@ -539,6 +543,7 @@ export function createMultiplayerServer(
         inline,
         https: overHttps(options, request.raw),
         ...(options.frameAncestors ? { frameAncestors: options.frameAncestors } : {}),
+        ...(options.serviceWorker !== undefined ? { serviceWorker: true } : {}),
       });
       for (const [name, value] of Object.entries(headers)) void reply.header(name, value);
       return body;
@@ -558,6 +563,19 @@ export function createMultiplayerServer(
     // сюда, и без этого маршрута она упирается в 404. Отдаём тот же клиент, а какую
     // партию открыть, он читает из своего же пути (`decisions/matchAddress.ts`).
     app.get('/game/:matchId', serveIndex);
+  }
+
+  const worker = options.serviceWorker;
+  if (worker !== undefined) {
+    // Скрипт меняется с каждой сборкой, а браузер сверяет его сам при регистрации:
+    // `no-cache` не даёт ему держать старый. Политика API с хука (`default-src 'none'`)
+    // остаётся — worker'у не нужна сеть, только Cache Storage и уведомления.
+    const workerBody = Buffer.from(worker, 'utf8');
+    app.get('/sw.js', async (_request: FastifyRequest, reply: FastifyReply) => {
+      void reply.header('content-type', 'text/javascript; charset=utf-8');
+      void reply.header('cache-control', 'no-cache');
+      return reply.send(workerBody);
+    });
   }
 
   const assets = options.assets;

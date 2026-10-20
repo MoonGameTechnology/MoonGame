@@ -122,7 +122,7 @@
 | UIX-4.1 | ✅ | proto | `docs/backlog.md` | Доход в час на телефоне и отклик «+N». |
 | UIX-4.2 | ✅ | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
 | UIX-4.3 | ✅ | srv | `docs/backlog.md` | Push только о своём и срочном. |
-| UIX-4.4 | 🔶 | proto srv | `docs/backlog.md` | Подписка на push в клиенте. |
+| UIX-4.4 | ✅ | proto srv | `docs/backlog.md` | Подписка на push в клиенте. |
 | UIX-4.5 | ✅ | proto | `docs/backlog.md` | Без падающих цифр у ресурсов. |
 | UIX-5.1 | ✅ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |
 | UIX-5.2 | ✅ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
