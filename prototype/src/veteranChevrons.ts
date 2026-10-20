@@ -23,9 +23,12 @@ export function veteranTag(mark: { grade: number; title: string }, cls: string):
   return `<span class="${cls}" title="${esc(mark.title)}" aria-label="${esc(mark.title)}">${chevronsSvg(mark.grade)}</span>`;
 }
 
-/** Один шеврон на канвасе — у ярлыка флота на карте. `(x, y)` — центр. */
+/** Один шеврон на канвасе — у ярлыка флота на карте. `(x, y)` — центр.
+ *  Без save()/restore(): ярлык рисуется у каждого флота в каждом кадре, а save() оставляет
+ *  в куче браузера ~0,8 КБ, которые убирает только большая сборка мусора. Толщину, концы и
+ *  стыки линии шеврон возвращает сам; цвет обводки остаётся золотым. */
 export function drawChevron(cx: CanvasRenderingContext2D, x: number, y: number): void {
-  cx.save();
+  const { lineWidth, lineCap, lineJoin } = cx;
   cx.strokeStyle = VETERAN_GOLD;
   cx.lineWidth = 2;
   cx.lineCap = 'round';
@@ -35,5 +38,7 @@ export function drawChevron(cx: CanvasRenderingContext2D, x: number, y: number):
   cx.lineTo(x, y - 2.5);
   cx.lineTo(x + 4, y + 2.5);
   cx.stroke();
-  cx.restore();
+  cx.lineWidth = lineWidth;
+  cx.lineCap = lineCap;
+  cx.lineJoin = lineJoin;
 }

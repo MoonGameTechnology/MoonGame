@@ -491,8 +491,10 @@ export class TerrainRasterCache {
       raster = this.floorRaster(floor);
     }
     const b = field.box;
-    g.save();
-    // Terrain strokes use screen blending; preserve it against the political fill.
+    // Terrain strokes use screen blending; preserve it against the political fill. Set and put
+    // back by hand: a save() per field leaves ~0.8 KB on the browser's heap that only a major
+    // GC frees, and a gesture redraws every field on screen in each frame.
+    const blend = g.globalCompositeOperation;
     g.globalCompositeOperation = 'screen';
     // Padding belongs to the source raster. Scale it with the source rectangle,
     // otherwise a zoom shifts the image relative to its exact province polygon.
@@ -504,6 +506,6 @@ export class TerrainRasterCache {
     const h = (raster.height / dpr) * sy;
     if (raster.cell) g.drawImage(raster.surface, raster.cell.x, raster.cell.y, raster.width, raster.height, x, y, w, h);
     else g.drawImage(raster.surface, x, y, w, h);
-    g.restore();
+    g.globalCompositeOperation = blend;
   }
 }
