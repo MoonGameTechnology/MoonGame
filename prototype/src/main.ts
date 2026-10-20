@@ -4058,6 +4058,8 @@ let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
 function showHub(show: boolean): void {
   if (!show) registrationReward?.close();
   if (!show) arsenal?.close();
+  // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
+  if (show) document.getElementById('codex')?.classList.remove('show');
   hubEl.style.display = show ? 'flex' : 'none';
   // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
   // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
@@ -6041,10 +6043,12 @@ const codexEl = document.getElementById('codex');
 if (codexEl) {
   codexEl.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    // Мир — через codexWorld(): карточка, открытая ещё в партии, могла пережить вход в хаб.
+    const world = codexWorld();
     const build = (tg.closest('.cx-build') as HTMLElement | null)?.dataset.build;
-    if (build && selPlanet) {
+    if (build && world) {
       const [kind, id] = build.split(':');
-      enqueueBuild(selPlanet, { kind: kind as BuildKind, id: id!, count: 1 });
+      enqueueBuild(world, { kind: kind as BuildKind, id: id!, count: 1 });
       codexEl.classList.remove('show');
       invalidatePanel();
       renderPanel();
@@ -6059,8 +6063,8 @@ if (codexEl) {
     // «Улучшить» из карточки: хостовый путь заказа (сеть → приказ, соло → очередь);
     // карточка остаётся открытой и сама показывает «в работе» (проба погасит кнопку).
     const upg = (tg.closest('[data-cx-upg]') as HTMLElement | null)?.dataset.cxUpg;
-    if (upg && selPlanet) {
-      enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 });
+    if (upg && world) {
+      enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 });
       invalidatePanel();
       renderPanel();
       openCodex(`b:${upg}`);

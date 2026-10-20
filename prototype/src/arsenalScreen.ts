@@ -477,14 +477,16 @@ function waysHtml(s: ArsenalState, id: string, kind: 'hull' | 'module' = 'module
     return `<div class="ar-sec"><h4>${t('arsenal.ways')}</h4><p class="ar-note">${t('arsenal.ways.guest')}</p></div>`;
   const view = s.view;
   if (!view) return '';
-  const recipe = recipeOf(view, id);
+  // The workshop, the season and the shop hand out modules only.
+  const forModule = kind === 'module';
+  const recipe = forModule ? recipeOf(view, id) : undefined;
   const ways = [
     recipe ? workshopWayHtml(s, view, recipe) : '',
     dropWayHtml(view, id, kind),
-    seasonWaysHtml(view, id),
+    forModule ? seasonWaysHtml(view, id) : '',
     `<div class="ar-way"><div class="ar-way-h"><i aria-hidden="true">⌖</i><b>${t('arsenal.way.auction')}</b></div>` +
       `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-auction>${t('arsenal.auction.open')}</button></div></div>`,
-    shopOffersFor(s.offers, id).length
+    forModule && shopOffersFor(s.offers, id).length
       ? `<div class="ar-way"><div class="ar-way-h"><i aria-hidden="true">◈</i><b>${t('arsenal.way.shop')}</b></div>` +
         `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-store>${t('arsenal.shop.open')}</button></div></div>`
       : '',
@@ -880,7 +882,8 @@ export function initArsenal(host: ArsenalHost): {
 
   return {
     refresh,
-    items: () => items,
+    // A guest has no collection: the cache is not handed to the shipyard or the auction either.
+    items: () => (client.status().kind === 'guest' ? [] : items),
     relayout: () => {
       const next = !host.narrow();
       if (next === wide) return;

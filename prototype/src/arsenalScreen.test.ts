@@ -368,6 +368,29 @@ describe('арсенал — подробности корабля', () => {
     expect(html).toContain('Награда за сетевую партию');
   });
 
+  it('мастерская, сезон и магазин выдают модули: корпусу с тем же id их пути не показываются', () => {
+    const v = view();
+    const html = arsenalDetailHtml(
+      state({
+        tab: 'hulls',
+        hull: 'pirate_cruiser',
+        view: view({
+          drops: { ...drops, pool: [{ kind: 'hull', defId: 'pirate_cruiser', weight: 1 }] },
+          recipes: [{ ...v.recipes[0]!, id: 'pc', defId: 'pirate_cruiser' }],
+          seasons: [
+            {
+              ...v.seasons[0]!,
+              milestones: [{ ...v.seasons[0]!.milestones[0]!, choices: ['pirate_cruiser'] }],
+            },
+          ],
+        }),
+      }),
+    );
+    expect(html).toContain('Награда за сетевую партию');
+    expect(html).not.toContain('data-ar-craft');
+    expect(html).not.toContain('data-ar-season');
+  });
+
   it('корабль без отсеков так и говорит', () => {
     const html = arsenalDetailHtml(state({ tab: 'hulls', hull: 'landing_shuttle' }));
     expect(html).toContain('Отсеков нет');
@@ -463,6 +486,15 @@ describe('арсенал — вкладка', () => {
     await initArsenal(host).refresh();
     expect(host.root().innerHTML).toContain('Арсенал хранится в аккаунте');
     expect(host.root().innerHTML).toContain('miss" data-ar-module="targeting_array"');
+  });
+
+  it('кэш гостя не уходит и в другие экраны (верфь, аукцион)', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const arsenal = initArsenal(
+      hostOf({ authorizedBase: async () => null, readCache: () => [dropA] }),
+    );
+    await arsenal.refresh();
+    expect(arsenal.items()).toEqual([]);
   });
 
   it('кэш красится до сети, ответ сервера заменяет коллекцию и пишет кэш', async () => {
