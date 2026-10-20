@@ -105,7 +105,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('main-game supply screen', () => {
   it('separates personal material balances and leaves the workshop to the arsenal', () => {
-    const html = metaEconomyHtml(fixture(), []);
+    const html = metaEconomyHtml(fixture());
     expect(html).toContain('Торгуемые <b>5</b>');
     expect(html).toContain('Личные <b>20</b>');
     expect(html).toContain('Архивная дорожка');
@@ -118,63 +118,25 @@ describe('main-game supply screen', () => {
     const view = fixture();
     view.seasons[0]!.dailyXp = 100;
     const daily = '+100 опыта за каждый день с приказами в партии';
-    expect(metaEconomyHtml(view, [])).toContain(daily);
+    expect(metaEconomyHtml(view)).toContain(daily);
     view.seasons[0]!.active = false;
-    expect(metaEconomyHtml(view, [])).not.toContain(daily);
+    expect(metaEconomyHtml(view)).not.toContain(daily);
     delete view.seasons[0]!.dailyXp;
     view.seasons[0]!.archived = false;
-    expect(metaEconomyHtml(view, [])).not.toContain('за каждый день');
+    expect(metaEconomyHtml(view)).not.toContain('за каждый день');
   });
 
-  it('shows known store contents without a fake purchase button or fabricated price', () => {
-    const html = metaEconomyHtml(fixture(), [
-      {
-        productId: 'supply_personal',
-        catalogVersion: 'v1',
-        source: 'payment',
-        nameKey: 'commerce.offer.supply_personal.name',
-        contentsKey: 'commerce.offer.supply_personal.contents',
-        available: false,
-        unavailableReason: 'E_COMMERCE_UNAVAILABLE',
-        contents: { soulbound: true, materials: { ferroalloys: 5 } },
-      },
-    ]);
-    expect(html).toContain('Ферросплавы ×5');
-    expect(html).toContain('Покупки временно недоступны.');
-    expect(html).not.toContain('data-me-purchase');
-  });
-
-  // Плашка Суверенов ведёт в магазин: экран открывается прокрученным к нему, но только
-  // когда раздел уже нарисован, и только один раз.
-  it('the Sovereigns plate opens the supply screen scrolled to the store once it loads', async () => {
-    const root = fakeRoot();
-    const scrolled: string[] = [];
-    root.querySelector = ((selector: string) => ({
-      value: 'shield_booster',
-      scrollIntoView: () => {
-        scrolled.push(selector);
-      },
-    })) as unknown as typeof root.querySelector;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => response(url.endsWith('/offers') ? { offers: [] } : fixture())),
-    );
-    const screen = initMetaEconomy(host(root));
-    const loading = screen.refresh();
-    screen.showStore();
-    expect(scrolled).toEqual([]);
-    await loading;
-    expect(root.innerHTML).toContain('data-me-store');
-    expect(scrolled).toEqual(['[data-me-store]']);
-    await screen.refresh();
-    expect(scrolled).toHaveLength(1);
+  it('sells nothing itself: purchases moved to the shop', () => {
+    const html = metaEconomyHtml(fixture());
+    expect(html).not.toContain('data-me-store');
+    expect(html).not.toContain('Покупки временно недоступны.');
   });
 
   it('escapes server-controlled identifiers and names', () => {
     const view = fixture();
     view.seasons[0]!.id = 'x" onclick="alert(1)';
     view.seasons[0]!.milestones[0]!.choices = ['<script>bad</script>'];
-    const html = metaEconomyHtml(view, []);
+    const html = metaEconomyHtml(view);
     expect(html).not.toContain('onclick="alert');
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');

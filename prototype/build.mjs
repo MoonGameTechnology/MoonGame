@@ -2667,6 +2667,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cw-feed{flex:1;min-height:0;overflow:auto;padding:9px 11px;display:flex;flex-direction:column;gap:6px;
   border-top:1px solid var(--line-hi);scrollbar-width:thin;}
 #chatwin .dp-line{font-size:inherit;}
+/* Свой цвет шрифта (премиум): только текст реплик, служебные строки и пинги — своим цветом. */
+#chatwin .dp-line:not(.sys,.ping){color:var(--cw-ink,#cfe7e3);}
 .cw-empty{color:var(--dim);font-size:var(--fs-caption);text-align:center;margin:auto;padding:14px;line-height:1.5;}
 .cw-compose{display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--line-hi);flex:0 0 auto;}
 .cw-compose input{flex:1;min-width:0;padding:7px 9px;background:rgba(2,10,14,.9);border:1px solid var(--line-hi);
@@ -3727,6 +3729,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #profile .pf-who{flex:1;min-width:0;}
 #profile .pf-nm{font-size:20px;color:var(--sf-hi);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #profile .pf-sub{font-size:14px;color:var(--sf-dim);margin-top:4px;line-height:1.4;}
+/* Рамка «Премиум» (бонус премиум-аккаунта): золотая кайма шапки и метка под позывным —
+   её видят все, кто открывает профиль. */
+#profile .pf-top.premium{border-bottom-color:color-mix(in srgb,var(--cur-sovereigns) 60%,transparent);
+  background:linear-gradient(100deg,color-mix(in srgb,var(--cur-sovereigns) 12%,transparent),transparent 60%),var(--sf-card-off);}
+#profile .pf-top.premium .pf-av{border-color:var(--cur-sovereigns);box-shadow:0 0 0 2px color-mix(in srgb,var(--cur-sovereigns) 35%,transparent);}
+#profile .pf-prem{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:1px 9px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--cur-sovereigns) 60%,transparent);color:var(--cur-sovereigns);font-size:var(--fs-caption);font-weight:600;}
 /* Sovereigns capsule — the premium currency reads GOLD everywhere it appears
    (the hub wallet's plaque), never the UI's cyan. */
 #profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border-radius:999px;
@@ -3958,6 +3967,135 @@ span.ar-fchip{cursor:default;}
 @media (pointer:coarse){
   :is(#hp-arsenal,#arsenal-sheet) :is(.ar-fchip,.ar-mchip,.ar-tagline){min-height:44px;}
 }
+/* «Магазин» хаба (заказ владельца 2026-10-20, макет одобрен): разделы, полка и карточка
+   товара рядом, на телефоне шторкой (те же .ar-sheet, что у Арсенала). Раскладку решает
+   ширина вкладки: на широкой разделы колонкой слева, на средней строкой сверху. */
+#hp-shop{height:100%;overflow-y:auto;overscroll-behavior:contain;gap:14px;container:shop / size;}
+:is(#hp-shop,#shop-sheet){--rar:var(--sf-dim);color:var(--sf-text);}
+:is(#hp-shop,#shop-sheet) .r-simple{--rar:var(--rar-simple);}
+:is(#hp-shop,#shop-sheet) .r-unique{--rar:var(--rar-unique);}
+:is(#hp-shop,#shop-sheet) .r-mythic{--rar:var(--rar-mythic);}
+:is(#hp-shop,#shop-sheet) .r-legendary{--rar:var(--rar-legendary);}
+:is(#hp-shop,#shop-sheet) :is(.btn-main,.btn-second,.btn-quiet){min-height:44px;padding:0 16px;border-radius:10px;
+  font-size:var(--fs-body);display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+:is(#hp-shop,#shop-sheet) .btn-quiet{padding:0 6px;}
+.sh-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;}
+.sh-head h2{margin:0;font-size:var(--fs-title);font-weight:700;color:var(--sf-hi);}
+.sh-wallet{display:flex;flex-wrap:wrap;gap:8px;}
+.sh-cur{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--sf-edge);
+  background:var(--sf-inset);font-weight:600;font-variant-numeric:tabular-nums;}
+.sh-cur i{display:inline-flex;width:16px;height:16px;font-style:normal;align-items:center;justify-content:center;}
+.sh-cur i svg,.sh-sv svg,.sh-sov i svg,.sh-art-sov i svg{width:100%;height:100%;}
+.sh-cur.sov{color:var(--cur-sovereigns);border-color:color-mix(in srgb,var(--cur-sovereigns) 45%,transparent);}
+.sh-cur.war{color:var(--cur-warrants);}
+.sh-cur.prem{color:var(--cur-sovereigns);}
+.sh-status{margin:0;color:var(--sf-dim);line-height:1.5;}
+.sh-status.error{color:var(--red);}
+.sh-main{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;}
+.sh-tabs{display:flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);
+  overflow-x:auto;scrollbar-width:none;}
+.sh-tab{flex:1 0 auto;min-height:44px;padding:0 14px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 var(--fs-body) var(--sf-font);white-space:nowrap;}
+.sh-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.sh-tab-ic{display:inline-grid;place-items:center;width:18px;font-size:15px;}
+.sh-sv{display:inline-flex;width:16px;height:16px;color:var(--cur-sovereigns);font-style:normal;}
+.sh-gem{display:inline-flex;vertical-align:-2px;width:1em;height:1em;margin:0 1px;color:var(--cur-sovereigns);font-style:normal;}
+.btn-main .sh-gem{color:inherit;}
+.sh-gem svg{width:100%;height:100%;}
+.sh-list{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.sh-hint{margin:0;color:var(--sf-dim);font-size:var(--fs-caption);line-height:1.5;}
+.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:10px;}
+.sh-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:148px;padding:12px;
+  border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;
+  font:var(--fs-body)/1.35 var(--sf-font);}
+.sh-card:hover{border-color:var(--sf-edge-hi);}
+.sh-card[aria-pressed="true"]{border-color:var(--sf-edge-hi);background:var(--sf-sel);}
+:is(.sh-card,.sh-tab):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+.sh-card.off{border-style:dashed;background:var(--sf-card-off);}
+.sh-tag{position:absolute;top:8px;right:8px;font-size:var(--fs-caption);font-weight:600;line-height:18px;padding:1px 8px;
+  border-radius:999px;border:1px solid var(--cur-sovereigns);color:var(--cur-sovereigns);background:var(--sf-inset);}
+.sh-art{display:flex;align-items:center;gap:4px;min-height:40px;}
+.sh-art i{font-style:normal;}
+.sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
+.sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
+.sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
+  background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.sh-mi.own{filter:grayscale(1);opacity:.5;}
+/* Материалы — ромбы своего цвета: в игре у них нет иконок, а цвет различает их в наборе. */
+.sh-mat{width:15px;height:15px;margin:0 4px;border-radius:3px;transform:rotate(45deg);background:var(--mc);
+  box-shadow:0 0 6px color-mix(in srgb,var(--mc) 50%,transparent);}
+.m-ferroalloys{--mc:#b9c6cf;}
+.m-technical_composites{--mc:#7fd38a;}
+.m-control_circuits{--mc:#62b6ff;}
+.m-energy_cells{--mc:#f2c14e;}
+.m-technology_archives{--mc:#c39bff;}
+.sh-nm{font-weight:600;color:var(--sf-hi);}
+.sh-gold .sh-sov{font-size:var(--fs-heading);}
+.sh-sub{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-price{margin-top:auto;display:flex;align-items:baseline;justify-content:flex-end;gap:8px;width:100%;}
+.sh-price s{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-sov{display:inline-flex;align-items:center;gap:4px;color:var(--cur-sovereigns);font-weight:700;font-variant-numeric:tabular-nums;}
+.sh-sov i{display:inline-flex;width:14px;height:14px;}
+.btn-main .sh-sov,.btn-main[disabled] .sh-sov{color:inherit;}
+.sh-pill{font-size:var(--fs-caption);font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid var(--sf-edge);color:var(--sf-dim);}
+.sh-pill:is(.free,.on){color:var(--grn);border-color:color-mix(in srgb,var(--grn) 50%,transparent);}
+.sh-prem{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px;border:1px solid var(--sf-panel-edge);
+  background:linear-gradient(120deg,color-mix(in srgb,var(--cur-sovereigns) 10%,transparent),transparent 65%),var(--sf-card);}
+.sh-prem-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
+.sh-prem-h b{font-size:var(--fs-heading);color:var(--sf-hi);}
+.sh-prem ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 16px;}
+.sh-prem li{position:relative;padding-left:18px;line-height:1.45;}
+.sh-prem li::before{content:"✓";position:absolute;left:0;color:var(--grn);}
+.sh-prem .btn-main{align-self:flex-start;}
+.sh-note{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.sh-guest{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;align-items:center;padding:16px;
+  border-radius:14px;border:1px solid var(--sf-panel-edge);background:var(--sf-card);}
+.sh-guest b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.sh-guest p{margin:4px 0 0;color:var(--sf-dim);line-height:1.5;}
+.sh-detail{position:sticky;top:0;max-height:calc(100cqh - 2px);overflow-y:auto;overscroll-behavior:contain;padding:18px;border-radius:14px;
+  border:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);}
+.sh-detail:empty{display:none;}
+.sh-dt{display:flex;flex-direction:column;gap:14px;}
+.sh-dt h3{margin:0;font-size:var(--fs-title);line-height:1.25;color:var(--sf-hi);text-wrap:balance;}
+.sh-dt h3 .sh-sov{font-size:inherit;}
+.sh-dt h3 .sh-sov i{width:20px;height:20px;}
+.sh-lines{display:flex;flex-direction:column;}
+.sh-line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);}
+.sh-line span{display:inline-flex;align-items:center;gap:8px;color:var(--sf-dim);}
+.sh-line b{font-weight:600;color:var(--sf-hi);text-align:right;}
+.sh-line s{font-weight:400;color:var(--sf-dim);}
+.sh-mline span{color:var(--sf-text);}
+.sh-mline .sh-mi{width:28px;height:28px;font-size:14px;}
+.sh-mline b{color:var(--rar);}
+.sh-sec{margin:10px 0 0;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
+.sh-acts{display:flex;flex-direction:column;gap:8px;}
+.sh-confirm{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);}
+.sh-confirm p{margin:0;}
+.sh-row2{display:flex;gap:8px;}
+.sh-row2 > *{flex:1;}
+@container shop (min-width:700px){
+  .sh-main{grid-template-columns:minmax(0,1fr) minmax(300px,350px);}
+  .sh-tabs{grid-column:1 / -1;}
+}
+@container shop (min-width:980px){
+  .sh-main{grid-template-columns:184px minmax(0,1fr) minmax(300px,360px);}
+  .sh-tabs{grid-column:auto;position:sticky;top:0;flex-direction:column;}
+  .sh-tab{flex:0 0 auto;justify-content:flex-start;}
+}
+@container shop (max-width:520px){
+  /* four tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen */
+  .sh-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+  .sh-tab{flex-direction:column;gap:2px;min-height:52px;padding:6px 2px;font-size:var(--fs-caption);}
+}
+@container shop (max-width:699px){
+  .sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .sh-card{min-height:128px;padding:10px;}
+  .sh-guest{grid-template-columns:1fr;}
+  .sh-prem ul{grid-template-columns:1fr;}
+}
+#shop-sheet{position:fixed;inset:0;z-index:5;display:none;}
+#shop-sheet.open{display:block;}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:var(--fs-caption)}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
 #hp-supply{overflow-y:auto;gap:16px;padding-bottom:24px}.me-section{display:flex;flex-direction:column;gap:10px}.me-section h3,.me-section h4{margin:0}.me-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.me-head h2{margin:0;color:var(--cyan);font-size:20px}.me-hint{margin:0;color:var(--dim);font-size:var(--fs-caption);line-height:1.45}.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}.me-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--glass)}.me-card.me-goal{border-color:var(--cyan)}.me-card h4{margin:0}.me-amounts{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.me-amounts span,.me-row span{color:var(--dim)}.me-row{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-caption)}.me-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}#hp-supply button{min-height:40px;padding:8px 12px;border:1px solid var(--cyan-dim);border-radius:6px;background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer}#hp-supply button:disabled{opacity:.45;cursor:default}#hp-supply button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.me-badge{color:var(--cyan);font-size:var(--fs-caption)}.me-bound{color:#e8b869;font-size:var(--fs-caption);margin:0}.me-error{color:#ef9b9b}.me-track{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}.me-level{border-top:1px solid var(--line);padding-top:10px}.me-track details>summary{cursor:pointer;padding:8px 0}.me-material-list{display:grid;gap:6px}.me-select{width:100%;padding:8px;background:#07131b;color:var(--ink);border:1px solid var(--line);border-radius:6px}.me-reward{margin:0;padding-left:18px;font-size:var(--fs-caption);color:var(--dim)}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
@@ -4861,6 +4999,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
+    <div class="hub-panel" id="hp-shop" style="display:none"></div>
     <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
@@ -4871,6 +5010,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
         <!-- UIX-10.1: рейтинг и друзья — из нижней панели сюда, вкладок пять вместо семи -->
+        <button class="hub-tile" id="hub-shop" type="button"><span class="ht-ic">◈</span><span data-i18n="hub.tile.shop"></span></button>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
@@ -4903,8 +5043,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
-  <!-- Шторка арсенала на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
+  <!-- Шторки арсенала и магазина на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
   <div id="arsenal-sheet"></div>
+  <div id="shop-sheet"></div>
 </div>
 <div id="emblempick">
   <div class="ep-box">

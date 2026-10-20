@@ -1219,7 +1219,7 @@ const server = createMultiplayerServer({
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
-      registerProfileApi(app, { registrationRewards, profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
+      registerProfileApi(app, { registrationRewards, profiles: profileStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId), identify: identifySession });
       // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа
       // монтируется только при заданных VAPID.
       registerPushApi(app, {

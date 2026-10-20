@@ -18,7 +18,6 @@
  * PC shows the detail beside the list; a narrow tab (phone) opens it as a sheet over the hub.
  */
 import type { ArsenalItem } from '../../packages/shared-core/src/index';
-import type { CommerceOffer } from '../../packages/protocol/src/commerce';
 import type { MetaEconomyView, MetaRecipeView } from '../../packages/protocol/src/metaEconomyView';
 import { LOCALE, t, tData } from '../../localization/runtime';
 import { moduleGroups } from '../../decisions/moduleGroups';
@@ -38,13 +37,14 @@ import {
   percent,
   recipeProgress,
   seasonWays,
-  shopOffersFor,
   type HullGroup,
   type StarterEntry,
 } from '../../decisions/arsenalView';
+import { moduleOfferFor } from '../../decisions/shopView';
 import starterArsenal from '../../data/starterArsenal.json';
 import { data } from './gameData';
 import { esc, nfmt } from './format';
+import { SOV_SVG } from './icons';
 import { unitTitle } from './dossiers';
 import { parseArsenalItems } from './arsenal';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
@@ -160,7 +160,6 @@ export interface ArsenalState {
   items: readonly ArsenalItem[];
   /** The workshop, odds and seasons; null for a guest or while the server is unknown. */
   view: MetaEconomyView | null;
-  offers: readonly CommerceOffer[];
   guest: boolean;
   canSignIn: boolean;
   busy: boolean;
@@ -462,6 +461,16 @@ function seasonWaysHtml(view: MetaEconomyView, id: string): string {
     .join('');
 }
 
+/** The store's single-module offer, while it can still be bought: it opens the shop on it. */
+function shopWayHtml(view: MetaEconomyView, id: string): string {
+  const offer = moduleOfferFor(view.store ?? [], id);
+  if (!offer) return '';
+  return (
+    `<div class="ar-way"><div class="ar-way-h"><i aria-hidden="true">◈</i><b>${t('arsenal.way.shop')}</b><small>${esc(t('arsenal.shop.price', { n: nfmt(offer.price) })).replace('◆', `<span class="sh-gem" aria-hidden="true">${SOV_SVG}</span>`)}</small></div>` +
+    `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-store="${esc(offer.id)}">${t('arsenal.shop.open')}</button></div></div>`
+  );
+}
+
 function waysHtml(s: ArsenalState, id: string): string {
   if (s.guest)
     return `<div class="ar-sec"><h4>${t('arsenal.ways')}</h4><p class="ar-note">${t('arsenal.ways.guest')}</p></div>`;
@@ -474,10 +483,7 @@ function waysHtml(s: ArsenalState, id: string): string {
     seasonWaysHtml(view, id),
     `<div class="ar-way"><div class="ar-way-h"><i aria-hidden="true">⌖</i><b>${t('arsenal.way.auction')}</b></div>` +
       `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-auction>${t('arsenal.auction.open')}</button></div></div>`,
-    shopOffersFor(s.offers, id).length
-      ? `<div class="ar-way"><div class="ar-way-h"><i aria-hidden="true">◈</i><b>${t('arsenal.way.shop')}</b></div>` +
-        `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-store>${t('arsenal.shop.open')}</button></div></div>`
-      : '',
+    shopWayHtml(view, id),
   ].join('');
   return `<div class="ar-sec"><h4>${t('arsenal.ways')}</h4><div class="ar-ways">${ways}</div></div>`;
 }
@@ -624,7 +630,8 @@ export interface ArsenalHost {
   sell(itemId: string): void;
   /** «Снабжение» on its season (rewards are claimed there). */
   openSeason(): void;
-  openStore(): void;
+  /** «Магазин» on this module's offer. */
+  openStore(offerId: string): void;
   /** After a confirmed craft or salvage (the wallet, the auction). */
   changed?(): Promise<void>;
   requestId?(): string;
@@ -697,7 +704,6 @@ export function initArsenal(host: ArsenalHost): {
     return {
       items: shown,
       view: guest ? null : view,
-      offers: client.offers(),
       guest,
       canSignIn: host.canSignIn(),
       busy: client.busy(),
@@ -798,7 +804,7 @@ export function initArsenal(host: ArsenalHost): {
     if (d.arCodex) return host.openCodex(d.arCodex);
     if (d.arSignIn !== undefined) return host.signIn();
     if (d.arAuction !== undefined) return host.openAuction();
-    if (d.arStore !== undefined) return host.openStore();
+    if (d.arStore) return host.openStore(d.arStore);
     if (d.arSeason !== undefined) return host.openSeason();
     if (d.arRefresh !== undefined) {
       detach('арсенал: обновление', refresh());

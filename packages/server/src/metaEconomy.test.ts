@@ -715,6 +715,57 @@ describe('MetaEconomy Sovereign store', () => {
     expect((await f.service.readModel('alice')).sovereigns).toBe(330 - 149);
   });
 
+  it('premium gives daily Sovereigns once a day and one more rewarded supply, only while it runs', async () => {
+    const f = setup();
+    const ad = (id: string) =>
+      f.service.applyEntitlement(f.entitlement(id, 'rewarded_supply', { source: 'rewarded_ad' }));
+    const daily = (id: string) => f.service.claimPremiumDaily('alice', { requestId: id });
+    expect(await daily('none')).toEqual({ ok: false, code: 'E_PREMIUM' });
+    expect((await f.service.readModel('alice')).premiumDaily).toBeNull();
+    expect(await f.service.isPremium('alice')).toBe(false);
+    await buyPack(f, 'pack');
+    await f.service.buyOffer('alice', { requestId: 'p', offerId: 'premium_7' });
+    expect(await f.service.isPremium('alice')).toBe(true);
+    const { dailySovereigns } = f.catalog.store.premium;
+    expect((await f.service.readModel('alice')).premiumDaily).toEqual({
+      amount: dailySovereigns,
+      claimed: false,
+    });
+    expect(await daily('d1')).toMatchObject({
+      ok: true,
+      receipt: { sovereignsGranted: dailySovereigns },
+    });
+    // A retry is the same receipt; a new request the same day is refused.
+    expect((await daily('d1')).ok).toBe(true);
+    expect(await daily('d2')).toEqual({ ok: false, code: 'E_DAILY_CLAIMED' });
+    const view = await f.service.readModel('alice');
+    expect(view.sovereigns).toBe(1440 - 149 + dailySovereigns);
+    expect(view.premiumDaily).toEqual({ amount: dailySovereigns, claimed: true });
+    const limit = f.catalog.commerce.dailyAdLimit + f.catalog.store.premium.extraDailyAds;
+    expect(view.ads).toEqual({ used: 0, limit });
+    for (let i = 0; i < limit; i += 1) expect((await ad(`ad_${i}`)).ok).toBe(true);
+    expect(await ad('ad_over')).toEqual({ ok: false, code: 'E_AD_LIMIT' });
+    f.setTime(f.catalog.seasons[0]!.startsAt + DAY * 2);
+    expect((await daily('d3')).ok).toBe(true);
+    f.setTime(f.catalog.seasons[0]!.startsAt + DAY * 9);
+    expect(await daily('d4')).toEqual({ ok: false, code: 'E_PREMIUM' });
+    expect((await f.service.readModel('alice')).ads).toEqual({
+      used: 0,
+      limit: f.catalog.commerce.dailyAdLimit,
+    });
+  });
+
+  it('keeps premium cheaper than the Sovereigns it pays back', () => {
+    // Premium is bought with Sovereigns, so a term must never return more than it costs:
+    // otherwise renewing it would mint currency.
+    const { catalog } = setup();
+    for (const offer of Object.values(catalog.store.offers))
+      if (offer.premiumDays)
+        expect(offer.premiumDays * catalog.store.premium.dailySovereigns).toBeLessThan(
+          offer.price! / 2,
+        );
+  });
+
   it('never credits Sovereigns from a rewarded ad', async () => {
     const f = setup();
     expect(

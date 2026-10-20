@@ -38,6 +38,8 @@ export interface PlayerProfile extends ProfileAppearance {
   login: string;
   xp: number;
   progress: ProfileProgress;
+  /** A running premium account: the profile wears its frame. */
+  premium?: boolean;
 }
 export function defaultAppearance(): ProfileAppearance {
   return { portrait: 1, slots: Array.from({ length: MEDAL_SLOTS }, () => null) };

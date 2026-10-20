@@ -257,7 +257,8 @@
         "price": 200,
         "materials": { "technology_archives": 1 }
       }
-    }
+    },
+    "premium": { "dailySovereigns": 5, "extraDailyAds": 1 }
   },
   "commerce": {
     "dailyAdLimit": 2,

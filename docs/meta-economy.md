@@ -107,6 +107,19 @@ Commerce: товары `sovereigns_*` (база плюс `bonusSovereigns`). Р�
 `limit` ограничивает покупки на аккаунт. Цену и доступность для аккаунта сервер отдаёт в
 `GET /meta-economy/me` (`store`), клиент цену не присылает.
 
+Премиум (`store.premium`, пока идёт `premiumUntil`) даёт `dailySovereigns` (5 ◆) раз в UTC-день
+по `POST /meta-economy/premium/daily` и `extraDailyAds` (+1) к дневному пределу снабжения за
+рекламу. Пять ◆ в день держат премиум дешевле, чем он возвращает: 30 дней за 449 ◆ дают 150 ◆
+(тест «keeps premium cheaper»). Ещё премиум открывает цвет текста чата и метку ★ в профиле:
+`GET /profile` отдаёт `premium: true`, другим игрокам тоже. `GET /meta-economy/me` отдаёт
+`premiumPerks`, `premiumDaily` (сумма и забран ли сегодня) и `ads` (использовано и предел).
+
+Экран «Магазин» хаба (`prototype/src/shopScreen.ts`, решения — `decisions/shopView.ts`)
+показывает вкладки Суверены, Премиум, Модули и Материалы. Пакеты Суверенов и снабжение за
+рекламу берутся из `GET /commerce/offers` и пока недоступны: провайдера оплаты нет.
+Остальные вкладки продают витрину за ◆. Арсенал ведёт на штучный товар модуля, «Снабжение»
+больше ничего не продаёт.
+
 `frontier_fleet_2026`: 56 дней, 50 уровней, 200 XP на уровень после первого,
 бесплатные и premium milestones, восемь еженедельно открываемых контрактов.
 Темп сезона идёт от реального времени: каждый UTC-день с собственными приказами в любой
@@ -131,6 +144,7 @@ Commerce: товары `sovereigns_*` (база плюс `bonusSovereigns`). Р�
 | `POST /meta-economy/season/select` | `seasonId` |
 | `POST /meta-economy/season/claim` | `seasonId`, `level`, `defId` для выбора |
 | `POST /meta-economy/store/buy` | `offerId`: покупка за Суверены; отказы `E_SOVEREIGNS`, `E_ALREADY_OWNED`, `E_OFFER_LIMIT` |
+| `POST /meta-economy/premium/daily` | Ежедневные ◆ премиума; отказы `E_PREMIUM`, `E_DAILY_CLAIMED` |
 | `GET /meta-market` | Баланс, доступ к торговле, лоты и история |
 | `POST /meta-market/material/list`, `/buy`, `/cancel` | Материальные лоты; list: `materialId,quantity,price,requestId`, buy: `listingId,tradeId`, cancel: `listingId` |
 | `GET /commerce/offers` | Версия и точное содержимое витрины |

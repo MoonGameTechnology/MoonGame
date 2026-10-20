@@ -1,9 +1,9 @@
 /**
- * Main-game supply screen: materials, the season and the store. All grants and affordability
- * decisions belong to Meta. The workshop (craft, goal, salvage) lives in the arsenal next to
- * the module it makes (заказ владельца 2026-10-20); both screens share one session client.
+ * Main-game supply screen: materials and the season. All grants and affordability decisions
+ * belong to Meta. The workshop (craft, goal, salvage) lives in the arsenal next to the module
+ * it makes, and purchases in «Магазин» (`shopScreen.ts`), both by the owner's order of
+ * 2026-10-20; every screen has its own instance of the shared session client.
  */
-import type { CommerceOffer } from '../../packages/protocol/src/commerce';
 import type { MetaEconomyView, MetaSeasonView } from '../../packages/protocol/src/metaEconomyView';
 import { t, tData } from '../../localization/runtime';
 import { esc, nfmt } from './format';
@@ -24,8 +24,6 @@ const CONTRACT_KEYS: Record<string, string> = {
 };
 
 const moduleName = (defId: string): string => tData(data.modules[defId]?.name ?? defId);
-const materialName = (view: MetaEconomyView, id: string): string =>
-  t(view.materials.find((m) => m.id === id)?.nameKey ?? id);
 const button = (attributes: string, label: string, disabled: boolean): string =>
   `<button type="button" ${attributes}${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
 
@@ -80,44 +78,17 @@ function seasonHtml(season: MetaSeasonView, busy: boolean): string {
   );
 }
 
-export function metaEconomyHtml(
-  view: MetaEconomyView,
-  offers: readonly CommerceOffer[],
-  busy = false,
-): string {
+export function metaEconomyHtml(view: MetaEconomyView, busy = false): string {
   const materials = view.materials
     .map(
       (m) =>
         `<article class="me-card"><h4>${esc(t(m.nameKey))}</h4><div class="me-amounts"><span>${t('supply.tradable')} <b>${nfmt(m.tradable)}</b></span><span>${t('supply.personal')} <b>${nfmt(m.soulbound)}</b></span></div></article>`,
     )
     .join('');
-  const store = offers
-    .map((offer) => {
-      const contents = Object.entries(offer.contents.materials ?? {}).map(
-        ([id, quantity]) => `<li>${esc(materialName(view, id))} ×${nfmt(quantity)}</li>`,
-      );
-      if (offer.contents.moduleId)
-        contents.push(`<li>${esc(moduleName(offer.contents.moduleId))}</li>`);
-      if (offer.contents.seasonId) {
-        const season = view.seasons.find((s) => s.id === offer.contents.seasonId);
-        contents.push(
-          `<li>${esc(season ? t(season.nameKey) : offer.contents.seasonId)} · ${t('supply.season.premium')}</li>`,
-        );
-      }
-      return (
-        `<article class="me-card"><h4>${esc(t(offer.nameKey))}</h4><span class="me-hint">${t('supply.store.known')}</span><ul class="me-reward">${contents.join('')}</ul><p class="me-hint">${esc(t(offer.contentsKey))}</p>` +
-        (offer.dailyLimit === undefined
-          ? ''
-          : `<span class="me-hint">${t('supply.store.daily-limit', { n: offer.dailyLimit })}</span>`) +
-        `<span class="me-hint">${t('supply.store.unavailable')}</span></article>`
-      );
-    })
-    .join('');
   return (
     `<header class="me-head"><div><h2>${t('supply.title')}</h2><p class="me-hint">${t('supply.subtitle')}</p></div>${button('data-me-refresh', t('supply.retry'), busy)}</header>` +
     `<section class="me-section"><h3>${t('supply.materials')}</h3><div class="me-grid">${materials}</div></section>` +
-    `<section class="me-section"><h3>${t('supply.season')}</h3>${view.seasons.map((s) => seasonHtml(s, busy)).join('')}</section>` +
-    `<section class="me-section" data-me-store><h3>${t('supply.store')}</h3><div class="me-grid">${store || `<p class="me-hint">${t('supply.store.unavailable')}</p>`}</div></section>`
+    `<section class="me-section"><h3>${t('supply.season')}</h3>${view.seasons.map((s) => seasonHtml(s, busy)).join('')}</section>`
   );
 }
 
@@ -149,17 +120,12 @@ function statusLine(status: MetaEconomyStatus): { text: string; error: boolean }
 }
 
 /** No value is cached in the browser. A failed POST retains its id for a safe retry. */
-export function initMetaEconomy(host: MetaEconomyHost): {
-  refresh(): Promise<void>;
-  /** Плашка Суверенов ведёт в магазин: после ближайшей загрузки экран прокручен к нему. */
-  showStore(): void;
-} {
-  let wantStore = false;
+export function initMetaEconomy(host: MetaEconomyHost): { refresh(): Promise<void> } {
   const client = createMetaEconomyClient({
     authorizedBase: () => host.authorizedBase(),
     paint: () => paint(),
     // Render before accepting the response: malformed nested data never replaces a valid view.
-    accept: (view, offers) => void metaEconomyHtml(view, offers),
+    accept: (view) => void metaEconomyHtml(view),
     changed: () => host.changed(),
     ...(host.requestId ? { requestId: () => host.requestId!() } : {}),
   });
@@ -173,12 +139,8 @@ export function initMetaEconomy(host: MetaEconomyHost): {
     host.root().innerHTML =
       statusHtml +
       (view
-        ? metaEconomyHtml(view, client.offers(), busy)
+        ? metaEconomyHtml(view, busy)
         : `<div class="hub-empty">${t('supply.title')}<br>${button('data-me-refresh', t('supply.retry'), busy)}</div>`);
-    if (wantStore && !busy) {
-      wantStore = false;
-      if (view) host.root().querySelector('[data-me-store]')?.scrollIntoView({ block: 'start' });
-    }
   };
   host.root().addEventListener('click', (event) => {
     const el = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
@@ -208,11 +170,5 @@ export function initMetaEconomy(host: MetaEconomyHost): {
         );
     }
   });
-  return {
-    refresh: () => client.refresh(),
-    showStore: () => {
-      wantStore = true;
-      if (!client.busy()) paint();
-    },
-  };
+  return { refresh: () => client.refresh() };
 }

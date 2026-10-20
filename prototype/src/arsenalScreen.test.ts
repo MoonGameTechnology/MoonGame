@@ -124,7 +124,6 @@ function state(over: Partial<ArsenalState> = {}): ArsenalState {
   return {
     items: owned(),
     view: view(),
-    offers: [],
     guest: false,
     canSignIn: true,
     busy: false,

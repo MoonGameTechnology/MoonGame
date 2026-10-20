@@ -97,6 +97,11 @@ export const DEFAULT_CHAT_CFG: ChatCfg = {
   showReal: false,
 };
 
+/** A font colour the window accepts: the colour input's own format. */
+const CHAT_COLOR = /^#[0-9a-f]{6}$/i;
+/** The feed's own text colour (`.dp-line` in build.mjs), the picker's starting value. */
+const CHAT_INK = '#cfe7e3';
+
 export const DEFAULT_CHAT_GEOM: ChatGeom = { x: 12, y: 0, w: 360, h: 300 };
 
 /**
@@ -208,7 +213,8 @@ export function parseChatCache(raw: string | null): ChatCache | null {
       ),
       transparency: Math.max(0, Math.min(100, finiteOr(c.transparency, DEFAULT_CHAT_CFG.transparency))),
       censor: boolOr(c.censor, DEFAULT_CHAT_CFG.censor),
-      color: typeof c.color === 'string' ? c.color : DEFAULT_CHAT_CFG.color,
+      // Only a plain #rrggbb reaches the style: the cache is player-editable storage.
+      color: typeof c.color === 'string' && CHAT_COLOR.test(c.color) ? c.color : DEFAULT_CHAT_CFG.color,
       showDay: boolOr(c.showDay, DEFAULT_CHAT_CFG.showDay),
       showTime: boolOr(c.showTime, DEFAULT_CHAT_CFG.showTime),
       showReal: boolOr(c.showReal, DEFAULT_CHAT_CFG.showReal),
@@ -320,6 +326,8 @@ export interface ChatHost {
    * канал, куда пинги и падают, так что задет основной сценарий.
    */
   jumpToPing(planetId: string): void;
+  /** Premium is running: the font colour is open. */
+  premium?(): boolean;
 }
 
 /** Вкладки окна: постоянные комнаты, затем по вкладке на каждую существующую личку
@@ -373,8 +381,14 @@ export function chatArrivalStart(tail: ChatMessage | undefined, msgs: ChatMessag
 }
 
 /** Всплывающая панель настроек, вылетающая вправо: размер (в одну строку), шрифт,
- *  цвет (пока по подписке), цензура, прозрачность и тумблеры штампов. */
-export function settingsHtml(geom: ChatGeom, cfg: ChatCfg, vw: number, vh: number): string {
+ *  цвет (открыт премиум-аккаунту), цензура, прозрачность и тумблеры штампов. */
+export function settingsHtml(
+  geom: ChatGeom,
+  cfg: ChatCfg,
+  vw: number,
+  vh: number,
+  premium = false,
+): string {
   const { maxW, maxH } = chatBounds(vw, vh);
   const chk = (on: boolean): string => (on ? ' checked' : '');
   return (
@@ -384,7 +398,9 @@ export function settingsHtml(geom: ChatGeom, cfg: ChatCfg, vw: number, vh: numbe
     `<input type="number" data-cset="h" min="${CHAT_MIN_H}" max="${maxH}" value="${geom.h}">` +
     `<input type="number" data-cset="w" min="${CHAT_MIN_W}" max="${maxW}" value="${geom.w}"></div>` +
     `<div class="cw-srow"><label>${t('chat.win.font')}</label><input type="number" data-cset="font" min="${CHAT_FONT_MIN}" max="${CHAT_FONT_MAX}" value="${cfg.fontPx}"></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.color')}</label><input type="color" data-cset="color" value="#7fe7ff" disabled><span class="cw-sub">🔒 ${t('chat.win.color.premium')}</span></div>` +
+    (premium
+      ? `<div class="cw-srow"><label>${t('chat.win.color')}</label><input type="color" data-cset="color" value="${cfg.color || CHAT_INK}"></div>`
+      : `<div class="cw-srow"><label>${t('chat.win.color')}</label><input type="color" data-cset="color" value="${CHAT_INK}" disabled><span class="cw-sub">🔒 ${t('chat.win.color.premium')}</span></div>`) +
     `<div class="cw-srow"><label>${t('chat.win.censor')}</label><input type="checkbox" data-cset="censor"${chk(cfg.censor)}></div>` +
     `<div class="cw-srow"><label>${t('chat.win.opacity')}</label><input type="range" data-cset="opacity" min="0" max="100" value="${cfg.transparency}"><span class="cw-opval">${cfg.transparency}%</span></div>` +
     `<div class="cw-shdr">${t('chat.win.stamp')}</div>` +
@@ -409,6 +425,8 @@ export function windowHtml(o: {
   vw: number;
   vh: number;
   feedHtml: string;
+  /** Premium is running: the font colour is open. */
+  premium?: boolean;
 }): string {
   const tabs = o.tabs
     .map(
@@ -426,7 +444,7 @@ export function windowHtml(o: {
     `<div class="cw-tabs">${tabs}</div>` +
     `<div class="cw-feed" id="cw-feed">${o.feedHtml}</div>` +
     `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('chat.win.send')}">${skinIcon('paper-plane-tilt', '▶')}</button></div>` +
-    (o.settingsOpen ? settingsHtml(o.geom, o.cfg, o.vw, o.vh) : '')
+    (o.settingsOpen ? settingsHtml(o.geom, o.cfg, o.vw, o.vh, o.premium) : '')
   );
 }
 
@@ -516,6 +534,9 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
     Object.assign(win.style, geomStyle(geom, cfg, min));
     const feed = win.querySelector('#cw-feed') as HTMLElement | null;
     if (feed) feed.style.fontSize = cfg.fontPx + 'px';
+    // The colour waits in the cache while premium is off and comes back with it.
+    if (cfg.color && host.premium?.()) win.style.setProperty('--cw-ink', cfg.color);
+    else win.style.removeProperty('--cw-ink');
   };
 
   const tabsNow = (): ChatTab[] => discoverTabs(host, tab);
@@ -560,6 +581,7 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
       vw,
       vh,
       feedHtml: feedInnerHtml(msgs, tabLabel(tabs, tab, host.seatLabel(tab)), cfg, host.lineHtml),
+      premium: host.premium?.() ?? false,
     });
     applyGeom();
     const feed = win.querySelector('#cw-feed') as HTMLElement | null;
@@ -713,6 +735,10 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
           CHAT_FONT_MIN,
           Math.min(CHAT_FONT_MAX, Number(target.value) || cfg.fontPx),
         );
+        applyGeom();
+      } else if (k === 'color') {
+        if (!host.premium?.() || !CHAT_COLOR.test(target.value)) return;
+        cfg.color = target.value;
         applyGeom();
       } else if (k === 'opacity') {
         cfg.transparency = Math.max(0, Math.min(100, Number(target.value) || 0));

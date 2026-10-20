@@ -15,6 +15,7 @@ export interface MetaEconomyApiDeps {
     | 'selectPass'
     | 'chooseSeasonReward'
     | 'buyOffer'
+    | 'claimPremiumDaily'
   >;
   identify(request: FastifyRequest): Promise<Identity | null>;
   now?: () => number;
@@ -163,5 +164,10 @@ export function registerMetaEconomyApi(app: FastifyInstance, deps: MetaEconomyAp
         requestId: b.requestId as string,
         offerId: b.offerId as string,
       }),
+  );
+  post(
+    'premium/daily',
+    (b) => fields(b, ['requestId']),
+    (account, b) => deps.economy.claimPremiumDaily(account, { requestId: b.requestId as string }),
   );
 }

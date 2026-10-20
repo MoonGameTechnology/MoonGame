@@ -163,8 +163,9 @@ describe('шапка забега — проводка в кадре', () => {
   });
 
   it('основная игра не показывает выдуманные Суверены, кошелёк забега остаётся из профиля', () => {
-    // Неподтверждённый баланс не подменяется числом вне забега. Сама плашка с «+» осталась
-    // дверью в магазин (решение владельца 2026-10-15), но числа на ней нет.
+    // Неподтверждённый баланс не подменяется числом вне забега. Плашка с «+» — дверь в
+    // магазин (решение владельца 2026-10-15); число на ней — только баланс из ответа
+    // аккаунта, который прочёл «Магазин», а гостю — знак без числа.
     expect(main).not.toMatch(/\bSOVEREIGNS\b/);
     expect(bar).not.toMatch(/\bSOVEREIGNS\b/);
     // Строка статуса — у владельца верхней полосы (`matchTopBar.ts`, REFM-222).
@@ -172,7 +173,9 @@ describe('шапка забега — проводка в кадре', () => {
     expect(status).toContain('data-solo-save');
     expect(status).toContain('data-donate="1"');
     expect(status).not.toMatch(/dl-donate[^\n]*<b>/);
-    expect(main).toContain('wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),');
+    expect(main).toContain(
+      'wallet: () => ({ sovereigns: shop?.sovereigns() ?? null, warrants: metaMarket?.balance() ?? 0 }),',
+    );
     // Отдельный настоящий баланс Sector Zero по-прежнему приходит из профиля.
     expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
     expect(runWalletHtml({ research: 0, warrants: 0, sovereigns: 7 })).toMatch(
