@@ -437,6 +437,7 @@ import {
   uiScalePct,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
+import { initPush } from './pushSetup';
 import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
 import { initHolographicUi } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
@@ -954,7 +955,10 @@ initNetSession({
     invalidatePanel();
     syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
-  events: handleEvents,
+  events: (events) => {
+    handleEvents(events);
+    push?.onEvents(events, ME); // UIX-4.4: первая спокойная своя новость — спросить о push
+  },
   pingProvince: (target) => provinceForPing(target, MAP),
   closePingPop: () => pings?.closePop(),
   fps: () => fpsEma,
@@ -4679,6 +4683,8 @@ const settings = initSettings({
     ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
     // Нижняя панель есть там, где телефонная раскладка (UIX-3.3); настраивают её и с хаба.
     ...(MOBILE ? { phoneBar: phoneNav.bar() } : {}),
+    // Push (UIX-4.4): вкладка есть там, где браузер умеет уведомления.
+    ...(push?.view() ? { push: push.view()! } : {}),
   }),
   setSweepOpacity,
   setWindowOpacity: (v) => {
@@ -4700,11 +4706,29 @@ const settings = initSettings({
   setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
   resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
   setPhoneBar: (bar) => phoneNav.setBar(bar),
+  setPush: async (on) => push?.setEnabled(on),
+  setPushKind: async (kind, on) => push?.setKind(kind, on),
 });
-$('hub-settings').addEventListener('click', () => settings.open());
-$('hub-gear').addEventListener('click', () => settings.open());
+// Push-уведомления (UIX-4.4) — у владельца, `pushSetup.ts`: вопрос о согласии, worker,
+// подписка и виды. Стоит ПОСЛЕ окна настроек: `changed` перерисовывает его.
+const push = __SECTOR_ZERO_ONLY__
+  ? null
+  : initPush({
+      authorizedBase: hubAuthorizedBase,
+      askRoot: () => $('pushask'),
+      changed: () => {
+        if (settingsEl.classList.contains('show')) settings.render();
+      },
+    });
+/** Окно настроек; вход и подписка перечитываются — вкладка «Уведомления» покажет их свежими. */
+function openSettings(): void {
+  settings.open();
+  push?.refresh().catch(() => undefined); // не вышло перечитать — вкладка покажет прошлое
+}
+$('hub-settings').addEventListener('click', openSettings);
+$('hub-gear').addEventListener('click', openSettings);
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
-document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
+document.getElementById('rail-settings')?.addEventListener('click', openSettings);
 
 // Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
 // загрузочного блока: его ветка по ссылке может попросить войти.
@@ -5385,6 +5409,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'warprompt', isOpen: orderPromptOpen, close: () => cancelWarPrompt() }, // z48
   // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
   { id: 'abandon', isOpen: () => abandonCard.classList.contains('show'), close: () => closeAbandon() }, // z48
+  { id: 'pushask', isOpen: () => push?.asking() ?? false, close: () => push?.dismiss() }, // z48
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
@@ -5841,7 +5866,7 @@ initSectorZeroShell({
     openHub();
     $('hub-sector-zero').focus({ preventScroll: true });
   },
-  openSettings: () => settings.open(),
+  openSettings,
   note,
 });
 

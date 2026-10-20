@@ -395,9 +395,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   сторона push: `packages/server/src/push.ts` (VAPID-конфиг, `digestPushPayload`, `sendPush`
   через `web-push`, 404/410 → `gone`) + `PushStore` (Memory/Postgres, `push_subscriptions`) +
   `pushApi.ts` (`GET /push/key`, `POST /push/subscribe`, `POST /push/unsubscribe`,
-  session-gated) — 14 тестов. _Осталось: сам триггер («когда именно слать дайджест» — учёт
-  online/offline по аккаунту, cooldown, привязка к матчу) и клиентский service worker +
-  подписка на push из UI — приёмник (`sendPush`) уже готов, зовущего пока нет._
+  session-gated) — 14 тестов. Срочные push (UIX-4.3) и подписка из клиента с service worker
+  (UIX-4.4) сделаны. _Осталось: триггер самого дневного дайджеста (когда слать, cooldown) —
+  `digestPushPayload` по-прежнему никто не зовёт._
 
 ## Блок ST · Хранитель: крыло под опекой (заказ владельца 2026-07-16) `[core]` `[srv]` `[proto]`
 
@@ -3814,10 +3814,10 @@ _Второй заход аудита — ошибки обработки, го�
   часов нет (решение владельца 2026-10-20). Рассылка — `pushDispatch.ts` поверх потока
   наблюдения комнаты (`MatchLoaderDeps.onObservation`): место → аккаунт из `join`, только тем,
   кого нет в игре (счёт соединений места), мёртвый адрес снимается; подключена в
-  `packages/server/src/main.ts` при заданных VAPID. Хост игроков `prototype/netserver.ts`
-  push не знает вовсе (ни маршрутов, ни рассылки). Тесты: `pushRule.test.ts` (6),
+  `packages/server/src/main.ts` при заданных VAPID, в хосте игроков `prototype/netserver.ts` —
+  с UIX-4.4. Тесты: `pushRule.test.ts` (6),
   `pushDispatch.test.ts` (5).
-- **UIX-4.4** 🔶 `[proto]` `[srv]` **Подписка на push в клиенте.** Service worker, согласие
+- **UIX-4.4** ✅ `[proto]` `[srv]` **Подписка на push в клиенте.** Service worker, согласие
   после первого значимого события, а не на старте; выключатель по видам в настройках.
   Push приносит ключ `push.attacked` / `push.battle-won` / `push.battle-lost` / `push.built` /
   `push.researched`, id в `params` и счёт `more` (`pushRule.ts`): ключи завести в
@@ -3838,8 +3838,24 @@ _Второй заход аудита — ошибки обработки, го�
   фильтрует по `KIND_OF` (`pushRule.ts`: выигрыш и проигрыш — один вид «бои») до группировки,
   так что `more` считает только разрешённое. Тесты: `pushApi.test.ts` +1,
   `pushDispatch.test.ts` +1, `pushStore.test.ts` (память + настоящий PostgreSQL).
-  _Осталось (часть 2, клиент):_ service worker, согласие, выключатели по видам (шлют `kinds`),
-  ключи `push.*` в `/localization`.
+  _Сделано (часть 2, клиент; решения владельца 2026-10-20 «без имён», «по видам сразу»):_
+  service worker `prototype/src/pushWorker.ts` собирается в `dist/sw.js`, хост отдаёт его по
+  `/sw.js` (`wsServer.ts`, опция `serviceWorker`; только при VAPID и входе в аккаунт) и только
+  тогда разрешает его политикой документа (`worker-src 'self'`, правило 9 `securityHeaders.ts`).
+  Правила — `decisions/pushNotice.ts`: текст без имён по ключу (`push.attacked` … `push.more`
+  «+N»), тексты на выбранной локали worker получает от страницы, чужое тело — общий текст
+  `push.generic`; тап открывает `/game/<id>`. Согласие (`prototype/src/pushSetup.ts`, окно
+  `#pushask`) — после первой спокойной своей новости в сетевой партии (готовая постройка,
+  исследование, итог своего боя; не на нападении — окно закрыло бы бой), один раз; системный
+  запрос — только по «Включить». В настройках вкладка «Уведомления»: общий выключатель и четыре
+  вида, без входа или при запрете в браузере — только подсказка; подписка ждёт службу push не
+  дольше 20 с, потом «не удалось включить». Тесты: `pushNotice.test.ts` (10),
+  `settingsOverlay.test.ts` +4, `wsServer.test.ts` +1, `securityHeaders.test.ts` +1. Вживую
+  (хост с VAPID и входом, Chromium): вкладка, регистрация worker'а, разрешение, отказ по сроку;
+  push через CDP показал «Construction complete» / «+2» с адресом `/game/m-42`, мусор — «News
+  from your match». Настоящая подписка у службы push браузера в песочнице не проверена (нет
+  доступа к FCM). На проде push включится, когда хосту передадут `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` — `deploy/docker-compose.yml` их пока не пробрасывает.
 - **UIX-4.5** ✅ `[proto]` **Без падающих цифр у ресурсов.** Заказ владельца 2026-10-16: «И
   падающие цифры ресурсов убрать». _Было:_ под плашкой ресурса раз в 4 секунды всплывало «+N»
   дохода, трата всплывала «-N», а плашка вспыхивала цветом знака (UIX-4.1). _Сделано:_ чисел под

@@ -124,6 +124,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['coalwin', 'layer'], // окно коалиций, z49 (COAL-1)
   ['warprompt', 'layer'], // подтверждение объявления войны, z48
   ['abandon', 'layer'], // «Флот потерян» / «Завершить экспедицию?» (PVR-6.29), z48
+  ['pushask', 'layer'], // вопрос о push-уведомлениях (UIX-4.4), z48; Back — «Не сейчас»
   ['pingmenu', 'layer'], // композер пинга провинции, z47
   ['tech', 'layer'], // дерево технологий, z47
   ['buildwin', 'layer'], // окно построек мира (BUILD-1), z45 — ниже кодекса

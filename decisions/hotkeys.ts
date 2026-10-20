@@ -103,6 +103,7 @@ export const HOTKEY_SILENT_LAYERS: readonly string[] = [
   'coalwin',
   'warprompt',
   'abandon',
+  'pushask',
 ];
 
 /** Нажатие — те поля `KeyboardEvent`, которые что-то решают. */
