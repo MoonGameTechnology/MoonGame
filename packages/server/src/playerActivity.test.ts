@@ -166,9 +166,9 @@ describe.skipIf(!url)('durable activity on real PostgreSQL', () => {
     const target = new URL(url!);
     target.pathname = '/' + name;
     pool = new Pool({ connectionString: target.toString(), max: 4 });
-    // pool.end() resolves before every socket is closed; DROP ... WITH (FORCE) then terminates a
-    // client the pool already let go of, and its 57P01 would surface as an unhandled error.
-    pool.on('connect', (client) => client.on('error', () => {}));
+    // DROP ... WITH (FORCE) in afterAll can terminate a pooled socket that is still closing; the
+    // pool re-emits that 57P01 as its own 'error', which without a listener fails the whole run.
+    pool.on('error', () => {});
     await migrate(pool);
     await pool.query('UPDATE player_activity_state SET since_ms=$1', [t]);
     for (const id of ['alice', 'bob', 'carol'])
