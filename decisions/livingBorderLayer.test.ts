@@ -141,6 +141,7 @@ describe('borderLayerAction — судьба слоя в кадре (прави�
     dpr: 2,
     settled: true,
     sharp: true,
+    costly: false,
     ...over,
   });
 
@@ -210,6 +211,22 @@ describe('borderLayerAction — судьба слоя в кадре (прави�
     expect(borderLayerAction(at({ fresh: false, settled: false }))).toBe('paint');
     expect(borderLayerAction(at({ fresh: false, sharp: false }))).toBe('paint');
     expect(borderLayerAction(at({ fresh: false }))).toBe('paint');
+  });
+
+  it('медленное устройство: растянутый слой ждёт чёткую выпечку, сжатый рисуется заново', () => {
+    const zoom = (k: number, over: Partial<BorderLayerFrame> = {}) =>
+      borderLayerAction(at({ settled: false, transform: { k, tx: 9, ty: -4 }, ...over }));
+    const slow = { costly: true } as const;
+    expect(zoom(MAX_STRETCH * 1.01)).toBe('paint');
+    expect(zoom(MAX_STRETCH * 1.01, slow)).toBe('show');
+    expect(zoom(7.5, slow)).toBe('show');
+    // Камера встала, а выпечка под слоем ещё растянута: слой ждёт её, как после любого зума.
+    expect(zoom(4, { ...slow, settled: true, sharp: false })).toBe('show');
+    expect(zoom(4, { ...slow, settled: true, sharp: true })).toBe('paint');
+    // Отдаление открыло бы полстекла — как на быстром устройстве.
+    expect(zoom(SHRINK_LIMIT * 0.99, slow)).toBe('paint');
+    expect(zoom(Number.NaN, slow)).toBe('paint');
+    expect(zoom(4, { ...slow, fresh: false })).toBe('paint');
   });
 });
 

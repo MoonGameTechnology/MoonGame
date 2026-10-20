@@ -48,6 +48,7 @@ function frame(over: Partial<MapLayerFrame>): MapLayerFrame {
     margin: { x: 400, y: 225 },
     scroll: { x: 0, y: 0 },
     settled: false,
+    costly: false,
     ...over,
   };
 }
@@ -312,6 +313,60 @@ describe('mapLayerView', () => {
     expect(coversScreen({ k: 1, tx: 0, ty: 0 }, 1600, 900, { x: 0, y: 0 }, undefined, 0.1)).toBe(
       false,
     );
+  });
+
+  describe('правило 8: медленное устройство жест перепечкой не останавливает', () => {
+    const zoom = (k: number) => ({ k, tx: 800 * (1 - k), ty: 450 * (1 - k) });
+    const slow = (over: Partial<MapLayerFrame>) => frame({ costly: true, ...over });
+
+    it('приближение посреди жеста показывает выпечку растянутой сколько угодно', () => {
+      for (const k of [MAX_STRETCH * 1.01, 4, 7.5]) {
+        expect(mapLayerAction(frame({ transform: zoom(k) }))).toBe('rebake');
+        expect(mapLayerAction(slow({ transform: zoom(k) }))).toBe('show');
+      }
+    });
+
+    it('в покое растянутая выпечка сменяется новой в фоне', () => {
+      expect(mapLayerAction(frame({ settled: true, transform: zoom(4) }))).toBe('rebake');
+      const rest = slow({ settled: true, transform: zoom(4) });
+      expect(mapLayerAction(rest)).toBe('refresh');
+      // Фоновая на текущей камере ближе к ней, чем показанная: её допекают (правило 7).
+      const job = {
+        fresh: true,
+        transform: { k: 1, tx: 0, ty: 0 },
+        margin: rest.margin,
+        final: false,
+      };
+      expect(bakeJobFate(rest, 'refresh', job)).toBe('keep');
+    });
+
+    it('впрок посреди жеста не печётся ничего', () => {
+      expect(mapLayerAction(frame({ transform: zoom(0.79) }))).toBe('refresh');
+      expect(mapLayerAction(slow({ transform: zoom(0.79) }))).toBe('show');
+      const edge = { k: 1.2, tx: 400 * 1.2 - 100, ty: -270 };
+      expect(mapLayerAction(frame({ transform: edge }))).toBe('refresh');
+      expect(mapLayerAction(slow({ transform: edge }))).toBe('show');
+    });
+
+    it('открывшийся край, новое содержимое и прыжок камеры перепекают выпечку сразу', () => {
+      // Отдаление открыло край: пустой край хуже рывка.
+      expect(mapLayerAction(slow({ transform: zoom(0.66) }))).toBe('rebake');
+      expect(mapLayerAction(slow({ settled: true, transform: zoom(0.66) }))).toBe('rebake');
+      expect(mapLayerAction(slow({ transform: zoom(0.4) }))).toBe('rebake');
+      // Растянутая, но ушедшая с экрана: показать нечего.
+      expect(mapLayerAction(slow({ transform: { k: 4, tx: 5000, ty: 0 } }))).toBe('rebake');
+      expect(mapLayerAction(slow({ transform: { k: 1, tx: 2400, ty: 0 } }))).toBe('rebake');
+      expect(mapLayerAction(slow({ fresh: false, transform: zoom(4) }))).toBe('rebake');
+      expect(mapLayerAction(slow({ transform: { k: Number.NaN, tx: 0, ty: 0 } }))).toBe('rebake');
+    });
+
+    it('панорама — как на быстром: окно едет, покой встаёт на сетку', () => {
+      expect(mapLayerAction(slow({ transform: { k: 1, tx: 120.25, ty: -80.5 } }))).toBe('show');
+      expect(mapLayerAction(slow({ transform: { k: 1, tx: 420, ty: 0 } }))).toBe('scroll');
+      expect(mapLayerAction(slow({ settled: true, transform: { k: 1, tx: 37.5, ty: -21 } }))).toBe(
+        'snap',
+      );
+    });
   });
 
   describe('правило 7: судьба фоновой выпечки', () => {

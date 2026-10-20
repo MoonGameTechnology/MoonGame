@@ -36,6 +36,7 @@ import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryS
 import { borderTolerance } from '../../packages/client/src/territoryLod';
 import { t } from '../../localization/runtime';
 import {
+  GESTURE_BAKE_MS,
   NO_SCROLL,
   SETTLE_MS,
   bakeBudgetMs,
@@ -212,6 +213,8 @@ interface BakeJob {
   pending: boolean;
 }
 let bakeJob: BakeJob | null = null;
+/** Rule 8: what the last whole bake cost this device, its raster included, ms. */
+let bakeCostMs = 0;
 let bgComposite = ''; // what `bg` holds: which map bake, at which offset, over which sky
 let camSeen = ''; // projection of the previous frame, to notice the camera moving
 let camMovedAt = -Infinity;
@@ -221,6 +224,9 @@ let camMovedAt = -Infinity;
 export let provinceGeometry: MapLayerGeometry | null = null;
 /** The camera has rested `SETTLE_MS` (as {@link blitStaticLayer} judged this frame). */
 export let mapSettled = false;
+/** A whole bake costs this device more than `GESTURE_BAKE_MS`: a gesture does not wait for one
+ *  (rule 8, as {@link blitStaticLayer} judged this frame). */
+export let mapCostly = false;
 export let terrainFields: TerrainField[] = [];
 export let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -849,6 +855,7 @@ function bakeMapLayer(content: string, zooming: boolean, preparing = false): voi
   const DPR = game.dpr();
   cancelBakeJob(); // this bake supersedes it
   if (mapLayerX.isContextLost?.()) return;
+  const at = performance.now();
   const { margin, ox, oy, width, height } = mapLayerSize();
   mapLayerContent = ''; // publish the signature only after a complete paint
   // Preserve the allocation when only the scene changed.
@@ -861,6 +868,12 @@ function bakeMapLayer(content: string, zooming: boolean, preparing = false): voi
   publishMapGeometry(geo);
   terrainFields = paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y },
     zooming, preparing, geo);
+  if (!preparing) {
+    // Rule 8: the raster is four fifths of a bake, and it would land in the frame that shows the
+    // bake anyway: made here, it is counted in the bake's cost.
+    flushRaster(mapLayer);
+    bakeCostMs = performance.now() - at;
+  }
   mapLayerGeometry = geo;
   mapLayerAt = geo.at;
   mapLayerMargin = margin;
@@ -1077,6 +1090,8 @@ function swapBakeJob(job: BakeJob): void {
   mapLayerScroll = NO_SCROLL;
   mapLayerBakes++;
   mapLayerContent = mapLayerX.isContextLost?.() ? '' : job.content;
+  // Rule 8: its bands were rastered as they were painted, so they add up to a whole bake.
+  bakeCostMs = job.startMs + job.paintedMs;
   // As after a bake: the terrain its bands could not afford is sharpened next.
   terrainRefine = job.pending ? 0 : -1;
   terrainOwed = terrainRefine < 0 ? [] : null;
@@ -1120,6 +1135,8 @@ export function blitStaticLayer(now: number): void {
   // A pinch stays open while its fingers pause: no bake at each intermediate scale.
   const settled = pinchStart === null && now - camMovedAt >= SETTLE_MS;
   mapSettled = settled;
+  const costly = bakeCostMs > GESTURE_BAKE_MS;
+  mapCostly = costly;
   const content = mapLayerSignature();
   if (mapLayerX.isContextLost?.()) {
     // No offscreen map to reuse: paint it straight into the frame.
@@ -1145,6 +1162,7 @@ export function blitStaticLayer(now: number): void {
     margin: mapLayerMargin,
     scroll: mapLayerScroll,
     settled,
+    costly,
   });
   const decide = (): MapLayerAction => mapLayerAction(frameNow());
   let action = decide();
@@ -1172,8 +1190,9 @@ export function blitStaticLayer(now: number): void {
     });
     if (fate === 'drop') cancelBakeJob();
     else if (fate === 'finish') {
-      // The screen cannot wait for it, and its rows left cost less than a whole bake.
-      paintBakeBand(job, job.height - job.done, false);
+      // The screen cannot wait for it, and its rows left cost less than a whole bake. Their
+      // raster lands in this frame anyway: made here, the bake's cost counts it (rule 8).
+      paintBakeBand(job, job.height - job.done, true);
       swapBakeJob(job);
       view = layerTransform(mapLayerAt, here);
       action = decide();
@@ -1235,7 +1254,8 @@ export function blitStaticLayer(now: number): void {
       }
     }
     const next = bakeJob;
-    if (next) {
+    // Rule 8: on a slow device the bands wait for the camera to rest.
+    if (next && (settled || !costly)) {
       // One band a frame; a bake started in this frame has already spent its start, and the
       // refinement that started it its rasters.
       const rows = bandRows({ work: next.work, done: next.done, paintedMs: next.paintedMs,

@@ -250,7 +250,9 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000);
     expect(ml.mapSettled).toBe(false);
     expect(ml.mapView).toEqual({ k: 1, tx: 0, ty: 0 });
-    expect(drawn(frame).map((d) => d.src)).toEqual([layer]);
+    // Первый кадр печёт карту: её растр делается пикселем в кадр, чтобы цена выпечки его
+    // учла (правило 8), потом выпечка ложится под камеру.
+    expect(drawn(frame).map((d) => d.src)).toEqual([layer, layer]);
     expect(drawn(bg)).toEqual([]);
     frame.calls.length = 0;
     ml.blitStaticLayer(1000 + SETTLE_MS);
@@ -325,6 +327,50 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(2000 + 5000);
     expect(layer.width).toBe(0);
     expect(spare.width).toBeGreaterThan(0);
+  });
+
+  it('медленное устройство: приближение в жесте не перепекает карту, полосы ждут покоя', async () => {
+    // Быстрое устройство: растянутую вчетверо выпечку жест перепекает сразу. Часы стоят:
+    // цена выпечки не зависит от того, чем ещё занята машина с тестами.
+    const fast = await boot();
+    vi.stubGlobal('performance', { now: () => 0 });
+    fast.ml.blitStaticLayer(1000);
+    fast.ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(fast.ml.mapCostly).toBe(false);
+    const fastGeo = fast.ml.provinceGeometry;
+    fast.camera.zoomAt(800, 450, 4);
+    fast.ml.blitStaticLayer(2000);
+    expect(fast.ml.provinceGeometry).not.toBe(fastGeo);
+    vi.resetModules();
+    const { ml, camera, spare } = await boot();
+    // Каждое чтение часов — 60 мс: целая выпечка дороже GESTURE_BAKE_MS.
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(ml.mapCostly).toBe(true);
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 4);
+    ml.blitStaticLayer(2000);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(ml.mapView.k).toBeCloseTo(4, 6);
+    expect(spare.width).toBe(0);
+    // Покой: чёткая выпечка печётся в фоне, на экране растянутая.
+    let now = 2000 + SETTLE_MS;
+    ml.blitStaticLayer(now);
+    expect(spare.width).toBeGreaterThan(0);
+    expect(ml.provinceGeometry).toBe(geo);
+    // Новый жест: полоса не рисуется, пока камера не встанет.
+    camera.zoomAt(800, 450, 1.1);
+    const painted = spare.calls.length;
+    ml.blitStaticLayer((now += 16));
+    ml.blitStaticLayer((now += 16));
+    expect(spare.calls.length).toBe(painted);
+    expect(ml.provinceGeometry).toBe(geo);
+    now += SETTLE_MS;
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    expect(ml.provinceGeometry).not.toBe(geo);
   });
 
   it('потерянный контекст выпечки: карта рисуется прямо в кадр', async () => {
