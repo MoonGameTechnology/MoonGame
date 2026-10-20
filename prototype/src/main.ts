@@ -66,6 +66,7 @@ import {
   seatBadge,
   worldsOf,
 } from './diploWindow';
+import { closeCoalitions, coalOpen, initCoalitionWindow } from './coalitionWindow';
 import {
   fillWelcome,
   initSignInPages,
@@ -859,6 +860,8 @@ initDiploWindow({
   seatNick,
   refreshNicks: () => pullSeatNicks(),
 });
+// COAL-1: окно коалиций — кнопка полосы `#rail-coal`.
+initCoalitionWindow({ state: () => s, me: () => ME, names: () => NAME, ownerColor, playerOrder });
 
 /** Ники соседей по сетевой партии — из расклада мест сервера (`decisions/seatNicks.ts`).
  *  В состоянии мира их нет: там имя дома. Пришли новые — перерисовать дипломатию. */
@@ -5316,6 +5319,7 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z50
   { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
+  { id: 'coalwin', isOpen: () => coalOpen, close: () => closeCoalitions() }, // z49, окно коалиций
   // Проба по состоянию, а не по классу: `orderPromptOpen` (запрос войны или окно погрузки) — источник истины, класс лишь его
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
@@ -5428,6 +5432,7 @@ const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, str
   production: 'constructor',
   science: 'tech',
   events: 'logwin',
+  coalitions: 'coalwin',
   pings: 'pingpanel',
   market: 'market',
   trader: 'trader',

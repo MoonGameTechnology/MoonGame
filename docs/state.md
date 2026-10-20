@@ -250,7 +250,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `hero` — `hero.spawn`, `hero.ability` (один диспетчер способностей из данных),
   `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`; `heroEffects` — эффекты
   `hero.effect.*`: `aura`, `decoy`, `jump`, `recall`, `reveal`.
-- `diplomacy` — `diplomacy.declare/mapshare`: к войне — сразу, к миру — по согласию;
+- `diplomacy` — `diplomacy.declare/mapshare/decline`: к войне — сразу, к миру — по согласию,
+  от чужого предложения можно отказаться; `coalition.leave/edit` — коалиция как сущность
+  (`state/coalition.ts`): принятый союз создаёт её или вводит в неё, вместимость — 15% мест
+  карты, не меньше двух (карта на 20 — 3), сверх неё ядро отбивает `E_COALITION_FULL`;
   `espionage` — `espionage.spy`: окно разведки сквозь туман.
 - `seatClaim` — `seat.claim/confirm/kick/release`: место в идущей сетевой партии.
 

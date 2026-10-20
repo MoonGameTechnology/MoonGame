@@ -32,7 +32,16 @@ import {
   stanceKey,
   stanceThread,
 } from './diploAudience';
-import { diploOpen, diploTab, isAiSeat, pushSpyLog, renderDiplo, stanceRu } from './diploWindow';
+import {
+  diploOpen,
+  diploTab,
+  isAiSeat,
+  pushSpyLog,
+  refreshThreadDiplo,
+  renderDiplo,
+  stanceRu,
+} from './diploWindow';
+import { coalOpen, renderCoalitions } from './coalitionWindow';
 import { isMine, seen, seenTail } from './eventVisibility';
 import { aaImpact } from './fireEffects';
 import { flakTier } from './flakTiers';
@@ -850,6 +859,11 @@ export function handleEvents(events: DomainEvent[]) {
         break;
       }
     }
+  }
+  // COAL-1: предложения в открытой личке и окно коалиций читают состояние — раз на пакет.
+  if (events.some((e) => e.type.startsWith('diplomacy.') || e.type.startsWith('coalition.'))) {
+    refreshThreadDiplo();
+    if (coalOpen) renderCoalitions();
   }
 }
 

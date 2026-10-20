@@ -14,7 +14,13 @@
  * Форма REFM: разметка чистая и тестируемая, состояние — значение, DOM не трогается
  * вовсе (вкладку рисует хозяин, вставляя возвращённые строки).
  */
-import { getStance, type GameState } from '../../packages/shared-core/src/index';
+import {
+  getOffer,
+  getStance,
+  hasMapShareOffer,
+  type GameState,
+} from '../../packages/shared-core/src/index';
+import { coalitionChatShown, shownDms } from '../../decisions/diploChats';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 
@@ -60,6 +66,9 @@ export interface ConversationsHost {
   fmtStamp(at: number, opts?: StampOpts): string;
   /** Политический цвет стороны — тот же, которым покрашена карта. */
   ownerColor(id: string): string;
+  /** COAL-1: дипломатия внутри лички — висящие предложения с «принять/отказаться» и
+   *  кнопки нового предложения. Разметку даёт окно дипломатии: кнопки у них общие. */
+  threadDiploHtml(id: string): string;
 }
 
 /** Собрать вкладку. Возвращает разметку её частей и управление тем, что открыто. */
@@ -92,8 +101,31 @@ export function initConversations(host: ConversationsHost): {
     return sessionMessages.filter(
       (m) =>
         !GROUP_CHANNELS.has(m.to) &&
-        ((m.from === me && m.to === key) || (m.from === key && m.to === me)),
+        ((m.from === me && m.to === key) ||
+          (m.from === key && m.to === me) ||
+          // Служебная строка дипломатии с этим местом (`pushMsg(место, …, true, место)`):
+          // предложение, отказ, смена стойки — её место в этой же личке.
+          (m.sys && m.from === key && m.to === key)),
     );
+  }
+  /** COAL-1: висит ли между мной и местом предложение (стойки или обмена картами). */
+  function offered(id: string): boolean {
+    const s = host.state();
+    const me = host.me();
+    return (
+      getOffer(s, me, id) !== null ||
+      getOffer(s, id, me) !== null ||
+      hasMapShareOffer(s, me, id) ||
+      hasMapShareOffer(s, id, me)
+    );
+  }
+  /** Канал коалиции есть только у вступившего (`decisions/diploChats.ts`); открытый
+   *  без него — уходит на канал сессии. */
+  function coalitionShown(): boolean {
+    return coalitionChatShown(coalitionMembers().length);
+  }
+  function settleOpen(): void {
+    if (convoOpen === COALITION && !coalitionShown()) convoOpen = CH_SESSION;
   }
   function convoLast(key: string): SessionMsg | undefined {
     const ms = convoMessages(key);
@@ -141,14 +173,18 @@ export function initConversations(host: ConversationsHost): {
    *  opens its thread on the right. Session here is what makes the NET chat fully
    *  reachable from a PHONE — the floating chat window is desktop-only. */
   function convoListHtml(): string {
-    const dms = host
-      .seats()
-      .filter((id) => id !== host.me())
-      .sort(
-        (a, b) =>
-          (convoLast(b)?.at ?? -1) - (convoLast(a)?.at ?? -1) ||
-          host.nameOf(a).localeCompare(host.nameOf(b)),
-      );
+    settleOpen();
+    // COAL-1: личка — только с тем, с кем есть переписка или предложение.
+    const dms = shownDms({
+      others: host.seats().filter((id) => id !== host.me()),
+      open: convoOpen,
+      talked: (id) => convoMessages(id).length > 0,
+      offered,
+    }).sort(
+      (a, b) =>
+        (convoLast(b)?.at ?? -1) - (convoLast(a)?.at ?? -1) ||
+        host.nameOf(a).localeCompare(host.nameOf(b)),
+    );
     const sessLast = convoLast(CH_SESSION);
     const sessPrev = sessLast
       ? esc((sessLast.from === host.me() ? t('chat.you') + ': ' : '') + sessLast.text)
@@ -157,10 +193,11 @@ export function initConversations(host: ConversationsHost): {
       `<button class="dp-cv coal${convoOpen === CH_SESSION ? ' on' : ''}" data-convo="${CH_SESSION}">` +
       `<span class="dp-cv-ic" style="color:var(--cyan)">△</span>` +
       `<span class="dp-cv-nm">${t('chat.tab.session')}<em>${sessPrev}</em></span></button>`;
-    const coal =
-      `<button class="dp-cv coal${convoOpen === COALITION ? ' on' : ''}" data-convo="${COALITION}">` +
-      `<span class="dp-cv-ic" style="color:var(--amber)">⚡</span>` +
-      `<span class="dp-cv-nm">${t('chat.tab.coalition')}<em>${t('chat.members', { n: coalitionMembers().length })}</em></span></button>`;
+    const coal = !coalitionShown()
+      ? ''
+      : `<button class="dp-cv coal${convoOpen === COALITION ? ' on' : ''}" data-convo="${COALITION}">` +
+        `<span class="dp-cv-ic" style="color:var(--amber)">⚡</span>` +
+        `<span class="dp-cv-nm">${t('chat.tab.coalition')}<em>${t('chat.members', { n: coalitionMembers().length })}</em></span></button>`;
     const items = dms
       .map((id) => {
         const last = convoLast(id);
@@ -177,11 +214,13 @@ export function initConversations(host: ConversationsHost): {
         );
       })
       .join('');
-    return `<div class="dp-cvlist">${sess}${coal}${items}</div>`;
+    const none = items ? '' : `<div class="dp-cvnone">${t('chat.dm.none')}</div>`;
+    return `<div class="dp-cvlist">${sess}${coal}${items}${none}</div>`;
   }
   /** Right column: header, the open conversation's messages, and the composer (with a
    *  ping button in the coalition channel). */
   function convoThreadHtml(): string {
+    settleOpen();
     const isCoal = convoOpen === COALITION;
     const title =
       convoOpen === CH_SESSION
@@ -197,6 +236,7 @@ export function initConversations(host: ConversationsHost): {
       `<div class="dp-thread">` +
       `<div class="dp-thhead">${title}</div>` +
       `<div class="dp-feed" id="dp-feed">${convoFeedInnerHtml(convoOpen)}</div>` +
+      (GROUP_CHANNELS.has(convoOpen) ? '' : host.threadDiploHtml(convoOpen)) +
       compose +
       `</div>`
     );

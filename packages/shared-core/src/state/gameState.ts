@@ -1,5 +1,6 @@
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
+import type { Coalition } from './coalition';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -1107,6 +1108,12 @@ export interface GameState {
    *  Приватны для двух сторон, как `diplomacyOffers` — `visibleState` вырезает чужие
    *  переговоры. */
   mapShareOffers?: Record<string, true>;
+  /** COAL-1. Коалиции сессии по id (`state/coalition.ts`). ПУБЛИЧНЫ: список коалиций,
+   *  их состав, эмблема и описание видны всем местам партии. Союз (`alliance`) в
+   *  свободных режимах заключается только внутри коалиции. */
+  coalitions?: Record<string, Coalition>;
+  /** Счётчик, выдающий коалициям id. */
+  coalitionSeq?: number;
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;
