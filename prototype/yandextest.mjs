@@ -35,14 +35,14 @@
  *    в забеге нет.
  * 11. две вкладки (`AUD-29`): открывшая Sector Zero последней становится хозяйкой, прежняя
  *    встаёт под заставкой и больше не пишет, — правки обеих доживают до хранилища;
- * 12. битый журнал забега (`AUD-33`) не запирает меню, а герой `constructor` в профиле
- *    (`AUD-30`) не ломает «Новый забег»;
+ * 12. неподписанный битый журнал забега игнорируется без наград и не запирает меню, а
+ *    герой `constructor` в профиле (`AUD-30`) не ломает «Новый забег»;
  * 13–14. молчащий SDK (`AUD-33`): `getPlayer` без ответа не держит меню, `init()` без ответа
  *    не держит запуск — игра стартует веб-адаптером.
- * 15. печать профиля (`YAG-4.4`): честный профиль старой версии открывается без потерь и
- *    запечатывается, а правка Суверенов руками — в хранилище и в облачной копии — после
- *    перезагрузки исчезает. Облачный профиль в шагах 8 и 8а робот печатает для игрока `u-1`
- *    той же функцией, что и игра: другое устройство пишет облако уже запечатанным.
+ * 15. печать профиля (`YAG-4.4`): неподписанная запись сохраняется отдельно и не даёт
+ *    валюту; правка Суверенов руками — в хранилище и в облачной копии — после перезагрузки
+ *    исчезает. Доверенные локальные и облачные профили робот печатает той же функцией,
+ *    что и игра: другое устройство пишет облако уже запечатанным.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
  *   node prototype/yandextest.mjs --no-build # проверить уже собранный архив
@@ -373,7 +373,7 @@ try {
   // Облако пишет другое устройство, и копия в нём запечатана для игрока (`YAG-4.4`). Робот
   // печатает её той же функцией, что и игра: без печати облако копию не примет (шаг 15).
   const seal = await profileSeal();
-  const accountCloud = JSON.stringify({
+  const accountCloud = JSON.stringify(seal.sealCloudProfile({
     v: 1,
     seed: 'account',
     rev: 12,
@@ -381,22 +381,28 @@ try {
       { v: 1, seed: 'account', research: 50, nextAttempt: 41 },
       seal.cloudSeal('u-1'),
     ),
-  });
+  }, 'u-1'));
   // 8а. Развилка (YAG-1.4): гость с прогрессом входит, а в облаке — другой профиль.
   // Игрок видит числа обоих и выбирает; выбранный становится единственным.
   for (const pick of ['take-cloud', 'keep-here']) {
     const fork = await browser.newContext({ locale: 'ru-RU' });
     const forkPage = await fork.newPage();
     forkPage.on('pageerror', (error) => errors.push(`pageerror (${pick}): ${error.message}`));
-    await forkPage.addInitScript((meta) => {
+    await forkPage.addInitScript(({ meta, local }) => {
       window.__guest = true;
       window.__cloudInit = { meta };
       if (!localStorage.getItem('sector-zero.progress.v1'))
         localStorage.setItem(
           'sector-zero.progress.v1',
-          JSON.stringify({ v: 1, seed: 'device', research: 9, nextAttempt: 13 }),
+          local,
         );
-    }, accountCloud);
+    }, {
+      meta: accountCloud,
+      local: seal.sealProgress(
+        { v: 1, seed: 'device', research: 9, nextAttempt: 13 },
+        seal.LOCAL_SEAL,
+      ),
+    });
     await forkPage.goto(origin + '/');
     await waitForApp(forkPage);
     // Гость: облака нет, пока он не войдёт, — и вход только по кнопке.
@@ -457,12 +463,15 @@ try {
     settledThrough: 3,
   };
   await otherPage.addInitScript(
-    (progress) => {
-      window.__cloudInit = {
-        meta: JSON.stringify({ v: 1, seed: 'account', rev: 12, progress }),
-      };
+    (meta) => {
+      window.__cloudInit = { meta };
     },
-    seal.sealProgress(cloudProfile, seal.cloudSeal('u-1')),
+    JSON.stringify(seal.sealCloudProfile({
+      v: 1,
+      seed: 'account',
+      rev: 12,
+      progress: seal.sealProgress(cloudProfile, seal.cloudSeal('u-1')),
+    }, 'u-1')),
   );
   await otherPage.goto(origin + '/');
   await waitForApp(otherPage);
@@ -488,6 +497,10 @@ try {
     })
     .then((handle) => handle.jsonValue());
   const cloudRun = JSON.parse(JSON.parse(envelope).state);
+  assert.ok(
+    seal.wholeCloud(JSON.parse(envelope), 'u-1')?.state,
+    'весь исходящий конверт запечатан для игрока',
+  );
   assert.ok(cloudRun.state.time > 0, 'в облаке — мир забега, который уже шёл');
   const second = await browser.newContext({ locale: 'ru-RU' });
   const secondPage = await second.newPage();
@@ -510,6 +523,32 @@ try {
   );
   assert.equal(resumed.sectorZeroAttempt, cloudRun.sectorZeroAttempt, 'та же попытка');
   await second.close();
+
+  // Старый облачный конверт с печатью только профиля сохраняет метапрогресс, но не
+  // восстанавливает неподтверждённый мир или дескриптор забега.
+  const { seal: _envelopeSeal, ...legacyEnvelope } = JSON.parse(envelope);
+  const legacyProfile = JSON.parse(legacyEnvelope.progress);
+  const oldCloud = await browser.newContext({ locale: 'ru-RU' });
+  const oldCloudPage = await oldCloud.newPage();
+  oldCloudPage.on('pageerror', (error) => errors.push(`pageerror (старое облако): ${error.message}`));
+  await oldCloudPage.addInitScript((meta) => {
+    window.__cloudInit = { meta };
+  }, JSON.stringify(legacyEnvelope));
+  await oldCloudPage.goto(origin + '/');
+  await waitForApp(oldCloudPage);
+  await oldCloudPage.waitForFunction(() => !document.getElementById('sz-new').disabled);
+  const oldAdopted = await oldCloudPage.evaluate(() =>
+    JSON.parse(localStorage.getItem('sector-zero.progress.v1')),
+  );
+  for (const key of ['seed', 'nextAttempt', 'settledThrough', 'research', 'warrants', 'sovereigns'])
+    assert.equal(oldAdopted[key], legacyProfile[key], `старое облако: профиль сохранён — ${key}`);
+  assert.equal(await oldCloudPage.locator('#sz-continue').isVisible(), false, 'старое облако: неподписанный забег не продолжается');
+  assert.deepEqual(
+    await oldCloudPage.evaluate(() => ['void.run.v1', 'void.run.portable.v1'].map((key) => localStorage.getItem(key))),
+    [null, null],
+    'старое облако: мир и дескриптор не приняты',
+  );
+  await oldCloud.close();
 
   // 9. Площадка говорит `en`, а браузер — по-русски: язык берётся у площадки (требование
   // 2.14), и скачан только английский файл. Браузер нарочно другой: совпади они, проверка
@@ -616,18 +655,17 @@ try {
   assert.equal(await tabA.locator('#tab-taken').count(), 0, 'A снова хозяйка');
   await tabs.close();
 
-  // 12. Битый журнал забега (AUD-33) и герой `constructor` в профиле (AUD-30). Раньше
-  // исключение при засчёте журнала оставляло меню в «Проверяем сохранение…» навсегда, а
-  // «Новый забег» на таком профиле давал пустой экран.
+  // 12. Неподписанный битый журнал не засчитывается и не запирает меню. Герой
+  // `constructor` в профиле (AUD-30) тоже не должен ломать «Новый забег».
   const broken = await browser.newContext({ locale: 'ru-RU' });
   const brokenPage = await broken.newPage();
   brokenPage.on('pageerror', (error) => errors.push(`pageerror (битый журнал): ${error.message}`));
-  await brokenPage.addInitScript(() => {
+  await brokenPage.addInitScript((profile) => {
     if (localStorage.getItem('robot.planted')) return;
     localStorage.setItem('robot.planted', '1');
     localStorage.setItem(
       'sector-zero.progress.v1',
-      JSON.stringify({ v: 1, nextAttempt: 3, settledThrough: 1, selectedHero: 'constructor' }),
+      profile,
     );
     localStorage.setItem(
       'void.run.v1',
@@ -644,14 +682,21 @@ try {
         sectorZeroMission: 0,
       }),
     );
-  });
+  }, seal.sealProgress(
+    { v: 1, seed: 'broken-journal', nextAttempt: 3, settledThrough: 1, selectedHero: 'constructor' },
+    seal.LOCAL_SEAL,
+  ));
   await brokenPage.goto(origin + '/');
   await waitForApp(brokenPage);
   await ready(brokenPage);
-  assert.equal(
-    (await brokenPage.locator('#sz-summary').textContent())?.trim(),
-    builtText('ru', 'sector-zero.restore-failed'),
-    'битый журнал: меню говорит, что сохранение не открылось, и пускает дальше',
+  assert.equal(await brokenPage.locator('#sz-continue').isVisible(), false, 'неподписанный журнал не продолжается');
+  assert.deepEqual(
+    await brokenPage.evaluate(() => {
+      const p = JSON.parse(localStorage.getItem('sector-zero.progress.v1'));
+      return [p.settledThrough, p.research, p.warrants, p.lastReward, p.chaptersWon];
+    }),
+    [1, 0, 0, 0, []],
+    'неподписанный журнал не даёт победу и награды',
   );
   await brokenPage.locator('#sz-new').click();
   await passChapterComic(brokenPage);
@@ -670,17 +715,19 @@ try {
     await silentPage.addInitScript((name) => {
       window[name] = true;
     }, flag);
-    await silentPage.goto(origin + '/');
-    await waitForApp(silentPage, { timeout: 20000 });
-    await silentPage.waitForFunction(() => !document.getElementById('sz-new').disabled, undefined, {
-      timeout: 15000,
+    await withDiagnostics(silentPage, `yandextest-${flag}`, async () => {
+      await silentPage.goto(origin + '/');
+      await waitForApp(silentPage, { timeout: 20000 });
+      await silentPage.waitForFunction(() => !document.getElementById('sz-new').disabled, undefined, {
+        timeout: 15000,
+      });
     });
     await silent.close();
   }
 
-  // 15. Печать профиля (YAG-4.4). Профиль старой версии, записанный сборкой без печати,
-  // открывается без потерь и запечатывается. Правка Суверенов руками после перезагрузки
-  // исчезает: и в хранилище (с печатью и без неё), и в облачной копии.
+  // 15. Неподписанный профиль не подтверждает валюту: исходник остаётся отдельно,
+  // а игра начинает свежий профиль. Правка Суверенов в запечатанном профиле после
+  // перезагрузки исчезает: с печатью, без неё и со снятой отметкой миграции.
   const sealed = await browser.newContext({ locale: 'ru-RU' });
   const sealPage = await sealed.newPage();
   sealPage.setDefaultTimeout(20000);
@@ -694,15 +741,17 @@ try {
     nextAttempt: 4,
     settledThrough: 3,
   };
+  const legacyRaw = JSON.stringify(legacy);
   await sealPage.addInitScript((raw) => {
     if (localStorage.getItem('robot.planted')) return;
     localStorage.setItem('robot.planted', '1');
     localStorage.setItem('sector-zero.progress.v1', raw);
-  }, JSON.stringify(legacy));
+  }, legacyRaw);
   const stored = () =>
     sealPage.evaluate(() => ({
       main: localStorage.getItem('sector-zero.progress.v1'),
       shadow: localStorage.getItem('sector-zero.progress.shadow.v1'),
+      unverified: localStorage.getItem('sector-zero.progress.unverified.v1'),
       mark: JSON.parse(localStorage.getItem('sector-zero.cloud.v1') ?? '{}'),
     }));
   const reopen = async () => {
@@ -713,25 +762,50 @@ try {
   await sealPage.goto(origin + '/');
   await waitForApp(sealPage);
   await ready(sealPage);
+  await sealPage.locator('#sz-prep').click();
+  for (const currency of ['data', 'warrants', 'sovereigns'])
+    assert.equal(
+      (await sealPage.locator(`#sz-workshop .sz-cur-${currency}`).textContent())?.replace(/\D/g, ''),
+      '0',
+      `неподписанный профиль: в кошельке нет валюты — ${currency}`,
+    );
+  // Свежий профиль пишется первым действием игрока: установка уже открытого модуля
+  // не меняет баланс, но позволяет проверить его сохранение и отдельный исходник.
+  await sealPage.locator('[data-prep="bay"][data-slot="utility"]').first().click();
+  await sealPage.locator('#sz-workshop .sz-cards [data-prep="fit"][data-id="ion_engine"]').click();
+  await sealPage.locator('[data-prep="back"]').click();
   await sealPage.waitForFunction(() =>
     Boolean(JSON.parse(localStorage.getItem('sector-zero.progress.v1')).seal),
   );
   const first = await stored();
-  assert.equal(seal.checkSeal(first.main, seal.LOCAL_SEAL), 'sealed', 'старый профиль запечатан');
+  assert.equal(seal.checkSeal(first.main, seal.LOCAL_SEAL), 'sealed', 'новый профиль запечатан');
   assert.equal(first.shadow, first.main, 'рядом — теневая копия');
   assert.equal(first.mark.sealed, true, 'устройство помнит, что уже запечатывало');
+  assert.equal(first.unverified, legacyRaw, 'исходник неподписанного профиля сохранён отдельно');
   const honest = JSON.parse(first.main);
-  for (const key of ['seed', 'research', 'warrants', 'sovereigns', 'nextAttempt'])
-    assert.equal(honest[key], legacy[key], `старый профиль открылся без потерь: ${key}`);
+  assert.notEqual(honest.seed, legacy.seed, 'неподписанная родословная не принята');
+  assert.deepEqual(
+    [honest.research, honest.warrants, honest.sovereigns, honest.nextAttempt, honest.settledThrough],
+    [0, 0, 0, 1, 0],
+    'неподписанный профиль не даёт валюту и прогресс',
+  );
   // Правка руками — с печатью на месте и со снятой печатью: обе после перезагрузки исчезают.
   const { seal: _stripped, ...bare } = honest;
-  for (const [label, forged] of [
+  for (const [label, forged, stripMark] of [
     ['правка', { ...honest, sovereigns: 99999 }],
     ['снятая печать', { ...bare, sovereigns: 99999 }],
+    ['снятая печать и отметка', { ...bare, sovereigns: 99999 }, true],
   ]) {
     await sealPage.evaluate(
-      (raw) => localStorage.setItem('sector-zero.progress.v1', raw),
-      JSON.stringify(forged),
+      ({ raw, stripMark }) => {
+        localStorage.setItem('sector-zero.progress.v1', raw);
+        if (stripMark) {
+          const mark = JSON.parse(localStorage.getItem('sector-zero.cloud.v1') ?? '{}');
+          delete mark.sealed;
+          localStorage.setItem('sector-zero.cloud.v1', JSON.stringify(mark));
+        }
+      },
+      { raw: JSON.stringify(forged), stripMark },
     );
     await reopen();
     await sealPage.waitForFunction(
@@ -740,7 +814,7 @@ try {
     const after = await stored();
     assert.equal(
       JSON.parse(after.main).sovereigns,
-      legacy.sovereigns,
+      honest.sovereigns,
       `${label}: Суверены прежние`,
     );
     assert.equal(after.main, first.main, `${label}: в хранилище — целая копия`);

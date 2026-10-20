@@ -42,8 +42,10 @@ import {
   LOCAL_SEAL,
   SECTOR_ZERO_SHADOW_KEY,
   cloudSeal,
+  checkSeal,
   pickLocalProfile,
   sealProgress,
+  sealCloudProfile,
   wholeCloud,
   type LocalProfile,
 } from '../../decisions/profileSeal';
@@ -123,10 +125,25 @@ export const runSaveStore: RunSaveStore = localRunSaveStore(RUN_SAVE_KEY, ownsSe
 // Дескриптор забега (`YAG-2.1`) — рядом с полным снимком. Снимок точнее, дескриптор живучее:
 // шесть полей переживают смену формы мира после обновления игры, блоб — нет.
 export const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero, noteWrite);
-const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero, noteWrite);
+const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero);
 // Теневая копия профиля (`YAG-4.4`) — последний целый профиль: правленый руками основной
 // игра не берёт, а берёт её.
-const sectorShadowStore = localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero, noteWrite);
+const sectorShadowStore = localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero);
+/** Исходный неподписанный профиль хранится отдельно и не становится доверенным
+ *  из-за миграции. До подтверждённого резервирования основную запись не заменяем. */
+export const SECTOR_ZERO_UNVERIFIED_KEY = 'sector-zero.progress.unverified.v1';
+const unverifiedStore = localRunSaveStore(SECTOR_ZERO_UNVERIFIED_KEY, ownsSectorZero);
+let unverifiedProfile: string | null = null;
+
+async function preserveUnverifiedProfile(): Promise<boolean> {
+  if (unverifiedProfile === null) return true;
+  const original = unverifiedProfile;
+  await unverifiedStore.save(original);
+  if ((await unverifiedStore.load()) !== original) return false;
+  unverifiedProfile = null;
+  return true;
+}
+
 // Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
 // Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
 // он один раз — у сохранённого профиля свой сид, и разбор его сохраняет.
@@ -143,15 +160,15 @@ export let progressWrite: Promise<void> = Promise.resolve();
 export function initSectorProfile(hooks: SectorProfileHost): void {
   game = hooks;
   if (writeFailing) game.saveFailing(true);
-  progressWrite = loadSectorProfile().then((pick) => {
+  progressWrite = loadSectorProfile().then(async (pick) => {
     sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
     // Профиль с главами, выигранными до наград-героев, и с уже засчитанными спасениями
     // догоняет их при чтении (heroRecruits §3, §4).
     const granted = grantChapterHeroes(sectorProgress, sectorChapterIds(), data, pveRescues());
-    // Запись и тогда, когда печать велит: подделка стирается, старый профиль запечатывается.
+    // Запись и тогда, когда печать велит: целая тень восстанавливает основную копию.
     if (granted.progress === sectorProgress && !pick.rewrite) return;
     sectorProgress = granted.progress;
-    return writeSectorProgress(sealProgress(granted.progress, LOCAL_SEAL));
+    await writeSectorProgress(sealProgress(granted.progress, LOCAL_SEAL));
   });
   progressWrite = progressWrite.then(syncCloud).catch(cloudSyncFailed);
   addEventListener('storage', (event) => {
@@ -163,12 +180,16 @@ export function initSectorProfile(hooks: SectorProfileHost): void {
 
 /**
  * Профиль из хранилища по правилу печати (`YAG-4.4`, `pickLocalProfile`): целый основной,
- * иначе теневая копия, иначе профиль старой версии — один раз. Флаг «уже запечатывало»
- * лежит в отметке сверки облака (ниже по файлу).
+ * иначе теневая копия, иначе свежий. Неподписанный исходник резервируется отдельно;
+ * флаг старой миграции больше не разрешает доверять непроверенным балансам.
  */
 async function loadSectorProfile(): Promise<LocalProfile> {
   const main = await sectorProgressStore.load();
   const shadow = await sectorShadowStore.load();
+  if (checkSeal(main, LOCAL_SEAL) === 'unsealed') {
+    unverifiedProfile = main;
+    if (!(await preserveUnverifiedProfile()) && ownsSectorZero()) noteWrite(false);
+  }
   const pick = pickLocalProfile(main, shadow, syncMark.sealed === true);
   // Правка руками не прощается молча: причина — в журнал, а игроку ничего (наказаний нет).
   if (pick.from === 'shadow' || (pick.from === 'none' && main))
@@ -176,18 +197,25 @@ async function loadSectorProfile(): Promise<LocalProfile> {
   return pick;
 }
 
-/**
- * Запечатанный профиль (`sealProgress`) — в основную копию и сразу в теневую. Флаг «уже
- * запечатывало» встаёт, только когда запись правда легла. Иначе переполненное хранилище
- * оставило бы рядом с флагом старый профиль без печати, и следующий старт принял бы
- * честный профиль за правленый.
- */
-async function writeSectorProgress(blob: string): Promise<void> {
+/** Записать обе копии и проверить основную чтением. Только подтверждённая запись
+ *  разрешает забыть журнал награды; флаг совместимости со старыми сборками ставится
+ *  после неё. Неподписанный исходник прежде сохраняется отдельно. */
+async function writeSectorProgress(blob: string): Promise<boolean> {
+  if (!(await preserveUnverifiedProfile())) {
+    if (ownsSectorZero()) noteWrite(false);
+    return false;
+  }
   await sectorProgressStore.save(blob);
   await sectorShadowStore.save(blob);
-  if (syncMark.sealed || (await sectorProgressStore.load()) !== blob) return;
-  syncMark = { ...syncMark, sealed: true };
-  writeSyncMark();
+  // На старте основная целая копия имеет приоритет над тенью: одной новой тени
+  // недостаточно, если основная осталась старой. Журнал в таком случае сохраняем.
+  const saved = (await sectorProgressStore.load()) === blob;
+  if (ownsSectorZero()) noteWrite(saved);
+  if (saved && !syncMark.sealed) {
+    syncMark = { ...syncMark, sealed: true };
+    writeSyncMark();
+  }
+  return saved;
 }
 
 /** Id глав по номерам — для правила «герой за главу» (`heroRecruits.ts`). */
@@ -226,6 +254,15 @@ export function chapterLater(mission: number) {
   return chapter.objectives.filter((o) => !shown.has(o.id) && !done.has(o.id));
 }
 
+/** Повторить запись текущего профиля и подтвердить её чтением основной копии.
+ *  Исполненный Promise хранилища сам по себе успеха не обещает. */
+export function persistSectorProgress(): Promise<boolean> {
+  const blob = sealProgress(sectorProgress, LOCAL_SEAL);
+  const saved = progressWrite.then(() => writeSectorProgress(blob));
+  progressWrite = saved.then(() => undefined);
+  return saved;
+}
+
 export function saveSectorProgress(next: SectorZeroProgress): void {
   // Победа в главе приводит её героя (решение владельца 2026-09-23), спасение задачей главы —
   // спасённого (баг-репорт 2026-09-27) — на любом пути засчёта.
@@ -241,8 +278,7 @@ export function saveSectorProgress(next: SectorZeroProgress): void {
   for (const unlock of metaUnlocks(sectorProgress, next))
     getPlatform().analytics.emit('meta_unlock', unlock);
   sectorProgress = next;
-  const blob = sealProgress(next, LOCAL_SEAL);
-  progressWrite = progressWrite.then(() => writeSectorProgress(blob));
+  detach('профиль: запись', persistSectorProgress());
   bumpCloudRev();
 }
 
@@ -357,6 +393,7 @@ export function pushCloud(flush = false): void {
         ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
       },
       (candidate) => platform.save.fits?.(candidate) ?? true,
+      (candidate) => JSON.stringify(sealCloudProfile(candidate, cloudPlayer)),
     );
     if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
     lastCloudEnvelope = envelope;

@@ -257,6 +257,163 @@ describe('REFM-210 — журнал забега', () => {
     expect(cell.has(RUN_SAVE_KEY)).toBe(false);
   });
 
+  it.each([['frame', false], ['menu', false], ['frame', true], ['menu', true]] as const)('отказ записи награды (%s, только основная=%s) оставляет журнал до восстановления хранилища', async (path, primaryOnly) => {
+    const env = await boot();
+    startRun(env);
+    env.run.saveRun();
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    const attempt = env.run.sectorAttempt;
+    const storage = localStorage;
+    let failing = true;
+    vi.stubGlobal('localStorage', {
+      getItem: storage.getItem,
+      setItem: (key: string, value: string) => {
+        if (failing && (primaryOnly ? key === 'sector-zero.progress.v1' : key.startsWith('sector-zero.progress'))) throw new Error('quota');
+        storage.setItem(key, value);
+      },
+      removeItem: storage.removeItem,
+    });
+    end(env, 'p1');
+    env.run.saveRun();
+    await env.run.runWrite;
+    if (path === 'frame') env.run.tickRunSave(10_000);
+    else await env.run.loadSavedRun();
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    expect(cell.has(RUN_SAVE_KEY)).toBe(true);
+    expect(cell.has(PORTABLE_RUN_KEY)).toBe(true);
+    // Перезагрузка при всё ещё неисправном хранилище снова не должна стирать журнал.
+    const after = await reload();
+    expect(await after.run.loadSavedRun()).toBeNull();
+    expect(after.run.restoreRun()).toBe(false);
+    expect(after.profile.sectorProgress.settledThrough).toBe(attempt);
+    expect(cell.has(RUN_SAVE_KEY)).toBe(true);
+    const earned = after.profile.sectorProgress.warrants;
+    failing = false;
+    await after.run.loadSavedRun();
+    expect(cell.has(RUN_SAVE_KEY)).toBe(false);
+    expect(cell.has(PORTABLE_RUN_KEY)).toBe(false);
+    const durable = await reload();
+    expect(durable.profile.sectorProgress.settledThrough).toBe(attempt);
+    expect(durable.profile.sectorProgress.warrants).toBe(earned);
+    await durable.run.loadSavedRun();
+    expect(durable.profile.sectorProgress.warrants).toBe(earned);
+  });
+
+  it.each(['frame', 'menu'] as const)('новая попытка не затирает невыплаченную победу (%s) до сохранения профиля', async (path) => {
+    const env = await boot();
+    startRun(env);
+    env.run.saveRun();
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    const priorAttempt = env.run.sectorAttempt;
+    const storage = localStorage;
+    let failing = true;
+    vi.stubGlobal('localStorage', {
+      getItem: storage.getItem,
+      setItem: (key: string, value: string) => {
+        if (failing && key.startsWith('sector-zero.progress')) throw new Error('quota');
+        storage.setItem(key, value);
+      },
+      removeItem: storage.removeItem,
+    });
+    end(env, 'p1');
+    env.run.saveRun();
+    await env.run.runWrite;
+    if (path === 'frame') env.run.tickRunSave(10_000);
+    else await env.run.loadSavedRun();
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    const terminal = cell.get(RUN_SAVE_KEY);
+    const terminalPortable = cell.get(PORTABLE_RUN_KEY);
+    expect(parseRunSave(terminal)?.state).toMatchObject({ match: { status: 'ended', winner: 'p1' } });
+    const earned = env.profile.sectorProgress.warrants;
+    expect(earned).toBeGreaterThan(0);
+    startRun(env);
+    const nextAttempt = env.run.sectorAttempt;
+    expect(nextAttempt).toBeGreaterThan(priorAttempt);
+    env.run.saveRun();
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    expect(cell.get(RUN_SAVE_KEY)).toBe(terminal);
+    expect(cell.get(PORTABLE_RUN_KEY)).toBe(terminalPortable);
+
+    failing = false;
+    env.run.saveRun();
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    expect(parseRunSave(cell.get(RUN_SAVE_KEY))).toMatchObject({
+      sectorZeroAttempt: nextAttempt,
+      state: { match: { status: 'ongoing' } },
+    });
+    expect(JSON.parse(cell.get('sector-zero.progress.v1')!)).toMatchObject({
+      settledThrough: priorAttempt,
+      warrants: earned,
+      nextAttempt: nextAttempt + 1,
+    });
+    const after = await reload();
+    expect(after.profile.sectorProgress.warrants).toBe(earned);
+    expect(after.profile.sectorProgress.settledThrough).toBe(priorAttempt);
+    expect(await after.run.loadSavedRun()).not.toBeNull();
+    expect(after.run.restoreRun()).toBe(true);
+    expect(after.run.sectorAttempt).toBe(nextAttempt);
+    await after.run.runWrite;
+    await after.profile.progressWrite;
+    expect(after.profile.sectorProgress.warrants).toBe(earned);
+  });
+
+  it('подписанный финал возвращает награду, даже если резерв попытки не сохранился', async () => {
+    const env = await boot();
+    expect(await env.profile.persistSectorProgress()).toBe(true);
+    const baseline = cell.get('sector-zero.progress.v1');
+    const seed = env.profile.sectorProgress.seed;
+    const storage = localStorage;
+    let failing = true;
+    vi.stubGlobal('localStorage', {
+      getItem: storage.getItem,
+      setItem: (key: string, value: string) => {
+        if (failing && key.startsWith('sector-zero.progress')) throw new Error('quota');
+        storage.setItem(key, value);
+      },
+      removeItem: storage.removeItem,
+    });
+    startRun(env);
+    const attempt = env.run.sectorAttempt;
+    end(env, 'p1');
+    env.run.tickRunSave(10_000);
+    await env.run.runWrite;
+    await env.profile.progressWrite;
+    const earned = env.profile.sectorProgress.warrants;
+    expect(earned).toBeGreaterThan(0);
+    expect(cell.get('sector-zero.progress.v1')).toBe(baseline);
+    expect(parseRunSave(cell.get(RUN_SAVE_KEY))).toMatchObject({
+      sectorZeroAttempt: attempt,
+      state: { match: { status: 'ended', winner: 'p1' } },
+    });
+    failing = false;
+    const after = await reload();
+    expect(after.profile.sectorProgress.seed).toBe(seed);
+    expect(after.profile.sectorProgress.nextAttempt).toBe(attempt);
+    expect(await after.run.loadSavedRun()).toBeNull();
+    expect(after.profile.sectorProgress).toMatchObject({
+      nextAttempt: attempt + 1,
+      settledThrough: attempt,
+      warrants: earned,
+    });
+    expect(cell.has(RUN_SAVE_KEY)).toBe(false);
+    expect(cell.has(PORTABLE_RUN_KEY)).toBe(false);
+    const durable = await reload();
+    expect(durable.profile.sectorProgress).toMatchObject({
+      seed,
+      nextAttempt: attempt + 1,
+      settledThrough: attempt,
+      warrants: earned,
+    });
+    await durable.run.loadSavedRun();
+    expect(durable.profile.sectorProgress.warrants).toBe(earned);
+  });
+
   it('поражение засчитывается без финала главы', async () => {
     const env = await boot();
     startRun(env);
@@ -288,6 +445,30 @@ describe('REFM-210 — «Продолжить»', () => {
     const env = await reload();
     return { attempt, env };
   }
+
+  it.each(['edited', 'unsealed'] as const)('поддельные журналы (%s) не приносят победу и не восстанавливаются', async (kind) => {
+    const first = await boot();
+    startRun(first);
+    first.run.saveRun();
+    await first.run.runWrite;
+    await first.profile.progressWrite;
+    const raw = JSON.parse(cell.get(RUN_SAVE_KEY)!);
+    raw.state.match.status = 'ended';
+    raw.state.match.winner = 'p1';
+    raw.state.pve.waveNumber = raw.state.pve.totalWaves;
+    if (kind === 'unsealed') delete raw.seal;
+    cell.set(RUN_SAVE_KEY, JSON.stringify(raw));
+    const portable = JSON.parse(cell.get(PORTABLE_RUN_KEY)!);
+    if (kind === 'unsealed') delete portable.seal;
+    else portable.wave += 1;
+    cell.set(PORTABLE_RUN_KEY, JSON.stringify(portable));
+    const env = await reload();
+    const before = env.profile.sectorProgress;
+    expect(await env.run.loadSavedRun()).toBeNull();
+    expect(env.run.restoreRun()).toBe(false);
+    expect(env.profile.sectorProgress).toBe(before);
+    expect(env.profile.sectorProgress.chaptersWon).toEqual([]);
+  });
 
   it('после перезагрузки поднимает тот же забег с той же попыткой', async () => {
     const { attempt, env } = await savedRun();

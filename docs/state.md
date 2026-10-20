@@ -383,8 +383,15 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Профиль `sector-zero.progress.v1` с печатью (`decisions/profileSeal.ts`), правила —
   `decisions/sectorZeroProgress.ts` (полка `shelf`, снимок в забег `prepareSectorZeroRun`);
   заточка детерминирована (`decisions/sectorZeroForge.ts`), витрина — `decisions/sectorZeroShop.ts`.
-- Забег: снимок `void.run.v1` и дескриптор `void.run.portable.v1`; «идёт» меняет только
-  `setRunActive`; спрятанное в забеге — `decisions/sectorZeroTools.ts`.
+- Забег: снимок `void.run.v1` и дескриптор `void.run.portable.v1` запечатаны для сида профиля
+  (`decisions/runSeal.ts`); неподписанные старые забеги не продолжаются, засчитанный прогресс
+  сохраняется. Журнал конца удаляется только после подтверждённой записи основной копии
+  профиля; при отказе меню повторяет идемпотентный расчёт и не оживляет завершённый мир.
+  «Идёт» меняет только `setRunActive`; спрятанное — `decisions/sectorZeroTools.ts`.
+- В игру принимаются только целые подписанные профиль или тень. Неподписанный исходник
+  резервируется в `sector-zero.progress.unverified.v1`; без подтверждения резервной записи
+  основная не заменяется. Его баланс не переносится в игру/облако. Облачный конверт
+  запечатан целиком; из старого конверта принимается только подписанный профиль без забега.
 
 **Площадки: Яндекс Игры, APK, RuStore.**
 - Контракт `GamePlatform` (`src/platform/types.ts`), адаптеры `web.ts` и `yandex.ts`; `host.ts`
