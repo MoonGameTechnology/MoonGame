@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 12491 зелёных** (143 skip, 1009 файлов; прогон 2026-10-19 на `4d2a60c4`).
+**Тесты: 12539 зелёных** (136 skip, 1017 файлов; прогон 2026-10-20 на `7d78d1ca` + UIX-7.1).
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -335,6 +335,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   Уже 720 px или ниже 520 px на сенсорном — телефон: `mobileHud.ts`, `mobile-*.css`.
 - Телефон: нижняя панель «Карта · три окна на выбор · Ещё» (`decisions/phoneNav.ts`), скорость
   одной кнопкой (`decisions/phoneSpeed.ts`), приказ — черновик цели и отправка (`mobileOrders.ts`).
+  Свой мир с одним своим флотом — одна карточка с вкладками «Флот» / «Мир», открытая на
+  вкладке прошлого раза (`decisions/worldFleetTabs.ts`, `worldFleetCard.ts`).
 - Клавиши ПК по `KeyboardEvent.code` — `decisions/hotkeys.ts` и `pcHotkeys.ts`. Back и Escape:
   стопка слоёв — `backLayers.ts`, Back без слоёв (предупредить, выйти вторым) — `backGesture.ts`.
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в

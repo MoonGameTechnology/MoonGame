@@ -3214,6 +3214,8 @@ export const ru: Record<string, string> = {
   'hud.mobile.ready': 'Готово',
   'hud.mobile.send': 'Отправить приказ',
   'hud.mobile.summary': 'Характеристики',
+  'hud.mobile.tab.fleet': 'Флот',
+  'hud.mobile.tab.world': 'Мир',
   'hud.mobile.target-hint': 'Выберите цель. Перетаскивание двигает карту.',
   'hud.mobile.target-none': 'Цель не выбрана',
   'hud.mobile.target-stale': 'Цель больше недоступна. Выберите другую.',
