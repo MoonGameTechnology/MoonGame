@@ -29,6 +29,8 @@ window.__mobileTest = {
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
   notices: () => __noticeFlashes.length,
+  // Стартовый разведчик без трюма (af394450): десант грузит фрегат — трюм на одно место.
+  addHold: id => { s.fleets[id].units.push({ unit: 'frigate', count: 1 }); invalidatePanel(); },
   emit: events => handleEvents(events),
 };`;
 // Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
@@ -317,14 +319,23 @@ try {
     await pause();
     assert.deepEqual((await ui()).ids, [trooper.id]);
   };
+  await p.evaluate((id) => window.__mobileTest.addHold(id), trooper.id);
   await selectTrooper();
   assert.equal(await sheet.locator('[data-cmd="attack"]').count(), 0, 'no troops, no assault');
   await sheet.locator('[data-cmd="more"]').tap();
   await sheet.locator('[data-cmd="troops"]').tap();
+  // «▲» набивает трюм ЭТИМ типом доверху, поэтому после первого типа у остальных кнопка
+  // законно гаснет: места нет. Жмём только живые и проверяем, что план что-то грузит.
   for (const unit of await p
     .locator('[data-cmd="tmax"][data-dir="1"]')
-    .evaluateAll((els) => els.map((e) => e.dataset.unit)))
-    await p.locator(`[data-cmd="tmax"][data-dir="1"][data-unit="${unit}"]`).tap();
+    .evaluateAll((els) => els.map((e) => e.dataset.unit))) {
+    const up = p.locator(`[data-cmd="tmax"][data-dir="1"][data-unit="${unit}"]`);
+    if (await up.isEnabled()) await up.tap();
+  }
+  assert(
+    await p.locator('.tdelta.pos').count(),
+    'the max preset plans at least one unit for the hold',
+  );
   await p.locator('[data-cmd="tok"]').tap();
   // Панель скорости на телефоне прячется под открытой карточкой.
   await p.locator('[data-mobile="close"]').tap();
