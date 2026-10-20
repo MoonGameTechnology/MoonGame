@@ -4,6 +4,7 @@ import {
   FIRST_BAND_SHARE,
   CELL_WORK,
   EMPTY_WORK,
+  LIVE_RING_BUDGET,
   MAX_BAKE_BUDGET_MS,
   MAX_BAKE_PIXELS,
   MAX_STRETCH,
@@ -20,6 +21,7 @@ import {
   exposedStrips,
   gridNudge,
   layerTransform,
+  liveRingsShown,
   mapLayerAction,
   onPixelGrid,
   overscanFor,
@@ -358,6 +360,16 @@ describe('mapLayerView', () => {
       expect(mapLayerAction(slow({ transform: { k: 1, tx: 2400, ty: 0 } }))).toBe('rebake');
       expect(mapLayerAction(slow({ fresh: false, transform: zoom(4) }))).toBe('rebake');
       expect(mapLayerAction(slow({ transform: { k: Number.NaN, tx: 0, ty: 0 } }))).toBe('rebake');
+    });
+
+    it('кольца обзора кадр рисует, только когда их нет в выпечке', () => {
+      expect(liveRingsShown(true, true, 0)).toBe(false);
+      expect(liveRingsShown(true, false, 0)).toBe(false);
+      // В покое — все: они ложатся в готовый кадр один раз.
+      expect(liveRingsShown(false, true, 1675)).toBe(true);
+      // В движении — пока их на экране немного.
+      expect(liveRingsShown(false, false, LIVE_RING_BUDGET)).toBe(true);
+      expect(liveRingsShown(false, false, LIVE_RING_BUDGET + 1)).toBe(false);
     });
 
     it('панорама — как на быстром: окно едет, покой встаёт на сетку', () => {

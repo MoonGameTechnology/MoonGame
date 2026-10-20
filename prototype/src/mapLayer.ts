@@ -37,6 +37,7 @@ import { borderTolerance } from '../../packages/client/src/territoryLod';
 import { t } from '../../localization/runtime';
 import {
   GESTURE_BAKE_MS,
+  LIVE_RING_BUDGET,
   NO_SCROLL,
   SETTLE_MS,
   bakeBudgetMs,
@@ -47,6 +48,7 @@ import {
   exposedStrips,
   gridNudge,
   layerTransform,
+  liveRingsShown,
   mapLayerAction,
   onPixelGrid,
   overscanFor,
@@ -434,6 +436,9 @@ export interface MapLayerGeometry {
   /** One permitted world-space scene, reused by the bake and all its exposed strips. */
   environment: TerrainEnvironment | null;
   readonly lod: MapLod;
+  /** The bake carries the overview's node rings. A slow device's leaves them to the frame
+   *  ({@link drawLiveRings}, rule 8): stretched with the bake, they would swell with the map. */
+  readonly rings: boolean;
   readonly seeds: ProvinceSeed[];
   /** The province of `seeds[i]`. */
   readonly nodes: readonly MapNode[];
@@ -511,6 +516,7 @@ function measureMapLayer(): MapLayerGeometry {
     at,
     environment: null,
     lod: currentMapLod(),
+    rings: !mapCostly,
     seeds,
     nodes,
     shape,
@@ -821,8 +827,9 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   }
   // The overview's node rings belong to the map, not to the moment: every province the same
   // neutral ring (`drawSchematicNode`), fading as the node art comes in. Baked on top of the
-  // roads they end, since a frame stroking 1675 of them spent half its raster on them.
-  if (lod.art < 1) {
+  // roads they end, since a frame stroking 1675 of them spent half its raster on them. A slow
+  // device's bake leaves them to the frame (`drawLiveRings`, rule 8).
+  if (geo.rings && lod.art < 1) {
     g.save();
     g.globalAlpha *= 1 - lod.art;
     const reach = lod.markerRadius + 1;
@@ -1111,6 +1118,63 @@ function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform): void {
       view.k * mapLayer.width, view.k * mapLayer.height);
 }
 
+/** One ring of the overview per radius and pixel density, drawn as a bake draws it. */
+const ringSprites = new Map<string, HTMLCanvasElement>();
+function ringSprite(radius: number, dpr: number): HTMLCanvasElement {
+  const key = `${radius}:${dpr}`;
+  let sprite = ringSprites.get(key);
+  if (!sprite) {
+    sprite = document.createElement('canvas');
+    sprite.width = sprite.height = Math.ceil((2 * radius + 2) * dpr);
+    const g = sprite.getContext('2d') as CanvasRenderingContext2D;
+    const c = sprite.width / dpr / 2;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawSchematicNode(g, { x: c, y: c }, radius);
+    ringSprites.set(key, sprite);
+  }
+  return sprite;
+}
+
+/**
+ * Rule 8: the overview's node rings that the bake shown under `view` does not carry, drawn into
+ * `g` at the current camera's size, so a stretched bake does not swell them. A sprite a ring on
+ * whole device pixels: a copy, not a resample. In motion only while few are on the screen
+ * ({@link liveRingsShown}).
+ */
+function drawLiveRings(g: CanvasRenderingContext2D, geo: MapLayerGeometry, view: LayerTransform,
+  settled: boolean): void {
+  if (geo.rings) return;
+  const lod = currentMapLod();
+  if (!(lod.art < 1)) return;
+  const VW = game.vw();
+  const VH = game.vh();
+  const DPR = game.dpr();
+  // A ring's size goes in tenths of a pixel: a zoom makes a few sprites, not one a frame.
+  const radius = Math.round(lod.markerRadius * 10) / 10;
+  const reach = radius + 1;
+  // Map point `p` lies on the screen at `a·p + (x0, y0)`: the bake's projection, then `view`.
+  const a = view.k * geo.at.a;
+  const x0 = view.k * geo.at.x + view.tx;
+  const y0 = view.k * geo.at.y + view.ty;
+  const shown = (x: number, y: number): boolean => x >= -reach && x <= VW + reach && y >= -reach && y <= VH + reach;
+  let onScreen = 0;
+  if (!settled)
+    for (const n of geo.nodes) if (shown(a * n.x + x0, a * n.y + y0) && ++onScreen > LIVE_RING_BUDGET) break;
+  if (!liveRingsShown(geo.rings, settled, onScreen)) return;
+  const sprite = ringSprite(radius, DPR);
+  const half = sprite.width / 2;
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalAlpha = 1 - lod.art;
+  g.globalCompositeOperation = 'source-over';
+  for (const n of geo.nodes) {
+    const x = a * n.x + x0;
+    const y = a * n.y + y0;
+    if (shown(x, y)) g.drawImage(sprite, Math.round(x * DPR - half), Math.round(y * DPR - half));
+  }
+  g.restore();
+}
+
 /** Province geometry for input and the transform from the screen into it. Bakes the map
  *  layer first when there is none yet (a tap before the first frame). */
 export function mapLayerForInput(): LayerTransform {
@@ -1147,6 +1211,7 @@ export function blitStaticLayer(now: number): void {
     const geo = measureMapLayer();
     publishMapGeometry(geo);
     terrainFields = paintMapLayer(cx, { x0: 0, y0: 0, x1: VW, y1: VH }, !settled, false, geo);
+    drawLiveRings(cx, geo, { k: 1, tx: 0, ty: 0 }, true);
     cx.restore();
     mapLayerAt = here;
     mapView = { k: 1, tx: 0, ty: 0 };
@@ -1286,6 +1351,7 @@ export function blitStaticLayer(now: number): void {
       if (bg.height !== height) bg.height = height;
       paintSky(bgx);
       showMapLayer(bgx, mapView);
+      if (mapLayerGeometry) drawLiveRings(bgx, mapLayerGeometry, mapView, true);
       if (!bgx.isContextLost?.()) bgComposite = key;
     }
     cx.save();
@@ -1301,6 +1367,7 @@ export function blitStaticLayer(now: number): void {
   cx.save();
   paintSky(cx);
   showMapLayer(cx, mapView);
+  if (mapLayerGeometry) drawLiveRings(cx, mapLayerGeometry, mapView, false);
   cx.restore();
 }
 
