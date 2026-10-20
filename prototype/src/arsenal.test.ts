@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterArsenal, gradesOf, originOf, ownedDefIds, parseArsenalItems } from './arsenal';
+import { originOf, ownedDefIds, parseArsenalItems } from './arsenal';
 import type { ArsenalItem } from '../../packages/shared-core/src/index';
 
 const hull: ArsenalItem = {
@@ -33,23 +33,7 @@ const module2: ArsenalItem = {
 };
 const all = [hull, module1, module2];
 
-describe('arsenal witryna — filter/group', () => {
-  it('filters by kind', () => {
-    expect(filterArsenal(all, { kind: 'module' })).toEqual([module1, module2]);
-    expect(filterArsenal(all, { kind: 'hull' })).toEqual([hull]);
-    expect(filterArsenal(all, {})).toEqual(all);
-  });
-
-  it('filters by grade (blueprints without a grade never match a grade filter)', () => {
-    expect(filterArsenal(all, { grade: 2 })).toEqual([module1]);
-    expect(filterArsenal(all, { grade: 1 })).toEqual([]);
-  });
-
-  it('gradesOf collects only the graded instances, sorted', () => {
-    expect(gradesOf(all)).toEqual([2]);
-    expect(gradesOf([hull, module2])).toEqual([]);
-  });
-
+describe('arsenal witryna — owned defIds', () => {
   it('ownedDefIds narrows to one kind, deduped', () => {
     expect(ownedDefIds(all, 'hull')).toEqual(new Set(['cruiser']));
     expect(ownedDefIds(all, 'module')).toEqual(new Set(['laser', 'command']));

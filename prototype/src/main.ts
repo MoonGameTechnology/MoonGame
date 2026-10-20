@@ -4050,7 +4050,11 @@ const hubNote = $('hub-note');
 let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
 function showHub(show: boolean): void {
   if (!show) registrationReward?.close();
+  if (!show) arsenal?.close();
   hubEl.style.display = show ? 'flex' : 'none';
+  // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
+  // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
+  document.body.classList.toggle('hub-open', show);
 }
 const HUB_PANELS: Record<string, string> = {
   home: 'hp-home',
@@ -4085,6 +4089,7 @@ function hubTab(tab: string): void {
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
   if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
+  if (tab !== 'arsenal') arsenal?.close(); // the phone sheet lives over the hub, not in the tab
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
@@ -4182,16 +4187,21 @@ const rank = __SECTOR_ZERO_ONLY__
       openPlayer: (login) => profile?.open(login),
     });
 
-// --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
-// The витрина itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks.
-// Cache key is per callsign, like the meta store. `authorizedBase` encodes the tab's
-// policy: it may reuse a session token a prior join already stashed, but must never
-// prompt for a password just to LOOK at the collection — no server, no accounts or
-// no stashed session all read the same way (null ⇒ keep the cached paint).
+// --- «Арсенал» — the account's persistent collection and its workshop (hub tab, ARS-5) ----
+// The tab itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks. Cache key is
+// per callsign, like the meta store. `authorizedBase` encodes the tab's policy: it may reuse
+// a session token a prior join already stashed, but must never prompt for a password just to
+// LOOK at the collection — no server, no accounts or no stashed session all read the same way
+// (the starter kit and a sign-in). Narrow = the tab is too narrow for the detail beside the
+// list (the `@container arsenal` rule in build.mjs uses the same width), and then the detail
+// opens as a sheet over the hub.
+const ARSENAL_WIDE_MIN = 700;
 const arsenal = __SECTOR_ZERO_ONLY__
   ? null
   : initArsenal({
-      root: () => $('arsenal-items'),
+      root: () => $('hp-arsenal'),
+      sheet: () => $('arsenal-sheet'),
+      narrow: () => $('hp-arsenal').clientWidth < ARSENAL_WIDE_MIN,
       readCache: () => {
         try {
           return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
@@ -4202,7 +4212,29 @@ const arsenal = __SECTOR_ZERO_ONLY__
       writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
       openCodex,
       authorizedBase: hubAuthorizedBase,
+      canSignIn: () => !!resolveServer() && authMode === 'accounts',
+      signIn: () => {
+        showHub(false);
+        showConnect(true);
+        showStage('welcome');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+      },
+      openAuction: () => hubTab('auction'),
+      sell: (itemId) => {
+        metaMarket?.focusSell(itemId);
+        hubTab('auction');
+      },
+      openSeason: () => hubTab('supply'),
+      openStore: () => {
+        hubTab('supply');
+        metaEconomy?.showStore();
+      },
+      changed: async () => {
+        await metaMarket?.sync();
+      },
     });
+if (arsenal && typeof ResizeObserver !== 'undefined')
+  new ResizeObserver(() => arsenal.relayout()).observe($('hp-arsenal'));
 // EC-3 «Аукцион»: витрина торговли мета-предметами. Лоты и кошелёк живут на сервере,
 // поэтому кэша, как у арсенала, здесь нет — экран всегда спрашивает свежее.
 const metaMarket = __SECTOR_ZERO_ONLY__
@@ -4227,7 +4259,6 @@ const metaEconomy = __SECTOR_ZERO_ONLY__
         await arsenal?.refresh();
         await metaMarket?.sync();
       },
-      confirm: (message) => window.confirm(message),
     });
 // Кошелёк главного экрана (UIX-10.2, заказ владельца 2026-10-01): Суверены — та же плашка с
 // «+», что в строке статуса партии; Варранты аукциона — плашкой, которая и есть дверь в аукцион.
@@ -4488,8 +4519,7 @@ document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('met
 document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
 document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
-for (const id of ['hub-supply', 'arsenal-supply'])
-  document.getElementById(id)?.addEventListener('click', () => hubTab('supply'));
+document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
@@ -5277,6 +5307,7 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z46
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
+  { id: 'arsenal-sheet', isOpen: () => arsenal?.isOpen() ?? false, close: () => arsenal?.close() }, // inside the hub (z52), under the codex opened from it
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45

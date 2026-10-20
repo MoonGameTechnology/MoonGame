@@ -56,7 +56,19 @@ export interface MetaSeasonView {
     freeClaimed: boolean;
     premiumClaimed: boolean;
     choices: string[];
+    /** The module a free reward grants outright (not a choice); absent otherwise. */
+    module?: string;
   }>;
+}
+
+/** The end-of-match drop tables as the server rolls them, so the arsenal can disclose
+ *  the odds instead of keeping a copy that could drift from the server's file. */
+export interface MetaDropOddsView {
+  /** A drop is guaranteed on the `pityAfter`-th consecutive dry match. */
+  pityAfter: number;
+  /** Chance by final place, ascending `maxPlace`: the first row with `place <= maxPlace`. */
+  byPlace: Array<{ maxPlace: number; chance: number }>;
+  pool: Array<{ kind: 'hull' | 'module'; defId: string; weight: number }>;
 }
 
 export interface MetaEconomyView {
@@ -68,6 +80,8 @@ export interface MetaEconomyView {
   salvageableItemIds: string[];
   seasons: MetaSeasonView[];
   cosmetics: string[];
+  /** Absent from a server that predates the arsenal's odds disclosure. */
+  drops?: MetaDropOddsView;
 }
 
 export interface MetaCommandReceipt {

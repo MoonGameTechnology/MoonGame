@@ -309,6 +309,22 @@ describe('MetaEconomy manufacturing', () => {
     });
   });
 
+  it('discloses the drop tables it rolls and the module a season level grants outright', async () => {
+    const f = setup();
+    const view = await f.service.readModel('alice');
+    const tables = loadDropTables(data);
+    expect(view.drops).toEqual({
+      pityAfter: tables.pityAfter,
+      byPlace: [...tables.byPlace].sort((a, b) => a.maxPlace - b.maxPlace),
+      pool: tables.pool,
+    });
+    const season = f.catalog.seasons[0]!;
+    for (const [i, milestone] of season.milestones.entries()) {
+      expect(view.seasons[0]!.milestones[i]!.module).toBe(milestone.free.module);
+    }
+    expect(view.seasons[0]!.milestones.some((m) => m.module)).toBe(true);
+  });
+
   it('requires consent before mixing personal inputs and keeps salvage personal', async () => {
     const f = setup();
     await f.credit(false, 2);
