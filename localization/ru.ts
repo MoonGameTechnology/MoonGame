@@ -3059,6 +3059,7 @@ export const ru: Record<string, string> = {
   'hub.digest.empty.title': 'Нет матчей, ждущих приказа',
   'hub.digest.section': 'Сводка',
   'hub.discord': 'Discord',
+  'hub.contacts': 'Контакты',
   'hub.discord.desc': 'Сообщество игры · откроется в новой вкладке',
   'hub.emblem.close': 'Закрыть',
   'hub.emblem.title': 'Выбор эмблемы',

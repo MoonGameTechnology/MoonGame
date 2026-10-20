@@ -3050,6 +3050,7 @@ export const en: Record<string, string> = {
   'hub.digest.empty.title': 'No matches waiting on an order',
   'hub.digest.section': 'Summary',
   'hub.discord': 'Discord',
+  'hub.contacts': 'Contacts',
   'hub.discord.desc': 'Game community · opens in a new tab',
   'hub.emblem.close': 'Close',
   'hub.emblem.title': 'Choose an emblem',

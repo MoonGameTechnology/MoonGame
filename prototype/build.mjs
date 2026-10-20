@@ -3567,6 +3567,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hub-mode:hover{border-color:var(--sf-edge-hi);}
 #hub .hub-mode:active{transform:translateY(1px);}
 #hub .hub-discord{text-decoration:none;}
+#hub .hub-discord svg.ht-ic{width:22px;height:22px;}
 #hub .hub-discord:focus-visible{outline:2px solid var(--sf-accent);outline-offset:3px;}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -4778,7 +4779,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
-      ${external ? '' : `<a id="hub-discord" class="hub-mode hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer"><b data-i18n="hub.discord"></b><span data-i18n="hub.discord.desc"></span></a>`}
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
@@ -4822,6 +4822,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <a class="hub-tile" id="hub-privacy" data-i18n="welcome.privacy"></a>
         <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
+      ${external ? '' : `<!-- Контакты: ссылки наружу, отдельным блоком под плитками -->
+      <div class="hub-sec" data-i18n="hub.contacts"></div>
+      <div class="hub-grid">
+        <a class="hub-tile hub-discord" id="hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer" data-i18n-title="hub.discord.desc"><svg class="ht-ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.32 4.37A19.8 19.8 0 0 0 15.4 2.85a13.7 13.7 0 0 0-.63 1.3 18.4 18.4 0 0 0-5.5 0 13 13 0 0 0-.64-1.3 19.7 19.7 0 0 0-4.93 1.52C.6 9.05-.25 13.6.18 18.1a19.9 19.9 0 0 0 6.04 3.05c.49-.66.92-1.36 1.3-2.1a12.9 12.9 0 0 1-2.04-.98l.5-.39a14.2 14.2 0 0 0 12.07 0l.5.39c-.65.39-1.33.71-2.05.98.38.74.81 1.44 1.3 2.1a19.8 19.8 0 0 0 6.04-3.05c.5-5.2-.86-9.71-3.52-13.73ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42s2.18 1.1 2.16 2.42c0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42Z"/></svg><span data-i18n="hub.discord"></span></a>
+      </div>`}
     </div>
   </div>
   <div class="hub-note" id="hub-note"></div>
