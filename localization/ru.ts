@@ -3058,6 +3058,8 @@ export const ru: Record<string, string> = {
     'Войдите в матч на вкладке «Игры» — здесь появятся события, требующие внимания.',
   'hub.digest.empty.title': 'Нет матчей, ждущих приказа',
   'hub.digest.section': 'Сводка',
+  'hub.discord': 'Discord',
+  'hub.discord.desc': 'Сообщество игры · откроется в новой вкладке',
   'hub.emblem.close': 'Закрыть',
   'hub.emblem.title': 'Выбор эмблемы',
   'hub.messages.soon': 'Сообщения — скоро',

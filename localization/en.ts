@@ -3049,6 +3049,8 @@ export const en: Record<string, string> = {
     'Join a match on the "Games" tab — events needing your attention will show up here.',
   'hub.digest.empty.title': 'No matches waiting on an order',
   'hub.digest.section': 'Summary',
+  'hub.discord': 'Discord',
+  'hub.discord.desc': 'Game community · opens in a new tab',
   'hub.emblem.close': 'Close',
   'hub.emblem.title': 'Choose an emblem',
   'hub.messages.soon': 'Messages — coming soon',
