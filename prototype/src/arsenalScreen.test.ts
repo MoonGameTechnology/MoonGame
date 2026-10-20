@@ -497,6 +497,25 @@ describe('арсенал — вкладка', () => {
     expect(arsenal.items()).toEqual([]);
   });
 
+  it('смена командира: коллекция и вид прошлого аккаунта не уходят дальше', async () => {
+    server();
+    const host = hostOf();
+    const arsenal = initArsenal(host);
+    await arsenal.refresh();
+    expect(arsenal.items()).toHaveLength(owned().length);
+    arsenal.forget();
+    expect(arsenal.items()).toEqual([]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new Error('offline'))),
+    );
+    const loading = arsenal.refresh();
+    const painted = host.root().innerHTML;
+    await loading;
+    expect(painted).not.toContain('Цель мастерской');
+    expect(host.root().innerHTML).not.toContain('Цель мастерской');
+  });
+
   it('кэш красится до сети, ответ сервера заменяет коллекцию и пишет кэш', async () => {
     server();
     const written: ArsenalItem[][] = [];

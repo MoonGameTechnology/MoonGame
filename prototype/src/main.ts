@@ -4660,7 +4660,10 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 // загрузочного блока: его ветка по ссылке может попросить войти.
 let activity: ReturnType<typeof startPlayerActivity> | undefined;
 initAccountSession({
-  sessionChanged: () => activity?.refresh(),
+  sessionChanged: () => {
+    activity?.refresh();
+    arsenal?.forget();
+  },
   status: (text) => {
     statusEl.textContent = text;
   },

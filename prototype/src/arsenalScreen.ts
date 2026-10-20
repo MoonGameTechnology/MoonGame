@@ -648,6 +648,8 @@ export interface ArsenalHost {
 export function initArsenal(host: ArsenalHost): {
   refresh(): Promise<void>;
   items(): readonly ArsenalItem[];
+  /** Another commander signed in or out: drop the collection, as at boot. */
+  forget(): void;
   /** Re-lay the tab after its width changed (detail beside the list ⇄ sheet). */
   relayout(): void;
   /** The phone sheet is open (a layer of the Back ladder). */
@@ -670,11 +672,14 @@ export function initArsenal(host: ArsenalHost): {
   let acting = false;
   /** The last accepted view, kept on screen (inert) while a read is under way. */
   let lastView: MetaEconomyView | null = null;
+  /** The session changed: what was read for the previous one is not drawn until a new read. */
+  let forgotten = false;
 
   const client = createMetaEconomyClient({
     authorizedBase: () => host.authorizedBase(),
     paint: () => paint(),
     accept: (view) => {
+      forgotten = false;
       items = parseArsenalItems(view.items);
       host.writeCache(items);
     },
@@ -697,7 +702,7 @@ export function initArsenal(host: ArsenalHost): {
 
   function state(): ArsenalState {
     const st = client.status();
-    const live = client.view();
+    const live = forgotten ? null : client.view();
     if (live) lastView = live;
     else if (!client.busy()) lastView = null;
     const view = live ?? lastView;
@@ -712,7 +717,7 @@ export function initArsenal(host: ArsenalHost): {
     return {
       items: shown,
       view: shownView,
-      offers: client.offers(),
+      offers: forgotten ? [] : client.offers(),
       guest,
       canSignIn: host.canSignIn(),
       busy: client.busy(),
@@ -884,6 +889,12 @@ export function initArsenal(host: ArsenalHost): {
     refresh,
     // A guest has no collection: the cache is not handed to the shipyard or the auction either.
     items: () => (client.status().kind === 'guest' ? [] : items),
+    // Until the next read the shipyard and the auction get nothing, not the previous account's.
+    forget: () => {
+      items = [];
+      lastView = null;
+      forgotten = true;
+    },
     relayout: () => {
       const next = !host.narrow();
       if (next === wide) return;
