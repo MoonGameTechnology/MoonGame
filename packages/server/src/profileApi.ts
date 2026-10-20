@@ -11,6 +11,8 @@ export interface ProfileApiDeps {
   users: Pick<UserStore, 'findUser' | 'findById'>;
   commanders: Pick<CommanderStore, 'xpOf'>;
   registrationRewards?: RegistrationRewardStore;
+  /** A running premium account (Meta): shown as the profile frame. */
+  premium?(accountId: string): Promise<boolean>;
   identify(request: FastifyRequest): Promise<Identity | null>;
 }
 
@@ -18,12 +20,15 @@ export interface ProfileApiDeps {
 export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): void {
   const limited = slidingWindowIpLimiter({ now: Date.now, max: 120, windowMs: 60_000 });
   const view = async (id: string, login: string, owner = true): Promise<PlayerProfile> => {
-    const [appearance, progress, xp] = await Promise.all([
+    const [appearance, progress, xp, premium] = await Promise.all([
       deps.profiles.appearance(id),
       deps.profiles.progress(id),
       deps.commanders.xpOf(id),
+      // The frame is decoration: a failed read leaves it off, never the whole profile.
+      deps.premium?.(id).catch(() => false) ?? false,
     ]);
-    if (owner) return { login, xp, progress, ...appearance };
+    const frame = premium ? { premium: true } : {};
+    if (owner) return { login, xp, progress, ...appearance, ...frame };
     const publicProgress: PlayerProfile['progress'] = {};
     for (const id of appearance.slots) {
       if (!id) continue;
@@ -31,7 +36,7 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
       const medal = PROFILE_MEDALS.find((m) => m.id === id)!;
       if (grade) publicProgress[medal.metric] = Math.max(publicProgress[medal.metric] ?? 0, medal.goals[3 - grade]!);
     }
-    return { login, xp, progress: publicProgress, ...appearance };
+    return { login, xp, progress: publicProgress, ...appearance, ...frame };
   };
   app.get<{ Querystring: { login?: string } }>('/profiles', async (request, reply) => {
     if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });

@@ -106,6 +106,13 @@ const schema = z
       .object({
         modulePrices: z.record(id, amount),
         offers: z.record(id, storeOffer),
+        /** What a running premium adds: daily Sovereigns to claim, extra rewarded-ad supplies. */
+        premium: z
+          .object({
+            dailySovereigns: z.number().int().min(0).max(100),
+            extraDailyAds: z.number().int().min(0).max(5),
+          })
+          .strict(),
       })
       .strict(),
     commerce: z

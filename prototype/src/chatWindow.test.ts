@@ -476,6 +476,17 @@ describe('чат — разметка', () => {
     expect(windowHtml({ ...base, min: false })).toContain('—');
   });
 
+  it('цвет шрифта открыт только премиуму, и в кэше живёт только #rrggbb', () => {
+    expect(settingsHtml(geom(), cfg(), VW, VH)).toMatch(/data-cset="color"[^>]*disabled/);
+    const open = settingsHtml(geom(), { ...cfg(), color: '#ff8800' }, VW, VH, true);
+    expect(open).toContain('data-cset="color" value="#ff8800">');
+    expect(open).not.toContain('🔒');
+    const parsed = (color: unknown) =>
+      parseChatCache(JSON.stringify({ cfg: { color } }))?.cfg.color;
+    expect(parsed('#a1b2c3')).toBe('#a1b2c3');
+    for (const bad of ['red', '#fff', 'url(x)', '#12345g', 7]) expect(parsed(bad)).toBe('');
+  });
+
   it('поля размера в настройках несут те же пределы, что и зажим', () => {
     const html = settingsHtml(geom(), cfg(), VW, VH);
     expect(html).toContain(`min="${CHAT_MIN_H}" max="450"`);
@@ -492,7 +503,14 @@ describe('чат — делегированные клики', () => {
     const classes = new Set<string>();
     const el = {
       innerHTML: '',
-      style: {} as Record<string, string>,
+      style: {
+        setProperty(k: string, v: string) {
+          (this as Record<string, unknown>)[k] = v;
+        },
+        removeProperty(k: string) {
+          delete (this as Record<string, unknown>)[k];
+        },
+      } as Record<string, unknown>,
       classList: {
         toggle: (c: string, on?: boolean) => (on ? classes.add(c) : classes.delete(c)),
         contains: (c: string) => classes.has(c),

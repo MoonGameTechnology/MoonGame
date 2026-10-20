@@ -54,7 +54,7 @@ describe.skipIf(!process.env.DATABASE_URL)('durable profile store', () => {
   );
 });
 
-async function fixture() {
+async function fixture(premium?: (accountId: string) => Promise<boolean>) {
   const app = Fastify();
   const profiles = new MemoryProfileStore();
   const users = new MemoryUserStore();
@@ -66,6 +66,7 @@ async function fixture() {
     profiles,
     users,
     commanders,
+    ...(premium ? { premium } : {}),
     identify: async (request) => {
       const id =
         request.headers.authorization === 'Alice'
@@ -80,6 +81,31 @@ async function fixture() {
 }
 
 describe('profile API authority and public projection', () => {
+  it('shows a running premium as a frame to everyone, and a failed premium read leaves it off', async () => {
+    let failing = false;
+    const holders = new Set<string>();
+    const { app, alice } = await fixture(async (id) => {
+      if (failing) throw Error('meta down');
+      return holders.has(id);
+    });
+    holders.add(alice);
+    try {
+      const read = async (who: string, login: string) =>
+        (
+          await app.inject({ url: `/profiles?login=${login}`, headers: { authorization: who } })
+        ).json();
+      expect((await read('Bob', 'Alice')).premium).toBe(true);
+      expect((await read('Alice', 'Alice')).premium).toBe(true);
+      expect(await read('Alice', 'Bob')).not.toHaveProperty('premium');
+      failing = true;
+      const fallback = await read('Bob', 'Alice');
+      expect(fallback.login).toBe('Alice');
+      expect(fallback).not.toHaveProperty('premium');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('only the session owner can save, and a different player sees the saved card', async () => {
     const { app, profiles, alice, bob } = await fixture();
     try {

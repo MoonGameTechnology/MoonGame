@@ -59,6 +59,7 @@ describe('API dependency error logging privacy', () => {
         selectPass: vi.fn(),
         chooseSeasonReward: vi.fn(),
         buyOffer: vi.fn(),
+        claimPremiumDaily: vi.fn(),
       };
       registerMetaEconomyApi(app, {
         economy,

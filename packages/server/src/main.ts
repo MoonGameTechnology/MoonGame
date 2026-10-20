@@ -663,6 +663,7 @@ const server = createMultiplayerServer({
               registrationRewards: stores.registrationRewards,
               users: stores.userStore,
               commanders: stores.commanderStore,
+              premium: (accountId) => metaEconomy.isPremium(accountId),
               identify,
             });
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с

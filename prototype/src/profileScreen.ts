@@ -68,7 +68,13 @@ export interface ProfileView {
   /** The editor (`profileStudioHtml`), which places the career block itself. Generated
    *  locally from validated data, never server-provided HTML. */
   studio?: string;
+  /** A running premium account: the header wears its frame. */
+  premium?: boolean;
 }
+
+/** The premium frame's mark under the callsign (the frame itself is `.pf-top.premium`). */
+const premiumMark = (on: boolean | undefined): string =>
+  on ? `<span class="pf-prem">★ ${esc(t('profile.premium'))}</span>` : '';
 
 /** The cached medal blob (per callsign), parsed fail-soft: a corrupt cache is an empty
  *  showcase, never a crash. */
@@ -150,11 +156,11 @@ export function profileHtml(v: ProfileView): string {
     (v.corp ? `${esc(v.corp.name)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
   return (
     `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button>` +
-    `<div class="pf-top">` +
+    `<div class="pf-top${v.premium ? ' premium' : ''}">` +
     (v.face
       ? `<div class="pf-av face"><img src="${esc(v.face)}" alt=""></div>`
       : `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>`) +
-    `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
+    `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div>${premiumMark(v.premium)}</div>` +
     (v.sovereigns === null ? '' : `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>`) +
     `</div>` +
     `<div class="pf-body">` +
@@ -243,12 +249,13 @@ export function initProfile(host: ProfileHost): {
         owned,
         catalog,
         face: PORTRAITS[custom.portrait - 1],
+        ...(custom.premium ? { premium: true } : {}),
       };
       const studio = profileStudioHtml(custom, state, profileCareerHtml(view, preview));
       root.innerHTML = profileHtml({ ...view, studio }) + profileSaveBarHtml(state);
     } else {
       const grid = `<div class="pf-grid">${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div>`;
-      root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div></div></div><div class="pf-body">${profileStudioHtml(custom, state, grid)}</div>`;
+      root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top${custom.premium ? ' premium' : ''}"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div>${premiumMark(custom.premium)}</div></div><div class="pf-body">${profileStudioHtml(custom, state, grid)}</div>`;
     }
     const body = root.querySelector?.('.pf-body');
     if (body) {

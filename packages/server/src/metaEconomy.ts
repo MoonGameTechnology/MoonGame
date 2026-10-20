@@ -11,6 +11,7 @@ import type {
   MetaEconomyAccount,
   MetaEconomyView,
   MetaMatchRewardsView,
+  MetaPremiumDailyCommand,
   MetaRecipeView,
   MetaSalvageCommand,
   MetaSeasonChoiceCommand,
@@ -107,6 +108,9 @@ function safeAdd(a: number, b: number): number {
   const result = a + b;
   if (!Number.isSafeInteger(result) || result < 0 || result > MAX_VALUE) reject('E_META_LIMIT');
   return result;
+}
+function premiumActive(account: MetaEconomyAccount, now: number): boolean {
+  return (account.premiumUntil ?? 0) > now;
 }
 function receiptKey(kind: string, accountId: string, requestId: string): string {
   return `meta:${kind}:${metaEconomyFingerprint([accountId, requestId])}`;
@@ -236,13 +240,22 @@ export class MetaEconomy {
       return {
         catalogVersion: this.deps.catalog.version,
         sovereigns: account.sovereigns ?? 0,
-        premiumUntil:
-          account.premiumUntil !== undefined && account.premiumUntil > now
-            ? account.premiumUntil
-            : null,
+        premiumUntil: premiumActive(account, now) ? account.premiumUntil! : null,
         store: Object.entries(this.deps.catalog.store.offers).map(([id, offer]) =>
           this.storeOfferView(id, offer, account, items, now),
         ),
+        premiumPerks: { ...this.deps.catalog.store.premium },
+        premiumDaily:
+          premiumActive(account, now) && this.deps.catalog.store.premium.dailySovereigns > 0
+            ? {
+                amount: this.deps.catalog.store.premium.dailySovereigns,
+                claimed: Boolean(account.counters[`premium-daily:${Math.floor(now / DAY)}`]),
+              }
+            : null,
+        ads: {
+          used: account.counters[`ads:${Math.floor(now / DAY)}`] ?? 0,
+          limit: this.adLimit(account, now),
+        },
         materials: Object.entries(this.deps.catalog.materials).map(([id, material]) => ({
           id,
           nameKey: material.nameKey,
@@ -551,6 +564,42 @@ export class MetaEconomy {
       bought: account.counters[`offer:${id}`] ?? 0,
       ...(terms.blocked ? { blocked: terms.blocked } : {}),
     };
+  }
+
+  /** Rewarded-ad supplies allowed today: premium adds its extra ones. */
+  private adLimit(account: MetaEconomyAccount, now: number): number {
+    return (
+      this.deps.catalog.commerce.dailyAdLimit +
+      (premiumActive(account, now) ? this.deps.catalog.store.premium.extraDailyAds : 0)
+    );
+  }
+
+  /** Running premium shows a frame on the public profile; no other account data leaves here. */
+  async isPremium(accountId: string): Promise<boolean> {
+    if (!validKey(accountId)) return false;
+    return premiumActive(await this.deps.store.read(accountId), this.now());
+  }
+
+  /** Premium's daily Sovereigns: once per UTC day while premium runs. */
+  claimPremiumDaily(
+    accountId: string,
+    command: MetaPremiumDailyCommand,
+  ): Promise<MetaCommandResult> {
+    return this.command(
+      accountId,
+      command.requestId,
+      'premium-daily',
+      command,
+      async (_tx, account, receipt) => {
+        const amount = this.deps.catalog.store.premium.dailySovereigns;
+        if (amount === 0 || !premiumActive(account, receipt.at)) reject('E_PREMIUM');
+        const counter = `premium-daily:${Math.floor(receipt.at / DAY)}`;
+        if (account.counters[counter]) reject('E_DAILY_CLAIMED');
+        account.counters[counter] = 1;
+        account.sovereigns = safeAdd(account.sovereigns ?? 0, amount);
+        receipt.sovereignsGranted = amount;
+      },
+    );
   }
 
   /** Spend Sovereigns on a store offer. Bought goods are personal (soulbound), like paid ones. */
@@ -1008,7 +1057,7 @@ export class MetaEconomy {
           const source: MaterialSource = command.source === 'rewarded_ad' ? 'ad' : 'commerce';
           if (source === 'ad') {
             const counter = `ads:${Math.floor(receipt.at / DAY)}`;
-            if ((account.counters[counter] ?? 0) >= this.deps.catalog.commerce.dailyAdLimit)
+            if ((account.counters[counter] ?? 0) >= this.adLimit(account, receipt.at))
               reject('E_AD_LIMIT');
             account.counters[counter] = safeAdd(account.counters[counter] ?? 0, 1);
           }

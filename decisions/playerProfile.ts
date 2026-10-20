@@ -45,6 +45,7 @@ export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
     xp: v.xp,
     progress,
     slots: appearance.slots.map((id) => (id && medalGrade(id, progress) ? id : null)),
+    ...(v.premium === true ? { premium: true } : {}),
   };
 }
 

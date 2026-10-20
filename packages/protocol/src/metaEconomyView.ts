@@ -107,6 +107,12 @@ export interface MetaEconomyView {
   /** Premium account expiry (epoch ms), or null without premium. */
   premiumUntil?: number | null;
   store?: MetaStoreOfferView[];
+  /** What premium gives, from the catalogue: shown before it is bought. */
+  premiumPerks?: { dailySovereigns: number; extraDailyAds: number };
+  /** Today's daily Sovereigns of a running premium; null without premium. */
+  premiumDaily?: { amount: number; claimed: boolean } | null;
+  /** Rewarded-ad supplies taken today (UTC) and today's limit (premium adds to it). */
+  ads?: { used: number; limit: number };
 }
 
 export interface MetaCommandReceipt {
@@ -121,6 +127,8 @@ export interface MetaCommandReceipt {
   sovereignsSpent?: number;
   /** Premium account expiry after the purchase. */
   premiumUntil?: number;
+  /** Sovereigns credited by the premium daily claim. */
+  sovereignsGranted?: number;
   soulbound?: boolean;
   drop?: { kind: 'hull' | 'module'; defId: string; forced: boolean } | null;
   dropOdds?: { chance: number; pity: number; forced: boolean; tablesHash: string };
@@ -175,6 +183,9 @@ export interface MetaSeasonChoiceCommand {
   seasonId: string;
   level: number;
   defId: string;
+}
+export interface MetaPremiumDailyCommand {
+  requestId: string;
 }
 export interface MetaStoreBuyCommand {
   requestId: string;

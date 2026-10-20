@@ -28,6 +28,7 @@ function setup(options: { authenticated?: boolean; rateMax?: number } = {}) {
     selectPass: vi.fn(async () => ok),
     chooseSeasonReward: vi.fn(async () => ok),
     buyOffer: vi.fn(async () => ok),
+    claimPremiumDaily: vi.fn(async () => ok),
   };
   const app = Fastify();
   apps.push(app);
@@ -173,6 +174,25 @@ describe('main economy HTTP boundary', () => {
     expect(poor.statusCode).toBe(409);
     expect(poor.json()).toEqual({ error: 'E_SOVEREIGNS' });
     expect(economy.buyOffer).toHaveBeenCalledWith('session-owner', buy);
+  });
+
+  it('claims premium daily Sovereigns for the session owner, with nothing else in the body', async () => {
+    const { app, economy } = setup();
+    const claim = { requestId: 'daily-1' };
+    const forged = await app.inject({
+      method: 'POST',
+      url: '/meta-economy/premium/daily',
+      payload: { ...claim, amount: 999 },
+    });
+    expect(forged.statusCode).toBe(400);
+    expect(economy.claimPremiumDaily).not.toHaveBeenCalled();
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/meta-economy/premium/daily',
+      payload: claim,
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(economy.claimPremiumDaily).toHaveBeenCalledWith('session-owner', claim);
   });
 
   it('limits writes and returns stable errors without database details', async () => {
