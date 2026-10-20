@@ -16,6 +16,7 @@ import {
   type LocalSync,
   type SyncMark,
 } from './cloudSync';
+import { sealCloudProfile, sealProgress, cloudSeal, wholeCloud } from './profileSeal';
 import { freshSectorZeroProgress } from './sectorZeroProgress';
 
 const local = (over: Partial<LocalSync> = {}): LocalSync => ({
@@ -129,6 +130,31 @@ describe('AUD-24 — облако везёт ТОЧНЫЙ мир забега, �
     const p = cloud({ run: '{"v":1,"wave":9}', state: world });
     const sent = parseCloudProfile(cloudEnvelope(p, (e) => !e.includes('"state"')));
     expect(sent).toEqual(cloud({ run: '{"v":1,"wave":9}' }));
+  });
+});
+
+describe('целостность облачного конверта и лимит площадки', () => {
+  it('проверяет размер подписанного конверта и заново подписывает сокращённый', () => {
+    const p = cloud({
+      progress: sealProgress({ seed: 's1', sovereigns: 5 }, cloudSeal('p1')),
+      state: 'large-world', run: 'descriptor',
+    });
+    let checked = '';
+    const sent = parseCloudProfile(cloudEnvelope(p, (candidate) => {
+      checked = candidate;
+      return false;
+    }, (candidate) => JSON.stringify(sealCloudProfile(candidate, 'p1'))));
+    expect(wholeCloud(parseCloudProfile(checked), 'p1')).toHaveProperty('state', 'large-world');
+    expect(wholeCloud(sent, 'p1')).toEqual(sent);
+    expect(sent).not.toHaveProperty('state');
+    expect(sent!.run).toBe('descriptor');
+    expect(sent!.seal).not.toBe(parseCloudProfile(checked)!.seal);
+  });
+
+  it('не превращает ошибочную внешнюю печать в старый конверт без печати', () => {
+    for (const seal of [null, 5, {}, false]) {
+      expect(parseCloudProfile(JSON.stringify({ ...cloud(), seal }))).toBeNull();
+    }
   });
 });
 

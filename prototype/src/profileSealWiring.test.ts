@@ -39,12 +39,13 @@ describe('YAG-4.4 — профиль пишется только с печать
     );
     expect(calls.length).toBeGreaterThanOrEqual(4);
     for (const arg of calls) expect(arg).toMatch(/^sealProgress\(.+, LOCAL_SEAL\)\)?$|^blob\)?$/);
-    expect(body('saveSectorProgress')).toContain('const blob = sealProgress(next, LOCAL_SEAL);');
+    expect(body('persistSectorProgress')).toContain('const blob = sealProgress(sectorProgress, LOCAL_SEAL);');
+    expect(body('saveSectorProgress')).toContain("detach('профиль: запись', persistSectorProgress());");
   });
 
   it('флаг «уже запечатывало» встаёт только после того, как запись легла', () => {
     expect(body('writeSectorProgress')).toMatch(
-      /if \(syncMark\.sealed \|\| \(await sectorProgressStore\.load\(\)\) !== blob\) return;\s+syncMark = \{ \.\.\.syncMark, sealed: true \};\s+writeSyncMark\(\);/,
+      /const saved = \(await sectorProgressStore\.load\(\)\) === blob;\s+if \(ownsSectorZero\(\)\) noteWrite\(saved\);\s+if \(saved && !syncMark\.sealed\) \{\s+syncMark = \{ \.\.\.syncMark, sealed: true \};\s+writeSyncMark\(\);/,
     );
   });
 });

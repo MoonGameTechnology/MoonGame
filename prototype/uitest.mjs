@@ -143,11 +143,14 @@ const storage = new Map();
 storage.set('void.holography', '0');
 const bootCheck = process.argv.includes('--boot-check');
 const soloBootCheck = process.argv.includes('--solo-boot-check');
-const savedAtBoot = (bootCheck || soloBootCheck) ? readFileSync(0, 'utf8') : null;
+const bootInput = (bootCheck || soloBootCheck) ? readFileSync(0, 'utf8') : null;
+const bootFixture = bootCheck && bootInput ? JSON.parse(bootInput) : null;
+const savedAtBoot = bootCheck ? bootFixture?.run : bootInput;
 if (savedAtBoot) {
   storage.set(soloBootCheck ? 'void.solo.v1' : 'void.run.v1', savedAtBoot);
   storage.set('void.nick', 'ReturningCommander');
 }
+if (bootFixture?.progress) storage.set('sector-zero.progress.v1', bootFixture.progress);
 globalThis.localStorage = {
   getItem: key => storage.get(key) ?? null,
   setItem: (key, value) => storage.set(key, String(value)),
@@ -768,13 +771,15 @@ await click('tomenu');
 console.log('Sector Zero dev isolation OK');
 // Reboot the real bundled entry with a real save from the flow above, not a guessed fixture.
 if (!sectorEntry) {
-  for (const [input, args] of [
+  for (const [run, args] of [
     [storage.get('void.run.v1'), []],
     ['{broken', []],
     [storage.get('void.run.v1'), ['--sector-zero']],
   ]) {
     const reboot = spawnSync(process.execPath, ['prototype/uitest.mjs', '--boot-check', ...args], {
-      input, encoding: 'utf8', timeout: 120_000,
+      // The run seal belongs to this persisted profile; reboot the same player.
+      input: JSON.stringify({ run, progress: storage.get('sector-zero.progress.v1') }),
+      encoding: 'utf8', timeout: 120_000,
     });
     assert.equal(reboot.status, 0, reboot.stderr || reboot.error?.message);
     console.log(reboot.stdout.trim());

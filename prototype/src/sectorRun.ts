@@ -26,11 +26,15 @@ import type { GameState } from '../../packages/shared-core/src/index';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
 import {
   describeRun,
-  parsePortableRun,
   resumePortableRun,
-  serializePortableRun,
   type PortableRunSave,
 } from '../../decisions/portableRun';
+import {
+  parseSealedRunSave,
+  serializeSealedRunSave,
+  parseSealedPortableRun,
+  serializeSealedPortableRun,
+} from '../../decisions/runSeal';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pveOutcomeEvent } from '../../decisions/runAnalytics';
 import {
@@ -40,8 +44,6 @@ import {
 } from '../../decisions/runDifficulty';
 import {
   RUN_SAVE_VERSION,
-  parseRunSave,
-  serializeRunSave,
   type RunSave,
 } from '../../decisions/runSave';
 import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
@@ -70,6 +72,7 @@ import {
   chapterWorld,
   offerRunToCloud,
   portableRunStore,
+  persistSectorProgress,
   profileWaitsFor,
   progressWrite,
   runSaveStore,
@@ -135,6 +138,10 @@ export let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty
 export let nextSectorMission = pveMissionIndex(Number(readRaw('void.pveMission') ?? 0));
 export let runWrite = Promise.resolve();
 let clearedAttempt = 0;
+/** Terminal journal still protects an award until the profile is durable. This is
+ * separate from clearedAttempt, which also controls end-of-run scenes and analytics. */
+let protectedTerminalAttempt = 0;
+let awardWritten: Promise<boolean> = Promise.resolve(false);
 /** Реальное время последней записи. Снимок пишется НЕ каждый кадр: он весит десятки
  *  килобайт, а забегу хватает секундной точности. */
 let runSavedAtReal = 0;
@@ -251,18 +258,40 @@ function currentRunSave(): RunSave<GameState> | null {
 export function saveRun(): void {
   const save = currentRunSave();
   if (!save || (save.state.match.status === 'ended' && clearedAttempt === sectorAttempt)) return;
-  const blob = serializeRunSave(save);
+  const blob = serializeSealedRunSave(save, sectorProgress.seed);
   const boons = data.modes[save.mode]?.pve?.boons ?? [];
-  const portable = serializePortableRun(
+  const portable = serializeSealedPortableRun(
     describeRun(save.state, game.me(), (id) => boons.includes(id), {
       mode: save.mode,
       difficulty: save.difficulty,
       attempt: sectorAttempt,
     }),
+    sectorProgress.seed,
   );
-  runWrite = runWrite
-    .then(() => runSaveStore.save(blob))
-    .then(() => portableRunStore.save(portable));
+  // Capture the write before extending runWrite: a later award can make the profile
+  // wait for this journal, so starting persistence inside the callback would cycle.
+  const priorAwardWritten = protectedTerminalAttempt > 0 &&
+    protectedTerminalAttempt !== save.sectorZeroAttempt
+    ? persistSectorProgress()
+    : null;
+  if (save.state.match.status === 'ended' && protectedTerminalAttempt === 0) {
+    protectedTerminalAttempt = save.sectorZeroAttempt ?? 0;
+  }
+  const seed = sectorProgress.seed;
+  runWrite = runWrite.then(async () => {
+    const prior = priorAwardWritten
+      ? parseSealedRunSave(await runSaveStore.load(), seed)
+      : null;
+    const replacesTerminal = prior && prior.sectorZeroAttempt !== save.sectorZeroAttempt &&
+      (prior.state as GameState).match?.status === 'ended';
+    if (replacesTerminal && !(await priorAwardWritten)) return;
+    await runSaveStore.save(blob);
+    await portableRunStore.save(portable);
+    if (replacesTerminal && protectedTerminalAttempt === prior.sectorZeroAttempt) {
+      protectedTerminalAttempt = 0;
+    }
+    if (save.state.match.status === 'ended') protectedTerminalAttempt = save.sectorZeroAttempt ?? 0;
+  });
   // Дескриптор и мир забега — часть облачного профиля: когда они станут новой правкой,
   // решает его владелец (`offerRunToCloud`).
   offerRunToCloud(portable, blob);
@@ -287,6 +316,7 @@ export function awardSectorRun(): number {
     profileWaitsFor(runWrite);
     saveSectorProgress(next);
   }
+  awardWritten = persistSectorProgress();
   return sectorProgress.lastReward;
 }
 
@@ -312,11 +342,14 @@ export function tickRunSave(nowReal: number): void {
       clearedAttempt = sectorAttempt;
       // Победа — комикс главы поверх итогов (в первый раз); итоги под ним уже нарисованы.
       if (won) game.chapterWon();
-      const awardWrite = progressWrite;
-      runWrite = runWrite
-        .then(() => awardWrite)
-        .then(() => runSaveStore.clear())
-        .then(() => portableRunStore.clear());
+      const awardWrite = awardWritten;
+      const attempt = sectorAttempt;
+      runWrite = runWrite.then(async () => {
+        if (!(await awardWrite) || sectorAttempt !== attempt) return;
+        await runSaveStore.clear();
+        await portableRunStore.clear();
+        if (protectedTerminalAttempt === attempt) protectedTerminalAttempt = 0;
+      });
     }
     return;
   }
@@ -332,7 +365,7 @@ export function tickRunSave(nowReal: number): void {
 export async function loadSavedRun(): Promise<RunPreview | null> {
   await progressWrite;
   await runWrite;
-  savedRun = parseRunSave(await runSaveStore.load());
+  savedRun = parseSealedRunSave(await runSaveStore.load(), sectorProgress.seed);
   // Persistence can be unavailable. A paused run still exists in this tab.
   if (runInProgress() && !sectorDevActive) savedRun = currentRunSave();
   if (
@@ -340,6 +373,13 @@ export async function loadSavedRun(): Promise<RunPreview | null> {
     savedRun.mode === pveModeId() &&
     (savedRun.state as GameState).match?.status === 'ended'
   ) {
+    const terminalAttempt = savedRun.sectorZeroAttempt ?? 0;
+    protectedTerminalAttempt = terminalAttempt;
+    // The signed journal can outlive the failed metadata write that reserved its
+    // serial. Adopt that trusted reservation before settlement, as on live resume.
+    if (terminalAttempt >= sectorProgress.nextAttempt) {
+      saveSectorProgress({ ...sectorProgress, nextAttempt: terminalAttempt + 1 });
+    }
     const next = settleSectorZeroRun(
       sectorProgress,
       savedRun.sectorZeroAttempt ?? 0,
@@ -348,16 +388,22 @@ export async function loadSavedRun(): Promise<RunPreview | null> {
       data,
     );
     if (next !== sectorProgress) saveSectorProgress(next);
-    await progressWrite;
-    await runSaveStore.clear();
-    await portableRunStore.clear();
+    if (await persistSectorProgress()) {
+      await runSaveStore.clear();
+      await portableRunStore.clear();
+      if (protectedTerminalAttempt === terminalAttempt) protectedTerminalAttempt = 0;
+    }
     savedRun = null;
+    // При отказе записи журнал ещё нужен для награды. Его дескриптор не должен
+    // воскресить уже завершённую попытку и затереть этот журнал новым миром.
+    savedPortable = null;
+    return null;
   }
   const full = sectorZeroRunPreview(savedRun, pveModeId() ?? '');
   if (full) return full;
   // Полного снимка нет или он не читается (игру обновили, форма мира сменилась) —
   // карточка по дескриптору: тот же забег, та же волна, но мир соберётся заново.
-  savedPortable = parsePortableRun(await portableRunStore.load());
+  savedPortable = parseSealedPortableRun(await portableRunStore.load(), sectorProgress.seed);
   const mode = pveModeId() ?? '';
   const known = pveMissionOfMap(savedPortable?.map) !== null;
   return portableRunPreview(known ? savedPortable : null, mode, data.modes[mode]?.pve?.waves ?? 0);
@@ -380,6 +426,7 @@ export async function resetSectorZero(): Promise<void> {
   if (runInProgress()) setRunActive(false);
   await runSaveStore.clear();
   await portableRunStore.clear();
+  protectedTerminalAttempt = 0;
   forgetSavedRun();
   chooseMission(0);
   saveSectorProgress(freshSectorZeroProgress(data, sectorProgress.seed));
