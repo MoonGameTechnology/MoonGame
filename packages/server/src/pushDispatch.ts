@@ -1,7 +1,13 @@
 import type { PushStore, PushSubscriptionRecord } from './store';
 import type { RoomObservation } from './matchRoom';
 import type { SendPushResult } from './push';
-import { groupedPush, pushNotices, type PushNoticePayload } from './pushRule';
+import {
+  groupedPush,
+  KIND_OF,
+  pushNotices,
+  type PushNotice,
+  type PushNoticePayload,
+} from './pushRule';
 
 /**
  * UIX-4.3 · the trigger side of Web Push: reads each room's observation stream and sends
@@ -12,6 +18,7 @@ import { groupedPush, pushNotices, type PushNoticePayload } from './pushRule';
  *   +1, `leave` −1), so a second tab closing does not mark the player away.
  * - **Only to an account.** The seat → account link comes from the `join` the handshake
  *   proved; nick-mode seats and bots have no account and get nothing.
+ * - **Only the kinds the player allowed** (`kinds` on the subscription, UIX-4.4).
  * - **A dead endpoint is dropped** (`gone`), the same as the explicit unsubscribe.
  *
  * Sends are fire-and-forget: a slow push service never holds a room's event loop.
@@ -37,9 +44,20 @@ export function createPushDispatcher(
     if (!m) matches.set(matchId, (m = { account: new Map(), online: new Map() }));
     return m;
   };
-  const deliver = async (accountId: string, payload: PushNoticePayload): Promise<void> => {
+  const deliver = async (
+    accountId: string,
+    matchId: string,
+    notices: readonly PushNotice[],
+  ): Promise<void> => {
     const sub = await deps.store.of(accountId);
     if (!sub) return;
+    // The player's switches (UIX-4.4): a browser must show every push it gets, so a kind
+    // they turned off is dropped here, before grouping — `more` counts only what is allowed.
+    const allowed = sub.kinds
+      ? notices.filter((n) => sub.kinds!.includes(KIND_OF[n.key]))
+      : notices;
+    const payload = groupedPush(allowed, matchId);
+    if (!payload) return;
     const r = await deps.send(sub, payload);
     if (!r.ok && r.gone) await deps.store.remove(accountId);
   };
@@ -64,9 +82,9 @@ export function createPushDispatcher(
     if (!m) return;
     for (const [seat, accountId] of m.account) {
       if ((m.online.get(seat) ?? 0) > 0) continue;
-      const payload = groupedPush(pushNotices(event.events, seat), matchId);
-      if (!payload) continue;
-      void deliver(accountId, payload).catch((err: unknown) =>
+      const notices = pushNotices(event.events, seat);
+      if (notices.length === 0) continue;
+      void deliver(accountId, matchId, notices).catch((err: unknown) =>
         deps.onError?.(
           `push to ${accountId} failed — ${err instanceof Error ? err.message : String(err)}`,
         ),

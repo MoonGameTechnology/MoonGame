@@ -1,4 +1,8 @@
-import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
+import type {
+  CorpBuildOrder,
+  CorpInfrastructureResult,
+  CorpInfrastructureState,
+} from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
@@ -51,6 +55,7 @@ import {
   DEFAULT_CHALLENGES_LIMIT,
   DEFAULT_LOCKED_MATCHUPS_LIMIT,
   DEFAULT_RESULTS_LIMIT,
+  PUSH_KINDS,
 } from './types';
 
 /** Create the tables (idempotent). JSONB discipline: the queryable fields (status,
@@ -445,6 +450,8 @@ const SCHEMA_SQL = `
       p256dh      text NOT NULL,
       auth        text NOT NULL
     );
+    -- UIX-4.4: allowed push kinds, comma-separated; NULL = every kind (older rows).
+    ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS kinds text;
 
     -- FRIENDS-1: the social graph — ONE row per pair, keyed on the SORTED pair, so
     -- «A→B» and «B→A» cannot become two rows. requested_by carries the direction
@@ -463,7 +470,8 @@ const SCHEMA_SQL = `
     CREATE INDEX IF NOT EXISTS friend_edges_hi ON friend_edges (hi_id);
   `;
 
-export const schemaFingerprint = (): string => createHash('sha256').update(SCHEMA_SQL).digest('hex');
+export const schemaFingerprint = (): string =>
+  createHash('sha256').update(SCHEMA_SQL).digest('hex');
 
 export async function migrate(pool: Pool | PoolClient): Promise<void> {
   // Boot/admin callers already own their client's transaction and migration lock.
@@ -499,7 +507,10 @@ interface MatchRow {
 export class PostgresMatchStore implements MatchStore {
   async economyMatchIds(after = '', limit = 100): Promise<string[]> {
     const size = Number.isSafeInteger(limit) ? Math.min(100, Math.max(1, limit)) : 100;
-    const result = await this.pool.query<{ id: string }>('SELECT id FROM matches WHERE id>$1 ORDER BY id LIMIT $2', [after, size]);
+    const result = await this.pool.query<{ id: string }>(
+      'SELECT id FROM matches WHERE id>$1 ORDER BY id LIMIT $2',
+      [after, size],
+    );
     return result.rows.map((row) => row.id);
   }
   constructor(private readonly pool: Pool) {}
@@ -575,10 +586,26 @@ export class PostgresMatchStore implements MatchStore {
          END,
          updated_at   = now()
        WHERE matches.seq <= EXCLUDED.seq`,
-      [snapshot.matchId, snapshot.dataVersion, snapshot.seq, snapshot.status, snapshot.state, snapshot.clock ?? null,
+      [
+        snapshot.matchId,
+        snapshot.dataVersion,
+        snapshot.seq,
+        snapshot.status,
+        snapshot.state,
+        snapshot.clock ?? null,
         snapshot.economyObservations ? JSON.stringify(snapshot.economyObservations) : null,
-        snapshot.economyActivity ? JSON.stringify(Object.fromEntries(Object.entries(snapshot.economyActivity).map(([key, ids]) => [key, [...new Set(ids)].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE)]))) : null,
-        MAX_META_ACTIVITY_FACTS_PER_ROLE],
+        snapshot.economyActivity
+          ? JSON.stringify(
+              Object.fromEntries(
+                Object.entries(snapshot.economyActivity).map(([key, ids]) => [
+                  key,
+                  [...new Set(ids)].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE),
+                ]),
+              ),
+            )
+          : null,
+        MAX_META_ACTIVITY_FACTS_PER_ROLE,
+      ],
     );
   }
 
@@ -616,9 +643,10 @@ export class PostgresAccountStore implements AccountStore {
     );
     const taken = new Set(takenR.rows.map((r) => r.player_id));
     // Preferred slot first (REL-7 seat selection): try it before the default order.
-    const order = preferred && seats.includes(preferred) && !taken.has(preferred)
-      ? [preferred, ...seats.filter((s) => s !== preferred)]
-      : seats;
+    const order =
+      preferred && seats.includes(preferred) && !taken.has(preferred)
+        ? [preferred, ...seats.filter((s) => s !== preferred)]
+        : seats;
     for (const candidate of order) {
       if (taken.has(candidate)) continue;
       try {
@@ -791,18 +819,27 @@ export class PostgresUserStore implements UserStore {
   constructor(private readonly pool: Pool) {}
 
   async deletionStatus(accountId: string, requestId: string): Promise<boolean> {
-    const result = await this.pool.query('SELECT 1 FROM account_deletions WHERE account_id=$1 AND request_id=$2', [accountId, requestId]);
+    const result = await this.pool.query(
+      'SELECT 1 FROM account_deletions WHERE account_id=$1 AND request_id=$2',
+      [accountId, requestId],
+    );
     return Boolean(result.rowCount);
   }
-  async requestDeletion(user: UserRecord, requestId: string = randomUUID()): Promise<string | null> {
-    const result = await this.pool.query<{ request_id: string }>(`
+  async requestDeletion(
+    user: UserRecord,
+    requestId: string = randomUUID(),
+  ): Promise<string | null> {
+    const result = await this.pool.query<{ request_id: string }>(
+      `
       WITH disabled AS (
         UPDATE users SET deletion_requested_at = now(), session_nonce = $4
         WHERE id = $1 AND pass_hash = $2 AND session_nonce = $3
           AND deletion_requested_at IS NULL RETURNING id,login
       ) INSERT INTO account_deletions(account_id, request_id, login_hash)
         SELECT id, $4, encode(sha256(convert_to(lower(login),'UTF8')),'hex') FROM disabled RETURNING request_id
-    `, [user.userId, user.passHash, user.sessionNonce ?? '', requestId]);
+    `,
+      [user.userId, user.passHash, user.sessionNonce ?? '', requestId],
+    );
     return result.rows[0]?.request_id ?? null;
   }
 
@@ -834,7 +871,10 @@ export class PostgresUserStore implements UserStore {
       // account (the constraint name is on the pg error). Any other cause is treated as a
       // taken login too — fail-secure, no account is overwritten.
       const constraint = (e as { constraint?: string }).constraint;
-      return { ok: false, code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN' };
+      return {
+        ok: false,
+        code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN',
+      };
     }
   }
 
@@ -877,13 +917,20 @@ export class PostgresUserStore implements UserStore {
   }
 
   async revokeSessions(userId: string): Promise<void> {
-    await this.pool.query('UPDATE users SET session_nonce = $2 WHERE id = $1', [userId, randomUUID()]);
+    await this.pool.query('UPDATE users SET session_nonce = $2 WHERE id = $1', [
+      userId,
+      randomUUID(),
+    ]);
   }
 
   async setPassword(userId: string, passHash: string): Promise<void> {
     await this.pool.query(`UPDATE users SET pass_hash = $2 WHERE id = $1`, [userId, passHash]);
   }
-  async setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean> {
+  async setPasswordIfCurrent(
+    userId: string,
+    expectedHash: string,
+    passHash: string,
+  ): Promise<boolean> {
     const result = await this.pool.query(
       `UPDATE users SET pass_hash = $3 WHERE id = $1 AND pass_hash = $2 AND deletion_requested_at IS NULL`,
       [userId, expectedHash, passHash],
@@ -930,31 +977,52 @@ function memberOf(row: CorpMemberRow): CorpMembership {
 }
 
 export class PostgresCorpStore implements CorpStore {
-  async infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+  async infrastructure(
+    corpId: string,
+    actor: string,
+    now: number,
+    order?: CorpBuildOrder,
+  ): Promise<CorpInfrastructureResult> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       // Lock membership first, like disband: role transfer/kick cannot race spending.
       const members = await client.query<{ role: CorpRole }>(
-        `SELECT role FROM corp_members WHERE account_id = $1 AND corp_id = $2 FOR UPDATE`, [actor, corpId]);
+        `SELECT role FROM corp_members WHERE account_id = $1 AND corp_id = $2 FOR UPDATE`,
+        [actor, corpId],
+      );
       const role = members.rows[0]?.role;
       if (!role || role === 'recruit' || (order && role !== 'head')) {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_FORBIDDEN' };
       }
-      const corps = await client.query<{ influence: string; infrastructure: CorpInfrastructureState | null }>(
-        `SELECT influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
+      const corps = await client.query<{
+        influence: string;
+        infrastructure: CorpInfrastructureState | null;
+      }>(`SELECT influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
       const corp = corps.rows[0];
       if (!corp) {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_FORBIDDEN' };
       }
-      const updated = updateCorpInfrastructure(corpId, actor, role, Number(corp.influence), corp.infrastructure, now, order);
-      await client.query(`UPDATE corps SET influence = $2, infrastructure = $3::jsonb WHERE id = $1`,
-        [corpId, updated.influence, JSON.stringify(updated.state)]);
+      const updated = updateCorpInfrastructure(
+        corpId,
+        actor,
+        role,
+        Number(corp.influence),
+        corp.infrastructure,
+        now,
+        order,
+      );
+      await client.query(
+        `UPDATE corps SET influence = $2, infrastructure = $3::jsonb WHERE id = $1`,
+        [corpId, updated.influence, JSON.stringify(updated.state)],
+      );
       for (const entry of updated.audit) {
-        await client.query(`INSERT INTO corp_audit (corp_id, at, actor, action, target, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
-          [corpId, entry.at, entry.actor, entry.action, entry.target ?? null, entry.detail ?? null]);
+        await client.query(
+          `INSERT INTO corp_audit (corp_id, at, actor, action, target, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [corpId, entry.at, entry.actor, entry.action, entry.target ?? null, entry.detail ?? null],
+        );
       }
       await client.query('COMMIT');
       return updated.result;
@@ -1755,19 +1823,37 @@ const SESSION_COLS = 'match_id, matchup_id, map_id, seats, at, war_at, war_decla
  *  `create` atomically one-per-matchup and one-per-instance; a duplicate raises the
  *  insert conflict → `E_SESSION_EXISTS` (the orchestrator treats that as "already built"). */
 export class PostgresAvaSessionStore implements AvaSessionStore {
-  async pendingResults(limit = 100): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>> {
-    const result = await this.pool.query<{ match_id: string; matchup_id: string; winner: string | null }>(
+  async pendingResults(
+    limit = 100,
+  ): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>> {
+    const result = await this.pool.query<{
+      match_id: string;
+      matchup_id: string;
+      winner: string | null;
+    }>(
       `SELECT s.match_id,s.matchup_id,m.state->'match'->>'winner' AS winner
        FROM ava_sessions s JOIN matches m ON m.id=s.match_id
        LEFT JOIN ava_result_delivery d ON d.match_id=s.match_id
-       WHERE m.status='ended' AND (d.match_id IS NULL OR (NOT d.delivered AND d.retry_at<=$2)) ORDER BY COALESCE(d.attempts,0),s.at,s.match_id LIMIT $1`, [limit, Date.now()]);
-    return result.rows.map((r) => ({ matchId: r.match_id, matchupId: r.matchup_id, winner: r.winner }));
+       WHERE m.status='ended' AND (d.match_id IS NULL OR (NOT d.delivered AND d.retry_at<=$2)) ORDER BY COALESCE(d.attempts,0),s.at,s.match_id LIMIT $1`,
+      [limit, Date.now()],
+    );
+    return result.rows.map((r) => ({
+      matchId: r.match_id,
+      matchupId: r.matchup_id,
+      winner: r.winner,
+    }));
   }
   async markResultRetry(matchId: string): Promise<void> {
-    await this.pool.query('INSERT INTO ava_result_delivery(match_id,attempts,retry_at) VALUES($1,1,$2) ON CONFLICT(match_id) DO UPDATE SET attempts=ava_result_delivery.attempts+1,retry_at=$2', [matchId, Date.now()+5000]);
+    await this.pool.query(
+      'INSERT INTO ava_result_delivery(match_id,attempts,retry_at) VALUES($1,1,$2) ON CONFLICT(match_id) DO UPDATE SET attempts=ava_result_delivery.attempts+1,retry_at=$2',
+      [matchId, Date.now() + 5000],
+    );
   }
   async markResultDelivered(matchId: string): Promise<void> {
-    await this.pool.query('INSERT INTO ava_result_delivery(match_id,delivered) VALUES($1,true) ON CONFLICT(match_id) DO UPDATE SET delivered=true', [matchId]);
+    await this.pool.query(
+      'INSERT INTO ava_result_delivery(match_id,delivered) VALUES($1,true) ON CONFLICT(match_id) DO UPDATE SET delivered=true',
+      [matchId],
+    );
   }
 
   constructor(private readonly pool: Pool) {}
@@ -1890,7 +1976,8 @@ export class PostgresArsenalStore implements ArsenalStore {
   constructor(private readonly pool: Pick<Pool, 'query'>) {}
 
   async grant(item: OwnedArsenalItem): Promise<void> {
-    await this.pool.query( // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
+    await this.pool.query(
+      // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
       `INSERT INTO arsenal (${ARSENAL_COLS})
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (item_id) DO NOTHING`,
@@ -1950,10 +2037,10 @@ export class PostgresArsenalStore implements ArsenalStore {
   }
 
   async consume(itemId: string, accountId: string): Promise<boolean> {
-    const r = await this.pool.query(
-      `DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`,
-      [itemId, accountId],
-    );
+    const r = await this.pool.query(`DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`, [
+      itemId,
+      accountId,
+    ]);
     return (r.rowCount ?? 0) > 0;
   }
 
@@ -1979,25 +2066,54 @@ export class PostgresCorpRentStore implements CorpRentStore {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
-      const removed = await db.query<CorpRentRow>('DELETE FROM corp_arsenal_rent WHERE matchup_id=$1 AND item_id=$2 RETURNING *', [matchupId, itemId]);
+      const removed = await db.query<CorpRentRow>(
+        'DELETE FROM corp_arsenal_rent WHERE matchup_id=$1 AND item_id=$2 RETURNING *',
+        [matchupId, itemId],
+      );
       const row = removed.rows[0];
-      if (!row) { await db.query('COMMIT'); return false; }
-      const updated = await db.query('UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-1) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id', [itemId, row.corp_id]);
+      if (!row) {
+        await db.query('COMMIT');
+        return false;
+      }
+      const updated = await db.query(
+        'UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-1) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id',
+        [itemId, row.corp_id],
+      );
       if (updated.rowCount !== 1) throw Error('E_CORP_ITEM_MISSING');
       const eventId = JSON.stringify(['rent_return', matchupId, itemId]);
-      const entry: CorpAuditEntry = { eventId, corpId: row.corp_id, at, actor: 'system', action: 'rent_return', target: row.account_id, detail: itemId };
-      await db.query('INSERT INTO corp_return_audit(event_id,matchup_id,entry) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING', [eventId, matchupId, JSON.stringify(entry)]);
+      const entry: CorpAuditEntry = {
+        eventId,
+        corpId: row.corp_id,
+        at,
+        actor: 'system',
+        action: 'rent_return',
+        target: row.account_id,
+        detail: itemId,
+      };
+      await db.query(
+        'INSERT INTO corp_return_audit(event_id,matchup_id,entry) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING',
+        [eventId, matchupId, JSON.stringify(entry)],
+      );
       await db.query('COMMIT');
       return true;
-    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
-    finally { db.release(); }
+    } catch (error) {
+      await db.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      db.release();
+    }
   }
   async pendingReturnAudits(matchupId: string): Promise<CorpAuditEntry[]> {
-    const result = await this.pool.query<{ entry: CorpAuditEntry }>('SELECT entry FROM corp_return_audit WHERE matchup_id=$1 AND NOT delivered ORDER BY event_id', [matchupId]);
+    const result = await this.pool.query<{ entry: CorpAuditEntry }>(
+      'SELECT entry FROM corp_return_audit WHERE matchup_id=$1 AND NOT delivered ORDER BY event_id',
+      [matchupId],
+    );
     return result.rows.map((row) => row.entry);
   }
   async markReturnAudited(eventId: string): Promise<void> {
-    await this.pool.query('UPDATE corp_return_audit SET delivered=true WHERE event_id=$1', [eventId]);
+    await this.pool.query('UPDATE corp_return_audit SET delivered=true WHERE event_id=$1', [
+      eventId,
+    ]);
   }
 
   constructor(private readonly pool: Pool) {}
@@ -2205,11 +2321,17 @@ export class PostgresPushStore implements PushStore {
 
   async save(accountId: string, sub: PushSubscriptionRecord): Promise<void> {
     await this.pool.query(
-      `INSERT INTO push_subscriptions (account_id, endpoint, p256dh, auth)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO push_subscriptions (account_id, endpoint, p256dh, auth, kinds)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (account_id) DO UPDATE
-         SET endpoint = $2, p256dh = $3, auth = $4`,
-      [accountId, sub.endpoint, sub.keys.p256dh, sub.keys.auth],
+         SET endpoint = $2, p256dh = $3, auth = $4, kinds = $5`,
+      [
+        accountId,
+        sub.endpoint,
+        sub.keys.p256dh,
+        sub.keys.auth,
+        sub.kinds ? sub.kinds.join(',') : null,
+      ],
     );
   }
 
@@ -2218,11 +2340,22 @@ export class PostgresPushStore implements PushStore {
   }
 
   async of(accountId: string): Promise<PushSubscriptionRecord | undefined> {
-    const r = await this.pool.query<{ endpoint: string; p256dh: string; auth: string }>(
-      `SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE account_id = $1`,
-      [accountId],
-    );
+    const r = await this.pool.query<{
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+      kinds: string | null;
+    }>(`SELECT endpoint, p256dh, auth, kinds FROM push_subscriptions WHERE account_id = $1`, [
+      accountId,
+    ]);
     const row = r.rows[0];
-    return row ? { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } } : undefined;
+    if (!row) return undefined;
+    const kinds =
+      row.kinds === null ? undefined : PUSH_KINDS.filter((k) => row.kinds!.split(',').includes(k));
+    return {
+      endpoint: row.endpoint,
+      keys: { p256dh: row.p256dh, auth: row.auth },
+      ...(kinds ? { kinds } : {}),
+    };
   }
 }

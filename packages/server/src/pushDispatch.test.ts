@@ -68,6 +68,35 @@ describe('UIX-4.3 · push dispatcher over the room observation stream', () => {
     expect(store.remove).toHaveBeenCalledWith('acc1');
   });
 
+  it('only the kinds the player allowed go out; `more` counts only allowed ones (UIX-4.4)', async () => {
+    const store = {
+      of: vi.fn(async () => ({ ...SUB, kinds: ['researched' as const] })),
+      remove: vi.fn(async () => {}),
+    };
+    const send = vi.fn(async (): Promise<SendPushResult> => ({ ok: true }));
+    const observe = createPushDispatcher({ store, send });
+    observe('m1', { kind: 'join', playerId: 'p1', accountId: 'acc1' });
+    observe('m1', { kind: 'leave', playerId: 'p1' });
+    observe('m1', attack); // attacks switched off — nothing goes out
+    await flush();
+    expect(send).not.toHaveBeenCalled();
+    observe('m1', {
+      kind: 'events',
+      seq: 2,
+      events: [
+        ...attack.events,
+        { type: 'technology.researched', payload: { playerId: 'p1', technology: 'radar' } },
+      ],
+    });
+    await flush();
+    expect(send).toHaveBeenCalledWith(expect.anything(), {
+      key: 'push.researched',
+      params: { technology: 'radar' },
+      matchId: 'm1',
+      more: 0,
+    });
+  });
+
   it('the match end forgets its seats', async () => {
     const { send, observe } = setup();
     observe('m1', { kind: 'join', playerId: 'p1', accountId: 'acc1' });
