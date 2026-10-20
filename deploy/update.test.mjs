@@ -457,3 +457,61 @@ describe('update.sh — добор недостающих ключей server.en
     }
   });
 });
+
+
+describe('update.sh — сохранение образов предыдущей успешной версии', () => {
+  const repo = 'ghcr.io/moongametechnology/moongame';
+  const old = `${repo}@sha256:${'a'.repeat(64)}`;
+  const next = `${repo}@sha256:${'b'.repeat(64)}`;
+  const oldEdge = `${repo}/caddy@sha256:${'c'.repeat(64)}`;
+  const nextEdge = `${repo}/caddy@sha256:${'d'.repeat(64)}`;
+  const pair = (server, caddy) => `version=1\nserver=${server}\ncaddy=${caddy}\n`;
+  function host({ tls = false, healthFailFirst = 0 } = {}) {
+    const sb = sandbox({ healthFailFirst });
+    const state = join(sb.root, 'state');
+    mkdirSync(state);
+    writeFileSync(join(state, 'server.env'), tls ? 'DOMAIN=play.example.com\n' : '# stub\n');
+    stub(sb.deploy, 'stack.sh', 'echo "stack $VOID_IMAGE ${VOID_CADDY_IMAGE:-}" >> "$LOG"');
+    writeFileSync(
+      join(state, tls ? 'last-good-release' : 'last-good-image'),
+      tls ? pair(old, oldEdge) : old + '\n',
+    );
+    return {
+      ...sb,
+      state,
+      extra: { STATE_DIR: state, VOID_IMAGE: next, ...(tls ? { VOID_CADDY_IMAGE: nextEdge } : {}) },
+    };
+  }
+  it('первый запуск новым update.sh сохраняет прежнюю TLS-пару до замены checkpoint', async () => {
+    const sb = host({ tls: true });
+    expect((await runUpdate(sb, sb.extra)).code).toBe(0);
+    expect(readFileSync(join(sb.state, 'previous-good-release'), 'utf8')).toBe(pair(old, oldEdge));
+    expect(readFileSync(join(sb.state, 'last-good-release'), 'utf8')).toBe(pair(next, nextEdge));
+  });
+  it('неудачная выкатка сохраняет и текущий, и предыдущий успешный checkpoint', async () => {
+    const sb = host({ tls: true, healthFailFirst: 1 });
+    const prior = pair(
+      `${repo}@sha256:${'e'.repeat(64)}`,
+      `${repo}/caddy@sha256:${'f'.repeat(64)}`,
+    );
+    writeFileSync(join(sb.state, 'previous-good-release'), prior);
+    expect((await runUpdate(sb, sb.extra)).code).toBe(1);
+    expect(readFileSync(join(sb.state, 'previous-good-release'), 'utf8')).toBe(prior);
+    expect(readFileSync(join(sb.state, 'last-good-release'), 'utf8')).toBe(pair(old, oldEdge));
+  });
+  it('повторный подъём той же TLS-пары не затирает предыдущую', async () => {
+    const sb = host({ tls: true });
+    const prior = pair(next, nextEdge);
+    writeFileSync(join(sb.state, 'previous-good-release'), prior);
+    expect(
+      (await runUpdate(sb, { ...sb.extra, VOID_IMAGE: old, VOID_CADDY_IMAGE: oldEdge })).code,
+    ).toBe(0);
+    expect(readFileSync(join(sb.state, 'previous-good-release'), 'utf8')).toBe(prior);
+  });
+  it('без TLS хранит предыдущий digest после успешной проверки здоровья', async () => {
+    const sb = host();
+    expect((await runUpdate(sb, sb.extra)).code).toBe(0);
+    expect(readFileSync(join(sb.state, 'previous-good-image'), 'utf8')).toBe(old + '\n');
+    expect(readFileSync(join(sb.state, 'last-good-image'), 'utf8')).toBe(next + '\n');
+  });
+});
