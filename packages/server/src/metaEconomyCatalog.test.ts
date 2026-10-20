@@ -63,4 +63,18 @@ describe('main-game meta content', () => {
     catalog.rewards.participation.finalPresence = 0;
     expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow();
   });
+
+  it('keeps every store offer to one kind of goods with a price the server can compute', () => {
+    const shipped = loadMetaEconomyCatalog(data);
+    expect(Object.keys(shipped.store.offers).length).toBeGreaterThan(0);
+    const mixed = loadMetaEconomyCatalog(data);
+    mixed.store.offers.premium_7!.materials = { ferroalloys: 1 };
+    expect(() => parseMetaEconomyCatalog(mixed, data)).toThrow('E_META_STORE');
+    const unpriced = loadMetaEconomyCatalog(data);
+    unpriced.store.offers.pack_full!.modules!.push('cargo_bay');
+    expect(() => parseMetaEconomyCatalog(unpriced, data)).toThrow('E_META_STORE');
+    const adCurrency = loadMetaEconomyCatalog(data);
+    adCurrency.commerce.products.rewarded_supply!.sovereigns = 10;
+    expect(() => parseMetaEconomyCatalog(adCurrency, data)).toThrow('E_META_AD_PRODUCT');
+  });
 });

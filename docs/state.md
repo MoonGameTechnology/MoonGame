@@ -440,10 +440,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | --- | --- | --- |
 | Корпорации: роли, влияние, стройка | `corpService.ts`, `corpConstruction.ts` | вкл. |
 | Арсенал: стартовый набор, дроп, гейт `E_NOT_OWNED` | `mainGameArsenal.ts`, `arsenal.ts` | вкл. |
-| Мета-экономика: материалы, крафт, выплаты, сезон | `metaEconomy*.ts` | вкл. |
+| Мета-экономика: материалы, крафт, выплаты, сезон, Суверены и витрина за ◆ | `metaEconomy*.ts` | вкл. |
 | Аукцион `MetaMarket`: комиссия 8%, до 20 лотов | `metaMarket.ts` | вкл., от 100 XP |
 | Сессионная AvA, медали, аренда корп-арсенала | `avaService.ts`, `medalService.ts` и др. | выкл. |
-| Магазин Commerce: 4 товара, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |
+| Магазин Commerce: 4 товара и 6 пакетов Суверенов, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |
 
 - AvA ([corporation-wars.md](corporation-wars.md)) и медали монтируют только `main.ts` пакета
   сервера и процесс корпораций ([corporation-service.md](corporation-service.md)).

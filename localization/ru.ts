@@ -3157,6 +3157,18 @@ export const ru: Record<string, string> = {
   'commerce.offer.frontier_fleet_premium.name': 'Пограничный флот: премиум',
   'commerce.offer.frontier_fleet_premium.contents':
     'Премиум-дорожка сезона. Начатую дорожку можно закончить позднее.',
+  'commerce.offer.sovereigns_100.name': '100 Суверенов',
+  'commerce.offer.sovereigns_100.contents': 'Суверены на счёт аккаунта.',
+  'commerce.offer.sovereigns_330.name': '330 Суверенов',
+  'commerce.offer.sovereigns_330.contents': 'Суверены на счёт аккаунта: 300 и 30 в подарок.',
+  'commerce.offer.sovereigns_690.name': '690 Суверенов',
+  'commerce.offer.sovereigns_690.contents': 'Суверены на счёт аккаунта: 600 и 90 в подарок.',
+  'commerce.offer.sovereigns_1440.name': '1 440 Суверенов',
+  'commerce.offer.sovereigns_1440.contents': 'Суверены на счёт аккаунта: 1 200 и 240 в подарок.',
+  'commerce.offer.sovereigns_3125.name': '3 125 Суверенов',
+  'commerce.offer.sovereigns_3125.contents': 'Суверены на счёт аккаунта: 2 500 и 625 в подарок.',
+  'commerce.offer.sovereigns_7800.name': '7 800 Суверенов',
+  'commerce.offer.sovereigns_7800.contents': 'Суверены на счёт аккаунта: 6 000 и 1 800 в подарок.',
   'commerce.offer.rewarded_supply.name': 'Снабжение за рекламу',
   'commerce.offer.rewarded_supply.contents':
     'Личный набор без Варрантов и опыта сезона.',

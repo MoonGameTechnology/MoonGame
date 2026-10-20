@@ -32,6 +32,11 @@ export interface MetaOperationState {
 
 export interface MetaEconomyAccount {
   materials: MaterialLot[];
+  /** Sovereigns ◆: the paid currency, credited only by a verified Commerce entitlement.
+   *  Absent on accounts that never held any. */
+  sovereigns?: number;
+  /** Premium account expiry (epoch ms); absent or past = no premium. */
+  premiumUntil?: number;
   supplyGoal?: string;
   season: Record<string, MetaSeasonState>;
   activeSeasonId?: string;

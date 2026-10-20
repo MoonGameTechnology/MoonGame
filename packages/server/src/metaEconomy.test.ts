@@ -599,3 +599,129 @@ describe('MetaEconomy verified entitlements', () => {
     ).toBe(2);
   });
 });
+
+describe('MetaEconomy Sovereign store', () => {
+  const buyPack = async (f: ReturnType<typeof setup>, id: string, productId = 'sovereigns_1440') =>
+    f.service.applyEntitlement(f.entitlement(id, productId));
+
+  it('credits a verified Sovereign pack with its gift and spends it on premium days', async () => {
+    const f = setup();
+    expect((await f.service.readModel('alice')).sovereigns).toBe(0);
+    expect((await buyPack(f, 'pack')).ok).toBe(true);
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440);
+    const now = f.catalog.seasons[0]!.startsAt + DAY;
+    const first = await f.service.buyOffer('alice', { requestId: 'p1', offerId: 'premium_7' });
+    expect(first).toMatchObject({
+      ok: true,
+      receipt: { sovereignsSpent: 149, premiumUntil: now + 7 * DAY },
+    });
+    // A repeated request returns the same receipt and charges once.
+    expect(await f.service.buyOffer('alice', { requestId: 'p1', offerId: 'premium_7' })).toEqual(
+      first,
+    );
+    // A second term extends the first instead of restarting it.
+    await f.service.buyOffer('alice', { requestId: 'p2', offerId: 'premium_30' });
+    const view = await f.service.readModel('alice');
+    expect(view.sovereigns).toBe(1440 - 149 - 449);
+    expect(view.premiumUntil).toBe(now + 37 * DAY);
+    f.setTime(now + 38 * DAY);
+    expect((await f.service.readModel('alice')).premiumUntil).toBeNull();
+  });
+
+  it('refuses a purchase it cannot pay for without changing anything', async () => {
+    const f = setup();
+    expect(
+      await f.service.buyOffer('alice', { requestId: 'poor', offerId: 'materials_personal' }),
+    ).toEqual({ ok: false, code: 'E_SOVEREIGNS' });
+    expect(await f.service.buyOffer('alice', { requestId: 'x', offerId: 'nope' })).toEqual({
+      ok: false,
+      code: 'E_META_OFFER',
+    });
+    expect(await f.store.read('alice')).toMatchObject({ materials: [], counters: {} });
+  });
+
+  it('prices a module pack by the modules still missing and grants only those, as personal blueprints', async () => {
+    const f = setup();
+    await buyPack(f, 'pack', 'sovereigns_3125');
+    const shield = await f.service.buyOffer('alice', {
+      requestId: 'one',
+      offerId: 'module_shield_booster',
+    });
+    expect(shield).toMatchObject({ ok: true, receipt: { sovereignsSpent: 180 } });
+    const pack = (await f.service.readModel('alice')).store!.find((o) => o.id === 'pack_defense')!;
+    // Shield owned: only the repair tender is left, 180 ◆ less 15%.
+    expect(pack).toMatchObject({ price: 153, fullPrice: 180 });
+    expect(pack.modules).toEqual([
+      { defId: 'shield_booster', owned: true },
+      { defId: 'repair_tender', owned: false },
+    ]);
+    const bought = await f.service.buyOffer('alice', { requestId: 'two', offerId: 'pack_defense' });
+    expect(bought).toMatchObject({ ok: true, receipt: { sovereignsSpent: 153 } });
+    const items = await f.arsenal.listOf('alice');
+    expect(items.map((item) => item.defId).sort()).toEqual(['repair_tender', 'shield_booster']);
+    expect(items.every((item) => item.soulbound && item.form === 'blueprint')).toBe(true);
+    expect(
+      await f.service.buyOffer('alice', { requestId: 'three', offerId: 'pack_defense' }),
+    ).toEqual({ ok: false, code: 'E_ALREADY_OWNED' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(3125 - 180 - 153);
+  });
+
+  it('sells personal materials and the season premium track once', async () => {
+    const f = setup();
+    await buyPack(f, 'pack');
+    await f.service.buyOffer('alice', { requestId: 'm', offerId: 'materials_ferroalloys' });
+    const lots = (await f.store.read('alice')).materials;
+    expect(lots).toEqual([
+      expect.objectContaining({
+        materialId: 'ferroalloys',
+        quantity: 30,
+        soulbound: true,
+        source: 'commerce',
+      }),
+    ]);
+    const season = f.catalog.seasons[0]!.id;
+    expect(
+      (await f.service.buyOffer('alice', { requestId: 's', offerId: 'season_frontier_fleet' })).ok,
+    ).toBe(true);
+    expect((await f.store.read('alice')).season[season]).toMatchObject({ premium: true });
+    expect(
+      await f.service.buyOffer('alice', { requestId: 's2', offerId: 'season_frontier_fleet' }),
+    ).toEqual({ ok: false, code: 'E_ALREADY_OWNED' });
+  });
+
+  it('refunds an unspent Sovereign pack and sends a spent one to review', async () => {
+    const f = setup();
+    const refundOf = (original: EntitlementCommandV1, id: string) =>
+      f.entitlement(id, original.productId, {
+        kind: 'revoke',
+        originalCommandId: original.commandId,
+        orderId: original.orderId,
+        providerTransactionId: original.providerTransactionId,
+      });
+    const unspent = f.entitlement('unspent', 'sovereigns_100');
+    await f.service.applyEntitlement(unspent);
+    expect(await f.service.applyEntitlement(refundOf(unspent, 'r1'))).toMatchObject({
+      ok: true,
+      receipt: { status: 'revoked' },
+    });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(0);
+    const spent = f.entitlement('spent', 'sovereigns_330');
+    await f.service.applyEntitlement(spent);
+    await f.service.buyOffer('alice', { requestId: 'buy', offerId: 'premium_7' });
+    expect(await f.service.applyEntitlement(refundOf(spent, 'r2'))).toMatchObject({
+      ok: true,
+      receipt: { status: 'review-required' },
+    });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(330 - 149);
+  });
+
+  it('never credits Sovereigns from a rewarded ad', async () => {
+    const f = setup();
+    expect(
+      await f.service.applyEntitlement(
+        f.entitlement('ad', 'sovereigns_100', { source: 'rewarded_ad' }),
+      ),
+    ).toEqual({ ok: false, code: 'E_ENTITLEMENT' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(0);
+  });
+});

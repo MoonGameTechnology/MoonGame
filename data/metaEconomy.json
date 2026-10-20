@@ -168,6 +168,97 @@
       ]
     }
   ],
+  "store": {
+    "modulePrices": {
+      "targeting_array": 180,
+      "shield_booster": 180,
+      "repair_tender": 180,
+      "mine_layer": 200,
+      "siege_platform": 220,
+      "tractor_beam": 220,
+      "rocket_mine_layer": 360
+    },
+    "offers": {
+      "premium_7": { "category": "premium", "price": 149, "premiumDays": 7 },
+      "premium_30": { "category": "premium", "price": 449, "premiumDays": 30 },
+      "premium_90": { "category": "premium", "price": 1090, "premiumDays": 90 },
+      "season_frontier_fleet": {
+        "category": "premium",
+        "price": 690,
+        "premiumSeason": "frontier_fleet_2026"
+      },
+      "pack_defense": {
+        "category": "modules",
+        "modules": ["shield_booster", "repair_tender"],
+        "discountPercent": 15
+      },
+      "pack_assault": {
+        "category": "modules",
+        "modules": ["targeting_array", "siege_platform"],
+        "discountPercent": 15
+      },
+      "pack_control": {
+        "category": "modules",
+        "modules": ["tractor_beam", "mine_layer"],
+        "discountPercent": 15
+      },
+      "pack_full": {
+        "category": "modules",
+        "modules": [
+          "targeting_array",
+          "shield_booster",
+          "repair_tender",
+          "mine_layer",
+          "siege_platform",
+          "tractor_beam",
+          "rocket_mine_layer"
+        ],
+        "discountPercent": 25
+      },
+      "module_targeting_array": { "category": "modules", "modules": ["targeting_array"] },
+      "module_shield_booster": { "category": "modules", "modules": ["shield_booster"] },
+      "module_repair_tender": { "category": "modules", "modules": ["repair_tender"] },
+      "module_mine_layer": { "category": "modules", "modules": ["mine_layer"] },
+      "module_siege_platform": { "category": "modules", "modules": ["siege_platform"] },
+      "module_tractor_beam": { "category": "modules", "modules": ["tractor_beam"] },
+      "module_rocket_mine_layer": { "category": "modules", "modules": ["rocket_mine_layer"] },
+      "materials_personal": {
+        "category": "materials",
+        "price": 60,
+        "materials": {
+          "ferroalloys": 5,
+          "technical_composites": 3,
+          "control_circuits": 3,
+          "energy_cells": 2
+        }
+      },
+      "materials_engineer": {
+        "category": "materials",
+        "price": 250,
+        "materials": {
+          "ferroalloys": 25,
+          "technical_composites": 15,
+          "control_circuits": 15,
+          "energy_cells": 10
+        }
+      },
+      "materials_ferroalloys": {
+        "category": "materials",
+        "price": 120,
+        "materials": { "ferroalloys": 30 }
+      },
+      "materials_circuits": {
+        "category": "materials",
+        "price": 150,
+        "materials": { "control_circuits": 25 }
+      },
+      "materials_archives": {
+        "category": "materials",
+        "price": 200,
+        "materials": { "technology_archives": 1 }
+      }
+    }
+  },
   "commerce": {
     "dailyAdLimit": 2,
     "products": {
@@ -182,6 +273,12 @@
       },
       "module_shield_booster": { "source": "payment", "module": "shield_booster" },
       "frontier_fleet_premium": { "source": "payment", "premiumSeason": "frontier_fleet_2026" },
+      "sovereigns_100": { "source": "payment", "sovereigns": 100 },
+      "sovereigns_330": { "source": "payment", "sovereigns": 300, "bonusSovereigns": 30 },
+      "sovereigns_690": { "source": "payment", "sovereigns": 600, "bonusSovereigns": 90 },
+      "sovereigns_1440": { "source": "payment", "sovereigns": 1200, "bonusSovereigns": 240 },
+      "sovereigns_3125": { "source": "payment", "sovereigns": 2500, "bonusSovereigns": 625 },
+      "sovereigns_7800": { "source": "payment", "sovereigns": 6000, "bonusSovereigns": 1800 },
       "rewarded_supply": {
         "source": "rewarded_ad",
         "materials": {

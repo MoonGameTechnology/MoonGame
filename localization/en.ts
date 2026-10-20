@@ -3148,6 +3148,18 @@ export const en: Record<string, string> = {
   'commerce.offer.frontier_fleet_premium.name': 'Frontier Fleet: Premium',
   'commerce.offer.frontier_fleet_premium.contents':
     'Season premium track. A started pass can be completed later.',
+  'commerce.offer.sovereigns_100.name': '100 Sovereigns',
+  'commerce.offer.sovereigns_100.contents': 'Sovereigns for your account.',
+  'commerce.offer.sovereigns_330.name': '330 Sovereigns',
+  'commerce.offer.sovereigns_330.contents': 'Sovereigns for your account: 300 plus 30 as a gift.',
+  'commerce.offer.sovereigns_690.name': '690 Sovereigns',
+  'commerce.offer.sovereigns_690.contents': 'Sovereigns for your account: 600 plus 90 as a gift.',
+  'commerce.offer.sovereigns_1440.name': '1,440 Sovereigns',
+  'commerce.offer.sovereigns_1440.contents': 'Sovereigns for your account: 1,200 plus 240 as a gift.',
+  'commerce.offer.sovereigns_3125.name': '3,125 Sovereigns',
+  'commerce.offer.sovereigns_3125.contents': 'Sovereigns for your account: 2,500 plus 625 as a gift.',
+  'commerce.offer.sovereigns_7800.name': '7,800 Sovereigns',
+  'commerce.offer.sovereigns_7800.contents': 'Sovereigns for your account: 6,000 plus 1,800 as a gift.',
   'commerce.offer.rewarded_supply.name': 'Rewarded supply',
   'commerce.offer.rewarded_supply.contents':
     'Personal supply without Warrants or season XP.',
