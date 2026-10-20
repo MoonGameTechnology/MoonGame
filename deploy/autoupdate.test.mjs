@@ -50,16 +50,34 @@ function stub(dir, name, body) {
  *  заглушки там, где поведение проверяется отдельно. */
 function writeRelease(dir, { updateExit = 0, verifyExit = 0, marker = '' } = {}) {
   mkdirSync(dir, { recursive: true });
-  for (const f of ['autoupdate.sh', 'stack.sh', 'moongame.sh', 'env-keys.sh', 'production-preflight.sh', 'release-state.sh']) {
+  for (const f of [
+    'autoupdate.sh',
+    'stack.sh',
+    'moongame.sh',
+    'env-keys.sh',
+    'production-preflight.sh',
+    'release-state.sh',
+  ]) {
     cpSync(join(DEPLOY_DIR, f), join(dir, f));
     chmodSync(join(dir, f), 0o755);
   }
-  for (const f of ['docker-compose.yml', 'docker-compose.release.yml', 'docker-compose.tls.yml', 'docker-compose.release-tls.yml'])
+  for (const f of [
+    'docker-compose.yml',
+    'docker-compose.release.yml',
+    'docker-compose.tls.yml',
+    'docker-compose.release-tls.yml',
+  ])
     writeFileSync(join(dir, f), '# stub\n');
   stub(
     dir,
     'verify-image.sh',
     `echo "verify $1 by ${marker || basename(dirname(dir))}" >> "$LOG"\nexit ${verifyExit}`,
+  );
+  stub(
+    dir,
+    'prune-images.sh',
+    `printf '%s\\n' "$*" >> "$STATE_DIR/cleanup-calls"
+exit "\${CLEANUP_EXIT:-0}"`,
   );
   // update.sh версии: пишет точку отката при успехе — как настоящий.
   stub(
@@ -68,8 +86,16 @@ function writeRelease(dir, { updateExit = 0, verifyExit = 0, marker = '' } = {})
     `echo "update.sh(${marker || basename(dirname(dir))}) VOID_IMAGE=$VOID_IMAGE STATE_DIR=$STATE_DIR VOID_CADDY_IMAGE=\${VOID_CADDY_IMAGE:-}" >> "$LOG"
 if [ ${updateExit} -eq 0 ]; then
   if [ -n "\${VOID_CADDY_IMAGE:-}" ]; then
+    if [ -f "$STATE_DIR/last-good-release" ] && ! grep -qxF "server=$VOID_IMAGE" "$STATE_DIR/last-good-release"; then
+      cp "$STATE_DIR/last-good-release" "$STATE_DIR/previous-good-release"
+    fi
     printf 'version=1\\nserver=%s\\ncaddy=%s\\n' "$VOID_IMAGE" "$VOID_CADDY_IMAGE" > "$STATE_DIR/last-good-release"
-  else printf '%s\\n' "$VOID_IMAGE" > "$STATE_DIR/last-good-image"; fi
+  else
+    if [ -s "$STATE_DIR/last-good-image" ] && [ "$(cat "$STATE_DIR/last-good-image")" != "$VOID_IMAGE" ]; then
+      cp "$STATE_DIR/last-good-image" "$STATE_DIR/previous-good-image"
+    fi
+    printf '%s\\n' "$VOID_IMAGE" > "$STATE_DIR/last-good-image"
+  fi
 fi
 exit ${updateExit}`,
   );
@@ -456,5 +482,75 @@ describe('autoupdate.sh — подписанная TLS-пара', () => {
     expect(bootstrap).toContain(`VOID_CADDY_IMAGE=${NEW_EDGE}`);
     expect(sb.pair()).toContain(`server=${NEW}\ncaddy=${NEW_EDGE}`);
     expect(existsSync(join(sb.state, 'prepared-release'))).toBe(false);
+  });
+});
+
+
+describe('autoupdate.sh — очистка кэша образов', () => {
+  const cleanup = (sb) =>
+    existsSync(join(sb.state, 'cleanup-calls'))
+      ? readFileSync(join(sb.state, 'cleanup-calls'), 'utf8').trim().split('\n')
+      : [];
+
+  it('работает вне окна и при AUTODEPLOY=0 без обращения к реестру', async () => {
+    for (const serverEnv of ['AUTODEPLOY=0\n', 'AUTODEPLOY_WINDOW=04:00-07:00\n']) {
+      const sb = sandbox({ serverEnv, now: '19:30' });
+      expect((await agent(sb)).code).toBe(0);
+      expect(cleanup(sb)).toEqual([`--apply ${OLD}`]);
+      expect(sb.readLog()).toBe('');
+    }
+  });
+
+  it('после выкатки сохраняет предыдущую TLS-пару и защищает её при следующих прогонах', async () => {
+    const sb = sandbox({ tls: true });
+    expect((await agent(sb)).code).toBe(0);
+    expect(readFileSync(join(sb.state, 'previous-good-release'), 'utf8')).toBe(
+      `version=1\nserver=${OLD}\ncaddy=${OLD_EDGE}\n`,
+    );
+    expect(cleanup(sb)).toEqual([
+      `--apply ${OLD} ${OLD_EDGE}`,
+      `--apply ${NEW} ${NEW_EDGE} ${OLD} ${OLD_EDGE}`,
+    ]);
+    await agent(sb);
+    expect(cleanup(sb).at(-1)).toBe(`--apply ${NEW} ${NEW_EDGE} ${OLD} ${OLD_EDGE}`);
+  });
+
+  it('защищает предыдущий образ и подготовленного кандидата без TLS', async () => {
+    const sb = sandbox({ remote: OLD });
+    const prior = `${REPO}@sha256:${'c'.repeat(64)}`;
+    writeFileSync(join(sb.state, 'previous-good-image'), prior + '\n');
+    writeFileSync(join(sb.state, 'prepared-image'), NEW + '\n');
+    await agent(sb);
+    expect(cleanup(sb)).toEqual([`--apply ${OLD} ${prior} ${NEW}`]);
+  });
+
+  it('--cleanup-dry-run защищает подготовленную TLS-пару и не выкатывает новую версию', async () => {
+    const sb = sandbox({ tls: true });
+    writeFileSync(
+      join(sb.state, 'prepared-release'),
+      `version=1\nserver=${NEW}\ncaddy=${NEW_EDGE}\n`,
+    );
+    expect((await agent(sb, ['--cleanup-dry-run'])).code).toBe(0);
+    expect(cleanup(sb)).toEqual([`--dry-run ${OLD} ${OLD_EDGE} ${NEW} ${NEW_EDGE}`]);
+    expect(sb.readLog()).toBe('');
+    expect(sb.currentTarget()).toBe(pairId(OLD, OLD_EDGE));
+  });
+
+  it('повреждённый checkpoint и отсутствие текущего pin запрещают очистку', async () => {
+    const sb = sandbox({ tls: true });
+    writeFileSync(join(sb.state, 'previous-good-release'), 'broken\n');
+    expect((await agent(sb, ['--cleanup'])).code).toBe(1);
+    expect(cleanup(sb)).toEqual([]);
+    const empty = sandbox({ lastGood: '' });
+    expect((await agent(empty, ['--cleanup'])).code).toBe(1);
+    expect(cleanup(empty)).toEqual([]);
+  });
+
+  it('ошибка уборки не отменяет здоровую выкатку, ручная команда возвращает ошибку', async () => {
+    const sb = sandbox();
+    expect((await agent(sb, [], { CLEANUP_EXIT: '1' })).code).toBe(0);
+    expect(sb.lastGood()).toBe(NEW);
+    expect(readFileSync(join(sb.state, 'previous-good-image'), 'utf8').trim()).toBe(OLD);
+    expect((await agent(sb, ['--cleanup'], { CLEANUP_EXIT: '1' })).code).toBe(1);
   });
 });

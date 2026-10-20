@@ -50,7 +50,7 @@ PAIR_FILE="$STATE_DIR/last-good-release"
 # Файлы, без которых версия `deploy/` не способна ни выкатить себя, ни подняться после
 # ребута. Образ без них (собранный до автодеплоя) агент не катит: иначе следующий прогон
 # таймера искал бы себя в каталоге, где его нет.
-REQUIRED_FILES="autoupdate.sh update.sh stack.sh moongame.sh verify-image.sh env-keys.sh production-preflight.sh release-state.sh docker-compose.yml docker-compose.release.yml"
+REQUIRED_FILES="autoupdate.sh update.sh stack.sh moongame.sh verify-image.sh env-keys.sh production-preflight.sh release-state.sh prune-images.sh docker-compose.yml docker-compose.release.yml"
 
 if [ "$TLS" = 1 ]; then REQUIRED_FILES+=" docker-compose.tls.yml docker-compose.release-tls.yml"; fi
 MODE=timer
@@ -59,8 +59,10 @@ case "${1:-}" in
   --now) MODE=now ;;
   --bootstrap) MODE=bootstrap ;;
   --prepare-bootstrap) MODE=prepare ;;
+  --cleanup) MODE=cleanup ;;
+  --cleanup-dry-run) MODE=cleanup-dry-run ;;
   *)
-    echo "usage: $0 [--now|--bootstrap|--prepare-bootstrap]" >&2
+    echo "usage: $0 [--now|--bootstrap|--prepare-bootstrap|--cleanup|--cleanup-dry-run]" >&2
     exit 2
     ;;
 esac
@@ -232,6 +234,41 @@ prune_releases() {
   done
 }
 
+# Cleanup shares the deployment lock. It runs before window/registry checks so a
+# disabled rollout or registry outage cannot make the local cache grow indefinitely.
+prune_cached_images() {
+  local mode="${1:---apply}" file value
+  local -a pins=()
+  if [ "$TLS" = 1 ]; then
+    [ -e "$PAIR_FILE" ] || { log E_IMAGE_CLEANUP_NO_CHECKPOINT; return 1; }
+    release_pair_read "$PAIR_FILE" || { log E_IMAGE_CLEANUP_CHECKPOINT; return 1; }
+    pins+=("$RELEASE_SERVER" "$RELEASE_CADDY")
+  else
+    value="$(cat "$LAST_GOOD" 2>/dev/null)" || { log E_IMAGE_CLEANUP_NO_CHECKPOINT; return 1; }
+    release_ref_valid "$value" || { log E_IMAGE_CLEANUP_CHECKPOINT; return 1; }
+    pins+=("$value")
+  fi
+  # Pin both formats, including an installer candidate staged before a restart.
+  for file in "$STATE_DIR/previous-good-release" "$STATE_DIR/prepared-release"; do
+    if [ -e "$file" ] || [ -L "$file" ]; then
+      release_pair_read "$file" || { log E_IMAGE_CLEANUP_CHECKPOINT; return 1; }
+      pins+=("$RELEASE_SERVER" "$RELEASE_CADDY")
+    fi
+  done
+  for file in "$STATE_DIR/previous-good-image" "$STATE_DIR/prepared-image"; do
+    if [ -e "$file" ] || [ -L "$file" ]; then
+      value="$(cat "$file")" || { log E_IMAGE_CLEANUP_CHECKPOINT; return 1; }
+      release_ref_valid "$value" || { log E_IMAGE_CLEANUP_CHECKPOINT; return 1; }
+      pins+=("$value")
+    fi
+  done
+  IMAGE_REPO="$IMAGE_REPO" CADDY_REPO="$CADDY_REPO" \
+    bash "$HERE/prune-images.sh" "$mode" "${pins[@]}" || {
+      log E_IMAGE_CLEANUP_FAILED
+      return 1
+    }
+}
+
 # ---------------------------------------------------------------------------------------
 
 mkdir -p "$RELEASES"
@@ -242,6 +279,17 @@ exec 9>"$STATE_DIR/autoupdate.lock"
 if ! flock -n 9; then
   log "уже идёт другая выкатка — пропускаю этот прогон"
   exit 0
+fi
+
+if [ "$MODE" = cleanup ] || [ "$MODE" = cleanup-dry-run ]; then
+  cleanup_mode=--apply
+  if [ "$MODE" = cleanup-dry-run ]; then cleanup_mode=--dry-run; fi
+  prune_cached_images "$cleanup_mode"
+  exit $?
+fi
+# No cleanup on an unbootstrapped host; no authoritative recovery pin exists yet.
+if [ -s "$LAST_GOOD" ] || [ -e "$PAIR_FILE" ]; then
+  prune_cached_images || true
 fi
 
 if [ "$MODE" = timer ] && [ "$(env_value AUTODEPLOY)" = "0" ]; then
@@ -360,6 +408,7 @@ if STATE_DIR="$STATE_DIR" VOID_IMAGE="$REF" VOID_CADDY_IMAGE="$CADDY_REF" DEPLOY
   if [ "$MODE" = bootstrap ]; then rm -f "$STATE_DIR/prepared-release" "$STATE_DIR/prepared-image"; fi
   record "$PREV" "$REF" ok "$(running_version)"
   prune_releases "$NEW_ID" "$PREV_ID"
+  prune_cached_images || true
   exit 0
 fi
 

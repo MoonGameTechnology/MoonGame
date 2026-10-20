@@ -65,6 +65,7 @@ Zero touch не значит «никогда». Значит «никогда �
 | Production-миграции выполняет отдельный migrator до запуска DML-runtime | `deploy/update.sh`, `packages/server/src/databaseAdmin.ts` |
 | `/health` называет запущенную сборку (короткий sha коммита), смоук это проверяет | `packages/server/src/buildVersion.ts`, `image.yml` |
 | Доставка на хост: таймер раз в 5 минут, окно тихих часов, подписи пары → pull → миграция → up → readiness → откат, журнал выкаток | `deploy/autoupdate.sh`, `deploy/install-autodeploy.sh` |
+| Очистка локального кэша: пять последних ревизий сервера/Caddy, сохранение checkpoint и образов всех контейнеров | `deploy/prune-images.sh`, общий замок и таймер `deploy/autoupdate.sh`; [правила хранения](../../deploy/README.md#очистка-старых-образов) |
 | Клиент выкатывает Cloudflare Workers Builds на push в `main` | `wrangler.jsonc` |
 
 Клиент уже zero touch. У сервера есть обе половины: собрать, проверить, подписать и

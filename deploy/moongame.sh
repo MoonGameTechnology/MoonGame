@@ -40,6 +40,13 @@ case "${1:-}" in
     # Тот же путь, что у таймера (подпись, здоровье, откат), и та же строка в журнале.
     as_service bash "$HERE/autoupdate.sh" --now
     ;;
+  cleanup-images)
+    case "${2:-}" in
+      "") as_service bash "$HERE/autoupdate.sh" --cleanup ;;
+      --dry-run) as_service bash "$HERE/autoupdate.sh" --cleanup-dry-run ;;
+      *) echo 'usage: moongame cleanup-images [--dry-run]' >&2; exit 2 ;;
+    esac
+    ;;
   history)
     # Последние выкатки и откаты (ZTP-1.3). Полный файл — $STATE_DIR/deploy-history.
     as_service tail -n "${2:-20}" "$STATE_DIR/deploy-history"
@@ -63,6 +70,7 @@ case "${1:-}" in
     echo "  logs        — логи сервера (Ctrl+C для выхода)"
     echo "  journal     — журнал юнитов сервера и автообновления"
     echo "  update      — выкатить свежую подписанную сборку сейчас, мимо окна"
+    echo "  cleanup-images [--dry-run] — очистить старые образы или показать план"
     echo "  history [N] — последние выкатки и откаты"
     echo "  version     — что сейчас запущено"
     echo ""
