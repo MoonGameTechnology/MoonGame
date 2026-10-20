@@ -399,11 +399,18 @@ function paintSky(g: CanvasRenderingContext2D): void {
     g.lineTo(VW, y);
   }
   g.stroke();
-  if (starfieldOn())
+  if (starfieldOn()) {
+    // One colour for all the stars, their brightness in the alpha: the canvas parses a colour
+    // string through a cache of eight, and 280 distinct ones missed it in every frame of a
+    // gesture, each miss leaving a heap object that only a major GC frees.
+    const alpha = g.globalAlpha;
+    g.fillStyle = '#bfeee6';
     for (const st of STARS) {
-      g.fillStyle = rgba('#bfeee6', st.b * 0.45);
+      g.globalAlpha = alpha * st.b * 0.45;
       g.fillRect(st.x * VW, st.y * VH, 0.7, 0.7);
     }
+    g.globalAlpha = alpha;
+  }
 }
 
 /** A screen rectangle in CSS pixels; a bake's view reaches past the screen by its margin. */

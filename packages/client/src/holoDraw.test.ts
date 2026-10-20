@@ -20,23 +20,39 @@ describe('holographic sprite context recovery', () => {
     clearHolographicSprites();
     vi.unstubAllGlobals();
   });
-  it('composes glow opacity with the current LOD layer and restores it', () => {
-    const noop = () => {};
-    const sprite = {
-      setTransform: noop,
-      fillRect: noop,
-      createRadialGradient: () => ({ addColorStop: noop }),
-    };
-    vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => sprite }) });
-    const alphas: number[] = [];
-    const target = {
-      globalAlpha: 0.25,
-      drawImage: () => alphas.push(target.globalAlpha),
-    };
-    blitGlow(target as unknown as CanvasRenderingContext2D, 1, '#aabbcc', 20, 20, 8, 0.5);
-    expect(alphas).toEqual([0.125]);
-    expect(target.globalAlpha).toBe(0.25);
-  });
+  it.each([blitGlow, blitSphere])(
+    'composes sprite opacity with the current LOD layer and restores it without save()',
+    (draw) => {
+      const noop = () => {};
+      const sprite = {
+        globalAlpha: 1,
+        setTransform: noop,
+        save: noop,
+        restore: noop,
+        beginPath: noop,
+        moveTo: noop,
+        lineTo: noop,
+        stroke: noop,
+        arc: noop,
+        fillRect: noop,
+        createRadialGradient: () => ({ addColorStop: noop }),
+      };
+      vi.stubGlobal('document', {
+        createElement: () =>
+          Object.assign(new EventTarget(), { width: 0, height: 0, getContext: () => sprite }),
+      });
+      const alphas: number[] = [];
+      // No save()/restore() on the target: a blit per node per frame would leave heap
+      // garbage that only a major GC frees.
+      const target = {
+        globalAlpha: 0.25,
+        drawImage: () => alphas.push(target.globalAlpha),
+      };
+      draw(target as unknown as CanvasRenderingContext2D, 1, '#aabbcc', 20, 20, 8, 0.5);
+      expect(alphas).toEqual([0.125]);
+      expect(target.globalAlpha).toBe(0.25);
+    },
+  );
   it.each([blitGlow, blitSphere])(
     'keeps frequent-read sprites separate from default and legacy targets',
     (draw) => {
