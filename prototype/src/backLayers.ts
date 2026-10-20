@@ -136,6 +136,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['tgted', 'layer'], // меню точки в режиме «Приказ» (CHAIN-UX), z46
   ['logwin', 'layer'], // журнал, z46
   ['codexhub', 'layer'], // кодекс из хаба, z45
+  ['arsenal-sheet', 'layer'], // шторка арсенала хаба на телефоне — внутри хаба (z52), под кодексом из неё
   ['pingpanel', 'layer'], // окно «Метки коалиции», z60
   ['pingpop', 'layer'], // всплывашка пинга, z45
   ['splitdlg', 'layer'], // диалог разделения флота, z45

@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { metaMarketHtml } from './metaMarketScreen';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { initMetaMarket, metaMarketHtml } from './metaMarketScreen';
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('meta market screen', () => {
   it('renders wallet, listings and only tradable instances in the sell section', () => {
@@ -88,5 +90,48 @@ describe('meta market screen', () => {
     );
     expect(html).toContain('data-mm-material-buy="buy" disabled');
     expect(html).toContain('data-mm-material-cancel="mine">');
+  });
+
+  // «Продать» в арсенале ведёт сюда: форма продажи этой копии в фокусе, но только после
+  // загрузки (раньше её перерисовка сбросила бы фокус) и только один раз.
+  it('focuses the sell form of the copy the arsenal sent, once the market has loaded', async () => {
+    const copy = {
+      itemId: 'drop-b',
+      kind: 'module' as const,
+      form: 'blueprint' as const,
+      defId: 'targeting_array',
+      soulbound: false,
+      origin: 'drop' as const,
+      acquiredAt: 1,
+    };
+    const focused: string[] = [];
+    const root = {
+      innerHTML: '',
+      addEventListener: () => {},
+      querySelector: (selector: string) => ({
+        scrollIntoView: () => {},
+        focus: () => focused.push(selector),
+      }),
+    };
+    vi.stubGlobal('CSS', { escape: (value: string) => value });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ balance: 0, feeRate: 0.08, listings: [] }),
+      })),
+    );
+    const market = initMetaMarket({
+      root: () => root as unknown as HTMLElement,
+      arsenal: () => [copy],
+      authorizedBase: async () => ({ base: 'https://srv', token: 'tok' }),
+      note: () => {},
+    });
+    market.focusSell('drop-b');
+    await market.refresh();
+    expect(root.innerHTML).toContain('data-mm-price="drop-b"');
+    expect(focused).toEqual(['[data-mm-price="drop-b"]']);
+    await market.refresh();
+    expect(focused).toHaveLength(1);
   });
 });

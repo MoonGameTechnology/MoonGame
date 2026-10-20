@@ -275,9 +275,21 @@ export class MetaEconomy {
               freeClaimed: progress?.claimed.includes(`free:${milestone.level}`) ?? false,
               premiumClaimed: progress?.claimed.includes(`premium:${milestone.level}`) ?? false,
               choices: milestone.free.choices ?? [],
+              ...(milestone.free.module ? { module: milestone.free.module } : {}),
             })),
           };
         }),
+        drops: {
+          pityAfter: this.deps.dropTables.pityAfter,
+          byPlace: [...this.deps.dropTables.byPlace]
+            .sort((a, b) => a.maxPlace - b.maxPlace)
+            .map(({ maxPlace, chance }) => ({ maxPlace, chance })),
+          pool: this.deps.dropTables.pool.map(({ kind, defId, weight }) => ({
+            kind,
+            defId,
+            weight,
+          })),
+        },
       };
     });
   }

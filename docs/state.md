@@ -336,9 +336,12 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
   `prototype/build.mjs`), кнопки `.btn-main`/`.btn-second`/`.btn-quiet`/`.btn-x`. Палитра
   `--sf-*` — копия `surfaceTheme` из того же `theme.ts`, равенство держит `surfaceTokens.test.ts`.
-- Хаб: вкладки Домой, Игры, Арсенал, Альянсы, Ещё; дверь — `decisions/hubDoor.ts`; «Снабжение»
-  и аукцион — `metaEconomyScreen.ts`, `metaMarketScreen.ts`. Кабинет корпорации `corpScreen.ts`
-  — 7 вкладок; постройки — `data/corpBuildings.json`.
+- Хаб: вкладки Домой, Игры, Арсенал, Альянсы, Ещё; дверь — `decisions/hubDoor.ts`. Арсенал
+  (`arsenalScreen.ts`, решения — `decisions/arsenalView.ts`): модули и корабли с недостающими,
+  цель мастерской, сборка и разбор, способы получить модуль с шансами наград; на телефоне
+  карточка открывается шторкой. «Снабжение» (материалы, сезон, магазин) и аукцион —
+  `metaEconomyScreen.ts`, `metaMarketScreen.ts`, общая сессия экономики — `metaEconomyClient.ts`.
+  Кабинет корпорации `corpScreen.ts` — 7 вкладок; постройки — `data/corpBuildings.json`.
 - «Производство» (`shipyard.ts`): Корабли, Поддержка, Шаттлы, Пехота, Техника, Герои; отсеки —
   `packages/client/src/loadoutEditor.ts` и `decisions/slotCallouts.ts`. «Герои» — `heroStaff.ts`:
   `hero.spawn`, `hero.ability`, `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`.

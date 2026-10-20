@@ -30,7 +30,7 @@ import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import { slotCallouts, type SlotCallout } from '../../decisions/slotCallouts';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
-import { isPercentStat, isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
+import { effectChip, STAT_KEY } from './moduleEffect';
 import {
   effectiveStats,
   matchCost,
@@ -148,35 +148,8 @@ export const RES_KEY: Record<string, string> = {
   food: 'res.of.food',
   microelectronics: 'res.of.microelectronics',
 };
-// Short stat labels for module-effect chips («+4 атака», «+15 щит»).
-export const STAT_KEY: Record<string, string> = {
-  attack: 'div.stat.attack',
-  defense: 'div.stat.defense',
-  hp: 'stat.hp',
-  shield: 'stat.shield',
-  speed: 'stat.speed',
-  cargoCapacity: 'stat.cargo',
-  radarRange: 'stat.radar',
-  pointDefense: 'stat.point-defense',
-  siegeDamage: 'loadout.stat.siege',
-  // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
-  shieldRegen: 'loadout.stat.shield-regen',
-  hullRepair: 'loadout.stat.hull-repair',
-  retreatPull: 'loadout.stat.retreat-pull',
-  salvageBonus: 'loadout.stat.salvage',
-  fleetHullRepair: 'loadout.stat.fleet-repair',
-  mineCharge: 'loadout.stat.mine-charge',
-  mineHit: 'loadout.stat.mine-hit',
-};
-/** Чип эффекта модуля: доля в час — процентом («+5%/ч»), прочее — как есть. */
-const effectChip = (k: string, v: number): string =>
-  `+${
-    isPerHourShare(k)
-      ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) })
-      : isPercentStat(k)
-        ? t('loadout.stat.percent', { n: perHourPercent(v) })
-        : Math.round(v * 10) / 10
-  } ${t(STAT_KEY[k] ?? k)}`;
+// Подписи статов и чип эффекта модуля — у арсенала и верфи общие (`moduleEffect.ts`).
+export { STAT_KEY };
 
 /**
  * Редкость и звёзды модуля — языком карточек Сектора Зеро: слово ступени её цветом и горящие

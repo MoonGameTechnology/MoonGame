@@ -855,6 +855,10 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #codexhub{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #codexhub.show{display:flex;}
+/* Справочник, открытый из хаба (из арсенала, из «Ещё»), лежит поверх хаба (#hub 52), а не за ним.
+   Класс body.hub-open ставит showHub(); в партии слои остаются прежними. */
+body.hub-open #codexhub{z-index:53;}
+body.hub-open #codex{z-index:54;}
 #codexhub .chbox{width:min(460px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--glass);
   border:1px solid var(--cyan);border-radius:10px;padding:14px 16px 12px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 #codexhub .ch-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
@@ -3693,18 +3697,203 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
-/* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
-#hp-arsenal{overflow-y:auto;gap:10px;}
+/* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
+   каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
+   Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт
+   колонкой под зумом. Вкладка прокручивается сама, поэтому карточка справа держится на виду. */
+#hp-arsenal{height:100%;overflow-y:auto;overscroll-behavior:contain;gap:16px;container:arsenal / size;}
+:is(#hp-arsenal,#arsenal-sheet){--rar:var(--sf-dim);color:var(--sf-text);}
+:is(#hp-arsenal,#arsenal-sheet) .r-simple{--rar:var(--rar-simple);}
+:is(#hp-arsenal,#arsenal-sheet) .r-unique{--rar:var(--rar-unique);}
+:is(#hp-arsenal,#arsenal-sheet) .r-mythic{--rar:var(--rar-mythic);}
+:is(#hp-arsenal,#arsenal-sheet) .r-legendary{--rar:var(--rar-legendary);}
+:is(#hp-arsenal,#arsenal-sheet) :is(.btn-main,.btn-second,.btn-quiet){min-height:44px;padding:0 16px;border-radius:10px;
+  font-size:var(--fs-body);}
+:is(#hp-arsenal,#arsenal-sheet) .btn-quiet{padding:0 6px;}
+.ar-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;}
+.ar-head h2{margin:0;font-size:var(--fs-title);font-weight:700;color:var(--sf-hi);}
+.ar-rule{margin:4px 0 0;max-width:60ch;color:var(--sf-dim);line-height:1.5;}
+.ar-tabs{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);}
+.ar-tab{min-height:44px;padding:0 16px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;font:600 var(--fs-heading) var(--sf-font);white-space:nowrap;}
+.ar-tab small{font-size:var(--fs-caption);font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--sf-edge);}
+.ar-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.ar-tab[aria-selected="true"] small{border-color:var(--sf-edge-hi);}
+.ar-status{margin:0;color:var(--sf-dim);line-height:1.5;}
+.ar-status.error{color:var(--red);}
+/* Цель мастерской — верстак над модулями: чего не хватает и кнопка сборки. */
+.ar-goal{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"ic t act" "ic m act";gap:8px 18px;
+  align-items:center;padding:14px 16px;border-radius:14px;border:1px solid var(--sf-panel-edge);
+  background:linear-gradient(120deg,color-mix(in srgb,var(--sf-accent) 9%,transparent),transparent 65%),var(--sf-card);}
+.ar-goal.empty{grid-template-areas:"ic t act";}
+.ar-goal-ic{grid-area:ic;width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:28px;
+  background:color-mix(in srgb,var(--rar) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.ar-goal.empty .ar-goal-ic{font-size:24px;color:var(--sf-dim);}
+.ar-goal-t{grid-area:t;min-width:0;}
+.ar-goal-t > b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.ar-goal-t p{margin:2px 0 0;color:var(--sf-dim);}
+.ar-goal-k{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-goal-n{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;}
+.ar-goal-n b{font-size:var(--fs-heading);color:var(--sf-hi);}
+.ar-goal .ar-mats{grid-area:m;}
+.ar-goal-act{grid-area:act;display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:220px;}
+.ar-goal-p{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-goal-p b{color:var(--sf-hi);font-weight:600;}
+.ar-row2{display:flex;gap:8px;}
+.ar-row2 > *{flex:1;}
+.ar-mats{display:flex;flex-wrap:wrap;gap:6px;}
+.ar-mat{display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:3px 10px;border-radius:8px;
+  border:1px solid var(--sf-edge);background:var(--sf-inset);font-size:var(--fs-caption);}
+.ar-mat b{font-weight:600;color:var(--sf-hi);}
+.ar-mat.short{border-color:color-mix(in srgb,var(--amber) 55%,transparent);}
+.ar-mat.short b{color:var(--amber);}
+.ar-mat.done b{color:var(--grn);}
+.ar-bar{display:block;height:6px;border-radius:3px;background:color-mix(in srgb,var(--sf-accent) 14%,transparent);overflow:hidden;}
+.ar-bar i{display:block;height:100%;border-radius:3px;background:var(--sf-accent);}
+.ar-bar.ok i{background:var(--grn);}
+.ar-guest{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;align-items:center;padding:16px;
+  border-radius:14px;border:1px solid var(--sf-panel-edge);background:var(--sf-card);}
+.ar-guest b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.ar-guest p{margin:4px 0 0;color:var(--sf-dim);line-height:1.5;}
+/* Список и карточка выбранного: рядом на широкой вкладке, одной колонкой на узкой. */
+.ar-main{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start;}
+.ar-list{display:flex;flex-direction:column;gap:20px;min-width:0;}
+.ar-group-h{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line);
+  font-size:var(--fs-heading);font-weight:600;color:var(--sf-head);}
+.ar-group-h small{font-size:var(--fs-caption);font-weight:500;color:var(--sf-dim);padding:2px 8px;border-radius:999px;border:1px solid var(--sf-edge);}
+.ar-group-h small.zero{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 50%,transparent);}
+.ar-mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:10px;}
+.ar-hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:10px;}
+.ar-mc{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:4px 10px;align-items:start;min-height:78px;padding:12px;
+  border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;
+  font:var(--fs-body)/1.35 var(--sf-font);}
+.ar-mc-ic{grid-column:1;grid-row:1 / span 3;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;font-size:21px;
+  background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.ar-mc-nm{grid-column:2;grid-row:1;font-weight:600;color:var(--sf-hi);}
+.ar-mc-sub{grid-column:2 / -1;grid-row:2;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:var(--fs-caption);}
+.ar-rw{color:var(--rar);}
+.ar-get{grid-column:2 / -1;grid-row:3;display:flex;align-items:center;gap:8px;margin-top:4px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-get .ar-bar{flex:1;max-width:96px;}
+.ar-get.ready{color:var(--grn);}
+.ar-tag{grid-column:3;grid-row:1;white-space:nowrap;font-size:var(--fs-caption);font-weight:600;line-height:18px;padding:1px 8px;
+  border-radius:999px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);color:var(--sf-hi);}
+.ar-tag.goal{border-color:var(--sf-accent);color:var(--sf-accent);}
+.ar-mc.miss{border-style:dashed;background:var(--sf-card-off);}
+.ar-mc.miss .ar-mc-ic{filter:grayscale(1);opacity:.55;background:transparent;box-shadow:inset 0 0 0 1px var(--sf-edge);}
+.ar-mc.miss .ar-mc-nm{color:var(--sf-text);}
+.ar-mc.goal{border-color:color-mix(in srgb,var(--sf-accent) 70%,transparent);}
+.ar-hc{display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:12px;border:1px solid var(--sf-edge);
+  background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;font:var(--fs-body)/1.35 var(--sf-font);}
+.ar-hc .ship-art,.ar-noart{display:block;width:100%;aspect-ratio:16 / 10;max-height:none;margin:0;border:0;border-radius:0;background:var(--sf-inset);}
+.ar-hc-b{display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px;}
+.ar-hc-nm{font-weight:600;color:var(--sf-hi);}
+.ar-hc.miss{border-style:dashed;background:var(--sf-card-off);}
+.ar-hc.miss .ship-art{filter:grayscale(.85);opacity:.6;}
+.ar-pips{display:flex;flex-wrap:wrap;gap:5px;}
+.ar-pip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 7px;border-radius:7px;border:1px dashed var(--sf-edge);
+  font-size:var(--fs-caption);}
+.ar-pip i{font-style:normal;}
+.ar-pip.none{border-color:transparent;padding:0;color:var(--sf-dim);}
+:is(.ar-mc,.ar-hc,.ar-fchip,.ar-mchip):hover{border-color:var(--sf-edge-hi);}
+:is(.ar-mc,.ar-hc)[aria-pressed="true"]{border-color:var(--sf-edge-hi);background:var(--sf-sel);}
+:is(.ar-tab,.ar-mc,.ar-hc,.ar-fchip,.ar-mchip):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+/* Карточка выбранного. Справа она липнет к верху вкладки и прокручивается сама. */
+.ar-detail{position:sticky;top:0;max-height:calc(100cqh - 2px);overflow-y:auto;overscroll-behavior:contain;padding:18px;border-radius:14px;
+  border:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);}
+.ar-detail:empty{display:none;}
+@container arsenal (min-width:700px){.ar-main{grid-template-columns:minmax(0,1fr) minmax(320px,380px);}}
+.ar-dt{display:flex;flex-direction:column;gap:16px;}
+.ar-dt-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;}
+.ar-dt-ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:26px;
+  background:color-mix(in srgb,var(--rar) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.ar-dt-ic.miss{filter:grayscale(1);opacity:.6;}
+.ar-dt h3{margin:0;font-size:var(--fs-title);line-height:1.25;color:var(--sf-hi);text-wrap:balance;}
+.ar-dt-meta{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:2px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-dt-meta .ar-rw{font-weight:600;}
+.ar-dt > .ship-art{max-height:180px;margin:0;border-radius:12px;border-color:var(--sf-edge);}
+.ar-dt-eff{display:flex;flex-wrap:wrap;gap:6px;}
+.ar-dt-eff span{padding:6px 12px;border-radius:9px;border:1px solid var(--sf-edge);background:var(--sf-inset);color:var(--sf-hi);font-weight:600;}
+.ar-sec{display:flex;flex-direction:column;gap:8px;}
+.ar-sec h4{margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
+.ar-sec h4 small{font-size:var(--fs-caption);font-weight:500;color:var(--sf-dim);}
+.ar-note{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.ar-note.warn{color:var(--amber);}
+.ar-fits,.ar-mchips,.ar-bays{display:flex;flex-wrap:wrap;gap:8px;}
+.ar-fchip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:3px 10px 3px 3px;border-radius:9px;
+  border:1px solid var(--sf-edge);background:var(--sf-inset);color:var(--sf-text);font:var(--fs-caption) var(--sf-font);cursor:pointer;}
+span.ar-fchip{cursor:default;}
+.ar-fchip .ship-art--thumb{width:42px;height:28px;border-radius:6px;border:0;}
+.ar-mchip{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;border-radius:9px;border:1px solid var(--sf-edge);
+  background:var(--sf-inset);color:var(--sf-text);font:var(--fs-caption) var(--sf-font);cursor:pointer;}
+.ar-mchip.miss{border-style:dashed;color:var(--sf-dim);}
+.ar-mchip.miss .ar-mi{filter:grayscale(1);opacity:.6;}
+.ar-rd{width:7px;height:7px;border-radius:50%;background:var(--rar);}
+.ar-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+.ar-stat{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--sf-inset);}
+.ar-stat span{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-stat b{color:var(--sf-hi);white-space:nowrap;}
+.ar-bay{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:9px;border:1px dashed var(--sf-edge-hi);}
+.ar-bay i{font-style:normal;}
+.ar-bay b{color:var(--sf-hi);}
+.ar-copies,.ar-ways,.ar-rows{display:flex;flex-direction:column;gap:6px;}
+.ar-ways{gap:8px;}
+.ar-copy{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:10px 12px;border-radius:10px;
+  border:1px solid var(--line);background:var(--sf-inset);}
+.ar-copy b{display:block;font-weight:600;color:var(--sf-hi);}
+.ar-copy-st{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-copy-st.ok{color:var(--grn);}
+.ar-copy-st.bound{color:var(--cur-sovereigns);}
+.ar-acts,.ar-acts-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.ar-way{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);}
+.ar-way-h{display:flex;align-items:center;gap:10px;}
+.ar-way-h i{flex:0 0 auto;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-style:normal;
+  border:1px solid var(--sf-edge);background:var(--sf-inset);}
+.ar-way-h b{flex:1;font-weight:600;color:var(--sf-hi);}
+.ar-way-h small{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-way p{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.ar-mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;font-size:var(--fs-caption);}
+.ar-mrow b{font-weight:600;color:var(--sf-hi);}
+.ar-mrow b.lack{color:var(--amber);}
+.ar-mrow .ar-bar{grid-column:1 / -1;height:4px;}
+.ar-tagline{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:9px;border:1px solid var(--sf-accent);
+  color:var(--sf-accent);font-size:var(--fs-caption);font-weight:600;}
+.ar-confirm{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);}
+.ar-confirm p{margin:0;}
+/* Узкая вкладка (телефон): одна колонка, карточка выбранного уходит в шторку. */
+@container arsenal (max-width:699px){
+  .ar-head{align-items:stretch;}
+  .ar-tabs{display:flex;width:100%;}
+  .ar-tab{flex:1;padding:0 8px;gap:7px;}
+  .ar-goal{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ic t" "m m" "act act";gap:10px 12px;padding:12px;}
+  .ar-goal.empty{grid-template-areas:"ic t" "act act";}
+  .ar-goal-ic{width:46px;height:46px;font-size:23px;}
+  .ar-goal-act{min-width:0;}
+  .ar-guest{grid-template-columns:1fr;}
+  .ar-mgrid{grid-template-columns:1fr;gap:8px;}
+  .ar-hgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .ar-hc-b{padding:8px 10px 10px;gap:5px;}
+}
+/* Шторка телефона — поверх хаба, вне его прокрутки: стекло тела хаба (backdrop-filter)
+   сделало бы fixed-потомка частью себя. */
+#arsenal-sheet{position:fixed;inset:0;z-index:5;display:none;}
+#arsenal-sheet.open{display:block;}
+.ar-scrim{position:absolute;inset:0;background:rgba(1,5,9,.6);}
+.ar-sheet{position:absolute;left:0;right:0;bottom:0;max-height:86%;display:flex;flex-direction:column;
+  border-radius:20px 20px 0 0;border-top:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);
+  padding-bottom:env(safe-area-inset-bottom,0px);animation:ar-rise .22s ease-out;}
+.ar-sheet-top{position:relative;display:flex;justify-content:flex-end;padding:8px 10px 0;}
+.ar-sheet-top::before{content:"";position:absolute;left:50%;top:10px;width:40px;height:4px;border-radius:2px;background:var(--sf-edge);
+  transform:translateX(-50%);}
+.ar-sheet-top .btn-x{width:44px;height:44px;border-radius:10px;font-size:18px;}
+.ar-sheet-body{overflow-y:auto;overscroll-behavior:contain;padding:0 16px 22px;}
+@keyframes ar-rise{from{transform:translateY(32px);opacity:0;}}
+@media (prefers-reduced-motion:reduce){.ar-sheet{animation:none;}}
+/* Палец: цели от 44 px (UIX-1.3). */
+@media (pointer:coarse){
+  :is(#hp-arsenal,#arsenal-sheet) :is(.ar-fchip,.ar-mchip,.ar-tagline){min-height:44px;}
+}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:var(--fs-caption)}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
 #hp-supply{overflow-y:auto;gap:16px;padding-bottom:24px}.me-section{display:flex;flex-direction:column;gap:10px}.me-section h3,.me-section h4{margin:0}.me-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.me-head h2{margin:0;color:var(--cyan);font-size:20px}.me-hint{margin:0;color:var(--dim);font-size:var(--fs-caption);line-height:1.45}.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}.me-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--glass)}.me-card.me-goal{border-color:var(--cyan)}.me-card h4{margin:0}.me-amounts{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.me-amounts span,.me-row span{color:var(--dim)}.me-row{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-caption)}.me-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}#hp-supply button{min-height:40px;padding:8px 12px;border:1px solid var(--cyan-dim);border-radius:6px;background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer}#hp-supply button:disabled{opacity:.45;cursor:default}#hp-supply button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.me-badge{color:var(--cyan);font-size:var(--fs-caption)}.me-bound{color:#e8b869;font-size:var(--fs-caption);margin:0}.me-error{color:#ef9b9b}.me-track{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}.me-level{border-top:1px solid var(--line);padding-top:10px}.me-track details>summary{cursor:pointer;padding:8px 0}.me-material-list{display:grid;gap:6px}.me-select{width:100%;padding:8px;background:#07131b;color:var(--ink);border:1px solid var(--line);border-radius:6px}.me-reward{margin:0;padding-left:18px;font-size:var(--fs-caption);color:var(--dim)}
-.ar-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid var(--line);}
-.ar-fchip{padding:3px 9px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--dim);
-  font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.ar-fchip.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
-.ar-fsep{width:1px;height:14px;background:var(--line-hi);margin:0 2px;}
-/* arsenal cards carry a third line (badges + origin) — a touch taller than a hub tile */
-.ar-grid .ar-card{min-height:76px;}
-.ar-meta{color:var(--dim);font-size:var(--fs-caption);}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
   padding-bottom:env(safe-area-inset-bottom,0);}
 #hub .hub-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;cursor:pointer;
@@ -4601,7 +4790,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
-    <div class="hub-panel" id="hp-arsenal" style="display:none"><button id="arsenal-supply" class="hub-solo" type="button" data-i18n="hub.tile.supply"></button><div id="arsenal-items"></div></div>
+    <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
     <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
@@ -4640,6 +4829,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
+  <!-- Шторка арсенала на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
+  <div id="arsenal-sheet"></div>
 </div>
 <div id="emblempick">
   <div class="ep-box">

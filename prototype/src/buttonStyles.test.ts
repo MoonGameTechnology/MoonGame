@@ -4,7 +4,7 @@
 // место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
 // производстве и науке (UIX-11.1), карточке мира, разделении флота, окне боя, рынке, штабе
 // героев, корпорации, итоге партии, входе и обозревателе партий (UIX-11.2), настройке схватки
-// и заставке входа в партию (UIX-16.1):
+// и заставке входа в партию (UIX-16.1), арсенале хаба и его шторке:
 // разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
 // перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
 import { readdirSync, readFileSync } from 'node:fs';
@@ -98,6 +98,12 @@ function converted(part: string): boolean {
   // и «Создать сетевую игру».
   if (/#(setup|seatpick)(?![-\w])/.test(part) && /^\.(sgo|scancel|smapchip)\b/.test(s)) return true;
   if (/^#setup-network-create\b/.test(s)) return true;
+  // Арсенал хаба и шторка телефона: лист задаёт кнопкам только рост и отступы.
+  if (
+    /#(hp-arsenal|arsenal-sheet)(?![-\w])/.test(part) &&
+    /(^|[(,\s])\.btn-(main|second|quiet)\b/.test(s)
+  )
+    return true;
   if (part.includes('#splitdlg') && /^(button|\.cbtn)\b/.test(s)) return true;
   if (/#battlewinbody (\.bw-(actions|orders) )?button\b/.test(part) || s.includes('bw-attack'))
     return true;

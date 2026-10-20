@@ -27,6 +27,7 @@
 | H4 | 🗑 |  | `docs/backlog.md` | Конструктор наземной армии: пехота в 3 вариантах (militia — дешёвое мясо, |
 | MSVC-0 | ✅ | srv | `docs/backlog.md` | Фундамент межсервисных вызовов. |
 | CORP-SVC-1 | ✅ | srv | `docs/backlog.md` | Независимый сервис корпораций. |
+| ARS-9 | ✅ | proto srv | `docs/backlog.md` | Арсенал хаба переделан по макету. |
 | LARS-2 | 🔒 | srv | `docs/backlog.md` | (EC-1.2, EC-2/EC-3 — economy-roadmap.md) Цепочка валют → фронт |
 | CON-3 | 🗑 | proto | `docs/backlog.md` | Армия |
 | SHIP-5 | 🔒 | srv | `docs/backlog.md` | предметы мета-экономики |
