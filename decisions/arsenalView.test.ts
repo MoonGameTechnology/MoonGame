@@ -22,7 +22,6 @@ import {
   percent,
   recipeProgress,
   seasonWays,
-  shopOffersFor,
   type StarterEntry,
 } from './arsenalView';
 
@@ -316,20 +315,6 @@ describe('arsenalView — сезон и магазин', () => {
     expect(seasonWays([claimed], 'targeting_array')).toEqual([]);
     expect(seasonWays([season({ archived: true })], 'targeting_array')).toEqual([]);
     expect(seasonWays([season({ archived: true, level: 12 })], 'targeting_array')).toHaveLength(1);
-  });
-
-  it('магазин — предложения с этим модулем', () => {
-    const offer = {
-      productId: 'module_shield_booster',
-      catalogVersion: 'v',
-      source: 'payment' as const,
-      nameKey: 'n',
-      contentsKey: 'c',
-      contents: { moduleId: 'shield_booster', soulbound: true as const },
-      available: false,
-    };
-    expect(shopOffersFor([offer], 'shield_booster')).toEqual([offer]);
-    expect(shopOffersFor([offer], 'tractor_beam')).toEqual([]);
   });
 });
 

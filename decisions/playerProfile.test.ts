@@ -7,6 +7,12 @@ import {
 import { parsePlayerProfile, placeProfileMedal, tunicFit } from './playerProfile';
 
 describe('profile customization decisions', () => {
+  it('keeps the premium frame only when the server says exactly true', () => {
+    const base = { ...defaultAppearance(), login: 'Alice', xp: 0, progress: {} };
+    expect(parsePlayerProfile({ ...base, premium: true })?.premium).toBe(true);
+    for (const premium of [false, 'true', 1, undefined])
+      expect(parsePlayerProfile({ ...base, premium })).not.toHaveProperty('premium');
+  });
   it('moves one medal instead of duplicating it; removing preserves other slots', () => {
     const original = defaultAppearance();
     original.slots[1] = 'first';

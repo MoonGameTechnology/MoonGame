@@ -4,7 +4,6 @@ import {
   type ArsenalItem,
   type GameData,
 } from '../packages/shared-core/src/index';
-import type { CommerceOffer } from '../packages/protocol/src/commerce';
 import type {
   MetaDropOddsView,
   MetaRecipeView,
@@ -232,11 +231,6 @@ export function seasonWays(seasons: readonly MetaSeasonView[], defId: string): S
     }
   }
   return out;
-}
-
-/** Предложения магазина, которые выдают этот модуль. */
-export function shopOffersFor(offers: readonly CommerceOffer[], defId: string): CommerceOffer[] {
-  return offers.filter((o) => o.contents.moduleId === defId);
 }
 
 /** Что открыть во вкладке «Модули», пока игрок ничего не выбрал: цель мастерской, иначе

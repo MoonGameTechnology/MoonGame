@@ -27,6 +27,8 @@ function setup(options: { authenticated?: boolean; rateMax?: number } = {}) {
     salvage: vi.fn(async () => ok),
     selectPass: vi.fn(async () => ok),
     chooseSeasonReward: vi.fn(async () => ok),
+    buyOffer: vi.fn(async () => ok),
+    claimPremiumDaily: vi.fn(async () => ok),
   };
   const app = Fastify();
   apps.push(app);
@@ -153,6 +155,44 @@ describe('main economy HTTP boundary', () => {
       ).toBe(400);
     }
     expect(economy.craft).not.toHaveBeenCalled();
+  });
+
+  it('buys a store offer for the session owner only and passes no price from the client', async () => {
+    const { app, economy } = setup();
+    const buy = { requestId: 'buy-1', offerId: 'premium_30' };
+    for (const extra of [{ price: 0 }, { accountId: 'victim' }, { sovereigns: 999 }]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/meta-economy/store/buy',
+        payload: { ...buy, ...extra },
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    expect(economy.buyOffer).not.toHaveBeenCalled();
+    vi.mocked(economy.buyOffer).mockResolvedValueOnce({ ok: false, code: 'E_SOVEREIGNS' });
+    const poor = await app.inject({ method: 'POST', url: '/meta-economy/store/buy', payload: buy });
+    expect(poor.statusCode).toBe(409);
+    expect(poor.json()).toEqual({ error: 'E_SOVEREIGNS' });
+    expect(economy.buyOffer).toHaveBeenCalledWith('session-owner', buy);
+  });
+
+  it('claims premium daily Sovereigns for the session owner, with nothing else in the body', async () => {
+    const { app, economy } = setup();
+    const claim = { requestId: 'daily-1' };
+    const forged = await app.inject({
+      method: 'POST',
+      url: '/meta-economy/premium/daily',
+      payload: { ...claim, amount: 999 },
+    });
+    expect(forged.statusCode).toBe(400);
+    expect(economy.claimPremiumDaily).not.toHaveBeenCalled();
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/meta-economy/premium/daily',
+      payload: claim,
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(economy.claimPremiumDaily).toHaveBeenCalledWith('session-owner', claim);
   });
 
   it('limits writes and returns stable errors without database details', async () => {

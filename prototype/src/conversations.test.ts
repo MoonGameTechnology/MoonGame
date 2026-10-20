@@ -36,6 +36,7 @@ function hostOf(over: Partial<ConversationsHost> = {}): ConversationsHost {
     seatBadge: () => ({ icon: '◆', tag: 'tag' }),
     fmtStamp: (at) => `T${at}`,
     ownerColor: () => '#0ff',
+    threadDiploHtml: (id) => `<div class="tdip-${id}"></div>`,
     ...over,
   };
 }
@@ -176,11 +177,54 @@ describe('конверсации — открытая переписка', () =>
 });
 
 describe('конверсации — список и заголовок', () => {
-  it('в списке есть общий канал, коалиция и личка соседа', () => {
+  it('без переписки и союзов в списке только общий канал (COAL-1)', () => {
     const html = initConversations(hostOf()).listHtml();
     expect(html).toContain(`data-convo="${CH_SESSION}"`);
-    expect(html).toContain(`data-convo="${COALITION}"`);
+    expect(html).not.toContain(`data-convo="${COALITION}"`);
+    expect(html).not.toContain('data-convo="p2"');
+    expect(html).toContain('dp-cvnone');
+  });
+
+  it('переписка в любую сторону создаёт личку', () => {
+    const log = [msg({ from: 'p2', to: 'p1', text: 'привет' })];
+    const html = initConversations(hostOf({ messages: () => log })).listHtml();
     expect(html).toContain('data-convo="p2"');
+    expect(html).not.toContain('dp-cvnone');
+  });
+
+  it('служебная строка дипломатии с местом попадает в его личку', () => {
+    const log = [msg({ from: 'p2', to: 'p2', sys: true, text: 'Предложение: Мир' })];
+    const c = initConversations(hostOf({ messages: () => log }));
+    expect(c.messagesOf('p2')).toHaveLength(1);
+    expect(c.listHtml()).toContain('data-convo="p2"');
+  });
+
+  it('предложение без слов тоже создаёт личку', () => {
+    const state: GameState = newGame();
+    state.diplomacyOffers = { 'p2>p1': 'peace' };
+    const html = initConversations(hostOf({ state: () => state })).listHtml();
+    expect(html).toContain('data-convo="p2"');
+  });
+
+  it('канал коалиции появляется только у вступившего', () => {
+    const state: GameState = newGame();
+    state.diplomacy = { ...(state.diplomacy ?? {}), [pairKey('p1', 'p2')]: 'alliance' };
+    expect(initConversations(hostOf({ state: () => state })).listHtml()).toContain(
+      `data-convo="${COALITION}"`,
+    );
+  });
+
+  it('открытый без коалиции канал коалиции уходит на общий', () => {
+    const c = initConversations(hostOf());
+    c.threadHtml();
+    expect(c.current()).toBe(CH_SESSION);
+  });
+
+  it('в личке есть дипломатия, в групповом канале — нет', () => {
+    const c = initConversations(hostOf());
+    expect(c.threadHtml()).not.toContain('tdip-');
+    c.open('p2');
+    expect(c.threadHtml()).toContain('tdip-p2');
   });
 
   it('открытая переписка подсвечена в списке', () => {
@@ -196,14 +240,19 @@ describe('конверсации — список и заголовок', () => 
 
   it('имя соседа экранируется в списке (CWE-79)', () => {
     const html = initConversations(
-      hostOf({ nameOf: (id) => (id === 'p2' ? '<img src=x>' : id) }),
+      hostOf({
+        nameOf: (id) => (id === 'p2' ? '<img src=x>' : id),
+        messages: () => [msg({ from: 'p2', to: 'p1' })],
+      }),
     ).listHtml();
     expect(html).toContain('&lt;img');
     expect(html).not.toContain('<img src=x');
   });
 
   it('в коалиционной ветке есть кнопка пинга, в личке — нет', () => {
-    const c = initConversations(hostOf());
+    const state: GameState = newGame();
+    state.diplomacy = { ...(state.diplomacy ?? {}), [pairKey('p1', 'p2')]: 'alliance' };
+    const c = initConversations(hostOf({ state: () => state }));
     expect(c.threadHtml()).toContain('dp-ping');
     c.open('p2');
     expect(c.threadHtml()).not.toContain('dp-ping');

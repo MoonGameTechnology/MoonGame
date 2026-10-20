@@ -124,7 +124,6 @@ function state(over: Partial<ArsenalState> = {}): ArsenalState {
   return {
     items: owned(),
     view: view(),
-    offers: [],
     guest: false,
     canSignIn: true,
     busy: false,
@@ -383,12 +382,22 @@ describe('арсенал — подробности корабля', () => {
               milestones: [{ ...v.seasons[0]!.milestones[0]!, choices: ['pirate_cruiser'] }],
             },
           ],
+          store: [
+            {
+              id: 'pc-offer',
+              category: 'modules',
+              price: 100,
+              bought: 0,
+              modules: [{ defId: 'pirate_cruiser', owned: false }],
+            },
+          ],
         }),
       }),
     );
     expect(html).toContain('Награда за сетевую партию');
     expect(html).not.toContain('data-ar-craft');
     expect(html).not.toContain('data-ar-season');
+    expect(html).not.toContain('data-ar-store');
   });
 
   it('корабль без отсеков так и говорит', () => {

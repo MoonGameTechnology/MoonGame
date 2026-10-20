@@ -16,7 +16,17 @@ const TOOLS = Object.keys(SECTOR_ZERO_ABSENT_TOOLS) as SessionTool[];
 
 describe('PVR-6.1 — инструменты мультиплеера не едут в забег Sector Zero', () => {
   it('список — ровно решение владельца: дипломатия осталась', () => {
-    expect(TOOLS.sort()).toEqual(['chat', 'corp', 'mail', 'market', 'pings', 'steward']);
+    // Окно коалиций (COAL-1) — туда же: боты в коалиции не вступают, а живых игроков в
+    // забеге нет.
+    expect(TOOLS.sort()).toEqual([
+      'chat',
+      'coalitions',
+      'corp',
+      'mail',
+      'market',
+      'pings',
+      'steward',
+    ]);
   });
 
   it('каждая кнопка существует в разметке рельса', () => {

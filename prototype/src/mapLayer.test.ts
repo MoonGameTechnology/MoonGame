@@ -231,6 +231,20 @@ describe('REFM-232 — статический слой карты', () => {
     expect(ml.provinceGeometry).not.toBe(geo);
   });
 
+  it('туман: местность — какой её знает игрок, скрытая смена не перерисовывает карту', async () => {
+    const { ml, fog, env, home } = await boot({ holo: true });
+    const hidden = Object.values(env.world.planets).find((p) => !fog.known(p.id))!;
+    ml.blitStaticLayer(1000);
+    const geo = ml.provinceGeometry;
+    hidden.terrain = 'asteroid_field';
+    ml.blitStaticLayer(1016);
+    expect(ml.provinceGeometry).toBe(geo);
+    // Своя провинция сменила местность — это знание, и карта перепекается.
+    home('p1').terrain = 'asteroid_field';
+    ml.blitStaticLayer(1032);
+    expect(ml.provinceGeometry).not.toBe(geo);
+  });
+
   it('кадр: в движении небо и карта рисуются живьём, на покое — одна копия готового кадра', async () => {
     const { ml, frame, bg, layer, drawn } = await boot();
     ml.blitStaticLayer(1000);

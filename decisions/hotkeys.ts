@@ -100,6 +100,7 @@ export const HOTKEY_SILENT_LAYERS: readonly string[] = [
   'spotlight',
   'playercard',
   'diplo',
+  'coalwin',
   'warprompt',
   'abandon',
 ];

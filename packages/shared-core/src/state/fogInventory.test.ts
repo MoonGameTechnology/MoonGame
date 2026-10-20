@@ -117,6 +117,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   diplomacyOffers: 'filtered', // а кто с кем ТОРГУЕТСЯ — дело двоих
   mapShares: 'public', // кто с кем делится картой — тоже открытое знание (MAPSHARE-1)
   mapShareOffers: 'filtered', // предложение обмена — переговоры двоих
+  coalitions: 'public', // список коалиций, состав, эмблема и описание — открытые (COAL-1)
+  coalitionSeq: 'public',
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
   market: 'public', // сессионный стакан публичен по замыслу
   marketSeq: 'public',
@@ -449,6 +451,16 @@ function maximalState(): GameState {
       [offerKey(VIEWER, RIVAL)]: true, // зритель — сторона, увидит
       [offerKey(RIVAL, 'CANARY_third')]: true, // чужие переговоры — вырезаются
     },
+    coalitions: {
+      c1: {
+        id: 'c1',
+        founder: 'bystanderA',
+        members: ['bystanderA', 'bystanderB'],
+        emblem: 'star',
+        description: '',
+      },
+    },
+    coalitionSeq: 1,
     intel: {
       // Своё окно — безобидное (свой же мир), чтобы оно не пробило туман само.
       [VIEWER]: [{ kind: 'planet', target: 'A', until: 900 }],

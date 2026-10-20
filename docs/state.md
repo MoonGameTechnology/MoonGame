@@ -250,7 +250,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `hero` — `hero.spawn`, `hero.ability` (один диспетчер способностей из данных),
   `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`; `heroEffects` — эффекты
   `hero.effect.*`: `aura`, `decoy`, `jump`, `recall`, `reveal`.
-- `diplomacy` — `diplomacy.declare/mapshare`: к войне — сразу, к миру — по согласию;
+- `diplomacy` — `diplomacy.declare/mapshare/decline`: к войне — сразу, к миру — по согласию,
+  от чужого предложения можно отказаться; `coalition.leave/edit` — коалиция как сущность
+  (`state/coalition.ts`): принятый союз создаёт её или вводит в неё, вместимость — 15% мест
+  карты, не меньше двух (карта на 20 — 3), сверх неё ядро отбивает `E_COALITION_FULL`;
   `espionage` — `espionage.spy`: окно разведки сквозь туман.
 - `seatClaim` — `seat.claim/confirm/kick/release`: место в идущей сетевой партии.
 
@@ -328,7 +331,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Кадр жеста не мусорит в куче холста: слои флотов и миров держат один `save()` на слой, блоки
   на объект возвращают свойства руками, ширины текста берутся из кэша (`fleetCountBadge.ts`).
   С `save()` на каждый флот мусор при быстром зуме рос быстрее, чем слабый телефон его убирал,
-  и вкладка падала.
+  и вкладка падала. Свежесть выпечки карты кадр сверяет номером знания игрока о мирах
+  (`staticLayerCache.ts`), а не строкой по всем мирам.
 
 **Окна и HUD.**
 - `main.ts` — хозяин мира и проводки; интерфейс разнесён по модулям `init*(host)` (больше 80) с
@@ -349,8 +353,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Хаб: вкладки Домой, Игры, Арсенал, Альянсы, Ещё; дверь — `decisions/hubDoor.ts`. Арсенал
   (`arsenalScreen.ts`, решения — `decisions/arsenalView.ts`): модули и корабли с недостающими,
   цель мастерской, сборка и разбор, способы получить модуль с шансами наград; на телефоне
-  карточка открывается шторкой. «Снабжение» (материалы, сезон, магазин) и аукцион —
+  карточка открывается шторкой. «Снабжение» (материалы, сезон) и аукцион —
   `metaEconomyScreen.ts`, `metaMarketScreen.ts`, общая сессия экономики — `metaEconomyClient.ts`.
+  «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
+  Материалы; покупка за ◆, пакеты ◆ ждут провайдера оплаты.
   Кабинет корпорации `corpScreen.ts` — 7 вкладок; постройки — `data/corpBuildings.json`.
 - «Производство» (`shipyard.ts`): Корабли, Поддержка, Шаттлы, Пехота, Техника, Герои; отсеки —
   `packages/client/src/loadoutEditor.ts` и `decisions/slotCallouts.ts`. «Герои» — `heroStaff.ts`:
@@ -437,10 +443,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | --- | --- | --- |
 | Корпорации: роли, влияние, стройка | `corpService.ts`, `corpConstruction.ts` | вкл. |
 | Арсенал: стартовый набор, дроп, гейт `E_NOT_OWNED` | `mainGameArsenal.ts`, `arsenal.ts` | вкл. |
-| Мета-экономика: материалы, крафт, выплаты, сезон | `metaEconomy*.ts` | вкл. |
+| Мета-экономика: материалы, крафт, выплаты, сезон, Суверены, витрина за ◆, перки премиума | `metaEconomy*.ts` | вкл. |
 | Аукцион `MetaMarket`: комиссия 8%, до 20 лотов | `metaMarket.ts` | вкл., от 100 XP |
 | Сессионная AvA, медали, аренда корп-арсенала | `avaService.ts`, `medalService.ts` и др. | выкл. |
-| Магазин Commerce: 4 товара, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |
+| Магазин Commerce: 4 товара и 6 пакетов Суверенов, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |
 
 - AvA ([corporation-wars.md](corporation-wars.md)) и медали монтируют только `main.ts` пакета
   сервера и процесс корпораций ([corporation-service.md](corporation-service.md)).

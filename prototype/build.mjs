@@ -1105,6 +1105,66 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #diplo{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #diplo.show{display:flex;}
+/* COAL-1: окно коалиций — та же стеклянная коробка, что у дипломатии */
+#coalwin{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#coalwin.show{display:flex;}
+#coalwin .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
+  box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#coalwin .dp-head .cw-title{font-size:var(--fs-body);color:var(--cyan);margin-right:auto;}
+.cw-body{overflow:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;}
+.cw-cap{font-size:var(--fs-caption);color:var(--dim);}
+.cw-hint{font-size:var(--fs-caption);color:var(--ink);border:1px dashed var(--line);border-radius:7px;padding:7px 9px;line-height:1.5;}
+.cw-list{display:flex;flex-direction:column;gap:6px;min-height:90px;}
+.cw-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;text-align:left;
+  border:1px solid var(--line);background:rgba(53,214,230,.03);color:var(--ink);cursor:pointer;font:inherit;}
+.cw-row:hover{background:rgba(53,214,230,.08);}
+.cw-row.mine{border-color:var(--amber);}
+.cw-emb,.cw-big{flex:0 0 auto;display:grid;place-items:center;color:var(--amber);font-variant-emoji:text;
+  border:1px solid rgba(255,190,77,.45);background:rgba(255,190,77,.08);}
+.cw-emb{width:36px;height:36px;border-radius:8px;font-size:20px;}
+.cw-big{width:58px;height:58px;border-radius:12px;font-size:34px;}
+.cw-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.cw-name{font-weight:700;font-size:var(--fs-body);color:#eafffb;}
+.cw-name em{font-style:normal;font-weight:400;color:var(--amber);font-size:var(--fs-caption);}
+.cw-members,.cw-desc{font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cw-members b{font-weight:600;}
+.cw-seats{flex:0 0 auto;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);
+  border:1px solid var(--cyan-dim);border-radius:999px;padding:2px 8px;align-self:center;}
+.cw-seats.full{color:var(--amber);border-color:var(--amber);}
+.cw-hero .cw-seats{align-self:flex-start;}
+.cw-back{align-self:flex-start;background:transparent;border:0;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);cursor:pointer;padding:2px 0;}
+.cw-hero{display:flex;align-items:center;gap:12px;}
+.cw-sec{font-size:var(--fs-caption);color:var(--dim);font-weight:700;margin-top:4px;}
+.cw-mems{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:5px;}
+.cw-mem{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:var(--fs-body);color:var(--ink);}
+.cw-mem.empty{color:var(--dim);border-style:dashed;justify-content:center;}
+.cw-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.cw-pick{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
+.cw-eb{height:38px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:20px;
+  font-variant-emoji:text;cursor:pointer;}
+.cw-eb.on{color:var(--amber);border-color:var(--amber);background:rgba(255,190,77,.12);}
+#cw-text{width:100%;box-sizing:border-box;resize:vertical;background:#06181c;color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:7px 9px;font:var(--fs-body) var(--sf-font);}
+#cw-text:focus{outline:none;border-color:var(--cyan-dim);}
+.cw-text{font-size:var(--fs-body);color:var(--ink);line-height:1.5;white-space:pre-wrap;}
+.cw-acts{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;}
+.cw-save,.cw-leave{padding:7px 12px;border-radius:7px;font:700 var(--fs-caption) var(--sf-font);cursor:pointer;background:transparent;}
+.cw-save{border:1px solid var(--cyan);color:var(--cyan);}
+.cw-leave{border:1px solid var(--line);color:var(--dim);}
+.cw-leave.sure{border-color:#ff6b6b;color:#ff8f8f;}
+/* COAL-1: дипломатия внутри лички — висящие предложения и кнопки нового */
+.dp-tdip{border-top:1px solid var(--line-hi);padding:7px 10px;display:flex;flex-direction:column;gap:6px;}
+.dp-offer{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:var(--fs-caption);color:var(--ink);
+  border:1px solid var(--line);border-radius:7px;padding:6px 8px;}
+.dp-offer span{flex:1 1 140px;}
+.dp-offer.in{border-color:var(--amber);background:rgba(255,190,77,.07);}
+.dp-offer.out{color:var(--dim);}
+.dp-dec{padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);cursor:pointer;}
+.dp-propose{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
+.dp-cvnone{font-size:var(--fs-caption);color:var(--dim);padding:8px 6px;line-height:1.5;}
 #diplo .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
   border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
   box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
@@ -2607,6 +2667,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cw-feed{flex:1;min-height:0;overflow:auto;padding:9px 11px;display:flex;flex-direction:column;gap:6px;
   border-top:1px solid var(--line-hi);scrollbar-width:thin;}
 #chatwin .dp-line{font-size:inherit;}
+/* Свой цвет шрифта (премиум): только текст реплик, служебные строки и пинги — своим цветом. */
+#chatwin .dp-line:not(.sys,.ping){color:var(--cw-ink,#cfe7e3);}
 .cw-empty{color:var(--dim);font-size:var(--fs-caption);text-align:center;margin:auto;padding:14px;line-height:1.5;}
 .cw-compose{display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--line-hi);flex:0 0 auto;}
 .cw-compose input{flex:1;min-width:0;padding:7px 9px;background:rgba(2,10,14,.9);border:1px solid var(--line-hi);
@@ -2722,6 +2784,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */
   #diplo .dp-head b{display:none;}
   #diplo .dp-tab{padding:6px 9px;}
+  /* COAL-1: карточка предложения — текст строкой, «принять/отказаться» поровну под ним */
+  .dp-offer span{flex-basis:100%;}
+  .dp-offer .dp-acc,.dp-offer .dp-dec{flex:1;}
   #side{right:0;left:0;bottom:0;top:auto;width:auto;max-height:50vh;z-index:28;clip-path:none;
     border-left:0;border-right:0;border-top:1px solid var(--cyan);
     padding-bottom:env(safe-area-inset-bottom,0px);}
@@ -3440,7 +3505,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
    clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
+  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#coalwin,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 }
 /* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
@@ -3567,6 +3632,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hub-mode:hover{border-color:var(--sf-edge-hi);}
 #hub .hub-mode:active{transform:translateY(1px);}
 #hub .hub-discord{text-decoration:none;}
+#hub .hub-discord svg.ht-ic{width:22px;height:22px;}
 #hub .hub-discord:focus-visible{outline:2px solid var(--sf-accent);outline-offset:3px;}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
@@ -3663,6 +3729,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #profile .pf-who{flex:1;min-width:0;}
 #profile .pf-nm{font-size:20px;color:var(--sf-hi);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #profile .pf-sub{font-size:14px;color:var(--sf-dim);margin-top:4px;line-height:1.4;}
+/* Рамка «Премиум» (бонус премиум-аккаунта): золотая кайма шапки и метка под позывным —
+   её видят все, кто открывает профиль. */
+#profile .pf-top.premium{border-bottom-color:color-mix(in srgb,var(--cur-sovereigns) 60%,transparent);
+  background:linear-gradient(100deg,color-mix(in srgb,var(--cur-sovereigns) 12%,transparent),transparent 60%),var(--sf-card-off);}
+#profile .pf-top.premium .pf-av{border-color:var(--cur-sovereigns);box-shadow:0 0 0 2px color-mix(in srgb,var(--cur-sovereigns) 35%,transparent);}
+#profile .pf-prem{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:1px 9px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--cur-sovereigns) 60%,transparent);color:var(--cur-sovereigns);font-size:var(--fs-caption);font-weight:600;}
 /* Sovereigns capsule — the premium currency reads GOLD everywhere it appears
    (the hub wallet's plaque), never the UI's cyan. */
 #profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border-radius:999px;
@@ -3894,6 +3967,135 @@ span.ar-fchip{cursor:default;}
 @media (pointer:coarse){
   :is(#hp-arsenal,#arsenal-sheet) :is(.ar-fchip,.ar-mchip,.ar-tagline){min-height:44px;}
 }
+/* «Магазин» хаба (заказ владельца 2026-10-20, макет одобрен): разделы, полка и карточка
+   товара рядом, на телефоне шторкой (те же .ar-sheet, что у Арсенала). Раскладку решает
+   ширина вкладки: на широкой разделы колонкой слева, на средней строкой сверху. */
+#hp-shop{height:100%;overflow-y:auto;overscroll-behavior:contain;gap:14px;container:shop / size;}
+:is(#hp-shop,#shop-sheet){--rar:var(--sf-dim);color:var(--sf-text);}
+:is(#hp-shop,#shop-sheet) .r-simple{--rar:var(--rar-simple);}
+:is(#hp-shop,#shop-sheet) .r-unique{--rar:var(--rar-unique);}
+:is(#hp-shop,#shop-sheet) .r-mythic{--rar:var(--rar-mythic);}
+:is(#hp-shop,#shop-sheet) .r-legendary{--rar:var(--rar-legendary);}
+:is(#hp-shop,#shop-sheet) :is(.btn-main,.btn-second,.btn-quiet){min-height:44px;padding:0 16px;border-radius:10px;
+  font-size:var(--fs-body);display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+:is(#hp-shop,#shop-sheet) .btn-quiet{padding:0 6px;}
+.sh-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;}
+.sh-head h2{margin:0;font-size:var(--fs-title);font-weight:700;color:var(--sf-hi);}
+.sh-wallet{display:flex;flex-wrap:wrap;gap:8px;}
+.sh-cur{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--sf-edge);
+  background:var(--sf-inset);font-weight:600;font-variant-numeric:tabular-nums;}
+.sh-cur i{display:inline-flex;width:16px;height:16px;font-style:normal;align-items:center;justify-content:center;}
+.sh-cur i svg,.sh-sv svg,.sh-sov i svg,.sh-art-sov i svg{width:100%;height:100%;}
+.sh-cur.sov{color:var(--cur-sovereigns);border-color:color-mix(in srgb,var(--cur-sovereigns) 45%,transparent);}
+.sh-cur.war{color:var(--cur-warrants);}
+.sh-cur.prem{color:var(--cur-sovereigns);}
+.sh-status{margin:0;color:var(--sf-dim);line-height:1.5;}
+.sh-status.error{color:var(--red);}
+.sh-main{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;}
+.sh-tabs{display:flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);
+  overflow-x:auto;scrollbar-width:none;}
+.sh-tab{flex:1 0 auto;min-height:44px;padding:0 14px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 var(--fs-body) var(--sf-font);white-space:nowrap;}
+.sh-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.sh-tab-ic{display:inline-grid;place-items:center;width:18px;font-size:15px;}
+.sh-sv{display:inline-flex;width:16px;height:16px;color:var(--cur-sovereigns);font-style:normal;}
+.sh-gem{display:inline-flex;vertical-align:-2px;width:1em;height:1em;margin:0 1px;color:var(--cur-sovereigns);font-style:normal;}
+.btn-main .sh-gem{color:inherit;}
+.sh-gem svg{width:100%;height:100%;}
+.sh-list{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.sh-hint{margin:0;color:var(--sf-dim);font-size:var(--fs-caption);line-height:1.5;}
+.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:10px;}
+.sh-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:148px;padding:12px;
+  border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;
+  font:var(--fs-body)/1.35 var(--sf-font);}
+.sh-card:hover{border-color:var(--sf-edge-hi);}
+.sh-card[aria-pressed="true"]{border-color:var(--sf-edge-hi);background:var(--sf-sel);}
+:is(.sh-card,.sh-tab):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+.sh-card.off{border-style:dashed;background:var(--sf-card-off);}
+.sh-tag{position:absolute;top:8px;right:8px;font-size:var(--fs-caption);font-weight:600;line-height:18px;padding:1px 8px;
+  border-radius:999px;border:1px solid var(--cur-sovereigns);color:var(--cur-sovereigns);background:var(--sf-inset);}
+.sh-art{display:flex;align-items:center;gap:4px;min-height:40px;}
+.sh-art i{font-style:normal;}
+.sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
+.sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
+.sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
+  background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.sh-mi.own{filter:grayscale(1);opacity:.5;}
+/* Материалы — ромбы своего цвета: в игре у них нет иконок, а цвет различает их в наборе. */
+.sh-mat{width:15px;height:15px;margin:0 4px;border-radius:3px;transform:rotate(45deg);background:var(--mc);
+  box-shadow:0 0 6px color-mix(in srgb,var(--mc) 50%,transparent);}
+.m-ferroalloys{--mc:#b9c6cf;}
+.m-technical_composites{--mc:#7fd38a;}
+.m-control_circuits{--mc:#62b6ff;}
+.m-energy_cells{--mc:#f2c14e;}
+.m-technology_archives{--mc:#c39bff;}
+.sh-nm{font-weight:600;color:var(--sf-hi);}
+.sh-gold .sh-sov{font-size:var(--fs-heading);}
+.sh-sub{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-price{margin-top:auto;display:flex;align-items:baseline;justify-content:flex-end;gap:8px;width:100%;}
+.sh-price s{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-sov{display:inline-flex;align-items:center;gap:4px;color:var(--cur-sovereigns);font-weight:700;font-variant-numeric:tabular-nums;}
+.sh-sov i{display:inline-flex;width:14px;height:14px;}
+.btn-main .sh-sov,.btn-main[disabled] .sh-sov{color:inherit;}
+.sh-pill{font-size:var(--fs-caption);font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid var(--sf-edge);color:var(--sf-dim);}
+.sh-pill:is(.free,.on){color:var(--grn);border-color:color-mix(in srgb,var(--grn) 50%,transparent);}
+.sh-prem{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px;border:1px solid var(--sf-panel-edge);
+  background:linear-gradient(120deg,color-mix(in srgb,var(--cur-sovereigns) 10%,transparent),transparent 65%),var(--sf-card);}
+.sh-prem-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
+.sh-prem-h b{font-size:var(--fs-heading);color:var(--sf-hi);}
+.sh-prem ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 16px;}
+.sh-prem li{position:relative;padding-left:18px;line-height:1.45;}
+.sh-prem li::before{content:"✓";position:absolute;left:0;color:var(--grn);}
+.sh-prem .btn-main{align-self:flex-start;}
+.sh-note{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.sh-guest{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;align-items:center;padding:16px;
+  border-radius:14px;border:1px solid var(--sf-panel-edge);background:var(--sf-card);}
+.sh-guest b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.sh-guest p{margin:4px 0 0;color:var(--sf-dim);line-height:1.5;}
+.sh-detail{position:sticky;top:0;max-height:calc(100cqh - 2px);overflow-y:auto;overscroll-behavior:contain;padding:18px;border-radius:14px;
+  border:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);}
+.sh-detail:empty{display:none;}
+.sh-dt{display:flex;flex-direction:column;gap:14px;}
+.sh-dt h3{margin:0;font-size:var(--fs-title);line-height:1.25;color:var(--sf-hi);text-wrap:balance;}
+.sh-dt h3 .sh-sov{font-size:inherit;}
+.sh-dt h3 .sh-sov i{width:20px;height:20px;}
+.sh-lines{display:flex;flex-direction:column;}
+.sh-line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);}
+.sh-line span{display:inline-flex;align-items:center;gap:8px;color:var(--sf-dim);}
+.sh-line b{font-weight:600;color:var(--sf-hi);text-align:right;}
+.sh-line s{font-weight:400;color:var(--sf-dim);}
+.sh-mline span{color:var(--sf-text);}
+.sh-mline .sh-mi{width:28px;height:28px;font-size:14px;}
+.sh-mline b{color:var(--rar);}
+.sh-sec{margin:10px 0 0;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
+.sh-acts{display:flex;flex-direction:column;gap:8px;}
+.sh-confirm{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);}
+.sh-confirm p{margin:0;}
+.sh-row2{display:flex;gap:8px;}
+.sh-row2 > *{flex:1;}
+@container shop (min-width:700px){
+  .sh-main{grid-template-columns:minmax(0,1fr) minmax(300px,350px);}
+  .sh-tabs{grid-column:1 / -1;}
+}
+@container shop (min-width:980px){
+  .sh-main{grid-template-columns:184px minmax(0,1fr) minmax(300px,360px);}
+  .sh-tabs{grid-column:auto;position:sticky;top:0;flex-direction:column;}
+  .sh-tab{flex:0 0 auto;justify-content:flex-start;}
+}
+@container shop (max-width:520px){
+  /* four tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen */
+  .sh-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+  .sh-tab{flex-direction:column;gap:2px;min-height:52px;padding:6px 2px;font-size:var(--fs-caption);}
+}
+@container shop (max-width:699px){
+  .sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .sh-card{min-height:128px;padding:10px;}
+  .sh-guest{grid-template-columns:1fr;}
+  .sh-prem ul{grid-template-columns:1fr;}
+}
+#shop-sheet{position:fixed;inset:0;z-index:5;display:none;}
+#shop-sheet.open{display:block;}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:var(--fs-caption)}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
 #hp-supply{overflow-y:auto;gap:16px;padding-bottom:24px}.me-section{display:flex;flex-direction:column;gap:10px}.me-section h3,.me-section h4{margin:0}.me-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.me-head h2{margin:0;color:var(--cyan);font-size:20px}.me-hint{margin:0;color:var(--dim);font-size:var(--fs-caption);line-height:1.45}.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}.me-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--glass)}.me-card.me-goal{border-color:var(--cyan)}.me-card h4{margin:0}.me-amounts{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.me-amounts span,.me-row span{color:var(--dim)}.me-row{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-caption)}.me-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}#hp-supply button{min-height:40px;padding:8px 12px;border:1px solid var(--cyan-dim);border-radius:6px;background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer}#hp-supply button:disabled{opacity:.45;cursor:default}#hp-supply button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.me-badge{color:var(--cyan);font-size:var(--fs-caption)}.me-bound{color:#e8b869;font-size:var(--fs-caption);margin:0}.me-error{color:#ef9b9b}.me-track{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}.me-level{border-top:1px solid var(--line);padding-top:10px}.me-track details>summary{cursor:pointer;padding:8px 0}.me-material-list{display:grid;gap:6px}.me-select{width:100%;padding:8px;background:#07131b;color:var(--ink);border:1px solid var(--line);border-radius:6px}.me-reward{margin:0;padding-left:18px;font-size:var(--fs-caption);color:var(--dim)}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
@@ -4084,7 +4286,7 @@ span.ar-fchip{cursor:default;}
     --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
-  #settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
+  #settings,#warprompt,#abandon,#diplo,#coalwin,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
      весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
@@ -4124,6 +4326,7 @@ span.ar-fchip{cursor:default;}
   #settings .setbox{width:min(380px,61vw);max-height:57vh;}
   #warprompt .wpbox{width:min(360px,61vw);}
   #diplo .dpbox{width:53.4vw;max-height:58.5vh;}
+  #coalwin .dpbox{width:min(460px,40vw);max-height:58.5vh;}
   .dp-convo{height:min(41vh,440px);}
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
@@ -4368,6 +4571,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-dossier" type="button" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
     <button id="rail-diplo">⬡<span class="rlbl" data-i18n="rail.diplo.title"></span></button>
     <button id="rail-msgs">✉<span class="rlbl" data-i18n="rail.msgs.title"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-coal">⛨<span class="rlbl" data-i18n="rail.coal.title"></span></button>
     <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
     <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>
     <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
@@ -4450,6 +4654,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div class="wp-actions"><button type="button" id="abandon-stay" class="wp-no"></button><button type="button" id="abandon-menu" class="wp-no" data-i18n="run.exit.menu" hidden></button><button type="button" id="abandon-go" class="wp-yes" data-i18n="run.abandon.go"></button></div>
 </div></div>
 <div id="diplo"></div>
+<div id="coalwin" role="dialog" data-i18n-aria="coal.win.title"></div>
 <div id="pingpop"></div>
 <!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (fleetCard.ts, renderStatPop) -->
 <div id="statpop" role="dialog" aria-live="polite"></div>
@@ -4778,7 +4983,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
-      ${external ? '' : `<a id="hub-discord" class="hub-mode hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer"><b data-i18n="hub.discord"></b><span data-i18n="hub.discord.desc"></span></a>`}
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
@@ -4795,6 +4999,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
+    <div class="hub-panel" id="hp-shop" style="display:none"></div>
     <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
@@ -4805,6 +5010,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
         <!-- UIX-10.1: рейтинг и друзья — из нижней панели сюда, вкладок пять вместо семи -->
+        <button class="hub-tile" id="hub-shop" type="button"><span class="ht-ic">◈</span><span data-i18n="hub.tile.shop"></span></button>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
@@ -4822,6 +5028,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <a class="hub-tile" id="hub-privacy" data-i18n="welcome.privacy"></a>
         <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
+      ${external ? '' : `<!-- Контакты: ссылки наружу, отдельным блоком под плитками -->
+      <div class="hub-sec" data-i18n="hub.contacts"></div>
+      <div class="hub-grid">
+        <a class="hub-tile hub-discord" id="hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer" data-i18n-title="hub.discord.desc"><svg class="ht-ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.32 4.37A19.8 19.8 0 0 0 15.4 2.85a13.7 13.7 0 0 0-.63 1.3 18.4 18.4 0 0 0-5.5 0 13 13 0 0 0-.64-1.3 19.7 19.7 0 0 0-4.93 1.52C.6 9.05-.25 13.6.18 18.1a19.9 19.9 0 0 0 6.04 3.05c.49-.66.92-1.36 1.3-2.1a12.9 12.9 0 0 1-2.04-.98l.5-.39a14.2 14.2 0 0 0 12.07 0l.5.39c-.65.39-1.33.71-2.05.98.38.74.81 1.44 1.3 2.1a19.8 19.8 0 0 0 6.04-3.05c.5-5.2-.86-9.71-3.52-13.73ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42s2.18 1.1 2.16 2.42c0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42Z"/></svg><span data-i18n="hub.discord"></span></a>
+      </div>`}
     </div>
   </div>
   <div class="hub-note" id="hub-note"></div>
@@ -4832,8 +5043,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
-  <!-- Шторка арсенала на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
+  <!-- Шторки арсенала и магазина на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
   <div id="arsenal-sheet"></div>
+  <div id="shop-sheet"></div>
 </div>
 <div id="emblempick">
   <div class="ep-box">

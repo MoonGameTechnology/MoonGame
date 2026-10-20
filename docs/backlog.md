@@ -3817,11 +3817,21 @@ _Второй заход аудита — ошибки обработки, го�
   `packages/server/src/main.ts` при заданных VAPID. Хост игроков `prototype/netserver.ts`
   push не знает вовсе (ни маршрутов, ни рассылки). Тесты: `pushRule.test.ts` (6),
   `pushDispatch.test.ts` (5).
-- **UIX-4.4** ⏳ `[proto]` **Подписка на push в клиенте.** Service worker, согласие
+- **UIX-4.4** 🔶 `[proto]` `[srv]` **Подписка на push в клиенте.** Service worker, согласие
   после первого значимого события, а не на старте; выключатель по видам в настройках.
   Push приносит ключ `push.attacked` / `push.battle-won` / `push.battle-lost` / `push.built` /
   `push.researched`, id в `params` и счёт `more` (`pushRule.ts`): ключи завести в
   `/localization`, имена мира, постройки и науки собрать на клиенте.
+  _Сделано (часть 1, сервер игроков; разбивка — решение владельца 2026-10-20):_ хост игроков
+  `prototype/netserver.ts` получил приёмник подписки (`registerPushApi`, при `AUTH`) и
+  рассылку `pushDispatch.ts` в `observe` каждой партии; хранилище — `PostgresPushStore` /
+  `MemoryPushStore`; без VAPID в окружении нет ни маршрута ключа, ни рассылки. `web-push`
+  вынесен из бандла хоста (`bundle-netserver.mjs`): вбандленный CommonJS ронял хост на
+  старте («Dynamic require of "crypto"»), это ловит `productionBoot.test.mjs`. Вживую:
+  регистрация → `/push/key` отдаёт ключ, подписка на `fcm.googleapis.com` — 200, на
+  `169.254.169.254` — 400, без входа — 401; без VAPID хост стартует, `/push/key` — 404.
+  _Осталось (часть 2, клиент):_ service worker, согласие, выключатели по видам, ключи
+  `push.*` в `/localization`.
 - **UIX-4.5** ✅ `[proto]` **Без падающих цифр у ресурсов.** Заказ владельца 2026-10-16: «И
   падающие цифры ресурсов убрать». _Было:_ под плашкой ресурса раз в 4 секунды всплывало «+N»
   дохода, трата всплывала «-N», а плашка вспыхивала цветом знака (UIX-4.1). _Сделано:_ чисел под

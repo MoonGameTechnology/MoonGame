@@ -66,6 +66,7 @@ import {
   seatBadge,
   worldsOf,
 } from './diploWindow';
+import { closeCoalitions, coalOpen, initCoalitionWindow, syncCoalitions } from './coalitionWindow';
 import {
   fillWelcome,
   initSignInPages,
@@ -525,6 +526,7 @@ import {
 import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
 import { initMetaEconomy } from './metaEconomyScreen';
+import { initShop } from './shopScreen';
 import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
@@ -825,6 +827,7 @@ const chatWin = __SECTOR_ZERO_ONLY__
         dispatch: dispatchChat,
         openSeatCard,
         jumpToPing,
+        premium: () => premiumRunning(),
       },
       CH_SESSION,
     );
@@ -859,6 +862,8 @@ initDiploWindow({
   seatNick,
   refreshNicks: () => pullSeatNicks(),
 });
+// COAL-1: окно коалиций — кнопка полосы `#rail-coal`.
+initCoalitionWindow({ state: () => s, me: () => ME, names: () => NAME, ownerColor, playerOrder });
 
 /** Ники соседей по сетевой партии — из расклада мест сервера (`decisions/seatNicks.ts`).
  *  В состоянии мира их нет: там имя дома. Пришли новые — перерисовать дипломатию. */
@@ -947,6 +952,7 @@ initNetSession({
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
     pruneSelection(s.fleets, ME, s.strikes);
     invalidatePanel();
+    syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
   events: handleEvents,
   pingProvince: (target) => provinceForPing(target, MAP),
@@ -4089,6 +4095,7 @@ let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
 function showHub(show: boolean): void {
   if (!show) registrationReward?.close();
   if (!show) arsenal?.close();
+  if (!show) shop?.close();
   // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
   if (show) document.getElementById('codex')?.classList.remove('show');
   hubEl.style.display = show ? 'flex' : 'none';
@@ -4104,12 +4111,13 @@ const HUB_PANELS: Record<string, string> = {
   arsenal: 'hp-arsenal',
   auction: 'hp-auction',
   supply: 'hp-supply',
+  shop: 'hp-shop',
   ally: 'hp-ally',
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 /** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply']);
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -4125,6 +4133,8 @@ function hubTab(tab: string): void {
   if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
   // Кошелёк Варрантов в шапке (UIX-10.2) — тихо: гостю и при сбое сервера остаётся прежнее число.
   if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
+  // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
+  if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
@@ -4132,6 +4142,8 @@ function hubTab(tab: string): void {
   if (tab !== 'arsenal') arsenal?.close(); // the phone sheet lives over the hub, not in the tab
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
+  if (tab === 'shop' && shop) detach('хаб: магазин', shop.refresh());
+  if (tab !== 'shop') shop?.close(); // the phone sheet lives over the hub, like the arsenal's
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
@@ -4265,9 +4277,9 @@ const arsenal = __SECTOR_ZERO_ONLY__
         hubTab('auction');
       },
       openSeason: () => hubTab('supply'),
-      openStore: () => {
-        hubTab('supply');
-        metaEconomy?.showStore();
+      openStore: (offerId) => {
+        shop?.show('modules', offerId);
+        hubTab('shop');
       },
       changed: async () => {
         await metaMarket?.sync();
@@ -4289,6 +4301,43 @@ const metaMarket = __SECTOR_ZERO_ONLY__
       changed: () => hubWallet?.render(),
       inventoryChanged: async () => { await arsenal?.refresh(); },
     });
+// «Магазин» (заказ владельца 2026-10-20): Суверены, премиум, модули и материалы за ◆.
+// Единственное место покупок — Снабжение и Арсенал ведут сюда. Баланс ◆ и срок премиума
+// приходят с ответом аккаунта: плашка хаба показывает число, чат помнит премиум по позывному
+// (цвет шрифта — его бонус; сам срок проверяется по часам при каждом открытии настроек).
+const SHOP_WIDE_MIN = 700;
+const premiumKey = (): string => 'vd.premium.' + (nickInput.value.trim() || 'guest');
+const shop = __SECTOR_ZERO_ONLY__
+  ? null
+  : initShop({
+      root: () => $('hp-shop'),
+      sheet: () => $('shop-sheet'),
+      narrow: () => $('hp-shop').clientWidth < SHOP_WIDE_MIN,
+      authorizedBase: hubAuthorizedBase,
+      canSignIn: () => !!resolveServer() && authMode === 'accounts',
+      signIn: () => {
+        showHub(false);
+        showConnect(true);
+        showStage('welcome');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+      },
+      warrants: () => metaMarket?.balance() ?? 0,
+      now: () => Date.now(),
+      accountChanged: (view) => {
+        if (view) writeRaw(premiumKey(), String(view.premiumUntil ?? 0));
+        hubWallet?.render();
+      },
+      changed: async () => {
+        await arsenal?.refresh();
+        await metaMarket?.sync();
+      },
+    });
+if (shop && typeof ResizeObserver !== 'undefined')
+  new ResizeObserver(() => shop.relayout()).observe($('hp-shop'));
+/** Premium is running for this callsign, by the last account read on this device. */
+function premiumRunning(): boolean {
+  return Number(readRaw(premiumKey()) ?? 0) > Date.now();
+}
 // Main-game supply has its own server-owned state; Sector Zero remains independent.
 const metaEconomy = __SECTOR_ZERO_ONLY__
   ? null
@@ -4306,10 +4355,10 @@ const hubWallet = __SECTOR_ZERO_ONLY__
   ? null
   : initHubWallet({
       root: $('hubwallet'),
-      wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),
+      wallet: () => ({ sovereigns: shop?.sovereigns() ?? null, warrants: metaMarket?.balance() ?? 0 }),
       donate: () => {
-        hubTab('supply');
-        metaEconomy?.showStore();
+        shop?.show('sovereigns');
+        hubTab('shop');
       },
       auction: () => hubTab('auction'),
     });
@@ -4341,7 +4390,7 @@ const profile = __SECTOR_ZERO_ONLY__
             const c = corp?.mine().corp;
             return c ? { name: c.name, influence: c.influence } : null;
           })(),
-          sovereigns: null,
+          sovereigns: shop?.sovereigns() ?? null,
         };
       },
       readCache: () => {
@@ -4560,6 +4609,7 @@ document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('ran
 document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
 document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
+document.getElementById('hub-shop')?.addEventListener('click', () => hubTab('shop'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
@@ -5328,6 +5378,7 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z50
   { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
+  { id: 'coalwin', isOpen: () => coalOpen, close: () => closeCoalitions() }, // z49, окно коалиций
   // Проба по состоянию, а не по классу: `orderPromptOpen` (запрос войны или окно погрузки) — источник истины, класс лишь его
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
@@ -5360,6 +5411,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
   { id: 'arsenal-sheet', isOpen: () => arsenal?.isOpen() ?? false, close: () => arsenal?.close() }, // inside the hub (z52), under the codex opened from it
+  { id: 'shop-sheet', isOpen: () => shop?.isOpen() ?? false, close: () => shop?.close() }, // inside the hub (z52)
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
@@ -5440,6 +5492,7 @@ const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, str
   production: 'constructor',
   science: 'tech',
   events: 'logwin',
+  coalitions: 'coalwin',
   pings: 'pingpanel',
   market: 'market',
   trader: 'trader',

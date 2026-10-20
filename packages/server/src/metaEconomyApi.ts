@@ -14,6 +14,8 @@ export interface MetaEconomyApiDeps {
     | 'salvage'
     | 'selectPass'
     | 'chooseSeasonReward'
+    | 'buyOffer'
+    | 'claimPremiumDaily'
   >;
   identify(request: FastifyRequest): Promise<Identity | null>;
   now?: () => number;
@@ -153,5 +155,19 @@ export function registerMetaEconomyApi(app: FastifyInstance, deps: MetaEconomyAp
         level: b.level as number,
         defId: b.defId as string,
       }),
+  );
+  post(
+    'store/buy',
+    (b) => fields(b, ['requestId', 'offerId']) && id(b.offerId),
+    (account, b) =>
+      deps.economy.buyOffer(account, {
+        requestId: b.requestId as string,
+        offerId: b.offerId as string,
+      }),
+  );
+  post(
+    'premium/daily',
+    (b) => fields(b, ['requestId']),
+    (account, b) => deps.economy.claimPremiumDaily(account, { requestId: b.requestId as string }),
   );
 }
