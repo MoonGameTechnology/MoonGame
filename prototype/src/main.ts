@@ -2322,6 +2322,11 @@ function openShipCard(fleetId: string, index: number): void {
   el.classList.add('show');
 }
 
+/** Выбранный мир партии для справочника. Из хаба — никакого: после выхода из партии
+ *  `selPlanet` остаётся от неё, и карточка предложила бы строить в скрытой партии. */
+function codexWorld(): string | null {
+  return document.body.classList.contains('hub-open') ? null : selPlanet;
+}
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -2329,9 +2334,10 @@ function openCodex(key: string): void {
   // BUILD-1: карточка здания листает уровни (`b:id:уровень`). Без уровня в ключе
   // показывается ТЕКУЩИЙ построенный на выбранном мире (если есть) — владелец
   // открывает свою постройку и видит её, а не абстрактный первый уровень.
+  const world = codexWorld();
   const builtLvl =
-    kind === 'b' && selPlanet
-      ? s.planets[selPlanet]?.buildings.find((b) => b.type === id)?.level
+    kind === 'b' && world
+      ? s.planets[world]?.buildings.find((b) => b.type === id)?.level
       : undefined;
   const level = Number(lvl) || builtLvl || 1;
   el.innerHTML = `<div class="cxbox">${codexHtml(kind, id, level)}${codexBuildBtn(kind, id, level)}<button class="cx-close">${t('codex.close')}</button></div>`;
@@ -2340,7 +2346,8 @@ function openCodex(key: string): void {
 /** A "Build here" action inside the codex when the selected province can raise this
  *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
 function codexBuildBtn(kind: string, id: string, level = 1): string {
-  const p = selPlanet ? s.planets[selPlanet] : null;
+  const world = codexWorld();
+  const p = world ? s.planets[world] : null;
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
     // BUILD-1: у ПОСТРОЕННОГО здания карточка предлагает «Улучшить» — той же пробой
@@ -4089,6 +4096,8 @@ function showHub(show: boolean): void {
   if (!show) registrationReward?.close();
   if (!show) arsenal?.close();
   if (!show) shop?.close();
+  // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
+  if (show) document.getElementById('codex')?.classList.remove('show');
   hubEl.style.display = show ? 'flex' : 'none';
   // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
   // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
@@ -4701,7 +4710,10 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 // загрузочного блока: его ветка по ссылке может попросить войти.
 let activity: ReturnType<typeof startPlayerActivity> | undefined;
 initAccountSession({
-  sessionChanged: () => activity?.refresh(),
+  sessionChanged: () => {
+    activity?.refresh();
+    arsenal?.forget();
+  },
   status: (text) => {
     statusEl.textContent = text;
   },
@@ -6127,10 +6139,12 @@ const codexEl = document.getElementById('codex');
 if (codexEl) {
   codexEl.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    // Мир — через codexWorld(): карточка, открытая ещё в партии, могла пережить вход в хаб.
+    const world = codexWorld();
     const build = (tg.closest('.cx-build') as HTMLElement | null)?.dataset.build;
-    if (build && selPlanet) {
+    if (build && world) {
       const [kind, id] = build.split(':');
-      enqueueBuild(selPlanet, { kind: kind as BuildKind, id: id!, count: 1 });
+      enqueueBuild(world, { kind: kind as BuildKind, id: id!, count: 1 });
       codexEl.classList.remove('show');
       invalidatePanel();
       renderPanel();
@@ -6145,8 +6159,8 @@ if (codexEl) {
     // «Улучшить» из карточки: хостовый путь заказа (сеть → приказ, соло → очередь);
     // карточка остаётся открытой и сама показывает «в работе» (проба погасит кнопку).
     const upg = (tg.closest('[data-cx-upg]') as HTMLElement | null)?.dataset.cxUpg;
-    if (upg && selPlanet) {
-      enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 });
+    if (upg && world) {
+      enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 });
       invalidatePanel();
       renderPanel();
       openCodex(`b:${upg}`);

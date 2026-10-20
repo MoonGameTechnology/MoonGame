@@ -279,6 +279,19 @@ describe('арсенал — подробности модуля', () => {
     expect(html).toContain('Верфи хватает одной копии.');
   });
 
+  it('у копии видны заточка и прочность: продаётся и разбирается именно эта', () => {
+    const graded = copy({
+      itemId: 'inst-1',
+      defId: 'targeting_array',
+      form: 'instance',
+      grade: 2,
+      durability: 3,
+    });
+    const html = arsenalDetailHtml(state({ module: 'targeting_array', items: [dropA, graded] }));
+    expect(html).toContain('Награда за партию, 9 окт., заточка +2, прочность 3');
+    expect(html).toContain('data-ar-sell="inst-1"');
+  });
+
   it('одна копия предупреждает, что продажа уберёт модуль с верфи', () => {
     const html = arsenalDetailHtml(
       state({
@@ -336,6 +349,55 @@ describe('арсенал — подробности корабля', () => {
     expect(html).toContain('data-ar-module="targeting_array"');
     expect(html).toContain('ar-mchip r-unique miss" data-ar-module="siege_platform"');
     expect(html).toContain('data-ar-codex="u:cruiser"');
+  });
+
+  it('корабль из таблицы наград виден пунктиром, с шансом получить', () => {
+    const pool: MetaDropOddsView['pool'] = [
+      ...drops.pool,
+      { kind: 'hull', defId: 'pirate_cruiser', weight: 10 },
+    ];
+    const s = state({
+      tab: 'hulls',
+      hull: 'pirate_cruiser',
+      view: view({ drops: { ...drops, pool } }),
+    });
+    expect(arsenalHtml(s)).toContain('ar-hc miss" data-ar-hull="pirate_cruiser"');
+    const html = arsenalDetailHtml(s);
+    expect(html).toContain('Как получить');
+    expect(html).toContain('Награда за сетевую партию');
+  });
+
+  it('мастерская, сезон и магазин выдают модули: корпусу с тем же id их пути не показываются', () => {
+    const v = view();
+    const html = arsenalDetailHtml(
+      state({
+        tab: 'hulls',
+        hull: 'pirate_cruiser',
+        view: view({
+          drops: { ...drops, pool: [{ kind: 'hull', defId: 'pirate_cruiser', weight: 1 }] },
+          recipes: [{ ...v.recipes[0]!, id: 'pc', defId: 'pirate_cruiser' }],
+          seasons: [
+            {
+              ...v.seasons[0]!,
+              milestones: [{ ...v.seasons[0]!.milestones[0]!, choices: ['pirate_cruiser'] }],
+            },
+          ],
+          store: [
+            {
+              id: 'pc-offer',
+              category: 'modules',
+              price: 100,
+              bought: 0,
+              modules: [{ defId: 'pirate_cruiser', owned: false }],
+            },
+          ],
+        }),
+      }),
+    );
+    expect(html).toContain('Награда за сетевую партию');
+    expect(html).not.toContain('data-ar-craft');
+    expect(html).not.toContain('data-ar-season');
+    expect(html).not.toContain('data-ar-store');
   });
 
   it('корабль без отсеков так и говорит', () => {
@@ -425,6 +487,42 @@ describe('арсенал — вкладка', () => {
     expect(host.root().innerHTML).toContain('Арсенал хранится в аккаунте');
     host.root().fire({ arSignIn: '' });
     expect(signIn).toHaveBeenCalledOnce();
+  });
+
+  it('гость не видит кэш прошлой сессии — только стартовый набор', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const host = hostOf({ authorizedBase: async () => null, readCache: () => [dropA] });
+    await initArsenal(host).refresh();
+    expect(host.root().innerHTML).toContain('Арсенал хранится в аккаунте');
+    expect(host.root().innerHTML).toContain('miss" data-ar-module="targeting_array"');
+  });
+
+  it('кэш гостя не уходит и в другие экраны (верфь, аукцион)', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const arsenal = initArsenal(
+      hostOf({ authorizedBase: async () => null, readCache: () => [dropA] }),
+    );
+    await arsenal.refresh();
+    expect(arsenal.items()).toEqual([]);
+  });
+
+  it('смена командира: коллекция и вид прошлого аккаунта не уходят дальше', async () => {
+    server();
+    const host = hostOf();
+    const arsenal = initArsenal(host);
+    await arsenal.refresh();
+    expect(arsenal.items()).toHaveLength(owned().length);
+    arsenal.forget();
+    expect(arsenal.items()).toEqual([]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new Error('offline'))),
+    );
+    const loading = arsenal.refresh();
+    const painted = host.root().innerHTML;
+    await loading;
+    expect(painted).not.toContain('Цель мастерской');
+    expect(host.root().innerHTML).not.toContain('Цель мастерской');
   });
 
   it('кэш красится до сети, ответ сервера заменяет коллекцию и пишет кэш', async () => {

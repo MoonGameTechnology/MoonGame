@@ -45,6 +45,10 @@ const item = (over: Partial<ArsenalItem> & Pick<ArsenalItem, 'itemId' | 'defId'>
 describe('arsenalView — каталог', () => {
   const { hulls, modules } = arsenalCatalog({ starter, items: [], data });
 
+  it('у корабля и модуля не бывает одного id: владение ищется по defId', () => {
+    expect(Object.keys(data.units).filter((id) => id in data.modules)).toEqual([]);
+  });
+
   it('корабли — стартовый набор аккаунта, в его порядке', () => {
     expect(hulls).toEqual(starter.filter((s) => s.kind === 'hull').map((s) => s.defId));
   });
@@ -66,6 +70,18 @@ describe('arsenalView — каталог', () => {
   it('модуль из каждой награды сервера уже в каталоге', () => {
     for (const line of drops.pool.filter((l) => l.kind === 'module'))
       expect(modules, line.defId).toContain(line.defId);
+  });
+
+  it('корабль из таблицы наград виден до получения, с модулями для него', () => {
+    const withReward = arsenalCatalog({
+      starter,
+      items: [],
+      obtainable: [{ kind: 'hull', defId: 'pirate_cruiser' }],
+      data,
+    });
+    expect(withReward.hulls.at(-1)).toBe('pirate_cruiser');
+    for (const m of modulesFor('pirate_cruiser', Object.keys(data.modules), data))
+      expect(withReward.modules, m).toContain(m);
   });
 
   it('модуль в коллекции попадает в каталог, даже если ни один корабль игрока его не несёт', () => {
@@ -220,6 +236,15 @@ describe('arsenalView — шансы награды', () => {
   it('модуля нет в пуле — доли нет; гарантии с первой партии — нет и строки про серию', () => {
     expect(dropOdds(drops, 'cargo_bay').share).toBeNull();
     expect(dropOdds({ ...drops, pityAfter: 1 }, 'cargo_bay').dryRun).toBeNull();
+  });
+
+  it('доля корабля считается по строкам корпусов, модуль с тем же именем не в счёт', () => {
+    const pool: MetaDropOddsView['pool'] = [
+      { kind: 'module', defId: 'pirate_cruiser', weight: 3 },
+      { kind: 'hull', defId: 'pirate_cruiser', weight: 1 },
+    ];
+    expect(dropOdds({ ...drops, pool }, 'pirate_cruiser', 'hull').share).toBe(25);
+    expect(dropOdds({ ...drops, pool }, 'pirate_cruiser').share).toBe(75);
   });
 
   it('последняя строка с узким потолком — это диапазон, а не «остальные»', () => {

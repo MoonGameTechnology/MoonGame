@@ -665,6 +665,8 @@ export const ru: Record<string, string> = {
   'arsenal.copy.sellable': 'Можно продать',
   'arsenal.copy.bound': 'Личная, не продаётся',
   'arsenal.copy.no-sale': 'Не продаётся',
+  'arsenal.copy.grade': 'заточка +{n}',
+  'arsenal.copy.durability': 'прочность {n}',
   'arsenal.from.starter': 'Стартовый набор',
   'arsenal.from.drop': 'Награда за партию',
   'arsenal.from.craft': 'Сборка в мастерской',

@@ -176,7 +176,9 @@ export interface ArsenalState {
   wide: boolean;
 }
 
-const catalogOf = (s: ArsenalState) => arsenalCatalog({ starter: STARTER, items: s.items, data });
+/** The catalog of this paint: the starter kit, the collection and what a reward can bring. */
+const catalogOf = (s: Pick<ArsenalState, 'items' | 'view'>) =>
+  arsenalCatalog({ starter: STARTER, items: s.items, obtainable: s.view?.drops?.pool, data });
 
 function moduleGetHtml(s: ArsenalState, id: string): string {
   const line = (text: string, cls = ''): string => `<span class="ar-get${cls}">${esc(text)}</span>`;
@@ -378,8 +380,16 @@ function copiesHtml(s: ArsenalState, id: string): string {
         c.acquiredAt > 0
           ? `, ${new Date(c.acquiredAt).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })}`
           : '';
+      // Copies differ by grade and wear, and selling or salvaging takes THIS one.
+      const state = [
+        c.grade ? t('arsenal.copy.grade', { n: c.grade }) : '',
+        typeof c.durability === 'number' ? t('arsenal.copy.durability', { n: c.durability }) : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
       return (
-        `<div class="ar-copy"><div><b>${t(FROM_KEY[c.origin])}${esc(when)}</b><span class="ar-copy-st${cls}">${t(statusKey)}</span></div><div class="ar-acts">` +
+        `<div class="ar-copy"><div><b>${t(FROM_KEY[c.origin])}${esc(when)}${state ? esc(`, ${state}`) : ''}</b>` +
+        `<span class="ar-copy-st${cls}">${t(statusKey)}</span></div><div class="ar-acts">` +
         (sell
           ? `<button type="button" class="btn-second" data-ar-sell="${esc(c.itemId)}"${off(s.busy)}>${t('arsenal.sell')}</button>`
           : '') +
@@ -428,9 +438,9 @@ function workshopWayHtml(s: ArsenalState, view: MetaEconomyView, recipe: MetaRec
   );
 }
 
-function dropWayHtml(view: MetaEconomyView, id: string): string {
+function dropWayHtml(view: MetaEconomyView, id: string, kind: 'hull' | 'module'): string {
   if (!view.drops) return '';
-  const odds = dropOdds(view.drops, id);
+  const odds = dropOdds(view.drops, id, kind);
   if (odds.share === null) return '';
   const places = odds.places
     .map((p) =>
@@ -471,19 +481,21 @@ function shopWayHtml(view: MetaEconomyView, id: string): string {
   );
 }
 
-function waysHtml(s: ArsenalState, id: string): string {
+function waysHtml(s: ArsenalState, id: string, kind: 'hull' | 'module' = 'module'): string {
   if (s.guest)
     return `<div class="ar-sec"><h4>${t('arsenal.ways')}</h4><p class="ar-note">${t('arsenal.ways.guest')}</p></div>`;
   const view = s.view;
   if (!view) return '';
-  const recipe = recipeOf(view, id);
+  // The workshop, the season and the shop hand out modules only.
+  const forModule = kind === 'module';
+  const recipe = forModule ? recipeOf(view, id) : undefined;
   const ways = [
     recipe ? workshopWayHtml(s, view, recipe) : '',
-    dropWayHtml(view, id),
-    seasonWaysHtml(view, id),
+    dropWayHtml(view, id, kind),
+    forModule ? seasonWaysHtml(view, id) : '',
     `<div class="ar-way"><div class="ar-way-h"><i aria-hidden="true">⌖</i><b>${t('arsenal.way.auction')}</b></div>` +
       `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-auction>${t('arsenal.auction.open')}</button></div></div>`,
-    shopWayHtml(view, id),
+    forModule ? shopWayHtml(view, id) : '',
   ].join('');
   return `<div class="ar-sec"><h4>${t('arsenal.ways')}</h4><div class="ar-ways">${ways}</div></div>`;
 }
@@ -591,7 +603,8 @@ function hullDetailHtml(s: ArsenalState, id: string, modules: readonly string[])
   return (
     `<div class="ar-dt">${catalogPortraitHtml('u', id, data, 'portrait')}<div><h3 id="ar-dt-title">${esc(unitTitle(id))}</h3>` +
     `<div class="ar-dt-meta">${group ? `<span>${t(HULL_GROUP_KEY[group])}</span>` : ''}<span>${t(own ? 'arsenal.owned' : 'arsenal.missing')}</span></div></div>` +
-    `<div class="ar-stats">${stats}</div><div class="ar-sec"><h4>${t('arsenal.bays')}</h4>${baysHtml}</div>${fittingHtml}` +
+    `<div class="ar-stats">${stats}</div>${own ? '' : waysHtml(s, id, 'hull')}` +
+    `<div class="ar-sec"><h4>${t('arsenal.bays')}</h4>${baysHtml}</div>${fittingHtml}` +
     `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-codex="u:${esc(id)}">${t('arsenal.codex')}</button></div></div>`
   );
 }
@@ -642,6 +655,8 @@ export interface ArsenalHost {
 export function initArsenal(host: ArsenalHost): {
   refresh(): Promise<void>;
   items(): readonly ArsenalItem[];
+  /** Another commander signed in or out: drop the collection, as at boot. */
+  forget(): void;
   /** Re-lay the tab after its width changed (detail beside the list ⇄ sheet). */
   relayout(): void;
   /** The phone sheet is open (a layer of the Back ladder). */
@@ -664,11 +679,14 @@ export function initArsenal(host: ArsenalHost): {
   let acting = false;
   /** The last accepted view, kept on screen (inert) while a read is under way. */
   let lastView: MetaEconomyView | null = null;
+  /** The session changed: what was read for the previous one is not drawn until a new read. */
+  let forgotten = false;
 
   const client = createMetaEconomyClient({
     authorizedBase: () => host.authorizedBase(),
     paint: () => paint(),
     accept: (view) => {
+      forgotten = false;
       items = parseArsenalItems(view.items);
       host.writeCache(items);
     },
@@ -691,19 +709,21 @@ export function initArsenal(host: ArsenalHost): {
 
   function state(): ArsenalState {
     const st = client.status();
-    const live = client.view();
+    const live = forgotten ? null : client.view();
     if (live) lastView = live;
     else if (!client.busy()) lastView = null;
     const view = live ?? lastView;
     const guest = st.kind === 'guest';
-    const shown = items.length ? items : starterPreview();
-    const { hulls, modules } = arsenalCatalog({ starter: STARTER, items: shown, data });
+    // A guest is promised the starter kit: the cache belongs to a session that is gone.
+    const shown = guest || !items.length ? starterPreview() : items;
+    const shownView = guest ? null : view;
+    const { hulls, modules } = catalogOf({ items: shown, view: shownView });
     if (!chosen || !module || !modules.includes(module))
       module = defaultModule(modules, shown, goalRecipe(view)?.defId ?? null);
     if (!hull || !hulls.includes(hull)) hull = hulls[0];
     return {
       items: shown,
-      view: guest ? null : view,
+      view: shownView,
       guest,
       canSignIn: host.canSignIn(),
       busy: client.busy(),
@@ -873,7 +893,14 @@ export function initArsenal(host: ArsenalHost): {
 
   return {
     refresh,
-    items: () => items,
+    // A guest has no collection: the cache is not handed to the shipyard or the auction either.
+    items: () => (client.status().kind === 'guest' ? [] : items),
+    // Until the next read the shipyard and the auction get nothing, not the previous account's.
+    forget: () => {
+      items = [];
+      lastView = null;
+      forgotten = true;
+    },
     relayout: () => {
       const next = !host.narrow();
       if (next === wide) return;
