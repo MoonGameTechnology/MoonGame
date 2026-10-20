@@ -3205,6 +3205,8 @@ export const en: Record<string, string> = {
   'hud.mobile.ready': 'Done',
   'hud.mobile.send': 'Send order',
   'hud.mobile.summary': 'Statistics',
+  'hud.mobile.tab.fleet': 'Fleet',
+  'hud.mobile.tab.world': 'World',
   'hud.mobile.target-hint': 'Choose a target. Drag to move the map.',
   'hud.mobile.target-none': 'No target selected',
   'hud.mobile.target-stale': 'Target is no longer available. Choose another.',

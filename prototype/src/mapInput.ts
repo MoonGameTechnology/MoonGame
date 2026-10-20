@@ -83,6 +83,8 @@ import {
   touchPick,
   type TapPick,
 } from '../../decisions/tapCycle';
+import { openTab, pairOfChoices, tabPick } from '../../decisions/worldFleetTabs';
+import { lastCardTab, pairFacts } from './worldFleetCard';
 import { tapOwner, tapRadius } from '../../decisions/tapPriority';
 import { rightClickAct } from '../../decisions/rightClick';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
@@ -829,6 +831,14 @@ export function selectAt(mx: number, my: number) {
       if (sure && choices.length > 1) {
         offerChoices([]);
         applyPick(sure);
+        return;
+      }
+      // Свой мир со своим единственным флотом — не список, а одна карточка с вкладками
+      // «Флот» и «Мир», открытая на вкладке прошлого раза (`worldFleetTabs.ts`, UIX-7.1).
+      const pair = pairOfChoices(choices, pairFacts(game.world(), game.me()));
+      if (pair) {
+        offerChoices([]);
+        applyPick(tabPick(pair, openTab(lastCardTab())));
         return;
       }
       offerChoices(choices.length > 1 ? choices : []);
