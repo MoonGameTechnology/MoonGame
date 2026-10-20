@@ -537,10 +537,14 @@ function threadDiploHtml(id: string): string {
     `<button class="dp-dec" data-decline="${kind}" data-seat="${id}">✕ ${t('diplo.offer.decline')}</button></div>`;
   const inSt = getOffer(s, id, ME);
   if (inSt) {
+    // Союз сверх вместимости или с членом чужой коалиции ядро отобьёт: кнопка гаснет
+    // с той же причиной, что и кнопка союза в ростере.
+    const bar = inSt === 'alliance' ? allianceBar(id) : null;
+    const barAttr = bar ? ` disabled title="${esc(t(bar))}"` : '';
     cards.push(
       incoming(
         stanceRu(inSt),
-        `<button class="dp-act dp-acc" data-stance="${inSt}" data-seat="${id}" style="--sc:${game.stanceCol(inSt)}">✓ ${t('diplo.offer.accept')}</button>`,
+        `<button class="dp-act dp-acc" data-stance="${inSt}" data-seat="${id}" style="--sc:${game.stanceCol(inSt)}"${barAttr}>✓ ${t('diplo.offer.accept')}</button>`,
         'stance',
       ),
     );
@@ -753,8 +757,14 @@ export function renderDiplo(): void {
  *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */
 export function refreshThreadDiplo(): void {
   if (!diploOpen || diploTab !== 'msgs') return;
+  // Список может сам сменить открытый канал (распалась коалиция → общий чат). Тогда
+  // перерисовывается вся вкладка: иначе шапка и поле ввода остались бы от старого
+  // канала, и реплика для союзников ушла бы в общий чат.
+  const was = conversations.current();
+  const listHtml = conversations.listHtml();
+  if (conversations.current() !== was) return renderDiplo();
   const list = document.querySelector('#diplo .dp-cvlist');
-  if (list) list.outerHTML = conversations.listHtml();
+  if (list) list.outerHTML = listHtml;
   const box = document.querySelector('#diplo .dp-tdip');
   if (box) box.outerHTML = threadDiploHtml(conversations.current());
 }

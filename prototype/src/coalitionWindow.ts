@@ -12,6 +12,7 @@ import {
   COALITION_EMBLEMS,
   coalitionCapacity,
   coalitionOf,
+  hasFixedSides,
   type Action,
   type Coalition,
   type GameState,
@@ -54,6 +55,9 @@ let viewing: string | null = null;
 let draftEmblem: string | null = null;
 /** Первый тап «выйти» только просит подтверждения. */
 let confirmLeave = false;
+/** Что окно нарисовало последним: коалиции партии и описание в поле ввода. */
+let drawn = '';
+let drawnDesc = '';
 
 function all(): Coalition[] {
   const c = game.state().coalitions ?? {};
@@ -74,6 +78,8 @@ function seatsHtml(c: Coalition, cap: number): string {
 
 function listHtml(): string {
   const s = game.state();
+  // В командном режиме стороны задаёт режим, коалиций-сущностей нет.
+  if (hasFixedSides(s.modeId)) return `<div class="cw-hint">${t('coal.fixed')}</div>`;
   const cap = coalitionCapacity(s);
   const mine = coalitionOf(s, game.me());
   const rows = all()
@@ -142,10 +148,27 @@ export function renderCoalitions(): void {
   if (!el) return;
   const card = viewing ? (game.state().coalitions?.[viewing] ?? null) : null;
   if (viewing && !card) viewing = null; // коалицию распустили, пока карточка была открыта
+  // Недописанное описание переживает перерисовку от чужой правки.
+  const area = document.getElementById('cw-text') as HTMLTextAreaElement | null;
+  const typed = area && area.value !== drawnDesc ? area.value : null;
+  drawn = signature();
+  drawnDesc = card?.description ?? '';
   el.innerHTML =
     `<div class="dpbox cwbox">` +
     `<div class="dp-head"><b class="cw-title">${t('coal.win.title')}</b><button class="dp-close btn-x">✕</button></div>` +
     `<div class="cw-body">${card ? cardHtml(card) : listHtml()}</div></div>`;
+  const fresh = document.getElementById('cw-text') as HTMLTextAreaElement | null;
+  if (fresh && typed !== null) fresh.value = typed;
+}
+
+function signature(): string {
+  const s = game.state();
+  return JSON.stringify([s.coalitions ?? null, coalitionCapacity(s)]);
+}
+/** Новый снимок мира: перерисовать открытое окно, если коалиции изменились. Чужую
+ *  правку эмблемы или описания событие не приносит — его видит только автор. */
+export function syncCoalitions(): void {
+  if (coalOpen && signature() !== drawn) renderCoalitions();
 }
 
 export function openCoalitions(): void {
@@ -185,13 +208,8 @@ export function initCoalitionWindow(host: CoalitionWindowHost): void {
     }
     const emblem = (tg.closest('[data-emblem]') as HTMLElement | null)?.dataset.emblem;
     if (emblem) {
-      // Текст описания переживает перерисовку: эмблему выбирают, пока пишут.
-      const text = (document.getElementById('cw-text') as HTMLTextAreaElement | null)?.value;
-      draftEmblem = emblem;
-      renderCoalitions();
-      const area = document.getElementById('cw-text') as HTMLTextAreaElement | null;
-      if (area && text !== undefined) area.value = text;
-      return;
+      draftEmblem = emblem; // текст описания переживает перерисовку: эмблему выбирают, пока пишут
+      return renderCoalitions();
     }
     const mine = coalitionOf(game.state(), game.me());
     if (tg.closest('.cw-save') && mine) {

@@ -66,7 +66,7 @@ import {
   seatBadge,
   worldsOf,
 } from './diploWindow';
-import { closeCoalitions, coalOpen, initCoalitionWindow } from './coalitionWindow';
+import { closeCoalitions, coalOpen, initCoalitionWindow, syncCoalitions } from './coalitionWindow';
 import {
   fillWelcome,
   initSignInPages,
@@ -950,6 +950,7 @@ initNetSession({
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
     pruneSelection(s.fleets, ME, s.strikes);
     invalidatePanel();
+    syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
   events: handleEvents,
   pingProvince: (target) => provinceForPing(target, MAP),
