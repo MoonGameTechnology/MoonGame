@@ -14,7 +14,7 @@ const config=JSON.parse(readFileSync('mobile/distribution.json','utf8'));
 const root=config.origin+config.basePath;
 const link=root+'/player/latest.apk';
 // Hostile release notes must render as text, never as markup.
-const hostileNotes='Changes <script>not executable</script>';
+const hostileNotes='Changes <img src=x onerror="window.__xss=1">';
 // The real key signs in CI only. The harness bakes its own public key into the served
 // build so the actual WebCrypto check runs; a file signed by any other key must fail.
 const testKey=generateKeyPairSync('ed25519'),strangerKey=generateKeyPairSync('ed25519');
@@ -61,7 +61,7 @@ try {
       assert.equal(await page.locator('#hub-android').count(),0,'APK must not advertise another installation');
       if(scenario==='newer') {
         await page.locator('#updbar').waitFor({state:'visible'});assert.notEqual(await page.locator('#ub-go').getAttribute('href'),apkUrl,'no unverified plain-link download');
-        assert.equal(await page.locator('#ub-notes').textContent(),hostileNotes);assert.equal(await page.locator('#ub-notes script').count(),0);
+        assert.equal(await page.locator('#ub-notes').textContent(),hostileNotes);assert.equal(await page.locator('#ub-notes img').count(),0);assert.equal(await page.evaluate(()=>window.__xss),undefined);
         await page.locator('#ub-go').click();assert.deepEqual(await page.evaluate(()=>window.__installs),[[apkUrl,apkSha256]]);
         assert.equal(await page.locator('#ub-status').textContent(),lane==='alpha'?'✗ файл не совпал с подписанной версией, установка отменена':"✗ the file doesn't match the signed version, install cancelled");
         await page.screenshot({path:`.playwright-mcp/android-update-${lane}.png`});
