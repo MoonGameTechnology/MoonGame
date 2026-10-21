@@ -46,9 +46,15 @@ export interface BotRosterStore {
   /** Caller has proved this bot never acquired the account-store seat. */
   cancelUnclaimedAssignment(matchId: string, botId: string): Promise<void>;
   activeMatchIds(): Promise<string[]>;
-  /** All assigned seats must have a result. XP, history and release commit together.
-   *  The caller credits the existing ProfileStore first; this store owns only bot XP/history. */
-  finishMatch(matchId: string, results: readonly BotMatchResult[], now: number): Promise<void>;
+  /** Every assignment needs a result or an explicit unplayed declaration from a
+   *  durable terminal snapshot. Unplayed identities earn no XP/history. XP, history
+   *  and release commit together; the caller credits ProfileStore first. */
+  finishMatch(
+    matchId: string,
+    results: readonly BotMatchResult[],
+    now: number,
+    unplayedBotIds?: readonly string[],
+  ): Promise<void>;
   /** Only for a host that has proved this match has no durable snapshot. No time-based expiry. */
   abandonMatch(matchId: string): Promise<void>;
   recentMatches(botId: string, limit?: number): Promise<BotMatchHistory[]>;
@@ -213,11 +219,14 @@ function allocationInput(
 function checkResults(
   assignments: readonly BotAssignment[],
   results: readonly BotMatchResult[],
+  unplayedBotIds: readonly string[],
 ): void {
   const owners = new Map(assignments.map((a) => [a.botId, a.playerId]));
+  const completed = [...results.map((r) => r.botId), ...unplayedBotIds];
   if (
-    results.length !== owners.size ||
-    new Set(results.map((r) => r.botId)).size !== owners.size ||
+    completed.length !== owners.size ||
+    new Set(completed).size !== owners.size ||
+    unplayedBotIds.some((id) => !owners.has(id)) ||
     results.some((r) => !owners.has(r.botId) || owners.get(r.botId) !== r.playerId)
   )
     throw new Error('E_BOT_RESULT_MISMATCH');
@@ -307,10 +316,12 @@ export class MemoryBotRosterStore implements BotRosterStore {
 
   async cancelUnclaimedAssignment(matchId: string, botId: string): Promise<void> {
     if (this.matches.get(matchId) !== 'active') return;
-    this.seats.set(
-      matchId,
-      (this.seats.get(matchId) ?? []).filter((a) => a.botId !== botId),
-    );
+    const remaining = (this.seats.get(matchId) ?? []).filter((a) => a.botId !== botId);
+    if (remaining.length) this.seats.set(matchId, remaining);
+    else {
+      this.seats.delete(matchId);
+      this.matches.delete(matchId);
+    }
   }
 
   async activeMatchIds(): Promise<string[]> {
@@ -324,12 +335,13 @@ export class MemoryBotRosterStore implements BotRosterStore {
     matchId: string,
     results: readonly BotMatchResult[],
     now: number,
+    unplayedBotIds: readonly string[] = [],
   ): Promise<void> {
     if (!validId(matchId)) throw new Error('E_BOT_ROSTER_INPUT');
     checkTimestamp(now);
     const status = this.matches.get(matchId);
     if (status && status !== 'active') return;
-    checkResults(this.seats.get(matchId) ?? [], results);
+    checkResults(this.seats.get(matchId) ?? [], results, unplayedBotIds);
     for (const result of results)
       if (!Number.isSafeInteger(this.identities.get(result.botId)!.bot.xp + result.xp))
         throw new Error('E_BOT_XP_OVERFLOW');
@@ -486,6 +498,11 @@ export class PostgresBotRosterStore implements BotRosterStore {
         'DELETE FROM bot_roster_assignments WHERE match_id = $1 AND bot_id = $2 AND active',
         [matchId, botId],
       );
+      await client.query(
+        `DELETE FROM bot_roster_matches WHERE match_id = $1 AND status = 'active'
+         AND NOT EXISTS (SELECT 1 FROM bot_roster_assignments WHERE match_id = $1)`,
+        [matchId],
+      );
     });
   }
 
@@ -500,13 +517,14 @@ export class PostgresBotRosterStore implements BotRosterStore {
     matchId: string,
     results: readonly BotMatchResult[],
     now: number,
+    unplayedBotIds: readonly string[] = [],
   ): Promise<void> {
     if (!validId(matchId)) throw new Error('E_BOT_ROSTER_INPUT');
     checkTimestamp(now);
     await this.withLock(async (client) => {
       const status = await this.matchStatus(client, matchId);
       if (status && status !== 'active') return;
-      checkResults(await this.readAssignments(client, matchId), results);
+      checkResults(await this.readAssignments(client, matchId), results, unplayedBotIds);
       if (results.length) {
         const identities = await client.query<{ id: string; xp: string }>(
           'SELECT id, xp FROM bot_roster_identities WHERE id = ANY($1::text[])',

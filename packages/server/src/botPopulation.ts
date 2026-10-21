@@ -216,28 +216,43 @@ function endedWallTime(snapshot: MatchSnapshot, now: number): number {
 
 /** Caller supplies a successfully persisted terminal snapshot. Progress commits
  * FIRST; XP/history/release commit together afterwards. Either operation can be
- * replayed after a crash without double credit or freeing an unfinished identity. */
+ * replayed after a crash without double credit. A bot whose admission never
+ * confirmed cannot participate after this terminal snapshot: release it without
+ * inventing XP, profile progress or history. Live snapshots never release it. */
 export async function settleBotMatch(args: {
   snapshot: MatchSnapshot;
   bots: BotRosterStore;
   profiles: ProfileStore;
+  accounts: Pick<AccountStore, 'seatOf'>;
   now: number;
 }): Promise<void> {
-  const { snapshot, bots, profiles, now } = args;
+  const { snapshot, bots, profiles, accounts, now } = args;
   const { matchId, state } = snapshot;
   if (state.match.status !== 'ended' || snapshot.status !== 'ended') return;
   if (!(await bots.activeMatchIds()).includes(matchId)) return;
   const assignments = await bots.assignments(matchId);
-  if (!assignments.length) return;
-  if (assignments.some((a) => !state.players[a.playerId]?.seated))
+  if (assignments.some((a) => !state.players[a.playerId] || state.players[a.playerId]!.npc))
     throw new Error('E_BOT_RESULT_INCOMPLETE');
-  const progress = assignments.map((a) => ({
+  const played: BotAssignment[] = [];
+  const unplayedBotIds: string[] = [];
+  for (const assignment of assignments) {
+    // Allocation precedes account-store reservation. A human may have won that
+    // seat and confirmed it while bot admission was still awaiting resolveSeat.
+    // The terminal player's `seated` flag alone does not prove bot ownership.
+    const ownedSeat = await accounts.seatOf(matchId, assignment.login);
+    if (ownedSeat !== null && ownedSeat !== assignment.playerId)
+      throw new Error('E_BOT_SEAT_CONFLICT');
+    if (ownedSeat === assignment.playerId && state.players[assignment.playerId]!.seated)
+      played.push(assignment);
+    else unplayedBotIds.push(assignment.botId);
+  }
+  const progress = played.map((a) => ({
     accountId: a.botId,
     progress: matchProfileProgress(state, a.playerId),
   }));
   const winnerExists = !!state.match.winner || (state.match.winners?.length ?? 0) > 0;
   const endedAt = endedWallTime(snapshot, now);
-  const results = assignments.map((a, index) => ({
+  const results = played.map((a, index) => ({
     botId: a.botId,
     playerId: a.playerId,
     mapId: state.mapId ?? 'legacy',
@@ -251,7 +266,7 @@ export async function settleBotMatch(args: {
     place: state.match.rewards?.[a.playerId]?.place ?? null,
   }));
   await profiles.credit(matchId, progress);
-  await bots.finishMatch(matchId, results, now);
+  await bots.finishMatch(matchId, results, now, unplayedBotIds);
 }
 
 /** Before admitting new matches: retain live assignments, finish committed results,
@@ -275,7 +290,13 @@ export async function recoverBotPopulation(args: RecoveryDeps): Promise<void> {
 export async function recoverBotMatch(args: RecoveryDeps, matchId: string): Promise<void> {
   const snapshot = await args.matches.load(matchId);
   if (snapshot) {
-    await settleBotMatch({ snapshot, bots: args.bots, profiles: args.profiles, now: args.now() });
+    await settleBotMatch({
+      snapshot,
+      bots: args.bots,
+      profiles: args.profiles,
+      accounts: args.accounts,
+      now: args.now(),
+    });
   } else {
     for (const assignment of await args.bots.assignments(matchId)) {
       const seat = await args.accounts.seatOf(matchId, assignment.login);

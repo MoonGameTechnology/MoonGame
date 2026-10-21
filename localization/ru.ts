@@ -887,6 +887,18 @@ export const ru: Record<string, string> = {
 
   // --- chat.win — Плавающее окно чата (десктоп): каналы, настройки окна, штамп.
   'chat.ping.mark': 'метка {node}',
+  'bot-chat.alliance-refused': 'В коалиции не вступаю. Могу обсудить мир или пакт.',
+  'bot-chat.greeting': 'Привет, командир. Готов обсудить мир, пакт или торговлю.',
+  'bot-chat.help': 'Для переговоров напиши «давай мир», «предлагаю пакт» или /peace. Для войны: «объявляю войну».',
+  'bot-chat.negotiation-failed': 'Изменить отношения не удалось. Проверь текущий статус в дипломатии.',
+  'bot-chat.negotiation-refused': 'Пока не принимаю это предложение.',
+  'bot-chat.pact-accepted': 'Пакт о ненападении заключён.',
+  'bot-chat.pact-current': 'У нас уже действует пакт о ненападении.',
+  'bot-chat.peace-accepted': 'Мир заключён.',
+  'bot-chat.peace-current': 'Между нами уже мир.',
+  'bot-chat.trade': 'Предложения ресурсов размещаются на рынке. Переписка сама по себе сделку не заключает.',
+  'bot-chat.war-confirmed': 'Война объявлена. Буду защищать свои миры.',
+  'bot-chat.war-current': 'Мы уже воюем.',
   'chat.ping.need-province': 'Сначала выберите провинцию на карте',
   'chat.ping.need-province.short': 'Сначала выберите провинцию',
   'chat.tab.global': 'Глобальный',

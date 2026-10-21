@@ -35,10 +35,13 @@ import { MemoryPlayerActivityStore, PostgresPlayerActivityStore } from '../packa
 import { registerPlayerActivityApi } from '../packages/server/src/playerActivityApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
-import { MemoryBotRosterStore, PostgresBotRosterStore, type BotRosterStore } from '../packages/server/src/botRoster';
+import { MemoryBotRosterStore, PostgresBotRosterStore, type BotRosterStore, type BotAssignment, type BotIdentity } from '../packages/server/src/botRoster';
 import { botMatchLimit, startBotArrivals, botPopulationConfig, prepareBotPopulation, recoverBotMatch, recoverBotPopulation, settleBotMatch } from '../packages/server/src/botPopulation';
 import { StaggeredAi } from './src/aiScheduler';
 import { aiOrderSlices } from './src/aiOrderSlices';
+import { botAcceptsOffer, botBehaviorOrders, botStyle } from './src/botBehavior';
+import { createBotSocial } from '../packages/server/src/botSocial';
+import { botChatText } from '../scripts/botChatText';
 import type { Action } from '../packages/shared-core/src/index';
 import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
 // Serves the prototype's OWN world over WebSocket so two browsers — or two phones
@@ -512,7 +515,19 @@ async function createHostedMatch(
   // the server-side AI (mirrors single-player: empty slots are taken by the AI).
   const humans = new Set<string>();
   const botSeats = new Set<string>();
+  const botIdentities = new Map<string, BotIdentity>();
   const aiEligibleAt = new Map<string, number>();
+
+  async function rememberBots(assignments: readonly BotAssignment[]): Promise<void> {
+    for (const assignment of assignments) {
+      if (!botIdentities.has(assignment.playerId)) {
+        const identity = await botStore.findByLogin(assignment.login);
+        if (!identity || identity.id !== assignment.botId) throw new Error('E_BOT_IDENTITY');
+        botIdentities.set(assignment.playerId, identity);
+      }
+      botSeats.add(assignment.playerId);
+    }
+  }
 
   const restoredSnap = await matchStore.load(id);
   let initialState =
@@ -606,6 +621,8 @@ async function createHostedMatch(
     initialState,
     kernel,
     data,
+    onChat: (message) => botSocial?.onMessage(message),
+    serverChatAllowed: (seat) => botSeats.has(seat),
     now: () => Date.now(),
     // Born running: the clock anchors at the initial game time (fresh world: Day 1
     // now; restored snapshot: its durable anchor) and TIME_SCALE applies from here.
@@ -652,6 +669,17 @@ async function createHostedMatch(
     ...(GATE ? { gate: new ActionGate({ payloadValidator: isValidActionPayload }) } : {}),
   });
 
+  const botSocial = createBotSocial({
+    room,
+    isBot: (seat) => botSeats.has(seat),
+    render: botChatText,
+    behavior: (bot, human, stance, state) => {
+      const identity = botIdentities.get(bot);
+      return identity !== undefined && botAcceptsOffer(state, bot, human, identity.seed, stance);
+    },
+    onError: (code) => process.stderr.write(`${code}\n`),
+  });
+
   if (AUTH && initialState.match.status === 'ended')
     await creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, initialState);
 
@@ -691,22 +719,23 @@ async function createHostedMatch(
         economyActivity: room.economyActivitySnapshot,
       };
       await matchStore.save(snapshot);
-      if (botSeats.size > 0 && snapshot.status === 'ended')
-        await settleBotMatch({ snapshot, bots: botStore, profiles: profileStore, now: Date.now() });
+      // Admission may cross the terminal deadline before it can update botSeats.
+      // The durable roster, not the successfully seated in-memory cache, owns settlement.
+      if (snapshot.status === 'ended')
+        await settleBotMatch({ snapshot, bots: botStore, profiles: profileStore, accounts: accountStore, now: Date.now() });
     } catch (e) {
       process.stderr.write(`snapshot save failed (${id}): ${(e as Error)?.message ?? String(e)}\n`);
       // A finished room has no more AI wakes. Keep one bounded retry until its
       // durable result lands; active roster ownership survives a process restart.
-      if (botSeats.size > 0 && room.state.match.status === 'ended') scheduleSave(5_000);
+      if (room.state.match.status === 'ended') scheduleSave(5_000);
     }
     saving = false;
   }
 
   if (AUTH) {
     try {
-      for (const assignment of await prepareBotPopulation({ matchId: id, room, bots: botStore,
-        accounts: accountStore, data, config: BOT_POPULATION, restored: true, now: Date.now() }))
-        botSeats.add(assignment.playerId);
+      await rememberBots(await prepareBotPopulation({ matchId: id, room, bots: botStore,
+        accounts: accountStore, data, config: BOT_POPULATION, restored: true, now: Date.now() }));
     } catch (error) {
       // A partially persisted claim belongs to this match and is repaired on
       // restart. Never release it on a timeout or expose a half-admitted room.
@@ -752,7 +781,7 @@ async function createHostedMatch(
     policy.slice(policy.indexOf(':') + 1) as StewardPosture | 'expand';
   const aiPolicy = (seat: string): string | null => {
     if (room.state.players[seat]?.status !== 'active') return null;
-    if (botSeats.has(seat)) return 'bot:expand';
+    if (botSeats.has(seat)) return `bot:${botStyle(botIdentities.get(seat)!.seed)}`;
     // Offline population keeps its own empires active. The grace-based human
     // stand-in keeps the existing watched-room policy.
     if (connected === 0) return null;
@@ -776,7 +805,9 @@ async function createHostedMatch(
         driversBusy = true;
         try {
           const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
-            (seat, policy) => aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
+            (seat, policy) => botSeats.has(seat)
+              ? botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed)
+              : aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
           if (!step.worked) return;
           const group = step.action ?? [];
           // Политику спрашиваем ОДИН раз на порцию. Перепроверка перед каждым приказом
@@ -909,9 +940,8 @@ async function createHostedMatch(
     canJoin: () => !aiStopped && room.state.match.status !== 'ended' && registry.entryOpen(id) &&
       botSeats.size < botMatchLimit(room.state, BOT_POPULATION.fillPercent),
     join: async () => {
-      for (const assignment of await prepareBotPopulation({ matchId: id, room, bots: botStore,
-        accounts: accountStore, data, config: BOT_POPULATION, restored: false, now: Date.now() }))
-        botSeats.add(assignment.playerId);
+      await rememberBots(await prepareBotPopulation({ matchId: id, room, bots: botStore,
+        accounts: accountStore, data, config: BOT_POPULATION, restored: false, now: Date.now() }));
       driver?.reschedule();
       scheduleSave();
     },
@@ -925,6 +955,7 @@ async function createHostedMatch(
     flush: doSave,
     clearTimers(): void {
       botArrivals?.stop();
+      botSocial?.stop();
       aiStopped = true;
       saveStopped = true;
       if (saveTimer) {

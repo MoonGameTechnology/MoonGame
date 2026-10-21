@@ -50,6 +50,10 @@ Recovery-письма обоих хостов форматирует `scripts/re
 профилей, атомарные назначения и история; `botPopulation.ts` — посадка, реальные
 итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
 `profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
+`prototype/src/botBehavior.ts` выбирает стратегию и политику переговоров по постоянному seed;
+`packages/server/src/botSocial.ts` отвечает на принятые личные сообщения, а
+`scripts/botChatText.ts` форматирует RU/EN-реплики без изменения протокола.
+Реальный HTTP/WS: `pnpm run smoke:bots:chat`; CPU/RSS: `pnpm run perf:bots:load`.
 Параметры включения описаны в [runbook](deploy/README.md#постоянные-боты-для-заполнения-карт).
 
 ---

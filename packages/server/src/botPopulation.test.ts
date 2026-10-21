@@ -11,6 +11,7 @@ import {
   settleBotMatch,
 } from './botPopulation';
 import { MemoryProfileStore } from './profileStore';
+import { seatClaimAction, seatConfirmAction } from './joinSeat';
 import { createDevMatch, loadShippedData } from './scenario';
 import { MemoryAccountStore, MemoryMatchStore, MemoryUserStore, type MatchSnapshot } from './store';
 
@@ -262,7 +263,7 @@ describe('bot results and restart recovery', () => {
     vi.spyOn(w.bots, 'finishMatch')
       .mockRejectedValueOnce(new Error('store offline'))
       .mockImplementation(original);
-    const args = { snapshot, bots: w.bots, profiles: w.profiles, now: NOW };
+    const args = { snapshot, bots: w.bots, profiles: w.profiles, accounts: w.accounts, now: NOW };
     await expect(settleBotMatch(args)).rejects.toThrow('store offline');
     expect(await w.bots.activeMatchIds()).toEqual([w.id]);
     expect(await w.profiles.progress(seats[0]!.botId)).toMatchObject({ matches: 1 });
@@ -291,7 +292,13 @@ describe('bot results and restart recovery', () => {
     const snapshot = ended(w.id, w.room.state);
     snapshot.state.match.winner = null;
     delete snapshot.state.match.rewards;
-    await settleBotMatch({ snapshot, bots: w.bots, profiles: w.profiles, now: NOW });
+    await settleBotMatch({
+      snapshot,
+      bots: w.bots,
+      profiles: w.profiles,
+      accounts: w.accounts,
+      now: NOW,
+    });
     expect((await w.bots.recentMatches(seats[0]!.botId))[0]).toMatchObject({
       outcome: 'draw',
       xp: 0,
@@ -300,19 +307,169 @@ describe('bot results and restart recovery', () => {
     expect((await w.profiles.progress(seats[0]!.botId)).wins ?? 0).toBe(0);
   });
 
-  it('keeps incomplete participants reserved and rejects their result before any credit', async () => {
+  it('keeps incomplete participants pinned while their durable match is still live', async () => {
     const w = await fixture();
     const seats = await w.bots.assign(w.id, ['p4'], 20, NOW);
+    const snapshot: MatchSnapshot = {
+      matchId: w.id,
+      dataVersion: data.version,
+      seq: 0,
+      status: 'ongoing',
+      state: w.room.state,
+    };
+    await w.matches.save(snapshot);
+    await recoverBotPopulation({ ...w, now: () => NOW });
+    expect(await w.bots.activeMatchIds()).toEqual([w.id]);
+    expect(await w.profiles.progress(seats[0]!.botId)).toEqual({});
+  });
+
+  it('recovers a real terminal deadline crossed between durable claim and confirmation without invented participation', async () => {
+    const w = await fixture();
+    let wall = 0;
+    const room = createDevMatch(data, {
+      id: w.id,
+      now: () => wall,
+      initialState: w.room.state,
+      config: { timeScale: 1, victory: { endsAt: 1000 } },
+      persist: async (snapshot, receipt) => {
+        await w.matches.save(snapshot);
+        // A slow claim roundtrip crosses the deadline. The real confirmation's
+        // clock catch-up ends the world before the kernel can confirm the seat.
+        if (receipt.actionId.startsWith('seat-claim:')) wall = 1000;
+      },
+    });
+    await expect(
+      prepareBotPopulation({
+        matchId: w.id,
+        room,
+        bots: w.bots,
+        accounts: w.accounts,
+        data,
+        config: CONFIG,
+        restored: false,
+        now: NOW,
+      }),
+    ).rejects.toThrow('E_BOT_CONFIRMATION');
+    const [seat] = await w.bots.assignments(w.id);
+    expect(room.state.match).toMatchObject({ status: 'ended', reason: 'timeout' });
+    expect(room.state.players[seat!.playerId]).toMatchObject({ claimedAt: 0 });
+    expect(room.state.players[seat!.playerId]!.seated).not.toBe(true);
+    expect((await w.matches.load(w.id))!.status).toBe('ended');
+    await recoverBotPopulation({ ...w, now: () => NOW });
+    await recoverBotPopulation({ ...w, now: () => NOW });
+    expect(await w.bots.activeMatchIds()).toEqual([]);
+    expect(await w.profiles.progress(seat!.botId)).toEqual({});
+    expect((await w.bots.findByLogin(seat!.login))?.xp).toBe(0);
+    expect(await w.bots.recentMatches(seat!.botId)).toEqual([]);
+    expect(await w.bots.assign('next-match', ['p1'], 1, NOW + 1)).toHaveLength(1);
+  });
+
+  it('settles confirmed participants while releasing only unplayed identities without a result', async () => {
+    const w = await fixture();
+    const played = await w.populate();
+    const all = await w.bots.assign(w.id, ['p4'], 20, NOW);
+    const unplayed = all.find((seat) => !played.some((a) => a.botId === seat.botId))!;
+    const snapshot = ended(w.id, w.room.state);
+    await settleBotMatch({
+      snapshot,
+      bots: w.bots,
+      profiles: w.profiles,
+      accounts: w.accounts,
+      now: NOW,
+    });
+    expect(await w.bots.activeMatchIds()).toEqual([]);
+    for (const seat of played) {
+      expect(await w.profiles.progress(seat.botId)).toMatchObject({ matches: 1 });
+      expect(await w.bots.recentMatches(seat.botId)).toHaveLength(1);
+      expect((await w.bots.findByLogin(seat.login))?.xp).toBeGreaterThan(0);
+    }
+    expect(await w.profiles.progress(unplayed.botId)).toEqual({});
+    expect(await w.bots.recentMatches(unplayed.botId)).toEqual([]);
+    expect((await w.bots.findByLogin(unplayed.login))?.xp).toBe(0);
+  });
+
+  it('rejects a terminal snapshot with a missing assigned player instead of treating it as unplayed', async () => {
+    const w = await fixture();
+    const [seat] = await w.bots.assign(w.id, ['missing-seat'], 20, NOW);
     await expect(
       settleBotMatch({
         snapshot: ended(w.id, w.room.state),
         bots: w.bots,
         profiles: w.profiles,
+        accounts: w.accounts,
         now: NOW,
       }),
     ).rejects.toThrow('E_BOT_RESULT_INCOMPLETE');
     expect(await w.bots.activeMatchIds()).toEqual([w.id]);
-    expect(await w.profiles.progress(seats[0]!.botId)).toEqual({});
+    expect(await w.profiles.progress(seat!.botId)).toEqual({});
+  });
+
+  it('does not credit a human result when the human won an assigned bot seat before the match ended', async () => {
+    const w = await fixture();
+    let wall = 0;
+    const room = createDevMatch(data, {
+      id: w.id,
+      now: () => wall,
+      initialState: w.room.state,
+      config: { timeScale: 1, victory: { endsAt: 1000 } },
+      persist: (snapshot) => w.matches.save(snapshot),
+    });
+    const [bot] = await w.bots.assign(w.id, ['p6'], 1, NOW);
+    // Allocation has committed, but the human wins the authoritative reservation
+    // and actually enters the map before the bot's resolveSeat can cancel it.
+    await w.accounts.resolveSeat(w.id, 'alice', ['p6']);
+    expect(
+      (await room.submitServerAction('p6', seatClaimAction(w.id, 'p6', room.state.time, {}))).ok,
+    ).toBe(true);
+    expect(
+      (
+        await room.submitServerAction(
+          'p6',
+          seatConfirmAction(w.id, 'p6', room.state.time, room.state.players.p6!.claimedAt),
+        )
+      ).ok,
+    ).toBe(true);
+    wall = 1000;
+    await room.submitServerAction('p1', seatClaimAction(w.id, 'p1', room.state.time, {}));
+    const snapshot = (await w.matches.load(w.id))!;
+    expect(snapshot.state.match).toMatchObject({ status: 'ended', reason: 'timeout' });
+    expect(snapshot.state.players.p6!.seated).toBe(true);
+    expect(await w.accounts.seatOf(w.id, bot!.login)).toBeNull();
+    await settleBotMatch({
+      snapshot,
+      bots: w.bots,
+      profiles: w.profiles,
+      accounts: w.accounts,
+      now: NOW,
+    });
+    // A delayed admission cancellation cannot manufacture or erase a result.
+    await w.bots.cancelUnclaimedAssignment(w.id, bot!.botId);
+    await recoverBotPopulation({ ...w, now: () => NOW });
+    expect(await w.bots.activeMatchIds()).toEqual([]);
+    expect((await w.bots.findByLogin(bot!.login))?.xp).toBe(0);
+    expect(await w.profiles.progress(bot!.botId)).toEqual({});
+    expect(await w.bots.recentMatches(bot!.botId)).toEqual([]);
+    expect(await w.accounts.seatOf(w.id, 'alice')).toBe('p6');
+  });
+
+  it('rejects conflicting bot ownership or an account-store outage before any profile credit', async () => {
+    const w = await fixture();
+    const seats = await w.populate();
+    const snapshot = ended(w.id, w.room.state);
+    const args = { snapshot, bots: w.bots, profiles: w.profiles, accounts: w.accounts, now: NOW };
+    const credit = vi.spyOn(w.profiles, 'credit');
+    const seatOf = vi.spyOn(w.accounts, 'seatOf').mockRejectedValueOnce(new Error('offline'));
+    await expect(settleBotMatch(args)).rejects.toThrow('offline');
+    seatOf.mockRestore();
+    await w.accounts.releaseSeat(w.id, seats[0]!.login);
+    await w.accounts.resolveSeat(w.id, seats[0]!.login, ['p1']);
+    await expect(settleBotMatch(args)).rejects.toThrow('E_BOT_SEAT_CONFLICT');
+    expect(credit).not.toHaveBeenCalled();
+    expect(await w.bots.activeMatchIds()).toEqual([w.id]);
+    for (const seat of seats) {
+      expect(await w.profiles.progress(seat.botId)).toEqual({});
+      expect(await w.bots.recentMatches(seat.botId)).toEqual([]);
+    }
   });
 
   it('recovers terminal results and true orphans while leaving live matches pinned', async () => {

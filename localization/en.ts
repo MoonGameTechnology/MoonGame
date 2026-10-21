@@ -885,6 +885,18 @@ export const en: Record<string, string> = {
 
   // --- chat.win — Плавающее окно чата (десктоп): каналы, настройки окна, штамп.
   'chat.ping.mark': 'marker {node}',
+  'bot-chat.alliance-refused': 'I do not join coalitions. We can discuss peace or a pact.',
+  'bot-chat.greeting': 'Hello, commander. We can discuss peace, a pact or trade.',
+  'bot-chat.help': 'To negotiate, write “make peace”, “offer pact” or /peace. To declare war, write “declare war”.',
+  'bot-chat.negotiation-failed': 'Relations could not be changed. Check the current diplomatic status.',
+  'bot-chat.negotiation-refused': 'I am not accepting that offer for now.',
+  'bot-chat.pact-accepted': 'Our non-aggression pact is now in effect.',
+  'bot-chat.pact-current': 'Our non-aggression pact is already in effect.',
+  'bot-chat.peace-accepted': 'We are now at peace.',
+  'bot-chat.peace-current': 'We are already at peace.',
+  'bot-chat.trade': 'Resource offers go on the market. Chat alone does not complete a trade.',
+  'bot-chat.war-confirmed': 'War has been declared. I will defend my worlds.',
+  'bot-chat.war-current': 'We are already at war.',
   'chat.ping.need-province': 'Select a province on the map first',
   'chat.ping.need-province.short': 'Select a province first',
   'chat.tab.global': 'Global',

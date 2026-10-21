@@ -70,6 +70,18 @@ function rosterContract(label: string, create: () => BotRosterStore): void {
       expect(await store.recentMatches(b!.botId)).toHaveLength(1);
     });
 
+    it('removes an empty active marker after the last lost reservation and permits a fresh attempt', async () => {
+      const [seat] = await store.assign('lost-race', ['p1'], 1, 1);
+      await store.cancelUnclaimedAssignment('lost-race', seat!.botId);
+      await store.cancelUnclaimedAssignment('lost-race', seat!.botId);
+      expect(await store.assignments('lost-race')).toEqual([]);
+      expect(await store.activeMatchIds()).toEqual([]);
+      const retry = await store.assign('lost-race', ['p2'], 1, 2);
+      expect(retry).toHaveLength(1);
+      expect(retry[0]?.playerId).toBe('p2');
+      expect(await store.activeMatchIds()).toEqual(['lost-race']);
+    });
+
     it('atomically enforces the global active limit across competing rooms and calls', async () => {
       const requests = Array.from({ length: 6 }, (_, i) =>
         store.assign(`room-${i}`, ['p1', 'p2', 'p3'], 7, 1),
@@ -133,6 +145,30 @@ function rosterContract(label: string, create: () => BotRosterStore): void {
       }
       await store.finishMatch('result-match', good, 4);
       expect(await store.activeMatchIds()).toEqual([]);
+    });
+
+    it('atomically releases explicitly unplayed identities without XP or history and rejects conflicting declarations', async () => {
+      const [played, unplayed] = await store.assign('partial-admission', ['p1', 'p2'], 2, 1);
+      for (const ids of [
+        [],
+        [played!.botId],
+        ['foreign-bot'],
+        [unplayed!.botId, unplayed!.botId],
+      ]) {
+        await expect(
+          store.finishMatch('partial-admission', [result(played!)], 2, ids),
+        ).rejects.toThrow('E_BOT_RESULT_MISMATCH');
+      }
+      expect(await store.activeMatchIds()).toEqual(['partial-admission']);
+      expect((await store.findByLogin(played!.login))?.xp).toBe(0);
+      await store.finishMatch('partial-admission', [result(played!)], 3, [unplayed!.botId]);
+      await store.finishMatch('partial-admission', [result(played!)], 4, [unplayed!.botId]);
+      expect(await store.activeMatchIds()).toEqual([]);
+      expect((await store.findByLogin(played!.login))?.xp).toBe(120);
+      expect(await store.recentMatches(played!.botId)).toHaveLength(1);
+      expect((await store.findByLogin(unplayed!.login))?.xp).toBe(0);
+      expect(await store.recentMatches(unplayed!.botId)).toEqual([]);
+      expect(await store.assign('later-match', ['p1', 'p2'], 2, 5)).toHaveLength(2);
     });
 
     it('a delayed finish or abandon of an old match cannot release a profile reused by a new match', async () => {
