@@ -13,6 +13,8 @@ const {PNG}=createRequire(require.resolve('qrcode/package.json'))('pngjs');
 const config=JSON.parse(readFileSync('mobile/distribution.json','utf8'));
 const root=config.origin+config.basePath;
 const link=root+'/player/latest.apk';
+// Hostile release notes must render as text, never as markup.
+const hostileNotes='Changes <script>not executable</script>';
 // The real key signs in CI only. The harness bakes its own public key into the served
 // build so the actual WebCrypto check runs; a file signed by any other key must fail.
 const testKey=generateKeyPairSync('ed25519'),strangerKey=generateKeyPairSync('ed25519');
@@ -53,13 +55,13 @@ try {
       const apkUrl=`${root}/${lane}/${vc}-deadbee/void-dominion-${lane}.apk`;
       let requests=0;
       await page.addInitScript(()=>{window.__BUILD__={versionCode:42,sha:'abc1234',versionName:'installed-42'};window.__installs=[];window.VoidNative={installVerified:(url,sha)=>{window.__installs.push([url,sha]);window.dispatchEvent(new CustomEvent('void-apk-update',{detail:'E_UPDATE_DIGEST'}));}};});
-      await page.route(root+`/${lane}/latest.json`,async route=>{requests++;if(scenario==='offline')return route.abort('failed');return route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(signed({versionCode:vc,versionName:`${lane}-deadbee`,sha:'deadbee',apkUrl,notes:'Changes <script>not executable</script>',apkSha256,appId:lane==='alpha'?'com.voiddominion.prototype':'com.voiddominion.player',signerSha256:config.signerSha256},scenario==='forged'?strangerKey.privateKey:undefined))});});
+      await page.route(root+`/${lane}/latest.json`,async route=>{requests++;if(scenario==='offline')return route.abort('failed');return route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(signed({versionCode:vc,versionName:`${lane}-deadbee`,sha:'deadbee',apkUrl,notes:hostileNotes,apkSha256,appId:lane==='alpha'?'com.voiddominion.prototype':'com.voiddominion.player',signerSha256:config.signerSha256},scenario==='forged'?strangerKey.privateKey:undefined))});});
       await page.goto(pages.url+(lane==='player'?'/player':'/'));await waitForApp(page);
       await page.waitForFunction(()=>document.getElementById('cver')?.textContent?.includes('installed-42'));
       assert.equal(await page.locator('#hub-android').count(),0,'APK must not advertise another installation');
       if(scenario==='newer') {
         await page.locator('#updbar').waitFor({state:'visible'});assert.notEqual(await page.locator('#ub-go').getAttribute('href'),apkUrl,'no unverified plain-link download');
-        assert.equal(await page.locator('#ub-notes').textContent(),'Changes <script>not executable</script>');assert.equal(await page.locator('#ub-notes script').count(),0);
+        assert.equal(await page.locator('#ub-notes').textContent(),hostileNotes);assert.equal(await page.locator('#ub-notes script').count(),0);
         await page.locator('#ub-go').click();assert.deepEqual(await page.evaluate(()=>window.__installs),[[apkUrl,apkSha256]]);
         assert.equal(await page.locator('#ub-status').textContent(),lane==='alpha'?'✗ файл не совпал с подписанной версией, установка отменена':"✗ the file doesn't match the signed version, install cancelled");
         await page.screenshot({path:`.playwright-mcp/android-update-${lane}.png`});
