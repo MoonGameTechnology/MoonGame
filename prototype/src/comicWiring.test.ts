@@ -64,8 +64,9 @@ describe('комиксы глав — проводка', () => {
     expect(MAIN).toContain('finalScenes: () => playTaskComic(runMissionRows(), runChain()),');
   });
 
-  it('«назад» и Escape закрывают комикс первым — он верхняя ступень лестницы', () => {
-    const ladder = /const BACK_LAYERS: BackLayer\[\] = \[\n\s+\{ id: '([^']+)'/.exec(MAIN)?.[1];
-    expect(ladder).toBe('comic');
+  it('комикс выше обычных экранов, нативный диалог описания выше комикса', () => {
+    const block = MAIN.split('const BACK_LAYERS: BackLayer[] = [')[1]!.split('\n];')[0]!;
+    const ladder = [...block.matchAll(/\{\s*id: '([^']+)'/g)].map(match => match[1]);
+    expect(ladder.slice(0, 2)).toEqual(['match-description', 'comic']);
   });
 });

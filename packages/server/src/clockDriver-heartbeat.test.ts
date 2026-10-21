@@ -205,9 +205,142 @@ describe('clock driver · live-player heartbeat (NETA2-6)', () => {
   });
 });
 
+describe('clock driver · optional background heartbeat', () => {
+  it('uses one timer and switches to the existing watched heartbeat without querying the background policy', () => {
+    const clock = capturingClock();
+    const room = stubRoom({ peerCount: 0 });
+    const active = new Set<unknown>();
+    let policyReads = 0;
+    const driver = startClockDriver(asRoom(room), {
+      heartbeatMs: 1000,
+      backgroundHeartbeatMs: () => {
+        policyReads++;
+        return 60_000;
+      },
+      schedule: (fn, ms) => {
+        const handle = clock.schedule(fn, ms);
+        active.add(handle);
+        return handle;
+      },
+      cancel: (handle) => {
+        active.delete(handle);
+        clock.cancel(handle);
+      },
+    });
+    expect(clock.armed()!.ms).toBe(60_000);
+    expect(policyReads).toBe(1);
+    expect(room.peerCount).toBe(0);
+    expect(active.size).toBe(1);
+    room.peerCount = 1;
+    driver.reschedule();
+    expect(clock.armed()!.ms).toBe(1000);
+    expect(policyReads).toBe(1);
+    expect(active.size).toBe(1);
+    driver.stop();
+    expect(clock.armed()).toBeNull();
+    expect(active.size).toBe(0);
+  });
+
+  it('keeps event deadlines and maximum waits ahead of a later background beat', () => {
+    for (const [next, maxDelayMs, expected] of [
+      [200, 90_000, 200],
+      [120_000, 90_000, 60_000],
+      [120_000, 30_000, 30_000],
+    ] as const) {
+      const clock = capturingClock();
+      const driver = startClockDriver(asRoom(stubRoom({ peerCount: 0, next })), {
+        backgroundHeartbeatMs: () => 60_000,
+        maxDelayMs,
+        schedule: clock.schedule,
+        cancel: clock.cancel,
+      });
+      expect(clock.armed()!.ms).toBe(expected);
+      driver.stop();
+    }
+  });
+
+  it('never queries or arms background work for a frozen room', () => {
+    const clock = capturingClock();
+    let policyReads = 0;
+    const driver = startClockDriver(asRoom(stubRoom({ isClockRunning: false, peerCount: 0 })), {
+      heartbeatMs: 1000,
+      backgroundHeartbeatMs: () => {
+        policyReads++;
+        return 1000;
+      },
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+    });
+    expect(clock.armed()).toBeNull();
+    expect(policyReads).toBe(0);
+    driver.stop();
+  });
+
+  it('idles when the host disables an ended match and ignores invalid intervals', () => {
+    const clock = capturingClock();
+    let ended = false;
+    const driver = startClockDriver(asRoom(stubRoom({ peerCount: 0 })), {
+      backgroundHeartbeatMs: () => (ended ? null : 60_000),
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+    });
+    expect(clock.armed()).not.toBeNull();
+    // MatchRoom.isClockRunning describes lobby state; the host withdraws this extra beat at end.
+    ended = true;
+    driver.reschedule();
+    expect(clock.armed()).toBeNull();
+    driver.stop();
+
+    for (const interval of [0, -1, NaN, Infinity, -Infinity]) {
+      const badClock = capturingClock();
+      const badDriver = startClockDriver(asRoom(stubRoom({ peerCount: 0 })), {
+        backgroundHeartbeatMs: () => interval,
+        schedule: badClock.schedule,
+        cancel: badClock.cancel,
+      });
+      expect(badClock.armed()).toBeNull();
+      badDriver.stop();
+    }
+  });
+});
+
 describe('clock driver · heartbeat on a real dev match (NETA2-6 end-to-end)', () => {
   const data = loadShippedData();
   const silentPeer: RoomPeer = { send: () => {} };
+
+  it('advances an opted-in empty match with no peers or scheduled events; ordinary empty matches still idle', () => {
+    let wall = 1000;
+    const room = createDevMatch(data, { now: () => wall, time: wall, config: { timeScale: 1 } });
+    const clock = capturingClock();
+    const ordinary = startClockDriver(room, {
+      heartbeatMs: HEARTBEAT_MS,
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+    });
+    expect(room.isClockRunning).toBe(true);
+    expect(room.peerCount).toBe(0);
+    expect(room.msUntilNextEvent()).toBeNull();
+    expect(clock.armed()).toBeNull();
+    ordinary.stop();
+
+    const seen: boolean[] = [];
+    const driver = startClockDriver(room, {
+      heartbeatMs: HEARTBEAT_MS,
+      backgroundHeartbeatMs: () => 60_000,
+      onTick: ({ progressed }) => seen.push(progressed),
+      now: () => wall,
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+    });
+    expect(clock.armed()!.ms).toBe(60_000);
+    wall += 60_000;
+    clock.armed()!.fn();
+    expect(room.state.time).toBe(wall);
+    expect(room.peerCount).toBe(0);
+    expect(seen).toEqual([true]);
+    expect(clock.armed()!.ms).toBe(60_000);
+    driver.stop();
+  });
 
   it('advances a watched fresh match with NO scheduled events and no player action', () => {
     let clock = 1000;
