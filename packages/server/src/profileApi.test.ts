@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { Pool } from 'pg';
 import { defaultAppearance, medalGrade } from '@void/protocol';
-import { registerProfileApi } from './profileApi';
+import { registerProfileApi, type ProfileApiDeps } from './profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
 import { MemoryCommanderStore, MemoryUserStore, migrate } from './store';
 import { creditProfileMatch } from './profileCredit';
@@ -54,7 +54,9 @@ describe.skipIf(!process.env.DATABASE_URL)('durable profile store', () => {
   );
 });
 
-async function fixture() {
+async function fixture(option?: ProfileApiDeps['bots'] | ProfileApiDeps['premium']) {
+  const premium = typeof option === 'function' ? option : undefined;
+  const bots = typeof option === 'object' ? option : undefined;
   const app = Fastify();
   const profiles = new MemoryProfileStore();
   const users = new MemoryUserStore();
@@ -66,6 +68,8 @@ async function fixture() {
     profiles,
     users,
     commanders,
+    ...(premium ? { premium } : {}),
+    ...(bots ? { bots } : {}),
     identify: async (request) => {
       const id =
         request.headers.authorization === 'Alice'
@@ -76,10 +80,170 @@ async function fixture() {
       return id ? { accountId: id, login: id === alice.userId ? 'Alice' : 'Bob' } : null;
     },
   });
-  return { app, profiles, alice: alice.userId, bob: bob.userId };
+  return { app, profiles, commanders, alice: alice.userId, bob: bob.userId };
 }
 
+describe('persistent bot public profiles', () => {
+  const bot = { id: 'bot-001', login: '~Orion', portrait: 19, seed: 71, xp: 245 };
+  const result = {
+    botId: bot.id,
+    playerId: 'p3',
+    matchId: 'm-finished',
+    mapId: 'nexus',
+    endedAt: 1_800_000_000_000,
+    outcome: 'win' as const,
+    xp: 245,
+    place: 1,
+  };
+  function roster() {
+    return {
+      findByLogin: vi.fn(async (login: string) => (login.toLowerCase() === '~orion' ? bot : null)),
+      recentMatches: vi.fn(async () => [result]),
+    };
+  }
+  it('shows real accumulated bot progress and a bounded explicit history without auth identity', async () => {
+    const bots = roster();
+    const { app, profiles, commanders } = await fixture(bots);
+    try {
+      await profiles.credit('m-real', [
+        {
+          accountId: bot.id,
+          progress: { matches: 24, wins: 12, explored: 72 },
+        },
+      ]);
+      const view = await app.inject({
+        url: '/profiles?login=~orion',
+        headers: { authorization: 'Alice' },
+      });
+      expect(view.statusCode).toBe(200);
+      expect(view.json()).toEqual({
+        kind: 'bot',
+        login: bot.login,
+        portrait: bot.portrait,
+        xp: bot.xp,
+        progress: { matches: 24, wins: 12, explored: 72 },
+        slots: ['first', 'map', 'service', ...Array(12).fill(null)],
+        recentMatches: [
+          {
+            matchId: result.matchId,
+            mapId: result.mapId,
+            endedAt: result.endedAt,
+            outcome: 'win',
+            xp: 245,
+            place: 1,
+          },
+        ],
+      });
+      expect(view.body).not.toMatch(/botId|playerId|accountId|seed|passHash|email/);
+      expect(bots.recentMatches).toHaveBeenCalledWith(bot.id, 10);
+      expect(await commanders.xpOf(bot.id)).toBe(0);
+      bots.recentMatches.mockResolvedValue(
+        Array.from({ length: 11 }, (_, i) => ({ ...result, matchId: `m-${i}` })),
+      );
+      const bounded = (
+        await app.inject({ url: '/profiles?login=~Orion', headers: { authorization: 'Alice' } })
+      ).json();
+      expect(bounded.recentMatches).toHaveLength(10);
+      expect((await app.inject({ url: '/profiles?login=~Orion' })).statusCode).toBe(401);
+      expect(
+        (await app.inject({ url: '/profiles?login=~missing', headers: { authorization: 'Alice' } }))
+          .statusCode,
+      ).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+  it('starts without medals and never redirects user reads or writes to a bot', async () => {
+    const bots = roster();
+    // Even a resolver that returns the bot for a real login cannot take over that profile.
+    bots.findByLogin.mockImplementation(async () => ({ ...bot, xp: 0 }));
+    bots.recentMatches.mockResolvedValue([]);
+    const { app, profiles, alice } = await fixture(bots);
+    try {
+      const fresh = (
+        await app.inject({ url: '/profiles?login=~Orion', headers: { authorization: 'Alice' } })
+      ).json();
+      expect(fresh.progress).toEqual({});
+      expect(fresh.slots).toEqual(defaultAppearance().slots);
+      expect(fresh.recentMatches).toEqual([]);
+      bots.findByLogin.mockClear();
+      await profiles.credit('human', [{ accountId: alice, progress: { matches: 15, wins: 7 } }]);
+      const human = (
+        await app.inject({ url: '/profiles?login=Alice', headers: { authorization: 'Bob' } })
+      ).json();
+      expect(human.progress).toEqual({});
+      expect(human).not.toHaveProperty('kind');
+      expect(human).not.toHaveProperty('recentMatches');
+      expect(bots.findByLogin).not.toHaveBeenCalled();
+      const look = { ...defaultAppearance(), portrait: 11 };
+      const saved = await app.inject({
+        method: 'POST',
+        url: '/profiles/me?login=~Orion',
+        headers: { authorization: 'Alice' },
+        payload: look,
+      });
+      expect(saved.statusCode).toBe(200);
+      expect(saved.json().login).toBe('Alice');
+      expect(await profiles.appearance(alice)).toEqual(look);
+      expect(await profiles.appearance(bot.id)).toEqual(defaultAppearance());
+      for (const payload of [
+        { ...look, kind: 'bot' },
+        { ...look, botId: bot.id },
+        { ...look, recentMatches: [result] },
+      ]) {
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/profiles/me',
+              headers: { authorization: 'Alice' },
+              payload,
+            })
+          ).statusCode,
+        ).toBe(400);
+      }
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/profiles/me',
+            headers: { authorization: '~Orion' },
+            payload: look,
+          })
+        ).statusCode,
+      ).toBe(401);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 describe('profile API authority and public projection', () => {
+  it('shows a running premium as a frame to everyone, and a failed premium read leaves it off', async () => {
+    let failing = false;
+    const holders = new Set<string>();
+    const { app, alice } = await fixture(async (id) => {
+      if (failing) throw Error('meta down');
+      return holders.has(id);
+    });
+    holders.add(alice);
+    try {
+      const read = async (who: string, login: string) =>
+        (
+          await app.inject({ url: `/profiles?login=${login}`, headers: { authorization: who } })
+        ).json();
+      expect((await read('Bob', 'Alice')).premium).toBe(true);
+      expect((await read('Alice', 'Alice')).premium).toBe(true);
+      expect(await read('Alice', 'Bob')).not.toHaveProperty('premium');
+      failing = true;
+      const fallback = await read('Bob', 'Alice');
+      expect(fallback.login).toBe('Alice');
+      expect(fallback).not.toHaveProperty('premium');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('only the session owner can save, and a different player sees the saved card', async () => {
     const { app, profiles, alice, bob } = await fixture();
     try {

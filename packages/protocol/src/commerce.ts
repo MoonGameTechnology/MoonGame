@@ -36,6 +36,10 @@ export interface CommerceOffer {
     materials?: Record<string, number>;
     moduleId?: string;
     seasonId?: string;
+    /** Sovereigns ◆ credited, the gift not included. */
+    sovereigns?: number;
+    /** Gift Sovereigns credited on top of `sovereigns`. */
+    bonusSovereigns?: number;
     soulbound: true;
   };
   dailyLimit?: number;

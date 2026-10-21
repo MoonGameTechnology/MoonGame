@@ -376,6 +376,20 @@ describe('вкладки', () => {
 });
 
 describe('очередь стройки', () => {
+  it('подписи очереди и приостановленных строек остаются текстом (CWE-79)', async () => {
+    const { env, card } = await boot({ pc: false });
+    const payload = '<img src=x onerror="alert(1)">';
+    const a = env.s.planets.A!;
+    a.buildQueue = [{ id: 11, kind: 'unit', playerId: 'p1', unit: payload, count: 2 }];
+    a.pausedConstruction = [{
+      id: 7, kind: 'unit', playerId: 'p1', unit: payload, count: 1,
+      progress: 0.5, remainingHours: 2, remainingCost: {},
+    }];
+    const html = card('A', 'ground');
+    expect(html).not.toContain(payload);
+    expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+  });
+
   it('ждущий заказ и пауза стоят на своей полосе', async () => {
     const { env, card } = await boot();
     const a = env.s.planets.A!;
@@ -401,6 +415,17 @@ describe('очередь стройки', () => {
 });
 
 describe('мир вне зрения', () => {
+  it('память скана экранирует недоверенные имена и неизвестные постройки (CWE-79)', async () => {
+    const { env, m } = await boot();
+    const payload = '<img src=x onerror="alert(1)">';
+    env.names.p2 = payload;
+    env.memory.N = { owner: 'p2', garrison: 5, buildings: [{ type: payload, level: 1 }] };
+    const html = m.unknownPlanetHtml(env.s.planets.N!);
+    expect(html).not.toContain(payload);
+    expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+    expect(html).toContain('L1');
+  });
+
   it('память скана: владелец, гарнизон, постройки и разведка чужого мира', async () => {
     const { env, m } = await boot();
     env.memory.N = { owner: 'p2', garrison: 5, buildings: [{ type: 'mine', level: 1 }] };

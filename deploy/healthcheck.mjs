@@ -26,6 +26,8 @@ export function healthcheck(env = process.env) {
         ...(cert
           ? {
               ca,
+              // Keep the probe verified even when the host disables Node's TLS default.
+              rejectUnauthorized: true,
               servername: env.HEALTHCHECK_TLS_SERVERNAME || 'localhost',
               // A mounted leaf cert is an explicit trust anchor; hostname/expiry still checked.
               allowPartialTrustChain: true,

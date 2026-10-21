@@ -33,13 +33,18 @@ interface Call {
   font: unknown;
   dash: unknown;
   offset: unknown;
+  /** Матрица холста `[a, b, c, d, e, f]` в момент вызова. */
+  matrix: number[];
 }
 
 /** Градиент поддельного холста — один на всех: кадр и эталон сравниваются по значению. */
 const GRADIENT = { addColorStop() {} };
+/** Экранная матрица: без поворотов и сдвигов. */
+const SCREEN = [1, 0, 0, 1, 0, 0];
 
-/** Холст, чей контекст записывает каждый вызов с цветом, шириной, прозрачностью и шрифтом.
- *  `save`/`restore` держат стек состояния, как настоящий холст. */
+/** Холст, чей контекст записывает каждый вызов с цветом, шириной, прозрачностью, шрифтом и
+ *  матрицей. `save`/`restore` держат стек состояния, как настоящий холст; `translate`,
+ *  `rotate` и `scale` умножают матрицу, `setTransform` ставит её, `getTransform` отдаёт. */
 function fakeCanvas() {
   const calls: Call[] = [];
   const props: Record<string, unknown> = {
@@ -51,20 +56,32 @@ function fakeCanvas() {
     lineDashOffset: 0,
   };
   let dash: unknown = [];
-  const stack: Array<[Record<string, unknown>, unknown]> = [];
+  let m = SCREEN;
+  /** Матрица, умноженная справа на `[a, b, c, d, e, f]`, — как у настоящего холста. */
+  const times = ([a, b, c, d, e, f]: number[]) => {
+    const [ma, mb, mc, md, me, mf] = m as [number, number, number, number, number, number];
+    m = [ma * a! + mc * b!, mb * a! + md * b!, ma * c! + mc * d!, mb * c! + md * d!, ma * e! + mc * f! + me, mb * e! + md * f! + mf];
+  };
+  const stack: Array<[Record<string, unknown>, unknown, number[]]> = [];
   const ctx = new Proxy(props, {
     get(target, name) {
       if (typeof name !== 'string') return undefined;
       if (name in target) return target[name];
       if (name === 'getContextAttributes') return () => ({});
       return (...args: unknown[]) => {
+        const n = args as number[];
         if (name === 'setLineDash') dash = args[0];
-        if (name === 'save') stack.push([{ ...target }, dash]);
+        if (name === 'translate') times([1, 0, 0, 1, n[0]!, n[1]!]);
+        if (name === 'rotate') times([Math.cos(n[0]!), Math.sin(n[0]!), -Math.sin(n[0]!), Math.cos(n[0]!), 0, 0]);
+        if (name === 'scale') times([n[0]!, 0, 0, n[1]!, 0, 0]);
+        if (name === 'setTransform') m = n.slice(0, 6);
+        if (name === 'save') stack.push([{ ...target }, dash, m]);
         if (name === 'restore') {
           const top = stack.pop();
           if (top) {
             Object.assign(target, top[0]);
             dash = top[1];
+            m = top[2];
           }
         }
         calls.push({
@@ -77,9 +94,11 @@ function fakeCanvas() {
           font: target.font,
           dash,
           offset: target.lineDashOffset,
+          matrix: m,
         });
         if (name.startsWith('create')) return GRADIENT;
         if (name === 'measureText') return { width: 40 };
+        if (name === 'getTransform') return { a: m[0], b: m[1], c: m[2], d: m[3], e: m[4], f: m[5] };
         return undefined;
       };
     },
@@ -547,6 +566,35 @@ describe('REFM-235 — флоты на карте', () => {
     expect(mark).toBeGreaterThanOrEqual(0);
     expect(mark).toBeLessThan(translateAt(frame.calls, A));
   });
+
+  it('корпус крутится в своих координатах, а следующий флот и бейдж начинают с экрана; save() — один на слой', async () => {
+    // save() на каждый флот оставлял в куче браузера мусор, который на слабом телефоне при
+    // быстром зуме валил вкладку. Теперь блоки возвращают холст сами, и здесь проверено, что
+    // поворот корпуса не утекает ни в бейдж, ни в соседний флот.
+    const { fleets, frame, geo, env, home, next, fleet, putFleet, keepFleets } = await boot();
+    env.world = { ...env.world, heroes: {} };
+    keepFleets('p1-1');
+    putFleet({ ...fleet('p1-1'), id: 'p1-a', location: next.id });
+    putFleet({ ...fleet('p1-1'), id: 'p1-b', location: home.id });
+    const anchors = ['p1-1', 'p1-a', 'p1-b'].map((id) => geo.fleetAnchor(fleet(id))!);
+    const screen = (calls: Call[]) => calls.every((k) => k.matrix.every((v, i) => near(v, SCREEN[i]!)));
+    for (const detail of [1, 0.5, 0]) {
+      frame.calls.length = 0;
+      fleets.drawFleets(0, LOD({ detail }));
+      // Каждый корпус переносится в свою точку от экранной матрицы — и контур схемы, и полный.
+      for (const A of anchors) {
+        const moves = frame.calls.filter((k) => k.name === 'translate' && near(k.args[0] as number, A.x) && near(k.args[1] as number, A.y));
+        expect(moves.length, `${detail}`).toBe(detail === 0.5 ? 2 : 1);
+        expect(moves.every((k) => k.matrix.every((v, i) => near(v, [1, 0, 0, 1, A.x, A.y][i]!))), `${detail}`).toBe(true);
+      }
+      const badgeCalls = frame.calls.filter((k) => k.name === 'fillRect' && k.fill === 'rgba(3,14,22,.88)');
+      expect(badgeCalls, `${detail}`).toHaveLength(3);
+      expect(screen(badgeCalls), `${detail}`).toBe(true);
+      expect(screen(frame.named('fillText')), `${detail}`).toBe(true);
+      expect(frame.named('save'), `${detail}`).toHaveLength(1);
+      expect(frame.calls.at(-1)!.matrix, `${detail}`).toEqual(SCREEN);
+    }
+  });
 });
 
 describe('REFM-235 — орбиты', () => {
@@ -692,7 +740,8 @@ describe('REFM-235 — бои', () => {
     fleets.drawOrbitRings(0, 1);
     fleets.drawBattles(0, 1);
     fleets.drawBattleTracers(0);
-    expect(frame.calls).toEqual([]);
+    // Слой флотов бережёт состояние холста раз на кадр — это не рисование.
+    expect(frame.calls.filter((k) => !['save', 'getTransform', 'restore'].includes(k.name))).toEqual([]);
   });
 
   it('бой в тумане не виден вовсе', async () => {

@@ -19,6 +19,8 @@ describe('published Commerce content contract', () => {
         ...(product.materials ? { materials: product.materials } : {}),
         ...(product.module ? { moduleId: product.module } : {}),
         ...(product.premiumSeason ? { seasonId: product.premiumSeason } : {}),
+        ...(product.sovereigns ? { sovereigns: product.sovereigns } : {}),
+        ...(product.bonusSovereigns ? { bonusSovereigns: product.bonusSovereigns } : {}),
       });
       expect(offer.dailyLimit).toBe(
         offer.source === 'rewarded_ad' ? meta.commerce.dailyAdLimit : undefined,

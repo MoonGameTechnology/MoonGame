@@ -1,10 +1,11 @@
 import { once } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { createDevMatch, loadShippedData } from './scenario';
 import { createMultiplayerServer } from './wsServer';
 import { hmacSecret, signJoinToken, type JoinClaim } from './auth';
 import type { ServerMessage } from './protocol';
+import { MemoryAccountStore } from './store';
 
 // SE-0.1 — the authenticated WS handshake (closes F-01). When `auth` is configured, a
 // verified join token is the SOLE identity: ?player=/?nick= no longer work, the token's
@@ -47,6 +48,118 @@ function rejectStatus(
 }
 
 describe('SE-0.1 · authenticated handshake', () => {
+  it('refuses invalid credentials before loading a persisted match', async () => {
+    const resolve = vi.fn(async () => createDevMatch(data));
+    const server = createMultiplayerServer({
+      registry: { get: () => undefined, ids: () => ['dev'], resolve },
+      auth,
+      accountPwfp: async () => 'current',
+    });
+    const url = await server.listen();
+    try {
+      expect(await rejectStatus(url)).toBe(401);
+      expect(await rejectStatus(`${url}?token=forged`)).toBe(401);
+      const other = await token({ matchId: 'other', playerId: 'green' });
+      expect(await rejectStatus(`${url}?token=${other}`)).toBe(403);
+      const stale = await token({ matchId: 'dev', playerId: 'green', accountId: 'alice', pwfp: 'old' });
+      expect(await rejectStatus(`${url}?token=${stale}`)).toBe(401);
+      expect(resolve).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('a released or reassigned seat refuses its former owner’s unexpired join token', async () => {
+    const accounts = new MemoryAccountStore();
+    const logins = new Map([['alice-id', 'Alice'], ['bob-id', 'Bob']]);
+    await accounts.resolveSeat('dev', 'Alice', ['green', 'red'], 'green');
+    const server = createMultiplayerServer({
+      room: createDevMatch(data),
+      auth,
+      accountSeat: async (matchId, accountId) => {
+        const login = logins.get(accountId);
+        return login ? accounts.seatOf(matchId, login) : null;
+      },
+    });
+    const url = await server.listen();
+    const old = await token({ matchId: 'dev', playerId: 'green', accountId: 'alice-id' });
+    try {
+      await accounts.releaseSeat('dev', 'Alice');
+      expect(await rejectStatus(`${url}?token=${old}`)).toBe(403);
+      // Bob is offline: there is no connected peer for addPeer's takeover check.
+      await accounts.resolveSeat('dev', 'Bob', ['green', 'red'], 'green');
+      expect(await rejectStatus(`${url}?token=${old}`)).toBe(403);
+      const fresh = await token({ matchId: 'dev', playerId: 'green', accountId: 'bob-id' });
+      const ws = new WebSocket(`${url}?token=${fresh}`);
+      try {
+        expect(await nextMessage(ws)).toMatchObject({ type: 'welcome', playerId: 'green' });
+      } finally {
+        ws.close();
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each(['kick', 'logout'] as const)('refuses an ownership lookup overtaken by %s, including an offline seat', async (change) => {
+    const room = createDevMatch(data);
+    let lookups = 0;
+    const server = createMultiplayerServer({
+      room,
+      auth,
+      accountSeat: async () => {
+        lookups += 1;
+        if (lookups === 2) {
+          // Simulate a DB read started while the old binding was live, but its
+          // response arriving after the revocation sweep found no live socket.
+          if (change === 'kick') room.evict('green');
+          else room.evictAccount('alice', 'E_SESSION_REVOKED');
+        }
+        return 'green';
+      },
+    });
+    const url = await server.listen();
+    try {
+      const t = await token({ matchId: 'dev', playerId: 'green', accountId: 'alice' });
+      expect(await rejectStatus(`${url}?token=${t}`)).toBe(401);
+      expect(lookups).toBe(2);
+      expect(room.peerCount).toBe(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('refuses a seat lookup failure without loading or admitting a match', async () => {
+    const resolve = vi.fn(async () => createDevMatch(data));
+    const server = createMultiplayerServer({
+      registry: { get: () => undefined, ids: () => ['dev'], resolve },
+      auth,
+      accountSeat: async () => { throw new Error('private database detail'); },
+    });
+    const url = await server.listen();
+    try {
+      const t = await token({ matchId: 'dev', playerId: 'green', accountId: 'alice' });
+      expect(await rejectStatus(`${url}?token=${t}`)).toBe(500);
+      expect(resolve).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each(['__proto__', 'constructor', 'toString'])('rejects inherited player id %s', async (playerId) => {
+    const room = createDevMatch(data);
+    expect(room.hasPlayer(playerId)).toBe(false);
+    const server = createMultiplayerServer({ room, auth });
+    const url = await server.listen();
+    try {
+      const t = await token({ matchId: 'dev', playerId });
+      expect(await rejectStatus(`${url}?token=${t}`)).toBe(403);
+      expect(room.peerCount).toBe(0);
+    } finally {
+      await server.close();
+    }
+  });
+
   it('accepts a valid join token and seats its player', async () => {
     const server = createMultiplayerServer({ room: createDevMatch(data), auth });
     const url = await server.listen();

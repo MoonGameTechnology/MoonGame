@@ -1,9 +1,9 @@
 /**
  * ARS-5 — arsenal witryna (pure logic). The account's persistent meta-inventory
  * (ARS-1..4, server-side) had no client-facing shape until now; this module is
- * the filter/group/cache layer the hub tab and the constructor's ownership
- * filter both read. Pure: no DOM, no fetch — main.ts feeds it the fetched/cached
- * items and persists.
+ * the parse/ownership layer the hub tab and the constructor's ownership filter
+ * both read. Pure: no DOM, no fetch — main.ts feeds it the fetched/cached items
+ * and persists. What the hub tab shows is decided in `decisions/arsenalView.ts`.
  *
  * `PlayerArsenal` (the coarse hulls/modules/fittings id snapshot ARS-3 seeds a
  * MATCH with) is a narrower projection of the same items — kept in shared-core
@@ -13,26 +13,6 @@
 
 import type { ArsenalItem } from '../../packages/shared-core/src/index';
 import { safeParseArsenalItem } from '../../packages/shared-core/src/index';
-
-export interface ArsenalFilter {
-  kind?: ArsenalItem['kind'];
-  grade?: number;
-}
-
-/** Apply the witryna's kind/grade filter. Ungraded filter values match everything
- *  (grade only narrows among instances — blueprints have no grade). */
-export function filterArsenal(items: readonly ArsenalItem[], filter: ArsenalFilter): ArsenalItem[] {
-  return items.filter((i) => {
-    if (filter.kind && i.kind !== filter.kind) return false;
-    if (filter.grade && i.grade !== filter.grade) return false;
-    return true;
-  });
-}
-
-/** The distinct grades present among instances — drives the grade filter's chip row. */
-export function gradesOf(items: readonly ArsenalItem[]): number[] {
-  return [...new Set(items.map((i) => i.grade).filter((g): g is number => typeof g === 'number'))].sort();
-}
 
 /** The defIds this collection actually owns for one kind — what a build-catalog
  *  filter (constructor palette, hero fitting picker) narrows to. Dedup only; a

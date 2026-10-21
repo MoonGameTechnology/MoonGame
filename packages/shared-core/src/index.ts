@@ -188,6 +188,13 @@ export {
   type DiplomaticRelation,
   type DiplomacyCapability,
 } from './state/diplomacy';
+export {
+  COALITION_EMBLEMS,
+  COALITION_DESC_MAX,
+  coalitionCapacity,
+  coalitionOf,
+  type Coalition,
+} from './state/coalition';
 export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {
   visibleState,
@@ -681,7 +688,7 @@ export {
 export { instantRepairModule } from './modules/instantRepair';
 export { fleetRepairModule } from './modules/fleetRepair';
 export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
-export { victoryModule } from './modules/victory';
+export { victoryModule, effectiveVictoryRules } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export {
   heroModule,

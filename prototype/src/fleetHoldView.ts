@@ -2,7 +2,12 @@
 import { holdBadgePosition, type FleetHold } from '../../decisions/fleetHolds';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { fleetCountWidth } from '../../packages/client/src/fleetCountBadge';
+import {
+  FLEET_COUNT_FONT,
+  countTextWidth,
+  drawFleetSign,
+  fleetCountWidth,
+} from '../../packages/client/src/fleetCountBadge';
 import { drawChevron } from './veteranChevrons';
 
 const number = (n: number): string => String(Math.round(n * 10) / 10);
@@ -47,7 +52,12 @@ export function fleetHoldsHtml(meters: readonly FleetHold[]): string {
 
 /** All readings stay upright; their box moves away from the planet, independently
  * of the ship's heading. Unselected fleets use short bars; selection/close zoom adds
- * exact figures. The model is supplied only for the player's own fleets. */
+ * exact figures. The model is supplied only for the player's own fleets.
+ *
+ * It runs for every fleet on every frame, so it does without save()/restore(): each save
+ * leaves ~0.8 KB on the browser's heap that only a major GC frees (`fleetCountBadge.ts`).
+ * It sets what it uses and leaves the fill, stroke, line width, text alignment and
+ * {@link FLEET_COUNT_FONT} set — the caller's own save() around its layer takes them back. */
 export function drawFleetHoldBadge(
   cx: CanvasRenderingContext2D,
   anchor: { x: number; y: number },
@@ -59,14 +69,14 @@ export function drawFleetHoldBadge(
   /** Высшая степень «Выслуги» во флоте (`fleetVeteranGrade`); >0 — у числа кораблей шеврон. */
   veteran = 0,
 ): void {
-  cx.save();
-  cx.font = '700 16px ui-monospace,Menlo,monospace';
+  cx.font = FLEET_COUNT_FONT;
   cx.textBaseline = 'middle';
   cx.textAlign = 'left';
 
+  const count = String(ships);
   const countWidth = fleetCountWidth(cx, ships) + (veteran > 0 ? 10 : 0);
   const figures = meters.map((m) => `${number(m.used)}/${number(m.capacity)}`);
-  const textWidth = detailed ? Math.max(0, ...figures.map((s) => cx.measureText(s).width)) : 0;
+  const textWidth = detailed ? Math.max(0, ...figures.map((s) => countTextWidth(cx, s))) : 0;
   const meterWidth = meters.length ? 44 + (detailed ? textWidth + 5 : 0) : 0;
   const gutter = meters.length ? 7 : 0;
   const width = countWidth + gutter + meterWidth;
@@ -85,13 +95,11 @@ export function drawFleetHoldBadge(
   cx.fillRect(box.x, box.y, 3, height);
 
   const centerY = box.y + height / 2;
-  cx.font = '600 10px sans-serif';
-  cx.fillText('▱', box.x + 7, centerY);
-  cx.font = '700 16px ui-monospace,Menlo,monospace';
+  drawFleetSign(cx, box.x + 7, centerY);
   cx.fillStyle = '#f4f8fc';
-  cx.fillText(String(ships), box.x + 20, centerY);
+  cx.fillText(count, box.x + 20, centerY);
   // Ветераны во флоте (решение владельца 2026-09-25): шеврон сразу за числом кораблей.
-  if (veteran > 0) drawChevron(cx, box.x + 26 + cx.measureText(String(ships)).width, centerY);
+  if (veteran > 0) drawChevron(cx, box.x + 26 + countTextWidth(cx, count), centerY);
 
   if (meters.length) {
     const dividerX = box.x + countWidth + 0.5;
@@ -138,7 +146,6 @@ export function drawFleetHoldBadge(
         cx.fillText(figures[index]!, barX + barWidth + 5, y + 6);
       }
     });
+    cx.font = FLEET_COUNT_FONT;
   }
-
-  cx.restore();
 }

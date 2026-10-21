@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { EntitlementReceipt } from '@void/protocol';
+import { COMMERCE_PRODUCTS } from './commerceCatalog';
 import { CommerceService, type CommerceProvider } from './commerceService';
 import { MemoryCommerceStore, type CommerceVerification } from './commerceStore';
 import type { CommerceEntitlementService } from './commerceTransport';
@@ -71,7 +72,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
   it('leaves every product unavailable without a real provider adapter', async () => {
     const f = fixture();
     const service = new CommerceService(f.store, f.meta);
-    expect(service.offers()).toHaveLength(4);
+    expect(service.offers()).toHaveLength(COMMERCE_PRODUCTS.length);
     expect(service.offers().every((offer) => !offer.available && !offer.price)).toBe(true);
     await expect(
       service.createOrder('a', 'request', 'supply_personal', 'meta-v0.1'),

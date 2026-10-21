@@ -72,6 +72,8 @@ export interface CloudProfile {
   seed: string;
   rev: number;
   progress: string;
+  /** Печать всего конверта: включает снимок, дескриптор и родословную. */
+  seal?: string;
   run?: string;
   /**
    * Точный мир идущего забега — тот же блоб, что лежит локально (`runSave.ts`). AUD-24:
@@ -151,12 +153,14 @@ export function parseCloudProfile(raw: string | null): CloudProfile | null {
   const rev = count(o.rev);
   if (o.v !== 1 || typeof o.seed !== 'string' || rev === null) return null;
   if (typeof o.progress !== 'string' || o.progress.length === 0) return null;
+  if ('seal' in o && typeof o.seal !== 'string') return null;
   const lineage = parseLineage(o.lineage);
   return {
     v: 1,
     seed: o.seed,
     rev,
     progress: o.progress,
+    ...(typeof o.seal === 'string' ? { seal: o.seal } : {}),
     ...(typeof o.run === 'string' && o.run ? { run: o.run } : {}),
     ...(typeof o.state === 'string' && o.state ? { state: o.state } : {}),
     ...(lineage ? { lineage } : {}),
@@ -176,11 +180,12 @@ export const serializeCloudProfile = (profile: CloudProfile): string => JSON.str
 export function cloudEnvelope(
   profile: CloudProfile,
   fits: (envelope: string) => boolean = () => true,
+  encode: (profile: CloudProfile) => string = serializeCloudProfile,
 ): string {
-  const full = serializeCloudProfile(profile);
+  const full = encode(profile);
   if (profile.state === undefined || fits(full)) return full;
   const { state: _dropped, ...rest } = profile;
-  return serializeCloudProfile(rest);
+  return encode(rest);
 }
 
 /**

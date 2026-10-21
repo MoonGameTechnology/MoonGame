@@ -343,16 +343,16 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
     {
       active: active
         ? {
-            label: constructionLabel(active.payload),
+            label: esc(constructionLabel(active.payload)),
             at: active.at,
             durationMs: buildDurationHours(active.payload) * HOUR,
             seq: active.seq,
           }
         : null,
-      queued: queued.map((q) => ({ label: constructionLabel(q), id: q.id })),
+      queued: queued.map((q) => ({ label: esc(constructionLabel(q)), id: q.id })),
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
         .filter((p) => laneOf(p.kind) === lane)
-        .map((p) => ({ id: p.id, label: pausedLabel(p), progress: p.progress })),
+        .map((p) => ({ id: p.id, label: esc(pausedLabel(p)), progress: p.progress })),
       // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
       // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
       // ещё ждёт — значит она уперлась ровно в деньги (BLD-1, правило 4); своего
@@ -407,7 +407,7 @@ export function unknownPlanetHtml(p: Planet): string {
       mem.buildings
         .map(
           (b) =>
-            `${BUILD_ICON[b.type] ?? '▪'} ${buildingName(data.buildings[b.type]?.name, b.type)} L${b.level}`,
+            `${BUILD_ICON[b.type] ?? '▪'} ${esc(buildingName(data.buildings[b.type]?.name, b.type))} L${b.level}`,
         )
         .join(', ') || t('side.scan.no-buildings');
     // Espionage from memory: you know WHOSE world this was — an agent can reveal
@@ -424,7 +424,7 @@ export function unknownPlanetHtml(p: Planet): string {
       cardHeader(ownerColor(mem.owner), placeName(p.id), t('side.scan.title')) +
       `<div class="pscan">` +
       `<div class="row dim">${t('side.scan.stale')}</div>` +
-      `<div class="row">${t('side.scan.owner')}: <b>${mem.owner ? NAME[mem.owner] : t('side.neutral')}</b></div>` +
+      `<div class="row">${t('side.scan.owner')}: <b>${esc(mem.owner ? NAME[mem.owner] ?? mem.owner : t('side.neutral'))}</b></div>` +
       `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
       `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
       spyRow +

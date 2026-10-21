@@ -1,4 +1,5 @@
 import {
+  BOT_PROFILE_HISTORY_LIMIT,
   PROFILE_MEDALS,
   parseAppearance,
   medalGrade,
@@ -7,15 +8,48 @@ import {
   type ProfileMedalId,
   type ProfileProgress,
   type ProfileMetric,
+  type BotProfileMatch,
 } from '../packages/protocol/src/playerProfile';
 
 export function profileMetricKey(metric: ProfileMetric): string {
   return 'profile.metric.' + metric.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase());
 }
 
+function historyId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value);
+}
+
+function parseBotMatch(raw: unknown): BotProfileMatch | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const row = raw as Record<string, unknown>;
+  if (
+    !historyId(row.matchId) ||
+    !historyId(row.mapId) ||
+    typeof row.endedAt !== 'number' ||
+    !Number.isSafeInteger(row.endedAt) ||
+    row.endedAt < 0 ||
+    row.endedAt > 8_640_000_000_000_000 ||
+    (row.outcome !== 'win' && row.outcome !== 'draw' && row.outcome !== 'loss') ||
+    typeof row.xp !== 'number' ||
+    !Number.isSafeInteger(row.xp) ||
+    row.xp < 0 ||
+    (row.place !== null &&
+      (typeof row.place !== 'number' || !Number.isSafeInteger(row.place) || row.place < 1))
+  )
+    return null;
+  return {
+    matchId: row.matchId,
+    mapId: row.mapId,
+    endedAt: row.endedAt,
+    outcome: row.outcome,
+    xp: row.xp,
+    place: row.place,
+  };
+}
+
 /** Strict read boundary for cached/network data; no arbitrary URL, CSS or grade. */
 export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const v = raw as Record<string, unknown>;
   const appearance = parseAppearance({ portrait: v.portrait, slots: v.slots });
   if (
@@ -24,7 +58,9 @@ export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
     v.login.length > 64 ||
     typeof v.xp !== 'number' ||
     !Number.isFinite(v.xp) ||
-    v.xp < 0
+    v.xp < 0 ||
+    (v.kind !== undefined && v.kind !== 'bot') ||
+    (v.kind === 'bot' && !Number.isSafeInteger(v.xp))
   )
     return null;
   if (!v.progress || typeof v.progress !== 'object' || Array.isArray(v.progress)) return null;
@@ -39,12 +75,30 @@ export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
       return null;
     if (typeof value === 'number') progress[metric] = value;
   }
+  let recentMatches: BotProfileMatch[] | undefined;
+  if (v.recentMatches !== undefined) {
+    if (
+      v.kind !== 'bot' ||
+      !Array.isArray(v.recentMatches) ||
+      v.recentMatches.length > BOT_PROFILE_HISTORY_LIMIT
+    )
+      return null;
+    recentMatches = [];
+    for (const raw of v.recentMatches) {
+      const match = parseBotMatch(raw);
+      if (!match) return null;
+      recentMatches.push(match);
+    }
+  }
   return {
     ...appearance,
     login: v.login,
     xp: v.xp,
     progress,
     slots: appearance.slots.map((id) => (id && medalGrade(id, progress) ? id : null)),
+    ...(v.premium === true ? { premium: true } : {}),
+    ...(v.kind === 'bot' ? { kind: 'bot' as const } : {}),
+    ...(recentMatches !== undefined ? { recentMatches } : {}),
   };
 }
 

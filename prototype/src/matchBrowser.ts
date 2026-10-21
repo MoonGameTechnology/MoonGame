@@ -39,6 +39,7 @@ import {
   type FilterState,
 } from './matchFilter';
 import { openSessionTab } from './matchJoin';
+import { isMatchDescriptionOpen, openMatchDescription } from './matchDescription';
 import {
   fmtJoinWindow,
   joinWindow,
@@ -119,7 +120,7 @@ export async function refreshMatches(quiet = false): Promise<void> {
   };
   line('start');
   line((await loadMatchLists(srv)) ? 'loaded' : 'failed');
-  renderMatches();
+  if (!isMatchDescriptionOpen()) renderMatches();
 }
 
 /**
@@ -289,11 +290,11 @@ function renderEmpty(el: HTMLElement, plan: Extract<Fallback, { kind: 'empty' }>
 
 /** Строка матча: карта и режим, ниже день, места, правила и окно входа; справа кнопки. */
 function matchRow(m: MatchRow): HTMLElement {
-  // «В архив» / «Восстановить» рядом со входом — только на своих вкладках (`matchRow.ts`). Строке
-  // с двумя кнопками на телефоне нужен свой ряд под них: рядом с картой они сжали бы имя.
+  // «В архив» / «Восстановить» — только на своих вкладках. «Описание» доступно везде;
+  // кнопкам на телефоне нужен свой ряд, чтобы они не сжимали название карты.
   const action = rowAction(activeTab);
   const row = document.createElement('div');
-  row.className = action ? 'mrow mrow-2' : 'mrow';
+  row.className = 'mrow mrow-2';
   // Номер партии в строке не печатается — как в «Моих партиях» хаба: `m-<uuid>` вытеснял
   // то, ради чего сюда смотрят. Он остаётся подсказкой строки — для разговора с поддержкой.
   row.dataset.match = m.matchId;
@@ -335,7 +336,7 @@ function matchRow(m: MatchRow): HTMLElement {
   info.innerHTML =
     `<div class="mname"><b>${esc(game.mapLabel(m.mapId))}</b>${modeHtml}${ended}</div>` +
     `<div class="mmeta"><span>${t('browser.day', { n: m.days })}</span>${seats}` +
-    `<span>${esc(ruleSummary(m.rules))}</span>${windowHtml}</div>`;
+    `<span>${esc(ruleSummary(m.rules, m.kind))}</span>${windowHtml}</div>`;
   row.appendChild(info);
   const btns = document.createElement('div');
   btns.className = 'mbtns';
@@ -357,8 +358,18 @@ function matchRow(m: MatchRow): HTMLElement {
     );
     btns.appendChild(arch);
   }
+  btns.appendChild(descriptionButton(m));
   row.appendChild(btns);
   return row;
+}
+
+function descriptionButton(match: MatchRow): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'mbtn btn-quiet mdescription';
+  button.textContent = t('browser.description');
+  button.addEventListener('click', () => openMatchDescription(match, game.mapLabel(match.mapId)));
+  return button;
 }
 
 function renderMatches(): void {
@@ -496,6 +507,7 @@ function renderMyMatches(): void {
         });
     });
     btns.appendChild(copy);
+    btns.appendChild(descriptionButton(m));
     card.appendChild(btns);
     el.appendChild(card);
   }
@@ -601,6 +613,7 @@ function startPoll(): void {
   pollStarted = true;
   const browseEl = $('cbrowse');
   setInterval(() => {
+    if (isMatchDescriptionOpen()) return;
     // Уместен ли переопрос прямо сейчас — `matchPoll.ts` (REFM-153): тикает только
     // список НА ЭКРАНЕ. Поверх закрытого оверлея (матч / ставка) и на приветственном
     // шаге фоновая неудача написала бы «сервер недоступен» в чужую строку статуса; пока

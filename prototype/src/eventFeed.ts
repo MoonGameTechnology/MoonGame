@@ -32,7 +32,16 @@ import {
   stanceKey,
   stanceThread,
 } from './diploAudience';
-import { diploOpen, diploTab, isAiSeat, pushSpyLog, renderDiplo, stanceRu } from './diploWindow';
+import {
+  diploOpen,
+  diploTab,
+  isAiSeat,
+  pushSpyLog,
+  refreshThreadDiplo,
+  renderDiplo,
+  stanceRu,
+} from './diploWindow';
+import { syncCoalitions } from './coalitionWindow';
 import { isMine, seen, seenTail } from './eventVisibility';
 import { aaImpact } from './fireEffects';
 import { flakTier } from './flakTiers';
@@ -349,10 +358,9 @@ export function handleEvents(events: DomainEvent[]) {
         const na = NAME[a] ?? a;
         const nb = NAME[b] ?? b;
         // Кому адресована дипломатия — `diploAudience.ts` (REFM-182): у треда две
-        // стороны, и чужой паре в нём места нет; у войны свой текст. Адрес треда
-        // сохранён как есть — расхождение 2 в шапке модуля.
+        // стороны, и чужой паре в нём места нет; у войны свой текст. Тред — собеседник.
         if (diploConcernsMe(a, b, ME)) {
-          const thread = stanceThread(a, b);
+          const thread = stanceThread(a, b, ME);
           pushMsg(
             thread.key,
             st === 'war'
@@ -850,6 +858,11 @@ export function handleEvents(events: DomainEvent[]) {
         break;
       }
     }
+  }
+  // COAL-1: предложения в открытой личке и окно коалиций читают состояние — раз на пакет.
+  if (events.some((e) => e.type.startsWith('diplomacy.') || e.type.startsWith('coalition.'))) {
+    refreshThreadDiplo();
+    syncCoalitions();
   }
 }
 

@@ -75,6 +75,10 @@ const sectorTypeOf = (id: string): (typeof SECTOR_TYPES)[string] | undefined => 
 /** Имя места — то же, что у журнала и окон (`planetName.ts`, UIX-5.2). */
 const placeName = (id: string): string => worldName(game.world(), id);
 
+// Region names in the label font, measured once: `measureText` leaves an object on the
+// browser's heap that only a major GC frees, and the labels were measured in every frame.
+const regionTextWidths = new Map<string, number>();
+
 /**
  * ИМЕНА ОБЛАСТЕЙ (M2.15, `decisions/regionName.ts`): проступают при отдалении, когда
  * внутренние границы растворяются, и гаснут, когда снова читаются провинции. Анимации нет —
@@ -107,7 +111,16 @@ function drawRegionLabels(lod: MapLod): void {
     return visible(c, 240) ? [{ id: label.id, text: label.text.toUpperCase(), x: c.x, y: c.y }] : [];
   });
   const lineHeight = 16;
-  for (const label of layoutRegionLabels(onScreen, (text) => cx.measureText(text).width, { width: viewWidth() }, lineHeight)) {
+  const width = (text: string): number => {
+    let w = regionTextWidths.get(text);
+    if (w === undefined) {
+      w = cx.measureText(text).width;
+      if (regionTextWidths.size >= 256) regionTextWidths.clear();
+      regionTextWidths.set(text, w);
+    }
+    return w;
+  };
+  for (const label of layoutRegionLabels(onScreen, width, { width: viewWidth() }, lineHeight)) {
     label.lines.forEach((line, i) => {
       const y = label.y + (i - (label.lines.length - 1) / 2) * lineHeight;
       cx.strokeText(line, label.x, y);
@@ -118,15 +131,17 @@ function drawRegionLabels(lod: MapLod): void {
 }
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
- *  marker if it has never been identified. */
+ *  marker if it has never been identified. A fogged map draws one per node per frame, so
+ *  there is no save() here: each leaves ~0.8 KB on the browser's heap that only a major GC
+ *  frees. The marker puts back its alpha and text alignment; the stroke, fill, line width
+ *  and font stay changed, and whatever is drawn next sets its own. */
 function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined, lod: MapLod): void {
   const cx = game.ctx();
-  cx.save();
   if (lod.detail === 0) {
     drawSchematicNode(cx, c, lod.markerRadius);
-    cx.restore();
     return;
   }
+  const { globalAlpha, textAlign } = cx;
   if (mem) {
     const col = ownerColor(mem.owner);
     cx.setLineDash([2, 4]);
@@ -164,7 +179,8 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
     cx.textAlign = 'center';
     cx.fillText('?', c.x, c.y + 3);
   }
-  cx.restore();
+  cx.globalAlpha = globalAlpha;
+  cx.textAlign = textAlign;
 }
 
 /** A regular polygon path centred at (x,y) — fort/station containment marker.
@@ -310,6 +326,12 @@ export function drawWorlds(now: number, lod: MapLod): void {
   };
   cx.save();
   cx.globalAlpha *= lod.art;
+  // The busiest per-world blocks below (the callout, the radar ring, the building chips) put
+  // back by hand what the next world draws with, instead of a save() per world: each save
+  // leaves ~0.8 KB on the browser's heap that only a major GC frees, and a fast pinch on a
+  // phone leaves no idle time for one.
+  const { textAlign, textBaseline, shadowBlur, shadowColor, lineDashOffset } = cx;
+  const lineDash = cx.getLineDash();
   if (lod.art > 0)
   for (const n of MAP) {
     const p = s.planets[n.id];
@@ -476,7 +498,6 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // drawn on every world it read as a radar the world doesn't have. Same gate as the
     // range finder (`radarShown`, rule 11), so it can't leak a hidden radar through fog.
     if (radarShown({ detailed: seesDetails(p), reach: planetRadar(p) })) {
-      cx.save();
       cx.setLineDash([3, 5]);
       cx.lineDashOffset = -hologramTime / 240;
       cx.strokeStyle = rgba(col, 0.12 + 0.05 * ownerPulse);
@@ -484,7 +505,8 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.beginPath();
       cx.arc(c.x, c.y, R + (14 + 2 * ownerPulse) * ns, 0, TAU);
       cx.stroke();
-      cx.restore();
+      cx.setLineDash(lineDash);
+      cx.lineDashOffset = lineDashOffset;
     }
 
     // fort = hex containment ring
@@ -502,7 +524,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // мир будто съезжает вбок при каждой достройке), сжимается вместе с маркером, а у
     // кегля есть пол — буква мельче семи пикселей читается как сор, а не как значок.
     if (chipsShown(kn, p.buildings.length, detail)) {
-      cx.save();
+      const alpha = cx.globalAlpha;
       cx.globalAlpha = detail;
       cx.font = `${chipFontPx(ns)}px ui-monospace,Menlo,monospace`;
       cx.textAlign = 'center';
@@ -524,7 +546,9 @@ export function drawWorlds(now: number, lod: MapLod): void {
         cx.fillStyle = rgba(col, 0.9);
         cx.fillText(chipGlyph(BUILD_ICON[b.type]), bx, by + 0.5);
       }
-      cx.restore();
+      cx.globalAlpha = alpha;
+      cx.textAlign = textAlign;
+      cx.textBaseline = textBaseline;
     }
 
     if (holographicMapOn() && hasTerrainMaterial(n.sector) &&
@@ -719,7 +743,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     const g = p.garrison.reduce((a, st) => a + st.count, 0);
     const line = calloutLine({ detail, tier, garrison: g, buildings: p.buildings.length });
     const ink = calloutInk(!!p.owner);
-    cx.save();
+    const alpha = cx.globalAlpha;
     cx.globalAlpha = callout;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
@@ -738,7 +762,9 @@ export function drawWorlds(now: number, lod: MapLod): void {
       const stats = [t('map.callout.garrison', { n: g }), icons].filter(Boolean).join('  ');
       cx.fillText(stats, c.x + R + 12, c.y + (isWorld ? 12 : 11));
     }
-    cx.restore();
+    cx.globalAlpha = alpha;
+    cx.shadowBlur = shadowBlur;
+    cx.shadowColor = shadowColor;
   }
 
   // FORT-6.1: крепости на РАЗВИЛКАХ. Их площадок нет в `MAP` — это не узлы карты, а

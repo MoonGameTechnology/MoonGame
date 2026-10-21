@@ -19,9 +19,10 @@ const validSub = {
   keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
 };
 
-function harness(
-  opts: { vapidPublicKey?: string; rateMax?: number; now?: () => number } = {},
-): { app: ReturnType<typeof Fastify>; store: MemoryPushStore } {
+function harness(opts: { vapidPublicKey?: string; rateMax?: number; now?: () => number } = {}): {
+  app: ReturnType<typeof Fastify>;
+  store: MemoryPushStore;
+} {
   const store = new MemoryPushStore();
   const app = Fastify();
   registerPushApi(app, {
@@ -70,11 +71,39 @@ describe('push HTTP API', () => {
     await app.close();
   });
 
+  it('stores the per-kind switches (UIX-4.4); unknown, repeated or junk kinds → 400', async () => {
+    const { app, store } = harness();
+    const post = (payload: unknown) =>
+      app.inject({
+        method: 'POST',
+        url: '/push/subscribe',
+        headers: as('alice'),
+        payload: payload as object,
+      });
+    expect((await post({ ...validSub, kinds: ['attacked', 'battle'] })).statusCode).toBe(200);
+    await expect(store.of('acc-alice')).resolves.toEqual({
+      ...validSub,
+      kinds: ['attacked', 'battle'],
+    });
+    expect((await post({ ...validSub, kinds: [] })).statusCode).toBe(200); // all off is a choice
+    await expect(store.of('acc-alice')).resolves.toEqual({ ...validSub, kinds: [] });
+    for (const kinds of [['spam'], ['built', 'built'], 'built', [1], ['a', 'b', 'c', 'd', 'e']])
+      expect((await post({ ...validSub, kinds })).statusCode).toBe(400);
+    // Extra fields are not persisted.
+    expect((await post({ ...validSub, extra: 'x' })).statusCode).toBe(200);
+    await expect(store.of('acc-alice')).resolves.toEqual(validSub);
+    await app.close();
+  });
+
   it('unsubscribe removes only the caller own subscription', async () => {
     const { app, store } = harness();
     await store.save('acc-alice', validSub);
     await store.save('acc-bob', validSub);
-    const res = await app.inject({ method: 'POST', url: '/push/unsubscribe', headers: as('alice') });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/push/unsubscribe',
+      headers: as('alice'),
+    });
     expect(res.statusCode).toBe(200);
     await expect(store.of('acc-alice')).resolves.toBeUndefined();
     await expect(store.of('acc-bob')).resolves.toEqual(validSub);

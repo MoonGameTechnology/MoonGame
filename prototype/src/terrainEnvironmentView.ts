@@ -11,6 +11,16 @@ import type { TerrainField } from './holographicSurface';
 interface EnvironmentKnowledge { kind?: string; terrain?: string }
 export interface TerrainEnvironmentProjection { scale: number; x: number; y: number }
 
+/** The environment the viewer may know, as is rather than a copy: the live one when
+ * identified, the remembered snapshot otherwise, `undefined` when there is neither. */
+export function knownEnvironment(
+  live: EnvironmentKnowledge | undefined,
+  identified: boolean,
+  remembered?: { environment?: EnvironmentKnowledge },
+): EnvironmentKnowledge | undefined {
+  return (identified ? live : remembered?.environment) ?? undefined;
+}
+
 /** A remembered province uses its snapshot, never the now-hidden live environment.
  * Older saves without an environment snapshot safely remain undecorated. */
 export function terrainKnowledge(
@@ -18,7 +28,7 @@ export function terrainKnowledge(
   identified: boolean,
   remembered?: { environment?: EnvironmentKnowledge },
 ): { known: boolean; kind?: string; terrain?: string } {
-  const allowed = identified ? live : remembered?.environment;
+  const allowed = knownEnvironment(live, identified, remembered);
   if (!allowed) return { known: false };
   return {
     known: true,

@@ -43,7 +43,7 @@ Prometheus/Loki/Alloy и Game metrics наружу не публикуются.
 | Target / путь | Клиент и credential | Доступ / сеть | Период / timeout |
 | --- | --- | --- | --- |
 | Game `/health`, `/ready` | ограниченный Game exporter, без пользовательского токена | Внутренняя сеть; публичные probes сохраняют нынешний контракт | 15 с / default 1500 мс, cap 2 с |
-| Game `/metrics`, `/metrics/summary` | Game exporter, host `METRICS_TOKEN` ≥32 символов | Внутренняя сеть; Caddy продолжает запрещать публичные `/metrics*` | 15 с / default 1500 мс, cap 2 с |
+| Game `/metrics`, `/metrics/summary`, `/metrics/activity` | Game exporter, host `METRICS_TOKEN` ≥32 символов | Внутренняя сеть; Caddy продолжает запрещать публичные `/metrics*` | 15 с / default 1500 мс, cap 2 с |
 | Game `/metrics/recent`, `/metrics/health` | Не опрашивать в scrape | Первый читает raw файл целиком, второй содержит накопленные alert/max | Нет periodic scrape |
 | Game exporter `:9108/metrics` | Prometheus | Только наблюдательная сеть, без host-port | 15 с / 2 с |
 | node_exporter `:9100/metrics` | Prometheus, allowlist collectors | Хостовые числа без процессов/env/SSH/Docker socket в контейнере | 15 с / 2 с |
@@ -79,6 +79,9 @@ Game Prometheus-имена ниже реализованы в standalone OBS-1.1
 | `moongame_build_info{version}` → `/health.version` | G=1, hex SHA 7–40 знаков | Один текущий build; отсутствие версии — unknown |
 | `moongame_game_ready` → `/ready.ready` | G, 0/1 | 503 с `ready:false` — известная неготовность, не успех liveness |
 | `moongame_matches`, `moongame_connections` → `/metrics.matches`, `.connections` | G, rooms / WS sockets | Rooms registry не равны активным боям; socket не равен человеку |
+| `moongame_players_online` → `/metrics/activity.online` | G, уникальные аккаунты | Foreground heartbeat ≤70с; sockets не считаются игроками |
+| `moongame_player_activity_{since,sample}_timestamp_seconds` → activity since/at | G, Unix seconds | Начало сбора и свежесть снимка; ms → s |
+| `moongame_player_activity_daily_{players,visits,online_seconds}{day}` → activity.days | G, accounts / заходы / игроко-секунды | ≤30 суток UTC, union вкладок/устройств; текущий день неполный. [Семантика/retention](../deploy/observability/PLAYER-ACTIVITY.md) |
 | `moongame_joins_total`, `moongame_leaves_total` → summary joins/leaves | C, events | За жизнь процесса, не за сутки |
 | `moongame_actions_total{outcome}` → actions.ok/rejected | C, actions; outcome=`ok,rejected` | Сумма должна совпадать с actions.total; неизвестная схема — invalid |
 | `moongame_action_types_total{type}` → actions.byType | C, actions; известные типы манифеста | Не создавать совместный outcome×type: источник не даёт cross-tab |
@@ -124,10 +127,12 @@ counters источника; его рестарт не добавляет offse
 но exporter не получает socket ради него. Persisted summary и live counters
 не суммируются; сравнение baseline с новым startedAt помечается reset/incomparable.
 
-Labels только environment/instance/service/source/stream/outcome/type/code/version/le/mode/container;
+Labels только environment/instance/service/source/stream/outcome/type/code/version/le/mode/container/day;
 на ряд разрешены только перечисленные для него значения. Бюджет всего стенда
 ≤25 000 active series, ≤256 известных action types и ≤64 reject codes (+other).
 Никаких matchId/playerId/actor/install/session/IP/URL/query/текста исключения в labels.
+`day` разрешён только трём `moongame_player_activity_daily_*`: ISO UTC date из
+текущего 30-дневного окна, ≤30 значений на instance. Это не label игрока/сессии.
 При исчерпании бюджета новые ряды отклоняются со счётчиком, не создаются бесконечно.
 
 ## Privacy, хранение и лимиты
@@ -161,7 +166,7 @@ Raw игровые JSONL не являются technical stream. До OBS-0.3/2.
 ## Локальный Game exporter — OBS-1.1
 
 `node deploy/observability/game-exporter.mjs` слушает 127.0.0.1:9108; читает только
-literal loopback четыре Game routes. Ports настраиваются числом, URL/hostname не
+literal loopback пять Game routes. Ports настраиваются числом, URL/hostname не
 принимаются. [Runbook](../deploy/observability/GAME-EXPORTER.md) описывает private
 plain token file, bounded refresh и отсутствие автоматического Compose wiring.
 Таблица target matrix выше сохраняет целевой сетевой профиль; текущий CLI не

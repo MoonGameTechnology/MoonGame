@@ -91,7 +91,34 @@ Claim дропа общий с прежним AvA-контуром: повтор
 Нельзя выставить платные/рекламные или привязанные материалы. Требуется 100 XP аккаунта;
 комиссия — `ceil(price × 0.08)`, предел — 20 суммарных активных лотов продавца.
 `META_MARKET_FAUCET` по умолчанию 0; ненулевой faucet предназначен только для тестового стенда.
-Суверены в v0 не являются реализованным платёжным кошельком.
+
+## Суверены и витрина
+
+Баланс Суверенов ◆ лежит в состоянии аккаунта Meta (`sovereigns`) и меняется в той же
+транзакции, что материалы, арсенал и receipts. Зачисляет его только проверенный entitlement
+Commerce: товары `sovereigns_*` (база плюс `bonusSovereigns`). Рекламой ◆ не выдаются.
+Возврат пакета снимает ◆, если они ещё на счёте; потраченные уводят возврат в `review-required`.
+
+Витрина (`store` в `data/metaEconomy.json`) продаёт за ◆ четыре вида товаров, по одному на
+предложение: дни премиум-аккаунта (`premiumDays`, новый срок продлевает идущий, итог —
+`premiumUntil`), премиум-дорожку сезона, модули и материалы. Цена модуля — `modulePrices`;
+набор платит только за модули, которых в арсенале ещё нет, со скидкой `discountPercent`, и
+выдаёт только их. Всё купленное привязано (`commerce`, soulbound): модули приходят чертежами.
+`limit` ограничивает покупки на аккаунт. Цену и доступность для аккаунта сервер отдаёт в
+`GET /meta-economy/me` (`store`), клиент цену не присылает.
+
+Премиум (`store.premium`, пока идёт `premiumUntil`) даёт `dailySovereigns` (5 ◆) раз в UTC-день
+по `POST /meta-economy/premium/daily` и `extraDailyAds` (+1) к дневному пределу снабжения за
+рекламу. Пять ◆ в день держат премиум дешевле, чем он возвращает: 30 дней за 449 ◆ дают 150 ◆
+(тест «keeps premium cheaper»). Ещё премиум открывает цвет текста чата и метку ★ в профиле:
+`GET /profile` отдаёт `premium: true`, другим игрокам тоже. `GET /meta-economy/me` отдаёт
+`premiumPerks`, `premiumDaily` (сумма и забран ли сегодня) и `ads` (использовано и предел).
+
+Экран «Магазин» хаба (`prototype/src/shopScreen.ts`, решения — `decisions/shopView.ts`)
+показывает вкладки Суверены, Премиум, Модули и Материалы. Пакеты Суверенов и снабжение за
+рекламу берутся из `GET /commerce/offers` и пока недоступны: провайдера оплаты нет.
+Остальные вкладки продают витрину за ◆. Арсенал ведёт на штучный товар модуля, «Снабжение»
+больше ничего не продаёт.
 
 `frontier_fleet_2026`: 56 дней, 50 уровней, 200 XP на уровень после первого,
 бесплатные и premium milestones, восемь еженедельно открываемых контрактов.
@@ -109,20 +136,23 @@ Claim дропа общий с прежним AvA-контуром: повтор
 
 | Метод и путь | Назначение / поля body кроме `requestId` |
 | --- | --- |
-| `GET /meta-economy/me` | Материалы, рецепты, предметы, цель и сезон |
+| `GET /meta-economy/me` | Материалы, рецепты, предметы, цель, сезон, Суверены, премиум и витрина |
 | `GET /meta-economy/matches/:matchId/rewards` | Собственные награды конкретного матча |
 | `POST /meta-economy/supply-goal` | `recipeId` или `null` |
 | `POST /meta-economy/craft` | `recipeId`, `allowSoulbound` |
 | `POST /meta-economy/salvage` | `itemId` |
 | `POST /meta-economy/season/select` | `seasonId` |
 | `POST /meta-economy/season/claim` | `seasonId`, `level`, `defId` для выбора |
+| `POST /meta-economy/store/buy` | `offerId`: покупка за Суверены; отказы `E_SOVEREIGNS`, `E_ALREADY_OWNED`, `E_OFFER_LIMIT` |
+| `POST /meta-economy/premium/daily` | Ежедневные ◆ премиума; отказы `E_PREMIUM`, `E_DAILY_CLAIMED` |
 | `GET /meta-market` | Баланс, доступ к торговле, лоты и история |
 | `POST /meta-market/material/list`, `/buy`, `/cancel` | Материальные лоты; list: `materialId,quantity,price,requestId`, buy: `listingId,tradeId`, cancel: `listingId` |
 | `GET /commerce/offers` | Версия и точное содержимое витрины |
 
 ## Commerce: готовность и доверие
 
-`commerceMain.ts` запускается без provider adapters: четыре offers unavailable, цен/checkout нет.
+`commerceMain.ts` запускается без provider adapters: все десять offers unavailable (четыре
+товара и шесть пакетов Суверенов), цен/checkout нет.
 Реальные платежи требуют `CommerceProvider.verify`, проверки протокола провайдера и подключения
 Game→Commerce order gateway; env недостаточно. Fake adapter есть только в тестах; SDK callback не proof.
 

@@ -27,7 +27,7 @@
 
 | Что запускается | Кто это на самом деле | Когда |
 |---|---|---|
-| `packages/server/dist/proto-server.mjs` | **прод**: `Dockerfile` `CMD`; собирается на этапе build из `prototype/netserver.ts` (`RUN node prototype/bundle-netserver.mjs`, `Dockerfile:62`) | контейнер, `moongame`/compose |
+| `packages/server/dist/proto-server.mjs` | **прод**: `Dockerfile` `CMD`; собирается на этапе build из `prototype/netserver.ts` (`RUN node prototype/bundle-netserver.mjs`, `Dockerfile:71`) | контейнер, `moongame`/compose |
 | `prototype/netserver.mjs` | тот же хост для разработки: собирает бандл и запускает его | `pnpm dev:proto-server` |
 | `prototype/host.mjs` | одной командой для живого теста: собирает HTML, поднимает хост на 0.0.0.0 и печатает LAN-адрес для друзей | `pnpm host` |
 | `scripts/server.ts` → `packages/server/src/main.ts:startServer` | **канонический** сервер пакета (Fastify + WS + persist + clockDriver); `packages/server/dev.mjs` собирает внешний entry, который инъецирует почтовый адаптер. В проде пока НЕ запускается | `pnpm dev:server` |
@@ -45,6 +45,16 @@
 Recovery-письма обоих хостов форматирует `scripts/recoveryMailer.ts` под локаль
 получателя. Серверный `authApi` передаёт структурный `RecoveryMail`, а `mailer.ts`
 отвечает за SMTP/TLS; каталогов локализации в графе серверного пакета нет.
+
+Постоянные боты игрового хоста: `packages/server/src/botRoster.ts` — 100 системных
+профилей, атомарные назначения и история; `botPopulation.ts` — посадка, реальные
+итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
+`profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
+`prototype/src/botBehavior.ts` выбирает стратегию и политику переговоров по постоянному seed;
+`packages/server/src/botSocial.ts` отвечает на принятые личные сообщения, а
+`scripts/botChatText.ts` форматирует RU/EN-реплики без изменения протокола.
+Реальный HTTP/WS: `pnpm run smoke:bots:chat`; CPU/RSS: `pnpm run perf:bots:load`.
+Параметры включения описаны в [runbook](deploy/README.md#постоянные-боты-для-заполнения-карт).
 
 ---
 
@@ -271,7 +281,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 |---|---|---|
 | `gate.ts` | `ActionGate`, `createActionGate` | гейт: envelope validation → zod payload → auth → idempotency → sequence |
 | `envelope.ts` | `createActionEnvelope`, `parseActionEnvelope` | обёртка `action.v1` |
-| `payloadSchemas.ts` | per-type zod schemas | валидация payload по типу действия |
+| `shared-core/src/actions/payloadSchemas.ts` | `actionPayloadSchemas`, `isValidActionPayload`, `CLIENT_ACTION_TYPES` | zod-схема payload по типу действия; гейт получает валидатор параметром |
 | `receipts.ts` | `ReceiptStore`, idempotency receipts | идемпотентность (durable, bounded, rate-limited) |
 | `sequence.ts` | per-session `clientSeq` gate | строгая последовательность |
 | `errors.ts` | `E_*` stable error codes | fail-secure коды |
@@ -337,6 +347,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `medalApi.ts` / `medalService.ts` / `medalCatalog.ts` | medals | медали |
 | `push.ts` / `pushApi.ts` | `VapidConfig`, push API | push-уведомления |
 | `metrics.ts` | `SeriesStat` | метрики |
+| `playerActivity.ts` / `playerActivityApi.ts` | account-day intervals, pulse, operator snapshot | Foreground presence и union времени; [runbook](deploy/observability/PLAYER-ACTIVITY.md) |
 | `password.ts` | `ScryptParams` | scrypt hashing |
 | `ephemeral.ts` | `EphemeralStore` | ephemeral state |
 | `roomRegistry.ts` | `RoomRegistry` | интерфейс реестра |

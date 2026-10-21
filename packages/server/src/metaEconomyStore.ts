@@ -57,6 +57,13 @@ function accountFrom(accounts: Map<string, MetaEconomyAccount>, id: string): Met
 }
 
 function validAccount(account: MetaEconomyAccount): void {
+  if (
+    account.sovereigns !== undefined &&
+    (!Number.isSafeInteger(account.sovereigns) || account.sovereigns < 0)
+  )
+    throw Error('E_ECONOMY_STATE');
+  if (account.premiumUntil !== undefined && !Number.isSafeInteger(account.premiumUntil))
+    throw Error('E_ECONOMY_STATE');
   const ids = new Set<string>();
   for (const lot of account.materials) {
     if (

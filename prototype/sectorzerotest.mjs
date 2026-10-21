@@ -454,10 +454,11 @@ try {
     assert.equal(await page.locator(radars).count(), 0, 'у крейсера нет радаров разведчика и дозорного фрегата');
     await page.locator('[data-prep="hull"][data-id="scout"]').click();
     assert.equal(await page.locator('#sz-workshop .sz-cards [data-id="compact_radar"]').count(), 1, 'у разведчика его радар на месте');
+    assert.equal(await page.locator('#sz-workshop .sz-cards [data-id="cargo_bay"]').count(), 0, 'у разведчика нет запрещённого грузового модуля');
     // Мастерская живёт в «Кораблях» (решение владельца 2026-09-25): вкладки нет, а у открытого
     // модуля в карточке своя кнопка улучшения.
     assert.equal(await page.locator('[data-prep="tab"][data-id="workshop"]').count(), 0, 'вкладки «Мастерская» нет');
-    assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="cargo_bay"]').count(), 1, 'улучшение — в карточке открытого модуля');
+    assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="ion_engine"]').count(), 1, 'улучшение — в карточке открытого модуля');
     // «Корабли» по окну производства (заказ владельца 2026-10-11): рядом с кораблём — модули
     // ОТКРЫТОГО отсека, одного его типа. У разведчика один отсек, системный.
     const bayKinds = () =>
@@ -467,13 +468,18 @@ try {
         ),
       ]);
     assert.equal((await bayKinds()).length, 1, `в колонке отсека модули одного слота: ${await bayKinds()}`);
-    // Занятый отсек: другой модуль встаёт ВМЕСТО надетого («Заменить»), «Снять» освобождает.
-    const scoutBay = page.locator('[data-prep="bay"]').first();
+    // Занятый отсек крейсера: оба открытых модуля допустимы для корпуса. Другой модуль
+    // встаёт ВМЕСТО надетого («Заменить»), «Снять» освобождает.
+    await page.locator('[data-prep="hull"][data-id="cruiser"]').click();
+    const cruiserBay = page.locator('[data-prep="bay"][data-slot="utility"]');
+    await cruiserBay.click();
     await page.locator('#sz-workshop .sz-cards [data-prep="fit"][data-id="ion_engine"]').click();
+    await cruiserBay.click();
     await page.locator('#sz-workshop .sz-cards [data-prep="fit:swap"][data-id="cargo_bay"]').click();
-    assert.match(await scoutBay.getAttribute('aria-label') ?? await scoutBay.textContent(), /Грузовой|Cargo/i, '«Заменить» ставит модуль в отсек');
+    assert.match(await cruiserBay.getAttribute('aria-label') ?? await cruiserBay.textContent(), /Грузовой|Cargo/i, '«Заменить» ставит модуль в отсек');
+    await cruiserBay.click();
     await page.locator('#sz-workshop .sz-bayhead [data-prep="fit"][data-id="cargo_bay"]').click();
-    assert.doesNotMatch(await scoutBay.getAttribute('class'), /\b(filled|full)\b/, '«Снять» освобождает отсек');
+    assert.doesNotMatch(await cruiserBay.getAttribute('class'), /\b(filled|full)\b/, '«Снять» освобождает отсек');
     // Корабль героя (PVR-6.24): своя плитка в ряду «Корабли», модуль встаёт на него. Отсек
     // открывается плиткой; встал модуль — открыт следующий пустой отсек, а плитка системного
     // отсека несёт модуль.

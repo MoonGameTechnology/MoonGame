@@ -1,6 +1,7 @@
 /** Account cosmetics. No player-supplied grade or achievement counter crosses the write API. */
 export const PORTRAIT_COUNT = 40;
 export const MEDAL_SLOTS = 15;
+export const BOT_PROFILE_HISTORY_LIMIT = 10;
 export const PROFILE_MEDALS = [
   { id: 'first', metric: 'wins', goals: [1, 10, 50] },
   { id: 'map', metric: 'explored', goals: [20, 60, 150] },
@@ -34,10 +35,26 @@ export interface ProfileAppearance {
   /** Stable medal IDs only: a new degree replaces the previous one in this same slot. */
   slots: Array<ProfileMedalId | null>;
 }
+/** Completed public results only; bot identity and match-seat ownership stay on the server. */
+export interface BotProfileMatch {
+  matchId: string;
+  mapId: string;
+  /** UTC epoch milliseconds, not the match's elapsed game clock. */
+  endedAt: number;
+  outcome: 'win' | 'draw' | 'loss';
+  xp: number;
+  place: number | null;
+}
 export interface PlayerProfile extends ProfileAppearance {
   login: string;
   xp: number;
   progress: ProfileProgress;
+  /** A running premium account: the profile wears its frame. */
+  premium?: boolean;
+  /** Absent on human profiles, including a human's temporary AI substitute. */
+  kind?: 'bot';
+  /** At most BOT_PROFILE_HISTORY_LIMIT results, newest first; only supplied for bots. */
+  recentMatches?: BotProfileMatch[];
 }
 export function defaultAppearance(): ProfileAppearance {
   return { portrait: 1, slots: Array.from({ length: MEDAL_SLOTS }, () => null) };

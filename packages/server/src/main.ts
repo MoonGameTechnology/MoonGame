@@ -7,6 +7,7 @@ import { useRemoteCorporations } from './corporateRemote';
 import { securityAuditFromEnv } from './securityAudit';
 import rateLimit from '@fastify/rate-limit';
 import { registerProfileApi } from './profileApi';
+import { registerPlayerActivityApi } from './playerActivityApi';
 import { creditProfileMatch } from './profileCredit';
 import { nickSeatAccounts } from './commanderCredit';
 import {
@@ -29,7 +30,7 @@ import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
-import { operatorTokenFromEnv } from './operatorAccess';
+import { isOperatorRequest, operatorTokenFromEnv } from './operatorAccess';
 import { createMatchLoader } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { freeMatchId } from './matchId';
@@ -63,7 +64,8 @@ import { registerMetaMarketApi } from './metaMarketApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
 import { registerPushApi } from './pushApi';
-import { configureWebPush, vapidFromEnv } from './push';
+import { configureWebPush, sendPush, vapidFromEnv } from './push';
+import { createPushDispatcher } from './pushDispatch';
 import { loadMedalCatalog } from './medalCatalog';
 import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
@@ -192,6 +194,17 @@ const loadMatch = createMatchLoader({
   // read before that — a module bought mid-match becomes buildable without a new
   // match/snapshot (LARS-0.2: only the build catalog goes live).
   arsenalStore: stores.arsenalStore,
+  // UIX-4.3: the push trigger — own urgent news to a seat whose player is away. Only with
+  // VAPID configured: no keys ⇒ no subscriptions could exist, nothing to send.
+  ...(vapid
+    ? {
+        onObservation: createPushDispatcher({
+          store: stores.pushStore,
+          send: sendPush,
+          onError: (m) => process.stderr.write(`${m}\n`),
+        }),
+      }
+    : {}),
   onStall: (matchId) =>
     process.stderr.write(
       `match ${matchId}: world clock stalled (a same-instant scheduling loop) — ` +
@@ -539,7 +552,15 @@ const server = createMultiplayerServer({
   auth,
   // A join token is bound to the account's password: a reset refuses the old one here.
   ...(auth
-    ? { accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId) }
+    ? {
+        accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId),
+        accountSeat: async (matchId: string, accountId: string) => {
+          const ava = await avaOrchestrator.resolveAvaSeat(matchId, accountId);
+          if (ava) return ava.ok ? ava.playerId : null;
+          const user = await stores.userStore.findById(accountId);
+          return user ? accountStore.seatOf(matchId, user.login) : null;
+        },
+      }
     : {}),
   allowedOrigins,
   securityAudit,
@@ -612,6 +633,12 @@ const server = createMultiplayerServer({
         // Corporations (CORP-0) — session-gated on every route: the acting identity
         // comes from the session, so the API only exists where sessions do.
         if (identify) {
+          registerPlayerActivityApi(scope, {
+            store: stores.playerActivity,
+            identify,
+            operator: (req) => isOperatorRequest({remoteAddress:req.raw.socket.remoteAddress,headers:req.headers},operatorTokenFromEnv(process.env)),
+            ...(allowedOrigins ? { allowedOrigins } : {}),
+          });
             registerCorporateMaintenance(scope, process.env.CORPORATIONS_MAINTENANCE === '1');
             if (corporationsEndpoint) {
               registerCorporateGateway(scope, corporationsEndpoint, identify);
@@ -636,6 +663,7 @@ const server = createMultiplayerServer({
               registrationRewards: stores.registrationRewards,
               users: stores.userStore,
               commanders: stores.commanderStore,
+              premium: (accountId) => metaEconomy.isPremium(accountId),
               identify,
             });
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с

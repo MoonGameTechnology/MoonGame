@@ -37,7 +37,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
 
   /**
    * Fail-secure (инвариант #4): любой неожиданный бросок превращается в стабильный
-   * `E_INTERNAL` без деталей, а подробности уходят в лог сервера.
+   * `E_INTERNAL` без деталей; журнал получает код и идентификатор запроса.
    *
    * Без этой обёртки нарушение `CHECK (warrants >= 0)` или дедлок Postgres доезжали бы
    * до клиента как 500 со стеком — то есть утечка внутреннего устройства там, где
@@ -51,8 +51,11 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
   ): Promise<T | { error: 'E_INTERNAL' }> => {
     try {
       return await run();
-    } catch (err) {
-      app.log.error({ err }, 'meta-market request failed');
+    } catch {
+      app.log.error(
+        { code: 'E_INTERNAL', requestId: reply.request.id },
+        'meta-market request failed',
+      );
       void reply.code(500);
       return { error: 'E_INTERNAL' as const };
     }
@@ -85,12 +88,15 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
           : 'E_AUTH',
   });
 
-  const changed = async (identity: Identity): Promise<void> => {
+  const changed = async (identity: Identity, request: FastifyRequest): Promise<void> => {
     if (!deps.onChanged) return;
     try {
       await deps.onChanged(identity);
-    } catch (err) {
-      app.log.error({ err }, 'meta-market committed change sync failed');
+    } catch {
+      app.log.error(
+        { code: 'E_META_MARKET_SYNC', requestId: request.id },
+        'meta-market committed change sync failed',
+      );
     }
   };
 
@@ -166,8 +172,9 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         : undefined;
       const result = await deps.market.buy(identity.accountId, id, tradeId as string | undefined);
       if (result.ok) {
-        await changed(identity);
-        if (listing) await changed({ accountId: listing.sellerId, login: listing.sellerLogin });
+        await changed(identity, request);
+        if (listing)
+          await changed({ accountId: listing.sellerId, login: listing.sellerLogin }, request);
       }
       if (!result.ok) void reply.code(result.code === 'E_NO_LISTING' ? 404 : 409);
       return result.ok ? result : { error: result.code };
@@ -223,7 +230,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         body.listingId,
         body.tradeId,
       );
-      if (result.ok) await changed(identity);
+      if (result.ok) await changed(identity, request);
       if (!result.ok)
         void reply.code(
           result.code === 'E_NO_LISTING' ? 404 : result.code === 'E_BAD_REQUEST' ? 400 : 409,

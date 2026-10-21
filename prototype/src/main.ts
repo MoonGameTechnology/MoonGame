@@ -9,6 +9,7 @@ import {
   splitAloft,
 } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
+import { startPlayerActivity } from '../../packages/client/src/playerActivity';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
@@ -38,9 +39,17 @@ import {
   dispatchChat,
   initMessageLog,
   pushMsg,
+  readMessages,
   replaceMessages,
   sessionMessages,
+  unreadMsgs,
 } from './messageLog';
+import { pendingDecisions } from '../../decisions/pendingDecisions';
+import { battleConcernsMe } from './attentionBadges';
+import { pendingHtml } from './pendingPanel';
+import { tabPick, tabsForSelection } from '../../decisions/worldFleetTabs';
+import type { TapPick } from '../../decisions/tapCycle';
+import { pairFacts, rememberCardTab } from './worldFleetCard';
 import {
   closeDiplo,
   conversations,
@@ -49,6 +58,7 @@ import {
   diploTab,
   fmtStamp,
   initDiploWindow,
+  openDiplo,
   openPlayerCard,
   openSeatCard,
   renderDiplo,
@@ -56,6 +66,7 @@ import {
   seatBadge,
   worldsOf,
 } from './diploWindow';
+import { closeCoalitions, coalOpen, initCoalitionWindow, syncCoalitions } from './coalitionWindow';
 import {
   fillWelcome,
   initSignInPages,
@@ -89,6 +100,7 @@ import {
   stopNetSetupPoll,
 } from './matchJoin';
 import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
+import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
 import { forkSiteId, isForkSite, shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, type MapId } from './mapCatalog';
@@ -221,7 +233,7 @@ import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
 import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
-import { drawAimPreview, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
+import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { clearFlak, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
@@ -426,6 +438,7 @@ import {
   uiScalePct,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
+import { initPush } from './pushSetup';
 import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
 import { initHolographicUi } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
@@ -515,6 +528,7 @@ import {
 import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
 import { initMetaEconomy } from './metaEconomyScreen';
+import { initShop } from './shopScreen';
 import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
@@ -656,7 +670,7 @@ import { claimIntent, matchIdFrom } from '../../decisions/matchAddress';
 import { httpBase } from '../../decisions/matchQuery';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
-import { defaultServerField, resolveAddress } from '../../decisions/serverAddress';
+import { defaultServerField, resolveAddress, resolveBase } from '../../decisions/serverAddress';
 import { radarContacts } from './snapshotIngest';
 import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
@@ -815,6 +829,7 @@ const chatWin = __SECTOR_ZERO_ONLY__
         dispatch: dispatchChat,
         openSeatCard,
         jumpToPing,
+        premium: () => premiumRunning(),
       },
       CH_SESSION,
     );
@@ -849,6 +864,8 @@ initDiploWindow({
   seatNick,
   refreshNicks: () => pullSeatNicks(),
 });
+// COAL-1: окно коалиций — кнопка полосы `#rail-coal`.
+initCoalitionWindow({ state: () => s, me: () => ME, names: () => NAME, ownerColor, playerOrder });
 
 /** Ники соседей по сетевой партии — из расклада мест сервера (`decisions/seatNicks.ts`).
  *  В состоянии мира их нет: там имя дома. Пришли новые — перерисовать дипломатию. */
@@ -937,8 +954,12 @@ initNetSession({
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
     pruneSelection(s.fleets, ME, s.strikes);
     invalidatePanel();
+    syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
-  events: handleEvents,
+  events: (events) => {
+    handleEvents(events);
+    push?.onEvents(events, ME); // UIX-4.4: первая спокойная своя новость — спросить о push
+  },
   pingProvince: (target) => provinceForPing(target, MAP),
   closePingPop: () => pings?.closePop(),
   fps: () => fpsEma,
@@ -1013,6 +1034,7 @@ let lastPanelHtml = '';
 let lastSplitHtml = '';
 let lastObjDescHtml = '';
 let lastLogHtml = '';
+let lastPendHtml = '';
 // --- fog of war (renderer projection; always on) -----------------------------
 // Client-side projection just for the renderer — NOT the real security boundary
 // (that is `visibleState` in shared-core). Зрение кадра и память разведки — `mapFog.ts`.
@@ -1040,6 +1062,7 @@ if (typeof ResizeObserver !== 'undefined')
     if (h > 0) document.body.style.setProperty('--sheeth', sheetHeightVar(h));
   }).observe(side);
 const logEl = $('log');
+const logPendEl = $('log-pending');
 // «Флот потерян» / «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): без флота
 // игрок минутами смотрел, как Рой штурмует его планету. Карточка встаёт в кадре, когда кораблей
 // стало ноль (`decisions/fleetLost.ts`), и та же открывается кнопкой рельса в любой момент
@@ -1158,15 +1181,7 @@ const mobileHud = initMobileHud({
   },
   choose: (pick) => {
     offerChoices([]);
-    if (pick.kind === 'fleet') setFleetSelection([pick.id]);
-    else if (pick.kind === 'strike') {
-      pickStrike(pick.id);
-      invalidatePanel();
-    } else {
-      clearSelection();
-      pickWorld(pick.id);
-      markSelection(lastReal);
-    }
+    choosePhonePick(pick);
   },
   ping: () => side.querySelector<HTMLButtonElement>('[data-act="ping"]')?.click(),
   summary: () => side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click(),
@@ -1174,7 +1189,36 @@ const mobileHud = initMobileHud({
     openDossier(key);
   },
   resized: () => revealMobileSelection(),
+  // UIX-7.1: вкладка переключает выбор между флотом и его миром и запоминается.
+  tab: (tab) => {
+    const cur = cardTabs();
+    if (!cur) return;
+    rememberCardTab(tab);
+    choosePhonePick(tabPick(cur.pair, tab));
+  },
 });
+/** Выбор с карточки телефона — строкой списка или вкладкой «Флот» / «Мир». */
+function choosePhonePick(pick: TapPick): void {
+  if (pick.kind === 'fleet') setFleetSelection([pick.id]);
+  else if (pick.kind === 'strike') {
+    pickStrike(pick.id);
+    invalidatePanel();
+  } else {
+    clearSelection();
+    pickWorld(pick.id);
+    markSelection(lastReal);
+  }
+}
+/** Вкладки карточки для текущего выбора (`worldFleetTabs.ts`, правило 3). */
+function cardTabs() {
+  const ids = selectedFleetIds();
+  const sel = selPlanet
+    ? ({ kind: 'planet', id: selPlanet } as const)
+    : ids.length === 1
+      ? ({ kind: 'fleet', id: ids[0]! } as const)
+      : null;
+  return tabsForSelection(sel, pairFacts(s, ME));
+}
 
 // Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
 // wears in the in-match top-bar corner. Client-side only (localStorage) — never match
@@ -2014,6 +2058,7 @@ function renderMap(now: number) {
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
+  drawCourseReach(); // UIX-7.2: ближайшие миры под «Курс» — кольцо и срок пути
   drawAimPreview(lastReal);
   drawCastAim(); // CAST-UX: дальность каста + область действия
   drawPatrolAim(); // SHU-6.3: круг патруля под указателем
@@ -2282,6 +2327,11 @@ function openShipCard(fleetId: string, index: number): void {
   el.classList.add('show');
 }
 
+/** Выбранный мир партии для справочника. Из хаба — никакого: после выхода из партии
+ *  `selPlanet` остаётся от неё, и карточка предложила бы строить в скрытой партии. */
+function codexWorld(): string | null {
+  return document.body.classList.contains('hub-open') ? null : selPlanet;
+}
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -2289,9 +2339,10 @@ function openCodex(key: string): void {
   // BUILD-1: карточка здания листает уровни (`b:id:уровень`). Без уровня в ключе
   // показывается ТЕКУЩИЙ построенный на выбранном мире (если есть) — владелец
   // открывает свою постройку и видит её, а не абстрактный первый уровень.
+  const world = codexWorld();
   const builtLvl =
-    kind === 'b' && selPlanet
-      ? s.planets[selPlanet]?.buildings.find((b) => b.type === id)?.level
+    kind === 'b' && world
+      ? s.planets[world]?.buildings.find((b) => b.type === id)?.level
       : undefined;
   const level = Number(lvl) || builtLvl || 1;
   el.innerHTML = `<div class="cxbox">${codexHtml(kind, id, level)}${codexBuildBtn(kind, id, level)}<button class="cx-close">${t('codex.close')}</button></div>`;
@@ -2300,7 +2351,8 @@ function openCodex(key: string): void {
 /** A "Build here" action inside the codex when the selected province can raise this
  *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
 function codexBuildBtn(kind: string, id: string, level = 1): string {
-  const p = selPlanet ? s.planets[selPlanet] : null;
+  const world = codexWorld();
+  const p = world ? s.planets[world] : null;
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
     // BUILD-1: у ПОСТРОЕННОГО здания карточка предлагает «Улучшить» — той же пробой
@@ -2725,7 +2777,13 @@ function updateMobileHud(): void {
     }
   }
   offerChoices(choices.map(({ kind, id }) => ({ kind, id })));
-  mobileHud.update(key, !!mobileOrderKind() || pickMode || !!chainMode, cmdMore, choices);
+  mobileHud.update(
+    key,
+    !!mobileOrderKind() || pickMode || !!chainMode,
+    cmdMore,
+    choices,
+    selStrike ? null : (cardTabs()?.active ?? null),
+  );
 }
 
 // Ряд команд — разметка, поповеры, полоска «Приказ» и кэш разметки — живёт в `cmdBar.ts`
@@ -3572,6 +3630,18 @@ document.getElementById('rail-log')?.addEventListener('click', () => logWin?.cla
 logWin?.addEventListener('click', (e) => {
   const tg = e.target as HTMLElement;
   if (tg.id === 'logwin' || tg.classList.contains('lw-close')) logWin.classList.remove('show');
+  // UIX-4.2: «Показать» у пункта «Ждёт решения» — бой: окно боя и камера к его миру;
+  // письма — вкладка сообщений (чтение гасит значок, как у кнопки ✉).
+  const show = tg.closest<HTMLElement>('[data-pending]');
+  if (!show) return;
+  logWin.classList.remove('show');
+  if (show.dataset.pending === 'battle') {
+    if (show.dataset.loc) focusWorld(show.dataset.loc);
+    if (show.dataset.id) battleWindow.open(show.dataset.id);
+  } else {
+    readMessages();
+    openDiplo('msgs');
+  }
 });
 
 // --- technologies window -----------------------------------------------------
@@ -4029,7 +4099,14 @@ const hubNote = $('hub-note');
 let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
 function showHub(show: boolean): void {
   if (!show) registrationReward?.close();
+  if (!show) arsenal?.close();
+  if (!show) shop?.close();
+  // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
+  if (show) document.getElementById('codex')?.classList.remove('show');
   hubEl.style.display = show ? 'flex' : 'none';
+  // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
+  // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
+  document.body.classList.toggle('hub-open', show);
 }
 const HUB_PANELS: Record<string, string> = {
   home: 'hp-home',
@@ -4039,12 +4116,13 @@ const HUB_PANELS: Record<string, string> = {
   arsenal: 'hp-arsenal',
   auction: 'hp-auction',
   supply: 'hp-supply',
+  shop: 'hp-shop',
   ally: 'hp-ally',
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 /** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply']);
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -4060,12 +4138,17 @@ function hubTab(tab: string): void {
   if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
   // Кошелёк Варрантов в шапке (UIX-10.2) — тихо: гостю и при сбое сервера остаётся прежнее число.
   if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
+  // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
+  if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
   if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
+  if (tab !== 'arsenal') arsenal?.close(); // the phone sheet lives over the hub, not in the tab
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
+  if (tab === 'shop' && shop) detach('хаб: магазин', shop.refresh());
+  if (tab !== 'shop') shop?.close(); // the phone sheet lives over the hub, like the arsenal's
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
@@ -4161,16 +4244,21 @@ const rank = __SECTOR_ZERO_ONLY__
       openPlayer: (login) => profile?.open(login),
     });
 
-// --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
-// The витрина itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks.
-// Cache key is per callsign, like the meta store. `authorizedBase` encodes the tab's
-// policy: it may reuse a session token a prior join already stashed, but must never
-// prompt for a password just to LOOK at the collection — no server, no accounts or
-// no stashed session all read the same way (null ⇒ keep the cached paint).
+// --- «Арсенал» — the account's persistent collection and its workshop (hub tab, ARS-5) ----
+// The tab itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks. Cache key is
+// per callsign, like the meta store. `authorizedBase` encodes the tab's policy: it may reuse
+// a session token a prior join already stashed, but must never prompt for a password just to
+// LOOK at the collection — no server, no accounts or no stashed session all read the same way
+// (the starter kit and a sign-in). Narrow = the tab is too narrow for the detail beside the
+// list (the `@container arsenal` rule in build.mjs uses the same width), and then the detail
+// opens as a sheet over the hub.
+const ARSENAL_WIDE_MIN = 700;
 const arsenal = __SECTOR_ZERO_ONLY__
   ? null
   : initArsenal({
-      root: () => $('arsenal-items'),
+      root: () => $('hp-arsenal'),
+      sheet: () => $('arsenal-sheet'),
+      narrow: () => $('hp-arsenal').clientWidth < ARSENAL_WIDE_MIN,
       readCache: () => {
         try {
           return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
@@ -4181,7 +4269,29 @@ const arsenal = __SECTOR_ZERO_ONLY__
       writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
       openCodex,
       authorizedBase: hubAuthorizedBase,
+      canSignIn: () => !!resolveServer() && authMode === 'accounts',
+      signIn: () => {
+        showHub(false);
+        showConnect(true);
+        showStage('welcome');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+      },
+      openAuction: () => hubTab('auction'),
+      sell: (itemId) => {
+        metaMarket?.focusSell(itemId);
+        hubTab('auction');
+      },
+      openSeason: () => hubTab('supply'),
+      openStore: (offerId) => {
+        shop?.show('modules', offerId);
+        hubTab('shop');
+      },
+      changed: async () => {
+        await metaMarket?.sync();
+      },
     });
+if (arsenal && typeof ResizeObserver !== 'undefined')
+  new ResizeObserver(() => arsenal.relayout()).observe($('hp-arsenal'));
 // EC-3 «Аукцион»: витрина торговли мета-предметами. Лоты и кошелёк живут на сервере,
 // поэтому кэша, как у арсенала, здесь нет — экран всегда спрашивает свежее.
 const metaMarket = __SECTOR_ZERO_ONLY__
@@ -4196,6 +4306,43 @@ const metaMarket = __SECTOR_ZERO_ONLY__
       changed: () => hubWallet?.render(),
       inventoryChanged: async () => { await arsenal?.refresh(); },
     });
+// «Магазин» (заказ владельца 2026-10-20): Суверены, премиум, модули и материалы за ◆.
+// Единственное место покупок — Снабжение и Арсенал ведут сюда. Баланс ◆ и срок премиума
+// приходят с ответом аккаунта: плашка хаба показывает число, чат помнит премиум по позывному
+// (цвет шрифта — его бонус; сам срок проверяется по часам при каждом открытии настроек).
+const SHOP_WIDE_MIN = 700;
+const premiumKey = (): string => 'vd.premium.' + (nickInput.value.trim() || 'guest');
+const shop = __SECTOR_ZERO_ONLY__
+  ? null
+  : initShop({
+      root: () => $('hp-shop'),
+      sheet: () => $('shop-sheet'),
+      narrow: () => $('hp-shop').clientWidth < SHOP_WIDE_MIN,
+      authorizedBase: hubAuthorizedBase,
+      canSignIn: () => !!resolveServer() && authMode === 'accounts',
+      signIn: () => {
+        showHub(false);
+        showConnect(true);
+        showStage('welcome');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+      },
+      warrants: () => metaMarket?.balance() ?? 0,
+      now: () => Date.now(),
+      accountChanged: (view) => {
+        if (view) writeRaw(premiumKey(), String(view.premiumUntil ?? 0));
+        hubWallet?.render();
+      },
+      changed: async () => {
+        await arsenal?.refresh();
+        await metaMarket?.sync();
+      },
+    });
+if (shop && typeof ResizeObserver !== 'undefined')
+  new ResizeObserver(() => shop.relayout()).observe($('hp-shop'));
+/** Premium is running for this callsign, by the last account read on this device. */
+function premiumRunning(): boolean {
+  return Number(readRaw(premiumKey()) ?? 0) > Date.now();
+}
 // Main-game supply has its own server-owned state; Sector Zero remains independent.
 const metaEconomy = __SECTOR_ZERO_ONLY__
   ? null
@@ -4206,7 +4353,6 @@ const metaEconomy = __SECTOR_ZERO_ONLY__
         await arsenal?.refresh();
         await metaMarket?.sync();
       },
-      confirm: (message) => window.confirm(message),
     });
 // Кошелёк главного экрана (UIX-10.2, заказ владельца 2026-10-01): Суверены — та же плашка с
 // «+», что в строке статуса партии; Варранты аукциона — плашкой, которая и есть дверь в аукцион.
@@ -4214,10 +4360,10 @@ const hubWallet = __SECTOR_ZERO_ONLY__
   ? null
   : initHubWallet({
       root: $('hubwallet'),
-      wallet: () => ({ sovereigns: null, warrants: metaMarket?.balance() ?? 0 }),
+      wallet: () => ({ sovereigns: shop?.sovereigns() ?? null, warrants: metaMarket?.balance() ?? 0 }),
       donate: () => {
-        hubTab('supply');
-        metaEconomy?.showStore();
+        shop?.show('sovereigns');
+        hubTab('shop');
       },
       auction: () => hubTab('auction'),
     });
@@ -4249,7 +4395,7 @@ const profile = __SECTOR_ZERO_ONLY__
             const c = corp?.mine().corp;
             return c ? { name: c.name, influence: c.influence } : null;
           })(),
-          sovereigns: null,
+          sovereigns: shop?.sovereigns() ?? null,
         };
       },
       readCache: () => {
@@ -4467,8 +4613,8 @@ document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('met
 document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
 document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
-for (const id of ['hub-supply', 'arsenal-supply'])
-  document.getElementById(id)?.addEventListener('click', () => hubTab('supply'));
+document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
+document.getElementById('hub-shop')?.addEventListener('click', () => hubTab('shop'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
@@ -4538,6 +4684,8 @@ const settings = initSettings({
     ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
     // Нижняя панель есть там, где телефонная раскладка (UIX-3.3); настраивают её и с хаба.
     ...(MOBILE ? { phoneBar: phoneNav.bar() } : {}),
+    // Push (UIX-4.4): вкладка есть там, где браузер умеет уведомления.
+    ...(push?.view() ? { push: push.view()! } : {}),
   }),
   setSweepOpacity,
   setWindowOpacity: (v) => {
@@ -4559,15 +4707,38 @@ const settings = initSettings({
   setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
   resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
   setPhoneBar: (bar) => phoneNav.setBar(bar),
+  setPush: async (on) => push?.setEnabled(on),
+  setPushKind: async (kind, on) => push?.setKind(kind, on),
 });
-$('hub-settings').addEventListener('click', () => settings.open());
-$('hub-gear').addEventListener('click', () => settings.open());
+// Push-уведомления (UIX-4.4) — у владельца, `pushSetup.ts`: вопрос о согласии, worker,
+// подписка и виды. Стоит ПОСЛЕ окна настроек: `changed` перерисовывает его.
+const push = __SECTOR_ZERO_ONLY__
+  ? null
+  : initPush({
+      authorizedBase: hubAuthorizedBase,
+      askRoot: () => $('pushask'),
+      changed: () => {
+        if (settingsEl.classList.contains('show')) settings.render();
+      },
+    });
+/** Окно настроек; вход и подписка перечитываются — вкладка «Уведомления» покажет их свежими. */
+function openSettings(): void {
+  settings.open();
+  push?.refresh().catch(() => undefined); // не вышло перечитать — вкладка покажет прошлое
+}
+$('hub-settings').addEventListener('click', openSettings);
+$('hub-gear').addEventListener('click', openSettings);
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
-document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
+document.getElementById('rail-settings')?.addEventListener('click', openSettings);
 
 // Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
 // загрузочного блока: его ветка по ссылке может попросить войти.
+let activity: ReturnType<typeof startPlayerActivity> | undefined;
 initAccountSession({
+  sessionChanged: () => {
+    activity?.refresh();
+    arsenal?.forget();
+  },
   status: (text) => {
     statusEl.textContent = text;
   },
@@ -5000,6 +5171,13 @@ function resolveServer(): { base: string; nick: string } | null {
   return null;
 }
 
+if (!__SECTOR_ZERO_ONLY__) activity = startPlayerActivity(() => {
+  const step=resolveBase(srvInput.value,location.protocol==='https:');
+  const base=step.kind==='ok' ? step.base : null;
+  const token=base ? sessionToken(base) : null;
+  return base && token ? {base:httpBase(base),token} : null;
+});
+
 // MUST stay a hoisted function declaration — NOT a `const` arrow. The boot block
 // (~900 lines above) does `await probeAuthMode(...)` during module evaluation, and an
 // async body runs synchronously up to its first `await` — so httpBase is CALLED long
@@ -5183,6 +5361,7 @@ const hide = (id: string): void => document.getElementById(id)?.classList.remove
 const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
 
 const BACK_LAYERS: BackLayer[] = [
+  { id: 'match-description', isOpen: isMatchDescriptionOpen, close: closeMatchDescription }, // native top layer
   { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z61, above the cabinet it explains
@@ -5225,12 +5404,14 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z50
   { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
+  { id: 'coalwin', isOpen: () => coalOpen, close: () => closeCoalitions() }, // z49, окно коалиций
   // Проба по состоянию, а не по классу: `orderPromptOpen` (запрос войны или окно погрузки) — источник истины, класс лишь его
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
   { id: 'warprompt', isOpen: orderPromptOpen, close: () => cancelWarPrompt() }, // z48
   // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
   { id: 'abandon', isOpen: () => abandonCard.classList.contains('show'), close: () => closeAbandon() }, // z48
+  { id: 'pushask', isOpen: () => push?.asking() ?? false, close: () => push?.dismiss() }, // z48
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
@@ -5256,6 +5437,8 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z46
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
+  { id: 'arsenal-sheet', isOpen: () => arsenal?.isOpen() ?? false, close: () => arsenal?.close() }, // inside the hub (z52), under the codex opened from it
+  { id: 'shop-sheet', isOpen: () => shop?.isOpen() ?? false, close: () => shop?.close() }, // inside the hub (z52)
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
@@ -5336,6 +5519,7 @@ const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, str
   production: 'constructor',
   science: 'tech',
   events: 'logwin',
+  coalitions: 'coalwin',
   pings: 'pingpanel',
   market: 'market',
   trader: 'trader',
@@ -5684,7 +5868,7 @@ initSectorZeroShell({
     openHub();
     $('hub-sector-zero').focus({ preventScroll: true });
   },
-  openSettings: () => settings.open(),
+  openSettings,
   note,
 });
 
@@ -5874,6 +6058,26 @@ function frame(nowReal: number) {
     fpsEl.textContent = CLEARED;
     lastFpsText = CLEARED;
   }
+  // UIX-4.2: над журналом — то, что ждёт решения (`pendingDecisions.ts`). Бои — те же,
+  // что считает значок тревоги на кнопке «События» (`attentionBadges.ts`).
+  const pendHtml = pendingHtml(
+    pendingDecisions(
+      Object.values(s.battles)
+        .filter((b) => battleConcernsMe(b, ME, known) || !!vision?.engaged.battles.has(b.id))
+        .map((b) => ({
+          id: b.id,
+          location: b.location,
+          mine: b.sides.some((sd) => sd.owner === ME),
+          ...(b.nextRoundAt !== undefined ? { nextRoundAt: b.nextRoundAt } : {}),
+        })),
+      unreadMsgs,
+    ),
+    placeName,
+  );
+  if (pendHtml !== lastPendHtml) {
+    logPendEl.innerHTML = pendHtml;
+    lastPendHtml = pendHtml;
+  }
   const logHtml = logLines.map((l) => `<div>${esc(l)}</div>`).join('');
   if (logHtml !== lastLogHtml) {
     logEl.innerHTML = logHtml;
@@ -5962,10 +6166,12 @@ const codexEl = document.getElementById('codex');
 if (codexEl) {
   codexEl.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    // Мир — через codexWorld(): карточка, открытая ещё в партии, могла пережить вход в хаб.
+    const world = codexWorld();
     const build = (tg.closest('.cx-build') as HTMLElement | null)?.dataset.build;
-    if (build && selPlanet) {
+    if (build && world) {
       const [kind, id] = build.split(':');
-      enqueueBuild(selPlanet, { kind: kind as BuildKind, id: id!, count: 1 });
+      enqueueBuild(world, { kind: kind as BuildKind, id: id!, count: 1 });
       codexEl.classList.remove('show');
       invalidatePanel();
       renderPanel();
@@ -5980,8 +6186,8 @@ if (codexEl) {
     // «Улучшить» из карточки: хостовый путь заказа (сеть → приказ, соло → очередь);
     // карточка остаётся открытой и сама показывает «в работе» (проба погасит кнопку).
     const upg = (tg.closest('[data-cx-upg]') as HTMLElement | null)?.dataset.cxUpg;
-    if (upg && selPlanet) {
-      enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 });
+    if (upg && world) {
+      enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 });
       invalidatePanel();
       renderPanel();
       openCodex(`b:${upg}`);

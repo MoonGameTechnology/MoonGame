@@ -10,7 +10,7 @@ import {
 } from './auth';
 import { MemoryUserStore } from './store';
 import { registerMatchApi, type MatchApiDeps } from './matchApi';
-import { hashPassword, type ScryptParams } from './password';
+import { hashPassword, verifyPassword, passwordWork, type ScryptParams } from './password';
 
 // SE-1.x — the login+password HTTP API: registration, login, uniform failures,
 // rate limiting, and the session gate on the match API.
@@ -27,11 +27,13 @@ afterEach(async () => {
 });
 
 interface AuthAppOptions {
+  scryptParams?: ScryptParams;
   users?: MemoryUserStore;
   now?: () => number;
   rateMax?: number;
   rateWindowMs?: number;
   onRegistered?: (accountId: string, login: string) => Promise<void>;
+  onPasswordChanged?: (accountId: string) => Promise<void>;
 }
 
 function authApp(options: AuthAppOptions = {}): FastifyInstance {
@@ -54,6 +56,104 @@ const post = (
   server.inject({ method: 'POST', url, payload: body as object });
 
 describe('SE-1.x · /auth/register + /auth/login', () => {
+  it('gradually rehashes a verified legacy password and issues a session for the committed hash', async () => {
+    const users = new MemoryUserStore();
+    const before = await hashPassword('legacy orbit signal', FAST);
+    const created = await users.createUser('UpgradePilot', before);
+    if (!created.ok) throw new Error('fixture');
+    const revoked = vi.fn(async () => {});
+    const server = authApp({ users, scryptParams: { ...FAST, p: 3 }, onPasswordChanged: revoked });
+    const response = await post(server, '/auth/login', { login: 'UpgradePilot', password: 'legacy orbit signal' });
+    expect(response.statusCode).toBe(200);
+    const current = await users.findById(created.userId);
+    expect(current?.passHash).toMatch(/^scrypt\$4096\$8\$3\$/);
+    expect(await verifyPassword('legacy orbit signal', current!.passHash)).toBe(true);
+    const verified = await verifySessionToken((response.json() as { token: string }).token, VERIFY);
+    expect(verified.ok && verified.claim.pwfp).toBe(pwFingerprint(current!.passHash));
+    expect(verified.ok && verified.claim.pwfp).not.toBe(pwFingerprint(before));
+    expect(revoked).toHaveBeenCalledExactlyOnceWith(created.userId);
+  });
+
+  it.each(['reset', 'deletion', 'logout'] as const)('rehash cannot restore credentials overtaken by %s', async (change) => {
+    const users = new MemoryUserStore();
+    const before = await hashPassword('legacy orbit signal', FAST);
+    const reset = await hashPassword('a different password', FAST);
+    const created = await users.createUser('RacePilot', before);
+    if (!created.ok) throw new Error('fixture');
+    const cas = users.setPasswordIfCurrent.bind(users);
+    users.setPasswordIfCurrent = async (...args) => {
+      if (change === 'reset') await users.setPassword(created.userId, reset);
+      else if (change === 'logout') await users.revokeSessions(created.userId);
+      else await users.requestDeletion({ ...(await users.findById(created.userId))! });
+      return cas(...args);
+    };
+    const server = authApp({ users, scryptParams: { ...FAST, p: 3 } });
+    const response = await post(server, '/auth/login', { login: 'RacePilot', password: 'legacy orbit signal' });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: 'E_AUTH' });
+    if (change === 'reset') expect((await users.findById(created.userId))?.passHash).toBe(reset);
+    if (change === 'deletion') expect(await users.findById(created.userId)).toBeNull();
+    if (change === 'logout') expect((await users.findById(created.userId))?.sessionNonce).toBeTruthy();
+  });
+
+  it.each(['reset', 'logout'] as const)('an already-current hash cannot mint a session across concurrent %s', async (change) => {
+    const users = new MemoryUserStore();
+    const before = await hashPassword('current orbit signal', FAST);
+    const reset = await hashPassword('a different password', FAST);
+    const created = await users.createUser('CurrentPilot', before);
+    if (!created.ok) throw new Error('fixture');
+    const findById = users.findById.bind(users);
+    users.findById = async (id) => {
+      if (change === 'reset') await users.setPassword(id, reset);
+      else await users.revokeSessions(id);
+      return findById(id);
+    };
+    const server = authApp({ users });
+    const response = await post(server, '/auth/login', { login: 'CurrentPilot', password: 'current orbit signal' });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: 'E_AUTH' });
+  });
+
+  it('shares a bounded KDF budget across callers and refuses overload uniformly', async () => {
+    const users = new MemoryUserStore();
+    await users.createUser('BusyPilot', await hashPassword('busy orbit signal', FAST));
+    const server = authApp({ users });
+    // Complete the startup decoy AND its first verification before taking slots.
+    expect((await post(server, '/auth/login', { login: 'unknown-pilot', password: 'busy orbit signal' })).statusCode).toBe(401);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const admitted = Array.from({ length: 18 }, () => passwordWork.run(() => held));
+    try {
+      for (const [url, login] of [['/auth/login', 'BusyPilot'], ['/auth/login', 'unknown-pilot'], ['/auth/register', 'BrandNewPilot']]) {
+        const response = await post(server, url!, { login, password: 'busy orbit signal' });
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({ error: 'E_AUTH_BUSY' });
+      }
+    } finally {
+      release();
+      await Promise.allSettled(admitted);
+    }
+    expect((await post(server, '/auth/login', { login: 'BusyPilot', password: 'busy orbit signal' })).statusCode).toBe(200);
+  });
+
+  it('retries a decoy whose initial warming was refused by saturation', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const admitted = Array.from({ length: 18 }, () => passwordWork.run(() => held));
+    const server = authApp();
+    try {
+      const response = await post(server, '/auth/login', { login: 'unknown-pilot', password: 'busy orbit signal' });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: 'E_AUTH_BUSY' });
+    } finally {
+      release();
+      await Promise.allSettled(admitted);
+    }
+    const recovered = await post(server, '/auth/login', { login: 'unknown-pilot', password: 'busy orbit signal' });
+    expect(recovered.statusCode).toBe(401);
+    expect(recovered.json()).toEqual({ error: 'E_AUTH' });
+  });
+
   it('enforces new-password rules server-side without rewriting accepted secrets', async () => {
     const users = new MemoryUserStore();
     const server = authApp({ users });

@@ -271,6 +271,30 @@ body.mobile-ui #mobile-sheet.choosing #side,
 body.mobile-ui #mobile-sheet.choosing #cmdbar {
   display: none !important;
 }
+/* UIX-7.1: вкладки «Флот» / «Мир» у своего мира со своим флотом. */
+.mobile-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 8px;
+  flex: none;
+}
+.mobile-tabs[hidden] {
+  display: none;
+}
+.mobile-tabs > button {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #5a87984d;
+  background: transparent;
+  color: #bcdeea;
+  font: 600 var(--fs-body) / 1 var(--sf-font);
+}
+.mobile-tabs > button[aria-selected='true'] {
+  border-color: var(--cyan, #35d6e6);
+  background: rgba(53, 214, 230, 0.14);
+  color: var(--cyan, #35d6e6);
+}
 .mobile-choices {
   overflow-y: auto;
   max-height: 45dvh;

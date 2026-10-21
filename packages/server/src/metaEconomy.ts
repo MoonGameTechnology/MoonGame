@@ -11,11 +11,14 @@ import type {
   MetaEconomyAccount,
   MetaEconomyView,
   MetaMatchRewardsView,
+  MetaPremiumDailyCommand,
   MetaRecipeView,
   MetaSalvageCommand,
   MetaSeasonChoiceCommand,
   MetaSeasonState,
   MetaSelectPassCommand,
+  MetaStoreBuyCommand,
+  MetaStoreOfferView,
   MetaSupplyGoalCommand,
 } from '@void/protocol';
 import { chanceForPlace, pickFromPool, rollStream, type DropTables } from './dropRoller';
@@ -23,6 +26,7 @@ import type {
   MetaEconomyCatalog,
   MetaSeasonDefinition,
   MetaSeasonGrant,
+  MetaStoreOffer,
 } from './metaEconomyCatalog';
 import type { MetaEconomyStore, MetaEconomyTransaction } from './metaEconomyStore';
 import { parseEntitlementCommand } from './commerceTransport';
@@ -104,6 +108,9 @@ function safeAdd(a: number, b: number): number {
   const result = a + b;
   if (!Number.isSafeInteger(result) || result < 0 || result > MAX_VALUE) reject('E_META_LIMIT');
   return result;
+}
+function premiumActive(account: MetaEconomyAccount, now: number): boolean {
+  return (account.premiumUntil ?? 0) > now;
 }
 function receiptKey(kind: string, accountId: string, requestId: string): string {
   return `meta:${kind}:${metaEconomyFingerprint([accountId, requestId])}`;
@@ -232,6 +239,23 @@ export class MetaEconomy {
       const now = this.now();
       return {
         catalogVersion: this.deps.catalog.version,
+        sovereigns: account.sovereigns ?? 0,
+        premiumUntil: premiumActive(account, now) ? account.premiumUntil! : null,
+        store: Object.entries(this.deps.catalog.store.offers).map(([id, offer]) =>
+          this.storeOfferView(id, offer, account, items, now),
+        ),
+        premiumPerks: { ...this.deps.catalog.store.premium },
+        premiumDaily:
+          premiumActive(account, now) && this.deps.catalog.store.premium.dailySovereigns > 0
+            ? {
+                amount: this.deps.catalog.store.premium.dailySovereigns,
+                claimed: Boolean(account.counters[`premium-daily:${Math.floor(now / DAY)}`]),
+              }
+            : null,
+        ads: {
+          used: account.counters[`ads:${Math.floor(now / DAY)}`] ?? 0,
+          limit: this.adLimit(account, now),
+        },
         materials: Object.entries(this.deps.catalog.materials).map(([id, material]) => ({
           id,
           nameKey: material.nameKey,
@@ -275,9 +299,21 @@ export class MetaEconomy {
               freeClaimed: progress?.claimed.includes(`free:${milestone.level}`) ?? false,
               premiumClaimed: progress?.claimed.includes(`premium:${milestone.level}`) ?? false,
               choices: milestone.free.choices ?? [],
+              ...(milestone.free.module ? { module: milestone.free.module } : {}),
             })),
           };
         }),
+        drops: {
+          pityAfter: this.deps.dropTables.pityAfter,
+          byPlace: [...this.deps.dropTables.byPlace]
+            .sort((a, b) => a.maxPlace - b.maxPlace)
+            .map(({ maxPlace, chance }) => ({ maxPlace, chance })),
+          pool: this.deps.dropTables.pool.map(({ kind, defId, weight }) => ({
+            kind,
+            defId,
+            weight,
+          })),
+        },
       };
     });
   }
@@ -462,6 +498,181 @@ export class MetaEconomy {
       });
       if (receipt) (receipt.materials ??= []).push({ materialId, quantity, soulbound });
     }
+  }
+
+  /** What the offer costs this account now and why it cannot be bought, if it cannot. */
+  private storeTerms(
+    id: string,
+    offer: MetaStoreOffer,
+    account: MetaEconomyAccount,
+    items: readonly ArsenalItem[],
+    now: number,
+  ): {
+    price: number;
+    fullPrice: number;
+    missing: string[];
+    blocked?: MetaStoreOfferView['blocked'];
+  } {
+    const bought = account.counters[`offer:${id}`] ?? 0;
+    const missing = (offer.modules ?? []).filter(
+      (defId) => !items.some((item) => item.defId === defId),
+    );
+    const fullPrice = offer.modules
+      ? missing.reduce((sum, defId) => sum + this.deps.catalog.store.modulePrices[defId]!, 0)
+      : offer.price!;
+    const price = Math.round((fullPrice * (100 - (offer.discountPercent ?? 0))) / 100);
+    const season = offer.premiumSeason
+      ? this.deps.catalog.seasons.find((row) => row.id === offer.premiumSeason)
+      : undefined;
+    let blocked: MetaStoreOfferView['blocked'];
+    if (offer.limit !== undefined && bought >= offer.limit) blocked = 'limit';
+    else if (offer.modules && missing.length === 0) blocked = 'owned';
+    else if (season && account.season[season.id]?.premium) blocked = 'owned';
+    else if (
+      season &&
+      (now < season.startsAt || now >= season.startsAt + season.durationDays * DAY)
+    )
+      blocked = 'season';
+    return { price, fullPrice, missing, ...(blocked ? { blocked } : {}) };
+  }
+
+  private storeOfferView(
+    id: string,
+    offer: MetaStoreOffer,
+    account: MetaEconomyAccount,
+    items: readonly ArsenalItem[],
+    now: number,
+  ): MetaStoreOfferView {
+    const terms = this.storeTerms(id, offer, account, items, now);
+    return {
+      id,
+      category: offer.category,
+      price: terms.price,
+      ...(terms.fullPrice !== terms.price ? { fullPrice: terms.fullPrice } : {}),
+      ...(offer.premiumDays ? { premiumDays: offer.premiumDays } : {}),
+      ...(offer.premiumSeason ? { premiumSeason: offer.premiumSeason } : {}),
+      ...(offer.modules
+        ? {
+            modules: offer.modules.map((defId) => ({
+              defId,
+              owned: !terms.missing.includes(defId),
+            })),
+          }
+        : {}),
+      ...(offer.materials ? { materials: { ...offer.materials } } : {}),
+      ...(offer.limit !== undefined ? { limit: offer.limit } : {}),
+      bought: account.counters[`offer:${id}`] ?? 0,
+      ...(terms.blocked ? { blocked: terms.blocked } : {}),
+    };
+  }
+
+  /** Rewarded-ad supplies allowed today: premium adds its extra ones. */
+  private adLimit(account: MetaEconomyAccount, now: number): number {
+    return (
+      this.deps.catalog.commerce.dailyAdLimit +
+      (premiumActive(account, now) ? this.deps.catalog.store.premium.extraDailyAds : 0)
+    );
+  }
+
+  /** Running premium shows a frame on the public profile; no other account data leaves here. */
+  async isPremium(accountId: string): Promise<boolean> {
+    if (!validKey(accountId)) return false;
+    return premiumActive(await this.deps.store.read(accountId), this.now());
+  }
+
+  /** Premium's daily Sovereigns: once per UTC day while premium runs. */
+  claimPremiumDaily(
+    accountId: string,
+    command: MetaPremiumDailyCommand,
+  ): Promise<MetaCommandResult> {
+    return this.command(
+      accountId,
+      command.requestId,
+      'premium-daily',
+      command,
+      async (_tx, account, receipt) => {
+        const amount = this.deps.catalog.store.premium.dailySovereigns;
+        if (amount === 0 || !premiumActive(account, receipt.at)) reject('E_PREMIUM');
+        const counter = `premium-daily:${Math.floor(receipt.at / DAY)}`;
+        if (account.counters[counter]) reject('E_DAILY_CLAIMED');
+        account.counters[counter] = 1;
+        account.sovereigns = safeAdd(account.sovereigns ?? 0, amount);
+        receipt.sovereignsGranted = amount;
+      },
+    );
+  }
+
+  /** Spend Sovereigns on a store offer. Bought goods are personal (soulbound), like paid ones. */
+  buyOffer(accountId: string, command: MetaStoreBuyCommand): Promise<MetaCommandResult> {
+    return this.command(
+      accountId,
+      command.requestId,
+      'store-buy',
+      command,
+      async (tx, account, receipt) => {
+        if (
+          !validKey(command.offerId) ||
+          !Object.hasOwn(this.deps.catalog.store.offers, command.offerId)
+        )
+          reject('E_META_OFFER');
+        const offer = this.deps.catalog.store.offers[command.offerId]!;
+        const items = await tx.arsenal.listOf(accountId);
+        const terms = this.storeTerms(command.offerId, offer, account, items, receipt.at);
+        if (terms.blocked === 'limit') reject('E_OFFER_LIMIT');
+        if (terms.blocked === 'owned') reject('E_ALREADY_OWNED');
+        if (terms.blocked === 'season') reject('E_META_SEASON');
+        const balance = account.sovereigns ?? 0;
+        if (balance < terms.price) reject('E_SOVEREIGNS');
+        account.sovereigns = balance - terms.price;
+        receipt.sovereignsSpent = terms.price;
+        const counter = `offer:${command.offerId}`;
+        account.counters[counter] = safeAdd(account.counters[counter] ?? 0, 1);
+        if (offer.materials)
+          this.grantMaterials(
+            account,
+            offer.materials,
+            true,
+            'commerce',
+            receipt.id,
+            receipt.at,
+            receipt,
+          );
+        for (const defId of terms.missing) {
+          const itemId = `store-item:${metaEconomyFingerprint([receipt.id, defId])}`;
+          await tx.arsenal.grant({
+            itemId,
+            accountId,
+            kind: 'module',
+            form: 'blueprint',
+            defId,
+            soulbound: true,
+            origin: 'commerce',
+            acquiredAt: receipt.at,
+          });
+          account.itemSources[itemId] = { source: 'commerce', sourceId: receipt.id };
+          (receipt.itemIds ??= []).push(itemId);
+        }
+        if (offer.premiumDays) {
+          // A new term extends a running one; an expired one restarts from now.
+          const until = Math.max(receipt.at, account.premiumUntil ?? 0) + offer.premiumDays * DAY;
+          if (!Number.isSafeInteger(until)) reject('E_META_LIMIT');
+          account.premiumUntil = until;
+          receipt.premiumUntil = account.premiumUntil;
+        }
+        if (offer.premiumSeason) {
+          const season = this.deps.catalog.seasons.find((row) => row.id === offer.premiumSeason)!;
+          const progress = this.startSeason(account, season, receipt.at);
+          progress.premium = true;
+          account.activeSeasonId ??= season.id;
+          account.itemSources[`premium:${season.id}`] = {
+            source: 'commerce',
+            sourceId: receipt.id,
+          };
+          await this.grantMilestones(tx, accountId, account, season, receipt.at);
+        }
+        receipt.soulbound = true;
+      },
+    );
   }
 
   private seasonLevel(season: MetaSeasonDefinition, progress?: MetaSeasonState): number {
@@ -846,7 +1057,7 @@ export class MetaEconomy {
           const source: MaterialSource = command.source === 'rewarded_ad' ? 'ad' : 'commerce';
           if (source === 'ad') {
             const counter = `ads:${Math.floor(receipt.at / DAY)}`;
-            if ((account.counters[counter] ?? 0) >= this.deps.catalog.commerce.dailyAdLimit)
+            if ((account.counters[counter] ?? 0) >= this.adLimit(account, receipt.at))
               reject('E_AD_LIMIT');
             account.counters[counter] = safeAdd(account.counters[counter] ?? 0, 1);
           }
@@ -873,6 +1084,11 @@ export class MetaEconomy {
             });
             account.itemSources[itemId] = { source, sourceId: command.commandId };
           }
+          if (product.sovereigns)
+            account.sovereigns = safeAdd(
+              account.sovereigns ?? 0,
+              product.sovereigns + (product.bonusSovereigns ?? 0),
+            );
           if (product.premiumSeason) {
             const season = this.deps.catalog.seasons.find(
               (row) => row.id === product.premiumSeason,
@@ -975,8 +1191,12 @@ export class MetaEconomy {
       if (!progress?.premium || progress.claimed.some((claim) => claim.startsWith('premium:')))
         recoverable = false;
     }
+    // Sovereigns already spent cannot be taken back automatically: a person reviews it.
+    const sovereigns = (product.sovereigns ?? 0) + (product.bonusSovereigns ?? 0);
+    if ((account.sovereigns ?? 0) < sovereigns) recoverable = false;
     receipt.status = recoverable ? 'revoked' : 'review-required';
     if (recoverable) {
+      if (sovereigns > 0) account.sovereigns = (account.sovereigns ?? 0) - sovereigns;
       account.materials = account.materials.filter((lot) => !lots.includes(lot));
       if (product.module && !(await tx.arsenal.consume(itemId, command.accountId)))
         reject('E_NOT_OWNER');

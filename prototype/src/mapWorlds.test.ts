@@ -80,6 +80,7 @@ function fakeCanvas() {
         });
         if (name.startsWith('create')) return { addColorStop() {} };
         if (name === 'measureText') return { width: 40 };
+        if (name === 'getLineDash') return dash;
         return undefined;
       };
     },
@@ -249,6 +250,9 @@ describe('REFM-235 — мир на карте', () => {
     const ring = arcAt(frame.calls, c, R + 14 + 2 * pulse(n, 0))!;
     expect([ring.dash, ring.offset, ring.width]).toEqual([[3, 5], -1234 / 240, 0.75]);
     expect(ring.stroke).toBe(rgba(col, 0.12 + 0.05 * pulse(n, 0)));
+    // Пунктир кольца не уходит дальше: save() на кольцо больше нет, его возвращают руками.
+    const [, nextStroke] = frame.calls.slice(frame.calls.indexOf(ring)).filter((k) => k.name === 'stroke');
+    expect([nextStroke!.dash, nextStroke!.offset]).toEqual([[], 0]);
     // Ряд построек: плитки по центру под узлом, значок — цветом владельца.
     const xs = chipXs(home.buildings.length, c.x, 1);
     const by = chipY(c.y, R, 1);
@@ -428,7 +432,7 @@ describe('REFM-235 — схема и области', () => {
     camera.setView({ scale: 1, x: 1e6, y: 1e6 });
     worlds.drawWorlds(0, LOD());
     worlds.drawWorlds(0, LOD({ art: 0.5, detail: 0 }));
-    expect(frame.calls.filter((k) => !['save', 'restore'].includes(k.name))).toEqual([]);
+    expect(frame.calls.filter((k) => !['save', 'restore', 'getLineDash'].includes(k.name))).toEqual([]);
   });
 });
 

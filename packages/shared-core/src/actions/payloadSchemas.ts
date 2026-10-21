@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRADER_MAX_UNITS } from '../modules/trader';
+import { COALITION_DESC_MAX } from '../state/coalition';
 
 /**
  * SV-1.2 — per-action-type payload schemas, enforced at the action-layer gate BEFORE the
@@ -140,6 +141,13 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // MAPSHARE-1: договор об обмене картами — отдельное соглашение поверх лестницы
   // стоек (заключение по взаимному согласию, расторжение одностороннее).
   'diplomacy.mapshare': z.object({ target: id, on: z.boolean() }),
+  // COAL-1: отказ от предложения стойки, выход из коалиции, её эмблема и описание.
+  'diplomacy.decline': z.object({ target: id }),
+  'coalition.leave': z.object({}),
+  'coalition.edit': z.object({
+    emblem: id,
+    description: z.string().max(COALITION_DESC_MAX),
+  }),
   // --- prototype-host actions (the netserver runs the prototype's kernel) -----------
   // fleet.launch/merge/split/engage: canonical `fleetOpsModule` handles these too
   // (the missing garrison→mobile-fleet link) — not prototype-only anymore, the
@@ -304,6 +312,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
  *  with no schema (an internal scheduled action, or an unknown type) returns false — the
  *  gate then rejects it, so a client can only submit the actions it is meant to. */
 export function isValidActionPayload(type: string, payload: unknown): boolean {
+  // Wire action names must be entries in the catalog, never Object.prototype members.
+  if (!Object.hasOwn(actionPayloadSchemas, type)) return false;
   const schema = actionPayloadSchemas[type];
   if (!schema) return false;
   return schema.safeParse(payload).success;

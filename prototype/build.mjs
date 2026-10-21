@@ -862,6 +862,10 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #codexhub{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #codexhub.show{display:flex;}
+/* Справочник, открытый из хаба (из арсенала, из «Ещё»), лежит поверх хаба (#hub 52), а не за ним.
+   Класс body.hub-open ставит showHub(); в партии слои остаются прежними. */
+body.hub-open #codexhub{z-index:53;}
+body.hub-open #codex{z-index:54;}
 #codexhub .chbox{width:min(460px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--glass);
   border:1px solid var(--cyan);border-radius:10px;padding:14px 16px 12px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 #codexhub .ch-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
@@ -1077,10 +1081,10 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-switch input:focus-visible ~ .sw-track{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.35);}
 
 /* war prompt — confirm before a move declares war on a player you're at peace with */
-#warprompt,#abandon{position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;padding:18px;
+#warprompt,#abandon,#pushask{position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(20,2,1,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-#warprompt.show,#abandon.show{display:flex;}
-#warprompt .wpbox,#abandon .wpbox{width:min(360px,92vw);background:var(--glass);border:1px solid var(--red);
+#warprompt.show,#abandon.show,#pushask.show{display:flex;}
+#warprompt .wpbox,#abandon .wpbox,#pushask .wpbox{width:min(360px,92vw);background:var(--glass);border:1px solid var(--red);
   border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 44px rgba(255,90,77,.22),inset 0 0 0 1px rgba(255,90,77,.06);}
 .wp-head{font-size:15px;color:var(--red);text-shadow:0 0 10px rgba(255,90,77,.5);
   padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid #5a201a;}
@@ -1099,6 +1103,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #warprompt.calm .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
 #warprompt.calm .wp-body{color:var(--ink);}
 #warprompt.calm .wp-actions{flex-direction:column;}
+/* вопрос о push (UIX-4.4): не военный — тот же спокойный циан, «Включить» без красного */
+#pushask{background:rgba(1,10,14,.6);}
+#pushask .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
+#pushask .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
+#pushask .wp-body{color:var(--ink);}
+#pushask .wp-yes{border-color:var(--cyan-dim);background:rgba(53,214,230,.18);color:var(--cyan);}
 .lp-after{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.16);color:var(--cyan);}
 .lp-now{border:1px solid #7a5a1c;background:rgba(255,190,77,.1);color:#ffc65a;}
 /* сколько заберёт «Завершить» — цветом данных экспедиций, как кошелёк подготовки */
@@ -1108,6 +1118,66 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #diplo{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #diplo.show{display:flex;}
+/* COAL-1: окно коалиций — та же стеклянная коробка, что у дипломатии */
+#coalwin{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#coalwin.show{display:flex;}
+#coalwin .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
+  box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#coalwin .dp-head .cw-title{font-size:var(--fs-body);color:var(--cyan);margin-right:auto;}
+.cw-body{overflow:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;}
+.cw-cap{font-size:var(--fs-caption);color:var(--dim);}
+.cw-hint{font-size:var(--fs-caption);color:var(--ink);border:1px dashed var(--line);border-radius:7px;padding:7px 9px;line-height:1.5;}
+.cw-list{display:flex;flex-direction:column;gap:6px;min-height:90px;}
+.cw-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;text-align:left;
+  border:1px solid var(--line);background:rgba(53,214,230,.03);color:var(--ink);cursor:pointer;font:inherit;}
+.cw-row:hover{background:rgba(53,214,230,.08);}
+.cw-row.mine{border-color:var(--amber);}
+.cw-emb,.cw-big{flex:0 0 auto;display:grid;place-items:center;color:var(--amber);font-variant-emoji:text;
+  border:1px solid rgba(255,190,77,.45);background:rgba(255,190,77,.08);}
+.cw-emb{width:36px;height:36px;border-radius:8px;font-size:20px;}
+.cw-big{width:58px;height:58px;border-radius:12px;font-size:34px;}
+.cw-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.cw-name{font-weight:700;font-size:var(--fs-body);color:#eafffb;}
+.cw-name em{font-style:normal;font-weight:400;color:var(--amber);font-size:var(--fs-caption);}
+.cw-members,.cw-desc{font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cw-members b{font-weight:600;}
+.cw-seats{flex:0 0 auto;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);
+  border:1px solid var(--cyan-dim);border-radius:999px;padding:2px 8px;align-self:center;}
+.cw-seats.full{color:var(--amber);border-color:var(--amber);}
+.cw-hero .cw-seats{align-self:flex-start;}
+.cw-back{align-self:flex-start;background:transparent;border:0;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);cursor:pointer;padding:2px 0;}
+.cw-hero{display:flex;align-items:center;gap:12px;}
+.cw-sec{font-size:var(--fs-caption);color:var(--dim);font-weight:700;margin-top:4px;}
+.cw-mems{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:5px;}
+.cw-mem{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:var(--fs-body);color:var(--ink);}
+.cw-mem.empty{color:var(--dim);border-style:dashed;justify-content:center;}
+.cw-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.cw-pick{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
+.cw-eb{height:38px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:20px;
+  font-variant-emoji:text;cursor:pointer;}
+.cw-eb.on{color:var(--amber);border-color:var(--amber);background:rgba(255,190,77,.12);}
+#cw-text{width:100%;box-sizing:border-box;resize:vertical;background:#06181c;color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:7px 9px;font:var(--fs-body) var(--sf-font);}
+#cw-text:focus{outline:none;border-color:var(--cyan-dim);}
+.cw-text{font-size:var(--fs-body);color:var(--ink);line-height:1.5;white-space:pre-wrap;}
+.cw-acts{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;}
+.cw-save,.cw-leave{padding:7px 12px;border-radius:7px;font:700 var(--fs-caption) var(--sf-font);cursor:pointer;background:transparent;}
+.cw-save{border:1px solid var(--cyan);color:var(--cyan);}
+.cw-leave{border:1px solid var(--line);color:var(--dim);}
+.cw-leave.sure{border-color:#ff6b6b;color:#ff8f8f;}
+/* COAL-1: дипломатия внутри лички — висящие предложения и кнопки нового */
+.dp-tdip{border-top:1px solid var(--line-hi);padding:7px 10px;display:flex;flex-direction:column;gap:6px;}
+.dp-offer{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:var(--fs-caption);color:var(--ink);
+  border:1px solid var(--line);border-radius:7px;padding:6px 8px;}
+.dp-offer span{flex:1 1 140px;}
+.dp-offer.in{border-color:var(--amber);background:rgba(255,190,77,.07);}
+.dp-offer.out{color:var(--dim);}
+.dp-dec{padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);cursor:pointer;}
+.dp-propose{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
+.dp-cvnone{font-size:var(--fs-caption);color:var(--dim);padding:8px 6px;line-height:1.5;}
 #diplo .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
   border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
   box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
@@ -1689,6 +1759,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #log{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:10px 14px;
   font:var(--fs-caption)/1.6 var(--sf-font);font-variant-numeric:tabular-nums;color:#73b6a2;scrollbar-width:thin;}
 #log div::before{content:"> ";color:var(--grn-dim);}
+/* UIX-4.2: «Ждёт решения» над журналом — бои и письма с кнопкой «Показать» */
+#log-pending:empty{display:none;}
+#log-pending{padding:10px 14px;border-bottom:1px solid var(--line-hi);display:flex;flex-direction:column;gap:6px;}
+.lw-pend-title{font-size:var(--fs-caption);color:var(--cyan);}
+.lw-pend-row{display:flex;align-items:center;gap:10px;font-size:var(--fs-body);color:var(--fg,#d8f3ee);}
+.lw-pend-row span{flex:1;min-width:0;}
+.lw-pend-show{flex:none;min-height:44px;padding:0 14px;}
 
 /* technologies + steward + heroes windows (modal, mirror #logwin) */
 #tech,#steward,#battlewin{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
@@ -1849,6 +1926,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #battlewinbody .bw-balance{margin-bottom:10px;}
 #battlewinbody .bw-bal{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05);}
 #battlewinbody .bw-bal i{display:block;min-width:3px;transition:flex .6s ease;}
+/* UIX-12.1: своя доля отличается штриховкой, а не только цветом */
+#battlewinbody .bw-bal i.mine{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.38) 0 3px,transparent 3px 7px) !important;}
 #battlewinbody .bw-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:var(--fs-body);color:var(--dim);}
 #battlewinbody .bw-legend span{display:inline-flex;align-items:center;gap:5px;}
 #battlewinbody .bw-legend span.mine{color:var(--cyan);font-weight:700;}
@@ -2601,6 +2680,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cw-feed{flex:1;min-height:0;overflow:auto;padding:9px 11px;display:flex;flex-direction:column;gap:6px;
   border-top:1px solid var(--line-hi);scrollbar-width:thin;}
 #chatwin .dp-line{font-size:inherit;}
+/* Свой цвет шрифта (премиум): только текст реплик, служебные строки и пинги — своим цветом. */
+#chatwin .dp-line:not(.sys,.ping){color:var(--cw-ink,#cfe7e3);}
 .cw-empty{color:var(--dim);font-size:var(--fs-caption);text-align:center;margin:auto;padding:14px;line-height:1.5;}
 .cw-compose{display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--line-hi);flex:0 0 auto;}
 .cw-compose input{flex:1;min-width:0;padding:7px 9px;background:rgba(2,10,14,.9);border:1px solid var(--line-hi);
@@ -2716,6 +2797,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */
   #diplo .dp-head b{display:none;}
   #diplo .dp-tab{padding:6px 9px;}
+  /* COAL-1: карточка предложения — текст строкой, «принять/отказаться» поровну под ним */
+  .dp-offer span{flex-basis:100%;}
+  .dp-offer .dp-acc,.dp-offer .dp-dec{flex:1;}
   #side{right:0;left:0;bottom:0;top:auto;width:auto;max-height:50vh;z-index:28;clip-path:none;
     border-left:0;border-right:0;border-top:1px solid var(--cyan);
     padding-bottom:env(safe-area-inset-bottom,0px);}
@@ -2867,6 +2951,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .cpass-toggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-3px;}
 #connect .cpass-slash{display:none;}
 #connect .cpass-toggle[data-visible="true"] .cpass-slash{display:block;}
+#connect .authform input[aria-invalid="true"]{border-color:#ff6b78;box-shadow:0 0 0 1px #ff6b78;}
+#connect .authform input[aria-invalid="true"]:focus{border-color:#ff6b78;box-shadow:0 0 0 2px rgba(255,107,120,.3);}
 #connect .cstat{margin-top:14px;min-height:16px;font-size:var(--fs-body);color:var(--amber);text-align:center;}
 /* The status line reserves its row so an appearing message doesn't shove the card's
    buttons down. On a freshly opened welcome card there IS no message, and the reserved
@@ -2966,8 +3052,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .msolo{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 8px 16px;text-align:center;}
 #connect .msolo .mbtn{min-height:46px;padding:0 20px;}
 #connect .msolo-sub{font-size:14px;line-height:1.45;color:var(--sf-dim);}
-/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне «Войти»
-   стоит рядом с картой, и строка под ней — во всю ширину; две кнопки своих вкладок — своим рядом.
+/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне кнопки
+   входа, описания и архива стоят своим рядом, чтобы не сжимать название карты.
    На ПК кнопки справа от обеих строк (bridge-shell.css). */
 #connect .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name btns" "meta meta";
   align-items:center;gap:6px 12px;padding:12px 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
@@ -2989,8 +3075,22 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .mwin{color:var(--sf-accent);}
 #connect .mwin.soon{color:var(--amber,#e0a942);}
 #connect .mwin.shut{color:var(--sf-dim);text-decoration:line-through;}
-#connect .mbtns{grid-area:btns;justify-self:end;display:flex;gap:6px;}
+#connect .mbtns{grid-area:btns;justify-self:end;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;}
 #connect .mbtn{min-height:44px;padding:0 16px;border-radius:12px;font-size:15px;white-space:nowrap;}
+/* The browser and home hub share one native, keyboard-accessible details dialog. */
+#match-description{box-sizing:border-box;width:min(520px,calc(100% - 32px));max-width:none;max-height:calc(100dvh - 48px);
+  margin:auto;padding:22px;color:var(--sf-text);background:var(--sf-panel),#07121d;border:1px solid var(--sf-edge-hi);
+  border-radius:16px;font:16px/1.5 var(--sf-font);box-shadow:var(--sf-shadow);overflow-y:auto;overflow-wrap:anywhere;}
+#match-description::backdrop{background:rgba(2,8,14,.82);backdrop-filter:blur(3px);}
+#match-description h2{margin:0 0 14px;font-size:20px;color:var(--sf-hi);}
+#match-description h3{margin:0;font-size:18px;color:var(--sf-hi);}
+#match-description p{margin:8px 0 16px;color:var(--sf-dim);}
+#match-description dl{margin:16px 0 20px;}
+#match-description dl > div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--sf-edge);}
+#match-description dt{color:var(--sf-dim);}
+#match-description dd{margin:0;}
+#match-description .mbtn{width:100%;min-height:44px;border-radius:12px;font:inherit;}
 /* «Новый матч» — у нижнего края, только над загруженными «Доступными». */
 #connect .mcreate{order:5;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
   padding-top:12px;border-top:1px solid var(--sf-edge);}
@@ -3449,7 +3549,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
    clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
+  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#pushask,#diplo,#coalwin,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 }
 /* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
@@ -3575,6 +3675,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   font-size:26px;font-weight:300;color:var(--sf-accent);}
 #hub .hub-mode:hover{border-color:var(--sf-edge-hi);}
 #hub .hub-mode:active{transform:translateY(1px);}
+#hub .hub-discord{text-decoration:none;}
+#hub .hub-discord svg.ht-ic{width:22px;height:22px;}
+#hub .hub-discord:focus-visible{outline:2px solid var(--sf-accent);outline-offset:3px;}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 #solo-replace{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:#000b;padding:20px;}
@@ -3670,6 +3773,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #profile .pf-who{flex:1;min-width:0;}
 #profile .pf-nm{font-size:20px;color:var(--sf-hi);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #profile .pf-sub{font-size:14px;color:var(--sf-dim);margin-top:4px;line-height:1.4;}
+/* Рамка «Премиум» (бонус премиум-аккаунта): золотая кайма шапки и метка под позывным —
+   её видят все, кто открывает профиль. */
+#profile .pf-top.premium{border-bottom-color:color-mix(in srgb,var(--cur-sovereigns) 60%,transparent);
+  background:linear-gradient(100deg,color-mix(in srgb,var(--cur-sovereigns) 12%,transparent),transparent 60%),var(--sf-card-off);}
+#profile .pf-top.premium .pf-av{border-color:var(--cur-sovereigns);box-shadow:0 0 0 2px color-mix(in srgb,var(--cur-sovereigns) 35%,transparent);}
+#profile .pf-prem{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:1px 9px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--cur-sovereigns) 60%,transparent);color:var(--cur-sovereigns);font-size:var(--fs-caption);font-weight:600;}
 /* Sovereigns capsule — the premium currency reads GOLD everywhere it appears
    (the hub wallet's plaque), never the UI's cyan. */
 #profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border-radius:999px;
@@ -3706,18 +3816,332 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
-/* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
-#hp-arsenal{overflow-y:auto;gap:10px;}
+/* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
+   каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
+   Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт
+   колонкой под зумом. Вкладка прокручивается сама, поэтому карточка справа держится на виду. */
+#hp-arsenal{height:100%;overflow-y:auto;overscroll-behavior:contain;gap:16px;container:arsenal / size;}
+:is(#hp-arsenal,#arsenal-sheet){--rar:var(--sf-dim);color:var(--sf-text);}
+:is(#hp-arsenal,#arsenal-sheet) .r-simple{--rar:var(--rar-simple);}
+:is(#hp-arsenal,#arsenal-sheet) .r-unique{--rar:var(--rar-unique);}
+:is(#hp-arsenal,#arsenal-sheet) .r-mythic{--rar:var(--rar-mythic);}
+:is(#hp-arsenal,#arsenal-sheet) .r-legendary{--rar:var(--rar-legendary);}
+:is(#hp-arsenal,#arsenal-sheet) :is(.btn-main,.btn-second,.btn-quiet){min-height:44px;padding:0 16px;border-radius:10px;
+  font-size:var(--fs-body);}
+:is(#hp-arsenal,#arsenal-sheet) .btn-quiet{padding:0 6px;}
+.ar-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;}
+.ar-head h2{margin:0;font-size:var(--fs-title);font-weight:700;color:var(--sf-hi);}
+.ar-rule{margin:4px 0 0;max-width:60ch;color:var(--sf-dim);line-height:1.5;}
+.ar-tabs{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);}
+.ar-tab{min-height:44px;padding:0 16px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;font:600 var(--fs-heading) var(--sf-font);white-space:nowrap;}
+.ar-tab small{font-size:var(--fs-caption);font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--sf-edge);}
+.ar-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.ar-tab[aria-selected="true"] small{border-color:var(--sf-edge-hi);}
+.ar-status{margin:0;color:var(--sf-dim);line-height:1.5;}
+.ar-status.error{color:var(--red);}
+/* Цель мастерской — верстак над модулями: чего не хватает и кнопка сборки. */
+.ar-goal{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"ic t act" "ic m act";gap:8px 18px;
+  align-items:center;padding:14px 16px;border-radius:14px;border:1px solid var(--sf-panel-edge);
+  background:linear-gradient(120deg,color-mix(in srgb,var(--sf-accent) 9%,transparent),transparent 65%),var(--sf-card);}
+.ar-goal.empty{grid-template-areas:"ic t act";}
+.ar-goal-ic{grid-area:ic;width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:28px;
+  background:color-mix(in srgb,var(--rar) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.ar-goal.empty .ar-goal-ic{font-size:24px;color:var(--sf-dim);}
+.ar-goal-t{grid-area:t;min-width:0;}
+.ar-goal-t > b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.ar-goal-t p{margin:2px 0 0;color:var(--sf-dim);}
+.ar-goal-k{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-goal-n{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;}
+.ar-goal-n b{font-size:var(--fs-heading);color:var(--sf-hi);}
+.ar-goal .ar-mats{grid-area:m;}
+.ar-goal-act{grid-area:act;display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:220px;}
+.ar-goal-p{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-goal-p b{color:var(--sf-hi);font-weight:600;}
+.ar-row2{display:flex;gap:8px;}
+.ar-row2 > *{flex:1;}
+.ar-mats{display:flex;flex-wrap:wrap;gap:6px;}
+.ar-mat{display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:3px 10px;border-radius:8px;
+  border:1px solid var(--sf-edge);background:var(--sf-inset);font-size:var(--fs-caption);}
+.ar-mat b{font-weight:600;color:var(--sf-hi);}
+.ar-mat.short{border-color:color-mix(in srgb,var(--amber) 55%,transparent);}
+.ar-mat.short b{color:var(--amber);}
+.ar-mat.done b{color:var(--grn);}
+.ar-bar{display:block;height:6px;border-radius:3px;background:color-mix(in srgb,var(--sf-accent) 14%,transparent);overflow:hidden;}
+.ar-bar i{display:block;height:100%;border-radius:3px;background:var(--sf-accent);}
+.ar-bar.ok i{background:var(--grn);}
+.ar-guest{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;align-items:center;padding:16px;
+  border-radius:14px;border:1px solid var(--sf-panel-edge);background:var(--sf-card);}
+.ar-guest b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.ar-guest p{margin:4px 0 0;color:var(--sf-dim);line-height:1.5;}
+/* Список и карточка выбранного: рядом на широкой вкладке, одной колонкой на узкой. */
+.ar-main{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start;}
+.ar-list{display:flex;flex-direction:column;gap:20px;min-width:0;}
+.ar-group-h{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line);
+  font-size:var(--fs-heading);font-weight:600;color:var(--sf-head);}
+.ar-group-h small{font-size:var(--fs-caption);font-weight:500;color:var(--sf-dim);padding:2px 8px;border-radius:999px;border:1px solid var(--sf-edge);}
+.ar-group-h small.zero{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 50%,transparent);}
+.ar-mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:10px;}
+.ar-hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:10px;}
+.ar-mc{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:4px 10px;align-items:start;min-height:78px;padding:12px;
+  border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;
+  font:var(--fs-body)/1.35 var(--sf-font);}
+.ar-mc-ic{grid-column:1;grid-row:1 / span 3;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;font-size:21px;
+  background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.ar-mc-nm{grid-column:2;grid-row:1;font-weight:600;color:var(--sf-hi);}
+.ar-mc-sub{grid-column:2 / -1;grid-row:2;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:var(--fs-caption);}
+.ar-rw{color:var(--rar);}
+.ar-get{grid-column:2 / -1;grid-row:3;display:flex;align-items:center;gap:8px;margin-top:4px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-get .ar-bar{flex:1;max-width:96px;}
+.ar-get.ready{color:var(--grn);}
+.ar-tag{grid-column:3;grid-row:1;white-space:nowrap;font-size:var(--fs-caption);font-weight:600;line-height:18px;padding:1px 8px;
+  border-radius:999px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);color:var(--sf-hi);}
+.ar-tag.goal{border-color:var(--sf-accent);color:var(--sf-accent);}
+.ar-mc.miss{border-style:dashed;background:var(--sf-card-off);}
+.ar-mc.miss .ar-mc-ic{filter:grayscale(1);opacity:.55;background:transparent;box-shadow:inset 0 0 0 1px var(--sf-edge);}
+.ar-mc.miss .ar-mc-nm{color:var(--sf-text);}
+.ar-mc.goal{border-color:color-mix(in srgb,var(--sf-accent) 70%,transparent);}
+.ar-hc{display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:12px;border:1px solid var(--sf-edge);
+  background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;font:var(--fs-body)/1.35 var(--sf-font);}
+.ar-hc .ship-art,.ar-noart{display:block;width:100%;aspect-ratio:16 / 10;max-height:none;margin:0;border:0;border-radius:0;background:var(--sf-inset);}
+.ar-hc-b{display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px;}
+.ar-hc-nm{font-weight:600;color:var(--sf-hi);}
+.ar-hc.miss{border-style:dashed;background:var(--sf-card-off);}
+.ar-hc.miss .ship-art{filter:grayscale(.85);opacity:.6;}
+.ar-pips{display:flex;flex-wrap:wrap;gap:5px;}
+.ar-pip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 7px;border-radius:7px;border:1px dashed var(--sf-edge);
+  font-size:var(--fs-caption);}
+.ar-pip i{font-style:normal;}
+.ar-pip.none{border-color:transparent;padding:0;color:var(--sf-dim);}
+:is(.ar-mc,.ar-hc,.ar-fchip,.ar-mchip):hover{border-color:var(--sf-edge-hi);}
+:is(.ar-mc,.ar-hc)[aria-pressed="true"]{border-color:var(--sf-edge-hi);background:var(--sf-sel);}
+:is(.ar-tab,.ar-mc,.ar-hc,.ar-fchip,.ar-mchip):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+/* Карточка выбранного. Справа она липнет к верху вкладки и прокручивается сама. */
+.ar-detail{position:sticky;top:0;max-height:calc(100cqh - 2px);overflow-y:auto;overscroll-behavior:contain;padding:18px;border-radius:14px;
+  border:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);}
+.ar-detail:empty{display:none;}
+@container arsenal (min-width:700px){.ar-main{grid-template-columns:minmax(0,1fr) minmax(320px,380px);}}
+.ar-dt{display:flex;flex-direction:column;gap:16px;}
+.ar-dt-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;}
+.ar-dt-ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:26px;
+  background:color-mix(in srgb,var(--rar) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.ar-dt-ic.miss{filter:grayscale(1);opacity:.6;}
+.ar-dt h3{margin:0;font-size:var(--fs-title);line-height:1.25;color:var(--sf-hi);text-wrap:balance;}
+.ar-dt-meta{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:2px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-dt-meta .ar-rw{font-weight:600;}
+.ar-dt > .ship-art{max-height:180px;margin:0;border-radius:12px;border-color:var(--sf-edge);}
+.ar-dt-eff{display:flex;flex-wrap:wrap;gap:6px;}
+.ar-dt-eff span{padding:6px 12px;border-radius:9px;border:1px solid var(--sf-edge);background:var(--sf-inset);color:var(--sf-hi);font-weight:600;}
+.ar-sec{display:flex;flex-direction:column;gap:8px;}
+.ar-sec h4{margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
+.ar-sec h4 small{font-size:var(--fs-caption);font-weight:500;color:var(--sf-dim);}
+.ar-note{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.ar-note.warn{color:var(--amber);}
+.ar-fits,.ar-mchips,.ar-bays{display:flex;flex-wrap:wrap;gap:8px;}
+.ar-fchip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:3px 10px 3px 3px;border-radius:9px;
+  border:1px solid var(--sf-edge);background:var(--sf-inset);color:var(--sf-text);font:var(--fs-caption) var(--sf-font);cursor:pointer;}
+span.ar-fchip{cursor:default;}
+.ar-fchip .ship-art--thumb{width:42px;height:28px;border-radius:6px;border:0;}
+.ar-mchip{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;border-radius:9px;border:1px solid var(--sf-edge);
+  background:var(--sf-inset);color:var(--sf-text);font:var(--fs-caption) var(--sf-font);cursor:pointer;}
+.ar-mchip.miss{border-style:dashed;color:var(--sf-dim);}
+.ar-mchip.miss .ar-mi{filter:grayscale(1);opacity:.6;}
+.ar-rd{width:7px;height:7px;border-radius:50%;background:var(--rar);}
+.ar-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+.ar-stat{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--sf-inset);}
+.ar-stat span{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-stat b{color:var(--sf-hi);white-space:nowrap;}
+.ar-bay{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:9px;border:1px dashed var(--sf-edge-hi);}
+.ar-bay i{font-style:normal;}
+.ar-bay b{color:var(--sf-hi);}
+.ar-copies,.ar-ways,.ar-rows{display:flex;flex-direction:column;gap:6px;}
+.ar-ways{gap:8px;}
+.ar-copy{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:10px 12px;border-radius:10px;
+  border:1px solid var(--line);background:var(--sf-inset);}
+.ar-copy b{display:block;font-weight:600;color:var(--sf-hi);}
+.ar-copy-st{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-copy-st.ok{color:var(--grn);}
+.ar-copy-st.bound{color:var(--cur-sovereigns);}
+.ar-acts,.ar-acts-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.ar-way{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);}
+.ar-way-h{display:flex;align-items:center;gap:10px;}
+.ar-way-h i{flex:0 0 auto;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-style:normal;
+  border:1px solid var(--sf-edge);background:var(--sf-inset);}
+.ar-way-h b{flex:1;font-weight:600;color:var(--sf-hi);}
+.ar-way-h small{font-size:var(--fs-caption);color:var(--sf-dim);}
+.ar-way p{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.ar-mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;font-size:var(--fs-caption);}
+.ar-mrow b{font-weight:600;color:var(--sf-hi);}
+.ar-mrow b.lack{color:var(--amber);}
+.ar-mrow .ar-bar{grid-column:1 / -1;height:4px;}
+.ar-tagline{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:9px;border:1px solid var(--sf-accent);
+  color:var(--sf-accent);font-size:var(--fs-caption);font-weight:600;}
+.ar-confirm{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);}
+.ar-confirm p{margin:0;}
+/* Узкая вкладка (телефон): одна колонка, карточка выбранного уходит в шторку. */
+@container arsenal (max-width:699px){
+  .ar-head{align-items:stretch;}
+  .ar-tabs{display:flex;width:100%;}
+  .ar-tab{flex:1;padding:0 8px;gap:7px;}
+  .ar-goal{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ic t" "m m" "act act";gap:10px 12px;padding:12px;}
+  .ar-goal.empty{grid-template-areas:"ic t" "act act";}
+  .ar-goal-ic{width:46px;height:46px;font-size:23px;}
+  .ar-goal-act{min-width:0;}
+  .ar-guest{grid-template-columns:1fr;}
+  .ar-mgrid{grid-template-columns:1fr;gap:8px;}
+  .ar-hgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .ar-hc-b{padding:8px 10px 10px;gap:5px;}
+}
+/* Шторка телефона — поверх хаба, вне его прокрутки: стекло тела хаба (backdrop-filter)
+   сделало бы fixed-потомка частью себя. */
+#arsenal-sheet{position:fixed;inset:0;z-index:5;display:none;}
+#arsenal-sheet.open{display:block;}
+.ar-scrim{position:absolute;inset:0;background:rgba(1,5,9,.6);}
+.ar-sheet{position:absolute;left:0;right:0;bottom:0;max-height:86%;display:flex;flex-direction:column;
+  border-radius:20px 20px 0 0;border-top:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);
+  padding-bottom:env(safe-area-inset-bottom,0px);animation:ar-rise .22s ease-out;}
+.ar-sheet-top{position:relative;display:flex;justify-content:flex-end;padding:8px 10px 0;}
+.ar-sheet-top::before{content:"";position:absolute;left:50%;top:10px;width:40px;height:4px;border-radius:2px;background:var(--sf-edge);
+  transform:translateX(-50%);}
+.ar-sheet-top .btn-x{width:44px;height:44px;border-radius:10px;font-size:18px;}
+.ar-sheet-body{overflow-y:auto;overscroll-behavior:contain;padding:0 16px 22px;}
+@keyframes ar-rise{from{transform:translateY(32px);opacity:0;}}
+@media (prefers-reduced-motion:reduce){.ar-sheet{animation:none;}}
+/* Палец: цели от 44 px (UIX-1.3). */
+@media (pointer:coarse){
+  :is(#hp-arsenal,#arsenal-sheet) :is(.ar-fchip,.ar-mchip,.ar-tagline){min-height:44px;}
+}
+/* «Магазин» хаба (заказ владельца 2026-10-20, макет одобрен): разделы, полка и карточка
+   товара рядом, на телефоне шторкой (те же .ar-sheet, что у Арсенала). Раскладку решает
+   ширина вкладки: на широкой разделы колонкой слева, на средней строкой сверху. */
+#hp-shop{height:100%;overflow-y:auto;overscroll-behavior:contain;gap:14px;container:shop / size;}
+:is(#hp-shop,#shop-sheet){--rar:var(--sf-dim);color:var(--sf-text);}
+:is(#hp-shop,#shop-sheet) .r-simple{--rar:var(--rar-simple);}
+:is(#hp-shop,#shop-sheet) .r-unique{--rar:var(--rar-unique);}
+:is(#hp-shop,#shop-sheet) .r-mythic{--rar:var(--rar-mythic);}
+:is(#hp-shop,#shop-sheet) .r-legendary{--rar:var(--rar-legendary);}
+:is(#hp-shop,#shop-sheet) :is(.btn-main,.btn-second,.btn-quiet){min-height:44px;padding:0 16px;border-radius:10px;
+  font-size:var(--fs-body);display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+:is(#hp-shop,#shop-sheet) .btn-quiet{padding:0 6px;}
+.sh-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;}
+.sh-head h2{margin:0;font-size:var(--fs-title);font-weight:700;color:var(--sf-hi);}
+.sh-wallet{display:flex;flex-wrap:wrap;gap:8px;}
+.sh-cur{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--sf-edge);
+  background:var(--sf-inset);font-weight:600;font-variant-numeric:tabular-nums;}
+.sh-cur i{display:inline-flex;width:16px;height:16px;font-style:normal;align-items:center;justify-content:center;}
+.sh-cur i svg,.sh-sv svg,.sh-sov i svg,.sh-art-sov i svg{width:100%;height:100%;}
+.sh-cur.sov{color:var(--cur-sovereigns);border-color:color-mix(in srgb,var(--cur-sovereigns) 45%,transparent);}
+.sh-cur.war{color:var(--cur-warrants);}
+.sh-cur.prem{color:var(--cur-sovereigns);}
+.sh-status{margin:0;color:var(--sf-dim);line-height:1.5;}
+.sh-status.error{color:var(--red);}
+.sh-main{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;}
+.sh-tabs{display:flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);
+  overflow-x:auto;scrollbar-width:none;}
+.sh-tab{flex:1 0 auto;min-height:44px;padding:0 14px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 var(--fs-body) var(--sf-font);white-space:nowrap;}
+.sh-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.sh-tab-ic{display:inline-grid;place-items:center;width:18px;font-size:15px;}
+.sh-sv{display:inline-flex;width:16px;height:16px;color:var(--cur-sovereigns);font-style:normal;}
+.sh-gem{display:inline-flex;vertical-align:-2px;width:1em;height:1em;margin:0 1px;color:var(--cur-sovereigns);font-style:normal;}
+.btn-main .sh-gem{color:inherit;}
+.sh-gem svg{width:100%;height:100%;}
+.sh-list{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.sh-hint{margin:0;color:var(--sf-dim);font-size:var(--fs-caption);line-height:1.5;}
+.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:10px;}
+.sh-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:148px;padding:12px;
+  border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);text-align:left;cursor:pointer;
+  font:var(--fs-body)/1.35 var(--sf-font);}
+.sh-card:hover{border-color:var(--sf-edge-hi);}
+.sh-card[aria-pressed="true"]{border-color:var(--sf-edge-hi);background:var(--sf-sel);}
+:is(.sh-card,.sh-tab):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+.sh-card.off{border-style:dashed;background:var(--sf-card-off);}
+.sh-tag{position:absolute;top:8px;right:8px;font-size:var(--fs-caption);font-weight:600;line-height:18px;padding:1px 8px;
+  border-radius:999px;border:1px solid var(--cur-sovereigns);color:var(--cur-sovereigns);background:var(--sf-inset);}
+.sh-art{display:flex;align-items:center;gap:4px;min-height:40px;}
+.sh-art i{font-style:normal;}
+.sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
+.sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
+.sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
+  background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
+.sh-mi.own{filter:grayscale(1);opacity:.5;}
+/* Материалы — ромбы своего цвета: в игре у них нет иконок, а цвет различает их в наборе. */
+.sh-mat{width:15px;height:15px;margin:0 4px;border-radius:3px;transform:rotate(45deg);background:var(--mc);
+  box-shadow:0 0 6px color-mix(in srgb,var(--mc) 50%,transparent);}
+.m-ferroalloys{--mc:#b9c6cf;}
+.m-technical_composites{--mc:#7fd38a;}
+.m-control_circuits{--mc:#62b6ff;}
+.m-energy_cells{--mc:#f2c14e;}
+.m-technology_archives{--mc:#c39bff;}
+.sh-nm{font-weight:600;color:var(--sf-hi);}
+.sh-gold .sh-sov{font-size:var(--fs-heading);}
+.sh-sub{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-price{margin-top:auto;display:flex;align-items:baseline;justify-content:flex-end;gap:8px;width:100%;}
+.sh-price s{font-size:var(--fs-caption);color:var(--sf-dim);}
+.sh-sov{display:inline-flex;align-items:center;gap:4px;color:var(--cur-sovereigns);font-weight:700;font-variant-numeric:tabular-nums;}
+.sh-sov i{display:inline-flex;width:14px;height:14px;}
+.btn-main .sh-sov,.btn-main[disabled] .sh-sov{color:inherit;}
+.sh-pill{font-size:var(--fs-caption);font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid var(--sf-edge);color:var(--sf-dim);}
+.sh-pill:is(.free,.on){color:var(--grn);border-color:color-mix(in srgb,var(--grn) 50%,transparent);}
+.sh-prem{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px;border:1px solid var(--sf-panel-edge);
+  background:linear-gradient(120deg,color-mix(in srgb,var(--cur-sovereigns) 10%,transparent),transparent 65%),var(--sf-card);}
+.sh-prem-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;}
+.sh-prem-h b{font-size:var(--fs-heading);color:var(--sf-hi);}
+.sh-prem ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 16px;}
+.sh-prem li{position:relative;padding-left:18px;line-height:1.45;}
+.sh-prem li::before{content:"✓";position:absolute;left:0;color:var(--grn);}
+.sh-prem .btn-main{align-self:flex-start;}
+.sh-note{margin:0;font-size:var(--fs-caption);line-height:1.5;color:var(--sf-dim);}
+.sh-guest{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;align-items:center;padding:16px;
+  border-radius:14px;border:1px solid var(--sf-panel-edge);background:var(--sf-card);}
+.sh-guest b{display:block;font-size:var(--fs-heading);color:var(--sf-hi);}
+.sh-guest p{margin:4px 0 0;color:var(--sf-dim);line-height:1.5;}
+.sh-detail{position:sticky;top:0;max-height:calc(100cqh - 2px);overflow-y:auto;overscroll-behavior:contain;padding:18px;border-radius:14px;
+  border:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);}
+.sh-detail:empty{display:none;}
+.sh-dt{display:flex;flex-direction:column;gap:14px;}
+.sh-dt h3{margin:0;font-size:var(--fs-title);line-height:1.25;color:var(--sf-hi);text-wrap:balance;}
+.sh-dt h3 .sh-sov{font-size:inherit;}
+.sh-dt h3 .sh-sov i{width:20px;height:20px;}
+.sh-lines{display:flex;flex-direction:column;}
+.sh-line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);}
+.sh-line span{display:inline-flex;align-items:center;gap:8px;color:var(--sf-dim);}
+.sh-line b{font-weight:600;color:var(--sf-hi);text-align:right;}
+.sh-line s{font-weight:400;color:var(--sf-dim);}
+.sh-mline span{color:var(--sf-text);}
+.sh-mline .sh-mi{width:28px;height:28px;font-size:14px;}
+.sh-mline b{color:var(--rar);}
+.sh-sec{margin:10px 0 0;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
+.sh-acts{display:flex;flex-direction:column;gap:8px;}
+.sh-confirm{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--sf-edge-hi);background:var(--sf-inset);}
+.sh-confirm p{margin:0;}
+.sh-row2{display:flex;gap:8px;}
+.sh-row2 > *{flex:1;}
+@container shop (min-width:700px){
+  .sh-main{grid-template-columns:minmax(0,1fr) minmax(300px,350px);}
+  .sh-tabs{grid-column:1 / -1;}
+}
+@container shop (min-width:980px){
+  .sh-main{grid-template-columns:184px minmax(0,1fr) minmax(300px,360px);}
+  .sh-tabs{grid-column:auto;position:sticky;top:0;flex-direction:column;}
+  .sh-tab{flex:0 0 auto;justify-content:flex-start;}
+}
+@container shop (max-width:520px){
+  /* four tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen */
+  .sh-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+  .sh-tab{flex-direction:column;gap:2px;min-height:52px;padding:6px 2px;font-size:var(--fs-caption);}
+}
+@container shop (max-width:699px){
+  .sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .sh-card{min-height:128px;padding:10px;}
+  .sh-guest{grid-template-columns:1fr;}
+  .sh-prem ul{grid-template-columns:1fr;}
+}
+#shop-sheet{position:fixed;inset:0;z-index:5;display:none;}
+#shop-sheet.open{display:block;}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:var(--fs-caption)}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
 #hp-supply{overflow-y:auto;gap:16px;padding-bottom:24px}.me-section{display:flex;flex-direction:column;gap:10px}.me-section h3,.me-section h4{margin:0}.me-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.me-head h2{margin:0;color:var(--cyan);font-size:20px}.me-hint{margin:0;color:var(--dim);font-size:var(--fs-caption);line-height:1.45}.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}.me-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--glass)}.me-card.me-goal{border-color:var(--cyan)}.me-card h4{margin:0}.me-amounts{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.me-amounts span,.me-row span{color:var(--dim)}.me-row{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-caption)}.me-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}#hp-supply button{min-height:40px;padding:8px 12px;border:1px solid var(--cyan-dim);border-radius:6px;background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer}#hp-supply button:disabled{opacity:.45;cursor:default}#hp-supply button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.me-badge{color:var(--cyan);font-size:var(--fs-caption)}.me-bound{color:#e8b869;font-size:var(--fs-caption);margin:0}.me-error{color:#ef9b9b}.me-track{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}.me-level{border-top:1px solid var(--line);padding-top:10px}.me-track details>summary{cursor:pointer;padding:8px 0}.me-material-list{display:grid;gap:6px}.me-select{width:100%;padding:8px;background:#07131b;color:var(--ink);border:1px solid var(--line);border-radius:6px}.me-reward{margin:0;padding-left:18px;font-size:var(--fs-caption);color:var(--dim)}
-.ar-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid var(--line);}
-.ar-fchip{padding:3px 9px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--dim);
-  font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.ar-fchip.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
-.ar-fsep{width:1px;height:14px;background:var(--line-hi);margin:0 2px;}
-/* arsenal cards carry a third line (badges + origin) — a touch taller than a hub tile */
-.ar-grid .ar-card{min-height:76px;}
-.ar-meta{color:var(--dim);font-size:var(--fs-caption);}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
   padding-bottom:env(safe-area-inset-bottom,0);}
 #hub .hub-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;cursor:pointer;
@@ -3906,7 +4330,7 @@ ${profileCss}
     --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
-  #settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
+  #settings,#warprompt,#abandon,#pushask,#diplo,#coalwin,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
      весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
@@ -3946,6 +4370,7 @@ ${profileCss}
   #settings .setbox{width:min(380px,61vw);max-height:57vh;}
   #warprompt .wpbox{width:min(360px,61vw);}
   #diplo .dpbox{width:53.4vw;max-height:58.5vh;}
+  #coalwin .dpbox{width:min(460px,40vw);max-height:58.5vh;}
   .dp-convo{height:min(41vh,440px);}
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
@@ -4190,6 +4615,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-dossier" type="button" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
     <button id="rail-diplo">⬡<span class="rlbl" data-i18n="rail.diplo.title"></span></button>
     <button id="rail-msgs">✉<span class="rlbl" data-i18n="rail.msgs.title"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-coal">⛨<span class="rlbl" data-i18n="rail.coal.title"></span></button>
     <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
     <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>
     <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
@@ -4210,7 +4636,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </nav>
 <!-- floating chat window (desktop only) — content rendered by renderChat() in main.ts -->
 <div id="chatwin" class="desk-only"></div>
-<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close btn-x">✕</button></div><div id="log"></div></div></div>
+<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close btn-x">✕</button></div><div id="log-pending"></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
 <div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="techbody"></div></div></div>
 <div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
@@ -4271,7 +4697,14 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div class="wp-reward" id="abandon-reward" hidden></div>
   <div class="wp-actions"><button type="button" id="abandon-stay" class="wp-no"></button><button type="button" id="abandon-menu" class="wp-no" data-i18n="run.exit.menu" hidden></button><button type="button" id="abandon-go" class="wp-yes" data-i18n="run.abandon.go"></button></div>
 </div></div>
+<!-- Вопрос о push-уведомлениях (UIX-4.4, pushSetup.ts): после первой спокойной своей новости в сетевой партии -->
+<div id="pushask" role="dialog" aria-modal="true" aria-labelledby="pushask-title"><div class="wpbox">
+  <div class="wp-head" id="pushask-title" data-i18n="push.ask.title"></div>
+  <div class="wp-body" data-i18n="push.ask.text"></div>
+  <div class="wp-actions"><button type="button" id="pushask-no" class="wp-no" data-i18n="push.ask.no"></button><button type="button" id="pushask-yes" class="wp-yes" data-i18n="push.ask.yes"></button></div>
+</div></div>
 <div id="diplo"></div>
+<div id="coalwin" role="dialog" data-i18n-aria="coal.win.title"></div>
 <div id="pingpop"></div>
 <!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (fleetCard.ts, renderStatPop) -->
 <div id="statpop" role="dialog" aria-live="polite"></div>
@@ -4449,7 +4882,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go"></button>
         </div>
       </div>
-      <div id="cstatus" class="cstat"></div>
+      <div id="cstatus" class="cstat" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
     <button id="cupd" class="cupd" type="button" style="display:none" data-i18n="welcome.update-check"></button>
     <div id="cver" class="cver"></div>
@@ -4623,8 +5056,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
-    <div class="hub-panel" id="hp-arsenal" style="display:none"><button id="arsenal-supply" class="hub-solo" type="button" data-i18n="hub.tile.supply"></button><div id="arsenal-items"></div></div>
+    <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
+    <div class="hub-panel" id="hp-shop" style="display:none"></div>
     <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
@@ -4635,6 +5069,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
         <!-- UIX-10.1: рейтинг и друзья — из нижней панели сюда, вкладок пять вместо семи -->
+        <button class="hub-tile" id="hub-shop" type="button"><span class="ht-ic">◈</span><span data-i18n="hub.tile.shop"></span></button>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
@@ -4652,6 +5087,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <a class="hub-tile" id="hub-privacy" data-i18n="welcome.privacy"></a>
         <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
+      ${external ? '' : `<!-- Контакты: ссылки наружу, отдельным блоком под плитками -->
+      <div class="hub-sec" data-i18n="hub.contacts"></div>
+      <div class="hub-grid">
+        <a class="hub-tile hub-discord" id="hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer" data-i18n-title="hub.discord.desc"><svg class="ht-ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.32 4.37A19.8 19.8 0 0 0 15.4 2.85a13.7 13.7 0 0 0-.63 1.3 18.4 18.4 0 0 0-5.5 0 13 13 0 0 0-.64-1.3 19.7 19.7 0 0 0-4.93 1.52C.6 9.05-.25 13.6.18 18.1a19.9 19.9 0 0 0 6.04 3.05c.49-.66.92-1.36 1.3-2.1a12.9 12.9 0 0 1-2.04-.98l.5-.39a14.2 14.2 0 0 0 12.07 0l.5.39c-.65.39-1.33.71-2.05.98.38.74.81 1.44 1.3 2.1a19.8 19.8 0 0 0 6.04-3.05c.5-5.2-.86-9.71-3.52-13.73ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42s2.18 1.1 2.16 2.42c0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42Z"/></svg><span data-i18n="hub.discord"></span></a>
+      </div>`}
     </div>
   </div>
   <div class="hub-note" id="hub-note"></div>
@@ -4662,6 +5102,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
+  <!-- Шторки арсенала и магазина на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
+  <div id="arsenal-sheet"></div>
+  <div id="shop-sheet"></div>
 </div>
 <div id="emblempick">
   <div class="ep-box">
@@ -4884,3 +5327,21 @@ writeFileSync('prototype/dist/void-dominion-admin.html', adminHtml);
 console.log(
   'wrote prototype/dist/void-dominion-admin.html (' + (adminHtml.length / 1024).toFixed(0) + ' KB)',
 );
+
+// Service worker push-уведомлений (UIX-4.4): отдельный файл, его отдаёт сервер по `/sw.js`
+// (`wsServer.ts`, опция `serviceWorker`). Worker'у нужен свой адрес на том же origin, что и
+// страница, поэтому строкой в документ его не положить.
+const pushWorker = (
+  await build({
+    entryPoints: ['prototype/src/pushWorker.ts'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    minify: true,
+    legalComments: 'none',
+    write: false,
+  })
+).outputFiles[0].text;
+writeFileSync('prototype/dist/sw.js', pushWorker);
+console.log('wrote prototype/dist/sw.js (' + (pushWorker.length / 1024).toFixed(1) + ' KB)');

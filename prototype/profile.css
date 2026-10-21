@@ -42,6 +42,46 @@
   touch-action: pan-y;
   scrollbar-gutter: stable;
 }
+#profile .pf-history {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+#profile .pf-history li {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sf-edge);
+  border-radius: 12px;
+  background: var(--sf-card);
+  font-size: 14px;
+  line-height: 1.45;
+}
+#profile .pf-history-main,
+#profile .pf-history-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+#profile .pf-history-main {
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+#profile .pf-history-main b {
+  font-weight: 600;
+  color: var(--sf-head);
+}
+#profile .pf-history-main time,
+#profile .pf-history-details {
+  color: var(--sf-dim);
+}
+#profile .pf-history-map {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .pf-player-link {
   font: inherit;
   color: inherit;

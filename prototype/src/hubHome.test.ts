@@ -71,7 +71,7 @@ describe('главный экран хаба (UIX-10.1)', () => {
     expect(MAIN).toContain(
       "document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));",
     );
-    expect(MAIN).toContain("new Set(['meta', 'auction', 'rank', 'friends', 'supply'])");
+    expect(MAIN).toContain("new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop'])");
     expect(MAIN).toContain("const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;");
   });
 
