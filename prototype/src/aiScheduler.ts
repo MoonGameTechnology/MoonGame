@@ -24,12 +24,25 @@ export class StaggeredAi<Action> {
     this.pending = null;
   }
 
-  step(
+  /** Game milliseconds until an eligible actor needs a slice. Offline hosts can
+   * sleep until this deadline instead of polling once for EVERY map seat. Reading
+   * the deadline never consumes a turn or changes the stable phases on reconnect. */
+  nextDelay(
     now: number,
     seats: readonly string[],
     policyFor: (seat: string) => string | null,
-    plan: (seat: string, policy: string) => Action[],
-  ): { worked: boolean; action?: Action } {
+  ): number | null {
+    this.sync(now, seats);
+    if (this.pending) return 0; // drain or discard the bounded retained plan
+    let delay = Infinity;
+    for (let i = 0; i < this.roster.length; i++) {
+      if (policyFor(this.roster[i]!) !== null)
+        delay = Math.min(delay, Math.max(0, this.due[i]! - now));
+    }
+    return delay === Infinity ? null : delay;
+  }
+
+  private sync(now: number, seats: readonly string[]): void {
     if (now < this.epoch) this.reset(now);
     if (seats.length !== this.roster.length || seats.some((seat, i) => seat !== this.roster[i])) {
       // A replacement roster starts a fresh spread; joining/leaving a HUMAN does not
@@ -39,6 +52,15 @@ export class StaggeredAi<Action> {
       this.due = seats.map((_, i) => this.epoch + ((i + 1) * this.period) / seats.length);
       this.pending = null;
     }
+  }
+
+  step(
+    now: number,
+    seats: readonly string[],
+    policyFor: (seat: string) => string | null,
+    plan: (seat: string, policy: string) => Action[],
+  ): { worked: boolean; action?: Action } {
+    this.sync(now, seats);
     if (this.pending) {
       const p = this.pending;
       if (now >= p.expires || policyFor(p.seat) !== p.policy) {
@@ -51,7 +73,15 @@ export class StaggeredAi<Action> {
     }
     let next = -1;
     for (let i = 0; i < this.due.length; i++) {
-      if (this.due[i]! <= now && (next < 0 || this.due[i]! < this.due[next]!)) next = i;
+      const due = this.due[i]!;
+      if (due > now) continue;
+      if (policyFor(this.roster[i]!) === null) {
+        // Ineligible seats consume no planning/apply slices. Keep their phase so
+        // a human stand-in becoming eligible still uses the original roster clock.
+        this.due[i] = due + (Math.floor((now - due) / this.period) + 1) * this.period;
+        continue;
+      }
+      if (next < 0 || due < this.due[next]!) next = i;
     }
     if (next < 0) return { worked: false };
     const due = this.due[next]!;

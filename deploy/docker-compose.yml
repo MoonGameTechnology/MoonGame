@@ -131,6 +131,12 @@ services:
       # How many independent sessions this ONE process hosts (proto, proto-2, …):
       # all appear in the in-game match browser; each is durable in Postgres.
       MATCHES: ${MATCHES:-1}
+      # Persistent system profiles gradually fill ordinary PvP rooms (AUTH required).
+      # Lowering these limits never evicts bots from matches already in progress.
+      BOT_FILL_PERCENT: ${BOT_FILL_PERCENT:-0}
+      BOT_ACTIVE_LIMIT: ${BOT_ACTIVE_LIMIT:-20}
+      BOT_JOIN_MIN_MS: ${BOT_JOIN_MIN_MS:-300000}
+      BOT_JOIN_MAX_MS: ${BOT_JOIN_MAX_MS:-900000}
       # Durable matches: snapshots to the postgres service over the compose network.
       DATABASE_URL: postgres://${DB_RUNTIME_USER:-void}:${DB_RUNTIME_PASSWORD:-${POSTGRES_PASSWORD:-void}}@postgres:5432/void
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-1}

@@ -434,6 +434,47 @@ const SCHEMA_SQL = `
       account_id text NOT NULL,
       PRIMARY KEY (match_id, account_id)
     );
+    -- Dedicated population bots are permanent system identities, never login users.
+    -- Catalogue seeding never replaces their appearance, seed or earned XP.
+    CREATE TABLE IF NOT EXISTS bot_roster_identities (
+      id text PRIMARY KEY,
+      login text NOT NULL CHECK (left(login, 1) = '~'),
+      portrait integer NOT NULL CHECK (portrait BETWEEN 1 AND 40),
+      seed bigint NOT NULL CHECK (seed BETWEEN 0 AND 4294967295),
+      xp bigint NOT NULL DEFAULT 0 CHECK (xp BETWEEN 0 AND 9007199254740991),
+      last_assigned_at bigint CHECK (last_assigned_at BETWEEN 0 AND 8640000000000000)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS bot_roster_login_idx ON bot_roster_identities (lower(login));
+    CREATE TABLE IF NOT EXISTS bot_roster_matches (
+      match_id text PRIMARY KEY,
+      status text NOT NULL CHECK (status IN ('active', 'ended', 'abandoned')),
+      finished_at bigint CHECK (finished_at BETWEEN 0 AND 8640000000000000)
+    );
+    CREATE INDEX IF NOT EXISTS bot_roster_active_match_idx ON bot_roster_matches (match_id) WHERE status = 'active';
+    -- History is retained after release. A process restart/heartbeat never expires a seat.
+    CREATE TABLE IF NOT EXISTS bot_roster_assignments (
+      match_id text NOT NULL REFERENCES bot_roster_matches(match_id),
+      player_id text NOT NULL,
+      bot_id text NOT NULL REFERENCES bot_roster_identities(id),
+      assigned_at bigint NOT NULL CHECK (assigned_at BETWEEN 0 AND 8640000000000000),
+      active boolean NOT NULL DEFAULT true,
+      PRIMARY KEY (match_id, player_id),
+      UNIQUE (match_id, bot_id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS bot_roster_active_bot_idx ON bot_roster_assignments (bot_id) WHERE active;
+    CREATE TABLE IF NOT EXISTS bot_roster_results (
+      match_id text NOT NULL,
+      bot_id text NOT NULL,
+      player_id text NOT NULL,
+      map_id text NOT NULL,
+      ended_at bigint NOT NULL CHECK (ended_at BETWEEN 0 AND 8640000000000000),
+      outcome text NOT NULL CHECK (outcome IN ('win', 'draw', 'loss')),
+      xp bigint NOT NULL CHECK (xp BETWEEN 0 AND 9007199254740991),
+      place bigint CHECK (place BETWEEN 1 AND 9007199254740991),
+      PRIMARY KEY (match_id, bot_id),
+      FOREIGN KEY (match_id, bot_id) REFERENCES bot_roster_assignments(match_id, bot_id)
+    );
+    CREATE INDEX IF NOT EXISTS bot_roster_history_idx ON bot_roster_results (bot_id, ended_at DESC, match_id DESC);
     -- Existing accounts stay ineligible; only the new registration writer opts in.
     ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_reward boolean NOT NULL DEFAULT false;
     CREATE TABLE IF NOT EXISTS registration_rewards (
