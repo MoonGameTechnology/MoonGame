@@ -1,15 +1,16 @@
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
-import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
+import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
+import { corpFoundedNews, corpLevelNews } from '../corpNews';
 import { randomUUID } from 'node:crypto';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
   AccountStore,
+  AnnouncementStore,
   ArsenalStore,
   AvaChallenge,
   AvaChallengeStore,
-  AvaFeedEntry,
   AvaFeedStore,
   AvaResult,
   AvaResultStore,
@@ -20,6 +21,7 @@ import type {
   AvaSide,
   CommanderStore,
   CorpAuditEntry,
+  CorpFeedEntry,
   CorpMembership,
   CorpRecord,
   CorpRent,
@@ -28,6 +30,8 @@ import type {
   CorpStore,
   CorpSummary,
   DropStore,
+  FeedEntry,
+  FeedKind,
   FriendEdge,
   FriendParty,
   FriendStore,
@@ -45,6 +49,7 @@ import type {
   UserStore,
 } from './types';
 import {
+  ACTIVE_ANNOUNCEMENTS_MAX,
   DEFAULT_AUDIT_LIMIT,
   DEFAULT_FEED_LIMIT,
   DEFAULT_CHALLENGES_LIMIT,
@@ -312,6 +317,10 @@ export class MemoryUserStore implements UserStore {
 export class MemoryCorpStore implements CorpStore {
   private readonly infrastructureStates = new Map<string, CorpInfrastructureState>();
 
+  /** CORP-1: the public feed the corporation's own facts go to (founded, reached a level)
+   *  — the memory twin of the Postgres store writing them in the same transaction. */
+  constructor(private readonly feed?: Pick<AvaFeedStore, 'append'>) {}
+
   infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
     // No await between the authorization read and commit: one event-loop operation.
     const member = this.members.get(actor);
@@ -323,7 +332,12 @@ export class MemoryCorpStore implements CorpStore {
     corp.influence = updated.influence;
     this.infrastructureStates.set(corpId, updated.state);
     this.audit.push(...updated.audit);
-    return Promise.resolve(structuredClone(updated.result));
+    const result = structuredClone(updated.result);
+    return this.publish(corpLevelNews(corpId, corp.name, updated.audit)).then(() => result);
+  }
+
+  private async publish(entries: readonly CorpFeedEntry[]): Promise<void> {
+    for (const entry of entries) await this.feed?.append(entry);
   }
 
   private readonly corps = new Map<string, CorpRecord>();
@@ -338,6 +352,7 @@ export class MemoryCorpStore implements CorpStore {
     name: string,
     headAccountId: string,
     headLogin: string,
+    at: number = Date.now(),
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
     const key = name.toLowerCase();
     for (const corp of this.corps.values()) {
@@ -353,7 +368,7 @@ export class MemoryCorpStore implements CorpStore {
       login: headLogin,
       role: 'head',
     });
-    return Promise.resolve({ ok: true, corpId });
+    return this.publish([corpFoundedNews(corpId, name, at)]).then(() => ({ ok: true as const, corpId }));
   }
 
   getCorp(corpId: string): Promise<CorpRecord | null> {
@@ -663,20 +678,63 @@ export class MemoryMedalStore implements MedalStore {
 
 /** In-memory AvA feed store (AVA-9) — an append-only list, read newest-first. */
 export class MemoryAvaFeedStore implements AvaFeedStore {
-  private readonly rows: AvaFeedEntry[] = [];
+  private readonly rows: FeedEntry[] = [];
 
-  append(entry: AvaFeedEntry): Promise<void> {
-    this.rows.push({ ...entry });
+  append(entry: FeedEntry): Promise<void> {
+    // Idempotent by id, like the Postgres `ON CONFLICT (id) DO NOTHING`.
+    if (!this.rows.some((r) => r.id === entry.id)) this.rows.push({ ...entry });
     return Promise.resolve();
   }
 
-  recent(limit = DEFAULT_FEED_LIMIT, before?: number): Promise<AvaFeedEntry[]> {
+  recent(limit = DEFAULT_FEED_LIMIT, before?: number, kinds?: readonly FeedKind[]): Promise<FeedEntry[]> {
     return Promise.resolve(
       this.rows
-        .filter((r) => before === undefined || r.at < before)
+        .filter((r) => (before === undefined || r.at < before) && (!kinds || kinds.includes(r.kind)))
         .sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))
         .slice(0, limit)
         .map((r) => ({ ...r })),
+    );
+  }
+}
+
+/** In-memory admin announcements (CORP-1). */
+export class MemoryAnnouncementStore implements AnnouncementStore {
+  private readonly rows = new Map<string, { item: NewsAnnouncement; removedAt: number | null }>();
+
+  add(announcement: NewsAnnouncement): Promise<void> {
+    if (!this.rows.has(announcement.id))
+      this.rows.set(announcement.id, { item: structuredClone(announcement), removedAt: null });
+    return Promise.resolve();
+  }
+
+  active(now: number): Promise<NewsAnnouncement[]> {
+    return Promise.resolve(
+      this.newest()
+        .filter((r) => r.removedAt === null && (r.item.until === null || r.item.until > now))
+        .slice(0, ACTIVE_ANNOUNCEMENTS_MAX)
+        .map((r) => structuredClone(r.item)),
+    );
+  }
+
+  recent(limit: number): Promise<NewsAnnouncement[]> {
+    return Promise.resolve(
+      this.newest()
+        .filter((r) => r.removedAt === null)
+        .slice(0, limit)
+        .map((r) => structuredClone(r.item)),
+    );
+  }
+
+  remove(id: string, at: number): Promise<boolean> {
+    const row = this.rows.get(id);
+    if (!row || row.removedAt !== null) return Promise.resolve(false);
+    row.removedAt = at;
+    return Promise.resolve(true);
+  }
+
+  private newest(): Array<{ item: NewsAnnouncement; removedAt: number | null }> {
+    return [...this.rows.values()].sort(
+      (a, b) => b.item.at - a.item.at || (a.item.id < b.item.id ? 1 : -1),
     );
   }
 }

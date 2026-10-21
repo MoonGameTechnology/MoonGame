@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
+import { parseMedalCatalog, type MedalCatalog } from './medalCatalog';
 import {
   MemoryAvaChallengeStore,
   MemoryAvaFeedStore,
@@ -23,6 +24,8 @@ interface Fixture {
   ava: AvaService;
   corp: CorpService;
   store: MemoryCorpStore;
+  /** The public feed the AvA service and the corp store both write to (CORP-1). */
+  feed: MemoryAvaFeedStore;
   corpA: string;
   corpB: string;
   clock: () => number;
@@ -36,9 +39,11 @@ async function fixture(
     cost?: number;
     capPerSide?: number;
     winReward?: number;
+    medals?: MedalCatalog;
   } = {},
 ): Promise<Fixture> {
-  const store = new MemoryCorpStore();
+  const feed = new MemoryAvaFeedStore();
+  const store = new MemoryCorpStore(feed);
   const challenges = new MemoryAvaChallengeStore();
   let t = 0;
   const now = (): number => ++t;
@@ -48,7 +53,8 @@ async function fixture(
     challengeStore: challenges,
     rosterStore: new MemoryAvaRosterStore(),
     resultStore: new MemoryAvaResultStore(),
-    feedStore: new MemoryAvaFeedStore(),
+    feedStore: feed,
+    ...(opts.medals ? { medals: opts.medals } : {}),
     now,
     challengeCost: opts.cost ?? 100,
     expiryMs: 1_000,
@@ -65,7 +71,20 @@ async function fixture(
   await corp.accept(A_HEAD, a.corpId, A_MEMBER.accountId);
   await store.addInfluence(a.corpId, opts.influenceA ?? 500);
   await store.addInfluence(b.corpId, opts.influenceB ?? 500);
-  return { ava, corp, store, corpA: a.corpId, corpB: b.corpId, clock: (): number => t };
+  return { ava, corp, store, feed, corpA: a.corpId, corpB: b.corpId, clock: (): number => t };
+}
+
+/** Ready → challenge → accept → both sides join → sweep-lock: the LOCKED matchup id. */
+async function lockedMatchup(f: Fixture): Promise<string> {
+  await f.ava.setCorpReady(A_HEAD);
+  await f.ava.setCorpReady(B_HEAD);
+  const ch = await f.ava.challenge(A_HEAD, f.corpB);
+  if (!ch.ok) throw new Error('challenge failed');
+  if (!(await f.ava.accept(B_HEAD, ch.id)).ok) throw new Error('accept failed');
+  await f.ava.join(A_HEAD, ch.id);
+  await f.ava.join(B_HEAD, ch.id);
+  if ((await f.ava.sweepRosters(1_000_000)).locked !== 1) throw new Error('lock failed');
+  return ch.id;
 }
 
 describe('AvaService — readiness (AVA-3)', () => {
@@ -300,19 +319,6 @@ describe('AvaService — roster window S3 (AVA-6)', () => {
 });
 
 describe('AvaService — settlement (AVA-8, S7)', () => {
-  /** Ready → challenge → accept → both sides join → sweep-lock: the LOCKED matchup id. */
-  async function lockedMatchup(f: Fixture): Promise<string> {
-    await f.ava.setCorpReady(A_HEAD);
-    await f.ava.setCorpReady(B_HEAD);
-    const ch = await f.ava.challenge(A_HEAD, f.corpB);
-    if (!ch.ok) throw new Error('challenge failed');
-    if (!(await f.ava.accept(B_HEAD, ch.id)).ok) throw new Error('accept failed');
-    await f.ava.join(A_HEAD, ch.id);
-    await f.ava.join(B_HEAD, ch.id);
-    if ((await f.ava.sweepRosters(1_000_000)).locked !== 1) throw new Error('lock failed');
-    return ch.id;
-  }
-
   it('archives the matchup, records the outcome, awards influence to the winner', async () => {
     const f = await fixture();
     const id = await lockedMatchup(f);
@@ -397,5 +403,57 @@ describe('AvaService — public feed (AVA-9)', () => {
     expect(feed[0]).toMatchObject({ kind: 'result', winnerCorp: f.corpA });
     // The public feed never carries private roster data.
     expect(JSON.stringify(feed)).not.toContain(A_MEMBER.accountId);
+    // The same store also holds both corporations' founding (CORP-1); this feed keeps to
+    // battles.
+    expect((await f.feed.recent(50)).map((e) => e.kind).sort()).toEqual([
+      'founded',
+      'founded',
+      'matchup',
+      'result',
+    ]);
+  });
+});
+
+describe('AvaService — medal news (CORP-1)', () => {
+  const catalog = parseMedalCatalog({
+    medals: {
+      first: {
+        name: 'n',
+        description: 'd',
+        scope: 'corp',
+        grant: 'manual',
+        condition: { type: 'corp_wins', count: 1 },
+      },
+      two: {
+        name: 'n',
+        description: 'd',
+        scope: 'corp',
+        grant: 'manual',
+        condition: { type: 'corp_matches', count: 2 },
+      },
+    },
+  });
+  const medalNews = async (f: Fixture): Promise<string[]> =>
+    (await f.feed.recent(50, undefined, ['medal'])).map((e) => e.id).sort();
+
+  it('a settlement that brings a record to a corp medal condition is news, once', async () => {
+    const f = await fixture({ medals: catalog });
+    expect((await f.ava.settleMatch(await lockedMatchup(f), 'challenger')).ok).toBe(true);
+    expect(await medalNews(f)).toEqual([`medal:${f.corpA}:first`]);
+    // The second battle: A wins again (no second «first»), both sides reach two battles.
+    expect((await f.ava.settleMatch(await lockedMatchup(f), 'challenger')).ok).toBe(true);
+    expect(await medalNews(f)).toEqual(
+      [`medal:${f.corpA}:first`, `medal:${f.corpA}:two`, `medal:${f.corpB}:two`].sort(),
+    );
+    const [entry] = (await f.feed.recent(50, undefined, ['medal'])).filter(
+      (e) => e.id === `medal:${f.corpB}:two`,
+    );
+    expect(entry).toMatchObject({ kind: 'medal', corpId: f.corpB, corpName: 'Alliance B', medalId: 'two' });
+  });
+
+  it('without the catalog a settlement is no medal news', async () => {
+    const f = await fixture();
+    expect((await f.ava.settleMatch(await lockedMatchup(f), 'challenger')).ok).toBe(true);
+    expect(await medalNews(f)).toEqual([]);
   });
 });

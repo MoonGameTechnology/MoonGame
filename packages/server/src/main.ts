@@ -56,6 +56,7 @@ import { registerLeaderboardApi } from './leaderboardApi';
 import { FriendService } from './friendService';
 import { CorpService } from './corpService';
 import { registerAvaApi, registerAvaFeed } from './avaApi';
+import { registerNewsApi } from './newsApi';
 import { AvaService } from './avaService';
 import { registerMedalApi } from './medalApi';
 import { MedalService } from './medalService';
@@ -475,6 +476,11 @@ if (auth && !allowedOrigins) {
   );
 }
 
+// The medal catalog (MED-1) is fixed data (`data/medals.json`), validated once at boot:
+// the medal service grants from it, and the AvA settlement announces a corp reaching a
+// corp medal's condition in the news feed (CORP-1).
+const medalCatalog = loadMedalCatalog();
+
 // AvA service (AVA-2/3/4/6/8): readiness pool + challenge state machine + roster window
 // + settlement over the durable stores. One instance is shared by the HTTP API and the
 // sweeps.
@@ -487,18 +493,19 @@ if (auth && !allowedOrigins) {
   rosterStore: stores.rosterStore,
   resultStore: stores.resultStore,
   feedStore: stores.feedStore,
+  medals: medalCatalog,
 });
 
 // Medals (MED-1, corporations.md §3): objective, server-checked corp achievements from the
-// AvA match history. The catalog is fixed data (`data/medals.json`), validated once at boot;
-// the service authorizes the head/officer manual-grant path over the durable stores.
+// AvA match history, over the catalog above; the service authorizes the head/officer
+// manual-grant path over the durable stores.
   const medalService =
     stores.corporateServices?.medals ??
     new MedalService({
   corpStore: stores.corpStore,
   resultStore: stores.resultStore,
   medalStore: stores.medalStore,
-  catalog: loadMedalCatalog(),
+  catalog: medalCatalog,
 });
 
 // Match factory (SV-2.5): keep OPEN_MATCHES joinable matches available so the feed is
@@ -579,6 +586,9 @@ const server = createMultiplayerServer({
     });
     // The public AvA feed (AVA-9) — confirmed matchups + results, read-only, no session.
     registerAvaFeed(app, { service: avaService });
+    // The news feed (CORP-1) — the admin's announcements + corporation and battle facts,
+    // public like the AvA feed it grew from.
+    registerNewsApi(app, { feed: stores.feedStore, announcements: stores.announcementStore });
     // The account + match WRITE surface only when auth is on (it mints tokens); no auth ⇒
     // the insecure dev ?player= handshake only. It sits behind @fastify/rate-limit in an
     // ENCAPSULATED scope so the coarse per-IP backstop covers only these write routes —
@@ -716,6 +726,7 @@ const server = createMultiplayerServer({
             identify,
             admins: ADMIN_LOGINS,
             users: stores.userStore,
+            announcements: stores.announcementStore,
             roster: async (matchId) => {
               // Load-on-demand: a hibernated match still has a roster to command —
               // an admin asking about it is exactly a reason to wake it.

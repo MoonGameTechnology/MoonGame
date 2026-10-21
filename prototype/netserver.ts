@@ -23,6 +23,8 @@ import { checkProductionReadiness } from '../packages/server/src/serverConfig';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
+import { MemoryAnnouncementStore, MemoryAvaFeedStore, PostgresAnnouncementStore, PostgresAvaFeedStore, type AnnouncementStore, type AvaFeedStore } from '../packages/server/src/store';
+import { registerNewsApi } from '../packages/server/src/newsApi';
 import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
 // UIX-4.4 (часть 1): push до игроков — тот же приёмник подписки и та же рассылка «своё и
@@ -314,6 +316,10 @@ let profileStore: ProfileStore;
 let botStore: BotRosterStore;
 let registrationRewards: RegistrationRewardStore;
 let corpStore: CorpStore;
+// CORP-1: the news feed — corporation and battle facts beside the corporations, the
+// admin's announcements in the game database.
+let feedStore: AvaFeedStore;
+let announcementStore: AnnouncementStore;
 // EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
 // из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
 // на аккаунт превращает регистрацию в монетный двор (ARS-0 anti-RMT).
@@ -336,6 +342,8 @@ if (DATABASE_URL) {
   botStore = new PostgresBotRosterStore(pool);
   registrationRewards = new PostgresRegistrationRewardStore(pool);
   corpStore = new PostgresCorpStore(pool);
+  feedStore = new PostgresAvaFeedStore(pool);
+  announcementStore = new PostgresAnnouncementStore(pool);
   arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
   metaEconomyStore = new PostgresMetaEconomyStore(pool);
@@ -350,7 +358,11 @@ if (DATABASE_URL) {
   profileStore = new MemoryProfileStore();
   botStore = new MemoryBotRosterStore();
   registrationRewards = new MemoryRegistrationRewardStore(userStore, profileStore, commanderStore);
-  corpStore = new MemoryCorpStore();
+  // One feed for both writers: the corp store announces a corp's own facts into it.
+  const memoryFeed = new MemoryAvaFeedStore();
+  feedStore = memoryFeed;
+  corpStore = new MemoryCorpStore(memoryFeed);
+  announcementStore = new MemoryAnnouncementStore();
   const memoryArsenal = new MemoryArsenalStore();
   const memoryMarket = new MemoryMetaMarket(memoryArsenal, undefined, metaFaucet);
   arsenalStore = memoryArsenal;
@@ -380,7 +392,10 @@ const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCata
   },
 });
 
-if (corporationsEndpoint) corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
+if (corporationsEndpoint) {
+  corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
+  feedStore = corporateRemote(corporationsEndpoint, 'feedStore');
+}
 
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
  *  seat, deterministic). At match end, map each seat's nick → account and bank the XP
@@ -1243,6 +1258,8 @@ const server = createMultiplayerServer({
       // which is participation, not proof (that host has no sessions to check).
       ...(AUTH ? { identify: identifySession } : {}),
     });
+    // The news feed (CORP-1) — public, the same module as the production entry.
+    registerNewsApi(app, { feed: feedStore, announcements: announcementStore });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
     app.get('/auth/status', async () => ({ enabled: AUTH, accountDeletion: AUTH && !!pool && process.env.ACCOUNT_DELETION_ENABLED === '1' }));
@@ -1346,6 +1363,7 @@ const server = createMultiplayerServer({
         identify: identifySession,
         admins: ADMIN_LOGINS,
         users: userStore,
+        announcements: announcementStore,
         roster: async (id) => {
           const room = registry.get(id);
           if (!room) return null;

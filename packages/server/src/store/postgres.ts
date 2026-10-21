@@ -2,19 +2,22 @@ import type {
   CorpBuildOrder,
   CorpInfrastructureResult,
   CorpInfrastructureState,
+  NewsAnnouncement,
+  NewsAnnouncementKind,
 } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
+import { corpFoundedNews, corpLevelNews } from '../corpNews';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
   AccountStore,
+  AnnouncementStore,
   ArsenalStore,
   AvaChallenge,
   AvaChallengeStatus,
   AvaChallengeStore,
-  AvaFeedEntry,
   AvaFeedStore,
   AvaResult,
   AvaResultStore,
@@ -33,6 +36,8 @@ import type {
   CorpStore,
   CorpSummary,
   DropStore,
+  FeedEntry,
+  FeedKind,
   FriendEdge,
   FriendParty,
   FriendStore,
@@ -50,6 +55,8 @@ import type {
   UserStore,
 } from './types';
 import {
+  ACTIVE_ANNOUNCEMENTS_MAX,
+  isAvaFeedEntry,
   DEFAULT_AUDIT_LIMIT,
   DEFAULT_FEED_LIMIT,
   DEFAULT_CHALLENGES_LIMIT,
@@ -282,6 +289,12 @@ const SCHEMA_SQL = `
       winner_corp     text
     );
     CREATE INDEX IF NOT EXISTS ava_feed_at_idx ON ava_feed (at DESC, id DESC);
+    -- CORP-1: the same public feed carries a corporation's own facts (founded, reached a
+    -- level, reached a corp medal's condition). Such a row names one corp in the
+    -- challenger columns and none in the target ones; detail holds the level / medal id.
+    ALTER TABLE ava_feed ALTER COLUMN target_corp DROP NOT NULL;
+    ALTER TABLE ava_feed ALTER COLUMN target_name DROP NOT NULL;
+    ALTER TABLE ava_feed ADD COLUMN IF NOT EXISTS detail jsonb;
 
     -- Medals / achievements (corporations.md §3, MED-1): permanent per-account record. PK
     -- (account, medal) is the idempotency + one-per invariant; corp_id snapshots the corp
@@ -509,6 +522,23 @@ const SCHEMA_SQL = `
       PRIMARY KEY (lo_id, hi_id)
     );
     CREATE INDEX IF NOT EXISTS friend_edges_hi ON friend_edges (hi_id);
+
+    -- CORP-1: admin announcements in the news feed — the admin's own text in both
+    -- languages (the feed's other rows are facts the client words itself). A removed one
+    -- keeps its row with removed_at set; until_at NULL = shown until removed.
+    CREATE TABLE IF NOT EXISTS announcements (
+      id         text PRIMARY KEY,
+      at         bigint NOT NULL,
+      kind       text NOT NULL CHECK (kind IN ('tech', 'update', 'event')),
+      pinned     boolean NOT NULL DEFAULT false,
+      until_at   bigint,
+      title_ru   text NOT NULL,
+      title_en   text NOT NULL DEFAULT '',
+      body_ru    text NOT NULL DEFAULT '',
+      body_en    text NOT NULL DEFAULT '',
+      removed_at bigint
+    );
+    CREATE INDEX IF NOT EXISTS announcements_at_idx ON announcements (at DESC, id DESC) WHERE removed_at IS NULL;
   `;
 
 export const schemaFingerprint = (): string =>
@@ -1038,9 +1068,10 @@ export class PostgresCorpStore implements CorpStore {
         return { ok: false, code: 'E_FORBIDDEN' };
       }
       const corps = await client.query<{
+        name: string;
         influence: string;
         infrastructure: CorpInfrastructureState | null;
-      }>(`SELECT influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
+      }>(`SELECT name, influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
       const corp = corps.rows[0];
       if (!corp) {
         await client.query('ROLLBACK');
@@ -1065,6 +1096,10 @@ export class PostgresCorpStore implements CorpStore {
           [corpId, entry.at, entry.actor, entry.action, entry.target ?? null, entry.detail ?? null],
         );
       }
+      // CORP-1: a reached corporation level is public news, committed with the level.
+      for (const news of corpLevelNews(corpId, corp.name, updated.audit)) {
+        await client.query(FEED_INSERT, feedValues(news));
+      }
       await client.query('COMMIT');
       return updated.result;
     } catch (err) {
@@ -1081,6 +1116,7 @@ export class PostgresCorpStore implements CorpStore {
     name: string,
     headAccountId: string,
     headLogin: string,
+    at: number = Date.now(),
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
     // One transaction, two atomic claims: the corp_members PK is the one-corp-per-
     // account claim, the lower(name) unique index is the name claim. ON CONFLICT
@@ -1105,6 +1141,8 @@ export class PostgresCorpStore implements CorpStore {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_NAME_TAKEN' };
       }
+      // CORP-1: «founded» is public news, committed with the corporation itself.
+      await client.query(FEED_INSERT, feedValues(corpFoundedNews(corpId, name, at)));
       await client.query('COMMIT');
       return { ok: true, corpId };
     } catch (err) {
@@ -1776,62 +1814,175 @@ interface FeedRow {
   kind: string;
   challenger_corp: string;
   challenger_name: string;
-  target_corp: string;
-  target_name: string;
+  target_corp: string | null;
+  target_name: string | null;
   winner_corp: string | null;
+  detail: { level?: unknown; medalId?: unknown } | null;
 }
 
-function feedEntryOf(row: FeedRow): AvaFeedEntry {
-  return {
-    id: row.id,
-    at: Number(row.at),
-    kind: row.kind as AvaFeedEntry['kind'],
-    challengerCorp: row.challenger_corp,
-    challengerName: row.challenger_name,
-    targetCorp: row.target_corp,
-    targetName: row.target_name,
-    // A matchup entry has no winner concept; a result carries one (null = draw).
-    ...(row.kind === 'result' ? { winnerCorp: row.winner_corp } : {}),
-  };
+/** One feed row, whatever its kind (AVA-9 + CORP-1). `ON CONFLICT (id) DO NOTHING` is the
+ *  idempotency the feed promises: a corp fact's id is derived from the fact. */
+const FEED_INSERT = `INSERT INTO ava_feed
+     (id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp, detail)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+   ON CONFLICT (id) DO NOTHING`;
+
+function feedValues(entry: FeedEntry): unknown[] {
+  if (isAvaFeedEntry(entry)) {
+    return [
+      entry.id,
+      entry.at,
+      entry.kind,
+      entry.challengerCorp,
+      entry.challengerName,
+      entry.targetCorp,
+      entry.targetName,
+      entry.winnerCorp ?? null,
+      null,
+    ];
+  }
+  const detail =
+    entry.kind === 'level'
+      ? { level: entry.level }
+      : entry.kind === 'medal'
+        ? { medalId: entry.medalId }
+        : null;
+  return [
+    entry.id,
+    entry.at,
+    entry.kind,
+    entry.corpId,
+    entry.corpName,
+    null,
+    null,
+    null,
+    detail === null ? null : JSON.stringify(detail),
+  ];
 }
 
-/** Postgres AvA feed store (AVA-9) — append-only, newest-first with an `at` cursor. */
+/** A stored row back to its entry; null for a kind or detail this build cannot read. */
+function feedEntryOf(row: FeedRow): FeedEntry | null {
+  const at = Number(row.at);
+  switch (row.kind) {
+    case 'matchup':
+    case 'result':
+      return {
+        id: row.id,
+        at,
+        kind: row.kind,
+        challengerCorp: row.challenger_corp,
+        challengerName: row.challenger_name,
+        targetCorp: row.target_corp ?? '',
+        targetName: row.target_name ?? '',
+        // A matchup entry has no winner concept; a result carries one (null = draw).
+        ...(row.kind === 'result' ? { winnerCorp: row.winner_corp } : {}),
+      };
+    case 'founded':
+      return { id: row.id, at, kind: 'founded', corpId: row.challenger_corp, corpName: row.challenger_name };
+    case 'level': {
+      const level = row.detail?.level;
+      return typeof level === 'number' && Number.isSafeInteger(level)
+        ? { id: row.id, at, kind: 'level', corpId: row.challenger_corp, corpName: row.challenger_name, level }
+        : null;
+    }
+    case 'medal': {
+      const medalId = row.detail?.medalId;
+      return typeof medalId === 'string'
+        ? { id: row.id, at, kind: 'medal', corpId: row.challenger_corp, corpName: row.challenger_name, medalId }
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Postgres public corporation feed store (AVA-9, CORP-1) — append-only, newest-first
+ *  with an `at` cursor. */
 export class PostgresAvaFeedStore implements AvaFeedStore {
   constructor(private readonly pool: Pool) {}
 
-  async append(entry: AvaFeedEntry): Promise<void> {
+  async append(entry: FeedEntry): Promise<void> {
+    await this.pool.query(FEED_INSERT, feedValues(entry));
+  }
+
+  async recent(
+    limit = DEFAULT_FEED_LIMIT,
+    before?: number,
+    kinds?: readonly FeedKind[],
+  ): Promise<FeedEntry[]> {
+    const r = await this.pool.query<FeedRow>(
+      `SELECT id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp, detail
+       FROM ava_feed
+       WHERE ($2::bigint IS NULL OR at < $2) AND ($3::text[] IS NULL OR kind = ANY($3))
+       ORDER BY at DESC, id DESC LIMIT $1`,
+      [limit, before ?? null, kinds ? [...kinds] : null],
+    );
+    return r.rows.flatMap((row) => feedEntryOf(row) ?? []);
+  }
+}
+
+interface AnnouncementRow {
+  id: string;
+  at: string;
+  kind: string;
+  pinned: boolean;
+  until_at: string | null;
+  title_ru: string;
+  title_en: string;
+  body_ru: string;
+  body_en: string;
+}
+
+function announcementOf(row: AnnouncementRow): NewsAnnouncement {
+  return {
+    id: row.id,
+    at: Number(row.at),
+    kind: row.kind as NewsAnnouncementKind, // the CHECK constraint admits these three only
+    pinned: row.pinned,
+    until: row.until_at === null ? null : Number(row.until_at),
+    title: { ru: row.title_ru, en: row.title_en },
+    body: { ru: row.body_ru, en: row.body_en },
+  };
+}
+
+/** Postgres admin announcements (CORP-1). A removal stamps `removed_at`; the row stays. */
+export class PostgresAnnouncementStore implements AnnouncementStore {
+  constructor(private readonly pool: Pool) {}
+
+  async add(a: NewsAnnouncement): Promise<void> {
     await this.pool.query(
-      `INSERT INTO ava_feed
-         (id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO announcements (id, at, kind, pinned, until_at, title_ru, title_en, body_ru, body_en)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO NOTHING`,
-      [
-        entry.id,
-        entry.at,
-        entry.kind,
-        entry.challengerCorp,
-        entry.challengerName,
-        entry.targetCorp,
-        entry.targetName,
-        entry.winnerCorp ?? null,
-      ],
+      [a.id, a.at, a.kind, a.pinned, a.until, a.title.ru, a.title.en, a.body.ru, a.body.en],
     );
   }
 
-  async recent(limit = DEFAULT_FEED_LIMIT, before?: number): Promise<AvaFeedEntry[]> {
-    const r =
-      before === undefined
-        ? await this.pool.query<FeedRow>(
-            `SELECT id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp
-             FROM ava_feed ORDER BY at DESC, id DESC LIMIT $1`,
-            [limit],
-          )
-        : await this.pool.query<FeedRow>(
-            `SELECT id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp
-             FROM ava_feed WHERE at < $2 ORDER BY at DESC, id DESC LIMIT $1`,
-            [limit, before],
-          );
-    return r.rows.map(feedEntryOf);
+  async active(now: number): Promise<NewsAnnouncement[]> {
+    const r = await this.pool.query<AnnouncementRow>(
+      `SELECT id, at, kind, pinned, until_at, title_ru, title_en, body_ru, body_en FROM announcements
+       WHERE removed_at IS NULL AND (until_at IS NULL OR until_at > $1)
+       ORDER BY at DESC, id DESC LIMIT $2`,
+      [now, ACTIVE_ANNOUNCEMENTS_MAX],
+    );
+    return r.rows.map(announcementOf);
+  }
+
+  async recent(limit: number): Promise<NewsAnnouncement[]> {
+    const r = await this.pool.query<AnnouncementRow>(
+      `SELECT id, at, kind, pinned, until_at, title_ru, title_en, body_ru, body_en FROM announcements
+       WHERE removed_at IS NULL ORDER BY at DESC, id DESC LIMIT $1`,
+      [limit],
+    );
+    return r.rows.map(announcementOf);
+  }
+
+  async remove(id: string, at: number): Promise<boolean> {
+    const r = await this.pool.query(
+      `UPDATE announcements SET removed_at = $2 WHERE id = $1 AND removed_at IS NULL`,
+      [id, at],
+    );
+    return (r.rowCount ?? 0) === 1;
   }
 }
 
