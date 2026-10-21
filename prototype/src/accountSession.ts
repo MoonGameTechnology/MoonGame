@@ -93,6 +93,17 @@ const AUTH_REASON: Record<AuthOutcome, string> = {
   'login-refused': 'acc.login-refused',
 };
 
+export type SessionFailure = Exclude<AuthOutcome, 'ok' | 'created'> | 'nick-rule' | 'pass-rule' | 'server-down';
+
+/** A form owns its errors and ignores replies for values it has already changed. */
+export interface SessionFeedback {
+  /** The original screen is still active; field edits alone do not cancel it. */
+  isActive(): boolean;
+  /** Error feedback still refers to the values currently shown. */
+  isCurrent(): boolean;
+  reject(reason: SessionFailure, key: string): void;
+}
+
 // Что сервер сказал про аккаунты. НЕ булево: «не знаю» (проба ещё не спрошена или не
 // дошла) обязано отличаться от «аккаунтов нет» — иначе незнание читается как разрешение
 // (`joinLanding`, правило 5). До ответа сервера — именно «не знаю».
@@ -164,16 +175,30 @@ export async function ensureSession(
   login: string,
   passwordArg?: string,
   emailArg?: string,
+  feedback?: SessionFeedback,
 ): Promise<string | null> {
+  const reject = (reason: SessionFailure, key: string): void => {
+    if (feedback) {
+      if (feedback.isCurrent()) feedback.reject(reason, key);
+    } else game.status(t(key));
+  };
   // Automatic resume can reuse only OUR OWN cached session. An explicit password
   // (including an empty one) means a submitted form and must be checked below.
   const mine = tokenFor(localStorage, base, login);
   if (passwordArg === undefined && mine) return mine;
+  const startingSession = readSession(localStorage, base);
+  const canComplete = (): boolean => {
+    if (!feedback) return true;
+    const currentSession = readSession(localStorage, base);
+    return feedback.isActive()
+      && currentSession?.login === startingSession?.login
+      && currentSession?.token === startingSession?.token;
+  };
   // Правила логина и пароля — в `authRules.ts` (REFM-47): зеркало серверных, чтобы
   // игрок увидел ПРИЧИНУ, а не сухой одинаковый отказ.
   if (!validLogin(login)) {
     reportLogin('nick-rule');
-    game.status(t('acc.nick.rule'));
+    reject('nick-rule', 'acc.nick.rule');
     return null;
   }
   // Откуда берётся пароль — `authRequest.ts` (REFM-156, правила 1–2): с приветственной
@@ -182,7 +207,7 @@ export async function ensureSession(
   const password = passwordFrom(passwordArg, game.welcomePassword());
   if (!validLoginPassword(password)) {
     reportLogin('pass-rule');
-    game.status(t('acc.login-pass.rule'));
+    reject('pass-rule', 'acc.login-pass.rule');
     return null;
   }
   const call = async (
@@ -199,11 +224,16 @@ export async function ensureSession(
   };
   try {
     const login1 = await call('/auth/login');
+    if (!canComplete() || (feedback && !feedback.isCurrent())) return null;
     // Registration carries the optional recovery email (login never needs it).
     // Почта уходит только в регистрацию и только если её ввели (`authRequest.ts`,
     // правило 3): `email: ''` записал бы на учётку пустой адрес.
     const extra = registerExtra(emailArg);
     const reg = shouldRegister(login1) ? await call('/auth/register', extra) : undefined;
+    if (!canComplete()) return null;
+    // Registration has already created the account. Accept its issued session
+    // even after field edits; only an error for the old values is stale.
+    if (!reg?.token && feedback && !feedback.isCurrent()) return null;
     // Причину называет `authRules.ts` — там же правило «401 на входе + 409 на
     // регистрации = неверный пароль», которое иначе свелось бы к «отказу регистрации».
     const outcome = authOutcome(login1, reg);
@@ -216,11 +246,11 @@ export async function ensureSession(
       if (outcome === 'created') game.note('✔ ' + t('acc.created'));
       return token;
     }
-    game.status(t(AUTH_REASON[outcome]));
+    reject(outcome as SessionFailure, AUTH_REASON[outcome]);
     return null;
   } catch {
     reportLogin('server-down');
-    game.status(t('acc.server-down'));
+    reject('server-down', 'acc.server-down');
     return null;
   }
 }

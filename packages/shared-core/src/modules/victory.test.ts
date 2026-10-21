@@ -11,7 +11,7 @@ import {
 import type { AdvanceResult, Context, MatchConfig } from '../action/types';
 import type { GameModule } from '../kernel/module';
 import { setStance } from '../state/diplomacy';
-import { victoryModule } from './victory';
+import { effectiveVictoryRules, victoryModule } from './victory';
 
 const HOUR = 3_600_000;
 
@@ -121,6 +121,13 @@ function okAdvance(r: AdvanceResult): AdvanceResult & { ok: true } {
 }
 
 describe('victory module', () => {
+  it('effective rules preserve explicit zero settings and do not publish internal fields', () => {
+    const victory = { scoreLimit: 0, dominationPercent: 0, coalitionFactor: 0, endsAt: 0, internal: 'private' };
+    expect(effectiveVictoryRules({ timeScale: 1, victory })).toEqual({
+      scoreLimit: 0, dominationPercent: 0, coalitionFactor: 0, endsAt: 0,
+    });
+  });
+
   it('ends by domination when a player controls the configured planet share', () => {
     const kernel = createKernel([victoryModule]);
     const state: GameState = {
@@ -403,7 +410,7 @@ describe('victory module', () => {
     expect(r.state.match.status).toBe('ongoing');
   });
 
-  it('ends by the DEFAULT session cap (100 game-days at ×1) without any victory config', () => {
+  it.each([[1, 100], [2, 60], [4, 30], [24, 100]])('ends by the default cap at ×%s after %s game days', (timeScale, days) => {
     const kernel = createKernel([victoryModule]);
     const state: GameState = {
       ...baseState(),
@@ -415,11 +422,14 @@ describe('victory module', () => {
       },
     };
     const DAY = 24 * HOUR;
+    const config = { timeScale };
+    const deadline = effectiveVictoryRules(config).endsAt;
+    expect(deadline).toBe(days * DAY);
     // One tick short of the cap the match still runs…
-    const early = okAdvance(kernel.advanceTo(state, ctx(100 * DAY - 1)));
+    const early = okAdvance(kernel.advanceTo(state, ctx(deadline - 1, config)));
     expect(early.state.match.status).toBe('ongoing');
     // …at the cap the time-crisis backstop ends it on score.
-    const r = okAdvance(kernel.advanceTo(early.state, ctx(100 * DAY)));
+    const r = okAdvance(kernel.advanceTo(early.state, ctx(deadline, config)));
     expect(r.state.match).toMatchObject({ status: 'ended', reason: 'timeout', winner: 'p1' });
   });
 

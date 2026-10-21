@@ -17,13 +17,15 @@ import { t, LOCALE } from '../../localization/runtime';
 import { httpBase } from '../../decisions/matchQuery';
 import { resolveBase } from '../../decisions/serverAddress';
 import { saveSession } from '../../decisions/sessionStore';
+import { validLogin, validLoginPassword } from '../../decisions/authRules';
 import { authMode, ensureSession, notifySessionChanged, pendingJoinAfterAuth, probeAuthMode } from './accountSession';
 import { detach } from './detach';
 import { getPlatform } from './platform/host';
 import { revealSignup } from './identityProbe';
 import { initPasswordReset } from './passwordReset';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
-import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
+import { callsignFor, nextCallsignNumber, registerPayload, registerProblems, type RegisterField } from './registerForm';
+import { initFormFeedback } from './formFeedback';
 
 /** Что страницам входа нужно от игры. Всё перечисленное живёт в `main.ts`. */
 export interface SignInPagesHost {
@@ -61,9 +63,11 @@ let registerStageEl: HTMLElement;
 let recoverStageEl: HTMLElement;
 let resetStageEl: HTMLElement;
 let browseStageEl: HTMLElement;
+let stageRevision = 0;
 /** Стадии экрана подключения. Последняя, `browse`, — обозреватель партий: его страница
  *  не здесь, но переключатель у стадий один. */
 export function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 'browse'): void {
+  stageRevision++;
   for (const hide of hidePasswords) hide();
   welcomeStageEl.style.display = stage === 'welcome' ? '' : 'none';
   registerStageEl.style.display = stage === 'register' ? '' : 'none';
@@ -102,6 +106,7 @@ let wLoginEl: HTMLElement;
 let wNickInput: HTMLInputElement;
 let wPassRowEl: HTMLElement;
 let wPassInput: HTMLInputElement;
+let welcomeFeedback: ReturnType<typeof initFormFeedback<'nick' | 'pass'>>;
 function signInByCallsign(): void {
   const nick = wNickInput.value.trim();
   if (!nick) {
@@ -129,19 +134,35 @@ let signingIn = false; // in-flight guard: Enter + click must not double-registe
  *  callsign creates the account and a known one just logs in. */
 async function welcomeSignIn(nick: string): Promise<void> {
   if (signingIn) return; // a second Enter/click while the first runs would double-POST
+  const problem = welcomeFeedback.validate();
+  if (problem) {
+    (problem.field === 'nick' ? wNickInput : wPassInput).focus();
+    return;
+  }
   signingIn = true;
   try {
     wPassRowEl.style.display = 'flex'; // make sure the password is visible before we demand it
     game.setNick(nick);
     const srv = game.resolveServer();
     if (!srv) return;
-    const session = await ensureSession(srv.base, nick, wPassInput.value);
-    if (!session) {
-      wPassInput.focus(); // ensureSession already explained why in the status line
-      return;
-    }
+    const password = wPassInput.value;
+    const revision = stageRevision;
+    const session = await ensureSession(srv.base, nick, password, undefined, {
+      isActive: () => revision === stageRevision,
+      isCurrent: () => revision === stageRevision && wNickInput.value.trim() === nick && wPassInput.value === password,
+      reject: (reason, key) => {
+        const field = reason === 'nick-rule' || reason === 'nickname-blocked' ? 'nick'
+          : reason === 'pass-rule' || reason === 'password-rule' || reason === 'wrong-password' ? 'pass' : null;
+        if (field) {
+          welcomeFeedback.reject(field, key, reason === 'wrong-password' ? ['nick'] : []);
+          (field === 'nick' ? wNickInput : wPassInput).focus();
+        } else game.status(t(key));
+      },
+    });
+    if (!session) return;
     localStorage.setItem('void.nick', nick);
     wPassInput.value = ''; // the session JWT is stored instead — a password never lingers
+    welcomeFeedback.clear();
     game.status('');
     // If we arrived via `?join=<id>` (or the join button opened the welcome card
     // because no session was cached), resume the join now that we have a JWT — with
@@ -168,6 +189,7 @@ export function welcomePassword(): string {
  *  (сервер без аккаунтов). */
 export function fillWelcome(nick: string, password: 'focus' | 'show' | 'hide'): void {
   wNickInput.value = nick || suggestCallsign();
+  welcomeFeedback.clear();
   wPassRowEl.style.display = password === 'hide' ? 'none' : 'flex';
   if (password === 'focus') wPassInput.focus();
 }
@@ -181,38 +203,36 @@ let crNickInput: HTMLInputElement;
 let crMailInput: HTMLInputElement;
 let crPassInput: HTMLInputElement;
 let crPass2Input: HTMLInputElement;
+let registerFeedback: ReturnType<typeof initFormFeedback<RegisterField>>;
+const registerFields = () => ({ nick: crNickInput, pass: crPassInput, pass2: crPass2Input, email: crMailInput });
+const registerDraft = () => ({
+  nick: crNickInput.value,
+  pass: crPassInput.value,
+  pass2: crPass2Input.value,
+  email: crMailInput.value,
+});
 function openRegister(): void {
   showStage('register');
   crNickInput.value = crNickInput.value.trim() || suggestCallsign();
   crPassInput.value = '';
   crPass2Input.value = '';
+  registerFeedback.clear();
   game.status('');
   crPassInput.focus();
 }
 async function submitRegister(): Promise<void> {
+  if (signingIn) return; // Enter + click must not double-register
   // The check ladder and the payload live in `registerForm.ts` (REFM-52): every
   // problem names its own field, and an empty email never reaches the request.
-  const form = {
-    nick: crNickInput.value,
-    pass: crPassInput.value,
-    pass2: crPass2Input.value,
-    email: crMailInput.value,
-  };
-  const payload = registerPayload(form);
-  if (!payload) {
-    const problem = checkRegister(form)!;
-    game.status(t(problem.key));
-    const focusOn = {
-      nick: crNickInput,
-      pass: crPassInput,
-      pass2: crPass2Input,
-      email: crMailInput,
-    };
-    focusOn[problem.field].focus();
+  const form = registerDraft();
+  const problem = registerFeedback.validate();
+  if (problem) {
+    registerFields()[problem.field].focus();
     return;
   }
+  const payload = registerPayload(form);
+  if (!payload) return;
   const nick = payload.nick;
-  if (signingIn) return; // Enter + click must not double-register
   signingIn = true;
   try {
     // The callsign the player just typed lives on THIS page (`crnick`), while
@@ -224,15 +244,27 @@ async function submitRegister(): Promise<void> {
     if (!srv) return;
     // Email is OPTIONAL — it exists only so the account can be recovered later; skipping it
     // just means no self-service reset. A malformed one is caught by the server (400).
-    const session = await ensureSession(srv.base, nick, payload.pass, payload.email);
-    if (!session) {
-      crPassInput.focus(); // ensureSession already explained why in the status line
-      return;
-    }
+    const revision = stageRevision;
+    const session = await ensureSession(srv.base, nick, payload.pass, payload.email, {
+      isActive: () => revision === stageRevision,
+      isCurrent: () => revision === stageRevision
+        && Object.entries(registerDraft()).every(([field, value]) => value === form[field as RegisterField]),
+      reject: (reason, key) => {
+        const field = reason === 'wrong-password' || reason === 'nick-rule' || reason === 'nickname-blocked' ? 'nick'
+          : reason === 'pass-rule' || reason === 'password-rule' ? 'pass'
+          : reason === 'mail-taken' ? 'email' : null;
+        if (field) {
+          registerFeedback.reject(field, reason === 'wrong-password' ? 'acc.nick.taken' : key);
+          registerFields()[field].focus();
+        } else game.status(t(key));
+      },
+    });
+    if (!session) return;
     localStorage.setItem('void.nick', nick);
     game.setNick(nick);
     crPassInput.value = '';
     crPass2Input.value = '';
+    registerFeedback.clear();
     game.status('');
     // Same resume as welcomeSignIn: a `?join=<id>` deep-link (or a «Войти» press with
     // no session yet) routes a BRAND-NEW player through the full registration page —
@@ -357,6 +389,19 @@ export function initSignInPages(host: SignInPagesHost): void {
   crecMailInput = $('crecmail') as HTMLInputElement;
   cresetPassInput = $('cresetpass') as HTMLInputElement;
   cresetPass2Input = $('cresetpass2') as HTMLInputElement;
+
+  const feedbackStatus = (key: string | null) => game.status(key ? t(key) : '');
+  welcomeFeedback = initFormFeedback<'nick' | 'pass'>(
+    { nick: wNickInput, pass: wPassInput },
+    () => [
+      ...(!validLogin(wNickInput.value.trim()) ? [{ field: 'nick' as const, key: 'acc.nick.rule' }] : []),
+      ...(!validLoginPassword(wPassInput.value) ? [{ field: 'pass' as const, key: 'acc.login-pass.rule' }] : []),
+    ],
+    feedbackStatus,
+  );
+  registerFeedback = initFormFeedback<RegisterField>(
+    registerFields(), () => registerProblems(registerDraft()), feedbackStatus, { pass2: ['pass'] },
+  );
 
   hidePasswords = [wPassInput, crPassInput, crPass2Input, cresetPassInput, cresetPass2Input].map(
     (input) => {

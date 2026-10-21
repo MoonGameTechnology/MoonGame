@@ -65,6 +65,7 @@ function fakeOverlay(): FakeOverlay {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  setLocale('ru');
 });
 
 it('досье скрывает неподтверждённый баланс Суверенов', () => {
@@ -85,6 +86,70 @@ describe('публичный профиль и устаревшие ответы
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(root.html()).toContain('Other');
     expect(root.html()).not.toMatch(/pf-cur|data-portrait=|data-ps="save"|9999|Owner/);
+    expect(root.html()).not.toMatch(/pf-bot-badge|pf-history|Последние матчи|>Матчей<|>Победы в матчах</);
+  });
+  it.each([
+    { locale: 'ru' as const, matches: 'Матчей', wins: 'Победы в матчах', xp: 'Опыт командира', history: 'Последние матчи', results: ['Победа', 'Ничья', 'Поражение'] },
+    { locale: 'en' as const, matches: 'Matches', wins: 'Match victories', xp: 'Commander XP', history: 'Recent matches', results: ['Victory', 'Draw', 'Defeat'] },
+  ])('бот показывает серверную карьеру и историю без редактора ($locale)', async (copy) => {
+    setLocale(copy.locale);
+    const recentMatches = ['win', 'draw', 'loss'].map((outcome, index) => ({
+      matchId: `match-${index}`,
+      mapId: `sector-${index}`,
+      endedAt: Date.UTC(2026, 9, 19 - index, 12),
+      outcome,
+      xp: 30 - index * 10,
+      place: index === 1 ? null : index + 1,
+    }));
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ...publicData('~Orion'), kind: 'bot', progress: { matches: 3, wins: 1 }, recentMatches }),
+    }));
+    vi.stubGlobal('fetch', fetcher);
+    const root = fakeOverlay();
+    const api = initProfile(host(root));
+    api.open('~Orion');
+    expect(root.html()).not.toMatch(/pf-bot-badge|pf-history/);
+    await tick();
+    const html = root.html();
+    expect(fetcher).toHaveBeenCalledWith('https://server/profiles?login=~Orion', expect.anything());
+    expect(html).not.toMatch(/pf-bot-badge|Командир под управлением ИИ|AI-controlled commander|>ИИ<|>AI</);
+    expect(html).toContain(pfCell(copy.xp, '70'));
+    expect(html).toContain(pfCell(copy.matches, '3'));
+    expect(html).toContain(pfCell(copy.wins, '1'));
+    expect(html).toContain(copy.history);
+    expect([...html.matchAll(/class="pf-history-main"/g)]).toHaveLength(3);
+    for (const result of copy.results) expect(html).toContain(`<b>${result}</b>`);
+    expect(html).toContain('datetime="2026-10-19T12:00:00.000Z"');
+    expect(html).toContain('sector-0');
+    expect(html).not.toMatch(/pf-cur|data-portrait=|data-pstab=|data-ps=|9999|Owner|>null<|NaN|href=/);
+  });
+  it('у нового бота нулевые счётчики и пустая история появляются только после ответа', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ...publicData('~New'), kind: 'bot', xp: 0, progress: {} }),
+    })));
+    const root = fakeOverlay();
+    const api = initProfile(host(root));
+    api.open('~New');
+    expect(root.html()).not.toContain('История матчей пока пуста.');
+    await tick();
+    expect(root.html()).toContain(pfCell('Матчей', '0'));
+    expect(root.html()).toContain(pfCell('Победы в матчах', '0'));
+    expect(root.html()).toContain(pfCell('Опыт командира', '0'));
+    expect(root.html()).toContain('История матчей пока пуста.');
+    expect(root.html()).not.toContain('class="pf-history"');
+  });
+  it('позывной бота из сетевого профиля экранируется (CWE-79)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ...publicData('<img src=x onerror=alert(1)>'), kind: 'bot' }),
+    })));
+    const root = fakeOverlay();
+    initProfile(host(root)).open('~Orion');
+    await tick();
+    expect(root.html()).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(root.html()).not.toContain('<img src=x');
   });
   it('запоздалый ответ предыдущей карточки не подменяет новую', async () => {
     let resolveOld!: (value: unknown) => void;
@@ -93,8 +158,9 @@ describe('публичный профиль и устаревшие ответы
       : Promise.resolve({ ok: true, json: async () => publicData('New') })));
     const root = fakeOverlay(); const api = initProfile(host(root));
     api.open('Old'); await tick(); api.open('New'); await tick();
-    resolveOld({ ok: true, json: async () => publicData('Old') }); await tick();
+    resolveOld({ ok: true, json: async () => ({ ...publicData('Old'), kind: 'bot' }) }); await tick();
     expect(root.html()).toContain('New'); expect(root.html()).not.toContain('Old');
+    expect(root.html()).not.toContain('pf-bot-badge');
     api.close(); expect(root.shown()).toBe(false);
   });
 });

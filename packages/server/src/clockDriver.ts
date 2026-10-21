@@ -61,6 +61,11 @@ export interface ClockDriverOptions {
    *  doesn't freeze on-screen between actions. Undefined ⇒ the driver idles when nothing
    *  is pending (the pre-heartbeat behavior — right for an unwatched/hibernated room). */
   heartbeatMs?: number;
+  /** Optional slower heartbeat for an unwatched room with background actors. The host
+   *  returns null when no background work remains (including an ended match). Read once
+   *  per arm, only while the clock runs and no peers are present; only finite positive
+   *  intervals are accepted. Without it an empty unwatched room still idles. */
+  backgroundHeartbeatMs?: () => number | null;
   /** Longest single timer. `setTimeout` overflows past ~24.8 days (the default,
    *  `MAX_DELAY`); a tighter cap also periodically re-syncs a long sleep against
    *  wall-clock drift (the prototype host pins 1h). */
@@ -147,16 +152,26 @@ export function startClockDriver(
       return;
     }
     const ev = room.msUntilNextEvent(); // wall-ms to the next scheduled event, or null
-    // Heartbeat only while the room is watched (≥1 peer) AND its clock is running: an
-    // unwatched/hibernated room has nobody to freeze on-screen, and a frozen pre-start
-    // lobby has no live clock — both idle on their schedule alone. (isClockRunning, not
-    // isStarted: a plain dev match runs its clock without ever being "started".)
-    const beat =
-      options.heartbeatMs !== undefined && room.isClockRunning && room.peerCount > 0
-        ? options.heartbeatMs
-        : null;
+    // Watched rooms retain their live heartbeat. Only the host's explicit background
+    // policy wakes an otherwise empty room; a frozen lobby enables neither heartbeat.
+    // isClockRunning (not isStarted): plain dev matches run without being "started".
+    let beat: number | null = null;
+    if (room.isClockRunning) {
+      if (room.peerCount > 0) {
+        beat = options.heartbeatMs ?? null;
+      } else if (room.peerCount === 0) {
+        const background = options.backgroundHeartbeatMs?.();
+        if (
+          background !== undefined &&
+          background !== null &&
+          Number.isFinite(background) &&
+          background > 0
+        )
+          beat = background;
+      }
+    }
     if (ev === null && beat === null) {
-      clear(); // nothing pending, nobody watching → idle
+      clear(); // no scheduled work or selected heartbeat → idle
       return;
     }
     // Soonest of {next event, next beat}, capped at maxDelay (a long sleep taken in hops).
