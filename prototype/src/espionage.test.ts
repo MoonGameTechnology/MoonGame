@@ -26,7 +26,7 @@ function spyUntilSuccess(
   for (let i = 0; i < 12; i++) {
     const out = order(st, spyOn('p1', target, kind, planetId), st.time);
     expect(out.error).toBeUndefined();
-    st = out.state;
+    st = { ...out.state, spyAgents: undefined }; // SPY-6: retries need a free agent each
     if (st.intel?.['p1']?.some((g) => g.kind === kind)) return st;
   }
   throw new Error('no success in 12 seeded attempts — chance pipeline broken?');
@@ -70,7 +70,9 @@ describe('espionage in the prototype kernel (SPY-1 playable)', () => {
       const before = botFavour(st, 'p2', 'p1');
       const out = order(st, spyOn('p1', 'p2', 'treasury'), st.time);
       expect(out.error).toBeUndefined();
-      st = out.state;
+      // SPY-6: the network holds 3 agents — send them home so the retries never trip
+      // E_NO_AGENT (this test is about favour, not about the network).
+      st = { ...out.state, spyAgents: undefined };
       const caught = out.events.find(
         (e) => e.type === 'espionage.detected' && (e.payload as { spy?: string }).spy === 'p1',
       );
@@ -81,5 +83,16 @@ describe('espionage in the prototype kernel (SPY-1 playable)', () => {
       }
     }
     throw new Error('no red-handed detection in 40 seeded attempts');
+  });
+
+  it('SPY-6: three agents away → the fourth attempt is refused with E_NO_AGENT', () => {
+    let st = funded();
+    for (let i = 0; i < 3; i++) {
+      const out = order(st, spyOn('p1', 'p2', 'treasury'), st.time);
+      expect(out.error).toBeUndefined();
+      st = out.state;
+    }
+    expect(st.spyAgents?.['p1']).toHaveLength(3);
+    expect(order(st, spyOn('p1', 'p2', 'treasury'), st.time).error).toBe('E_NO_AGENT');
   });
 });

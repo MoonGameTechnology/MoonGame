@@ -55,7 +55,7 @@ import {
   spyOn,
   STANCE_RANK,
 } from './game';
-import { grantLeftMs, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
+import { grantLeftMs, myAgents, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
 import { selPlanet } from './interaction';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
@@ -579,13 +579,17 @@ function declineFrom(seat: string, kind: string | undefined): void {
   if (kind === 'map') game.playerOrder(shareMap(ME, seat, false));
   else game.playerOrder(declineOffer(ME, seat));
 }
+/** SPY-6: все агенты в деле — кнопки операций гаснут, но не прячутся. */
+function spyLock(): string {
+  return myAgents(game.state(), game.me()).free > 0 ? '' : ' disabled';
+}
 function seatDiploActionsHtml(id: string): string {
   return (
     `<div class="dp-actions">` +
     stanceButtonsHtml(id) +
     (espionageShown(game.sectorZeroToolsHidden())
-      ? `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>`
+      ? `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}"${spyLock()}>🕵 ${t('log.spy.kind.treasury')}</button>` +
+        `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}"${spyLock()}>🕵 ${t('spy.op.fleets')}</button>`
       : '') +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
     intelRowHtml(id)
@@ -690,13 +694,22 @@ function intelTabHtml(): string {
       );
     })
     .join('');
+  // SPY-6: сеть агентов — сколько свободно и когда вернутся остальные.
+  const net = myAgents(s, ME);
+  const lock = net.free > 0 ? '' : ' disabled';
+  const agents = net.away
+    .map((a) => {
+      const left = t('fmt.hours', { n: Math.max(0, Math.ceil((a.until - s.time) / HOUR)) });
+      return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : '🕵'}</span><b>${t(a.lost ? 'spy.agent.lost' : 'spy.agent.busy')}</b><span class="in-t">⏳ ${left}</span></div>`;
+    })
+    .join('');
   const ops = Object.keys(s.players)
     .filter((id) => id !== ME)
     .map(
       (id) =>
         `<div class="in-row"><b>${esc(NAME[id] ?? id)}</b>` +
-        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('spy.op.fleets')}</button></div>`,
+        `<button class="dp-spy" data-spy="treasury" data-seat="${id}"${lock}>🕵 ${t('log.spy.kind.treasury')}</button>` +
+        `<button class="dp-spy" data-spy="fleets" data-seat="${id}"${lock}>🕵 ${t('spy.op.fleets')}</button></div>`,
     )
     .join('');
   const log = [...spyLog]
@@ -706,6 +719,8 @@ function intelTabHtml(): string {
   return (
     `<div class="dp-list in-list">` +
     `<div class="in-hint">${t('spy.note', { c: SPY_COST })}</div>` +
+    `<div class="in-sec">${t('spy.agents.title', { free: net.free, total: net.total })}</div>` +
+    agents +
     `<div class="in-sec">${t('spy.windows.title')}</div>` +
     (rows || `<div class="in-empty">${t('spy.windows.empty')}</div>`) +
     `<div class="in-sec">${t('spy.ops.title')}</div>` +

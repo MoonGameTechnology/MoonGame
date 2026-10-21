@@ -18,11 +18,22 @@
  * Журнал шпионажа — сессионный и ОГРАНИЧЕННЫЙ: без потолка он рос бы весь матч, а окно
  * вкладки показывает последние строки.
  */
-import type { IntelGrant } from '../../packages/shared-core/src/index';
+import {
+  BASE_SPY_AGENTS,
+  type GameState,
+  type IntelGrant,
+} from '../../packages/shared-core/src/index';
+import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
 
 /** Базовая цена одной попытки — зеркало `BASE_COST` модуля ядра. Это ПОДПИСЬ на кнопке:
  *  авторитетно ядро, оно же отвергает попытку с `E_INSUFFICIENT`, когда денег мало. */
 export const SPY_COST = 150;
+
+/** Сеть агентов игрока сейчас (SPY-6). Размер — база ядра `BASE_SPY_AGENTS`: как и
+ *  `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */
+export function myAgents(s: GameState, me: string): SpyAgents {
+  return spyAgents(s.spyAgents?.[me], BASE_SPY_AGENTS, s.time);
+}
 
 /** Сколько строк держит сессионный журнал шпионажа. */
 export const SPY_LOG_MAX = 30;

@@ -120,6 +120,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   coalitions: 'public', // список коалиций, состав, эмблема и описание — открытые (COAL-1)
   coalitionSeq: 'public',
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
+  spyAgents: 'filtered', // сеть агентов (SPY-6) — тот же секрет шпиона
   market: 'public', // сессионный стакан публичен по замыслу
   marketSeq: 'public',
   trader: 'public', // курс торговца экспедиции — цена рынка, одна на всех
@@ -466,6 +467,7 @@ function maximalState(): GameState {
       [VIEWER]: [{ kind: 'planet', target: 'A', until: 900 }],
       [RIVAL]: [{ kind: 'planet', target: 'CANARY_target', until: 900 }],
     },
+    spyAgents: { [VIEWER]: [{ until: 900 }], [RIVAL]: [{ until: 900, lost: true }] },
     market: [{ id: 'm1', side: 'sell', owner: RIVAL, resource: 'metal', amount: 5, price: 3 }],
     marketSeq: 1,
     trader: { metal: { shift: 0.1, at: 0 } },

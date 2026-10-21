@@ -331,6 +331,16 @@ export interface IntelGrant {
   until: number;
 }
 
+/** An agent of the spy's network that is away (espionage, SPY-6): busy working a
+ *  stolen window, slipping home after a failure, or — `lost` — caught, with a
+ *  replacement being recruited. Back in the network once `until` passes. */
+export interface AgentAway {
+  /** World-time (ms) the agent is available again. */
+  until: number;
+  /** The agent was caught; `until` is when the replacement is recruited. */
+  lost?: true;
+}
+
 export type MatchStatus = 'ongoing' | 'ended';
 export type MatchEndReason =
   | 'domination'
@@ -1117,6 +1127,9 @@ export interface GameState {
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;
+  /** Agents away from each spy's network (`espionageModule`, SPY-6). PRIVATE like
+   *  `intel`: a viewer's projection carries only their own network. */
+  spyAgents?: Record<PlayerId, AgentAway[]>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];

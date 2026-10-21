@@ -1121,6 +1121,13 @@ function project(
     if (own?.length) view.intel = { [viewerId]: own };
     else delete view.intel;
   }
+  // The agent network (SPY-6) is as secret as the grants: how many agents a rival
+  // has out says that someone is being spied on.
+  if (view.spyAgents) {
+    const own = view.spyAgents[viewerId];
+    if (own?.length) view.spyAgents = { [viewerId]: own };
+    else delete view.spyAgents;
+  }
   // Diplomatic OFFERS are private to the two negotiating parties (the committed
   // stances themselves are public): a third party must not see who is suing for
   // peace with whom. Keep only offers the viewer sends or receives; a map left

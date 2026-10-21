@@ -1,6 +1,6 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule } from '../kernel/module';
-import type { IntelGrant } from '../state/gameState';
+import type { AgentAway, IntelGrant } from '../state/gameState';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
@@ -25,7 +25,16 @@ import { canAfford, payCost } from '../util/treasury';
  * emits `espionage.detected` addressed to the VICTIM; the thief's identity is
  * included only when the attempt FAILED (an agent caught red-handed) — a
  * successful theft that gets noticed reveals THAT intel leaked, not by whom.
- * The spy is never told they were spotted.
+ * The spy is never told a clean theft was spotted; a CAUGHT agent is another
+ * matter — see SPY-6 below.
+ *
+ * Agent network (SPY-6): every attempt needs a free agent out of a small network
+ * (`espionage.agents` pipeline, base 3). No free agent → `E_NO_AGENT`, nothing
+ * paid, nothing rolled. A sent agent is away for a while (`state.spyAgents`):
+ * after a success — as long as the stolen window stays open; after an unnoticed
+ * failure — `AGENT_RETURN_HOURS`; after a caught failure the agent is LOST and a
+ * replacement is recruited in `AGENT_RECRUIT_HOURS`. Losing an agent cannot be
+ * hidden from its owner, so `espionage.failed` says `agentLost: true` then.
  */
 
 const SPY_KINDS = new Set(['treasury', 'planet', 'fleets']);
@@ -46,6 +55,13 @@ const BASE_DETECT_SUCCESS = 0.25; // a clean theft is noticed rarer
 /** A beneficiary holds at most this many live grants — the oldest one is evicted
  *  first (fail-secure bound: state must not grow without limit). */
 const MAX_GRANTS = 8;
+/** Base size of a player's agent network (SPY-6) — the `espionage.agents` pipeline
+ *  may bend it; the result is floored and clamped to [0, MAX_GRANTS]. */
+export const BASE_SPY_AGENTS = 3;
+/** How long an agent is away after a failed attempt nobody noticed, game-hours. */
+const AGENT_RETURN_HOURS = 6;
+/** How long recruiting a replacement for a caught agent takes, game-hours. */
+const AGENT_RECRUIT_HOURS = 24;
 
 interface SpyPayload {
   target?: string;
@@ -90,6 +106,19 @@ export const espionageModule: GameModule = {
         grantTarget = p.planetId;
       }
 
+      // SPY-6: an attempt needs a free agent — checked before the fee, so a refusal
+      // costs nothing and draws no RNG.
+      const rawAgents = h.hook<number>('espionage.agents', BASE_SPY_AGENTS, {
+        playerId: action.playerId,
+      });
+      const agents = Number.isFinite(rawAgents)
+        ? Math.min(MAX_GRANTS, Math.max(0, Math.floor(rawAgents)))
+        : BASE_SPY_AGENTS;
+      const away = (h.state.spyAgents?.[action.playerId] ?? []).filter((a) => a.until > h.ctx.now);
+      if (away.length >= agents) {
+        return h.reject('E_NO_AGENT');
+      }
+
       const fee = h.hook<Record<string, number>>('espionage.cost', { ...BASE_COST }, {
         playerId: action.playerId,
         target: p.target,
@@ -128,9 +157,25 @@ export const espionageModule: GameModule = {
         : baseDetect;
       const detected = h.rng.nextFloat() < detectChance;
 
+      const sendAway = (agent: AgentAway): void => {
+        away.push(agent);
+        (h.state.spyAgents ??= {})[action.playerId] = away;
+      };
+
       if (!succeeded) {
+        // A caught agent is lost (a replacement is recruited); otherwise it slips home.
+        sendAway(
+          detected
+            ? { until: h.ctx.now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true }
+            : { until: h.ctx.now + hoursToMs(h.ctx, AGENT_RETURN_HOURS) },
+        );
         // Addressed to the actor (`owner` routes the event through the fog filter).
-        h.emit('espionage.failed', { owner: action.playerId, target: p.target, kind: p.kind });
+        h.emit('espionage.failed', {
+          owner: action.playerId,
+          target: p.target,
+          kind: p.kind,
+          ...(detected ? { agentLost: true } : {}),
+        });
         if (detected) {
           // Caught red-handed: the victim learns the kind AND who sent the agent.
           h.emit('espionage.detected', { owner: p.target, kind: p.kind, spy: action.playerId });
@@ -152,6 +197,7 @@ export const espionageModule: GameModule = {
       };
       const mine = ((h.state.intel ??= {})[action.playerId] ??= []);
       mine.push(grant);
+      sendAway({ until: grant.until }); // the agent works the window while it is open
       while (mine.length > MAX_GRANTS) mine.shift(); // oldest window evicted first
       h.emit('intel.stolen', {
         owner: action.playerId,
@@ -166,13 +212,22 @@ export const espionageModule: GameModule = {
       }
     });
 
-    // Housekeeping: expired windows are dropped as time advances, so persisted
-    // state stays small. The projection independently ignores expired grants —
-    // this is cleanup, not the security check.
+    // Housekeeping: expired windows and returned agents are dropped as time
+    // advances, so persisted state stays small. The projection independently
+    // ignores expired grants — this is cleanup, not the security check.
     api.on('time.advanced', (event, h) => {
+      const { to } = event.payload as { to: number };
+      const agents = h.state.spyAgents;
+      if (agents) {
+        for (const playerId of Object.keys(agents)) {
+          const still = agents[playerId]!.filter((a) => a.until > to);
+          if (still.length === 0) delete agents[playerId];
+          else if (still.length !== agents[playerId]!.length) agents[playerId] = still;
+        }
+        if (Object.keys(agents).length === 0) delete h.state.spyAgents;
+      }
       const intel = h.state.intel;
       if (!intel) return;
-      const { to } = event.payload as { to: number };
       for (const playerId of Object.keys(intel)) {
         const live = intel[playerId]!.filter((g) => g.until > to);
         if (live.length === 0) delete intel[playerId];

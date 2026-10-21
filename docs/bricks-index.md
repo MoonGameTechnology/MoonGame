@@ -170,6 +170,7 @@
 | CORP-11 | 🔒 | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
 | CORP-12 | 🔒 | srv | `docs/backlog.md` | Медали игроков в ленте. |
 | CORP-13 | 🔒 | proto | `docs/backlog.md` | Картинки базы. |
+| SPY-6 | ✅ | core proto | `docs/backlog.md` | Сеть из 3 агентов. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
