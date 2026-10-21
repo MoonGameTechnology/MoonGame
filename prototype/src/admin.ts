@@ -20,9 +20,14 @@
  *    устаревшему списку — это снятый не тот человек; сервер от этого защищён (кик
  *    адресован ПОЗЫВНОМУ, а не креслу), но показывать несуществующий состав всё
  *    равно нельзя.
+ *
+ * Здесь же объявления ленты новостей (CORP-2): форма на двух языках и список с кнопкой
+ * «Снять». Список, как и состав, перечитывается после каждого действия.
  */
-import { t, localizeStaticDom } from '../../localization/runtime';
+import { LOCALE, t, localizeStaticDom } from '../../localization/runtime';
 import { resolveBase } from '../../decisions/serverAddress';
+import { NEWS_KIND_LABEL, parseNewsAnnouncement } from '../../decisions/newsFeed';
+import { NEWS_ANNOUNCEMENT_KINDS, type NewsAnnouncement } from '../../packages/protocol/src/news';
 import { detach } from './detach';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -147,6 +152,8 @@ async function confirmAuthority(): Promise<void> {
   });
   say('admin.ready');
   await loadMatches();
+  await loadNews();
+  if (session !== checking) return; // пока читались списки, сессию сняли или сменили сервер
   if (timer === null)
     timer = setInterval(() => detach('пульт: обновление состава', loadRoster()), REFRESH_MS);
 }
@@ -276,6 +283,101 @@ async function kick(matchId: string, nick: string): Promise<void> {
   await loadRoster();
 }
 
+// --- объявления ленты (CORP-2) ---------------------------------------------------------
+
+const stamp = (at: number): string =>
+  new Date(at).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short' });
+
+/** Объявления — свежие сверху, истёкшие тоже: их видно, пока их не сняли. */
+async function loadNews(): Promise<void> {
+  const res = await call('/admin/news');
+  if (!res) return say('admin.err.server');
+  // Нет маршрута или полномочия — списка нет; о полномочии уже сказал вход.
+  if (res.status !== 200) {
+    el('a-news-list').textContent = '';
+    return;
+  }
+  const raw = (res.body as { announcements?: unknown } | null)?.announcements;
+  renderNews(Array.isArray(raw) ? raw.flatMap((a) => parseNewsAnnouncement(a) ?? []) : []);
+}
+
+function renderNews(list: readonly NewsAnnouncement[]): void {
+  const host = el('a-news-list');
+  host.textContent = '';
+  if (list.length === 0) {
+    host.textContent = t('admin.news.none');
+    return;
+  }
+  const table = document.createElement('table');
+  const head = document.createElement('tr');
+  for (const key of ['admin.news.col.at', 'admin.news.col.title', 'admin.news.until', 'admin.col.act']) {
+    const th = document.createElement('th');
+    th.textContent = t(key);
+    head.append(th);
+  }
+  table.append(head);
+  const now = Date.now();
+  for (const a of list) {
+    const tr = document.createElement('tr');
+    const cell = (text: string): HTMLTableCellElement => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.append(td);
+      return td;
+    };
+    cell(stamp(a.at));
+    cell([t(NEWS_KIND_LABEL[a.kind]), ...(a.pinned ? [t('news.pinned')] : []), a.title.ru].join(' · '));
+    cell(a.until === null ? t('admin.news.forever') : a.until <= now ? t('admin.news.expired') : stamp(a.until));
+    const button = document.createElement('button');
+    button.className = 'kick';
+    button.textContent = t('admin.news.remove');
+    button.onclick = () => detach('пульт: снятие объявления', removeNews(a));
+    cell('').append(button);
+    table.append(tr);
+  }
+  host.append(table);
+}
+
+/** Опубликовать объявление из формы. Срок вводят по часам этого компьютера — по ним и
+ *  считается момент; прошедший срок сервер не примет, поэтому он ловится здесь. */
+async function publishNews(): Promise<void> {
+  const value = (id: string): string => el<HTMLInputElement>(id).value.trim();
+  const titleRu = value('a-news-title-ru');
+  if (!titleRu) return say('admin.news.need-title');
+  const untilText = value('a-news-until');
+  const until = untilText ? new Date(untilText).getTime() : null;
+  if (until !== null && !(until > Date.now())) return say('admin.news.bad-until');
+  const typed = el<HTMLSelectElement>('a-news-kind').value;
+  const res = await call('/admin/news', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: NEWS_ANNOUNCEMENT_KINDS.find((k) => k === typed) ?? 'tech',
+      pinned: el<HTMLInputElement>('a-news-pin').checked,
+      until,
+      title: { ru: titleRu, en: value('a-news-title-en') },
+      body: { ru: value('a-news-body-ru'), en: value('a-news-body-en') },
+    }),
+  });
+  if (!res) return say('admin.err.server');
+  if (res.status === 400) return say('admin.news.bad');
+  if (res.status !== 201) return say('admin.err.no-authority');
+  for (const id of ['a-news-title-ru', 'a-news-title-en', 'a-news-body-ru', 'a-news-body-en', 'a-news-until'])
+    el<HTMLInputElement>(id).value = '';
+  el<HTMLInputElement>('a-news-pin').checked = false;
+  say('admin.news.published');
+  await loadNews();
+}
+
+async function removeNews(a: NewsAnnouncement): Promise<void> {
+  if (!confirm(t('admin.news.remove.confirm', { title: a.title.ru }))) return;
+  const res = await call(`/admin/news/${encodeURIComponent(a.id)}/remove`, { method: 'POST' });
+  if (!res) return say('admin.err.server');
+  if (res.status === 404) say('admin.news.gone');
+  else if (res.status !== 200) say('admin.err.no-authority');
+  else say('admin.news.removed');
+  await loadNews();
+}
+
 localizeStaticDom();
 // Вход висит на ОТПРАВКЕ формы, а не на клике по кнопке: так работает и Enter в поле
 // пароля, и менеджер паролей, который сам заполняет пару и жмёт отправку.
@@ -284,7 +386,14 @@ el<HTMLFormElement>('a-gate').onsubmit = (e: Event): void => {
   detach('пульт: вход', signIn());
 };
 el('a-signout').onclick = () => signOut();
-el('a-refresh').onclick = () => detach('пульт: список матчей', loadMatches());
+el('a-refresh').onclick = () => {
+  detach('пульт: список матчей', loadMatches());
+  detach('пульт: объявления', loadNews());
+};
+el<HTMLFormElement>('a-news-form').onsubmit = (e: Event): void => {
+  e.preventDefault();
+  detach('пульт: публикация объявления', publishNews());
+};
 el<HTMLSelectElement>('a-match').onchange = () => detach('пульт: состав матча', loadRoster());
 
 // Перезагрузка страницы не должна означать повторный вход (правило 2).

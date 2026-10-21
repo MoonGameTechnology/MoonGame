@@ -3687,6 +3687,97 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hm-go{margin-top:10px;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--sf-accent);
   background:var(--sf-sel);color:var(--sf-hi);font:600 15px var(--sf-font);cursor:pointer;}
 #hub .hm-go:hover{border-color:var(--sf-edge-hi);}
+/* CORP-2 «Домой»: лента новостей (newsScreen.ts). Раскладку решает ширина ПАНЕЛИ
+   (контейнер home): на широкой лента — липкой колонкой справа от «Моих партий», на узкой —
+   превью под дверью и вся лента шторкой. Панель прокручивается сама, как арсенал и магазин:
+   так колонка знает высоту видимой части (100cqh) и целиком помещается в неё. */
+#hp-home{height:100%;overflow-y:auto;overscroll-behavior:contain;container:home / size;}
+#hub .home-grid,#hub .home-main{display:flex;flex-direction:column;gap:14px;min-width:0;}
+#hub .nw-col{display:none;}
+#hub .nw-teaser{display:flex;flex-direction:column;border-radius:14px;border:1px solid var(--sf-panel-edge);
+  background:var(--sf-panel);overflow:hidden;}
+@container home (min-width:760px){
+  #hub .home-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;align-items:start;}
+  #hub .nw-col{display:flex;flex-direction:column;position:sticky;top:0;
+    max-height:max(240px,100cqh);border-radius:14px;
+    border:1px solid var(--sf-panel-edge);background:var(--sf-panel);overflow:hidden;}
+  #hub .nw-col .nw-list{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;}
+  #hub .nw-teaser{display:none;}
+}
+.nw-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:14px 16px 0;}
+.nw-h h3{margin:0;font:600 var(--fs-heading) var(--sf-font);color:var(--sf-hi);}
+.nw-teaser .nw-h{padding-bottom:6px;}
+.nw-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 12px;border-bottom:1px solid var(--line);}
+.nw-chip{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--sf-edge);background:var(--sf-inset);
+  color:var(--sf-dim);font:600 var(--fs-caption) var(--sf-font);cursor:pointer;white-space:nowrap;}
+.nw-chip[aria-pressed="true"]{border-color:var(--sf-accent);color:var(--sf-hi);background:var(--sf-sel);}
+.nw-chip.mine[aria-pressed="true"]{border-color:var(--grn);color:var(--grn);background:color-mix(in srgb,var(--grn) 10%,transparent);}
+.nw-chip:focus-visible,.nw-all:focus-visible{outline:2px solid var(--sf-accent);outline-offset:-2px;}
+.nw-list{display:flex;flex-direction:column;min-height:0;}
+/* Строка ленты: значок раздела, подпись и время, фраза, кнопки. Цвет раздела — --k. */
+.nw-it{--k:var(--sf-accent);position:relative;display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;
+  padding:12px 16px;border-bottom:1px solid var(--line);}
+.nw-it:last-of-type{border-bottom:0;}
+.nw-it.k-ann{--k:var(--amber);}
+.nw-it.k-ann.s-update{--k:var(--cyan);}
+.nw-it.k-ann.s-event{--k:var(--cur-warrants);}
+.nw-it.k-battle{--k:#ff7a6b;}
+.nw-it.k-ach{--k:var(--cur-sovereigns);}
+/* Закреплённое — янтарная кромка и подсветка, новость своей корпорации — зелёная кромка. */
+.nw-it.pin{background:linear-gradient(90deg,color-mix(in srgb,var(--amber) 10%,transparent),transparent 70%);}
+.nw-it.pin::before,.nw-it.my::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;
+  border-radius:0 3px 3px 0;background:var(--amber);}
+.nw-it.my::before{background:var(--grn);}
+.nw-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:16px;color:var(--k);
+  background:color-mix(in srgb,var(--k) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--k) 45%,transparent);}
+.nw-b{min-width:0;display:flex;flex-direction:column;gap:3px;}
+.nw-top{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.nw-top span{color:var(--k);font-weight:600;}
+.nw-top time{flex:0 0 auto;}
+.nw-t{color:var(--sf-hi);font-weight:600;line-height:1.35;overflow-wrap:anywhere;}
+.nw-x{margin:0;font-size:var(--fs-caption);color:var(--sf-text);line-height:1.45;white-space:pre-line;overflow-wrap:anywhere;}
+.nw-a{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;}
+.nw-btn{min-height:36px;padding:0 12px;border-radius:8px;font-size:var(--fs-caption);}
+.nw-pill{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;border:1px solid var(--sf-edge);
+  font-size:var(--fs-caption);font-weight:600;color:var(--sf-dim);white-space:nowrap;}
+.nw-pill.win{color:var(--grn);border-color:color-mix(in srgb,var(--grn) 60%,transparent);background:color-mix(in srgb,var(--grn) 10%,transparent);}
+.nw-pill.loss{color:var(--red);border-color:color-mix(in srgb,var(--red) 60%,transparent);background:color-mix(in srgb,var(--red) 10%,transparent);}
+.nw-pill.wait{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 55%,transparent);}
+.nw-empty{margin:0;padding:18px 16px;color:var(--sf-dim);font-size:var(--fs-body);}
+.nw-more{align-self:center;margin:10px 16px 14px;min-height:40px;padding:0 16px;border-radius:10px;}
+.nw-all{min-height:44px;border:0;border-top:1px solid var(--line);background:none;color:var(--sf-accent);
+  font:600 var(--fs-body) var(--sf-font);cursor:pointer;}
+/* Шторка ленты: на телефоне — снизу, на широком экране — окном по центру. Вне тела хаба,
+   как шторки арсенала и магазина. */
+#news-sheet{position:fixed;inset:0;z-index:5;display:none;}
+#news-sheet.open{display:block;}
+.nw-scrim{position:absolute;inset:0;background:rgba(1,5,9,.6);}
+.nw-sheet{position:absolute;left:0;right:0;bottom:0;max-height:86%;display:flex;flex-direction:column;
+  border-radius:20px 20px 0 0;border-top:1px solid var(--sf-panel-edge);background:var(--sf-panel);box-shadow:var(--sf-shadow);
+  padding-bottom:env(safe-area-inset-bottom,0px);animation:nw-rise .22s ease-out;}
+.nw-sheet-top{position:relative;display:flex;justify-content:flex-end;padding:8px 10px 0;}
+.nw-sheet-top::before{content:"";position:absolute;left:50%;top:10px;width:40px;height:4px;border-radius:2px;
+  background:var(--sf-edge);transform:translateX(-50%);}
+.nw-sheet-top .btn-x{width:44px;height:44px;border-radius:10px;font-size:18px;}
+.nw-sheet-body{overflow-y:auto;overscroll-behavior:contain;padding:0 0 22px;}
+.nw-sheet .nw-h{padding-top:0;}
+.nw-sheet.card .nw-sheet-body{display:flex;flex-direction:column;gap:12px;padding:0 20px 22px;}
+.nw-sheet.card h3{margin:0;font:700 18px var(--sf-font);color:var(--sf-hi);overflow-wrap:anywhere;}
+.nw-facts{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;color:var(--sf-text);font-size:var(--fs-body);}
+.nw-note{margin:0;color:var(--sf-dim);}
+/* Ответ на заявку — над лентой и при прокрутке: строка хаба под шторкой не видна. */
+.nw-notice{position:sticky;top:0;z-index:1;margin:0 16px 8px;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--sf-edge-hi);background:var(--sf-inset);color:var(--sf-hi);font-size:var(--fs-caption);}
+.nw-sheet.card .nw-notice{margin:0;}
+.nw-sheet.card .nw-a :is(.btn-main,.btn-second){min-height:44px;padding:0 18px;border-radius:10px;}
+@keyframes nw-rise{from{transform:translateY(32px);opacity:0;}}
+@media (min-width:760px){
+  .nw-sheet{left:50%;right:auto;top:50%;bottom:auto;width:min(560px,calc(100% - 48px));max-height:calc(100% - 56px);
+    transform:translate(-50%,-50%);border:1px solid var(--sf-panel-edge);border-radius:18px;animation:none;}
+  .nw-sheet-top::before{display:none;}
+}
+@media (prefers-reduced-motion:reduce){.nw-sheet{animation:none;}}
+@media (pointer:coarse){.nw-chip,.nw-btn{min-height:44px;}}
 #hub .hub-empty{padding:54px 16px;text-align:center;color:var(--dim);font-size:14px;line-height:1.9;}
 #hub .hub-empty .he-ic{font-size:38px;color:var(--dim);display:block;margin-bottom:14px;
   text-shadow:0 0 16px rgba(53,214,230,.3);}
@@ -4996,6 +5087,10 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   </div>
   <div class="hub-body">
     <div class="hub-panel" id="hp-home">
+      <!-- CORP-2: на широком экране лента новостей — колонкой справа, на узком — превью под
+           дверью (newsScreen.ts). Раскладку решает ширина панели, а не экрана. -->
+      <div class="home-grid">
+      <div class="home-main">
       <!-- UIX-10.1: одна главная дверь — «Продолжить» или, новичку, «Начать обучение»
            (какая из двух — decisions/hubDoor.ts); под ней режимы, у каждого строка отличия. -->
       <button id="hub-solo-continue" class="hub-door" type="button" hidden><b data-i18n="solo.save.continue"></b><span id="hub-continue-sub"></span></button>
@@ -5005,6 +5100,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button id="ob-start" class="hub-door" type="button"><b data-i18n="hub.onboard.start"></b><span data-i18n="hub.onboard.sub"></span></button>
         <button id="ob-skip" class="ob-later" type="button" data-i18n="hub.onboard.skip"></button>
       </div>
+      <section class="nw-teaser" id="news-teaser" data-i18n-aria="news.title"></section>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
@@ -5014,14 +5110,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
-      <div class="hub-sec" data-i18n="hub.digest.section"></div>
-      <div class="hub-card">
-        <div class="hc-ic">◷</div>
-        <div><div class="hc-t" data-i18n="hub.digest.empty.title"></div><div class="hc-s" data-i18n="hub.digest.empty.sub"></div></div>
       </div>
-      <div class="hub-card">
-        <div class="hc-ic">✦</div>
-        <div><div class="hc-t" data-i18n="hub.season.title"></div><div class="hc-s" data-i18n="hub.season.sub"></div></div>
+      <aside class="nw-col" id="news-col" data-i18n-aria="news.title"></aside>
       </div>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
@@ -5071,9 +5161,10 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
-  <!-- Шторки арсенала и магазина на телефоне: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
+  <!-- Шторки арсенала, магазина и ленты новостей: вне тела хаба, чтобы его стекло не держало fixed-потомка -->
   <div id="arsenal-sheet"></div>
   <div id="shop-sheet"></div>
+  <div id="news-sheet"></div>
 </div>
 <div id="emblempick">
   <div class="ep-box">
@@ -5165,9 +5256,12 @@ body{margin:0;padding:18px;background:#02080e;color:var(--ink);
 h1{font-size:16px;letter-spacing:2px;margin:0;color:var(--cyan);}
 p.sub{margin:2px 0 16px;color:var(--dim);}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
-input,select,button{font:inherit;color:var(--ink);background:#041016;
+input,select,button,textarea{font:inherit;color:var(--ink);background:#041016;
   border:1px solid var(--line);border-radius:2px;padding:6px 9px;}
-input:focus,select:focus{outline:1px solid var(--cyan);}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--cyan);}
+h2{font-size:14px;letter-spacing:1px;margin:22px 0 10px;color:var(--cyan);}
+#a-news-form input:not([type]),#a-news-form textarea{flex:1 1 280px;max-width:370px;}
+#a-news-list{margin-top:10px;}
 button{cursor:pointer;border-color:var(--cyan);}
 button:hover{background:#062028;}
 button.kick{border-color:var(--red);color:var(--red);}
@@ -5209,6 +5303,32 @@ const adminPage = (js) => `<!doctype html>
   </div>
   <div id="a-meta"></div>
   <div id="a-roster"></div>
+  <!-- CORP-2: объявления ленты новостей. Текст пишется сразу на двух языках: сервер
+       не знает языка читателя и прозы не сочиняет. -->
+  <h2 data-i18n="admin.news.title"></h2>
+  <form id="a-news-form">
+    <div class="row">
+      <label for="a-news-kind" data-i18n="admin.news.kind"></label>
+      <select id="a-news-kind">
+        <option value="tech" data-i18n="news.kind.tech"></option>
+        <option value="update" data-i18n="news.kind.update"></option>
+        <option value="event" data-i18n="news.kind.event"></option>
+      </select>
+      <label><input id="a-news-pin" type="checkbox"> <span data-i18n="admin.news.pin"></span></label>
+      <label for="a-news-until" data-i18n="admin.news.until"></label>
+      <input id="a-news-until" type="datetime-local">
+    </div>
+    <div class="row">
+      <input id="a-news-title-ru" maxlength="120" data-i18n-ph="admin.news.title-ru" data-i18n-aria="admin.news.title-ru">
+      <input id="a-news-title-en" maxlength="120" data-i18n-ph="admin.news.title-en" data-i18n-aria="admin.news.title-en">
+    </div>
+    <div class="row">
+      <textarea id="a-news-body-ru" maxlength="600" rows="3" data-i18n-ph="admin.news.body-ru" data-i18n-aria="admin.news.body-ru"></textarea>
+      <textarea id="a-news-body-en" maxlength="600" rows="3" data-i18n-ph="admin.news.body-en" data-i18n-aria="admin.news.body-en"></textarea>
+    </div>
+    <div class="row"><button id="a-news-publish" type="submit" data-i18n="admin.news.publish"></button></div>
+  </form>
+  <div id="a-news-list"></div>
 </div>
 <div id="a-status"></div>
 <script>${js}</script>
