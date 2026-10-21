@@ -19,7 +19,7 @@
  * finished `ProfileView`, so it needs neither storage nor a clock), and only
  * `initProfile(host)` touches the host, through explicit hooks.
  */
-import { t } from '../../localization/runtime';
+import { LOCALE, t } from '../../localization/runtime';
 import { esc, kfmt, nfmt } from './format';
 import { SOV_SVG } from './icons';
 import { averagePlace, leagueKey, metaLevel, winRate, type MetaStats } from './meta';
@@ -169,6 +169,48 @@ export function profileHtml(v: ProfileView): string {
   );
 }
 
+/** Bot careers come from the server's real, bounded match history. Human public
+ *  profiles keep their existing projection: XP and equipped medals only. */
+function publicCareerHtml(profile: PlayerProfile, ready: boolean): string {
+  const bot = ready && profile.kind === 'bot';
+  const grid =
+    `<div class="pf-grid">` +
+    pfCell(t('profile.xp'), ready ? String(profile.xp) : null) +
+    (bot
+      ? pfCell(t('profile.matches'), String(profile.progress.matches ?? 0)) +
+        pfCell(t('profile.metric.wins'), String(profile.progress.wins ?? 0))
+      : '') +
+    `</div>`;
+  if (!bot) return grid;
+  const history = profile.recentMatches ?? [];
+  const title = `<h3>${esc(t('profile.history.title'))}</h3>`;
+  if (!history.length)
+    return grid + title + `<p class="pf-hint">${esc(t('profile.history.empty'))}</p>`;
+  const dateFormat = new Intl.DateTimeFormat(LOCALE, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return (
+    grid + title + `<ol class="pf-history">` +
+    history.map((match) => {
+      const date = new Date(match.endedAt);
+      const outcome = match.outcome === 'win'
+        ? t('profile.history.win')
+        : match.outcome === 'draw'
+          ? t('profile.history.draw')
+          : t('profile.history.loss');
+      const place = match.place === null
+        ? ''
+        : `<span>${esc(t('profile.history.place', { n: match.place }))}</span>`;
+      return (
+        `<li><div class="pf-history-main"><b>${esc(outcome)}</b><time datetime="${esc(date.toISOString())}">${esc(dateFormat.format(date))}</time></div>` +
+        `<div class="pf-history-details"><span class="pf-history-map">${esc(t('profile.history.map', { map: match.mapId }))}</span>${place}<span>${esc(t('profile.history.xp', { n: match.xp }))}</span></div></li>`
+      );
+    }).join('') + `</ol>`
+  );
+}
+
 /** What the dossier needs from the shell. */
 export interface ProfileHost {
   /** Scope cache and pending requests to the selected server AND account. */
@@ -254,8 +296,7 @@ export function initProfile(host: ProfileHost): {
       const studio = profileStudioHtml(custom, state, profileCareerHtml(view, preview));
       root.innerHTML = profileHtml({ ...view, studio }) + profileSaveBarHtml(state);
     } else {
-      const grid = `<div class="pf-grid">${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div>`;
-      root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top${custom.premium ? ' premium' : ''}"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div>${premiumMark(custom.premium)}</div></div><div class="pf-body">${profileStudioHtml(custom, state, grid)}</div>`;
+      root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top${custom.premium ? ' premium' : ''}"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div>${premiumMark(custom.premium)}</div></div><div class="pf-body">${profileStudioHtml(custom, state, publicCareerHtml(custom, ready))}</div>`;
     }
     const body = root.querySelector?.('.pf-body');
     if (body) {

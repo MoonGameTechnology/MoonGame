@@ -47,4 +47,77 @@ describe('profile customization decisions', () => {
     expect(parsePlayerProfile({ ...raw, progress: { wins: -1 } })).toBeNull();
     expect(parseAppearance({ ...look, portrait: '../evil' })).toBeNull();
   });
+  it('retains the bot marker and only public fields of completed-match history', () => {
+    const match = {
+      matchId: 'm-finished',
+      mapId: 'nexus',
+      endedAt: 1_800_000_000_000,
+      outcome: 'win',
+      xp: 245,
+      place: 1,
+    };
+    const raw = {
+      ...defaultAppearance(),
+      login: '~Orion',
+      kind: 'bot',
+      xp: 245,
+      progress: { matches: 1, wins: 1 },
+      recentMatches: [{ ...match, botId: 'bot-001', playerId: 'p3' }],
+    };
+    expect(parsePlayerProfile(raw)).toEqual({ ...raw, recentMatches: [match] });
+    expect(parsePlayerProfile({ ...raw, recentMatches: [] })?.recentMatches).toEqual([]);
+    expect(parsePlayerProfile({ ...raw, recentMatches: undefined })?.kind).toBe('bot');
+    expect(
+      parsePlayerProfile({ ...raw, kind: undefined, recentMatches: undefined }),
+    ).not.toHaveProperty('kind');
+  });
+  it('rejects malformed, unbounded or URL-based bot history', () => {
+    const match = {
+      matchId: 'm-finished',
+      mapId: 'nexus',
+      endedAt: 1_800_000_000_000,
+      outcome: 'win',
+      xp: 245,
+      place: 1,
+    };
+    const raw = {
+      ...defaultAppearance(),
+      login: '~Orion',
+      kind: 'bot',
+      xp: 245,
+      progress: { matches: 1, wins: 1 },
+      recentMatches: [match],
+    };
+    for (const patch of [
+      { kind: 'human' },
+      { kind: undefined },
+      { xp: 1.5 },
+      { recentMatches: {} },
+      { recentMatches: Array.from({ length: 11 }, (_, i) => ({ ...match, matchId: `m-${i}` })) },
+      ...[
+        { matchId: '' },
+        { matchId: 'x'.repeat(129) },
+        { matchId: 'https://evil.test/match' },
+        { mapId: '../nexus' },
+        { endedAt: -1 },
+        { endedAt: Number.MAX_SAFE_INTEGER },
+        { xp: -1 },
+        { xp: 1.5 },
+        { place: 0 },
+        { place: 1.5 },
+        { outcome: 'ongoing' },
+      ].map((bad) => ({ recentMatches: [{ ...match, ...bad }] })),
+    ])
+      expect(parsePlayerProfile({ ...raw, ...patch })).toBeNull();
+    expect(
+      parsePlayerProfile({ ...raw, recentMatches: [{ ...match, outcome: 'draw', place: null }] })
+        ?.recentMatches?.[0]?.place,
+    ).toBeNull();
+    expect(
+      parsePlayerProfile({
+        ...raw,
+        recentMatches: Array.from({ length: 10 }, (_, i) => ({ ...match, matchId: `m-${i}` })),
+      })?.recentMatches,
+    ).toHaveLength(10);
+  });
 });
