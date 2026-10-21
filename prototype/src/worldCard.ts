@@ -58,7 +58,7 @@ import {
   type HangarView,
 } from './hangarPanel';
 import { BUILD_ICON, unitIconHtml } from './icons';
-import { SPY_COST } from './intel';
+import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
 import type { SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
@@ -416,7 +416,7 @@ export function unknownPlanetHtml(p: Planet): string {
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
+        ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }) && myAgents(game.world(), ME).free > 0)}</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -526,8 +526,10 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // its countdown replaces the button. В забеге Sector Zero шпионажа нет (`espionageShown`).
   if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    // Свой и ничейный мир не шпионят; нехватка кредитов гасит кнопку, но не прячет её.
-    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
+    // Свой и ничейный мир не шпионят; нехватка кредитов или свободных агентов (SPY-6)
+    // гасит кнопку, но не прячет её.
+    const ready = afford({ credits: SPY_COST }) && myAgents(s, ME).free > 0;
+    const spy = spyOffer(mine, !!p.owner, !!live, ready);
     if (spy === 'window' && live) {
       out.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,

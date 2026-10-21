@@ -257,3 +257,79 @@ describe('espionage — the projection honors live windows only', () => {
     expect(json).not.toContain('777');
   });
 });
+
+describe('espionage — the agent network (SPY-6)', () => {
+  const treasury = { target: 'p2', kind: 'treasury' };
+  const rich = (): GameState => {
+    const s = baseState();
+    s.players.p1!.resources.credits = 10_000;
+    return s;
+  };
+
+  it('a success keeps the agent busy while its window is open', () => {
+    const k = createKernel([espionageModule, sureShot, neverDetect]);
+    const r = okApply(k.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(r.state.spyAgents?.p1).toEqual([{ until: 24 * HOUR }]);
+  });
+
+  it('an unnoticed failure sends the agent home for 6h; a caught one loses it for 24h', () => {
+    const slip = createKernel([espionageModule, dudShot, neverDetect]);
+    const a = okApply(slip.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(a.state.spyAgents?.p1).toEqual([{ until: 6 * HOUR }]);
+    expect(a.events.find((e) => e.type === 'espionage.failed')?.payload).not.toHaveProperty('agentLost');
+
+    const caught = createKernel([espionageModule, dudShot, alwaysDetect]);
+    const b = okApply(caught.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(b.state.spyAgents?.p1).toEqual([{ until: 24 * HOUR, lost: true }]);
+    expect(b.events).toContainEqual({
+      type: 'espionage.failed',
+      payload: { owner: 'p1', target: 'p2', kind: 'treasury', agentLost: true },
+    });
+  });
+
+  it('the fourth attempt with all three agents away is refused — free of charge', () => {
+    const k = createKernel([espionageModule, dudShot, neverDetect]);
+    let s = rich();
+    for (let i = 0; i < 3; i++) s = okApply(k.applyAction(s, spy('p1', treasury), ctx(0))).state;
+    expect(s.players.p1?.resources.credits).toBe(10_000 - 3 * 150);
+    const r = k.applyAction(s, spy('p1', treasury), ctx(0));
+    expect(errCode(r)).toBe('E_NO_AGENT');
+    // an agent back home frees a slot again
+    okApply(k.applyAction(s, spy('p1', treasury), ctx(6 * HOUR)));
+  });
+
+  it('the network size is a pipeline (base 3), clamped and fail-secure', () => {
+    const sized = (n: number): GameModule => ({
+      id: `agents-${n}`,
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('espionage.agents', () => n);
+      },
+    });
+    const none = createKernel([espionageModule, sureShot, sized(0)]);
+    expect(errCode(none.applyAction(rich(), spy('p1', treasury), ctx(0)))).toBe('E_NO_AGENT');
+    // a broken pipeline reverts to the base network, it does not switch spying off
+    const broken = createKernel([espionageModule, dudShot, neverDetect, sized(Number.NaN)]);
+    let s = rich();
+    for (let i = 0; i < 3; i++) s = okApply(broken.applyAction(s, spy('p1', treasury), ctx(0))).state;
+    expect(errCode(broken.applyAction(s, spy('p1', treasury), ctx(0)))).toBe('E_NO_AGENT');
+  });
+
+  it('housekeeping drops returned agents as time advances', () => {
+    const k = createKernel([espionageModule]);
+    const s = baseState();
+    s.spyAgents = { p1: [{ until: 1 * HOUR }, { until: 5 * HOUR, lost: true }] };
+    s.scheduled = [{ id: 'evt:t', at: 2 * HOUR, type: 'noop', payload: {}, seq: 0 }];
+    s.scheduleSeq = 1;
+    const r = k.advanceTo(s, ctx(2 * HOUR));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.spyAgents).toEqual({ p1: [{ until: 5 * HOUR, lost: true }] });
+  });
+
+  it('anti-leak: a rival never sees the spy network', () => {
+    const s = baseState();
+    s.spyAgents = { p1: [{ until: 9 * HOUR }] };
+    expect(visibleState(s, 'p1', data).spyAgents).toEqual({ p1: [{ until: 9 * HOUR }] });
+    expect(JSON.stringify(visibleState(s, 'p2', data))).not.toContain('spyAgents');
+  });
+});

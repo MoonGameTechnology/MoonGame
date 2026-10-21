@@ -306,8 +306,10 @@ export function handleEvents(events: DomainEvent[]) {
       case 'espionage.failed':
         if (p.owner === ME) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
-          note(t('log.spy.fail', { who: whoF }));
-          pushSpyLog(t('log.spy.fail.short', { who: whoF }));
+          // SPY-6: пойманный агент потерян — об этом владелец узнаёт сразу.
+          const lost = p.agentLost === true;
+          note(t(lost ? 'log.spy.fail.lost' : 'log.spy.fail', { who: whoF }));
+          pushSpyLog(t(lost ? 'log.spy.fail.lost.short' : 'log.spy.fail.short', { who: whoF }));
         }
         break;
       case 'espionage.detected': {
