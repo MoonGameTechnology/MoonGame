@@ -23,9 +23,11 @@ class Node {
   value = '';
   type = 'password';
   ariaLabel = '';
+  ariaInvalid: string | null = null;
   title = '';
   style = { display: 'none' };
   dataset: Record<string, string> = {};
+  private attributes = new Map<string, string>();
   private on = new Map<string, Array<(ev: unknown) => void>>();
   constructor(readonly id: string) {}
   addEventListener(type: string, fn: (ev: unknown) => void): void {
@@ -34,8 +36,12 @@ class Node {
   fire(type: string, ev: unknown = {}): void {
     for (const fn of this.on.get(type) ?? []) fn(ev);
   }
+  setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
+  removeAttribute(name: string): void { this.attributes.delete(name); }
+  getAttribute(name: string): string | null { return this.attributes.get(name) ?? null; }
   focus(): void {
     focused = this.id;
+    this.fire('focus');
   }
 }
 /** Ответ сервера: только то, что читают модуль и сессия. */
@@ -341,6 +347,22 @@ describe('REFM-218 — приветствие', () => {
     expect(cell.has('void.nick')).toBe(false);
   });
 
+  it.each(['cwnick', 'cwpass'])('смена %s снимает отказ для старой пары учётных данных', async (id) => {
+    const { env } = await bootAccounts();
+    server['/auth/login'] = () => reply(401);
+    server['/auth/register'] = () => reply(409);
+    el('cwnick').value = 'Orion';
+    el('cwpass').value = 'wrong-pass';
+    click('cwgo');
+    await settle();
+    expect([el('cwnick').ariaInvalid, el('cwpass').ariaInvalid, env.status.at(-1)])
+      .toEqual([null, 'true', t('acc.bad-pass')]);
+    el(id).value = id === 'cwnick' ? 'AnotherCommander' : 'another-secret';
+    el(id).fire('input');
+    expect([el('cwnick').ariaInvalid, el('cwpass').ariaInvalid, env.status.at(-1)])
+      .toEqual([null, null, '']);
+  });
+
   it.each(['click', 'enter'])(
     'сохранённая сессия не пускает с пустым паролем через %s',
     async (via) => {
@@ -358,6 +380,10 @@ describe('REFM-218 — приветствие', () => {
         [],
       ]);
       expect(posted('/auth/login')).toEqual([]);
+      el('cwnick').value = 'AnotherCommander';
+      el('cwnick').fire('input');
+      expect([el('cwpass').ariaInvalid, env.status.at(-1)])
+        .toEqual(['true', t('acc.login-pass.rule')]);
     },
   );
 
@@ -446,6 +472,144 @@ describe('REFM-218 — регистрация', () => {
     await settle();
     expect([env.status.at(-1), focused]).toEqual([t('auth.pass-mismatch'), 'crpass2']);
     expect(posted('/auth/login')).toEqual([]);
+    expect([el('crpass').ariaInvalid, el('crpass2').ariaInvalid]).toEqual(['true', 'true']);
+    el('crpass2').value = el('crpass').value;
+    el('crpass2').fire('input');
+    expect([el('crpass').ariaInvalid, el('crpass2').ariaInvalid, env.status.at(-1)]).toEqual([null, null, '']);
+  });
+
+  it('нетронутая форма не красная; правило пароля и повтор обновляются при вводе', async () => {
+    const { env } = await onRegister();
+    expect([el('crnick').ariaInvalid, el('crpass').ariaInvalid, el('crpass2').ariaInvalid]).toEqual([null, null, null]);
+    el('crpass').fire('blur');
+    expect(el('crpass').ariaInvalid).toBeNull();
+    el('crpass').value = 'short';
+    el('crpass').fire('input');
+    expect([el('crpass').ariaInvalid, el('crpass2').ariaInvalid, env.status.at(-1)])
+      .toEqual(['true', null, t('acc.pass.rule')]);
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass').fire('input');
+    expect([el('crpass').ariaInvalid, el('crpass2').ariaInvalid]).toEqual([null, null]);
+    el('crpass2').value = 'orbit-other-pass';
+    el('crpass2').fire('input');
+    expect([el('crpass').ariaInvalid, el('crpass2').ariaInvalid]).toEqual(['true', 'true']);
+    el('crpass').value = el('crpass2').value;
+    el('crpass').fire('input');
+    expect([el('crpass').ariaInvalid, el('crpass2').ariaInvalid]).toEqual([null, null]);
+  });
+
+  it('занятый ник красный до его исправления, остальные поля его ошибку не стирают', async () => {
+    const { env } = await onRegister();
+    server['/auth/login'] = () => reply(401);
+    server['/auth/register'] = () => reply(409, { error: 'E_LOGIN_TAKEN' });
+    el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+    click('crgo');
+    await settle();
+    expect([el('crnick').ariaInvalid, el('crpass').ariaInvalid, focused, env.status.at(-1)])
+      .toEqual(['true', null, 'crnick', t('acc.nick.taken')]);
+    el('crmail').value = 'mail@example.test';
+    el('crmail').fire('input');
+    expect([el('crnick').ariaInvalid, env.status.at(-1)]).toEqual(['true', t('acc.nick.taken')]);
+    el('crnick').value = 'AnotherCommander';
+    el('crnick').fire('input');
+    expect([el('crnick').ariaInvalid, env.status.at(-1)]).toEqual([null, '']);
+  });
+
+  it('отказ старой формы не меняет исправленные поля и сессию', async () => {
+    const { env } = await onRegister();
+    let answer!: (value: Reply) => void;
+    server['/auth/login'] = () => reply(401);
+    server['/auth/register'] = () => new Promise<Reply>((resolve) => { answer = resolve; });
+    el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+    click('crgo');
+    await settle();
+    el('crnick').value = 'AnotherCommander';
+    el('crnick').fire('input');
+    const before = env.status.at(-1);
+    answer(reply(409, { error: 'E_LOGIN_TAKEN' }));
+    await settle();
+    expect([el('crnick').ariaInvalid, env.status.at(-1), env.hub, readSession(localStorage, BASE)])
+      .toEqual([null, before, [], null]);
+  });
+
+  it.each(['crnick', 'crmail', 'crpass', 'crpass2'])(
+    'успешная регистрация сохраняет созданный аккаунт после правки %s во время запроса', async (id) => {
+      const { env } = await onRegister();
+      let answer!: (value: Reply) => void;
+      server['/auth/login'] = () => reply(401);
+      server['/auth/register'] = () => new Promise<Reply>((resolve) => { answer = resolve; });
+      el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+      click('crgo');
+      await settle();
+      el(id).value = 'changed-after-submit';
+      el(id).fire('input');
+      answer(reply(201, { token: 'created-session' }));
+      await settle();
+      expect(readSession(localStorage, BASE)).toEqual({ login: 'Orion', token: 'created-session' });
+      expect([cell.get('void.nick'), env.nick, env.hub, env.status.at(-1)])
+        .toEqual(['Orion', 'Orion', [undefined], '']);
+      expect([el('crpass').value, el('crpass2').value]).toEqual(['', '']);
+    },
+  );
+
+  it.each(['leave-screen', 'replace-session'])(
+    'завершение регистрации сохраняет защиту контекста: %s', async (change) => {
+      const { env } = await onRegister();
+      let answer!: (value: Reply) => void;
+      server['/auth/login'] = () => reply(401);
+      server['/auth/register'] = () => new Promise<Reply>((resolve) => { answer = resolve; });
+      el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+      click('crgo');
+      await settle();
+      const replacement = { login: 'AnotherCommander', token: 'newer-session' };
+      if (change === 'leave-screen') click('crback');
+      else saveSession(localStorage, BASE, replacement);
+      answer(reply(201, { token: 'created-session' }));
+      await settle();
+      expect(readSession(localStorage, BASE)).toEqual(change === 'leave-screen' ? null : replacement);
+      expect(env.hub).toEqual([]);
+    },
+  );
+
+  it('несколько красных полей получают описание своей ошибки при фокусе', async () => {
+    const { env } = await onRegister();
+    el('crnick').value = '<bad>';
+    el('crmail').value = 'invalid-email';
+    el('crpass').value = el('crpass2').value = 'short';
+    click('crgo');
+    await settle();
+    expect(['crnick', 'crmail', 'crpass'].map((id) => el(id).ariaInvalid)).toEqual(['true', 'true', 'true']);
+    expect(env.status.at(-1)).toBe(t('acc.nick.rule'));
+    expect(['crnick', 'crmail', 'crpass'].map((id) => el(id).getAttribute('aria-errormessage')))
+      .toEqual(['cstatus', null, null]);
+    el('crpass').focus();
+    expect(env.status.at(-1)).toBe(t('acc.pass.rule'));
+    expect(['crnick', 'crmail', 'crpass'].map((id) => el(id).getAttribute('aria-errormessage')))
+      .toEqual([null, null, 'cstatus']);
+    el('crmail').focus();
+    expect(env.status.at(-1)).toBe(t('acc.email.rule'));
+    expect(['crnick', 'crmail', 'crpass'].map((id) => el(id).getAttribute('aria-errormessage')))
+      .toEqual([null, 'cstatus', null]);
+    expect(['crnick', 'crmail', 'crpass'].map((id) => el(id).ariaInvalid)).toEqual(['true', 'true', 'true']);
+    el('crpass').value = 'orbit-secret-pass';
+    el('crpass').fire('input');
+    el('crpass2').focus();
+    expect(env.status.at(-1)).toBe(t('auth.pass-mismatch'));
+    expect(['crnick', 'crmail', 'crpass', 'crpass2'].map((id) => el(id).getAttribute('aria-errormessage')))
+      .toEqual([null, null, 'cstatus', 'cstatus']);
+  });
+
+  it('серверное требование к паролю выделяет поле даже при пройденной местной проверке', async () => {
+    const { env } = await onRegister();
+    server['/auth/login'] = () => reply(401);
+    server['/auth/register'] = () => reply(400, { error: 'E_PASSWORD_POLICY' });
+    el('crpass').value = el('crpass2').value = 'orbit-secret-pass';
+    click('crgo');
+    await settle();
+    expect([el('crpass').ariaInvalid, focused, env.status.at(-1)])
+      .toEqual(['true', 'crpass', t('acc.pass.rule')]);
+    el('crmail').fire('input');
+    expect(el('crpass').ariaInvalid).toBe('true');
   });
 
   it.each([

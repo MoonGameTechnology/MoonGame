@@ -8,7 +8,7 @@ import {
   ruleSummary,
   type MatchTab,
 } from './matchRow';
-import { tData } from '../../localization/runtime';
+import { t, tData } from '../../localization/runtime';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -28,6 +28,12 @@ describe('строка матча — сводка правил', () => {
     expect(s).toContain('×5');
     expect(s).toContain('1000');
     expect(s).toContain('60'); // доля карты — в процентах, а не в долях
+    expect(s).toContain(t('browser.description.score', { n: 1000 }));
+  });
+
+  it('PvE не обещает победу по очкам или контролю карты', () => {
+    expect(ruleSummary({ timeScale: 2, victory: { scoreLimit: 600, dominationPercent: .6 } }, 'pve'))
+      .toBe('×2');
   });
 });
 

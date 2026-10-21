@@ -69,3 +69,38 @@ describe('распределённые ходы ИИ', () => {
     expect(ai.step(1025, [], decision, plan).action).toBeUndefined();
   });
 });
+
+
+describe('AI background deadlines', () => {
+  it('wakes only for eligible bots on a 50-seat map, preserving their phases', () => {
+    const ai = new StaggeredAi<string>(1000);
+    const roster = Array.from({ length: 50 }, (_, i) => `p${i}`);
+    const policy = (seat: string) => seat === 'p24' || seat === 'p49' ? 'bot' : null;
+    expect(ai.nextDelay(0, roster, policy)).toBe(500);
+    const planned: string[] = [];
+    expect(ai.step(500, roster, policy, (seat) => { planned.push(seat); return []; }).worked).toBe(true);
+    expect(planned).toEqual(['p24']);
+    expect(ai.step(500, roster, policy, () => [])).toEqual({ worked: false });
+    expect(ai.nextDelay(500, roster, policy)).toBe(500);
+    ai.step(1000, roster, policy, (seat) => { planned.push(seat); return []; });
+    expect(planned).toEqual(['p24', 'p49']);
+    expect(ai.nextDelay(1000, roster, policy)).toBe(500);
+    expect(ai.nextDelay(1000, roster, () => null)).toBeNull();
+  });
+
+  it('reconnects and policy changes keep the original phase; pending work wakes immediately', () => {
+    const ai = new StaggeredAi<string>(100);
+    expect(ai.nextDelay(0, seats, () => null)).toBeNull();
+    expect(ai.nextDelay(10, seats, decision)).toBe(15);
+    ai.step(25, seats, decision, plan);
+    expect(ai.nextDelay(25, seats, decision)).toBe(0);
+    ai.step(25, seats, () => null, plan); // discard a stale retained plan
+    expect(ai.nextDelay(25, seats, () => null)).toBeNull();
+    expect(ai.nextDelay(25, seats, decision)).toBe(25);
+    expect(ai.nextDelay(100000, seats, decision)).toBe(0);
+    const planned: string[] = [];
+    for (let i = 0; i < 5; i++) ai.step(100000, seats, decision, (seat) => { planned.push(seat); return []; });
+    expect(planned).toEqual(['b', 'c', 'd', 'a']);
+    expect(ai.nextDelay(100000, seats, decision)).toBe(25);
+  });
+});

@@ -63,6 +63,60 @@ describe('BRW-0 — мета сессии собирается из самой �
     });
     expect(meta).toMatchObject({ rules: { timeScale: 100 }, createdAt: 7, entryWindowMs: 42 });
   });
+
+  it('the browser receives the room\'s resolved victory overrides with the host clock scale', async () => {
+    const room = createDevMatch(data, {
+      id: 'custom-rules',
+      mapId: 'duel-1',
+      config: { timeScale: 1, modeId: 'standard', victory: { scoreLimit: 777, dominationPercent: 0.8 } },
+    });
+    const reg = new MatchRegistry(new MemoryAccountStore(), data);
+    const meta = sessionMeta(room, { timeScale: 24, createdAt: 7 });
+    reg.register(room, meta);
+    const [row] = (await reg.list(null)).available;
+    expect(row).toMatchObject({
+      mapId: 'duel-1',
+      rules: {
+        timeScale: 24,
+        victory: { scoreLimit: 777, dominationPercent: 0.8, coalitionFactor: 0.7 },
+      },
+    });
+    // The browser clock is ×24, but the kernel config is ×1: its cap is 100 game days.
+    expect(row?.rules.victory?.endsAt).toBe(100 * 86_400_000);
+    meta.rules.victory!.scoreLimit = 1;
+    expect(room.victoryRules?.scoreLimit).toBe(777);
+  });
+
+  it('the browser receives the evaluator defaults for a room without explicit victory settings', () => {
+    expect(sessionMeta(session('m', 'nexus'), { timeScale: 1, createdAt: 7 }).rules).toEqual({
+      timeScale: 1,
+      victory: {
+        scoreLimit: 600,
+        dominationPercent: 0.6,
+        coalitionFactor: 0.7,
+        endsAt: 100 * 86_400_000,
+      },
+    });
+  });
+
+  it.each([
+    ['team-2v2', 'team_2v2', 2200],
+    ['team-3v3', 'team_3v3', 3300],
+  ] as const)('publishes effective team rules omitted by the %s mode preset', (mapId, modeId, scoreLimit) => {
+    expect(data.modes[modeId]?.victory?.dominationPercent).toBeUndefined();
+    expect(data.modes[modeId]?.victory?.coalitionFactor).toBeUndefined();
+    const room = createDevMatch(data, {
+      id: mapId,
+      mapId,
+      config: { timeScale: 1, modeId, victory: { scoreLimit } },
+    });
+    expect(sessionMeta(room, { timeScale: 24, createdAt: 7 }).rules.victory).toEqual({
+      scoreLimit,
+      dominationPercent: 0.6,
+      coalitionFactor: 0.7,
+      endsAt: 100 * 86_400_000,
+    });
+  });
 });
 
 describe('BRW-0 — «Готово, когда»: две сессии различимы в GET /matches', () => {

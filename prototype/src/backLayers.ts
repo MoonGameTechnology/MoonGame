@@ -77,7 +77,9 @@ export type LayerVerdict =
 // `phoneNav.ts`, открытость — атрибут `hidden`, стили — в `mobile-console.css`, вне описи.
 // `phone-speed` — раскрытый ряд скорости телефона (UIX-3.2): узел — полоса скорости, которая
 // живёт всегда, раскрытость — класс `phone-speed-open` на `body` (`phoneSpeed.ts`).
+// `match-description` — нативный dialog: открытость задаёт showModal(), а не CSS display.
 export const EXTRA_LAYERS: readonly string[] = [
+  'match-description',
   'chain',
   'aim',
   'rail',

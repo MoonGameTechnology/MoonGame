@@ -23,4 +23,4 @@ exec docker run --rm --pull never --read-only --user 0:0 \
   --mount "type=volume,src=$ERASURE_DOCKER_LOG_VOLUME,dst=/app/playtest-logs" \
   --env "ERASURE_LEDGER=/erasure/$(basename "$ERASURE_LEDGER")" \
   --env ERASURE_LOG_DIR=/app/playtest-logs \
-  --entrypoint /nodejs/bin/node "$image" packages/server/dist/account-erasure.mjs "$1"
+  "$image" packages/server/dist/account-erasure.mjs "$1"
