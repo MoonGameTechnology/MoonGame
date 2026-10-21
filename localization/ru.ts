@@ -536,6 +536,7 @@ export const ru: Record<string, string> = {
   'admin.kick.done': '{nick} снят — кресло {seat} свободно',
   'admin.err.creds': 'Неверный позывной или пароль',
   'admin.err.no-authority': 'У этой учётной записи нет прав администратора',
+  'admin.err.bot-seat-locked': 'Место ИИ-командира закреплено до завершения матча',
   'admin.err.no-match': 'Партия не найдена',
   'admin.err.not-seated': 'Это кресло уже свободно — состав обновлён',
   'admin.err.server': 'Сервер не отвечает',
@@ -2272,6 +2273,14 @@ export const ru: Record<string, string> = {
   'province.training-1.station': 'Наблюдательная станция',
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
+  'profile.history.draw': 'Ничья',
+  'profile.history.empty': 'История матчей пока пуста.',
+  'profile.history.loss': 'Поражение',
+  'profile.history.map': 'Карта: {map}',
+  'profile.history.place': 'Место: {n}',
+  'profile.history.title': 'Последние матчи',
+  'profile.history.win': 'Победа',
+  'profile.history.xp': '+{n} опыта',
   'profile.title': 'Профиль',
   'profile.premium': 'Премиум',
   'profile.tabs': 'Разделы профиля',

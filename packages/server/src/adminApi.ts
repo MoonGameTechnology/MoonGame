@@ -70,7 +70,7 @@ export interface AdminRoster {
 }
 
 /** Refusals the host's `kick` may return; everything else is an internal error. */
-export type AdminKickRefusal = 'E_NO_MATCH' | 'E_NOT_SEATED' | 'E_INTERNAL';
+export type AdminKickRefusal = 'E_NO_MATCH' | 'E_NOT_SEATED' | 'E_BOT_SEAT_LOCKED' | 'E_INTERNAL';
 
 export interface AdminApiDeps {
   /** Resolve the caller from the session token — REQUIRED, no anonymous fallback. */
@@ -114,6 +114,7 @@ export function isAdmin(login: string, admins: ReadonlySet<string>): boolean {
 const KICK_STATUS: Record<AdminKickRefusal, number> = {
   E_NO_MATCH: 404,
   E_NOT_SEATED: 409,
+  E_BOT_SEAT_LOCKED: 409,
   E_INTERNAL: 500,
 };
 

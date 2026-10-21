@@ -46,6 +46,12 @@ Recovery-письма обоих хостов форматирует `scripts/re
 получателя. Серверный `authApi` передаёт структурный `RecoveryMail`, а `mailer.ts`
 отвечает за SMTP/TLS; каталогов локализации в графе серверного пакета нет.
 
+Постоянные боты игрового хоста: `packages/server/src/botRoster.ts` — 100 системных
+профилей, атомарные назначения и история; `botPopulation.ts` — посадка, реальные
+итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
+`profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
+Параметры включения описаны в [runbook](deploy/README.md#постоянные-боты-для-заполнения-карт).
+
 ---
 
 ## prototype/ — играбельный клиент и хост плейтестов

@@ -532,6 +532,7 @@ export const en: Record<string, string> = {
   'admin.kick.done': '{nick} removed — seat {seat} is free',
   'admin.err.creds': 'Wrong callsign or password',
   'admin.err.no-authority': 'This account has no admin authority',
+  'admin.err.bot-seat-locked': 'The AI commander keeps this seat until the match ends',
   'admin.err.no-match': 'No such match',
   'admin.err.not-seated': 'That chair is already free — roster refreshed',
   'admin.err.server': 'The server is not responding',
@@ -2266,6 +2267,14 @@ export const en: Record<string, string> = {
   'province.training-1.station': 'Observation Station',
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
+  'profile.history.draw': 'Draw',
+  'profile.history.empty': 'No match history yet.',
+  'profile.history.loss': 'Defeat',
+  'profile.history.map': 'Map: {map}',
+  'profile.history.place': 'Place: {n}',
+  'profile.history.title': 'Recent matches',
+  'profile.history.win': 'Victory',
+  'profile.history.xp': '+{n} XP',
   'profile.title': 'Profile',
   'profile.premium': 'Premium',
   'profile.tabs': 'Profile sections',

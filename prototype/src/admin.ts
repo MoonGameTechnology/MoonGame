@@ -260,7 +260,9 @@ async function kick(matchId: string, nick: string): Promise<void> {
   });
   if (!res) return say('admin.err.server');
   if (res.status === 409) {
-    say('admin.err.not-seated');
+    if ((res.body as { error?: unknown } | null)?.error === 'E_BOT_SEAT_LOCKED')
+      say('admin.err.bot-seat-locked');
+    else say('admin.err.not-seated');
   } else if (res.status === 404) {
     say('admin.err.no-match');
   } else if (res.status !== 200) {
