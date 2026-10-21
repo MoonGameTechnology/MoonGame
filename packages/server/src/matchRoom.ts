@@ -128,6 +128,12 @@ export interface MatchRoomOptions {
   clientActionTypes?: readonly string[];
   /** Observation-only room-event stream for metrics/playtest logging (M0). */
   observe?: (event: RoomObservation) => void;
+  /** Accepted human chat only, after sanitizing, rate limiting and relay. The host
+   *  may schedule an NPC response; server messages never re-enter this callback. */
+  onChat?: (message: Readonly<ChatMessage>) => void;
+  /** Server-owned speakers (for example persistent bots). Omit to disable the
+   *  internal DM sender; a wire peer can never choose a different sender. */
+  serverChatAllowed?: (playerId: PlayerId) => boolean;
   securityAudit?: SecurityAudit;
   /** Deterministic-replay recorder (RPL-2): receives every advance boundary the room
    *  actually executed (pure `{at}` entries — timer ticks and pre-action catch-ups)
@@ -525,6 +531,8 @@ export class MatchRoom {
   private readonly snapshotBytes = new WeakMap<RoomPeer, number>();
   private readonly securityAudit?: SecurityAudit;
   private readonly observe?: (event: RoomObservation) => void;
+  private readonly onChat?: (message: Readonly<ChatMessage>) => void;
+  private readonly serverChatAllowed?: (playerId: PlayerId) => boolean;
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
   private readonly persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
@@ -680,6 +688,8 @@ export class MatchRoom {
     // throwing observer can't escape a commit/broadcast (a metrics bug must not take
     // the match down) — every `this.observe(...)` call site is guarded for free.
     this.securityAudit = options.securityAudit;
+    this.onChat = options.onChat;
+    this.serverChatAllowed = options.serverChatAllowed;
     const raw = options.observe;
     this.observe = raw
       ? (event): void => {
@@ -2436,6 +2446,34 @@ export class MatchRoom {
       msg.to = message.to;
     }
     this.chatWindow.record(playerId, wall);
+    this.relayChat(msg);
+    try {
+      this.onChat?.(Object.freeze({ ...msg }));
+    } catch {
+      // An optional responder must never break an already accepted human message.
+    }
+  }
+
+  /** Host-only DM, using the ordinary privacy, sanitization, flood limit and
+   *  bounded reconnect history. Does not create peers or emit human joins. */
+  sendServerChat(from: PlayerId, to: PlayerId, rawText: string): boolean {
+    if (!this.serverChatAllowed?.(from) || from === to ||
+        this.state.match.status === 'ended' ||
+        this.state.players[from]?.status !== 'active' ||
+        this.state.players[to]?.status !== 'active') return false;
+    const wall = this.now();
+    if (this.chatWindow.limited(from, wall)) return false;
+    const text = sanitizeChatText(rawText, CHAT_TEXT_MAX);
+    if (!text) return false;
+    this.chatWindow.record(from, wall);
+    this.relayChat({
+      id: `chat:${from}:${opaqueId()}`,
+      from, to, channel: 'dm', text, at: this.clock(),
+    });
+    return true;
+  }
+
+  private relayChat(msg: ChatMessage): void {
     this.chatHistory.push(msg);
     if (this.chatHistory.length > CHAT_HISTORY_MAX) this.chatHistory.shift();
     for (const [pid, peers] of this.peers) {

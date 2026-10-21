@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { MS_PER_DAY, type GameData } from '@void/shared-core';
-import { registerAdminApi, adminLoginsFromEnv, isAdmin } from './adminApi';
+import { registerAdminApi, adminLoginsFromEnv, isAdmin, type AdminApiDeps } from './adminApi';
 import { kickSeat } from './seatKick';
 import { seatClaimAction, seatConfirmAction } from './joinSeat';
 import { MatchRegistry } from './matchRegistry';
@@ -60,7 +60,12 @@ type Accounts = Map<string, string> | 'all';
 
 /** Сервер с админским API. Личность — как в остальных тестах: `Bearer <логин>` или
  *  `Bearer <логин>@<id учётки>`, когда тесту нужна другая учётка под тем же логином. */
-function adminApp(w: World, admins: string[], accounts: Accounts = 'all'): FastifyInstance {
+function adminApp(
+  w: World,
+  admins: string[],
+  accounts: Accounts = 'all',
+  kick?: AdminApiDeps['kick'],
+): FastifyInstance {
   app = Fastify();
   registerAdminApi(app, {
     admins: new Set(admins),
@@ -98,7 +103,7 @@ function adminApp(w: World, admins: string[], accounts: Accounts = 'all'): Fasti
         })),
       };
     },
-    kick: (id, nick) => kickSeat({ matchId: id, room: w.registry.get(id), accounts: w.accounts }, nick),
+    kick: kick ?? ((id, nick) => kickSeat({ matchId: id, room: w.registry.get(id), accounts: w.accounts }, nick)),
   });
   return app;
 }
@@ -200,6 +205,24 @@ describe('ADM-1 · состав матча', () => {
 });
 
 describe('ADM-1 · кик', () => {
+  it('закреплённый хостом ИИ-командир возвращает 409 со своим кодом отказа', async () => {
+    const w = await world('~Orion');
+    const server = adminApp(w, ['boss'], 'all', async () => ({
+      ok: false,
+      code: 'E_BOT_SEAT_LOCKED',
+    }));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/admin/matches/m1/kick',
+      headers: ADMIN,
+      payload: { nick: '~Orion' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'E_BOT_SEAT_LOCKED' });
+    expect(await w.accounts.seatOf('m1', '~Orion')).toBe('green');
+    expect(w.room.state.players.green?.seated).toBe(true);
+  });
+
   it('освобождает кресло во ВСЕХ трёх слоях и называет причину снятому', async () => {
     const w = await world();
     const peer = fakePeer();
