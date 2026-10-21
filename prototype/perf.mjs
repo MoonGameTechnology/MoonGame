@@ -20,6 +20,7 @@ const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
   const el = {
     id,
+    value: '',
     style: { removeProperty(name) { delete this[name]; }, setProperty(name, value) { this[name] = value; }, getPropertyPriority() { return ''; } },
     setAttribute(name, value) { this[name] = String(value); },
     removeAttribute(name) { delete this[name]; },

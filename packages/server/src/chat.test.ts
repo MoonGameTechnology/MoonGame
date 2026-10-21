@@ -7,7 +7,7 @@ import {
   type Planet,
   type Player,
 } from '@void/shared-core';
-import { MatchRoom, type RoomPeer } from './matchRoom';
+import { MatchRoom, type MatchRoomOptions, type RoomPeer } from './matchRoom';
 import { DEV_MODULES, loadShippedData } from './scenario';
 
 /**
@@ -51,7 +51,13 @@ const planet = (id: string, owner: string, x: number): Planet => ({
 });
 
 function makeRoom(
-  opts: { teams?: Record<string, string>; alliance?: [string, string]; now?: () => number } = {},
+  opts: {
+    teams?: Record<string, string>;
+    alliance?: [string, string];
+    now?: () => number;
+    onChat?: MatchRoomOptions['onChat'];
+    serverChatAllowed?: MatchRoomOptions['serverChatAllowed'];
+  } = {},
 ): MatchRoom {
   const data = loadShippedData();
   const base = createInitialState({
@@ -80,13 +86,67 @@ function makeRoom(
     data,
     now: opts.now ?? (() => 0),
     teams: opts.teams,
+    onChat: opts.onChat,
+    serverChatAllowed: opts.serverChatAllowed,
   });
 }
 
 const say = (channel: string, text: string, to?: string): string =>
-  JSON.stringify(to === undefined ? { type: 'chat.send', channel, text } : { type: 'chat.send', channel, to, text });
+  JSON.stringify(
+    to === undefined
+      ? { type: 'chat.send', channel, text }
+      : { type: 'chat.send', channel, to, text },
+  );
 
 describe('session chat relay', () => {
+  it('notifies only for accepted, sanitized human messages and isolates callback errors', async () => {
+    const accepted: Readonly<{ text: string }>[] = [];
+    const room = makeRoom({
+      onChat(message) {
+        accepted.push(message);
+        throw new Error('private');
+      },
+    });
+    const g = new Peer();
+    room.addPeer('green', g);
+    await room.receive('green', g, say('dm', '  hello\u0000 ', 'blue'));
+    await room.receive('green', g, say('dm', 'invalid', 'ghost'));
+    await room.receive('green', g, say('session', ' '));
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]!.text).toBe('hello');
+    expect(Object.isFrozen(accepted[0])).toBe(true);
+    expect(g.chatTexts()).toEqual(['hello']);
+    expect(g.ofType('error').map((m) => m.code)).toEqual(['E_CHAT_TARGET', 'E_CHAT_TEXT']);
+  });
+
+  it('sends server DMs through the ordinary private history without peers or recursive callbacks', async () => {
+    let calls = 0;
+    const room = makeRoom({
+      onChat: () => {
+        calls++;
+      },
+      serverChatAllowed: (id) => id === 'blue',
+    });
+    const g = new Peer(),
+      r = new Peer();
+    room.addPeer('green', g);
+    room.addPeer('red', r);
+    expect(room.sendServerChat('red', 'green', 'forged')).toBe(false);
+    expect(room.sendServerChat('blue', 'ghost', 'bad')).toBe(false);
+    expect(room.sendServerChat('blue', 'blue', 'self')).toBe(false);
+    expect(room.sendServerChat('blue', 'green', '  hello\u0000  ')).toBe(true);
+    expect(g.chatTexts()).toEqual(['hello']);
+    expect(r.chatTexts()).toEqual([]);
+    expect(calls).toBe(0);
+    expect(room.peerCount).toBe(2);
+    const reconnect = new Peer();
+    room.addPeer('green', reconnect);
+    expect(reconnect.chatTexts()).toEqual(['hello']);
+    for (let i = 0; i < 5; i++) expect(room.sendServerChat('blue', 'green', 'line')).toBe(true);
+    expect(room.sendServerChat('blue', 'green', 'flood')).toBe(false);
+    expect(makeRoom().sendServerChat('blue', 'green', 'disabled')).toBe(false);
+  });
+
   it('sanitizes controls before relay/history, preserving literal plain-text markup', async () => {
     const room = makeRoom();
     const g = new Peer();

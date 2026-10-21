@@ -77,6 +77,9 @@ const srcFiles = (): string[] => [
   // Почтовый адаптер хостов (письмо сброса пароля) живёт рядом с точкой входа сервера:
   // это слой хоста, а не прототипа, но ключи `auth.recovery-mail.*` читает он.
   'scripts/recoveryMailer.ts',
+  // Host-rendered bot DM templates: the server declares keys, the host owns texts.
+  'packages/server/src/botSocial.ts',
+  'scripts/botChatText.ts',
 ];
 
 /** Шипнутый каталог — ВТОРОЙ источник живых ключей, наравне с исходниками (CONV-12c).

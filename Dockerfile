@@ -54,6 +54,9 @@ RUN node deploy/runtime/prepare-libc.mjs /runtime-libc
 # Same for libssl3t64 deb13u2 (SEC-42): apt fetches the pinned deb13u3 and accepts it only
 # against Debian's signed index (this digest-pinned builder's keyring); no package scripts run.
 RUN node deploy/runtime/prepare-libssl.mjs /runtime-libssl
+# DSA-6572-1 removes compromised roots. Rebuild the bundle from Debian's signed,
+# version-pinned archive; do not inherit the builder's extra/local trust anchors.
+RUN node deploy/runtime/prepare-ca.mjs /runtime-ca
 RUN pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, dev at /dev)
 
 # Bake the server bundle HERE instead of at container startup. Two reasons, and the
@@ -116,6 +119,7 @@ RUN mkdir -p playtest-logs
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
 COPY --from=build /runtime-libc/ /
 COPY --from=build /runtime-libssl/ /
+COPY --from=build /runtime-ca/ /
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left
 # (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying
@@ -129,6 +133,9 @@ ENV PORT=8788
 # A bare docker run must not accidentally publish the unauthenticated dev harness.
 # Isolated smoke tests explicitly override PROD=0 and publish only on loopback.
 ENV PROD=1
+# Node's embedded Mozilla roots still include a root removed by DSA-6572-1.
+# Use ONLY the patched OpenSSL store, rather than adding it to the bundled roots.
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 # ZTP-1.1: the commit this image was built from, reported by GET /health so the running
 # build is visible without logging into the host. image.yml passes it; a local build
 # leaves it empty and /health simply omits the field. Declared this late on purpose: an
@@ -141,7 +148,8 @@ EXPOSE 8788
 # same way the server does, so a platform-injected PORT moves both together.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
   CMD ["/nodejs/bin/node", "deploy/healthcheck.mjs"]
-# distroless/nodejs ENTRYPOINT is already ["/nodejs/bin/node"], so CMD is just the script.
+# Apply this to every default container command, including one-off migration jobs.
+ENTRYPOINT ["/nodejs/bin/node", "--use-openssl-ca"]
 # Runs the PRE-BUILT bundle, not prototype/netserver.mjs: that one bundles on startup and
 # therefore needs esbuild, which no longer ships in this image. The bundle reads $PORT the
 # same way (platforms like Render/Fly inject their own).

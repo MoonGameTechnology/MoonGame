@@ -2944,6 +2944,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .cpass-toggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-3px;}
 #connect .cpass-slash{display:none;}
 #connect .cpass-toggle[data-visible="true"] .cpass-slash{display:block;}
+#connect .authform input[aria-invalid="true"]{border-color:#ff6b78;box-shadow:0 0 0 1px #ff6b78;}
+#connect .authform input[aria-invalid="true"]:focus{border-color:#ff6b78;box-shadow:0 0 0 2px rgba(255,107,120,.3);}
 #connect .cstat{margin-top:14px;min-height:16px;font-size:var(--fs-body);color:var(--amber);text-align:center;}
 /* The status line reserves its row so an appearing message doesn't shove the card's
    buttons down. On a freshly opened welcome card there IS no message, and the reserved
@@ -3043,8 +3045,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .msolo{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 8px 16px;text-align:center;}
 #connect .msolo .mbtn{min-height:46px;padding:0 20px;}
 #connect .msolo-sub{font-size:14px;line-height:1.45;color:var(--sf-dim);}
-/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне «Войти»
-   стоит рядом с картой, и строка под ней — во всю ширину; две кнопки своих вкладок — своим рядом.
+/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне кнопки
+   входа, описания и архива стоят своим рядом, чтобы не сжимать название карты.
    На ПК кнопки справа от обеих строк (bridge-shell.css). */
 #connect .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name btns" "meta meta";
   align-items:center;gap:6px 12px;padding:12px 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
@@ -3066,8 +3068,22 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .mwin{color:var(--sf-accent);}
 #connect .mwin.soon{color:var(--amber,#e0a942);}
 #connect .mwin.shut{color:var(--sf-dim);text-decoration:line-through;}
-#connect .mbtns{grid-area:btns;justify-self:end;display:flex;gap:6px;}
+#connect .mbtns{grid-area:btns;justify-self:end;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;}
 #connect .mbtn{min-height:44px;padding:0 16px;border-radius:12px;font-size:15px;white-space:nowrap;}
+/* The browser and home hub share one native, keyboard-accessible details dialog. */
+#match-description{box-sizing:border-box;width:min(520px,calc(100% - 32px));max-width:none;max-height:calc(100dvh - 48px);
+  margin:auto;padding:22px;color:var(--sf-text);background:var(--sf-panel),#07121d;border:1px solid var(--sf-edge-hi);
+  border-radius:16px;font:16px/1.5 var(--sf-font);box-shadow:var(--sf-shadow);overflow-y:auto;overflow-wrap:anywhere;}
+#match-description::backdrop{background:rgba(2,8,14,.82);backdrop-filter:blur(3px);}
+#match-description h2{margin:0 0 14px;font-size:20px;color:var(--sf-hi);}
+#match-description h3{margin:0;font-size:18px;color:var(--sf-hi);}
+#match-description p{margin:8px 0 16px;color:var(--sf-dim);}
+#match-description dl{margin:16px 0 20px;}
+#match-description dl > div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--sf-edge);}
+#match-description dt{color:var(--sf-dim);}
+#match-description dd{margin:0;}
+#match-description .mbtn{width:100%;min-height:44px;border-radius:12px;font:inherit;}
 /* «Новый матч» — у нижнего края, только над загруженными «Доступными». */
 #connect .mcreate{order:5;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
   padding-top:12px;border-top:1px solid var(--sf-edge);}
@@ -4844,7 +4860,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go"></button>
         </div>
       </div>
-      <div id="cstatus" class="cstat"></div>
+      <div id="cstatus" class="cstat" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
     <button id="cupd" class="cupd" type="button" style="display:none" data-i18n="welcome.update-check"></button>
     <div id="cver" class="cver"></div>

@@ -302,6 +302,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.doUnmock('./matchJoin');
   vi.doUnmock('./setupScreen');
+  vi.doUnmock('./matchDescription');
 });
 
 /** Свежая загрузка — как после перезагрузки страницы. У сборок одна страница (UIX-17.1), поэтому
@@ -315,6 +316,11 @@ async function boot() {
   }));
   vi.doMock('./setupScreen', () => ({
     openSetup: (from: string) => void calls.push(['openSetup', from]),
+  }));
+  vi.doMock('./matchDescription', () => ({
+    isMatchDescriptionOpen: () => !!doc.descriptionOpen,
+    openMatchDescription: (match: { matchId: string }, label: string) =>
+      void calls.push(['description', match.matchId, label]),
   }));
   const mb = await import('./matchBrowser');
   mb.initMatchBrowser({
@@ -459,7 +465,8 @@ describe('REFM-217 — лента обозревателя', () => {
         '<i></i>'.repeat(6) +
         '<b>2/8</b></span>',
     );
-    expect(a1).toContain(ruleSummary({ timeScale: 1, victory: { scoreLimit: 500 } }));
+    expect(a1).toContain(ruleSummary({ timeScale: 1, victory: { scoreLimit: 500 } }, 'pve'));
+    expect(a1).not.toContain(t('browser.description.score', { n: 500 }));
     // Идущий матч — обычное состояние: «идёт» на каждой строке было шумом.
     expect(a1).not.toContain(t('browser.running'));
     expect(a1).toContain(
@@ -497,8 +504,8 @@ describe('REFM-217 — лента обозревателя', () => {
     await browsing();
     const join = rows()[0]!.buttons[0]!;
     expect(join.textContent).toBe(t('browser.join'));
-    expect(rows()[0]!.buttons).toHaveLength(1);
-    expect(rows()[0]!.row.className).toBe('mrow');
+    expect(rows()[0]!.buttons).toHaveLength(2);
+    expect(rows()[0]!.row.className).toBe('mrow mrow-2');
     join.click();
     expect(calls).toEqual([['openSessionTab', 'a1', false]]);
   });
@@ -541,7 +548,36 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(rows()[0]!.buttons.map((b) => b.textContent)).toEqual([
       t('browser.join'),
       t('browser.restore'),
+      t('browser.description'),
     ]);
+  });
+
+  it('описание доступно во всех вкладках и в хабе без входа в матч', async () => {
+    const mb = await browsing();
+    for (const name of ['available', 'active', 'archived']) {
+      tab(name).click();
+      const first = rows()[0]!;
+      first.buttons.at(-1)!.click();
+      expect(of('description').at(-1)).toEqual(['description', first.id, 'карта nexus']);
+    }
+    await mb.refreshMyMatches();
+    $('hub-mine').querySelector('.mdescription')!.click();
+    expect(of('description').at(-1)).toEqual(['description', 'm1', 'карта nexus']);
+    expect(of('openSessionTab')).toEqual([]);
+  });
+
+  it('переопрос не заменяет кнопку под открытым описанием', async () => {
+    const mb = await browsing();
+    const first = rows()[0]!.row;
+    doc.descriptionOpen = true;
+    vi.advanceTimersByTime(10_000);
+    await settle();
+    expect(matchesFetches()).toHaveLength(0);
+    await mb.refreshMatches(true);
+    expect(rows()[0]!.row).toBe(first);
+    doc.descriptionOpen = false;
+    await mb.refreshMatches(true);
+    expect(rows()[0]!.row).not.toBe(first);
   });
 
   it('«Новая партия» видна только над загруженными «Доступными»', async () => {
