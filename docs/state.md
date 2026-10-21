@@ -439,7 +439,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   берёт Яндекс, только если поднят лоадер SDK, иначе и при сбое SDK — веб.
 - Архив `dist/yandex/` (`platformBuild.mjs`, `__SECTOR_ZERO_ONLY__`) — только Sector Zero и один
   язык; реклама только rewarded (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
-- APK — Capacitor (`mobile/`), ленты `alpha` и `player` в `android.yml`; RuStore — `rustore.yml`,
+- APK — Capacitor (`mobile/`), ленты `alpha` и `player` в `android.yml`; обновления берёт с VPS
+  по манифесту, подписанному в CI, и ставит только файл с подписанным SHA-256
+  ([runbook](../deploy/apk/README.md)); RuStore — `rustore.yml`,
   выпуск закрыт до решений оператора ([rustore-preparation.md](security/rustore-preparation.md)).
 
 **Локализация, пульт, телеметрия.**

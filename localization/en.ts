@@ -4405,10 +4405,18 @@ export const en: Record<string, string> = {
   'upd.build': 'build {b}',
   'upd.checking': 'check: {msg}',
   'upd.current': '✓ up to date · local {l} · server {r}',
+  'upd.downloading': 'downloading and checking the file…',
+  'upd.err-digest': "✗ the file doesn't match the signed version, install cancelled",
+  'upd.err-download': "✗ couldn't download the update",
+  'upd.err-package': "✗ the file isn't for this app, install cancelled",
+  'upd.err-permission': 'allow installs from this app, then tap again',
   'upd.go': 'Download update',
   'upd.http-error': '✗ update site answered {s}',
+  'upd.installing': '✓ file verified, opening the installer',
   'upd.later': 'Later',
   'upd.no-network': "✗ can't reach the update site",
+  'upd.unsupported': '✗ signature check unavailable: update Android System WebView',
+  'upd.unverified': '✗ the version on the site failed the signature check',
 
   // --- welcome — Экран приветствия: вход, регистрация, восстановление, список матчей, подвал.
   'welcome.apple': 'Sign in with Apple',

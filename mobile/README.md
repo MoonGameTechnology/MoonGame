@@ -77,23 +77,33 @@ needs a real (secret) keystore — a later step.
 ## In-app auto-update
 
 Install a new site-aware APK once; subsequent checks read only our HTTPS site:
-`/downloads/android/{alpha|player}/latest.json`. The public JSON contains
-`versionCode`, `versionName`, `apkUrl`, `notes`, `sha`, `apkSha256`, `appId` and
-`signerSha256`. The APK URL is immutable and belongs to the same origin/lane.
+`/downloads/android/{alpha|player}/latest.json`. It is a signed envelope
+`{payload, signature}`: `payload` is the manifest (`versionCode`, `versionName`,
+`apkUrl`, `notes`, `sha`, `apkSha256`, `appId`, `signerSha256`) and `signature` is
+Ed25519 over those exact bytes, made in CI with the `APK_MANIFEST_SIGNING_KEY` secret.
+The app checks it against `manifestPublicKey` in `mobile/distribution.json` through
+WebCrypto and ignores anything else, so the download host cannot forge a version.
+The APK URL is immutable and belongs to the same origin/lane.
 The app prompts only when the remote Android versionCode is strictly larger;
 notes are plain text and the action is **«Скачать обновление»**. The native bridge
-opens the system browser; Android installation always requires the user's approval.
+(`VoidNative.installVerified`, written by `patch-updater.mjs`) downloads the APK into
+the app's private cache, compares its SHA-256 with the signed one and its package
+name, and only then opens the system installer. A mismatch deletes the file. This
+check, not the APK signature, is what stops a swapped file: the debug key is public.
+Android installation always requires the user's approval; the first time it also asks
+to allow installs from this app. A WebView without Ed25519 (Chromium older than 137)
+shows that instead of offering the update.
 Application IDs, WebView origin and `mobile/debug.keystore` are unchanged, so a
 compatible update installs over the existing app and retains its local data.
 
 Checks run at launch, foreground return (15min throttle), every4h, and manually.
-Timeout5s/body16KiB, malformed JSON, unavailable site and older/equal versions never
+Timeout5s/body32KiB, malformed JSON, a bad signature, unavailable site and older/equal versions never
 block boot. Requests omit credentials, reject redirects and bypass caches.
 RuStore builds remain on their store update channel and never check sideload versions.
 
 CI stamps versionCode=git commit count and versionName=lane-SHA into both Gradle and
-`window.__BUILD__`, verifies the actual APK signer/package/versions, then attaches
-`version.json` to the rolling release. Non-increasing publication is refused.
+`window.__BUILD__`, verifies the actual APK signer/package/versions, signs the manifest,
+then attaches `version.json` to the rolling release. Non-increasing publication is refused.
 The unprivileged VPS timer downloads/verifies each new release and switches one
 pointer shared by JSON and the stable APK link only after all checks pass. No
 SSH deploy credential or public upload endpoint is required. Old releases remain

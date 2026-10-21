@@ -4,7 +4,7 @@ import { openSync, closeSync, writeSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateManifest, LANES, apkName } from '../../mobile/apk-manifest.mjs';
+import { validateManifest, openSignedManifest, LANES, apkName, distribution } from '../../mobile/apk-manifest.mjs';
 import { verifyApk } from '../../mobile/apk-verify.mjs';
 const { AbortController } = globalThis;
 const REPO = 'https://api.github.com/repos/MoonGameTechnology/MoonGame';
@@ -44,15 +44,21 @@ export async function download(url, limit, { fetchImpl = fetch, destination } = 
   } finally { clearTimeout(timer); if(descriptor!==undefined)closeSync(descriptor); }
 }
 
+/** Host-owned current file: signed envelope, or a legacy plain manifest imported by hand. */
+function currentManifest(text,lane,publicKey) {
+  const value=JSON.parse(text);
+  return typeof value?.payload==='string' ? openSignedManifest(value,lane,publicKey).manifest : validateManifest(value,lane);
+}
 /** Commit immutable files first, then switch ONE pointer shared by JSON and APK. */
-export async function installRelease({ root, lane, manifest, acquire, verify=verifyApk, checkSpace=true }) {
-  const m=validateManifest(manifest,lane); const dir=join(root,lane); await mkdir(dir,{recursive:true,mode:0o755});
+export async function installRelease({ root, lane, signed, acquire, verify=verifyApk, checkSpace=true, publicKey=distribution.manifestPublicKey }) {
+  // Clients verify the same signature; the host refuses to publish what they would refuse.
+  const { manifest:m, envelope }=openSignedManifest(signed,lane,publicKey); const dir=join(root,lane); await mkdir(dir,{recursive:true,mode:0o755});
   // A killed process cannot run finally. The systemd oneshot serializes runs;
   // remove only this publisher's random staging names before another attempt.
   for(const name of await readdir(dir))
     if(/^\.(?:incoming|current)-[a-f0-9]{24}$/.test(name))await rm(join(dir,name),{recursive:true,force:true});
   let current;
-  try { current=JSON.parse(await readFile(join(dir,'current','latest.json'),'utf8')); }
+  try { current=currentManifest(await readFile(join(dir,'current','latest.json'),'utf8'),lane,publicKey); }
   catch(e) { if(e.code!=='ENOENT')throw new Error('E_APK_CURRENT', { cause:e }); }
   if(current && m.versionCode<=current.versionCode) {
     if(m.versionCode===current.versionCode && m.apkSha256!==current.apkSha256)throw new Error('E_APK_VERSION_REUSE');
@@ -65,7 +71,7 @@ export async function installRelease({ root, lane, manifest, acquire, verify=ver
     const result=await acquire(join(stage,filename));
     if(result.sha256!==m.apkSha256 || result.bytes<=0 || result.bytes>MAX_APK)throw new Error('E_APK_DIGEST');
     await verify(join(stage,filename),m);
-    await writeFile(join(stage,'latest.json'),JSON.stringify(m,null,2)+'\n',{flag:'wx',mode:0o644});
+    await writeFile(join(stage,'latest.json'),JSON.stringify(envelope)+'\n',{flag:'wx',mode:0o644});
     await symlink(filename,join(stage,'latest.apk'));
     // Recover an immutable directory left by an interrupted switch only after
     // verification above; it was never public through the stable pointer.
@@ -78,7 +84,7 @@ export async function installRelease({ root, lane, manifest, acquire, verify=ver
     return true;
   } finally { await rm(stage,{recursive:true,force:true}); await unlink(pointer).catch(()=>{}); }
 }
-export async function syncLane(root,lane,{ get=download }={}) {
+export async function syncLane(root,lane,{ get=download, publicKey=distribution.manifestPublicKey }={}) {
   const release=JSON.parse((await get(`${REPO}/releases/tags/${lane}`,65536)).body.toString('utf8'));
   if(release.tag_name!==lane || !Array.isArray(release.assets))throw new Error('E_APK_RELEASE');
   const asset=(name)=>release.assets.find(a=>a.name===name && typeof a.browser_download_url==='string')?.browser_download_url;
@@ -87,15 +93,15 @@ export async function syncLane(root,lane,{ get=download }={}) {
   if(!metadata) {
     // Migration only: an already imported, verified legacy build is unchanged.
     // Never infer/download a new APK from prose when version.json is missing.
-    const current=validateManifest(JSON.parse(await readFile(join(root,lane,'current/latest.json'),'utf8')),lane);
+    const current=currentManifest(await readFile(join(root,lane,'current/latest.json'),'utf8'),lane,publicKey);
     const vc=/void:versionCode=(\d+)/.exec(release.body||'');
     const sha=/void:sha=([a-f0-9]{7,40})/.exec(release.body||'');
     if(vc && sha && Number(vc[1])===current.versionCode && sha[1]===current.sha)return false;
     throw new Error('E_APK_RELEASE');
   }
   if(metadata!==prefix+'version.json' || apk!==prefix+apkName(lane))throw new Error('E_APK_RELEASE');
-  const m=JSON.parse((await get(metadata,16384)).body.toString('utf8'));
-  return installRelease({root,lane,manifest:m,acquire:destination=>get(apk,MAX_APK,{destination})});
+  const signed=JSON.parse((await get(metadata,32768)).body.toString('utf8'));
+  return installRelease({root,lane,signed,publicKey,acquire:destination=>get(apk,MAX_APK,{destination})});
 }
 async function main() {
   const root=process.env.APK_PUBLIC_DIR;

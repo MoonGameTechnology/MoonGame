@@ -38,8 +38,33 @@ export function updateMessage(r: UpdateCheck): string {
       return t('upd.http-error', { s: r.status });
     case 'unparsable':
       return t('upd.bad-version');
+    case 'unverified':
+      return t('upd.unverified');
+    case 'unsupported':
+      return t('upd.unsupported');
     case 'dormant':
       return t('upd.apk-only');
+  }
+}
+
+/**
+ * Что сказать игроку на статус нативной установки (`void-apk-update`). Нативная сторона
+ * шлёт только фиксированные коды; незнакомый код — отказ, а не тишина.
+ */
+export function installMessage(code: unknown): string {
+  switch (code) {
+    case 'downloading':
+      return t('upd.downloading');
+    case 'installing':
+      return t('upd.installing');
+    case 'E_UPDATE_PERMISSION':
+      return t('upd.err-permission');
+    case 'E_UPDATE_DIGEST':
+      return t('upd.err-digest');
+    case 'E_UPDATE_PACKAGE':
+      return t('upd.err-package');
+    default:
+      return t('upd.err-download');
   }
 }
 
@@ -69,13 +94,18 @@ export function initApkUpdater(): void {
   const cupd = el('cupd');
   if (cupd) cupd.style.display = '';
 
+  let offered: UpdateInfo | null = null;
+  const status = (text: string): void => {
+    const line = el('ub-status');
+    if (line) line.textContent = text;
+  };
   const showUpdate = (u: UpdateInfo): void => {
+    offered = u;
+    status('');
     const ver = el('ub-ver');
     if (ver) ver.textContent = buildLabel(u);
     const notes = el('ub-notes');
     if (notes) notes.textContent = u.notes;
-    const go = el('ub-go') as HTMLAnchorElement | null;
-    if (go) go.href = u.apkUrl;
     const bar = el('updbar');
     if (bar) bar.style.display = 'block'; // override the stylesheet's display:none
   };
@@ -101,18 +131,19 @@ export function initApkUpdater(): void {
     }
   };
 
-  // «Обновить» → open the APK in the system browser via the native bridge (downloads +
-  // offers install, reliable everywhere). Falls back to the plain <a href> navigation
-  // when the bridge is absent (a real browser / dev build).
+  // «Скачать обновление» → the native side downloads the APK itself, compares its SHA-256
+  // with the SIGNED manifest and only then opens the system installer. There is no
+  // plain-link fallback: a browser download would fetch bytes nobody checked.
   el('ub-go')?.addEventListener('click', (e) => {
-    const native = (globalThis as { VoidNative?: { open?: (u: string) => void } }).VoidNative;
-    const url = (el('ub-go') as HTMLAnchorElement | null)?.href;
-    if (!url || !isTrustedApkUrl(url)) { e.preventDefault(); return; }
-    if (native?.open) {
-      e.preventDefault();
-      native.open(url);
+    e.preventDefault();
+    const native = (globalThis as { VoidNative?: { installVerified?: (url: string, sha256: string) => void } }).VoidNative;
+    if (!offered || !isTrustedApkUrl(offered.apkUrl) || !native?.installVerified) {
+      status(installMessage(null));
+      return;
     }
+    native.installVerified(offered.apkUrl, offered.apkSha256);
   });
+  window.addEventListener('void-apk-update', (e) => status(installMessage((e as CustomEvent).detail)));
   el('ub-later')?.addEventListener('click', () => {
     const bar = el('updbar');
     if (bar) bar.style.display = 'none';

@@ -3411,6 +3411,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .hub-android .ha-qr svg{display:block;width:132px;height:132px;background:#fff;margin-bottom:8px;}
 #ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
 #ub-notes:empty{display:none;}
+#ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
+#ub-status:empty{display:none;}
 @media (min-width:801px) and (pointer:fine){.hub-android{display:flex;}}
 
 /* in-app APK update banner + manual check (APK only; updater.ts toggles visibility).
@@ -4904,6 +4906,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="updbar" role="region" aria-live="polite">
   <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
   <p id="ub-notes"></p>
+  <p id="ub-status"></p>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>
     <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>

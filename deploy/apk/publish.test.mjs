@@ -2,26 +2,31 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, mkdir, writeFile, readFile, readlink, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
-import { createManifest, validateManifest, distribution } from '../../mobile/apk-manifest.mjs';
+import { createHash, generateKeyPairSync } from 'node:crypto';
+import { createManifest, validateManifest, distribution, signManifest, openSignedManifest } from '../../mobile/apk-manifest.mjs';
 import { download, installRelease, syncLane } from './publish.mjs';
 import { apkIngress } from './ingress.mjs';
 const { Response } = globalThis;
 const bytes=Buffer.from('APK fixture bytes');const sha=createHash('sha256').update(bytes).digest('hex');
 const manifest=(vc=1,lane='player')=>createManifest({lane,versionCode:vc,versionName:`${lane}-deadbee`,sha:'deadbee',notes:'Changes',apkSha256:sha,signerSha256:distribution.signerSha256});
+const pair=()=>{const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+  return {pem:privateKey.export({type:'pkcs8',format:'pem'}),publicKey:Buffer.from(publicKey.export({format:'jwk'}).x,'base64url').toString('base64')};};
+const keys=pair(),other=pair();
+const signed=(m=manifest())=>signManifest(m,keys.pem);
+const publicKey=keys.publicKey;
 const acquire=async path=>{await writeFile(path,bytes);return {bytes:bytes.length,sha256:sha};};
 const verify=async()=>{};
 describe('verified atomic site publication',()=>{
   it('pairs the stable APK and version through a single pointer; preserves old immutable APKs',async()=>{
     const root=await mkdtemp(join(tmpdir(),'apk-publish-'));
     try {
-      const install=(vc)=>installRelease({root,lane:'player',manifest:manifest(vc),acquire,verify,checkSpace:false});
+      const install=(vc)=>installRelease({root,lane:'player',signed:signed(manifest(vc)),publicKey,acquire,verify,checkSpace:false});
       expect(await install(1)).toBe(true);
       expect(await readlink(join(root,'player','current'))).toBe('1-deadbee');
-      expect(JSON.parse(await readFile(join(root,'player/current/latest.json'),'utf8')).versionCode).toBe(1);
+      expect(openSignedManifest(JSON.parse(await readFile(join(root,'player/current/latest.json'),'utf8')),'player',publicKey).manifest.versionCode).toBe(1);
       expect(await readFile(join(root,'player/current/latest.apk'))).toEqual(bytes);
       expect(await install(2)).toBe(true);
-      expect(JSON.parse(await readFile(join(root,'player/current/latest.json'),'utf8')).versionCode).toBe(2);
+      expect(openSignedManifest(JSON.parse(await readFile(join(root,'player/current/latest.json'),'utf8')),'player',publicKey).manifest.versionCode).toBe(2);
       expect(await readFile(join(root,'player/1-deadbee/void-dominion-player.apk'))).toEqual(bytes);
       expect(await install(1)).toBe(false);
       expect(await install(2)).toBe(false);
@@ -30,10 +35,10 @@ describe('verified atomic site publication',()=>{
   it.each(['interrupted','digest','signature'])('keeps previous APK+JSON when %s fails',async(kind)=>{
     const root=await mkdtemp(join(tmpdir(),'apk-failure-'));
     try {
-      await installRelease({root,lane:'player',manifest:manifest(),acquire,verify,checkSpace:false});
+      await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
       const badAcquire=kind==='interrupted'?async()=>{throw Error('network');}:kind==='digest'?async path=>{await acquire(path);return {bytes:bytes.length,sha256:'0'.repeat(64)};}:acquire;
       const badVerify=kind==='signature'?async()=>{throw Error('E_APK_SIGNER');}:verify;
-      await expect(installRelease({root,lane:'player',manifest:manifest(2),acquire:badAcquire,verify:badVerify,checkSpace:false})).rejects.toThrow();
+      await expect(installRelease({root,lane:'player',signed:signed(manifest(2)),publicKey,acquire:badAcquire,verify:badVerify,checkSpace:false})).rejects.toThrow();
       expect(await readlink(join(root,'player/current'))).toBe('1-deadbee');
       expect((await readdir(join(root,'player'))).filter(x=>x.startsWith('.'))).toEqual([]);
     } finally {await rm(root,{recursive:true,force:true});}
@@ -41,14 +46,29 @@ describe('verified atomic site publication',()=>{
   it('rejects changing APK bytes under an existing versionCode',async()=>{
     const root=await mkdtemp(join(tmpdir(),'apk-reuse-'));
     try {
-      await installRelease({root,lane:'player',manifest:manifest(),acquire,verify,checkSpace:false});
-      await expect(installRelease({root,lane:'player',manifest:{...manifest(),apkSha256:'0'.repeat(64)},acquire,verify,checkSpace:false})).rejects.toThrow('E_APK_VERSION_REUSE');
+      await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
+      await expect(installRelease({root,lane:'player',signed:signed({...manifest(),apkSha256:'0'.repeat(64)}),publicKey,acquire,verify,checkSpace:false})).rejects.toThrow('E_APK_VERSION_REUSE');
     } finally {await rm(root,{recursive:true,force:true});}
   });
   it('rejects wrong signer, package, lane or asset path before publishing',()=>{
     for(const patch of [{signerSha256:'0'.repeat(64)},{appId:'com.other.app'},{apkUrl:'https://evil.test/a.apk'},{versionCode:0}])
       expect(()=>validateManifest({...manifest(),...patch},'player')).toThrow('E_APK_MANIFEST');
     expect(()=>validateManifest(manifest(),'alpha')).toThrow();
+  });
+  it('publishes only what the CI key signed, byte for byte',async()=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-signed-'));
+    try {
+      const good=signed();
+      const forged=[signManifest(manifest(),other.pem),{...good,payload:signed(manifest(2)).payload},{payload:good.payload},{...good,signature:good.signature.slice(4)}];
+      for(const bad of forged)
+        await expect(installRelease({root,lane:'player',signed:bad,publicKey,acquire,verify,checkSpace:false})).rejects.toThrow();
+      expect(await readdir(root)).toEqual([]);
+      await installRelease({root,lane:'player',signed:{...good,extra:'x'},publicKey,acquire,verify,checkSpace:false});
+      const published=JSON.parse(await readFile(join(root,'player/current/latest.json'),'utf8'));
+      expect(published).toEqual({payload:good.payload,signature:good.signature});
+      expect(openSignedManifest(published,'player',publicKey).manifest).toEqual(manifest());
+      expect(()=>openSignedManifest(good,'alpha',publicKey)).toThrow();
+    } finally {await rm(root,{recursive:true,force:true});}
   });
   it('drops unknown remote metadata rather than publishing secrets',()=>expect(validateManifest({...manifest(),extra:'secret'},'player')).not.toHaveProperty('extra'));
 });
@@ -78,10 +98,10 @@ it('renders a public CORS/no-cache file-only ingress with stable aliases',()=>{
 it('keeps a verified legacy release unchanged but refuses any unmanifested newer build',async()=>{
  const root=await mkdtemp(join(tmpdir(),'apk-migration-'));
  try {
-  await installRelease({root,lane:'player',manifest:manifest(),acquire,verify,checkSpace:false});
+  await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
   const legacy=vc=>({get:async()=>({body:Buffer.from(JSON.stringify({tag_name:'player',body:`<!-- void:versionCode=${vc} void:sha=deadbee -->`,assets:[]}))})});
-  expect(await syncLane(root,'player',legacy(1))).toBe(false);
-  await expect(syncLane(root,'player',legacy(2))).rejects.toThrow('E_APK_RELEASE');
+  expect(await syncLane(root,'player',{...legacy(1),publicKey})).toBe(false);
+  await expect(syncLane(root,'player',{...legacy(2),publicKey})).rejects.toThrow('E_APK_RELEASE');
   expect(await readlink(join(root,'player/current'))).toBe('1-deadbee');
  } finally {await rm(root,{recursive:true,force:true});}
 });
@@ -89,9 +109,9 @@ it('keeps a verified legacy release unchanged but refuses any unmanifested newer
 it('recovers staging left by a killed publisher without deleting the current release',async()=>{
  const root=await mkdtemp(join(tmpdir(),'apk-orphan-'));
  try {
-  await installRelease({root,lane:'player',manifest:manifest(),acquire,verify,checkSpace:false});
+  await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
   const orphan=join(root,'player','.incoming-'+ 'a'.repeat(24));await mkdir(orphan);await writeFile(join(orphan,'partial.apk'),'incomplete');
-  expect(await installRelease({root,lane:'player',manifest:manifest(),acquire,verify,checkSpace:false})).toBe(false);
+  expect(await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false})).toBe(false);
   expect((await readdir(join(root,'player'))).some(x=>x.startsWith('.incoming-'))).toBe(false);
   expect(await readlink(join(root,'player/current'))).toBe('1-deadbee');
  } finally {await rm(root,{recursive:true,force:true});}

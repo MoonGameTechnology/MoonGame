@@ -196,7 +196,13 @@ jobs:
             echo "APKSIGNER=$ANDROID_HOME/build-tools/$BT/apksigner"
           } >> "$GITHUB_ENV"
 
-      - name: Generate the site release manifest from the verified APK
+      # The signed manifest is the trust root of the site updater: installed APKs accept
+      # only metadata signed by this key and install only bytes with the signed SHA-256.
+      # The private key lives ONLY in this secret (never on the VPS); without it, or with a
+      # key that does not pair with mobile/distribution.json, the build stops here.
+      - name: Generate the signed site release manifest from the verified APK
+        env:
+          APK_MANIFEST_SIGNING_KEY: ${{ secrets.APK_MANIFEST_SIGNING_KEY }}
         run: |
           node mobile/apk-manifest.mjs mobile/android/app/build/outputs/apk/debug/app-debug.apk version.json
 

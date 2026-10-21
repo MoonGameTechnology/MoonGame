@@ -54,6 +54,9 @@
 - **APK-SITE-1** ✅ — Один HTTPS source на VPS для sideload update и desktop
   APK/QR. Verified immutable APK + atomic latest.json/current, прежние appId/key,
   versionCode monotonic, bounded/offline-safe client, native user-approved install.
+  Манифест подписан в CI ключом Ed25519, которого нет на VPS; приложение проверяет
+  подпись и SHA-256 скачанного APK до установки, иначе взломанный VPS подменил бы
+  файл (ключ подписи APK публичный).
   [Runbook и границы проверки](../deploy/apk/README.md). RuStore и архив площадки
   не получают sideload promotion; legacy GitHub markers оставлены для миграции.
 
