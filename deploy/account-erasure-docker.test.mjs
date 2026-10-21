@@ -23,6 +23,8 @@ it('pins the maintenance container to the installed image and passes credentials
     const actual = readFileSync(args, 'utf8').trim().split('\n');
     expect(actual).toContain(image);
     expect(actual).toContain('--read-only');
+    // Keep the image's TLS trust policy, including its Node --use-openssl-ca flag.
+    expect(actual).not.toContain('--entrypoint');
     expect(actual).toContain(secret);
     expect(actual).toContain(`type=bind,src=${dir},dst=/erasure`);
     expect(actual).not.toContain('never-print-this');
