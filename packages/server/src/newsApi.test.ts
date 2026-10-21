@@ -102,10 +102,23 @@ describe('GET /news', () => {
     const last = await news(s, `?limit=2&before=${next.events[1]!.at}`);
     expect(last.events.map((e) => e.id)).toEqual(['a']);
     expect(last.more).toBe(false);
-    // A page that is all one moment is served as it is.
+  });
+
+  it('a page that is all one moment serves the moment whole, past the limit', async () => {
+    // One settlement writes its result and medals at one moment; a small page must not
+    // leave the rest of that moment behind a `before` cursor that skips it.
+    const s = await server([founded('o', 4), founded('p', 5), founded('q', 5), founded('r', 5)]);
+    const first = await news(s, '?limit=2');
+    expect(first.events.map((e) => e.id)).toEqual(['r', 'q', 'p']);
+    expect(first.more).toBe(true);
+    const next = await news(s, `?limit=2&before=${first.events[2]!.at}`);
+    expect(next.events.map((e) => e.id)).toEqual(['o']);
+    expect(next.more).toBe(false);
     await app?.close();
-    const same = await server([founded('p', 5), founded('q', 5), founded('r', 5)]);
-    expect((await news(same, '?limit=2')).events.map((e) => e.id)).toEqual(['r', 'q']);
+    const only = await server([founded('p', 5), founded('q', 5), founded('r', 5)]);
+    const all = await news(only, '?limit=1');
+    expect(all.events.map((e) => e.id)).toEqual(['r', 'q', 'p']);
+    expect(all.more).toBe(false);
   });
 
   it('narrows to the asked kinds; an unknown kind is a bad request', async () => {
