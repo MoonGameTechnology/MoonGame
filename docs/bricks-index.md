@@ -158,7 +158,7 @@
 | UIX-16.1 | ✅ | proto | `docs/backlog.md` | Стартовое меню — одним экраном. |
 | UIX-17.1 | ✅ | proto | `docs/backlog.md` | Страница «Матчи» — без полей адреса и позывного. |
 | CORP-1 | ✅ | srv | `docs/backlog.md` | Лента новостей на сервере: события корпораций и объявления. |
-| CORP-2 | ⏳ | proto | `docs/backlog.md` | Лента на «Домой» вместо «Сводки». |
+| CORP-2 | ✅ | proto | `docs/backlog.md` | Лента на «Домой» вместо «Сводки». |
 | CORP-3 | ⏳ | proto | `docs/backlog.md` | Вкладка «Корпорация» в хабе вместо «Альянсов». |
 | CORP-4 | ⏳ | srv | `docs/backlog.md` | Битва корпораций загружается и считает победу по сторонам. |
 | CORP-5 | 🔒 | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
@@ -168,7 +168,7 @@
 | CORP-9 | 🔒 | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
 | CORP-10 | 🔒 | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
 | CORP-11 | 🔒 | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
-| CORP-12 | 🔒 | srv | `docs/backlog.md` | Медали игроков в ленте. |
+| CORP-12 | ⏳ | srv | `docs/backlog.md` | Медали игроков в ленте. |
 | CORP-13 | 🔒 | proto | `docs/backlog.md` | Картинки базы. |
 | SPY-6 | ✅ | core proto | `docs/backlog.md` | Сеть из 3 агентов. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |

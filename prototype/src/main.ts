@@ -529,6 +529,7 @@ import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
 import { initMetaEconomy } from './metaEconomyScreen';
 import { initShop } from './shopScreen';
+import { initNews } from './newsScreen';
 import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
@@ -4140,6 +4141,8 @@ function hubTab(tab: string): void {
   if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
   // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
   if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
+  if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());
+  if (tab !== 'home') news?.close(); // the feed sheet lives over the home panel
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
@@ -4339,6 +4342,27 @@ const shop = __SECTOR_ZERO_ONLY__
     });
 if (shop && typeof ResizeObserver !== 'undefined')
   new ResizeObserver(() => shop.relayout()).observe($('hp-shop'));
+// CORP-2 «Домой»: лента новостей. Экран — `newsScreen.ts`, решения — `decisions/newsFeed.ts`.
+// Ленту сервер отдаёт без входа, поэтому ей нужен только адрес; сессия хаба — для «Моей
+// корпорации», карточки корпорации и заявки.
+const news = __SECTOR_ZERO_ONLY__
+  ? null
+  : initNews({
+      column: () => $('news-col'),
+      teaser: () => $('news-teaser'),
+      sheet: () => $('news-sheet'),
+      publicBase: () => {
+        const step = resolveBase(srvInput.value, location.protocol === 'https:');
+        return step.kind === 'ok' ? httpBase(step.base) : null;
+      },
+      authorizedBase: hubAuthorizedBase,
+      note: (text) => {
+        hubNote.textContent = text;
+      },
+      errText,
+      openCorp: (tab) => corp?.open(tab === 'current' ? 'wars' : tab === 'history' ? 'battles' : 'hq'),
+      now: () => Date.now(),
+    });
 /** Premium is running for this callsign, by the last account read on this device. */
 function premiumRunning(): boolean {
   return Number(readRaw(premiumKey()) ?? 0) > Date.now();
@@ -5439,6 +5463,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
   { id: 'arsenal-sheet', isOpen: () => arsenal?.isOpen() ?? false, close: () => arsenal?.close() }, // inside the hub (z52), under the codex opened from it
   { id: 'shop-sheet', isOpen: () => shop?.isOpen() ?? false, close: () => shop?.close() }, // inside the hub (z52)
+  { id: 'news-sheet', isOpen: () => news?.isOpen() ?? false, close: () => news?.close() }, // inside the hub (z52), the feed and a corp card
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45

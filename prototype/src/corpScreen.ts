@@ -228,9 +228,10 @@ export interface CorpHost {
 
 /** Wire the cabinet up. Call once at boot — it attaches the overlay's and the tab
  *  row's click delegates. `mine()` is how the profile card reads the live corp record
- *  (its influence line and subtitle) without reaching into this screen's internals. */
+ *  (its influence line and subtitle) without reaching into this screen's internals.
+ *  `open(tab)` opens on that tab (an id from `CORP_TABS`); without it, on the last one. */
 export function initCorp(host: CorpHost): {
-  open: () => void;
+  open: (tab?: string) => void;
   close: () => void;
   mine: () => { corp: CorpRecord | null; membership: CorpMembership | null };
 } {
@@ -753,7 +754,11 @@ export function initCorp(host: CorpHost): {
     host.body().innerHTML = body;
   }
 
-  function openCorp(): void {
+  function openCorp(tab?: string): void {
+    if (tab !== undefined && CORP_TABS.some((ct) => ct.id === tab)) {
+      corpTab = tab;
+      cupSlot = null; // витрина живёт только на «Штабе»
+    }
     renderCorp(); // paint instantly from whatever's cached in memory…
     host.root().style.display = 'flex';
     detach('корпорация: обновление кабинета', refreshCorp()); // …then refresh from the server
