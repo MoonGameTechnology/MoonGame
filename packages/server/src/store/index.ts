@@ -1,5 +1,6 @@
 export type {
   AccountStore,
+  AnnouncementStore,
   ArsenalStore,
   AvaChallenge,
   AvaChallengeStatus,
@@ -16,6 +17,8 @@ export type {
   AvaSide,
   CommanderStore,
   CorpAuditEntry,
+  CorpFeedEntry,
+  CorpFeedKind,
   CorpMembership,
   CorpRecord,
   CorpRent,
@@ -24,6 +27,8 @@ export type {
   CorpStore,
   CorpSummary,
   DropStore,
+  FeedEntry,
+  FeedKind,
   FriendEdge,
   FriendParty,
   FriendStore,
@@ -42,6 +47,7 @@ export type {
 } from './types';
 export {
   MemoryAccountStore,
+  MemoryAnnouncementStore,
   MemoryArsenalStore,
   MemoryAvaChallengeStore,
   MemoryAvaFeedStore,
@@ -62,6 +68,7 @@ export {
 export {
   migrate,
   PostgresAccountStore,
+  PostgresAnnouncementStore,
   PostgresArsenalStore,
   PostgresAvaChallengeStore,
   PostgresAvaFeedStore,
@@ -81,3 +88,5 @@ export {
 } from './postgres';
 // UIX-4.4: the switchable push kinds — a value, so the API and the dispatcher share one list.
 export { PUSH_KINDS, type PushKind } from './types';
+// CORP-1: which feed rows are AvA ones — a value, shared by the AvA route and the news route.
+export { AVA_FEED_KINDS, isAvaFeedEntry } from './types';

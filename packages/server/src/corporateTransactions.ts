@@ -73,6 +73,7 @@ export function createCorporateServices(pool: Pool): {
   ava: AvaService;
   medals: MedalService;
 } {
+  const catalog = loadMedalCatalog();
   return {
     corp: transactional(pool, (db) => new CorpService({ store: new PostgresCorpStore(db) })),
     ava: transactional(
@@ -84,6 +85,7 @@ export function createCorporateServices(pool: Pool): {
           rosterStore: new PostgresAvaRosterStore(db),
           resultStore: new PostgresAvaResultStore(db),
           feedStore: new PostgresAvaFeedStore(db),
+          medals: catalog,
         }),
     ),
     medals: transactional(
@@ -93,7 +95,7 @@ export function createCorporateServices(pool: Pool): {
           corpStore: new PostgresCorpStore(db),
           resultStore: new PostgresAvaResultStore(db),
           medalStore: new PostgresMedalStore(db),
-          catalog: loadMedalCatalog(),
+          catalog,
         }),
     ),
   };
