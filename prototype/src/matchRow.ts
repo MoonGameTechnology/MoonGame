@@ -35,7 +35,7 @@ export type MatchTab = 'available' | 'active' | 'archived';
 /** Правила партии в том виде, в каком их отдаёт сервер. */
 export interface MatchRules {
   timeScale?: number;
-  victory?: { dominationPercent?: number; scoreLimit?: number; coalitionFactor?: number };
+  victory?: { dominationPercent?: number; scoreLimit?: number; coalitionFactor?: number; endsAt?: number };
 }
 
 /** Часовой «окна нет»: всё, что дальше десятилетия, — бесконечность (правило 2). */

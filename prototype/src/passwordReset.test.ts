@@ -17,13 +17,18 @@ beforeAll(() => setLocale('ru'));
 function field(value = ''): HTMLInputElement & { focused: () => number } {
   let focused = 0;
   const handlers = new Map<string, EventListener>();
+  const attributes = new Map<string, string>();
   const el = {
     value,
     ariaInvalid: null,
     addEventListener: (type: string, handler: EventListener) => handlers.set(type, handler),
     dispatchEvent: (event: Event) => { handlers.get(event.type)?.(event); return true; },
+    setAttribute: (name: string, value: string) => attributes.set(name, value),
+    removeAttribute: (name: string) => attributes.delete(name),
+    getAttribute: (name: string) => attributes.get(name) ?? null,
     focus: () => {
       focused++;
+      handlers.get('focus')?.(new Event('focus'));
     },
     focused: () => focused,
   };

@@ -53,6 +53,36 @@ describe('match description', () => {
     expect(html).not.toContain(t('browser.description.domination', { p: 60 }));
   });
 
+  it.each(['pvp', 'pve'] as const)('shows the %s deadline as game time independent of browser age or clock scale', (kind) => {
+    const endsAt = 2 * 86_400_000 + 7 * 3_600_000 + 45 * 60_000;
+    const expected = t('browser.description.timeout', {
+      at: t('fmt.stamp', { d: 3, hm: '07:45' }),
+    });
+    for (const timeScale of [1, 24]) {
+      const html = matchDescriptionHtml({
+        ...match,
+        kind,
+        days: 99,
+        rules: { timeScale, victory: { ...match.rules.victory, endsAt } },
+      }, 'Map');
+      expect(html).toContain(t('browser.description.deadline'));
+      expect(html).toContain(expected);
+    }
+  });
+
+  it('does not fabricate a deadline for old servers or malformed timestamps', () => {
+    for (const endsAt of [undefined, NaN, Infinity, -1]) {
+      const html = matchDescriptionHtml({
+        ...match,
+        rules: { victory: { endsAt } },
+      }, 'Map');
+      expect(html).toContain(t('browser.description.unknown'));
+      expect(html).not.toContain(t('browser.description.timeout', {
+        at: t('fmt.stamp', { d: 101, hm: '00:00' }),
+      }));
+    }
+  });
+
   it('a closed window or ended match cannot promise admission', () => {
     for (const changed of [{ entryOpen: false }, { status: 'ended' }]) {
       const html = matchDescriptionHtml({ ...match, ...changed }, 'Map');

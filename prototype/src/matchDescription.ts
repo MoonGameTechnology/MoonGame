@@ -1,6 +1,6 @@
 import { t, tData } from '../../localization/runtime';
 import type { MatchRow } from './matchBrowser';
-import { esc } from './format';
+import { esc, gameStamp } from './format';
 import { fmtJoinWindow, joinWindow } from './matchRow';
 
 /** Read-only details from the same server row as the browser; opening never claims a seat. */
@@ -20,6 +20,12 @@ export function matchDescriptionHtml(match: MatchRow, mapName: string): string {
           ? t('browser.description.entry-open')
           : unknown;
   const goals: string[] = [];
+  const endsAt = match.rules.victory?.endsAt;
+  // The server's deadline is absolute GAME time, never a wall-clock timestamp or
+  // a remaining duration. Use the same day numbering as the in-match clock/log.
+  const deadline = endsAt !== undefined && Number.isFinite(endsAt) && endsAt >= 0
+    ? t('browser.description.timeout', { at: gameStamp(endsAt) })
+    : unknown;
   if (match.kind === 'pve') goals.push(t('browser.description.pve'));
   else {
     if (match.rules.victory?.scoreLimit)
@@ -53,6 +59,7 @@ export function matchDescriptionHtml(match: MatchRow, mapName: string): string {
     ) +
     item('browser.description.speed', `×${match.rules.timeScale ?? 1}`) +
     item('browser.description.goal', goals.join(' · ') || unknown) +
+    item('browser.description.deadline', deadline) +
     item('browser.description.entry', entry) +
     item('browser.description.number', match.matchId) +
     `</dl><button type="button" class="mbtn btn-second" data-description-close>${esc(t('browser.description.close'))}</button>`

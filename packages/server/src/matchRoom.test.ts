@@ -2032,7 +2032,7 @@ describe('MatchRoom — режим матча консервируется пр�
     );
   });
 
-  it('browser victory rules include only configured public fields after mode resolution', () => {
+  it('browser victory rules include effective public fields after mode resolution', () => {
     const victory = {
       dominationPercent: 0.8,
       coalitionFactor: 0.65,
@@ -2046,7 +2046,12 @@ describe('MatchRoom — режим матча консервируется пр�
       coalitionFactor: 0.65,
       endsAt: 12_345,
     });
-    expect(modeRoom({ timeScale: 1 }).victoryRules).toBeUndefined();
+    expect(modeRoom({ timeScale: 2 }).victoryRules).toEqual({
+      scoreLimit: 600,
+      dominationPercent: 0.6,
+      coalitionFactor: 0.7,
+      endsAt: 60 * 86_400_000,
+    });
   });
 
   it('mutating the browser victory rules cannot change the rules used by the reducer', async () => {
@@ -2062,7 +2067,12 @@ describe('MatchRoom — режим матча консервируется пр�
       payload: {},
     });
     expect(r.state.players.p1?.name).toBe('777');
-    expect(r.victoryRules).toEqual({ scoreLimit: 777 });
+    expect(r.victoryRules).toEqual({
+      scoreLimit: 777,
+      dominationPercent: 0.6,
+      coalitionFactor: 0.7,
+      endsAt: 100 * 86_400_000,
+    });
   });
 
   it('матч без режима поднимается как раньше (обратная совместимость)', async () => {

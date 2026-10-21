@@ -97,6 +97,9 @@ export type SessionFailure = Exclude<AuthOutcome, 'ok' | 'created'> | 'nick-rule
 
 /** A form owns its errors and ignores replies for values it has already changed. */
 export interface SessionFeedback {
+  /** The original screen is still active; field edits alone do not cancel it. */
+  isActive(): boolean;
+  /** Error feedback still refers to the values currently shown. */
   isCurrent(): boolean;
   reject(reason: SessionFailure, key: string): void;
 }
@@ -183,6 +186,14 @@ export async function ensureSession(
   // (including an empty one) means a submitted form and must be checked below.
   const mine = tokenFor(localStorage, base, login);
   if (passwordArg === undefined && mine) return mine;
+  const startingSession = readSession(localStorage, base);
+  const canComplete = (): boolean => {
+    if (!feedback) return true;
+    const currentSession = readSession(localStorage, base);
+    return feedback.isActive()
+      && currentSession?.login === startingSession?.login
+      && currentSession?.token === startingSession?.token;
+  };
   // Правила логина и пароля — в `authRules.ts` (REFM-47): зеркало серверных, чтобы
   // игрок увидел ПРИЧИНУ, а не сухой одинаковый отказ.
   if (!validLogin(login)) {
@@ -213,13 +224,16 @@ export async function ensureSession(
   };
   try {
     const login1 = await call('/auth/login');
-    if (feedback && !feedback.isCurrent()) return null;
+    if (!canComplete() || (feedback && !feedback.isCurrent())) return null;
     // Registration carries the optional recovery email (login never needs it).
     // Почта уходит только в регистрацию и только если её ввели (`authRequest.ts`,
     // правило 3): `email: ''` записал бы на учётку пустой адрес.
     const extra = registerExtra(emailArg);
     const reg = shouldRegister(login1) ? await call('/auth/register', extra) : undefined;
-    if (feedback && !feedback.isCurrent()) return null;
+    if (!canComplete()) return null;
+    // Registration has already created the account. Accept its issued session
+    // even after field edits; only an error for the old values is stale.
+    if (!reg?.token && feedback && !feedback.isCurrent()) return null;
     // Причину называет `authRules.ts` — там же правило «401 на входе + 409 на
     // регистрации = неверный пароль», которое иначе свелось бы к «отказу регистрации».
     const outcome = authOutcome(login1, reg);

@@ -4719,11 +4719,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         </div>
         <form class="authform" onsubmit="return false">
           <div id="cwlogin" class="cwlogin" style="display:none">
-            <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" aria-errormessage="cstatus" data-i18n-ph="welcome.nick.ph">
+            <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
             <button id="cwgo" class="cbtn btn-second" type="button" data-i18n="welcome.go"></button>
           </div>
           <div id="cwpassrow" class="cwlogin password-field" style="display:none">
-            <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" aria-errormessage="cstatus" data-i18n-ph="welcome.pass.ph">
+            <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
             ${passwordToggle('cwpass')}
           </div>
         </form>
@@ -4734,22 +4734,22 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <p class="csub" data-i18n="welcome.register.sub"></p>
         <form class="authform" onsubmit="return false">
           <label class="cfield"><span data-i18n="welcome.register.nick"></span>
-            <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" aria-errormessage="cstatus" data-i18n-ph="welcome.nick.ph">
+            <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
           </label>
           <label class="cfield"><span data-i18n="welcome.register.mail"></span>
-            <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" aria-errormessage="cstatus" placeholder="you@mail.com">
+            <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
             <small data-i18n="auth.email.attachment"></small>
           </label>
           <div class="cfield"><label for="crpass" data-i18n="welcome.register.pass"></label>
             <div class="password-field">
-            <input id="crpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="crpassrule" aria-errormessage="cstatus" data-i18n-ph="welcome.pass.min.ph">
+            <input id="crpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="crpassrule" data-i18n-ph="welcome.pass.min.ph">
               ${passwordToggle('crpass')}
             </div>
           </div>
           <p id="crpassrule" class="csub" data-i18n="acc.pass.rule"></p>
           <div class="cfield"><label for="crpass2" data-i18n="welcome.register.pass2"></label>
             <div class="password-field">
-            <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" aria-errormessage="cstatus" data-i18n-ph="welcome.pass.again.ph">
+            <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
               ${passwordToggle('crpass2')}
             </div>
           </div>
@@ -4781,14 +4781,14 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <input id="cresetuser" type="text" autocomplete="username" hidden aria-hidden="true" tabindex="-1">
           <div class="cfield"><label for="cresetpass" data-i18n="welcome.reset.pass"></label>
             <div class="password-field">
-            <input id="cresetpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="cresetpassrule" aria-errormessage="cstatus" data-i18n-ph="welcome.pass.min.ph">
+            <input id="cresetpass" type="password" autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="cresetpassrule" data-i18n-ph="welcome.pass.min.ph">
               ${passwordToggle('cresetpass')}
             </div>
           </div>
           <p id="cresetpassrule" class="csub" data-i18n="acc.pass.rule"></p>
           <div class="cfield"><label for="cresetpass2" data-i18n="welcome.reset.pass2"></label>
             <div class="password-field">
-            <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" aria-errormessage="cstatus" data-i18n-ph="welcome.pass.again.ph">
+            <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
               ${passwordToggle('cresetpass2')}
             </div>
           </div>

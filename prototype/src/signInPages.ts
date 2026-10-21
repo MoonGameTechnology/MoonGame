@@ -148,6 +148,7 @@ async function welcomeSignIn(nick: string): Promise<void> {
     const password = wPassInput.value;
     const revision = stageRevision;
     const session = await ensureSession(srv.base, nick, password, undefined, {
+      isActive: () => revision === stageRevision,
       isCurrent: () => revision === stageRevision && wNickInput.value.trim() === nick && wPassInput.value === password,
       reject: (reason, key) => {
         const field = reason === 'nick-rule' || reason === 'nickname-blocked' ? 'nick'
@@ -245,6 +246,7 @@ async function submitRegister(): Promise<void> {
     // just means no self-service reset. A malformed one is caught by the server (400).
     const revision = stageRevision;
     const session = await ensureSession(srv.base, nick, payload.pass, payload.email, {
+      isActive: () => revision === stageRevision,
       isCurrent: () => revision === stageRevision
         && Object.entries(registerDraft()).every(([field, value]) => value === form[field as RegisterField]),
       reject: (reason, key) => {
