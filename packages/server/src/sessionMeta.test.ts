@@ -63,6 +63,34 @@ describe('BRW-0 — мета сессии собирается из самой �
     });
     expect(meta).toMatchObject({ rules: { timeScale: 100 }, createdAt: 7, entryWindowMs: 42 });
   });
+
+  it('the browser receives the room\'s resolved victory overrides with the host clock scale', async () => {
+    const room = createDevMatch(data, {
+      id: 'custom-rules',
+      mapId: 'duel-1',
+      config: { timeScale: 1, modeId: 'standard', victory: { scoreLimit: 777, dominationPercent: 0.8 } },
+    });
+    const reg = new MatchRegistry(new MemoryAccountStore(), data);
+    const meta = sessionMeta(room, { timeScale: 24, createdAt: 7 });
+    reg.register(room, meta);
+    const [row] = (await reg.list(null)).available;
+    expect(row).toMatchObject({
+      mapId: 'duel-1',
+      rules: {
+        timeScale: 24,
+        victory: { scoreLimit: 777, dominationPercent: 0.8, coalitionFactor: 0.7 },
+      },
+    });
+    expect(row?.rules.victory?.endsAt).toBeUndefined();
+    meta.rules.victory!.scoreLimit = 1;
+    expect(room.victoryRules?.scoreLimit).toBe(777);
+  });
+
+  it('the browser does not invent victory settings absent from the room', () => {
+    expect(sessionMeta(session('m', 'nexus'), { timeScale: 1, createdAt: 7 }).rules).toEqual({
+      timeScale: 1,
+    });
+  });
 });
 
 describe('BRW-0 — «Готово, когда»: две сессии различимы в GET /matches', () => {

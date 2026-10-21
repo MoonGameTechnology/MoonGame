@@ -120,6 +120,11 @@ describe('лестница main.ts совпадает с описью', () => {
     expect(ladder.length).toBeGreaterThan(20);
   });
 
+  it('описание матча закрывается первым: нативный dialog выше обычных слоёв', () => {
+    expect(ladder[0]).toBe('match-description');
+    expect(block).toContain('isOpen: isMatchDescriptionOpen, close: closeMatchDescription');
+  });
+
   it('каждый слой описи есть в лестнице — иначе Back его не закроет', () => {
     const declared = [...LAYER_INVENTORY].filter(([, v]) => v === 'layer').map(([id]) => id);
     const missing = declared.filter((id) => !ladder.includes(id));

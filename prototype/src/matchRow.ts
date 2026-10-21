@@ -35,7 +35,7 @@ export type MatchTab = 'available' | 'active' | 'archived';
 /** Правила партии в том виде, в каком их отдаёт сервер. */
 export interface MatchRules {
   timeScale?: number;
-  victory?: { dominationPercent?: number; scoreLimit?: number };
+  victory?: { dominationPercent?: number; scoreLimit?: number; coalitionFactor?: number };
 }
 
 /** Часовой «окна нет»: всё, что дальше десятилетия, — бесконечность (правило 2). */
@@ -45,9 +45,10 @@ export const ENTRY_UNBOUNDED_MS = 3650 * 24 * 60 * 60 * 1000;
 export const ENTRY_SOON_MS = 24 * 60 * 60 * 1000;
 
 /** Сводка правил партии: скорость и условия победы, только заданные. */
-export function ruleSummary(r: MatchRules): string {
+export function ruleSummary(r: MatchRules, kind?: 'pvp' | 'pve'): string {
   const parts = [`×${r.timeScale ?? 1}`];
-  if (r.victory?.scoreLimit) parts.push(t('browser.goal.score', { n: r.victory.scoreLimit }));
+  if (kind === 'pve') return parts.join(' · ');
+  if (r.victory?.scoreLimit) parts.push(t('browser.description.score', { n: r.victory.scoreLimit }));
   if (r.victory?.dominationPercent)
     parts.push(t('browser.goal.map', { p: Math.round(r.victory.dominationPercent * 100) }));
   return parts.join(' · ');

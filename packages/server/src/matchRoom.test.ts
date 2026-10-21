@@ -2032,6 +2032,39 @@ describe('MatchRoom — режим матча консервируется пр�
     );
   });
 
+  it('browser victory rules include only configured public fields after mode resolution', () => {
+    const victory = {
+      dominationPercent: 0.8,
+      coalitionFactor: 0.65,
+      endsAt: 12_345,
+      internalNote: 'not public',
+    };
+    const r = modeRoom({ timeScale: 1, modeId: 'brisk', victory });
+    expect(r.victoryRules).toEqual({
+      scoreLimit: 120,
+      dominationPercent: 0.8,
+      coalitionFactor: 0.65,
+      endsAt: 12_345,
+    });
+    expect(modeRoom({ timeScale: 1 }).victoryRules).toBeUndefined();
+  });
+
+  it('mutating the browser victory rules cannot change the rules used by the reducer', async () => {
+    const r = modeRoom({ timeScale: 1, modeId: 'brisk', victory: { scoreLimit: 777 } });
+    const published = r.victoryRules!;
+    published.scoreLimit = 1;
+    published.dominationPercent = 0.01;
+    await r.submitServerAction('p1', {
+      id: 'read-unchanged-rules',
+      type: 'test.rules',
+      playerId: 'p1',
+      issuedAt: 1,
+      payload: {},
+    });
+    expect(r.state.players.p1?.name).toBe('777');
+    expect(r.victoryRules).toEqual({ scoreLimit: 777 });
+  });
+
   it('матч без режима поднимается как раньше (обратная совместимость)', async () => {
     expect(await seenScoreLimit({ timeScale: 1 })).toBe('none');
   });

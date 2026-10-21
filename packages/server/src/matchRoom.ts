@@ -13,6 +13,7 @@ import type {
   PlayerReward,
   SignatureContact,
   StateDelta,
+  VictoryConfig,
 } from '@void/shared-core';
 import {
   CLIENT_ACTION_TYPES,
@@ -834,6 +835,23 @@ export class MatchRoom {
    *  реально живёт, иначе строка обещает игроку не тот матч (BRW-0). */
   get modeId(): string | undefined {
     return this.config?.modeId;
+  }
+
+  /** Public, configured victory rules for the match browser. Copy only the known
+   *  fields so callers cannot mutate the room's pinned config or publish future
+   *  internal fields. Unspecified rules stay unspecified; the browser must not
+   *  invent defaults from a different version of the simulation. */
+  get victoryRules(): VictoryConfig | undefined {
+    const victory = this.config?.victory;
+    if (victory === undefined) return undefined;
+    return {
+      ...(victory.scoreLimit !== undefined ? { scoreLimit: victory.scoreLimit } : {}),
+      ...(victory.dominationPercent !== undefined
+        ? { dominationPercent: victory.dominationPercent }
+        : {}),
+      ...(victory.coalitionFactor !== undefined ? { coalitionFactor: victory.coalitionFactor } : {}),
+      ...(victory.endsAt !== undefined ? { endsAt: victory.endsAt } : {}),
+    };
   }
 
   get state(): GameState {

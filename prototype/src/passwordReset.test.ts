@@ -16,8 +16,12 @@ beforeAll(() => setLocale('ru'));
 /** Поле ввода без DOM: значение + счётчик фокусов — всё, чем пользуется сцена. */
 function field(value = ''): HTMLInputElement & { focused: () => number } {
   let focused = 0;
+  const handlers = new Map<string, EventListener>();
   const el = {
     value,
+    ariaInvalid: null,
+    addEventListener: (type: string, handler: EventListener) => handlers.set(type, handler),
+    dispatchEvent: (event: Event) => { handlers.get(event.type)?.(event); return true; },
     focus: () => {
       focused++;
     },
@@ -188,6 +192,63 @@ describe('сброс пароля — сцена', () => {
     await w.api.submit();
     expect(w.sent).toEqual([]);
     expect(w.status.at(-1)).toBeTruthy();
+    expect(w.pass.ariaInvalid).toBe('true');
+  });
+
+  it('повтор выделяет оба поля, исправление любого убирает рамки и сообщение', async () => {
+    const w = wired();
+    w.api.open('TOKEN', 'https://void.example/g?reset=TOKEN');
+    expect([w.pass.ariaInvalid, w.pass2.ariaInvalid]).toEqual([null, null]);
+    w.pass.value = 'orbit-new-secret';
+    w.pass2.value = 'orbit-other-secret';
+    await w.api.submit();
+    expect([w.pass.ariaInvalid, w.pass2.ariaInvalid, w.status.at(-1)])
+      .toEqual(['true', 'true', t('auth.pass-mismatch')]);
+    w.pass.value = w.pass2.value;
+    w.pass.dispatchEvent(new Event('input'));
+    expect([w.pass.ariaInvalid, w.pass2.ariaInvalid, w.status.at(-1)]).toEqual([null, null, '']);
+  });
+
+  it('ответ о старом пароле не помечает уже исправленный пароль', async () => {
+    let answer!: (value: { ok: boolean; body: unknown }) => void;
+    const w = wired({ submit: () => new Promise((resolve) => { answer = resolve; }) });
+    w.api.open('TOKEN', 'https://void.example/g?reset=TOKEN');
+    w.pass.value = w.pass2.value = 'orbit-new-secret';
+    const pending = w.api.submit();
+    w.pass.value = w.pass2.value = 'orbit-other-secret';
+    w.pass.dispatchEvent(new Event('input'));
+    answer({ ok: false, body: { error: 'E_PASSWORD_POLICY' } });
+    await pending;
+    expect([w.pass.ariaInvalid, w.pass2.ariaInvalid, w.status.at(-1), w.success]).toEqual([null, null, '', []]);
+  });
+
+  it('успешный сброс сохраняет сессию, даже если поля изменили во время запроса', async () => {
+    let answer!: (value: { ok: boolean; body: unknown }) => void;
+    const w = wired({ submit: () => new Promise((resolve) => { answer = resolve; }) });
+    w.api.open('TOKEN', 'https://void.example/g?reset=TOKEN');
+    w.pass.value = w.pass2.value = 'orbit-new-secret';
+    const pending = w.api.submit();
+    w.pass.value = 'changed-after-submit';
+    w.pass.dispatchEvent(new Event('input'));
+    answer({ ok: true, body: { login: 'Orion', token: 'reset-session' } });
+    await pending;
+    expect(w.success).toEqual([['Orion', 'reset-session']]);
+    expect([w.pass.value, w.pass2.value, w.pass.ariaInvalid, w.pass2.ariaInvalid]).toEqual(['', '', null, null]);
+    expect(w.isBusy()).toBe(false);
+  });
+
+  it('ответ для прежней ссылки сброса не заменяет новую открытую форму', async () => {
+    let answer!: (value: { ok: boolean; body: unknown }) => void;
+    const w = wired({ submit: () => new Promise((resolve) => { answer = resolve; }) });
+    w.api.open('TOKEN', 'https://void.example/g?reset=TOKEN');
+    w.pass.value = w.pass2.value = 'orbit-new-secret';
+    const pending = w.api.submit();
+    w.api.open('NEW-TOKEN', 'https://void.example/g?reset=NEW-TOKEN');
+    w.pass.value = w.pass2.value = 'another-new-secret';
+    answer({ ok: true, body: { login: 'Orion', token: 'reset-session' } });
+    await pending;
+    expect(w.success).toEqual([]);
+    expect([w.pass.value, w.pass2.value]).toEqual(['another-new-secret', 'another-new-secret']);
   });
 
   it('успех тратит токен и логинит — сессия уходит хозяину', async () => {
@@ -230,6 +291,7 @@ describe('сброс пароля — сцена', () => {
     await w.api.submit();
     expect(w.status.at(-1)).toBe(t('acc.pass.rule'));
     expect(w.pass.focused()).toBeGreaterThan(0);
+    expect(w.pass.ariaInvalid).toBe('true');
     expect(w.success).toEqual([]);
     await w.api.submit();
     expect(w.sent[1]?.[0]).toBe('ТОКЕН');

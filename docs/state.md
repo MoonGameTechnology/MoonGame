@@ -385,9 +385,13 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Номер партии — 8 цифр (`packages/server/src/matchId.ts`, `decisions/matchNumber.ts`), адрес
   `/game/<id>` (`decisions/matchAddress.ts`); вход — экран `#setup` в сетевом режиме
   (`matchJoin.ts`); «Мои партии» — `decisions/myMatches.ts`, отказ по ссылке — `joinLanding.ts`.
+  Кнопка «Описание» в ленте и «Моих партиях» открывает `matchDescription.ts`: параметры и
+  настроенные условия победы с сервера, без занятия места; закрывается также Escape и Back.
 - Хост гонит тот же `StaggeredAi`, пока подключён хоть один игрок, с паузой 16 мс между порциями.
 - Корпорации — `registerCorpApi` с `features: { ava: false, medals: false }`.
 - Правила ввода аккаунтов у сервера и обоих клиентов — `packages/protocol/src/inputPolicy.ts`.
+  Формы прототипа выделяют неверные поля через `formFeedback.ts`: требования пароля,
+  несовпадение повтора и занятый ник; исправление соответствующего поля снимает ошибку.
 
 **Sector Zero и прогресс между забегами.**
 - Хозяева: `sectorZeroShell.ts` (меню, подготовка, магазин, ролики, комиксы), `sectorRun.ts`

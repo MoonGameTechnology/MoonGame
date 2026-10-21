@@ -100,6 +100,7 @@ import {
   stopNetSetupPoll,
 } from './matchJoin';
 import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
+import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
 import { forkSiteId, isForkSite, shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, type MapId } from './mapCatalog';
@@ -5360,6 +5361,7 @@ const hide = (id: string): void => document.getElementById(id)?.classList.remove
 const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
 
 const BACK_LAYERS: BackLayer[] = [
+  { id: 'match-description', isOpen: isMatchDescriptionOpen, close: closeMatchDescription }, // native top layer
   { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z61, above the cabinet it explains
