@@ -13,10 +13,12 @@ import type {
   PlayerReward,
   SignatureContact,
   StateDelta,
+  VictoryConfig,
 } from '@void/shared-core';
 import {
   CLIENT_ACTION_TYPES,
   diffState,
+  effectiveVictoryRules,
   flashBattles,
   getStance,
   hashState,
@@ -844,6 +846,12 @@ export class MatchRoom {
    *  реально живёт, иначе строка обещает игроку не тот матч (BRW-0). */
   get modeId(): string | undefined {
     return this.config?.modeId;
+  }
+
+  /** Public rules from the same resolver the victory evaluator uses, including
+   *  effective defaults. The fresh allowlisted copy keeps the pinned config private. */
+  get victoryRules(): Required<VictoryConfig> {
+    return effectiveVictoryRules(this.config);
   }
 
   get state(): GameState {
