@@ -354,7 +354,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
   `prototype/build.mjs`), кнопки `.btn-main`/`.btn-second`/`.btn-quiet`/`.btn-x`. Палитра
   `--sf-*` — копия `surfaceTheme` из того же `theme.ts`, равенство держит `surfaceTokens.test.ts`.
-- Хаб: вкладки Домой, Игры, Арсенал, Альянсы, Ещё; дверь — `decisions/hubDoor.ts`. На «Домой» —
+- Хаб: вкладки Домой, Игры, Арсенал, Корпорация, Ещё; дверь — `decisions/hubDoor.ts`. На «Домой» —
   лента новостей `newsScreen.ts` (решения — `decisions/newsFeed.ts`): на широкой панели
   колонкой рядом с партиями, на узкой — превью под дверью и вся лента шторкой. Арсенал
   (`arsenalScreen.ts`, решения — `decisions/arsenalView.ts`): модули и корабли с недостающими,
@@ -363,7 +363,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `metaEconomyScreen.ts`, `metaMarketScreen.ts`, общая сессия экономики — `metaEconomyClient.ts`.
   «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
   Материалы; покупка за ◆, пакеты ◆ ждут провайдера оплаты.
-  Кабинет корпорации `corpScreen.ts` — 7 вкладок; постройки — `data/corpBuildings.json`.
+  «Корпорация» (`corpHubView.ts`, решения — `decisions/corpHub.ts`, `corpBase.ts`,
+  `corpMembers.ts`, `corpTreasury.ts`): База (голограммы зданий `corpSprites.ts`, лист здания
+  шторкой), Битвы, Состав, Казна; без корпорации — создание и список с заявкой. Окно
+  корпорации в партии — `corpScreen.ts`, 7 вкладок; постройки — `data/corpBuildings.json`.
 - «Производство» (`shipyard.ts`): Корабли, Поддержка, Шаттлы, Пехота, Техника, Герои; отсеки —
   `packages/client/src/loadoutEditor.ts` и `decisions/slotCallouts.ts`. «Герои» — `heroStaff.ts`:
   `hero.spawn`, `hero.ability`, `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`.
