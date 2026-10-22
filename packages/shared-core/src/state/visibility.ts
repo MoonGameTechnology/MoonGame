@@ -436,10 +436,6 @@ export function missileVisible(
   circles: readonly SightCircle[] = sightCircles(state, viewerId, data),
 ): boolean {
   if (fleet.owner === viewerId) return true;
-  const spied = (state.intel?.[viewerId] ?? []).some(
-    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
-  );
-  if (spied) return true;
   const at = fleetPosition(state, fleet);
   return !!at && circles.some((c) => inRadius(at, c, c.identify));
 }
@@ -639,6 +635,13 @@ export function sensorCoverageOf(
   return coverage;
 }
 
+/** Worlds under the viewer's LIVE recon windows (espionage, SPY-8). */
+function spiedPlanets(state: GameState, viewerId: PlayerId): Set<PlanetId> {
+  return new Set(
+    (state.intel?.[viewerId] ?? []).filter((g) => g.until > state.time).map((g) => g.target),
+  );
+}
+
 /** The set of nodes `viewerId` currently identifies (full detail). Exported so
  *  `visibilityModule` snapshots exactly what the projection treats as live. */
 export function identifiedNodes(
@@ -730,8 +733,6 @@ export function radarSignatures(
 ): SignatureContact[] {
   const sources = radarSources(state, viewerId, data);
   if (!sources.length) return [];
-  const spied = new Set((state.intel?.[viewerId] ?? [])
-    .filter((g) => g.kind === 'fleets' && g.until > state.time).map((g) => g.target));
   // A fleet in the viewer's own battle is shown in full (`engagementOf`) — no blip on top.
   const engaged = engagementOf(state, viewerId).fleets;
   const emitters: SignalEmitter[] = [];
@@ -761,7 +762,7 @@ export function radarSignatures(
     // от того, кто её не видел, и её id в отметке выдал бы её (замечание Codex на #1503).
     if (isMissileFleet(fleet, data)) {
       const at = fleetPosition(state, fleet);
-      if (spied.has(fleet.owner) || !at) continue;
+      if (!at) continue;
       if (missileVisible(state, fleet, viewerId, data, (eyes ??= sightCircles(state, viewerId, data)))) continue;
       const location = nearestOf((provinces ??= publicProvinces(state)), state, at);
       if (location === null) continue;
@@ -770,7 +771,7 @@ export function radarSignatures(
     }
     // Опознанный кругом мины или патруля виден целиком — отметка поверх была бы вторым
     // значком одного корабля.
-    if (spied.has(fleet.owner) || engaged.has(fleet.id) || seenAt.has(fleet.id)) continue;
+    if (engaged.has(fleet.id) || seenAt.has(fleet.id)) continue;
     const location = fleetNode(state, fleet);
     const at = fleetPosition(state, fleet);
     if (location === null || identify.has(location) || !at) continue;
@@ -895,11 +896,6 @@ export function isVisibleTo(
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
-  // Окно шпионажа `fleets` открывает все флоты цели, как и в проекции (`visibleView`).
-  const spied = (state.intel?.[viewerId] ?? []).some(
-    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
-  );
-  if (spied) return true;
   // Ракета — по своей позиции, глазами блока зрения, и в окне шпионажа (SM-3.7b).
   if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
@@ -907,7 +903,9 @@ export function isVisibleTo(
   const at = fleetPositionAt(state, fleet, state.time);
   if (at && positionEyes(state, viewerId, data).some((c) => inRadius(at, c, c.identify))) return true;
   const node = fleetNode(state, fleet);
-  return node !== null && (identified ?? identifiedNodes(state, viewerId, data)).has(node);
+  if (node === null) return false;
+  // Окно разведки (SPY-8) опознаёт мир вместе с его орбитой, как и в проекции.
+  return (identified ?? identifiedNodes(state, viewerId, data)).has(node) || spiedPlanets(state, viewerId).has(node);
 }
 
 /**
@@ -1006,8 +1004,13 @@ function project(
   state: GameState,
   viewerId: PlayerId,
   data: GameData,
-  { identify }: Coverage,
+  coverage: Coverage,
 ): VisibleState {
+  // Stolen recon windows (espionage, SPY-8): the viewer's LIVE grants make their worlds
+  // read as identified — contents and orbit alike. Expired grants open nothing — expiry
+  // is enforced HERE, at the security boundary, not only by the module's housekeeping.
+  const spied = spiedPlanets(state, viewerId);
+  const identify = spied.size ? new Set([...coverage.identify, ...spied]) : coverage.identify;
   const view = deepClone(state) as VisibleState;
   const ord = visibleOrdnance(state, viewerId);
   if (ord) view.ordnance = ord;
@@ -1074,19 +1077,11 @@ function project(
     else delete view.missionFacts;
   }
 
-  // Stolen intel windows (espionage): the viewer's LIVE grants open narrow holes in
-  // the fog below. Expired grants open nothing — expiry is enforced HERE, at the
-  // security boundary, not only by the module's housekeeping.
-  const grants = (state.intel?.[viewerId] ?? []).filter((g) => g.until > state.time);
-  const spiedTreasury = new Set(grants.filter((g) => g.kind === 'treasury').map((g) => g.target));
-  const spiedPlanets = new Set(grants.filter((g) => g.kind === 'planet').map((g) => g.target));
-  const spiedFleets = new Set(grants.filter((g) => g.kind === 'fleets').map((g) => g.target));
-
   // Other players' private data: keep identity, drop treasury and research (incl. the
   // chosen research leader — its branch focus / +slot is strategic, not public).
   for (const player of Object.values(view.players)) {
     if (player.id === viewerId) continue;
-    if (!spiedTreasury.has(player.id)) player.resources = {};
+    player.resources = {};
     delete player.technologies;
     delete player.scientist;
     delete player.scientists; // the council (branch focus / +slot) — same intel as the legacy field
@@ -1252,8 +1247,7 @@ function project(
       if (own.length > 0) planet.awaitingFleets = own;
       else delete planet.awaitingFleets;
     }
-    if (planet.owner === viewerId || identify.has(planet.id) || spiedPlanets.has(planet.id))
-      continue;
+    if (planet.owner === viewerId || identify.has(planet.id)) continue;
     // FORT-6.1: площадка крепости на развилке — не топология карты, а сооружение, и само
     // её существование говорит «здесь стоит (или стояла) крепость». Провинции видны всем
     // (они и есть карта), а площадку, которую зритель не видел ни разу, он не получает
@@ -1265,8 +1259,8 @@ function project(
     }
     // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на
     // орбите — снаружи видно здание, но не то, сколько машин в нём. Единственное
-    // исключение выше по функции: шпионаж (`spiedPlanets`) вскрывает мир целиком и
-    // сюда не доходит.
+    // исключение выше по функции: шпионаж (окно разведки опознаёт мир) вскрывает его
+    // целиком и сюда не доходит.
     delete planet.hangar;
     // ROS-1.5: плацдарм — войска НА ЗЕМЛЕ чужого мира, и виден он ровно там же, где
     // виден гарнизон. На неопознанном мире его быть не должно: иначе десант соседа
@@ -1359,7 +1353,6 @@ function project(
       if (!original || !mineFleetVisible(state, original, viewerId, data)) delete view.fleets[id];
       continue;
     }
-    if (spiedFleets.has(fleet.owner)) continue;
     // Ракета (SM-3.7b) — глазами по её позиции; под одним радаром она — отметка выше.
     if (isMissileFleet(fleet, data)) {
       const original = state.fleets[id];

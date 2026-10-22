@@ -148,7 +148,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'construction.resume': { planetId: 'home_p1', id: 0 },
   'technology.research': { technology: 'propulsion_1' },
   'technology.boost': { technology: 'propulsion_1' },
-  'espionage.spy': { target: 'p2', kind: 'treasury' },
+  'espionage.spy': { planetId: 'home_p2', op: 'recon' },
   'market.list': { side: 'sell', resource: 'metal', amount: 1, price: 1 },
   'market.take': { id: 'missing-lot', amount: 1 },
   'market.cancel': { id: 'missing-lot' },

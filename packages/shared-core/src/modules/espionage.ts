@@ -1,69 +1,71 @@
 import { hoursToMs } from '../action/types';
-import type { GameModule } from '../kernel/module';
+import type { GameModule, HandlerContext } from '../kernel/module';
 import { buildingLevel, type GameData } from '../data/schemas';
-import type { AgentAway, GameState, IntelGrant } from '../state/gameState';
+import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
- * Espionage (SPY-1, the foundation): steal a time-boxed WINDOW of intel through
- * the fog. `espionage.spy` pays a price, rolls the seeded RNG, and on success
- * grants the actor an `IntelGrant` — `visibleState` then lets THEM (and only
- * them) see the granted target live until the window closes:
+ * Espionage: an agent is sent to ONE PLANET on an operation (SPY-8, owner's
+ * resolution 2026-10-22 — a spy targets a world, not a player). `espionage.spy`
+ * takes a free agent, pays the fee and schedules `espionage.resolve` at the end of
+ * the mission (`MISSION_HOURS`); every roll happens THEN, against whoever owns the
+ * planet at that moment. Operations:
  *
- *   - `treasury` — the target player's resource bag;
- *   - `planet`   — one world's contents (owner / garrison / buildings);
- *   - `fleets`   — the target player's fleets (position + composition).
+ *   - `recon` — a time-boxed WINDOW of intel (`IntelGrant`): `visibleState` lets
+ *     the spy (and only them) see the world as identified — its buildings, ground
+ *     army and the fleets in its orbit — until the window closes.
  *
  * Price, success chance and window length are value pipelines with base
  * defaults (`espionage.cost` / `espionage.chance` / `espionage.duration`), so
  * tech, factions, buildings or counter-intelligence modules can bend them
  * without touching this module. Failure costs the fee too — spying is a
- * gamble; the failure event is addressed to the actor.
+ * gamble; the failure event is addressed to the actor. A planet that has no
+ * other active owner by the end of the mission (captured by the spy, abandoned)
+ * aborts it: `espionage.aborted`, no rolls, the agent comes home.
  *
- * Counter-intelligence (SPY-2): every paid attempt also rolls DETECTION for
+ * Counter-intelligence (SPY-2): every resolved mission also rolls DETECTION for
  * the victim (`espionage.detect` pipeline; base 0.5 after a failed attempt —
  * the agent left tracks — vs 0.25 after a clean success). A detected attempt
  * emits `espionage.detected` addressed to the VICTIM; the thief's identity is
  * included only when the attempt FAILED (an agent caught red-handed) — a
  * successful theft that gets noticed reveals THAT intel leaked, not by whom.
- * The spy is never told a clean theft was spotted; a CAUGHT agent is another
- * matter — see SPY-6 below.
+ * The spy is never told a clean theft was spotted; a KILLED agent is another
+ * matter — see below.
  *
- * Agent network (SPY-6): every attempt needs a free agent out of a small network
+ * Agent network (SPY-6): every mission needs a free agent out of a small network
  * (`espionage.agents` pipeline, base 3). No free agent → `E_NO_AGENT`, nothing
- * paid, nothing rolled. A sent agent is away for a while (`state.spyAgents`):
- * after a success — as long as the stolen window stays open; after an unnoticed
- * failure — `AGENT_RETURN_HOURS`; after a caught failure the agent is LOST and a
- * replacement is recruited in `AGENT_RECRUIT_HOURS`. Losing an agent cannot be
- * hidden from its owner, so `espionage.failed` says `agentLost: true` then.
+ * paid, nothing scheduled. A sent agent is away (`state.spyAgents`): on the mission
+ * itself, then — after a success — as long as the stolen window stays open; after a
+ * failure `AGENT_RETURN_HOURS`; a killed agent is LOST and a replacement is found in
+ * `AGENT_RECRUIT_HOURS`.
  *
  * Counter-intelligence building (SPY-7): a building that declares `spyDetectBonus`
  * adds it to the victim's base detection odds. The victim's STRONGEST such building
  * counts (not a sum — spamming bureaus must not make detection a certainty), and it
- * guards every attempt against its owner, since treasury and fleets are not stolen
- * from one world.
+ * guards every mission against its owner, not only against its own world.
  *
  * Death on exposure (SPY-7): a DETECTED agent also rolls death (`espionage.kill`
  * pipeline; base 0.5 plus the victim's strongest `spyKillBonus`, clamped to [0,1]).
- * A killed agent is lost — a replacement is recruited in `AGENT_RECRUIT_HOURS`, even
- * after a success (the stolen window stays open). A detected agent that survives
- * escapes: after a failure it returns in `AGENT_RETURN_HOURS`, after a success it
- * keeps working the window. The kill roll is drawn for every paid attempt, so the
- * RNG stream shape stays independent of the outcome. Death cannot be hidden from the
- * agent's owner (`agentLost: true` on `espionage.failed` / `intel.stolen`); the
- * victim's `espionage.detected` says `killed: true`.
+ * A killed agent is lost even after a success (the stolen window stays open). A
+ * detected agent that survives escapes like an undetected one. Success, detect and
+ * kill are drawn for every resolved mission, so the RNG stream shape stays
+ * independent of the outcome. Death cannot be hidden from the agent's owner
+ * (`agentLost: true` on `espionage.failed` / `intel.stolen`); the victim's
+ * `espionage.detected` says `killed: true`.
  */
 
-const SPY_KINDS = new Set(['treasury', 'planet', 'fleets']);
+const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon']);
 
-/** Base price of one attempt — overridden per-match via the `espionage.cost` hook. */
+/** Base price of one mission — overridden per-match via the `espionage.cost` hook. */
 const BASE_COST = { credits: 150 } as const;
 /** Base success chance — the `espionage.chance` pipeline may bend it; the result
  *  is clamped so no stack of modifiers makes spying a certainty or an impossibility. */
 const BASE_CHANCE = 0.6;
 const CHANCE_MIN = 0.05;
 const CHANCE_MAX = 0.95;
+/** How long every operation takes before it resolves, game-hours (owner, 2026-10-22). */
+export const MISSION_HOURS = 12;
 /** Base window length, in game-hours (timeScale-compressed like every duration). */
 const BASE_DURATION_HOURS = 24;
 /** Base odds the VICTIM notices the attempt (`espionage.detect` pipeline bends them;
@@ -76,9 +78,9 @@ const MAX_GRANTS = 8;
 /** Base size of a player's agent network (SPY-6) — the `espionage.agents` pipeline
  *  may bend it; the result is floored and clamped to [0, MAX_GRANTS]. */
 export const BASE_SPY_AGENTS = 3;
-/** How long an agent is away after a failed attempt nobody noticed, game-hours. */
+/** How long an agent is away after a failed or aborted mission, game-hours. */
 const AGENT_RETURN_HOURS = 6;
-/** How long recruiting a replacement for a killed agent takes, game-hours. */
+/** How long finding a replacement for a killed agent takes, game-hours. */
 const AGENT_RECRUIT_HOURS = 24;
 /** Base odds a DETECTED agent dies (`espionage.kill` pipeline, clamped to [0,1]). */
 const BASE_KILL = 0.5;
@@ -103,9 +105,28 @@ export function counterIntelOf(
 }
 
 interface SpyPayload {
-  target?: string;
-  kind?: string;
   planetId?: string;
+  op?: string;
+}
+
+/** What `espionage.resolve` carries: who sent which mission where. */
+interface ResolvePayload {
+  spy: string;
+  planetId: string;
+  op: SpyOp;
+  mission: number;
+}
+
+/** A hook result, or its base when the pipeline broke (non-finite) — a broken
+ *  pipeline must not silently switch a rule off. */
+function finiteOr(raw: number, base: number): number {
+  return Number.isFinite(raw) ? raw : base;
+}
+
+/** Replace the agent of `mission` with what it does next (`next`). */
+function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAway): void {
+  const agents = (h.state.spyAgents ??= {});
+  agents[spy] = [...(agents[spy] ?? []).filter((a) => a.mission !== mission), next];
 }
 
 export const espionageModule: GameModule = {
@@ -114,39 +135,27 @@ export const espionageModule: GameModule = {
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
-      if (typeof p?.kind !== 'string' || !SPY_KINDS.has(p.kind)) {
+      if (typeof p?.op !== 'string' || !SPY_OPS.has(p.op) || typeof p.planetId !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
       }
       const actor = h.state.players[action.playerId];
       if (!actor || actor.status !== 'active') {
         return h.reject('E_FORBIDDEN');
       }
-      if (typeof p.target !== 'string' || p.target === action.playerId) {
+      const planet = h.state.planets[p.planetId];
+      if (!planet) {
+        return h.reject('E_NO_PLANET');
+      }
+      // Someone else's world: your own or an unclaimed one has nobody to spy on.
+      if (planet.owner === null || planet.owner === action.playerId) {
         return h.reject('E_BAD_TARGET');
       }
-      const victim = h.state.players[p.target];
-      if (!victim || victim.status !== 'active') {
+      if (h.state.players[planet.owner]?.status !== 'active') {
         return h.reject('E_NO_PLAYER');
       }
-      // The `planet` kind steals one specific world's contents — it must exist and
-      // belong to the target (you spy on a PLAYER's holdings, not on the map).
-      let grantTarget = p.target;
-      if (p.kind === 'planet') {
-        if (typeof p.planetId !== 'string') {
-          return h.reject('E_BAD_PAYLOAD');
-        }
-        const planet = h.state.planets[p.planetId];
-        if (!planet) {
-          return h.reject('E_NO_PLANET');
-        }
-        if (planet.owner !== p.target) {
-          return h.reject('E_BAD_TARGET'); // not that player's world
-        }
-        grantTarget = p.planetId;
-      }
 
-      // SPY-6: an attempt needs a free agent — checked before the fee, so a refusal
-      // costs nothing and draws no RNG.
+      // SPY-6: a mission needs a free agent — checked before the fee, so a refusal
+      // costs nothing.
       const rawAgents = h.hook<number>('espionage.agents', BASE_SPY_AGENTS, {
         playerId: action.playerId,
       });
@@ -160,77 +169,101 @@ export const espionageModule: GameModule = {
 
       const fee = h.hook<Record<string, number>>('espionage.cost', { ...BASE_COST }, {
         playerId: action.playerId,
-        target: p.target,
-        kind: p.kind,
+        target: planet.owner,
+        kind: p.op,
       });
       if (!canAfford(actor.resources, fee)) {
         return h.reject('E_INSUFFICIENT');
       }
       payCost(actor.resources, fee); // the fee burns on failure too — spying is a gamble
 
+      // Unique among the player's live missions — that is all `espionage.resolve` needs to
+      // find its agent; a private per-player id leaks nothing (a global counter would).
+      const mission = Math.max(0, ...away.map((a) => a.mission ?? 0)) + 1;
+      const resolvesAt = h.ctx.now + hoursToMs(h.ctx, MISSION_HOURS);
+      const op = p.op as SpyOp;
+      away.push({ until: resolvesAt, mission, op, planetId: p.planetId });
+      (h.state.spyAgents ??= {})[action.playerId] = away;
+      h.schedule(resolvesAt, 'espionage.resolve', {
+        spy: action.playerId,
+        planetId: p.planetId,
+        op,
+        mission,
+      } satisfies ResolvePayload);
+      h.emit('espionage.sent', { owner: action.playerId, planetId: p.planetId, op, until: resolvesAt });
+    });
+
+    api.on('espionage.resolve', (event, h) => {
+      const { spy, planetId, op, mission } = event.payload as ResolvePayload;
+      const now = h.ctx.now;
+      const victim = h.state.planets[planetId]?.owner ?? null;
+      const comeHome: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RETURN_HOURS) };
+      if (
+        victim === null ||
+        victim === spy ||
+        h.state.players[victim]?.status !== 'active' ||
+        h.state.players[spy]?.status !== 'active'
+      ) {
+        // Nobody else holds the world any more: nothing to steal, nothing rolled.
+        reassign(h, spy, mission, comeHome);
+        h.emit('espionage.aborted', { owner: spy, planetId, kind: op });
+        return;
+      }
+
       const rawChance = h.hook<number>('espionage.chance', BASE_CHANCE, {
-        playerId: action.playerId,
-        target: p.target,
-        kind: p.kind,
+        playerId: spy,
+        target: victim,
+        kind: op,
       });
       const chance = Number.isFinite(rawChance)
         ? Math.min(CHANCE_MAX, Math.max(CHANCE_MIN, rawChance))
         : BASE_CHANCE;
       const succeeded = h.rng.nextFloat() < chance;
 
-      // Counter-intelligence (SPY-2): the detect roll is drawn for EVERY paid
-      // attempt — success or failure — so the RNG stream shape does not depend on
+      // Counter-intelligence (SPY-2): the detect roll is drawn for EVERY resolved
+      // mission — success or failure — so the RNG stream shape does not depend on
       // the outcome (or on what hooks did to the odds).
       const baseDetect =
         (succeeded ? BASE_DETECT_SUCCESS : BASE_DETECT_FAILED) +
-        counterIntelOf(h.ctx.data, h.state, p.target, 'spyDetectBonus');
+        counterIntelOf(h.ctx.data, h.state, victim, 'spyDetectBonus');
       const rawDetect = h.hook<number>('espionage.detect', baseDetect, {
-        playerId: action.playerId,
-        target: p.target,
-        kind: p.kind,
+        playerId: spy,
+        target: victim,
+        kind: op,
         succeeded,
       });
-      // Same fallback policy as the chance/duration hooks: a broken pipeline
-      // (non-finite) reverts to the BASE value — it must not silently switch
-      // counter-intelligence off.
-      const detectChance = Number.isFinite(rawDetect)
-        ? Math.min(1, Math.max(0, rawDetect))
-        : baseDetect;
+      const detectChance = Math.min(1, Math.max(0, finiteOr(rawDetect, baseDetect)));
       const detected = h.rng.nextFloat() < detectChance;
 
-      // Death on exposure: drawn for every paid attempt too; it only bites when detected.
-      const baseKill = BASE_KILL + counterIntelOf(h.ctx.data, h.state, p.target, 'spyKillBonus');
+      // Death on exposure: drawn for every resolved mission too; it only bites when detected.
+      const baseKill = BASE_KILL + counterIntelOf(h.ctx.data, h.state, victim, 'spyKillBonus');
       const rawKill = h.hook<number>('espionage.kill', baseKill, {
-        playerId: action.playerId,
-        target: p.target,
-        kind: p.kind,
+        playerId: spy,
+        target: victim,
+        kind: op,
         succeeded,
       });
-      const killChance = Number.isFinite(rawKill) ? Math.min(1, Math.max(0, rawKill)) : baseKill;
+      const killChance = Math.min(1, Math.max(0, finiteOr(rawKill, baseKill)));
       const killed = h.rng.nextFloat() < killChance && detected;
-      const recruit = { until: h.ctx.now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true } as const;
-
-      const sendAway = (agent: AgentAway): void => {
-        away.push(agent);
-        (h.state.spyAgents ??= {})[action.playerId] = away;
-      };
+      const recruit: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true };
 
       if (!succeeded) {
-        // A killed agent is lost (a replacement is recruited); otherwise it slips home.
-        sendAway(killed ? recruit : { until: h.ctx.now + hoursToMs(h.ctx, AGENT_RETURN_HOURS) });
+        reassign(h, spy, mission, killed ? recruit : comeHome);
         // Addressed to the actor (`owner` routes the event through the fog filter).
         h.emit('espionage.failed', {
-          owner: action.playerId,
-          target: p.target,
-          kind: p.kind,
+          owner: spy,
+          target: victim,
+          kind: op,
+          planetId,
           ...(killed ? { agentLost: true } : {}),
         });
         if (detected) {
-          // Caught red-handed: the victim learns the kind AND who sent the agent.
+          // Caught red-handed: the victim learns the operation AND who sent the agent.
           h.emit('espionage.detected', {
-            owner: p.target,
-            kind: p.kind,
-            spy: action.playerId,
+            owner: victim,
+            kind: op,
+            planetId,
+            spy,
             ...(killed ? { killed: true } : {}),
           });
         }
@@ -238,33 +271,34 @@ export const espionageModule: GameModule = {
       }
 
       const rawHours = h.hook<number>('espionage.duration', BASE_DURATION_HOURS, {
-        playerId: action.playerId,
-        target: p.target,
-        kind: p.kind,
+        playerId: spy,
+        target: victim,
+        kind: op,
       });
       const hours =
         Number.isFinite(rawHours) && rawHours > 0 ? rawHours : BASE_DURATION_HOURS;
-      const grant: IntelGrant = {
-        kind: p.kind as IntelGrant['kind'],
-        target: grantTarget,
-        until: h.ctx.now + hoursToMs(h.ctx, hours),
-      };
-      const mine = ((h.state.intel ??= {})[action.playerId] ??= []);
+      const grant: IntelGrant = { kind: 'planet', target: planetId, until: now + hoursToMs(h.ctx, hours) };
+      const mine = ((h.state.intel ??= {})[spy] ??= []);
       mine.push(grant);
-      // The agent works the window while it is open — unless it was killed.
-      sendAway(killed ? recruit : { until: grant.until });
       while (mine.length > MAX_GRANTS) mine.shift(); // oldest window evicted first
+      // The agent works the window while it is open — unless it was killed.
+      reassign(h, spy, mission, killed ? recruit : { until: grant.until });
       h.emit('intel.stolen', {
-        owner: action.playerId,
-        target: p.target,
-        kind: p.kind,
+        owner: spy,
+        target: victim,
+        kind: op,
+        planetId,
         until: grant.until,
-        ...(p.kind === 'planet' ? { intelPlanet: grantTarget } : {}),
         ...(killed ? { agentLost: true } : {}),
       });
       if (detected) {
-        // A noticed CLEAN theft: the victim learns the leak's kind, not the thief.
-        h.emit('espionage.detected', { owner: p.target, kind: p.kind, ...(killed ? { killed: true } : {}) });
+        // A noticed CLEAN theft: the victim learns the leak, not the thief.
+        h.emit('espionage.detected', {
+          owner: victim,
+          kind: op,
+          planetId,
+          ...(killed ? { killed: true } : {}),
+        });
       }
     });
 

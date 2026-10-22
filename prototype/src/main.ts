@@ -3136,7 +3136,7 @@ side.addEventListener('click', (ev) => {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
     }
   } else if (act === 'spyplanet') {
-    playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
+    playerOrder(spyOn(ME, selPlanet!, 'recon'));
   } else if (act === 'capital') {
     playerOrder(designateCapital(ME, selPlanet!));
   } else if (act === 'holdpoint') {

@@ -19,11 +19,6 @@ describe('разбор дипломатического клика', () => {
     expect(diploIntent(tg)).toEqual({ kind: 'map', seat: 'p3' });
   });
 
-  it('шпион несёт и место, и вид операции', () => {
-    const tg = клик([{ sel: '.dp-spy', dataset: { seat: 'p4', spy: 'fleets' } }]);
-    expect(diploIntent(tg)).toEqual({ kind: 'spy', seat: 'p4', what: 'fleets' });
-  });
-
   it('письмо: место из `msgseat`', () => {
     const tg = клик([{ sel: '.dp-msg', dataset: { msgseat: 'p5' } }]);
     expect(diploIntent(tg)).toEqual({ kind: 'message', seat: 'p5' });
@@ -32,27 +27,24 @@ describe('разбор дипломатического клика', () => {
   it('ПЕРВОЕ СОВПАДЕНИЕ ВЫИГРЫВАЕТ: иначе один клик сделает два действия (правило 3)', () => {
     const tg = клик([
       { sel: '.dp-act', dataset: { seat: 'p2', stance: 'peace' } },
-      { sel: '.dp-spy', dataset: { seat: 'p2', spy: 'treasury' } },
       { sel: '.dp-msg', dataset: { msgseat: 'p2' } },
     ]);
     expect(diploIntent(tg)?.kind).toBe('stance');
   });
 
-  it('порядок проверок: позиция → карта → шпион → письмо', () => {
+  it('порядок проверок: позиция → карта → письмо', () => {
     const без = (кроме: string) =>
       клик(
         (
           [
             { sel: '.dp-act', dataset: { seat: 'p1', stance: 'peace' } },
             { sel: '.dp-map', dataset: { mapseat: 'p1' } },
-            { sel: '.dp-spy', dataset: { seat: 'p1', spy: 'treasury' } },
             { sel: '.dp-msg', dataset: { msgseat: 'p1' } },
           ] as Array<{ sel: string; dataset: Record<string, string> }>
         ).filter((b) => !кроме.includes(b.sel)),
       );
     expect(diploIntent(без('.dp-act'))?.kind).toBe('map');
-    expect(diploIntent(без('.dp-act.dp-map'))?.kind).toBe('spy');
-    expect(diploIntent(без('.dp-act.dp-map.dp-spy'))?.kind).toBe('message');
+    expect(diploIntent(без('.dp-act.dp-map'))?.kind).toBe('message');
   });
 
   it('НЕ ДИПЛОМАТИЧЕСКАЯ КНОПКА — НЕТ НАМЕРЕНИЯ: экран продолжит свой разбор (правило 4)', () => {

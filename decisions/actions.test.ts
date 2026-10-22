@@ -156,8 +156,7 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['leaveCoalition', leaveCoalition(P)],
   ['editCoalition', editCoalition(P, 'star', 'вместе')],
   ['declareWar', declareWar(P, 'p2')],
-  ['spyOn', spyOn(P, 'p2', 'fleets')],
-  ['spyOn (мир)', spyOn(P, 'p2', 'planet', 'alpha')],
+  ['spyOn', spyOn(P, 'alpha', 'recon')],
   ['castHeroAbility', castHeroAbility(P, 'h1', 'corridor')],
   ['castHeroAbility (по цели)', castHeroAbility(P, 'h1', 'corridor', 'alpha')],
   ['orderAuto', orderAuto(P, 'f1', true)],
@@ -289,9 +288,6 @@ describe('необязательное поле ОТСУТСТВУЕТ, а не 
   });
   it('деление без десанта не несёт takeLanding', () => {
     expect(keys(splitFleet(P, 'f1', [{ unit: 'cruiser', count: 1 }]))).not.toContain('takeLanding');
-  });
-  it('слежка не за миром не несёт planetId', () => {
-    expect(keys(spyOn(P, 'p2', 'fleets'))).not.toContain('planetId');
   });
   it('способность без цели не несёт target', () => {
     expect(keys(castHeroAbility(P, 'h1', 'corridor'))).not.toContain('target');

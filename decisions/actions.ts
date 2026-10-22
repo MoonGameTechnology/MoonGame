@@ -277,14 +277,9 @@ export const editCoalition = (playerId: string, emblem: string, description: str
   act(playerId, 'coalition.edit', { emblem, description });
 export const declareWar = (playerId: string, target: string, stance: DiplomaticStance = 'war') =>
   act(playerId, 'diplomacy.declare', { target, stance });
-/** Steal a time-boxed intel window on another commander (SPY-1 core module):
- *  `treasury` / `fleets` spy on the player; `planet` needs the world's id too. */
-export const spyOn = (
-  playerId: string,
-  target: string,
-  kind: 'treasury' | 'planet' | 'fleets',
-  planetId?: string,
-) => act(playerId, 'espionage.spy', { target, kind, ...(planetId ? { planetId } : {}) });
+/** Send an agent on an operation against another commander's world (SPY-8). */
+export const spyOn = (playerId: string, planetId: string, op: 'recon') =>
+  act(playerId, 'espionage.spy', { planetId, op });
 /** Cast a hero ability (HERO-4 dispatcher); `target` — planet id for ranged casts.
  *  Pulled ahead of the rest of the "hero engine" builder cluster (REFP-22's deferred
  *  remainder) because REFP-24's `serverChainActions` (CC-1 chain driver) needs it for

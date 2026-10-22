@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { t } from '../../localization/runtime';
 import type { Action, DiplomaticStance, GameState } from '../../packages/shared-core/src/index';
 import { COALITION } from './conversations';
-import { declareWar, newGame, shareMap, spyOn, START_CANDIDATES } from './game';
+import { declareWar, newGame, shareMap, START_CANDIDATES } from './game';
 
 interface El {
   id: string;
@@ -309,15 +309,11 @@ describe('REFM-214 — стойки, договор карт и шпионаж',
     expect(env.notes).toEqual([t('comms.bots-no-coalition')]);
   });
 
-  it('договор карт и шпион уходят приказом от моего места', async () => {
+  it('договор карт уходит приказом от моего места', async () => {
     const { win, env } = await boot();
     win.openDiplo('diplo');
     tap('diplo', { '.dp-map': { mapseat: 'p3' } });
-    tap('diplo', { '.dp-spy': { seat: 'p3', spy: 'fleets' } });
-    expect(env.orders.map(intent)).toEqual([
-      intent(shareMap('p1', 'p3', true)),
-      intent(spyOn('p1', 'p3', 'fleets')),
-    ]);
+    expect(env.orders.map(intent)).toEqual([intent(shareMap('p1', 'p3', true))]);
   });
 
   it('✉ в строке ростера открывает тред этого места', async () => {
