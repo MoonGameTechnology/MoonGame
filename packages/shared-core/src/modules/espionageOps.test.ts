@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { espionageModule, MISSION_HOURS, THEFT_CAP } from './espionage';
 import { constructionModule } from './construction';
+import { technologyModule } from './technology';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context, DomainEvent } from '../action/types';
 import type { GameModule } from '../kernel/module';
 
-// SPY-9: sabotage and resource theft. Both resolve at the end of the 12h mission like
+// SPY-9/10: sabotage, resource theft and research theft. Both resolve at the end of the 12h mission like
 // recon; the success / detect / kill rolls are pinned by hooks so each test reads one
 // outcome. The building damage itself goes through construction's `building.damage`.
 
@@ -22,6 +23,11 @@ const data: GameData = parseGameData({
     beacon: { name: 'Beacon', cost: {} }, // no modelled HP — sabotage can't touch it
   },
   events: {},
+  technologies: {
+    optics: { name: 'Optics', cost: { metal: 1 }, researchTimeHours: 1 },
+    lasers: { name: 'Lasers', cost: { metal: 1 }, researchTimeHours: 1, requires: ['optics'] },
+    armor: { name: 'Armor', cost: { metal: 1 }, researchTimeHours: 1 },
+  },
 });
 const HOUR = 3_600_000;
 const END = MISSION_HOURS * HOUR;
@@ -67,7 +73,7 @@ function spy(op: string, planetId = 'B'): Action {
   return { id: `s:${op}`, type: 'espionage.spy', playerId: 'p1', payload: { planetId, op }, issuedAt: 0 };
 }
 function run(op: string, pins: GameModule[], s: GameState = baseState()) {
-  const k = createKernel([constructionModule, espionageModule, ...pins]);
+  const k = createKernel([constructionModule, technologyModule, espionageModule, ...pins]);
   const sent = k.applyAction(s, spy(op), ctx(0));
   if (!sent.ok) throw new Error(sent.code);
   const done = k.advanceTo(sent.state, ctx(END));
@@ -175,5 +181,49 @@ describe('SPY-9 — resource theft', () => {
     expect(ofType(events, 'espionage.detected').map((e) => e.payload)).toEqual([
       { owner: 'p2', kind: 'theft', planetId: 'B' },
     ]);
+  });
+});
+
+describe('SPY-10 — research theft', () => {
+  const lab = (completed: string[], active: string[] = []) => ({
+    completed,
+    active: active.map((technology) => ({ technology, startedAt: 0, completesAt: 99 * HOUR })),
+  });
+  const withTech = (spyTech: ReturnType<typeof lab>, victim: string[]): GameState => {
+    const s = baseState();
+    s.players.p1!.technologies = spyTech;
+    s.players.p2!.technologies = lab(victim);
+    return s;
+  };
+  const stolen = (events: DomainEvent[]) =>
+    (ofType(events, 'espionage.succeeded')[0]!.payload as { tech: string | null }).tech;
+
+  it('takes a technology the spy has not started before one in its lab, prerequisites ignored', () => {
+    // p1 researches `armor`; `lasers` (needs optics, which p1 lacks) is the only fresh one.
+    const { state, events } = run('research', [sure, unseen, spared], withTech(lab([], ['armor']), ['lasers', 'armor']));
+    expect(stolen(events)).toBe('lasers');
+    expect(state.players.p1!.technologies!.completed).toContain('lasers');
+    expect(ofType(events, 'technology.researched').map((e) => e.payload)).toContainEqual({
+      playerId: 'p1',
+      technology: 'lasers',
+    });
+  });
+
+  it('only lab work left — finishes it and frees the slot', () => {
+    const { state, events } = run('research', [sure, unseen, spared], withTech(lab(['optics'], ['armor']), ['optics', 'armor']));
+    expect(stolen(events)).toBe('armor');
+    expect(state.players.p1!.technologies!.completed).toContain('armor');
+    expect(state.players.p1!.technologies!.active ?? []).toEqual([]);
+  });
+
+  it('the victim knows nothing new — the civilisation lags behind (tech: null)', () => {
+    const { state, events } = run('research', [sure, unseen, spared], withTech(lab(['optics', 'armor']), ['optics']));
+    expect(stolen(events)).toBeNull();
+    expect(state.players.p1!.technologies!.completed).toEqual(['optics', 'armor']);
+  });
+
+  it('the agent comes home after the theft', () => {
+    const { state } = run('research', [sure, unseen, spared], withTech(lab([]), ['armor']));
+    expect(state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
   });
 });

@@ -1,12 +1,14 @@
 /**
- * Итог саботажа и кражи ресурсов для журнала исполнителя (SPY-9). Само правило — что
+ * Итог саботажа, кражи ресурсов и кражи исследований для журнала исполнителя (SPY-9/10). Само правило — что
  * сломать и сколько унести — в ядре (`espionageModule`, событие `espionage.succeeded`);
  * здесь только какую строку показать.
  *
  * 1. **Саботаж называет число.** Сколько построек повреждено и сколько из них снесено;
  *    ломать было нечего — отдельная строка, а не «повреждено 0».
  * 2. **Кража называет добычу.** Ресурс и сколько; пустая казна — отдельная строка.
- * 3. **Гибель агента не прячется.** Убитый агент — флаг `lost`, хост добавляет строку
+ * 3. **Кража исследований называет технологию.** Красть нечего — цель отстаёт от нас,
+ *    и строка говорит именно это.
+ * 4. **Гибель агента не прячется.** Убитый агент — флаг `lost`, хост добавляет строку
  *    о поиске нового шпиона.
  */
 
@@ -15,6 +17,7 @@ export interface SpyDeedPayload {
   kind?: unknown;
   hits?: unknown;
   loot?: unknown;
+  tech?: unknown;
   agentLost?: unknown;
 }
 
@@ -25,7 +28,7 @@ export interface SpyDeedLine {
   lost: boolean;
 }
 
-/** Правила 1–3. `null` — событие не саботаж и не кража. */
+/** Правила 1–4. `null` — событие не саботаж и не кража. */
 export function spyDeed(p: SpyDeedPayload): SpyDeedLine | null {
   const lost = p.agentLost === true;
   if (p.kind === 'sabotage') {
@@ -40,6 +43,10 @@ export function spyDeed(p: SpyDeedPayload): SpyDeedLine | null {
       return { key: 'log.spy.theft.none', params: {}, lost };
     }
     return { key: 'log.spy.theft', params: { res: loot.resource, amount: loot.amount }, lost };
+  }
+  if (p.kind === 'research') {
+    if (typeof p.tech !== 'string') return { key: 'log.spy.research.none', params: {}, lost };
+    return { key: 'log.spy.research', params: { tech: p.tech }, lost };
   }
   return null;
 }

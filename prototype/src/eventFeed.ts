@@ -324,6 +324,8 @@ export function handleEvents(events: DomainEvent[]) {
         const at = game.placeName(String(p.planetId));
         const params: Record<string, number | string> = { ...deed.params, at };
         if (typeof params.res === 'string') params.res = tData(params.res);
+        if (typeof params.tech === 'string')
+          params.tech = tData(data.technologies[params.tech]?.name ?? params.tech);
         const line = t(deed.key, params) + (deed.lost ? ` ${t('log.spy.agent-lost')}` : '');
         note(line);
         pushSpyLog(line);

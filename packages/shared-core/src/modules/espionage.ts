@@ -1,6 +1,7 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingDamage, BuildingHit } from './construction';
+import type { TechnologyGrant } from './technology';
 import { buildingLevel, type GameData } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
@@ -22,8 +23,13 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *   - `theft` (SPY-9) — a random resource the owner holds: 5–15% of the stock, at
  *     most `THEFT_CAP`, moves from the owner's treasury to the spy's (a world has no
  *     stockpile of its own; owner's resolution 2026-10-22).
+ *   - `research` (SPY-10) — a random technology the owner has finished and the spy
+ *     has not, prerequisites ignored: first among those the spy has not started, then
+ *     among those in its labs. The grant is the technology module's
+ *     (`technology.grant` capability). Nothing to take → the success reports that
+ *     the target civilisation lags behind (`tech: null`).
  *
- * After a sabotage or a theft the agent comes home (`AGENT_RETURN_HOURS`), as after
+ * After a sabotage, a theft or a research theft the agent comes home (`AGENT_RETURN_HOURS`), as after
  * a failure; `espionage.succeeded` tells the spy what was done.
  *
  * Price, success chance and window length are value pipelines with base
@@ -65,7 +71,7 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * `espionage.detected` says `killed: true`.
  */
 
-const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft']);
+const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft', 'research']);
 
 /** Base price of one mission — overridden per-match via the `espionage.cost` hook. */
 const BASE_COST = { credits: 150 } as const;
@@ -178,6 +184,23 @@ function theft(h: HandlerContext, spy: string, victim: string): { resource: stri
   return { resource, amount };
 }
 
+/** Research theft: a technology `victim` has finished and `spy` has not — first among
+ *  those the spy has not started, then among those it researches now. `null` — the
+ *  victim knows nothing new to the spy, or no technology module grants it. */
+function stealResearch(h: HandlerContext, spy: string, victim: string): string | null {
+  const own = h.state.players[spy]!.technologies;
+  const done = new Set(own?.completed ?? []);
+  const inLab = new Set((own?.active ?? []).map((a) => a.technology));
+  const lacking = (h.state.players[victim]!.technologies?.completed ?? []).filter(
+    (t) => !done.has(t) && h.ctx.data.technologies[t] !== undefined,
+  );
+  const fresh = lacking.filter((t) => !inLab.has(t));
+  const pool = fresh.length > 0 ? fresh : lacking;
+  if (pool.length === 0) return null;
+  const tech = pool[h.rng.nextInt(0, pool.length)]!;
+  return h.capability<TechnologyGrant>('technology.grant')?.(h, spy, tech) ? tech : null;
+}
+
 /** Replace the agent of `mission` with what it does next (`next`). */
 function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAway): void {
   const agents = (h.state.spyAgents ??= {});
@@ -186,8 +209,8 @@ function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAw
 
 export const espionageModule: GameModule = {
   id: 'espionage',
-  // 1.1.0: саботаж и кража ресурсов (SPY-9).
-  version: '1.1.0',
+  // 1.1.0: саботаж и кража ресурсов (SPY-9). 1.2.0: кража исследований (SPY-10).
+  version: '1.2.0',
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -327,11 +350,13 @@ export const espionageModule: GameModule = {
       }
 
       if (op !== 'recon') {
-        // Sabotage / theft: the deed is done at once, the agent heads home.
+        // Sabotage / theft / research theft: the deed is done at once, the agent heads home.
         const done =
           op === 'sabotage'
             ? { hits: sabotage(h, planetId) }
-            : { loot: theft(h, spy, victim) };
+            : op === 'theft'
+              ? { loot: theft(h, spy, victim) }
+              : { tech: stealResearch(h, spy, victim) };
         reassign(h, spy, mission, killed ? recruit : comeHome);
         h.emit('espionage.succeeded', {
           owner: spy,
