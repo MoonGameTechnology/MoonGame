@@ -411,10 +411,11 @@ export interface AvaChallengeStore {
   /** AVA-7: every LOCKED matchup (roster frozen), newest first — the orchestrator sweep
    *  reads these and raises a session for each one that has none yet. */
   lockedMatchups(limit?: number): Promise<AvaChallenge[]>;
-  /** AVA-8: atomic locked→ended transition (S7 archive). False = the row was NOT
-   *  locked and NOTHING changed — the exactly-once gate for settlement, so a replayed
-   *  `match.ended` can't award influence twice. */
-  endMatchup(id: string): Promise<boolean>;
+  /** AVA-8: atomic locked→ended transition (S7 archive); CORP-4: locked→cancelled when
+   *  no map fits the locked roster. False = the row was NOT locked and NOTHING changed —
+   *  the exactly-once gate for settlement, so a replayed `match.ended` can't award
+   *  influence twice, and a cancellation can't refund twice. */
+  endMatchup(id: string, status?: 'ended' | 'cancelled'): Promise<boolean>;
   close?(): Promise<void>;
 }
 

@@ -779,6 +779,9 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       name: a.name ?? a.playerId,
       faction: a.faction ?? '',
       status: 'active',
+      // The slot's side is the seat's fixed match side (CORP-4). Rules read it only under
+      // a fixed-side mode (`hasFixedSides`); without one it is an inert fact.
+      team: slot.team,
       resources: { ...slot.resources },
       ...(a.ai ? { ai: true } : {}),
       ...(scientists.length ? { scientists } : {}),

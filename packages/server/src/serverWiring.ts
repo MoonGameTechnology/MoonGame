@@ -12,7 +12,8 @@ import { createDevMatch, MODULE_MANIFEST_VERSION } from './scenario';
 import { startClockDriver, HEARTBEAT_MS, type ClockDriverHandle } from './clockDriver';
 import { snapshotOf, type Stores } from './persistence';
 import type { LoadedMatch } from './roomRegistry';
-import type { RoomObservation } from './matchRoom';
+import type { MatchRoom, RoomObservation } from './matchRoom';
+import { warDeclarationsFor, type AvaSessionSpec } from './avaOrchestrator';
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { standingOrderTickActions } from './standingOrderDriver';
 import { expiredSeatClaims } from './seatExpiry';
@@ -143,6 +144,14 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       initialState: snap.state,
       initialReceipts,
       initialSeq: snap.seq,
+      // The mode is persisted in the state (BRW-0): without this a restart would bring an
+      // AvA battle back under every-seat-for-itself rules (CORP-4).
+      ...(snap.state.modeId !== undefined
+        ? { config: { timeScale: 1, modeId: snap.state.modeId } }
+        : {}),
+      // A room born on its own world clock resumes from the saved anchor; a room without
+      // one keeps reading the wall clock as world time.
+      ...(snap.clock ? { initiallyStarted: true, initialClock: snap.clock } : {}),
       gate: deps.gateFactory?.(),
       ...(extras?.denyPlayerActions ? { denyPlayerActions: extras.denyPlayerActions } : {}),
       ...(deps.arsenalStore ? { arsenalStore: deps.arsenalStore } : {}),
@@ -208,4 +217,39 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     };
     return { room, dispose };
   };
+}
+
+/** CORP-4 — the AvA orchestrator's `createRoom` sink: persist the session's first
+ *  snapshot for `createMatchLoader` to raise. The room is born running on its own world
+ *  clock from the map's start time: an AvA world starts at 0, and a room reading the wall
+ *  clock as world time would cross the session cap on its first tick. The snapshot
+ *  carries that clock's anchor across every load. */
+export function createAvaRoom(deps: {
+  stores: Pick<Stores, 'store'>;
+  data: GameData;
+  /** Wall clock (injectable for tests). */
+  now?: () => number;
+}): (spec: AvaSessionSpec) => Promise<void> {
+  return async ({ matchId, state }) => {
+    const room = createDevMatch(deps.data, {
+      id: matchId,
+      initialState: state,
+      initiallyStarted: true,
+      ...(deps.now ? { now: deps.now } : {}),
+    });
+    await deps.stores.store.save(snapshotOf(room));
+  };
+}
+
+/** AVA-8 (S6) — open an AvA war on a live room: submit the system declarations
+ *  (`warDeclarationsFor`) through the server-action path, past the wire deny that keeps
+ *  players out of AvA diplomacy. True = every cross-side pair is at war (`E_SAME_STANCE`
+ *  is a pair an earlier partial pass already flipped); false = retry on the next sweep. */
+export async function declareAvaWar(room: MatchRoom, matchId: string): Promise<boolean> {
+  let allLanded = true;
+  for (const { playerId, action } of warDeclarationsFor(room.state, matchId)) {
+    const r = await room.submitServerAction(playerId, action);
+    if (!r.ok && r.code !== 'E_SAME_STANCE') allLanded = false;
+  }
+  return allLanded;
 }

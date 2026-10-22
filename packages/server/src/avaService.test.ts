@@ -374,6 +374,34 @@ describe('AvaService — settlement (AVA-8, S7)', () => {
   });
 });
 
+describe('AvaService — a locked battle no map fits (CORP-4)', () => {
+  it('cancels the matchup and refunds the challenge exactly once', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f);
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(400); // cost spent at challenge
+    expect(await f.ava.cancelLocked(id)).toBe(true);
+    expect((await f.ava.challengesFor(A_HEAD))[0]?.status).toBe('cancelled');
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // refunded
+    expect(await f.ava.cancelLocked(id)).toBe(false); // replay: no second refund
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500);
+    // A cancelled battle is never settled, and records no result.
+    expect(await f.ava.settleMatch(id, 'challenger')).toEqual({ ok: false, code: 'E_MATCHUP_CLOSED' });
+    expect(await f.ava.matchHistory()).toHaveLength(0);
+  });
+
+  it('leaves an unlocked or missing matchup alone', async () => {
+    const f = await fixture();
+    await f.ava.setCorpReady(A_HEAD);
+    await f.ava.setCorpReady(B_HEAD);
+    const ch = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!ch.ok) throw new Error('challenge failed');
+    await f.ava.accept(B_HEAD, ch.id); // accepted, roster window still open
+    expect(await f.ava.cancelLocked(ch.id)).toBe(false);
+    expect(await f.ava.cancelLocked('nope')).toBe(false);
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(400); // nothing refunded
+  });
+});
+
 describe('AvaService — public feed (AVA-9)', () => {
   it('publishes a matchup on accept and a result on settle; no roster leaks', async () => {
     const f = await fixture();

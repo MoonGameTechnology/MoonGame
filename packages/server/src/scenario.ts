@@ -632,6 +632,11 @@ export interface DevMatchOptions {
   initialReceipts?: ActionReceipt[];
   /** Resume the action counter from a persisted snapshot (see `MatchRoom.initialSeq`). */
   initialSeq?: number;
+  /** Born running on its own world clock from `initialState.time` (see
+   *  `MatchRoom.initiallyStarted`) instead of reading the wall clock as world time. */
+  initiallyStarted?: boolean;
+  /** The persisted anchor of such a clock (see `MatchRoom.initialClock`). */
+  initialClock?: MatchSnapshot['clock'];
   /** Strict commit-before-broadcast durable write (see `MatchRoom.persist`). */
   persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
   /** Opt-in `@void/action-layer` front-door (see `MatchRoom.gate`). */
@@ -766,6 +771,8 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     record: options.record,
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,
+    ...(options.initiallyStarted ? { initiallyStarted: true } : {}),
+    ...(options.initialClock ? { initialClock: options.initialClock } : {}),
     persist: options.persist,
     gate: options.gate,
     actionRateMax: options.actionRateMax,

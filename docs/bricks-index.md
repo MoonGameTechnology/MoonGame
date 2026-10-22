@@ -160,8 +160,8 @@
 | CORP-1 | ✅ | srv | `docs/backlog.md` | Лента новостей на сервере: события корпораций и объявления. |
 | CORP-2 | ✅ | proto | `docs/backlog.md` | Лента на «Домой» вместо «Сводки». |
 | CORP-3 | ✅ | proto | `docs/backlog.md` | Вкладка «Корпорация» в хабе вместо «Альянсов». |
-| CORP-4 | ⏳ | srv | `docs/backlog.md` | Битва корпораций загружается и считает победу по сторонам. |
-| CORP-5 | 🔒 | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
+| CORP-4 | ✅ | srv | `docs/backlog.md` | Битва корпораций загружается и считает победу по сторонам. |
+| CORP-5 | ⏳ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
 | CORP-6 | ⏳ | data srv | `docs/backlog.md` | Уровни корпорации 4 и 5. |
 | CORP-7 | 🔒 | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
 | CORP-8 | 🔒 | data srv | `docs/backlog.md` | Карта под формат. |
