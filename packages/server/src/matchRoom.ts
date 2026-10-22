@@ -505,6 +505,10 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['espionage.failed', 'owner'],
   ['intel.stolen', 'owner'],
   ['espionage.succeeded', 'owner'],
+  ['espionage.posted', 'owner'],
+  ['espionage.recalled', 'owner'],
+  ['espionage.counter.caught', 'owner'],
+  ['espionage.counter.lost', 'owner'],
   ['espionage.detected', 'owner'],
 ]);
 

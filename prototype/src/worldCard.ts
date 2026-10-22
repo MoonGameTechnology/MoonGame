@@ -546,6 +546,10 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
       out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), ready));
       out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), ready));
     }
+    // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
+    const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
+    if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
+    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST }), ready));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }

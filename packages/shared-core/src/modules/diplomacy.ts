@@ -85,12 +85,55 @@ function leaveCoalition(h: HandlerContext, me: PlayerId, except: PlayerId | null
  *    combat falls back to reading the stance directly — same behaviour, so the
  *    module degrades gracefully (invariant #3).
  */
+/** Escalation — unilateral, and it ends any negotiation in flight. Shared by
+ *  `diplomacy.declare` and the `declareWar` capability (SPY-11). */
+function escalate(
+  h: HandlerContext,
+  me: PlayerId,
+  target: PlayerId,
+  stance: DiplomaticStance,
+  from: DiplomaticStance,
+  cause?: string,
+): void {
+  clearOffers(h.state, me, target);
+  // COAL-1: отказ от союза с членом своей коалиции — это выход из неё.
+  if (from === 'alliance' && coalitionsOn(h)) leaveCoalition(h, me, target);
+  // MAPSHARE-1: война рвёт договор об обмене картами вместе с переговорами о нём.
+  // Делиться разведкой и пускать войска к тому, кому только что объявил войну, —
+  // противоречие, и держать такой договор значило бы отдавать врагу свою карту.
+  if (stance === 'war') {
+    setMapShare(h.state, me, target, false);
+    clearMapShareOffers(h.state, me, target);
+  }
+  setStance(h.state, me, target, stance);
+  h.emit('diplomacy.changed', { a: me, b: target, stance, from, ...(cause ? { cause } : {}) });
+}
+
+/** Fixed sides (team modes) are match rules: humans of two teams stay as the mode set them. */
+function fixedPair(h: HandlerContext, a: PlayerId, b: PlayerId): boolean {
+  const pa = h.state.players[a];
+  const pb = h.state.players[b];
+  return (
+    hasFixedSides(h.ctx.config?.modeId) &&
+    !!pa && !!pb && !pa.npc && !pb.npc &&
+    pa.team !== undefined && pb.team !== undefined
+  );
+}
+
 export const diplomacyModule: GameModule = {
   id: 'diplomacy',
-  version: '1.4.0',
+  // 1.5.0: `declareWar` в возможности — война по раскрытию шпиона (SPY-11).
+  version: '1.5.0',
   setup(api) {
     api.provideCapability<DiplomacyCapability>('diplomacy', {
       getRelation: (state, a, b) => stanceToRelation(getStance(state, a, b)),
+      declareWar: (h, a, b, cause) => {
+        if (a === b || fixedPair(h, a, b)) return false;
+        const from = getStance(h.state, a, b);
+        if (from === 'war') return false;
+        escalate(h, a, b, 'war', from, cause);
+        return true;
+      },
     });
 
     api.onAction('diplomacy.declare', (action, h) => {
@@ -125,19 +168,7 @@ export const diplomacyModule: GameModule = {
       }
 
       if (HOSTILITY[stance] > HOSTILITY[from]) {
-        // Escalation — unilateral, and it ends any negotiation in flight.
-        clearOffers(h.state, me, target);
-        // COAL-1: отказ от союза с членом своей коалиции — это выход из неё.
-        if (from === 'alliance' && coalitionsOn(h)) leaveCoalition(h, me, target);
-        // MAPSHARE-1: война рвёт договор об обмене картами вместе с переговорами о нём.
-        // Делиться разведкой и пускать войска к тому, кому только что объявил войну, —
-        // противоречие, и держать такой договор значило бы отдавать врагу свою карту.
-        if (stance === 'war') {
-          setMapShare(h.state, me, target, false);
-          clearMapShareOffers(h.state, me, target);
-        }
-        setStance(h.state, me, target, stance);
-        h.emit('diplomacy.changed', { a: me, b: target, stance, from });
+        escalate(h, me, target, stance, from);
         return;
       }
 

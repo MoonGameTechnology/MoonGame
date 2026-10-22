@@ -273,7 +273,8 @@ describe('действия мира', () => {
   it('разведка чужого мира — кнопкой, а открытое окно — отсчётом вместо неё', async () => {
     const { env, card } = await boot();
     expect(card('N')).toContain(act('spyplanet', 'recon'));
-    expect(card('A')).not.toContain('data-act="spyplanet"');
+    expect(card('A')).not.toContain(act('spyplanet', 'recon'));
+    expect(card('A')).toContain(act('spyplanet', 'counter')); // SPY-11: свой мир охраняют
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
     const html = card('N');
     expect(html).toContain(t('side.world.spy-window'));

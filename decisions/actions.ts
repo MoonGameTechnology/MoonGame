@@ -281,6 +281,9 @@ export const declareWar = (playerId: string, target: string, stance: DiplomaticS
 /** Send an agent on an operation against another commander's world (SPY-8/9). */
 export const spyOn = (playerId: string, planetId: string, op: SpyOp) =>
   act(playerId, 'espionage.spy', { planetId, op });
+/** Call a counter-intelligence agent off its post on this world (SPY-11). */
+export const recallSpy = (playerId: string, planetId: string) =>
+  act(playerId, 'espionage.recall', { planetId });
 /** Cast a hero ability (HERO-4 dispatcher); `target` — planet id for ranged casts.
  *  Pulled ahead of the rest of the "hero engine" builder cluster (REFP-22's deferred
  *  remainder) because REFP-24's `serverChainActions` (CC-1 chain driver) needs it for

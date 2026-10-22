@@ -331,6 +331,33 @@ export function handleEvents(events: DomainEvent[]) {
         pushSpyLog(line);
         break;
       }
+      // SPY-11: контрразведчик — пост, отзыв, поимка чужого и потеря своего.
+      case 'espionage.posted':
+      case 'espionage.recalled':
+        if (p.owner === ME) {
+          const line = t(e.type === 'espionage.posted' ? 'log.spy.posted' : 'log.spy.recalled', {
+            at: game.placeName(String(p.planetId)),
+          });
+          note(line);
+          pushSpyLog(line);
+        }
+        break;
+      case 'espionage.counter.caught':
+      case 'espionage.counter.lost':
+        if (p.owner === ME) {
+          const at = game.placeName(String(p.planetId));
+          const dead = p.killed === true || p.agentLost === true;
+          const line =
+            e.type === 'espionage.counter.caught'
+              ? t(dead ? 'log.spy.counter.caught.killed' : 'log.spy.counter.caught', {
+                  at,
+                  who: NAME[p.spy as string] ?? (p.spy as string),
+                })
+              : t(dead ? 'log.spy.counter.lost.killed' : 'log.spy.counter.lost', { at });
+          note(line);
+          pushSpyLog(line);
+        }
+        break;
       case 'espionage.failed':
         if (p.owner === ME) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
@@ -404,6 +431,8 @@ export function handleEvents(events: DomainEvent[]) {
           // «Экспедиция начата — Рой уже идёт» служебной строкой с именем фракции игрока.
           // Реплика в треде дипломатии выше остаётся.
           if (!sectorRunActive) note(`${na} → ${nb}: ${stanceRu(st)}`);
+          // SPY-11: войну объявило раскрытие шпиона, а не игрок — это стоит назвать.
+          if (p.cause === 'espionage') note(t('log.spy.war', { a: na, b: nb }));
         }
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;

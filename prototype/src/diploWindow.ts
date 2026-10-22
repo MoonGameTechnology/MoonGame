@@ -672,13 +672,15 @@ function intelTabHtml(): string {
   const net = myAgents(s, ME);
   const agents = net.away
     .map((a) => {
-      const left = t('fmt.hours', { n: Math.max(0, Math.ceil((a.until - s.time) / HOUR)) });
+      // SPY-11: a counter-intelligence agent is away until recalled — no countdown.
+      const guard = a.op === 'counter';
+      const left = guard ? '' : `⏳ ${t('fmt.hours', { n: Math.max(0, Math.ceil((a.until - s.time) / HOUR)) })}`;
       const what = a.lost
         ? t('spy.agent.lost')
         : a.planetId
-          ? t('spy.agent.mission', { at: game.placeName(a.planetId) })
+          ? t(a.posted ? 'spy.agent.post' : 'spy.agent.mission', { at: game.placeName(a.planetId) })
           : t('spy.agent.busy');
-      return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : '🕵'}</span><b>${esc(what)}</b><span class="in-t">⏳ ${left}</span></div>`;
+      return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : guard ? '🛡' : '🕵'}</span><b>${esc(what)}</b><span class="in-t">${left}</span></div>`;
     })
     .join('');
   const log = [...spyLog]

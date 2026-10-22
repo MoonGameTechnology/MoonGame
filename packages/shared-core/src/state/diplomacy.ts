@@ -1,4 +1,5 @@
 import type { DiplomaticStance, GameState, PlayerId } from './gameState';
+import type { HandlerContext } from '../kernel/module';
 
 /** Friendliness order of the stances — the shared vocabulary for "is this change
  *  an upgrade or a downgrade" (core `diplomacyModule` rules, prototype UI routing). */
@@ -105,6 +106,11 @@ export function stanceToRelation(stance: DiplomaticStance): DiplomaticRelation {
  *  degradation — same behaviour, since the base mapping is this same one). */
 export interface DiplomacyCapability {
   getRelation(state: GameState, a: PlayerId, b: PlayerId): DiplomaticRelation;
+  /** SPY-11: declare war between `a` and `b` on the game's own initiative (an exposed
+   *  spy) — the same escalation as `diplomacy.declare … war` (offers, coalition and the
+   *  map-share treaty go with it), announced with `cause`. False when nothing changed:
+   *  already at war, or fixed sides forbid it. Optional: a stub capability may omit it. */
+  declareWar?(h: HandlerContext, a: PlayerId, b: PlayerId, cause: string): boolean;
 }
 
 /** Separator inside a DIRECTED offer key (`from>to`). Like {@link pairKey}'s
