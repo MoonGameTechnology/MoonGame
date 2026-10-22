@@ -127,6 +127,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['diplomacy.mapshare', { target: 'p2', on: true }], // MAPSHARE-1: предложить/принять
       ['diplomacy.mapshare', { target: 'p2', on: false }], // расторгнуть / отозвать
       ['espionage.spy', { planetId: 'home_b', op: 'recon' }],
+      ['espionage.spy', { planetId: 'home_b', op: 'sabotage' }],
       // REL-2 — prototype-host intents
       ['market.list', { side: 'buy', resource: 'metal', amount: 4, price: 2 }], // two-sided book
       ['market.take', { id: 'lot:1', amount: 2 }],

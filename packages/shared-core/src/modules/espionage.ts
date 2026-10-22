@@ -1,9 +1,10 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
+import type { BuildingDamage, BuildingHit } from './construction';
 import { buildingLevel, type GameData } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
-import { canAfford, payCost } from '../util/treasury';
+import { canAfford, payCost, refundCost } from '../util/treasury';
 
 /**
  * Espionage: an agent is sent to ONE PLANET on an operation (SPY-8, owner's
@@ -15,6 +16,15 @@ import { canAfford, payCost } from '../util/treasury';
  *   - `recon` — a time-boxed WINDOW of intel (`IntelGrant`): `visibleState` lets
  *     the spy (and only them) see the world as identified — its buildings, ground
  *     army and the fleets in its orbit — until the window closes.
+ *   - `sabotage` (SPY-9) — 3–5 random buildings of the world lose 10–20% of their
+ *     max HP each; one already worn down can be destroyed. The damage itself is the
+ *     construction module's (`building.damage` capability) — without it nothing breaks.
+ *   - `theft` (SPY-9) — a random resource the owner holds: 5–15% of the stock, at
+ *     most `THEFT_CAP`, moves from the owner's treasury to the spy's (a world has no
+ *     stockpile of its own; owner's resolution 2026-10-22).
+ *
+ * After a sabotage or a theft the agent comes home (`AGENT_RETURN_HOURS`), as after
+ * a failure; `espionage.succeeded` tells the spy what was done.
  *
  * Price, success chance and window length are value pipelines with base
  * defaults (`espionage.cost` / `espionage.chance` / `espionage.duration`), so
@@ -55,7 +65,7 @@ import { canAfford, payCost } from '../util/treasury';
  * `espionage.detected` says `killed: true`.
  */
 
-const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon']);
+const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft']);
 
 /** Base price of one mission — overridden per-match via the `espionage.cost` hook. */
 const BASE_COST = { credits: 150 } as const;
@@ -84,6 +94,15 @@ const AGENT_RETURN_HOURS = 6;
 const AGENT_RECRUIT_HOURS = 24;
 /** Base odds a DETECTED agent dies (`espionage.kill` pipeline, clamped to [0,1]). */
 const BASE_KILL = 0.5;
+/** Sabotage: how many buildings are hit (inclusive range) and the share of max HP each loses. */
+const SABOTAGE_MIN = 3;
+const SABOTAGE_MAX = 5;
+const SABOTAGE_SHARE_MIN = 0.1;
+const SABOTAGE_SHARE_MAX = 0.2;
+/** Theft: the share of the chosen stock taken, and the most one theft can carry. */
+const THEFT_SHARE_MIN = 0.05;
+const THEFT_SHARE_MAX = 0.15;
+export const THEFT_CAP = 500;
 
 /** The victim's counter-intelligence: the largest `field` bonus among the buildings
  *  on the worlds they own (SPY-7). 0 without such a building. */
@@ -123,6 +142,42 @@ function finiteOr(raw: number, base: number): number {
   return Number.isFinite(raw) ? raw : base;
 }
 
+/** Sabotage: pick 3–5 distinct damageable buildings of the world and hand them to the
+ *  `building.damage` capability. Fewer buildings than the roll → every one is hit. */
+function sabotage(h: HandlerContext, planetId: string): { building: string; destroyed: boolean }[] {
+  const planet = h.state.planets[planetId]!;
+  const pool: { index: number; maxHp: number }[] = [];
+  planet.buildings.forEach((b, index) => {
+    const def = h.ctx.data.buildings[b.type];
+    const maxHp = def ? buildingLevel(def, b.level).hp : 0;
+    if (maxHp > 0 && b.hp > 0) pool.push({ index, maxHp });
+  });
+  const count = Math.min(pool.length, h.rng.nextInt(SABOTAGE_MIN, SABOTAGE_MAX + 1));
+  const hits: BuildingHit[] = [];
+  for (let i = 0; i < count; i++) {
+    // Partial Fisher–Yates: the i-th pick comes from the not-yet-picked tail.
+    const j = h.rng.nextInt(i, pool.length);
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    const share = SABOTAGE_SHARE_MIN + h.rng.nextFloat() * (SABOTAGE_SHARE_MAX - SABOTAGE_SHARE_MIN);
+    hits.push({ index: pool[i]!.index, amount: Math.round(pool[i]!.maxHp * share) });
+  }
+  return h.capability<BuildingDamage>('building.damage')?.(h, planetId, hits) ?? [];
+}
+
+/** Theft: a random resource the victim holds at least one whole unit of, 5–15% of it
+ *  (rounded down, at most `THEFT_CAP`), moved to the spy. `null` — nothing to take. */
+function theft(h: HandlerContext, spy: string, victim: string): { resource: string; amount: number } | null {
+  const purse = h.state.players[victim]!.resources;
+  const held = h.ctx.data.resources.filter((r) => (purse[r] ?? 0) >= 1);
+  if (held.length === 0) return null;
+  const resource = held[h.rng.nextInt(0, held.length)]!;
+  const share = THEFT_SHARE_MIN + h.rng.nextFloat() * (THEFT_SHARE_MAX - THEFT_SHARE_MIN);
+  const amount = Math.min(THEFT_CAP, Math.max(1, Math.floor(purse[resource]! * share)));
+  payCost(purse, { [resource]: amount });
+  refundCost(h.state.players[spy]!.resources, { [resource]: amount });
+  return { resource, amount };
+}
+
 /** Replace the agent of `mission` with what it does next (`next`). */
 function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAway): void {
   const agents = (h.state.spyAgents ??= {});
@@ -131,7 +186,8 @@ function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAw
 
 export const espionageModule: GameModule = {
   id: 'espionage',
-  version: '1.0.0',
+  // 1.1.0: саботаж и кража ресурсов (SPY-9).
+  version: '1.1.0',
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -264,6 +320,32 @@ export const espionageModule: GameModule = {
             kind: op,
             planetId,
             spy,
+            ...(killed ? { killed: true } : {}),
+          });
+        }
+        return;
+      }
+
+      if (op !== 'recon') {
+        // Sabotage / theft: the deed is done at once, the agent heads home.
+        const done =
+          op === 'sabotage'
+            ? { hits: sabotage(h, planetId) }
+            : { loot: theft(h, spy, victim) };
+        reassign(h, spy, mission, killed ? recruit : comeHome);
+        h.emit('espionage.succeeded', {
+          owner: spy,
+          target: victim,
+          kind: op,
+          planetId,
+          ...done,
+          ...(killed ? { agentLost: true } : {}),
+        });
+        if (detected) {
+          h.emit('espionage.detected', {
+            owner: victim,
+            kind: op,
+            planetId,
             ...(killed ? { killed: true } : {}),
           });
         }
