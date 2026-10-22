@@ -175,7 +175,7 @@
 | SPY-8 | ✅ | core srv proto | `docs/backlog.md` | Цель — планета, операция 12 ч, разведка |
 | SPY-9 | ✅ | core srv proto | `docs/backlog.md` | Саботаж и кража ресурсов. |
 | SPY-10 | ✅ | core proto | `docs/backlog.md` | Кража исследований. |
-| SPY-11 | ⏳ | core proto | `docs/backlog.md` | Контрразведчик и война. |
+| SPY-11 | ✅ | core srv proto | `docs/backlog.md` | Контрразведчик и война. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, order, spyOn, advance, botFavour, FAVOUR_SPY_CAUGHT_HIT, HOUR, DAY } from './game';
-import type { GameState } from '../../packages/shared-core/src/index';
+import { getStance, type GameState } from '../../packages/shared-core/src/index';
 import type { StepOut } from './protoKernel';
 
 // The core espionageModule wired into the prototype kernel: `espionage.spy` sends an
@@ -78,9 +78,10 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
       if (caught) {
         expect((caught.payload as { owner: string }).owner).toBe('p2'); // addressed to the victim
         // Favour heals a little over the 12h mission, so the hit shows as a drop below
-        // where it started, never more than the hit itself.
-        expect(botFavour(st, 'p2', 'p1')).toBeLessThan(before);
-        expect(botFavour(st, 'p2', 'p1')).toBeGreaterThanOrEqual(before - FAVOUR_SPY_CAUGHT_HIT);
+        // where it started. SPY-11: the exposure also declares war, so the war hit may
+        // stack on top — the drop is at least most of the spy hit.
+        expect(botFavour(st, 'p2', 'p1')).toBeLessThan(before - FAVOUR_SPY_CAUGHT_HIT / 2);
+        expect(getStance(st, 'p1', 'p2')).toBe('war');
         return;
       }
     }

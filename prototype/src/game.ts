@@ -207,6 +207,7 @@ export {
   leaveCoalition,
   editCoalition,
   spyOn,
+  recallSpy,
   canTraverse,
   castHeroAbility,
   orderAuto,

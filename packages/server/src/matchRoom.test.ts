@@ -1554,6 +1554,10 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('espionage.failed', { owner, target: 'p2', kind: 'recon', planetId: 'node1' });
         h.emit('intel.stolen', { owner, target: 'p2', kind: 'recon', planetId: 'node1', until: 9 });
         h.emit('espionage.succeeded', { owner, target: 'p2', kind: 'theft', planetId: 'node1', loot: null });
+        h.emit('espionage.posted', { owner, planetId: 'node1' });
+        h.emit('espionage.recalled', { owner, planetId: 'node1' });
+        h.emit('espionage.counter.caught', { owner, planetId: 'node1', spy: 'p3' });
+        h.emit('espionage.counter.lost', { owner, planetId: 'node1' });
         h.emit('espionage.detected', { owner, kind: 'recon', planetId: 'node1', spy: 'p3' });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
@@ -1709,6 +1713,10 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'espionage.failed',
       'intel.stolen',
       'espionage.succeeded',
+      'espionage.posted',
+      'espionage.recalled',
+      'espionage.counter.caught',
+      'espionage.counter.lost',
       'espionage.detected',
     ];
     // Every entry of the server's list is exercised here, so a new one can't skip this test.

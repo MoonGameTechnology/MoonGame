@@ -2,6 +2,7 @@ import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingDamage, BuildingHit } from './construction';
 import type { TechnologyGrant } from './technology';
+import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 import { buildingLevel, type GameData } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
@@ -28,6 +29,21 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *     among those in its labs. The grant is the technology module's
  *     (`technology.grant` capability). Nothing to take → the success reports that
  *     the target civilisation lags behind (`tech: null`).
+ *
+ *   - `counter` (SPY-11) — a counter-intelligence agent: after the 12h trip it stays
+ *     on the world (`posted`) until recalled (`espionage.recall`) or caught. Any
+ *     world with an owner, your own included. While posted it adds
+ *     `COUNTER_DETECT_BONUS` / `COUNTER_KILL_BONUS` (on top of the bureau) against
+ *     every AGGRESSIVE mission (all the others) there by a player who is neither its
+ *     owner nor that owner's ally. Every `COUNTER_SWEEP_HOURS` it also hunts the
+ *     counter-intelligence agents posted there by civilisations at WAR with its owner
+ *     — on an enemy world that includes the enemy's own guard.
+ *
+ * War on exposure (SPY-11, owner's resolution 2026-10-22): an aggressive mission that
+ * is DETECTED (a killed agent is always detected) declares war between the world's
+ * owner and the spy's owner — through the `diplomacy` capability's `declareWar`, so an
+ * alliance or a pact breaks too. A caught counter-intelligence agent declares nothing:
+ * both sides are at war already, and a third party's world is not party to it.
  *
  * After a sabotage, a theft or a research theft the agent comes home (`AGENT_RETURN_HOURS`), as after
  * a failure; `espionage.succeeded` tells the spy what was done.
@@ -71,7 +87,7 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * `espionage.detected` says `killed: true`.
  */
 
-const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft', 'research']);
+const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft', 'research', 'counter']);
 
 /** Base price of one mission — overridden per-match via the `espionage.cost` hook. */
 const BASE_COST = { credits: 150 } as const;
@@ -109,6 +125,17 @@ const SABOTAGE_SHARE_MAX = 0.2;
 const THEFT_SHARE_MIN = 0.05;
 const THEFT_SHARE_MAX = 0.15;
 export const THEFT_CAP = 500;
+/** A posted counter-intelligence agent's `until`: it is away until recalled or caught.
+ *  JSON-safe (unlike `Infinity`), and no world clock reaches it. */
+export const COUNTER_POSTED = Number.MAX_SAFE_INTEGER;
+/** What a posted counter-intelligence agent adds against aggressive missions on its world
+ *  (stacks with the bureau). */
+const COUNTER_DETECT_BONUS = 0.2;
+const COUNTER_KILL_BONUS = 0.15;
+/** How often a posted agent hunts hostile counter-intelligence on its world, game-hours,
+ *  and its odds to catch one per sweep. */
+const COUNTER_SWEEP_HOURS = 12;
+const COUNTER_CATCH = 0.2;
 
 /** The victim's counter-intelligence: the largest `field` bonus among the buildings
  *  on the worlds they own (SPY-7). 0 without such a building. */
@@ -201,6 +228,26 @@ function stealResearch(h: HandlerContext, spy: string, victim: string): string |
   return h.capability<TechnologyGrant>('technology.grant')?.(h, spy, tech) ? tech : null;
 }
 
+/** Posted counter-intelligence agents on `planetId`, by owner — owners in sorted order so
+ *  every walk over them is deterministic. */
+function postedOn(state: GameState, planetId: string): { owner: string; agent: AgentAway }[] {
+  const out: { owner: string; agent: AgentAway }[] = [];
+  for (const owner of Object.keys(state.spyAgents ?? {}).sort()) {
+    for (const agent of state.spyAgents![owner]!) {
+      if (agent.posted && agent.planetId === planetId) out.push({ owner, agent });
+    }
+  }
+  return out;
+}
+
+/** Is an aggressive mission by `spy` on `planetId` watched by someone's counter-intelligence:
+ *  a posted agent whose owner is neither the spy nor the spy's ally? */
+function guarded(state: GameState, planetId: string, spy: string): boolean {
+  return postedOn(state, planetId).some(
+    ({ owner }) => owner !== spy && getStance(state, owner, spy) !== 'alliance',
+  );
+}
+
 /** Replace the agent of `mission` with what it does next (`next`). */
 function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAway): void {
   const agents = (h.state.spyAgents ??= {});
@@ -210,7 +257,8 @@ function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAw
 export const espionageModule: GameModule = {
   id: 'espionage',
   // 1.1.0: саботаж и кража ресурсов (SPY-9). 1.2.0: кража исследований (SPY-10).
-  version: '1.2.0',
+  // 1.3.0: контрразведчик и война по раскрытию (SPY-11).
+  version: '1.3.0',
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -225,12 +273,20 @@ export const espionageModule: GameModule = {
       if (!planet) {
         return h.reject('E_NO_PLANET');
       }
-      // Someone else's world: your own or an unclaimed one has nobody to spy on.
-      if (planet.owner === null || planet.owner === action.playerId) {
+      // Someone else's world: your own or an unclaimed one has nobody to spy on. A
+      // counter-intelligence agent may guard your own world too, but never an empty one.
+      const counter = p.op === 'counter';
+      if (planet.owner === null || (planet.owner === action.playerId && !counter)) {
         return h.reject('E_BAD_TARGET');
       }
       if (h.state.players[planet.owner]?.status !== 'active') {
         return h.reject('E_NO_PLAYER');
+      }
+      const mineHere = (h.state.spyAgents?.[action.playerId] ?? []).some(
+        (a) => a.op === 'counter' && a.planetId === p.planetId && a.until > h.ctx.now,
+      );
+      if (counter && mineHere) {
+        return h.reject('E_BAD_TARGET'); // one guard per world is all a network spares
       }
 
       // SPY-6: a mission needs a free agent — checked before the fee, so a refusal
@@ -261,7 +317,9 @@ export const espionageModule: GameModule = {
       const mission = Math.max(0, ...away.map((a) => a.mission ?? 0)) + 1;
       const resolvesAt = h.ctx.now + hoursToMs(h.ctx, MISSION_HOURS);
       const op = p.op as SpyOp;
-      away.push({ until: resolvesAt, mission, op, planetId: p.planetId });
+      // A counter-intelligence agent is away until recalled, from the start: housekeeping
+      // must not drop it on arrival, and a recall on the way must find it.
+      away.push({ until: counter ? COUNTER_POSTED : resolvesAt, mission, op, planetId: p.planetId });
       (h.state.spyAgents ??= {})[action.playerId] = away;
       h.schedule(resolvesAt, 'espionage.resolve', {
         spy: action.playerId,
@@ -277,6 +335,23 @@ export const espionageModule: GameModule = {
       const now = h.ctx.now;
       const victim = h.state.planets[planetId]?.owner ?? null;
       const comeHome: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RETURN_HOURS) };
+      if (op === 'counter') {
+        // Recalled on the way: its slot is already a homecoming, nothing to post.
+        if (!(h.state.spyAgents?.[spy] ?? []).some((a) => a.mission === mission)) return;
+        if (victim === null || h.state.players[spy]?.status !== 'active') {
+          reassign(h, spy, mission, comeHome);
+          h.emit('espionage.aborted', { owner: spy, planetId, kind: op });
+          return;
+        }
+        reassign(h, spy, mission, { until: COUNTER_POSTED, mission, op, planetId, posted: true });
+        h.schedule(now + hoursToMs(h.ctx, COUNTER_SWEEP_HOURS), 'espionage.sweep', {
+          spy,
+          planetId,
+          mission,
+        });
+        h.emit('espionage.posted', { owner: spy, planetId });
+        return;
+      }
       if (
         victim === null ||
         victim === spy ||
@@ -302,9 +377,12 @@ export const espionageModule: GameModule = {
       // Counter-intelligence (SPY-2): the detect roll is drawn for EVERY resolved
       // mission — success or failure — so the RNG stream shape does not depend on
       // the outcome (or on what hooks did to the odds).
+      // SPY-11: a counter-intelligence agent posted on the world adds its share.
+      const watched = guarded(h.state, planetId, spy);
       const baseDetect =
         (succeeded ? BASE_DETECT_SUCCESS : BASE_DETECT_FAILED) +
-        counterIntelOf(h.ctx.data, h.state, victim, 'spyDetectBonus');
+        counterIntelOf(h.ctx.data, h.state, victim, 'spyDetectBonus') +
+        (watched ? COUNTER_DETECT_BONUS : 0);
       const rawDetect = h.hook<number>('espionage.detect', baseDetect, {
         playerId: spy,
         target: victim,
@@ -315,7 +393,10 @@ export const espionageModule: GameModule = {
       const detected = h.rng.nextFloat() < detectChance;
 
       // Death on exposure: drawn for every resolved mission too; it only bites when detected.
-      const baseKill = BASE_KILL + counterIntelOf(h.ctx.data, h.state, victim, 'spyKillBonus');
+      const baseKill =
+        BASE_KILL +
+        counterIntelOf(h.ctx.data, h.state, victim, 'spyKillBonus') +
+        (watched ? COUNTER_KILL_BONUS : 0);
       const rawKill = h.hook<number>('espionage.kill', baseKill, {
         playerId: spy,
         target: victim,
@@ -325,6 +406,10 @@ export const espionageModule: GameModule = {
       const killChance = Math.min(1, Math.max(0, finiteOr(rawKill, baseKill)));
       const killed = h.rng.nextFloat() < killChance && detected;
       const recruit: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true };
+      // War on exposure (SPY-11): even an ally or a pact partner caught spying is an enemy now.
+      if (detected) {
+        h.capability<DiplomacyCapability>('diplomacy')?.declareWar?.(h, victim, spy, 'espionage');
+      }
 
       if (!succeeded) {
         reassign(h, spy, mission, killed ? recruit : comeHome);
@@ -407,6 +492,48 @@ export const espionageModule: GameModule = {
           ...(killed ? { killed: true } : {}),
         });
       }
+    });
+
+    // SPY-11: a posted counter-intelligence agent hunts hostile guards on its world.
+    api.on('espionage.sweep', (event, h) => {
+      const { spy, planetId, mission } = event.payload as { spy: string; planetId: string; mission: number };
+      const mine = (h.state.spyAgents?.[spy] ?? []).find((a) => a.posted && a.mission === mission);
+      if (!mine) return; // recalled or caught — its watch is over
+      const now = h.ctx.now;
+      const comeHome: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RETURN_HOURS) };
+      if (!h.state.planets[planetId]?.owner || h.state.players[spy]?.status !== 'active') {
+        reassign(h, spy, mission, comeHome);
+        h.emit('espionage.aborted', { owner: spy, planetId, kind: 'counter' });
+        return;
+      }
+      for (const { owner, agent } of postedOn(h.state, planetId)) {
+        if (owner === spy || getStance(h.state, spy, owner) !== 'war') continue;
+        const caught = h.rng.nextFloat() < COUNTER_CATCH;
+        const killed = h.rng.nextFloat() < BASE_KILL + COUNTER_KILL_BONUS && caught;
+        if (!caught) continue;
+        reassign(
+          h,
+          owner,
+          agent.mission!,
+          killed ? { until: now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true } : comeHome,
+        );
+        h.emit('espionage.counter.caught', { owner: spy, planetId, spy: owner, ...(killed ? { killed: true } : {}) });
+        h.emit('espionage.counter.lost', { owner, planetId, ...(killed ? { agentLost: true } : {}) });
+      }
+      h.schedule(now + hoursToMs(h.ctx, COUNTER_SWEEP_HOURS), 'espionage.sweep', { spy, planetId, mission });
+    });
+
+    api.onAction('espionage.recall', (action, h) => {
+      const { planetId } = action.payload as { planetId?: unknown };
+      if (typeof planetId !== 'string') return h.reject('E_BAD_PAYLOAD');
+      const agent = (h.state.spyAgents?.[action.playerId] ?? []).find(
+        (a) => a.op === 'counter' && a.planetId === planetId && a.until > h.ctx.now,
+      );
+      if (!agent || agent.mission === undefined) return h.reject('E_BAD_TARGET');
+      reassign(h, action.playerId, agent.mission, {
+        until: h.ctx.now + hoursToMs(h.ctx, AGENT_RETURN_HOURS),
+      });
+      h.emit('espionage.recalled', { owner: action.playerId, planetId });
     });
 
     // Housekeeping: expired windows and returned agents are dropped as time
