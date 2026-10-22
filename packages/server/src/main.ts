@@ -16,6 +16,7 @@ import {
   loadDropTables,
   loadShippedData,
   loadStarterArsenal,
+  MODULE_MANIFEST_VERSION,
 } from './scenario';
 import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { salvageFromEvents } from './dropRoller';
@@ -31,7 +32,7 @@ import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { isOperatorRequest, operatorTokenFromEnv } from './operatorAccess';
-import { createMatchLoader } from './serverWiring';
+import { createAvaRoom, createMatchLoader, declareAvaWar } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { freeMatchId } from './matchId';
 import {
@@ -68,7 +69,7 @@ import { registerPushApi } from './pushApi';
 import { configureWebPush, sendPush, vapidFromEnv } from './push';
 import { createPushDispatcher } from './pushDispatch';
 import { loadMedalCatalog } from './medalCatalog';
-import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
+import { AvaOrchestrator } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry, revokeAccountConnections } from './roomRegistry';
 import { buildVersion } from './buildVersion';
@@ -330,10 +331,10 @@ const avaOrchestrator = new AvaOrchestrator({
   sessionStore: stores.sessionStore,
   data,
   maps: loadAvaMaps(),
-  createRoom: async ({ matchId, state }) => {
-    const room = createDevMatch(data, { id: matchId, initialState: state, time: state.time });
-    await stores.store.save(snapshotOf(room));
-  },
+  manifest: MODULE_MANIFEST_VERSION, // the module graph `createMatchLoader` resumes under
+  createRoom: createAvaRoom({ stores, data }),
+  // CORP-4: no map fits the locked roster — cancel the battle and refund the challenge.
+  cancel: (matchupId) => avaService.cancelLocked(matchupId),
   // AVA-8 (S6): the peace period, then the war opens on a timer. Env-tunable for
   // playtests (a real day is too long to watch); the MVP default is 24h.
   peaceMs: Number(process.env.AVA_PEACE_MS ?? '') || undefined,
@@ -345,13 +346,7 @@ const avaOrchestrator = new AvaOrchestrator({
   escalateWar: async (matchId) => {
     const room = await registry.resolve?.(matchId);
     if (!room) return false; // snapshot missing/unloadable — retry next sweep
-    let allLanded = true;
-    for (const { playerId, action } of warDeclarationsFor(room.state, matchId)) {
-      const r = await room.submitServerAction(playerId, action);
-      // E_SAME_STANCE = already at war (a replay after a partial pass) — that pair is done.
-      if (!r.ok && r.code !== 'E_SAME_STANCE') allLanded = false;
-    }
-    return allLanded;
+    return declareAvaWar(room, matchId);
   },
   // AVA-8 (S7): settle the ended war — archive the matchup, record the outcome,
   // award influence to the winning corp (exactly-once by the locked→ended gate).

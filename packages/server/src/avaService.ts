@@ -393,6 +393,17 @@ export class AvaService {
     return { locked, cancelled };
   }
 
+  /** CORP-4: no AvA map fits a LOCKED roster, so the battle can't be raised — cancel the
+   *  matchup and refund the challenge cost. The locked→cancelled transition is the
+   *  exactly-once gate, like settlement's locked→ended: false = not locked, nothing
+   *  changed. Server-driven (the orchestrator sweep), no client. */
+  async cancelLocked(matchupId: string): Promise<boolean> {
+    const matchup = await this.challenges.getChallenge(matchupId);
+    if (!matchup || !(await this.challenges.endMatchup(matchupId, 'cancelled'))) return false;
+    await this.refund(matchup);
+    return true;
+  }
+
   // ---- AVA-8 · settlement (S7) --------------------------------------------
 
   /** settleMatch — the orchestrator calls this once a LOCKED matchup's war has ended:

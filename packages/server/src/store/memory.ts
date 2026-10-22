@@ -603,10 +603,10 @@ export class MemoryAvaChallengeStore implements AvaChallengeStore {
     );
   }
 
-  endMatchup(id: string): Promise<boolean> {
+  endMatchup(id: string, status: 'ended' | 'cancelled' = 'ended'): Promise<boolean> {
     const row = this.rows.get(id);
     if (!row || row.status !== 'locked') return Promise.resolve(false);
-    row.status = 'ended';
+    row.status = status;
     return Promise.resolve(true);
   }
 }

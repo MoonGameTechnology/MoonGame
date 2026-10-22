@@ -1586,12 +1586,12 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
     return r.rows.map(challengeOf);
   }
 
-  async endMatchup(id: string): Promise<boolean> {
+  async endMatchup(id: string, status: 'ended' | 'cancelled' = 'ended'): Promise<boolean> {
     // Same exactly-once contract as closeMatchup, over the locked state: only a
     // still-locked matchup transitions, so settlement can't award influence twice.
     const r = await this.pool.query(
-      `UPDATE ava_challenges SET status = 'ended' WHERE id = $1 AND status = 'locked'`,
-      [id],
+      `UPDATE ava_challenges SET status = $2 WHERE id = $1 AND status = 'locked'`,
+      [id, status],
     );
     return (r.rowCount ?? 0) > 0;
   }

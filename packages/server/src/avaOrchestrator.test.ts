@@ -1,13 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { pairKey } from '@void/shared-core';
+import { buildStateFromMap, getStance, pairKey, parseMatchMap } from '@void/shared-core';
 import {
   AvaOrchestrator,
+  avaModeId,
   seatAvaRoster,
   warDeclarationsFor,
   winnerSideOf,
   type AvaSessionSpec,
 } from './avaOrchestrator';
-import { loadAvaMaps, loadShippedData } from './scenario';
+import { loadAvaMaps, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
 import {
   MemoryAvaChallengeStore,
   MemoryAvaRosterStore,
@@ -43,6 +45,7 @@ function harness(): Harness {
     sessionStore: sessions,
     data,
     maps,
+    manifest: MODULE_MANIFEST_VERSION,
     createRoom: (spec) => {
       built.push(spec);
       return Promise.resolve();
@@ -151,6 +154,28 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
     expect(res.seats).toEqual({ 'acc-a1': 'slot_a1', 'acc-a2': 'slot_a2', 'acc-b1': 'slot_b1' });
   });
 
+  it('pins the host’s module manifest, each seat’s side and the team mode (CORP-4)', async () => {
+    const h = harness();
+    await lockedMatchup(h, 'mu-duel', ['acc-a'], ['acc-b']);
+    await lockedMatchup(h, 'mu-team', ['acc-a1', 'acc-a2'], ['acc-b1']);
+    await h.orch.orchestrate('mu-duel');
+    await h.orch.orchestrate('mu-team');
+    const [duel, team] = h.built.map((spec) => spec.state);
+    // The loader resumes only a match pinned to the module graph it runs.
+    expect(duel!.version.manifest).toBe(MODULE_MANIFEST_VERSION);
+    expect(team!.version.manifest).toBe(MODULE_MANIFEST_VERSION);
+    // A 1-on-1 needs no sides; a 2-on-2 is a fixed-side team match.
+    expect(duel!.modeId).toBeUndefined();
+    expect(team!.modeId).toBe('team_2v2');
+    // Every seat, bots included, carries its side from the map's slots.
+    expect(Object.fromEntries(Object.values(team!.players).map((p) => [p.id, p.team]))).toEqual({
+      slot_a1: 'A',
+      slot_a2: 'A',
+      slot_b1: 'B',
+      'bot:slot_b2': 'B',
+    });
+  });
+
   it('is idempotent — a second orchestrate returns the same session without rebuilding', async () => {
     const h = harness();
     await lockedMatchup(h, 'mu3', ['acc-a'], ['acc-b']);
@@ -214,6 +239,7 @@ describe('AvaOrchestrator × arsenal snapshot (ARS-3)', () => {
       sessionStore: sessions,
       data,
       maps,
+      manifest: MODULE_MANIFEST_VERSION,
       createRoom: (spec) => {
         built.push(spec);
         return Promise.resolve();
@@ -249,6 +275,7 @@ describe('AvaOrchestrator × corp rentals (ARS-6)', () => {
       sessionStore: sessions,
       data,
       maps,
+      manifest: MODULE_MANIFEST_VERSION,
       createRoom: (spec) => {
         built.push(spec);
         return Promise.resolve();
@@ -277,15 +304,55 @@ describe('AvaOrchestrator × corp rentals (ARS-6)', () => {
   });
 });
 
+describe('avaModeId (CORP-4) — the mode a battle format plays under', () => {
+  it('a team format is a fixed-side mode; a 1-on-1 needs none; an unknown format has none', () => {
+    expect(avaModeId(1)).toBeUndefined();
+    expect(avaModeId(2)).toBe('team_2v2');
+    expect(avaModeId(3)).toBe('team_3v3');
+    // No fixed-side mode for 4-on-4 yet: such a battle is cancelled, never played
+    // every seat for itself.
+    expect(avaModeId(4)).toBeNull();
+  });
+});
+
 describe('AvaOrchestrator.sweep (AVA-7) — no client needed', () => {
   it('raises a session for every locked matchup that has none, idempotently', async () => {
     const h = harness();
     await lockedMatchup(h, 'mu5', ['acc-a'], ['acc-b']);
     await lockedMatchup(h, 'mu6', ['acc-c'], ['acc-d']);
-    expect(await h.orch.sweep()).toEqual({ raised: 2 });
+    expect(await h.orch.sweep()).toEqual({ raised: 2, cancelled: 0 });
     expect(h.built).toHaveLength(2);
-    expect(await h.orch.sweep()).toEqual({ raised: 0 }); // both already have sessions
+    expect(await h.orch.sweep()).toEqual({ raised: 0, cancelled: 0 }); // both already have sessions
     expect(h.built).toHaveLength(2);
+  });
+
+  it('cancels a locked matchup no map fits instead of leaving it locked (CORP-4)', async () => {
+    const challenges = new MemoryAvaChallengeStore();
+    const roster = new MemoryAvaRosterStore();
+    const sessions = new MemoryAvaSessionStore();
+    const cancelled: string[] = [];
+    const orch = new AvaOrchestrator({
+      challengeStore: challenges,
+      rosterStore: roster,
+      sessionStore: sessions,
+      data,
+      maps,
+      manifest: MODULE_MANIFEST_VERSION,
+      createRoom: () => Promise.resolve(),
+      // The service's locked→cancelled gate; here the store transition stands in for it.
+      cancel: (matchupId) => {
+        cancelled.push(matchupId);
+        return challenges.endMatchup(matchupId, 'cancelled');
+      },
+    });
+    const h = { orch, challenges, roster, sessions, built: [] } as unknown as Harness;
+    // No shipped map is a 3-on-3, and the game has no fixed-side 4-on-4 mode.
+    await lockedMatchup(h, 'mu-3v3', ['a1', 'a2', 'a3'], ['b1', 'b2', 'b3']);
+    await lockedMatchup(h, 'mu-4v4', ['c1', 'c2', 'c3', 'c4'], ['d1']);
+    await lockedMatchup(h, 'mu-duel', ['e1'], ['f1']);
+    expect(await orch.sweep()).toEqual({ raised: 1, cancelled: 2 });
+    expect(cancelled.sort()).toEqual(['mu-3v3', 'mu-4v4']);
+    expect(await orch.sweep()).toEqual({ raised: 0, cancelled: 0 }); // no longer locked
   });
 });
 
@@ -312,6 +379,7 @@ function warHarness(peaceMs = 1_000): WarHarness {
     sessionStore: sessions,
     data,
     maps,
+    manifest: MODULE_MANIFEST_VERSION,
     createRoom: (spec) => {
       built.push(spec);
       return Promise.resolve();
@@ -391,6 +459,34 @@ describe('warDeclarationsFor (AVA-8, S6) — the system declarations that open t
     expect(warDeclarationsFor(state, 'ava-mu10')).toHaveLength(0);
     expect(ids).toHaveLength(4);
   });
+
+  it('declares on the other side only — a map’s inhabitants keep their stance (CORP-4)', () => {
+    // The authored team map seats inhabitants: neutral settlements at peace with every
+    // seat, pirates and broods at war with all.
+    const map = parseMatchMap(
+      JSON.parse(readFileSync(new URL('../../../data/maps/team-2v2.json', import.meta.url), 'utf8')),
+    );
+    const { slots } = seatAvaRoster(map, { challenger: ['acc-a1', 'acc-a2'], target: ['acc-b1'] });
+    const state = buildStateFromMap(map, data, { slots, crossTeamStart: 'peace' });
+    const neutral = Object.keys(state.players).filter((id) => state.players[id]!.npc === 'neutral');
+    expect(neutral.length).toBeGreaterThan(0);
+    const declares = warDeclarationsFor(state, 'ava-team');
+    const pairs = declares.map(({ action }) =>
+      [action.playerId, (action.payload as { target: string }).target].join('>'),
+    );
+    expect(pairs).toEqual([
+      'bot:slot_4>slot_1',
+      'bot:slot_4>slot_2',
+      'slot_1>slot_3',
+      'slot_2>slot_3',
+    ]);
+    // Opening the war leaves every neutral settlement at peace with every seat.
+    for (const { action } of declares) {
+      const { target } = action.payload as { target: string };
+      state.diplomacy![pairKey(action.playerId, target)] = 'war';
+    }
+    for (const id of neutral) expect(getStance(state, id, 'slot_1')).toBe('peace');
+  });
 });
 
 describe('AvaOrchestrator.onMatchEnded (AVA-8, S7) — the settlement hook', () => {
@@ -429,7 +525,7 @@ it('keeps the game war clock and fixed seating independent of corporate availabi
   h.challenges.getChallenge = async () => { throw Error('corporations offline'); };
   let opened = 0;
   const game = new AvaOrchestrator({ challengeStore: h.challenges, rosterStore: h.roster, sessionStore: h.sessions,
-    data, maps, createRoom: async () => undefined, isMatchEnded: async () => false,
+    data, maps, manifest: MODULE_MANIFEST_VERSION, createRoom: async () => undefined, isMatchEnded: async () => false,
     escalateWar: async () => { opened++; return true; } });
   expect(await game.resolveAvaSeat('ava-independent', 'acc-a')).toEqual({ ok: true, playerId: 'slot_a' });
   expect(await game.resolveAvaSeat('ava-independent', 'outsider')).toEqual({ ok: false, code: 'E_NOT_ROSTERED' });

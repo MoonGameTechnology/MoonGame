@@ -668,6 +668,20 @@ function avaChallengeStoreContract(
       // …and drops out once it is archived (ended).
       expect((await store.lockedMatchups()).map((c) => c.id)).not.toContain(uniq('ch-f'));
     });
+
+    it('CORP-4: a locked matchup no map fits is cancelled exactly once', async () => {
+      const store = make();
+      const [a, b] = [uniq('c-a6'), uniq('c-b6')];
+      await store.createChallenge(challenge(uniq('ch-g'), a, b, 1000));
+      await store.closeChallenge(uniq('ch-g'), 'accepted');
+      expect(await store.endMatchup(uniq('ch-g'), 'cancelled')).toBe(false); // not locked yet
+      await store.closeMatchup(uniq('ch-g'), 'locked');
+      expect(await store.endMatchup(uniq('ch-g'), 'cancelled')).toBe(true);
+      expect(await store.endMatchup(uniq('ch-g'), 'cancelled')).toBe(false);
+      expect(await store.endMatchup(uniq('ch-g'))).toBe(false); // nor settled afterwards
+      expect((await store.getChallenge(uniq('ch-g')))?.status).toBe('cancelled');
+      expect((await store.lockedMatchups()).map((c) => c.id)).not.toContain(uniq('ch-g'));
+    });
   });
 }
 
