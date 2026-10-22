@@ -180,7 +180,7 @@ describe('radar signal detection', () => {
     s.fleets.a = fleet('a', 'near');
     s.fleets.mine = { ...fleet('mine', 'close', 100), owner: 'me' };
     s.fleets.hidden = fleet('hidden', 'close');
-    s.intel = { me: [{ kind: 'fleets', target: 'foe', until: 10 }] };
+    s.intel = { me: [{ kind: 'planet', target: 'close', until: 10 }] }; // recon of its world
     const v = visibleState(s, 'me', data);
     expect(Object.keys(v.fleets).sort()).toEqual(['a', 'hidden', 'mine']);
     expect(v.signatures).toEqual([]);

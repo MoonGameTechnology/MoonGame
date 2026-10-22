@@ -316,29 +316,34 @@ export interface PlayerTechnologyState {
 export type DiplomaticStance = 'war' | 'peace' | 'pact' | 'alliance';
 
 
-/** A stolen, time-boxed intel window (espionage): while `until` is ahead of the
- *  world clock, `visibleState` lets the OWNING viewer see through the fog at the
- *  granted target. What each kind opens:
- *  - `treasury` — the target player's resource bag stays visible;
- *  - `planet`   — the granted world's contents (owner/garrison/buildings) read live;
- *  - `fleets`   — the target player's fleets stay in view (position + composition).
+/** A stolen, time-boxed intel window (espionage `recon`, SPY-8): while `until` is
+ *  ahead of the world clock, `visibleState` lets the OWNING viewer see the granted
+ *  world as identified — owner, garrison, buildings and the fleets in its orbit.
  *  Grants are produced by `espionageModule` and expire on their own. */
 export interface IntelGrant {
-  kind: 'treasury' | 'planet' | 'fleets';
-  /** `treasury`/`fleets` → target player id; `planet` → the granted planet id. */
+  kind: 'planet';
+  /** The granted planet id. */
   target: string;
   /** World-time (ms) the window closes. */
   until: number;
 }
 
-/** An agent of the spy's network that is away (espionage, SPY-6): busy working a
- *  stolen window, slipping home after a failure, or — `lost` — caught, with a
- *  replacement being recruited. Back in the network once `until` passes. */
+/** An espionage operation an agent is sent on (SPY-8). */
+export type SpyOp = 'recon';
+
+/** An agent of the spy's network that is away (espionage, SPY-6): on a mission,
+ *  busy working a stolen window, slipping home after a failure, or — `lost` —
+ *  killed, with a replacement being found. Back in the network once `until` passes. */
 export interface AgentAway {
   /** World-time (ms) the agent is available again. */
   until: number;
-  /** The agent was caught; `until` is when the replacement is recruited. */
+  /** The agent was killed; `until` is when the replacement is found. */
   lost?: true;
+  /** On a mission (SPY-8): its id among the player's live missions, the operation and
+   *  the target world; `until` is when the mission resolves. */
+  mission?: number;
+  op?: SpyOp;
+  planetId?: PlanetId;
 }
 
 export type MatchStatus = 'ongoing' | 'ended';

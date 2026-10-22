@@ -89,16 +89,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'technology.research': z.object({ technology: id }),
   // SES-3: sink the premium resource into one ACTIVE research (diminishing returns)
   'technology.boost': z.object({ technology: id }),
-  // espionage.ts — steal a time-boxed intel window; `planetId` only with kind 'planet'
-  'espionage.spy': z
-    .object({
-      target: id,
-      kind: z.enum(['treasury', 'planet', 'fleets']),
-      planetId: id.optional(),
-    })
-    .refine((v) => v.kind !== 'planet' || v.planetId !== undefined, {
-      message: "kind 'planet' needs a planetId",
-    }),
+  // espionage.ts — send an agent on an operation against one world (SPY-8)
+  'espionage.spy': z.object({ planetId: id, op: z.enum(['recon']) }),
   // market.ts — amounts are plain positive numbers (resources accrue continuously,
   // so fractional amounts are legal); price is a positive unit price (≥ 1) — the
   // anti-wash-trade guard (SEC-A06-5): a `price: 0` listing is a free resource

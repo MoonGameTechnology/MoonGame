@@ -102,9 +102,8 @@ export function fleetNode(f: Fleet): string | null {
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
 // The core `espionageModule` grants time-boxed intel windows (`state.intel[ME]`);
-// here the client fog honours them: a `planet` grant identifies that node, a
-// `fleets` grant shows the target's fleets through the fog, a `treasury` grant is
-// read by the diplomacy roster. Mirrors what `visibleState` does server-side.
+// here the client fog honours them: a `planet` grant identifies that node (SPY-8:
+// the only kind left). Mirrors what `visibleState` does server-side.
 // Окна краденой разведки и журнал шпионажа живут в `intel.ts` (REFM-28) — там же
 // правила «истёкшее окно не видно» и «опознание влечёт радар».
 /** Мои ЖИВЫЕ окна разведки на текущий час мира. */
@@ -112,9 +111,6 @@ export function myIntel(): IntelGrant[] {
   const s = game.world();
   return liveGrants(s.intel?.[game.me()], s.time);
 }
-// Владельцы, чьи флоты этот кадр показаны живым окном `fleets` — набор пересобирается
-// вместе с `vision`, чтобы отрисовка проверяла Set, а не список грантов.
-let intelFleetOwners = new Set<string>();
 
 /** Variant-B visibility: an identify range (full detail, feeds memory) plus a
  *  wider radar range (enemy fleets seen only as coarse signatures). The radar
@@ -148,11 +144,8 @@ function computeVision(): Vision {
   const netSignatures = game.contacts();
   const { identify, radar } = sensorCoverage(s, ME, data);
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
-  // is remembered after the window closes); `fleets` windows fill the owner set
-  // that fleet rendering consults.
-  const grants = myIntel();
-  grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
-  intelFleetOwners = targetsOf(grants, 'fleets');
+  // is remembered after the window closes).
+  grantVision({ identify, radar }, targetsOf(myIntel(), 'planet'), (id) => !!s.planets[id]);
   const seenAt = fleetsSeenByPosition(s, ME, data);
   return {
     identify,
@@ -247,28 +240,25 @@ export function restoreFogMemory(entries: Parameters<ScanMemory['restore']>[0]):
   scans.restore(entries);
 }
 
-/** Is this fleet visible? Own always; enemy — when its node is identified OR a
- *  live `fleets` intel window covers its owner. */
+/** Is this fleet visible? Own always; enemy — when its node is identified (a recon
+ *  window on a world identifies the fleets at it, SPY-8). */
 export function fleetSeen(f: Fleet): boolean {
   const s = game.world();
   const ME = game.me();
   // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
   if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
-  // Ракета (SM-3.7b) — по обычному туману, но по своей ПОЗИЦИИ: узла у неё нет. Окно
-  // шпионажа открывает её здесь, остальное решает `missileOnMap`: в сети — присутствие в
+  // Ракета (SM-3.7b) — по обычному туману, но по своей ПОЗИЦИИ: узла у неё нет. Решает
+  // `missileOnMap`: в сети — присутствие в
   // проекции сервера, в соло — правило ядра (своя или глаза блока зрения); туман,
   // выключенный в песочнице (`vision` пуст), открывает её, как и любой флот.
   if (isMissileFleet(f, data))
-    return (
-      intelFleetOwners.has(f.owner) ||
-      missileOnMap(s, f, ME, data, {
-        net: game.net(),
-        fogOff: !vision,
-        circles: () => game.sight(),
-      })
-    );
+    return missileOnMap(s, f, ME, data, {
+      net: game.net(),
+      fogOff: !vision,
+      circles: () => game.sight(),
+    });
   // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
-  return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
+  return fleetVisible(f.owner === ME, fleetKnown(f), false);
 }
 
 /** Опознан ли флот: стоит у опознанного узла, дерётся в моём бою ИЛИ идёт в круге моей
@@ -281,7 +271,7 @@ export function fleetSeen(f: Fleet): boolean {
 export function fleetKnown(f: Fleet): boolean {
   return fleetIdentified({
     net: game.net(),
-    spied: intelFleetOwners.has(f.owner),
+    spied: false,
     local: () => fleetSeenHere(f),
   });
 }

@@ -2,8 +2,7 @@
  * Краденая разведка: окна интела и журнал шпионажа (REFM-28).
  *
  * Модуль ядра выдаёт ОГРАНИЧЕННЫЕ ПО ВРЕМЕНИ окна (`state.intel[me]`), а клиентский туман
- * их чтит: окно `planet` опознаёт узел, окно `fleets` показывает флоты цели сквозь туман,
- * окно `treasury` читает список дипломатии. То же самое делает `visibleState` на сервере —
+ * их чтит: окно `planet` опознаёт узел (с SPY-8 других видов нет). То же самое делает `visibleState` на сервере —
  * здесь это повторяется только потому, что соло-режим проекцию не гоняет и считает туман
  * сам, по полному состоянию.
  *
@@ -50,7 +49,7 @@ export function liveGrants(grants: readonly IntelGrant[] | undefined, now: numbe
   return (grants ?? []).filter((g) => g.until > now);
 }
 
-/** Цели живых окон одного вида: id миров (`planet`) или id игроков (`fleets`/`treasury`). */
+/** Цели живых окон одного вида: id миров (`planet`). */
 export function targetsOf(grants: readonly IntelGrant[], kind: IntelGrant['kind']): Set<string> {
   const out = new Set<string>();
   for (const g of grants) if (g.kind === kind) out.add(g.target);

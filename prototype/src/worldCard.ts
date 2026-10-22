@@ -410,13 +410,12 @@ export function unknownPlanetHtml(p: Planet): string {
             `${BUILD_ICON[b.type] ?? '▪'} ${esc(buildingName(data.buildings[b.type]?.name, b.type))} L${b.level}`,
         )
         .join(', ') || t('side.scan.no-buildings');
-    // Espionage from memory: you know WHOSE world this was — an agent can reveal
-    // its live contents without flying there. Wrong/stale owner → the kernel
-    // rejects the attempt (bad target), which is honest: intel decays.
+    // Espionage from memory: an agent goes to the WORLD itself (SPY-8), not to its
+    // owner — if the world changed hands, the kernel targets whoever holds it now.
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }) && myAgents(game.world(), ME).free > 0)}</div>`
+        ? `<div class="row">${btn('spyplanet', p.id, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }) && myAgents(game.world(), ME).free > 0)}</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -522,8 +521,8 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
   if (toolShown('pings', sectorZeroToolsHidden()))
     out.push(btn('ping', '', t('side.world.ping'), true));
-  // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a window lives
-  // its countdown replaces the button. В забеге Sector Zero шпионажа нет (`espionageShown`).
+  // Espionage: a 12h recon mission to this enemy world (SPY-8) opens a 24h intel window.
+  // While a window lives its countdown replaces the button. В забеге Sector Zero шпионажа нет (`espionageShown`).
   if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
     // Свой и ничейный мир не шпионят; нехватка кредитов или свободных агентов (SPY-6)
@@ -535,7 +534,7 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
       );
     } else if (spy !== 'none') {
-      out.push(btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
+      out.push(btn('spyplanet', p.id, t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
     }
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';

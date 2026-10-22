@@ -71,7 +71,7 @@ const CLIENT_ACTIONS: Action[] = [
   buildShip(P, 'C1R1', 'cruiser', 1, ['targeting_array']),
   researchTech(P, 'propulsion_1'),
   declareWar(P, 'p2'),
-  spyOn(P, 'p2', 'treasury'),
+  spyOn(P, 'C0R1', 'recon'),
   marketList(P, 'sell', 'metal', 10, 5),
   marketTake(P, 'lot:1', 5),
   marketCancel(P, 'lot:1'),

@@ -231,8 +231,9 @@ describe('удар челноков — вылет (правила 1–2, 5)', (
     expect(code(fogged, strike({ targetFleetId: 'FAR' }))).toBe('E_NO_TARGET'); // был E_OUT_OF_RANGE
     // Видимая цель в радиусе по-прежнему принимается.
     expect(code(fogged, strike({ targetFleetId: 'E1' }))).toBe(null);
-    // Окно шпионажа `fleets` открывает флот, как и в проекции: дальше судит дальность.
-    const grant = { kind: 'fleets' as const, target: fogged.fleets.FAR!.owner, until: fogged.time + 1 };
+    // Окно разведки мира (SPY-8) открывает флот на его орбите, как и в проекции: дальше
+    // судит дальность.
+    const grant = { kind: 'planet' as const, target: fogged.fleets.FAR!.location!, until: fogged.time + 1 };
     const spied = { ...fogged, intel: { p1: [grant] } };
     expect(code(spied, strike({ targetFleetId: 'FAR' }))).toBe('E_OUT_OF_RANGE');
   });

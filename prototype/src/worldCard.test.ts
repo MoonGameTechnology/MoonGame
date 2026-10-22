@@ -272,7 +272,7 @@ describe('действия мира', () => {
 
   it('разведка чужого мира — кнопкой, а открытое окно — отсчётом вместо неё', async () => {
     const { env, card } = await boot();
-    expect(card('N')).toContain(act('spyplanet', 'p2'));
+    expect(card('N')).toContain(act('spyplanet', 'N'));
     expect(card('A')).not.toContain('data-act="spyplanet"');
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
     const html = card('N');
@@ -434,7 +434,7 @@ describe('мир вне зрения', () => {
     expect(html).toContain('<b>Багровые</b>');
     expect(html).toContain('<b>5</b>');
     expect(html).toContain(`${buildingName(data.buildings.mine!.name, 'mine')} L1`);
-    expect(html).toContain(act('spyplanet', 'p2'));
+    expect(html).toContain(act('spyplanet', 'N'));
     env.memory.N = { owner: 'p1', garrison: 0, buildings: [] };
     const own = m.unknownPlanetHtml(env.s.planets.N!);
     expect(own).toContain(t('side.scan.no-buildings'));

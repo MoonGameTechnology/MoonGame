@@ -498,6 +498,13 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['fleet.merge.pending', 'owner'],
   ['refuge.found', 'owner'],
   ['fleet.halted', 'owner'],
+  // Espionage (SPY-8): every event names its world (`planetId`), and anyone who sees that
+  // world must still not read who spied on it, nor the victim the thief's success.
+  ['espionage.sent', 'owner'],
+  ['espionage.aborted', 'owner'],
+  ['espionage.failed', 'owner'],
+  ['intel.stolen', 'owner'],
+  ['espionage.detected', 'owner'],
 ]);
 
 export class MatchRoom {
