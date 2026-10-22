@@ -1829,7 +1829,7 @@ export const en: Record<string, string> = {
   'dossier.building.starfort':
     'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level.',
   'dossier.building.counterintel':
-    'Raises the chance to expose an enemy spy by {b}. Covers every attempt against you.',
+    'Raises the chance to expose an enemy spy by {b} and to kill an exposed one by {k}. Covers every attempt against you.',
   'dossier.building.tax-office':
     "Raises the world's credit take by {b}.",
   'dossier.fleet.desc':
@@ -3625,15 +3625,19 @@ export const en: Record<string, string> = {
   'log.shuttle.mine-cleared': '💣 Mine cleared by shuttles',
   'log.pd.mine-cleared': '💣 Mine shot down by point defense',
   'log.spy.caught': '🛡 Counter-intel: agent {who} caught stealing ({what})!',
+  'log.spy.caught.killed': '🛡 Counter-intel: agent {who} caught stealing ({what}) and killed!',
   'log.spy.fail': '🕵 Agent failed ({who}) — the fee is gone',
-  'log.spy.fail.lost': '🕵 Agent caught ({who}). A replacement in 24h',
-  'log.spy.fail.lost.short': '✖ Agent caught: {who}',
+  'log.spy.fail.lost': '🕵 Agent killed ({who}). A replacement in 24h',
+  'log.spy.fail.lost.short': '✖ Agent killed: {who}',
   'log.spy.fail.short': '✖ Failed against {who} — the fee burned',
   'log.spy.kind.fleets': 'fleet data',
   'log.spy.kind.treasury': 'treasury',
   'log.spy.kind.world': "a world's data",
   'log.spy.leak': '🛡 Counter-intel: an intel leak ({what}) — the thief is unknown',
+  'log.spy.leak.killed': '🛡 Counter-intel: an intel leak ({what}). The agent is dead, the thief unknown',
   'log.spy.success': '🕵 Agent got intel: {what} — a 24h window',
+  'log.spy.success.lost': '🕵 Agent got intel: {what} — a 24h window. The agent was killed, a replacement in 24h',
+  'log.spy.success.lost.short': '🗝 Success: {what}. Agent killed',
   'log.spy.success.short': '🗝 Success: {what}',
   'log.spy.what.fleets': "{who}'s fleets",
   'log.spy.what.treasury': "{who}'s treasury",

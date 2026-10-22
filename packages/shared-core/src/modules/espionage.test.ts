@@ -50,6 +50,21 @@ const neverDetect: GameModule = {
     api.hook<number>('espionage.detect', () => 0);
   },
 };
+// Death pins (SPY-7): the kill clamp is [0,1] too.
+const alwaysKill: GameModule = {
+  id: 'always-kill',
+  version: '1.0.0',
+  setup(api) {
+    api.hook<number>('espionage.kill', () => 1);
+  },
+};
+const neverKill: GameModule = {
+  id: 'never-kill',
+  version: '1.0.0',
+  setup(api) {
+    api.hook<number>('espionage.kill', () => 0);
+  },
+};
 
 function player(id: string, credits = 500): Player {
   return { id, name: id, faction: '', status: 'active', resources: { credits } };
@@ -173,7 +188,7 @@ describe('espionage — counter-intelligence (SPY-2)', () => {
     r.events.filter((e) => e.type === 'espionage.detected');
 
   it('a caught FAILED attempt exposes the spy to the victim', () => {
-    const k = createKernel([espionageModule, dudShot, alwaysDetect]);
+    const k = createKernel([espionageModule, dudShot, alwaysDetect, neverKill]);
     const r = okApply(k.applyAction(baseState(), spy('p1', { target: 'p2', kind: 'treasury' }), ctx(0)));
     expect(detectedOf(r)).toEqual([
       // owner = the VICTIM — the fog filter routes this event to them, not the spy
@@ -182,7 +197,7 @@ describe('espionage — counter-intelligence (SPY-2)', () => {
   });
 
   it('a noticed SUCCESSFUL theft reveals the leak but not the thief', () => {
-    const k = createKernel([espionageModule, sureShot, alwaysDetect]);
+    const k = createKernel([espionageModule, sureShot, alwaysDetect, neverKill]);
     const r = okApply(k.applyAction(baseState(), spy('p1', { target: 'p2', kind: 'fleets' }), ctx(0)));
     const det = detectedOf(r);
     expect(det).toHaveLength(1);
@@ -273,19 +288,53 @@ describe('espionage — the agent network (SPY-6)', () => {
     expect(r.state.spyAgents?.p1).toEqual([{ until: 24 * HOUR }]);
   });
 
-  it('an unnoticed failure sends the agent home for 6h; a caught one loses it for 24h', () => {
+  it('an unnoticed failure sends the agent home for 6h; a killed one loses it for 24h', () => {
     const slip = createKernel([espionageModule, dudShot, neverDetect]);
     const a = okApply(slip.applyAction(rich(), spy('p1', treasury), ctx(0)));
     expect(a.state.spyAgents?.p1).toEqual([{ until: 6 * HOUR }]);
     expect(a.events.find((e) => e.type === 'espionage.failed')?.payload).not.toHaveProperty('agentLost');
 
-    const caught = createKernel([espionageModule, dudShot, alwaysDetect]);
+    const caught = createKernel([espionageModule, dudShot, alwaysDetect, alwaysKill]);
     const b = okApply(caught.applyAction(rich(), spy('p1', treasury), ctx(0)));
     expect(b.state.spyAgents?.p1).toEqual([{ until: 24 * HOUR, lost: true }]);
     expect(b.events).toContainEqual({
       type: 'espionage.failed',
       payload: { owner: 'p1', target: 'p2', kind: 'treasury', agentLost: true },
     });
+  });
+
+  it('a detected agent that survives escapes: home in 6h after a failure, still on the job after a success', () => {
+    const lose = createKernel([espionageModule, dudShot, alwaysDetect, neverKill]);
+    const a = okApply(lose.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(a.state.spyAgents?.p1).toEqual([{ until: 6 * HOUR }]);
+    expect(a.events.find((e) => e.type === 'espionage.failed')?.payload).not.toHaveProperty('agentLost');
+    const win = createKernel([espionageModule, sureShot, alwaysDetect, neverKill]);
+    const b = okApply(win.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(b.state.spyAgents?.p1).toEqual([{ until: 24 * HOUR }]);
+  });
+
+  it('a killed agent after a SUCCESS: the window stays, the agent is lost, both sides are told', () => {
+    const k = createKernel([espionageModule, sureShot, alwaysDetect, alwaysKill]);
+    const r = okApply(k.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(r.state.intel?.p1?.[0]).toMatchObject({ kind: 'treasury', target: 'p2' });
+    expect(r.state.spyAgents?.p1).toEqual([{ until: 24 * HOUR, lost: true }]);
+    expect(r.events.find((e) => e.type === 'intel.stolen')?.payload).toMatchObject({ agentLost: true });
+    expect(r.events).toContainEqual({
+      type: 'espionage.detected',
+      payload: { owner: 'p2', kind: 'treasury', killed: true },
+    });
+  });
+
+  it('no detection, no death — even with the kill hook pinned to 1', () => {
+    const k = createKernel([espionageModule, dudShot, neverDetect, alwaysKill]);
+    const r = okApply(k.applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(r.state.spyAgents?.p1).toEqual([{ until: 6 * HOUR }]);
+  });
+
+  it('the kill roll is drawn even when nothing was detected (stable RNG shape)', () => {
+    const a = okApply(createKernel([espionageModule, dudShot, neverDetect]).applyAction(rich(), spy('p1', treasury), ctx(0)));
+    const b = okApply(createKernel([espionageModule, dudShot, alwaysDetect]).applyAction(rich(), spy('p1', treasury), ctx(0)));
+    expect(a.state.rng).toEqual(b.state.rng);
   });
 
   it('the fourth attempt with all three agents away is refused — free of charge', () => {
@@ -346,7 +395,8 @@ describe('espionage — counter-intelligence building (SPY-7)', () => {
         name: 'Bureau',
         cost: {},
         spyDetectBonus: 0.15,
-        upgrades: [{ cost: {}, spyDetectBonus: 0.25 }],
+        spyKillBonus: 0.1,
+        upgrades: [{ cost: {}, spyDetectBonus: 0.25, spyKillBonus: 0.2 }],
       },
       mine: { name: 'Mine', cost: {} },
     },
@@ -393,10 +443,31 @@ describe('espionage — counter-intelligence building (SPY-7)', () => {
     expect(attempt(s)).toBeCloseTo(0.25);
   });
 
+  it('the victim bureau raises the death odds of a detected agent', () => {
+    const kills: number[] = [];
+    const killProbe: GameModule = {
+      id: 'kill-probe',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('espionage.kill', (v) => {
+          kills.push(v);
+          return v;
+        });
+      },
+    };
+    const k = createKernel([espionageModule, sureShot, killProbe]);
+    for (const s of [withBuildings(), withBuildings({ type: 'bureau', level: 1 }), withBuildings({ type: 'bureau', level: 2 })])
+      okApply(k.applyAction(s, spy('p1', { target: 'p2', kind: 'treasury' }), { now: 0, data: bureauData }));
+    expect(kills[0]).toBeCloseTo(0.5);
+    expect(kills[1]).toBeCloseTo(0.6);
+    expect(kills[2]).toBeCloseTo(0.7);
+  });
+
   it('the shipped catalogue carries the bureau with a rising bonus', () => {
-    const shipped = JSON.parse(readFileSync(new URL('../../../../data/buildings.json', import.meta.url), 'utf8')) as Record<string, { spyDetectBonus?: number; upgrades?: Array<{ spyDetectBonus?: number }> }>;
+    const shipped = JSON.parse(readFileSync(new URL('../../../../data/buildings.json', import.meta.url), 'utf8')) as Record<string, { spyDetectBonus?: number; spyKillBonus?: number; upgrades?: Array<{ spyDetectBonus?: number; spyKillBonus?: number }> }>;
     const bureau = shipped.counterintel!;
     const levels = [bureau.spyDetectBonus!, ...bureau.upgrades!.map((u) => u.spyDetectBonus!)];
     expect(levels).toEqual([0.15, 0.25, 0.35]);
+    expect([bureau.spyKillBonus!, ...bureau.upgrades!.map((u) => u.spyKillBonus!)]).toEqual([0.1, 0.2, 0.3]);
   });
 });

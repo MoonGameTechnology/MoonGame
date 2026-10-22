@@ -163,7 +163,7 @@ export function buildingDossier(id: string, level: number): Dossier | null {
       return {
         name,
         // SPY-7: прибавка к шансу раскрыть шпиона — то же поле, что исполняет ядро.
-        body: t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)) }),
+        body: t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)), k: hl(pct(lv.spyKillBonus)) }),
       };
     case 'farm':
       return {

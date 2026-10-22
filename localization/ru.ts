@@ -1837,7 +1837,7 @@ export const ru: Record<string, string> = {
   'dossier.building.starfort':
     'Корпус космической крепости: {hp} прочности, {aa} по кораблям и {pd} по шаттлам, урон по узлу меньше на {d}. Растёт с уровнем крепости.',
   'dossier.building.counterintel':
-    'Повышает шанс раскрыть вражеского шпиона на {b}. Действует на все попытки против вас.',
+    'Повышает шанс раскрыть вражеского шпиона на {b}, шанс убить раскрытого на {k}. Действует на все попытки против вас.',
   'dossier.building.tax-office':
     'Поднимает кредитный сбор мира на {b}.',
   'dossier.fleet.desc':
@@ -3634,15 +3634,19 @@ export const ru: Record<string, string> = {
   'log.shuttle.mine-cleared': '💣 Мина снята челноками',
   'log.pd.mine-cleared': '💣 Мина сбита ПВО',
   'log.spy.caught': '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!',
+  'log.spy.caught.killed': '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what}) и убит!',
   'log.spy.fail': '🕵 Агент провалился ({who}) — плата сгорела',
-  'log.spy.fail.lost': '🕵 Агент пойман ({who}). Замена через 24ч',
-  'log.spy.fail.lost.short': '✖ Агент пойман: {who}',
+  'log.spy.fail.lost': '🕵 Агент убит ({who}). Замена через 24ч',
+  'log.spy.fail.lost.short': '✖ Агент убит: {who}',
   'log.spy.fail.short': '✖ Провал против {who} — плата сгорела',
   'log.spy.kind.fleets': 'данные о флотах',
   'log.spy.kind.treasury': 'казна',
   'log.spy.kind.world': 'данные мира',
   'log.spy.leak': '🛡 Контрразведка: утечка разведданных ({what}) — вор не установлен',
+  'log.spy.leak.killed': '🛡 Контрразведка: утечка разведданных ({what}). Агент убит, вор не установлен',
   'log.spy.success': '🕵 Агент добыл разведданные: {what} — окно 24ч',
+  'log.spy.success.lost': '🕵 Агент добыл разведданные: {what} — окно 24ч. Агент убит, замена через 24ч',
+  'log.spy.success.lost.short': '🗝 Успех: {what}. Агент убит',
   'log.spy.success.short': '🗝 Успех: {what}',
   'log.spy.what.fleets': 'флоты {who}',
   'log.spy.what.treasury': 'казна {who}',

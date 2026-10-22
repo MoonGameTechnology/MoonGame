@@ -59,11 +59,15 @@ export function bootyKind(
   return 'log.spy.kind.world';
 }
 
-/** Поймали вора или только заметили утечку (правило 4). */
-export function counterLine(spy: string | undefined | null): {
-  key: 'log.spy.caught' | 'log.spy.leak';
+/** Поймали вора или только заметили утечку (правило 4); убит ли раскрытый агент (SPY-7). */
+export function counterLine(
+  spy: string | undefined | null,
+  killed = false,
+): {
+  key: 'log.spy.caught' | 'log.spy.leak' | 'log.spy.caught.killed' | 'log.spy.leak.killed';
   /** Называется ли имя вора. */
   named: boolean;
 } {
-  return spy ? { key: 'log.spy.caught', named: true } : { key: 'log.spy.leak', named: false };
+  if (spy) return { key: killed ? 'log.spy.caught.killed' : 'log.spy.caught', named: true };
+  return { key: killed ? 'log.spy.leak.killed' : 'log.spy.leak', named: false };
 }

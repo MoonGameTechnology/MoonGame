@@ -757,6 +757,7 @@
     "hp": 16,
     "scoreValue": 2,
     "spyDetectBonus": 0.15,
+    "spyKillBonus": 0.1,
     "upkeep": {
       "energy": 20
     },
@@ -769,6 +770,7 @@
         "buildTimeHours": 6,
         "hp": 24,
         "spyDetectBonus": 0.25,
+        "spyKillBonus": 0.2,
         "upkeep": {
           "energy": 35
         }
@@ -781,6 +783,7 @@
         "buildTimeHours": 8,
         "hp": 32,
         "spyDetectBonus": 0.35,
+        "spyKillBonus": 0.3,
         "upkeep": {
           "energy": 55
         }
