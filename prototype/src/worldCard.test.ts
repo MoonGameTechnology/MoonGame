@@ -272,12 +272,20 @@ describe('действия мира', () => {
 
   it('разведка чужого мира — кнопкой, а открытое окно — отсчётом вместо неё', async () => {
     const { env, card } = await boot();
-    expect(card('N')).toContain(act('spyplanet', 'N'));
+    expect(card('N')).toContain(act('spyplanet', 'recon'));
     expect(card('A')).not.toContain('data-act="spyplanet"');
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
     const html = card('N');
     expect(html).toContain(t('side.world.spy-window'));
-    expect(html).not.toContain('data-act="spyplanet"');
+    expect(html).not.toContain(act('spyplanet', 'recon'));
+  });
+
+  it('саботаж и кража ресурсов — свои кнопки, и при открытом окне тоже (SPY-9)', async () => {
+    const { env, card } = await boot();
+    env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
+    const html = card('N');
+    expect(html).toContain(act('spyplanet', 'sabotage'));
+    expect(html).toContain(act('spyplanet', 'theft'));
   });
 
   it('в забеге Sector Zero нет ни пинга, ни разведки', async () => {
@@ -434,7 +442,8 @@ describe('мир вне зрения', () => {
     expect(html).toContain('<b>Багровые</b>');
     expect(html).toContain('<b>5</b>');
     expect(html).toContain(`${buildingName(data.buildings.mine!.name, 'mine')} L1`);
-    expect(html).toContain(act('spyplanet', 'N'));
+    expect(html).toContain(act('spyplanet', 'recon'));
+    expect(html).toContain(act('spyplanet', 'theft'));
     env.memory.N = { owner: 'p1', garrison: 0, buildings: [] };
     const own = m.unknownPlanetHtml(env.s.planets.N!);
     expect(own).toContain(t('side.scan.no-buildings'));

@@ -3136,7 +3136,7 @@ side.addEventListener('click', (ev) => {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
     }
   } else if (act === 'spyplanet') {
-    playerOrder(spyOn(ME, selPlanet!, 'recon'));
+    if (arg === 'recon' || arg === 'sabotage' || arg === 'theft') playerOrder(spyOn(ME, selPlanet!, arg));
   } else if (act === 'capital') {
     playerOrder(designateCapital(ME, selPlanet!));
   } else if (act === 'holdpoint') {

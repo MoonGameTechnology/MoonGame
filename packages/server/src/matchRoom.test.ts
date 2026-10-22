@@ -1553,6 +1553,7 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('espionage.aborted', { owner, planetId: 'node1', kind: 'recon' });
         h.emit('espionage.failed', { owner, target: 'p2', kind: 'recon', planetId: 'node1' });
         h.emit('intel.stolen', { owner, target: 'p2', kind: 'recon', planetId: 'node1', until: 9 });
+        h.emit('espionage.succeeded', { owner, target: 'p2', kind: 'theft', planetId: 'node1', loot: null });
         h.emit('espionage.detected', { owner, kind: 'recon', planetId: 'node1', spy: 'p3' });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
@@ -1707,6 +1708,7 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'espionage.aborted',
       'espionage.failed',
       'intel.stolen',
+      'espionage.succeeded',
       'espionage.detected',
     ];
     // Every entry of the server's list is exercised here, so a new one can't skip this test.

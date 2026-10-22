@@ -60,6 +60,7 @@ import { tellBuild, tellHero, tellSteward } from './orderPipeline';
 import type { RecapEvent } from './recap';
 import { sectorRunActive } from './sectorRun';
 import { counterLine, spyRepaint } from './spyLog';
+import { spyDeed } from '../../decisions/spyDeed';
 import { squadronCallsignOf } from './squadronPanel';
 import { stewardMine } from './stewardLog';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
@@ -314,6 +315,18 @@ export function handleEvents(events: DomainEvent[]) {
         note(t(lostS ? 'log.spy.success.lost' : 'log.spy.success', { what }));
         pushSpyLog(t(lostS ? 'log.spy.success.lost.short' : 'log.spy.success.short', { what }));
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
+        break;
+      }
+      case 'espionage.succeeded': {
+        // SPY-9: саботаж и кража — итог исполнителю (`decisions/spyDeed.ts`).
+        const deed = p.owner === ME ? spyDeed(p) : null;
+        if (!deed) break;
+        const at = game.placeName(String(p.planetId));
+        const params: Record<string, number | string> = { ...deed.params, at };
+        if (typeof params.res === 'string') params.res = tData(params.res);
+        const line = t(deed.key, params) + (deed.lost ? ` ${t('log.spy.agent-lost')}` : '');
+        note(line);
+        pushSpyLog(line);
         break;
       }
       case 'espionage.failed':

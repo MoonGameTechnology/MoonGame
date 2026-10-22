@@ -23,6 +23,7 @@ import {
   type Action,
   type DiplomaticStance,
   type GameState,
+  type SpyOp,
   type StewardPosture,
 } from '../packages/shared-core/src/index';
 
@@ -277,8 +278,8 @@ export const editCoalition = (playerId: string, emblem: string, description: str
   act(playerId, 'coalition.edit', { emblem, description });
 export const declareWar = (playerId: string, target: string, stance: DiplomaticStance = 'war') =>
   act(playerId, 'diplomacy.declare', { target, stance });
-/** Send an agent on an operation against another commander's world (SPY-8). */
-export const spyOn = (playerId: string, planetId: string, op: 'recon') =>
+/** Send an agent on an operation against another commander's world (SPY-8/9). */
+export const spyOn = (playerId: string, planetId: string, op: SpyOp) =>
   act(playerId, 'espionage.spy', { planetId, op });
 /** Cast a hero ability (HERO-4 dispatcher); `target` — planet id for ranged casts.
  *  Pulled ahead of the rest of the "hero engine" builder cluster (REFP-22's deferred
