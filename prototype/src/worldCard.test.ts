@@ -286,6 +286,7 @@ describe('действия мира', () => {
     const html = card('N');
     expect(html).toContain(act('spyplanet', 'sabotage'));
     expect(html).toContain(act('spyplanet', 'theft'));
+    expect(html).toContain(act('spyplanet', 'research'));
   });
 
   it('в забеге Sector Zero нет ни пинга, ни разведки', async () => {

@@ -28,7 +28,20 @@ describe('правило 2 — кража называет добычу', () => 
   });
 });
 
-describe('правило 3 — гибель агента не прячется', () => {
+describe('правило 3 — кража исследований называет технологию', () => {
+  it('технология', () => {
+    expect(spyDeed({ kind: 'research', tech: 'optics' })).toEqual({
+      key: 'log.spy.research',
+      params: { tech: 'optics' },
+      lost: false,
+    });
+  });
+  it('красть нечего — цель отстаёт', () => {
+    expect(spyDeed({ kind: 'research', tech: null })?.key).toBe('log.spy.research.none');
+  });
+});
+
+describe('правило 4 — гибель агента не прячется', () => {
   it('флаг переходит в строку', () => {
     expect(spyDeed({ kind: 'theft', loot: null, agentLost: true })?.lost).toBe(true);
   });
