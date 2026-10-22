@@ -350,6 +350,9 @@ export const BuildingLevelSchema = z.object({
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
+  /** Прибавка к шансу раскрыть вражеского шпиона на этом уровне (0.15 = +15 п.п.).
+   *  См. одноимённое поле в `BuildingDefSchema`. */
+  spyDetectBonus: z.number().nonnegative().default(0),
   /** Доля ускорения постройки юнитов на этом уровне (0.5 = +50% скорости, т.е.
    *  buildTime × (1 − 0.5)). Применяется к `unit.build` на планете, где стоит это
    *  здание. 0 = нет бонуса. */
@@ -501,6 +504,11 @@ export const BuildingDefSchema = z.object({
    *  `data/buildings.json` нет вовсе: ядро знало про контент, которого у него не было.
    *  Теперь эффект объявляет само здание, как уже объявляет `produces`/`radarRange`. */
   creditsBonus: z.number().default(0),
+  /** Контрразведка (SPY-7). Прибавка к шансу, что владелец здания раскроет вражеского
+   *  шпиона (0.15 = +15 п.п. к базе `espionageModule`). Действует на любую попытку
+   *  против владельца, а не только на свой мир: казну и флоты крадут не с планеты.
+   *  Из нескольких таких зданий игрока считается сильнейшее, а не сумма. */
+  spyDetectBonus: z.number().nonnegative().default(0),
   /** Доля ускорения постройки юнитов (0.5 = +50% скорости). См. BuildingLevelSchema. */
   buildSpeedBonus: z.number().nonnegative().default(0),
 });
@@ -1658,8 +1666,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, spyDetectBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, spyDetectBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

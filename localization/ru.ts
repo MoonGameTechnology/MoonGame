@@ -1738,6 +1738,7 @@ export const ru: Record<string, string> = {
   'data.strike-vectors': 'Ударные векторы',
   'data.tank': 'танк',
   'data.targeting-array': 'Система наведения',
+  'data.counter-intelligence-bureau': 'Бюро контрразведки',
   'data.tax-office': 'Налоговая управа',
   'data.terran': 'Земной',
   'data.hive': 'Улей',
@@ -1835,6 +1836,8 @@ export const ru: Record<string, string> = {
     'Приносит {c}¤ в час.',
   'dossier.building.starfort':
     'Корпус космической крепости: {hp} прочности, {aa} по кораблям и {pd} по шаттлам, урон по узлу меньше на {d}. Растёт с уровнем крепости.',
+  'dossier.building.counterintel':
+    'Повышает шанс раскрыть вражеского шпиона на {b}. Действует на все попытки против вас.',
   'dossier.building.tax-office':
     'Поднимает кредитный сбор мира на {b}.',
   'dossier.fleet.desc':

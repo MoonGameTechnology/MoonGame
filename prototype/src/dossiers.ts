@@ -159,6 +159,12 @@ export function buildingDossier(id: string, level: number): Dossier | null {
         // экономика — правило и его описание игроку больше не могут разойтись.
         body: t('dossier.building.tax-office', { b: hl(pct(lv.creditsBonus)) }),
       };
+    case 'counterintel':
+      return {
+        name,
+        // SPY-7: прибавка к шансу раскрыть шпиона — то же поле, что исполняет ядро.
+        body: t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)) }),
+      };
     case 'farm':
       return {
         name,

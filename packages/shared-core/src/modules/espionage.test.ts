@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createKernel } from '../kernel/kernel';
 import { espionageModule } from './espionage';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
@@ -331,5 +332,71 @@ describe('espionage — the agent network (SPY-6)', () => {
     s.spyAgents = { p1: [{ until: 9 * HOUR }] };
     expect(visibleState(s, 'p1', data).spyAgents).toEqual({ p1: [{ until: 9 * HOUR }] });
     expect(JSON.stringify(visibleState(s, 'p2', data))).not.toContain('spyAgents');
+  });
+});
+
+describe('espionage — counter-intelligence building (SPY-7)', () => {
+  const bureauData: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['credits'],
+    units: { cruiser: { faction: 'x', stats: { attack: 4, defense: 4, speed: 6, hp: 20 } } },
+    factions: {},
+    buildings: {
+      bureau: {
+        name: 'Bureau',
+        cost: {},
+        spyDetectBonus: 0.15,
+        upgrades: [{ cost: {}, spyDetectBonus: 0.25 }],
+      },
+      mine: { name: 'Mine', cost: {} },
+    },
+    events: {},
+  });
+  /** Records the base odds the detect pipeline receives — the building's share is in it. */
+  const seen: number[] = [];
+  const probe: GameModule = {
+    id: 'detect-probe',
+    version: '1.0.0',
+    setup(api) {
+      api.hook<number>('espionage.detect', (v) => {
+        seen.push(v);
+        return v;
+      });
+    },
+  };
+  const attempt = (s: GameState, k = createKernel([espionageModule, sureShot, probe])) => {
+    seen.length = 0;
+    okApply(k.applyAction(s, spy('p1', { target: 'p2', kind: 'treasury' }), { now: 0, data: bureauData }));
+    return seen[0]!;
+  };
+  const withBuildings = (...bs: Array<{ type: string; level: number }>): GameState => {
+    const s = baseState();
+    s.planets.B!.buildings = bs.map((b) => ({ ...b, hp: 10 }));
+    return s;
+  };
+
+  it('the victim bureau raises the base detection odds by its level bonus', () => {
+    expect(attempt(withBuildings())).toBeCloseTo(0.25); // clean theft, no bureau
+    expect(attempt(withBuildings({ type: 'bureau', level: 1 }))).toBeCloseTo(0.4);
+    expect(attempt(withBuildings({ type: 'bureau', level: 2 }))).toBeCloseTo(0.5);
+    const dud = createKernel([espionageModule, dudShot, probe]);
+    expect(attempt(withBuildings({ type: 'bureau', level: 2 }), dud)).toBeCloseTo(0.75); // 0.5 + 0.25
+  });
+
+  it('only the strongest bureau of the victim counts, and only the victim', () => {
+    const s = withBuildings({ type: 'bureau', level: 1 }, { type: 'mine', level: 1 });
+    s.planets.C = { ...s.planets.B!, id: 'C', buildings: [{ type: 'bureau', level: 2, hp: 10 }] };
+    expect(attempt(s)).toBeCloseTo(0.5); // max 0.25, not 0.15 + 0.25
+    // a bureau of someone else (here the spy's own world) does not guard p2
+    s.planets.C.owner = 'p1';
+    s.planets.B!.buildings = [];
+    expect(attempt(s)).toBeCloseTo(0.25);
+  });
+
+  it('the shipped catalogue carries the bureau with a rising bonus', () => {
+    const shipped = JSON.parse(readFileSync(new URL('../../../../data/buildings.json', import.meta.url), 'utf8')) as Record<string, { spyDetectBonus?: number; upgrades?: Array<{ spyDetectBonus?: number }> }>;
+    const bureau = shipped.counterintel!;
+    const levels = [bureau.spyDetectBonus!, ...bureau.upgrades!.map((u) => u.spyDetectBonus!)];
+    expect(levels).toEqual([0.15, 0.25, 0.35]);
   });
 });

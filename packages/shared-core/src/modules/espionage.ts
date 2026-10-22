@@ -1,6 +1,8 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule } from '../kernel/module';
-import type { AgentAway, IntelGrant } from '../state/gameState';
+import { buildingLevel, type GameData } from '../data/schemas';
+import type { AgentAway, GameState, IntelGrant } from '../state/gameState';
+import { recordValues } from '../util/records';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
@@ -35,6 +37,12 @@ import { canAfford, payCost } from '../util/treasury';
  * failure — `AGENT_RETURN_HOURS`; after a caught failure the agent is LOST and a
  * replacement is recruited in `AGENT_RECRUIT_HOURS`. Losing an agent cannot be
  * hidden from its owner, so `espionage.failed` says `agentLost: true` then.
+ *
+ * Counter-intelligence building (SPY-7): a building that declares `spyDetectBonus`
+ * adds it to the victim's base detection odds. The victim's STRONGEST such building
+ * counts (not a sum — spamming bureaus must not make detection a certainty), and it
+ * guards every attempt against its owner, since treasury and fleets are not stolen
+ * from one world.
  */
 
 const SPY_KINDS = new Set(['treasury', 'planet', 'fleets']);
@@ -62,6 +70,20 @@ export const BASE_SPY_AGENTS = 3;
 const AGENT_RETURN_HOURS = 6;
 /** How long recruiting a replacement for a caught agent takes, game-hours. */
 const AGENT_RECRUIT_HOURS = 24;
+
+/** The victim's counter-intelligence: the largest `spyDetectBonus` among the buildings
+ *  on the worlds they own (SPY-7). 0 without such a building. */
+export function counterIntelOf(data: GameData, state: GameState, playerId: string): number {
+  let best = 0;
+  for (const planet of recordValues(state.planets)) {
+    if (planet.owner !== playerId) continue;
+    for (const b of planet.buildings) {
+      const def = data.buildings[b.type];
+      if (def) best = Math.max(best, buildingLevel(def, b.level).spyDetectBonus);
+    }
+  }
+  return best;
+}
 
 interface SpyPayload {
   target?: string;
@@ -142,7 +164,9 @@ export const espionageModule: GameModule = {
       // Counter-intelligence (SPY-2): the detect roll is drawn for EVERY paid
       // attempt — success or failure — so the RNG stream shape does not depend on
       // the outcome (or on what hooks did to the odds).
-      const baseDetect = succeeded ? BASE_DETECT_SUCCESS : BASE_DETECT_FAILED;
+      const baseDetect =
+        (succeeded ? BASE_DETECT_SUCCESS : BASE_DETECT_FAILED) +
+        counterIntelOf(h.ctx.data, h.state, p.target);
       const rawDetect = h.hook<number>('espionage.detect', baseDetect, {
         playerId: action.playerId,
         target: p.target,

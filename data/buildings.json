@@ -747,6 +747,46 @@
       }
     ]
   },
+  "counterintel": {
+    "name": "Counter-Intelligence Bureau",
+    "cost": {
+      "metal": 110,
+      "credits": 70
+    },
+    "buildTimeHours": 4,
+    "hp": 16,
+    "scoreValue": 2,
+    "spyDetectBonus": 0.15,
+    "upkeep": {
+      "energy": 20
+    },
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 200,
+          "credits": 120
+        },
+        "buildTimeHours": 6,
+        "hp": 24,
+        "spyDetectBonus": 0.25,
+        "upkeep": {
+          "energy": 35
+        }
+      },
+      {
+        "cost": {
+          "metal": 330,
+          "credits": 200
+        },
+        "buildTimeHours": 8,
+        "hp": 32,
+        "spyDetectBonus": 0.35,
+        "upkeep": {
+          "energy": 55
+        }
+      }
+    ]
+  },
   "void_hangar": {
     "name": "Fortress Hangar",
     "cost": {

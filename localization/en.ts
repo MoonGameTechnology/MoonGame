@@ -1730,6 +1730,7 @@ export const en: Record<string, string> = {
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
   'data.targeting-array': 'Targeting Array',
+  'data.counter-intelligence-bureau': 'Counter-Intelligence Bureau',
   'data.tax-office': 'Tax Office',
   'data.terran': 'Terran',
   'data.hive': 'Hive',
@@ -1827,6 +1828,8 @@ export const en: Record<string, string> = {
     'Yields {c}¤ per hour.',
   'dossier.building.starfort':
     'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level.',
+  'dossier.building.counterintel':
+    'Raises the chance to expose an enemy spy by {b}. Covers every attempt against you.',
   'dossier.building.tax-office':
     "Raises the world's credit take by {b}.",
   'dossier.fleet.desc':
