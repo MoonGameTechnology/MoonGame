@@ -18,6 +18,7 @@ export const BUILD_ICON: Record<string, string> = {
   mine: '❒',
   refinery: '◇',
   tax_office: '⛁',
+  counterintel: '⌖', // бюро контрразведки: прицел на чужого агента (SPY-7)
   farm: '⚘',
   power_plant: 'ϟ',
   fabricator: '▣',

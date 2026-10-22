@@ -56,6 +56,10 @@ describe('правило 4 — пойманного зовут по имени, 
   it.each([undefined, null, ''])('вор не установлен (%s) — имени нет', (spy) => {
     expect(counterLine(spy)).toEqual({ key: 'log.spy.leak', named: false });
   });
+  it('раскрытый агент убит — строка об этом говорит (SPY-7)', () => {
+    expect(counterLine('p2', true)).toEqual({ key: 'log.spy.caught.killed', named: true });
+    expect(counterLine(undefined, true)).toEqual({ key: 'log.spy.leak.killed', named: false });
+  });
 });
 
 describe('правило 5 — ростер перерисовывается в разные моменты', () => {

@@ -298,15 +298,17 @@ export function handleEvents(events: DomainEvent[]) {
           b.field === 'who'
             ? t(b.key, { who: NAME[p.target as string] ?? (p.target as string) })
             : t(b.key, { at: game.placeName(String(p.intelPlanet ?? p.target)) });
-        note(t('log.spy.success', { what }));
-        pushSpyLog(t('log.spy.success.short', { what }));
+        // SPY-7: раскрытого агента могли убить — окно открыто, но агента нет.
+        const lostS = p.agentLost === true;
+        note(t(lostS ? 'log.spy.success.lost' : 'log.spy.success', { what }));
+        pushSpyLog(t(lostS ? 'log.spy.success.lost.short' : 'log.spy.success.short', { what }));
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
       case 'espionage.failed':
         if (p.owner === ME) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
-          // SPY-6: пойманный агент потерян — об этом владелец узнаёт сразу.
+          // SPY-6/7: убитый агент потерян — об этом владелец узнаёт сразу.
           const lost = p.agentLost === true;
           note(t(lost ? 'log.spy.fail.lost' : 'log.spy.fail', { who: whoF }));
           pushSpyLog(t(lost ? 'log.spy.fail.lost.short' : 'log.spy.fail.short', { who: whoF }));
@@ -316,7 +318,7 @@ export function handleEvents(events: DomainEvent[]) {
         if (spyRepaint('detected') === 'before' && diploOpen && diploTab === 'diplo') renderDiplo();
         if (p.owner !== ME) break;
         const what = t(bootyKind(p.kind as string));
-        const c = counterLine(p.spy as string | undefined);
+        const c = counterLine(p.spy as string | undefined, p.killed === true);
         const line = c.named
           ? t(c.key, { who: NAME[p.spy as string] ?? (p.spy as string), what })
           : t(c.key, { what });
