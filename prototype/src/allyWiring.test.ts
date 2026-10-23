@@ -16,6 +16,8 @@ const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
 // Чип связи в строке статуса и доклад об угрозе докам — у верхней полосы (`matchTopBar.ts`,
 // REFM-222); окно и мигание чипа — двери `main.ts`.
 const TOPBAR = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
+// Цепочка главы — у забега (`sectorRun.ts`, REFM-243).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 
 describe('глава IV — проводка интерфейса', () => {
   it('окно есть в разметке; вход — чип строки статуса', () => {
@@ -60,8 +62,8 @@ describe('глава IV — проводка интерфейса', () => {
 
 describe('глава VI — проводка интерфейса (PVR-8.4, PVR-8.5)', () => {
   it('панель берёт цепочку главы с данными: у главы VI счёт контракта операции', () => {
-    expect(MAIN).toMatch(
-      /return chapterChain\(s, ME, extractionNeedMs\(s, ctx\(s\.time, s\)\), data\);/,
+    expect(RUN).toMatch(
+      /return chapterChain\(s, game\.me\(\), extractionNeedMs\(s, ctx\(s\.time, s\)\), data\);/,
     );
   });
 

@@ -1520,7 +1520,7 @@ BRW-2/3 написаны ровно под это.
 связь и вход, потом карточки, панель, лента и обучение, в конце переходы между матчами.
 
 > REFM-215 ✅ → REFM-214 ✅ → REFM-218 ✅ → REFM-216 ✅ → REFM-217 ✅ → REFM-242 ✅ →
-> REFM-230 ✅ → REFM-222 ✅ → REFM-223 ✅ → REFM-224 ✅ → REFM-225 ✅ → REFM-221 ✅ → REFM-243 →
+> REFM-230 ✅ → REFM-222 ✅ → REFM-223 ✅ → REFM-224 ✅ → REFM-225 ✅ → REFM-221 ✅ → REFM-243 ✅ →
 > REFM-219 → REFM-220
 
 Владелец сообщений (REFM-214) стоит вторым: его ждут и сокет (REFM-216), и лента
@@ -2490,13 +2490,24 @@ REFM-244 — общий финиш.
   `uitest`, `smoke:browser`, `smoke:mobile`, `smoke:startup`, `smoke:hotkeys` зелёные;
   вживую на ru и en: постройка из окна построек и улучшение из карточки мира, вторая
   стройка встаёт в очередь ядра с тостом «в очередь». `main.ts` 14 629→14 523 строк.
-- **REFM-243** ⏳ `[proto]` **Остатки Sector Zero**, ≈190. Карточка ухода из забега
+- **REFM-243** ✅ `[proto]` **Остатки Sector Zero**, ≈190. Карточка ухода из забега
   (`openAbandon`: флот потерян, ⚑ «Завершить», ⌂ «Выйти»), инструменты экрана забега
   (`markGameplay`, `syncSectorZeroTools`), строки задач и цепочка главы (`runMissionRows`,
   `runChain`, `fleetLabelOf`), пауза забега (`runPauseEvent`). Переезжают к уже готовым
   хозяевам (`sectorRun.ts`, `sectorZeroShell.ts`). Сторожа `runExitWiring`,
   `runPauseWiring`, `platformBackWiring`, `tabLockWiring`. Проверка: `smoke:sector-zero`,
   `smoke:yandex`.
+  **Сделано.** К забегу (`sectorRun.ts`) уехали разметка геймплея (`markGameplay`, кадровый
+  такт `tickGameplayMark`), признак забега для интерфейса (`sectorZeroToolsHidden`), задачи и
+  цепочка главы (`runMissionRows`, `runChain`, `fleetLabelOf`), правило паузы с её памятью
+  (`runPauseShown`, `runPauseEvent`). Темп и комиксы остались у `main.ts` и доходят хуками
+  `playing`, `speed`, `setSpeed` (сброс отметки реального времени при возобновлении),
+  `playSpeed`; поводы паузы (уход со страницы, пауза и выход площадки) подключает `main.ts`. К
+  оболочке (`sectorZeroShell.ts`) — карточка ухода с её кнопками и кадровым тактом
+  (`openAbandon`, `closeAbandon`, `tickAbandon`) и инструменты экрана (`syncSectorZeroTools`).
+  Сторожа `runExitWiring`, `runPauseWiring`, `gameplayMarking`, `runWallet`, `allyWiring`
+  читают новых хозяев; прямые тесты — четыре в `sectorRun.test.ts`. `main.ts` 5 268→5 101
+  строк.
 - **REFM-244** 🔒(REFM-220) `[proto]` **Точка сборки**, финиш обеих линий.
   Берётся, когда обе линии закрыты. Импорты без мёртвых имён, хосты окон матча (`initX`)
   читают владельцев напрямую вместо геттеров `main.ts`, замер файла. Цель плана —
