@@ -132,6 +132,7 @@ const ENTITY_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
   'fleets',
   'battles',
   'fog',
+  'surveyed',
   'heroes',
 ]);
 

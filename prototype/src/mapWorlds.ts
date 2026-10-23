@@ -19,10 +19,11 @@ import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { t, tData } from '../../localization/runtime';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { layoutRegionLabels, regionLabelAlpha, regionLabels } from '../../decisions/regionName';
+import { STALE_ALPHA, worldLook } from '../../decisions/worldLook';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { fleetAnchor } from './fleetGeometry';
 import { nodeView } from './fogView';
-import { data, hpOfLevel, type MapNode, type SECTOR_TYPES } from './game';
+import { data, hpOfLevel, SECTOR_TYPES, type MapNode } from './game';
 import { fxBlur, fxBreath } from './graphicsPrefs';
 import { hasTerrainMaterial } from './holographicSurface';
 import { BUILD_ICON, KIND_ICON } from './icons';
@@ -30,7 +31,7 @@ import { isCurrentMap, mapPreset } from './mapCatalog';
 import { selFork, selPlanet } from './interaction';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { viewWidth, visible, world } from './mapCamera';
-import { fleetSeen, known, memory, seesDetails } from './mapFog';
+import { fleetSeen, known, memory, seesDetails, surveyed } from './mapFog';
 import { roadDrawingOf } from './mapLayer';
 import { targetBrackets } from './mapOverlays';
 import { CARDINAL, TAU, blitGlow, blitSphere, ownerColor } from './mapPalette';
@@ -40,7 +41,6 @@ import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
 import { worldName } from './planetName';
 import { phaseAt } from './pulseFx';
 import { radarShown } from './radarSources';
-import type { Snapshot } from './scanMemory';
 import { artScale, calloutAlpha, sphereBloom } from './semanticZoom';
 import { VOID_COLOR } from './sideColors';
 import { sweepPaint, sweepShows } from './sweepFx';
@@ -130,54 +130,33 @@ function drawRegionLabels(lod: MapLod): void {
   cx.restore();
 }
 
-/** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
- *  marker if it has never been identified. A fogged map draws one per node per frame, so
- *  there is no save() here: each leaves ~0.8 KB on the browser's heap that only a major GC
- *  frees. The marker puts back its alpha and text alignment; the stroke, fill, line width
- *  and font stay changed, and whatever is drawn next sets its own. */
-function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined, lod: MapLod): void {
+/** Draw a never-identified system: an unexplored marker, and the province type under it
+ *  once a ship has crossed its border (`surveyed`). A fogged map draws one per node per
+ *  frame, so there is no save() here: each leaves ~0.8 KB on the browser's heap that only
+ *  a major GC frees. The marker puts back its alpha and text alignment; the stroke, fill,
+ *  line width and font stay changed, and whatever is drawn next sets its own. */
+function drawFogMarker(c: { x: number; y: number }, lod: MapLod, kind: string | undefined): void {
   const cx = game.ctx();
   if (lod.detail === 0) {
     drawSchematicNode(cx, c, lod.markerRadius);
     return;
   }
   const { globalAlpha, textAlign } = cx;
-  if (mem) {
-    const col = ownerColor(mem.owner);
-    cx.setLineDash([2, 4]);
-    cx.strokeStyle = rgba(col, 0.34);
-    cx.lineWidth = 1;
-    cx.beginPath();
-    cx.arc(c.x, c.y, lod.markerRadius + (9 - lod.markerRadius) * lod.detail, 0, TAU);
-    cx.stroke();
-    cx.setLineDash([]);
-    cx.fillStyle = rgba(col, 0.4);
-    cx.beginPath();
-    cx.arc(c.x, c.y, 1.6, 0, TAU);
-    cx.fill();
-    cx.globalAlpha *= lod.detail;
+  cx.strokeStyle = 'rgba(125,161,176,0.5)';
+  cx.lineWidth = 1;
+  cx.beginPath();
+  cx.arc(c.x, c.y, lod.markerRadius + (6 - lod.markerRadius) * lod.detail, 0, TAU);
+  cx.stroke();
+  cx.globalAlpha *= lod.detail;
+  cx.fillStyle = 'rgba(125,161,176,0.65)';
+  cx.font = '9px ui-monospace,Menlo,monospace';
+  cx.textAlign = 'center';
+  cx.fillText('?', c.x, c.y + 3);
+  const type = kind === undefined ? undefined : SECTOR_TYPES[kind];
+  if (type) {
     cx.textAlign = 'left';
-    cx.fillStyle = rgba(col, 0.5);
-    cx.font = '700 11px ui-monospace,Menlo,monospace';
-    cx.fillText(placeName(id), c.x + 13, c.y - 1);
-    cx.fillStyle = 'rgba(120,140,150,0.45)';
-    cx.font = '9px ui-monospace,Menlo,monospace';
-    const icons = mem.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
-    // Словами, а не «G:4 ✦last» (UIX-5.4): у холста нет подсказки, которая расшифровала бы
-    // букву, а ✦ — тот же знак, что у «Последних данных» в карточке мира.
-    const stats = [t('map.callout.garrison', { n: mem.garrison }), icons, t('map.fog.old')];
-    cx.fillText(stats.filter(Boolean).join(' '), c.x + 13, c.y + 10);
-  } else {
-    cx.strokeStyle = 'rgba(125,161,176,0.5)';
-    cx.lineWidth = 1;
-    cx.beginPath();
-    cx.arc(c.x, c.y, lod.markerRadius + (6 - lod.markerRadius) * lod.detail, 0, TAU);
-    cx.stroke();
-    cx.globalAlpha *= lod.detail;
-    cx.fillStyle = 'rgba(125,161,176,0.65)';
-    cx.font = '9px ui-monospace,Menlo,monospace';
-    cx.textAlign = 'center';
-    cx.fillText('?', c.x, c.y + 3);
+    cx.fillStyle = 'rgba(150,210,205,0.45)';
+    cx.fillText(tData(type.name), c.x + 10, c.y + 3);
   }
   cx.globalAlpha = globalAlpha;
   cx.textAlign = textAlign;
@@ -277,7 +256,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
   const drawStationArt = (
     c: { x: number; y: number },
     col: string,
-    buildings: readonly BuildingInstance[],
+    buildings: readonly Pick<BuildingInstance, 'type' | 'level'>[],
     R: number,
   ): void => {
     cx.save();
@@ -317,11 +296,14 @@ export function drawWorlds(now: number, lod: MapLod): void {
         drawShipShape(cx, 'station', detail > 0.5);
         cx.restore();
       }
-      const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
-      cx.fillStyle = 'rgba(2,9,13,.7)';
-      cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-      cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-      cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+      // A remembered core has no strength: the scan saw the fortress, not its damage.
+      if ('hp' in core && typeof core.hp === 'number') {
+        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+        cx.fillStyle = 'rgba(2,9,13,.7)';
+        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+      }
     }
   };
   cx.save();
@@ -330,7 +312,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
   // back by hand what the next world draws with, instead of a save() per world: each save
   // leaves ~0.8 KB on the browser's heap that only a major GC frees, and a fast pinch on a
   // phone leaves no idle time for one.
-  const { textAlign, textBaseline, shadowBlur, shadowColor, lineDashOffset } = cx;
+  const { textAlign, textBaseline, shadowBlur, shadowColor, lineDashOffset, globalAlpha: lit } = cx;
   const lineDash = cx.getLineDash();
   if (lod.art > 0)
   for (const n of MAP) {
@@ -338,6 +320,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     if (!p) continue;
     const c = world(n);
     if (!visible(c, 110)) continue;
+    cx.globalAlpha = lit; // a remembered world before this one drew dimmed
     // Variant B: fog hides capturable systems (void cells stay as pure geometry).
     // Какой вид у узла — `fogView.ts` (REFM-62): пустой всегда виден, неопознанный
     // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса только вблизи.
@@ -352,22 +335,24 @@ export function drawWorlds(now: number, lod: MapLod): void {
     const kn = known(n.id);
     const mem = memory.get(n.id);
     const view = nodeView({ sector: n.sector, identified: kn, remembered: !!mem });
-    if (view === 'remembered' || view === 'unexplored') {
-      drawFogMarker(c, n.id, mem, lod);
+    if (view === 'unexplored') {
+      drawFogMarker(c, lod, surveyed(n.id)?.kind);
       continue;
     }
-    const showOwner = p.owner;
-    const col = ownerColor(p.owner);
-    const ownerPulse = fxBreath(now, {
-      period: 620,
-      base: 0.64,
-      amp: 0.36,
-      phase: phaseAt(n.x, n.y),
-    });
+    // A world scouted and then out of sight keeps the look it was scouted with: drawn from
+    // the scan memory, dimmed and still (`decisions/worldLook.ts`, owner 2026-10-23).
+    const look = worldLook(p, n.sector, view === 'remembered' ? mem : undefined);
+    const { stale, sector } = look;
+    const dim = stale ? STALE_ALPHA : 1;
+    cx.globalAlpha = lit * dim;
+    const showOwner = look.owner;
+    const col = ownerColor(look.owner);
+    const breath = { period: 620, base: 0.64, amp: 0.36, phase: phaseAt(n.x, n.y) };
+    const ownerPulse = stale ? breath.base : fxBreath(now, breath);
 
     // empty-space sector: just a faint survey marker at its centre (no city, no
     // capture) — it is only a node you travel through.
-    if (n.sector === 'empty') {
+    if (sector === 'empty') {
       cx.save();
       cx.strokeStyle = rgba(VOID_COLOR, 0.5);
       cx.lineWidth = 1;
@@ -392,7 +377,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // Висит ли бейдж, где именно и как выглядит — `kindBadge.ts` (REFM-121): он оторван
     // от узла, чтобы не слиться с искусством сектора, и потому обязан тянуть к нему луч
     // проектора; покачивание фазируется координатами узла, иначе вся карта дрожит в такт.
-    if (!holographicMapOn() && badgeShown(!!KIND_ICON[n.sector], detail)) {
+    if (!holographicMapOn() && badgeShown(!!KIND_ICON[sector], detail)) {
       const kc = sectorTypeOf(n.id)?.color ?? '#9fb6bd';
       const look = badgeLook();
       const nodeTop = c.y - R;
@@ -400,7 +385,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       const by = badgeCenterY(nodeTop, badgeBob(now, n.x, n.y));
       const tether = badgeTether(nodeTop, by);
       cx.save();
-      cx.globalAlpha = detail; // LOD: the hologram dissolves on the schematic view
+      cx.globalAlpha = detail * dim; // LOD: the hologram dissolves on the schematic view
       blitGlow(kc, bx, by, look.glowRadius, look.glowAlpha); // holographic bloom (cached disc)
       // projector tether — a faint dashed beam from the node up to the badge
       cx.strokeStyle = rgba(kc, look.tetherAlpha);
@@ -432,7 +417,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.shadowColor = kc;
       cx.shadowBlur = fxBlur(look.glyphBlur);
       cx.fillStyle = rgba(kc, look.glyphAlpha);
-      cx.fillText(KIND_ICON[n.sector]!, bx, by + 0.5);
+      cx.fillText(KIND_ICON[sector]!, bx, by + 0.5);
       cx.restore();
     }
 
@@ -440,8 +425,8 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
     // fortress here stops making it an asteroid field at all: `station.deploy` turns the
     // node into `void_station`, which draws (with its hull bar) in its own branch below.
-    if ((n.sector === 'asteroid' || n.sector === 'asteroid_cluster') && !holographicMapOn()) {
-      blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
+    if ((sector === 'asteroid' || sector === 'asteroid_cluster') && !holographicMapOn()) {
+      blitGlow(col, c.x, c.y, 30, look.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
       cx.fillStyle = 'rgba(42,40,33,0.72)';
@@ -449,7 +434,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       for (const rk of asteroidsFor(n.id, n.x, n.y)) {
         cx.save();
         cx.translate(c.x + rk.dx, c.y + rk.dy);
-        cx.rotate(rk.rot + now / 9000);
+        cx.rotate(rk.rot + (stale ? 0 : now / 9000));
         cx.beginPath();
         for (let k = 0; k < rk.sides; k++) {
           const a = (k / rk.sides) * TAU;
@@ -466,7 +451,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       }
       cx.restore();
       // fat junction hub (the lanes converge here), owner-coloured
-      blitGlow(col, c.x, c.y, 13, p.owner ? 0.5 : 0.3); // cached bloom, not shadowBlur
+      blitGlow(col, c.x, c.y, 13, look.owner ? 0.5 : 0.3); // cached bloom, not shadowBlur
       cx.fillStyle = rgba(col, 0.92);
       cx.beginPath();
       cx.arc(c.x, c.y, 4.2, 0, TAU);
@@ -481,7 +466,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.shadowColor = 'rgba(0,0,0,0.85)';
       cx.shadowBlur = fxBlur(3);
       // An asteroid field is a minor sector — de-emphasised (dim, smaller).
-      cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
+      cx.fillStyle = look.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
       cx.font = '600 10px ui-monospace,Menlo,monospace';
       cx.fillText(placeName(n.id), c.x + 16, c.y - 1);
       cx.fillStyle = 'rgba(150,210,205,0.38)';
@@ -497,7 +482,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // sensor-range ring (dashed, faint) — only where a radar actually stands (PVR-6.19):
     // drawn on every world it read as a radar the world doesn't have. Same gate as the
     // range finder (`radarShown`, rule 11), so it can't leak a hidden radar through fog.
-    if (radarShown({ detailed: seesDetails(p), reach: planetRadar(p) })) {
+    if (!stale && radarShown({ detailed: seesDetails(p), reach: planetRadar(p) })) {
       cx.setLineDash([3, 5]);
       cx.lineDashOffset = -hologramTime / 240;
       cx.strokeStyle = rgba(col, 0.12 + 0.05 * ownerPulse);
@@ -510,7 +495,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     }
 
     // fort = hex containment ring
-    if (kn && p.buildings.some((b) => b.type === 'fort')) {
+    if (look.buildings.some((b) => b.type === 'fort')) {
       cx.strokeStyle = rgba(col, 0.5);
       cx.lineWidth = 1;
       poly(c.x, c.y, R + 6 * ns, 6, Math.PI / 6);
@@ -523,17 +508,17 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // Раскладку ряда считает `buildChips.ts` (REFM-122): ряд ЦЕНТРИРОВАН под узлом (иначе
     // мир будто съезжает вбок при каждой достройке), сжимается вместе с маркером, а у
     // кегля есть пол — буква мельче семи пикселей читается как сор, а не как значок.
-    if (chipsShown(kn, p.buildings.length, detail)) {
+    if (chipsShown(kn || stale, look.buildings.length, detail)) {
       const alpha = cx.globalAlpha;
-      cx.globalAlpha = detail;
+      cx.globalAlpha = detail * dim;
       cx.font = `${chipFontPx(ns)}px ui-monospace,Menlo,monospace`;
       cx.textAlign = 'center';
       cx.textBaseline = 'middle';
       const { half } = chipMetrics(ns);
-      const xs = chipXs(p.buildings.length, c.x, ns);
+      const xs = chipXs(look.buildings.length, c.x, ns);
       const by = chipY(c.y, R, ns);
-      for (let i = 0; i < p.buildings.length; i++) {
-        const b = p.buildings[i];
+      for (let i = 0; i < look.buildings.length; i++) {
+        const b = look.buildings[i];
         if (!b) continue;
         const bx = xs[i]!;
         cx.fillStyle = 'rgba(2,9,13,.78)';
@@ -551,17 +536,17 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.textBaseline = textBaseline;
     }
 
-    if (holographicMapOn() && hasTerrainMaterial(n.sector) &&
-      n.sector !== 'dead_world' && n.sector !== 'planet' && n.sector !== 'void_station') {
+    if (holographicMapOn() && hasTerrainMaterial(sector) &&
+      sector !== 'dead_world' && sector !== 'planet' && sector !== 'void_station') {
       // Terrain is the province's material; retain a precise selectable survey point.
       cx.fillStyle = rgba(col, .7);
       cx.beginPath();
       cx.arc(c.x, c.y, 2.4, 0, TAU);
       cx.fill();
-    } else if (n.sector === 'planet') {
+    } else if (sector === 'planet') {
       // A transparent rotating wire volume, with no opaque core obscuring its mesh.
       // The visual clock is independent of game speed and freezes on pause/reduced motion.
-      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(lod.scale)), detail > 0 ? hologramTime + phaseAt(n.x, n.y) * 400 : 0);
+      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(lod.scale)), detail > 0 && !stale ? hologramTime + phaseAt(n.x, n.y) * 400 : 0);
       blitGlow(col, c.x, c.y, R + 7, showOwner ? 0.08 : 0.035);
 
       // N/E/S/W crosshair ticks
@@ -573,7 +558,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
         cx.lineTo(c.x + dx * (R + 5), c.y + dy * (R + 5));
       }
       cx.stroke();
-    } else if (n.sector === 'rift') {
+    } else if (sector === 'rift') {
       // Classic mode retains a compact split-seam marker for the new obstacle.
       cx.save();
       cx.strokeStyle = '#c7a0ed';
@@ -587,7 +572,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
         cx.stroke();
       }
       cx.restore();
-    } else if (n.sector === 'nebula' || n.sector === 'dense_nebula') {
+    } else if (sector === 'nebula' || sector === 'dense_nebula') {
       // Nebula: soft diamond (rotated square) with diffuse glow
       const kc = sectorTypeOf(n.id)?.color ?? col;
       const dr = R * 0.85;
@@ -621,12 +606,12 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.arc(c.x, c.y, 2, 0, TAU);
       cx.fill();
       cx.restore();
-    } else if (n.sector === 'ion_storm' || n.sector === 'solar_flare') {
+    } else if (sector === 'ion_storm' || sector === 'solar_flare') {
       // Storm: spiky burst (6-pointed star)
       const kc = sectorTypeOf(n.id)?.color ?? col;
       const outerR = R * 0.9;
       const innerR = R * 0.4;
-      const spikes = n.sector === 'ion_storm' ? 5 : 8;
+      const spikes = sector === 'ion_storm' ? 5 : 8;
       blitGlow(kc, c.x, c.y, R + 7, showOwner ? 0.22 : 0.1);
       cx.save();
       cx.strokeStyle = rgba(kc, 0.75);
@@ -648,7 +633,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.arc(c.x, c.y, 2, 0, TAU);
       cx.fill();
       cx.restore();
-    } else if (n.sector === 'graveyard') {
+    } else if (sector === 'graveyard') {
       // Derelict Graveyard: scattered debris fragments around a dim hub
       const kc = sectorTypeOf(n.id)?.color ?? col;
       blitGlow(kc, c.x, c.y, R + 5, showOwner ? 0.16 : 0.06);
@@ -675,7 +660,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.arc(c.x, c.y, 7, 0, TAU);
       cx.stroke();
       cx.restore();
-    } else if (n.sector === 'dead_world') {
+    } else if (sector === 'dead_world') {
       // Dead World: broken/dashed circle with an X through it
       const kc = sectorTypeOf(n.id)?.color ?? col;
       blitGlow(kc, c.x, c.y, R + 5, showOwner ? 0.16 : 0.08);
@@ -703,8 +688,8 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.arc(c.x, c.y, 2, 0, TAU);
       cx.fill();
       cx.restore();
-    } else if (['void_station', 'pirate_base', 'neutral_base'].includes(n.sector)) {
-      drawStationArt(c, col, p.buildings, R);
+    } else if (['void_station', 'pirate_base', 'neutral_base'].includes(sector)) {
+      drawStationArt(c, col, look.buildings, R);
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
@@ -735,16 +720,16 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // пустой тихий сектор молчит, чтобы не сорить «гарнизон 0» вдоль всего маршрута.
     // Сюда доходит только ОПОЗНАННЫЙ узел — неопознанный забрал `drawFogMarker` выше
     // по циклу (REFM-117.1), поэтому ветки «нет телеметрии» здесь больше нет.
-    const tier = calloutTier(n.sector);
+    const tier = calloutTier(sector);
     const isWorld = tier === 'world';
-    const mineWorld = isWorld && p.owner === ME;
+    const mineWorld = isWorld && look.owner === ME;
     const callout = calloutAlpha(detail, mineWorld);
     if (callout === 0) continue;
-    const g = p.garrison.reduce((a, st) => a + st.count, 0);
-    const line = calloutLine({ detail, tier, garrison: g, buildings: p.buildings.length });
-    const ink = calloutInk(!!p.owner);
+    const g = look.garrison;
+    const line = calloutLine({ detail, tier, garrison: g, buildings: look.buildings.length });
+    const ink = calloutInk(!!look.owner);
     const alpha = cx.globalAlpha;
-    cx.globalAlpha = callout;
+    cx.globalAlpha = callout * dim;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
     if (isWorld) {
@@ -755,17 +740,20 @@ export function drawWorlds(now: number, lod: MapLod): void {
       cx.font = '600 10px ui-monospace,Menlo,monospace';
     }
     cx.fillText(placeName(n.id), c.x + R + 12, c.y - 1);
-    if (line.do === 'stats') {
-      const icons = p.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
+    // A remembered quiet sector still says its data is old: the dimming alone is easy to miss.
+    if (line.do === 'stats' || (stale && detail > 0)) {
+      const icons = look.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
       cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
       cx.font = isWorld ? '10px ui-monospace,Menlo,monospace' : '9px ui-monospace,Menlo,monospace';
-      const stats = [t('map.callout.garrison', { n: g }), icons].filter(Boolean).join('  ');
+      const report = line.do === 'stats' ? [t('map.callout.garrison', { n: g }), icons] : [];
+      const stats = [...report, stale ? t('map.fog.old') : ''].filter(Boolean).join('  ');
       cx.fillText(stats, c.x + R + 12, c.y + (isWorld ? 12 : 11));
     }
     cx.globalAlpha = alpha;
     cx.shadowBlur = shadowBlur;
     cx.shadowColor = shadowColor;
   }
+  cx.globalAlpha = lit;
 
   // FORT-6.1: крепости на РАЗВИЛКАХ. Их площадок нет в `MAP` — это не узлы карты, а
   // сооружения на дороге, — поэтому они рисуются отдельным проходом по состоянию, тем же

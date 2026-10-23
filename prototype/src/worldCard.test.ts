@@ -126,6 +126,7 @@ async function boot(over: Record<string, unknown> = {}) {
     pc: true,
     merge: null as { from: string } | null,
     memory: {} as Record<string, Snapshot>,
+    surveyed: {} as Record<string, { kind?: string; at: number }>,
     intel: [] as Array<{ kind: string; target: string; until: number }>,
     stewardTech: false,
     relocate: false,
@@ -144,6 +145,7 @@ async function boot(over: Record<string, unknown> = {}) {
   vi.doMock('./mapAim', () => ({ squadronRelocateSpots: () => (env.relocate ? [{}] : []) }));
   vi.doMock('./mapFog', () => ({
     memory: { get: (id: string) => env.memory[id] },
+    surveyed: (id: string) => env.surveyed[id],
     myIntel: () => env.intel,
   }));
   vi.doMock('./stewardScreen', () => ({ stewardTechDone: () => env.stewardTech }));
@@ -459,6 +461,17 @@ describe('мир вне зрения', () => {
     expect(html).toContain(act('ping', ''));
     env.hidden = true;
     expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="ping"');
+  });
+
+  it('провинция, куда залетал корабль, называет свой тип, но не хозяина', async () => {
+    const { env, m } = await boot();
+    const { SECTOR_TYPES } = await import('./map');
+    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain(tData(SECTOR_TYPES.graveyard!.name));
+    env.surveyed.Z = { kind: 'graveyard', at: 1 };
+    const html = m.unknownPlanetHtml(env.s.planets.Z!);
+    expect(html).toContain(t('side.notelemetry.title'));
+    expect(html).toContain(tData(SECTOR_TYPES.graveyard!.name));
+    expect(html).not.toContain(t('side.scan.owner'));
   });
 
   it('в забеге Sector Zero память скана не предлагает разведку', async () => {

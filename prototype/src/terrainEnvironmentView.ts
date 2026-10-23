@@ -12,13 +12,15 @@ interface EnvironmentKnowledge { kind?: string; terrain?: string }
 export interface TerrainEnvironmentProjection { scale: number; x: number; y: number }
 
 /** The environment the viewer may know, as is rather than a copy: the live one when
- * identified, the remembered snapshot otherwise, `undefined` when there is neither. */
+ * identified, the remembered snapshot otherwise, then the type a ship found on crossing
+ * the border (`surveyed`), `undefined` when there is none of them. */
 export function knownEnvironment(
   live: EnvironmentKnowledge | undefined,
   identified: boolean,
   remembered?: { environment?: EnvironmentKnowledge },
+  surveyed?: EnvironmentKnowledge,
 ): EnvironmentKnowledge | undefined {
-  return (identified ? live : remembered?.environment) ?? undefined;
+  return (identified ? live : remembered?.environment ?? surveyed) ?? undefined;
 }
 
 /** A remembered province uses its snapshot, never the now-hidden live environment.
@@ -27,8 +29,9 @@ export function terrainKnowledge(
   live: EnvironmentKnowledge | undefined,
   identified: boolean,
   remembered?: { environment?: EnvironmentKnowledge },
+  surveyed?: EnvironmentKnowledge,
 ): { known: boolean; kind?: string; terrain?: string } {
-  const allowed = knownEnvironment(live, identified, remembered);
+  const allowed = knownEnvironment(live, identified, remembered, surveyed);
   if (!allowed) return { known: false };
   return {
     known: true,

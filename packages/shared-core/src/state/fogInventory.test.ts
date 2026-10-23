@@ -103,6 +103,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   scheduleSeq: 'stripped',
   swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
+  surveyed: 'filtered', // свои обследованные провинции — да; чужие выдали бы, где летал сосед
   // EVT-2: котёл трофеев ключуется узлом и считается по тому, кто там погиб, — то есть
   // рассказал бы про цену боя на мирах, которых зритель не видит. Своё начисление игрок
   // узнаёт адресным `salvage.paid`, а не состоянием.
@@ -399,6 +400,10 @@ function maximalState(): GameState {
       [VIEWER]: {
         Z: { owner: RIVAL, garrison: [{ unit: 'scout', count: 1 }], buildings: [], at: 50 },
       },
+    },
+    surveyed: {
+      [VIEWER]: { Z: { kind: 'planet', at: 40 } },
+      [RIVAL]: { A: { kind: 'CANARY_surveyed', at: 60 } },
     },
     heroes: {
       mine_hero: { id: 'mine_hero', owner: VIEWER, location: 'A', cooldowns: {}, alive: true },

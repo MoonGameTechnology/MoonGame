@@ -57,12 +57,12 @@ import {
   transferOffer,
   type HangarView,
 } from './hangarPanel';
-import { BUILD_ICON, unitIconHtml } from './icons';
+import { BUILD_ICON, KIND_ICON, unitIconHtml } from './icons';
 import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
-import type { SectorType } from './map';
+import { SECTOR_TYPES, type SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
-import { memory, myIntel } from './mapFog';
+import { memory, myIntel, surveyed } from './mapFog';
 import { ownerColor, youColor } from './mapPalette';
 import {
   actionButton,
@@ -436,12 +436,19 @@ export function unknownPlanetHtml(p: Planet): string {
       `</div>`
     );
   }
+  // A province a ship has crossed into shows its type, and only that (`surveyed`).
+  const kind = surveyed(p.id)?.kind;
+  const type = kind === undefined ? undefined : SECTOR_TYPES[kind];
+  const typeRow = type
+    ? `<div class="row">${KIND_ICON[kind!] ?? ''} <b>${esc(tData(type.name))}</b></div>`
+    : '';
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
   return (
     cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
     `<div class="pscan">` +
     `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
+    typeRow +
     `<div class="hint">${t('side.notelemetry.hint')}</div>` +
     ping +
     `</div>`

@@ -1081,6 +1081,11 @@ export interface GameState {
    *  each seen world. Maintained by `visibilityModule`; read by `visibleState`
    *  to show greyed "last known" worlds. Internal — stripped from projections. */
   fog?: Record<PlayerId, FogMemory>;
+  /** Per-player SURVEY: the type of every province a player's ship has been inside, kept
+   *  for good. Crossing a border shows what kind of space this is, not who holds it, so a
+   *  survey carries the type only (owner 2026-10-23). Maintained by `visibilityModule`;
+   *  `visibleState` ships the viewer's own record and keeps the surveyed type on the map. */
+  surveyed?: Record<PlayerId, Record<PlanetId, ProvinceSurvey>>;
   /** Per-observer last identified Swarm fleet composition; persists with this match. */
   swarmIntel?: Record<PlayerId, Record<FleetId, SwarmContact>>;
   /** Hero instances, keyed by instance id (`Hero.id`), maintained by `heroModule`.
@@ -1778,6 +1783,16 @@ export interface PlanetSnapshot {
 }
 /** One player's memory: last-known snapshot per world they have ever identified. */
 export type FogMemory = Record<PlanetId, PlanetSnapshot>;
+
+/** The type of a province as a ship found it on crossing its border: no owner, garrison
+ *  or buildings — those take a scan (`PlanetSnapshot`). */
+export interface ProvinceSurvey {
+  kind?: string;
+  terrain?: string;
+  planetType?: string;
+  /** Simulation time (ms) of the last crossing. */
+  at: number;
+}
 
 /**
  * Зрение — ТОЛЬКО КРУГИ (решение владельца 2026-09-24). Каждый свой мир и флот видит

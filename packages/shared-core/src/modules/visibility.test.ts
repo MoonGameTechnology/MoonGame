@@ -173,3 +173,82 @@ describe('fleet scouting (A3) — a traveling fleet commits passed nodes to memo
     expect(view.remembered).toContain('B');
   });
 });
+
+describe('обследование: тип провинции раскрывается на границе (владелец 2026-10-23)', () => {
+  const sdata: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: { scout: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 8 } } },
+    factions: {},
+    buildings: {},
+    events: {},
+  });
+  const sctx = (now: number): Context => ({ now, data: sdata, config: { timeScale: 1 } });
+  const kernel = createKernel([movementModule, visibilityModule]);
+
+  /** p1 owns no worlds: the scout alone looks, and its own circle reaches no further than
+   *  40. A(0)–B(400), speed 10: the border is crossed at hour 20, B's centre reached at 40. */
+  function flying(): GameState {
+    const state: GameState = {
+      ...createInitialState({ seed: 'survey', version: { data: '0.1.0', manifest: '1' } }),
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: {
+        A: planet('A', null, ['B'], { position: { x: 0, y: 0 } }),
+        B: planet('B', 'p2', ['A'], {
+          position: { x: 400, y: 0 },
+          kind: 'graveyard',
+          terrain: 'debris_field',
+          garrison: [{ unit: 'scout', count: 2 }],
+        }),
+      },
+      fleets: {
+        probe: { id: 'probe', owner: 'p1', location: 'A', movement: null, units: [{ unit: 'scout', count: 1 }], traits: [] },
+      },
+    };
+    const move = kernel.applyAction(
+      state,
+      { id: 's:p1:1', type: 'fleet.move', playerId: 'p1', payload: { fleetId: 'probe', to: 'B' }, issuedAt: 0 },
+      sctx(0),
+    );
+    if (!move.ok) throw new Error(move.code);
+    return move.state;
+  }
+  const at = (state: GameState, hours: number): GameState => {
+    const r = kernel.advanceTo(state, sctx(hours * HOUR));
+    if (!r.ok) throw new Error(r.code);
+    return r.state;
+  };
+
+  it('корабль за границей узнаёт тип провинции, но не хозяина и не гарнизон', () => {
+    const before = at(flying(), 15);
+    expect(before.surveyed?.p1?.B).toBeUndefined(); // ещё по эту сторону границы
+
+    const across = at(before, 25); // за границей, но до центра B ещё 150 — круг его не достаёт
+    expect(across.surveyed?.p1?.B).toEqual({ kind: 'graveyard', terrain: 'debris_field', at: 25 * HOUR });
+    expect(across.fog?.p1?.B).toBeUndefined(); // это не скан
+
+    const view = visibleState(across, 'p1', sdata);
+    expect(view.planets.B?.kind).toBe('graveyard');
+    expect(view.planets.B?.terrain).toBe('debris_field');
+    expect(view.planets.B?.owner).toBeNull();
+    expect(view.planets.B?.garrison).toEqual([]);
+    expect(view.remembered).not.toContain('B');
+  });
+
+  it('пока тип прежний, запись не переписывается каждым шагом', () => {
+    const across = at(at(flying(), 25), 30);
+    expect(across.surveyed?.p1?.B?.at).toBe(25 * HOUR);
+  });
+
+  it('чужое обследование зрителю не уходит, а необследованная провинция типа не выдаёт', () => {
+    const state: GameState = {
+      ...baseState(),
+      surveyed: { p2: { C: { kind: 'nebula', at: 1 } } },
+      planets: { ...baseState().planets, C: { ...baseState().planets.C!, kind: 'nebula' } },
+    };
+    const view = visibleState(state, 'p1', data);
+    expect(view.surveyed).toBeUndefined();
+    expect(view.planets.C?.kind).toBeUndefined();
+    expect(visibleState(state, 'p2', data).surveyed).toEqual({ p2: { C: { kind: 'nebula', at: 1 } } });
+  });
+});
