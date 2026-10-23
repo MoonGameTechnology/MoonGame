@@ -1,0 +1,11 @@
+[Unit]
+Description=Sample MoonGame container health every 15 seconds
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=15
+AccuracySec=1s
+Unit=moongame-container-observer.service
+
+[Install]
+WantedBy=timers.target

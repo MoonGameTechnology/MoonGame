@@ -64,6 +64,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // PVR-6.17: дерево технологий матча — тоже правила стола из режима; окно технологий
   // каждого игрока рисует по ним, какие узлы есть и заперты ли дни.
   techRules: 'public',
+  // Цены партии — тоже правила стола: окно стройки каждого игрока показывает по ним цену.
+  pricing: 'public',
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
@@ -101,6 +103,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   scheduleSeq: 'stripped',
   swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
+  surveyed: 'filtered', // свои обследованные провинции — да; чужие выдали бы, где летал сосед
   // EVT-2: котёл трофеев ключуется узлом и считается по тому, кто там погиб, — то есть
   // рассказал бы про цену боя на мирах, которых зритель не видит. Своё начисление игрок
   // узнаёт адресным `salvage.paid`, а не состоянием.
@@ -115,7 +118,10 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   diplomacyOffers: 'filtered', // а кто с кем ТОРГУЕТСЯ — дело двоих
   mapShares: 'public', // кто с кем делится картой — тоже открытое знание (MAPSHARE-1)
   mapShareOffers: 'filtered', // предложение обмена — переговоры двоих
+  coalitions: 'public', // список коалиций, состав, эмблема и описание — открытые (COAL-1)
+  coalitionSeq: 'public',
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
+  spyAgents: 'filtered', // сеть агентов (SPY-6) — тот же секрет шпиона
   market: 'public', // сессионный стакан публичен по замыслу
   marketSeq: 'public',
   trader: 'public', // курс торговца экспедиции — цена рынка, одна на всех
@@ -215,6 +221,7 @@ function maximalState(): GameState {
     modeId: 'pve_waves',
     sight: { world: 330, fleet: 90, radarScale: 2.5 },
     techRules: { dayGates: false, exclude: ['ai_stewardship'] },
+    pricing: { cost: { metal: 1.5 }, hours: 2, start: { metal: 1.5 } },
     startedAt: 0,
     match: {
       status: 'ongoing',
@@ -394,6 +401,10 @@ function maximalState(): GameState {
         Z: { owner: RIVAL, garrison: [{ unit: 'scout', count: 1 }], buildings: [], at: 50 },
       },
     },
+    surveyed: {
+      [VIEWER]: { Z: { kind: 'planet', at: 40 } },
+      [RIVAL]: { A: { kind: 'CANARY_surveyed', at: 60 } },
+    },
     heroes: {
       mine_hero: { id: 'mine_hero', owner: VIEWER, location: 'A', cooldowns: {}, alive: true },
       CANARY_hero: {
@@ -446,11 +457,22 @@ function maximalState(): GameState {
       [offerKey(VIEWER, RIVAL)]: true, // зритель — сторона, увидит
       [offerKey(RIVAL, 'CANARY_third')]: true, // чужие переговоры — вырезаются
     },
+    coalitions: {
+      c1: {
+        id: 'c1',
+        founder: 'bystanderA',
+        members: ['bystanderA', 'bystanderB'],
+        emblem: 'star',
+        description: '',
+      },
+    },
+    coalitionSeq: 1,
     intel: {
       // Своё окно — безобидное (свой же мир), чтобы оно не пробило туман само.
       [VIEWER]: [{ kind: 'planet', target: 'A', until: 900 }],
       [RIVAL]: [{ kind: 'planet', target: 'CANARY_target', until: 900 }],
     },
+    spyAgents: { [VIEWER]: [{ until: 900 }], [RIVAL]: [{ until: 900, lost: true }] },
     market: [{ id: 'm1', side: 'sell', owner: RIVAL, resource: 'metal', amount: 5, price: 3 }],
     marketSeq: 1,
     trader: { metal: { shift: 0.1, at: 0 } },

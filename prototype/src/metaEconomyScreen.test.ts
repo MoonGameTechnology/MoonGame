@@ -94,7 +94,6 @@ function host(
     root: () => root as unknown as HTMLElement,
     authorizedBase: async () => ({ base: 'https://server', token: 'session' }),
     changed: async () => {},
-    confirm: () => true,
     requestId: () => `intent-${++id}`,
     ...overrides,
   };
@@ -105,77 +104,39 @@ beforeEach(() => setLocale('ru'));
 afterEach(() => vi.unstubAllGlobals());
 
 describe('main-game supply screen', () => {
-  it('separates personal material balances and warns before a bound recipe', () => {
-    const html = metaEconomyHtml(fixture(), []);
+  it('separates personal material balances and leaves the workshop to the arsenal', () => {
+    const html = metaEconomyHtml(fixture());
     expect(html).toContain('Торгуемые <b>5</b>');
     expect(html).toContain('Личные <b>20</b>');
-    expect(html).toContain('Личные материалы делают результат личным.');
-    expect(html).toContain('Материалы останутся личными.');
-    expect(html).toContain('Текущая цель');
     expect(html).toContain('Архивная дорожка');
+    expect(html).not.toContain('data-me-craft');
+    expect(html).not.toContain('data-me-salvage');
+    expect(html).not.toContain('data-me-goal');
   });
 
   it('names the daily season XP on the pass that receives it', () => {
     const view = fixture();
     view.seasons[0]!.dailyXp = 100;
     const daily = '+100 опыта за каждый день с приказами в партии';
-    expect(metaEconomyHtml(view, [])).toContain(daily);
+    expect(metaEconomyHtml(view)).toContain(daily);
     view.seasons[0]!.active = false;
-    expect(metaEconomyHtml(view, [])).not.toContain(daily);
+    expect(metaEconomyHtml(view)).not.toContain(daily);
     delete view.seasons[0]!.dailyXp;
     view.seasons[0]!.archived = false;
-    expect(metaEconomyHtml(view, [])).not.toContain('за каждый день');
+    expect(metaEconomyHtml(view)).not.toContain('за каждый день');
   });
 
-  it('shows known store contents without a fake purchase button or fabricated price', () => {
-    const html = metaEconomyHtml(fixture(), [
-      {
-        productId: 'supply_personal',
-        catalogVersion: 'v1',
-        source: 'payment',
-        nameKey: 'commerce.offer.supply_personal.name',
-        contentsKey: 'commerce.offer.supply_personal.contents',
-        available: false,
-        unavailableReason: 'E_COMMERCE_UNAVAILABLE',
-        contents: { soulbound: true, materials: { ferroalloys: 5 } },
-      },
-    ]);
-    expect(html).toContain('Ферросплавы ×5');
-    expect(html).toContain('Покупки временно недоступны.');
-    expect(html).not.toContain('data-me-purchase');
-  });
-
-  // Плашка Суверенов ведёт в магазин: экран открывается прокрученным к нему, но только
-  // когда раздел уже нарисован, и только один раз.
-  it('the Sovereigns plate opens the supply screen scrolled to the store once it loads', async () => {
-    const root = fakeRoot();
-    const scrolled: string[] = [];
-    root.querySelector = ((selector: string) => ({
-      value: 'shield_booster',
-      scrollIntoView: () => {
-        scrolled.push(selector);
-      },
-    })) as unknown as typeof root.querySelector;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => response(url.endsWith('/offers') ? { offers: [] } : fixture())),
-    );
-    const screen = initMetaEconomy(host(root));
-    const loading = screen.refresh();
-    screen.showStore();
-    expect(scrolled).toEqual([]);
-    await loading;
-    expect(root.innerHTML).toContain('data-me-store');
-    expect(scrolled).toEqual(['[data-me-store]']);
-    await screen.refresh();
-    expect(scrolled).toHaveLength(1);
+  it('sells nothing itself: purchases moved to the shop', () => {
+    const html = metaEconomyHtml(fixture());
+    expect(html).not.toContain('data-me-store');
+    expect(html).not.toContain('Покупки временно недоступны.');
   });
 
   it('escapes server-controlled identifiers and names', () => {
     const view = fixture();
-    view.recipes[0]!.id = 'x" onclick="alert(1)';
-    view.recipes[0]!.defId = '<script>bad</script>';
-    const html = metaEconomyHtml(view, []);
+    view.seasons[0]!.id = 'x" onclick="alert(1)';
+    view.seasons[0]!.milestones[0]!.choices = ['<script>bad</script>'];
+    const html = metaEconomyHtml(view);
     expect(html).not.toContain('onclick="alert');
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
@@ -190,26 +151,13 @@ describe('main-game supply screen', () => {
     expect(root.innerHTML).toContain('после входа в аккаунт');
   });
 
-  it('declining the personal-material confirmation sends no craft command', async () => {
-    const root = fakeRoot();
-    const fetcher = vi.fn(async (url: string) =>
-      response(url.endsWith('/offers') ? { offers: [] } : fixture()),
-    );
-    vi.stubGlobal('fetch', fetcher);
-    const confirm = vi.fn(() => false);
-    await initMetaEconomy(host(root, { confirm })).refresh();
-    root.fire({ meCraft: 'shield' });
-    expect(confirm).toHaveBeenCalledOnce();
-    expect(fetcher).toHaveBeenCalledTimes(2);
-  });
-
-  it('retries an ambiguous craft with the same request id and blocks double submits', async () => {
+  it('retries an ambiguous season command with the same request id and blocks double submits', async () => {
     const root = fakeRoot();
     const bodies: Array<Record<string, unknown>> = [];
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init: { body?: string }) => {
-        if (url.endsWith('/craft')) {
+        if (url.endsWith('/select')) {
           bodies.push(JSON.parse(init.body!) as Record<string, unknown>);
           if (bodies.length === 1) throw new Error('disconnected after commit');
           return response({ ok: true, receipt: { id: 'receipt' } });
@@ -218,41 +166,19 @@ describe('main-game supply screen', () => {
       }),
     );
     await initMetaEconomy(host(root)).refresh();
-    root.fire({ meCraft: 'shield' });
-    root.fire({ meCraft: 'shield' });
+    root.fire({ meSeason: 'frontier' });
+    root.fire({ meSeason: 'frontier' });
     await vi.waitFor(() => expect(root.innerHTML).toContain('Действие не выполнено'));
     expect(bodies).toHaveLength(1);
-    root.fire({ meCraft: 'shield' });
-    await vi.waitFor(() => expect(root.innerHTML).toContain('Предмет добавлен в арсенал.'));
+    root.fire({ meSeason: 'frontier' });
+    await vi.waitFor(() => expect(bodies).toHaveLength(2));
     expect(bodies).toEqual([
-      { recipeId: 'shield', allowSoulbound: true, requestId: 'intent-1' },
-      { recipeId: 'shield', allowSoulbound: true, requestId: 'intent-1' },
+      { seasonId: 'frontier', requestId: 'intent-1' },
+      { seasonId: 'frontier', requestId: 'intent-1' },
     ]);
   });
 
-  it('a confirmed craft followed by a failed refresh removes stale craft controls', async () => {
-    const root = fakeRoot();
-    let writes = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        if (url.endsWith('/craft')) {
-          writes++;
-          return response({ ok: true, receipt: { id: 'receipt' } });
-        }
-        if (url.endsWith('/me') && writes > 0) throw new Error('offline');
-        return response(url.endsWith('/offers') ? { offers: [] } : fixture());
-      }),
-    );
-    await initMetaEconomy(host(root)).refresh();
-    root.fire({ meCraft: 'shield' });
-    await vi.waitFor(() => expect(root.innerHTML).toContain('Действие не выполнено'));
-    expect(root.innerHTML).not.toContain('data-me-craft');
-    root.fire({ meCraft: 'shield' });
-    expect(writes).toBe(1);
-  });
-
-  it('does not execute a previous account’s craft after switching sessions', async () => {
+  it('does not execute a previous account’s command after switching sessions', async () => {
     const root = fakeRoot();
     let token = 'one';
     const fetcher = vi.fn(async (url: string) =>
@@ -263,7 +189,7 @@ describe('main-game supply screen', () => {
       host(root, { authorizedBase: async () => ({ base: 'https://server', token }) }),
     ).refresh();
     token = 'two';
-    root.fire({ meCraft: 'shield' });
+    root.fire({ meSeason: 'frontier' });
     await vi.waitFor(() => expect(root.innerHTML).toContain('после входа в аккаунт'));
     expect(fetcher).toHaveBeenCalledTimes(2);
   });

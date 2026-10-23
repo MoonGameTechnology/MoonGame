@@ -30,9 +30,11 @@ import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import { slotCallouts, type SlotCallout } from '../../decisions/slotCallouts';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
-import { isPercentStat, isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
+import { effectChip, STAT_KEY } from './moduleEffect';
 import {
   effectiveStats,
+  matchCost,
+  matchHours,
   moduleAllowed,
   unitBuildSiteBlocker,
   type Action,
@@ -146,35 +148,8 @@ export const RES_KEY: Record<string, string> = {
   food: 'res.of.food',
   microelectronics: 'res.of.microelectronics',
 };
-// Short stat labels for module-effect chips («+4 атака», «+15 щит»).
-export const STAT_KEY: Record<string, string> = {
-  attack: 'div.stat.attack',
-  defense: 'div.stat.defense',
-  hp: 'stat.hp',
-  shield: 'stat.shield',
-  speed: 'stat.speed',
-  cargoCapacity: 'stat.cargo',
-  radarRange: 'stat.radar',
-  pointDefense: 'stat.point-defense',
-  siegeDamage: 'loadout.stat.siege',
-  // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
-  shieldRegen: 'loadout.stat.shield-regen',
-  hullRepair: 'loadout.stat.hull-repair',
-  retreatPull: 'loadout.stat.retreat-pull',
-  salvageBonus: 'loadout.stat.salvage',
-  fleetHullRepair: 'loadout.stat.fleet-repair',
-  mineCharge: 'loadout.stat.mine-charge',
-  mineHit: 'loadout.stat.mine-hit',
-};
-/** Чип эффекта модуля: доля в час — процентом («+5%/ч»), прочее — как есть. */
-const effectChip = (k: string, v: number): string =>
-  `+${
-    isPerHourShare(k)
-      ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) })
-      : isPercentStat(k)
-        ? t('loadout.stat.percent', { n: perHourPercent(v) })
-        : Math.round(v * 10) / 10
-  } ${t(STAT_KEY[k] ?? k)}`;
+// Подписи статов и чип эффекта модуля — у арсенала и верфи общие (`moduleEffect.ts`).
+export { STAT_KEY };
 
 /**
  * Редкость и звёзды модуля — языком карточек Сектора Зеро: слово ступени её цветом и горящие
@@ -338,6 +313,7 @@ export function loadoutPaneHtml(
     modules: draft.modules,
     count: draft.count,
     ownedModules,
+    pricing: state.pricing,
     ...boosts,
   });
   if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
@@ -422,6 +398,7 @@ export function loadoutPaneHtml(
           modules: m.modules.filter((id) => id !== cur),
           count: draft.count,
           ownedModules,
+          pricing: state.pricing,
           ...boosts,
         })
       : ed;
@@ -549,7 +526,7 @@ export function yardQueueHtml(
     );
   };
   if (active?.payload.unit) {
-    const pct = Math.round(progressPct(active, state.time, data, HOUR));
+    const pct = Math.round(progressPct(active, state.time, data, HOUR, state));
     const eta = fmtEta(hoursLeft(active.at, state.time, HOUR));
     items.push(
       chip(
@@ -657,6 +634,7 @@ export function orderBarHtml(
     count: draft.count,
     ownedModules: snap ? new Set(snap.modules) : undefined,
     bonusSlots: snap?.slots?.[draft.hull],
+    pricing: state.pricing,
   });
   if (!ed.ok) return '';
   // Цена десантного челнока — челнок с модулями ПЛЮС бойцы, срок — дольший из двух (SHU-5.2).
@@ -664,7 +642,7 @@ export function orderBarHtml(
   const troop =
     lander && draft.troop && (view.troops ?? []).includes(draft.troop) ? draft.troop : undefined;
   const total: Record<string, number> = { ...ed.totalCost };
-  for (const [r, n] of Object.entries((troop && data.units[troop]?.cost) || {}))
+  for (const [r, n] of Object.entries((troop && matchCost(state, data.units[troop]?.cost)) || {}))
     total[r] = (total[r] ?? 0) + n * ed.count;
   const affordable = Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n);
   const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
@@ -688,7 +666,7 @@ export function orderBarHtml(
     : `<div class="cn-noplace">${t('yard.no-place')}</div>`;
   return (
     `<div class="cn-order">` +
-    `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(orderHours(data, draft.hull, troop))}</span></div>` +
+    `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(matchHours(state, orderHours(data, draft.hull, troop)))}</span></div>` +
     `<div class="cn-oworld">${where}</div>` +
     `<div class="cn-ogo"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
     `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button></div>` +
@@ -942,6 +920,7 @@ export function initShipyard(host: YardHost): {
       count: draft.count,
       ownedModules: p?.arsenal ? new Set(p.arsenal.modules) : undefined,
       bonusSlots: p?.arsenal?.slots?.[draft.hull],
+      pricing: host.state().pricing,
     });
   }
 

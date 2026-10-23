@@ -17,8 +17,10 @@ import { en } from '../../localization/en';
 import { trainingBaseline } from '../../decisions/trainingStages';
 import { trainingState } from '../../packages/client/src/gameData';
 import { buildFirstMatchTour } from './firstMatchTour';
+import { firstMatchFixture } from './firstMatchTour.fixture';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildTrainingTour } from './trainingTour';
+import { trainingUiFixture } from './trainingTour.fixture';
 import { data } from './gameData';
 import type { SpotlightStep } from './spotlight';
 
@@ -27,14 +29,13 @@ const STEP_MAX = 90;
 
 const first = (mouse: boolean): SpotlightStep[] =>
   buildFirstMatchTour({
+    ...firstMatchFixture().deps,
     mouse: () => mouse,
     homeOpened: () => false,
     cardLayout: () => !mouse,
     panelOpen: () => false,
     shipsTabOpen: () => false,
-    hasFleet: () => false,
     capturedWorld: () => false,
-    scoreRose: () => false,
   });
 
 const world = trainingState(data);
@@ -43,7 +44,7 @@ const training = buildTrainingTour({
   me: 'p1',
   data,
   baseline: trainingBaseline(world, 'p1', data),
-  fleetSelected: () => false,
+  ui: trainingUiFixture(true),
 });
 
 const steps = [...first(true), ...first(false), ...HUD_ORIENTATION_TOUR, ...training];

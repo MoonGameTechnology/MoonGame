@@ -44,14 +44,20 @@ export interface RegisterProblem {
 
 /** Проверить форму. `null` — форма цела, можно идти в сеть. */
 export function checkRegister(draft: RegisterDraft): RegisterProblem | null {
-  if (!draft.nick.trim()) return { key: 'auth.need-name', field: 'nick' };
-  if (!validLogin(draft.nick.trim())) return { key: 'acc.nick.rule', field: 'nick' };
-  if (blockedPublicName(draft.nick.trim())) return { key: 'acc.nick.blocked', field: 'nick' };
+  return registerProblems(draft)[0] ?? null;
+}
+
+/** All independent errors, so correcting one field does not hide another. */
+export function registerProblems(draft: RegisterDraft): RegisterProblem[] {
+  const problems: RegisterProblem[] = [];
+  if (!draft.nick.trim()) problems.push({ key: 'auth.need-name', field: 'nick' });
+  else if (!validLogin(draft.nick.trim())) problems.push({ key: 'acc.nick.rule', field: 'nick' });
+  else if (blockedPublicName(draft.nick.trim())) problems.push({ key: 'acc.nick.blocked', field: 'nick' });
   // Правило 2: сначала длина, потом совпадение.
-  if (!validPassword(draft.pass)) return { key: 'acc.pass.rule', field: 'pass' };
-  if (draft.pass !== draft.pass2) return { key: 'auth.pass-mismatch', field: 'pass2' };
-  if (draft.email.trim() && parseRecoveryEmail(draft.email) === null) return { key: 'acc.email.rule', field: 'email' };
-  return null;
+  if (!validPassword(draft.pass)) problems.push({ key: 'acc.pass.rule', field: 'pass' });
+  else if (draft.pass !== draft.pass2) problems.push({ key: 'auth.pass-mismatch', field: 'pass2' });
+  if (draft.email.trim() && parseRecoveryEmail(draft.email) === null) problems.push({ key: 'acc.email.rule', field: 'email' });
+  return problems;
 }
 
 /** Что уходит на сервер. Почты нет вовсе, если её не заполнили (правило 3). */

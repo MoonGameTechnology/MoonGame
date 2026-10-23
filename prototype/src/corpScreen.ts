@@ -1,6 +1,16 @@
+import { corpHubBadges, corpHubState } from '../../decisions/corpHub';
 import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
 import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
 import { corpBuildingsHtml, updateCorpConstructionCountdown } from './corpBuildingsView';
+import {
+  CORP_HUB_SECTIONS,
+  corpHubHtml,
+  corpHubSheetHtml,
+  updateCorpHubCountdown,
+  type CorpHubPaint,
+  type CorpHubSection,
+  type CorpHubSheet,
+} from './corpHubView';
 /**
  * Corporation cabinet (AVA-C1/C2, REFM-11) — the cross-session alliance management
  * screen designed in docs/corporation-ui.md, over the live CORP-0/AVA-2..9/MED-1 HTTP
@@ -224,15 +234,37 @@ export interface CorpHost {
   errText(code: string): string;
   /** Fire a just-in-time intro card by id (`corp`, `ava`). */
   onIntro(id: string): void;
+  /** CORP-3 — the hub «Корпорация» tab: its panel (`#hp-corp`), the sheet over the hub
+   *  (`#corp-sheet`) and the hub's status line. Toasts lie under the hub, so the tab's
+   *  refusals go to that line, or into the sheet while one is open. */
+  hub: {
+    root(): HTMLElement;
+    sheet(): HTMLElement;
+    note(text: string): void;
+    /** Accounts are on, so a guest can be offered a sign-in. */
+    canSignIn(): boolean;
+    signIn(): void;
+  };
 }
 
-/** Wire the cabinet up. Call once at boot — it attaches the overlay's and the tab
- *  row's click delegates. `mine()` is how the profile card reads the live corp record
- *  (its influence line and subtitle) without reaching into this screen's internals. */
+/** Wire the cabinet up. Call once at boot — it attaches the overlay's, the tab row's and
+ *  the hub tab's click delegates. `mine()` is how the profile card reads the live corp
+ *  record (its influence line and subtitle) without reaching into this screen's internals.
+ *  `open(tab)` opens on that tab (an id from `CORP_TABS`); without it, on the last one.
+ *  The hub tab and the overlay paint from the same state and send the same intents. */
 export function initCorp(host: CorpHost): {
-  open: () => void;
+  open: (tab?: string) => void;
   close: () => void;
   mine: () => { corp: CorpRecord | null; membership: CorpMembership | null };
+  /** The hub tab came into view: paint, refresh, start the tick. */
+  showHub: () => void;
+  /** The hub tab left view (another tab, a match): stop the tick, drop the sheet. */
+  hideHub: () => void;
+  /** Put the tab on a section — the news feed's doors land here. */
+  showSection: (section: CorpHubSection) => void;
+  /** Back ladder: the sheet over the hub. */
+  hubSheetOpen: () => boolean;
+  closeHubSheet: () => void;
 } {
   let infrastructure: CorpInfrastructureView | null = null;
   let infrastructureAt = 0;
@@ -271,6 +303,23 @@ export function initCorp(host: CorpHost): {
   let medalDefs: MedalDef[] = [];
   let medalsOwned: string[] = [];
   let showcase: string[] = readShowcase(readRaw(SHOWCASE_KEY));
+  // Чтение в пути: приказ ждёт его, а не теряется (кнопки во время чтения не гаснут).
+  let refreshing: Promise<void> | null = null;
+  let refreshedAt = 0; // начало последнего чтения — тик базы не стучится чаще
+
+  // --- вкладка хаба «Корпорация» (CORP-3) ------------------------------------------
+  let hubShown = false;
+  let hubSection: CorpHubSection = 'base';
+  let hubSheet: CorpHubSheet | null = null;
+  // Взведённая кнопка необратимого приказа: второе нажатие исполняет, любое другое снимает.
+  let hubArmed: string | null = null;
+  // Отказ сервера, пока открыта шторка: строка хаба лежит под ней.
+  let hubNotice = '';
+  let hubTimer: ReturnType<typeof setInterval> | undefined;
+  // Вход известен после первого чтения; до него вкладка — загрузка, а не приглашение войти.
+  let signedIn: boolean | null = null;
+  let answered = false; // сервер хотя бы раз ответил на /corps/me
+  let mineFailed = false; // последний /corps/me не удался
 
   /** Shared authenticated call for the corp/AvA/medals APIs — the host resolves the
    *  session exactly as it does for ARS-5's /arsenal/me, but there is no local cache: this data is too volatile (roster windows, challenges)
@@ -295,13 +344,23 @@ export function initCorp(host: CorpHost): {
       const body = (await res.json().catch(() => null)) as unknown;
       if (!res.ok) {
         const code = (body as { error?: unknown } | null)?.error;
-        if (typeof code === 'string') host.note('✖ ' + host.errText(code));
+        if (typeof code === 'string') surface('✖ ' + host.errText(code));
         return null;
       }
       return body;
     } catch {
       return null;
     }
+  }
+
+  /** Отказ сервера — туда, где его увидят: тосты лежат под хабом, строка хаба — под
+   *  шторкой. */
+  function surface(text: string): void {
+    if (!hubShown) host.note(text);
+    else if (hubSheet) {
+      hubNotice = text;
+      renderHubSheet();
+    } else host.hub.note(text);
   }
 
   /** Приказ кабинета «выстрелил и забыл»: исход назван (RESIL-1), а имя ему даёт сам
@@ -313,124 +372,144 @@ export function initCorp(host: CorpHost): {
 
   /** Full refresh of the cabinet's live state, then re-render. Cheap enough to
    *  call after every intent (create/apply/accept/kick/…) — the server is the
-   *  only source of truth, no local optimistic membership mutation. */
-  async function refreshCorp(): Promise<void> {
-    if (corpFetchBusy) return;
+   *  only source of truth, no local optimistic membership mutation. A refresh
+   *  already in flight is joined rather than doubled. */
+  function refreshCorp(): Promise<void> {
+    if (!refreshing)
+      refreshing = reloadCorp().finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
+  }
+
+  async function reloadCorp(): Promise<void> {
     corpFetchBusy = true;
-    infrastructureAt = performance.now();
+    refreshedAt = performance.now();
     try {
-      const mineRaw = (await corpFetch('/corps/me')) as {
-        corp?: unknown;
-        membership?: unknown;
-        features?: { ava?: boolean; medals?: boolean };
-      } | null;
-      avaAvailable = mineRaw?.features?.ava !== false;
-      medalsAvailable = mineRaw?.features?.medals !== false;
-      infrastructure = null;
-      corpMine = mineRaw
-        ? { corp: parseCorpRecord(mineRaw.corp), membership: parseMembership(mineRaw.membership) }
-        : { corp: null, membership: null };
-
-      if (corpMine.membership) {
-        const corpId = corpMine.membership.corpId;
-        const detailRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}`)) as {
-          corp?: unknown;
-          members?: unknown;
-        } | null;
-        const corp = detailRaw ? parseCorpRecord(detailRaw.corp) : null;
-        corpDetail = corp ? { corp, members: parseMemberships(detailRaw?.members) } : null;
-        if (corpMine.membership.role !== 'recruit') {
-          infrastructure = parseCorpInfrastructure(await corpFetch(`/corps/${encodeURIComponent(corpId)}/infrastructure`));
-          infrastructureAt = performance.now();
-          if (infrastructure && corpMine.corp) corpMine.corp.influence = infrastructure.influence;
-        }
-        if (canManage(corpMine.membership.role)) {
-          const auditRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}/audit`)) as {
-            audit?: unknown;
-          } | null;
-          corpAudit = parseAudit(auditRaw?.audit);
-        } else {
-          corpAudit = [];
-        }
-        corpBrowseList = [];
-      } else {
-        corpDetail = null;
-        corpAudit = [];
-        const listRaw = (await corpFetch('/corps')) as { corps?: unknown } | null;
-        corpBrowseList = parseCorpSummaries(listRaw?.corps);
-      }
-
-      // Место в общей доске и награды — только когда корпорация есть: у безкорпного
-      // и то и другое пусто по смыслу, а лишний запрос стоит сети.
-      if (corpMine.membership) {
-        const board = (await corpFetch('/leaderboard')) as {
-          corps?: { me?: { rank?: unknown } };
-        } | null;
-        const rank = board?.corps?.me?.rank;
-        corpRank = typeof rank === 'number' ? rank : null;
-        const catRaw = ((medalsAvailable ? await corpFetch('/medals') : null)) as { medals?: unknown } | null;
-        medalDefs = parseMedalDefs(catRaw?.medals);
-        const mineMedals = ((medalsAvailable ? await corpFetch('/medals/me') : null)) as { medals?: unknown } | null;
-        medalsOwned = parseMedals(mineMedals?.medals).map((m) => m.medalId);
-      } else {
-        corpRank = null;
-        medalDefs = [];
-        medalsOwned = [];
-      }
-
-      const challengesRaw = ((avaAvailable ? await corpFetch('/ava/challenges') : null)) as { challenges?: unknown } | null;
-      avaChallenges = parseChallenges(challengesRaw?.challenges);
-      const poolRaw = ((avaAvailable ? await corpFetch('/ava/pool') : null)) as { pool?: unknown } | null;
-      avaPool = parseReadyPool(poolRaw?.pool);
-      // Лента ПУБЛИЧНАЯ и общая: вкладка «Битвы» отбирает из неё свои бои, поэтому окно
-      // берётся шире восьми записей — иначе чужие войны вытеснят мои из истории.
-      const feedRaw = ((avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
-      avaFeed = parseFeed(feedRaw?.feed);
-
-      // A locked-or-accepted matchup my corp is party to: show its roster window.
-      const myCorpId = corpMine.membership?.corpId;
-      const activeMatchup = avaChallenges.find(
-        (c) =>
-          (c.status === 'accepted' || c.status === 'locked') &&
-          (c.challengerCorp === myCorpId || c.targetCorp === myCorpId),
-      );
-      avaRoster = activeMatchup
-        ? parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(activeMatchup.id)}`))
-        : null;
-
-      // The setRoster eligibility set (AVA-6) — head/officer only, only while curating.
-      avaReadyPlayers =
-        avaRoster?.status === 'accepted' &&
-        myCorpId &&
-        corpMine.membership &&
-        canManage(corpMine.membership.role)
-          ? parseAccountIds(
-              (
-                (await corpFetch(`/corps/${encodeURIComponent(myCorpId)}/ready-players`)) as {
-                  accountIds?: unknown;
-                } | null
-              )?.accountIds,
-            )
-          : [];
+      await loadCorp();
     } finally {
       corpFetchBusy = false;
     }
-    renderCorp();
+    paint();
+  }
+
+  async function loadCorp(): Promise<void> {
+    signedIn = (await host.authorizedBase()) !== null;
+    const mineRaw = (signedIn ? await corpFetch('/corps/me') : null) as {
+      corp?: unknown;
+      membership?: unknown;
+      features?: { ava?: boolean; medals?: boolean };
+    } | null;
+    // Отказ чтения — не «корпорации нет»: остаётся прежняя картина (decisions/corpHub.ts).
+    mineFailed = signedIn && mineRaw === null;
+    if (mineFailed) return;
+    answered = signedIn;
+    avaAvailable = mineRaw?.features?.ava !== false;
+    medalsAvailable = mineRaw?.features?.medals !== false;
+    corpMine = mineRaw
+      ? { corp: parseCorpRecord(mineRaw.corp), membership: parseMembership(mineRaw.membership) }
+      : { corp: null, membership: null };
+
+    if (corpMine.membership) {
+      const corpId = corpMine.membership.corpId;
+      const detailRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}`)) as {
+        corp?: unknown;
+        members?: unknown;
+      } | null;
+      const corp = detailRaw ? parseCorpRecord(detailRaw.corp) : null;
+      corpDetail = corp ? { corp, members: parseMemberships(detailRaw?.members) } : null;
+      // Базу не гасим на время чтения: прежняя остаётся на экране до нового ответа.
+      if (corpMine.membership.role !== 'recruit') {
+        infrastructure = parseCorpInfrastructure(await corpFetch(`/corps/${encodeURIComponent(corpId)}/infrastructure`));
+        infrastructureAt = performance.now();
+        if (infrastructure && corpMine.corp) corpMine.corp.influence = infrastructure.influence;
+      } else infrastructure = null;
+      if (canManage(corpMine.membership.role)) {
+        const auditRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}/audit`)) as {
+          audit?: unknown;
+        } | null;
+        corpAudit = parseAudit(auditRaw?.audit);
+      } else {
+        corpAudit = [];
+      }
+      corpBrowseList = [];
+    } else {
+      corpDetail = null;
+      corpAudit = [];
+      infrastructure = null;
+      const listRaw = (await corpFetch('/corps')) as { corps?: unknown } | null;
+      corpBrowseList = parseCorpSummaries(listRaw?.corps);
+    }
+
+    // Место в общей доске и награды — только когда корпорация есть: у безкорпного
+    // и то и другое пусто по смыслу, а лишний запрос стоит сети.
+    if (corpMine.membership) {
+      const board = (await corpFetch('/leaderboard')) as {
+        corps?: { me?: { rank?: unknown } };
+      } | null;
+      const rank = board?.corps?.me?.rank;
+      corpRank = typeof rank === 'number' ? rank : null;
+      const catRaw = ((medalsAvailable ? await corpFetch('/medals') : null)) as { medals?: unknown } | null;
+      medalDefs = parseMedalDefs(catRaw?.medals);
+      const mineMedals = ((medalsAvailable ? await corpFetch('/medals/me') : null)) as { medals?: unknown } | null;
+      medalsOwned = parseMedals(mineMedals?.medals).map((m) => m.medalId);
+    } else {
+      corpRank = null;
+      medalDefs = [];
+      medalsOwned = [];
+    }
+
+    const challengesRaw = ((avaAvailable ? await corpFetch('/ava/challenges') : null)) as { challenges?: unknown } | null;
+    avaChallenges = parseChallenges(challengesRaw?.challenges);
+    const poolRaw = ((avaAvailable ? await corpFetch('/ava/pool') : null)) as { pool?: unknown } | null;
+    avaPool = parseReadyPool(poolRaw?.pool);
+    // Лента ПУБЛИЧНАЯ и общая: вкладка «Битвы» отбирает из неё свои бои, поэтому окно
+    // берётся шире восьми записей — иначе чужие войны вытеснят мои из истории.
+    const feedRaw = ((avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
+    avaFeed = parseFeed(feedRaw?.feed);
+
+    // A locked-or-accepted matchup my corp is party to: show its roster window.
+    const myCorpId = corpMine.membership?.corpId;
+    const activeMatchup = avaChallenges.find(
+      (c) =>
+        (c.status === 'accepted' || c.status === 'locked') &&
+        (c.challengerCorp === myCorpId || c.targetCorp === myCorpId),
+    );
+    avaRoster = activeMatchup
+      ? parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(activeMatchup.id)}`))
+      : null;
+
+    // The setRoster eligibility set (AVA-6) — head/officer only, only while curating.
+    avaReadyPlayers =
+      avaRoster?.status === 'accepted' &&
+      myCorpId &&
+      corpMine.membership &&
+      canManage(corpMine.membership.role)
+        ? parseAccountIds(
+            (
+              (await corpFetch(`/corps/${encodeURIComponent(myCorpId)}/ready-players`)) as {
+                accountIds?: unknown;
+              } | null
+            )?.accountIds,
+          )
+        : [];
   }
 
   /** Fire an intent, then always refresh (the server is authoritative — no local
-   *  guess at the new state). */
+   *  guess at the new state). A refresh in flight is waited out first: its answer
+   *  predates the order. */
   async function corpIntent(path: string, body?: unknown): Promise<void> {
-    if (intentBusy || corpFetchBusy) return;
+    if (intentBusy) return;
     intentBusy = true;
-    renderCorp();
+    paint();
     try {
+      if (refreshing) await refreshing;
       await corpFetch(path, { method: 'POST', body: body ?? {} });
       // Refresh even on rejection/timeout: the server may have committed the order.
       await refreshCorp();
     } finally {
       intentBusy = false;
-      renderCorp();
+      paint();
     }
   }
 
@@ -753,7 +832,11 @@ export function initCorp(host: CorpHost): {
     host.body().innerHTML = body;
   }
 
-  function openCorp(): void {
+  function openCorp(tab?: string): void {
+    if (tab !== undefined && CORP_TABS.some((ct) => ct.id === tab)) {
+      corpTab = tab;
+      cupSlot = null; // витрина живёт только на «Штабе»
+    }
     renderCorp(); // paint instantly from whatever's cached in memory…
     host.root().style.display = 'flex';
     detach('корпорация: обновление кабинета', refreshCorp()); // …then refresh from the server
@@ -761,12 +844,21 @@ export function initCorp(host: CorpHost): {
     if (infrastructureTimer !== undefined) clearInterval(infrastructureTimer);
     infrastructureTimer = setInterval(() => {
       if (corpFetchBusy || intentBusy || corpTab !== 'buildings') return;
-      const elapsed = performance.now() - infrastructureAt;
-      const due = infrastructure?.construction?.completesAt;
-      if (elapsed >= 30_000 || (due !== undefined && infrastructure && infrastructure.serverNow + elapsed >= due)) {
-        detach('corporation infrastructure refresh', refreshCorp());
-      } else if (infrastructure) updateCorpConstructionCountdown(host.body(), infrastructure, elapsed);
+      if (baseStale(30_000)) detach('corporation infrastructure refresh', refreshCorp());
+      else if (infrastructure)
+        updateCorpConstructionCountdown(host.body(), infrastructure, performance.now() - infrastructureAt);
     }, 1000);
+  }
+  /** Пора перечитать: с прошлого чтения прошло `periodMs` или стройка по часам сервера
+   *  уже кончилась — тогда не чаще раза в 5 с, чтобы обрыв сети не стал запросом в секунду. */
+  function baseStale(periodMs: number): boolean {
+    const since = performance.now() - refreshedAt;
+    const due = infrastructure?.construction?.completesAt;
+    const done =
+      due !== undefined &&
+      infrastructure !== null &&
+      infrastructure.serverNow + (performance.now() - infrastructureAt) >= due;
+    return since >= periodMs || (done && since >= 5_000);
   }
   /** Ступень Back: сначала закрывается ВИТРИНА, и только потом сам кабинет — иначе
    *  аппаратная кнопка выбрасывала бы игрока из корпорации целиком с полпути выбора. */
@@ -824,11 +916,16 @@ export function initCorp(host: CorpHost): {
       return;
     }
     const btn = tg.closest('[data-corpact]') as HTMLElement | null;
-    const act = btn?.dataset.corpact;
-    if (!act || (btn as HTMLButtonElement | null)?.disabled) return;
-    const arg = btn?.dataset.corparg ?? '';
+    if (btn) runAct(btn);
+  });
+
+  /** Приказ кнопки `data-corpact` — один у окна в партии и у вкладки хаба. */
+  function runAct(btn: HTMLElement): void {
+    const act = btn.dataset.corpact;
+    if (!act || (btn as HTMLButtonElement).disabled) return;
+    const arg = btn.dataset.corparg ?? '';
     const corpId = corpMine.membership?.corpId ?? '';
-    const account = btn?.dataset.corpaccount ?? '';
+    const account = btn.dataset.corpaccount ?? '';
     switch (act) {
       case 'buildings':
         corpTab = 'buildings';
@@ -845,13 +942,17 @@ export function initCorp(host: CorpHost): {
         break;
       }
       case 'create': {
-        const input = document.getElementById('corpnewname') as HTMLInputElement | null;
+        // Поле названия — своё у окна и у вкладки хаба; кнопка называет его сама.
+        const input = document.getElementById(btn.dataset.corpinput ?? 'corpnewname') as HTMLInputElement | null;
         const name = input?.value.trim() ?? '';
         if (name) corpSend(act, '/corps', { name });
         break;
       }
       case 'apply':
         corpSend(act, `/corps/${encodeURIComponent(arg)}/apply`);
+        break;
+      case 'cancel':
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/cancel`);
         break;
       case 'accept':
         corpSend(act, `/corps/${encodeURIComponent(corpId)}/accept`, { target: arg });
@@ -865,7 +966,7 @@ export function initCorp(host: CorpHost): {
       case 'role':
         corpSend(act, `/corps/${encodeURIComponent(corpId)}/role`, {
           target: arg,
-          role: btn?.dataset.corprole,
+          role: btn.dataset.corprole,
         });
         break;
       case 'transfer':
@@ -905,7 +1006,7 @@ export function initCorp(host: CorpHost): {
           corpFetch('/ava/ready/player', { method: 'POST' }).then((r) => {
             if (r) {
               playerReadyOptimistic = true;
-              renderCorp();
+              paint();
             }
           }),
         );
@@ -916,7 +1017,7 @@ export function initCorp(host: CorpHost): {
           corpFetch('/ava/ready/player/clear', { method: 'POST' }).then((r) => {
             if (r) {
               playerReadyOptimistic = false;
-              renderCorp();
+              paint();
             }
           }),
         );
@@ -945,10 +1046,208 @@ export function initCorp(host: CorpHost): {
         break;
       }
     }
+  }
+
+  // --- вкладка хаба «Корпорация» (CORP-3) ------------------------------------------
+
+  /** Обе картины корпорации — окно в партии и вкладка хаба — из одного состояния. */
+  function paint(): void {
+    renderCorp();
+    renderHub();
+  }
+
+  function hubPaint(): CorpHubPaint {
+    const me = corpMine.membership;
+    const members = corpDetail?.members ?? [];
+    return {
+      state: corpHubState({ signedIn: signedIn ?? true, answered, failed: mineFailed, role: me?.role ?? null }),
+      section: hubSection,
+      corp: corpMine.corp,
+      me,
+      members,
+      view: infrastructure,
+      elapsedMs: performance.now() - infrastructureAt,
+      rank: corpRank,
+      journal: me && canManage(me.role) ? corpAudit : null,
+      browse: corpBrowseList,
+      busy: intentBusy,
+      armed: hubArmed,
+      badges: corpHubBadges(me, members, avaChallenges),
+      // «Битвы» до CORP-10 — те же построители, что у окна в партии.
+      battles: hubSection === 'battles' ? corpWarsHtml() + (avaAvailable ? corpBattlesHtml() : '') : '',
+      canSignIn: host.hub.canSignIn(),
+      now: Date.now(),
+    };
+  }
+
+  function renderHub(): void {
+    if (!hubShown) return;
+    const root = host.hub.root();
+    // Перерисовка не теряет набранное название и место на панораме.
+    const input = root.querySelector<HTMLInputElement>('#corp-hub-name');
+    const typed = input?.value ?? '';
+    const focused = input !== null && input === document.activeElement;
+    const scroll = root.querySelector<HTMLElement>('.cb-pano-scroll')?.scrollLeft ?? null;
+    const p = hubPaint();
+    root.innerHTML = corpHubHtml(p);
+    const nextInput = root.querySelector<HTMLInputElement>('#corp-hub-name');
+    if (nextInput) {
+      nextInput.value = typed;
+      if (focused) nextInput.focus();
+    }
+    // Панорама впервые на экране — штабом в середину: на телефоне она шире экрана.
+    const pano = root.querySelector<HTMLElement>('.cb-pano-scroll');
+    if (pano) pano.scrollLeft = scroll ?? (pano.scrollWidth - pano.clientWidth) / 2;
+    renderHubSheet(p);
+  }
+
+  /** Шторка над хабом. Здания или участника больше нет — она закрывается сама. */
+  function renderHubSheet(p?: CorpHubPaint): void {
+    const el = host.hub.sheet();
+    const html = hubShown && hubSheet ? corpHubSheetHtml(p ?? hubPaint(), hubSheet, hubNotice) : '';
+    if (!html) {
+      hubSheet = null;
+      hubNotice = '';
+      el.classList.remove('open');
+      el.innerHTML = '';
+      return;
+    }
+    const top = el.querySelector<HTMLElement>('.cb-sheet-body')?.scrollTop ?? 0;
+    el.innerHTML = html;
+    el.classList.add('open');
+    const body = el.querySelector<HTMLElement>('.cb-sheet-body');
+    if (body) body.scrollTop = top;
+  }
+
+  // Что открыло шторку: закрылась — фокус туда же. Панель могла перерисоваться, поэтому
+  // кнопка ищется по своему атрибуту, а не по узлу.
+  let sheetFrom: { attr: string; value: string } | null = null;
+
+  function openSheet(sheet: CorpHubSheet, attr: string, value: string): void {
+    hubSheet = sheet;
+    hubNotice = '';
+    sheetFrom = { attr, value };
+    renderHubSheet();
+    host.hub.sheet().querySelector<HTMLElement>('.cb-sheet-top .btn-x')?.focus();
+  }
+
+  function closeHubSheet(): void {
+    if (!hubSheet) return;
+    hubSheet = null;
+    renderHubSheet();
+    const from = sheetFrom;
+    if (from)
+      Array.from(host.hub.root().querySelectorAll<HTMLElement>(`[${from.attr}]`))
+        .find((el) => el.getAttribute(from.attr) === from.value)
+        ?.focus();
+  }
+
+  function pickSection(section: CorpHubSection): void {
+    hubSection = section;
+    renderHub();
+    if (section === 'battles') host.onIntro('ava');
+  }
+
+  function onHubClick(e: Event): void {
+    const tg = e.target as HTMLElement | null;
+    if (!tg) return;
+    // Любое нажатие снимает взвод; второе нажатие по взведённой кнопке исполняет приказ.
+    const armed = hubArmed;
+    hubArmed = null;
+    const confirm = tg.closest<HTMLElement>('[data-corpconfirm]');
+    if (confirm && !(confirm as HTMLButtonElement).disabled) {
+      const key = confirm.dataset.corpconfirm ?? '';
+      if (armed === key) {
+        runAct(confirm);
+        if (hubSheet?.kind === 'member') closeHubSheet();
+      } else hubArmed = key;
+      renderHub();
+      return;
+    }
+    if (armed !== null) renderHub();
+    if (tg.closest('[data-corp-close]')) {
+      closeHubSheet();
+      return;
+    }
+    const sec = tg.closest<HTMLElement>('[data-corpsec]')?.dataset.corpsec;
+    if (sec) {
+      const section = CORP_HUB_SECTIONS.find((s) => s === sec);
+      if (section) pickSection(section);
+      return;
+    }
+    const bld = tg.closest<HTMLElement>('[data-corpbld]')?.dataset.corpbld;
+    if (bld) {
+      openSheet({ kind: 'building', id: bld }, 'data-corpbld', bld);
+      return;
+    }
+    const nav = tg.closest<HTMLElement>('[data-corphub]');
+    if (nav) {
+      const what = nav.dataset.corphub;
+      if (what === 'levels') openSheet({ kind: 'levels' }, 'data-corphub', 'levels');
+      else if (what === 'member') {
+        const id = nav.dataset.corparg ?? '';
+        openSheet({ kind: 'member', accountId: id }, 'data-corparg', id);
+      } else if (what === 'refresh') detach('корпорация: обновление вкладки', refreshCorp());
+      else if (what === 'signin') host.hub.signIn();
+      return;
+    }
+    const btn = tg.closest<HTMLElement>('[data-corpact]');
+    if (!btn) return;
+    runAct(btn);
+    // Смена роли участника видна в составе — его шторка больше не нужна.
+    if (btn.dataset.corpact === 'role' && hubSheet?.kind === 'member') closeHubSheet();
+  }
+
+  function hubTick(): void {
+    if (corpFetchBusy || intentBusy) return;
+    if (baseStale(60_000)) {
+      detach('корпорация: обновление вкладки', refreshCorp());
+      return;
+    }
+    if (!infrastructure) return;
+    const elapsed = performance.now() - infrastructureAt;
+    updateCorpHubCountdown(host.hub.root(), infrastructure, elapsed);
+    if (hubSheet) updateCorpHubCountdown(host.hub.sheet(), infrastructure, elapsed);
+  }
+
+  function showHub(): void {
+    hubShown = true;
+    renderHub(); // то, что уже в памяти, — сразу…
+    host.onIntro('corp');
+    detach('корпорация: обновление вкладки', refreshCorp()); // …и свежее с сервера
+    if (hubTimer !== undefined) clearInterval(hubTimer);
+    hubTimer = setInterval(hubTick, 1000);
+  }
+
+  function hideHub(): void {
+    if (hubTimer !== undefined) clearInterval(hubTimer);
+    hubTimer = undefined;
+    hubShown = false;
+    hubArmed = null;
+    hubSheet = null;
+    renderHubSheet();
+  }
+
+  host.hub.root().addEventListener('click', onHubClick);
+  host.hub.sheet().addEventListener('click', onHubClick);
+  // Enter в поле названия — то же, что кнопка «Создать корпорацию».
+  host.hub.root().addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key !== 'Enter' || (e.target as HTMLElement | null)?.id !== 'corp-hub-name') return;
+    const create = host.hub.root().querySelector<HTMLElement>('[data-corpinput="corp-hub-name"]');
+    if (create) runAct(create);
   });
+
   return {
     open: openCorp,
     close: closeCorp,
     mine: () => corpMine,
+    showHub,
+    hideHub,
+    showSection: (section) => {
+      hubSection = section;
+      renderHub();
+    },
+    hubSheetOpen: () => hubSheet !== null,
+    closeHubSheet,
   };
 }

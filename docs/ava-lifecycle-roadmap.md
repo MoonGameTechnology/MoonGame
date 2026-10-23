@@ -319,11 +319,14 @@ fixed playerId | E_NOT_ROSTERED` (mapping из `matchup.slot→account`), вст
 >   `playerId=bot:<slot>`). `playerId = slotId` — id аккаунта не течёт в общий state;
 >   лоадаут = стартовый набор слота (снапшот арсенала отложен).
 > - **`orchestrate(matchupId)`** (идемпотентно): матчап должен быть `locked`; размер =
->   `max(сторона)` (короткую добивают боты) → `pickAvaMap(maps, 2, slotsPerSide, rng)`
->   (seeded `ava:<matchupId>` — детерминизм/аудит; нет карты → `E_NO_MAP`); state со
->   `crossTeamStart:'peace'` (S5); комната поднимается через инжектируемый `createRoom`
->   (снапшот в стор — ленивый реестр грузит на коннекте, как любой матч), затем
->   `AvaSessionStore.create` пишет связку. Коды `E_NO_MATCHUP`/`E_NOT_LOCKED`/`E_NO_MAP`.
+>   `max(сторона)` (короткую добивают боты) → режим `team_NvN` с постоянными сторонами
+>   (`avaModeId`, у дуэли режима нет) → `pickAvaMap(maps, 2, slotsPerSide, rng)`
+>   (seeded `ava:<matchupId>` — детерминизм/аудит; нет карты или режима → `E_NO_MAP`, и
+>   свип отменяет матчап с возвратом вызова — CORP-4); state со `crossTeamStart:'peace'`
+>   (S5), версией модулей хоста и `modeId`; комната поднимается через инжектируемый
+>   `createRoom` (хост: `createAvaRoom` — комната на своих часах от нуля; снапшот в стор —
+>   ленивый реестр грузит на коннекте, как любой матч), затем `AvaSessionStore.create`
+>   пишет связку. Коды `E_NO_MATCHUP`/`E_NOT_LOCKED`/`E_NO_MAP`.
 > - **`AvaSessionStore`** (Memory+Postgres `ava_sessions`, PK match_id + UNIQUE matchup_id):
 >   `matchId`, `matchupId`, `mapId`, `seats` (account→playerId) — одна сессия на матчап и
 >   на инстанс. Restart-safe опора для `resolveAvaSeat` и (AVA-8) маппинга итога.

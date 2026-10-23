@@ -1,0 +1,533 @@
+{
+  "uid": "moongame-player-activity",
+  "title": "MoonGame — активность игроков",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "30s",
+  "timezone": "utc",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "tags": [
+    "moongame",
+    "players"
+  ],
+  "links": [
+    {
+      "title": "Обзор плейтеста",
+      "type": "link",
+      "url": "/d/moongame-overview"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Игроков онлайн",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "description": "Уникальные аккаунты с подтверждённым сигналом от видимого приложения за последние 70 секунд. При аварийном закрытии возможен хвост до 70 секунд.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_players_online and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "title": "Свежесть данных",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - moongame_player_activity_sample_timestamp_seconds and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "title": "Начало сбора",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_player_activity_since_timestamp_seconds * 1000 and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "decimals": 2,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "type": "text",
+      "title": "Как читать графики",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 6
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Последние **30 календарных дней UTC**, включая текущий неполный день. Считаются аккаунты с новым клиентом. Время — подтверждённые интервалы видимого приложения; вкладки и устройства одного аккаунта не удваивают его. Сигнал раз в 30 секунд; при потерях возможен недосчёт. Разрывы более 70 секунд не учитываются. «Заходы» — открытия и возвраты. Истории до начала сбора нет; старым APK нужно обновление."
+      }
+    },
+    {
+      "id": 5,
+      "title": "Одновременный онлайн",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Количество уникальных аккаунтов, а не WebSocket-соединений.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_players_online and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": false,
+          "range": true,
+          "format": "time_series",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Уникальные игроки по дням",
+      "type": "barchart",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 9
+      },
+      "description": "Суточные агрегаты за последние 30 дней UTC. Текущий день неполный; до начала сбора данных нет. При удалении аккаунта его строки исключаются из пересчёта.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_player_activity_daily_players and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "day",
+        "orientation": "vertical",
+        "showValue": "auto",
+        "barWidth": 0.85,
+        "groupWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "xTickLabelRotation": -45
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "day",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "day",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value": "Уникальные игроки по дням"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Заходы и возвраты по дням",
+      "type": "barchart",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 9
+      },
+      "description": "Суточные агрегаты за последние 30 дней UTC. Текущий день неполный; до начала сбора данных нет. При удалении аккаунта его строки исключаются из пересчёта.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_player_activity_daily_visits and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "day",
+        "orientation": "vertical",
+        "showValue": "auto",
+        "barWidth": 0.85,
+        "groupWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "xTickLabelRotation": -45
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "day",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "day",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value": "Заходы и возвраты по дням"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Время онлайн по дням, игроко-часы",
+      "type": "barchart",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 12,
+        "h": 9
+      },
+      "description": "Суточные агрегаты за последние 30 дней UTC. Текущий день неполный; до начала сбора данных нет. При удалении аккаунта его строки исключаются из пересчёта.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_player_activity_daily_online_seconds / 3600 and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 2,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "day",
+        "orientation": "vertical",
+        "showValue": "auto",
+        "barWidth": 0.85,
+        "groupWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "xTickLabelRotation": -45
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "day",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "day",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value": "Время онлайн по дням, игроко-часы"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Среднее время на игрока, минуты",
+      "type": "barchart",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 12,
+        "h": 9
+      },
+      "description": "Суточные агрегаты за последние 30 дней UTC. Текущий день неполный; до начала сбора данных нет. При удалении аккаунта его строки исключаются из пересчёта.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_player_activity_daily_online_seconds / clamp_min(moongame_player_activity_daily_players, 1) / 60 and on(job,instance) ((moongame_source_up{source=\"activity\"} == 1) and on(job,instance) (time() - moongame_player_activity_sample_timestamp_seconds < 45))",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "Игроки"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "decimals": 2,
+          "noValue": "Нет данных",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "cyan"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "day",
+        "orientation": "vertical",
+        "showValue": "auto",
+        "barWidth": 0.85,
+        "groupWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "xTickLabelRotation": -45
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "day",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "day",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value": "Среднее время на игрока, минуты"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { buildingLevel, type ResourceBag } from '../data/schemas';
 import type { Planet, PlayerId, UnitStack } from '../state/gameState';
 import { effectiveStats } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
+import { matchCost } from '../util/pricing';
 import type { DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { isCapturable, isStationable } from '../state/sectorKind';
@@ -254,7 +255,8 @@ export const stationModule: GameModule = {
       } else if (!isStationable(h.ctx.data, node)) {
         return h.reject('E_NOT_STATIONABLE');
       }
-      if (!canAfford(player.resources, STATION_COST)) return h.reject('E_INSUFFICIENT');
+      const cost = matchCost(h.state, STATION_COST);
+      if (!canAfford(player.resources, cost)) return h.reject('E_INSUFFICIENT');
 
       // Ядро обязано быть в каталоге: без него крепость вышла бы бестелесной — без HP,
       // без стрельбы и без уровня, то есть обещание действия не выполнилось бы. Отказ
@@ -274,7 +276,7 @@ export const stationModule: GameModule = {
       );
       if (!unlock.allowed) return h.reject(unlock.code ?? 'E_LOCKED');
 
-      payCost(player.resources, STATION_COST);
+      payCost(player.resources, cost);
       const coreHp = buildingLevel(core, 1).hp;
       if (anchor) {
         // Площадка развилки: при первой крепости здесь её ещё нет — заводим; после гибели

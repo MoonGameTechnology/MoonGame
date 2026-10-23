@@ -109,6 +109,14 @@ services:
       # PTM-0.2: salt of the analytics pseudonym in the match journal (≥32 chars). Unset ⇒
       # the journal carries no `actor`, so players can't be linked across matches and days.
       ANALYTICS_SALT: ${ANALYTICS_SALT:-}
+      ACCOUNT_DELETION_ENABLED: ${ACCOUNT_DELETION_ENABLED:-0}
+      # Push-уведомления игрокам (UIX-4.3/4.4): пара ключей VAPID и контакт отправителя
+      # (`mailto:` или `https:`). Все три пусты ⇒ push выключен целиком: нет ни `/sw.js`, ни
+      # `/push/key`, ни рассылки. Ключи держите ПОСТОЯННЫМИ: новая пара обнуляет все
+      # подписки игроков. Как сгенерировать — deploy/server.env.example.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
       # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
       # plain `docker compose up` against the public interface is safe. Override
@@ -123,6 +131,12 @@ services:
       # How many independent sessions this ONE process hosts (proto, proto-2, …):
       # all appear in the in-game match browser; each is durable in Postgres.
       MATCHES: ${MATCHES:-1}
+      # Persistent system profiles gradually fill ordinary PvP rooms (AUTH required).
+      # Lowering these limits never evicts bots from matches already in progress.
+      BOT_FILL_PERCENT: ${BOT_FILL_PERCENT:-0}
+      BOT_ACTIVE_LIMIT: ${BOT_ACTIVE_LIMIT:-20}
+      BOT_JOIN_MIN_MS: ${BOT_JOIN_MIN_MS:-300000}
+      BOT_JOIN_MAX_MS: ${BOT_JOIN_MAX_MS:-900000}
       # Durable matches: snapshots to the postgres service over the compose network.
       DATABASE_URL: postgres://${DB_RUNTIME_USER:-void}:${DB_RUNTIME_PASSWORD:-${POSTGRES_PASSWORD:-void}}@postgres:5432/void
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-1}
@@ -157,11 +171,12 @@ services:
       # TLS_CERT_FILE=/certs/fullchain.pem above. Harmless (empty) when TLS is off.
       - ./certs:/certs:ro
     # The image bakes its own HEALTHCHECK (GET /health); compose inherits it.
-    # Hardening (SEC-12; rationale in the header). No `read_only: true` here on purpose:
-    # netserver.mjs esbuild-transpiles the server INTO /app/packages/server/dist at every
-    # startup and appends match JSONL to /app/playtest-logs, so the root FS must stay
-    # writable. The image already runs as non-root (uid 65532), which is what read_only
-    # would mostly be buying.
+    # The image runs its prebuilt bundle: runtime code/dependencies stay immutable.
+    # Journals retain their persistent volume; temporary files have a small, non-executable
+    # memory filesystem instead of opening the application tree for writes.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
     security_opt:
       - no-new-privileges:true
     cap_drop:

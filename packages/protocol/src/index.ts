@@ -1,4 +1,5 @@
 export * from './corpInfrastructure';
+export * from './news';
 export type * from './metaEconomy';
 export type * from './metaEconomyView';
 export * from './commerce';

@@ -2,7 +2,7 @@
 -- Roles/passwords are cluster state: provision them first on a replacement cluster.
 DO $restore_acl$
 DECLARE
-  app_tables text[] := ARRAY['matches', 'seats', 'receipts', 'users', 'corps', 'corp_members', 'corp_audit', 'corp_gateway_nonces', 'corp_ready', 'player_ready', 'ava_challenges', 'ava_roster', 'ava_results', 'ava_sessions', 'ava_result_delivery', 'ava_feed', 'medals', 'arsenal', 'corp_arsenal_rent', 'corp_return_audit', 'meta_wallets', 'meta_market_listings', 'meta_market_ledger', 'meta_economy_accounts', 'meta_economy_receipts', 'meta_material_listings', 'meta_market_receipts', 'meta_entitlement_nonces', 'drop_claims', 'drop_meta', 'commander_xp', 'commander_credits', 'player_profiles', 'profile_progress', 'profile_credits', 'push_subscriptions', 'friend_edges'];
+  app_tables text[] := ARRAY['matches', 'seats', 'receipts', 'users', 'player_activity_channels', 'player_activity_days', 'player_activity_state','account_deletions','account_erasure_guard', 'corps', 'corp_members', 'corp_audit', 'corp_gateway_nonces', 'corp_ready', 'player_ready', 'ava_challenges', 'ava_roster', 'ava_results', 'ava_sessions', 'ava_result_delivery', 'ava_feed', 'announcements', 'medals', 'arsenal', 'corp_arsenal_rent', 'corp_return_audit', 'meta_wallets', 'meta_market_listings', 'meta_market_ledger', 'meta_economy_accounts', 'meta_economy_receipts', 'meta_material_listings', 'meta_market_receipts', 'meta_entitlement_nonces', 'drop_claims', 'drop_meta', 'commander_xp', 'commander_credits', 'player_profiles', 'profile_progress', 'profile_credits', 'bot_roster_identities', 'bot_roster_matches', 'bot_roster_assignments', 'bot_roster_results', 'registration_rewards', 'push_subscriptions', 'friend_edges'];
   item record;
 BEGIN
   IF to_regclass('public.vd_schema_revision') IS NULL THEN RETURN; END IF;
@@ -24,6 +24,12 @@ BEGIN
     EXECUTE format('ALTER TABLE public.%I OWNER TO vd_schema', item.relname);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO vd_runtime', item.relname);
   END LOOP;
+  REVOKE ALL ON public.account_erasure_guard FROM vd_runtime;
+  GRANT SELECT ON public.account_erasure_guard TO vd_runtime;
+  IF to_regclass('public.account_deletions') IS NOT NULL THEN
+    REVOKE ALL ON public.account_deletions FROM vd_runtime;
+    GRANT SELECT, INSERT ON public.account_deletions TO vd_runtime;
+  END IF;
   ALTER TABLE public.vd_schema_revision OWNER TO vd_schema;
   GRANT SELECT ON public.vd_schema_revision TO vd_runtime;
   FOR item IN SELECT s.relname FROM pg_class s JOIN pg_namespace n ON n.oid=s.relnamespace

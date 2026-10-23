@@ -12,6 +12,7 @@
 import {
   createInitialState,
   buildStateFromMap,
+  matchStart,
   deriveRoads,
   factionStart,
   shareRoadNetwork,
@@ -393,7 +394,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       seat.id,
       seat.name,
       seat.faction,
-      { credits: 260, metal: 320, food: 120, energy: 90, microelectronics: 40 },
+      // Стартовый запас — по ценам партии (`pricing.start`): в основной игре всё дороже,
+      // и запас растёт вместе с ценами, но медленнее их (резолюция владельца 2026-10-18).
+      matchStart(base.pricing, { credits: 260, metal: 320, food: 120, energy: 90, microelectronics: 40 }),
       seat.ai,
     );
     // Human seats get the research-leader council chosen at setup (before the start-point

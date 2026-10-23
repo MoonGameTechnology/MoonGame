@@ -483,6 +483,15 @@ describe('свой флот', () => {
 });
 
 describe('чужой флот', () => {
+  it('подпись чужого владельца экранирует недоверенное имя (CWE-79)', async () => {
+    const { env, card } = await boot();
+    const payload = '<img src=x onerror="alert(1)">';
+    env.names.p2 = payload;
+    const html = card('F2');
+    expect(html).not.toContain(payload);
+    expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+  });
+
   it('опознанный — состав и подпись владельца, приказов и трюма нет', async () => {
     const { card } = await boot();
     const html = card('F2');

@@ -3,6 +3,7 @@ import type { MetaMaterialListing } from '../../packages/protocol/src/metaEconom
 import type { MetaMaterialView } from '../../packages/protocol/src/metaEconomyView';
 import { hasKey, t } from '../../localization/runtime';
 import { refusalKeyOf } from '../../decisions/refusalText';
+import { canSell } from '../../decisions/arsenalView';
 import { esc, nfmt } from './format';
 import { arsenalItemName } from './arsenalScreen';
 import { detach } from './detach';
@@ -51,7 +52,7 @@ export function metaMarketHtml(
     )
     .join('');
   const sell = mine
-    .filter((i) => !i.soulbound && i.origin !== 'starter' && i.origin !== 'rent')
+    .filter(canSell)
     .map(
       (i) =>
         `<article class="mm-card"><b>${esc(arsenalItemName(i))}</b>${i.form === 'blueprint' ? `<span>${t('auction.blueprint')}</span>` : ''}<label>${t('auction.price')} <input data-mm-price="${esc(i.itemId)}" type="number" min="1" step="1" value="100"></label><button type="button" data-mm-list="${esc(i.itemId)}"${tradeDisabled}>${t('auction.list')}</button></article>`,
@@ -77,10 +78,13 @@ export function initMetaMarket(host: MetaMarketHost): {
   refresh(): Promise<void>;
   sync(): Promise<void>;
   balance(): number;
+  /** «Продать» в арсенале: после ближайшей загрузки форма этой копии в фокусе. */
+  focusSell(itemId: string): void;
 } {
   let view = empty;
   let busy = false;
   let identity = '';
+  let wantSell: string | null = null;
   const attempts = new Map<string, string>();
   const paint = () => {
     host.root().innerHTML = metaMarketHtml(view, host.arsenal(), busy);
@@ -120,6 +124,13 @@ export function initMetaMarket(host: MetaMarketHost): {
       materials: (economy as { materials?: MetaMaterialView[] }).materials ?? [],
     };
     paint();
+    if (wantSell) {
+      const price = host
+        .root()
+        .querySelector<HTMLInputElement>(`[data-mm-price="${CSS.escape(wantSell)}"]`);
+      price?.scrollIntoView({ block: 'center' });
+      wantSell = null;
+    }
     host.changed?.();
   };
   const noteError = (error: unknown) => {
@@ -131,6 +142,7 @@ export function initMetaMarket(host: MetaMarketHost): {
     try {
       await load();
     } catch (e) {
+      wantSell = null;
       noteError(e);
     }
   };
@@ -214,5 +226,12 @@ export function initMetaMarket(host: MetaMarketHost): {
       })(),
     );
   });
-  return { refresh, sync, balance: () => view.balance };
+  return {
+    refresh,
+    sync,
+    balance: () => view.balance,
+    focusSell: (itemId) => {
+      wantSell = itemId;
+    },
+  };
 }

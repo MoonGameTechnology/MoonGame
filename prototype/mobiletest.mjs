@@ -31,6 +31,8 @@ window.__mobileTest = {
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,__moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
   notices: () => __noticeFlashes.length,
+  // Стартовый разведчик без трюма (af394450): десант грузит фрегат — трюм на одно место.
+  addHold: id => { s.fleets[id].units.push({ unit: 'frigate', count: 1 }); invalidatePanel(); },
   emit: events => handleEvents(events),
 };`;
 // Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
@@ -68,42 +70,39 @@ async function drag(x, y, dx, dy) {
   await pause();
 }
 async function chooseFleet(f) {
-  // Тап ровно между флотом на орбите и его миром спорный — открывается список «флот или
-  // провинция». Тап в сам значок флота выбирает флот сразу (`tapCycle.ts`, правило 8).
+  // Тап ровно между флотом на орбите и его миром спорный. Свой мир со своим единственным
+  // флотом — не список «флот или провинция», а одна карточка с вкладками «Флот» и «Мир»,
+  // открытая на вкладке прошлого раза; без памяти — «Флот» (`worldFleetTabs.ts`, UIX-7.1).
   const home = (await p.evaluate(() => window.__mobileTest.worlds())).find((w) => w.id === f.loc);
   assert(home, 'the fleet stands on a world');
   const between = { x: (f.p.x + home.p.x) / 2, y: (f.p.y + home.p.y) / 2 };
   await p.touchscreen.tap(between.x, between.y);
   await pause();
-  let choices = (await ui()).choices;
-  const provinceIndex = choices.findIndex((x) => x.kind === 'planet');
-  assert(
-    provinceIndex >= 0 && choices.some((x) => x.kind === 'fleet'),
-    'stack picker offers the fleet and its province',
-  );
-  const province = p.locator(`[data-mobile="choose"][data-index="${provinceIndex}"]`);
-  const row = (await province.locator('b').textContent()).trim();
-  assert.notEqual(
-    row,
-    choices[provinceIndex].id,
-    'the chooser names the province, not its node id',
-  );
-  await province.tap();
+  assert.equal((await ui()).choices.length, 0, 'own world with its fleet opens no chooser');
+  assert.deepEqual((await ui()).ids, [f.id], 'the card opens on the fleet tab by default');
+  const tabs = p.locator('#mobile-sheet .mobile-tabs');
+  assert(await tabs.isVisible(), 'the card carries the Fleet / World tabs');
+  await tabs.locator('[data-tab="world"]').tap();
   await pause();
-  assert.equal((await ui()).planet, choices[provinceIndex].id);
-  assert.equal(
-    await p
-      .locator('#side .ptitle > :first-child')
-      .textContent()
-      .then((x) => x.replace(/ ▸$/, '').trim()),
-    row,
-    'the card that opens carries the same name as the chooser row',
-  );
+  assert.equal((await ui()).planet, f.loc, 'the World tab switches the card to the world');
+  const row = (await tabs.locator('[data-tab="world"]').getAttribute('aria-selected')) === 'true';
+  assert(row, 'the World tab is the selected one');
+  const title = await p
+    .locator('#side .ptitle > :first-child')
+    .textContent()
+    .then((x) => x.replace(/ ▸$/, '').trim());
+  assert.notEqual(title, f.loc, 'the card names the province, not its node id');
   // Второй тап по выбранной провинции снимает выбор, а не открывает список заново.
   await p.touchscreen.tap(between.x, between.y);
   await pause();
   assert.equal((await ui()).planet, null, 're-tap on the selected province clears the selection');
   assert.equal((await ui()).choices.length, 0, 're-tap does not reopen the chooser');
+  // Память вкладки: следующий спорный тап открывает «Мир», на котором остановились.
+  await p.touchscreen.tap(between.x, between.y);
+  await pause();
+  assert.equal((await ui()).planet, f.loc, 'the next tap reopens the tab chosen last time');
+  await p.touchscreen.tap(between.x, between.y);
+  await pause();
   const current = (await p.evaluate(() => window.__mobileTest.fleets())).find((x) => x.id === f.id);
   await p.touchscreen.tap(current.p.x, current.p.y);
   await pause();
@@ -265,7 +264,7 @@ try {
   await p.keyboard.press('Escape');
   await pause();
   assert.equal(await snapshot(), stopped);
-  console.log('PASS visible grouping, empty-group exit, object chooser and unknown province Ping');
+  console.log('PASS visible grouping, empty-group exit, own world + fleet Fleet/World tabs and unknown province Ping');
 
   await p.setViewportSize({ width: 844, height: 390 });
   await pause();
@@ -322,14 +321,23 @@ try {
     await pause();
     assert.deepEqual((await ui()).ids, [trooper.id]);
   };
+  await p.evaluate((id) => window.__mobileTest.addHold(id), trooper.id);
   await selectTrooper();
   assert.equal(await sheet.locator('[data-cmd="attack"]').count(), 0, 'no troops, no assault');
   await sheet.locator('[data-cmd="more"]').tap();
   await sheet.locator('[data-cmd="troops"]').tap();
+  // «▲» набивает трюм ЭТИМ типом доверху, поэтому после первого типа у остальных кнопка
+  // законно гаснет: места нет. Жмём только живые и проверяем, что план что-то грузит.
   for (const unit of await p
     .locator('[data-cmd="tmax"][data-dir="1"]')
-    .evaluateAll((els) => els.map((e) => e.dataset.unit)))
-    await p.locator(`[data-cmd="tmax"][data-dir="1"][data-unit="${unit}"]`).tap();
+    .evaluateAll((els) => els.map((e) => e.dataset.unit))) {
+    const up = p.locator(`[data-cmd="tmax"][data-dir="1"][data-unit="${unit}"]`);
+    if (await up.isEnabled()) await up.tap();
+  }
+  assert(
+    await p.locator('.tdelta.pos').count(),
+    'the max preset plans at least one unit for the hold',
+  );
   await p.locator('[data-cmd="tok"]').tap();
   // Панель скорости на телефоне прячется под открытой карточкой.
   await p.locator('[data-mobile="close"]').tap();

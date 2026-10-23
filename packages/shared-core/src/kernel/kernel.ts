@@ -132,6 +132,7 @@ const ENTITY_RECORDS: ReadonlySet<string> = new Set<keyof GameState>([
   'fleets',
   'battles',
   'fog',
+  'surveyed',
   'heroes',
 ]);
 
@@ -350,8 +351,11 @@ export class Kernel {
     draft: (state: GameState) => GameState,
   ): ApplyResult {
     const handler = this.actionHandlers.get(action.type);
-    if (!handler) {
-      // Fail-secure: an unknown action type is rejected, never silently ignored.
+    // Fail-secure: an unknown action type is rejected, never silently ignored. The check
+    // is on the handler being callable, not merely present: `action.type` can arrive from
+    // a message (the solo worker, `simHost.ts`), and CodeQL's
+    // js/unvalidated-dynamic-method-call accepts only a `typeof` guard on such a lookup.
+    if (typeof handler !== 'function') {
       return { ok: false, code: 'E_UNKNOWN_ACTION' };
     }
     // Terminal gate (BF-34): once the match is decided, the world is frozen — a

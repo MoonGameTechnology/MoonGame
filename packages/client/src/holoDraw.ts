@@ -174,8 +174,10 @@ export function blitSphere(
   const atlas = sphereSprite(dpr, color, frequentRead(ctx));
   const tile = atlas.width / 4;
   const frame = sphereFrame(timeMs);
-  ctx.save();
-  ctx.globalAlpha *= a;
+  // Alpha is put back by hand, as in blitGlow: a save() per node leaves ~0.8 KB on the
+  // browser's heap that only a major GC frees.
+  const alpha = ctx.globalAlpha;
+  ctx.globalAlpha = alpha * a;
   ctx.drawImage(
     atlas,
     (frame % 4) * tile,
@@ -187,5 +189,5 @@ export function blitSphere(
     r * 2,
     r * 2,
   );
-  ctx.restore();
+  ctx.globalAlpha = alpha;
 }

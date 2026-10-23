@@ -57,6 +57,13 @@ function accountFrom(accounts: Map<string, MetaEconomyAccount>, id: string): Met
 }
 
 function validAccount(account: MetaEconomyAccount): void {
+  if (
+    account.sovereigns !== undefined &&
+    (!Number.isSafeInteger(account.sovereigns) || account.sovereigns < 0)
+  )
+    throw Error('E_ECONOMY_STATE');
+  if (account.premiumUntil !== undefined && !Number.isSafeInteger(account.premiumUntil))
+    throw Error('E_ECONOMY_STATE');
   const ids = new Set<string>();
   for (const lot of account.materials) {
     if (
@@ -273,8 +280,8 @@ export class PostgresMetaEconomyStore implements MetaEconomyStore {
         },
         saveReceipt: async (key, fingerprint, response) => {
           const inserted = await db.query(
-            'INSERT INTO meta_economy_receipts(receipt_key,fingerprint,response) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING',
-            [key, fingerprint, JSON.stringify(response)],
+            'INSERT INTO meta_economy_receipts(receipt_key,fingerprint,response,account_ids) VALUES($1,$2,$3::jsonb,$4::text[]) ON CONFLICT DO NOTHING',
+            [key, fingerprint, JSON.stringify(response), [...new Set(accountIds)]],
           );
           if (!inserted.rowCount) {
             const old = await db.query<{ fingerprint: string }>(

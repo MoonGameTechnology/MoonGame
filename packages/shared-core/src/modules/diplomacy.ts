@@ -1,4 +1,4 @@
-import type { GameModule } from '../kernel/module';
+import type { GameModule, HandlerContext } from '../kernel/module';
 import { hasFixedSides } from '../action/matchMode';
 import type { DiplomaticStance } from '../state/gameState';
 import {
@@ -10,6 +10,7 @@ import {
   hasMapShareOffer,
   isBotPair,
   offerInvolves,
+  offerKey,
   setMapShare,
   setMapShareOffer,
   setOffer,
@@ -17,6 +18,16 @@ import {
   stanceToRelation,
   type DiplomacyCapability,
 } from '../state/diplomacy';
+import {
+  addMember,
+  coalitionCapacity,
+  coalitionOf,
+  COALITION_DESC_MAX,
+  COALITION_EMBLEMS,
+  foundCoalition,
+  removeMember,
+} from '../state/coalition';
+import type { PlayerId } from '../state/gameState';
 
 /** Hostility rank of a stance — the axis declarations move along. Higher = more
  *  hostile. Unilateral declarations may only move a pair UP this axis (toward
@@ -32,6 +43,27 @@ const HOSTILITY: Record<DiplomaticStance, number> = {
 
 function isStance(value: unknown): value is DiplomaticStance {
   return value === 'war' || value === 'peace' || value === 'pact' || value === 'alliance';
+}
+
+/** COAL-1: коалиции-сущности живут только в свободных режимах. В командных стороны
+ *  заданы правилами матча, и союз там — состав команды, а не договор. */
+function coalitionsOn(h: HandlerContext): boolean {
+  return !hasFixedSides(h.ctx.config?.modeId);
+}
+
+/** COAL-1: `me` выходит из своей коалиции. Союз с каждым, кто в ней остался, сменяется
+ *  миром — кроме `except` (ему вызывающий сам ставит объявленную стойку). */
+function leaveCoalition(h: HandlerContext, me: PlayerId, except: PlayerId | null): void {
+  const c = coalitionOf(h.state, me);
+  if (!c) return;
+  const rest = removeMember(h.state, me);
+  for (const other of rest) {
+    if (other === except || getStance(h.state, me, other) !== 'alliance') continue;
+    clearOffers(h.state, me, other);
+    setStance(h.state, me, other, 'peace');
+    h.emit('diplomacy.changed', { a: me, b: other, stance: 'peace', from: 'alliance' });
+  }
+  h.emit('coalition.left', { playerId: me, coalitionId: c.id });
 }
 
 /**
@@ -53,12 +85,55 @@ function isStance(value: unknown): value is DiplomaticStance {
  *    combat falls back to reading the stance directly — same behaviour, so the
  *    module degrades gracefully (invariant #3).
  */
+/** Escalation — unilateral, and it ends any negotiation in flight. Shared by
+ *  `diplomacy.declare` and the `declareWar` capability (SPY-11). */
+function escalate(
+  h: HandlerContext,
+  me: PlayerId,
+  target: PlayerId,
+  stance: DiplomaticStance,
+  from: DiplomaticStance,
+  cause?: string,
+): void {
+  clearOffers(h.state, me, target);
+  // COAL-1: отказ от союза с членом своей коалиции — это выход из неё.
+  if (from === 'alliance' && coalitionsOn(h)) leaveCoalition(h, me, target);
+  // MAPSHARE-1: война рвёт договор об обмене картами вместе с переговорами о нём.
+  // Делиться разведкой и пускать войска к тому, кому только что объявил войну, —
+  // противоречие, и держать такой договор значило бы отдавать врагу свою карту.
+  if (stance === 'war') {
+    setMapShare(h.state, me, target, false);
+    clearMapShareOffers(h.state, me, target);
+  }
+  setStance(h.state, me, target, stance);
+  h.emit('diplomacy.changed', { a: me, b: target, stance, from, ...(cause ? { cause } : {}) });
+}
+
+/** Fixed sides (team modes) are match rules: humans of two teams stay as the mode set them. */
+function fixedPair(h: HandlerContext, a: PlayerId, b: PlayerId): boolean {
+  const pa = h.state.players[a];
+  const pb = h.state.players[b];
+  return (
+    hasFixedSides(h.ctx.config?.modeId) &&
+    !!pa && !!pb && !pa.npc && !pb.npc &&
+    pa.team !== undefined && pb.team !== undefined
+  );
+}
+
 export const diplomacyModule: GameModule = {
   id: 'diplomacy',
-  version: '1.2.0',
+  // 1.6.0: explicit coalition founding; single-member coalitions persist.
+  version: '1.6.0',
   setup(api) {
     api.provideCapability<DiplomacyCapability>('diplomacy', {
       getRelation: (state, a, b) => stanceToRelation(getStance(state, a, b)),
+      declareWar: (h, a, b, cause) => {
+        if (a === b || fixedPair(h, a, b)) return false;
+        const from = getStance(h.state, a, b);
+        if (from === 'war') return false;
+        escalate(h, a, b, 'war', from, cause);
+        return true;
+      },
     });
 
     api.onAction('diplomacy.declare', (action, h) => {
@@ -93,17 +168,7 @@ export const diplomacyModule: GameModule = {
       }
 
       if (HOSTILITY[stance] > HOSTILITY[from]) {
-        // Escalation — unilateral, and it ends any negotiation in flight.
-        clearOffers(h.state, me, target);
-        // MAPSHARE-1: война рвёт договор об обмене картами вместе с переговорами о нём.
-        // Делиться разведкой и пускать войска к тому, кому только что объявил войну, —
-        // противоречие, и держать такой договор значило бы отдавать врагу свою карту.
-        if (stance === 'war') {
-          setMapShare(h.state, me, target, false);
-          clearMapShareOffers(h.state, me, target);
-        }
-        setStance(h.state, me, target, stance);
-        h.emit('diplomacy.changed', { a: me, b: target, stance, from });
+        escalate(h, me, target, stance, from);
         return;
       }
 
@@ -113,12 +178,51 @@ export const diplomacyModule: GameModule = {
       if (stance === 'alliance' && isBotPair(h.state, me, target)) {
         return h.reject('E_BOT_ALLIANCE');
       }
+      // COAL-1: союз заключается только внутри коалиции, и вместимость её держит ядро.
+      // Проверка стоит и перед предложением, и перед принятием: за время, пока
+      // предложение висело, коалиция могла заполниться.
+      const mine = stance === 'alliance' && coalitionsOn(h) ? coalitionOf(h.state, me) : null;
+      const theirs = stance === 'alliance' && coalitionsOn(h) ? coalitionOf(h.state, target) : null;
+      if (mine && theirs && mine.id !== theirs.id) {
+        return h.reject('E_COALITION_OTHER'); // сначала выйти из своей
+      }
+      const joining = mine ?? theirs;
+      if (joining && joining.members.length + 1 > coalitionCapacity(h.state)) {
+        return h.reject('E_COALITION_FULL');
+      }
       // De-escalation — the consent protocol (D3): commit on a matching
       // counter-offer, otherwise record/replace this side's standing offer.
       if (getOffer(h.state, target, me) === stance) {
         clearOffers(h.state, me, target);
         setStance(h.state, me, target, stance);
         h.emit('diplomacy.changed', { a: me, b: target, stance, from });
+        if (stance === 'alliance' && coalitionsOn(h)) {
+          if (!joining) {
+            // Первый союз двух свободных игроков создаёт коалицию; основатель — тот,
+            // чьё предложение приняли.
+            const c = foundCoalition(h.state, target, me);
+            h.emit('coalition.joined', { playerId: target, coalitionId: c.id });
+            h.emit('coalition.joined', { playerId: me, coalitionId: c.id });
+          } else {
+            // Свободный игрок вступает в коалицию: союз со ВСЕМИ её членами. Принять
+            // нового может любой член — это и есть согласие коалиции.
+            const newcomer = mine ? target : me;
+            for (const member of joining.members) {
+              const prev = getStance(h.state, newcomer, member);
+              if (prev === 'alliance') continue;
+              clearOffers(h.state, newcomer, member);
+              setStance(h.state, newcomer, member, 'alliance');
+              h.emit('diplomacy.changed', {
+                a: newcomer,
+                b: member,
+                stance: 'alliance',
+                from: prev,
+              });
+            }
+            addMember(h.state, joining.id, newcomer);
+            h.emit('coalition.joined', { playerId: newcomer, coalitionId: joining.id });
+          }
+        }
         return;
       }
       if (getOffer(h.state, me, target) === stance) {
@@ -126,6 +230,76 @@ export const diplomacyModule: GameModule = {
       }
       setOffer(h.state, me, target, stance);
       h.emit('diplomacy.offered', { from: me, to: target, stance });
+    });
+
+    /** Found an independent coalition without granting a treaty or intel access. */
+    api.onAction('coalition.create', (action, h) => {
+      const actor = h.state.players[action.playerId];
+      if (
+        !coalitionsOn(h) ||
+        !actor ||
+        actor.status !== 'active' ||
+        actor.ai === true ||
+        actor.npc !== undefined ||
+        coalitionOf(h.state, action.playerId)
+      ) {
+        return h.reject('E_FORBIDDEN');
+      }
+      const c = foundCoalition(h.state, action.playerId);
+      h.emit('coalition.joined', { playerId: action.playerId, coalitionId: c.id });
+    });
+
+    /**
+     * COAL-1 — `diplomacy.decline { target }`: отказаться от предложения стойки, которое
+     * `target` сделал мне. Снимает только его предложение; моё встречное, если есть,
+     * остаётся. Отказ слышит предложивший (`diplomacy.declined`).
+     */
+    api.onAction('diplomacy.decline', (action, h) => {
+      const { target } = action.payload as { target?: unknown };
+      if (typeof target !== 'string' || target === action.playerId) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const me = action.playerId;
+      const stance = getOffer(h.state, target, me);
+      if (stance === null) return h.reject('E_NO_OFFER');
+      const offers = h.state.diplomacyOffers!;
+      delete offers[offerKey(target, me)];
+      if (Object.keys(offers).length === 0) delete h.state.diplomacyOffers;
+      h.emit('diplomacy.declined', { from: target, to: me, stance });
+    });
+
+    /**
+     * COAL-1 — `coalition.leave {}`: выйти из своей коалиции. Союз с её членами
+     * сменяется миром.
+     */
+    api.onAction('coalition.leave', (action, h) => {
+      if (!coalitionsOn(h)) return h.reject('E_FORBIDDEN');
+      if (!coalitionOf(h.state, action.playerId)) return h.reject('E_NO_COALITION');
+      leaveCoalition(h, action.playerId, null);
+    });
+
+    /**
+     * COAL-1 — `coalition.edit { emblem, description }`: эмблема и описание своей
+     * коалиции. Править может любой её член. Эмблема — из перечня ядра, описание —
+     * до {@link COALITION_DESC_MAX} символов без управляющих.
+     */
+    api.onAction('coalition.edit', (action, h) => {
+      const { emblem, description } = action.payload as { emblem?: unknown; description?: unknown };
+      if (
+        typeof emblem !== 'string' ||
+        !(COALITION_EMBLEMS as readonly string[]).includes(emblem) ||
+        typeof description !== 'string' ||
+        description.length > COALITION_DESC_MAX ||
+        // eslint-disable-next-line no-control-regex
+        /[\u0000-\u001f\u007f]/.test(description)
+      ) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const c = coalitionOf(h.state, action.playerId);
+      if (!c) return h.reject('E_NO_COALITION');
+      c.emblem = emblem;
+      c.description = description.trim();
+      h.emit('coalition.updated', { playerId: action.playerId, coalitionId: c.id });
     });
 
     /**
@@ -157,8 +331,13 @@ export const diplomacyModule: GameModule = {
       const me = action.playerId;
 
       if (!on) {
-        // Расторжение (или отзыв своего предложения) — всегда одностороннее.
-        if (!hasMapShare(h.state, me, target) && !hasMapShareOffer(h.state, me, target)) {
+        // Расторжение, отзыв своего предложения или отказ от чужого (COAL-1) — всегда
+        // одностороннее.
+        if (
+          !hasMapShare(h.state, me, target) &&
+          !hasMapShareOffer(h.state, me, target) &&
+          !hasMapShareOffer(h.state, target, me)
+        ) {
           return h.reject('E_NO_MAPSHARE');
         }
         setMapShare(h.state, me, target, false);
@@ -218,6 +397,10 @@ export const diplomacyModule: GameModule = {
           if (id !== playerId) setMapShare(h.state, playerId, id, false);
         }
       }
+      // COAL-1: выбывший освобождает место в коалиции, а его союзы с оставшимися
+      // сменяются миром — чат и метки союзников читают стойку, а не состав. Союз
+      // оставшихся между собой цел.
+      leaveCoalition(h, playerId, null);
     });
   },
 };

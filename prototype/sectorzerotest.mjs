@@ -173,6 +173,7 @@ window.__szTest = {
   // Учебный полигон (TRN): какая карта открыта и выведен ли герой игрока.
   mapId: () => s.mapId ?? null,
   heroAlive: () => Object.values(s.heroes ?? {}).some((h) => h.owner === ME && h.alive),
+  enemyFleets: () => Object.values(s.fleets).filter((f) => f.owner !== ME).map((f) => f.id).sort(),
 };`;
 
 /** Панель тестового комикса и заведомо битая картинка (панель без арта). */
@@ -456,10 +457,11 @@ try {
     assert.equal(await page.locator(radars).count(), 0, 'у крейсера нет радаров разведчика и дозорного фрегата');
     await page.locator('[data-prep="hull"][data-id="scout"]').click();
     assert.equal(await page.locator('#sz-workshop .sz-cards [data-id="compact_radar"]').count(), 1, 'у разведчика его радар на месте');
+    assert.equal(await page.locator('#sz-workshop .sz-cards [data-id="cargo_bay"]').count(), 0, 'у разведчика нет запрещённого грузового модуля');
     // Мастерская живёт в «Кораблях» (решение владельца 2026-09-25): вкладки нет, а у открытого
     // модуля в карточке своя кнопка улучшения.
     assert.equal(await page.locator('[data-prep="tab"][data-id="workshop"]').count(), 0, 'вкладки «Мастерская» нет');
-    assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="cargo_bay"]').count(), 1, 'улучшение — в карточке открытого модуля');
+    assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="ion_engine"]').count(), 1, 'улучшение — в карточке открытого модуля');
     // «Корабли» по окну производства (заказ владельца 2026-10-11): рядом с кораблём — модули
     // ОТКРЫТОГО отсека, одного его типа. У разведчика один отсек, системный.
     const bayKinds = () =>
@@ -469,13 +471,18 @@ try {
         ),
       ]);
     assert.equal((await bayKinds()).length, 1, `в колонке отсека модули одного слота: ${await bayKinds()}`);
-    // Занятый отсек: другой модуль встаёт ВМЕСТО надетого («Заменить»), «Снять» освобождает.
-    const scoutBay = page.locator('[data-prep="bay"]').first();
+    // Занятый отсек крейсера: оба открытых модуля допустимы для корпуса. Другой модуль
+    // встаёт ВМЕСТО надетого («Заменить»), «Снять» освобождает.
+    await page.locator('[data-prep="hull"][data-id="cruiser"]').click();
+    const cruiserBay = page.locator('[data-prep="bay"][data-slot="utility"]');
+    await cruiserBay.click();
     await page.locator('#sz-workshop .sz-cards [data-prep="fit"][data-id="ion_engine"]').click();
+    await cruiserBay.click();
     await page.locator('#sz-workshop .sz-cards [data-prep="fit:swap"][data-id="cargo_bay"]').click();
-    assert.match(await scoutBay.getAttribute('aria-label') ?? await scoutBay.textContent(), /Грузовой|Cargo/i, '«Заменить» ставит модуль в отсек');
+    assert.match(await cruiserBay.getAttribute('aria-label') ?? await cruiserBay.textContent(), /Грузовой|Cargo/i, '«Заменить» ставит модуль в отсек');
+    await cruiserBay.click();
     await page.locator('#sz-workshop .sz-bayhead [data-prep="fit"][data-id="cargo_bay"]').click();
-    assert.doesNotMatch(await scoutBay.getAttribute('class'), /\b(filled|full)\b/, '«Снять» освобождает отсек');
+    assert.doesNotMatch(await cruiserBay.getAttribute('class'), /\b(filled|full)\b/, '«Снять» освобождает отсек');
     // Корабль героя (PVR-6.24): своя плитка в ряду «Корабли», модуль встаёт на него. Отсек
     // открывается плиткой; встал модуль — открыт следующий пустой отсек, а плитка системного
     // отсека несёт модуль.
@@ -847,6 +854,26 @@ try {
     await page.locator('#spotlight-chip').click();
     await page.locator('#spotlight .sl-skip-stage').click();
     assert.match(await page.locator('#spotlight .sl-count').innerText(), /2 .* 12/, 'полигон: этап пропущен');
+    // TRN-3: силы противника вводятся по этапам — на старте карта спокойна, на «Бою» (7)
+    // приходит патруль, на «Отходе» (8) — охрана цели; на «Закреплении» (11) объявлена
+    // контратака с отсчётом, и пока подсказка открыта, отсчёт ждёт.
+    assert.deepEqual(await page.evaluate(() => window.__szTest.enemyFleets()), [], 'полигон: на старте сил противника нет');
+    const toStage = async (n) => {
+      while (!new RegExp(`^\\D*${n} `).test(await page.locator('#spotlight .sl-count').innerText()))
+        await page.locator('#spotlight .sl-skip-stage').click();
+    };
+    await toStage(7);
+    await page.waitForFunction(() => window.__szTest.enemyFleets().includes('p2_patrol'));
+    assert(!(await page.evaluate(() => window.__szTest.enemyFleets())).includes('p2_guard'), 'полигон: охрана — не раньше «Отхода»');
+    await toStage(8);
+    await page.waitForFunction(() => window.__szTest.enemyFleets().includes('p2_guard'));
+    assert(await page.locator('#trnraid').isHidden(), 'полигон: до «Закрепления» контратака не объявлена');
+    await toStage(11);
+    await page.locator('#trnraid').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#trnraid').innerText(), /Контратака через \d+:\d\d\. Отсчёт ждёт|Counterattack in \d+:\d\d\. The countdown waits/, 'полигон: отсчёт ждёт чтения');
+    await page.locator('#spotlight .sl-fold').click();
+    await page.waitForFunction(() => !/ждёт|waits/.test(document.getElementById('trnraid').textContent));
+    await page.screenshot({ path: process.env.TRN3_SHOT ?? '/dev/null' }).catch(() => {});
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
@@ -854,7 +881,7 @@ try {
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +
-      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап;' +
+      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап; силы противника входят по этапам, контратака объявлена с отсчётом, который ждёт чтения;' +
       ' горячие клавиши ПК — только кнопки режима: в забеге B, M и 2 молчат, пробел — пауза с прежним темпом;' +
       ' подписи колонки инструментов под мышью — в своих кнопках\n',
   );

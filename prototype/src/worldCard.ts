@@ -57,12 +57,12 @@ import {
   transferOffer,
   type HangarView,
 } from './hangarPanel';
-import { BUILD_ICON, unitIconHtml } from './icons';
-import { SPY_COST } from './intel';
+import { BUILD_ICON, KIND_ICON, unitIconHtml } from './icons';
+import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
-import type { SectorType } from './map';
+import { SECTOR_TYPES, type SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
-import { memory, myIntel } from './mapFog';
+import { memory, myIntel, surveyed } from './mapFog';
 import { ownerColor, youColor } from './mapPalette';
 import {
   actionButton,
@@ -343,16 +343,16 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
     {
       active: active
         ? {
-            label: constructionLabel(active.payload),
+            label: esc(constructionLabel(active.payload)),
             at: active.at,
             durationMs: buildDurationHours(active.payload) * HOUR,
             seq: active.seq,
           }
         : null,
-      queued: queued.map((q) => ({ label: constructionLabel(q), id: q.id })),
+      queued: queued.map((q) => ({ label: esc(constructionLabel(q)), id: q.id })),
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
         .filter((p) => laneOf(p.kind) === lane)
-        .map((p) => ({ id: p.id, label: pausedLabel(p), progress: p.progress })),
+        .map((p) => ({ id: p.id, label: esc(pausedLabel(p)), progress: p.progress })),
       // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
       // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
       // ещё ждёт — значит она уперлась ровно в деньги (BLD-1, правило 4); своего
@@ -407,16 +407,19 @@ export function unknownPlanetHtml(p: Planet): string {
       mem.buildings
         .map(
           (b) =>
-            `${BUILD_ICON[b.type] ?? '▪'} ${buildingName(data.buildings[b.type]?.name, b.type)} L${b.level}`,
+            `${BUILD_ICON[b.type] ?? '▪'} ${esc(buildingName(data.buildings[b.type]?.name, b.type))} L${b.level}`,
         )
         .join(', ') || t('side.scan.no-buildings');
-    // Espionage from memory: you know WHOSE world this was — an agent can reveal
-    // its live contents without flying there. Wrong/stale owner → the kernel
-    // rejects the attempt (bad target), which is honest: intel decays.
+    // Espionage from memory: an agent goes to the WORLD itself (SPY-8), not to its
+    // owner — if the world changed hands, the kernel targets whoever holds it now.
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
+    const spyReady = afford({ credits: SPY_COST }) && myAgents(game.world(), ME).free > 0;
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
+        ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST }), spyReady)}` +
+          btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST }), spyReady) +
+          btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), spyReady) +
+          `${btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), spyReady)}</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -424,7 +427,7 @@ export function unknownPlanetHtml(p: Planet): string {
       cardHeader(ownerColor(mem.owner), placeName(p.id), t('side.scan.title')) +
       `<div class="pscan">` +
       `<div class="row dim">${t('side.scan.stale')}</div>` +
-      `<div class="row">${t('side.scan.owner')}: <b>${mem.owner ? NAME[mem.owner] : t('side.neutral')}</b></div>` +
+      `<div class="row">${t('side.scan.owner')}: <b>${esc(mem.owner ? NAME[mem.owner] ?? mem.owner : t('side.neutral'))}</b></div>` +
       `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
       `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
       spyRow +
@@ -433,12 +436,19 @@ export function unknownPlanetHtml(p: Planet): string {
       `</div>`
     );
   }
+  // A province a ship has crossed into shows its type, and only that (`surveyed`).
+  const kind = surveyed(p.id)?.kind;
+  const type = kind === undefined ? undefined : SECTOR_TYPES[kind];
+  const typeRow = type
+    ? `<div class="row">${KIND_ICON[kind!] ?? ''} <b>${esc(tData(type.name))}</b></div>`
+    : '';
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
   return (
     cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
     `<div class="pscan">` +
     `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
+    typeRow +
     `<div class="hint">${t('side.notelemetry.hint')}</div>` +
     ping +
     `</div>`
@@ -522,19 +532,31 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
   if (toolShown('pings', sectorZeroToolsHidden()))
     out.push(btn('ping', '', t('side.world.ping'), true));
-  // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a window lives
-  // its countdown replaces the button. В забеге Sector Zero шпионажа нет (`espionageShown`).
+  // Espionage: a 12h mission to this enemy world (SPY-8/9/10) — recon opens a 24h intel
+  // window (while it lives its countdown replaces the recon button), sabotage, theft of
+  // resources or of a technology. В забеге Sector Zero шпионажа нет (`espionageShown`).
   if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    // Свой и ничейный мир не шпионят; нехватка кредитов гасит кнопку, но не прячет её.
-    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
+    // Свой и ничейный мир не шпионят; нехватка кредитов или свободных агентов (SPY-6)
+    // гасит кнопку, но не прячет её.
+    const ready = afford({ credits: SPY_COST }) && myAgents(s, ME).free > 0;
+    const spy = spyOffer(mine, !!p.owner, !!live, ready);
     if (spy === 'window' && live) {
       out.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
       );
     } else if (spy !== 'none') {
-      out.push(btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
+      out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
     }
+    if (spy !== 'none') {
+      out.push(btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST }), ready));
+      out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), ready));
+      out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), ready));
+    }
+    // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
+    const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
+    if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
+    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST }), ready));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }
@@ -778,6 +800,7 @@ export function planetPanelHtml(p: Planet): string {
       s.players[ME]?.resources ?? {},
       data,
       s.players[ME]?.technologies?.completed ?? [],
+      s,
     );
     if (fortress.show) {
       const off = fortress.enabled ? '' : ' disabled';
@@ -835,6 +858,7 @@ export function forkPanelHtml(fork: { province: string; trail: number }): string
     s.players[ME]?.resources ?? {},
     data,
     s.players[ME]?.technologies?.completed ?? [],
+    s,
   );
   if (raise.show) {
     const off = raise.enabled ? '' : ' disabled';

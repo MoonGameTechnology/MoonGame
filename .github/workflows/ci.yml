@@ -175,6 +175,38 @@ jobs:
       # собран с `__SECTOR_ZERO_ONLY__`, и его кода не повторяет ни одна другая сборка:
       # смоук выше открывает `void-dominion.html`. Поза та же — не блокирует, а сбой
       # всплывает аннотацией; `--install` идемпотентен и лишь подтверждает Chromium.
+      - name: Player foreground activity smoke
+        run: |
+          pnpm run smoke:browser:install
+          pnpm run prototype
+          pnpm run smoke:player-activity
+
+      # The tutorial follows live controls; unit tests cannot catch a moved catalogue
+      # or a hidden phone button. Use the Chromium and bundle prepared above.
+      - name: Guided onboarding smoke
+        id: onboarding
+        run: node prototype/onboardingtest.mjs
+
+      - name: Onboarding failure screenshots
+        if: failure() && steps.onboarding.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: guided-onboarding-failure
+          path: /tmp/gw-onboarding
+          retention-days: 7
+
+      - name: Sector Zero guided training smoke
+        id: training
+        run: node prototype/trainingtest.mjs
+
+      - name: Training failure screenshots
+        if: failure() && steps.training.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sector-zero-training-failure
+          path: /tmp/sz-training
+          retention-days: 7
+
       - name: Platform archive smoke (non-blocking)
         run: |
           if ! pnpm run smoke:browser:install; then

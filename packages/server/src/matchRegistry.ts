@@ -70,12 +70,18 @@ export interface MatchMeta {
  * «неизвестно», а не отсеивать строку (правило 3 в `matchRow.ts`).
  */
 export function sessionMeta(
-  room: { state: { mapId?: string; time: number }; modeId?: string },
+  room: {
+    state: { mapId?: string; time: number };
+    modeId?: string;
+    victoryRules?: MatchConfig['victory'];
+  },
   opts: { timeScale: number; createdAt: number; entryWindowMs?: number },
 ): MatchMeta {
+  const victory = room.victoryRules;
   return {
     mapId: room.state.mapId ?? 'nexus',
-    rules: { timeScale: opts.timeScale },
+    // This is the host's wall→game clock scale, not the kernel's duration scale.
+    rules: { timeScale: opts.timeScale, ...(victory !== undefined ? { victory } : {}) },
     ...(room.modeId !== undefined ? { modeId: room.modeId } : {}),
     createdAt: opts.createdAt,
     startedAt: room.state.time,

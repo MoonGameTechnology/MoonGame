@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
+import type { NewsAnnouncement } from '@void/protocol';
 import { createInitialState, type GameState } from '@void/shared-core';
 import {
   MemoryAccountStore,
+  MemoryAnnouncementStore,
   MemoryArsenalStore,
   MemoryCommanderStore,
   MemoryUserStore,
@@ -20,6 +22,7 @@ import {
 } from './memory';
 import {
   PostgresAccountStore,
+  PostgresAnnouncementStore,
   PostgresArsenalStore,
   PostgresCommanderStore,
   PostgresUserStore,
@@ -36,8 +39,11 @@ import {
   PostgresReceiptStore,
   migrate,
 } from './postgres';
+import { AVA_FEED_KINDS, isAvaFeedEntry } from './types';
+import { SYSTEM_BOT_NICKNAMES } from '../botNicknames';
 import type {
   AccountStore,
+  AnnouncementStore,
   ArsenalStore,
   CommanderStore,
   CorpRentStore,
@@ -46,6 +52,7 @@ import type {
   UserStore,
   AvaChallenge,
   AvaChallengeStore,
+  AvaFeedEntry,
   AvaFeedStore,
   AvaResultStore,
   AvaRosterEntry,
@@ -53,6 +60,7 @@ import type {
   AvaSessionStore,
   AvaSide,
   CorpStore,
+  FeedEntry,
   MatchSnapshot,
   MatchStore,
   MedalStore,
@@ -330,6 +338,18 @@ function receiptStoreContract(name: string, make: () => ReceiptStore, uniq: (p: 
 /** SE-1.x — login+password accounts, run against BOTH adapters. */
 function userStoreContract(name: string, make: () => UserStore, uniq: (p: string) => string): void {
   describe(`UserStore — ${name}`, () => {
+    it('reserves permanent bot handles in any case even before the roster is seeded', async () => {
+      const store = make();
+      for (const login of SYSTEM_BOT_NICKNAMES) {
+        for (const spelling of [login, login.toUpperCase()]) {
+          expect(await store.createUser(spelling, 'cannot-be-a-human-password')).toEqual({
+            ok: false,
+            code: 'E_LOGIN_TAKEN',
+          });
+        }
+      }
+    });
+
     it('persists a new revocation nonce without changing credentials or another account', async () => {
       const store = make();
       const created = await store.createUser(uniq('logout-owner'), 'unchanged');
@@ -660,6 +680,20 @@ function avaChallengeStoreContract(
       expect((await store.getChallenge(uniq('ch-f')))?.status).toBe('ended');
       // …and drops out once it is archived (ended).
       expect((await store.lockedMatchups()).map((c) => c.id)).not.toContain(uniq('ch-f'));
+    });
+
+    it('CORP-4: a locked matchup no map fits is cancelled exactly once', async () => {
+      const store = make();
+      const [a, b] = [uniq('c-a6'), uniq('c-b6')];
+      await store.createChallenge(challenge(uniq('ch-g'), a, b, 1000));
+      await store.closeChallenge(uniq('ch-g'), 'accepted');
+      expect(await store.endMatchup(uniq('ch-g'), 'cancelled')).toBe(false); // not locked yet
+      await store.closeMatchup(uniq('ch-g'), 'locked');
+      expect(await store.endMatchup(uniq('ch-g'), 'cancelled')).toBe(true);
+      expect(await store.endMatchup(uniq('ch-g'), 'cancelled')).toBe(false);
+      expect(await store.endMatchup(uniq('ch-g'))).toBe(false); // nor settled afterwards
+      expect((await store.getChallenge(uniq('ch-g')))?.status).toBe('cancelled');
+      expect((await store.lockedMatchups()).map((c) => c.id)).not.toContain(uniq('ch-g'));
     });
   });
 }
@@ -1090,8 +1124,8 @@ function feedStoreContract(name: string, make: () => AvaFeedStore, uniq: (p: str
         targetName: `${tag}-B`,
         winnerCorp: a,
       });
-      const mine = (rows: Awaited<ReturnType<AvaFeedStore['recent']>>): typeof rows =>
-        rows.filter((r) => r.challengerName === `${tag}-A`);
+      const mine = (rows: FeedEntry[]): AvaFeedEntry[] =>
+        rows.filter(isAvaFeedEntry).filter((r) => r.challengerName === `${tag}-A`);
       const all = mine(await store.recent(50, base + 1_000));
       expect(all.map((r) => r.kind)).toEqual(['result', 'matchup']); // newest first
       expect(all[0]).toMatchObject({ kind: 'result', winnerCorp: a });
@@ -1100,6 +1134,67 @@ function feedStoreContract(name: string, make: () => AvaFeedStore, uniq: (p: str
       // the `before` cursor excludes rows at/after the cursor `at`
       const page = mine(await store.recent(50, base + 20));
       expect(page.map((r) => r.kind)).toEqual(['matchup']);
+    });
+
+    // CORP-1: a corporation's own facts ride the same feed. A year ahead of the clock, so
+    // these rows top the shared Postgres table whatever earlier runs left there.
+    it('keeps a corporation\'s own facts, lands each id once and reads only the asked kinds', async () => {
+      const store = make();
+      const corpId = uniq('corp');
+      const base = Date.now() + 365 * 24 * 3_600_000;
+      const facts: FeedEntry[] = [
+        { id: uniq('founded'), at: base + 1, kind: 'founded', corpId, corpName: 'Corp' },
+        { id: uniq('level'), at: base + 2, kind: 'level', corpId, corpName: 'Corp', level: 2 },
+        { id: uniq('medal'), at: base + 3, kind: 'medal', corpId, corpName: 'Corp', medalId: 'm' },
+      ];
+      for (const fact of [...facts, facts[1]!]) await store.append(fact); // a replayed write
+      const ours = (rows: FeedEntry[]): FeedEntry[] =>
+        rows.filter((r) => !isAvaFeedEntry(r) && r.corpId === corpId);
+      expect(ours(await store.recent(50, base + 10))).toEqual([...facts].reverse());
+      expect(ours(await store.recent(50, base + 10, ['level']))).toEqual([facts[1]]);
+      const battles = await store.recent(50, base + 10, AVA_FEED_KINDS);
+      expect(battles.every(isAvaFeedEntry)).toBe(true);
+    });
+  });
+}
+
+// CORP-1 — the admin's announcements: shown while their period lasts, until removed.
+function announcementStoreContract(
+  name: string,
+  make: () => AnnouncementStore,
+  uniq: (p: string) => string,
+): void {
+  describe(`AnnouncementStore — ${name}`, () => {
+    it('shows an announcement in its period; a removal hides it and is answered once', async () => {
+      const store = make();
+      const base = Date.now() + 365 * 24 * 3_600_000;
+      const note = (id: string, at: number, until: number | null): NewsAnnouncement => ({
+        id: uniq(id),
+        at,
+        kind: 'event',
+        pinned: id === 'pinned',
+        until,
+        title: { ru: `Новость ${id}`, en: `News ${id}` },
+        body: { ru: 'Строка 1\nСтрока 2', en: '' },
+      });
+      const open = note('open', base + 1, null);
+      const timed = note('timed', base + 2, base + 100);
+      const pinned = note('pinned', base + 3, base + 50);
+      for (const n of [open, timed, pinned]) await store.add(n);
+      await store.add({ ...open, title: { ru: 'Другая', en: '' } }); // same id: no overwrite
+      const ids = (list: NewsAnnouncement[]): string[] =>
+        list.map((n) => n.id).filter((id) => [open.id, timed.id, pinned.id].includes(id));
+      expect(ids(await store.active(base + 10))).toEqual([pinned.id, timed.id, open.id]);
+      expect((await store.active(base + 10)).find((n) => n.id === pinned.id)).toEqual(pinned);
+      expect((await store.active(base + 10)).find((n) => n.id === open.id)?.title.ru).toBe('Новость open');
+      // The period is exclusive at its end; an expired one stays on the admin's list.
+      expect(ids(await store.active(base + 50))).toEqual([timed.id, open.id]);
+      expect(ids(await store.recent(50))).toEqual([pinned.id, timed.id, open.id]);
+      expect(await store.remove(timed.id, base + 20)).toBe(true);
+      expect(await store.remove(timed.id, base + 21)).toBe(false);
+      expect(await store.remove(uniq('missing'), base + 21)).toBe(false);
+      expect(ids(await store.active(base + 30))).toEqual([pinned.id, open.id]);
+      expect(ids(await store.recent(50))).toEqual([pinned.id, open.id]);
     });
   });
 }
@@ -1110,6 +1205,7 @@ commanderStoreContract('memory', () => new MemoryCommanderStore(), (p) => p);
 receiptStoreContract('memory', () => new MemoryReceiptStore(), (p) => p);
 userStoreContract('memory', () => new MemoryUserStore(), (p) => p);
 feedStoreContract('memory', () => new MemoryAvaFeedStore(), (p) => p);
+announcementStoreContract('memory', () => new MemoryAnnouncementStore(), (p) => p);
 corpStoreContract(
   'memory',
   () => new MemoryCorpStore(),
@@ -1182,6 +1278,11 @@ describe.skipIf(!DB)('Postgres adapters', () => {
   receiptStoreContract('postgres', () => new PostgresReceiptStore(pool), (p) => `${p}_${stamp}`);
   userStoreContract('postgres', () => new PostgresUserStore(pool), (p) => `${p}_${stamp}`);
   feedStoreContract('postgres', () => new PostgresAvaFeedStore(pool), (p) => `${p}_${stamp}`);
+  announcementStoreContract(
+    'postgres',
+    () => new PostgresAnnouncementStore(pool),
+    (p) => `${p}_${stamp}`,
+  );
 
   it('migrates idempotently', async () => {
     await migrate(pool);

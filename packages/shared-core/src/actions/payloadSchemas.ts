@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRADER_MAX_UNITS } from '../modules/trader';
+import { COALITION_DESC_MAX } from '../state/coalition';
 
 /**
  * SV-1.2 — per-action-type payload schemas, enforced at the action-layer gate BEFORE the
@@ -88,16 +89,10 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'technology.research': z.object({ technology: id }),
   // SES-3: sink the premium resource into one ACTIVE research (diminishing returns)
   'technology.boost': z.object({ technology: id }),
-  // espionage.ts — steal a time-boxed intel window; `planetId` only with kind 'planet'
-  'espionage.spy': z
-    .object({
-      target: id,
-      kind: z.enum(['treasury', 'planet', 'fleets']),
-      planetId: id.optional(),
-    })
-    .refine((v) => v.kind !== 'planet' || v.planetId !== undefined, {
-      message: "kind 'planet' needs a planetId",
-    }),
+  // espionage.ts — send an agent on an operation against one world (SPY-8)
+  'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'theft', 'research', 'counter']) }),
+  // SPY-11: call a counter-intelligence agent off its post (or off its way there)
+  'espionage.recall': z.object({ planetId: id }),
   // market.ts — amounts are plain positive numbers (resources accrue continuously,
   // so fractional amounts are legal); price is a positive unit price (≥ 1) — the
   // anti-wash-trade guard (SEC-A06-5): a `price: 0` listing is a free resource
@@ -140,6 +135,14 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // MAPSHARE-1: договор об обмене картами — отдельное соглашение поверх лестницы
   // стоек (заключение по взаимному согласию, расторжение одностороннее).
   'diplomacy.mapshare': z.object({ target: id, on: z.boolean() }),
+  // Coalition founding, declined offers, membership and public presentation.
+  'diplomacy.decline': z.object({ target: id }),
+  'coalition.create': z.object({}),
+  'coalition.leave': z.object({}),
+  'coalition.edit': z.object({
+    emblem: id,
+    description: z.string().max(COALITION_DESC_MAX),
+  }),
   // --- prototype-host actions (the netserver runs the prototype's kernel) -----------
   // fleet.launch/merge/split/engage: canonical `fleetOpsModule` handles these too
   // (the missing garrison→mobile-fleet link) — not prototype-only anymore, the
@@ -304,6 +307,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
  *  with no schema (an internal scheduled action, or an unknown type) returns false — the
  *  gate then rejects it, so a client can only submit the actions it is meant to. */
 export function isValidActionPayload(type: string, payload: unknown): boolean {
+  // Wire action names must be entries in the catalog, never Object.prototype members.
+  if (!Object.hasOwn(actionPayloadSchemas, type)) return false;
   const schema = actionPayloadSchemas[type];
   if (!schema) return false;
   return schema.safeParse(payload).success;

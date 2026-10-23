@@ -68,7 +68,7 @@ export class CorpService {
     if (typeof name !== 'string' || name.length > 128) return { ok: false, code: 'E_BAD_NAME' };
     const trimmed = name.trim();
     if (!NAME_RE.test(trimmed) || blockedPublicName(trimmed)) return { ok: false, code: 'E_BAD_NAME' };
-    const created = await this.store.createCorp(trimmed, who.accountId, who.login);
+    const created = await this.store.createCorp(trimmed, who.accountId, who.login, this.now());
     if (!created.ok) return created;
     await this.audit(created.corpId, who, 'create', undefined, trimmed);
     return created;

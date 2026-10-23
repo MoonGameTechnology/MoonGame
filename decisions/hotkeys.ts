@@ -76,11 +76,12 @@ export const SPEED_SLOTS = 4;
 
 /**
  * Слои выше окон (правило 5) — ступени лестницы «Назад» (`BACK_LAYERS` в
- * `prototype/src/main.ts`) от комикса до подтверждений, в её порядке. Сторож
+ * `prototype/src/main.ts`) от нативных диалогов до подтверждений, в её порядке. Сторож
  * (`hotkeys.test.ts`) сверяет список с лестницей: новая ступень выше окон без решения о
  * клавишах уронит его.
  */
 export const HOTKEY_SILENT_LAYERS: readonly string[] = [
+  'match-description',
   'comic',
   'maploading',
   'intro',
@@ -100,8 +101,10 @@ export const HOTKEY_SILENT_LAYERS: readonly string[] = [
   'spotlight',
   'playercard',
   'diplo',
+  'coalwin',
   'warprompt',
   'abandon',
+  'pushask',
 ];
 
 /** Нажатие — те поля `KeyboardEvent`, которые что-то решают. */

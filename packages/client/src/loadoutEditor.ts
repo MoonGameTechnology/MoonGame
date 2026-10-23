@@ -12,6 +12,7 @@
  */
 import type {
   GameData,
+  MatchPricing,
   Rarity,
   ResourceBag,
   ShipBayType,
@@ -24,6 +25,7 @@ import {
   effectiveStats,
   loadoutBays,
   loadoutCost,
+  matchCost,
   moduleRarityBonus,
   moduleStarMultiplier,
   RARITIES,
@@ -102,6 +104,9 @@ export interface LoadoutModel {
   /** The seat's extra slots on this hull (`Player.arsenal.slots[unit]`), carried through the
    *  reducer like `ownedModules`. Absent = the catalog's slots (regular matches). */
   bonusSlots?: Partial<SlotCounts>;
+  /** Цены партии (`GameState.pricing`), с которыми построена модель, — несутся через
+   *  редьюсер, как `ownedModules`. Нет поля — цены каталога (Sector Zero). */
+  pricing?: MatchPricing;
   /** Live per-ship stats: base vs with the current modules. */
   preview: LoadoutStatLine[];
   /** Per-order costs (×count): hull, modules, and their sum. */
@@ -213,7 +218,9 @@ function buildModel(
   resources: ResourceBag,
   ownedModules?: ReadonlySet<string>,
   boosts: ModuleBoosts = {},
+  pricing?: MatchPricing,
 ): LoadoutModel | null {
+  const match = pricing ? { pricing } : {};
   const def: UnitDef | undefined = data.units[unit];
   if (!def) return null;
   // The hull as the build gate sees it on this seat: catalog slots plus the bought ones.
@@ -258,7 +265,7 @@ function buildModel(
         effect: contributionOn(id, data, boosts),
         rarity: rarityOn(id, data, boosts),
         star: starOf(id),
-        cost: m.cost,
+        cost: matchCost(match, m.cost),
         installable: check.ok,
         ...(check.ok ? {} : { code: check.code }),
       };
@@ -285,8 +292,9 @@ function buildModel(
     }
   }
 
-  const hullCost = scaleBag(def.cost, count);
-  const modulesCost = scaleBag(loadoutCost(modules, data), count);
+  // Цена партии по частям, как у ядра (`orderSpec`): корпус и модули отдельно.
+  const hullCost = scaleBag(matchCost(match, def.cost), count);
+  const modulesCost = scaleBag(matchCost(match, loadoutCost(modules, data)), count);
   const totalCost = addBags(hullCost, modulesCost);
 
   return {
@@ -305,6 +313,7 @@ function buildModel(
     ...(boosts.moduleStars ? { moduleStars: { ...boosts.moduleStars } } : {}),
     ...(boosts.moduleRarity ? { moduleRarity: { ...boosts.moduleRarity } } : {}),
     ...(boosts.bonusSlots ? { bonusSlots: { ...boosts.bonusSlots } } : {}),
+    ...(pricing ? { pricing } : {}),
   };
 }
 
@@ -315,7 +324,12 @@ export function createLoadoutEditor(
   unit: string,
   data: GameData,
   resources: ResourceBag,
-  opts?: { modules?: string[]; count?: number; ownedModules?: ReadonlySet<string> } & ModuleBoosts,
+  opts?: {
+    modules?: string[];
+    count?: number;
+    ownedModules?: ReadonlySet<string>;
+    pricing?: MatchPricing;
+  } & ModuleBoosts,
 ): LoadoutEditorResult {
   const model = buildModel(
     unit,
@@ -325,6 +339,7 @@ export function createLoadoutEditor(
     resources,
     opts?.ownedModules,
     boostsOf(opts),
+    opts?.pricing,
   );
   if (!model) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...model };
@@ -381,6 +396,7 @@ export function applyLoadoutAction(
     resources,
     model.ownedModules ? new Set(model.ownedModules) : undefined,
     boostsOf(model),
+    model.pricing,
   );
   if (!next) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...next };

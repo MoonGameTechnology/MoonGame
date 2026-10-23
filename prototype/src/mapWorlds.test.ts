@@ -18,6 +18,7 @@ import { rgba } from '../../packages/client/src/holoDraw';
 import type { MapLod } from '../../packages/client/src/mapLod';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeTether } from './kindBadge';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY } from './buildChips';
+import { STALE_ALPHA } from '../../decisions/worldLook';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { phaseAt } from './pulseFx';
 import type { MapNode } from './game';
@@ -80,6 +81,7 @@ function fakeCanvas() {
         });
         if (name.startsWith('create')) return { addColorStop() {} };
         if (name === 'measureText') return { width: 40 };
+        if (name === 'getLineDash') return dash;
         return undefined;
       };
     },
@@ -249,6 +251,9 @@ describe('REFM-235 — мир на карте', () => {
     const ring = arcAt(frame.calls, c, R + 14 + 2 * pulse(n, 0))!;
     expect([ring.dash, ring.offset, ring.width]).toEqual([[3, 5], -1234 / 240, 0.75]);
     expect(ring.stroke).toBe(rgba(col, 0.12 + 0.05 * pulse(n, 0)));
+    // Пунктир кольца не уходит дальше: save() на кольцо больше нет, его возвращают руками.
+    const [, nextStroke] = frame.calls.slice(frame.calls.indexOf(ring)).filter((k) => k.name === 'stroke');
+    expect([nextStroke!.dash, nextStroke!.offset]).toEqual([[], 0]);
     // Ряд построек: плитки по центру под узлом, значок — цветом владельца.
     const xs = chipXs(home.buildings.length, c.x, 1);
     const by = chipY(c.y, R, 1);
@@ -428,7 +433,7 @@ describe('REFM-235 — схема и области', () => {
     camera.setView({ scale: 1, x: 1e6, y: 1e6 });
     worlds.drawWorlds(0, LOD());
     worlds.drawWorlds(0, LOD({ art: 0.5, detail: 0 }));
-    expect(frame.calls.filter((k) => !['save', 'restore'].includes(k.name))).toEqual([]);
+    expect(frame.calls.filter((k) => !['save', 'restore', 'getLineDash'].includes(k.name))).toEqual([]);
   });
 });
 
@@ -452,27 +457,63 @@ describe('REFM-235 — туман', () => {
     expect(frame.named('fillText').some((k) => k.args[0] === '?')).toBe(false);
   });
 
-  it('помнимый — пунктир цветом прежнего владельца, имя и последние данные: гарнизон, постройки, «старое»', async () => {
+  it('никогда не виденный, куда залетал корабль, — тот же знак и тип провинции рядом', async () => {
+    const { worlds, env, fog, frame, node, at, tData, game } = await boot();
+    const dark = env.nodes.find((n) => !fog.known(n.id) && n.sector === 'planet' && !fog.memory.has(n.id))!;
+    const c = at(node(dark.id));
+    const type = tData(game.SECTOR_TYPES.graveyard!.name);
+    worlds.drawWorlds(0, LOD({ detail: 0.5 }));
+    expect(frame.named('fillText').some((k) => k.args[0] === type)).toBe(false);
+    env.world = { ...env.world, surveyed: { p1: { [dark.id]: { kind: 'graveyard', at: 0 } } } };
+    frame.calls.length = 0;
+    worlds.drawWorlds(0, LOD({ detail: 0.5 }));
+    expect(call(frame.calls, 'fillText', '?', c.x, c.y + 3)).toBeTruthy();
+    const label = call(frame.calls, 'fillText', type, c.x + 10, c.y + 3)!;
+    expect([label.fill, label.alpha]).toEqual(['rgba(150,210,205,0.45)', 0.5]);
+    // Тип узнан, мир — нет: ни сферы, ни имени.
+    expect(frame.named('drawImage').some((k) => k.args.length === 9 && near(k.args[5] as number, c.x - 13 * (0.45 + 0.55 * 0.5)))).toBe(false);
+  });
+
+  it('помнимый — нарисован, как его разведали: по снимку, приглушён, неподвижен, с пометкой «старые данные»', async () => {
     const { worlds, env, fog, palette, frame, node, at, name, patchPlanet, t, icons } = await boot();
     const dark = env.nodes.find((n) => !fog.known(n.id) && n.sector === 'planet')!;
     patchPlanet(dark.id, { owner: 'p2', buildings: [{ type: 'mine', level: 1, hp: 20 }], garrison: [{ unit: 'militia', count: 5 }] });
     fog.rememberScan([dark.id]);
-    // Мир с тех пор сменил хозяина — память этого не знает.
-    patchPlanet(dark.id, { owner: null });
+    // Мир с тех пор сменил хозяина, лишился шахты и гарнизона: память этого не знает.
+    patchPlanet(dark.id, { owner: null, buildings: [], garrison: [] });
     const c = at(node(dark.id));
+    const R = 13;
     const col = palette.ownerColor('p2');
+    const sphereOf = () => frame.named('drawImage').find((k) => k.args.length === 9 && near(k.args[5] as number, c.x - R))!;
     worlds.drawWorlds(0, LOD());
-    const ring = arcAt(frame.calls, c, 9)!;
-    expect([ring.stroke, ring.dash]).toEqual([rgba(col, 0.34), [2, 4]]);
-    expect(arcAt(frame.calls, c, 1.6)?.fill).toBe(rgba(col, 0.4));
-    expect(call(frame.calls, 'fillText', name(dark.id), c.x + 13, c.y - 1)?.fill).toBe(rgba(col, 0.5));
-    const stats = [t('map.callout.garrison', { n: 5 }), icons.BUILD_ICON.mine, t('map.fog.old')].join(' ');
-    expect(call(frame.calls, 'fillText', stats, c.x + 13, c.y + 10)?.font).toBe(`9px ${MONO}`);
-    // Вполовину крупная карта — кольцо меньше, подпись бледнее.
+    const sphere = sphereOf();
+    expect(sphere.args.slice(5)).toEqual([c.x - R, c.y - R, 2 * R, 2 * R]);
+    expect(sphere.alpha).toBeCloseTo(0.65 * STALE_ALPHA);
+    // Имя — цветом прежнего владельца, вторая строка — гарнизон и постройки снимка.
+    const title = call(frame.calls, 'fillText', name(dark.id), c.x + R + 12, c.y - 1)!;
+    expect([title.fill, title.alpha]).toEqual([col, STALE_ALPHA]);
+    const stats = [t('map.callout.garrison', { n: 5 }), icons.BUILD_ICON.mine, t('map.fog.old')].join('  ');
+    expect(call(frame.calls, 'fillText', stats, c.x + R + 12, c.y + 12)?.alpha).toBeCloseTo(STALE_ALPHA);
+    // Постройка снимка — плиткой под миром, как у живого.
+    expect(call(frame.calls, 'fillText', chipGlyph(icons.BUILD_ICON.mine), chipXs(1, c.x, 1)[0]!, chipY(c.y, R, 1) + 0.5)).toBeTruthy();
+    // Снимок не дышит и не вращается: кадр сферы тот же на любых часах.
+    const frozen = sphere.args.slice(1, 3);
+    env.clock = 98765;
     frame.calls.length = 0;
-    worlds.drawWorlds(0, LOD({ detail: 0.5 }));
-    expect(arcAt(frame.calls, c, 3 + (9 - 3) * 0.5)).toBeTruthy();
-    expect(call(frame.calls, 'fillText', name(dark.id), c.x + 13, c.y - 1)?.alpha).toBeCloseTo(0.5);
+    worlds.drawWorlds(0, LOD());
+    expect(sphereOf().args.slice(1, 3)).toEqual(frozen);
+  });
+
+  it('помнимый тихий сектор без гарнизона пишет только «старые данные»', async () => {
+    const { worlds, env, fog, frame, node, at, name, asSector, patchPlanet, t } = await boot();
+    const dark = env.nodes.find((n) => !fog.known(n.id) && n.sector === 'planet')!;
+    asSector(dark.id, 'dead_world');
+    patchPlanet(dark.id, { kind: 'dead_world', owner: null, buildings: [], garrison: [] });
+    fog.rememberScan([dark.id]);
+    const c = at(node(dark.id));
+    worlds.drawWorlds(0, LOD());
+    expect(call(frame.calls, 'fillText', name(dark.id), c.x + 13 + 12, c.y - 1)).toBeTruthy();
+    expect(call(frame.calls, 'fillText', t('map.fog.old'), c.x + 13 + 12, c.y + 11)?.alpha).toBeCloseTo(STALE_ALPHA);
   });
 });
 

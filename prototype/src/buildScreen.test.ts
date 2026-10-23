@@ -527,7 +527,8 @@ describe('окно построек — подключение к main.ts', () =
     expect(src).toMatch(
       /upgrade: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'upgrade', id, count: 1 \}\)/,
     );
-    expect(src).toContain("enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 })");
+    // Мир карточки — `codexWorld()`: из хаба выбранного мира нет (справочник поверх хаба).
+    expect(src).toContain("enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 })");
   });
 });
 

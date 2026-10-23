@@ -7,6 +7,7 @@ import { useRemoteCorporations } from './corporateRemote';
 import { securityAuditFromEnv } from './securityAudit';
 import rateLimit from '@fastify/rate-limit';
 import { registerProfileApi } from './profileApi';
+import { registerPlayerActivityApi } from './playerActivityApi';
 import { creditProfileMatch } from './profileCredit';
 import { nickSeatAccounts } from './commanderCredit';
 import {
@@ -15,6 +16,7 @@ import {
   loadDropTables,
   loadShippedData,
   loadStarterArsenal,
+  MODULE_MANIFEST_VERSION,
 } from './scenario';
 import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { salvageFromEvents } from './dropRoller';
@@ -29,8 +31,8 @@ import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
-import { operatorTokenFromEnv } from './operatorAccess';
-import { createMatchLoader } from './serverWiring';
+import { isOperatorRequest, operatorTokenFromEnv } from './operatorAccess';
+import { createAvaRoom, createMatchLoader, declareAvaWar } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { freeMatchId } from './matchId';
 import {
@@ -55,6 +57,7 @@ import { registerLeaderboardApi } from './leaderboardApi';
 import { FriendService } from './friendService';
 import { CorpService } from './corpService';
 import { registerAvaApi, registerAvaFeed } from './avaApi';
+import { registerNewsApi } from './newsApi';
 import { AvaService } from './avaService';
 import { registerMedalApi } from './medalApi';
 import { MedalService } from './medalService';
@@ -63,9 +66,10 @@ import { registerMetaMarketApi } from './metaMarketApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
 import { registerPushApi } from './pushApi';
-import { configureWebPush, vapidFromEnv } from './push';
+import { configureWebPush, sendPush, vapidFromEnv } from './push';
+import { createPushDispatcher } from './pushDispatch';
 import { loadMedalCatalog } from './medalCatalog';
-import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
+import { AvaOrchestrator } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry, revokeAccountConnections } from './roomRegistry';
 import { buildVersion } from './buildVersion';
@@ -192,6 +196,17 @@ const loadMatch = createMatchLoader({
   // read before that — a module bought mid-match becomes buildable without a new
   // match/snapshot (LARS-0.2: only the build catalog goes live).
   arsenalStore: stores.arsenalStore,
+  // UIX-4.3: the push trigger — own urgent news to a seat whose player is away. Only with
+  // VAPID configured: no keys ⇒ no subscriptions could exist, nothing to send.
+  ...(vapid
+    ? {
+        onObservation: createPushDispatcher({
+          store: stores.pushStore,
+          send: sendPush,
+          onError: (m) => process.stderr.write(`${m}\n`),
+        }),
+      }
+    : {}),
   onStall: (matchId) =>
     process.stderr.write(
       `match ${matchId}: world clock stalled (a same-instant scheduling loop) — ` +
@@ -316,10 +331,10 @@ const avaOrchestrator = new AvaOrchestrator({
   sessionStore: stores.sessionStore,
   data,
   maps: loadAvaMaps(),
-  createRoom: async ({ matchId, state }) => {
-    const room = createDevMatch(data, { id: matchId, initialState: state, time: state.time });
-    await stores.store.save(snapshotOf(room));
-  },
+  manifest: MODULE_MANIFEST_VERSION, // the module graph `createMatchLoader` resumes under
+  createRoom: createAvaRoom({ stores, data }),
+  // CORP-4: no map fits the locked roster — cancel the battle and refund the challenge.
+  cancel: (matchupId) => avaService.cancelLocked(matchupId),
   // AVA-8 (S6): the peace period, then the war opens on a timer. Env-tunable for
   // playtests (a real day is too long to watch); the MVP default is 24h.
   peaceMs: Number(process.env.AVA_PEACE_MS ?? '') || undefined,
@@ -331,13 +346,7 @@ const avaOrchestrator = new AvaOrchestrator({
   escalateWar: async (matchId) => {
     const room = await registry.resolve?.(matchId);
     if (!room) return false; // snapshot missing/unloadable — retry next sweep
-    let allLanded = true;
-    for (const { playerId, action } of warDeclarationsFor(room.state, matchId)) {
-      const r = await room.submitServerAction(playerId, action);
-      // E_SAME_STANCE = already at war (a replay after a partial pass) — that pair is done.
-      if (!r.ok && r.code !== 'E_SAME_STANCE') allLanded = false;
-    }
-    return allLanded;
+    return declareAvaWar(room, matchId);
   },
   // AVA-8 (S7): settle the ended war — archive the matchup, record the outcome,
   // award influence to the winning corp (exactly-once by the locked→ended gate).
@@ -462,6 +471,11 @@ if (auth && !allowedOrigins) {
   );
 }
 
+// The medal catalog (MED-1) is fixed data (`data/medals.json`), validated once at boot:
+// the medal service grants from it, and the AvA settlement announces a corp reaching a
+// corp medal's condition in the news feed (CORP-1).
+const medalCatalog = loadMedalCatalog();
+
 // AvA service (AVA-2/3/4/6/8): readiness pool + challenge state machine + roster window
 // + settlement over the durable stores. One instance is shared by the HTTP API and the
 // sweeps.
@@ -474,18 +488,19 @@ if (auth && !allowedOrigins) {
   rosterStore: stores.rosterStore,
   resultStore: stores.resultStore,
   feedStore: stores.feedStore,
+  medals: medalCatalog,
 });
 
 // Medals (MED-1, corporations.md §3): objective, server-checked corp achievements from the
-// AvA match history. The catalog is fixed data (`data/medals.json`), validated once at boot;
-// the service authorizes the head/officer manual-grant path over the durable stores.
+// AvA match history, over the catalog above; the service authorizes the head/officer
+// manual-grant path over the durable stores.
   const medalService =
     stores.corporateServices?.medals ??
     new MedalService({
   corpStore: stores.corpStore,
   resultStore: stores.resultStore,
   medalStore: stores.medalStore,
-  catalog: loadMedalCatalog(),
+  catalog: medalCatalog,
 });
 
 // Match factory (SV-2.5): keep OPEN_MATCHES joinable matches available so the feed is
@@ -539,13 +554,24 @@ const server = createMultiplayerServer({
   auth,
   // A join token is bound to the account's password: a reset refuses the old one here.
   ...(auth
-    ? { accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId) }
+    ? {
+        accountPwfp: (accountId: string) => currentPwfp(stores.userStore, accountId),
+        accountSeat: async (matchId: string, accountId: string) => {
+          const ava = await avaOrchestrator.resolveAvaSeat(matchId, accountId);
+          if (ava) return ava.ok ? ava.playerId : null;
+          const user = await stores.userStore.findById(accountId);
+          return user ? accountStore.seatOf(matchId, user.login) : null;
+        },
+      }
     : {}),
   allowedOrigins,
   securityAudit,
   accountStore, // dev ?nick= WS login (when auth is off)
   seatLock: SEAT_LOCK, // REL-5: nick+ticket identity; `?player=` alone is refused when on
   httpRoutes: (app) => {
+    app.get('/auth/status', async (_request, reply) => reply.header('Cache-Control', 'no-store').send({
+      enabled: !!auth, accountDeletion: !!auth && !!process.env.DATABASE_URL && process.env.ACCOUNT_DELETION_ENABLED === '1',
+    }));
     // The open-matches feed is PUBLIC and read-only — browsing joinable matches precedes
     // login and works with or without auth. Joining still needs a session (SE-1.x).
     registerOpenMatchesFeed(app, {
@@ -555,6 +581,9 @@ const server = createMultiplayerServer({
     });
     // The public AvA feed (AVA-9) — confirmed matchups + results, read-only, no session.
     registerAvaFeed(app, { service: avaService });
+    // The news feed (CORP-1) — the admin's announcements + corporation and battle facts,
+    // public like the AvA feed it grew from.
+    registerNewsApi(app, { feed: stores.feedStore, announcements: stores.announcementStore });
     // The account + match WRITE surface only when auth is on (it mints tokens); no auth ⇒
     // the insecure dev ?player= handshake only. It sits behind @fastify/rate-limit in an
     // ENCAPSULATED scope so the coarse per-IP backstop covers only these write routes —
@@ -570,6 +599,7 @@ const server = createMultiplayerServer({
           sendRecoveryMail,
           signSession,
           verifySession,
+          accountDeletionEnabled: process.env.ACCOUNT_DELETION_ENABLED === '1' && !!process.env.DATABASE_URL,
           onSessionsRevoked: (accountId) => { revokeAccountConnections(registry, accountId); },
           // A new password closes the account's open game sockets in every live match.
           onPasswordChanged: (accountId) => {
@@ -588,6 +618,8 @@ const server = createMultiplayerServer({
           // "an empty arsenal" never exists. Idempotent end to end (deterministic
           // item ids + first-write-wins grant), so a crashed grant re-runs safely.
           onRegistered: async (accountId) => {
+            try { await stores.registrationRewards.ensure(accountId); }
+            catch { process.stderr.write(`registration reward deferred for ${accountId}\n`); }
             try {
                 await grantStarterArsenal(
                   stores.arsenalStore,
@@ -606,6 +638,12 @@ const server = createMultiplayerServer({
         // Corporations (CORP-0) — session-gated on every route: the acting identity
         // comes from the session, so the API only exists where sessions do.
         if (identify) {
+          registerPlayerActivityApi(scope, {
+            store: stores.playerActivity,
+            identify,
+            operator: (req) => isOperatorRequest({remoteAddress:req.raw.socket.remoteAddress,headers:req.headers},operatorTokenFromEnv(process.env)),
+            ...(allowedOrigins ? { allowedOrigins } : {}),
+          });
             registerCorporateMaintenance(scope, process.env.CORPORATIONS_MAINTENANCE === '1');
             if (corporationsEndpoint) {
               registerCorporateGateway(scope, corporationsEndpoint, identify);
@@ -627,8 +665,10 @@ const server = createMultiplayerServer({
           });
             registerProfileApi(scope, {
               profiles: stores.profileStore,
+              registrationRewards: stores.registrationRewards,
               users: stores.userStore,
               commanders: stores.commanderStore,
+              premium: (accountId) => metaEconomy.isPremium(accountId),
               identify,
             });
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с
@@ -681,6 +721,7 @@ const server = createMultiplayerServer({
             identify,
             admins: ADMIN_LOGINS,
             users: stores.userStore,
+            announcements: stores.announcementStore,
             roster: async (matchId) => {
               // Load-on-demand: a hibernated match still has a roster to command —
               // an admin asking about it is exactly a reason to wake it.

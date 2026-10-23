@@ -126,6 +126,7 @@ async function boot(over: Record<string, unknown> = {}) {
     pc: true,
     merge: null as { from: string } | null,
     memory: {} as Record<string, Snapshot>,
+    surveyed: {} as Record<string, { kind?: string; at: number }>,
     intel: [] as Array<{ kind: string; target: string; until: number }>,
     stewardTech: false,
     relocate: false,
@@ -144,6 +145,7 @@ async function boot(over: Record<string, unknown> = {}) {
   vi.doMock('./mapAim', () => ({ squadronRelocateSpots: () => (env.relocate ? [{}] : []) }));
   vi.doMock('./mapFog', () => ({
     memory: { get: (id: string) => env.memory[id] },
+    surveyed: (id: string) => env.surveyed[id],
     myIntel: () => env.intel,
   }));
   vi.doMock('./stewardScreen', () => ({ stewardTechDone: () => env.stewardTech }));
@@ -272,12 +274,22 @@ describe('действия мира', () => {
 
   it('разведка чужого мира — кнопкой, а открытое окно — отсчётом вместо неё', async () => {
     const { env, card } = await boot();
-    expect(card('N')).toContain(act('spyplanet', 'p2'));
-    expect(card('A')).not.toContain('data-act="spyplanet"');
+    expect(card('N')).toContain(act('spyplanet', 'recon'));
+    expect(card('A')).not.toContain(act('spyplanet', 'recon'));
+    expect(card('A')).toContain(act('spyplanet', 'counter')); // SPY-11: свой мир охраняют
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
     const html = card('N');
     expect(html).toContain(t('side.world.spy-window'));
-    expect(html).not.toContain('data-act="spyplanet"');
+    expect(html).not.toContain(act('spyplanet', 'recon'));
+  });
+
+  it('саботаж и кража ресурсов — свои кнопки, и при открытом окне тоже (SPY-9)', async () => {
+    const { env, card } = await boot();
+    env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
+    const html = card('N');
+    expect(html).toContain(act('spyplanet', 'sabotage'));
+    expect(html).toContain(act('spyplanet', 'theft'));
+    expect(html).toContain(act('spyplanet', 'research'));
   });
 
   it('в забеге Sector Zero нет ни пинга, ни разведки', async () => {
@@ -376,6 +388,20 @@ describe('вкладки', () => {
 });
 
 describe('очередь стройки', () => {
+  it('подписи очереди и приостановленных строек остаются текстом (CWE-79)', async () => {
+    const { env, card } = await boot({ pc: false });
+    const payload = '<img src=x onerror="alert(1)">';
+    const a = env.s.planets.A!;
+    a.buildQueue = [{ id: 11, kind: 'unit', playerId: 'p1', unit: payload, count: 2 }];
+    a.pausedConstruction = [{
+      id: 7, kind: 'unit', playerId: 'p1', unit: payload, count: 1,
+      progress: 0.5, remainingHours: 2, remainingCost: {},
+    }];
+    const html = card('A', 'ground');
+    expect(html).not.toContain(payload);
+    expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+  });
+
   it('ждущий заказ и пауза стоят на своей полосе', async () => {
     const { env, card } = await boot();
     const a = env.s.planets.A!;
@@ -401,6 +427,17 @@ describe('очередь стройки', () => {
 });
 
 describe('мир вне зрения', () => {
+  it('память скана экранирует недоверенные имена и неизвестные постройки (CWE-79)', async () => {
+    const { env, m } = await boot();
+    const payload = '<img src=x onerror="alert(1)">';
+    env.names.p2 = payload;
+    env.memory.N = { owner: 'p2', garrison: 5, buildings: [{ type: payload, level: 1 }] };
+    const html = m.unknownPlanetHtml(env.s.planets.N!);
+    expect(html).not.toContain(payload);
+    expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+    expect(html).toContain('L1');
+  });
+
   it('память скана: владелец, гарнизон, постройки и разведка чужого мира', async () => {
     const { env, m } = await boot();
     env.memory.N = { owner: 'p2', garrison: 5, buildings: [{ type: 'mine', level: 1 }] };
@@ -409,7 +446,8 @@ describe('мир вне зрения', () => {
     expect(html).toContain('<b>Багровые</b>');
     expect(html).toContain('<b>5</b>');
     expect(html).toContain(`${buildingName(data.buildings.mine!.name, 'mine')} L1`);
-    expect(html).toContain(act('spyplanet', 'p2'));
+    expect(html).toContain(act('spyplanet', 'recon'));
+    expect(html).toContain(act('spyplanet', 'theft'));
     env.memory.N = { owner: 'p1', garrison: 0, buildings: [] };
     const own = m.unknownPlanetHtml(env.s.planets.N!);
     expect(own).toContain(t('side.scan.no-buildings'));
@@ -423,6 +461,17 @@ describe('мир вне зрения', () => {
     expect(html).toContain(act('ping', ''));
     env.hidden = true;
     expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="ping"');
+  });
+
+  it('провинция, куда залетал корабль, называет свой тип, но не хозяина', async () => {
+    const { env, m } = await boot();
+    const { SECTOR_TYPES } = await import('./map');
+    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain(tData(SECTOR_TYPES.graveyard!.name));
+    env.surveyed.Z = { kind: 'graveyard', at: 1 };
+    const html = m.unknownPlanetHtml(env.s.planets.Z!);
+    expect(html).toContain(t('side.notelemetry.title'));
+    expect(html).toContain(tData(SECTOR_TYPES.graveyard!.name));
+    expect(html).not.toContain(t('side.scan.owner'));
   });
 
   it('в забеге Sector Zero память скана не предлагает разведку', async () => {

@@ -556,7 +556,7 @@ export function fleetPanelHtml(f: Fleet): string {
   if (f.owner !== ME)
     return objectPanelHtml(
       h +
-        `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>`,
+        `<div class="hint">${t('side.fleet.foreign.hint', { who: esc(NAME[f.owner] ?? f.owner) })}</div>`,
       detail,
     );
 

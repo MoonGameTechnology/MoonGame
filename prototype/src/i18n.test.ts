@@ -13,20 +13,12 @@ import { INTROS } from './intros';
 import { FIRST_GOALS } from './firstGoals';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildFirstMatchTour } from './firstMatchTour';
+import { firstMatchFixture } from './firstMatchTour.fixture';
 import { refusalKeyOf } from '../../decisions/refusalText';
 import { PHONE_EDGE_LABEL, PHONE_ITEMS } from '../../decisions/phoneNav';
 
 /** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
-const TOUR_DEPS_STUB = {
-  mouse: () => true,
-  homeOpened: () => false,
-  cardLayout: () => false,
-  panelOpen: () => false,
-  shipsTabOpen: () => false,
-  hasFleet: () => false,
-  capturedWorld: () => false,
-  scoreRose: () => false,
-};
+const TOUR_DEPS_STUB = firstMatchFixture().deps;
 
 // Гейт локализации. Текст живёт в /localization, в коде — только ключи
 // (`t('err.no-capacity')`). Эти тесты держат три инварианта:
@@ -77,6 +69,9 @@ const srcFiles = (): string[] => [
   // Почтовый адаптер хостов (письмо сброса пароля) живёт рядом с точкой входа сервера:
   // это слой хоста, а не прототипа, но ключи `auth.recovery-mail.*` читает он.
   'scripts/recoveryMailer.ts',
+  // Host-rendered bot DM templates: the server declares keys, the host owns texts.
+  'packages/server/src/botSocial.ts',
+  'scripts/botChatText.ts',
 ];
 
 /** Шипнутый каталог — ВТОРОЙ источник живых ключей, наравне с исходниками (CONV-12c).
@@ -195,10 +190,12 @@ function shippedNames(): Array<[string, string]> {
 const DATA_KEY_GAPS = new Set<string>([]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
+  { prefix: 'onb.guide.', built_by: 'firstMatchTour.ts: step id → copy; checked by tourCopy.test.ts' },
   { prefix: 'meta.material.', built_by: 'metaEconomyScreen.ts: server meta economy material catalog nameKey' },
   { prefix: 'meta.season.', built_by: 'metaEconomyScreen.ts: server season catalog nameKey' },
   { prefix: 'meta.reward.', built_by: 'metaEconomyScreen.ts: server season milestone localization keys' },
   { prefix: 'commerce.offer.', built_by: 'metaEconomyScreen.ts: Commerce offer nameKey and contentsKey' },
+  { prefix: 'shop.offer.', built_by: 'shopScreen.ts: store offer id of a set; completeness checked by the catalogue test below' },
   { prefix: 'profile.portrait.', built_by: 'profileStudio.ts: static portrait index 1..40; completeness checked by profileStudio.test.ts' },
   { prefix: 'profile.medal.', built_by: 'profileStudio.ts: PROFILE_MEDALS ids; completeness checked by profileStudio.test.ts' },
   { prefix: 'profile.metric.', built_by: 'profileStudio.ts: PROFILE_MEDALS metrics; completeness checked by profileStudio.test.ts' },
@@ -281,9 +278,9 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       '(TRN-2); полноту держит prototype/src/trainingTour.test.ts',
   },
   {
-    prefix: 'training.tour.',
+    prefix: 'training.guide.',
     built_by:
-      'buildTrainingTour() — `training.tour.<этап>.<шаг>` из id шага (TRN-2); ' +
+      'buildTrainingTour() — `training.guide.<этап>.<шаг>` из id шага (TRN-2); ' +
       'полноту держит prototype/src/trainingTour.test.ts',
   },
 ];
@@ -348,6 +345,10 @@ describe('локализация — ключи', () => {
     walk(catalog);
     const products = (catalog.commerce as { products: Record<string, unknown> }).products;
     for (const id of Object.keys(products)) keys.push(`commerce.offer.${id}.name`, `commerce.offer.${id}.contents`);
+    // Наборы модулей и материалов магазин называет по id товара (`shopScreen.ts`, storeTitle).
+    const store = (catalog.store as { offers: Record<string, { modules?: string[]; materials?: unknown }> }).offers;
+    for (const [id, offer] of Object.entries(store))
+      if ((offer.modules?.length ?? 0) > 1 || offer.materials) keys.push(`shop.offer.${id}.name`);
     expect(keys.filter((key) => !(key in ru) || !(key in en))).toEqual([]);
   });
 

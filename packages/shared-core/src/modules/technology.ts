@@ -19,6 +19,7 @@ import type {
   UnitStack,
 } from '../state/gameState';
 import { scientistsOf } from '../state/gameState';
+import { matchCost, matchHours } from '../util/pricing';
 import { canAfford, payCost } from '../util/treasury';
 import { isForkSite } from '../state/forkSite';
 
@@ -349,15 +350,16 @@ function startResearch(action: Action, h: HandlerContext): void {
   if (lock) {
     return h.reject(lock);
   }
-  if (!canAfford(player.resources, def.cost)) {
+  const cost = matchCost(h.state, def.cost);
+  if (!canAfford(player.resources, cost)) {
     return h.reject('E_INSUFFICIENT');
   }
-  payCost(player.resources, def.cost);
+  payCost(player.resources, cost);
   const completesAt = scheduleCompletion(
     h,
     payload.technology,
     action.playerId,
-    def.researchTimeHours,
+    matchHours(h.state, def.researchTimeHours),
   );
   active.push({ technology: payload.technology, startedAt: h.ctx.now, completesAt });
   h.emit('technology.research.started', {
@@ -420,12 +422,33 @@ function boostResearch(action: Action, h: HandlerContext): void {
   });
 }
 
+/**
+ * Capability `technology.grant` (SPY-10): hand a player a finished technology outside
+ * the lab — research theft. A slot already researching it is freed (the scheduled
+ * completion then finds no slot and no-ops); nothing is refunded. Prerequisites are
+ * NOT checked (owner's resolution 2026-10-22). Emits `technology.researched` like a
+ * normal completion. Returns false when there is nothing to grant.
+ */
+export type TechnologyGrant = (h: HandlerContext, playerId: string, technology: string) => boolean;
+
+const grantTechnology: TechnologyGrant = (h, playerId, technology) => {
+  const player = h.state.players[playerId];
+  if (!player || !h.ctx.data.technologies[technology] || hasCompleted(player, technology)) return false;
+  const tech = technologyState(player);
+  if (tech.active) tech.active = tech.active.filter((a) => a.technology !== technology);
+  tech.completed.push(technology);
+  h.emit('technology.researched', { playerId, technology });
+  return true;
+};
+
 export const technologyModule: GameModule = {
   id: 'technology',
   // 1.1.0: условие «есть юнит» видит и десант на плацдарме.
   // 1.2.0: площадка крепости на развилке не считается сектором (замечание Codex на #1410).
-  version: '1.3.0',
+  // 1.4.0: возможность `technology.grant` — технология мимо лаборатории (SPY-10).
+  version: '1.4.0',
   setup(api) {
+    api.provideCapability<TechnologyGrant>('technology.grant', grantTechnology);
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);
     api.on('time.advanced', (_event, h) => pinTechRules(h));

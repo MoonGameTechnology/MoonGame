@@ -604,6 +604,39 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
     }
   });
 
+  it('service worker push-уведомлений: свой адрес, без кэша, и документ его разрешает (UIX-4.4)', async () => {
+    const WORKER = 'self.addEventListener("push",()=>{})';
+    const bare = createMultiplayerServer({ room: makeRoom(), indexHtml: CLIENT });
+    const bareBase = httpBase(await bare.listen());
+    try {
+      // Хост без worker'а: ни маршрута, ни разрешения в политике.
+      expect((await fetch(`${bareBase}/sw.js`)).status).toBe(404);
+      const csp = (await fetch(`${bareBase}/`)).headers.get('content-security-policy') ?? '';
+      expect(csp).toContain("worker-src 'none'");
+    } finally {
+      await bare.close();
+    }
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      indexHtml: CLIENT,
+      serviceWorker: WORKER,
+    });
+    const base = httpBase(await server.listen());
+    try {
+      const sw = await fetch(`${base}/sw.js`);
+      expect(sw.status).toBe(200);
+      expect(await sw.text()).toBe(WORKER);
+      expect(sw.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
+      expect(sw.headers.get('cache-control')).toBe('no-cache');
+      // Сам скрипт идёт с политикой API: сеть worker'у не нужна.
+      expect(sw.headers.get('content-security-policy')).toContain("default-src 'none'");
+      const csp = (await fetch(`${base}/`)).headers.get('content-security-policy') ?? '';
+      expect(csp).toContain("worker-src 'self'");
+    } finally {
+      await server.close();
+    }
+  });
+
   it('площадке-порталу встраивание разрешается параметром, а не снятием заголовка', async () => {
     const server = createMultiplayerServer({
       room: makeRoom(),

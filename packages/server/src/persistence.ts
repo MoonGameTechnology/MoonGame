@@ -1,4 +1,6 @@
+import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from './registrationRewardStore';
 import { createCorporateServices } from './corporateTransactions';
+import { MemoryPlayerActivityStore, PostgresPlayerActivityStore, type PlayerActivityStore } from './playerActivity';
 import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
@@ -6,6 +8,7 @@ import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMar
 import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from './metaEconomyStore';
 import {
   MemoryAccountStore,
+  MemoryAnnouncementStore,
   MemoryArsenalStore,
   MemoryAvaChallengeStore,
   MemoryAvaFeedStore,
@@ -23,6 +26,7 @@ import {
   MemoryReceiptStore,
   MemoryUserStore,
   PostgresAccountStore,
+  PostgresAnnouncementStore,
   PostgresArsenalStore,
   PostgresAvaChallengeStore,
   PostgresAvaFeedStore,
@@ -40,6 +44,7 @@ import {
   PostgresReceiptStore,
   PostgresUserStore,
   type AccountStore,
+  type AnnouncementStore,
   type ArsenalStore,
   type AvaChallengeStore,
   type AvaFeedStore,
@@ -69,8 +74,10 @@ import {
  * creates tables on boot unless DB_AUTO_MIGRATE=0 selects the separate migration job. See `docs/infra-sizing-roadmap.md`, blocker #1.
  */
 export interface Stores {
+  playerActivity: PlayerActivityStore;
   corporateServices?: ReturnType<typeof createCorporateServices>;
   profileStore: ProfileStore;
+  registrationRewards: RegistrationRewardStore;
   store: MatchStore;
   receiptStore: ReceiptStore;
   /** Nick→seat identity. Durable (Postgres) alongside the match itself, so a returning
@@ -89,8 +96,12 @@ export interface Stores {
   rosterStore: AvaRosterStore;
   /** AvA results (AVA-8) — recorded outcomes (MM-3.1 match history), durable. */
   resultStore: AvaResultStore;
-  /** AvA public feed (AVA-9) — confirmed matchups + results, no private data. */
+  /** The public feed (AVA-9, CORP-1) — confirmed matchups + results and a corporation's
+   *  own facts (founded, level, medal), no private data. */
   feedStore: AvaFeedStore;
+  /** The admin's announcements (CORP-1) — game database, not the corporations one: the
+   *  admin routes live in the game process. */
+  announcementStore: AnnouncementStore;
   /** AvA sessions (AVA-7) — the live match a locked matchup was raised into + its seating. */
   sessionStore: AvaSessionStore;
   /** Earned medals (MED-1) — permanent per-account achievement record. */
@@ -128,18 +139,26 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     const market = new MemoryMetaMarket(memoryArsenal, undefined, faucet);
     const economy = new MemoryMetaEconomyStore(memoryArsenal, memoryDrops, market);
     market.setEconomy(economy);
+    const users = new MemoryUserStore();
+    const profiles = new MemoryProfileStore();
+    const commanders = new MemoryCommanderStore();
+    // One feed for both writers: the corp store announces a corp's own facts into it.
+    const feed = new MemoryAvaFeedStore();
     return {
-      profileStore: new MemoryProfileStore(),
+      playerActivity: new MemoryPlayerActivityStore(),
+      profileStore: profiles,
+      registrationRewards: new MemoryRegistrationRewardStore(users, profiles, commanders),
       store: memoryMatches,
       receiptStore: new MemoryReceiptStore(),
       accountStore: new MemoryAccountStore(),
-      userStore: new MemoryUserStore(),
-      corpStore: new MemoryCorpStore(),
-      commanderStore: new MemoryCommanderStore(),
+      userStore: users,
+      corpStore: new MemoryCorpStore(feed),
+      commanderStore: commanders,
       challengeStore: new MemoryAvaChallengeStore(),
       rosterStore: new MemoryAvaRosterStore(),
       resultStore: new MemoryAvaResultStore(),
-      feedStore: new MemoryAvaFeedStore(),
+      feedStore: feed,
+      announcementStore: new MemoryAnnouncementStore(),
       sessionStore: new MemoryAvaSessionStore(memoryMatches),
       medalStore: new MemoryMedalStore(),
       arsenalStore: memoryArsenal,
@@ -162,8 +181,10 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const economy = new PostgresMetaEconomyStore(pool);
   market.setEconomy(economy);
   return {
+    playerActivity: new PostgresPlayerActivityStore(pool),
     corporateServices: createCorporateServices(pool),
     profileStore: new PostgresProfileStore(pool),
+    registrationRewards: new PostgresRegistrationRewardStore(pool),
     store: new PostgresMatchStore(pool),
     receiptStore: new PostgresReceiptStore(pool),
     accountStore: new PostgresAccountStore(pool), // shares the pool; closed by pool.end()
@@ -174,6 +195,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     rosterStore: new PostgresAvaRosterStore(pool),
     resultStore: new PostgresAvaResultStore(pool),
     feedStore: new PostgresAvaFeedStore(pool),
+    announcementStore: new PostgresAnnouncementStore(pool),
     sessionStore: new PostgresAvaSessionStore(pool),
     medalStore: new PostgresMedalStore(pool),
     arsenalStore: new PostgresArsenalStore(pool),

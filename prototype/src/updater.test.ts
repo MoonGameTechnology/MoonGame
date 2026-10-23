@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildLabel,
   checkForUpdate,
@@ -186,4 +186,14 @@ describe('checkForUpdateDetailed (diagnosable outcomes)', () => {
     setBuild(undefined);
     expect((await checkForUpdateDetailed(fetchOk(release(9, 'x')))).kind).toBe('dormant');
   });
+});
+
+it('RuStore never contacts GitHub for rolling APK updates', async () => {
+  const previous = (globalThis as { __BUILD__?: unknown }).__BUILD__;
+  (globalThis as { __BUILD__?: unknown }).__BUILD__ = { versionCode: 100, sha: 'abc', channel: 'rustore' };
+  const fetcher = vi.fn();
+  try {
+    expect(await checkForUpdateDetailed(fetcher)).toEqual({ kind: 'dormant' });
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally { (globalThis as { __BUILD__?: unknown }).__BUILD__ = previous; }
 });

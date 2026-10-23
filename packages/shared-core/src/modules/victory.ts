@@ -8,6 +8,7 @@ import type {
   UnitStack,
 } from '../state/gameState';
 import type { HandlerContext, GameModule } from '../kernel/module';
+import type { MatchConfig, VictoryConfig } from '../action/types';
 import { MS_PER_DAY } from '../util/time';
 import { isCapturable, provinceScore } from '../state/sectorKind';
 import { isForkSite } from '../state/forkSite';
@@ -32,6 +33,24 @@ export const DEFAULT_COALITION_FACTOR = 0.7;
  *  finale ranked by score (GDD §3.1/§3.2). Any other speed falls back to the ×1 cap. */
 const SESSION_MAX_DAYS: Record<number, number> = { 1: 100, 2: 60, 4: 30 };
 const DEFAULT_SESSION_DAYS = 100;
+
+/** The numeric race rules; `scripted` is a switch of the evaluator, not a published rule. */
+export type VictoryRules = Required<Omit<VictoryConfig, 'scripted'>>;
+
+/** Effective numeric rules used by this evaluator and published by the server.
+ *  The mode must already be resolved. Return a fresh allowlisted object so a
+ *  browser projection cannot mutate the config or disclose internal extensions. */
+export function effectiveVictoryRules(config?: MatchConfig): VictoryRules {
+  const victory = config?.victory;
+  return {
+    scoreLimit: victory?.scoreLimit ?? DEFAULT_SCORE_LIMIT,
+    dominationPercent: victory?.dominationPercent ?? DEFAULT_DOMINATION_PERCENT,
+    coalitionFactor: victory?.coalitionFactor ?? DEFAULT_COALITION_FACTOR,
+    endsAt: victory?.endsAt ??
+      (SESSION_MAX_DAYS[config?.timeScale ?? 1] ?? DEFAULT_SESSION_DAYS) * MS_PER_DAY,
+  };
+}
+
 /** Очки за решённый бой за планету игрока (BAL-16, резолюции владельца 2026-10-10 и
  *  2026-10-15): победа даёт фиксированные +40, проигрыш отнимает 5% текущего счёта.
  *  Процент бьёт лидера сильнее отстающего — при счёте 450 проигранный бой стоит 23 очка,
@@ -340,10 +359,8 @@ function endOnSessionCap(
   h: HandlerContext,
   scores: Record<PlayerId, MatchScore>,
   active: PlayerId[],
+  endsAt: number,
 ): void {
-  const timeScale = h.ctx.config?.timeScale ?? 1;
-  const endsAt =
-    h.ctx.config?.victory?.endsAt ?? (SESSION_MAX_DAYS[timeScale] ?? DEFAULT_SESSION_DAYS) * MS_PER_DAY;
   if (h.ctx.now >= endsAt) {
     const sides = fixedVictoryUnits(h, active);
     if (sides) {
@@ -363,6 +380,7 @@ function evaluateVictory(h: HandlerContext): void {
     return;
   }
 
+  const rules = effectiveVictoryRules(h.ctx.config);
   const scores = computeScores(h);
   h.state.match.scores = scores;
 
@@ -379,6 +397,12 @@ function evaluateVictory(h: HandlerContext): void {
   const activeBefore = playerIds.filter(
     (playerId) => h.state.players[playerId]?.status === 'active',
   );
+  // A scripted scenario (TRN-3) ends by its script: a seat without worlds stays in with
+  // its fleets — the training ground's counterattack arrives after its worlds fell.
+  if (h.ctx.config?.victory?.scripted) {
+    endOnSessionCap(h, scores, activeBefore, rules.endsAt);
+    return;
+  }
   // PvE (PVE-4) is decided FIRST, and — importantly — before the `< 2 active` guard
   // below. That guard exists for the PvP race (a one-player board has no race to
   // decide), but in PvE it is exactly the losing position: the Swarm alone on the
@@ -494,7 +518,7 @@ function evaluateVictory(h: HandlerContext): void {
   // `pve-failed` / `pve-cleared` are the whole verdict. Only the session-cap backstop
   // still applies, because a run that cannot end is worse than one that ends badly.
   if (h.state.pve) {
-    endOnSessionCap(h, scores, active);
+    endOnSessionCap(h, scores, active, rules.endsAt);
     return;
   }
 
@@ -523,7 +547,7 @@ function evaluateVictory(h: HandlerContext): void {
     capturableCount += 1;
     if (p.owner !== null) ownedCapturable.set(p.owner, (ownedCapturable.get(p.owner) ?? 0) + 1);
   }
-  const dominationPercent = h.ctx.config?.victory?.dominationPercent ?? DEFAULT_DOMINATION_PERCENT;
+  const dominationPercent = rules.dominationPercent;
   if (capturableCount > 0 && dominationPercent > 0) {
     // With a threshold ≤ 50% two players can cross it in the SAME span — the old
     // `find` on the sorted id list crowned the alphabetically-first one. Domination
@@ -548,8 +572,8 @@ function evaluateVictory(h: HandlerContext): void {
   // default so a match without explicit config still has a points victory. A
   // coalition (alliance component) races as ONE unit against the sub-linear
   // threshold scoreLimit × N × factor and wins together (GDD §3.3).
-  const scoreLimit = h.ctx.config?.victory?.scoreLimit ?? DEFAULT_SCORE_LIMIT;
-  const coalitionFactor = h.ctx.config?.victory?.coalitionFactor ?? DEFAULT_COALITION_FACTOR;
+  const scoreLimit = rules.scoreLimit;
+  const coalitionFactor = rules.coalitionFactor;
   let bestUnit: PlayerId[] | null = null;
   let bestTotal = -Infinity;
   let unitTie = false;
@@ -571,7 +595,7 @@ function evaluateVictory(h: HandlerContext): void {
   }
 
   // Time crisis — the upper-bound backstop: a forced finale ranked by score.
-  endOnSessionCap(h, scores, active);
+  endOnSessionCap(h, scores, active, rules.endsAt);
 }
 
 /**

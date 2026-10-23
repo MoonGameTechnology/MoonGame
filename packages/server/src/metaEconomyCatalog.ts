@@ -19,6 +19,21 @@ const grant = z
   })
   .strict();
 
+const storeOffer = z
+  .object({
+    category: z.enum(['premium', 'modules', 'materials']),
+    /** Fixed Sovereign price; module offers take theirs from `modulePrices` instead. */
+    price: amount.optional(),
+    premiumDays: z.number().int().min(1).max(366).optional(),
+    premiumSeason: id.optional(),
+    modules: z.array(id).min(1).max(20).optional(),
+    discountPercent: z.number().int().min(1).max(90).optional(),
+    materials: quantities.optional(),
+    /** Lifetime purchases per account. */
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
 const schema = z
   .object({
     version: z.string().min(1),
@@ -87,6 +102,19 @@ const schema = z
           .strict(),
       )
       .min(1),
+    store: z
+      .object({
+        modulePrices: z.record(id, amount),
+        offers: z.record(id, storeOffer),
+        /** What a running premium adds: daily Sovereigns to claim, extra rewarded-ad supplies. */
+        premium: z
+          .object({
+            dailySovereigns: z.number().int().min(0).max(100),
+            extraDailyAds: z.number().int().min(0).max(5),
+          })
+          .strict(),
+      })
+      .strict(),
     commerce: z
       .object({
         dailyAdLimit: z.number().int().min(0).max(10),
@@ -98,6 +126,8 @@ const schema = z
               materials: quantities.optional(),
               module: id.optional(),
               premiumSeason: id.optional(),
+              sovereigns: amount.optional(),
+              bonusSovereigns: amount.optional(),
             })
             .strict(),
         ),
@@ -109,6 +139,7 @@ const schema = z
 export type MetaEconomyCatalog = z.infer<typeof schema>;
 export type MetaSeasonDefinition = MetaEconomyCatalog['seasons'][number];
 export type MetaSeasonGrant = MetaSeasonDefinition['milestones'][number]['free'];
+export type MetaStoreOffer = MetaEconomyCatalog['store']['offers'][string];
 
 /** Meta content is independent of the deterministic match bundle and validated at boot. */
 export function parseMetaEconomyCatalog(
@@ -193,10 +224,38 @@ export function parseMetaEconomyCatalog(
       throw new Error('E_META_PRODUCT');
     if (
       product.source === 'rewarded_ad' &&
-      (product.module || product.premiumSeason || !product.materials)
+      (product.module || product.premiumSeason || product.sovereigns || !product.materials)
     ) {
       throw new Error('E_META_AD_PRODUCT');
     }
+    if (product.bonusSovereigns && !product.sovereigns) throw new Error('E_META_PRODUCT');
+    if (product.sovereigns && (product.materials || product.module || product.premiumSeason))
+      throw new Error('E_META_PRODUCT');
+  }
+  for (const [defId, price] of Object.entries(catalog.store.modulePrices)) {
+    checkModule(defId);
+    if (!Number.isSafeInteger(price)) throw new Error('E_META_STORE');
+  }
+  for (const offer of Object.values(catalog.store.offers)) {
+    // One kind of goods per offer: the store card and the refund rule stay simple.
+    const kinds = [offer.premiumDays, offer.premiumSeason, offer.modules, offer.materials].filter(
+      (kind) => kind !== undefined,
+    );
+    if (kinds.length !== 1) throw new Error('E_META_STORE');
+    if (offer.modules) {
+      if (
+        offer.price !== undefined ||
+        new Set(offer.modules).size !== offer.modules.length ||
+        offer.modules.some((defId) => !Object.hasOwn(catalog.store.modulePrices, defId))
+      )
+        throw new Error('E_META_STORE');
+    } else if (offer.price === undefined || offer.discountPercent !== undefined) {
+      throw new Error('E_META_STORE');
+    }
+    const category = offer.modules ? 'modules' : offer.materials ? 'materials' : 'premium';
+    if (offer.category !== category) throw new Error('E_META_STORE');
+    checkMaterials(offer.materials);
+    if (offer.premiumSeason && !seasonIds.has(offer.premiumSeason)) throw new Error('E_META_STORE');
   }
   return catalog;
 }

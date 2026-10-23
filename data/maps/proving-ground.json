@@ -88,6 +88,10 @@
         {
           "type": "tax_office",
           "level": 3
+        },
+        {
+          "type": "counterintel",
+          "level": 3
         }
       ],
       "garrison": [

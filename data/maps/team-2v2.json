@@ -1505,5 +1505,10 @@
     ],
     "dayGates": true,
     "exclude": []
+  },
+  "pricing": {
+    "cost": { "metal": 1.5, "microelectronics": 2, "credits": 3 },
+    "hours": 2,
+    "start": { "metal": 1.5, "microelectronics": 2, "credits": 2 }
   }
 }

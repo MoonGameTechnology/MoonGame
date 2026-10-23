@@ -1,6 +1,7 @@
 /** Account cosmetics. No player-supplied grade or achievement counter crosses the write API. */
 export const PORTRAIT_COUNT = 40;
 export const MEDAL_SLOTS = 15;
+export const BOT_PROFILE_HISTORY_LIMIT = 10;
 export const PROFILE_MEDALS = [
   { id: 'first', metric: 'wins', goals: [1, 10, 50] },
   { id: 'map', metric: 'explored', goals: [20, 60, 150] },
@@ -14,21 +15,46 @@ export const PROFILE_MEDALS = [
   { id: 'flawless', metric: 'intactWins', goals: [1, 10, 30] },
   { id: 'legend', metric: 'wins', goals: [100, 250, 500] },
   { id: 'explorer', metric: 'explored', goals: [100, 250, 500] },
+  { id: 'contribution', metric: 'registered', goals: [1] },
 ] as const;
 export type ProfileMedalId = (typeof PROFILE_MEDALS)[number]['id'];
 export type ProfileMetric = (typeof PROFILE_MEDALS)[number]['metric'];
 export type ProfileProgress = Partial<Record<ProfileMetric, number>>;
 export type MedalGrade = 1 | 2 | 3;
+/** Registration grants only class III; higher classes have no invented unlock rules. */
+export const REGISTRATION_REWARD = { medalId: 'contribution', grade: 3, xp: 25 } as const;
+export interface RegistrationReward {
+  medalId: 'contribution';
+  grade: 3;
+  xp: number;
+  accepted: boolean;
+}
 export interface ProfileAppearance {
   /** 1-based shipped asset index. Never an arbitrary image URL. */
   portrait: number;
   /** Stable medal IDs only: a new degree replaces the previous one in this same slot. */
   slots: Array<ProfileMedalId | null>;
 }
+/** Completed public results only; bot identity and match-seat ownership stay on the server. */
+export interface BotProfileMatch {
+  matchId: string;
+  mapId: string;
+  /** UTC epoch milliseconds, not the match's elapsed game clock. */
+  endedAt: number;
+  outcome: 'win' | 'draw' | 'loss';
+  xp: number;
+  place: number | null;
+}
 export interface PlayerProfile extends ProfileAppearance {
   login: string;
   xp: number;
   progress: ProfileProgress;
+  /** A running premium account: the profile wears its frame. */
+  premium?: boolean;
+  /** Absent on human profiles, including a human's temporary AI substitute. */
+  kind?: 'bot';
+  /** At most BOT_PROFILE_HISTORY_LIMIT results, newest first; only supplied for bots. */
+  recentMatches?: BotProfileMatch[];
 }
 export function defaultAppearance(): ProfileAppearance {
   return { portrait: 1, slots: Array.from({ length: MEDAL_SLOTS }, () => null) };
@@ -36,9 +62,9 @@ export function defaultAppearance(): ProfileAppearance {
 export function medalGrade(id: ProfileMedalId, progress: ProfileProgress): MedalGrade | null {
   const medal = PROFILE_MEDALS.find((m) => m.id === id)!;
   const value = progress[medal.metric] ?? 0;
-  return value >= medal.goals[2]
+  return medal.goals[2] !== undefined && value >= medal.goals[2]
     ? 1
-    : value >= medal.goals[1]
+    : medal.goals[1] !== undefined && value >= medal.goals[1]
       ? 2
       : value >= medal.goals[0]
         ? 3

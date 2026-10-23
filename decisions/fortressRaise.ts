@@ -22,7 +22,8 @@ import {
   STATION_COST,
   technologiesUnlocking,
 } from '../packages/shared-core/src/index';
-import type { GameData, Planet, ResourceBag } from '../packages/shared-core/src/index';
+import { matchCost } from '../packages/shared-core/src/index';
+import type { GameData, GameState, Planet, ResourceBag } from '../packages/shared-core/src/index';
 
 /** Почему крепость поставить нельзя. `null` в {@link FortressRaise} — значит можно. */
 export type FortressBlock =
@@ -63,11 +64,13 @@ export function fortressRaise(
   treasury: ResourceBag,
   data: GameData,
   completed: readonly string[] = [],
+  match: Pick<GameState, 'pricing'> = {},
 ): FortressRaise {
   const locks = technologiesUnlocking(data, 'building', STATION_CORE);
-  if (node.owner !== viewerId) return notHere('not-owned', locks);
-  if (!isStationable(data, node)) return notHere('kind', locks);
-  return placeable(locks, treasury, completed);
+  const cost = matchCost(match, STATION_COST);
+  if (node.owner !== viewerId) return notHere('not-owned', locks, cost);
+  if (!isStationable(data, node)) return notHere('kind', locks, cost);
+  return placeable(locks, treasury, completed, cost);
 }
 
 /**
@@ -87,23 +90,29 @@ export function forkFortressRaise(
   treasury: ResourceBag,
   data: GameData,
   completed: readonly string[] = [],
+  match: Pick<GameState, 'pricing'> = {},
 ): FortressRaise {
   const locks = technologiesUnlocking(data, 'building', STATION_CORE);
-  if (province?.owner !== viewerId) return notHere('not-owned', locks);
-  if (site && site.owner !== null) return notHere('kind', locks);
-  return placeable(locks, treasury, completed);
+  const cost = matchCost(match, STATION_COST);
+  if (province?.owner !== viewerId) return notHere('not-owned', locks, cost);
+  if (site && site.owner !== null) return notHere('kind', locks, cost);
+  return placeable(locks, treasury, completed, cost);
 }
 
 /** Кнопки нет: сюда крепость не ставят (чужое место или место занято). */
-function notHere(blocked: 'not-owned' | 'kind', needs: string[]): FortressRaise {
-  return { show: false, enabled: false, blocked, cost: STATION_COST, needs };
+function notHere(blocked: 'not-owned' | 'kind', needs: string[], cost: ResourceBag): FortressRaise {
+  return { show: false, enabled: false, blocked, cost, needs };
 }
 
 /** Место годится — дальше общие ворота обоих путей. Технология — раньше казны: без неё
  *  деньги не помогут, и «накопи» было бы неправдой. Ядро спрашивает тот же список тем же
  *  правилом «любая из» (FORT-5.1). */
-function placeable(locks: string[], treasury: ResourceBag, completed: readonly string[]): FortressRaise {
-  const cost = STATION_COST;
+function placeable(
+  locks: string[],
+  treasury: ResourceBag,
+  completed: readonly string[],
+  cost: ResourceBag,
+): FortressRaise {
   if (locks.length > 0 && !locks.some((id) => completed.includes(id))) {
     return { show: true, enabled: false, blocked: 'tech', cost, needs: locks };
   }

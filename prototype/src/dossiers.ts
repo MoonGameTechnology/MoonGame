@@ -22,6 +22,8 @@ import {
   MITIGATION_CAP,
   buildingLevel,
   buildingMaxLevel,
+  matchCost,
+  matchHours,
   thresholdRamp,
   signatureSize,
   unitTier,
@@ -156,6 +158,12 @@ export function buildingDossier(id: string, level: number): Dossier | null {
         // RULES-2: цифра в досье берётся из ТОГО ЖЕ поля данных, которое исполняет
         // экономика — правило и его описание игроку больше не могут разойтись.
         body: t('dossier.building.tax-office', { b: hl(pct(lv.creditsBonus)) }),
+      };
+    case 'counterintel':
+      return {
+        name,
+        // SPY-7: прибавка к шансу раскрыть шпиона — то же поле, что исполняет ядро.
+        body: t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)), k: hl(pct(lv.spyKillBonus)) }),
       };
     case 'farm':
       return {
@@ -615,8 +623,8 @@ export function createDossiers(host: DossierHost): {
       // Цена и срок — ЭТОГО уровня: вход для L1, апгрейд для L2+ (то же поле, из
       // которого платит ядро, — buildingLevel сводит их одинаково).
       const rows = [
-        cxRow(t('codex.row.cost'), cost(lv.cost, treasury())),
-        cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: lv.buildTimeHours ?? 0 })),
+        cxRow(t('codex.row.cost'), cost(matchCost(host.state(), lv.cost), treasury())),
+        cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchHours(host.state(), lv.buildTimeHours ?? 0) })),
         cxRow(t('codex.row.hp'), String(lv.hp ?? 0)),
       ];
       // Ресурс — иконкой и цветом (UI-RES2): карточка читается так же, как ценник
@@ -669,7 +677,7 @@ export function createDossiers(host: DossierHost): {
       if (!def) return '';
       const rows = [
         cxRow(t('codex.row.slot'), tData(def.slot)),
-        cxRow(t('codex.row.cost'), cost(def.cost, treasury())),
+        cxRow(t('codex.row.cost'), cost(matchCost(host.state(), def.cost), treasury())),
       ];
       for (const [k, v] of Object.entries(def.effects?.stats ?? {}))
         rows.push(cxRow(tData(k), String(v)));
@@ -683,8 +691,8 @@ export function createDossiers(host: DossierHost): {
     if (!def) return '';
     const st = def.stats;
     const rows = [
-      cxRow(t('codex.row.cost'), cost(def.cost, treasury())),
-      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: def.buildTimeHours ?? 0 })),
+      cxRow(t('codex.row.cost'), cost(matchCost(host.state(), def.cost), treasury())),
+      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchHours(host.state(), def.buildTimeHours ?? 0) })),
       cxRow(t('codex.row.atk-def'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
       cxRow(t('codex.row.hull'), String(st.hp ?? 0)),
     ];

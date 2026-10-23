@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hashPassword, verifyPassword, type ScryptParams } from './password';
+import { hashPassword, verifyPassword, passwordNeedsRehash, PasswordWorkQueue, PasswordWorkBusy, type ScryptParams } from './password';
 
 // Cheap parameters for tests — the FORMAT and the verify logic are what's under test,
 // not the production cost (which one dedicated case below pins).
@@ -49,7 +49,39 @@ describe('SE-1.x · password hashing (scrypt)', () => {
 
   it('default production cost derives successfully (maxmem headroom is sufficient)', async () => {
     const stored = await hashPassword('production cost check');
-    expect(stored.startsWith('scrypt$32768$8$1$')).toBe(true);
+    expect(stored.startsWith('scrypt$32768$8$3$')).toBe(true);
     expect(await verifyPassword('production cost check', stored)).toBe(true);
+  });
+
+  it('upgrades the legacy p=1 profile without downgrading stronger profiles', () => {
+    expect(passwordNeedsRehash('scrypt$32768$8$1$salt$key')).toBe(true);
+    expect(passwordNeedsRehash('scrypt$32768$8$3$salt$key')).toBe(false);
+    expect(passwordNeedsRehash('scrypt$65536$8$2$salt$key')).toBe(false);
+    expect(passwordNeedsRehash('scrypt$131072$8$1$salt$key')).toBe(false);
+  });
+
+  it('bounds active and waiting password work and releases capacity after failures', async () => {
+    const queue = new PasswordWorkQueue(2, 2);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let active = 0;
+    let peak = 0;
+    const work = () => queue.run(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await held;
+      active -= 1;
+    });
+    const admitted = [work(), work(), work(), work()];
+    try {
+      await expect(work()).rejects.toBeInstanceOf(PasswordWorkBusy);
+      expect(active).toBe(2);
+    } finally {
+      release();
+      await Promise.all(admitted);
+    }
+    expect(peak).toBe(2);
+    await expect(queue.run(async () => { throw new Error('fixture'); })).rejects.toThrow('fixture');
+    await expect(queue.run(async () => 'recovered')).resolves.toBe('recovered');
   });
 });

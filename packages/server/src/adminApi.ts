@@ -1,7 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { NewsAnnouncement } from '@void/protocol';
 import type { PlayerId } from '@void/shared-core';
+import { parseAnnouncementDraft } from './corpNews';
 import type { Identity } from './matchApi';
-import type { UserStore } from './store';
+import type { AnnouncementStore, UserStore } from './store';
 
 /**
  * ADM-1 — the operator's command surface over a live playtest: see who is actually
@@ -10,6 +13,9 @@ import type { UserStore } from './store';
  *   GET  /admin/whoami                 → { login, admin: true }
  *   GET  /admin/matches/:id/roster     → who holds each seat, and who is online
  *   POST /admin/matches/:id/kick       → { nick } — free that seat
+ *   GET  /admin/news                   → the news feed's announcements, expired ones too
+ *   POST /admin/news                   → publish one (CORP-1; body: `AnnouncementDraft`)
+ *   POST /admin/news/:id/remove        → take one off the feed
  *
  * Why this exists at all: a seat becomes permanent the moment its player reaches the
  * map (`seatClaim.ts`, rule 6 — and that promise is what `seat.release` refuses to
@@ -70,7 +76,7 @@ export interface AdminRoster {
 }
 
 /** Refusals the host's `kick` may return; everything else is an internal error. */
-export type AdminKickRefusal = 'E_NO_MATCH' | 'E_NOT_SEATED' | 'E_INTERNAL';
+export type AdminKickRefusal = 'E_NO_MATCH' | 'E_NOT_SEATED' | 'E_BOT_SEAT_LOCKED' | 'E_INTERNAL';
 
 export interface AdminApiDeps {
   /** Resolve the caller from the session token — REQUIRED, no anonymous fallback. */
@@ -86,6 +92,9 @@ export interface AdminApiDeps {
     matchId: string,
     nick: string,
   ): Promise<{ ok: true; playerId: PlayerId; closed: number } | { ok: false; code: AdminKickRefusal }>;
+  /** The news feed's announcements (CORP-1). Absent ⇒ no announcement routes. */
+  announcements?: AnnouncementStore;
+  now?: () => number;
 }
 
 /**
@@ -114,8 +123,12 @@ export function isAdmin(login: string, admins: ReadonlySet<string>): boolean {
 const KICK_STATUS: Record<AdminKickRefusal, number> = {
   E_NO_MATCH: 404,
   E_NOT_SEATED: 409,
+  E_BOT_SEAT_LOCKED: 409,
   E_INTERNAL: 500,
 };
+
+/** How many announcements the admin's list shows. */
+const ADMIN_NEWS_LIST = 50;
 
 export function registerAdminApi(app: FastifyInstance, deps: AdminApiDeps): void {
   // Decision 2: no admins ⇒ no admin surface. Not a 403 door — no door.
@@ -198,5 +211,45 @@ export function registerAdminApi(app: FastifyInstance, deps: AdminApiDeps): void
       `[admin] ${who.login} kicked ${nick.trim()} from match ${id} (seat ${result.playerId})\n`,
     );
     return { ok: true as const, playerId: result.playerId, closed: result.closed };
+  });
+
+  // CORP-1 — the news feed's announcements. The admin writes the text in both languages
+  // up front: the server never composes a player's sentence (it has no reader's locale).
+  const announcements = deps.announcements;
+  if (!announcements) return;
+  const now = deps.now ?? ((): number => Date.now());
+
+  app.get('/admin/news', async (request, reply) => {
+    const who = await commander(request, reply);
+    if (!who) return reply;
+    return { announcements: await announcements.recent(ADMIN_NEWS_LIST) };
+  });
+
+  app.post('/admin/news', async (request, reply) => {
+    const who = await commander(request, reply);
+    if (!who) return reply;
+    const at = now();
+    const draft = parseAnnouncementDraft(request.body, at);
+    if (!draft) {
+      void reply.code(400);
+      return { error: 'E_BAD_NEWS' as const };
+    }
+    const announcement: NewsAnnouncement = { id: randomUUID(), at, ...draft };
+    await announcements.add(announcement);
+    process.stderr.write(`[admin] ${who.login} published announcement ${announcement.id}\n`);
+    void reply.code(201);
+    return { ok: true as const, announcement };
+  });
+
+  app.post('/admin/news/:id/remove', async (request, reply) => {
+    const who = await commander(request, reply);
+    if (!who) return reply;
+    const { id } = request.params as { id: string };
+    if (!(await announcements.remove(id, now()))) {
+      void reply.code(404);
+      return { error: 'E_NO_NEWS' as const };
+    }
+    process.stderr.write(`[admin] ${who.login} removed announcement ${id}\n`);
+    return { ok: true as const };
   });
 }

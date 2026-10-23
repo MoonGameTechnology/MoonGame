@@ -17,6 +17,8 @@ const PATHS: Record<PhoneSection | PhoneMoreId, string> = {
   diplomacy:
     '<circle cx="8.5" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/>' +
     '<path d="M3 19.5c.6-3.4 2.8-5.5 5.5-5.5s4.9 2.1 5.5 5.5"/><path d="M15 14.1a5 5 0 0 1 1.5-.2c2.3 0 4.1 1.8 4.6 4.6"/>',
+  coalitions:
+    '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8 7.5 9.5 4.3-1.5 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m12 8 1.2 2.5 2.8.4-2 1.9.5 2.7L12 14.2l-2.5 1.3.5-2.7-2-1.9 2.8-.4L12 8Z"/>',
   mail: '<rect x="3.5" y="6" width="17" height="12" rx="1.5"/><path d="m4 7 8 6 8-6"/>',
   pings:
     '<path d="M12 21s6-5.6 6-11a6 6 0 0 0-12 0c0 5.4 6 11 6 11Z"/><circle cx="12" cy="10" r="2.2"/>',

@@ -33,42 +33,48 @@
 > **Sector Zero** — космическая стратегия в реальном времени. Инопланетный Рой поглощает
 > пограничный сектор, и ваша экспедиция стоит у него на пути.
 >
-> Каждая глава — отдельный забег. Отстройте экономику своих миров, соберите флот и
-> выстойте десять волн Роя — каждая сильнее прошлой. Возьмите пиратскую базу, выполните
-> задачи главы и удержите сектор до конца. Глава длится около получаса; забег можно
-> поставить на паузу и продолжить с того же места.
+> Каждая глава — отдельный забег со своими задачами: взять пиратскую базу, вывезти
+> беженцев, удержать маяки. Отстройте экономику своих миров, соберите флот и выстойте
+> десять волн Роя — каждая сильнее прошлой — и удержите сектор до конца. Глава длится
+> около получаса; забег можно поставить на паузу и продолжить с того же места.
 >
 > Между забегами — подготовка:
 > • Мастерская: модули кораблей, звёзды и редкость.
 > • Академия: герои. Новых приносят пройденные главы.
 > • Магазин: витрина обновляется каждый день.
 >
-> Выберите, насколько опасен Рой: обычный или матёрый. Открыты две первые главы — путь к
-> эпицентру заражения продолжается.
+> Выберите, насколько опасен Рой: обычный или матёрый. Шесть глав ведут к эпицентру
+> заражения.
 
 ### Описание — EN
 
 > **Sector Zero** is a real-time space strategy game. An alien Swarm is consuming a border
 > sector, and your expedition stands in its way.
 >
-> Every chapter is a run of its own. Build up your worlds' economy, assemble a fleet and
-> survive ten Swarm waves, each stronger than the last. Take the pirate base, complete the
-> chapter's objectives and hold the sector to the end. A chapter takes about half an hour;
-> pause the run at any time and pick it up where you left off.
+> Every chapter is a run of its own, with its own objectives: take the pirate base,
+> evacuate the refugees, hold the beacons. Build up your worlds' economy, assemble a fleet,
+> survive ten Swarm waves, each stronger than the last, and hold the sector to the end. A
+> chapter takes about half an hour; pause the run at any time and pick it up where you
+> left off.
 >
 > Between runs, prepare:
 > • Workshop: ship modules, stars and rarity.
 > • Academy: heroes. Completed chapters bring new ones.
 > • Shop: the offer changes every day.
 >
-> Choose how dangerous the Swarm is: regular or seasoned. The first two chapters are open;
-> the road to the epicenter continues.
+> Choose how dangerous the Swarm is: regular or seasoned. Six chapters lead to the
+> epicenter of the infestation.
 
 **Откуда факты.** Десять волн, волна N = 2N фрегатов и N крейсеров (`pve_waves`, PVR-1.3).
 Удержание 12 часов после последней волны (PVR-2.5). Глава — 29 минут на ▶ и 19 на ▶▶
 (PVR-2.2). Пираты — глава I (PVR-1.7). Задачи главы — PVR-5.2. Сложность: «Рой: обычный» /
 «Рой: матёрый» (`setup.pve.difficulty.*`). Мастерская, Академия, Магазин — PVR-6.6/6.7,
-SZE-3.2, SZE-5.2. Играбельных глав две из шести на маршруте (`chapterRoute.ts`).
+SZE-3.2, SZE-5.2. Играбельны все шесть глав маршрута (сверено 2026-10-19):
+`PVE_MISSION_COUNT` = 6 (`packages/client/src/gameData.ts`), маршрут —
+`decisions/chapterRoute.ts`. Все шесть карт идут режимом `pve_waves` (десять волн). Задачи
+из описания — по `objectives` в `data/maps/pve-*.json`: пираты — глава I, беженцы
+(`evac`) — главы II и IV–VI, маяки (`beacon`) — главы I и III–VI. Длительность «около
+получаса» замерена на главе I; на поздних главах её стоит перепроверить перед подачей.
 
 **Чего в описании нет.** «Рой учится и приспосабливается» — когда писалась карточка, это
 было неправдой: адаптация в браузерном Sector Zero не запускалась. Теперь запускается

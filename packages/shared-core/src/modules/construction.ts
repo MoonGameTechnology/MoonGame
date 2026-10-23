@@ -1,6 +1,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   BuildingInstance,
+  GameState,
   Planet,
   PausedConstructionSite,
   Player,
@@ -18,6 +19,7 @@ import type { Action } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
+import { matchCost, matchHours } from '../util/pricing';
 import { buildProgress } from '../util/construction';
 import { isAllied, mitigationFactor, type DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
@@ -108,6 +110,7 @@ function scaleCost(cost: ResourceBag, count: number): ResourceBag {
  *  placed. Null for a malformed/unrecognized payload (fail-secure: cancel/resume
  *  reject rather than guess). */
 function orderSpec(
+  state: Pick<GameState, 'pricing'>,
   data: GameData,
   p: CompletePayload,
 ): { hours: number; cost: ResourceBag } | null {
@@ -115,27 +118,29 @@ function orderSpec(
     const def = data.buildings[p.building];
     if (!def) return null;
     const level1 = buildingLevel(def, 1);
-    return { hours: level1.buildTimeHours, cost: level1.cost };
+    return { hours: matchHours(state, level1.buildTimeHours), cost: matchCost(state, level1.cost) };
   }
   if (p.kind === 'upgrade' && typeof p.building === 'string' && typeof p.level === 'number') {
     const def = data.buildings[p.building];
     if (!def) return null;
     const next = buildingLevel(def, p.level);
-    return { hours: next.buildTimeHours, cost: next.cost };
+    return { hours: matchHours(state, next.buildTimeHours), cost: matchCost(state, next.cost) };
   }
   if (p.kind === 'unit' && typeof p.unit === 'string' && typeof p.count === 'number') {
     const def = data.units[p.unit];
     if (!def) return null;
+    // Цена партии — по частям (корпус, модули, боец) за ОДИН корабль, потом × число:
+    // окно верфи складывает те же части, и округление у них не разойдётся.
     const hull =
       p.modules && p.modules.length > 0
-        ? sumBags(def.cost, loadoutCost(p.modules, data))
-        : def.cost;
+        ? sumBags(matchCost(state, def.cost), matchCost(state, loadoutCost(p.modules, data)))
+        : matchCost(state, def.cost);
     // Десантный челнок: цена — челнок ПЛЮС его боец, срок — дольший из двух (SHU-5.2).
     const troop = typeof p.troop === 'string' ? data.units[p.troop] : undefined;
     if (p.troop !== undefined && !troop) return null;
-    const perShip = troop ? sumBags(hull, troop.cost) : hull;
+    const perShip = troop ? sumBags(hull, matchCost(state, troop.cost)) : hull;
     const hours = troop ? Math.max(def.buildTimeHours, troop.buildTimeHours) : def.buildTimeHours;
-    return { hours, cost: scaleCost(perShip, p.count) };
+    return { hours: matchHours(state, hours), cost: scaleCost(perShip, p.count) };
   }
   return null;
 }
@@ -421,7 +426,7 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
       if (planet.buildQueue.length === 0) delete planet.buildQueue;
     };
     const player = h.state.players[head.playerId];
-    const spec = orderSpec(h.ctx.data, head);
+    const spec = orderSpec(h.state, h.ctx.data, head);
     if (!player || planet.owner !== head.playerId || !spec || !queuedStillValid(h, planet, head)) {
       drop();
       h.emit('construction.queue.dropped', {
@@ -718,6 +723,55 @@ function clearInfected(h: HandlerContext, planet: Planet, amount: number): void 
   planet.buildings = survivors;
 }
 
+/** One hit of {@link BuildingDamage}: `amount` HP off the building at `index` of
+ *  `planet.buildings` (indices as they stand BEFORE the call). */
+export interface BuildingHit {
+  index: number;
+  amount: number;
+}
+
+/**
+ * Capability `building.damage` (SPY-9): wear targeted damage on chosen buildings of one
+ * world — sabotage picks WHICH buildings, this module owns what damage means. A building
+ * whose HP reaches zero is removed and announced via `building.destroyed`, and the
+ * garrison it issued goes with it (`syncIssuedGarrison`), exactly as under bombardment.
+ * Returns what each hit did; unknown indices and undamageable buildings are skipped.
+ */
+export type BuildingDamage = (
+  h: HandlerContext,
+  planetId: string,
+  hits: readonly BuildingHit[],
+) => { building: string; destroyed: boolean }[];
+
+const damageChosenBuildings: BuildingDamage = (h, planetId, hits) => {
+  const planet = h.state.planets[planetId];
+  if (!planet) return [];
+  const out: { building: string; destroyed: boolean }[] = [];
+  const doomed = new Set<number>();
+  for (const hit of hits) {
+    const b = planet.buildings[hit.index];
+    const def = b ? h.ctx.data.buildings[b.type] : undefined;
+    if (!b || !def || doomed.has(hit.index) || buildingLevel(def, b.level).hp <= 0) continue;
+    if (!(hit.amount > 0)) continue;
+    b.hp = Math.max(0, b.hp - hit.amount);
+    const destroyed = b.hp <= 0;
+    if (destroyed) doomed.add(hit.index);
+    out.push({ building: b.type, destroyed });
+  }
+  if (doomed.size > 0) {
+    for (const i of [...doomed].sort((x, y) => x - y)) {
+      h.emit('building.destroyed', {
+        planetId,
+        building: planet.buildings[i]!.type,
+        owner: planet.owner,
+      });
+    }
+    planet.buildings = planet.buildings.filter((_, i) => !doomed.has(i));
+    syncIssuedGarrison(h, planet);
+  }
+  return out;
+};
+
 /**
  * Buildings — a base module (docs/modulesystem.md). It owns everything about
  * planet structures:
@@ -740,8 +794,10 @@ export const constructionModule: GameModule = {
   // 1.1.0: защита построек мира — доля каждой постройки, потолок 90%, штурм и обстрел (FORT-5.15).
   // 1.2.0: снос постройки пересчитывает прикрытие для остатка того же обстрела (FORT-5.16).
   // 1.3.0: бой с орудиями крепости на развилке ставит её стройку на паузу (Codex на #1410).
-  version: '1.4.0',
+  // 1.5.0: возможность `building.damage` — прицельный урон по выбранным постройкам (SPY-9).
+  version: '1.5.0',
   setup(api) {
+    api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;
       if (typeof payload?.planetId !== 'string' || typeof payload?.building !== 'string') {
@@ -825,11 +881,12 @@ export const constructionModule: GameModule = {
         return code ? h.reject(code) : undefined;
       }
       const level1 = buildingLevel(def, 1);
-      if (!canAfford(player.resources, level1.cost)) {
+      const cost = matchCost(h.state, level1.cost);
+      if (!canAfford(player.resources, cost)) {
         return h.reject('E_INSUFFICIENT');
       }
-      payCost(player.resources, level1.cost);
-      scheduleCompletion(h, level1.buildTimeHours, {
+      payCost(player.resources, cost);
+      scheduleCompletion(h, matchHours(h.state, level1.buildTimeHours), {
         kind: 'building',
         planetId: planet.id,
         playerId: action.playerId,
@@ -892,11 +949,12 @@ export const constructionModule: GameModule = {
         return code ? h.reject(code) : undefined;
       }
       const next = buildingLevel(def, nextLevel);
-      if (!canAfford(player.resources, next.cost)) {
+      const cost = matchCost(h.state, next.cost);
+      if (!canAfford(player.resources, cost)) {
         return h.reject('E_INSUFFICIENT');
       }
-      payCost(player.resources, next.cost);
-      scheduleCompletion(h, next.buildTimeHours, {
+      payCost(player.resources, cost);
+      scheduleCompletion(h, matchHours(h.state, next.buildTimeHours), {
         kind: 'upgrade',
         planetId: planet.id,
         playerId: action.playerId,
@@ -1036,7 +1094,7 @@ export const constructionModule: GameModule = {
       // The loadout is paid up-front with the hull and locked onto the built stack.
       // Десантный челнок — вместе со своим бойцом (SHU-5.2); цена и срок — `orderSpec`,
       // та же функция, что считает возврат при отмене.
-      const spec = orderSpec(h.ctx.data, {
+      const spec = orderSpec(h.state, h.ctx.data, {
         kind: 'unit',
         unit: payload.unit,
         count,
@@ -1110,7 +1168,7 @@ export const constructionModule: GameModule = {
       if (p.planetId !== planet.id || p.playerId !== action.playerId) {
         return h.reject('E_FORBIDDEN'); // that seq belongs to someone else's order
       }
-      const spec = orderSpec(h.ctx.data, p);
+      const spec = orderSpec(h.state, h.ctx.data, p);
       if (!spec) {
         return h.reject('E_UNKNOWN_BUILDING');
       }

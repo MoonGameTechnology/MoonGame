@@ -14,6 +14,7 @@
  */
 import { t } from '../../localization/runtime';
 import { MIN_PASSWORD, validPassword } from '../../decisions/authRules';
+import { initFormFeedback } from './formFeedback';
 
 /** Минимальная длина нового пароля — то же правило, что показывает подсказка. */
 export { MIN_PASSWORD };
@@ -84,39 +85,50 @@ export function initPasswordReset(host: PasswordResetHost): {
   submit: () => Promise<void>;
 } {
   let resetToken = ''; // токен из ссылки — живёт только до успешной траты
+  let revision = 0;
+  const feedback = initFormFeedback<PassField>(host.fields(), () => {
+    const { pass, pass2 } = host.fields();
+    const verdict = validateNewPassword(pass.value, pass2.value);
+    return verdict.ok ? [] : [{ field: verdict.focus, key: verdict.key }];
+  }, (key) => host.status(key ? t(key) : ''), { pass2: ['pass'] });
 
   const clearFields = (): void => {
     const { pass, pass2 } = host.fields();
     pass.value = '';
     pass2.value = '';
+    feedback.clear();
   };
 
   async function submit(): Promise<void> {
+    if (host.busy()) return;
     const { pass, pass2 } = host.fields();
-    const verdict = validateNewPassword(pass.value, pass2.value);
-    if (!verdict.ok) {
-      host.status(t(verdict.key));
-      (verdict.focus === 'pass' ? pass : pass2).focus();
+    const problem = feedback.validate();
+    if (problem) {
+      host.fields()[problem.field].focus();
       return;
     }
-    if (host.busy()) return;
     host.setBusy(true);
+    const submitted = { token: resetToken, pass: pass.value, pass2: pass2.value, revision };
     try {
-      const res = await host.submit(resetToken, pass.value);
+      const res = await host.submit(submitted.token, submitted.pass);
+      if (submitted.revision !== revision || submitted.token !== resetToken) return;
+      const outcome = res ? parseResetOutcome(res.ok, res.body) : { ok: false as const };
+      // A committed reset consumed this link even if the player edited the fields
+      // while waiting. Preserve the successful session; only errors can be stale.
+      if (outcome.ok) {
+        resetToken = ''; // ссылка потрачена
+        clearFields();
+        host.status('');
+        host.onSuccess(outcome.login, outcome.token);
+        return;
+      }
+      if (submitted.pass !== pass.value || submitted.pass2 !== pass2.value) return;
       if (res?.body && typeof res.body === 'object' && (res.body as { error?: unknown }).error === 'E_PASSWORD_POLICY') {
-        host.status(t('acc.pass.rule'));
+        feedback.reject('pass', 'acc.pass.rule');
         pass.focus();
         return;
       }
-      const outcome = res ? parseResetOutcome(res.ok, res.body) : { ok: false as const };
-      if (!outcome.ok) {
-        host.status(t('auth.reset.bad-link'));
-        return;
-      }
-      resetToken = ''; // ссылка потрачена
-      clearFields();
-      host.status('');
-      host.onSuccess(outcome.login, outcome.token);
+      host.status(t('auth.reset.bad-link'));
     } finally {
       host.setBusy(false);
     }
@@ -126,14 +138,12 @@ export function initPasswordReset(host: PasswordResetHost): {
     /** Принять deep-link: запомнить токен, вернуть ОЧИЩЕННЫЙ адрес (хост подменит им
      *  строку браузера) и подготовить форму. */
     open: (token: string, href: string): string => {
+      revision++;
       resetToken = token;
       const cleaned = stripResetParam(href);
       host.showStage();
-      const { pass, pass2 } = host.fields();
-      pass.value = '';
-      pass2.value = '';
+      clearFields();
       host.status('');
-      pass.focus();
       return cleaned;
     },
     submit,

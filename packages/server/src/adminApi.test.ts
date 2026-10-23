@@ -1,11 +1,13 @@
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
+import type { NewsAnnouncement, NewsView } from '@void/protocol';
 import { MS_PER_DAY, type GameData } from '@void/shared-core';
-import { registerAdminApi, adminLoginsFromEnv, isAdmin } from './adminApi';
+import { registerAdminApi, adminLoginsFromEnv, isAdmin, type AdminApiDeps } from './adminApi';
 import { kickSeat } from './seatKick';
 import { seatClaimAction, seatConfirmAction } from './joinSeat';
 import { MatchRegistry } from './matchRegistry';
-import { MemoryAccountStore } from './store';
+import { registerNewsApi } from './newsApi';
+import { MemoryAccountStore, MemoryAnnouncementStore, MemoryAvaFeedStore } from './store';
 import { createDevMatch, loadShippedData } from './scenario';
 import type { MatchRoom, RoomPeer } from './matchRoom';
 
@@ -60,7 +62,12 @@ type Accounts = Map<string, string> | 'all';
 
 /** Сервер с админским API. Личность — как в остальных тестах: `Bearer <логин>` или
  *  `Bearer <логин>@<id учётки>`, когда тесту нужна другая учётка под тем же логином. */
-function adminApp(w: World, admins: string[], accounts: Accounts = 'all'): FastifyInstance {
+function adminApp(
+  w: World,
+  admins: string[],
+  accounts: Accounts = 'all',
+  kick?: AdminApiDeps['kick'],
+): FastifyInstance {
   app = Fastify();
   registerAdminApi(app, {
     admins: new Set(admins),
@@ -98,7 +105,7 @@ function adminApp(w: World, admins: string[], accounts: Accounts = 'all'): Fasti
         })),
       };
     },
-    kick: (id, nick) => kickSeat({ matchId: id, room: w.registry.get(id), accounts: w.accounts }, nick),
+    kick: kick ?? ((id, nick) => kickSeat({ matchId: id, room: w.registry.get(id), accounts: w.accounts }, nick)),
   });
   return app;
 }
@@ -200,6 +207,24 @@ describe('ADM-1 · состав матча', () => {
 });
 
 describe('ADM-1 · кик', () => {
+  it('закреплённый хостом ИИ-командир возвращает 409 со своим кодом отказа', async () => {
+    const w = await world('~Orion');
+    const server = adminApp(w, ['boss'], 'all', async () => ({
+      ok: false,
+      code: 'E_BOT_SEAT_LOCKED',
+    }));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/admin/matches/m1/kick',
+      headers: ADMIN,
+      payload: { nick: '~Orion' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'E_BOT_SEAT_LOCKED' });
+    expect(await w.accounts.seatOf('m1', '~Orion')).toBe('green');
+    expect(w.room.state.players.green?.seated).toBe(true);
+  });
+
   it('освобождает кресло во ВСЕХ трёх слоях и называет причину снятому', async () => {
     const w = await world();
     const peer = fakePeer();
@@ -342,5 +367,118 @@ describe('ADM-1 · кик', () => {
     expect(r.statusCode).toBe(403);
     expect(await w.accounts.seatOf('m1', 'griefer')).toBe('green');
     expect(w.room.state.players['green']?.seated).toBe(true);
+  });
+});
+
+// CORP-1 — объявления ленты новостей: публикует и снимает администратор, видит любой.
+describe('CORP-1 · объявления в ленте', () => {
+  let clock = 1_000;
+
+  /** Админский слайс + публичная лента над одним хранилищем объявлений. */
+  function newsApp(announcements?: MemoryAnnouncementStore): FastifyInstance {
+    app = Fastify();
+    registerAdminApi(app, {
+      admins: new Set(['boss']),
+      users: { findUser: (login) => Promise.resolve({ userId: `acct:${login}`, login, passHash: 'x' }) },
+      identify: (request) => {
+        const raw = request.headers.authorization;
+        const login = typeof raw === 'string' ? raw.replace(/^Bearer /, '') : '';
+        return Promise.resolve(login ? { accountId: `acct:${login}`, login } : null);
+      },
+      roster: () => Promise.resolve(null),
+      kick: () => Promise.resolve({ ok: false as const, code: 'E_NO_MATCH' as const }),
+      ...(announcements ? { announcements, now: () => clock } : {}),
+    });
+    registerNewsApi(app, {
+      feed: new MemoryAvaFeedStore(),
+      announcements: announcements ?? new MemoryAnnouncementStore(),
+      now: () => clock,
+    });
+    return app;
+  }
+
+  const shown = async (server: FastifyInstance): Promise<string[]> =>
+    (await server.inject({ method: 'GET', url: '/news' })).json<NewsView>().announcements.map((a) => a.title.ru);
+
+  async function publish(server: FastifyInstance, payload: object, who = 'boss') {
+    return server.inject({
+      method: 'POST',
+      url: '/admin/news',
+      headers: { authorization: `Bearer ${who}` },
+      payload,
+    });
+  }
+
+  it('без хранилища объявлений маршрутов нет', async () => {
+    const server = newsApp();
+    const r = await server.inject({ method: 'GET', url: '/admin/news', headers: ADMIN });
+    expect(r.statusCode).toBe(404);
+  });
+
+  it('публикует и снимает только администратор', async () => {
+    const store = new MemoryAnnouncementStore();
+    const server = newsApp(store);
+    const draft = { kind: 'event', title: { ru: 'Турнир' } };
+    expect((await server.inject({ method: 'POST', url: '/admin/news', payload: draft })).statusCode).toBe(401);
+    expect((await publish(server, draft, 'player')).statusCode).toBe(403);
+    await store.add({
+      id: 'n1',
+      at: 1,
+      kind: 'update',
+      pinned: false,
+      until: null,
+      title: { ru: 'Обновление', en: '' },
+      body: { ru: '', en: '' },
+    });
+    const remove = await server.inject({
+      method: 'POST',
+      url: '/admin/news/n1/remove',
+      headers: { authorization: 'Bearer player' },
+    });
+    expect(remove.statusCode).toBe(403);
+    expect(await shown(server)).toEqual(['Обновление']);
+  });
+
+  it('опубликованное видно в ленте до срока, снятое пропадает', async () => {
+    clock = 1_000;
+    const server = newsApp(new MemoryAnnouncementStore());
+    const made = await publish(server, {
+      kind: 'tech',
+      pinned: true,
+      until: clock + 500,
+      title: { ru: 'Техработы', en: 'Maintenance' },
+      body: { ru: 'Сервер перезапустится.' },
+    });
+    expect(made.statusCode).toBe(201);
+    const { announcement } = made.json<{ ok: true; announcement: NewsAnnouncement }>();
+    expect(announcement).toMatchObject({ at: 1_000, kind: 'tech', pinned: true, until: 1_500 });
+    expect(await shown(server)).toEqual(['Техработы']);
+
+    clock = 1_500; // срок показа вышел: в ленте нет, у администратора — есть
+    expect(await shown(server)).toEqual([]);
+    const list = await server.inject({ method: 'GET', url: '/admin/news', headers: ADMIN });
+    expect(list.json<{ announcements: NewsAnnouncement[] }>().announcements.map((a) => a.id)).toEqual([
+      announcement.id,
+    ]);
+
+    const open = (await publish(server, { kind: 'update', title: { ru: 'Новая версия' } })).json<{
+      announcement: NewsAnnouncement;
+    }>().announcement;
+    expect(await shown(server)).toEqual(['Новая версия']);
+    const removeUrl = `/admin/news/${open.id}/remove`;
+    const removed = await server.inject({ method: 'POST', url: removeUrl, headers: ADMIN });
+    expect(removed.json()).toEqual({ ok: true });
+    expect(await shown(server)).toEqual([]);
+    const again = await server.inject({ method: 'POST', url: removeUrl, headers: ADMIN });
+    expect(again.statusCode).toBe(404);
+    expect(again.json()).toEqual({ error: 'E_NO_NEWS' });
+  });
+
+  it('кривое объявление — 400, и в ленту ничего не попадает', async () => {
+    const server = newsApp(new MemoryAnnouncementStore());
+    const bad = await publish(server, { kind: 'ad', title: { ru: 'Купи' } });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json()).toEqual({ error: 'E_BAD_NEWS' });
+    expect(await shown(server)).toEqual([]);
   });
 });

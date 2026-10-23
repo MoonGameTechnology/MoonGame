@@ -1,4 +1,5 @@
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
+import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from '../packages/server/src/registrationRewardStore';
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
 import { MemoryDropStore } from '../packages/server/src/store';
 import { MetaEconomy } from '../packages/server/src/metaEconomy';
@@ -22,12 +23,27 @@ import { checkProductionReadiness } from '../packages/server/src/serverConfig';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
+import { MemoryAnnouncementStore, MemoryAvaFeedStore, PostgresAnnouncementStore, PostgresAvaFeedStore, type AnnouncementStore, type AvaFeedStore } from '../packages/server/src/store';
+import { registerNewsApi } from '../packages/server/src/newsApi';
 import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
+// UIX-4.4 (часть 1): push до игроков — тот же приёмник подписки и та же рассылка «своё и
+// срочное», что у канонического хоста; без VAPID в окружении не монтируется ничего.
+import { registerPushApi } from '../packages/server/src/pushApi';
+import { configureWebPush, sendPush, vapidFromEnv } from '../packages/server/src/push';
+import { createPushDispatcher } from '../packages/server/src/pushDispatch';
+import { MemoryPushStore, PostgresPushStore, type PushStore } from '../packages/server/src/store';
+import { MemoryPlayerActivityStore, PostgresPlayerActivityStore } from '../packages/server/src/playerActivity';
+import { registerPlayerActivityApi } from '../packages/server/src/playerActivityApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
 import { creditProfileMatch } from '../packages/server/src/profileCredit';
+import { MemoryBotRosterStore, PostgresBotRosterStore, type BotRosterStore, type BotAssignment, type BotIdentity } from '../packages/server/src/botRoster';
+import { botMatchLimit, startBotArrivals, botPopulationConfig, prepareBotPopulation, recoverBotMatch, recoverBotPopulation, settleBotMatch } from '../packages/server/src/botPopulation';
 import { StaggeredAi } from './src/aiScheduler';
 import { aiOrderSlices } from './src/aiOrderSlices';
+import { botAcceptsOffer, botBehaviorOrders, botStyle } from './src/botBehavior';
+import { botSocialAvailable, createBotSocial } from '../packages/server/src/botSocial';
+import { botChatText } from '../scripts/botChatText';
 import type { Action } from '../packages/shared-core/src/index';
 import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
 // Serves the prototype's OWN world over WebSocket so two browsers — or two phones
@@ -139,6 +155,7 @@ import {
   nickSeatAccounts,
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
+import { createSnapshotWriter } from '../packages/server/src/snapshotWriter';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
@@ -297,7 +314,13 @@ let userStore: UserStore;
 let friendStore: FriendStore;
 let commanderStore: CommanderStore;
 let profileStore: ProfileStore;
+let botStore: BotRosterStore;
+let registrationRewards: RegistrationRewardStore;
 let corpStore: CorpStore;
+// CORP-1: the news feed — corporation and battle facts beside the corporations, the
+// admin's announcements in the game database.
+let feedStore: AvaFeedStore;
+let announcementStore: AnnouncementStore;
 // EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
 // из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
 // на аккаунт превращает регистрацию в монетный двор (ARS-0 anti-RMT).
@@ -306,6 +329,7 @@ const metaFaucet = Number(process.env.META_MARKET_FAUCET ?? 0) || 0;
 let metaMarket: MetaMarket;
 let arsenalStore: ArsenalStore;
 let metaEconomyStore: MetaEconomyStore;
+let pushStore: PushStore;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   await prepareRuntimeDatabase(pool, process.env);
@@ -316,10 +340,15 @@ if (DATABASE_URL) {
   friendStore = new PostgresFriendStore(pool);
   commanderStore = new PostgresCommanderStore(pool);
   profileStore = new PostgresProfileStore(pool);
+  botStore = new PostgresBotRosterStore(pool);
+  registrationRewards = new PostgresRegistrationRewardStore(pool);
   corpStore = new PostgresCorpStore(pool);
+  feedStore = new PostgresAvaFeedStore(pool);
+  announcementStore = new PostgresAnnouncementStore(pool);
   arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
   metaEconomyStore = new PostgresMetaEconomyStore(pool);
+  pushStore = new PostgresPushStore(pool);
 } else {
   matchStore = new MemoryMatchStore();
   accountStore = new MemoryAccountStore();
@@ -328,25 +357,54 @@ if (DATABASE_URL) {
   friendStore = new MemoryFriendStore();
   commanderStore = new MemoryCommanderStore();
   profileStore = new MemoryProfileStore();
-  corpStore = new MemoryCorpStore();
+  botStore = new MemoryBotRosterStore();
+  registrationRewards = new MemoryRegistrationRewardStore(userStore, profileStore, commanderStore);
+  // One feed for both writers: the corp store announces a corp's own facts into it.
+  const memoryFeed = new MemoryAvaFeedStore();
+  feedStore = memoryFeed;
+  corpStore = new MemoryCorpStore(memoryFeed);
+  announcementStore = new MemoryAnnouncementStore();
   const memoryArsenal = new MemoryArsenalStore();
   const memoryMarket = new MemoryMetaMarket(memoryArsenal, undefined, metaFaucet);
   arsenalStore = memoryArsenal;
   metaMarket = memoryMarket;
   metaEconomyStore = new MemoryMetaEconomyStore(memoryArsenal, new MemoryDropStore(), memoryMarket);
+  pushStore = new MemoryPushStore();
 }
 metaMarket.setEconomy(metaEconomyStore);
+// UIX-4.4 (часть 1): ключи VAPID из окружения. Нет ключей — нет ни маршрута ключа, ни
+// рассылки: подписаться было бы нечем, слать некому.
+const vapid = vapidFromEnv(process.env);
+if (vapid) configureWebPush(vapid);
+const pushDispatch = vapid
+  ? createPushDispatcher({
+      store: pushStore,
+      send: sendPush,
+      onError: (m) => process.stderr.write(`${m}\n`),
+    })
+  : null;
 const metaCatalog = loadMetaEconomyCatalog(data);
 const starterArsenal = loadStarterArsenal(data);
+let shuttingDown = false;
+const arsenalRefreshes = new Set<Promise<void>>();
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
 const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, dropTables: loadDropTables(data), now: Date.now,
   onEvent: (event) => {
     process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
-    void refreshGrantedArsenal(event.accountId).catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
+    // Final snapshots can themselves issue durable rewards. During shutdown do
+    // not start another room mutation; authenticated rejoin syncs the owned catalog.
+    if (shuttingDown) return;
+    const refresh = refreshGrantedArsenal(event.accountId)
+      .finally(() => { arsenalRefreshes.delete(refresh); });
+    arsenalRefreshes.add(refresh);
+    void refresh.catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
   },
 });
 
-if (corporationsEndpoint) corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
+if (corporationsEndpoint) {
+  corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
+  feedStore = corporateRemote(corporationsEndpoint, 'feedStore');
+}
 
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
  *  seat, deterministic). At match end, map each seat's nick → account and bank the XP
@@ -390,6 +448,14 @@ const rewardDelivery = createMetaRewardDelivery({
 });
 matchStore = rewardDelivery.matches;
 rewardDelivery.start();
+const BOT_POPULATION = botPopulationConfig(process.env);
+await botStore.ensureRoster();
+// System handles are reserved and cannot be registered as human accounts. The authenticated host
+// is required even when restoring existing bots with fresh filling disabled.
+if (!AUTH && (BOT_POPULATION.fillPercent > 0 || (await botStore.activeMatchIds()).length > 0))
+  throw new Error('E_BOT_AUTH_REQUIRED');
+await recoverBotPopulation({ bots: botStore, profiles: profileStore, accounts: accountStore,
+  matches: matchStore, now: Date.now });
 // ADM-1: кто может командовать составом партии (`ADMIN_LOGINS=alice,bob`). Полномочие —
 // на УЧЁТКЕ, а не общий токен: в логе видно, кто снял игрока, а смена пароля отзывает
 // доступ вместе с сессией. Пусто ⇒ админских маршрутов на хосте нет вообще.
@@ -472,7 +538,30 @@ async function createHostedMatch(
   // Seats with a live human peer. Any seat NOT in here is "empty" and is driven by
   // the server-side AI (mirrors single-player: empty slots are taken by the AI).
   const humans = new Set<string>();
+  const botSeats = new Set<string>();
+  const botIdentities = new Map<string, BotIdentity>();
   const aiEligibleAt = new Map<string, number>();
+  const background = new Set<Promise<void>>();
+  const runBackground = (what: string, work: Promise<unknown>): void => {
+    const tracked = work.then(() => {}).finally(() => { background.delete(tracked); });
+    background.add(tracked);
+    detach(what, tracked);
+  };
+  const drainBackground = async (): Promise<void> => {
+    // detach already reports failures; none may skip the final world snapshot.
+    while (background.size) await Promise.allSettled([...background]);
+  };
+
+  async function rememberBots(assignments: readonly BotAssignment[]): Promise<void> {
+    for (const assignment of assignments) {
+      if (!botIdentities.has(assignment.playerId)) {
+        const identity = await botStore.findByLogin(assignment.login);
+        if (!identity || identity.id !== assignment.botId) throw new Error('E_BOT_IDENTITY');
+        botIdentities.set(assignment.playerId, identity);
+      }
+      botSeats.add(assignment.playerId);
+    }
+  }
 
   const restoredSnap = await matchStore.load(id);
   let initialState =
@@ -500,6 +589,7 @@ async function createHostedMatch(
   let lastEconAt = initialState.time;
   const observe = (ev: RoomObservation): void => {
     metrics.observe(ev);
+    pushDispatch?.(id, ev); // UIX-4.3: своё и срочное — тем, кого нет в игре
     if (worthLogging(ev)) {
       matchLog.write(journalRecord(id, ev, actorOf));
     }
@@ -517,7 +607,7 @@ async function createHostedMatch(
       // written by the room's commit-before-broadcast `persist` callback — skip it
       // here or we double-write. Only the SYNC path (server drivers, ungated actions)
       // has no other durable writer, so it still persists through this branch.
-      detach('сохранение квитанции', receiptStore.save(id, {
+      runBackground('сохранение квитанции', receiptStore.save(id, {
         actionId: ev.actionId,
         playerId: ev.playerId,
         seq: ev.seq,
@@ -526,8 +616,8 @@ async function createHostedMatch(
       }));
     } else if (ev.kind === 'end' && AUTH) {
       // Bank each seated commander's match XP onto their account (idempotent).
-      detach('начисление опыта за матч', creditMatchXp(id, ev.rewards));
-      detach('профиль: итоги матча', creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, room.state));
+      runBackground('начисление опыта за матч', creditMatchXp(id, ev.rewards));
+      runBackground('профиль: итоги матча', creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, room.state));
     }
     // Persist after anything that changes the world (debounced below), and re-arm
     // the offline wakeup: an action may schedule or consume events — both move the
@@ -565,6 +655,8 @@ async function createHostedMatch(
     initialState,
     kernel,
     data,
+    onChat: (message) => botSocial?.onMessage(message),
+    serverChatAllowed: (seat) => botSeats.has(seat),
     now: () => Date.now(),
     // Born running: the clock anchors at the initial game time (fresh world: Day 1
     // now; restored snapshot: its durable anchor) and TIME_SCALE applies from here.
@@ -611,6 +703,21 @@ async function createHostedMatch(
     ...(GATE ? { gate: new ActionGate({ payloadValidator: isValidActionPayload }) } : {}),
   });
 
+  const botSocial = createBotSocial({
+    room,
+    isBot: (seat) => botSeats.has(seat),
+    availability: (seat, wall) => {
+      const identity = botIdentities.get(seat);
+      return identity !== undefined && botSocialAvailable(identity.id, wall);
+    },
+    render: botChatText,
+    behavior: (bot, human, stance, state) => {
+      const identity = botIdentities.get(bot);
+      return identity !== undefined && botAcceptsOffer(state, bot, human, identity.seed, stance);
+    },
+    onError: (code) => process.stderr.write(`${code}\n`),
+  });
+
   if (AUTH && initialState.match.status === 'ended')
     await creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, initialState);
 
@@ -623,35 +730,48 @@ async function createHostedMatch(
   }
 
   // Snapshot the world after changes, debounced so a burst of actions is one write.
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let saving = false;
-  function scheduleSave(): void {
-    if (saveTimer) return;
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      detach('отложенное сохранение мира', doSave());
-    }, 500);
-  }
-  async function doSave(): Promise<void> {
-    if (saving) {
-      scheduleSave(); // a save is in flight — coalesce into the next tick
-      return;
-    }
-    saving = true;
-    try {
-      await matchStore.save({
+  const snapshots = createSnapshotWriter({
+    async save() {
+      const snapshot = {
         matchId: id,
         dataVersion: room.state.version?.data ?? 'proto',
         seq: room.sequence,
-        status: room.state.match.status === 'ended' ? 'ended' : 'ongoing',
+        status: room.state.match.status === 'ended' ? 'ended' as const : 'ongoing' as const,
         state: room.state,
         clock: room.clockSnapshot,
         economyActivity: room.economyActivitySnapshot,
-      });
-    } catch (e) {
+      };
+      await matchStore.save(snapshot);
+      // Admission may cross the terminal deadline before it can update botSeats.
+      // The durable roster, not the successfully seated in-memory cache, owns settlement.
+      if (snapshot.status === 'ended')
+        await settleBotMatch({ snapshot, bots: botStore, profiles: profileStore, accounts: accountStore, now: Date.now() });
+    },
+    onError(e) {
       process.stderr.write(`snapshot save failed (${id}): ${(e as Error)?.message ?? String(e)}\n`);
+      // A finished room has no more AI wakes. Keep one bounded retry until its
+      // durable result lands; active roster ownership survives a process restart.
+      if (room.state.match.status === 'ended') scheduleSave(5_000);
+    },
+  });
+  function scheduleSave(delay = 500): void { snapshots.schedule(delay); }
+
+  if (AUTH) {
+    try {
+      await rememberBots(await prepareBotPopulation({ matchId: id, room, bots: botStore,
+        accounts: accountStore, data, config: BOT_POPULATION, restored: true, now: Date.now() }));
+    } catch (error) {
+      // A partially persisted claim belongs to this match and is repaired on
+      // restart. Never release it on a timeout or expose a half-admitted room.
+      snapshots.stop();
+      try {
+        await recoverBotMatch({ bots: botStore, profiles: profileStore, accounts: accountStore,
+          matches: matchStore, now: Date.now }, id);
+      } catch (cleanupError) {
+        process.stderr.write(`bot creation recovery deferred (${id}): ${String(cleanupError)}\n`);
+      }
+      throw error;
     }
-    saving = false;
   }
 
   // Offline scheduler (PA-4.1): the shared `startClockDriver` (assigned below, after the
@@ -684,6 +804,10 @@ async function createHostedMatch(
     policy.slice(policy.indexOf(':') + 1) as StewardPosture | 'expand';
   const aiPolicy = (seat: string): string | null => {
     if (room.state.players[seat]?.status !== 'active') return null;
+    if (botSeats.has(seat)) return `bot:${botStyle(botIdentities.get(seat)!.seed)}`;
+    // Offline population keeps its own empires active. The grace-based human
+    // stand-in keeps the existing watched-room policy.
+    if (connected === 0) return null;
     const posture = stewardActive(room.state, seat, room.state.time);
     const eligibleAt = aiEligibleAt.get(seat);
     const graceExpired = !!room.state.players[seat]?.npc || eligibleAt === undefined || Date.now() >= eligibleAt;
@@ -694,7 +818,7 @@ async function createHostedMatch(
     if (aiBusy || aiStopped) return;
     aiBusy = true;
     try {
-      while (!aiStopped && !aiClockStalled && room.isStarted && connected > 0 && room.state.match.status !== 'ended') {
+      while (!aiStopped && !aiClockStalled && room.isStarted && (connected > 0 || botSeats.size > 0) && room.state.match.status !== 'ended') {
         if (driversBusy) {
           await new Promise<void>((resolve) => setTimeout(resolve, 16));
           continue;
@@ -704,7 +828,9 @@ async function createHostedMatch(
         driversBusy = true;
         try {
           const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
-            (seat, policy) => aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
+            (seat, policy) => botSeats.has(seat)
+              ? botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed)
+              : aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
           if (!step.worked) return;
           const group = step.action ?? [];
           // Политику спрашиваем ОДИН раз на порцию. Перепроверка перед каждым приказом
@@ -721,9 +847,9 @@ async function createHostedMatch(
           // стоячих драйверов пропадёт вместе с этим ударом сердца. Отцепляем так же,
           // как это делает тик: свой сбой прохода не должен уронить цикл ИИ, а гварду
           // он возьмёт сам — следующая итерация подождёт её штатно.
-          if (standingDue) {
+          if (standingDue && !aiStopped) {
             standingDue = false;
-            detach('серверные драйверы (отложенный проход)', runStandingPass());
+            runBackground('серверные драйверы (отложенный проход)', runStandingPass());
           }
         }
         // Yield between BOTH planning and applying: persistence may resolve already,
@@ -766,6 +892,7 @@ async function createHostedMatch(
   // Один проход стоячих драйверов + истечение заявок на места. Зовут его тик и —
   // если тик не смог взять гварду — цикл ИИ, отпуская её (см. `standingDue`).
   async function runStandingPass(): Promise<void> {
+    if (aiStopped) return;
     driversBusy = true;
     try {
       await runServerStanding(); // CC-2/RETR-2/CC-1: standing orders (auto-storm, retreat, chains)
@@ -787,6 +914,13 @@ async function createHostedMatch(
   // next-event time (or a join/leave flips the beat).
   driver = startClockDriver(room, {
     heartbeatMs: HEARTBEAT_MS,
+    // One room timer, paced to the existing staggered two-game-hour AI cycle.
+    // It does not add sockets or affect the real online-player count.
+    backgroundHeartbeatMs: () => {
+      if (!botSeats.size || !room.isStarted || room.state.match.status === 'ended') return null;
+      const delay = aiSchedule.nextDelay(room.state.time, Object.keys(room.state.players), aiPolicy);
+      return delay === null ? null : Math.max(HEARTBEAT_MS, delay / room.clockScale);
+    },
     maxDelayMs: MAX_TIMER_MS,
     onTick: ({ progressed }) => {
       // ECON-6: почасовой экономический срез в пайплайн наблюдений (JSONL — кривые
@@ -812,9 +946,9 @@ async function createHostedMatch(
         if (driversBusy) standingDue = true;
         else {
           standingDue = false; // проход идёт ПРЯМО СЕЙЧАС — прежний долг им и погашен
-          detach('серверные драйверы', runStandingPass());
+          runBackground('серверные драйверы', runStandingPass());
         }
-        detach('распределённые ходы ИИ', runServerAI());
+        runBackground('распределённые ходы ИИ', runServerAI());
       }
       scheduleSave(); // persist the advanced world
     },
@@ -825,17 +959,38 @@ async function createHostedMatch(
       ),
   });
 
+  const botArrivals = AUTH ? startBotArrivals({
+    config: BOT_POPULATION,
+    canJoin: () => !aiStopped && room.state.match.status !== 'ended' && registry.entryOpen(id) &&
+      botSeats.size < botMatchLimit(room.state, BOT_POPULATION.fillPercent),
+    join: async () => {
+      await rememberBots(await prepareBotPopulation({ matchId: id, room, bots: botStore,
+        accounts: accountStore, data, config: BOT_POPULATION, restored: false, now: Date.now() }));
+      driver?.reschedule();
+      scheduleSave();
+    },
+    onError: (error) => process.stderr.write(`bot arrival deferred (${id}): ${String(error)}\n`),
+  }) : null;
+
   return {
     id,
     room,
     restored: !!restoredSnap,
-    flush: doSave,
-    clearTimers(): void {
-      aiStopped = true;
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
+    async flush() {
+      if (aiStopped) {
+        // Producers may already be awaiting a durable action when timers stop.
+        // Let them finish before draining the mailbox and capturing the final state.
+        await Promise.all([botArrivals?.drain(), botSocial.drain(), drainBackground()]);
+        await room.drain();
+        await drainBackground(); // a committed terminal action can credit profiles
       }
+      await snapshots.flush();
+    },
+    clearTimers(): void {
+      botArrivals?.stop();
+      botSocial?.stop();
+      aiStopped = true;
+      snapshots.stop();
       driver?.stop(); // cancel the pending wake
     },
   };
@@ -899,6 +1054,7 @@ const restoredCount = hosted.filter((h) => h.restored).length;
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
 async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Promise<HostedMatch> {
+  if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
   // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
   const id = await freeMatchId(async (candidate) =>
@@ -915,6 +1071,12 @@ async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Pro
   return h;
 }
 
+// UIX-4.4 (часть 2): service worker push-уведомлений (`build.mjs` → `dist/sw.js`). Только там,
+// где push правда работает — есть ключи VAPID и вход в аккаунт (подписка привязана к нему);
+// иначе нет ни `/sw.js`, ни разрешения воркера в политике документа.
+const swPath = 'prototype/dist/sw.js';
+const serviceWorker = vapid && AUTH && existsSync(swPath) ? readFileSync(swPath, 'utf8') : undefined;
+
 const server = createMultiplayerServer({
   securityAudit,
   registry,
@@ -922,6 +1084,7 @@ const server = createMultiplayerServer({
   port,
   indexHtml,
   ...(assets ? { assets } : {}),
+  ...(serviceWorker !== undefined ? { serviceWorker } : {}),
   accountStore, // `?nick=` WS login resolves its seat here
   seatLock: SEAT_LOCK, // REL-5: nick+ticket identity; `?player=` refused when on
   // Accounts (SES-2.5): with AUTH on, the WS handshake requires a verified join token
@@ -930,7 +1093,14 @@ const server = createMultiplayerServer({
   // The join token is also bound to the account's password: after a reset the old one
   // is refused here (and the reset itself closes the account's open sockets, below).
   ...(AUTH
-    ? { auth: authCfg.auth, accountPwfp: (accountId: string) => currentPwfp(userStore, accountId) }
+    ? {
+        auth: authCfg.auth,
+        accountPwfp: (accountId: string) => currentPwfp(userStore, accountId),
+        accountSeat: async (matchId: string, accountId: string) => {
+          const user = await userStore.findById(accountId);
+          return user ? accountStore.seatOf(matchId, user.login) : null;
+        },
+      }
     : {}),
   // TLS-2 (playtest-hardening): за https-прокси хост обязан уважать Origin-allowlist
   // (CSWSH) и реальные клиентские IP из X-Forwarded-For — без этой проводки env в
@@ -1046,6 +1216,12 @@ const server = createMultiplayerServer({
       const who = bearer ? await authCfg.verifySession!(bearer) : null;
       return who?.ok ? liveSession(who.claim, userStore) : null;
     };
+    if (AUTH) registerPlayerActivityApi(app, {
+      store: pool ? new PostgresPlayerActivityStore(pool) : new MemoryPlayerActivityStore(),
+      identify: identifySession,
+      operator,
+      ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
+    });
     telemetryStats = registerTelemetryApi(app, {
       log: clientLog,
       ...(AUTH ? { identify: identifySession } : {}),
@@ -1097,19 +1273,26 @@ const server = createMultiplayerServer({
       // which is participation, not proof (that host has no sessions to check).
       ...(AUTH ? { identify: identifySession } : {}),
     });
+    // The news feed (CORP-1) — public, the same module as the production entry.
+    registerNewsApi(app, { feed: feedStore, announcements: announcementStore });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
-    app.get('/auth/status', async () => ({ enabled: AUTH }));
+    app.get('/auth/status', async () => ({ enabled: AUTH, accountDeletion: AUTH && !!pool && process.env.ACCOUNT_DELETION_ENABLED === '1' }));
     if (AUTH) {
       // Register/login (SE-1.x contour, shared with the production entry): scrypt
       // hashes, uniform-401 + decoy timing, per-IP rate limit — hands out the
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
         users: userStore,
-        onRegistered: async (accountId) => { await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now()); },
+        onRegistered: async (accountId) => {
+          try { await registrationRewards.ensure(accountId); }
+          catch { process.stderr.write(`registration reward deferred for ${accountId}\n`); }
+          await grantStarterArsenal(arsenalStore, accountId, starterArsenal, Date.now());
+        },
         sendRecoveryMail: recoveryMailer(mailerFromEnv()),
         signSession: authCfg.signSession!,
         verifySession: authCfg.verifySession!,
+        accountDeletionEnabled: !!pool && process.env.ACCOUNT_DELETION_ENABLED === '1',
         onSessionsRevoked: (accountId) => { revokeAccountConnections(registry, accountId); },
         // Новый пароль закрывает открытые игровые сокеты аккаунта во всех партиях.
         onPasswordChanged: (accountId) => {
@@ -1174,7 +1357,14 @@ const server = createMultiplayerServer({
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
-      registerProfileApi(app, { profiles: profileStore, users: userStore, commanders: commanderStore, identify: identifySession });
+      registerProfileApi(app, { registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId), identify: identifySession });
+      // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа
+      // монтируется только при заданных VAPID.
+      registerPushApi(app, {
+        store: pushStore,
+        identify: identifySession,
+        ...(vapid ? { vapidPublicKey: vapid.publicKey } : {}),
+      });
       registerLeaderboardApi(app, {
         commanders: commanderStore,
         users: userStore,
@@ -1188,6 +1378,7 @@ const server = createMultiplayerServer({
         identify: identifySession,
         admins: ADMIN_LOGINS,
         users: userStore,
+        announcements: announcementStore,
         roster: async (id) => {
           const room = registry.get(id);
           if (!room) return null;
@@ -1210,8 +1401,9 @@ const server = createMultiplayerServer({
             })),
           };
         },
-        kick: (id, nick) =>
-          kickSeat({ matchId: id, room: registry.get(id), accounts: accountStore }, nick),
+        kick: async (id, nick) => (await botStore.findByLogin(nick))
+          ? { ok: false as const, code: 'E_BOT_SEAT_LOCKED' as const }
+          : kickSeat({ matchId: id, room: registry.get(id), accounts: accountStore }, nick),
       });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
@@ -1469,6 +1661,8 @@ const printSummary = (): void => {
 };
 
 const shutdown = (): void => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   printSummary();
   // M3: land the aggregated summary as the LAST JSONL line — the per-line log keeps
   // only anomalous broadcast/timing entries, so without this the report script would
@@ -1484,11 +1678,19 @@ const shutdown = (): void => {
   // дойдя до `process.exit`, и оркестратор добивал его по таймауту SIGKILL — то есть
   // последний снапшот мира терялся именно там, где его и сохраняли.
   void (async () => {
-    // Final flush per room so the latest state of EVERY session is durable before exit.
-    for (const h of hosted) await h.flush();
-    // Stop taking requests (Fastify waits for those in flight) before the journals: a
-    // `/telemetry` batch landing after the last flush would be lost at exit.
+    // Stop ingress first: HTTP/WS must not change a world after its final snapshot.
     await server.close();
+    // An HTTP creation already in flight may have registered another hosted room.
+    for (const h of hosted) h.clearTimers();
+    // Meta observers are detached from reward delivery; an earlier refresh can
+    // still submit durable room actions. New refreshes were disabled synchronously.
+    while (arsenalRefreshes.size) await Promise.allSettled([...arsenalRefreshes]);
+    const failures: unknown[] = [];
+    for (const h of hosted) {
+      try { await h.flush(); }
+      catch (error) { failures.push(error); }
+    }
+    if (failures.length) throw new AggregateError(failures, 'E_SHUTDOWN_SAVE');
     await rewardDelivery.stop();
     // The journals last: drain them, THEN write a fresh summary (its counters now match
     // the files; the one above stays as a fallback, the report keeps a run's LAST one)

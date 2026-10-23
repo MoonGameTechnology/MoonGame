@@ -24,6 +24,8 @@
 import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { t, tData } from '../../localization/runtime';
 import {
+  coalitionCapacity,
+  coalitionOf,
   getOffer,
   getStance,
   isForkSite,
@@ -37,11 +39,12 @@ import { COALITION, initConversations, type StampOpts } from './conversations';
 import { diploIntent } from './diploClick';
 import { diploDelivery } from './diploDelivery';
 import { diffDiplomacy, STANCES } from './diploEvents';
-import { clockHM, esc, fmtEta, gameDay, gameStamp, kfmt, resLine } from './format';
+import { clockHM, esc, fmtEta, gameDay, gameStamp, kfmt } from './format';
 import {
   botFavour,
   data,
   declareWar,
+  declineOffer,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
@@ -49,10 +52,9 @@ import {
   hasMapShareOffer,
   HOUR,
   shareMap,
-  spyOn,
   STANCE_RANK,
 } from './game';
-import { grantLeftMs, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
+import { grantLeftMs, myAgents, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
 import { selPlanet } from './interaction';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
@@ -410,25 +412,15 @@ function favourBarHtml(bot: string): string {
     `<span class="dp-fav-lbl">${label}</span></div>`
   );
 }
-/** Live stolen-intel readout for one seat (under its expanded actions): the
- *  treasury window prints the victim's actual resources, a fleets window says the
- *  map shows them, planet windows list the scanned worlds. Empty when nothing lives. */
+/** Live stolen-intel readout for one seat (under its expanded actions): the worlds
+ *  of theirs under a recon window (SPY-8). Empty when nothing lives. */
 function intelRowHtml(target: string): string {
   const s = game.state();
   const bits: string[] = [];
   for (const g of game.myIntel()) {
+    if (s.planets[g.target]?.owner !== target) continue;
     const left = fmtEta(grantLeftMs(g, s.time) / HOUR);
-    if (g.kind === 'treasury' && g.target === target) {
-      const r = s.players[target]?.resources ?? {};
-      const bag = resLine(
-        Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.floor(v as number)])),
-      );
-      bits.push(t('comms.intel.treasury', { bag: bag || '—', left }));
-    } else if (g.kind === 'fleets' && g.target === target) {
-      bits.push(t('comms.intel.fleets', { left }));
-    } else if (g.kind === 'planet' && s.planets[g.target]?.owner === target) {
-      bits.push(t('comms.intel.world', { id: esc(game.placeName(g.target)), left }));
-    }
+    bits.push(t('comms.intel.world', { id: esc(game.placeName(g.target)), left }));
   }
   if (!bits.length) return '';
   return `<div class="dp-intel">🕵 ${bits.join(' · ')}</div>`;
@@ -468,15 +460,33 @@ function mapShareBtnHtml(id: string): string {
   const cls = offerClass('dp-map', live, aff);
   return `<button class="${cls}" data-mapseat="${id}"${offerDisabled(aff, atWar) ? ' disabled' : ''} title="${esc(title)}">🗺 ${label}</button>`;
 }
-function seatDiploActionsHtml(id: string): string {
+/**
+ * COAL-1: почему союз с местом сейчас невозможен — ключ подсказки или null. Боты не
+ * вступают в коалиции; член чужой коалиции сначала выходит из неё; полная коалиция
+ * никого не принимает. Ядро отобьёт то же самое, кнопка лишь не обещает лишнего.
+ */
+function allianceBar(id: string): string | null {
+  if (isAiSeat(id)) return 'comms.bots-no-coalition';
+  const s = game.state();
+  const ME = game.me();
+  if (getStance(s, ME, id) === 'alliance') return null;
+  const mine = coalitionOf(s, ME);
+  const theirs = coalitionOf(s, id);
+  if (mine && theirs && mine.id !== theirs.id) return 'err.coalition-other';
+  const joining = mine ?? theirs;
+  if (joining && joining.members.length >= coalitionCapacity(s)) return 'err.coalition-full';
+  return null;
+}
+/** Кнопки стоек и договора карт для места — общие у ростера, карточки и лички. */
+function stanceButtonsHtml(id: string): string {
   const s = game.state();
   const ME = game.me();
   const NAME = game.names();
   const st = getStance(s, ME, id);
   return (
-    `<div class="dp-actions">` +
     STANCES.map((sk) => {
-      const barred = sk === 'alliance' && isAiSeat(id); // боты не вступают в коалиции
+      const barKey = sk === 'alliance' ? allianceBar(id) : null;
+      const barred = barKey !== null;
       // Чей ход — `offerAffordance.ts` (REFM-201), та же формула, что у кнопки карт.
       // ЗДЕСЬ подавитель — запрет: предложить коалицию боту нельзя вовсе, поэтому и
       // аффорданса быть не должно. Текущая стойка помечается ОТДЕЛЬНО (`sk === st`).
@@ -484,20 +494,84 @@ function seatDiploActionsHtml(id: string): string {
       const mark = offerMark(aff);
       const cls = offerClass('dp-act', sk === st, aff);
       const label = mark ? `${mark} ${stanceRu(sk)}` : stanceRu(sk);
-      const title = barred
-        ? t('comms.bots-no-coalition')
-        : aff === 'accept'
-          ? t('comms.offer.incoming', { who: NAME[id] ?? id })
-          : aff === 'waiting'
-            ? t('comms.offer.sent')
-            : '';
+      const title =
+        barKey === 'comms.bots-no-coalition'
+          ? t('comms.bots-no-coalition')
+          : barKey === 'err.coalition-other'
+            ? t('err.coalition-other')
+            : barKey === 'err.coalition-full'
+              ? t('err.coalition-full')
+              : aff === 'accept'
+                ? t('comms.offer.incoming', { who: NAME[id] ?? id })
+                : aff === 'waiting'
+                  ? t('comms.offer.sent')
+                  : '';
       return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${game.stanceCol(sk)}"${offerDisabled(aff, barred) ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
-    }).join('') +
-    mapShareBtnHtml(id) +
-    (espionageShown(game.sectorZeroToolsHidden())
-      ? `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>`
-      : '') +
+    }).join('') + mapShareBtnHtml(id)
+  );
+}
+/**
+ * COAL-1: дипломатия внутри лички. Входящее предложение — карточка с «принять» и
+ * «отказаться», своё — пометка «ждём ответа»; ниже кнопки нового предложения.
+ */
+function threadDiploHtml(id: string): string {
+  const s = game.state();
+  const ME = game.me();
+  if (!s.players[id] || id === ME) return '';
+  const who = esc(game.names()[id] ?? id);
+  const cards: string[] = [];
+  const incoming = (what: string, accept: string, kind: 'stance' | 'map'): string =>
+    `<div class="dp-offer in"><span>${t('diplo.offer.in', { who, what })}</span>` +
+    accept +
+    `<button class="dp-dec" data-decline="${kind}" data-seat="${id}">✕ ${t('diplo.offer.decline')}</button></div>`;
+  const inSt = getOffer(s, id, ME);
+  if (inSt) {
+    // Союз сверх вместимости или с членом чужой коалиции ядро отобьёт: кнопка гаснет
+    // с той же причиной, что и кнопка союза в ростере.
+    const bar = inSt === 'alliance' ? allianceBar(id) : null;
+    const barAttr = bar ? ` disabled title="${esc(t(bar))}"` : '';
+    cards.push(
+      incoming(
+        stanceRu(inSt),
+        `<button class="dp-act dp-acc" data-stance="${inSt}" data-seat="${id}" style="--sc:${game.stanceCol(inSt)}"${barAttr}>✓ ${t('diplo.offer.accept')}</button>`,
+        'stance',
+      ),
+    );
+  }
+  if (hasMapShareOffer(s, id, ME) && !hasMapShare(s, ME, id)) {
+    cards.push(
+      incoming(
+        t('comms.mapshare'),
+        `<button class="dp-map dp-acc" data-mapseat="${id}">✓ ${t('diplo.offer.accept')}</button>`,
+        'map',
+      ),
+    );
+  }
+  const outSt = getOffer(s, ME, id);
+  if (outSt)
+    cards.push(
+      `<div class="dp-offer out">⏳ ${t('diplo.offer.out', { what: stanceRu(outSt) })}</div>`,
+    );
+  if (hasMapShareOffer(s, ME, id)) {
+    cards.push(
+      `<div class="dp-offer out">⏳ ${t('diplo.offer.out', { what: t('comms.mapshare') })}</div>`,
+    );
+  }
+  return (
+    `<div class="dp-tdip">${cards.join('')}` +
+    `<div class="dp-propose"><span>${t('diplo.offer.make')}</span>${stanceButtonsHtml(id)}</div></div>`
+  );
+}
+/** COAL-1: отказ от предложения места — стойки или обмена картами. */
+function declineFrom(seat: string, kind: string | undefined): void {
+  const ME = game.me();
+  if (kind === 'map') game.playerOrder(shareMap(ME, seat, false));
+  else game.playerOrder(declineOffer(ME, seat));
+}
+function seatDiploActionsHtml(id: string): string {
+  return (
+    `<div class="dp-actions">` +
+    stanceButtonsHtml(id) +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
     intelRowHtml(id)
   );
@@ -572,42 +646,42 @@ export const conversations = initConversations({
   seatBadge,
   fmtStamp,
   ownerColor: (owner) => game.ownerColor(owner),
+  threadDiploHtml,
 });
 
-/** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — активные окна интела
- *  с таймерами, операции по каждому противнику (те же .dp-spy обработчики, что и в
- *  ростере) и сессионный журнал попыток. Разведка мира остаётся на карточке планеты
- *  (нужна цель) — вкладка ведёт к ней подсказкой. */
+/** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — сеть агентов, активные
+ *  окна интела с таймерами и сессионный журнал попыток. Агента отправляют с карточки
+ *  чужого мира (SPY-8: цель шпиона — мир), вкладка ведёт к ней подсказкой. */
 function intelTabHtml(): string {
   const s = game.state();
   const ME = game.me();
-  const NAME = game.names();
-  const grantLabel = (g: IntelGrant): string =>
-    g.kind === 'treasury'
-      ? t('log.spy.what.treasury', { who: NAME[g.target] ?? g.target })
-      : g.kind === 'fleets'
-        ? t('log.spy.what.fleets', { who: NAME[g.target] ?? g.target })
-        : t('log.spy.what.world', { at: game.placeName(g.target) });
   const rows = game
     .myIntel()
     .sort((a, b) => a.until - b.until)
     .map((g) => {
       const left = Math.max(0, Math.ceil((g.until - s.time) / HOUR));
-      const jump = g.kind === 'planet' ? ` data-iw="${esc(g.target)}"` : '';
+      const label = t('log.spy.what.world', { at: game.placeName(g.target) });
       return (
-        `<div class="in-row"${jump}><span class="in-k">🗝</span><b>${esc(grantLabel(g))}</b>` +
-        `<span class="in-t">⏳ ${t('fmt.hours', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
+        `<div class="in-row" data-iw="${esc(g.target)}"><span class="in-k">🗝</span><b>${esc(label)}</b>` +
+        `<span class="in-t">⏳ ${t('fmt.hours', { n: left })}</span><span class="in-go">↪</span></div>`
       );
     })
     .join('');
-  const ops = Object.keys(s.players)
-    .filter((id) => id !== ME)
-    .map(
-      (id) =>
-        `<div class="in-row"><b>${esc(NAME[id] ?? id)}</b>` +
-        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('spy.op.fleets')}</button></div>`,
-    )
+  // SPY-6: сеть агентов — сколько свободно и когда вернутся остальные; агент на задании
+  // (SPY-8) называет мир, к которому ушёл.
+  const net = myAgents(s, ME);
+  const agents = net.away
+    .map((a) => {
+      // SPY-11: a counter-intelligence agent is away until recalled — no countdown.
+      const guard = a.op === 'counter';
+      const left = guard ? '' : `⏳ ${t('fmt.hours', { n: Math.max(0, Math.ceil((a.until - s.time) / HOUR)) })}`;
+      const what = a.lost
+        ? t('spy.agent.lost')
+        : a.planetId
+          ? t(a.posted ? 'spy.agent.post' : 'spy.agent.mission', { at: game.placeName(a.planetId) })
+          : t('spy.agent.busy');
+      return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : guard ? '🛡' : '🕵'}</span><b>${esc(what)}</b><span class="in-t">${left}</span></div>`;
+    })
     .join('');
   const log = [...spyLog]
     .reverse()
@@ -616,10 +690,10 @@ function intelTabHtml(): string {
   return (
     `<div class="dp-list in-list">` +
     `<div class="in-hint">${t('spy.note', { c: SPY_COST })}</div>` +
+    `<div class="in-sec">${t('spy.agents.title', { free: net.free, total: net.total })}</div>` +
+    agents +
     `<div class="in-sec">${t('spy.windows.title')}</div>` +
     (rows || `<div class="in-empty">${t('spy.windows.empty')}</div>`) +
-    `<div class="in-sec">${t('spy.ops.title')}</div>` +
-    (ops || `<div class="in-empty">${t('spy.ops.empty')}</div>`) +
     `<div class="in-sec">${t('spy.log.title')}</div>` +
     (log || `<div class="in-empty">${t('spy.log.empty')}</div>`) +
     `</div>`
@@ -663,6 +737,21 @@ export function renderDiplo(): void {
     `</div>`;
   if (diploTab === 'msgs') scrollFeedToEnd();
 }
+/** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
+ *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */
+export function refreshThreadDiplo(): void {
+  if (!diploOpen || diploTab !== 'msgs') return;
+  // Список может сам сменить открытый канал (распалась коалиция → общий чат). Тогда
+  // перерисовывается вся вкладка: иначе шапка и поле ввода остались бы от старого
+  // канала, и реплика для союзников ушла бы в общий чат.
+  const was = conversations.current();
+  const listHtml = conversations.listHtml();
+  if (conversations.current() !== was) return renderDiplo();
+  const list = document.querySelector('#diplo .dp-cvlist');
+  if (list) list.outerHTML = listHtml;
+  const box = document.querySelector('#diplo .dp-tdip');
+  if (box) box.outerHTML = threadDiploHtml(conversations.current());
+}
 /** Patch just the open thread's feed (so a new line doesn't wipe a half-typed reply). */
 export function renderDiploFeed(): void {
   const feed = document.getElementById('dp-feed');
@@ -686,7 +775,6 @@ function sendDiploMsg(): void {
   dispatchChat(conversations.current(), text); // NET: server relay + echo; solo: local append
   if (input) {
     input.value = '';
-    input.focus();
   }
 }
 /** Ping the selected province into the coalition channel — also a clickable map
@@ -713,7 +801,6 @@ function pingSelected(): void {
   }
   if (input) {
     input.value = '';
-    input.focus();
   }
 }
 
@@ -751,7 +838,6 @@ export function initDiploWindow(host: DiploWindowHost): void {
       if (intent && intent.kind !== 'message') {
         if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
         else if (intent.kind === 'map') toggleMapShare(intent.seat);
-        else game.playerOrder(spyOn(game.me(), intent.seat, intent.what as 'treasury' | 'fleets'));
         refreshSeatCard(seat);
         return;
       }
@@ -761,7 +847,6 @@ export function initDiploWindow(host: DiploWindowHost): void {
         openDiplo('msgs'); // hand off to the full message thread
         conversations.open(intent.seat);
         renderDiplo();
-        document.getElementById('dp-text')?.focus();
       }
     });
   }
@@ -819,15 +904,21 @@ export function initDiploWindow(host: DiploWindowHost): void {
         renderDiplo();
         return;
       }
+      // COAL-1: «отказаться» в карточке предложения внутри лички.
+      const dec = tg.closest('[data-decline]') as HTMLElement | null;
+      if (dec?.dataset.seat) {
+        declineFrom(dec.dataset.seat, dec.dataset.decline);
+        renderDiplo();
+        return;
+      }
       // Тот же разбор, что и у карточки игрока (`diploClick.ts`, REFM-139) — а перерисовку
-      // здесь делает окно целиком. Письмо ниже: между ним и шпионом стоит окно интела, и
-      // порядок ветвей сохранён (правило 3).
+      // здесь делает окно целиком. Письмо ниже: перед ним стоит окно интела, и порядок
+      // ветвей сохранён (правило 3).
       const intent = diploIntent(tg);
       if (intent && intent.kind !== 'message') {
         if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
         else if (intent.kind === 'map') toggleMapShare(intent.seat);
-        else game.playerOrder(spyOn(game.me(), intent.seat, intent.what as 'treasury' | 'fleets'));
-        renderDiplo(); // the intel row (or the rejection note) reflects the outcome
+        renderDiplo();
         return;
       }
       const iw = (tg.closest('[data-iw]') as HTMLElement | null)?.dataset.iw;
@@ -840,14 +931,12 @@ export function initDiploWindow(host: DiploWindowHost): void {
         conversations.open(intent.seat);
         diploTab = 'msgs';
         renderDiplo();
-        document.getElementById('dp-text')?.focus();
         return;
       }
       const convo = (tg.closest('.dp-cv') as HTMLElement | null)?.dataset.convo;
       if (convo) {
         conversations.open(convo);
         renderDiplo();
-        document.getElementById('dp-text')?.focus();
         return;
       }
       if (tg.closest('.dp-ping')) return pingSelected();

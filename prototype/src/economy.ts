@@ -15,6 +15,7 @@ import {
   BROWNOUT,
   buildProgress,
   thresholdRamp,
+  matchHours,
   creditsBonusOf,
 } from '../../packages/shared-core/src/index';
 import {
@@ -127,7 +128,7 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
         if (!def) continue;
         const level1 = buildingLevel(def, 1);
         const ramp = thresholdRamp(
-          buildProgress(state.time, event.at, level1.buildTimeHours * HOUR),
+          buildProgress(state.time, event.at, matchHours(state, level1.buildTimeHours) * HOUR),
         );
         if (ramp <= 0) continue;
         for (const res of Object.keys(level1.produces)) {
@@ -146,7 +147,7 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
         const current = buildingLevel(def, instance.level);
         const target = buildingLevel(def, cp.level);
         const ramp = thresholdRamp(
-          buildProgress(state.time, event.at, target.buildTimeHours * HOUR),
+          buildProgress(state.time, event.at, matchHours(state, target.buildTimeHours) * HOUR),
         );
         if (ramp <= 0) continue;
         const resources = new Set([

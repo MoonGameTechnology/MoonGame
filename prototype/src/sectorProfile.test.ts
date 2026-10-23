@@ -16,15 +16,19 @@ import {
   checkSeal,
   cloudSeal,
   sealProgress,
+  sealCloudProfile,
 } from '../../decisions/profileSeal';
 import {
   SECTOR_ZERO_PROGRESS_KEY,
   freshSectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { TAB_OWNER_KEY } from '../../decisions/tabLock';
+import { RUN_SAVE_VERSION } from '../../decisions/runSave';
+import { serializeSealedRunSave } from '../../decisions/runSeal';
 import { t } from '../../localization/runtime';
 import { data } from './game';
 import type { GamePlatform } from './platform/types';
+import { RUN_SAVE_KEY } from './runSaveLocal';
 
 const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
 
@@ -135,6 +139,78 @@ describe('REFM-209 — профиль пишется с печатью и под
     expect(next.sectorProgress.sovereigns).toBe(after);
   });
 
+  it('без обеих копий профиля восстанавливает только seed из целого подписанного журнала', async () => {
+    const journal = serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed');
+    cell.set(RUN_SAVE_KEY, journal);
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).toBe('journal-seed');
+    expect(profile.sectorProgress.warrants).toBe(0);
+    expect(profile.sectorProgress.sovereigns).toBe(0);
+    expect(checkSeal(cell.get(SECTOR_ZERO_PROGRESS_KEY)!, LOCAL_SEAL)).toBe('sealed');
+    expect(cell.get(SECTOR_ZERO_SHADOW_KEY)).toBe(cell.get(SECTOR_ZERO_PROGRESS_KEY));
+    expect(cell.get(RUN_SAVE_KEY)).toBe(journal);
+  });
+
+  it.each(['edited', 'unsigned'] as const)('правленая подсказка seed или снятая печать (%s) не создают профиль журнала', async (kind) => {
+    const raw = serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed');
+    const forged = JSON.parse(raw);
+    if (kind === 'edited') forged.profileSeed = 'forged-seed';
+    else delete forged.seal;
+    cell.set(RUN_SAVE_KEY, JSON.stringify(forged));
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).not.toBe('journal-seed');
+    expect(profile.sectorProgress.seed).not.toBe('forged-seed');
+    expect(profile.sectorProgress.warrants).toBe(0);
+    expect(cell.has(SECTOR_ZERO_PROGRESS_KEY)).toBe(false);
+    expect(cell.has(SECTOR_ZERO_SHADOW_KEY)).toBe(false);
+  });
+
+  it.each([SECTOR_ZERO_PROGRESS_KEY, SECTOR_ZERO_SHADOW_KEY])('существующий профиль %s с другим seed имеет приоритет над подписанным журналом', async (key) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    cell.set(key, sealProgress({
+      ...freshSectorZeroProgress(data, 'existing-profile-seed'),
+      warrants: 7,
+    }, LOCAL_SEAL));
+    cell.set(RUN_SAVE_KEY, serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed'));
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).toBe('existing-profile-seed');
+    expect(profile.sectorProgress.warrants).toBe(7);
+  });
+
+  it.each([SECTOR_ZERO_PROGRESS_KEY, SECTOR_ZERO_SHADOW_KEY])('даже непроверенная существующая запись %s не разрешает восстановление identity из журнала', async (key) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    cell.set(key, '{broken');
+    cell.set(RUN_SAVE_KEY, serializeSealedRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: 'pve_waves',
+      difficulty: 'weak',
+      state: { match: { status: 'ended', winner: 'p1' } },
+      sectorZeroAttempt: 1,
+    }, 'journal-seed'));
+    const { profile } = await boot();
+    expect(profile.sectorProgress.seed).not.toBe('journal-seed');
+    expect(profile.sectorProgress.warrants).toBe(0);
+    expect(cell.get(key)).toBe('{broken');
+  });
+
   it('правленая руками основная копия не берётся: профиль встаёт из теневой и переписывается', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { profile } = await boot();
@@ -152,6 +228,68 @@ describe('REFM-209 — профиль пишется с печатью и под
 });
 
 describe('REFM-209 — главы по профилю', () => {
+  it('неподписанный профиль без тени и флага сохраняется отдельно, но его деньги не принимаются', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const raw = JSON.stringify({ ...freshSectorZeroProgress(data, 'unsigned'), sovereigns: 999999 });
+    cell.set(SECTOR_ZERO_PROGRESS_KEY, raw);
+    const { platform, saved } = cloudPlatform();
+    const { profile } = await boot(platform);
+    expect(profile.sectorProgress.sovereigns).toBe(0);
+    expect(cell.get(profile.SECTOR_ZERO_UNVERIFIED_KEY)).toBe(raw);
+    profile.saveSectorProgress({ ...profile.sectorProgress, research: 3 });
+    await profile.progressWrite;
+    expect(checkSeal(cell.get(SECTOR_ZERO_PROGRESS_KEY)!, LOCAL_SEAL)).toBe('sealed');
+    expect(cell.get(profile.SECTOR_ZERO_UNVERIFIED_KEY)).toBe(raw);
+    profile.pushCloud(true);
+    await vi.waitFor(() => expect(saved.length).toBeGreaterThan(0));
+    expect(JSON.parse(parseCloudProfile(saved.at(-1)!)!.progress).sovereigns).toBe(0);
+  });
+
+  it('не заменяет неподписанный исходник, пока резервная запись не подтверждена', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const raw = JSON.stringify({ ...freshSectorZeroProgress(data, 'unsigned'), research: 10 });
+    cell.set(SECTOR_ZERO_PROGRESS_KEY, raw);
+    const originalSet = localStorage.setItem;
+    let failing = true;
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => cell.get(k) ?? null,
+      setItem: (k: string, value: string) => {
+        if (failing && k === 'sector-zero.progress.unverified.v1') throw new Error('quota');
+        originalSet(k, value);
+      },
+      removeItem: (k: string) => void cell.delete(k),
+    });
+    const { profile, game } = await boot();
+    profile.saveSectorProgress({ ...profile.sectorProgress, research: 3 });
+    await profile.progressWrite;
+    expect(cell.get(SECTOR_ZERO_PROGRESS_KEY)).toBe(raw);
+    expect(game.saveFailing).toHaveBeenCalledWith(true);
+    failing = false;
+    expect(await profile.persistSectorProgress()).toBe(true);
+    expect(cell.get(profile.SECTOR_ZERO_UNVERIFIED_KEY)).toBe(raw);
+    expect(checkSeal(cell.get(SECTOR_ZERO_PROGRESS_KEY)!, LOCAL_SEAL)).toBe('sealed');
+  });
+
+  it('снятые печать и флаг не подменяют целую тень и не отправляют накрутку в облако', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { profile } = await boot();
+    profile.saveSectorProgress({ ...profile.sectorProgress, sovereigns: 5 });
+    await profile.progressWrite;
+    const forged = JSON.parse(cell.get(SECTOR_ZERO_PROGRESS_KEY)!);
+    delete forged.seal;
+    forged.sovereigns = 999999;
+    cell.set(SECTOR_ZERO_PROGRESS_KEY, JSON.stringify(forged));
+    const mark = JSON.parse(cell.get(CLOUD_MARK_KEY)!);
+    delete mark.sealed;
+    cell.set(CLOUD_MARK_KEY, JSON.stringify(mark));
+    const { platform, saved } = cloudPlatform();
+    const next = await reload(platform);
+    next.profile.pushCloud(true);
+    await vi.waitFor(() => expect(saved.length).toBeGreaterThan(0));
+    expect(next.profile.sectorProgress.sovereigns).toBe(5);
+    expect(JSON.parse(parseCloudProfile(saved.at(-1)!)!.progress).sovereigns).toBe(5);
+  });
+
   it('закрытая в профиле задача главы не видна в забеге и не ждёт «позже»', async () => {
     const { profile } = await boot();
     const { pveChapter } = await import('../../packages/client/src/gameData');
@@ -278,13 +416,13 @@ describe('REFM-209 — облачная копия', () => {
 
   it('облачный профиль с прогрессом берётся на старте и снимает забег прежнего', async () => {
     const theirs = { ...freshSectorZeroProgress(data, 'cloud-seed'), sovereigns: 9 };
-    const cloud = cloudEnvelope({
+    const cloud = cloudEnvelope(sealCloudProfile({
       v: 1,
       seed: 'cloud-seed',
       rev: 3,
       progress: sealProgress(theirs, cloudSeal('p-1')),
       state: 'cloud-world',
-    });
+    }, 'p-1'));
     const { platform } = cloudPlatform(cloud);
     const { profile, game } = await boot(platform);
     expect(profile.sectorProgress.seed).toBe('cloud-seed');

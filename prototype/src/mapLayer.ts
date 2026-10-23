@@ -60,7 +60,7 @@ import {
 } from '../../decisions/mapLayerView';
 import { forkMarks, roadStrokes, type ForkMark, type NetPoint } from '../../decisions/roadNetwork';
 import type { TerrainEnvironment } from '../../decisions/terrainEnvironment';
-import { projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
+import { knownEnvironment, projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { SECTOR_TYPES, type MapNode } from './game';
@@ -68,13 +68,13 @@ import { data } from './gameData';
 import { glowOn, starfieldOn } from './graphicsPrefs';
 import { clipGlassSurface, drawGlassScreen, type TerrainField } from './holographicSurface';
 import { cam, insets, mapBounds, panBy, world } from './mapCamera';
-import { known, memory } from './mapFog';
+import { known, memory, surveyed } from './mapFog';
 import { pinchStart } from './mapInput';
 import { GRID, ownerColor } from './mapPalette';
 import type { PreparationJob } from './mapPreparation';
 import { clipPolygon, clipRect, provinceSeeds, type ProvinceSeed } from './provinceMap';
 import { COLOR } from './sideColors';
-import { bakeSignature, ownersSignature } from './staticLayerCache';
+import { bakeSignature, KnowledgeRevision } from './staticLayerCache';
 import { floorDensityFor, TERRAIN_PAD, TerrainRasterCache } from './terrainRasterCache';
 import { TerrainGeometryCache } from './terrainGeometryCache';
 import { NEBULAE, STARS } from './viewport';
@@ -311,15 +311,9 @@ export function knownOwner(id: string): string | null {
   if (known(id)) return s.planets[id]?.owner ?? null;
   return memory.ownerOf(id);
 }
-function ownersSig(): string {
-  const MAP = game.nodes();
-  // Подпись читает ЗНАНИЕ игрока (`knownOwner`), а не правду — см. `staticLayerCache.ts`
-  // (REFM-60): иначе скрытый захват выдал бы себя самим фактом перерисовки.
-  return ownersSignature(
-    MAP.map((n) => n.id),
-    knownOwner,
-  );
-}
+/** Знание игрока о мирах для подписи выпечки: сверяется каждым кадром без строки по всем
+ *  мирам (`staticLayerCache.ts`, правило 2). */
+const knowledge = new KnowledgeRevision();
 
 /** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
  *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
@@ -344,7 +338,6 @@ export const territoryGeometry = new TerritoryGeometryCache();
  *  viewer's knowledge of owners and of explored provinces, never the raw truth. */
 function mapLayerSignature(): string {
   const s = game.world();
-  const MAP = game.nodes();
   const ME = game.me();
   const VW = game.vw();
   const VH = game.vh();
@@ -354,13 +347,15 @@ function mapLayerSignature(): string {
     vh: VH,
     dpr: DPR,
     me: ME,
-    owners: ownersSig(),
+    // Подпись читает ЗНАНИЕ игрока (`knownOwner`, `knownEnvironment`), а не правду — см.
+    // `staticLayerCache.ts` (REFM-60): иначе скрытый захват выдал бы себя самим фактом перерисовки.
+    knowledge: knowledge.check(game.nodes(), knownOwner,
+      (id) => knownEnvironment(s.planets[id], known(id), memory.get(id), surveyed(id))),
     starfield: starfieldOn(),
   }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
     // The roads: a hero's corridor lays new lanes mid-match. A scroll paints its strips with
     // the roads of the moment, so a bake that missed them would end at the strip's edge.
-    `|topo:${roadDrawingOf(s).topology}` +
-    `|environment:${JSON.stringify(MAP.map(n => terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id))))}`;
+    `|topo:${roadDrawingOf(s).topology}`;
 }
 
 /** The sky under the map — backdrop art (or the fallback nebulae), grid and stars — in
@@ -399,11 +394,18 @@ function paintSky(g: CanvasRenderingContext2D): void {
     g.lineTo(VW, y);
   }
   g.stroke();
-  if (starfieldOn())
+  if (starfieldOn()) {
+    // One colour for all the stars, their brightness in the alpha: the canvas parses a colour
+    // string through a cache of eight, and 280 distinct ones missed it in every frame of a
+    // gesture, each miss leaving a heap object that only a major GC frees.
+    const alpha = g.globalAlpha;
+    g.fillStyle = '#bfeee6';
     for (const st of STARS) {
-      g.fillStyle = rgba('#bfeee6', st.b * 0.45);
+      g.globalAlpha = alpha * st.b * 0.45;
       g.fillRect(st.x * VW, st.y * VH, 0.7, 0.7);
     }
+    g.globalAlpha = alpha;
+  }
 }
 
 /** A screen rectangle in CSS pixels; a bake's view reaches past the screen by its margin. */
@@ -470,7 +472,7 @@ function measureMapLayer(): MapLayerGeometry {
   });
   for (let i = 0; i < seeds.length; i++) {
     const id = nodes[i]!.id;
-    seeds[i]!.kind = terrainKnowledge(s.planets[id], known(id), memory.get(id)).kind ?? 'unknown';
+    seeds[i]!.kind = terrainKnowledge(s.planets[id], known(id), memory.get(id), surveyed(id)).kind ?? 'unknown';
   }
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
@@ -588,7 +590,7 @@ function environmentOf(geo: MapLayerGeometry, roads: RoadDrawing): TerrainEnviro
   const seed = s.mapId ?? 'terrain';
   const knowledge = geo.shape.cells.map((cell) => {
     const id = geo.nodes[cell.idx]!.id;
-    const k = terrainKnowledge(s.planets[id], known(id), memory.get(id));
+    const k = terrainKnowledge(s.planets[id], known(id), memory.get(id), surveyed(id));
     return `${id}:${k.known ? 1 : 0}:${k.kind ?? ''}:${k.terrain ?? ''}`;
   }).join('|');
   // Where the shape's coordinates land in the world; camera roundoff only costs a miss.
@@ -606,7 +608,7 @@ function environmentOf(geo: MapLayerGeometry, roads: RoadDrawing): TerrainEnviro
       const n = geo.nodes[cell.idx]!;
       return {
         id: n.id,
-        ...terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id)),
+        ...terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id), surveyed(n.id)),
         poly: cell.poly.map(([x, y]): [number, number] => [
           (x * geo.place.scale + geo.place.x - projection.x) / projection.a,
           (y * geo.place.scale + geo.place.y - projection.y) / projection.a,
@@ -722,7 +724,7 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     for (let i = 0; i < geo.shape.cells.length; i++) {
       if (!meets(i, reach)) continue;
       const n = geo.nodes[geo.shape.cells[i]!.idx]!;
-      const visible = terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id));
+      const visible = terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id), surveyed(n.id));
       if (visible.kind !== 'rift') continue;
       const field = terrainGeometry.project(n.id, 'rift', sectorTypeOf(n.id)?.color ?? '#9fb6bd',
         cellPoly(geo, i), visible.known, inBake(n));

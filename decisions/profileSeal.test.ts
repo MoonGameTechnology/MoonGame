@@ -6,6 +6,7 @@ import {
   cloudSeal,
   LOCAL_SEAL,
   pickLocalProfile,
+  sealCloudProfile,
   sealProgress,
   SECTOR_ZERO_SHADOW_KEY,
   wholeCloud,
@@ -70,7 +71,7 @@ describe('YAG-4.4 — печать: целый профиль узнаётся, 
     expect(checkSeal(sealProgress(midGame(), LOCAL_SEAL), cloudSeal('u-1'))).toBe('broken');
   });
 
-  it('без печати — старая версия; нет записи — пусто; мусор — сломан, без исключений', () => {
+  it('без печати — неподписанная запись; нет записи — пусто; мусор — сломан, без исключений', () => {
     expect(checkSeal(JSON.stringify(midGame()), LOCAL_SEAL)).toBe('unsealed');
     expect(checkSeal(null, LOCAL_SEAL)).toBe('empty');
     expect(checkSeal('', LOCAL_SEAL)).toBe('empty');
@@ -116,6 +117,12 @@ describe('YAG-4.4 — правка не приживается: берётся �
 
   it('целая основная — она; тень догоняет, если отстала', () => {
     expect(pickLocalProfile(good, good, true)).toEqual({ raw: good, from: 'main', rewrite: false });
+    expect(pickLocalProfile(good, good, false)).toEqual({
+      raw: good,
+      from: 'main',
+      rewrite: false,
+    });
+    expect(pickLocalProfile(good, good)).toEqual({ raw: good, from: 'main', rewrite: false });
     expect(pickLocalProfile(good, null, true)).toEqual({ raw: good, from: 'main', rewrite: true });
     // Правка тени руками — тоже: основная цела, тень перепишется с неё.
     expect(pickLocalProfile(good, forged, true)).toEqual({
@@ -180,32 +187,42 @@ describe('YAG-4.4 — правка не приживается: берётся �
     expect(pickLocalProfile(cloudCopy, null, true).from).toBe('none');
   });
 
-  it('профиль старой версии без печати принимается и запечатывается — один раз', () => {
-    const legacy = JSON.stringify(midGame());
-    expect(pickLocalProfile(legacy, null, false)).toEqual({
-      raw: legacy,
-      from: 'legacy',
-      rewrite: true,
-    });
-    // Разбор старого профиля даёт тот же прогресс — без потерь.
-    expect(parseSectorZeroProgress(legacy, data, 'x')).toMatchObject({
-      seed: 'seed-1',
-      research: 640,
-      warrants: 24,
-      sovereigns: 35,
-      nextAttempt: 7,
-      chaptersWon: ['pve-1'],
-    });
-  });
+  it.each([undefined, false, true])(
+    'профиль без печати и тени не принимается независимо от флага: %s',
+    (sealedBefore) => {
+      for (const raw of [
+        JSON.stringify(midGame()),
+        JSON.stringify({ ...midGame(), sovereigns: 999999 }),
+      ]) {
+        expect(pickLocalProfile(raw, null, sealedBefore)).toEqual({
+          raw: null,
+          from: 'none',
+          rewrite: false,
+        });
+        // Поддельная неподписанная тень тоже не подтверждает основную запись.
+        expect(pickLocalProfile(raw, raw, sealedBefore)).toEqual({
+          raw: null,
+          from: 'none',
+          rewrite: false,
+        });
+      }
+    },
+  );
 
-  it('откат площадки на сборку без печати (AUD-31): новее то, что записала старая сборка', () => {
+  it('снятие печати и флага вместе не обходит целую тень (в том числе после отката сборки)', () => {
     // До отката: запечатанный профиль, тень и флаг. Старая сборка сохранила новый прогресс
     // без печати и переписала отметку без флага, а тень не тронула — та отстала.
     const before = sealProgress(midGame(), LOCAL_SEAL);
     const afterRollback = JSON.stringify({ ...midGame(), sovereigns: 40, nextAttempt: 8 });
     expect(pickLocalProfile(afterRollback, before, false)).toEqual({
-      raw: afterRollback,
-      from: 'legacy',
+      raw: before,
+      from: 'shadow',
+      rewrite: true,
+    });
+    const strippedForgery = JSON.stringify({ ...midGame(), sovereigns: 99999 });
+    expect(pickLocalProfile(strippedForgery, before, false)).toEqual({
+      raw: before,
+      from: 'shadow',
       rewrite: true,
     });
   });
@@ -215,7 +232,7 @@ describe('YAG-4.4 — облако не разносит подделку (за�
   const envelope = (progress: string): CloudProfile => ({ v: 1, seed: 'seed-1', rev: 3, progress });
 
   it('принимается только копия, запечатанная для этого игрока', () => {
-    const mine = envelope(sealProgress(midGame(), cloudSeal('u-1')));
+    const mine = sealCloudProfile(envelope(sealProgress(midGame(), cloudSeal('u-1'))), 'u-1');
     expect(wholeCloud(mine, 'u-1')).toBe(mine);
     expect(wholeCloud(mine, 'u-2')).toBeNull();
   });
@@ -226,5 +243,78 @@ describe('YAG-4.4 — облако не разносит подделку (за�
     expect(wholeCloud(envelope(JSON.stringify(midGame())), 'u-1')).toBeNull();
     expect(wholeCloud(envelope(sealProgress(midGame(), LOCAL_SEAL)), 'u-1')).toBeNull();
     expect(wholeCloud(null, 'u-1')).toBeNull();
+  });
+
+  it('внешняя печать защищает мир, дескриптор, номер правки, сид и родословную', () => {
+    const mine = sealCloudProfile(
+      {
+        ...envelope(sealProgress(midGame(), cloudSeal('u-1'))),
+        run: '{"v":1,"wave":3}',
+        state: '{"v":1,"state":{"match":{"status":"active"}}}',
+        lineage: { A: 3 },
+      },
+      'u-1',
+    );
+    expect(wholeCloud(mine, 'u-1')).toBe(mine);
+    for (const patch of [
+      { state: '{"v":1,"state":{"match":{"status":"ended","winner":"p1"}}}' },
+      { run: '{"v":1,"wave":10}' },
+      { rev: 999 },
+      { seed: 'other' },
+      { lineage: { A: 999 } },
+      { seal: null },
+      { seal: '' },
+      { seal: 42 },
+    ]) {
+      const changed = JSON.parse(edit(JSON.stringify(mine), patch)) as CloudProfile;
+      expect(wholeCloud(changed, 'u-1'), JSON.stringify(patch)).toBeNull();
+    }
+    for (const field of ['state', 'run', 'lineage']) {
+      const changed = { ...mine } as Record<string, unknown>;
+      delete changed[field];
+      expect(wholeCloud(changed as unknown as CloudProfile, 'u-1'), field).toBeNull();
+    }
+  });
+
+  it('старый конверт сохраняет запечатанный прогресс, но не его неподписанные забеги', () => {
+    const old = {
+      ...envelope(sealProgress(midGame(), cloudSeal('u-1'))),
+      run: '{"v":1,"wave":10}',
+      state: '{"v":1,"state":{"match":{"status":"ended","winner":"p1"}}}',
+      lineage: { A: 3 },
+    };
+    const checked = wholeCloud(old, 'u-1');
+    expect(checked).toEqual({
+      v: 1,
+      seed: old.seed,
+      rev: old.rev,
+      progress: old.progress,
+      lineage: old.lineage,
+    });
+    expect(wholeCloud({ ...old, seed: 'unbound' }, 'u-1')).toBeNull();
+  });
+
+  it('снятая внешняя печать не превращает новый мир в старый доверенный забег', () => {
+    const mine = sealCloudProfile(
+      {
+        ...envelope(sealProgress(midGame(), cloudSeal('u-1'))),
+        run: '{"v":1,"wave":3}',
+        state: '{"v":1,"state":{"match":{"status":"active"}}}',
+      },
+      'u-1',
+    );
+    const { seal: _stripped, ...stripped } = mine;
+    expect(wholeCloud(stripped, 'u-1')).toEqual(envelope(mine.progress));
+  });
+
+  it('профиль и конверт имеют разные печати, а повторная печать конверта стабильна', () => {
+    const body = envelope(sealProgress(midGame(), cloudSeal('u-1')));
+    const wrongDomain = JSON.parse(sealProgress(body, cloudSeal('u-1'))) as CloudProfile;
+    expect(wholeCloud(wrongDomain, 'u-1')).toBeNull();
+    const mine = sealCloudProfile(body, 'u-1');
+    expect(sealCloudProfile(mine, 'u-1')).toEqual(mine);
+    expect(wholeCloud(JSON.parse(reorder(JSON.stringify(mine))) as CloudProfile, 'u-1')).toEqual(
+      mine,
+    );
   });
 });

@@ -1,0 +1,23 @@
+[Unit]
+Description=MoonGame fixed container health and cgroup projection
+After=moongame-docker.service moongame-observer.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/node /opt/moongame-ops/deploy/observability/container-observer.mjs
+TimeoutStartSec=30
+MemoryMax=96M
+CPUQuota=20%
+TasksMax=64
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+ReadWritePaths=/var/lib/moongame-metrics
+UMask=0022

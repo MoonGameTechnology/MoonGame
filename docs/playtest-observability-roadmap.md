@@ -260,15 +260,17 @@ observability services и возвращает предыдущую конфиг
 
 | Новый компонент | Стартовый cap RAM | Хранение / предел |
 | --- | ---: | --- |
-| Grafana | 256 MiB | Provisioning в Git; state volume ≤256 MiB, backup конфигурации отдельно |
+| Grafana | 512 MiB | Provisioning в Git; state volume ≤256 MiB, backup конфигурации отдельно |
 | Prometheus | 384 MiB | 7 дней и retention.size 1.5 GB; volume budget 2.5 GiB с WAL/head запасом |
 | Loki | 384 MiB | 72 ч через compactor retention; volume budget 2 GiB |
-| Alloy | 128 MiB | positions/spool ≤256 MiB, потеря/задержка измеряются |
+| Alloy | 256 MiB | positions/spool ≤256 MiB, потеря/задержка измеряются |
 | Game exporter | 64 MiB | Cache только текущего scrape, без долговременной БД |
 | node_exporter | 64 MiB | Host textfile маркеры атомарные, без истории в exporter |
 | DB exporter, если включён | 64 MiB | Ограниченный набор метрик, отдельная DB-роль |
 
-Новый always-on бюджет — до 1.35 GiB; вместе с прежними caps около 3.85 GiB,
+После первого VPS запуска caps уточнены: плановый always-on бюджет до1.69GiB
+(включая три отдельных exporter), вместе с прежними caps около4.19GiB.
+Текущий объединённый observer вместо трёх exporter даёт cap1.56GiB;
 остаток — ОС, page cache и пики. Report worker до 256 MiB с CPU/time limit,
 не параллелится сам с собой. Бюджет наблюдаемости на диске — до 6 GiB, исходных
 JSONL — до 1 GiB/7 дней с первым наступившим пределом, локальных backup — до
@@ -358,9 +360,20 @@ non-root/read-only/caps, memory/PID/log caps, private file secret, HTTP healthch
 digest pins и CI Trivy/KICS. Root CLI управляет только четырьмя `obs-*`, требует
 disk guard timer; restart сохраняет состояние. Контейнерный smoke проверяет
 auth/header/proxy/write/snapshot/Viewer границы, persistence и неизменность Game
-Compose config. [Runbook](../deploy/observability/README.md) отделяет реализацию от
-ещё не проведённых VPS root/systemd, внешних сетевых проверок и 24h/on-off приёмки.
-Game targets и Loki ingest не включены.
+Compose config. Первый VPS и Game/host wiring описаны отдельным
+[профилем](../deploy/observability/VPS.md); DB exporter, Loki ingest и24h/on-off
+приёмка не включены.
+
+### OBS-0.4 · Первый VPS и защищённый браузерный вход `[ops][sec]` ✅ — M
+
+По явному выбору владельца: персональный клиентский сертификат + Viewer password
+через отдельный HTTPS site Caddy. Host-side observer переиспользует OBS-1.1,
+пишет только atomic numeric allowlist в readonly Alloy textfile mount; без
+сетевого bearer, Docker/DB credentials и Game volumes в monitoring containers.
+Provisioned RU обзор показывает host/Game метрики, источник и45s freshness.
+[Runbook](../deploy/observability/VPS.md), [отчёт VPS](reviews/2026-10-18-obs-vps-bootstrap.md) фиксируют версии,
+проверки TLS/header/Viewer/write/stale/restart и оставшиеся ограничения.
+Этот bootstrap не закрывает отдельные критерии OBS-1.2/1.3/4.1.
 
 ### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` ⏳ — M
 
@@ -385,12 +398,21 @@ Fixture и живой production bundle с WS join/остановкой/рест
 [Запуск и границы](../deploy/observability/GAME-EXPORTER.md): Compose wiring,
 metrics-only credential и приёмка реального VPS остаются отдельными работами.
 
-### OBS-1.2 · Хост, БД и backup health `[ops]` ⏳ — S
+### OBS-1.2 · Хост, БД и backup health `[ops]` 🔶 — S
 
 Node exporter, ограниченный DB exporter, фиксированные textfile jobs для
 backup/restore/контейнеров. **Готово, когда:** проверенные изменения источников
 отражаются в числах; missing marker виден; мониторинговые роли не меняют БД,
 не читают секреты/игровые таблицы и не дают Docker API в Grafana.
+**Сделано 2026-10-18:** host/Game bridge и отдельный root timer с фиксированным
+allowlist семи контейнеров → atomic numeric textfile → существующий Alloy.
+Provisioned RU dashboard `moongame-containers`: state/health/present, restart,
+CPU quota/rate/throttling, RAM/limits/working set, OOM/limit hits,45s freshness.
+Нет socket/env/logs в monitoring containers. Grafana cap поднят до768MiB после
+реального UI reclaim stall при512MiB; Go heap target448MiB сохранён.
+[Запуск, проверка и семантика](../deploy/observability/VPS.md).
+**Остаток:** отдельная DB monitoring role/exporter, backup/restore markers и
+полная on/off/24h приёмка. Уведомления этим шагом не включаются.
 
 ### OBS-1.3 · Grafana и алерты первого выпуска `[ops][docs]` 🔒(OBS-1.2) — M
 
@@ -424,6 +446,16 @@ connections по существующим транспортным точкам,
 **Готово, когда:** buckets/count/sum согласованы на известном наборе samples,
 p95 отображается с достаточным n, legacy JSON API не сломан; on/off нагрузка
 не ухудшается сверх бюджета. Реализовать только нужные для алертов ряды.
+
+### OBS-2.4 · Активность аккаунтов по дням `[srv][proto][ops]` ✅ — M
+
+Авторизованные foreground-сигналы раз в30с; union интервалов нескольких вкладок/устройств,
+UTC-midnight, offline/reorder, Postgres persistence и удаление. Отдельный Grafana экран:
+DAU аккаунтов, заходы/возвраты, игроко-часы, среднее и текущий онлайн. Только bounded
+суточные gauges без player labels; 30-дневные строки и erasure.
+[Runbook и точность](../deploy/observability/PLAYER-ACTIVITY.md). CI и настоящий Chromium
+проверяют источник/клиента; Grafana проверен через HTTPS+mTLS с browser-only fixtures.
+Это не закрывает воронки/когорты OBS-2.2 и lifecycle сырых журналов OBS-0.3.
 
 ### OBS-3.1 · Список и карточка партии `[srv][proto][sec]` 🔒(OBS-1.3) — M
 

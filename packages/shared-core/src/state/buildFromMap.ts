@@ -664,6 +664,15 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     }
   }
 
+  if (map.pricing) {
+    const { cost, hours, start } = map.pricing;
+    base.pricing = {
+      ...(cost ? { cost: { ...cost } } : {}),
+      ...(hours !== undefined ? { hours } : {}),
+      ...(start ? { start: { ...start } } : {}),
+    };
+  }
+
   // per-sector links from the resolved adjacency (sorted = JSON-stable), plus the
   // borders terrain shut — a derived map publishes those so the renderer can draw the
   // barrier without re-deriving the geometry (M4.3).
@@ -770,6 +779,9 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       name: a.name ?? a.playerId,
       faction: a.faction ?? '',
       status: 'active',
+      // The slot's side is the seat's fixed match side (CORP-4). Rules read it only under
+      // a fixed-side mode (`hasFixedSides`); without one it is an inert fact.
+      team: slot.team,
       resources: { ...slot.resources },
       ...(a.ai ? { ai: true } : {}),
       ...(scientists.length ? { scientists } : {}),

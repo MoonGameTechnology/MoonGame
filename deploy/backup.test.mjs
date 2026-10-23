@@ -179,7 +179,9 @@ describe.skipIf(!BASE_URL)('учение: бэкап → разрушение �
     expect(await fingerprint(drillUrl(DRILL_DB)), 'база должна быть пуста').toEqual([]);
 
     await restore(file);
-    expect(await fingerprint(drillUrl(DRILL_DB))).toEqual(before);
+    // Restore adds a security barrier; restored application rows stay byte-identical.
+    expect((await fingerprint(drillUrl(DRILL_DB))).filter(row => !row.endsWith(' account_erasure_guard'))).toEqual(before);
+    expect((await psql(drillUrl(DRILL_DB), 'SELECT required FROM account_erasure_guard WHERE id=1')).stdout.trim()).toBe('t');
   }, 120_000);
 
   it('ОБРЕЗАННЫЙ дамп отвергается, и база остаётся цела', async () => {

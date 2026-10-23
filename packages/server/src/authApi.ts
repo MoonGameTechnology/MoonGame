@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { SessionClaim, SessionTokenResult } from './auth';
-import { hashPassword, verifyPassword, decoyHash, type ScryptParams } from './password';
+import { hashPassword, verifyPassword, decoyHash, passwordNeedsRehash, PasswordWorkBusy, type ScryptParams } from './password';
 import type { UserRecord, UserStore } from './store';
 import { slidingWindowIpLimiter } from './rateLimit';
 import { validLogin, validLoginPassword, passwordIssue, blockedPublicName, parseRecoveryEmail, closedInput } from '@void/protocol';
@@ -14,7 +14,8 @@ import { validLogin, validLoginPassword, passwordIssue, blockedPublicName, parse
  * Fail-secure by construction (invariant #4):
  *  - login failures are UNIFORM: unknown login and wrong password both return the same
  *    401 `E_AUTH`, and an unknown login still burns one scrypt derivation (decoy hash),
- *    so neither the body nor the response time enumerates accounts;
+ *    so failures disclose no account details in their body. During gradual KDF
+ *    upgrades, legacy hashes can still have a different verification cost;
  *  - malformed input → 400 `E_BAD_CREDENTIALS` with no field-level detail;
  *  - both routes sit behind a per-IP sliding-window rate limit (online-guessing brake) —
  *    a bounded map, evicted FIFO, so an address-spraying client can't grow memory.
@@ -77,6 +78,8 @@ export interface AuthApiDeps {
   users: UserStore;
   verifySession?(token: string): Promise<SessionTokenResult>;
   onSessionsRevoked?(accountId: string): void | Promise<void>;
+  /** Enabled only after the maintenance worker and restore barrier have been provisioned. */
+  accountDeletionEnabled?: boolean;
   /** Mint a session token for an authenticated account (from serverConfig). `pwfp` binds
    *  the session to the current password (see `liveSession`) so a reset revokes it. */
   signSession(accountId: string, login: string, pwfp: string): Promise<string>;
@@ -192,11 +195,33 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     maxIps: RATE_MAX_IPS,
   });
 
-  // A decoy hash computed once at startup: login misses verify against it so the
-  // "unknown login" path costs one scrypt derivation, same as "wrong password".
-  const decoy = decoyHash(deps.scryptParams);
+  // Warm a current-policy decoy: login misses still pay for a KDF. Legacy stored
+  // profiles can cost less until their next successful login upgrades them.
+  let decoy: Promise<string> | undefined;
+  const warmDecoy = (): Promise<string> => {
+    if (!decoy) {
+      const pending = decoyHash(deps.scryptParams);
+      decoy = pending;
+      // Observe startup overload and permit a future request to retry warming.
+      void pending.catch(() => { if (decoy === pending) decoy = undefined; });
+    }
+    return decoy;
+  };
+  warmDecoy().catch(() => {});
 
-  app.post('/auth/register', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
+  const protectedWork = (
+    work: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>,
+  ) => async (request: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
+    try {
+      return await work(request, reply);
+    } catch (error) {
+      if (!(error instanceof PasswordWorkBusy)) throw error;
+      reply.header('Retry-After', '1');
+      return reply.code(503).send({ error: 'E_AUTH_BUSY' });
+    }
+  };
+
+  app.post('/auth/register', { bodyLimit: AUTH_BODY_LIMIT }, protectedWork(async (request: FastifyRequest, reply: FastifyReply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
       return { error: 'E_RATE_LIMIT' as const };
@@ -239,9 +264,9 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     const token = await deps.signSession(created.userId, creds.login, pwFingerprint(passHash));
     void reply.code(201);
     return { accountId: created.userId, login: creds.login, token };
-  });
+  }));
 
-  app.post('/auth/login', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/auth/login', { bodyLimit: AUTH_BODY_LIMIT }, protectedWork(async (request: FastifyRequest, reply: FastifyReply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
       return { error: 'E_RATE_LIMIT' as const };
@@ -251,27 +276,76 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       void reply.code(400);
       return { error: 'E_BAD_CREDENTIALS' as const };
     }
-    const user = await deps.users.findUser(creds.login);
-    // Uniform failure: both paths verify against SOME hash and return the same 401,
-    // so account existence leaks neither through the body nor through timing. The
+    const found = await deps.users.findUser(creds.login);
+    // The memory store may return a live record. Never let an asynchronous reset
+    // change the hash/nonce used to mint a token after an old password verified.
+    const user = found ? { ...found } : null;
+    // Uniform public failure: both paths verify against SOME hash and return 401.
+    // Mixed legacy/current profiles need not have identical timing. The
     // decoy verification's result is deliberately discarded — it exists ONLY to
-    // cost one scrypt derivation, same as a real check.
+    // cost a current-policy scrypt derivation.
     let ok = false;
     if (user) {
       ok = await verifyPassword(creds.password, user.passHash);
     } else {
-      await verifyPassword(creds.password, await decoy);
+      await verifyPassword(creds.password, await warmDecoy());
     }
     if (!ok || !user) {
       void reply.code(401);
       return { error: 'E_AUTH' as const };
     }
-    const token = await deps.signSession(user.userId, user.login, sessionFingerprint(user));
-    return { accountId: user.userId, login: user.login, token };
-  });
+    let verifiedHash = user.passHash;
+    if (passwordNeedsRehash(verifiedHash, deps.scryptParams)) {
+      const upgraded = await hashPassword(creds.password, deps.scryptParams);
+      // A password reset, another rehash or account deletion wins this race.
+      // Never overwrite it or sign a session for a hash we did not verify/set.
+      if (!(await deps.users.setPasswordIfCurrent(user.userId, verifiedHash, upgraded)))
+        return reply.code(401).send({ error: 'E_AUTH' });
+      verifiedHash = upgraded;
+      if (deps.onPasswordChanged) {
+        try { await deps.onPasswordChanged(user.userId); }
+        catch { request.log.error({ code: 'E_REVOKE_CONNECTIONS' }, 'password upgrade: revoking connections failed'); }
+      }
+    }
+    const current = await deps.users.findById(user.userId);
+    if (!current || current.passHash !== verifiedHash || current.sessionNonce !== user.sessionNonce)
+      return reply.code(401).send({ error: 'E_AUTH' });
+    const token = await deps.signSession(current.userId, current.login, sessionFingerprint(current));
+    return { accountId: current.userId, login: current.login, token };
+  }));
 
   if (deps.verifySession) {
     const verify = deps.verifySession;
+    app.post('/auth/delete-account', { bodyLimit: AUTH_BODY_LIMIT }, protectedWork(async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      if (!deps.accountDeletionEnabled || !deps.users.requestDeletion)
+        return reply.code(503).send({ error: 'E_DELETION_UNAVAILABLE' });
+      if (!closedInput(request.body, ['password', 'confirm', 'requestId']))
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const body = request.body as { password?: unknown; confirm?: unknown; requestId?: unknown };
+      if (typeof body.password !== 'string' || !validLoginPassword(body.password) || body.confirm !== 'DELETE')
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      if (body.requestId !== undefined && (typeof body.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)))
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const header = request.headers.authorization;
+      const verified = header?.startsWith('Bearer ') ? await verify(header.slice(7).trim()) : null;
+      // A signed original session plus the caller's unguessable request ID can
+      // acknowledge a committed deletion, but never revive the revoked session.
+      if (verified?.ok && typeof body.requestId === 'string' &&
+          await deps.users.deletionStatus?.(verified.claim.accountId, body.requestId))
+        return reply.code(202).send({ requestId: body.requestId, status: 'pending' });
+      const who = verified?.ok ? await liveSession(verified.claim, deps.users) : null;
+      const found = who ? await deps.users.findById(who.accountId) : null;
+      const user = found ? { ...found } : null;
+      if (!user || !(await verifyPassword(body.password as string, user.passHash)))
+        return reply.code(401).send({ error: 'E_AUTH' });
+      const requestId = await deps.users.requestDeletion(user, body.requestId as string | undefined);
+      if (!requestId) return reply.code(409).send({ error: 'E_SESSION_CHANGED' });
+      await deps.onSessionsRevoked?.(user.userId);
+      // Accepted means queued, never a claim that all copies are already erased.
+      return reply.code(202).send({ requestId, status: 'pending' });
+    }));
     app.post('/auth/logout', { bodyLimit: AUTH_BODY_LIMIT }, async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
@@ -376,7 +450,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       return { ok: true as const };
     });
 
-    app.post('/auth/reset', { bodyLimit: AUTH_BODY_LIMIT }, async (request: FastifyRequest, reply: FastifyReply) => {
+    app.post('/auth/reset', { bodyLimit: AUTH_BODY_LIMIT }, protectedWork(async (request: FastifyRequest, reply: FastifyReply) => {
       if (rateLimited(request.ip)) {
         void reply.code(429);
         return { error: 'E_RATE_LIMIT' as const };
@@ -420,6 +494,6 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       // fingerprint, so it survives while every pre-reset session is now revoked).
       const sessionToken = await deps.signSession(user.userId, user.login, sessionFingerprint({ ...user, passHash }));
       return { accountId: user.userId, login: user.login, token: sessionToken };
-    });
+    }));
   }
 }

@@ -9,6 +9,9 @@ export { playablePlayerIds } from './state/playableSeats';
 // Determinism
 export { Rng, seedRng, type RngState } from './rng/rng';
 
+// Цены партии (основная игра дороже каталога, резолюция владельца 2026-10-18)
+export { matchCost, matchHours, matchStart } from './util/pricing';
+
 // State model
 export {
   createInitialState,
@@ -19,8 +22,10 @@ export {
   type Planet,
   type PlanetSnapshot,
   type FogMemory,
+  type ProvinceSurvey,
   type SightRules,
   type TechRules,
+  type MatchPricing,
   type Hero,
   type HeroSiege,
   type TempLane,
@@ -82,6 +87,8 @@ export {
   type PlayerReward,
   type DiplomaticStance,
   type IntelGrant,
+  type AgentAway,
+  type SpyOp,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -184,6 +191,13 @@ export {
   type DiplomaticRelation,
   type DiplomacyCapability,
 } from './state/diplomacy';
+export {
+  COALITION_EMBLEMS,
+  COALITION_DESC_MAX,
+  coalitionCapacity,
+  coalitionOf,
+  type Coalition,
+} from './state/coalition';
 export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {
   visibleState,
@@ -677,7 +691,7 @@ export {
 export { instantRepairModule } from './modules/instantRepair';
 export { fleetRepairModule } from './modules/fleetRepair';
 export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
-export { victoryModule } from './modules/victory';
+export { victoryModule, effectiveVictoryRules, type VictoryRules } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export {
   heroModule,
@@ -751,7 +765,7 @@ export {
   traderAffordable,
   TRADER_MAX_UNITS,
 } from './modules/trader';
-export { espionageModule } from './modules/espionage';
+export { espionageModule, BASE_SPY_AGENTS, COUNTER_POSTED, MISSION_HOURS } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 
 export type { SwarmRepelRecord, MissionFacts } from './state/gameState';

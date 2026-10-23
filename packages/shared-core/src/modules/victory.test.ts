@@ -11,7 +11,7 @@ import {
 import type { AdvanceResult, Context, MatchConfig } from '../action/types';
 import type { GameModule } from '../kernel/module';
 import { setStance } from '../state/diplomacy';
-import { victoryModule } from './victory';
+import { effectiveVictoryRules, victoryModule } from './victory';
 
 const HOUR = 3_600_000;
 
@@ -121,6 +121,13 @@ function okAdvance(r: AdvanceResult): AdvanceResult & { ok: true } {
 }
 
 describe('victory module', () => {
+  it('effective rules preserve explicit zero settings and do not publish internal fields', () => {
+    const victory = { scoreLimit: 0, dominationPercent: 0, coalitionFactor: 0, endsAt: 0, internal: 'private' };
+    expect(effectiveVictoryRules({ timeScale: 1, victory })).toEqual({
+      scoreLimit: 0, dominationPercent: 0, coalitionFactor: 0, endsAt: 0,
+    });
+  });
+
   it('ends by domination when a player controls the configured planet share', () => {
     const kernel = createKernel([victoryModule]);
     const state: GameState = {
@@ -255,6 +262,30 @@ describe('victory module', () => {
       type: 'player.eliminated',
       payload: expect.objectContaining({ playerId: 'p2', reason: 'no-territory' }),
     });
+  });
+
+  it('a scripted scenario (TRN-3): a landless seat keeps its fleets and no race ends the match', () => {
+    const kernel = createKernel([victoryModule]);
+    const state: GameState = {
+      ...baseState(),
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p1') }, // p1 holds everything
+      fleets: { F1: fleet('F1', 'p1'), F2: fleet('F2', 'p2') },
+    };
+    const scripted: MatchConfig = { timeScale: 1, victory: { dominationPercent: 0.5, scoreLimit: 1, scripted: true } };
+
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR, scripted)));
+
+    // No elimination, no domination, no score ending: the scenario decides.
+    expect(r.state.players.p2?.status).toBe('active');
+    expect(r.state.fleets.F2).toBeDefined();
+    expect(r.state.match.status).not.toBe('ended');
+    expect(r.events.some((e) => e.type === 'player.eliminated')).toBe(false);
+    // The session cap still ends a scripted match that never resolves.
+    const capped = okAdvance(
+      kernel.advanceTo(state, ctx(2 * HOUR, { ...scripted, victory: { ...scripted.victory, endsAt: HOUR } })),
+    );
+    expect(capped.state.match.status).toBe('ended');
+    expect(effectiveVictoryRules(scripted)).not.toHaveProperty('scripted');
   });
 
   it('ends by score when the score limit is reached', () => {
@@ -403,7 +434,7 @@ describe('victory module', () => {
     expect(r.state.match.status).toBe('ongoing');
   });
 
-  it('ends by the DEFAULT session cap (100 game-days at ×1) without any victory config', () => {
+  it.each([[1, 100], [2, 60], [4, 30], [24, 100]])('ends by the default cap at ×%s after %s game days', (timeScale, days) => {
     const kernel = createKernel([victoryModule]);
     const state: GameState = {
       ...baseState(),
@@ -415,11 +446,14 @@ describe('victory module', () => {
       },
     };
     const DAY = 24 * HOUR;
+    const config = { timeScale };
+    const deadline = effectiveVictoryRules(config).endsAt;
+    expect(deadline).toBe(days * DAY);
     // One tick short of the cap the match still runs…
-    const early = okAdvance(kernel.advanceTo(state, ctx(100 * DAY - 1)));
+    const early = okAdvance(kernel.advanceTo(state, ctx(deadline - 1, config)));
     expect(early.state.match.status).toBe('ongoing');
     // …at the cap the time-crisis backstop ends it on score.
-    const r = okAdvance(kernel.advanceTo(early.state, ctx(100 * DAY)));
+    const r = okAdvance(kernel.advanceTo(early.state, ctx(deadline, config)));
     expect(r.state.match).toMatchObject({ status: 'ended', reason: 'timeout', winner: 'p1' });
   });
 

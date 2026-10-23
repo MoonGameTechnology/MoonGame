@@ -85,6 +85,7 @@ import {
   setRallyPoint,
   splitFleet,
   splitSquadron,
+  recallSpy,
   spyOn,
   unloadShuttle,
 } from './game';
@@ -194,6 +195,10 @@ let objTipEl: HTMLElement | null = null;
 export let splitAwait: string | null = null;
 let hoverObj: string | null = null; // side-panel object under the pointer (data-desc key)
 export let planetTab: PlanetTab = 'buildings';
+/** Открыть вкладку мира снаружи — гид обучения ведёт игрока к кораблям (TRN-7). */
+export function setPlanetTab(tab: PlanetTab): void {
+  planetTab = tab;
+}
 // Bytro-карточка: тап по имени флота открывает сводку армии — какой флот сейчас
 // в режиме сводки (другой флот в панели → обычная карточка сама собой).
 export let fleetInfoFor: string | null = null;
@@ -781,7 +786,10 @@ function onSideClick(ev: MouseEvent): void {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
     }
   } else if (act === 'spyplanet') {
-    playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
+    if (arg === 'recon' || arg === 'sabotage' || arg === 'theft' || arg === 'research' || arg === 'counter')
+      playerOrder(spyOn(ME, selPlanet!, arg));
+  } else if (act === 'spyrecall') {
+    playerOrder(recallSpy(ME, selPlanet!));
   } else if (act === 'capital') {
     playerOrder(designateCapital(ME, selPlanet!));
   } else if (act === 'holdpoint') {

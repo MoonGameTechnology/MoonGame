@@ -1,4 +1,5 @@
-import type { GameData, UnitDef } from '../packages/shared-core/src/index';
+import { matchCost } from '../packages/shared-core/src/index';
+import type { GameData, GameState, UnitDef } from '../packages/shared-core/src/index';
 
 /**
  * Боец десантного челнока (SHU-5.2, резолюция владельца 2026-09-26): челнок с трейтом
@@ -47,10 +48,17 @@ export function orderableTroops(
   });
 }
 
-/** Цена ОДНОГО челнока с бойцом — челнок плюс боец, как считает ядро (`orderSpec`). */
-export function landerCost(data: GameData, unit: string, troop: string): Record<string, number> {
-  const out: Record<string, number> = { ...(data.units[unit]?.cost ?? {}) };
-  for (const [r, n] of Object.entries(data.units[troop]?.cost ?? {})) out[r] = (out[r] ?? 0) + n;
+/** Цена ОДНОГО челнока с бойцом — челнок плюс боец, как считает ядро (`orderSpec`): каждая
+ *  часть по цене партии (`match`), потом сумма. Без `match` — цена каталога. */
+export function landerCost(
+  data: GameData,
+  unit: string,
+  troop: string,
+  match: Pick<GameState, 'pricing'> = {},
+): Record<string, number> {
+  const out: Record<string, number> = { ...(matchCost(match, data.units[unit]?.cost) ?? {}) };
+  for (const [r, n] of Object.entries(matchCost(match, data.units[troop]?.cost) ?? {}))
+    out[r] = (out[r] ?? 0) + n;
   return out;
 }
 

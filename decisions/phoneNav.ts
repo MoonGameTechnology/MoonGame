@@ -41,6 +41,7 @@ export type PhoneItemId =
   | 'events'
   | 'diplomacy'
   | 'mail'
+  | 'coalitions'
   | 'pings'
   | 'market'
   | 'trader'
@@ -72,6 +73,7 @@ export const PHONE_ITEMS: readonly PhoneItem[] = [
   { id: 'events', label: 'rail.log.label', opens: '#rail-log' },
   { id: 'diplomacy', label: 'rail.diplo.title', opens: '#rail-diplo' },
   { id: 'mail', label: 'rail.msgs.title', opens: '#rail-msgs' },
+  { id: 'coalitions', label: 'rail.coal.title', opens: '#rail-coal' },
   { id: 'pings', label: 'rail.pings.label', opens: '#rail-pings' },
   { id: 'market', label: 'rail.market.label', opens: '#rail-market' },
   { id: 'trader', label: 'rail.trader.label', opens: '#rail-trader' },
@@ -95,6 +97,7 @@ export const PHONE_PINNABLE: readonly PhoneItemId[] = [
   'events',
   'diplomacy',
   'mail',
+  'coalitions',
   'pings',
   'market',
   'trader',

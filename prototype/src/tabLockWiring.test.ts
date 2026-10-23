@@ -25,15 +25,16 @@ const bodyIn = (src: string, name: string): string =>
 const body = (name: string): string => bodyIn(SRC, name);
 
 describe('AUD-29 — пишет только вкладка-хозяйка', () => {
-  it('все четыре хранилища Sector Zero спрашивают замок', () => {
-    // Третий аргумент — исход записи (PT-07): провал хранилища видит игрок.
+  it('все пять хранилищ Sector Zero спрашивают замок', () => {
+    // Журнал сообщает исход отдельной записи; профиль — подтверждённый исход пары копий.
     expect(SRC).toContain('localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero, noteWrite)');
     expect(SRC).toContain('localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero, noteWrite)');
-    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero, noteWrite)');
+    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero)');
     // Теневая копия профиля (`YAG-4.4`) — тоже: вытесненная вкладка затёрла бы ею целую.
-    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero, noteWrite)');
+    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero)');
+    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_UNVERIFIED_KEY, ownsSectorZero)');
     // Ни одного хранилища Sector Zero мимо замка — и ни одного у игры мимо владельца.
-    expect(SRC.match(/localRunSaveStore\(/g)).toHaveLength(4);
+    expect(SRC.match(/localRunSaveStore\(/g)).toHaveLength(5);
     expect(MAIN).not.toMatch(/localRunSaveStore\(/);
   });
 

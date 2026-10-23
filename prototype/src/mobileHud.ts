@@ -2,6 +2,7 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import type { TapPick } from '../../decisions/tapCycle';
+import type { CardTab } from '../../decisions/worldFleetTabs';
 
 export interface MobileChoice extends TapPick {
   title: string;
@@ -28,6 +29,8 @@ interface MobileHudHost {
   /** Досье по ключу `data-desc` — для метки в шапке листа (очки победы мира). */
   describe(key: string): void;
   resized(): void;
+  /** Вкладка «Флот» / «Мир» карточки своего мира со своим флотом (UIX-7.1). */
+  tab(tab: CardTab): void;
 }
 
 export function initMobileHud(host: MobileHudHost) {
@@ -60,6 +63,23 @@ export function initMobileHud(host: MobileHudHost) {
   head.appendChild(grab);
   head.appendChild(badge);
   head.appendChild(close);
+  // Вкладки «Флот» / «Мир» (UIX-7.1): видны, только когда выбор — свой мир с одним своим
+  // флотом; какая из них открыта, решает выбор, а не разметка.
+  const tabs = document.createElement('div');
+  tabs.className = 'mobile-tabs';
+  tabs.setAttribute('role', 'tablist');
+  tabs.hidden = true;
+  const tabButton = (tab: CardTab): HTMLButtonElement => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.dataset.mobile = 'tab';
+    b.dataset.tab = tab;
+    tabs.appendChild(b);
+    return b;
+  };
+  const fleetTab = tabButton('fleet');
+  const worldTab = tabButton('world');
   const choices = document.createElement('div');
   choices.className = 'mobile-choices';
   const quick = document.createElement('div');
@@ -82,6 +102,7 @@ export function initMobileHud(host: MobileHudHost) {
   quick.appendChild(summaryButton);
   quick.appendChild(pingButton);
   sheet.appendChild(head);
+  sheet.appendChild(tabs);
   sheet.appendChild(choices);
   sheet.appendChild(quick);
   const sideHome = document.createComment('phone selection home');
@@ -148,6 +169,10 @@ export function initMobileHud(host: MobileHudHost) {
     else if (action === 'summary') {
       expand(true);
       host.summary();
+    } else if (action === 'tab') {
+      const tab = button.dataset.tab;
+      if ((tab === 'fleet' || tab === 'world') && button.getAttribute('aria-selected') !== 'true')
+        host.tab(tab);
     } else if (action === 'choose') {
       const pick = choiceList[Number(button.dataset.index)];
       if (pick) host.choose(pick);
@@ -164,7 +189,9 @@ export function initMobileHud(host: MobileHudHost) {
   }
 
   return {
-    expanded: (): boolean => active && expanded,
+    // A guide may poll before the next frame installs the new selection. The old
+    // sheet being expanded must not count as the new fleet's details being open.
+    expanded: (key?: string): boolean => active && expanded && (key === undefined || key === selected),
     collapse: (): void => expand(false),
     sync(enabled: boolean): void {
       if (enabled === active) return;
@@ -185,7 +212,13 @@ export function initMobileHud(host: MobileHudHost) {
         expand(false);
       }
     },
-    update(key: string, mode: boolean, more: boolean, list: MobileChoice[]): void {
+    update(
+      key: string,
+      mode: boolean,
+      more: boolean,
+      list: MobileChoice[],
+      tab: CardTab | null = null,
+    ): void {
       if (!active) return;
       if (key !== selected) {
         selected = key;
@@ -220,6 +253,13 @@ export function initMobileHud(host: MobileHudHost) {
       sheet.classList.toggle('more-open', more);
       sheet.classList.toggle('has-commands', host.commands.classList.contains('show'));
       head.hidden = mode;
+      tabs.hidden = mode || choosing || !tab;
+      if (!tabs.hidden) {
+        setText(fleetTab, t('hud.mobile.tab.fleet'));
+        setText(worldTab, t('hud.mobile.tab.world'));
+        fleetTab.setAttribute('aria-selected', String(tab === 'fleet'));
+        worldTab.setAttribute('aria-selected', String(tab === 'world'));
+      }
       choices.hidden = !choosing;
       quick.hidden = mode || choosing;
       grab.disabled = choosing;

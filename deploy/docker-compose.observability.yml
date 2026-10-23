@@ -27,7 +27,10 @@ services:
     <<: *obs
     image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
     user: '472:472'
-    mem_limit: 256m
+    # 512MiB stalled under browser asset loading (cgroup reclaim, no OOM kill).
+    # Keep the Go heap target at 448MiB and leave room for native memory/cache.
+    mem_limit: 768m
+    cpus: 1.0
     ports: ['127.0.0.1:3000:3000']
     environment:
       <<: *obs-env
@@ -37,7 +40,8 @@ services:
       GF_SECURITY_COOKIE_SAMESITE: strict
       GF_SECURITY_CONTENT_SECURITY_POLICY: 'true'
       GF_SECURITY_ALLOW_EMBEDDING: 'false'
-      GF_SERVER_ROOT_URL: http://localhost:3000/
+      GF_SERVER_ROOT_URL: ${OBS_GRAFANA_ROOT_URL:-http://localhost:3000/}
+      GF_SECURITY_COOKIE_SECURE: ${OBS_GRAFANA_COOKIE_SECURE:-false}
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
       GF_AUTH_PROXY_ENABLED: 'false'
       GF_AUTH_JWT_ENABLED: 'false'
@@ -57,6 +61,8 @@ services:
       GF_SECURITY_DATA_SOURCE_PROXY_WHITELIST: obs-prometheus:9090
       GF_LOG_MODE: console
       GF_LOG_LEVEL: warn
+      GOMAXPROCS: '1'
+      GOMEMLIMIT: 448MiB
     secrets: [grafana_admin_password]
     volumes:
       - type: bind
@@ -72,7 +78,7 @@ services:
       test: [CMD, curl, -fsS, --max-time, '2', -o, /dev/null, http://127.0.0.1:3000/api/health]
       interval: 15s
       timeout: 3s
-      start_period: 60s
+      start_period: 180s
       retries: 5
 
   obs-prometheus:
@@ -163,7 +169,12 @@ services:
     <<: *obs
     image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
     user: '473:473'
-    mem_limit: 128m
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      <<: *obs-env
+      GOMAXPROCS: '1'
+      GOMEMLIMIT: 192MiB
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -171,6 +182,12 @@ services:
       - --disable-reporting
       - /etc/alloy/config.alloy
     volumes:
+      # Only the numeric allowlist output; never Game files or the bearer token.
+      - type: bind
+        source: ${OBS_METRICS_DIR:-./observability/textfile}
+        target: /run/moongame-metrics
+        read_only: true
+        bind: { create_host_path: false }
       - type: bind
         source: ${OBS_STATE_DIR:?use observability/stack.mjs init}/alloy
         target: /var/lib/alloy
@@ -202,6 +219,7 @@ services:
         ]
       interval: 15s
       timeout: 3s
+      start_period: 120s
       retries: 5
 
 networks:

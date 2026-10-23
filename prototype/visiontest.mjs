@@ -38,19 +38,13 @@ window.__visionTest = (() => {
   const same = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
   const check = () => {
     if (!vision) return;
-    // The fresh projection rewrites the owners set; put the frame's set back so a stale
-    // one is not repaired by the check itself.
-    const owners = __fog.intelFleetOwners;
     const f = fresh();
-    const freshOwners = __fog.intelFleetOwners;
-    __fog.intelFleetOwners = owners;
     const bad = [];
     if (!same(vision.identify, f.identify)) bad.push('identify');
     if (!same(vision.radar, f.radar)) bad.push('radar');
     if (JSON.stringify(vision.signatures) !== JSON.stringify(f.signatures)) bad.push('signatures');
     if (!same(vision.engaged.fleets, f.engaged.fleets) || !same(vision.engaged.battles, f.engaged.battles))
       bad.push('engaged');
-    if (!same(owners, freshOwners)) bad.push('intel');
     for (const id of f.identify) {
       const p = s.planets[id];
       if (p && JSON.stringify(memory.get(id)) !== JSON.stringify(__snapshotOf(p))) {

@@ -80,6 +80,26 @@ write_last_good() {
   printf '%s\n' "$1" > "$LAST_GOOD.tmp" && mv -f "$LAST_GOOD.tmp" "$LAST_GOOD"
 }
 
+# This runs in the NEW signed release, including its first rollout by an old
+# agent. Only a healthy changed release may replace the previous-successful pin.
+# Persist it before switching the current checkpoint; cleanup then sees both.
+write_previous_good() {
+  [ -n "$STATE_DIR" ] && [ -n "$PREV_IMAGE" ] || return 0
+  if [ "$TLS" = 1 ]; then
+    if [ "$PREV_IMAGE" = "$VOID_IMAGE" ] && [ "$PREV_CADDY" = "$VOID_CADDY_IMAGE" ]; then return 0; fi
+    release_pair_write "$STATE_DIR/previous-good-release" "$PREV_IMAGE" "$PREV_CADDY"
+  else
+    [ "$PREV_IMAGE" != "$VOID_IMAGE" ] || return 0
+    release_ref_valid "$PREV_IMAGE" || return 1
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/previous-good-image.XXXXXX")" || return 1
+    if ! printf '%s\n' "$PREV_IMAGE" > "$temporary" || ! mv -f "$temporary" "$STATE_DIR/previous-good-image"; then
+      rm -f "$temporary"
+      return 1
+    fi
+  fi
+}
+
 # Конфигурация ОТКАТЫВАЕТСЯ ВМЕСТЕ С ОБРАЗОМ.
 #
 # Добор ключей ниже меняет постуру: дописанный `AUTH_JWT_SECRET` переводит сервер с
@@ -190,13 +210,16 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   rollout_ok=0
   if release_up "$VOID_IMAGE" "${VOID_CADDY_IMAGE:-}" && health_ok; then rollout_ok=1; fi
   if [ "$rollout_ok" = 1 ]; then
-    if [ "$TLS" = 1 ]; then
-      release_pair_write "$PAIR_FILE" "$VOID_IMAGE" "$VOID_CADDY_IMAGE"
-    else
-      write_last_good "$VOID_IMAGE"
+    if write_previous_good; then
+      if [ "$TLS" = 1 ]; then
+        release_pair_write "$PAIR_FILE" "$VOID_IMAGE" "$VOID_CADDY_IMAGE"
+      else
+        write_last_good "$VOID_IMAGE"
+      fi
+      echo "[✓] Обновление завершено, /health отвечает."
+      exit 0
     fi
-    echo "[✓] Обновление завершено, /health отвечает."
-    exit 0
+    echo E_IMAGE_CLEANUP_ROLLBACK_PIN >&2
   fi
 
   echo "[✗] Сервер не поднялся после обновления." >&2

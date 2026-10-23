@@ -289,61 +289,168 @@ function feature(
       path([[gx, gy], [gx + Math.cos(t) * d, gy + Math.sin(t) * d]], false, 0.4, 0.6);
     }
   } else if (mix.family === 'wreck') {
-    // A ship graveyard: long hulks snapped across the back, each on its own heading,
-    // among loose plating. The old drawing gave every slot the same arrow-shaped hull on
-    // the shared flow heading, and the field read as rows of identical arrows (owner,
-    // 2026-10-14). Neither the size, the heading nor the lattice row repeats here.
+    // A ship graveyard in the fleet's own build: modular hulls with engine pods, station ring
+    // segments, bare truss and drifting panel arrays. The previous hulk was one tapered hull
+    // with a pointed prow, and from above it read as a sea boat (owner, 2026-10-23). The
+    // cues that say «spacecraft» here are the ones a boat never has: parallel engine pods
+    // with flared nozzles, a stepped modular hull, lattice frames and panel grids.
     const heading = random() * Math.PI * 2;
     const cx = x + (random() - 0.5) * 26, cy = y + (random() - 0.5) * 26;
-    const local = (a: number, ox: number, oy: number) => (u: number, v: number): TerrainPoint =>
+    const s = mix.scale;
+    type Frame = (u: number, v: number) => TerrainPoint;
+    const local = (a: number, ox: number, oy: number): Frame => (u, v) =>
       [ox + u * Math.cos(a) - v * Math.sin(a), oy + u * Math.sin(a) + v * Math.cos(a)];
+    const box = (f: Frame, u0: number, u1: number, v0: number, v1: number, alpha = 1, width = 0.75): void =>
+      path([f(u0, v0), f(u1, v0), f(u1, v1), f(u0, v1)], true, alpha, width);
+    const line = (f: Frame, u0: number, v0: number, u1: number, v1: number, alpha = 0.5, width = 0.5): void =>
+      path([f(u0, v0), f(u1, v1)], false, alpha, width);
     const shard = (px: number, py: number, size: number, alpha: number): void => {
       const spin = random() * Math.PI * 2;
       path([0, 2.1 + random() * 0.4, 4 + random() * 0.4].map((t): TerrainPoint =>
         [px + Math.cos(spin + t) * size, py + Math.sin(spin + t) * size]), true, alpha, 0.6);
     };
-    // Hulks in a little over a quarter of the slots: a field of wrecks, not a fleet in formation.
-    if (major && random() < 0.6) {
-      // An occasional capital ship among the escorts.
-      const length = (26 + random() * 22) * (random() < 0.2 ? 1.5 : 1) * mix.scale;
-      const beam = length * (0.08 + random() * 0.05);
-      const cut = (random() - 0.5) * 0.3 * length;
-      const jag = (): number => cut + (random() - 0.5) * 0.12 * length;
-      const top = jag(), mid = jag(), bottom = jag();
-      // Bow half: a long tapered prow, with a ragged edge where the back broke.
-      const bow = local(heading, cx, cy);
-      path([bow(top, -beam), bow(length * 0.24, -beam), bow(length * 0.5, 0),
-        bow(length * 0.24, beam), bow(bottom, beam), bow(mid, 0)], true);
-      path([bow(mid + length * 0.03, 0), bow(length * 0.3, 0)], false, 0.35, 0.6);
-      // Stern half: drifted back from the break and twisted, its frame showing, the
-      // engine bells still flared at its end.
-      const twist = (random() < 0.5 ? -1 : 1) * (0.12 + random() * 0.3);
-      const gap = (3 + random() * 5) * mix.scale;
-      const [bx, by] = bow(cut - gap, (random() - 0.5) * gap);
-      const stern = local(heading + twist, bx, by);
-      const s = (u: number, v: number): TerrainPoint => stern(u - cut, v);
-      const end = -length * 0.5;
-      path([s(end, -beam), s(top, -beam), s(mid, 0), s(bottom, beam), s(end, beam)], true);
-      for (const side of [-1, 1])
-        path([s(end, side * beam * 0.5), s(end - length * 0.07, side * beam * 0.85)], false, 0.7, 0.6);
-      for (const rib of [0.07, 0.15, 0.23])
-        path([s(cut - rib * length, -beam), s(cut - rib * length, beam)], false, 0.5, 0.5);
-      // Plating torn off at the break.
-      for (let i = 0, n = 2 + Math.floor(random() * 3); i < n; i++) {
-        const a = random() * Math.PI * 2, reach = (0.12 + random() * 0.3) * length;
-        const [px, py] = bow(cut + Math.cos(a) * reach, Math.sin(a) * reach * 0.6);
-        shard(px, py, (1.2 + random() * 2.4) * mix.scale, 0.65);
+    // An engine pod: a block with its nozzle flared open behind it.
+    const pod = (f: Frame, u: number, v: number, length: number, half: number, alpha = 0.9): void => {
+      box(f, u, u + length, v - half, v + half, alpha);
+      path([f(u, v - half * 0.7), f(u - length * 0.35, v - half * 1.15),
+        f(u - length * 0.35, v + half * 1.15), f(u, v + half * 0.7)], false, alpha * 0.8, 0.6);
+    };
+    // A lattice frame between two rails: what is left of a hull once its plating is gone.
+    const truss = (f: Frame, u0: number, u1: number, half: number, alpha: number): void => {
+      line(f, u0, -half, u1, -half, alpha, 0.6);
+      line(f, u0, half, u1, half, alpha, 0.6);
+      const bays = Math.max(2, Math.round((u1 - u0) / (half * 2.2)));
+      for (let i = 0; i < bays; i++) {
+        const a = u0 + (u1 - u0) * i / bays, b = u0 + (u1 - u0) * (i + 1) / bays;
+        line(f, a, i % 2 ? half : -half, b, i % 2 ? -half : half, alpha * 0.8, 0.45);
       }
-    } else if (random() < 0.55) {
-      // A torn length of hull plating with one ragged end.
-      const length = (6 + random() * 8) * mix.scale;
-      const beam = length * (0.12 + random() * 0.1);
+    };
+    const form = random();
+    if (major && form < 0.55) {
+      // A broken warship: engine pods, a stepped hull of modules and a blunt armoured
+      // prow, snapped at one module joint. The stern drifted off the break, twisted.
+      const length = (30 + random() * 24) * (random() < 0.2 ? 1.4 : 1) * s;
+      const beam = length * (0.075 + random() * 0.035);
+      const stern = -length / 2;
+      const pods = random() < 0.55 ? 2 : 3;
+      const podLength = length * 0.16;
+      const podHalf = beam * (pods === 2 ? 0.48 : 0.36);
+      // Module joints from the engine block to the prow; the hull breaks at one of them.
+      const joints = [stern + podLength, -length * 0.12, length * 0.08, length * 0.26];
+      const breakAt = 1 + Math.floor(random() * 2);
+      const cut = joints[breakAt]!;
+      const twist = (random() < 0.5 ? -1 : 1) * (0.15 + random() * 0.35);
+      const gap = (3 + random() * 5) * s;
+      const aft = local(heading, cx, cy);
+      const [bx, by] = aft(cut + gap, (random() - 0.5) * gap);
+      const fore = local(heading + twist, bx, by);
+      const at = (u: number, v: number): TerrainPoint => u < cut ? aft(u, v) : fore(u - cut, v);
+      const shape = (['fork', 'hammer', 'wedge'] as const)[Math.floor(random() * 3)]!;
+      // Hull halves: each module keeps its own width, so the outline steps.
+      const widths = [beam, beam * 0.82, beam * 0.9];
+      const hull = (from: number, to: number, f: Frame): void => {
+        const top: TerrainPoint[] = [], bottom: TerrainPoint[] = [];
+        for (let i = 0; i < 3; i++) {
+          const a = Math.max(from, joints[i]!), b = Math.min(to, joints[i + 1]!);
+          if (b <= a) continue;
+          top.push(f(a, -widths[i]!), f(b, -widths[i]!));
+          bottom.push(f(a, widths[i]!), f(b, widths[i]!));
+        }
+        if (to > joints[3]!) {
+          // The prow is never a pointed bow: twin prongs, a hammerhead or a stepped wedge.
+          const prow: Array<readonly [number, number]> = shape === 'fork'
+            ? [[joints[3]!, 0.9], [length / 2, 0.8], [length / 2, 0.36], [joints[3]! + length * 0.07, 0.12]]
+            : shape === 'hammer'
+              ? [[joints[3]!, 0.7], [length * 0.41, 0.7], [length * 0.41, 1.35], [length / 2, 1.2], [length / 2, 0.3]]
+              : [[joints[3]!, 0.9], [length * 0.38, 0.9], [length * 0.38, 0.62], [length / 2, 0.3]];
+          for (const [u, w] of prow) {
+            top.push(f(u, -beam * w));
+            bottom.push(f(u, beam * w));
+          }
+        }
+        // The broken edge is ragged, not a clean saw cut.
+        if (to === cut) {
+          path([...top, f(cut + 0.7 * s, -beam * 0.2), f(cut - 0.9 * s, beam * 0.3), ...bottom.reverse()], true);
+        } else {
+          path([...top, ...bottom.reverse(), f(cut - 0.7 * s, beam * 0.3), f(cut + 0.9 * s, -beam * 0.2)], true);
+        }
+      };
+      hull(joints[0]!, cut, aft);
+      hull(cut, length / 2, (u, v) => fore(u - cut, v));
+      // Engine block: pods side by side on the stern.
+      for (let i = 0; i < pods; i++) {
+        const v = (i - (pods - 1) / 2) * podHalf * 2.3;
+        pod(aft, stern, v, podLength, podHalf);
+      }
+      // Seams between modules, a side module and the command block.
+      for (const u of joints.slice(1)) if (u !== cut) path([at(u, -beam * 0.82), at(u, beam * 0.82)], false, 0.45, 0.5);
+      const side = random() < 0.5 ? -1 : 1;
+      const m0 = joints[2]! - cut + length * 0.02;
+      box(fore, m0, m0 + length * 0.14, side * beam * 0.9, side * beam * 1.45, 0.7);
+      const bridge = joints[3]! - cut - length * 0.12;
+      box(fore, bridge, bridge + length * 0.07, -side * beam * 0.1, -side * beam * 0.5, 0.75);
+      // The frame shows at the break, and plating tumbles off it.
+      for (const v of [-0.5, 0.15]) line(aft, cut - 0.4 * s, v * beam, cut + gap * 0.6, (v + 0.2) * beam, 0.55, 0.45);
+      for (let i = 0, n = 2 + Math.floor(random() * 3); i < n; i++) {
+        const a = random() * Math.PI * 2, reach = (0.08 + random() * 0.22) * length;
+        const [px, py] = aft(cut + Math.cos(a) * reach, Math.sin(a) * reach * 0.6);
+        shard(px, py, (1 + random() * 2) * s, 0.6);
+      }
+    } else if (major && form < 0.75) {
+      // A segment of a station ring: two arcs, habitat bulkheads between them, the
+      // stump of a spoke towards a centre that is no longer there.
+      const radius = (15 + random() * 12) * s;
+      const span = 0.8 + random() * 1.1;
+      const inner = radius * (0.78 + random() * 0.06);
+      // The segment lies on its slot; the ring's centre is empty space behind it.
+      const ox = cx - Math.cos(heading) * radius, oy = cy - Math.sin(heading) * radius;
+      const arc = (r: number): TerrainPoint[] => Array.from({ length: 9 }, (_, j) => {
+        const a = heading + (j / 8 - 0.5) * span;
+        return [ox + Math.cos(a) * r, oy + Math.sin(a) * r];
+      });
+      const outer = arc(radius), within = arc(inner);
+      // Both ends tear across the ring at a slant.
+      const end = (side: number, t: number): TerrainPoint => {
+        const a = heading + side * (span / 2 + 0.05 + random() * 0.06), r = inner + (radius - inner) * t;
+        return [ox + Math.cos(a) * r, oy + Math.sin(a) * r];
+      };
+      path([...outer, end(1, 0.55), ...[...within].reverse(), end(-1, 0.4)], true);
+      for (const j of [2, 4, 6]) path([outer[j]!, within[j]!], false, 0.5, 0.5);
+      const j = random() < 0.5 ? 3 : 5;
+      const a = heading + (j / 8 - 0.5) * span;
+      const reach = inner * (0.25 + random() * 0.25);
+      path([within[j]!, [ox + Math.cos(a) * (inner - reach), oy + Math.sin(a) * (inner - reach)]], false, 0.6, 0.6);
+      shard(outer[8]![0] + Math.cos(heading) * 3 * s, outer[8]![1] + Math.sin(heading) * 3 * s, 1.6 * s, 0.55);
+    } else if (major) {
+      // A bare keel: the truss of a hull stripped to its frame, bent where it broke.
+      const length = (14 + random() * 14) * s;
+      const halfWidth = (1.2 + random() * 0.8) * s;
+      const bend = (random() - 0.5) * 0.5;
+      const first = local(heading, cx, cy);
+      const [kx, ky] = first(length * 0.15, 0);
+      truss(first, -length * 0.5, length * 0.15, halfWidth, 0.8);
+      truss(local(heading + bend, kx, ky), 0, length * 0.35, halfWidth, 0.7);
+    } else if (form < 0.4) {
+      // A panel array torn loose: a radiator or solar wing, its grid still whole.
       const f = local(heading, cx, cy);
-      path([f(-length * 0.5, -beam), f(length * 0.35, -beam), f(length * 0.5, (random() - 0.5) * beam),
-        f(length * 0.2, beam), f(-length * 0.5, beam)], true, 0.75, 0.6);
+      const length = (7 + random() * 6) * s, width = (2.4 + random() * 1.6) * s;
+      const cells = 3 + Math.floor(random() * 2);
+      box(f, -length / 2, length / 2, -width / 2, width / 2, 0.8, 0.6);
+      for (let i = 1; i < cells; i++) {
+        const u = -length / 2 + length * i / cells;
+        line(f, u, -width / 2, u, width / 2, 0.45, 0.4);
+      }
+      line(f, -length / 2, 0, length / 2, 0, 0.35, 0.4);
+      line(f, -length / 2, 0, -length / 2 - 2.5 * s, 0.6 * s, 0.6, 0.5);
+    } else if (form < 0.65) {
+      // A lone engine pod, with its mounting strut.
+      const f = local(heading, cx, cy);
+      const length = (4.5 + random() * 3) * s, half = (1 + random() * 0.6) * s;
+      pod(f, -length / 2, 0, length, half, 0.75);
+      line(f, length / 2, 0, length / 2 + 2 * s, (random() - 0.5) * 2 * s, 0.55, 0.5);
     } else {
       for (let i = 0, n = 1 + Math.floor(random() * 3); i < n; i++)
-        shard(cx + (random() - 0.5) * 20, cy + (random() - 0.5) * 20, (1 + random() * 2.2) * mix.scale, 0.55);
+        shard(cx + (random() - 0.5) * 20, cy + (random() - 0.5) * 20, (1 + random() * 2.2) * s, 0.55);
     }
   } else if (mix.family === 'storm') {
     const points = Array.from({ length: 7 }, (_, j) => point((j - 3) * 15, (random() - 0.5) * 24));

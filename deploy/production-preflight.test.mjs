@@ -43,7 +43,7 @@ describe('production deployment data protection preflight', () => {
       writeFileSync(f.envFile, f.config + extra);
       const result = await check(f);
       expect(result.code).not.toBe(0);
-      expect(result.stderr).toContain('E_PRIVACY_RELEASE');
+      expect(result.stderr).toMatch(/E_PRIVACY_RELEASE|E_ERASURE_READINESS/);
       expect(readFileSync(f.calls, 'utf8')).toBe('');
     }
   });

@@ -9,8 +9,9 @@
  * The main page is the same file GitHub Pages publishes (`.github/workflows/pages.yml`),
  * so both web addresses show one game.
  */
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { headersFile } from './siteHeaders.mjs';
+import { bakeServer, parseServer } from './siteServer.mjs';
 
 const dist = 'prototype/dist';
 const site = `${dist}/site`;
@@ -24,13 +25,17 @@ const PAGES = {
 
 // A fresh folder each time: a page dropped from the list must not linger on the site.
 rmSync(site, { recursive: true, force: true });
+// The match server lives on another origin (siteServer.mjs); bake it before hashing, so
+// the page policy covers the baked script too.
+const server = parseServer(process.env.GAME_SERVER);
 mkdirSync(site, { recursive: true });
 const staged = {};
 for (const [published, built] of Object.entries(PAGES)) {
-  copyFileSync(`${dist}/${built}`, `${site}/${published}`);
-  staged[published] = readFileSync(`${site}/${published}`, 'utf8');
+  staged[published] = bakeServer(readFileSync(`${dist}/${built}`, 'utf8'), server);
+  writeFileSync(`${site}/${published}`, staged[published]);
   console.log(`staged ${site}/${published} ← ${built}`);
 }
 // Cloudflare reads `_headers` from the assets folder and does not serve it (siteHeaders.mjs).
 writeFileSync(`${site}/_headers`, headersFile(staged));
 console.log(`staged ${site}/_headers`);
+console.log(`game server: ${server ?? '(same origin)'}`);

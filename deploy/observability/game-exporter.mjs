@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { ACTION_TYPES, REJECT_CODES } from './game-exporter-catalog.mjs';
 
-const SOURCES = { health: '/health', ready: '/ready', metrics: '/metrics', summary: '/metrics/summary' };
+const SOURCES = { health: '/health', ready: '/ready', metrics: '/metrics', summary: '/metrics/summary', activity:'/metrics/activity' };
 const MAX_BODY = 65536, MAX_SAMPLES = 5000, MAX_EXPOSITION = 1048576;
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const number = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
@@ -29,6 +29,22 @@ export function projectSource(source, input) {
   } else if (source === 'metrics') {
     if (!count(input.matches) || !count(input.connections)) return null;
     for (const field of ['matches', 'connections']) add(`moongame_${field}`, input[field], 'gauge');
+  } else if (source === 'activity') {
+    if(input.schema!==1 || !count(input.since) || !count(input.at) || input.since>input.at ||
+      !count(input.online) || !Array.isArray(input.days) || input.days.length>30)return null;
+    add('moongame_players_online',input.online,'gauge');
+    add('moongame_player_activity_since_timestamp_seconds',input.since/1000,'gauge');
+    add('moongame_player_activity_sample_timestamp_seconds',input.at/1000,'gauge');
+    let previous='';
+    for(const row of input.days){
+      if(!object(row) || typeof row.day!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(row.day) || row.day<=previous ||
+        !count(row.players) || !count(row.visits) || !number(row.seconds) || row.seconds>row.players*86400 ||
+        !Number.isFinite(Date.parse(row.day+'T00:00:00Z')) || new Date(row.day+'T00:00:00Z').toISOString().slice(0,10)!==row.day ||
+        row.day<new Date(input.at-29*86400000).toISOString().slice(0,10) || row.day>new Date(input.at).toISOString().slice(0,10))return null;
+      previous=row.day;
+      for(const [key,suffix] of [['players','players'],['visits','visits'],['seconds','online_seconds']])
+        add(`moongame_player_activity_daily_${suffix}`,row[key],'gauge',{day:row.day});
+    }
   } else if (source === 'summary') {
     for (const [field, name] of [['joins', 'joins'], ['leaves', 'leaves'], ['desyncs', 'desyncs'], ['deadLetters', 'dead_letters'], ['advanceOverflows', 'advance_overflows']]) {
       if (!count(input[field])) return null;
@@ -174,7 +190,9 @@ export async function readToken(path) {
     const bytes = Buffer.alloc(4098);
     const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
     const value = bytes.subarray(0, bytesRead).toString('utf8').replace(/\n$/, '');
-    if (!/^[A-Za-z0-9._~+/=-]{32,4096}$/.test(value)) throw new Error();
+    // Include the installer's token alphabet; still exclude whitespace/control
+    // bytes so an existing credential cannot inject an HTTP header.
+    if (!/^[A-Za-z0-9._~+/=:,@%-]{32,4096}$/.test(value)) throw new Error();
     return value;
   } catch { throw new Error('E_OBS_CONFIG'); }
   finally { await file?.close(); }

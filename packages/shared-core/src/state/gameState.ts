@@ -1,5 +1,6 @@
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
+import type { Coalition } from './coalition';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -315,19 +316,37 @@ export interface PlayerTechnologyState {
 export type DiplomaticStance = 'war' | 'peace' | 'pact' | 'alliance';
 
 
-/** A stolen, time-boxed intel window (espionage): while `until` is ahead of the
- *  world clock, `visibleState` lets the OWNING viewer see through the fog at the
- *  granted target. What each kind opens:
- *  - `treasury` — the target player's resource bag stays visible;
- *  - `planet`   — the granted world's contents (owner/garrison/buildings) read live;
- *  - `fleets`   — the target player's fleets stay in view (position + composition).
+/** A stolen, time-boxed intel window (espionage `recon`, SPY-8): while `until` is
+ *  ahead of the world clock, `visibleState` lets the OWNING viewer see the granted
+ *  world as identified — owner, garrison, buildings and the fleets in its orbit.
  *  Grants are produced by `espionageModule` and expire on their own. */
 export interface IntelGrant {
-  kind: 'treasury' | 'planet' | 'fleets';
-  /** `treasury`/`fleets` → target player id; `planet` → the granted planet id. */
+  kind: 'planet';
+  /** The granted planet id. */
   target: string;
   /** World-time (ms) the window closes. */
   until: number;
+}
+
+/** An espionage operation an agent is sent on (SPY-8). */
+export type SpyOp = 'recon' | 'sabotage' | 'theft' | 'research' | 'counter';
+
+/** An agent of the spy's network that is away (espionage, SPY-6): on a mission,
+ *  busy working a stolen window, slipping home after a failure, or — `lost` —
+ *  killed, with a replacement being found. Back in the network once `until` passes. */
+export interface AgentAway {
+  /** World-time (ms) the agent is available again. */
+  until: number;
+  /** The agent was killed; `until` is when the replacement is found. */
+  lost?: true;
+  /** On a mission (SPY-8): its id among the player's live missions, the operation and
+   *  the target world; `until` is when the mission resolves. */
+  mission?: number;
+  op?: SpyOp;
+  planetId?: PlanetId;
+  /** A counter-intelligence agent on post (SPY-11): it stays on `planetId` until
+   *  recalled or caught, and `until` is the `COUNTER_POSTED` sentinel. */
+  posted?: true;
 }
 
 export type MatchStatus = 'ongoing' | 'ended';
@@ -352,7 +371,10 @@ export type MatchEndReason =
   | 'pve-operation'
   /** PVR-8.3: the main evacuation became impossible — fewer evacuees are left (delivered,
    *  under way and still waiting) than the contract needs. The NPC is the formal winner. */
-  | 'pve-evac-lost';
+  | 'pve-evac-lost'
+  /** TRN-3: the training ground's script — the counterattack broken and the target held.
+   *  Set by the scenario host of a `victory.scripted` mode, never by the victory module. */
+  | 'training-held';
 
 /** Операция союзника (PVR-7.4, §6.5): одна на жителя; новый приказ заменяет прежний. */
 export interface AllyOperation {
@@ -993,6 +1015,10 @@ export interface GameState {
    *  (`data.modes[id].technology`), закреплённые на первом шаге часов — как `sight`. Нет
    *  поля ⇒ дерево сетевого матча (`DEFAULT_TECH_RULES`, `modules/technology.ts`). */
   techRules?: TechRules;
+  /** Цены партии (`util/pricing.ts`): множители, которые карта основной игры
+   *  закрепляет при создании партии. Нет поля ⇒ цены и сроки каталога (Sector Zero и
+   *  всё, что создано до резолюции владельца 2026-10-18). */
+  pricing?: MatchPricing;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -1055,6 +1081,11 @@ export interface GameState {
    *  each seen world. Maintained by `visibilityModule`; read by `visibleState`
    *  to show greyed "last known" worlds. Internal — stripped from projections. */
   fog?: Record<PlayerId, FogMemory>;
+  /** Per-player SURVEY: the type of every province a player's ship has been inside, kept
+   *  for good. Crossing a border shows what kind of space this is, not who holds it, so a
+   *  survey carries the type only (owner 2026-10-23). Maintained by `visibilityModule`;
+   *  `visibleState` ships the viewer's own record and keeps the surveyed type on the map. */
+  surveyed?: Record<PlayerId, Record<PlanetId, ProvinceSurvey>>;
   /** Per-observer last identified Swarm fleet composition; persists with this match. */
   swarmIntel?: Record<PlayerId, Record<FleetId, SwarmContact>>;
   /** Hero instances, keyed by instance id (`Hero.id`), maintained by `heroModule`.
@@ -1103,9 +1134,18 @@ export interface GameState {
    *  Приватны для двух сторон, как `diplomacyOffers` — `visibleState` вырезает чужие
    *  переговоры. */
   mapShareOffers?: Record<string, true>;
+  /** COAL-1. Коалиции сессии по id (`state/coalition.ts`). ПУБЛИЧНЫ: список коалиций,
+   *  их состав, эмблема и описание видны всем местам партии. Союз (`alliance`) в
+   *  свободных режимах заключается только внутри коалиции. */
+  coalitions?: Record<string, Coalition>;
+  /** Счётчик, выдающий коалициям id. */
+  coalitionSeq?: number;
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;
+  /** Agents away from each spy's network (`espionageModule`, SPY-6). PRIVATE like
+   *  `intel`: a viewer's projection carries only their own network. */
+  spyAgents?: Record<PlayerId, AgentAway[]>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];
@@ -1744,6 +1784,16 @@ export interface PlanetSnapshot {
 /** One player's memory: last-known snapshot per world they have ever identified. */
 export type FogMemory = Record<PlanetId, PlanetSnapshot>;
 
+/** The type of a province as a ship found it on crossing its border: no owner, garrison
+ *  or buildings — those take a scan (`PlanetSnapshot`). */
+export interface ProvinceSurvey {
+  kind?: string;
+  terrain?: string;
+  planetType?: string;
+  /** Simulation time (ms) of the last crossing. */
+  at: number;
+}
+
 /**
  * Зрение — ТОЛЬКО КРУГИ (решение владельца 2026-09-24). Каждый свой мир и флот видит
  * вокруг себя круг полного обзора; радары (постройки, корабли, модули) расширяют его
@@ -1763,6 +1813,16 @@ export interface SightRules {
   fleet: number;
   /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
   radarScale: number;
+}
+
+/** Множители цен партии (`MatchMap.pricing`, `util/pricing.ts`). */
+export interface MatchPricing {
+  /** Множитель цены по ресурсу: строка каталога × множитель. Нет ресурса ⇒ ×1. */
+  cost?: Record<string, number>;
+  /** Множитель сроков постройки и исследования. Нет ⇒ ×1. */
+  hours?: number;
+  /** Множитель стартового запаса места по ресурсу. Нет ресурса ⇒ ×1. */
+  start?: Record<string, number>;
 }
 
 /** Правила дерева технологий матча (PVR-6.17). */

@@ -1,16 +1,24 @@
-import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
+import { reservedBotLogin } from '../botNicknames';
+import type {
+  CorpBuildOrder,
+  CorpInfrastructureResult,
+  CorpInfrastructureState,
+  NewsAnnouncement,
+  NewsAnnouncementKind,
+} from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
+import { corpFoundedNews, corpLevelNews } from '../corpNews';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
   AccountStore,
+  AnnouncementStore,
   ArsenalStore,
   AvaChallenge,
   AvaChallengeStatus,
   AvaChallengeStore,
-  AvaFeedEntry,
   AvaFeedStore,
   AvaResult,
   AvaResultStore,
@@ -29,6 +37,8 @@ import type {
   CorpStore,
   CorpSummary,
   DropStore,
+  FeedEntry,
+  FeedKind,
   FriendEdge,
   FriendParty,
   FriendStore,
@@ -46,11 +56,14 @@ import type {
   UserStore,
 } from './types';
 import {
+  ACTIVE_ANNOUNCEMENTS_MAX,
+  isAvaFeedEntry,
   DEFAULT_AUDIT_LIMIT,
   DEFAULT_FEED_LIMIT,
   DEFAULT_CHALLENGES_LIMIT,
   DEFAULT_LOCKED_MATCHUPS_LIMIT,
   DEFAULT_RESULTS_LIMIT,
+  PUSH_KINDS,
 } from './types';
 
 /** Create the tables (idempotent). JSONB discipline: the queryable fields (status,
@@ -105,6 +118,41 @@ const SCHEMA_SQL = `
     -- existing DBs predating recovery: add the optional recovery-email column in place
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS session_nonce text NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at timestamptz;
+    CREATE TABLE IF NOT EXISTS player_activity_channels (
+      account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel text NOT NULL CHECK(channel ~ '^[a-f0-9]{32}$'),
+      seen_ms bigint NOT NULL,
+      sequence integer NOT NULL,
+      active boolean NOT NULL,
+      PRIMARY KEY(account_id,channel)
+    );
+    CREATE INDEX IF NOT EXISTS player_activity_seen_idx ON player_activity_channels(seen_ms);
+    CREATE TABLE IF NOT EXISTS player_activity_days (
+      account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day date NOT NULL,
+      spans int8multirange NOT NULL DEFAULT '{}',
+      visits integer NOT NULL DEFAULT 0 CHECK(visits>=0),
+      PRIMARY KEY(account_id,day)
+    );
+    CREATE INDEX IF NOT EXISTS player_activity_day_idx ON player_activity_days(day);
+    CREATE TABLE IF NOT EXISTS player_activity_state (
+      id integer PRIMARY KEY CHECK(id=1), since_ms bigint NOT NULL
+    );
+    INSERT INTO player_activity_state VALUES(1,(extract(epoch FROM clock_timestamp())*1000)::bigint) ON CONFLICT DO NOTHING;
+    CREATE TABLE IF NOT EXISTS account_erasure_guard (id integer PRIMARY KEY CHECK(id=1), required boolean NOT NULL);
+    INSERT INTO account_erasure_guard VALUES(1,false) ON CONFLICT DO NOTHING;
+    CREATE TABLE IF NOT EXISTS account_deletions (
+      account_id text PRIMARY KEY,
+      request_id text NOT NULL UNIQUE,
+      requested_at timestamptz NOT NULL DEFAULT now(),
+      completed_at timestamptz,
+      login_hash text
+    );
+    ALTER TABLE account_deletions ADD COLUMN IF NOT EXISTS login_hash text;
+    UPDATE account_deletions d SET login_hash=encode(sha256(convert_to(lower(u.login),'UTF8')),'hex')
+      FROM users u WHERE u.id=d.account_id AND d.login_hash IS NULL;
+    CREATE INDEX IF NOT EXISTS account_deletions_login_idx ON account_deletions(login_hash);
     -- logins are unique case-insensitively: Vasya and vasya are one account
     CREATE UNIQUE INDEX IF NOT EXISTS users_login_idx ON users (lower(login));
     -- recovery emails are unique case-insensitively WHEN present (the reset lookup key)
@@ -242,6 +290,12 @@ const SCHEMA_SQL = `
       winner_corp     text
     );
     CREATE INDEX IF NOT EXISTS ava_feed_at_idx ON ava_feed (at DESC, id DESC);
+    -- CORP-1: the same public feed carries a corporation's own facts (founded, reached a
+    -- level, reached a corp medal's condition). Such a row names one corp in the
+    -- challenger columns and none in the target ones; detail holds the level / medal id.
+    ALTER TABLE ava_feed ALTER COLUMN target_corp DROP NOT NULL;
+    ALTER TABLE ava_feed ALTER COLUMN target_name DROP NOT NULL;
+    ALTER TABLE ava_feed ADD COLUMN IF NOT EXISTS detail jsonb;
 
     -- Medals / achievements (corporations.md §3, MED-1): permanent per-account record. PK
     -- (account, medal) is the idempotency + one-per invariant; corp_id snapshots the corp
@@ -326,6 +380,8 @@ const SCHEMA_SQL = `
       fingerprint text NOT NULL,
       response jsonb NOT NULL
     );
+    ALTER TABLE meta_economy_receipts ADD COLUMN IF NOT EXISTS account_ids text[];
+    CREATE INDEX IF NOT EXISTS meta_economy_receipts_accounts_idx ON meta_economy_receipts USING gin(account_ids);
     CREATE TABLE IF NOT EXISTS meta_material_listings (
       id text PRIMARY KEY,
       seller_id text NOT NULL,
@@ -392,6 +448,56 @@ const SCHEMA_SQL = `
       account_id text NOT NULL,
       PRIMARY KEY (match_id, account_id)
     );
+    -- Dedicated population bots are permanent system identities, never login users.
+    -- Catalogue seeding never replaces their appearance, seed or earned XP.
+    CREATE TABLE IF NOT EXISTS bot_roster_identities (
+      id text PRIMARY KEY,
+      login text NOT NULL,
+      portrait integer NOT NULL CHECK (portrait BETWEEN 1 AND 40),
+      seed bigint NOT NULL CHECK (seed BETWEEN 0 AND 4294967295),
+      xp bigint NOT NULL DEFAULT 0 CHECK (xp BETWEEN 0 AND 9007199254740991),
+      last_assigned_at bigint CHECK (last_assigned_at BETWEEN 0 AND 8640000000000000)
+    );
+    -- Display names no longer carry a mandatory system prefix.
+    ALTER TABLE bot_roster_identities DROP CONSTRAINT IF EXISTS bot_roster_identities_login_check;
+    CREATE UNIQUE INDEX IF NOT EXISTS bot_roster_login_idx ON bot_roster_identities (lower(login));
+    CREATE TABLE IF NOT EXISTS bot_roster_matches (
+      match_id text PRIMARY KEY,
+      status text NOT NULL CHECK (status IN ('active', 'ended', 'abandoned')),
+      finished_at bigint CHECK (finished_at BETWEEN 0 AND 8640000000000000)
+    );
+    CREATE INDEX IF NOT EXISTS bot_roster_active_match_idx ON bot_roster_matches (match_id) WHERE status = 'active';
+    -- History is retained after release. A process restart/heartbeat never expires a seat.
+    CREATE TABLE IF NOT EXISTS bot_roster_assignments (
+      match_id text NOT NULL REFERENCES bot_roster_matches(match_id),
+      player_id text NOT NULL,
+      bot_id text NOT NULL REFERENCES bot_roster_identities(id),
+      assigned_at bigint NOT NULL CHECK (assigned_at BETWEEN 0 AND 8640000000000000),
+      active boolean NOT NULL DEFAULT true,
+      PRIMARY KEY (match_id, player_id),
+      UNIQUE (match_id, bot_id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS bot_roster_active_bot_idx ON bot_roster_assignments (bot_id) WHERE active;
+    CREATE TABLE IF NOT EXISTS bot_roster_results (
+      match_id text NOT NULL,
+      bot_id text NOT NULL,
+      player_id text NOT NULL,
+      map_id text NOT NULL,
+      ended_at bigint NOT NULL CHECK (ended_at BETWEEN 0 AND 8640000000000000),
+      outcome text NOT NULL CHECK (outcome IN ('win', 'draw', 'loss')),
+      xp bigint NOT NULL CHECK (xp BETWEEN 0 AND 9007199254740991),
+      place bigint CHECK (place BETWEEN 1 AND 9007199254740991),
+      PRIMARY KEY (match_id, bot_id),
+      FOREIGN KEY (match_id, bot_id) REFERENCES bot_roster_assignments(match_id, bot_id)
+    );
+    CREATE INDEX IF NOT EXISTS bot_roster_history_idx ON bot_roster_results (bot_id, ended_at DESC, match_id DESC);
+    -- Existing accounts stay ineligible; only the new registration writer opts in.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_reward boolean NOT NULL DEFAULT false;
+    CREATE TABLE IF NOT EXISTS registration_rewards (
+      account_id text PRIMARY KEY REFERENCES users(id),
+      xp integer NOT NULL CHECK (xp >= 0),
+      accepted boolean NOT NULL DEFAULT false
+    );
 
     -- ONB-5: one Web Push subscription per account (a fresh subscribe replaces the
     -- old row — single-device, multi-device fan-out is a later brick).
@@ -401,6 +507,8 @@ const SCHEMA_SQL = `
       p256dh      text NOT NULL,
       auth        text NOT NULL
     );
+    -- UIX-4.4: allowed push kinds, comma-separated; NULL = every kind (older rows).
+    ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS kinds text;
 
     -- FRIENDS-1: the social graph — ONE row per pair, keyed on the SORTED pair, so
     -- «A→B» and «B→A» cannot become two rows. requested_by carries the direction
@@ -417,9 +525,27 @@ const SCHEMA_SQL = `
       PRIMARY KEY (lo_id, hi_id)
     );
     CREATE INDEX IF NOT EXISTS friend_edges_hi ON friend_edges (hi_id);
+
+    -- CORP-1: admin announcements in the news feed — the admin's own text in both
+    -- languages (the feed's other rows are facts the client words itself). A removed one
+    -- keeps its row with removed_at set; until_at NULL = shown until removed.
+    CREATE TABLE IF NOT EXISTS announcements (
+      id         text PRIMARY KEY,
+      at         bigint NOT NULL,
+      kind       text NOT NULL CHECK (kind IN ('tech', 'update', 'event')),
+      pinned     boolean NOT NULL DEFAULT false,
+      until_at   bigint,
+      title_ru   text NOT NULL,
+      title_en   text NOT NULL DEFAULT '',
+      body_ru    text NOT NULL DEFAULT '',
+      body_en    text NOT NULL DEFAULT '',
+      removed_at bigint
+    );
+    CREATE INDEX IF NOT EXISTS announcements_at_idx ON announcements (at DESC, id DESC) WHERE removed_at IS NULL;
   `;
 
-export const schemaFingerprint = (): string => createHash('sha256').update(SCHEMA_SQL).digest('hex');
+export const schemaFingerprint = (): string =>
+  createHash('sha256').update(SCHEMA_SQL).digest('hex');
 
 export async function migrate(pool: Pool | PoolClient): Promise<void> {
   // Boot/admin callers already own their client's transaction and migration lock.
@@ -455,7 +581,10 @@ interface MatchRow {
 export class PostgresMatchStore implements MatchStore {
   async economyMatchIds(after = '', limit = 100): Promise<string[]> {
     const size = Number.isSafeInteger(limit) ? Math.min(100, Math.max(1, limit)) : 100;
-    const result = await this.pool.query<{ id: string }>('SELECT id FROM matches WHERE id>$1 ORDER BY id LIMIT $2', [after, size]);
+    const result = await this.pool.query<{ id: string }>(
+      'SELECT id FROM matches WHERE id>$1 ORDER BY id LIMIT $2',
+      [after, size],
+    );
     return result.rows.map((row) => row.id);
   }
   constructor(private readonly pool: Pool) {}
@@ -531,10 +660,26 @@ export class PostgresMatchStore implements MatchStore {
          END,
          updated_at   = now()
        WHERE matches.seq <= EXCLUDED.seq`,
-      [snapshot.matchId, snapshot.dataVersion, snapshot.seq, snapshot.status, snapshot.state, snapshot.clock ?? null,
+      [
+        snapshot.matchId,
+        snapshot.dataVersion,
+        snapshot.seq,
+        snapshot.status,
+        snapshot.state,
+        snapshot.clock ?? null,
         snapshot.economyObservations ? JSON.stringify(snapshot.economyObservations) : null,
-        snapshot.economyActivity ? JSON.stringify(Object.fromEntries(Object.entries(snapshot.economyActivity).map(([key, ids]) => [key, [...new Set(ids)].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE)]))) : null,
-        MAX_META_ACTIVITY_FACTS_PER_ROLE],
+        snapshot.economyActivity
+          ? JSON.stringify(
+              Object.fromEntries(
+                Object.entries(snapshot.economyActivity).map(([key, ids]) => [
+                  key,
+                  [...new Set(ids)].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE),
+                ]),
+              ),
+            )
+          : null,
+        MAX_META_ACTIVITY_FACTS_PER_ROLE,
+      ],
     );
   }
 
@@ -572,9 +717,10 @@ export class PostgresAccountStore implements AccountStore {
     );
     const taken = new Set(takenR.rows.map((r) => r.player_id));
     // Preferred slot first (REL-7 seat selection): try it before the default order.
-    const order = preferred && seats.includes(preferred) && !taken.has(preferred)
-      ? [preferred, ...seats.filter((s) => s !== preferred)]
-      : seats;
+    const order =
+      preferred && seats.includes(preferred) && !taken.has(preferred)
+        ? [preferred, ...seats.filter((s) => s !== preferred)]
+        : seats;
     for (const candidate of order) {
       if (taken.has(candidate)) continue;
       try {
@@ -746,6 +892,31 @@ export class PostgresCommanderStore implements CommanderStore {
 export class PostgresUserStore implements UserStore {
   constructor(private readonly pool: Pool) {}
 
+  async deletionStatus(accountId: string, requestId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      'SELECT 1 FROM account_deletions WHERE account_id=$1 AND request_id=$2',
+      [accountId, requestId],
+    );
+    return Boolean(result.rowCount);
+  }
+  async requestDeletion(
+    user: UserRecord,
+    requestId: string = randomUUID(),
+  ): Promise<string | null> {
+    const result = await this.pool.query<{ request_id: string }>(
+      `
+      WITH disabled AS (
+        UPDATE users SET deletion_requested_at = now(), session_nonce = $4
+        WHERE id = $1 AND pass_hash = $2 AND session_nonce = $3
+          AND deletion_requested_at IS NULL RETURNING id,login
+      ) INSERT INTO account_deletions(account_id, request_id, login_hash)
+        SELECT id, $4, encode(sha256(convert_to(lower(login),'UTF8')),'hex') FROM disabled RETURNING request_id
+    `,
+      [user.userId, user.passHash, user.sessionNonce ?? '', requestId],
+    );
+    return result.rows[0]?.request_id ?? null;
+  }
+
   async createUser(
     login: string,
     passHash: string,
@@ -753,10 +924,19 @@ export class PostgresUserStore implements UserStore {
   ): Promise<
     { ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }
   > {
+    if (reservedBotLogin(login)) return { ok: false, code: 'E_LOGIN_TAKEN' };
     const userId = randomUUID();
     try {
+      // Historical snapshots can carry a callsign without an account ID. Reserve
+      // it through the deletion-ledger/backup lifetime so replay cannot touch a
+      // new person who reuses that name. The digest is still protected PDn.
+      const reserved = await this.pool.query(
+        "SELECT 1 FROM account_deletions WHERE login_hash=encode(sha256(convert_to(lower($1::text),'UTF8')),'hex') LIMIT 1",
+        [login],
+      );
+      if (reserved.rowCount) return { ok: false, code: 'E_LOGIN_TAKEN' };
       await this.pool.query(
-        `INSERT INTO users (id, login, pass_hash, email) VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO users (id, login, pass_hash, email, registration_reward) VALUES ($1, $2, $3, $4, true)`,
         [userId, login, passHash, email?.toLowerCase() ?? null],
       );
       return { ok: true, userId };
@@ -766,7 +946,10 @@ export class PostgresUserStore implements UserStore {
       // account (the constraint name is on the pg error). Any other cause is treated as a
       // taken login too — fail-secure, no account is overwritten.
       const constraint = (e as { constraint?: string }).constraint;
-      return { ok: false, code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN' };
+      return {
+        ok: false,
+        code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN',
+      };
     }
   }
 
@@ -775,7 +958,7 @@ export class PostgresUserStore implements UserStore {
   // `no-sql-string-interpolation` guard stays satisfied). All three share `rowToUser`.
   async findUser(login: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE lower(login) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE lower(login) = lower($1) AND deletion_requested_at IS NULL`,
       [login],
     );
     return rowToUser(r.rows[0]);
@@ -783,7 +966,7 @@ export class PostgresUserStore implements UserStore {
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE email IS NOT NULL AND lower(email) = lower($1)`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE email IS NOT NULL AND lower(email) = lower($1) AND deletion_requested_at IS NULL`,
       [email],
     );
     return rowToUser(r.rows[0]);
@@ -791,7 +974,7 @@ export class PostgresUserStore implements UserStore {
 
   async findById(userId: string): Promise<UserRecord | null> {
     const r = await this.pool.query<UserRow>(
-      `SELECT id, login, pass_hash, email, session_nonce FROM users WHERE id = $1`,
+      `SELECT id, login, pass_hash, email, session_nonce, registration_reward FROM users WHERE id = $1 AND deletion_requested_at IS NULL`,
       [userId],
     );
     return rowToUser(r.rows[0]);
@@ -800,7 +983,7 @@ export class PostgresUserStore implements UserStore {
   async loginsOf(userIds: readonly string[]): Promise<Record<string, string>> {
     if (userIds.length === 0) return {};
     const r = await this.pool.query<{ id: string; login: string }>(
-      `SELECT id, login FROM users WHERE id = ANY($1::text[])`,
+      `SELECT id, login FROM users WHERE id = ANY($1::text[]) AND deletion_requested_at IS NULL`,
       [[...userIds]],
     );
     const out: Record<string, string> = {};
@@ -809,15 +992,22 @@ export class PostgresUserStore implements UserStore {
   }
 
   async revokeSessions(userId: string): Promise<void> {
-    await this.pool.query('UPDATE users SET session_nonce = $2 WHERE id = $1', [userId, randomUUID()]);
+    await this.pool.query('UPDATE users SET session_nonce = $2 WHERE id = $1', [
+      userId,
+      randomUUID(),
+    ]);
   }
 
   async setPassword(userId: string, passHash: string): Promise<void> {
     await this.pool.query(`UPDATE users SET pass_hash = $2 WHERE id = $1`, [userId, passHash]);
   }
-  async setPasswordIfCurrent(userId: string, expectedHash: string, passHash: string): Promise<boolean> {
+  async setPasswordIfCurrent(
+    userId: string,
+    expectedHash: string,
+    passHash: string,
+  ): Promise<boolean> {
     const result = await this.pool.query(
-      `UPDATE users SET pass_hash = $3 WHERE id = $1 AND pass_hash = $2`,
+      `UPDATE users SET pass_hash = $3 WHERE id = $1 AND pass_hash = $2 AND deletion_requested_at IS NULL`,
       [userId, expectedHash, passHash],
     );
     return result.rowCount === 1;
@@ -830,6 +1020,7 @@ interface UserRow {
   pass_hash: string;
   session_nonce: string;
   email: string | null;
+  registration_reward: boolean;
 }
 
 function rowToUser(row: UserRow | undefined): UserRecord | null {
@@ -839,6 +1030,7 @@ function rowToUser(row: UserRow | undefined): UserRecord | null {
     login: row.login,
     passHash: row.pass_hash,
     ...(row.session_nonce ? { sessionNonce: row.session_nonce } : {}),
+    registrationReward: row.registration_reward,
     ...(row.email ? { email: row.email } : {}),
   };
 }
@@ -860,31 +1052,57 @@ function memberOf(row: CorpMemberRow): CorpMembership {
 }
 
 export class PostgresCorpStore implements CorpStore {
-  async infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+  async infrastructure(
+    corpId: string,
+    actor: string,
+    now: number,
+    order?: CorpBuildOrder,
+  ): Promise<CorpInfrastructureResult> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       // Lock membership first, like disband: role transfer/kick cannot race spending.
       const members = await client.query<{ role: CorpRole }>(
-        `SELECT role FROM corp_members WHERE account_id = $1 AND corp_id = $2 FOR UPDATE`, [actor, corpId]);
+        `SELECT role FROM corp_members WHERE account_id = $1 AND corp_id = $2 FOR UPDATE`,
+        [actor, corpId],
+      );
       const role = members.rows[0]?.role;
       if (!role || role === 'recruit' || (order && role !== 'head')) {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_FORBIDDEN' };
       }
-      const corps = await client.query<{ influence: string; infrastructure: CorpInfrastructureState | null }>(
-        `SELECT influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
+      const corps = await client.query<{
+        name: string;
+        influence: string;
+        infrastructure: CorpInfrastructureState | null;
+      }>(`SELECT name, influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
       const corp = corps.rows[0];
       if (!corp) {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_FORBIDDEN' };
       }
-      const updated = updateCorpInfrastructure(corpId, actor, role, Number(corp.influence), corp.infrastructure, now, order);
-      await client.query(`UPDATE corps SET influence = $2, infrastructure = $3::jsonb WHERE id = $1`,
-        [corpId, updated.influence, JSON.stringify(updated.state)]);
+      const updated = updateCorpInfrastructure(
+        corpId,
+        actor,
+        role,
+        Number(corp.influence),
+        corp.infrastructure,
+        now,
+        order,
+      );
+      await client.query(
+        `UPDATE corps SET influence = $2, infrastructure = $3::jsonb WHERE id = $1`,
+        [corpId, updated.influence, JSON.stringify(updated.state)],
+      );
       for (const entry of updated.audit) {
-        await client.query(`INSERT INTO corp_audit (corp_id, at, actor, action, target, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
-          [corpId, entry.at, entry.actor, entry.action, entry.target ?? null, entry.detail ?? null]);
+        await client.query(
+          `INSERT INTO corp_audit (corp_id, at, actor, action, target, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [corpId, entry.at, entry.actor, entry.action, entry.target ?? null, entry.detail ?? null],
+        );
+      }
+      // CORP-1: a reached corporation level is public news, committed with the level.
+      for (const news of corpLevelNews(corpId, corp.name, updated.audit)) {
+        await client.query(FEED_INSERT, feedValues(news));
       }
       await client.query('COMMIT');
       return updated.result;
@@ -902,6 +1120,7 @@ export class PostgresCorpStore implements CorpStore {
     name: string,
     headAccountId: string,
     headLogin: string,
+    at: number = Date.now(),
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
     // One transaction, two atomic claims: the corp_members PK is the one-corp-per-
     // account claim, the lower(name) unique index is the name claim. ON CONFLICT
@@ -926,6 +1145,8 @@ export class PostgresCorpStore implements CorpStore {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_NAME_TAKEN' };
       }
+      // CORP-1: «founded» is public news, committed with the corporation itself.
+      await client.query(FEED_INSERT, feedValues(corpFoundedNews(corpId, name, at)));
       await client.query('COMMIT');
       return { ok: true, corpId };
     } catch (err) {
@@ -1369,12 +1590,12 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
     return r.rows.map(challengeOf);
   }
 
-  async endMatchup(id: string): Promise<boolean> {
+  async endMatchup(id: string, status: 'ended' | 'cancelled' = 'ended'): Promise<boolean> {
     // Same exactly-once contract as closeMatchup, over the locked state: only a
     // still-locked matchup transitions, so settlement can't award influence twice.
     const r = await this.pool.query(
-      `UPDATE ava_challenges SET status = 'ended' WHERE id = $1 AND status = 'locked'`,
-      [id],
+      `UPDATE ava_challenges SET status = $2 WHERE id = $1 AND status = 'locked'`,
+      [id, status],
     );
     return (r.rowCount ?? 0) > 0;
   }
@@ -1597,62 +1818,175 @@ interface FeedRow {
   kind: string;
   challenger_corp: string;
   challenger_name: string;
-  target_corp: string;
-  target_name: string;
+  target_corp: string | null;
+  target_name: string | null;
   winner_corp: string | null;
+  detail: { level?: unknown; medalId?: unknown } | null;
 }
 
-function feedEntryOf(row: FeedRow): AvaFeedEntry {
-  return {
-    id: row.id,
-    at: Number(row.at),
-    kind: row.kind as AvaFeedEntry['kind'],
-    challengerCorp: row.challenger_corp,
-    challengerName: row.challenger_name,
-    targetCorp: row.target_corp,
-    targetName: row.target_name,
-    // A matchup entry has no winner concept; a result carries one (null = draw).
-    ...(row.kind === 'result' ? { winnerCorp: row.winner_corp } : {}),
-  };
+/** One feed row, whatever its kind (AVA-9 + CORP-1). `ON CONFLICT (id) DO NOTHING` is the
+ *  idempotency the feed promises: a corp fact's id is derived from the fact. */
+const FEED_INSERT = `INSERT INTO ava_feed
+     (id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp, detail)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+   ON CONFLICT (id) DO NOTHING`;
+
+function feedValues(entry: FeedEntry): unknown[] {
+  if (isAvaFeedEntry(entry)) {
+    return [
+      entry.id,
+      entry.at,
+      entry.kind,
+      entry.challengerCorp,
+      entry.challengerName,
+      entry.targetCorp,
+      entry.targetName,
+      entry.winnerCorp ?? null,
+      null,
+    ];
+  }
+  const detail =
+    entry.kind === 'level'
+      ? { level: entry.level }
+      : entry.kind === 'medal'
+        ? { medalId: entry.medalId }
+        : null;
+  return [
+    entry.id,
+    entry.at,
+    entry.kind,
+    entry.corpId,
+    entry.corpName,
+    null,
+    null,
+    null,
+    detail === null ? null : JSON.stringify(detail),
+  ];
 }
 
-/** Postgres AvA feed store (AVA-9) — append-only, newest-first with an `at` cursor. */
+/** A stored row back to its entry; null for a kind or detail this build cannot read. */
+function feedEntryOf(row: FeedRow): FeedEntry | null {
+  const at = Number(row.at);
+  switch (row.kind) {
+    case 'matchup':
+    case 'result':
+      return {
+        id: row.id,
+        at,
+        kind: row.kind,
+        challengerCorp: row.challenger_corp,
+        challengerName: row.challenger_name,
+        targetCorp: row.target_corp ?? '',
+        targetName: row.target_name ?? '',
+        // A matchup entry has no winner concept; a result carries one (null = draw).
+        ...(row.kind === 'result' ? { winnerCorp: row.winner_corp } : {}),
+      };
+    case 'founded':
+      return { id: row.id, at, kind: 'founded', corpId: row.challenger_corp, corpName: row.challenger_name };
+    case 'level': {
+      const level = row.detail?.level;
+      return typeof level === 'number' && Number.isSafeInteger(level)
+        ? { id: row.id, at, kind: 'level', corpId: row.challenger_corp, corpName: row.challenger_name, level }
+        : null;
+    }
+    case 'medal': {
+      const medalId = row.detail?.medalId;
+      return typeof medalId === 'string'
+        ? { id: row.id, at, kind: 'medal', corpId: row.challenger_corp, corpName: row.challenger_name, medalId }
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Postgres public corporation feed store (AVA-9, CORP-1) — append-only, newest-first
+ *  with an `at` cursor. */
 export class PostgresAvaFeedStore implements AvaFeedStore {
   constructor(private readonly pool: Pool) {}
 
-  async append(entry: AvaFeedEntry): Promise<void> {
+  async append(entry: FeedEntry): Promise<void> {
+    await this.pool.query(FEED_INSERT, feedValues(entry));
+  }
+
+  async recent(
+    limit = DEFAULT_FEED_LIMIT,
+    before?: number,
+    kinds?: readonly FeedKind[],
+  ): Promise<FeedEntry[]> {
+    const r = await this.pool.query<FeedRow>(
+      `SELECT id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp, detail
+       FROM ava_feed
+       WHERE ($2::bigint IS NULL OR at < $2) AND ($3::text[] IS NULL OR kind = ANY($3))
+       ORDER BY at DESC, id DESC LIMIT $1`,
+      [limit, before ?? null, kinds ? [...kinds] : null],
+    );
+    return r.rows.flatMap((row) => feedEntryOf(row) ?? []);
+  }
+}
+
+interface AnnouncementRow {
+  id: string;
+  at: string;
+  kind: string;
+  pinned: boolean;
+  until_at: string | null;
+  title_ru: string;
+  title_en: string;
+  body_ru: string;
+  body_en: string;
+}
+
+function announcementOf(row: AnnouncementRow): NewsAnnouncement {
+  return {
+    id: row.id,
+    at: Number(row.at),
+    kind: row.kind as NewsAnnouncementKind, // the CHECK constraint admits these three only
+    pinned: row.pinned,
+    until: row.until_at === null ? null : Number(row.until_at),
+    title: { ru: row.title_ru, en: row.title_en },
+    body: { ru: row.body_ru, en: row.body_en },
+  };
+}
+
+/** Postgres admin announcements (CORP-1). A removal stamps `removed_at`; the row stays. */
+export class PostgresAnnouncementStore implements AnnouncementStore {
+  constructor(private readonly pool: Pool) {}
+
+  async add(a: NewsAnnouncement): Promise<void> {
     await this.pool.query(
-      `INSERT INTO ava_feed
-         (id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO announcements (id, at, kind, pinned, until_at, title_ru, title_en, body_ru, body_en)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO NOTHING`,
-      [
-        entry.id,
-        entry.at,
-        entry.kind,
-        entry.challengerCorp,
-        entry.challengerName,
-        entry.targetCorp,
-        entry.targetName,
-        entry.winnerCorp ?? null,
-      ],
+      [a.id, a.at, a.kind, a.pinned, a.until, a.title.ru, a.title.en, a.body.ru, a.body.en],
     );
   }
 
-  async recent(limit = DEFAULT_FEED_LIMIT, before?: number): Promise<AvaFeedEntry[]> {
-    const r =
-      before === undefined
-        ? await this.pool.query<FeedRow>(
-            `SELECT id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp
-             FROM ava_feed ORDER BY at DESC, id DESC LIMIT $1`,
-            [limit],
-          )
-        : await this.pool.query<FeedRow>(
-            `SELECT id, at, kind, challenger_corp, challenger_name, target_corp, target_name, winner_corp
-             FROM ava_feed WHERE at < $2 ORDER BY at DESC, id DESC LIMIT $1`,
-            [limit, before],
-          );
-    return r.rows.map(feedEntryOf);
+  async active(now: number): Promise<NewsAnnouncement[]> {
+    const r = await this.pool.query<AnnouncementRow>(
+      `SELECT id, at, kind, pinned, until_at, title_ru, title_en, body_ru, body_en FROM announcements
+       WHERE removed_at IS NULL AND (until_at IS NULL OR until_at > $1)
+       ORDER BY at DESC, id DESC LIMIT $2`,
+      [now, ACTIVE_ANNOUNCEMENTS_MAX],
+    );
+    return r.rows.map(announcementOf);
+  }
+
+  async recent(limit: number): Promise<NewsAnnouncement[]> {
+    const r = await this.pool.query<AnnouncementRow>(
+      `SELECT id, at, kind, pinned, until_at, title_ru, title_en, body_ru, body_en FROM announcements
+       WHERE removed_at IS NULL ORDER BY at DESC, id DESC LIMIT $1`,
+      [limit],
+    );
+    return r.rows.map(announcementOf);
+  }
+
+  async remove(id: string, at: number): Promise<boolean> {
+    const r = await this.pool.query(
+      `UPDATE announcements SET removed_at = $2 WHERE id = $1 AND removed_at IS NULL`,
+      [id, at],
+    );
+    return (r.rowCount ?? 0) === 1;
   }
 }
 
@@ -1685,19 +2019,37 @@ const SESSION_COLS = 'match_id, matchup_id, map_id, seats, at, war_at, war_decla
  *  `create` atomically one-per-matchup and one-per-instance; a duplicate raises the
  *  insert conflict → `E_SESSION_EXISTS` (the orchestrator treats that as "already built"). */
 export class PostgresAvaSessionStore implements AvaSessionStore {
-  async pendingResults(limit = 100): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>> {
-    const result = await this.pool.query<{ match_id: string; matchup_id: string; winner: string | null }>(
+  async pendingResults(
+    limit = 100,
+  ): Promise<Array<{ matchId: string; matchupId: string; winner: string | null }>> {
+    const result = await this.pool.query<{
+      match_id: string;
+      matchup_id: string;
+      winner: string | null;
+    }>(
       `SELECT s.match_id,s.matchup_id,m.state->'match'->>'winner' AS winner
        FROM ava_sessions s JOIN matches m ON m.id=s.match_id
        LEFT JOIN ava_result_delivery d ON d.match_id=s.match_id
-       WHERE m.status='ended' AND (d.match_id IS NULL OR (NOT d.delivered AND d.retry_at<=$2)) ORDER BY COALESCE(d.attempts,0),s.at,s.match_id LIMIT $1`, [limit, Date.now()]);
-    return result.rows.map((r) => ({ matchId: r.match_id, matchupId: r.matchup_id, winner: r.winner }));
+       WHERE m.status='ended' AND (d.match_id IS NULL OR (NOT d.delivered AND d.retry_at<=$2)) ORDER BY COALESCE(d.attempts,0),s.at,s.match_id LIMIT $1`,
+      [limit, Date.now()],
+    );
+    return result.rows.map((r) => ({
+      matchId: r.match_id,
+      matchupId: r.matchup_id,
+      winner: r.winner,
+    }));
   }
   async markResultRetry(matchId: string): Promise<void> {
-    await this.pool.query('INSERT INTO ava_result_delivery(match_id,attempts,retry_at) VALUES($1,1,$2) ON CONFLICT(match_id) DO UPDATE SET attempts=ava_result_delivery.attempts+1,retry_at=$2', [matchId, Date.now()+5000]);
+    await this.pool.query(
+      'INSERT INTO ava_result_delivery(match_id,attempts,retry_at) VALUES($1,1,$2) ON CONFLICT(match_id) DO UPDATE SET attempts=ava_result_delivery.attempts+1,retry_at=$2',
+      [matchId, Date.now() + 5000],
+    );
   }
   async markResultDelivered(matchId: string): Promise<void> {
-    await this.pool.query('INSERT INTO ava_result_delivery(match_id,delivered) VALUES($1,true) ON CONFLICT(match_id) DO UPDATE SET delivered=true', [matchId]);
+    await this.pool.query(
+      'INSERT INTO ava_result_delivery(match_id,delivered) VALUES($1,true) ON CONFLICT(match_id) DO UPDATE SET delivered=true',
+      [matchId],
+    );
   }
 
   constructor(private readonly pool: Pool) {}
@@ -1820,7 +2172,8 @@ export class PostgresArsenalStore implements ArsenalStore {
   constructor(private readonly pool: Pick<Pool, 'query'>) {}
 
   async grant(item: OwnedArsenalItem): Promise<void> {
-    await this.pool.query( // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
+    await this.pool.query(
+      // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
       `INSERT INTO arsenal (${ARSENAL_COLS})
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (item_id) DO NOTHING`,
@@ -1880,10 +2233,10 @@ export class PostgresArsenalStore implements ArsenalStore {
   }
 
   async consume(itemId: string, accountId: string): Promise<boolean> {
-    const r = await this.pool.query(
-      `DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`,
-      [itemId, accountId],
-    );
+    const r = await this.pool.query(`DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`, [
+      itemId,
+      accountId,
+    ]);
     return (r.rowCount ?? 0) > 0;
   }
 
@@ -1909,25 +2262,54 @@ export class PostgresCorpRentStore implements CorpRentStore {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
-      const removed = await db.query<CorpRentRow>('DELETE FROM corp_arsenal_rent WHERE matchup_id=$1 AND item_id=$2 RETURNING *', [matchupId, itemId]);
+      const removed = await db.query<CorpRentRow>(
+        'DELETE FROM corp_arsenal_rent WHERE matchup_id=$1 AND item_id=$2 RETURNING *',
+        [matchupId, itemId],
+      );
       const row = removed.rows[0];
-      if (!row) { await db.query('COMMIT'); return false; }
-      const updated = await db.query('UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-1) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id', [itemId, row.corp_id]);
+      if (!row) {
+        await db.query('COMMIT');
+        return false;
+      }
+      const updated = await db.query(
+        'UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-1) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id',
+        [itemId, row.corp_id],
+      );
       if (updated.rowCount !== 1) throw Error('E_CORP_ITEM_MISSING');
       const eventId = JSON.stringify(['rent_return', matchupId, itemId]);
-      const entry: CorpAuditEntry = { eventId, corpId: row.corp_id, at, actor: 'system', action: 'rent_return', target: row.account_id, detail: itemId };
-      await db.query('INSERT INTO corp_return_audit(event_id,matchup_id,entry) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING', [eventId, matchupId, JSON.stringify(entry)]);
+      const entry: CorpAuditEntry = {
+        eventId,
+        corpId: row.corp_id,
+        at,
+        actor: 'system',
+        action: 'rent_return',
+        target: row.account_id,
+        detail: itemId,
+      };
+      await db.query(
+        'INSERT INTO corp_return_audit(event_id,matchup_id,entry) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING',
+        [eventId, matchupId, JSON.stringify(entry)],
+      );
       await db.query('COMMIT');
       return true;
-    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
-    finally { db.release(); }
+    } catch (error) {
+      await db.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      db.release();
+    }
   }
   async pendingReturnAudits(matchupId: string): Promise<CorpAuditEntry[]> {
-    const result = await this.pool.query<{ entry: CorpAuditEntry }>('SELECT entry FROM corp_return_audit WHERE matchup_id=$1 AND NOT delivered ORDER BY event_id', [matchupId]);
+    const result = await this.pool.query<{ entry: CorpAuditEntry }>(
+      'SELECT entry FROM corp_return_audit WHERE matchup_id=$1 AND NOT delivered ORDER BY event_id',
+      [matchupId],
+    );
     return result.rows.map((row) => row.entry);
   }
   async markReturnAudited(eventId: string): Promise<void> {
-    await this.pool.query('UPDATE corp_return_audit SET delivered=true WHERE event_id=$1', [eventId]);
+    await this.pool.query('UPDATE corp_return_audit SET delivered=true WHERE event_id=$1', [
+      eventId,
+    ]);
   }
 
   constructor(private readonly pool: Pool) {}
@@ -2135,11 +2517,17 @@ export class PostgresPushStore implements PushStore {
 
   async save(accountId: string, sub: PushSubscriptionRecord): Promise<void> {
     await this.pool.query(
-      `INSERT INTO push_subscriptions (account_id, endpoint, p256dh, auth)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO push_subscriptions (account_id, endpoint, p256dh, auth, kinds)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (account_id) DO UPDATE
-         SET endpoint = $2, p256dh = $3, auth = $4`,
-      [accountId, sub.endpoint, sub.keys.p256dh, sub.keys.auth],
+         SET endpoint = $2, p256dh = $3, auth = $4, kinds = $5`,
+      [
+        accountId,
+        sub.endpoint,
+        sub.keys.p256dh,
+        sub.keys.auth,
+        sub.kinds ? sub.kinds.join(',') : null,
+      ],
     );
   }
 
@@ -2148,11 +2536,22 @@ export class PostgresPushStore implements PushStore {
   }
 
   async of(accountId: string): Promise<PushSubscriptionRecord | undefined> {
-    const r = await this.pool.query<{ endpoint: string; p256dh: string; auth: string }>(
-      `SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE account_id = $1`,
-      [accountId],
-    );
+    const r = await this.pool.query<{
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+      kinds: string | null;
+    }>(`SELECT endpoint, p256dh, auth, kinds FROM push_subscriptions WHERE account_id = $1`, [
+      accountId,
+    ]);
     const row = r.rows[0];
-    return row ? { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } } : undefined;
+    if (!row) return undefined;
+    const kinds =
+      row.kinds === null ? undefined : PUSH_KINDS.filter((k) => row.kinds!.split(',').includes(k));
+    return {
+      endpoint: row.endpoint,
+      keys: { p256dh: row.p256dh, auth: row.auth },
+      ...(kinds ? { kinds } : {}),
+    };
   }
 }

@@ -2,8 +2,7 @@
  * Краденая разведка: окна интела и журнал шпионажа (REFM-28).
  *
  * Модуль ядра выдаёт ОГРАНИЧЕННЫЕ ПО ВРЕМЕНИ окна (`state.intel[me]`), а клиентский туман
- * их чтит: окно `planet` опознаёт узел, окно `fleets` показывает флоты цели сквозь туман,
- * окно `treasury` читает список дипломатии. То же самое делает `visibleState` на сервере —
+ * их чтит: окно `planet` опознаёт узел (с SPY-8 других видов нет). То же самое делает `visibleState` на сервере —
  * здесь это повторяется только потому, что соло-режим проекцию не гоняет и считает туман
  * сам, по полному состоянию.
  *
@@ -18,11 +17,22 @@
  * Журнал шпионажа — сессионный и ОГРАНИЧЕННЫЙ: без потолка он рос бы весь матч, а окно
  * вкладки показывает последние строки.
  */
-import type { IntelGrant } from '../../packages/shared-core/src/index';
+import {
+  BASE_SPY_AGENTS,
+  type GameState,
+  type IntelGrant,
+} from '../../packages/shared-core/src/index';
+import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
 
 /** Базовая цена одной попытки — зеркало `BASE_COST` модуля ядра. Это ПОДПИСЬ на кнопке:
  *  авторитетно ядро, оно же отвергает попытку с `E_INSUFFICIENT`, когда денег мало. */
 export const SPY_COST = 150;
+
+/** Сеть агентов игрока сейчас (SPY-6). Размер — база ядра `BASE_SPY_AGENTS`: как и
+ *  `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */
+export function myAgents(s: GameState, me: string): SpyAgents {
+  return spyAgents(s.spyAgents?.[me], BASE_SPY_AGENTS, s.time);
+}
 
 /** Сколько строк держит сессионный журнал шпионажа. */
 export const SPY_LOG_MAX = 30;
@@ -39,7 +49,7 @@ export function liveGrants(grants: readonly IntelGrant[] | undefined, now: numbe
   return (grants ?? []).filter((g) => g.until > now);
 }
 
-/** Цели живых окон одного вида: id миров (`planet`) или id игроков (`fleets`/`treasury`). */
+/** Цели живых окон одного вида: id миров (`planet`). */
 export function targetsOf(grants: readonly IntelGrant[], kind: IntelGrant['kind']): Set<string> {
   const out = new Set<string>();
   for (const g of grants) if (g.kind === kind) out.add(g.target);

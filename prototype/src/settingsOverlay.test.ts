@@ -643,3 +643,65 @@ describe('настройки — окно и обработчики', () => {
     expect(w.win.shown()).toBe(false);
   });
 });
+
+describe('настройки — уведомления (UIX-4.4)', () => {
+  const push = (over: Partial<NonNullable<SettingsView['push']>> = {}) => ({
+    state: 'on' as const,
+    kinds: ['attacked', 'built'] as const,
+    failed: false,
+    ...over,
+  });
+
+  it('вкладка есть только там, где браузер умеет push, и стоит последней', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('data-settab="push"');
+    const html = settingsBoxHtml(viewOf({ push: push() }));
+    expect(html).toContain(`>${t('settings.tab.push')}</button>`);
+    expect(html.indexOf('data-settab="controls"')).toBeLessThan(html.indexOf('data-settab="push"'));
+  });
+
+  it('без входа и при запрете в браузере — только что сделать, без выключателей', () => {
+    const guest = settingsBoxHtml(viewOf({ push: push({ state: 'guest' }) }), false, 'push');
+    expect(guest).toContain(t('settings.push.guest'));
+    expect(guest).not.toContain('id="set-push"');
+    const blocked = settingsBoxHtml(viewOf({ push: push({ state: 'blocked' }) }), false, 'push');
+    expect(blocked).toContain(t('settings.push.blocked'));
+    expect(blocked).not.toContain('id="set-push"');
+  });
+
+  it('выключено — один общий выключатель; включено — ещё четыре вида с их состоянием', () => {
+    const off = settingsBoxHtml(viewOf({ push: push({ state: 'off' }) }), false, 'push');
+    expect(off).toContain('id="set-push" type="checkbox" aria-label');
+    expect(off).not.toContain('id="set-push-attacked"');
+    const on = settingsBoxHtml(viewOf({ push: push() }), false, 'push');
+    expect(on).toContain('id="set-push" type="checkbox" checked');
+    expect(on).toContain('id="set-push-attacked" type="checkbox" checked');
+    expect(on).toContain('id="set-push-battle" type="checkbox" aria-label');
+    expect(on).toContain('id="set-push-built" type="checkbox" checked');
+    expect(on).toContain('id="set-push-researched" type="checkbox" aria-label');
+    expect(settingsBoxHtml(viewOf({ push: push({ failed: true }) }), false, 'push')).toContain(
+      t('settings.push.failed'),
+    );
+  });
+
+  it('выключатель вида зовёт свой сеттер, общий — включение и перерисовку по ответу', async () => {
+    const calls: unknown[] = [];
+    const w = wired(
+      {
+        setPush: async (on) => void calls.push(['push', on]),
+        setPushKind: async (kind, on) => void calls.push([kind, on]),
+      },
+      viewOf({ push: push() }),
+    );
+    w.api.open();
+    w.win.tab('push');
+    const battle = w.win.node('set-push-battle')!;
+    battle.checked = true;
+    w.win.fire('set-push-battle');
+    expect(calls).toEqual([['battle', true]]);
+    const master = w.win.node('set-push')!;
+    master.checked = false;
+    w.win.fire('set-push');
+    await Promise.resolve();
+    expect(calls).toContainEqual(['push', false]);
+  });
+});

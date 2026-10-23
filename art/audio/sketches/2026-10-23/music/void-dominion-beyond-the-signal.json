@@ -1,0 +1,46 @@
+{
+  "title": "Beyond the Signal / За пределами сигнала",
+  "project": "Void Dominion / Sector Zero",
+  "kind": "Original procedural electronic music demonstrator",
+  "duration_seconds": 96.0,
+  "bpm": 90,
+  "meter": "4/4",
+  "tonal_center": "A; A/E fifth family shared with existing send/start UI signals",
+  "theme_notes": "A - E - B - C; an altered B-flat shade in the alien section",
+  "sample_rate": 48000,
+  "channels": 2,
+  "pcm_bits": 16,
+  "peak_dbfs": -2.8001161890920208,
+  "rms_dbfs": -15.92938565287174,
+  "stereo_correlation": 0.900411213754096,
+  "sections": [
+    {
+      "from": 0,
+      "to": 32,
+      "name": "Карта / спокойное исследование",
+      "rms_dbfs": -16.799994243608168
+    },
+    {
+      "from": 32,
+      "to": 64,
+      "name": "Нарастание напряжения / пульс",
+      "rms_dbfs": -15.102080845303886
+    },
+    {
+      "from": 64,
+      "to": 88,
+      "name": "Рой / изменение знакомого сигнала",
+      "rms_dbfs": -15.868977087896571
+    },
+    {
+      "from": 88,
+      "to": 96,
+      "name": "Возвращение A/E / затухание",
+      "rms_dbfs": -16.659837287772284
+    }
+  ],
+  "size_bytes": 18432044,
+  "external_samples": false,
+  "seamless_loop": false,
+  "verification": "WAV decoded and checked for format, finite samples, headroom and near-zero endpoints. No subjective listening claimed."
+}

@@ -21,6 +21,16 @@ profile, production signing, store updates, save safety, listing requirements,
 testing, moderation, and optional monetization. It does **not** claim that a
 store-ready APK exists or change the existing dev/player release lanes below.
 
+## RuStore profile verification
+
+`node rustore-smoke.mjs` (from `mobile/`, with no generated `android/` directory)
+builds the actual release profile with an ephemeral signing key and explicitly
+synthetic configuration. Requires locked dependencies, JDK 21, Android SDK/build-tools,
+`openssl` and `unzip`. It restores `capacitor.config.json` and deletes test keys/APK;
+only `dist/rustore-smoke.json` is retained. The PR/merge-group workflow runs this
+without release credentials. This verifies packaging, not device installation or
+approval to publish. See [the drill report](../docs/reviews/rustore-release-drill-2026-10-18.md).
+
 ## Install on a phone (easiest)
 
 Every push to `main` that touches the game refreshes **two rolling prereleases**
@@ -111,7 +121,7 @@ don't publish a release):
    **`void-dominion-player-apk`** (player client) artifact.
 3. Sideload `app-debug.apk` (enable "install from unknown sources").
 
-## Build locally (needs JDK 17 + Android SDK)
+## Build locally (needs JDK 21 + Android SDK)
 
 ```bash
 cd mobile
@@ -132,8 +142,8 @@ A local build leaves `versionCode 1` and ships no `window.__BUILD__`, so its upd
 dormant — those are injected by CI from the git commit count; the native hook still
 compiles locally, which is the point of running it here.
 
-Requirements: JDK 17, Android SDK (set `ANDROID_HOME`), and accepted SDK licenses.
-`gradlew` downloads its own Gradle. Capacitor 6 ⇒ JDK 17.
+Requirements: JDK 21, Android SDK (set `ANDROID_HOME`), and accepted SDK licenses.
+`gradlew` downloads its own Gradle. The locked Capacitor 8 toolchain requires JDK 21 (see `package-lock.json`).
 
 ## Notes
 
@@ -145,3 +155,10 @@ Requirements: JDK 17, Android SDK (set `ANDROID_HOME`), and accepted SDK license
 - App id `com.voiddominion.prototype`, name "Void Dominion".
 - CI action versions are tag-pinned for now; SHA-pin them with the pipeline-hardening
   brick (SD-6.1) alongside the other workflows.
+
+
+## Канал RuStore
+
+Для сетевой игры подготовлен отдельный release workflow. См.
+[инструкцию выпуска и удаления аккаунтов](../docs/security/rustore-preparation.md).
+Debug APK и `debug.keystore` не используются для магазина. Публикация пока выключена.

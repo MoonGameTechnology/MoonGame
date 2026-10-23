@@ -13,10 +13,12 @@ import type {
   PlayerReward,
   SignatureContact,
   StateDelta,
+  VictoryRules,
 } from '@void/shared-core';
 import {
   CLIENT_ACTION_TYPES,
   diffState,
+  effectiveVictoryRules,
   flashBattles,
   getStance,
   hashState,
@@ -126,6 +128,12 @@ export interface MatchRoomOptions {
   clientActionTypes?: readonly string[];
   /** Observation-only room-event stream for metrics/playtest logging (M0). */
   observe?: (event: RoomObservation) => void;
+  /** Accepted human chat only, after sanitizing, rate limiting and relay. The host
+   *  may schedule an NPC response; server messages never re-enter this callback. */
+  onChat?: (message: Readonly<ChatMessage>) => void;
+  /** Server-owned speakers (for example persistent bots). Omit to disable the
+   *  internal DM sender; a wire peer can never choose a different sender. */
+  serverChatAllowed?: (playerId: PlayerId) => boolean;
   securityAudit?: SecurityAudit;
   /** Deterministic-replay recorder (RPL-2): receives every advance boundary the room
    *  actually executed (pure `{at}` entries — timer ticks and pre-action catch-ups)
@@ -490,6 +498,18 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['fleet.merge.pending', 'owner'],
   ['refuge.found', 'owner'],
   ['fleet.halted', 'owner'],
+  // Espionage (SPY-8): every event names its world (`planetId`), and anyone who sees that
+  // world must still not read who spied on it, nor the victim the thief's success.
+  ['espionage.sent', 'owner'],
+  ['espionage.aborted', 'owner'],
+  ['espionage.failed', 'owner'],
+  ['intel.stolen', 'owner'],
+  ['espionage.succeeded', 'owner'],
+  ['espionage.posted', 'owner'],
+  ['espionage.recalled', 'owner'],
+  ['espionage.counter.caught', 'owner'],
+  ['espionage.counter.lost', 'owner'],
+  ['espionage.detected', 'owner'],
 ]);
 
 export class MatchRoom {
@@ -523,6 +543,8 @@ export class MatchRoom {
   private readonly snapshotBytes = new WeakMap<RoomPeer, number>();
   private readonly securityAudit?: SecurityAudit;
   private readonly observe?: (event: RoomObservation) => void;
+  private readonly onChat?: (message: Readonly<ChatMessage>) => void;
+  private readonly serverChatAllowed?: (playerId: PlayerId) => boolean;
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
   private readonly persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
@@ -544,10 +566,13 @@ export class MatchRoom {
   /** True while a batch of server orders is in flight: without it a tick could read a
    *  state whose previous batch has not been applied yet and re-issue the same moves. */
   private serverOrdersBusy = false;
-  /** playerId → accountId for the room's life (see `addPeer`'s `accountId` param).
-   *  Only ever set, never cleared on disconnect — the same seat is always the same
-   *  account for a given match. */
+  private serverOrdersWork: Promise<void> = Promise.resolve();
+  /** playerId → accountId until the seat is explicitly released (see `evict`).
+   *  Ordinary disconnects keep the binding; a kick lets the next owner replace it. */
   private readonly playerAccountId = new Map<PlayerId, string>();
+  /** Changes on identity/seat revocation, including when no peer is connected.
+   *  An async handshake must not admit a lookup made before that revocation. */
+  private admissionVersion = 0;
   /** The actor mailbox (SV-0.2): serializes state-touching operations whose critical
    *  section spans an `await` — a committed submit (its persist) and a lobby `start`
    *  — so one runs fully before the next, and neither interleaves with the other's
@@ -676,6 +701,8 @@ export class MatchRoom {
     // throwing observer can't escape a commit/broadcast (a metrics bug must not take
     // the match down) — every `this.observe(...)` call site is guarded for free.
     this.securityAudit = options.securityAudit;
+    this.onChat = options.onChat;
+    this.serverChatAllowed = options.serverChatAllowed;
     const raw = options.observe;
     this.observe = raw
       ? (event): void => {
@@ -834,6 +861,12 @@ export class MatchRoom {
     return this.config?.modeId;
   }
 
+  /** Public rules from the same resolver the victory evaluator uses, including
+   *  effective defaults. The fresh allowlisted copy keeps the pinned config private. */
+  get victoryRules(): VictoryRules {
+    return effectiveVictoryRules(this.config);
+  }
+
   get state(): GameState {
     return this.stateValue;
   }
@@ -885,7 +918,11 @@ export class MatchRoom {
   }
 
   hasPlayer(playerId: PlayerId): boolean {
-    return this.stateValue.players[playerId] !== undefined;
+    return Object.hasOwn(this.stateValue.players, playerId) && this.stateValue.players[playerId] !== undefined;
+  }
+
+  get admissionRevision(): number {
+    return this.admissionVersion;
   }
 
   addPeer(
@@ -906,8 +943,8 @@ export class MatchRoom {
       return false;
     }
     // LARS-1: remember which account this seat is, for the live arsenal-ownership
-    // read at unit.build admission (options.arsenalStore). Never trust a later,
-    // different value for the same seat within one room's life.
+    // read at unit.build admission (options.arsenalStore). Only a seat release
+    // (`evict`) clears this binding for the next owner.
     if (accountId && !this.playerAccountId.has(playerId))
       this.playerAccountId.set(playerId, accountId);
     // Одно живое соединение на кресло — но выигрывает НОВОЕ, а не старое.
@@ -967,8 +1004,7 @@ export class MatchRoom {
       this.hashDueAt.set(playerId, this.now() + phase * STATE_HASH_EVERY_MS);
     }
     // Кто именно сидит на этом сокете. Отдельно от `playerAccountId`: та карта хранит
-    // ПЕРВОГО владельца кресла на всю жизнь комнаты (и правильно делает — это договор
-    // арсенала), а для перехвата нужен тот, кто сидит сейчас.
+    // владельца до ЯВНОГО освобождения кресла, а для перехвата нужен тот, кто сидит сейчас.
     this.peerAccountId.set(peer, accountId);
     this.observe?.({ kind: 'join', playerId, ...(accountId ? { accountId } : {}) });
     if (this.manualStart && this.host === null) this.host = playerId; // first in hosts
@@ -1064,14 +1100,16 @@ export class MatchRoom {
    * с кодом, потом закрытие.
    *
    * Отсоединение — НЕ выход из партии: место в мире остаётся, за ним доигрывает ИИ, и
-   * следующий вошедший садится в это кресло. Уборку `peers` делает обычный путь
-   * `removePeer` по событию закрытия сокета — дублировать её здесь значило бы посчитать
-   * `leave` дважды в метриках.
+   * следующий вошедший садится в это кресло. Сокет снимается СИНХРОННО, чтобы уже
+   * отправленные кадры не дошли до ядра после кика; повторный `removePeer` по событию
+   * закрытия ничего не делает и не удваивает метрики.
    *
    * Возвращает число закрытых соединений (0 — игрока сейчас нет на связи; кик от этого
    * не перестаёт быть выполненным, он про кресло, а не про сокет).
    */
   evict(playerId: PlayerId, code: ServerErrorCode = 'E_KICKED'): number {
+    this.admissionVersion += 1;
+    this.playerAccountId.delete(playerId);
     const playerPeers = this.peers.get(playerId);
     if (!playerPeers) return 0;
     let closed = 0;
@@ -1080,6 +1118,8 @@ export class MatchRoom {
       // 1000 «normal closure»: это не сбой связи, и клиенту не за что цепляться
       // авто-переподключением — причину он уже получил кадром выше.
       peer.close?.(1000, code);
+      // Already-buffered messages may arrive before the close handshake completes.
+      this.removePeer(playerId, peer);
       closed += 1;
     }
     return closed;
@@ -1100,6 +1140,7 @@ export class MatchRoom {
    * вернётся в своё кресло с новой сессией.
    */
   evictAccount(accountId: string, code: ServerErrorCode): number {
+    this.admissionVersion += 1;
     let closed = 0;
     for (const [playerId, playerPeers] of [...this.peers]) {
       for (const peer of [...playerPeers]) {
@@ -1633,7 +1674,7 @@ export class MatchRoom {
     if (orders.length === 0) return;
     this.serverOrderSeq += orders.length;
     this.serverOrdersBusy = true;
-    detach('приказы серверной автоматики', (async () => {
+    this.serverOrdersWork = (async () => {
       try {
         for (const action of orders) {
           await this.submitServerAction(action.playerId, action);
@@ -1643,7 +1684,22 @@ export class MatchRoom {
       } finally {
         this.serverOrdersBusy = false;
       }
-    })());
+    })();
+    detach('приказы серверной автоматики', this.serverOrdersWork);
+  }
+
+  /** After the host stops ingress and drivers, await already accepted work before
+   * taking its final snapshot. Internal batches may enqueue their next action only
+   * after the previous commit, so the mailbox alone is not the whole drain. */
+  async drain(): Promise<void> {
+    // An unexpected batch rejection is logged by detach; it must not skip saving
+    // unrelated accepted actions or the world's final snapshot.
+    await this.serverOrdersWork.catch(() => {});
+    let pending: Promise<void>;
+    do {
+      pending = this.mailbox;
+      await pending;
+    } while (pending !== this.mailbox);
   }
 
   /** Wall-ms until the soonest scheduled event comes due — what an offline wakeup
@@ -2418,6 +2474,34 @@ export class MatchRoom {
       msg.to = message.to;
     }
     this.chatWindow.record(playerId, wall);
+    this.relayChat(msg);
+    try {
+      this.onChat?.(Object.freeze({ ...msg }));
+    } catch {
+      // An optional responder must never break an already accepted human message.
+    }
+  }
+
+  /** Host-only DM, using the ordinary privacy, sanitization, flood limit and
+   *  bounded reconnect history. Does not create peers or emit human joins. */
+  sendServerChat(from: PlayerId, to: PlayerId, rawText: string): boolean {
+    if (!this.serverChatAllowed?.(from) || from === to ||
+        this.state.match.status === 'ended' ||
+        this.state.players[from]?.status !== 'active' ||
+        this.state.players[to]?.status !== 'active') return false;
+    const wall = this.now();
+    if (this.chatWindow.limited(from, wall)) return false;
+    const text = sanitizeChatText(rawText, CHAT_TEXT_MAX);
+    if (!text) return false;
+    this.chatWindow.record(from, wall);
+    this.relayChat({
+      id: `chat:${from}:${opaqueId()}`,
+      from, to, channel: 'dm', text, at: this.clock(),
+    });
+    return true;
+  }
+
+  private relayChat(msg: ChatMessage): void {
     this.chatHistory.push(msg);
     if (this.chatHistory.length > CHAT_HISTORY_MAX) this.chatHistory.shift();
     for (const [pid, peers] of this.peers) {

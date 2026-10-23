@@ -207,26 +207,6 @@
           "count": 2
         }
       ]
-    },
-    "p2_patrol": {
-      "owner": "p2",
-      "location": "open_reach",
-      "units": [
-        {
-          "unit": "frigate",
-          "count": 1
-        }
-      ]
-    },
-    "p2_guard": {
-      "owner": "p2",
-      "location": "target",
-      "units": [
-        {
-          "unit": "frigate",
-          "count": 2
-        }
-      ]
     }
   }
 }

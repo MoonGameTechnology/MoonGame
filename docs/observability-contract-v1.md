@@ -10,8 +10,11 @@ provisioning. Это не утверждение о rollout на VPS, node/DB ex
 
 ## Принятый профиль и экраны
 
-Один VPS, отдельные процессы/тома/лимиты мониторинга. Первый доступ — только
-SSH-туннель к Grafana на loopback; публичного операторского ingress нет.
+Один VPS, отдельные процессы/тома/лимиты мониторинга. Исходный доступ —
+SSH-туннель к Grafana на loopback. Дополнение владельца2026-10-18:
+[профиль первого VPS](../deploy/observability/VPS.md) допускает отдельный HTTPS
+site с обязательным клиентским сертификатом и персональным Grafana login;
+Prometheus/Loki/Alloy и Game metrics наружу не публикуются.
 Владелец явно выбрал **уведомления только в закрытом пульте**, без внешних
 сообщений. Contact point и внешний dead-man отложены: отсутствие всего VPS
 таким контуром не обнаруживается снаружи. Не записывать фиктивный успешный test-send.
@@ -40,7 +43,7 @@ SSH-туннель к Grafana на loopback; публичного операто
 | Target / путь | Клиент и credential | Доступ / сеть | Период / timeout |
 | --- | --- | --- | --- |
 | Game `/health`, `/ready` | ограниченный Game exporter, без пользовательского токена | Внутренняя сеть; публичные probes сохраняют нынешний контракт | 15 с / default 1500 мс, cap 2 с |
-| Game `/metrics`, `/metrics/summary` | Game exporter, host `METRICS_TOKEN` ≥32 символов | Внутренняя сеть; Caddy продолжает запрещать публичные `/metrics*` | 15 с / default 1500 мс, cap 2 с |
+| Game `/metrics`, `/metrics/summary`, `/metrics/activity` | Game exporter, host `METRICS_TOKEN` ≥32 символов | Внутренняя сеть; Caddy продолжает запрещать публичные `/metrics*` | 15 с / default 1500 мс, cap 2 с |
 | Game `/metrics/recent`, `/metrics/health` | Не опрашивать в scrape | Первый читает raw файл целиком, второй содержит накопленные alert/max | Нет periodic scrape |
 | Game exporter `:9108/metrics` | Prometheus | Только наблюдательная сеть, без host-port | 15 с / 2 с |
 | node_exporter `:9100/metrics` | Prometheus, allowlist collectors | Хостовые числа без процессов/env/SSH/Docker socket в контейнере | 15 с / 2 с |
@@ -76,6 +79,9 @@ Game Prometheus-имена ниже реализованы в standalone OBS-1.1
 | `moongame_build_info{version}` → `/health.version` | G=1, hex SHA 7–40 знаков | Один текущий build; отсутствие версии — unknown |
 | `moongame_game_ready` → `/ready.ready` | G, 0/1 | 503 с `ready:false` — известная неготовность, не успех liveness |
 | `moongame_matches`, `moongame_connections` → `/metrics.matches`, `.connections` | G, rooms / WS sockets | Rooms registry не равны активным боям; socket не равен человеку |
+| `moongame_players_online` → `/metrics/activity.online` | G, уникальные аккаунты | Foreground heartbeat ≤70с; sockets не считаются игроками |
+| `moongame_player_activity_{since,sample}_timestamp_seconds` → activity since/at | G, Unix seconds | Начало сбора и свежесть снимка; ms → s |
+| `moongame_player_activity_daily_{players,visits,online_seconds}{day}` → activity.days | G, accounts / заходы / игроко-секунды | ≤30 суток UTC, union вкладок/устройств; текущий день неполный. [Семантика/retention](../deploy/observability/PLAYER-ACTIVITY.md) |
 | `moongame_joins_total`, `moongame_leaves_total` → summary joins/leaves | C, events | За жизнь процесса, не за сутки |
 | `moongame_actions_total{outcome}` → actions.ok/rejected | C, actions; outcome=`ok,rejected` | Сумма должна совпадать с actions.total; неизвестная схема — invalid |
 | `moongame_action_types_total{type}` → actions.byType | C, actions; известные типы манифеста | Не создавать совместный outcome×type: источник не даёт cross-tab |
@@ -89,7 +95,17 @@ Game Prometheus-имена ниже реализованы в standalone OBS-1.1
 | `moongame_journal_{written,dropped,failed}_total{stream}` → journal.match/client | C, lines; stream=`match,client` | Написанная строка не подтверждает доставку в Loki |
 | `moongame_telemetry_{batches,events,dropped_events,rejected,limited}_total` → telemetry | C, соответствующие events/requests | Приём != аналитический дедуп; не считать raw строки уникальными событиями |
 | `moongame_active_installs` → telemetry.activeInstalls | G, browser installs | Скользящие 5 мин; не пользователи онлайн |
-| CPU busy, available RAM, FS bytes/inodes, IO → node_exporter | G / host counters, seconds/bytes/count | До включения exporter baseline использует /proc + statfs; IO не измерен CLI |
+| `moongame_host_cpu_seconds_total{mode}` → host observer `os.cpus()` | C, seconds; mode=user/nice/sys/idle/irq | Сумма по CPU, ms→seconds; busy — отношение rates, не loadavg |
+| `moongame_host_cpu_count`, `moongame_host_load1` → host observer | G, CPUs / runnable tasks | Весь VPS, не отдельный матч |
+| `moongame_host_memory_{total,available}_bytes` → `/proc/meminfo` | G, bytes | Именно MemAvailable, не MemFree |
+| `moongame_host_root_{size,available}_bytes`, `moongame_host_root_{inodes,free_inodes}` → `statfs('/')` | G, bytes / count | Root FS; IO пока не измеряется |
+| `moongame_observer_sample_timestamp_seconds` → atomic textfile publication | G, Unix seconds | Dashboard скрывает данные при age≥45s; error сохраняет старый timestamp |
+| `moongame_container_{source_up,present,resources_up}{container}` → fixed host timer | G,0/1; container=game/postgres/proxy/grafana/prometheus/loki/alloy | Ошибка Docker — source_up0, present отсутствует; absent — present0; cgroup failure — resources_up0 |
+| `moongame_container_{state,health}{container}` → inspect projection | G, enum | state:0created/1running/2paused/3restarting/4exited/5dead/6removing; health:-1none/0unhealthy/1healthy/2starting |
+| `moongame_container_{restart_count,oom_killed,started_timestamp_seconds}{container}` → inspect | G, count /0–1 /Unix seconds | RestartCount только automatic за жизнь текущего контейнера; не журнал ручных рестартов |
+| `moongame_container_{memory_bytes,memory_working_set_bytes,memory_limit_bytes,cpu_limit_cores}{container}` → cgroup v2 | G, bytes /cores | current включает cache; working set=max(0,current-inactive_file); limit0=unlimited, процент не строится |
+| `moongame_container_{cpu_seconds_total,cpu_throttled_seconds_total,memory_limit_hits_total,oom_kills_total}{container}` → cgroup v2 | C, seconds /events | Сброс при пересоздании; CPU rate относительно quota, не число матчей |
+| `moongame_container_sample_timestamp_seconds` → atomic containers.prom | G, Unix seconds | Отдельный15s producer; age≥45s скрывает текущие значения, ошибка записи не обновляет timestamp |
 | DB up/connections → ограниченный DB exporter | G, 0/1 / connections | Game ready проверяет только свой store, не заменяет весь DB health |
 | backup/restore last success → независимые verified job markers | G, Unix seconds | Сейчас not_configured; наличие локального файла не даёт success |
 | p95 submit/broadcast/RTT → H buckets в OBS-2.3 | H, seconds | Пока not_implemented; из avg/max/slow JSONL вычислять запрещено |
@@ -111,10 +127,12 @@ counters источника; его рестарт не добавляет offse
 но exporter не получает socket ради него. Persisted summary и live counters
 не суммируются; сравнение baseline с новым startedAt помечается reset/incomparable.
 
-Labels только environment/instance/service/source/stream/outcome/type/code/version/le;
+Labels только environment/instance/service/source/stream/outcome/type/code/version/le/mode/container/day;
 на ряд разрешены только перечисленные для него значения. Бюджет всего стенда
 ≤25 000 active series, ≤256 известных action types и ≤64 reject codes (+other).
 Никаких matchId/playerId/actor/install/session/IP/URL/query/текста исключения в labels.
+`day` разрешён только трём `moongame_player_activity_daily_*`: ISO UTC date из
+текущего 30-дневного окна, ≤30 значений на instance. Это не label игрока/сессии.
 При исчерпании бюджета новые ряды отклоняются со счётчиком, не создаются бесконечно.
 
 ## Privacy, хранение и лимиты
@@ -136,18 +154,19 @@ Raw игровые JSONL не являются technical stream. До OBS-0.3/2.
 | Raw JSONL | 7 UTC-дней или 1 GiB, что наступит раньше | Очистка/удаление субъекта — OBS-0.3; сейчас не исполняется |
 | Derived product aggregates | Не дольше исходного 7-дневного окна; erase + пересчёт/checkpoint | Worker ещё не установлен; D1 после реализации, D7/D30 unavailable |
 | Grafana / Alloy | State ≤256 MiB / positions+spool ≤256 MiB | Не установлены |
-| RAM caps | Grafana 256, Prometheus 384, Loki 384, Alloy 128, Game/node/DB exporter по 64 MiB | Всего 1344 MiB; report worker отдельно ≤256 MiB |
+| RAM caps после первого VPS запуска | Grafana768, Prometheus384, Loki384, Alloy256, Game/node/DB exporter по64MiB, container timer96MiB | План2080MiB; текущий объединённый observer вместо трёх exporter —1952MiB. Report worker отдельно ≤256MiB |
 | Monitoring CPU/disk | В среднем <0.5 core, диск ≤6 GiB; Game лимиты не уменьшать | Нужна on/off и 24 ч приёмка после установки |
 | Запас хоста | ≥12 GiB свободно; local backup budget ≤8 GiB при его включении | Бэкапы отложены; не считать бюджет готовым backup |
 
 Малые когорты/неполные UTC-окна показываются с n и качеством, не как ноль.
-Внешнее хранение и публичный доступ не включены этим профилем. TTL требует
+Внешнее хранение не включено; публичный HTTPS ingress допускается только отдельным
+профилем выше с client certificate + login. TTL требует
 удаления spool/derived copies и не заменяет права доступа или erasure.
 
 ## Локальный Game exporter — OBS-1.1
 
 `node deploy/observability/game-exporter.mjs` слушает 127.0.0.1:9108; читает только
-literal loopback четыре Game routes. Ports настраиваются числом, URL/hostname не
+literal loopback пять Game routes. Ports настраиваются числом, URL/hostname не
 принимаются. [Runbook](../deploy/observability/GAME-EXPORTER.md) описывает private
 plain token file, bounded refresh и отсутствие автоматического Compose wiring.
 Таблица target matrix выше сохраняет целевой сетевой профиль; текущий CLI не

@@ -29,13 +29,20 @@ export async function bundleNetserver() {
     platform: 'node',
     target: 'node22',
     // `ws`, `pg` и `fastify` тащат нативные/опциональные части и динамические require
-    // (avvio/find-my-way/pino) — оставляем их Node на рантайм. Всё остальное (@void/*
-    // TS-исходники и игра) вбандливается. Зеркалит packages/server/dev.mjs.
-    external: ['nodemailer', 'ws', 'pg', 'fastify'],
+    // (avvio/find-my-way/pino) — оставляем их Node на рантайм. `web-push` — CommonJS с
+    // `require('crypto')` внутри: вбандленный в ESM, он роняет хост на старте («Dynamic
+    // require of "crypto" is not supported», UIX-4.4; ловит productionBoot.test.mjs). Всё
+    // остальное (@void/* TS-исходники и игра) вбандливается. Зеркалит packages/server/dev.mjs.
+    external: ['nodemailer', 'ws', 'pg', 'fastify', 'web-push'],
   });
   await build({
     entryPoints: ['packages/server/src/databaseAdmin.ts'],
     outfile: 'packages/server/dist/database-admin.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
+  });
+  await build({
+    entryPoints: ['scripts/account-erasure.ts'],
+    outfile: 'packages/server/dist/account-erasure.mjs',
     bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
   });
   await build({

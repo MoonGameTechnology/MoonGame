@@ -350,6 +350,12 @@ export const BuildingLevelSchema = z.object({
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
+  /** Прибавка к шансу раскрыть вражеского шпиона на этом уровне (0.15 = +15 п.п.).
+   *  См. одноимённое поле в `BuildingDefSchema`. */
+  spyDetectBonus: z.number().nonnegative().default(0),
+  /** Прибавка к шансу, что раскрытый шпион погибнет, на этом уровне (0.1 = +10 п.п.).
+   *  См. одноимённое поле в `BuildingDefSchema`. */
+  spyKillBonus: z.number().nonnegative().default(0),
   /** Доля ускорения постройки юнитов на этом уровне (0.5 = +50% скорости, т.е.
    *  buildTime × (1 − 0.5)). Применяется к `unit.build` на планете, где стоит это
    *  здание. 0 = нет бонуса. */
@@ -501,6 +507,15 @@ export const BuildingDefSchema = z.object({
    *  `data/buildings.json` нет вовсе: ядро знало про контент, которого у него не было.
    *  Теперь эффект объявляет само здание, как уже объявляет `produces`/`radarRange`. */
   creditsBonus: z.number().default(0),
+  /** Контрразведка (SPY-7). Прибавка к шансу, что владелец здания раскроет вражеского
+   *  шпиона (0.15 = +15 п.п. к базе `espionageModule`). Действует на любую попытку
+   *  против владельца, а не только на свой мир: казну и флоты крадут не с планеты.
+   *  Из нескольких таких зданий игрока считается сильнейшее, а не сумма. */
+  spyDetectBonus: z.number().nonnegative().default(0),
+  /** Контрразведка (SPY-7). Прибавка к шансу, что РАСКРЫТЫЙ шпион погибнет (0.1 = +10 п.п.
+   *  к базе `espionageModule`). Охват и правило «сильнейшее, а не сумма» — как у
+   *  `spyDetectBonus`. */
+  spyKillBonus: z.number().nonnegative().default(0),
   /** Доля ускорения постройки юнитов (0.5 = +50% скорости). См. BuildingLevelSchema. */
   buildSpeedBonus: z.number().nonnegative().default(0),
 });
@@ -1322,6 +1337,8 @@ export const ModeVictorySchema = z
     dominationPercent: z.number().gt(0).max(1).optional(),
     scoreLimit: z.number().positive().optional(),
     coalitionFactor: z.number().positive().optional(),
+    /** `VictoryConfig.scripted`: the scenario, not a race, ends the match. */
+    scripted: z.literal(true).optional(),
   })
   .strict();
 
@@ -1464,6 +1481,18 @@ export const TechnologyRulesSchema = z
     starting: z.array(z.string()).optional(),
     dayGates: z.boolean().default(true),
     exclude: z.array(z.string()).default([]),
+  })
+  .strict();
+
+/** Цены партии, которые объявляет карта (`MatchMap.pricing`, `util/pricing.ts`):
+ *  множители к цене каталога по ресурсу, к срокам постройки и исследования и к
+ *  стартовому запасу места. Резолюция владельца 2026-10-18 делает корабли, юниты, здания
+ *  и технологии дорогими только в основной игре, а каталог у неё общий с Sector Zero. */
+export const MatchPricingSchema = z
+  .object({
+    cost: z.record(z.string(), z.number().positive()).optional(),
+    hours: z.number().positive().optional(),
+    start: z.record(z.string(), z.number().positive()).optional(),
   })
   .strict();
 
@@ -1646,8 +1675,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, spyDetectBonus, spyKillBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, spyDetectBonus, spyKillBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

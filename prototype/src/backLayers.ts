@@ -77,7 +77,9 @@ export type LayerVerdict =
 // `phoneNav.ts`, открытость — атрибут `hidden`, стили — в `mobile-console.css`, вне описи.
 // `phone-speed` — раскрытый ряд скорости телефона (UIX-3.2): узел — полоса скорости, которая
 // живёт всегда, раскрытость — класс `phone-speed-open` на `body` (`phoneSpeed.ts`).
+// `match-description` — нативный dialog: открытость задаёт showModal(), а не CSS display.
 export const EXTRA_LAYERS: readonly string[] = [
+  'match-description',
   'chain',
   'aim',
   'rail',
@@ -121,8 +123,10 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   //                         игрок в ней заперт: Back = «Пропустить», штатный выход тура
   ['playercard', 'layer'], // карточка игрока, z50
   ['diplo', 'layer'], // окно дипломатии, z49
+  ['coalwin', 'layer'], // окно коалиций, z49 (COAL-1)
   ['warprompt', 'layer'], // подтверждение объявления войны, z48
   ['abandon', 'layer'], // «Флот потерян» / «Завершить экспедицию?» (PVR-6.29), z48
+  ['pushask', 'layer'], // вопрос о push-уведомлениях (UIX-4.4), z48; Back — «Не сейчас»
   ['pingmenu', 'layer'], // композер пинга провинции, z47
   ['tech', 'layer'], // дерево технологий, z47
   ['buildwin', 'layer'], // окно построек мира (BUILD-1), z45 — ниже кодекса
@@ -136,6 +140,10 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['tgted', 'layer'], // меню точки в режиме «Приказ» (CHAIN-UX), z46
   ['logwin', 'layer'], // журнал, z46
   ['codexhub', 'layer'], // кодекс из хаба, z45
+  ['arsenal-sheet', 'layer'], // шторка арсенала хаба на телефоне — внутри хаба (z52), под кодексом из неё
+  ['shop-sheet', 'layer'], // шторка магазина хаба на телефоне — внутри хаба (z52), как у арсенала
+  ['news-sheet', 'layer'], // шторка ленты новостей «Домой» и карточка корпорации — внутри хаба (z52)
+  ['corp-sheet', 'layer'], // шторка вкладки «Корпорация»: здание, уровни, участник — внутри хаба (z52)
   ['pingpanel', 'layer'], // окно «Метки коалиции», z60
   ['pingpop', 'layer'], // всплывашка пинга, z45
   ['splitdlg', 'layer'], // диалог разделения флота, z45

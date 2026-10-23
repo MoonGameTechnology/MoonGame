@@ -353,7 +353,8 @@ describe('REFM-212 — двери гида и сети', () => {
     screen.prepareGuidedSetup();
     expect(screen.setupMapId).toBe('duel-1');
     const setup = screen.buildSetupConfig();
-    expect(setup.seats.map((s) => [s.id, s.start, s.faction])).toEqual([['p1', DUEL[0], 'amber']]);
+    expect(setup.seats.map((s) => [s.id, s.start, s.faction])).toEqual([['p1', DUEL[0], 'azure']]);
+    expect(setup.scientists).toEqual(['overseer', 'polymath']);
   });
 
   it('сетевой вход: карта и места от сервера, вход заперт до свободного мира', async () => {
