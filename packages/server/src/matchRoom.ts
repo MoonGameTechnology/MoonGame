@@ -13,7 +13,7 @@ import type {
   PlayerReward,
   SignatureContact,
   StateDelta,
-  VictoryConfig,
+  VictoryRules,
 } from '@void/shared-core';
 import {
   CLIENT_ACTION_TYPES,
@@ -863,7 +863,7 @@ export class MatchRoom {
 
   /** Public rules from the same resolver the victory evaluator uses, including
    *  effective defaults. The fresh allowlisted copy keeps the pinned config private. */
-  get victoryRules(): Required<VictoryConfig> {
+  get victoryRules(): VictoryRules {
     return effectiveVictoryRules(this.config);
   }
 

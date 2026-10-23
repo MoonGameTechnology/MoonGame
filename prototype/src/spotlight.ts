@@ -148,6 +148,12 @@ export class SpotlightTour {
     return this.running ? this.i : -1;
   }
 
+  /** Этап текущего шага; нет — тур не идёт или шаг без этапа (сценарий полигона, TRN-3). */
+  get stage(): string | undefined {
+    return this.running ? this.current.stage : undefined;
+  }
+
+
   /** Begin at the first step. An empty chain finishes immediately. */
   start(): void {
     if (this.running) return;

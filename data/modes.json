@@ -49,7 +49,7 @@
   "training": {
     "name": "Training Range",
     "teamFormat": "ffa",
-    "victory": { "dominationPercent": 1, "scoreLimit": 1000000 },
+    "victory": { "dominationPercent": 1, "scoreLimit": 1000000, "scripted": true },
     "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100, "fork_station": 100 }, "fleet": 90, "radarScale": 1.5 },
     "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }
   },

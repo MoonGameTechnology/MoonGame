@@ -109,9 +109,11 @@ try {
             await page.touchscreen.tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
           else await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
         } else if (!step.clock) {
+          // «Итог» ждёт объявленную контратаку (TRN-3): 25 игровых часов отсчёта и бой о
+          // форт поста — мелкий шаг упёрся бы в предел повторов.
           await page.evaluate(
             (hours) => window.__trainingTest.advance(hours),
-            step.id.endsWith('bombard-wait') ? 0.1 : 0.25,
+            step.id.endsWith('bombard-wait') ? 0.1 : step.id === 'finale.result' ? 2 : 0.25,
           );
         } else throw new Error(`missing control: ${step.id} ${step.target}`);
         await page.waitForTimeout(80);

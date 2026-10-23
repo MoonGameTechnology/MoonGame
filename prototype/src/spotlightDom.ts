@@ -319,6 +319,8 @@ export interface RunningTour {
   stop(): void;
   readonly active: boolean;
   readonly holdsClock: boolean;
+  /** Этап текущего шага: по нему сценарий полигона (TRN-3) вводит силы противника. */
+  readonly stage: string | undefined;
 }
 
 let current: SpotlightTour | null = null;
@@ -405,6 +407,9 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
     },
     get holdsClock() {
       return tour.holdsClock;
+    },
+    get stage() {
+      return tour.stage;
     },
   };
 }

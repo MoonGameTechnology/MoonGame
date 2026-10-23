@@ -371,7 +371,10 @@ export type MatchEndReason =
   | 'pve-operation'
   /** PVR-8.3: the main evacuation became impossible — fewer evacuees are left (delivered,
    *  under way and still waiting) than the contract needs. The NPC is the formal winner. */
-  | 'pve-evac-lost';
+  | 'pve-evac-lost'
+  /** TRN-3: the training ground's script — the counterattack broken and the target held.
+   *  Set by the scenario host of a `victory.scripted` mode, never by the victory module. */
+  | 'training-held';
 
 /** Операция союзника (PVR-7.4, §6.5): одна на жителя; новый приказ заменяет прежний. */
 export interface AllyOperation {

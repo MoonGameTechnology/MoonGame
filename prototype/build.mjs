@@ -1099,6 +1099,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #warprompt.calm .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
 #warprompt.calm .wp-body{color:var(--ink);}
 #warprompt.calm .wp-actions{flex-direction:column;}
+/* отсчёт контратаки полигона (TRN-3): табло под верхней панелью (её высота — --tbh у каждой
+   раскладки), тап сквозь него проходит */
+#trnraid{position:fixed;top:calc(var(--tbh,84px) + 8px);left:50%;transform:translateX(-50%);z-index:30;
+  max-width:calc(100vw - 24px);padding:6px 12px;border:1px solid var(--red);border-radius:8px;background:var(--glass);
+  color:var(--red);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;text-align:center;pointer-events:none;}
+#trnraid[hidden]{display:none;}
 /* вопрос о push (UIX-4.4): не военный — тот же спокойный циан, «Включить» без красного */
 #pushask{background:rgba(1,10,14,.6);}
 #pushask .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
@@ -5136,6 +5142,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="pingmenu"></div>
 <div id="fps"></div>
 <div id="banner"></div>
+<!-- Отсчёт объявленной контратаки учебного полигона (TRN-3, trainingScenario.ts) -->
+<div id="trnraid" role="timer" hidden></div>
 <div id="endscreen"></div>
 <div id="connect">
   <div class="cwrap">

@@ -171,6 +171,7 @@ window.__szTest = {
   // Учебный полигон (TRN): какая карта открыта и выведен ли герой игрока.
   mapId: () => s.mapId ?? null,
   heroAlive: () => Object.values(s.heroes ?? {}).some((h) => h.owner === ME && h.alive),
+  enemyFleets: () => Object.values(s.fleets).filter((f) => f.owner !== ME).map((f) => f.id).sort(),
 };`;
 
 /** Панель тестового комикса и заведомо битая картинка (панель без арта). */
@@ -851,6 +852,26 @@ try {
     await page.locator('#spotlight-chip').click();
     await page.locator('#spotlight .sl-skip-stage').click();
     assert.match(await page.locator('#spotlight .sl-count').innerText(), /2 .* 12/, 'полигон: этап пропущен');
+    // TRN-3: силы противника вводятся по этапам — на старте карта спокойна, на «Бою» (7)
+    // приходит патруль, на «Отходе» (8) — охрана цели; на «Закреплении» (11) объявлена
+    // контратака с отсчётом, и пока подсказка открыта, отсчёт ждёт.
+    assert.deepEqual(await page.evaluate(() => window.__szTest.enemyFleets()), [], 'полигон: на старте сил противника нет');
+    const toStage = async (n) => {
+      while (!new RegExp(`^\\D*${n} `).test(await page.locator('#spotlight .sl-count').innerText()))
+        await page.locator('#spotlight .sl-skip-stage').click();
+    };
+    await toStage(7);
+    await page.waitForFunction(() => window.__szTest.enemyFleets().includes('p2_patrol'));
+    assert(!(await page.evaluate(() => window.__szTest.enemyFleets())).includes('p2_guard'), 'полигон: охрана — не раньше «Отхода»');
+    await toStage(8);
+    await page.waitForFunction(() => window.__szTest.enemyFleets().includes('p2_guard'));
+    assert(await page.locator('#trnraid').isHidden(), 'полигон: до «Закрепления» контратака не объявлена');
+    await toStage(11);
+    await page.locator('#trnraid').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#trnraid').innerText(), /Контратака через \d+:\d\d\. Отсчёт ждёт|Counterattack in \d+:\d\d\. The countdown waits/, 'полигон: отсчёт ждёт чтения');
+    await page.locator('#spotlight .sl-fold').click();
+    await page.waitForFunction(() => !/ждёт|waits/.test(document.getElementById('trnraid').textContent));
+    await page.screenshot({ path: process.env.TRN3_SHOT ?? '/dev/null' }).catch(() => {});
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
@@ -858,7 +879,7 @@ try {
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +
-      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап;' +
+      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап; силы противника входят по этапам, контратака объявлена с отсчётом, который ждёт чтения;' +
       ' горячие клавиши ПК — только кнопки режима: в забеге B, M и 2 молчат, пробел — пауза с прежним темпом;' +
       ' подписи колонки инструментов под мышью — в своих кнопках\n',
   );

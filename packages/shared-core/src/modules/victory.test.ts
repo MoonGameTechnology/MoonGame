@@ -264,6 +264,30 @@ describe('victory module', () => {
     });
   });
 
+  it('a scripted scenario (TRN-3): a landless seat keeps its fleets and no race ends the match', () => {
+    const kernel = createKernel([victoryModule]);
+    const state: GameState = {
+      ...baseState(),
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p1') }, // p1 holds everything
+      fleets: { F1: fleet('F1', 'p1'), F2: fleet('F2', 'p2') },
+    };
+    const scripted: MatchConfig = { timeScale: 1, victory: { dominationPercent: 0.5, scoreLimit: 1, scripted: true } };
+
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR, scripted)));
+
+    // No elimination, no domination, no score ending: the scenario decides.
+    expect(r.state.players.p2?.status).toBe('active');
+    expect(r.state.fleets.F2).toBeDefined();
+    expect(r.state.match.status).not.toBe('ended');
+    expect(r.events.some((e) => e.type === 'player.eliminated')).toBe(false);
+    // The session cap still ends a scripted match that never resolves.
+    const capped = okAdvance(
+      kernel.advanceTo(state, ctx(2 * HOUR, { ...scripted, victory: { ...scripted.victory, endsAt: HOUR } })),
+    );
+    expect(capped.state.match.status).toBe('ended');
+    expect(effectiveVictoryRules(scripted)).not.toHaveProperty('scripted');
+  });
+
   it('ends by score when the score limit is reached', () => {
     const kernel = createKernel([victoryModule]);
     const state: GameState = {

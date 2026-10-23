@@ -6,6 +6,7 @@
  * с поперечной связью, станция маяка с нейтральной стороны — проверяются здесь числами:
  * любая правка координат может молча поменять карту.
  */
+import { RAID, STAGED_FORCES } from '../decisions/trainingScenario';
 import { describe, expect, it } from 'vitest';
 import { matchMapEdges, parseMatchMap, validateMatchMap, type MatchMap } from '../packages/shared-core/src/index';
 import {
@@ -88,6 +89,16 @@ describe('учебный полигон — противник и Рой (§14.2
       for (const u of f.units) expect(swarmUnits.has(u.unit), u.unit).toBe(false);
     for (const p of Object.values(state.planets))
       for (const b of p.buildings) expect(b.type.startsWith('swarm'), b.type).toBe(false);
+  });
+
+  it('силы противника не стоят на карте со старта: их вводит сценарий по этапам (TRN-3)', () => {
+    expect(Object.values(state.fleets).filter((f) => f.owner === 'p2')).toEqual([]);
+    for (const f of [...STAGED_FORCES, RAID]) {
+      expect(map.sectors[f.at], f.id).toBeDefined();
+      for (const u of f.units) expect(data.units[u.unit], u.unit).toBeDefined();
+    }
+    expect(map.sectors[RAID.to]).toBeDefined();
+    expect(data.modes.training?.victory.scripted).toBe(true);
   });
 
   it('режим без волн PvE — мир не заводит секцию забега, досье Роя не на чем стоять', () => {

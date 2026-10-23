@@ -38,6 +38,10 @@ export interface VictoryConfig {
   coalitionFactor?: number;
   /** Authoritative timestamp when the highest score wins. */
   endsAt?: number;
+  /** A scripted scenario decides the outcome, not a race (TRN-3, the training ground):
+   *  no elimination, domination or score ending, and a seat that lost its last world
+   *  keeps its fleets. Only the session-cap backstop still ends the match. */
+  scripted?: boolean;
 }
 
 /** Match-pinned configuration, versioned with the match (GDD §3.1 / §5.2). */
