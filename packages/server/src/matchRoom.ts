@@ -1,4 +1,4 @@
-import { censorChatText, containsBlockedLanguage, sanitizeChatText } from '@void/protocol';
+import { censorChatText, containsBlockedLanguage } from '@void/protocol';
 import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
