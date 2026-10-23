@@ -18,6 +18,8 @@ export interface OnboardState {
   stepReached: number;
   /** Walked the guide to the end. */
   completed: boolean;
+  /** The checklist bonus is per commander, including interrupted/replayed guides. */
+  goalsRewarded?: boolean;
   /** Chose to skip (respected forever — never nagged again). */
   skipped: boolean;
 }
@@ -54,6 +56,7 @@ export function parseOnboardState(raw: string | null): OnboardState {
       started: v.started === true,
       stepReached: step,
       completed: v.completed === true,
+      ...(v.goalsRewarded === true ? { goalsRewarded: true } : {}),
       skipped: v.skipped === true,
     };
   } catch {

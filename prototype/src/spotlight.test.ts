@@ -30,6 +30,33 @@ function fakeHost(present: Record<string, Rect> = {}) {
 
 const RECT: Rect = { left: 100, top: 100, width: 80, height: 30 };
 
+describe('live tutorial targets', () => {
+  it('re-locates a newly created fleet and keeps waiting when its panel is hidden', () => {
+    const h = fakeHost();
+    let selector: string | null = null;
+    const tour = new SpotlightTour([{ id: 'fleet', target: null, selector: () => selector,
+      copy: 'fleet', advance: { on: 'state', when: () => false }, gate: true }], h.host);
+    tour.start(); expect(h.last()?.target).toBeNull();
+    selector = '#fleet-2'; h.present[selector] = RECT; tour.refresh();
+    expect(h.last()?.target).toEqual(RECT);
+    delete h.present[selector]; tour.refresh();
+    expect(h.last()?.target).toBeNull(); expect(tour.active).toBe(true);
+  });
+  it('tracks camera movement without completing the task and respects missing tap anchors', () => {
+    const h = fakeHost();
+    let rect: Rect | null = RECT;
+    const step: SpotlightStep = { id: 'home', target: null, anchor: () => rect,
+      copy: 'home', advance: { on: 'state', when: () => false } };
+    const tour = new SpotlightTour([step], h.host);
+    tour.start(); rect = { ...RECT, left: 300 }; tour.refresh();
+    expect(h.last()?.target?.left).toBe(300);
+    rect = null; tour.refresh(); expect(tour.active).toBe(true);
+    const end = ender();
+    new SpotlightTour([{ ...step, advance: { on: 'tap' } }], h.host, end.onEnd).start();
+    expect(end.get()?.stopped).toBe(true);
+  });
+});
+
 /** Collects the single `TourResult` a tour ends with (or null if still running). */
 function ender() {
   let result: TourResult | null = null;

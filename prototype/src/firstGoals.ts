@@ -14,8 +14,8 @@ export interface Goal {
   labelKey: string; // ключ локали, рендерится через t()
 }
 
-/** Reach this score to close the last goal (home world alone is below it). */
-export const SCORE_GOAL = 100;
+/** Earn the first point beyond the start baseline; the first lesson is not a full match. */
+export const SCORE_GOAL = 1;
 
 /** The four first-match goals, in the order the guided match teaches them. */
 export const FIRST_GOALS: Goal[] = [
@@ -33,7 +33,7 @@ export interface GoalSignals {
   builtMine: boolean; // grew the Mine's output beyond the starting level
   launchedFleet: boolean; // raised a mobile fleet
   capturedWorld: boolean; // owns a world beyond the start
-  score: number; // current score
+  score: number; // points earned since the lesson began
 }
 
 /** Which goal ids are currently satisfied by the signals. */
