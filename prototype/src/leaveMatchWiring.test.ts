@@ -34,9 +34,10 @@ const handler = (id: string, src = SRC): string =>
 
 describe('REFM-205 — выход из партии одной дверью', () => {
   it('каждый выход из партии идёт через дверь', () => {
-    for (const id of ['hub-solo', 'ctest']) {
-      expect(handler(id), id).toContain('leaveMatch();');
-    }
+    expect(handler('ctest'), 'ctest').toContain('leaveMatch();');
+    // Кнопки хаба — у хаба (`hubScreen.ts`, REFM-220).
+    const HUB = readFileSync(new URL('./hubScreen.ts', import.meta.url), 'utf8');
+    expect(handler('hub-solo', HUB), 'hub-solo').toContain('leaveMatch();');
     expect(handler('tomenu', LIFE), 'tomenu').toContain('leaveMatch();');
     expect(handler('msolo-go', BROWSER), 'msolo-go').toContain('game.leaveMatch();');
     expect(SRC, 'msolo-go').toMatch(

@@ -11,6 +11,8 @@ import { en } from '../../localization/en';
 import { ru } from '../../localization/ru';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Хаб и его вкладки — у владельца, `hubScreen.ts` (REFM-220).
+const HUB = readFileSync(new URL('./hubScreen.ts', import.meta.url), 'utf8');
 // Дверь «Продолжить» рисует владелец слота схватки (REFM-213), подпись карты — `main.ts`.
 const SOLO = readFileSync(new URL('./soloCheckpoint.ts', import.meta.url), 'utf8');
 // «Мои партии» рисует владелец обозревателя (REFM-217), вкладку хаба ему даёт `main.ts`.
@@ -65,14 +67,14 @@ describe('главный экран хаба (UIX-10.1)', () => {
   it('рейтинг и друзья — плитки «Ещё»; пока открыты они, подсвечена «Ещё»', () => {
     expect(MORE).toContain('id="hub-rank"');
     expect(MORE).toContain('id="hub-friends"');
-    expect(MAIN).toContain(
+    expect(HUB).toContain(
       "document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));",
     );
-    expect(MAIN).toContain(
+    expect(HUB).toContain(
       "document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));",
     );
-    expect(MAIN).toContain("new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community'])");
-    expect(MAIN).toContain("const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;");
+    expect(HUB).toContain("new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community'])");
+    expect(HUB).toContain("const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;");
   });
 
   it('«Продолжить» называет партию: режим, карта и день', () => {
@@ -112,6 +114,6 @@ describe('главный экран хаба (UIX-10.1)', () => {
     expect(main).toContain('id="news-teaser"');
     expect(main).toContain('id="hub-mine"');
     // Лента перечитывается при каждом заходе «Домой», как и свои партии.
-    expect(MAIN).toContain("if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());");
+    expect(HUB).toContain("if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());");
   });
 });
