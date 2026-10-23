@@ -11,3 +11,5 @@ deploy/server.env
 deploy/migration.env
 deploy/certs
 .last-good-image
+# Listening drafts and offline synthesis sources are not production server assets.
+art/audio/sketches
