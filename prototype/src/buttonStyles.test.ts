@@ -98,9 +98,9 @@ function converted(part: string): boolean {
   // и «Создать сетевую игру».
   if (/#(setup|seatpick)(?![-\w])/.test(part) && /^\.(sgo|scancel|smapchip)\b/.test(s)) return true;
   if (/^#setup-network-create\b/.test(s)) return true;
-  // Арсенал хаба и шторка телефона: лист задаёт кнопкам только рост и отступы.
+  // Арсенал и корпорация хаба и их шторки: лист задаёт кнопкам только рост и отступы.
   if (
-    /#(hp-arsenal|arsenal-sheet)(?![-\w])/.test(part) &&
+    /#(hp-arsenal|arsenal-sheet|hp-corp|corp-sheet)(?![-\w])/.test(part) &&
     /(^|[(,\s])\.btn-(main|second|quiet)\b/.test(s)
   )
     return true;

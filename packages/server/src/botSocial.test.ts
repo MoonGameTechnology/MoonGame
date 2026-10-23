@@ -262,6 +262,34 @@ describe('bounded persistent bot DM responder', () => {
     expect(dead.human.texts()).toEqual(['hello']);
   });
 
+  it('drains a durable offer in flight without issuing a counter-offer or reply after stop', async () => {
+    let finish!: () => void;
+    const persisted: string[] = [];
+    const f = fixture({
+      stance: 'war',
+      persist: async (_snapshot, receipt) => {
+        await new Promise<void>((resolve) => { finish = resolve; });
+        persisted.push(receipt.playerId);
+      },
+    });
+    await f.send('/peace');
+    await f.deliver();
+    f.social.stop();
+    let drained = false;
+    const closing = f.social.drain().then(() => { drained = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(drained).toBe(false);
+    finish();
+    await closing;
+    expect(persisted).toEqual(['human']);
+    expect(getStance(f.room.state, 'human', 'bot')).toBe('war');
+    expect(getOffer(f.room.state, 'human', 'bot')).not.toBeNull();
+    expect(f.human.texts()).toEqual(['/peace']);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(persisted).toEqual(['human']);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('revoked consent cannot act for a new owner of the same seat', async () => {
     const f = fixture({ stance: 'war' });
     await f.send('давай мир');

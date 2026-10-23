@@ -316,19 +316,37 @@ export interface PlayerTechnologyState {
 export type DiplomaticStance = 'war' | 'peace' | 'pact' | 'alliance';
 
 
-/** A stolen, time-boxed intel window (espionage): while `until` is ahead of the
- *  world clock, `visibleState` lets the OWNING viewer see through the fog at the
- *  granted target. What each kind opens:
- *  - `treasury` — the target player's resource bag stays visible;
- *  - `planet`   — the granted world's contents (owner/garrison/buildings) read live;
- *  - `fleets`   — the target player's fleets stay in view (position + composition).
+/** A stolen, time-boxed intel window (espionage `recon`, SPY-8): while `until` is
+ *  ahead of the world clock, `visibleState` lets the OWNING viewer see the granted
+ *  world as identified — owner, garrison, buildings and the fleets in its orbit.
  *  Grants are produced by `espionageModule` and expire on their own. */
 export interface IntelGrant {
-  kind: 'treasury' | 'planet' | 'fleets';
-  /** `treasury`/`fleets` → target player id; `planet` → the granted planet id. */
+  kind: 'planet';
+  /** The granted planet id. */
   target: string;
   /** World-time (ms) the window closes. */
   until: number;
+}
+
+/** An espionage operation an agent is sent on (SPY-8). */
+export type SpyOp = 'recon' | 'sabotage' | 'theft' | 'research' | 'counter';
+
+/** An agent of the spy's network that is away (espionage, SPY-6): on a mission,
+ *  busy working a stolen window, slipping home after a failure, or — `lost` —
+ *  killed, with a replacement being found. Back in the network once `until` passes. */
+export interface AgentAway {
+  /** World-time (ms) the agent is available again. */
+  until: number;
+  /** The agent was killed; `until` is when the replacement is found. */
+  lost?: true;
+  /** On a mission (SPY-8): its id among the player's live missions, the operation and
+   *  the target world; `until` is when the mission resolves. */
+  mission?: number;
+  op?: SpyOp;
+  planetId?: PlanetId;
+  /** A counter-intelligence agent on post (SPY-11): it stays on `planetId` until
+   *  recalled or caught, and `until` is the `COUNTER_POSTED` sentinel. */
+  posted?: true;
 }
 
 export type MatchStatus = 'ongoing' | 'ended';
@@ -1117,6 +1135,9 @@ export interface GameState {
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;
+  /** Agents away from each spy's network (`espionageModule`, SPY-6). PRIVATE like
+   *  `intel`: a viewer's projection carries only their own network. */
+  spyAgents?: Record<PlayerId, AgentAway[]>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];

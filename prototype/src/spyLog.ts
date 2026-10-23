@@ -9,9 +9,9 @@
  *    кто послал агента; замеченную операцию — тот, у кого крали. В сети серверный фильтр
  *    тумана уже прячет их от второй стороны, и клиент обязан повторять тот же отбор:
  *    иначе одиночная игра покажет больше сетевой.
- * 2. **Успех называет ДОБЫЧУ по виду.** «Казна такого-то», «флоты такого-то», «мир такой-то»
- *    — у мира подставляется САМ МИР (а не его владелец), потому что «добыты сведения о
- *    мире» без имени мира не сведения, а намёк.
+ * 2. **Успех называет ДОБЫЧУ.** Разведка (SPY-8) добывает мир, и подставляется САМ МИР (а
+ *    не его владелец), потому что «добыты сведения о мире» без имени мира не сведения, а
+ *    намёк.
  * 3. **Каждое событие идёт в ДВА места: ленту и журнал шпионажа.** Лента коротка и
  *    переполняется боем, а вкладка «Шпионаж» — история операций; в журнале строка КОРОЧЕ,
  *    потому что там вокруг уже стоит контекст.
@@ -39,31 +39,16 @@ export function spyRepaint(kind: SpyEvent): 'before' | 'after' | 'never' {
   return 'never';
 }
 
-/** Чем названа добыча в строке успеха и какая подстановка ей нужна (правило 2). */
-export function bootyText(kind: string): {
-  key: 'log.spy.what.treasury' | 'log.spy.what.fleets' | 'log.spy.what.world';
-  /** `who` — жертва, `at` — сам мир. */
-  field: 'who' | 'at';
-} {
-  if (kind === 'treasury') return { key: 'log.spy.what.treasury', field: 'who' };
-  if (kind === 'fleets') return { key: 'log.spy.what.fleets', field: 'who' };
-  return { key: 'log.spy.what.world', field: 'at' };
-}
 
-/** Чем названа добыча в строке контрразведки — там имени жертвы уже не нужно (правило 4). */
-export function bootyKind(
-  kind: string,
-): 'log.spy.kind.treasury' | 'log.spy.kind.fleets' | 'log.spy.kind.world' {
-  if (kind === 'treasury') return 'log.spy.kind.treasury';
-  if (kind === 'fleets') return 'log.spy.kind.fleets';
-  return 'log.spy.kind.world';
-}
-
-/** Поймали вора или только заметили утечку (правило 4). */
-export function counterLine(spy: string | undefined | null): {
-  key: 'log.spy.caught' | 'log.spy.leak';
+/** Поймали вора или только заметили утечку (правило 4); убит ли раскрытый агент (SPY-7). */
+export function counterLine(
+  spy: string | undefined | null,
+  killed = false,
+): {
+  key: 'log.spy.caught' | 'log.spy.leak' | 'log.spy.caught.killed' | 'log.spy.leak.killed';
   /** Называется ли имя вора. */
   named: boolean;
 } {
-  return spy ? { key: 'log.spy.caught', named: true } : { key: 'log.spy.leak', named: false };
+  if (spy) return { key: killed ? 'log.spy.caught.killed' : 'log.spy.caught', named: true };
+  return { key: killed ? 'log.spy.leak.killed' : 'log.spy.leak', named: false };
 }

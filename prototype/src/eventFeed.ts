@@ -18,7 +18,7 @@ import type {
   GameState,
   StrikeBase,
 } from '../../packages/shared-core/src/index';
-import { engagementOf, flashBattles, inVisionBloc } from '../../packages/shared-core/src/index';
+import { engagementOf, flashBattles, inVisionBloc, MISSION_HOURS } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
@@ -59,7 +59,8 @@ import { EVENT_LOG_MAX, isRepeat, LOG_LINES, pushBounded } from './noteLog';
 import { tellBuild, tellHero, tellSteward } from './orderPipeline';
 import type { RecapEvent } from './recap';
 import { sectorRunActive } from './sectorRun';
-import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
+import { counterLine, spyRepaint } from './spyLog';
+import { spyDeed } from '../../decisions/spyDeed';
 import { squadronCallsignOf } from './squadronPanel';
 import { stewardMine } from './stewardLog';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
@@ -291,30 +292,86 @@ export function handleEvents(events: DomainEvent[]) {
       // операцию — ЖЕРТВА; пойманный вор называется по имени, неустановленный нет; у
       // кражи ростер перерисовывается ПОСЛЕ проверки адресата (появилась своя строка
       // разведки), у обнаружения — ДО неё (расположение бота двигается в любом случае).
+      // SPY-8: агент уходит на задание к миру, итог приходит в конце задания.
+      case 'espionage.sent':
+        if (p.owner === ME) {
+          const at = game.placeName(String(p.planetId));
+          note(t('log.spy.sent', { at, n: MISSION_HOURS }));
+          pushSpyLog(t('log.spy.sent.short', { at }));
+        }
+        break;
+      case 'espionage.aborted':
+        if (p.owner === ME) {
+          const at = game.placeName(String(p.planetId));
+          note(t('log.spy.aborted', { at }));
+          pushSpyLog(t('log.spy.aborted.short', { at }));
+        }
+        break;
       case 'intel.stolen': {
         if (p.owner !== ME) break;
-        const b = bootyText(p.kind as string);
-        const what =
-          b.field === 'who'
-            ? t(b.key, { who: NAME[p.target as string] ?? (p.target as string) })
-            : t(b.key, { at: game.placeName(String(p.intelPlanet ?? p.target)) });
-        note(t('log.spy.success', { what }));
-        pushSpyLog(t('log.spy.success.short', { what }));
+        const what = t('log.spy.what.world', { at: game.placeName(String(p.planetId)) });
+        // SPY-7: раскрытого агента могли убить — окно открыто, но агента нет.
+        const lostS = p.agentLost === true;
+        note(t(lostS ? 'log.spy.success.lost' : 'log.spy.success', { what }));
+        pushSpyLog(t(lostS ? 'log.spy.success.lost.short' : 'log.spy.success.short', { what }));
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
+      case 'espionage.succeeded': {
+        // SPY-9: саботаж и кража — итог исполнителю (`decisions/spyDeed.ts`).
+        const deed = p.owner === ME ? spyDeed(p) : null;
+        if (!deed) break;
+        const at = game.placeName(String(p.planetId));
+        const params: Record<string, number | string> = { ...deed.params, at };
+        if (typeof params.res === 'string') params.res = tData(params.res);
+        if (typeof params.tech === 'string')
+          params.tech = tData(data.technologies[params.tech]?.name ?? params.tech);
+        const line = t(deed.key, params) + (deed.lost ? ` ${t('log.spy.agent-lost')}` : '');
+        note(line);
+        pushSpyLog(line);
+        break;
+      }
+      // SPY-11: контрразведчик — пост, отзыв, поимка чужого и потеря своего.
+      case 'espionage.posted':
+      case 'espionage.recalled':
+        if (p.owner === ME) {
+          const line = t(e.type === 'espionage.posted' ? 'log.spy.posted' : 'log.spy.recalled', {
+            at: game.placeName(String(p.planetId)),
+          });
+          note(line);
+          pushSpyLog(line);
+        }
+        break;
+      case 'espionage.counter.caught':
+      case 'espionage.counter.lost':
+        if (p.owner === ME) {
+          const at = game.placeName(String(p.planetId));
+          const dead = p.killed === true || p.agentLost === true;
+          const line =
+            e.type === 'espionage.counter.caught'
+              ? t(dead ? 'log.spy.counter.caught.killed' : 'log.spy.counter.caught', {
+                  at,
+                  who: NAME[p.spy as string] ?? (p.spy as string),
+                })
+              : t(dead ? 'log.spy.counter.lost.killed' : 'log.spy.counter.lost', { at });
+          note(line);
+          pushSpyLog(line);
+        }
+        break;
       case 'espionage.failed':
         if (p.owner === ME) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
-          note(t('log.spy.fail', { who: whoF }));
-          pushSpyLog(t('log.spy.fail.short', { who: whoF }));
+          // SPY-6/7: убитый агент потерян — об этом владелец узнаёт сразу.
+          const lost = p.agentLost === true;
+          note(t(lost ? 'log.spy.fail.lost' : 'log.spy.fail', { who: whoF }));
+          pushSpyLog(t(lost ? 'log.spy.fail.lost.short' : 'log.spy.fail.short', { who: whoF }));
         }
         break;
       case 'espionage.detected': {
         if (spyRepaint('detected') === 'before' && diploOpen && diploTab === 'diplo') renderDiplo();
         if (p.owner !== ME) break;
-        const what = t(bootyKind(p.kind as string));
-        const c = counterLine(p.spy as string | undefined);
+        const what = t('log.spy.what.world', { at: game.placeName(String(p.planetId)) });
+        const c = counterLine(p.spy as string | undefined, p.killed === true);
         const line = c.named
           ? t(c.key, { who: NAME[p.spy as string] ?? (p.spy as string), what })
           : t(c.key, { what });
@@ -374,6 +431,8 @@ export function handleEvents(events: DomainEvent[]) {
           // «Экспедиция начата — Рой уже идёт» служебной строкой с именем фракции игрока.
           // Реплика в треде дипломатии выше остаётся.
           if (!sectorRunActive) note(`${na} → ${nb}: ${stanceRu(st)}`);
+          // SPY-11: войну объявило раскрытие шпиона, а не игрок — это стоит назвать.
+          if (p.cause === 'espionage') note(t('log.spy.war', { a: na, b: nb }));
         }
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;

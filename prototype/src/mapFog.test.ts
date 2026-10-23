@@ -170,7 +170,7 @@ describe('REFM-231 — зрение кадра', () => {
 });
 
 describe('REFM-231 — окна шпионажа', () => {
-  const grant = (kind: 'planet' | 'fleets', target: string, until: number) => (st: GameState) => {
+  const grant = (kind: 'planet', target: string, until: number) => (st: GameState) => {
     st.intel = { p1: [{ kind, target, until }] };
   };
 
@@ -186,7 +186,7 @@ describe('REFM-231 — окна шпионажа', () => {
     expect(gone.fog.known('E')).toBe(false);
   });
 
-  it('окно по флотам показывает флоты хозяина в тумане', async () => {
+  it('окно по миру показывает флоты у него в тумане (SPY-8)', async () => {
     const foe = fleet('f2', 'p2', 'E');
     const at = (st: GameState) => (st.fleets = { f2: foe, f1: fleet('f1', 'p1', 'A') });
     const plain = await boot(base(at));
@@ -197,7 +197,7 @@ describe('REFM-231 — окна шпионажа', () => {
     const spied = await boot(
       base((st) => {
         at(st);
-        grant('fleets', 'p2', 5000)(st);
+        grant('planet', 'E', 5000)(st);
       }),
     );
     spied.fog.refreshVision();
@@ -315,7 +315,6 @@ describe('REFM-231 — стык с main.ts', () => {
     for (const decl of [
       /export let vision\b/,
       /function computeVision\(/,
-      /let intelFleetOwners\b/,
       /const scans = /,
       /function updateMemory\(/,
     ]) {

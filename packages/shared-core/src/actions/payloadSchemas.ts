@@ -89,16 +89,10 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'technology.research': z.object({ technology: id }),
   // SES-3: sink the premium resource into one ACTIVE research (diminishing returns)
   'technology.boost': z.object({ technology: id }),
-  // espionage.ts — steal a time-boxed intel window; `planetId` only with kind 'planet'
-  'espionage.spy': z
-    .object({
-      target: id,
-      kind: z.enum(['treasury', 'planet', 'fleets']),
-      planetId: id.optional(),
-    })
-    .refine((v) => v.kind !== 'planet' || v.planetId !== undefined, {
-      message: "kind 'planet' needs a planetId",
-    }),
+  // espionage.ts — send an agent on an operation against one world (SPY-8)
+  'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'theft', 'research', 'counter']) }),
+  // SPY-11: call a counter-intelligence agent off its post (or off its way there)
+  'espionage.recall': z.object({ planetId: id }),
   // market.ts — amounts are plain positive numbers (resources accrue continuously,
   // so fractional amounts are legal); price is a positive unit price (≥ 1) — the
   // anti-wash-trade guard (SEC-A06-5): a `price: 0` listing is a free resource
@@ -141,8 +135,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // MAPSHARE-1: договор об обмене картами — отдельное соглашение поверх лестницы
   // стоек (заключение по взаимному согласию, расторжение одностороннее).
   'diplomacy.mapshare': z.object({ target: id, on: z.boolean() }),
-  // COAL-1: отказ от предложения стойки, выход из коалиции, её эмблема и описание.
+  // Coalition founding, declined offers, membership and public presentation.
   'diplomacy.decline': z.object({ target: id }),
+  'coalition.create': z.object({}),
   'coalition.leave': z.object({}),
   'coalition.edit': z.object({
     emblem: id,

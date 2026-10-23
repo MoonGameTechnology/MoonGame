@@ -158,6 +158,25 @@
 | UIX-15.4 | ✅ | proto | `docs/backlog.md` | Sector Zero — в палитре хаба. |
 | UIX-16.1 | ✅ | proto | `docs/backlog.md` | Стартовое меню — одним экраном. |
 | UIX-17.1 | ✅ | proto | `docs/backlog.md` | Страница «Матчи» — без полей адреса и позывного. |
+| CORP-1 | ✅ | srv | `docs/backlog.md` | Лента новостей на сервере: события корпораций и объявления. |
+| CORP-2 | ✅ | proto | `docs/backlog.md` | Лента на «Домой» вместо «Сводки». |
+| CORP-3 | ✅ | proto | `docs/backlog.md` | Вкладка «Корпорация» в хабе вместо «Альянсов». |
+| CORP-4 | ✅ | srv | `docs/backlog.md` | Битва корпораций загружается и считает победу по сторонам. |
+| CORP-5 | ⏳ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
+| CORP-6 | ⏳ | data srv | `docs/backlog.md` | Уровни корпорации 4 и 5. |
+| CORP-7 | 🔒 | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
+| CORP-8 | 🔒 | data srv | `docs/backlog.md` | Карта под формат. |
+| CORP-9 | 🔒 | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
+| CORP-10 | 🔒 | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
+| CORP-11 | 🔒 | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
+| CORP-12 | ⏳ | srv | `docs/backlog.md` | Медали игроков в ленте. |
+| CORP-13 | 🔒 | proto | `docs/backlog.md` | Картинки базы. |
+| SPY-6 | ✅ | core proto | `docs/backlog.md` | Сеть из 3 агентов. |
+| SPY-7 | ✅ | core data proto | `docs/backlog.md` | Бюро контрразведки |
+| SPY-8 | ✅ | core srv proto | `docs/backlog.md` | Цель — планета, операция 12 ч, разведка |
+| SPY-9 | ✅ | core srv proto | `docs/backlog.md` | Саботаж и кража ресурсов. |
+| SPY-10 | ✅ | core proto | `docs/backlog.md` | Кража исследований. |
+| SPY-11 | ✅ | core srv proto | `docs/backlog.md` | Контрразведчик и война. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

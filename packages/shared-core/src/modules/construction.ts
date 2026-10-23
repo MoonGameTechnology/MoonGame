@@ -723,6 +723,55 @@ function clearInfected(h: HandlerContext, planet: Planet, amount: number): void 
   planet.buildings = survivors;
 }
 
+/** One hit of {@link BuildingDamage}: `amount` HP off the building at `index` of
+ *  `planet.buildings` (indices as they stand BEFORE the call). */
+export interface BuildingHit {
+  index: number;
+  amount: number;
+}
+
+/**
+ * Capability `building.damage` (SPY-9): wear targeted damage on chosen buildings of one
+ * world — sabotage picks WHICH buildings, this module owns what damage means. A building
+ * whose HP reaches zero is removed and announced via `building.destroyed`, and the
+ * garrison it issued goes with it (`syncIssuedGarrison`), exactly as under bombardment.
+ * Returns what each hit did; unknown indices and undamageable buildings are skipped.
+ */
+export type BuildingDamage = (
+  h: HandlerContext,
+  planetId: string,
+  hits: readonly BuildingHit[],
+) => { building: string; destroyed: boolean }[];
+
+const damageChosenBuildings: BuildingDamage = (h, planetId, hits) => {
+  const planet = h.state.planets[planetId];
+  if (!planet) return [];
+  const out: { building: string; destroyed: boolean }[] = [];
+  const doomed = new Set<number>();
+  for (const hit of hits) {
+    const b = planet.buildings[hit.index];
+    const def = b ? h.ctx.data.buildings[b.type] : undefined;
+    if (!b || !def || doomed.has(hit.index) || buildingLevel(def, b.level).hp <= 0) continue;
+    if (!(hit.amount > 0)) continue;
+    b.hp = Math.max(0, b.hp - hit.amount);
+    const destroyed = b.hp <= 0;
+    if (destroyed) doomed.add(hit.index);
+    out.push({ building: b.type, destroyed });
+  }
+  if (doomed.size > 0) {
+    for (const i of [...doomed].sort((x, y) => x - y)) {
+      h.emit('building.destroyed', {
+        planetId,
+        building: planet.buildings[i]!.type,
+        owner: planet.owner,
+      });
+    }
+    planet.buildings = planet.buildings.filter((_, i) => !doomed.has(i));
+    syncIssuedGarrison(h, planet);
+  }
+  return out;
+};
+
 /**
  * Buildings — a base module (docs/modulesystem.md). It owns everything about
  * planet structures:
@@ -745,8 +794,10 @@ export const constructionModule: GameModule = {
   // 1.1.0: защита построек мира — доля каждой постройки, потолок 90%, штурм и обстрел (FORT-5.15).
   // 1.2.0: снос постройки пересчитывает прикрытие для остатка того же обстрела (FORT-5.16).
   // 1.3.0: бой с орудиями крепости на развилке ставит её стройку на паузу (Codex на #1410).
-  version: '1.4.0',
+  // 1.5.0: возможность `building.damage` — прицельный урон по выбранным постройкам (SPY-9).
+  version: '1.5.0',
   setup(api) {
+    api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;
       if (typeof payload?.planetId !== 'string' || typeof payload?.building !== 'string') {

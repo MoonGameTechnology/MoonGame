@@ -46,9 +46,10 @@ export function startBotArrivals(args: {
   join: () => Promise<unknown>;
   onError: (error: unknown) => void;
   random?: () => number;
-}): { stop(): void } {
+}): { stop(): void; drain(): Promise<void> } {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let inFlight: Promise<void> = Promise.resolve();
   const arm = (): void => {
     if (stopped || args.config.fillPercent === 0 || args.config.activeLimit === 0) return;
     const delay =
@@ -57,7 +58,7 @@ export function startBotArrivals(args: {
         (args.random ?? Math.random)() * (args.config.joinMaxMs - args.config.joinMinMs + 1),
       );
     timer = setTimeout(() => {
-      arrive().catch(args.onError);
+      inFlight = arrive().catch(args.onError);
     }, delay);
   };
   const arrive = async (): Promise<void> => {
@@ -75,6 +76,8 @@ export function startBotArrivals(args: {
       stopped = true;
       clearTimeout(timer);
     },
+    // Stop first, then let an already reserved seat finish its durable admission.
+    drain: () => inFlight,
   };
 }
 

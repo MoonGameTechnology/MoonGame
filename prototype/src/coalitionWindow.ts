@@ -2,11 +2,12 @@
  * Окно коалиций (COAL-1, заказ владельца 2026-10-20): список всех коалиций партии и
  * карточка одной коалиции — эмблема, описание, состав и вместимость.
  *
- * Коалиция — сущность ядра (`state/coalition.ts`): её создаёт принятый союз, потолок
- * состава держит сервер. Окно только показывает её и отдаёт два приказа: правку эмблемы
- * с описанием и выход. Открывается кнопкой полосы `#rail-coal`.
+ * Коалиция — сущность ядра (`state/coalition.ts`): игрок создаёт её явно или через
+ * принятый союз, потолок состава держит сервер. Окно отправляет намерения создания,
+ * правки и выхода. Открывается кнопкой полосы `#rail-coal`.
  */
 import { t } from '../../localization/runtime';
+import { canCreateCoalition } from '../../decisions/coalitionCreation';
 import {
   COALITION_DESC_MAX,
   COALITION_EMBLEMS,
@@ -18,7 +19,7 @@ import {
   type GameState,
 } from '../../packages/shared-core/src/index';
 import { esc } from './format';
-import { editCoalition, leaveCoalition } from './game';
+import { createCoalition, editCoalition, leaveCoalition } from '../../decisions/actions';
 
 /** Что окну нужно от игры. */
 export interface CoalitionWindowHost {
@@ -55,6 +56,8 @@ let viewing: string | null = null;
 let draftEmblem: string | null = null;
 /** Первый тап «выйти» только просит подтверждения. */
 let confirmLeave = false;
+/** Open the created card only after the authoritative state contains it. */
+let openMineOnSync = false;
 /** Что окно нарисовало последним: коалиции партии и описание в поле ввода. */
 let drawn = '';
 let drawnDesc = '';
@@ -100,6 +103,9 @@ function listHtml(): string {
     .join('');
   return (
     `<div class="cw-cap">${t('coal.capacity', { n: cap })}</div>` +
+    (canCreateCoalition(s, game.me())
+      ? `<button class="cw-create">${t('coal.create')}</button>`
+      : '') +
     (mine ? '' : `<div class="cw-hint">${t('coal.how')}</div>`) +
     `<div class="cw-list">${rows || `<div class="dp-empty">${t('coal.none')}</div>`}</div>`
   );
@@ -138,6 +144,7 @@ function cardHtml(c: Coalition): string {
     `<div class="cw-hero"><span class="cw-big">${glyph(emblem)}</span>` +
     `<span class="cw-main"><span class="cw-name">${titleOf(c)}</span>${seatsHtml(c, cap)}</span></div>` +
     `<div class="cw-sec">${t('coal.members')}</div><div class="cw-mems">${members}${slots}</div>` +
+    (mine ? `<div class="cw-hint">${t('coal.how')}</div>` : '') +
     picker +
     desc
   );
@@ -146,6 +153,11 @@ function cardHtml(c: Coalition): string {
 export function renderCoalitions(): void {
   const el = document.getElementById('coalwin');
   if (!el) return;
+  const mine = coalitionOf(game.state(), game.me());
+  if (openMineOnSync && mine) {
+    viewing = mine.id;
+    openMineOnSync = false;
+  }
   const card = viewing ? (game.state().coalitions?.[viewing] ?? null) : null;
   if (viewing && !card) viewing = null; // коалицию распустили, пока карточка была открыта
   // Недописанное описание переживает перерисовку от чужой правки.
@@ -163,7 +175,10 @@ export function renderCoalitions(): void {
 
 function signature(): string {
   const s = game.state();
-  return JSON.stringify([s.coalitions ?? null, coalitionCapacity(s)]);
+  return JSON.stringify([
+    s.modeId, game.me(), s.coalitions ?? null, coalitionCapacity(s),
+    canCreateCoalition(s, game.me()),
+  ]);
 }
 /** Новый снимок мира: перерисовать открытое окно, если коалиции изменились. Чужую
  *  правку эмблемы или описания событие не приносит — его видит только автор. */
@@ -176,11 +191,13 @@ export function openCoalitions(): void {
   viewing = null;
   draftEmblem = null;
   confirmLeave = false;
+  openMineOnSync = false;
   renderCoalitions();
   document.getElementById('coalwin')?.classList.add('show');
 }
 export function closeCoalitions(): void {
   coalOpen = false;
+  openMineOnSync = false;
   document.getElementById('coalwin')?.classList.remove('show');
 }
 
@@ -193,14 +210,24 @@ export function initCoalitionWindow(host: CoalitionWindowHost): void {
   el.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
     if (tg.id === 'coalwin' || tg.closest('.dp-close')) return closeCoalitions();
+    if (tg.closest('.cw-create')) {
+      if (!canCreateCoalition(game.state(), game.me())) return;
+      if (game.playerOrder(createCoalition(game.me()))) {
+        openMineOnSync = true;
+        renderCoalitions();
+      }
+      return;
+    }
     if (tg.closest('.cw-back')) {
       viewing = null;
       draftEmblem = null;
       confirmLeave = false;
+      openMineOnSync = false;
       return renderCoalitions();
     }
     const row = (tg.closest('[data-coal]') as HTMLElement | null)?.dataset.coal;
     if (row) {
+      openMineOnSync = false;
       viewing = row;
       draftEmblem = null;
       confirmLeave = false;

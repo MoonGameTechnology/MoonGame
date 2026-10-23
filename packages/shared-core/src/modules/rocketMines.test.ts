@@ -1325,12 +1325,6 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     expect(strike(advance(launch, fl.departedAt + 0.95 * (fl.arrivesAt - fl.departedAt)))).toBe(
       'ok',
     );
-    // Окно шпионажа по флотам хозяина открывает ракету и в проекции, и для удара: что видно,
-    // по тому и бьют (замечание Codex на #1503).
-    const spied = advance(launch, mid);
-    spied.intel = { q: [{ kind: 'fleets', target: 'p', until: spied.time + HOUR }] };
-    expect(visibleState(spied, 'q', data).fleets[m.id]).toBeDefined();
-    expect(strike(spied)).toBe('ok');
   });
 
   it('«Attack» on a missile is the same refusal as on a missing fleet (Codex, #1503)', () => {

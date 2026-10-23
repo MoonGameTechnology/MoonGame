@@ -10,7 +10,7 @@ export const CORPORATE_METHODS = {
   rosterStore: ['rosterOf'],
   resultStore: ['get', 'recent', 'statsForCorp'],
   feedStore: ['recent'],
-  ava: ['sweepExpired', 'sweepRosters', 'settleMatch', 'publicFeed', 'matchHistory'],
+  ava: ['sweepExpired', 'sweepRosters', 'settleMatch', 'cancelLocked', 'publicFeed', 'matchHistory'],
 } as const;
 export function corporateRemote<T extends object>(
   endpoint: CorporateEndpoint,

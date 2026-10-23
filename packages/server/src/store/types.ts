@@ -1,4 +1,4 @@
-import type { CorpBuildOrder, CorpInfrastructureResult } from '@void/protocol';
+import type { CorpBuildOrder, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
 import type { ArsenalItem, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
@@ -271,10 +271,13 @@ export const DEFAULT_CHALLENGES_LIMIT = 50;
 export const DEFAULT_LOCKED_MATCHUPS_LIMIT = 100;
 export const DEFAULT_RESULTS_LIMIT = 50;
 export const DEFAULT_FEED_LIMIT = 50;
+/** CORP-1: most announcements shown at once (the active ones are few; this bounds a mistake). */
+export const ACTIVE_ANNOUNCEMENTS_MAX = 50;
 
 export interface CorpStore {
   /** Settle elapsed construction/income, optionally order a level. Membership,
-   * debit, queue and audit commit together; only the head may spend influence. */
+   * debit, queue and audit commit together; only the head may spend influence. A settled
+   * headquarters of level 2+ also goes to the public feed in that commit (CORP-1). */
   infrastructure(
     corpId: string,
     actor: string,
@@ -282,11 +285,13 @@ export interface CorpStore {
     order?: CorpBuildOrder,
   ): Promise<CorpInfrastructureResult>;
   /** Create a corp with `head` as its Глава — atomic, so a duplicate name or an
-   *  already-membered founder can't slip in between check and insert. */
+   *  already-membered founder can't slip in between check and insert. The public feed's
+   *  «founded» row (CORP-1) commits with it, stamped `at` (default: now). */
   createCorp(
     name: string,
     headAccountId: string,
     headLogin: string,
+    at?: number,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }>;
   getCorp(corpId: string): Promise<CorpRecord | null>;
   /** Every corp with its accepted-member count, ordered by name (case-insensitive). */
@@ -406,10 +411,11 @@ export interface AvaChallengeStore {
   /** AVA-7: every LOCKED matchup (roster frozen), newest first — the orchestrator sweep
    *  reads these and raises a session for each one that has none yet. */
   lockedMatchups(limit?: number): Promise<AvaChallenge[]>;
-  /** AVA-8: atomic locked→ended transition (S7 archive). False = the row was NOT
-   *  locked and NOTHING changed — the exactly-once gate for settlement, so a replayed
-   *  `match.ended` can't award influence twice. */
-  endMatchup(id: string): Promise<boolean>;
+  /** AVA-8: atomic locked→ended transition (S7 archive); CORP-4: locked→cancelled when
+   *  no map fits the locked roster. False = the row was NOT locked and NOTHING changed —
+   *  the exactly-once gate for settlement, so a replayed `match.ended` can't award
+   *  influence twice, and a cancellation can't refund twice. */
+  endMatchup(id: string, status?: 'ended' | 'cancelled'): Promise<boolean>;
   close?(): Promise<void>;
 }
 
@@ -478,13 +484,54 @@ export interface AvaFeedEntry {
   winnerCorp?: string | null;
 }
 
-/** Persistence for the public AvA feed (AVA-9). Append-only; read newest-first with a
- *  simple `before`-`at` cursor for pagination. No private data ever enters it. */
+/** CORP-1 — a corporation's own public fact in the same feed: it was founded, reached a
+ *  level (= its headquarters level), or its AvA record reached a corp medal's condition.
+ *  The id is derived from the fact (`founded:<corp>`, `level:<corp>:<n>`,
+ *  `medal:<corp>:<medal>`), so a replayed write lands once. The name is snapshotted at
+ *  publish, like on the AvA rows. */
+export type CorpFeedKind = 'founded' | 'level' | 'medal';
+export interface CorpFeedEntry {
+  id: string;
+  at: number;
+  kind: CorpFeedKind;
+  corpId: string;
+  corpName: string;
+  /** `level` only. */
+  level?: number;
+  /** `medal` only: the catalog id (`data/medals.json`). */
+  medalId?: string;
+}
+
+/** Any row of the public corporation feed (AVA-9 + CORP-1). */
+export type FeedEntry = AvaFeedEntry | CorpFeedEntry;
+export type FeedKind = FeedEntry['kind'];
+export const AVA_FEED_KINDS: readonly AvaFeedKind[] = ['matchup', 'result'];
+
+export function isAvaFeedEntry(entry: FeedEntry): entry is AvaFeedEntry {
+  return entry.kind === 'matchup' || entry.kind === 'result';
+}
+
+/** Persistence for the public corporation feed (AVA-9, widened by CORP-1). Append-only,
+ *  idempotent by id; read newest-first with a simple `before`-`at` cursor for pagination.
+ *  No private data ever enters it. */
 export interface AvaFeedStore {
-  append(entry: AvaFeedEntry): Promise<void>;
-  /** Newest-first page (bounded by `limit`); `before` = an `at` cursor (exclusive). */
-  recent(limit?: number, before?: number): Promise<AvaFeedEntry[]>;
+  /** A second append with an id already stored changes nothing. */
+  append(entry: FeedEntry): Promise<void>;
+  /** Newest-first page (bounded by `limit`); `before` = an `at` cursor (exclusive);
+   *  `kinds` narrows the page (the AvA route reads only the AvA kinds). */
+  recent(limit?: number, before?: number, kinds?: readonly FeedKind[]): Promise<FeedEntry[]>;
   close?(): Promise<void>;
+}
+
+/** CORP-1 — an admin announcement in the news feed (shape: `NewsAnnouncement`). */
+export interface AnnouncementStore {
+  add(announcement: NewsAnnouncement): Promise<void>;
+  /** Not removed and not expired at `now`, newest first. */
+  active(now: number): Promise<NewsAnnouncement[]>;
+  /** The latest not removed, expired included (the admin's list), newest first. */
+  recent(limit: number): Promise<NewsAnnouncement[]>;
+  /** false = no such announcement, or it was already removed. */
+  remove(id: string, at: number): Promise<boolean>;
 }
 
 /** One raised AvA session (AVA-7) — the link a locked matchup gets once the orchestrator

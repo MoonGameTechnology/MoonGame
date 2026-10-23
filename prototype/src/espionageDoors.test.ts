@@ -9,8 +9,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-/** Файлы, где рисуются кнопки шпионажа: карточка мира (`worldCard.ts`, REFM-223), ростер,
- *  карточка места и вкладка «Шпионаж» — в окне дипломатии (`diploWindow.ts`, REFM-214).
+/** Файлы, где рисуются кнопки шпионажа: карточка мира (`worldCard.ts`, REFM-223) — живого и
+ *  памятного. С SPY-8 агент идёт на мир, так что кнопок в окне дипломатии
+ *  (`diploWindow.ts`, REFM-214) больше нет, но новая там обязана спросить режим.
  *  `main.ts` остаётся в списке: новая дверь там тоже обязана спросить режим. */
 const FILES = ['main.ts', 'worldCard.ts', 'diploWindow.ts'];
 const src = Object.fromEntries(
@@ -36,7 +37,7 @@ function enclosingFunction(file: string, i: number): string | null {
 
 describe('двери шпионажа спрашивают режим', () => {
   it('кнопок шпионажа несколько — сторожу есть что держать', () => {
-    expect(doors.length).toBeGreaterThanOrEqual(4);
+    expect(doors.length).toBeGreaterThanOrEqual(2);
   });
 
   it('каждую кнопку рисует ветка под espionageShown (или флагом вкладки из него)', () => {

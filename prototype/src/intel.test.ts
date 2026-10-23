@@ -47,18 +47,10 @@ describe('разведка — цели по видам', () => {
   const grants = [
     grant({ kind: 'planet', target: 'C1R1' }),
     grant({ kind: 'planet', target: 'C2R2' }),
-    grant({ kind: 'fleets', target: 'p2' }),
-    grant({ kind: 'treasury', target: 'p3' }),
   ];
 
-  it('каждый вид отдаёт СВОИ цели и не подмешивает чужие', () => {
+  it('окна planet отдают свои миры', () => {
     expect(targetsOf(grants, 'planet')).toEqual(new Set(['C1R1', 'C2R2']));
-    expect(targetsOf(grants, 'fleets')).toEqual(new Set(['p2']));
-    expect(targetsOf(grants, 'treasury')).toEqual(new Set(['p3']));
-  });
-
-  it('вида нет среди окон — пустое множество', () => {
-    expect(targetsOf([grant({ kind: 'planet' })], 'fleets')).toEqual(new Set());
   });
 
   it('два окна на одну цель схлопываются в одну', () => {

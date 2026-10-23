@@ -1549,6 +1549,16 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('fleet.merge.pending', { from: 'f9', into: 'f1', owner, at: 'node1' });
         h.emit('refuge.found', { owner, at: 'node1' });
         h.emit('fleet.halted', { fleetId: 'f1', owner, at: 'node1', blocked: 'far', blocker: 'p3' });
+        h.emit('espionage.sent', { owner, planetId: 'node1', op: 'recon', until: 9 });
+        h.emit('espionage.aborted', { owner, planetId: 'node1', kind: 'recon' });
+        h.emit('espionage.failed', { owner, target: 'p2', kind: 'recon', planetId: 'node1' });
+        h.emit('intel.stolen', { owner, target: 'p2', kind: 'recon', planetId: 'node1', until: 9 });
+        h.emit('espionage.succeeded', { owner, target: 'p2', kind: 'theft', planetId: 'node1', loot: null });
+        h.emit('espionage.posted', { owner, planetId: 'node1' });
+        h.emit('espionage.recalled', { owner, planetId: 'node1' });
+        h.emit('espionage.counter.caught', { owner, planetId: 'node1', spy: 'p3' });
+        h.emit('espionage.counter.lost', { owner, planetId: 'node1' });
+        h.emit('espionage.detected', { owner, kind: 'recon', planetId: 'node1', spy: 'p3' });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
       // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
@@ -1697,6 +1707,17 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'refuge.found',
       // FOG-LEAK: a halted fleet names the owner of a world its owner may not see.
       'fleet.halted',
+      // SPY-8: espionage names its world; who sees the world must not read the spy.
+      'espionage.sent',
+      'espionage.aborted',
+      'espionage.failed',
+      'intel.stolen',
+      'espionage.succeeded',
+      'espionage.posted',
+      'espionage.recalled',
+      'espionage.counter.caught',
+      'espionage.counter.lost',
+      'espionage.detected',
     ];
     // Every entry of the server's list is exercised here, so a new one can't skip this test.
     expect([...OWNER_ONLY_EVENTS.keys()].sort()).toEqual([...intel].sort());

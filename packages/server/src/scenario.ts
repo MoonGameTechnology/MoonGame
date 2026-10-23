@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '85'; // COAL-1: коалиции. Членство и порядок не
+export const MODULE_MANIFEST_VERSION = '86'; // Explicit coalition founding; `diplomacy`
+// 1.6.0 preserves single-member coalitions and transfers a departing founder's title.
+// Membership/order and JSON shape are unchanged, but a match on 85 dissolved a
+// coalition when only one member remained and must not resume under different rules.
+// export const MODULE_MANIFEST_VERSION = '85'; // COAL-1: коалиции. Членство и порядок не
 // тронуты; `diplomacy` 1.4.0 — союз заключается только внутри коалиции (`state.coalitions`,
 // вместимость 15% мест), новые действия `diplomacy.decline`, `coalition.leave`,
 // `coalition.edit`. Партия на 84 собрала бы союз сверх потолка.
@@ -632,6 +636,11 @@ export interface DevMatchOptions {
   initialReceipts?: ActionReceipt[];
   /** Resume the action counter from a persisted snapshot (see `MatchRoom.initialSeq`). */
   initialSeq?: number;
+  /** Born running on its own world clock from `initialState.time` (see
+   *  `MatchRoom.initiallyStarted`) instead of reading the wall clock as world time. */
+  initiallyStarted?: boolean;
+  /** The persisted anchor of such a clock (see `MatchRoom.initialClock`). */
+  initialClock?: MatchSnapshot['clock'];
   /** Strict commit-before-broadcast durable write (see `MatchRoom.persist`). */
   persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
   /** Opt-in `@void/action-layer` front-door (see `MatchRoom.gate`). */
@@ -766,6 +775,8 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     record: options.record,
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,
+    ...(options.initiallyStarted ? { initiallyStarted: true } : {}),
+    ...(options.initialClock ? { initialClock: options.initialClock } : {}),
     persist: options.persist,
     gate: options.gate,
     actionRateMax: options.actionRateMax,

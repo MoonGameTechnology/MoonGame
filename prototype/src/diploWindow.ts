@@ -39,7 +39,7 @@ import { COALITION, initConversations, type StampOpts } from './conversations';
 import { diploIntent } from './diploClick';
 import { diploDelivery } from './diploDelivery';
 import { diffDiplomacy, STANCES } from './diploEvents';
-import { clockHM, esc, fmtEta, gameDay, gameStamp, kfmt, resLine } from './format';
+import { clockHM, esc, fmtEta, gameDay, gameStamp, kfmt } from './format';
 import {
   botFavour,
   data,
@@ -52,10 +52,9 @@ import {
   hasMapShareOffer,
   HOUR,
   shareMap,
-  spyOn,
   STANCE_RANK,
 } from './game';
-import { grantLeftMs, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
+import { grantLeftMs, myAgents, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
 import { selPlanet } from './interaction';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
@@ -413,25 +412,15 @@ function favourBarHtml(bot: string): string {
     `<span class="dp-fav-lbl">${label}</span></div>`
   );
 }
-/** Live stolen-intel readout for one seat (under its expanded actions): the
- *  treasury window prints the victim's actual resources, a fleets window says the
- *  map shows them, planet windows list the scanned worlds. Empty when nothing lives. */
+/** Live stolen-intel readout for one seat (under its expanded actions): the worlds
+ *  of theirs under a recon window (SPY-8). Empty when nothing lives. */
 function intelRowHtml(target: string): string {
   const s = game.state();
   const bits: string[] = [];
   for (const g of game.myIntel()) {
+    if (s.planets[g.target]?.owner !== target) continue;
     const left = fmtEta(grantLeftMs(g, s.time) / HOUR);
-    if (g.kind === 'treasury' && g.target === target) {
-      const r = s.players[target]?.resources ?? {};
-      const bag = resLine(
-        Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.floor(v as number)])),
-      );
-      bits.push(t('comms.intel.treasury', { bag: bag || '—', left }));
-    } else if (g.kind === 'fleets' && g.target === target) {
-      bits.push(t('comms.intel.fleets', { left }));
-    } else if (g.kind === 'planet' && s.planets[g.target]?.owner === target) {
-      bits.push(t('comms.intel.world', { id: esc(game.placeName(g.target)), left }));
-    }
+    bits.push(t('comms.intel.world', { id: esc(game.placeName(g.target)), left }));
   }
   if (!bits.length) return '';
   return `<div class="dp-intel">🕵 ${bits.join(' · ')}</div>`;
@@ -583,10 +572,6 @@ function seatDiploActionsHtml(id: string): string {
   return (
     `<div class="dp-actions">` +
     stanceButtonsHtml(id) +
-    (espionageShown(game.sectorZeroToolsHidden())
-      ? `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>`
-      : '') +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
     intelRowHtml(id)
   );
@@ -664,40 +649,39 @@ export const conversations = initConversations({
   threadDiploHtml,
 });
 
-/** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — активные окна интела
- *  с таймерами, операции по каждому противнику (те же .dp-spy обработчики, что и в
- *  ростере) и сессионный журнал попыток. Разведка мира остаётся на карточке планеты
- *  (нужна цель) — вкладка ведёт к ней подсказкой. */
+/** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — сеть агентов, активные
+ *  окна интела с таймерами и сессионный журнал попыток. Агента отправляют с карточки
+ *  чужого мира (SPY-8: цель шпиона — мир), вкладка ведёт к ней подсказкой. */
 function intelTabHtml(): string {
   const s = game.state();
   const ME = game.me();
-  const NAME = game.names();
-  const grantLabel = (g: IntelGrant): string =>
-    g.kind === 'treasury'
-      ? t('log.spy.what.treasury', { who: NAME[g.target] ?? g.target })
-      : g.kind === 'fleets'
-        ? t('log.spy.what.fleets', { who: NAME[g.target] ?? g.target })
-        : t('log.spy.what.world', { at: game.placeName(g.target) });
   const rows = game
     .myIntel()
     .sort((a, b) => a.until - b.until)
     .map((g) => {
       const left = Math.max(0, Math.ceil((g.until - s.time) / HOUR));
-      const jump = g.kind === 'planet' ? ` data-iw="${esc(g.target)}"` : '';
+      const label = t('log.spy.what.world', { at: game.placeName(g.target) });
       return (
-        `<div class="in-row"${jump}><span class="in-k">🗝</span><b>${esc(grantLabel(g))}</b>` +
-        `<span class="in-t">⏳ ${t('fmt.hours', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
+        `<div class="in-row" data-iw="${esc(g.target)}"><span class="in-k">🗝</span><b>${esc(label)}</b>` +
+        `<span class="in-t">⏳ ${t('fmt.hours', { n: left })}</span><span class="in-go">↪</span></div>`
       );
     })
     .join('');
-  const ops = Object.keys(s.players)
-    .filter((id) => id !== ME)
-    .map(
-      (id) =>
-        `<div class="in-row"><b>${esc(NAME[id] ?? id)}</b>` +
-        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('spy.op.fleets')}</button></div>`,
-    )
+  // SPY-6: сеть агентов — сколько свободно и когда вернутся остальные; агент на задании
+  // (SPY-8) называет мир, к которому ушёл.
+  const net = myAgents(s, ME);
+  const agents = net.away
+    .map((a) => {
+      // SPY-11: a counter-intelligence agent is away until recalled — no countdown.
+      const guard = a.op === 'counter';
+      const left = guard ? '' : `⏳ ${t('fmt.hours', { n: Math.max(0, Math.ceil((a.until - s.time) / HOUR)) })}`;
+      const what = a.lost
+        ? t('spy.agent.lost')
+        : a.planetId
+          ? t(a.posted ? 'spy.agent.post' : 'spy.agent.mission', { at: game.placeName(a.planetId) })
+          : t('spy.agent.busy');
+      return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : guard ? '🛡' : '🕵'}</span><b>${esc(what)}</b><span class="in-t">${left}</span></div>`;
+    })
     .join('');
   const log = [...spyLog]
     .reverse()
@@ -706,10 +690,10 @@ function intelTabHtml(): string {
   return (
     `<div class="dp-list in-list">` +
     `<div class="in-hint">${t('spy.note', { c: SPY_COST })}</div>` +
+    `<div class="in-sec">${t('spy.agents.title', { free: net.free, total: net.total })}</div>` +
+    agents +
     `<div class="in-sec">${t('spy.windows.title')}</div>` +
     (rows || `<div class="in-empty">${t('spy.windows.empty')}</div>`) +
-    `<div class="in-sec">${t('spy.ops.title')}</div>` +
-    (ops || `<div class="in-empty">${t('spy.ops.empty')}</div>`) +
     `<div class="in-sec">${t('spy.log.title')}</div>` +
     (log || `<div class="in-empty">${t('spy.log.empty')}</div>`) +
     `</div>`
@@ -856,7 +840,6 @@ export function initDiploWindow(host: DiploWindowHost): void {
       if (intent && intent.kind !== 'message') {
         if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
         else if (intent.kind === 'map') toggleMapShare(intent.seat);
-        else game.playerOrder(spyOn(game.me(), intent.seat, intent.what as 'treasury' | 'fleets'));
         refreshSeatCard(seat);
         return;
       }
@@ -932,14 +915,13 @@ export function initDiploWindow(host: DiploWindowHost): void {
         return;
       }
       // Тот же разбор, что и у карточки игрока (`diploClick.ts`, REFM-139) — а перерисовку
-      // здесь делает окно целиком. Письмо ниже: между ним и шпионом стоит окно интела, и
-      // порядок ветвей сохранён (правило 3).
+      // здесь делает окно целиком. Письмо ниже: перед ним стоит окно интела, и порядок
+      // ветвей сохранён (правило 3).
       const intent = diploIntent(tg);
       if (intent && intent.kind !== 'message') {
         if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
         else if (intent.kind === 'map') toggleMapShare(intent.seat);
-        else game.playerOrder(spyOn(game.me(), intent.seat, intent.what as 'treasury' | 'fleets'));
-        renderDiplo(); // the intel row (or the rejection note) reflects the outcome
+        renderDiplo();
         return;
       }
       const iw = (tg.closest('[data-iw]') as HTMLElement | null)?.dataset.iw;

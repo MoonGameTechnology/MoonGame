@@ -17,6 +17,7 @@ import {
   type CorpHost,
 } from './corpScreen';
 import type { AvaFeedEntry, CorpRole, MedalDef } from './corp';
+import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruction';
 
 // REFM-11: locale pinned RU (see format.test.ts — Node has no browser language, so the
 // runtime would fall back to EN and the label assertions would drift).
@@ -39,6 +40,25 @@ function fakeEl(): HTMLElement & { html: () => string; fire: (t: unknown) => voi
   return el as unknown as HTMLElement & { html: () => string; fire: (t: unknown) => void };
 }
 
+/** Панель и шторка вкладки хаба: перерисовка целиком, класс `open` и делегат нажатий. */
+function fakeHubEl(): HTMLElement & { html: () => string; open: () => boolean; fire: (t: unknown) => void } {
+  const classes = new Set<string>();
+  const handlers: Record<string, (ev: unknown) => void> = {};
+  const el = {
+    innerHTML: '',
+    classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (type: string, h: (ev: unknown) => void) => {
+      handlers[type] = h;
+    },
+    html: () => el.innerHTML,
+    open: () => classes.has('open'),
+    fire: (target: unknown) => handlers.click?.({ target }),
+  };
+  return el as unknown as HTMLElement & { html: () => string; open: () => boolean; fire: (t: unknown) => void };
+}
+
 const closeCabinets: Array<() => void> = [];
 
 function wire(over: Partial<CorpHost> = {}) {
@@ -46,8 +66,12 @@ function wire(over: Partial<CorpHost> = {}) {
   const head = fakeEl();
   const tabs = fakeEl();
   const body = fakeEl();
+  const hubRoot = fakeHubEl();
+  const hubSheet = fakeHubEl();
   const notes: string[] = [];
+  const hubNotes: string[] = [];
   const intros: string[] = [];
+  const signIns: number[] = [];
   const api = initCorp({
     root: () => root,
     head: () => head,
@@ -57,10 +81,34 @@ function wire(over: Partial<CorpHost> = {}) {
     note: (x) => notes.push(x),
     errText: (code) => `текст:${code}`,
     onIntro: (id) => intros.push(id),
+    hub: {
+      root: () => hubRoot,
+      sheet: () => hubSheet,
+      note: (x) => hubNotes.push(x),
+      canSignIn: () => false,
+      signIn: () => signIns.push(1),
+    },
     ...over,
   });
-  closeCabinets.push(() => { api.close(); api.close(); });
-  return { api, root, head, tabs, body, notes, intros, shown: () => root.style.display };
+  closeCabinets.push(() => {
+    api.close();
+    api.close();
+    api.hideHub();
+  });
+  return {
+    api,
+    root,
+    head,
+    tabs,
+    body,
+    hubRoot,
+    hubSheet,
+    notes,
+    hubNotes,
+    intros,
+    signIns,
+    shown: () => root.style.display,
+  };
 }
 
 afterEach(() => {
@@ -295,5 +343,172 @@ describe('корпорации — кабинет', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(shown()).toBe('flex');
     expect(notes).toEqual([]); // молчаливая деградация: сеть упала — не вина игрока
+  });
+});
+
+describe('корпорации — вкладка хаба (CORP-3)', () => {
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const session = { authorizedBase: () => Promise.resolve({ base: 'https://srv', token: 'tok' }) };
+
+  /** Сервер корпорации на ответах из таблицы (`путь` или `МЕТОД путь`); чего в ней нет —
+   *  отказ с кодом. Возвращает журнал запросов. */
+  function server(routes: Record<string, unknown>): string[] {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: { method?: string }) => {
+        const path = url.replace('https://srv', '');
+        const method = init?.method ?? 'GET';
+        calls.push(`${method} ${path}`);
+        const body = routes[`${method} ${path}`] ?? (method === 'GET' ? routes[path] : undefined);
+        return Promise.resolve(
+          body === undefined
+            ? { ok: false, json: () => Promise.resolve({ error: 'E_NOPE' }) }
+            : { ok: true, json: () => Promise.resolve(body) },
+        );
+      }),
+    );
+    return calls;
+  }
+
+  const CORP = { corpId: 'c1', name: 'Звёздный штиль', influence: 500 };
+  const HEAD = { corpId: 'c1', accountId: 'a1', login: 'Арго', role: 'head' };
+  function headCorp(): Record<string, unknown> {
+    const saved = { levels: { headquarters: 1 }, construction: null, accruedAt: 0, remainder: 0 };
+    const built = updateCorpInfrastructure('c1', 'a1', 'head', 500, saved, 0).result;
+    if (!built.ok) throw new Error(built.code);
+    return {
+      '/corps/me': { corp: CORP, membership: HEAD, features: { ava: false, medals: false } },
+      '/corps/c1': { corp: CORP, members: [HEAD, { ...HEAD, accountId: 'a2', login: 'Вега', role: 'member' }] },
+      '/corps/c1/infrastructure': built.infrastructure,
+      '/corps/c1/audit': { audit: [] },
+      '/leaderboard': { corps: { me: { rank: 3 } } },
+    };
+  }
+
+  /** Нажатие по кнопке с такими `data-*`: делегат ищет её через `closest`. */
+  function press(attrs: Record<string, string>): unknown {
+    const button = { dataset: attrs, disabled: false };
+    const names = Object.keys(attrs).map((k) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}]`);
+    return { closest: (sel: string) => (names.includes(sel) ? button : null) };
+  }
+
+  it('без входа: сначала загрузка, потом приглашение — и в сеть вкладка не ходит', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const { api, hubRoot, intros } = wire();
+    api.showHub();
+    expect(hubRoot.html()).toContain(t('corp.hub.loading'));
+    expect(intros).toEqual(['corp']);
+    await tick();
+    expect(hubRoot.html()).toContain(t('corp.hub.guest.title'));
+    expect(hubRoot.html()).not.toContain('data-corphub="signin"');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('гостю с аккаунтами — кнопка входа, и она ведёт ко входу', async () => {
+    const hubRoot = fakeHubEl();
+    const sheet = fakeHubEl();
+    const signIns: number[] = [];
+    const { api } = wire({
+      hub: {
+        root: () => hubRoot,
+        sheet: () => sheet,
+        note: () => undefined,
+        canSignIn: () => true,
+        signIn: () => signIns.push(1),
+      },
+    });
+    api.showHub();
+    await tick();
+    expect(hubRoot.html()).toContain('data-corphub="signin"');
+    hubRoot.fire(press({ corphub: 'signin' }));
+    expect(signIns).toEqual([1]);
+  });
+
+  it('обрыв сети до первого ответа — «нет связи», а не «создайте корпорацию»', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
+    const { api, hubRoot, notes, hubNotes } = wire(session);
+    api.showHub();
+    await tick();
+    expect(hubRoot.html()).toContain(t('corp.hub.offline'));
+    expect(hubRoot.html()).not.toContain('corp-hub-name');
+    expect([...notes, ...hubNotes]).toEqual([]);
+  });
+
+  it('отказ сервера при открытой вкладке — в строку хаба, а не в тосты под ней', async () => {
+    server({});
+    const { api, notes, hubNotes } = wire(session);
+    api.showHub();
+    await tick();
+    expect(hubNotes).toEqual(['✖ текст:E_NOPE']);
+    expect(notes).toEqual([]);
+  });
+
+  it('глава: шапка и база, шторка уровней; отказ при шторке — в саму шторку', async () => {
+    const routes = headCorp();
+    server(routes);
+    const { api, hubRoot, hubSheet, hubNotes } = wire(session);
+    api.showHub();
+    await tick();
+    expect(hubRoot.html()).toContain('Звёздный штиль');
+    expect(hubRoot.html()).toContain('data-corpbld="headquarters"');
+    hubRoot.fire(press({ corphub: 'levels' }));
+    expect(api.hubSheetOpen()).toBe(true);
+    expect(hubSheet.open()).toBe(true);
+    expect(hubSheet.html()).toContain('cb-lvtable');
+    delete routes['/corps/me'];
+    hubRoot.fire(press({ corphub: 'refresh' }));
+    await tick();
+    expect(hubSheet.html()).toContain('✖ текст:E_NOPE');
+    expect(hubNotes).toEqual([]);
+    // Чтение не удалось — прежняя картина остаётся, а не «без корпорации».
+    expect(hubRoot.html()).toContain('Звёздный штиль');
+    api.closeHubSheet();
+    expect(api.hubSheetOpen()).toBe(false);
+    expect(hubSheet.open()).toBe(false);
+  });
+
+  it('«Расформировать»: первое нажатие спрашивает, второе отправляет', async () => {
+    const calls = server({ ...headCorp(), 'POST /corps/c1/disband': {} });
+    const { api, hubRoot } = wire(session);
+    api.showSection('members');
+    api.showHub();
+    await tick();
+    const disband = press({ corpconfirm: 'disband', corpact: 'disband' });
+    hubRoot.fire(disband);
+    expect(hubRoot.html()).toContain(t('corp.hub.disband.confirm'));
+    expect(calls).not.toContain('POST /corps/c1/disband');
+    hubRoot.fire(disband);
+    await tick();
+    expect(calls).toContain('POST /corps/c1/disband');
+  });
+
+  it('любое другое нажатие снимает взвод — приказ не уходит', async () => {
+    const calls = server({ ...headCorp(), 'POST /corps/c1/disband': {} });
+    const { api, hubRoot } = wire(session);
+    api.showSection('members');
+    api.showHub();
+    await tick();
+    const disband = press({ corpconfirm: 'disband', corpact: 'disband' });
+    hubRoot.fire(disband);
+    hubRoot.fire(press({ corpsec: 'treasury' }));
+    api.showSection('members');
+    expect(hubRoot.html()).not.toContain(t('corp.hub.disband.confirm'));
+    hubRoot.fire(disband);
+    await tick();
+    expect(calls).not.toContain('POST /corps/c1/disband');
+  });
+
+  it('уход с вкладки роняет шторку', async () => {
+    server(headCorp());
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corpbld: 'headquarters' }));
+    expect(hubSheet.open()).toBe(true);
+    api.hideHub();
+    expect(api.hubSheetOpen()).toBe(false);
+    expect(hubSheet.open()).toBe(false);
   });
 });

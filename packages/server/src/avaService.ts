@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AVA_FEED_KINDS, isAvaFeedEntry } from './store';
 import type {
   AvaChallenge,
   AvaChallengeStore,
@@ -14,6 +15,8 @@ import type {
   CorpSummary,
 } from './store';
 import type { CorpActor } from './corpService';
+import { corpMedalNews } from './corpNews';
+import type { MedalCatalog } from './medalCatalog';
 
 /**
  * AVA-2/3/4 — the Alliance-vs-Alliance readiness + challenge service (server/meta,
@@ -95,6 +98,9 @@ export interface AvaServiceDeps {
   minPerSide?: number;
   /** Influence awarded to the winning corp on settlement (AVA-8 S7). */
   winReward?: number;
+  /** The medal catalog (MED-1): a settlement that brings a corp's record to a corp
+   *  medal's condition is public news (CORP-1). Absent → no medal news. */
+  medals?: MedalCatalog;
 }
 
 export class AvaService {
@@ -110,6 +116,7 @@ export class AvaService {
   private readonly capPerSide: number;
   private readonly minPerSide: number;
   private readonly winReward: number;
+  private readonly medals: MedalCatalog | null;
 
   constructor(deps: AvaServiceDeps) {
     this.corps = deps.corpStore;
@@ -117,6 +124,7 @@ export class AvaService {
     this.roster = deps.rosterStore;
     this.results = deps.resultStore;
     this.feed = deps.feedStore;
+    this.medals = deps.medals ?? null;
     this.now = deps.now ?? ((): number => Date.now());
     this.cost = deps.challengeCost ?? DEFAULT_CHALLENGE_COST;
     this.expiryMs = deps.expiryMs ?? DEFAULT_EXPIRY_MS;
@@ -385,6 +393,17 @@ export class AvaService {
     return { locked, cancelled };
   }
 
+  /** CORP-4: no AvA map fits a LOCKED roster, so the battle can't be raised — cancel the
+   *  matchup and refund the challenge cost. The locked→cancelled transition is the
+   *  exactly-once gate, like settlement's locked→ended: false = not locked, nothing
+   *  changed. Server-driven (the orchestrator sweep), no client. */
+  async cancelLocked(matchupId: string): Promise<boolean> {
+    const matchup = await this.challenges.getChallenge(matchupId);
+    if (!matchup || !(await this.challenges.endMatchup(matchupId, 'cancelled'))) return false;
+    await this.refund(matchup);
+    return true;
+  }
+
   // ---- AVA-8 · settlement (S7) --------------------------------------------
 
   /** settleMatch — the orchestrator calls this once a LOCKED matchup's war has ended:
@@ -431,7 +450,26 @@ export class AvaService {
     // AVA-9: the public feed row goes LAST and best-effort — the settlement already
     // committed (endMatchup is the exactly-once gate); a feed hiccup must not fail it.
     await this.publishFeed('result', matchup, winnerCorp).catch(() => undefined);
+    await this.publishMedals(matchup, winnerCorp, at).catch(() => undefined);
     return { ok: true, winnerCorp };
+  }
+
+  /** CORP-1: a settlement that brings a side's record to a corp medal's condition is
+   *  public news — once per corp and medal, since the row id is derived from both. */
+  private async publishMedals(
+    matchup: AvaChallenge,
+    winnerCorp: string | null,
+    at: number,
+  ): Promise<void> {
+    if (!this.medals) return;
+    for (const corpId of [matchup.challengerCorp, matchup.targetCorp]) {
+      const corp = await this.corps.getCorp(corpId);
+      if (!corp) continue; // disbanded before the end: nobody to announce
+      const stats = await this.results.statsForCorp(corpId);
+      for (const entry of corpMedalNews(corp, stats, winnerCorp === corpId, this.medals, at)) {
+        await this.feed.append(entry);
+      }
+    }
   }
 
   /** Match history (AVA-8, MM-3.1 minimum) — recorded outcomes, newest first. The
@@ -444,8 +482,9 @@ export class AvaService {
 
   /** The public AvA feed (AVA-9): confirmed matchups + results, newest first, paginated
    *  by a `before`-`at` cursor. Public facts only — the store never holds a roster. */
-  publicFeed(limit?: number, before?: number): Promise<AvaFeedEntry[]> {
-    return this.feed.recent(limit, before);
+  async publicFeed(limit?: number, before?: number): Promise<AvaFeedEntry[]> {
+    // The feed also carries a corporation's own facts (CORP-1); this route keeps to AvA.
+    return (await this.feed.recent(limit, before, AVA_FEED_KINDS)).filter(isAvaFeedEntry);
   }
 
   /** Append a public feed row for a matchup/result, snapshotting the two corp names so

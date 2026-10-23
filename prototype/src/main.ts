@@ -125,6 +125,7 @@ import {
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
   spyOn,
+  recallSpy,
   assaultFleet,
   bombardFleet,
   deployStation,
@@ -529,6 +530,7 @@ import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
 import { initMetaEconomy } from './metaEconomyScreen';
 import { initShop } from './shopScreen';
+import { initNews } from './newsScreen';
 import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
@@ -3135,7 +3137,10 @@ side.addEventListener('click', (ev) => {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
     }
   } else if (act === 'spyplanet') {
-    playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
+    if (arg === 'recon' || arg === 'sabotage' || arg === 'theft' || arg === 'research' || arg === 'counter')
+      playerOrder(spyOn(ME, selPlanet!, arg));
+  } else if (act === 'spyrecall') {
+    playerOrder(recallSpy(ME, selPlanet!));
   } else if (act === 'capital') {
     playerOrder(designateCapital(ME, selPlanet!));
   } else if (act === 'holdpoint') {
@@ -4092,7 +4097,7 @@ function enterBrowse(): void {
 // --- meta-shell hub: post-login home + bottom nav (docs/main-menu.md) -------
 // After identity you land on the hub (home + PLAY + bottom nav), not the raw match
 // list. The nav routes into the existing flow: "Игры"/"ИГРАТЬ" → the match browser
-// (стадия 2 of #connect, untouched), Рейтинг/Альянсы → заглушки до мета-слоя, Ещё →
+// (стадия 2 of #connect, untouched), «Корпорация» → вкладка `corpScreen.ts` (CORP-3), Ещё →
 // настройки. Social sign-in is a guest stub (accounts AC-1.1) with a "скоро" note.
 const hubEl = $('hub');
 const hubNote = $('hub-note');
@@ -4101,6 +4106,7 @@ function showHub(show: boolean): void {
   if (!show) registrationReward?.close();
   if (!show) arsenal?.close();
   if (!show) shop?.close();
+  if (!show) corp?.hideHub();
   // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
   if (show) document.getElementById('codex')?.classList.remove('show');
   hubEl.style.display = show ? 'flex' : 'none';
@@ -4117,7 +4123,7 @@ const HUB_PANELS: Record<string, string> = {
   auction: 'hp-auction',
   supply: 'hp-supply',
   shop: 'hp-shop',
-  ally: 'hp-ally',
+  corp: 'hp-corp',
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
@@ -4140,6 +4146,8 @@ function hubTab(tab: string): void {
   if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
   // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
   if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
+  if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());
+  if (tab !== 'home') news?.close(); // the feed sheet lives over the home panel
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
@@ -4151,6 +4159,9 @@ function hubTab(tab: string): void {
   if (tab !== 'shop') shop?.close(); // the phone sheet lives over the hub, like the arsenal's
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
+  // CORP-3: the corporation tab paints after its panel is visible — the panorama centres by width.
+  if (tab === 'corp') corp?.showHub();
+  else corp?.hideHub();
   const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
     b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
@@ -4339,6 +4350,30 @@ const shop = __SECTOR_ZERO_ONLY__
     });
 if (shop && typeof ResizeObserver !== 'undefined')
   new ResizeObserver(() => shop.relayout()).observe($('hp-shop'));
+// CORP-2 «Домой»: лента новостей. Экран — `newsScreen.ts`, решения — `decisions/newsFeed.ts`.
+// Ленту сервер отдаёт без входа, поэтому ей нужен только адрес; сессия хаба — для «Моей
+// корпорации», карточки корпорации и заявки.
+const news = __SECTOR_ZERO_ONLY__
+  ? null
+  : initNews({
+      column: () => $('news-col'),
+      teaser: () => $('news-teaser'),
+      sheet: () => $('news-sheet'),
+      publicBase: () => {
+        const step = resolveBase(srvInput.value, location.protocol === 'https:');
+        return step.kind === 'ok' ? httpBase(step.base) : null;
+      },
+      authorizedBase: hubAuthorizedBase,
+      note: (text) => {
+        hubNote.textContent = text;
+      },
+      errText,
+      openCorp: (tab) => {
+        corp?.showSection(tab === 'hq' ? 'base' : 'battles');
+        hubTab('corp');
+      },
+      now: () => Date.now(),
+    });
 /** Premium is running for this callsign, by the last account read on this device. */
 function premiumRunning(): boolean {
   return Number(readRaw(premiumKey()) ?? 0) > Date.now();
@@ -5439,6 +5474,8 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
   { id: 'arsenal-sheet', isOpen: () => arsenal?.isOpen() ?? false, close: () => arsenal?.close() }, // inside the hub (z52), under the codex opened from it
   { id: 'shop-sheet', isOpen: () => shop?.isOpen() ?? false, close: () => shop?.close() }, // inside the hub (z52)
+  { id: 'news-sheet', isOpen: () => news?.isOpen() ?? false, close: () => news?.close() }, // inside the hub (z52), the feed and a corp card
+  { id: 'corp-sheet', isOpen: () => corp?.hubSheetOpen() ?? false, close: () => corp?.closeHubSheet() }, // inside the hub (z52), a building, levels, a member
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
@@ -6418,9 +6455,9 @@ if (currentBuild()) document.getElementById('hub-android')?.remove();
 if (!__SECTOR_ZERO_ONLY__) initApkUpdater();
 
 // --- corporation cabinet (AVA-C1/C2) -----------------------------------------
-// Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки и две двери,
-// которые его открывают (кнопка хаба и рельса матча). `authorizedBase` — та же
-// политика, что у «Арсенала» и профиля; кэша у кабинета сознательно нет.
+// Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки: окно в партии
+// открывает рельса матча, а в хабе корпорация — своя вкладка (CORP-3, `hubTab('corp')`).
+// `authorizedBase` — та же политика, что у «Арсенала» и профиля; кэша сознательно нет.
 const corp = __SECTOR_ZERO_ONLY__
   ? null
   : initCorp({
@@ -6432,6 +6469,19 @@ const corp = __SECTOR_ZERO_ONLY__
       errText,
       onIntro: maybeIntro,
       authorizedBase: hubAuthorizedBase,
+      hub: {
+        root: () => $('hp-corp'),
+        sheet: () => $('corp-sheet'),
+        note: (text) => {
+          hubNote.textContent = text;
+        },
+        canSignIn: () => !!resolveServer() && authMode === 'accounts',
+        signIn: () => {
+          showHub(false);
+          showConnect(true);
+          showStage('welcome');
+          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+        },
+      },
     });
-$('ccorp').addEventListener('click', () => corp?.open());
 $('railcorp').addEventListener('click', () => corp?.open());

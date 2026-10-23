@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/* global localStorage */
-/** Real playable host + real cabinet: auth, creation, construction and reload. */
+/* global localStorage, document */
+/** Real playable host + the hub «Корпорация» tab (CORP-3): auth, creation, construction and reload. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -65,38 +65,52 @@ try {
       await page.locator('#registration-reward[open]').waitFor();
       await page.click('#registration-reward [data-reward="accept"]');
       await page.locator('#registration-reward').waitFor({ state: 'hidden' });
-      await page.click('[data-hub="ally"]');
-      await page.click('#ccorp');
-      if (await page.locator('#intro .in-ok').isVisible()) {
-        await page.click('#intro .in-ok');
-        assert.equal(await page.locator('#corp').isVisible(), true);
-      }
-      await page.fill('#corpnewname', `Builders ${locale}`);
-      await page.click('[data-corpact="create"]');
-      await page.locator('#corphd .cident b').filter({ hasText: `Builders ${locale}` }).waitFor();
-      await page.click('[data-corptab="buildings"]');
-      const build = page.locator('[data-corpact="build"][data-corparg="headquarters"]');
+      const openTab = async () => {
+        await page.click('[data-hub="corp"]');
+        if (await page.locator('#intro .in-ok').isVisible()) await page.click('#intro .in-ok');
+      };
+      await openTab();
+      await page.fill('#corp-hub-name', `Builders ${locale}`);
+      await page.click('#hp-corp [data-corpact="create"]');
+      await page.locator('#hp-corp .cb-id h2').filter({ hasText: `Builders ${locale}` }).waitFor();
+      assert.equal(await page.locator('#hp-corp .cb-bc').count(), 3);
+      assert.equal(await page.locator('#hp-corp .cb-lot').count(), 3);
+      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-base.png` });
+      // A locked building's sheet explains the lock instead of offering an order.
+      await page.click('#hp-corp .cb-bc[data-corpbld="supply_center"]');
+      await page.locator('#corp-sheet.open').waitFor();
+      assert.equal(await page.locator('#corp-sheet [data-corpact="build"]').count(), 0);
+      await page.keyboard.press('Escape');
+      await page.locator('#corp-sheet.open').waitFor({ state: 'detached' });
+      await page.click('#hp-corp .cb-bc[data-corpbld="headquarters"]');
+      const build = page.locator('#corp-sheet [data-corpact="build"][data-corparg="headquarters"]');
       await build.waitFor();
       assert.equal(await build.isEnabled(), true);
-      assert.equal(await page.locator('[data-corparg="supply_center"]').isDisabled(), true);
-      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-catalog.png` });
+      // The phone sheet rises with a fade; capture it settled, not mid-animation.
+      await page.waitForFunction(() => document.querySelector('#corp-sheet .cb-sheet')
+        .getAnimations().every((a) => a.playState !== 'running'));
+      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-sheet.png` });
       await build.click();
-      await page.locator('.cbuild-queue').waitFor();
-      assert.equal(await build.isDisabled(), true);
-      assert.equal(await page.locator('.cbuild-card').count(), 3);
-      const overflow = await page.$eval('#corpbody', (el) => el.scrollWidth > el.clientWidth + 1);
-      assert.equal(overflow, false, 'cabinet must not overflow horizontally');
+      await page.locator('#corp-sheet .cb-sheet-job').waitFor();
+      await page.click('#corp-sheet .cb-scrim', { position: { x: 5, y: 5 } });
+      await page.locator('#hp-corp .cb-hud:not(.idle)').waitFor();
+      const overflow = await page.$eval('#hp-corp', (el) => el.scrollWidth > el.clientWidth + 1);
+      assert.equal(overflow, false, 'the corporation tab must not overflow horizontally');
       await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-queue.png` });
+      for (const section of ['members', 'treasury', 'battles']) {
+        await page.click(`#hp-corp [data-corpsec="${section}"]`);
+        await page.locator(`#hp-corp [data-corpsec="${section}"][aria-selected="true"]`).waitFor();
+        await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-${section}.png` });
+      }
       await page.reload();
       await waitForApp(page);
       await signIn();
-      await page.click('[data-hub="ally"]');
-      await page.click('#ccorp');
-      await page.click('[data-corptab="buildings"]');
-      await page.locator('.cbuild-queue').waitFor();
-      assert.equal(await page.locator('[data-corparg="headquarters"]').isDisabled(), true);
+      await openTab();
+      await page.click('#hp-corp [data-corpsec="base"]');
+      await page.locator('#hp-corp .cb-hud:not(.idle)').waitFor();
+      await page.locator('#hp-corp .cb-lot.build[data-corpbld="headquarters"]').waitFor();
       assert.deepEqual(errors, []);
-      console.log(`PASS ${locale} ${width}x${height}: login → create → build → persisted queue, no overflow/errors`);
+      console.log(`PASS ${locale} ${width}x${height}: login → hub tab → create → build → persisted queue, no overflow/errors`);
     });
     await context.close();
   }

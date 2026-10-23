@@ -58,7 +58,7 @@ import {
   type HangarView,
 } from './hangarPanel';
 import { BUILD_ICON, unitIconHtml } from './icons';
-import { SPY_COST } from './intel';
+import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
 import type { SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
@@ -410,13 +410,16 @@ export function unknownPlanetHtml(p: Planet): string {
             `${BUILD_ICON[b.type] ?? '▪'} ${esc(buildingName(data.buildings[b.type]?.name, b.type))} L${b.level}`,
         )
         .join(', ') || t('side.scan.no-buildings');
-    // Espionage from memory: you know WHOSE world this was — an agent can reveal
-    // its live contents without flying there. Wrong/stale owner → the kernel
-    // rejects the attempt (bad target), which is honest: intel decays.
+    // Espionage from memory: an agent goes to the WORLD itself (SPY-8), not to its
+    // owner — if the world changed hands, the kernel targets whoever holds it now.
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
+    const spyReady = afford({ credits: SPY_COST }) && myAgents(game.world(), ME).free > 0;
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
+        ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST }), spyReady)}` +
+          btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST }), spyReady) +
+          btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), spyReady) +
+          `${btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), spyReady)}</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -522,19 +525,31 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
   if (toolShown('pings', sectorZeroToolsHidden()))
     out.push(btn('ping', '', t('side.world.ping'), true));
-  // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a window lives
-  // its countdown replaces the button. В забеге Sector Zero шпионажа нет (`espionageShown`).
+  // Espionage: a 12h mission to this enemy world (SPY-8/9/10) — recon opens a 24h intel
+  // window (while it lives its countdown replaces the recon button), sabotage, theft of
+  // resources or of a technology. В забеге Sector Zero шпионажа нет (`espionageShown`).
   if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    // Свой и ничейный мир не шпионят; нехватка кредитов гасит кнопку, но не прячет её.
-    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
+    // Свой и ничейный мир не шпионят; нехватка кредитов или свободных агентов (SPY-6)
+    // гасит кнопку, но не прячет её.
+    const ready = afford({ credits: SPY_COST }) && myAgents(s, ME).free > 0;
+    const spy = spyOffer(mine, !!p.owner, !!live, ready);
     if (spy === 'window' && live) {
       out.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
       );
     } else if (spy !== 'none') {
-      out.push(btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
+      out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
     }
+    if (spy !== 'none') {
+      out.push(btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST }), ready));
+      out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), ready));
+      out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), ready));
+    }
+    // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
+    const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
+    if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
+    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST }), ready));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }

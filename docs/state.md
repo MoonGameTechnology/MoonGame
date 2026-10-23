@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 13055 зелёных** (10 skip; 1040 файлов прошли, 1 skip; CI с PostgreSQL 2026-10-21).
+**Тесты: 13176 зелёных** (167 skip; 1055 файлов прошли, 6 skip; локально без PostgreSQL, 2026-10-23).
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -169,7 +169,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | `fog?`, `seenPatrols?` | память тумана по игрокам; видимые чужие патрули (только в проекции) |
 | `heroes?`, `tempLanes?`, `topology?`, `heroSeq?` | герои, их временные лейны, версия графа |
 | `diplomacy?`, `mapShares?` | стойки пар (нет записи — `war`), договоры обмена картами |
-| `diplomacyOffers?`, `mapShareOffers?`, `intel?` | предложения о стойках и картах; окна шпионажа |
+| `diplomacyOffers?`, `mapShareOffers?`, `intel?`, `spyAgents?` | предложения о стойках и картах; окна шпионажа; занятые агенты |
 | `market?`, `marketSeq?`, `trader?` | книга заявок биржи и счётчик; курс торговца экспедиции |
 | `capital?`, `rallyPoints?` | столица (возрождение героев), точки сбора миров-верфей |
 | `orders?`, `autoAssault?`, `autoRetreat?`, `forcedMarch?` | цепочки и постоянные приказы флотов |
@@ -183,7 +183,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - **Только JSON**: без `Map`, `Date`, классов и функций; с `DATABASE_URL` — в `matches.state jsonb`.
 - **`version`** — пин правил партии: кто и где его сверяет — §2, пробел хоста игроков — §9.
 - **Клиенту** — проекция `visibleState`: без `rng`, `fog`, `salvage`, счётчиков id и памяти Роя;
-  чужие казна (кроме окон шпионажа), исследования, герои и приказы срезаны.
+  чужие казна, сеть агентов, исследования, герои и приказы срезаны.
 
 ## 5. Модули ядра
 
@@ -220,8 +220,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `capital` — столица и место возрождения героев (`capital.designate`); `visibility` — память
   тумана: последний виденный снимок мира.
 - `construction` — `building.construct/upgrade`, `unit.build`, `construction.cancel/resume`:
-  оплата вперёд, готовность событием `construction.complete`.
-- `technology` — `technology.research/boost`; урон боевой ветки идёт только своему каналу огня.
+  оплата вперёд, готовность событием `construction.complete`; возможность `building.damage` —
+  прицельный урон по выбранным постройкам (им бьёт саботаж шпиона).
+- `technology` — `technology.research/boost`; урон боевой ветки идёт только своему каналу огня;
+  возможность `technology.grant` выдаёт технологию мимо лаборатории (кража исследований).
   `scientist` — учёные, выбранные местом на старте; «+слот» идёт хуком `research.slots`.
 - `arsenal-sync` — сервер обновляет, что место может строить; `promotion` — изредка партия
   выходит «отмеченной»; `veteran` — надбавка за пережитые бои.
@@ -254,11 +256,21 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `hero` — `hero.spawn`, `hero.ability` (один диспетчер способностей из данных),
   `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`; `heroEffects` — эффекты
   `hero.effect.*`: `aura`, `decoy`, `jump`, `recall`, `reveal`.
-- `diplomacy` — `diplomacy.declare/mapshare/decline`: к войне — сразу, к миру — по согласию,
-  от чужого предложения можно отказаться; `coalition.leave/edit` — коалиция как сущность
-  (`state/coalition.ts`): принятый союз создаёт её или вводит в неё, вместимость — 15% мест
+- `diplomacy` — `diplomacy.declare/mapshare/decline`: к войне — сразу, к миру — по согласию
+  (возможность `diplomacy.declareWar` — та же эскалация по раскрытию шпиона),
+  от чужого предложения можно отказаться; `coalition.create/leave/edit` — коалиция как
+  сущность (`state/coalition.ts`): активный человек вне командного режима создаёт её один,
+  принятый союз создаёт её или вводит в неё. Одиночка сохраняется, пустая распускается;
+  уходящий основатель передаёт подпись первому оставшемуся по id. Вместимость — 15% мест
   карты, не меньше двух (карта на 20 — 3), сверх неё ядро отбивает `E_COALITION_FULL`;
-  `espionage` — `espionage.spy`: окно разведки сквозь туман.
+  `espionage` — `espionage.spy { planetId, op }`: агент уходит на МИР, операция длится 12 ч и
+  решается против того, кто владеет миром в этот час; разведка (`recon`) открывает окно на
+  мир на 24 ч, саботаж (`sabotage`) бьёт 3–5 построек на 10–20% прочности, кража (`theft`)
+  уносит 5–15% одного ресурса владельца, не больше 500, кража исследований (`research`) даёт
+  технологию, которую владелец изучил, а вор нет (сеть из 3 агентов); раскрытый агент гибнет с шансом 0.5; бюро контрразведки (`spyDetectBonus`/`spyKillBonus`
+  здания) поднимает жертве шанс раскрыть шпиона и убить раскрытого; контрразведчик
+  (`counter`, отзыв — `espionage.recall`) стоит на мире до отзыва и усиливает раскрытие;
+  раскрытая операция объявляет войну владельцу мира и хозяину шпиона.
 - `seatClaim` — `seat.claim/confirm/kick/release`: место в идущей сетевой партии.
 
 **PvE и Sector Zero.**
@@ -354,19 +366,29 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
   `prototype/build.mjs`), кнопки `.btn-main`/`.btn-second`/`.btn-quiet`/`.btn-x`. Палитра
   `--sf-*` — копия `surfaceTheme` из того же `theme.ts`, равенство держит `surfaceTokens.test.ts`.
-- Хаб: вкладки Домой, Игры, Арсенал, Альянсы, Ещё; дверь — `decisions/hubDoor.ts`. Арсенал
+- Хаб: вкладки Домой, Игры, Арсенал, Корпорация, Ещё; дверь — `decisions/hubDoor.ts`.
+  На телефоне бренд собран в компактную строку высотой 36 px при обычном размере текста.
+  На «Домой» —
+  лента новостей `newsScreen.ts` (решения — `decisions/newsFeed.ts`): на широкой панели
+  колонкой рядом с партиями, на узкой — превью под дверью и вся лента шторкой. Арсенал
   (`arsenalScreen.ts`, решения — `decisions/arsenalView.ts`): модули и корабли с недостающими,
   цель мастерской, сборка и разбор, способы получить модуль с шансами наград; на телефоне
   карточка открывается шторкой. «Снабжение» (материалы, сезон) и аукцион —
   `metaEconomyScreen.ts`, `metaMarketScreen.ts`, общая сессия экономики — `metaEconomyClient.ts`.
   «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
   Материалы; покупка за ◆, пакеты ◆ ждут провайдера оплаты.
-  Кабинет корпорации `corpScreen.ts` — 7 вкладок; постройки — `data/corpBuildings.json`.
+  «Корпорация» (`corpHubView.ts`, решения — `decisions/corpHub.ts`, `corpBase.ts`,
+  `corpMembers.ts`, `corpTreasury.ts`): База (голограммы зданий `corpSprites.ts`, лист здания
+  шторкой), Битвы, Состав, Казна; без корпорации — создание и список с заявкой. Окно
+  корпорации в партии — `corpScreen.ts`, 7 вкладок; постройки — `data/corpBuildings.json`.
 - «Производство» (`shipyard.ts`): Корабли, Поддержка, Шаттлы, Пехота, Техника, Герои; отсеки —
   `packages/client/src/loadoutEditor.ts` и `decisions/slotCallouts.ts`. «Герои» — `heroStaff.ts`:
   `hero.spawn`, `hero.ability`, `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`.
 - Флот: карточка `fleetCard.ts`, десант «кого и сколько» `troopsMenu.ts`, цепочка «◎ Приказ»
   `chainPlanner.ts` (`order.chain`); шаттлы — ангар `hangarPanel.ts`, эскадры `squadronPanel.ts`.
+- «Коалиции» (`coalitionWindow.ts`): «Создать коалицию» отправляет `coalition.create`;
+  карточка с эмблемой и описанием открывается после принятого состояния. Доступность —
+  `decisions/coalitionCreation.ts`; на телефоне окно доступно через «Ещё».
 - Обучение: подсветка `spotlight.ts`, гайд-матч без ботов на ×300 (`firstMatchTour.ts`,
   чек-лист `firstGoals.ts`), 10 разовых вводных `intros.ts`. Сводка «пока тебя не было» —
   `buildRecap` (`packages/shared-core/src/util/recap.ts`) над лентой `eventFeed.ts`.
@@ -386,6 +408,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 **Сеть (netserver).**
 - Партия хоста — `createHostedMatch`; на старте список из стора (`bootRoster`), новая —
   `hostNewMatch`, до 64 на процесс. Сокет и переподключение в клиенте — `netSession.ts`.
+- Остановка закрывает HTTP/WS и таймеры, ждёт начатые действия/обновления арсенала и
+  запись снимка; `snapshotWriter.ts` затем сохраняет свежий мир и результаты ботов до
+  закрытия БД. Ошибка финальной записи даёт ненулевой выход, не отменяя попытки сохранить другие комнаты.
 - Номер партии — 8 цифр (`packages/server/src/matchId.ts`, `decisions/matchNumber.ts`), адрес
   `/game/<id>` (`decisions/matchAddress.ts`); вход — экран `#setup` в сетевом режиме
   (`matchJoin.ts`); «Мои партии» — `decisions/myMatches.ts`, отказ по ссылке — `joinLanding.ts`.
@@ -441,6 +466,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   язык; реклама только rewarded (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
 - APK — Capacitor (`mobile/`), ленты `alpha` и `player` в `android.yml`; обновления берёт с VPS
   по манифесту, подписанному в CI, и ставит только файл с подписанным SHA-256
+  (открытый ключ Ed25519 закреплён в `mobile/distribution.json` как `manifestPublicKey`)
   ([runbook](../deploy/apk/README.md)); RuStore — `rustore.yml`,
   выпуск закрыт до решений оператора ([rustore-preparation.md](security/rustore-preparation.md)).
 
@@ -471,6 +497,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | Срез | Код (`packages/server/src`) | Хост игроков |
 | --- | --- | --- |
 | Корпорации: роли, влияние, стройка | `corpService.ts`, `corpConstruction.ts` | вкл. |
+| Лента новостей: жизнь корпораций, битвы, объявления администратора | `corpNews.ts`, `newsApi.ts`, `newsScreen.ts` | вкл. (`GET /news`, «Домой» в хабе) |
 | Арсенал: стартовый набор, дроп, гейт `E_NOT_OWNED` | `mainGameArsenal.ts`, `arsenal.ts` | вкл. |
 | Мета-экономика: материалы, крафт, выплаты, сезон, Суверены, витрина за ◆, перки премиума | `metaEconomy*.ts` | вкл. |
 | Аукцион `MetaMarket`: комиссия 8%, до 20 лотов | `metaMarket.ts` | вкл., от 100 XP |
@@ -478,7 +505,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | Магазин Commerce: 4 товара и 6 пакетов Суверенов, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |
 
 - AvA ([corporation-wars.md](corporation-wars.md)) и медали монтируют только `main.ts` пакета
-  сервера и процесс корпораций ([corporation-service.md](corporation-service.md)).
+  сервера и процесс корпораций ([corporation-service.md](corporation-service.md)). Там битва
+  проходит путь от вызова до итога: партия идёт по своим часам, победу решает сумма очков
+  стороны (сквозной тест `avaBattle.test.ts`).
 - Этапы партии платят накопительно 25% и 50% бюджета (очки участия и 3 / 7 дней своих приказов),
   финал — остаток, бонус места, дроп; сезон «Пограничный флот» ([meta-economy.md](meta-economy.md)).
 - Решение владельца 2026-10-12: дальнейший разнос на сервисы, staff-сервис и SIEM — на паузе

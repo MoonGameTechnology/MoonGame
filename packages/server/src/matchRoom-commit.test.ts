@@ -336,6 +336,45 @@ function markerData() {
   });
 }
 
+describe('MatchRoom · shutdown drain', () => {
+  it.each([false, true])('waits for every durable action in a queued or internal batch (internal=%s)', async (internal) => {
+    const releases: Array<() => void> = [];
+    const persisted: number[] = [];
+    const actions: Action[] = [1, 2].map((n) => ({
+      id: `drain:${n}`, type: 'marker.set', playerId: 'p1', payload: {}, issuedAt: 0,
+    }));
+    const base = createInitialState({ seed: 'drain', version: { data: 'test', manifest: 'test' } });
+    const room = new MatchRoom({
+      id: 'drain', initialState: { ...base, players: { p1: lobbyPlayer('p1') } },
+      kernel: createKernel([markerModule]), data: markerData(), now: () => 1000,
+      initiallyStarted: true,
+      ...(internal ? { serverOrders: () => actions } : {}),
+      persist: async (snapshot) => {
+        await new Promise<void>((resolve) => { releases.push(resolve); });
+        persisted.push(snapshot.seq);
+      },
+    });
+    const queued = internal ? [] : actions.map((action) => room.submitServerAction('p1', action));
+    if (internal) room.tick();
+    await flush();
+    expect(releases).toHaveLength(1);
+    let drained = false;
+    const closing = room.drain().then(() => { drained = true; });
+    await flush();
+    expect(drained).toBe(false);
+    releases[0]!();
+    await flush();
+    expect(releases).toHaveLength(2);
+    expect(drained).toBe(false);
+    releases[1]!();
+    await closing;
+    await Promise.all(queued);
+    expect(persisted).toEqual([1, 2]);
+    expect(room.sequence).toBe(2);
+    expect(room.state.players.p1!.resources.marker).toBe(2);
+  });
+});
+
 describe('MatchRoom · mailbox serializes lobby start', () => {
   it('runs a lobby start only after an in-flight committed action commits', async () => {
     let resolvePersist: (() => void) | null = null;

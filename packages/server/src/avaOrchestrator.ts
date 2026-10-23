@@ -2,6 +2,7 @@ import {
   Rng,
   buildStateFromMap,
   getStance,
+  hasFixedSides,
   seedRng,
   type Action,
   type GameData,
@@ -52,8 +53,16 @@ export interface AvaOrchestratorDeps {
   data: GameData;
   /** AvA-eligible map pool (loaded + validated at boot). */
   maps: readonly MatchMap[];
+  /** The module manifest the host's rooms run (`MODULE_MANIFEST_VERSION` on this server),
+   *  pinned into the built state. The loader refuses a match pinned to another module
+   *  graph, so a session built under a default here could never load (CORP-4). */
+  manifest: string;
   /** Build + register + persist the live room. Called once per newly-raised session. */
   createRoom: (spec: AvaSessionSpec) => Promise<void>;
+  /** CORP-4: no map fits a locked roster — cancel the matchup and refund the challenge
+   *  (`AvaService.cancelLocked`, exactly-once by its locked→cancelled gate; true = this
+   *  call cancelled it). Absent ⇒ the sweep leaves such a matchup locked. */
+  cancel?: (matchupId: string) => Promise<boolean>;
   /** Injectable clock (deterministic tests + the sweep). */
   now?: () => number;
   /** AVA-8 (S6): peace-period length — the war opens `peaceMs` after the session is
@@ -135,6 +144,18 @@ export function seatAvaRoster(
   return { slots, seats };
 }
 
+/** CORP-4 — the mode a battle of `slotsPerSide` seats a side plays under (pure, exported
+ *  for tests). A team battle is a fixed-side match (`hasFixedSides`): the roster decides
+ *  the sides, and every ending counts a side as one unit. One seat a side needs no mode —
+ *  the base rules already pit the two seats against each other. `null`: the game has no
+ *  fixed-side mode for this format, and a team battle is never played every seat for
+ *  itself (fail-secure) — the orchestrator treats it like a battle no map fits. */
+export function avaModeId(slotsPerSide: number): string | undefined | null {
+  if (slotsPerSide <= 1) return undefined;
+  const modeId = `team_${slotsPerSide}v${slotsPerSide}`;
+  return hasFixedSides(modeId) ? modeId : null;
+}
+
 export class AvaOrchestrator {
   private readonly challenges: AvaChallengeStore;
   private readonly roster: AvaRosterStore;
@@ -142,7 +163,9 @@ export class AvaOrchestrator {
   private readonly data: GameData;
   private readonly maps: readonly MatchMap[];
   private readonly isMatchEnded?: (matchId: string) => Promise<boolean>;
+  private readonly manifest: string;
   private readonly createRoom: (spec: AvaSessionSpec) => Promise<void>;
+  private readonly cancel?: (matchupId: string) => Promise<boolean>;
   private readonly now: () => number;
   private readonly peaceMs: number;
   private readonly escalateWar?: (matchId: string) => Promise<boolean>;
@@ -157,7 +180,9 @@ export class AvaOrchestrator {
     this.sessions = deps.sessionStore;
     this.data = deps.data;
     this.maps = deps.maps;
+    this.manifest = deps.manifest;
     this.createRoom = deps.createRoom;
+    if (deps.cancel) this.cancel = deps.cancel;
     this.now = deps.now ?? ((): number => Date.now());
     this.peaceMs = deps.peaceMs ?? DEFAULT_PEACE_MS;
     if (deps.escalateWar) this.escalateWar = deps.escalateWar;
@@ -189,7 +214,10 @@ export class AvaOrchestrator {
 
     // Pick a symmetric 2-side map big enough for the larger roster side; the shorter side's
     // spare slots become AI bots. Seeded by the matchup id → deterministic + re-derivable.
+    // A team format with no fixed-side mode has no map either (CORP-4, `avaModeId`).
     const slotsPerSide = Math.max(1, bySide.challenger.length, bySide.target.length);
+    const modeId = avaModeId(slotsPerSide);
+    if (modeId === null) return { ok: false, code: 'E_NO_MAP' };
     const rng = new Rng(seedRng(`ava:${matchupId}`));
     const map = pickAvaMap(this.maps, 2, slotsPerSide, rng);
     if (!map) return { ok: false, code: 'E_NO_MAP' };
@@ -212,8 +240,17 @@ export class AvaOrchestrator {
       }
     }
     // S5 peaceful start — cross-team stances seed at `peace` (combat-lock is free from the
-    // seed; the orchestrator escalates to war on a timer in AVA-8).
-    const state = buildStateFromMap(map, this.data, { slots, crossTeamStart: 'peace' });
+    // seed; the orchestrator escalates to war on a timer in AVA-8). Each seat carries its
+    // side (`Player.team`), and the mode persisted in the state makes the loader run the
+    // room with fixed sides (CORP-4).
+    const state: GameState = {
+      ...buildStateFromMap(map, this.data, {
+        slots,
+        crossTeamStart: 'peace',
+        manifest: this.manifest,
+      }),
+      ...(modeId !== undefined ? { modeId } : {}),
+    };
     const matchId = `ava-${matchupId}`;
 
     // Raise the room FIRST (persist its snapshot — idempotent by match id), then record the
@@ -255,16 +292,22 @@ export class AvaOrchestrator {
 
   /** Raise a session for every LOCKED matchup that has none yet — idempotent + restart-safe
    *  (skips those already in the session store). The host drives it on the same interval as
-   *  the challenge/roster sweeps. Returns how many sessions it raised this pass. */
-  async sweep(): Promise<{ raised: number }> {
+   *  the challenge/roster sweeps. A matchup no map fits is cancelled with a refund rather
+   *  than left locked forever (CORP-4). Returns how many sessions it raised and how many
+   *  matchups it cancelled this pass. */
+  async sweep(): Promise<{ raised: number; cancelled: number }> {
     const locked = await this.challenges.lockedMatchups();
     let raised = 0;
+    let cancelled = 0;
     for (const matchup of locked) {
       if (await this.sessions.byMatchup(matchup.id)) continue;
       const res = await this.orchestrate(matchup.id);
       if (res.ok) raised += 1;
+      else if (res.code === 'E_NO_MAP' && this.cancel && (await this.cancel(matchup.id))) {
+        cancelled += 1;
+      }
     }
-    return { raised };
+    return { raised, cancelled };
   }
 
   /** AVA-8 (S6) — the war sweep: for every session whose peace period lapsed, open the
@@ -318,23 +361,25 @@ export function winnerSideOf(map: MatchMap, winnerPlayerId: string): AvaSide | n
 }
 
 /** The system war declarations that open an AvA war (S6) — pure, exported for the host's
- *  `escalateWar` sink and tests. In an AvA session every same-side pair is seeded ALLIANCE
- *  and every cross-side pair PEACE, so "the pairs still at peace" IS the cross-team set;
- *  one unilateral escalation per pair flips it to war (`diplomacy.declare` toward hostile
- *  needs no consent). Action ids are deterministic (`ava-war:<matchId>:<a>:<b>`), so the
- *  room's idempotency receipts absorb a re-submitted batch after a partial failure. */
+ *  `escalateWar` sink and tests. The war is between the two SIDES (`Player.team`, seated
+ *  from the map's slots): every active cross-side pair not yet at war gets one unilateral
+ *  escalation (`diplomacy.declare` toward hostile needs no consent). A map's inhabitants
+ *  carry no side, so a neutral NPC keeps its peace (CORP-4). Action ids are deterministic
+ *  (`ava-war:<matchId>:<a>:<b>`), so the room's idempotency receipts absorb a
+ *  re-submitted batch after a partial failure. */
 export function warDeclarationsFor(
   state: GameState,
   matchId: string,
 ): Array<{ playerId: string; action: Action }> {
   const ids = Object.keys(state.players)
-    .filter((id) => state.players[id]?.status === 'active')
+    .filter((id) => state.players[id]?.status === 'active' && state.players[id]?.team !== undefined)
     .sort();
   const out: Array<{ playerId: string; action: Action }> = [];
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
       const [a, b] = [ids[i]!, ids[j]!];
-      if (getStance(state, a, b) !== 'peace') continue; // allies (or already at war)
+      if (state.players[a]!.team === state.players[b]!.team) continue; // one side
+      if (getStance(state, a, b) === 'war') continue; // already at war
       out.push({
         playerId: a,
         action: {

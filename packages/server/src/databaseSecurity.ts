@@ -25,6 +25,7 @@ export const APP_TABLES = [
   'ava_sessions',
   'ava_result_delivery',
   'ava_feed',
+  'announcements',
   'medals',
   'arsenal',
   'corp_arsenal_rent',
