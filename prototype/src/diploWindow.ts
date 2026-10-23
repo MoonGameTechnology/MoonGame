@@ -775,7 +775,6 @@ function sendDiploMsg(): void {
   dispatchChat(conversations.current(), text); // NET: server relay + echo; solo: local append
   if (input) {
     input.value = '';
-    input.focus();
   }
 }
 /** Ping the selected province into the coalition channel — also a clickable map
@@ -802,7 +801,6 @@ function pingSelected(): void {
   }
   if (input) {
     input.value = '';
-    input.focus();
   }
 }
 
@@ -849,7 +847,6 @@ export function initDiploWindow(host: DiploWindowHost): void {
         openDiplo('msgs'); // hand off to the full message thread
         conversations.open(intent.seat);
         renderDiplo();
-        document.getElementById('dp-text')?.focus();
       }
     });
   }
@@ -934,14 +931,12 @@ export function initDiploWindow(host: DiploWindowHost): void {
         conversations.open(intent.seat);
         diploTab = 'msgs';
         renderDiplo();
-        document.getElementById('dp-text')?.focus();
         return;
       }
       const convo = (tg.closest('.dp-cv') as HTMLElement | null)?.dataset.convo;
       if (convo) {
         conversations.open(convo);
         renderDiplo();
-        document.getElementById('dp-text')?.focus();
         return;
       }
       if (tg.closest('.dp-ping')) return pingSelected();

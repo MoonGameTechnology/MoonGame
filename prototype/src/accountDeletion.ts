@@ -85,6 +85,7 @@ export function mountAccountDeletion(base: () => string | null, accepted: () => 
     submit.textContent = t('account.delete.send');
     const cancel = document.createElement('button');
     cancel.type = 'button';
+    cancel.autofocus = true; // showModal must not focus the password and summon the keyboard.
     cancel.textContent = t('account.delete.cancel');
     cancel.addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
@@ -125,7 +126,6 @@ export function mountAccountDeletion(base: () => string | null, accepted: () => 
     });
     document.body.append(dialog);
     dialog.showModal();
-    password.focus();
   });
   return refresh;
 }

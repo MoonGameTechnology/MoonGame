@@ -17,6 +17,7 @@ import { en } from '../../localization/en';
 import { trainingBaseline } from '../../decisions/trainingStages';
 import { trainingState } from '../../packages/client/src/gameData';
 import { buildFirstMatchTour } from './firstMatchTour';
+import { firstMatchFixture } from './firstMatchTour.fixture';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildTrainingTour } from './trainingTour';
 import { data } from './gameData';
@@ -27,14 +28,13 @@ const STEP_MAX = 90;
 
 const first = (mouse: boolean): SpotlightStep[] =>
   buildFirstMatchTour({
+    ...firstMatchFixture().deps,
     mouse: () => mouse,
     homeOpened: () => false,
     cardLayout: () => !mouse,
     panelOpen: () => false,
     shipsTabOpen: () => false,
-    hasFleet: () => false,
     capturedWorld: () => false,
-    scoreRose: () => false,
   });
 
 const world = trainingState(data);

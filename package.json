@@ -72,7 +72,8 @@
     "audit": "pnpm audit --audit-level=high",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs-check",
     "docs-check": "node scripts/docs-check.mjs",
-    "smoke:apk-site": "node prototype/apksitetest.mjs"
+    "smoke:apk-site": "node prototype/apksitetest.mjs",
+    "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
