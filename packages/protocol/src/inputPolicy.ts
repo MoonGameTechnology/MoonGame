@@ -261,7 +261,6 @@ export function sanitizeChatText(text: string, max: number): string {
     .join('');
 }
 
-
 /**
  * Find whole offensive words, including spaced-letter/obfuscated spellings
  * ("f.u.c.k", "s h 1 t", Cyrillic/Latin homoglyphs). The dictionary is not a
@@ -298,6 +297,18 @@ function offensiveSpans(text: string): Array<{ start: number; end: number }> {
       end = next.end;
       if (Array.from(joined).length > 36) break;
       if (blockedPublicName(joined)) spans.push({ start: word.start, end });
+    }
+  }
+  // Chinese, Japanese and Korean do not consistently separate words with spaces.
+  // Scan exact CJK terms even inside longer script runs; keep whole-word matching
+  // for Latin/Cyrillic so innocent substrings remain safe.
+  for (const language of ['zh', 'ja', 'ko']) {
+    for (const term of MULTILINGUAL_BLOCKED_NAMES[language] ?? []) {
+      let start = text.indexOf(term);
+      while (start !== -1) {
+        spans.push({ start, end: start + term.length });
+        start = text.indexOf(term, start + term.length);
+      }
     }
   }
   return spans;
