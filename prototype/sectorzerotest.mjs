@@ -53,6 +53,8 @@ async function toggleTools() {
 // Меню каста флагмана живёт у композера «Приказ» (`chainComposer.ts`, REFM-229) — робот
 // берёт его своим импортом: в `main.ts` этого имени больше нет.
 const hooks = `import { chainAbilitiesFor as __chainAbilitiesFor } from './chainComposer';
+// Лента событий — у ленты (\`eventFeed.ts\`); \`main.ts\` её больше не читает (REFM-221).
+import { eventLog as __eventLog } from './eventFeed';
 import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { knownOwner as __knownOwner } from './mapLayer';
 import { moveFleet as __moveFleet } from './game';
@@ -143,7 +145,7 @@ window.__szTest = {
   atWar: () => Object.keys(s.players).filter((id) => id !== ME && __getStance(s, ME, id) === 'war'),
   warLines: () => {
     const foes = Object.keys(s.players).filter((id) => id !== ME && __getStance(s, ME, id) === 'war');
-    return eventLog.map((e) => e.text).filter((text) => foes.some((id) => text.startsWith(\`\${NAME[id]} → \`)));
+    return __eventLog.map((e) => e.text).filter((text) => foes.some((id) => text.startsWith(\`\${NAME[id]} → \`)));
   },
   warReplies: () => {
     const foes = Object.keys(s.players).filter((id) => id !== ME && __getStance(s, ME, id) === 'war');

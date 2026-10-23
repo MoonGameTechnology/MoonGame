@@ -528,7 +528,9 @@ describe('окно построек — подключение к main.ts', () =
       /upgrade: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'upgrade', id, count: 1 \}\)/,
     );
     // Мир карточки — `codexWorld()`: из хаба выбранного мира нет (справочник поверх хаба).
-    expect(src).toContain("enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 })");
+    // Карточка здания — у справки (`helpCenter.ts`, REFM-221).
+    const help = readFileSync(new URL('./helpCenter.ts', import.meta.url), 'utf8');
+    expect(help).toContain("enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 })");
   });
 });
 

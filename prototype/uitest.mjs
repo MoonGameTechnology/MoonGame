@@ -200,6 +200,8 @@ const bridge = `
 import { selectAt as __selectAt } from './mapInput';
 // Точка значка боя — у флотов карты (REFM-235); \`main.ts\` сам её не считает.
 import { battleAnchor as __battleAnchor } from './fleetGeometry';
+// Ведомый первый матч — у обучения (REFM-221).
+import { startGuidedMatch as __startGuidedMatch } from './guideFlow';
 import { battleBadgePoint as __battleBadgePoint } from '../../decisions/battleTap';
 // Узел флота — у тумана (\`mapFog.ts\`): с REFM-224 \`main.ts\` его не импортирует.
 import { fleetNode as __fleetNode } from './mapFog';
@@ -257,7 +259,7 @@ module.exports = {
       issuedAt: s.time, payload: { target: partner.id, stance: 'war' } }, s.time).error;
   },
   soloBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'solo-replace')),
-  tutorial: startGuidedMatch,
+  tutorial: __startGuidedMatch,
   saveSolo: () => saveSolo(true),
   autoSaveSolo: () => { s.players[ME].resources.metal += 1; tickSoloSave(performance.now() + 15000); },
   sandboxBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'sandbox')),

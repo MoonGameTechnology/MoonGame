@@ -7,11 +7,13 @@ import { instrumentedGame, launchBrowser, serve, waitForApp } from './harnessKit
 // Only the clock is accelerated. All orders and selections go through the visible UI.
 const host = await serve(
   await instrumentedGame(`
+// Счётчики гида — у обучения (REFM-221); \`main.ts\` их больше не видит.
+import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount } from '../../decisions/firstMatchGuide';
 window.__guideTest = {
   advanceHours: (hours) => apply(advance(s, s.time + hours * 3600000)),
   facts: () => ({ planets: Object.values(s.planets).filter(p => p.owner === ME).map(p => p.id),
-    ships: guideShipCount(s, ME), fleet: guideFleet(s, ME), onboard: loadOnboard(),
-    xp: loadMeta().xp, mine: guideMineLevel(s, 'home_1'), tech: s.players[ME]?.technologies, selected: selFleet }),
+    ships: __guideShipCount(s, ME), fleet: __guideFleet(s, ME), onboard: loadOnboard(),
+    xp: loadMeta().xp, mine: __guideMineLevel(s, 'home_1'), tech: s.players[ME]?.technologies, selected: selFleet }),
 };`),
 );
 const browser = await launchBrowser();
