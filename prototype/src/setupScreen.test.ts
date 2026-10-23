@@ -506,14 +506,16 @@ describe('REFM-212 — стык с main.ts: двери вместо присво
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   // Сетевой вход и опрос мест живут у входа в партию (`matchJoin.ts`, REFM-217).
   const JOIN = readFileSync(new URL('./matchJoin.ts', import.meta.url), 'utf8');
+  // Ведомый первый матч живёт у обучения (`guideFlow.ts`, REFM-221).
+  const GUIDE = readFileSync(new URL('./guideFlow.ts', import.meta.url), 'utf8');
   const body = (name: string, src = MAIN): string =>
     new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 
   it('гид готовит партию дверью экрана до старта', () => {
-    const guided = body('startGuidedMatch');
+    const guided = body('startGuidedMatch', GUIDE);
     const door = guided.indexOf('prepareGuidedSetup();');
     expect(door).toBeGreaterThan(-1);
-    expect(guided.indexOf('startMatch(buildSetupConfig(), false);')).toBeGreaterThan(door);
+    expect(guided.indexOf('game.startMatch(buildSetupConfig(), false);')).toBeGreaterThan(door);
   });
 
   it('сетевой вход открывает экран, затем ставит сетевой режим; опрос отдаёт места владельцу', () => {

@@ -94,7 +94,7 @@ import {
 } from './matchJoin';
 import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
-import { isForkSite, shareRoadNetwork } from '../../packages/shared-core/src/index';
+import { shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, type MapId } from './mapCatalog';
 /**
@@ -120,7 +120,6 @@ import {
   // SHU-3.1 — челноки: перегрузка порт ⇄ носитель и сам вылет.
   mergeFleet,
   buildBuilding,
-  upgradeBuilding,
   netIncome,
   capitalOf,
   type SetupConfig,
@@ -132,7 +131,6 @@ import {
 } from './unitGlyphs';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { worldName } from './planetName';
-import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
@@ -157,9 +155,7 @@ import {
   statPopOpen,
   strikeTitle,
   unitTileHtml,
-  veteranPowerOn,
 } from './fleetCard';
-import { veteranMark } from '../../decisions/veteranMark';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -177,9 +173,6 @@ import {
   typingTarget,
 } from './backGesture';
 import {
-  buildingLevel,
-  buildingMaxLevel,
-  matchCost,
   sightCircles,
   type SightCircle,
   type Squadron,
@@ -208,9 +201,6 @@ import { skinIcon } from './holographicIcons';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
-import { stackHullPct } from './fleetSummary';
-import { shipCardModel, stackBonusSlots } from '../../decisions/shipCard';
-import { shipCardHtml } from './shipCard';
 import { catalogPortraitHtml } from './shipArt';
 import { isWingUnit } from './planetSummary';
 import {
@@ -235,7 +225,6 @@ import { tokenFor } from '../../decisions/sessionStore';
 import { signOutEverywhere } from './accountSession';
 import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
-import { canBuildHere } from '../../decisions/buildGate';
 import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
 import { initMissionPanel } from './missionPanel';
 import { bossTask } from '../../decisions/runBoss';
@@ -300,7 +289,6 @@ import {
   initSetupScreen,
   netSetup,
   openSetup,
-  prepareGuidedSetup,
   sciWin,
   setupEl,
   setupMapId,
@@ -333,7 +321,6 @@ import { houseDisplayName, seatAiProfile } from './setupSeats';
 // English data/*.json names, the static HTML is localized by a boot pass.
 import {
   t,
-  tData,
   LOCALE,
   setLocale,
   localizeStaticDom,
@@ -341,21 +328,15 @@ import {
 // REFM-2: the pure presentation formatters live in `format.ts` now (no state, no DOM)
 import {
   esc,
-  cost,
-  buildingName,
   setRunClock,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
-  BUILD_ICON,
-  unitIconHtml,
   RES_SVG,
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
 import { buildingDossier, createDossiers, unitTitle } from './dossiers';
-// The client-side build-queue vocabulary, shared with `dossiers.ts`.
-import type { BuildKind } from './buildQueue';
 import {
   META_TREE,
   META_BRANCH_RU,
@@ -364,7 +345,6 @@ import {
   metaPoints,
   canUnlock,
   unlockNode,
-  matchXp,
   parseMetaState,
   type MetaState,
   type MetaBranch,
@@ -464,8 +444,8 @@ import {
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { flushPinch, forgetAdditive, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
-import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, myRes, progressPct, timeLeft } from './worldQueries';
-import { eventLog, handleEvents, initEventFeed, killStats, logLines, note, resetEventFeed, toast } from './eventFeed';
+import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct, timeLeft } from './worldQueries';
+import { handleEvents, initEventFeed, killStats, logLines, note, resetEventFeed, toast } from './eventFeed';
 import {
   PLAY_BASE,
   applyTimeSpeed,
@@ -510,33 +490,27 @@ import {
   initSandbox,
   setSandboxButton,
 } from './sandbox';
-// ONB-1 — the reusable guide-mark (spotlight) engine + its browser adapter.
-// `playerOrder` feeds it real actions so `action` steps advance; ONB-2 builds
-// the full guided first match on the same `startTour` primitive.
-import { startTour, type RunningTour } from './spotlightDom';
-import type { TourResult } from './spotlight';
-import { HUD_ORIENTATION_TOUR } from './onboardingTour';
-// ONB-2 — the guided first match (a data chain over this same engine).
-import { buildFirstMatchTour } from './firstMatchTour';
-import { GUIDE_TARGET, GUIDE_HULL, GUIDE_TECH, guideShipCount, guideFleet, guideMineLevel, guideCourseSet } from '../../decisions/firstMatchGuide';
+// Обучение (ONB-0/1/2/7) — у владельца `guideFlow.ts` (REFM-221): тур по HUD, флаг
+// пройденного обучения, ведомый первый матч, цели первой сессии.
+import {
+  activeTour,
+  initGuideFlow,
+  launchTour,
+  loadOnboard,
+  maybeStartPendingTour,
+  setPendingGuide,
+  stopFirstGoals,
+  updateGoals,
+} from './guideFlow';
+// TRN-2 — тур полигона: собирается здесь, запускается лаунчером `guideFlow.ts`.
 import { buildTrainingTour } from './trainingTour';
 import { trainingTourUi } from './trainingTourDom';
 import { trainingFlagshipMerge } from '../../decisions/trainingGuide';
 import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
-// ONB-4 — searchable codex/help index (pure) over the existing article corpus.
-import {
-  buildCodexIndex,
-  searchCodex,
-  GLOSSARY,
-  type CodexEntry,
-  type CodexCategory,
-} from './codexIndex';
-// ONB-3 — just-in-time mechanic intros (per-nick seen-set, shown once on first contact).
-import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
-// ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
-import { buildRecap } from './recap';
-import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
+// Справка (ONB-3/4/5) — у владельца `helpCenter.ts` (REFM-221): справочник и его поиск,
+// карточка корабля, вводные к механикам, сводка «пока вас не было».
+import { forgetAway, initHelpCenter, maybeIntro, openCodex, openShipCard } from './helpCenter';
 import { HOLD_TIP_MS, holdTipPos, movedTooFar } from './tipPlacement';
 import {
   IDLE,
@@ -547,13 +521,6 @@ import {
   release,
   type HoldState,
 } from '../../decisions/holdPress';
-import {
-  GOALS_BONUS_XP,
-  goalsChanged,
-  goalsListHtml,
-  goalsTrayHtml,
-  rewardDue,
-} from './goalsPanel';
 import { CLEARED, needsClearing, overlayAlarm, overlayShown, overlayText } from './netOverlay';
 import {
   BANNER_FORGOTTEN,
@@ -561,7 +528,6 @@ import {
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
 import {
-  aiming,
   allyAim,
   anyArmed,
   arm,
@@ -571,7 +537,6 @@ import {
   hasSelection,
   inspectFleet,
   mobileChoices,
-  mobileDraft,
   offerChoices,
   pickFleets,
   pickMode,
@@ -606,7 +571,6 @@ import {
 } from '../../decisions/netViewClock';
 import { mountLocaleMenu } from './localeMenu';
 import { mapLod, mapSpacing, type MapLod } from '../../packages/client/src/mapLod';
-import { goalBaseline, grew, mineLevels } from './goalTally';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
@@ -623,18 +587,8 @@ import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
 import { aaRings, type RangeRing } from './combatRanges';
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
-// ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
-import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
-// ONB-0 — first-run onboarding state + funnel (per-callsign localStorage). Pure
-// model; main.ts persists it and drives the hub offer / «Ещё → Обучение» replay.
-import {
-  applyTourOutcome,
-  markSkipped,
-  markStarted,
-  parseOnboardState,
-  welcomeMode,
-  type OnboardState,
-} from './onboarding';
+// ONB-0 — какой хаб показать новичку (флаг обучения хранит `guideFlow.ts`).
+import { welcomeMode } from './onboarding';
 import type {
   GameState,
   Fleet,
@@ -1474,270 +1428,22 @@ initOrderPipeline({
   forward: (action) => simLink?.forward(action),
 });
 
-// --- ONB-1 guide-mark launcher ------------------------------------------------
-// One tour at a time; `playerOrder` (`orderPipeline.ts`) notifies it of accepted actions so a
-// step's `advance: { on: 'action' }` fires on the real order. Exposed on `window`
-// as the reusable seam ONB-0/ONB-2 (auto-offer, «Ещё → Обучение») and headless
-// e2e drive — starting a HUD tour needs an active match, which those own.
-let activeTour: RunningTour | null = null;
-// Player build: the 'clock' step points at the pause/acceleration controls, which are
-// stripped there (the server owns the clock in a net match) — drop it so the tour
-// never narrates a control that doesn't exist. Dev client keeps the full chain.
-const ORIENTATION_TOUR = __PLAYER_BUILD__
-  ? HUD_ORIENTATION_TOUR.filter((step) => step.id !== 'clock')
-  : HUD_ORIENTATION_TOUR;
-function launchTour(steps = ORIENTATION_TOUR, onEnd?: (r: TourResult) => void): void {
-  activeTour = startTour(steps, (r) => {
-    activeTour = null;
-    onEnd?.(r);
-  });
-}
-interface TourWindow {
-  __vdTour?: {
-    start: (steps?: typeof HUD_ORIENTATION_TOUR) => void;
-    stop: () => void;
-    readonly active: boolean;
-  };
-}
-(window as unknown as TourWindow).__vdTour = {
-  start: (steps) => launchTour(steps),
-  stop: () => activeTour?.stop(),
-  get active() {
-    return activeTour?.active ?? false;
-  },
-};
-
-// --- ONB-0/ONB-2 first-run onboarding: flag + funnel + guided first match -----
-// The "passed onboarding" signal lives per-nick in localStorage (separate from the
-// saved callsign — a returning device can still be new to the guide). A brand-new
-// commander gets a one-time hub offer; accepting (or «Ещё → Обучение») launches the
-// ONB-2 guided first match: a bot-free solo sandbox with the data-described guide
-// (firstMatchTour) walking produce→build→move→capture→score over the live HUD.
-function onboardKey(): string {
-  return 'vd.onboard.' + (nickInput.value.trim() || 'guest');
-}
-function loadOnboard(): OnboardState {
-  return parseOnboardState(localStorage.getItem(onboardKey()));
-}
-function saveOnboard(st: OnboardState): void {
-  localStorage.setItem(onboardKey(), JSON.stringify(st));
-}
-// A guide queued to launch once the next match's HUD is live (from installMatch).
-let pendingGuide: (() => void) | null = null;
-function maybeStartPendingTour(): void {
-  if (!pendingGuide || NET) return;
-  const run = pendingGuide;
-  pendingGuide = null;
-  requestAnimationFrame(run); // let the fresh HUD paint a frame so selectors resolve
-}
-const myScore = (): number => Math.round(s.match?.scores?.[ME]?.total ?? 0);
-// Крепость на развилке (FORT-6.1) — не мир: её постройка не «захват нового мира».
-const myWorldCount = (): number =>
-  Object.values(s.planets).filter((p) => p.owner === ME && !isForkSite(p)).length;
-// ONB-2: start a bot-free solo sandbox and arm the guided first match over its HUD.
-function startGuidedMatch(): void {
-  prepareGuidedSetup(); // a bot-free solo sandbox on a deterministic homeworld
-  pendingGuide = () => {
-    const home = Object.values(s.planets).find((p) => p.owner === ME && p.kind === 'planet')!.id;
-    const mineLevel = guideMineLevel(s, home);
-    const ships = guideShipCount(s, ME);
-    const mineImproved = () => guideMineLevel(s, home) > mineLevel;
-    const hasShip = () => guideShipCount(s, ME) > ships;
-    const researchDone = () => s.players[ME]?.technologies?.completed.includes(GUIDE_TECH) === true;
-    const box = (p: { x: number; y: number } | null) =>
-      p && p.x >= 22 && p.x <= innerWidth - 22 && p.y >= 80 && p.y <= innerHeight - 44
-        ? { left: p.x - 22, top: p.y - 22, width: 44, height: 44 }
-        : null;
-    const planetBox = (id: string) => box(s.planets[id] ? world(s.planets[id]!.position) : null);
-    const dossier = (selector: string) => !!document.querySelector(`#codex.show ${selector}`);
-    startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
-    launchTour(
-      buildFirstMatchTour({
-        mouse: pcUi,
-        homeOpened: () => selPlanet === home,
-        cardLayout: () => MOBILE,
-        panelOpen: () => mobileHud.expanded(),
-        buildingsTabOpen: () => selPlanet === home && planetTab === 'buildings',
-        mineCardOpen: () => dossier('[data-cx-upg="mine"]'),
-        mineOrdered: () =>
-          mineImproved() ||
-          activeConstruction(home, 'buildings')?.payload.building === 'mine' ||
-          coreQueue(home, 'buildings').some((q) => q.building === 'mine'),
-        mineImproved,
-        dossierClosed: () => !document.getElementById('codex')?.classList.contains('show'),
-        techOpen: () => techWin.classList.contains('show'),
-        techAccessible: () =>
-          Array.from(
-            document.querySelectorAll('[data-phone-tab="science"], [data-phone-more="science"]'),
-          ).some((el) => el.getBoundingClientRect().width > 0),
-        spaceTabOpen: () => !!techWin.querySelector('[data-ttab="space"].on'),
-        researchStarted: () =>
-          researchDone() ||
-          s.players[ME]?.technologies?.active?.some((r) => r.technology === GUIDE_TECH) === true,
-        researchDone,
-        shipsTabOpen: () => selPlanet === home && planetTab === 'ships',
-        catalogOpen: () => buildWinEl.classList.contains('show'),
-        shipCardOpen: () => dossier('[data-build="unit:frigate"]'),
-        shipOrdered: () =>
-          hasShip() ||
-          activeConstruction(home, 'units')?.payload.unit === GUIDE_HULL ||
-          coreQueue(home, 'units').some((q) => q.unit === GUIDE_HULL),
-        hasShip,
-        fleetSelected: () => selFleet !== null && selFleet === guideFleet(s, ME)?.id,
-        moveArmed: () => aiming,
-        courseSet: () => guideCourseSet(s, ME),
-        coursePicked: () =>
-          mobileDraft?.order === 'move' &&
-          mobileDraft.target.kind === 'planet' &&
-          mobileDraft.target.id === GUIDE_TARGET &&
-          mobileDraft.fleetIds.includes(guideFleet(s, ME)?.id ?? ''),
-        capturedWorld: () => s.planets[GUIDE_TARGET]?.owner === ME,
-        homeAnchor: () => planetBox(home),
-        fleetSelector: () => {
-          const f = guideFleet(s, ME);
-          return f ? `[data-act="selfleet"][data-arg="${CSS.escape(f.id)}"]` : null;
-        },
-        targetAnchor: () => planetBox(GUIDE_TARGET),
-        showHome: () => focusWorld(home),
-        showFleet: () => {
-          focusWorld(home);
-          pickWorld(home);
-          setPlanetTab('ships');
-          invalidatePanel();
-          renderPanel();
-          if (MOBILE && !mobileHud.expanded())
-            document
-              .querySelector<HTMLButtonElement>('#mobile-sheet [data-mobile="details"]')
-              ?.click();
-        },
-        showTarget: () => focusWorld(GUIDE_TARGET),
-      }),
-      onGuidedTourEnded,
-    );
-  };
-  showHub(false);
-  showConnect(false);
-  startMatch(buildSetupConfig(), false); // installMatch → maybeStartPendingTour runs the guide
-  // The bot-free lesson accelerates the real construction, research and travel clocks.
-  applyTimeSpeed(300);
-  note(t('onb.tour.speed'));
-}
-// Fold the finished guide into the flag (+funnel); first completion earns XP + a nudge.
-function onGuidedTourEnded(r: TourResult): void {
-  const { state, rewarded } = applyTourOutcome(loadOnboard(), r);
-  saveOnboard(state);
-  if (rewarded) {
-    const cur = loadMeta();
-    const xp = matchXp({ won: false, score: 100 }); // a modest onboarding packet
-    saveMeta({ ...cur, xp: cur.xp + xp });
-    note(t('onb.tour.done', { n: xp }));
-  }
-  stopFirstGoals(); // ONB-7: the checklist belongs to the onboarding session only
-  if (DEV_UI)
-    console.debug(
-      `[onboard] ${r.completed ? 'completed' : r.skipped ? 'skipped' : 'stopped'} @ step ${r.reachedStep + 1}`,
-    );
-}
-
-// --- ONB-7 first-session goals checklist -------------------------------------
-// A light "am I playing right?" list, shown only in the onboarding match: four
-// goals tick from live state (mine improved, frigate built, sector taken, first point),
-// and finishing all four praises the player + nudges them to a real match.
-let goalsActive = false;
-let goalsCollapsed = false;
-let goalsRewarded = false;
-let goalsDone: string[] = [];
-let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
-let goalScoreBase = 0;
-let goalShipBase = 0;
-// Чем меряется прогресс — `goalTally.ts` (REFM-99): от базы на момент запуска списка,
-// а шахты суммой УРОВНЕЙ, потому что домашняя шахта уже стоит.
-const myMineLevel = (): number => mineLevels(Object.values(s.planets), ME);
-function goalSignals(): GoalSignals {
-  return {
-    builtMine: grew(myMineLevel(), goalBase.mineLevel),
-    launchedFleet: grew(guideShipCount(s, ME), goalShipBase),
-    capturedWorld: grew(myWorldCount(), goalBase.worlds),
-    score: Math.max(0, myScore() - goalScoreBase),
-  };
-}
-function startFirstGoals(): void {
-  goalBase = goalBaseline(Object.values(s.planets), Object.values(s.fleets), ME);
-  goalScoreBase = myScore();
-  goalShipBase = guideShipCount(s, ME);
-  goalsDone = [];
-  goalsRewarded = loadOnboard().goalsRewarded === true;
-  goalsCollapsed = false;
-  goalsActive = true;
-  renderGoals();
-}
-function stopFirstGoals(): void {
-  goalsActive = false;
-  document.getElementById('goals')?.classList.remove('show');
-}
-// Called each frame while active: tick newly-met goals; all-done → praise + XP once.
-function updateGoals(): void {
-  if (!goalsActive) return;
-  const next = mergeDone(goalsDone, metGoals(goalSignals()));
-  // Перерисовка только при СДВИГЕ списка — `goalsPanel.ts` (REFM-183): панель
-  // собирается через innerHTML, и перезапись каждый кадр рвала бы тап по кнопке.
-  if (!goalsChanged(goalsDone.length, next.length)) return;
-  goalsDone = next;
-  renderGoals();
-  // Награда ровно ОДИН раз: «список выполнен» остаётся истиной навсегда, защёлка — нет.
-  if (rewardDue(goalsComplete(goalsDone), goalsRewarded)) {
-    goalsRewarded = true;
-    saveOnboard({ ...loadOnboard(), goalsRewarded: true });
-    const cur = loadMeta();
-    saveMeta({ ...cur, xp: cur.xp + GOALS_BONUS_XP });
-    note(
-      t('onb.goals.all-done', {
-        n: GOALS_BONUS_XP,
-      }),
-    );
-  }
-}
-function renderGoals(): void {
-  const el = document.getElementById('goals');
-  if (!el) return;
-  // Collapsed = a small tappable tray badge (icon + count), not just the list hidden
-  // under a still-full-width header — the whole point is to give the map its room
-  // back, not just the four rows.
-  // Свёрнутая подача — ЛОТОК, а не спрятанные строки: смысл сворачивания вернуть карте
-  // место, а шапка во всю ширину этого не даёт (`goalsPanel.ts`, правило 3).
-  if (goalsCollapsed) {
-    el.innerHTML = goalsTrayHtml(t('onb.goal.tray.title'), goalsDone.length, FIRST_GOALS.length);
-    el.classList.add('show');
-    return;
-  }
-  el.innerHTML = goalsListHtml(
-    t('onb.goals.title'),
-    t('onb.goal.collapse.title'),
-    FIRST_GOALS.map((g) => ({ label: t(g.labelKey), done: goalsDone.includes(g.id) })),
-    goalsDone.length,
-  );
-  el.classList.add('show');
-}
-document.getElementById('goals')?.addEventListener('click', (ev) => {
-  const tgt = ev.target as HTMLElement;
-  if (tgt.closest('#gl-tg') || tgt.closest('#gl-tray')) {
-    goalsCollapsed = !goalsCollapsed;
-    renderGoals();
-  }
+// Обучение — у владельца, `guideFlow.ts` (REFM-221): лаунчер туров, флаг «обучение
+// пройдено», ведомый первый матч и список целей первой сессии. Отсюда — мир, своё место,
+// позывной, раскладка, мета-прогресс, переходы хаба и старт партии.
+initGuideFlow({
+  world: () => s,
+  me: () => ME,
+  callsign: () => nickInput.value.trim(),
+  mobile: () => MOBILE,
+  panelExpanded: () => mobileHud.expanded(),
+  loadMeta,
+  saveMeta,
+  showHub,
+  showConnect: (show) => showConnect(show), // объявлен ниже, у экрана входа
+  startMatch,
+  devUi: () => DEV_UI,
 });
-// «Начать обучение» / «Ещё → Обучение»: launch the guided first match.
-function beginOnboarding(): void {
-  saveOnboard(markStarted(loadOnboard()));
-  const nudge = document.getElementById('onboard-nudge');
-  if (nudge) nudge.style.display = 'none';
-  startGuidedMatch();
-}
-document.getElementById('ob-start')?.addEventListener('click', beginOnboarding);
-document.getElementById('ob-skip')?.addEventListener('click', () => {
-  saveOnboard(markSkipped(loadOnboard())); // respected forever — never nagged again
-  refreshHubDoor();
-});
-document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboarding);
 
 // Приказы группе — курс, штурм, запрос войны на пути через мирных, слияние, авто-штурм и
 // вход меню десанта — живут в `groupOrders.ts` (REFM-228). Здесь только хуки: мир, своё
@@ -2251,9 +1957,6 @@ function buildingLocked(planetId: string, id: string): TileLock {
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
-/** Карточка корабля (`shipCard.ts`) в окне справочника: отсеки стека с тем, что надето,
- *  и характеристики одного корабля. Стек адресуется местом во флоте — тем же, что у
- *  плитки; флот исчез или стек сдвинулся — карточки нет, а не чужой корабль. */
 let mineViewState: typeof s | undefined;
 let mineViewOwner = '';
 let mineViewCache: ReturnType<typeof visibleOrdnance>;
@@ -2271,294 +1974,19 @@ const mineControls = rocketMinesUi({
   portrait: (id) => catalogPortraitHtml('md', id, data),
 });
 
-function openShipCard(fleetId: string, index: number): void {
-  const el = document.getElementById('codex');
-  const f = s.fleets[fleetId];
-  const stack = f?.units[index];
-  if (!el || !f || !stack) return;
-  const model = shipCardModel(stack, data, stackBonusSlots(s, fleetId, stack, data));
-  if (!model) return;
-  const faction = s.players[f.owner]?.faction;
-  const html = shipCardHtml(
-    model,
-    {
-      // Портрет — семья владельца, как силуэт на карте: крейсер Роя — Охотник.
-      portrait: (u) => catalogPortraitHtml('u', u, data, 'portrait', faction),
-      icon: (u) => unitIconHtml(u, data, ownerColor(f.owner), 40, faction),
-      unitName: (u) => unitTitle(u),
-      moduleName: (m) => {
-        const mdef = data.modules[m];
-        return mdef ? tData(mdef.name) : m;
-      },
-    },
-    {
-      hpPct: stackHullPct(stack, data),
-      fleetName: fleetTitleOf(f.id),
-      veteran: veteranMark(stack, data, veteranPowerOn()),
-    },
-  );
-  el.innerHTML = `<div class="cxbox sc-box">${html}<button class="cx-close">${t('codex.close')}</button></div>`;
-  el.classList.add('show');
-}
-
-/** Выбранный мир партии для справочника. Из хаба — никакого: после выхода из партии
- *  `selPlanet` остаётся от неё, и карточка предложила бы строить в скрытой партии. */
-function codexWorld(): string | null {
-  return document.body.classList.contains('hub-open') ? null : selPlanet;
-}
-function openCodex(key: string): void {
-  const [kind, id, lvl] = key.split(':');
-  const el = document.getElementById('codex');
-  if (!el || !kind || !id) return;
-  // BUILD-1: карточка здания листает уровни (`b:id:уровень`). Без уровня в ключе
-  // показывается ТЕКУЩИЙ построенный на выбранном мире (если есть) — владелец
-  // открывает свою постройку и видит её, а не абстрактный первый уровень.
-  const world = codexWorld();
-  const builtLvl =
-    kind === 'b' && world
-      ? s.planets[world]?.buildings.find((b) => b.type === id)?.level
-      : undefined;
-  const level = Number(lvl) || builtLvl || 1;
-  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id, level)}${codexBuildBtn(kind, id, level)}<button class="cx-close">${t('codex.close')}</button></div>`;
-  el.classList.add('show');
-}
-/** A "Build here" action inside the codex when the selected province can raise this
- *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
-function codexBuildBtn(kind: string, id: string, level = 1): string {
-  const world = codexWorld();
-  const p = world ? s.planets[world] : null;
-  if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
-  if (kind === 'b') {
-    // BUILD-1: у ПОСТРОЕННОГО здания карточка предлагает «Улучшить» — той же пробой
-    // ядра, которой решается сам приказ (RULES-1): очередь, казна и потолок уровня
-    // покрыты одним вопросом. Недоступный по любой причине, кроме казны, — без кнопки.
-    const inst = p.buildings.find((b) => b.type === id);
-    if (inst) {
-      const def = data.buildings[id];
-      const max = def ? buildingMaxLevel(def) : 1;
-      if (inst.level >= max) return '';
-      const code = canOrder(s, upgradeBuilding(ME, p.id, id));
-      if (code !== null && code !== 'E_INSUFFICIENT') return '';
-      const c = def ? matchCost(s, buildingLevel(def, inst.level + 1).cost) : undefined;
-      return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
-    }
-    const buildable = canBuildHere(p, id, data, feedsOnBiomass(s, ME, data));
-    // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
-    // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
-    // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
-    if (!buildable || buildingLocked(p.id, id)) return '';
-    if (level > 1) return ''; // листаешь будущие уровни — строится всё равно первый
-    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(matchCost(s, data.buildings[id]?.cost), myRes())}</button>`;
-  }
-  if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, s.players[ME]?.faction)} ${t('codex.build-here')} · ${cost(matchCost(s, data.units[id]?.cost), myRes())}</button>`;
-  }
-  return '';
-}
-
-// --- ONB-4 codex/help hub: searchable index over the article corpus ----------
-// The pure index (src/codexIndex.ts) flattens every unit/building + a glossary of
-// tricky terms; here we localise labels and render a searchable «?» surface. A tap
-// on a result deep-links into the single-article codex (openCodex), so any
-// term/unit/mechanic is two taps away. Entry points: hub «Ещё → Справочник» + the
-// in-match rail «?».
-const CODEX_INDEX = buildCodexIndex(data, GLOSSARY);
-const CODEX_SECTIONS: Array<[CodexCategory, string]> = [
-  ['unit', 'codex.hub.sec.unit'],
-  ['building', 'codex.hub.sec.building'],
-  ['mechanic', 'codex.hub.sec.mechanic'],
-];
-function codexEntryLabel(e: CodexEntry): string {
-  const id = e.key.slice(2);
-  if (e.category === 'unit') return unitTitle(id);
-  if (e.category === 'building') return buildingName(data.buildings[id]?.name, id);
-  return t(e.titleKey ?? e.title); // mechanic: the heading lives in the locale
-}
-function codexEntryIcon(e: CodexEntry): string {
-  const id = e.key.slice(2);
-  if (e.category === 'unit') return unitIconHtml(id, data, youColor, 20, s.players[ME]?.faction);
-  if (e.category === 'building') return BUILD_ICON[id] ?? '▣';
-  return '?';
-}
-function codexItemHtml(e: CodexEntry): string {
-  return `<button class="ch-item" data-codex="${esc(e.key)}"><span class="ch-ic">${codexEntryIcon(e)}</span><span>${esc(codexEntryLabel(e))}</span></button>`;
-}
-// Search folds the LOCALISED label into the haystack so RU and EN queries both hit.
-function renderCodexResults(query: string): void {
-  const host = document.getElementById('ch-results');
-  if (!host) return;
-  // В забеге Sector Zero очков нет (`victoryPointsShown`) — и статьи о них тоже.
-  const index = victoryPointsShown(sectorZeroToolsHidden())
-    ? CODEX_INDEX
-    : CODEX_INDEX.filter((e) => e.key !== 'm:score');
-  const hits = searchCodex(index, query, (e) =>
-    (codexEntryLabel(e) + ' ' + e.title + ' ' + e.tags.join(' ')).toLowerCase(),
-  );
-  if (!query.trim()) {
-    // Empty query → browse by category.
-    host.innerHTML = CODEX_SECTIONS.map(([cat, label]) => {
-      const items = hits.filter((e) => e.category === cat);
-      return items.length
-        ? `<div class="ch-sec">${t(label)}</div><div class="ch-grid">${items.map(codexItemHtml).join('')}</div>`
-        : '';
-    }).join('');
-    return;
-  }
-  host.innerHTML = hits.length
-    ? `<div class="ch-grid">${hits.map(codexItemHtml).join('')}</div>`
-    : `<div class="ch-empty">${t('codex.hub.empty')}</div>`;
-}
-function openCodexHub(): void {
-  const box = document.getElementById('codexhub');
-  if (!box) return;
-  box.innerHTML =
-    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('codex.hub.title')}</b></div>` +
-    `<input id="ch-search" class="ch-search" type="text" placeholder="${t('codex.hub.search.ph')}" aria-label="${t('codex.hub.search.aria')}">` +
-    `<div class="ch-body" id="ch-results"></div>` +
-    `<button class="cx-close" id="ch-close">${t('codex.hub.close')}</button></div>`;
-  const input = document.getElementById('ch-search') as HTMLInputElement | null;
-  if (input) input.oninput = () => renderCodexResults(input.value);
-  renderCodexResults('');
-  box.classList.add('show');
-}
-// One delegated handler for the hub (rebuilt each open, so wire the container once).
-document.getElementById('codexhub')?.addEventListener('click', (ev) => {
-  const box = document.getElementById('codexhub')!;
-  const tg = ev.target as HTMLElement;
-  if (tg === box || tg.closest('#ch-close')) {
-    box.classList.remove('show'); // backdrop / CLOSE
-    return;
-  }
-  const item = tg.closest('.ch-item') as HTMLElement | null;
-  if (item?.dataset.codex) openCodex(item.dataset.codex); // deep-link → single article (layers on top)
-});
-document.getElementById('hub-help')?.addEventListener('click', openCodexHub);
-document.getElementById('rail-help')?.addEventListener('click', openCodexHub);
-
-// --- ONB-3 just-in-time mechanic intros --------------------------------------
-// The first time a player opens an advanced panel, a one-line hint explains it,
-// then never again (per-callsign seen-set). A veteran (has finished a match →
-// meta XP > 0) is marked seen silently, so they are never nagged.
-function seenIntrosKey(): string {
-  return 'vd.seenIntros.' + (nickInput.value.trim() || 'guest');
-}
-/** UIX-8.1: вводная — подсказка одной строкой у низа экрана, а не окно поверх того, что она
- *  объясняет: нажатия мимо неё проходят насквозь, и первое из них её убирает (ниже). */
-function showIntro(card: IntroCard): void {
-  const el = document.getElementById('intro');
-  if (!el) return;
-  el.innerHTML =
-    `<div class="inbox"><span class="in-ic">✦</span><div class="in-text"><b>${esc(t(card.titleKey))}</b>` +
-    `<span>${esc(t(card.bodyKey))}</span></div><button class="in-ok">${t('onb.intro.ok')}</button></div>`;
-  el.classList.add('show');
-}
-// Panel-open hook: show the intro for `id` once (unless already seen / a veteran).
-function maybeIntro(id: string): void {
-  const seen = parseSeenIntros(localStorage.getItem(seenIntrosKey()));
-  const veteran = loadMeta().xp > 0; // finished at least one match → knows the ropes
-  const { card, seen: next } = resolveIntro(seen, id, { veteran });
-  localStorage.setItem(seenIntrosKey(), JSON.stringify(next));
-  if (card) showIntro(card);
-}
-// «Понятно» — и любое нажатие по самой подсказке: под ней остаётся то, что она закрыла
-// (на телефоне — кнопка скорости), и следующее нажатие должно попасть туда. Мышь ловит
-// только коробка подсказки, поэтому щелчок сюда — щелчок по ней.
-document.getElementById('intro')?.addEventListener('click', () => {
-  document.getElementById('intro')!.classList.remove('show');
-});
-// Первое действие игрока — нажатие мимо подсказки — убирает её и делает своё: подсказка
-// учит в момент нужды, а не ждёт «Понятно» (UIX-8.1). Escape закрывает её первой, как раньше.
-document.addEventListener(
-  'pointerdown',
-  (ev) => {
-    const el = document.getElementById('intro');
-    if (el?.classList.contains('show') && !(ev.target as Element).closest?.('#intro'))
-      el.classList.remove('show');
-  },
-  true,
-);
-// С клавиатуры так же: клавиша убирает подсказку раньше, чем её прочтут горячие клавиши, и
-// срабатывает сама — пробел ставит паузу, T открывает науку. Escape остаётся лестнице
-// «Назад»: она закрывает подсказку, и только её. Повтор зажатой клавиши и одиночный
-// модификатор — ещё не действие: подсказка, открытая нажатием T, не гаснет от того же T.
-const INTRO_KEEP_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock']);
-window.addEventListener(
-  'keydown',
-  (ev) => {
-    if (!ev.repeat && !INTRO_KEEP_KEYS.has(ev.key)) document.getElementById('intro')?.classList.remove('show');
-  },
-  true,
-);
-
-// --- ONB-5 return digest ("пока тебя не было") -------------------------------
-// The world runs while you're away (a backgrounded tab catches up on return, and
-// on the server it runs 24/7). Rather than a silently-changed map, brief the player
-// on what happened since they left — attention items first, tap to jump to the spot.
-let awayFromGameTime: number | null = null;
-function recapItemHtml(i: { text: string; anchor?: string; high: boolean }): string {
-  const jump = i.anchor ? ` data-jump="${esc(i.anchor)}"` : '';
-  return `<button class="rc-item${i.high ? ' hi' : ''}"${jump}><span class="rc-dot"></span><span>${esc(i.text)}</span></button>`;
-}
-/** Render the digest of events at/after `since`. No-op when nothing happened. */
-function openRecap(since: number): void {
-  const el = document.getElementById('recap');
-  if (!el) return;
-  const r = buildRecap(eventLog, since);
-  // Политика показа — `awayBrief.ts` (REFM-74): пустой брифинг не нагружает, важное выше.
-  if (!worthShowing(r.count)) return;
-  const { hi, lo } = splitByAttention(r.items);
-  let body = '';
-  if (hi.length)
-    body +=
-      `<div class="rc-sec hi">${t('onb.recap.attention', { n: r.attention })}</div>` +
-      hi.map(recapItemHtml).join('');
-  if (lo.length)
-    body += `<div class="rc-sec">${t('onb.recap.rest')}</div>` + lo.map(recapItemHtml).join('');
-  el.innerHTML =
-    `<div class="rcbox"><div class="rc-head"><span class="cx-ic">🛰</span><b>${t('onb.recap.title')}</b></div>` +
-    `<div class="rc-body">${body}</div><button class="cx-close" id="rc-close">${t('onb.recap.close')}</button></div>`;
-  el.classList.add('show');
-}
-document.getElementById('recap')?.addEventListener('click', (ev) => {
-  const el = document.getElementById('recap')!;
-  const tg = ev.target as HTMLElement;
-  if (tg === el || tg.closest('#rc-close')) {
-    el.classList.remove('show');
-    return;
-  }
-  const jump = tg.closest('.rc-item') as HTMLElement | null;
-  if (jump?.dataset.jump) {
-    el.classList.remove('show');
-    jumpToPing(jump.dataset.jump); // fly the camera to the event's world
-  }
-});
-// The «🛰» button in the log window → the whole-session briefing on demand.
-document.getElementById('lw-recap')?.addEventListener('click', () => openRecap(0));
-// Auto-briefing: mark where we left when the tab hides; on return summarise what happened —
-// only for a real absence. In the network the server kept the world running; the solo sim does
-// NOT catch the absence up (AUD-23: a frame gap advances at most one plausible frame), so a solo
-// brief is usually empty and `worthShowing` skips it.
-let awayAtRealMs = 0;
-document.addEventListener?.('visibilitychange', () => {
-  if (document.hidden) {
-    if (marksAway(true, inMatch())) {
-      awayFromGameTime = s.time;
-      awayAtRealMs = Date.now();
-    }
-    return;
-  }
-  const since = briefSince({
-    awayFromGameTime,
-    inMatch: inMatch(),
-    awayAtRealMs,
-    nowRealMs: Date.now(),
-  });
-  awayFromGameTime = null; // метка одноразовая: иначе второй возврат покажет то же ещё раз
-  if (since === null) return;
-  // Give the frame loop a beat to catch the world up before we summarise it.
-  window.setTimeout(() => {
-    if (inMatch()) openRecap(since);
-  }, 500);
+// Справка — у владельца, `helpCenter.ts` (REFM-221): карточка корабля, справочник с кнопкой
+// «Построить здесь», поиск по статьям, вводные к механикам и сводка «пока вас не было».
+// Отсюда — мир, своё место, позывной, мета, досье, замок здания, имя флота и режим забега.
+initHelpCenter({
+  world: () => s,
+  me: () => ME,
+  callsign: () => nickInput.value.trim(),
+  loadMeta,
+  inMatch,
+  codexHtml: (kind, id, level) => codexHtml(kind, id, level),
+  buildingLocked,
+  fleetTitle: fleetTitleOf,
+  sectorZeroToolsHidden,
 });
 
 function updateMobileHud(): void {
@@ -4344,7 +3772,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   forgetRadarContacts();
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();
-  awayFromGameTime = null; // reset the away-window baseline for the new match
+  forgetAway(); // reset the away-window baseline for the new match
   banner = null; // clear any end-banner left by the menu-background match (else it sticks)
   endScreen = null; // a fresh match must not open into the previous result
   matchEnd.reset(); // новый матч зарабатывает свою награду
@@ -4462,7 +3890,7 @@ function startTraining(): void {
   // полигон учит тем кораблям, с которыми игрок пойдёт дальше.
   // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
   // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
-  pendingGuide = () => {
+  setPendingGuide(() => {
     const baseline = trainingBaseline(s, ME, data);
     launchTour(
       buildTrainingTour({
@@ -4480,7 +3908,7 @@ function startTraining(): void {
         introduced: forceIntroduced,
       }),
     );
-  };
+  });
   installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
   enterRun('training');
   apply(advance(s, s.time + 1));
@@ -4832,7 +4260,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'trader', isOpen: () => trader.isOpen(), close: () => trader.close() }, // z47 торговец экспедиции
   { id: 'ally', isOpen: () => allyScreen.isOpen(), close: () => allyScreen.close() }, // z47 связь с союзником
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
-  { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
+  { id: 'codex', isOpen: () => shown('codex'), close: () => hide('codex') }, // z46
   // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
   // и Back обязан сначала закрыть её, а уже потом само окно.
   { id: 'buildwin', isOpen: () => buildWinEl.classList.contains('show'), close: () => buildWinEl.classList.remove('show') }, // z45 «Постройки»
@@ -5592,49 +5020,6 @@ function frameLoop(nowReal: number) {
     else if (frameErrs === FRAME_ERR_LOG_MAX + 1) console.error('frame failing repeatedly — further errors muted');
   }
   requestAnimationFrame(frameLoop);
-}
-
-// Codex popup: full specs for a building/ship tile, with a contextual "Build here"
-// button. Tiles live in the build menu + fleet panel now (no global HUD strip).
-const codexEl = document.getElementById('codex');
-if (codexEl) {
-  codexEl.addEventListener('click', (e) => {
-    const tg = e.target as HTMLElement;
-    // Мир — через codexWorld(): карточка, открытая ещё в партии, могла пережить вход в хаб.
-    const world = codexWorld();
-    const build = (tg.closest('.cx-build') as HTMLElement | null)?.dataset.build;
-    if (build && world) {
-      const [kind, id] = build.split(':');
-      enqueueBuild(world, { kind: kind as BuildKind, id: id!, count: 1 });
-      codexEl.classList.remove('show');
-      invalidatePanel();
-      renderPanel();
-      return;
-    }
-    // BUILD-1: листалка уровней в карточке здания — перерисовка той же карточки.
-    const blvl = (tg.closest('[data-cx-blvl]') as HTMLElement | null)?.dataset.cxBlvl;
-    if (blvl) {
-      openCodex(`b:${blvl}`);
-      return;
-    }
-    // «Улучшить» из карточки: хостовый путь заказа (сеть → приказ, соло → очередь);
-    // карточка остаётся открытой и сама показывает «в работе» (проба погасит кнопку).
-    const upg = (tg.closest('[data-cx-upg]') as HTMLElement | null)?.dataset.cxUpg;
-    if (upg && world) {
-      enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 });
-      invalidatePanel();
-      renderPanel();
-      openCodex(`b:${upg}`);
-      return;
-    }
-    // Карточка корабля ведёт в справочник своего корпуса — той же дорогой, что плитка.
-    const deep = (tg.closest('.sc-codex') as HTMLElement | null)?.dataset.codex;
-    if (deep) {
-      openCodex(deep);
-      return;
-    }
-    if (tg.id === 'codex' || tg.classList.contains('cx-close')) codexEl.classList.remove('show');
-  });
 }
 
 // Player card: tap the top-left crest to open your session dossier (faction, worlds,
