@@ -364,7 +364,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
   `prototype/build.mjs`), кнопки `.btn-main`/`.btn-second`/`.btn-quiet`/`.btn-x`. Палитра
   `--sf-*` — копия `surfaceTheme` из того же `theme.ts`, равенство держит `surfaceTokens.test.ts`.
-- Хаб: вкладки Домой, Игры, Арсенал, Корпорация, Ещё; дверь — `decisions/hubDoor.ts`. На «Домой» —
+- Хаб: вкладки Домой, Игры, Арсенал, Корпорация, Ещё; дверь — `decisions/hubDoor.ts`.
+  На телефоне бренд собран в компактную строку высотой 36 px при обычном размере текста.
+  На «Домой» —
   лента новостей `newsScreen.ts` (решения — `decisions/newsFeed.ts`): на широкой панели
   колонкой рядом с партиями, на узкой — превью под дверью и вся лента шторкой. Арсенал
   (`arsenalScreen.ts`, решения — `decisions/arsenalView.ts`): модули и корабли с недостающими,
