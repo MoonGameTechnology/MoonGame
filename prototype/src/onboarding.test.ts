@@ -111,6 +111,13 @@ describe('parseOnboardState — fail-secure', () => {
 });
 
 describe('applyTourOutcome — fold a finished guide run', () => {
+  it('preserves the checklist reward across reload, interruption and replay', () => {
+    const saved = parseOnboardState(JSON.stringify({ ...FRESH_ONBOARD, goalsRewarded: true }));
+    const interrupted = applyTourOutcome(saved, { completed: false, skipped: true, reachedStep: 18 });
+    const replayed = applyTourOutcome(interrupted.state, { completed: true, skipped: false, reachedStep: 22 });
+    expect(replayed.state.goalsRewarded).toBe(true);
+    expect(parseOnboardState('{"goalsRewarded":"true"}').goalsRewarded).toBeUndefined();
+  });
   it('rewards the FIRST completion and marks onboarded', () => {
     const { state, rewarded } = applyTourOutcome(FRESH_ONBOARD, {
       completed: true,

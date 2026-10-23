@@ -92,9 +92,9 @@ describe('meta market screen', () => {
     expect(html).toContain('data-mm-material-cancel="mine">');
   });
 
-  // «Продать» в арсенале ведёт сюда: форма продажи этой копии в фокусе, но только после
-  // загрузки (раньше её перерисовка сбросила бы фокус) и только один раз.
-  it('focuses the sell form of the copy the arsenal sent, once the market has loaded', async () => {
+  // «Продать» в арсенале прокручивает к форме этой копии после загрузки,
+  // но не открывает клавиатуру без нажатия на цену.
+  it('scrolls to the sell form without focusing its price, once the market has loaded', async () => {
     const copy = {
       itemId: 'drop-b',
       kind: 'module' as const,
@@ -105,11 +105,12 @@ describe('meta market screen', () => {
       acquiredAt: 1,
     };
     const focused: string[] = [];
+    const scrolled: string[] = [];
     const root = {
       innerHTML: '',
       addEventListener: () => {},
       querySelector: (selector: string) => ({
-        scrollIntoView: () => {},
+        scrollIntoView: () => scrolled.push(selector),
         focus: () => focused.push(selector),
       }),
     };
@@ -130,8 +131,10 @@ describe('meta market screen', () => {
     market.focusSell('drop-b');
     await market.refresh();
     expect(root.innerHTML).toContain('data-mm-price="drop-b"');
-    expect(focused).toEqual(['[data-mm-price="drop-b"]']);
+    expect(scrolled).toEqual(['[data-mm-price="drop-b"]']);
+    expect(focused).toEqual([]);
     await market.refresh();
-    expect(focused).toHaveLength(1);
+    expect(scrolled).toHaveLength(1);
+    expect(focused).toEqual([]);
   });
 });

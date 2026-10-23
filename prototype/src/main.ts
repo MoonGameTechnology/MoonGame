@@ -557,6 +557,7 @@ import type { TourResult } from './spotlight';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 // ONB-2 — the guided first match (a data chain over this same engine).
 import { buildFirstMatchTour } from './firstMatchTour';
+import { GUIDE_TARGET, GUIDE_HULL, GUIDE_TECH, guideShipCount, guideFleet, guideMineLevel, guideCourseSet } from '../../decisions/firstMatchGuide';
 import { buildTrainingTour } from './trainingTour';
 import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
@@ -626,6 +627,7 @@ import {
   rallyAim,
   merging,
   mobileChoices,
+  mobileDraft,
   offerChoices,
   pickFleets,
   pickMode,
@@ -663,7 +665,7 @@ import {
 } from '../../decisions/netViewClock';
 import { mountLocaleMenu } from './localeMenu';
 import { mapLod, mapSpacing, type MapLod } from '../../packages/client/src/mapLod';
-import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
+import { goalBaseline, grew, mineLevels } from './goalTally';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
@@ -749,6 +751,7 @@ let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
 // Панель уже раскладывает их по своим полкам (`groundBuilds` / `shipBuilds` /
 // `wingBuilds` фильтруют этот же список), так что достаточно их сюда вписать.
 const BUILD_UNITS = [
+  'frigate',
   'cruiser',
   'heavy_cruiser',
   'scout',
@@ -1608,20 +1611,79 @@ const myWorldCount = (): number =>
 function startGuidedMatch(): void {
   prepareGuidedSetup(); // a bot-free solo sandbox on a deterministic homeworld
   pendingGuide = () => {
-    const startScore = myScore();
-    const startWorlds = myWorldCount(); // baseline: home only
-    const startFleets = myFleetCount(); // baseline: none yet
+    const home = Object.values(s.planets).find((p) => p.owner === ME && p.kind === 'planet')!.id;
+    const mineLevel = guideMineLevel(s, home);
+    const ships = guideShipCount(s, ME);
+    const mineImproved = () => guideMineLevel(s, home) > mineLevel;
+    const hasShip = () => guideShipCount(s, ME) > ships;
+    const researchDone = () => s.players[ME]?.technologies?.completed.includes(GUIDE_TECH) === true;
+    const box = (p: { x: number; y: number } | null) =>
+      p && p.x >= 22 && p.x <= innerWidth - 22 && p.y >= 80 && p.y <= innerHeight - 44
+        ? { left: p.x - 22, top: p.y - 22, width: 44, height: 44 }
+        : null;
+    const planetBox = (id: string) => box(s.planets[id] ? world(s.planets[id]!.position) : null);
+    const dossier = (selector: string) => !!document.querySelector(`#codex.show ${selector}`);
     startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
     launchTour(
       buildFirstMatchTour({
         mouse: pcUi,
-        homeOpened: () => selPlanet !== null && s.planets[selPlanet]?.owner === ME,
+        homeOpened: () => selPlanet === home,
         cardLayout: () => MOBILE,
         panelOpen: () => mobileHud.expanded(),
-        shipsTabOpen: () => planetTab === 'ships',
-        hasFleet: () => myFleetCount() > startFleets,
-        capturedWorld: () => myWorldCount() > startWorlds,
-        scoreRose: () => myScore() > startScore + 1,
+        buildingsTabOpen: () => selPlanet === home && planetTab === 'buildings',
+        mineCardOpen: () => dossier('[data-cx-upg="mine"]'),
+        mineOrdered: () =>
+          mineImproved() ||
+          activeConstruction(home, 'buildings')?.payload.building === 'mine' ||
+          coreQueue(home, 'buildings').some((q) => q.building === 'mine'),
+        mineImproved,
+        dossierClosed: () => !document.getElementById('codex')?.classList.contains('show'),
+        techOpen: () => techWin.classList.contains('show'),
+        techAccessible: () =>
+          Array.from(
+            document.querySelectorAll('[data-phone-tab="science"], [data-phone-more="science"]'),
+          ).some((el) => el.getBoundingClientRect().width > 0),
+        spaceTabOpen: () => !!techWin.querySelector('[data-ttab="space"].on'),
+        researchStarted: () =>
+          researchDone() ||
+          s.players[ME]?.technologies?.active?.some((r) => r.technology === GUIDE_TECH) === true,
+        researchDone,
+        shipsTabOpen: () => selPlanet === home && planetTab === 'ships',
+        catalogOpen: () => buildWinEl.classList.contains('show'),
+        shipCardOpen: () => dossier('[data-build="unit:frigate"]'),
+        shipOrdered: () =>
+          hasShip() ||
+          activeConstruction(home, 'units')?.payload.unit === GUIDE_HULL ||
+          coreQueue(home, 'units').some((q) => q.unit === GUIDE_HULL),
+        hasShip,
+        fleetSelected: () => selFleet !== null && selFleet === guideFleet(s, ME)?.id,
+        moveArmed: () => aiming,
+        courseSet: () => guideCourseSet(s, ME),
+        coursePicked: () =>
+          mobileDraft?.order === 'move' &&
+          mobileDraft.target.kind === 'planet' &&
+          mobileDraft.target.id === GUIDE_TARGET &&
+          mobileDraft.fleetIds.includes(guideFleet(s, ME)?.id ?? ''),
+        capturedWorld: () => s.planets[GUIDE_TARGET]?.owner === ME,
+        homeAnchor: () => planetBox(home),
+        fleetSelector: () => {
+          const f = guideFleet(s, ME);
+          return f ? `[data-act="selfleet"][data-arg="${CSS.escape(f.id)}"]` : null;
+        },
+        targetAnchor: () => planetBox(GUIDE_TARGET),
+        showHome: () => focusWorld(home),
+        showFleet: () => {
+          focusWorld(home);
+          pickWorld(home);
+          planetTab = 'ships';
+          invalidatePanel();
+          renderPanel();
+          if (MOBILE && !mobileHud.expanded())
+            document
+              .querySelector<HTMLButtonElement>('#mobile-sheet [data-mobile="details"]')
+              ?.click();
+        },
+        showTarget: () => focusWorld(GUIDE_TARGET),
       }),
       onGuidedTourEnded,
     );
@@ -1629,13 +1691,7 @@ function startGuidedMatch(): void {
   showHub(false);
   showConnect(false);
   startMatch(buildSetupConfig(), false); // installMatch → maybeStartPendingTour runs the guide
-  // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
-  // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
-  // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
-  // in this bot-free sandbox, so just run it fast: ×300 clears the two real waits
-  // (build the Cruiser the tour points at, 3h; fly it to the nearest neutral world,
-  // ~2.8h) in well under a minute each, instead of ~110s / ~100s at the player's own
-  // ×100 ceiling. Timed/measured empirically — see the ONB-2 roadmap entry.
+  // The bot-free lesson accelerates the real construction, research and travel clocks.
   applyTimeSpeed(300);
   note(t('onb.tour.speed'));
 }
@@ -1658,29 +1714,32 @@ function onGuidedTourEnded(r: TourResult): void {
 
 // --- ONB-7 first-session goals checklist -------------------------------------
 // A light "am I playing right?" list, shown only in the onboarding match: four
-// goals tick from live state (mine built, fleet raised, world taken, 100 score),
+// goals tick from live state (mine improved, frigate built, sector taken, first point),
 // and finishing all four praises the player + nudges them to a real match.
 let goalsActive = false;
 let goalsCollapsed = false;
 let goalsRewarded = false;
 let goalsDone: string[] = [];
 let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
+let goalScoreBase = 0;
+let goalShipBase = 0;
 // Чем меряется прогресс — `goalTally.ts` (REFM-99): от базы на момент запуска списка,
 // а шахты суммой УРОВНЕЙ, потому что домашняя шахта уже стоит.
 const myMineLevel = (): number => mineLevels(Object.values(s.planets), ME);
-const myFleetCount = (): number => fleetCount(Object.values(s.fleets), ME);
 function goalSignals(): GoalSignals {
   return {
     builtMine: grew(myMineLevel(), goalBase.mineLevel),
-    launchedFleet: grew(myFleetCount(), goalBase.fleets),
+    launchedFleet: grew(guideShipCount(s, ME), goalShipBase),
     capturedWorld: grew(myWorldCount(), goalBase.worlds),
-    score: myScore(),
+    score: Math.max(0, myScore() - goalScoreBase),
   };
 }
 function startFirstGoals(): void {
   goalBase = goalBaseline(Object.values(s.planets), Object.values(s.fleets), ME);
+  goalScoreBase = myScore();
+  goalShipBase = guideShipCount(s, ME);
   goalsDone = [];
-  goalsRewarded = false;
+  goalsRewarded = loadOnboard().goalsRewarded === true;
   goalsCollapsed = false;
   goalsActive = true;
   renderGoals();
@@ -1701,6 +1760,7 @@ function updateGoals(): void {
   // Награда ровно ОДИН раз: «список выполнен» остаётся истиной навсегда, защёлка — нет.
   if (rewardDue(goalsComplete(goalsDone), goalsRewarded)) {
     goalsRewarded = true;
+    saveOnboard({ ...loadOnboard(), goalsRewarded: true });
     const cur = loadMeta();
     saveMeta({ ...cur, xp: cur.xp + GOALS_BONUS_XP });
     note(
@@ -2448,7 +2508,6 @@ function openCodexHub(): void {
   if (input) input.oninput = () => renderCodexResults(input.value);
   renderCodexResults('');
   box.classList.add('show');
-  input?.focus();
 }
 // One delegated handler for the hub (rebuilt each open, so wire the container once).
 document.getElementById('codexhub')?.addEventListener('click', (ev) => {
@@ -4285,7 +4344,7 @@ const arsenal = __SECTOR_ZERO_ONLY__
         showHub(false);
         showConnect(true);
         showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
       },
       openAuction: () => hubTab('auction'),
       sell: (itemId) => {
@@ -4335,7 +4394,7 @@ const shop = __SECTOR_ZERO_ONLY__
         showHub(false);
         showConnect(true);
         showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
       },
       warrants: () => metaMarket?.balance() ?? 0,
       now: () => Date.now(),
@@ -4788,7 +4847,7 @@ initAccountSession({
     showHub(false);
     showStage('welcome');
     if (!srv) return;
-    fillWelcome(srv.nick ?? '', 'focus');
+    fillWelcome(srv.nick ?? '', 'show');
   },
 });
 
@@ -4874,7 +4933,7 @@ if (bootReset) {
       showConnect(true);
       showStage('welcome');
       const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-      fillWelcome(savedNick, 'focus');
+      fillWelcome(savedNick, 'show');
     })(),
   );
 } else if (document.body.dataset.entry === 'sector-zero') {
@@ -4899,7 +4958,7 @@ if (bootReset) {
       const srv = resolveServer();
       const mode = srv ? await probeAuthMode(srv.base) : authMode;
       const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-      if (mode === 'accounts') fillWelcome(savedNick, connectShown() ? 'focus' : 'show');
+      if (mode === 'accounts') fillWelcome(savedNick, 'show');
       else fillWelcome(savedNick, 'hide');
     })(),
   );
@@ -6479,7 +6538,7 @@ const corp = __SECTOR_ZERO_ONLY__
           showHub(false);
           showConnect(true);
           showStage('welcome');
-          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
         },
       },
     });

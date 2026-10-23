@@ -46,6 +46,16 @@ export interface SpotlightStep {
   id: string;
   /** CSS selector of the element to highlight, or `null` for a centred bubble. */
   target: string | null;
+  /** Live canvas target, in screen coordinates. Recomputed after camera movement. */
+  anchor?: () => Rect | null;
+  /** Selector whose identity is created during play (for example a newly built fleet). */
+  selector?: () => string | null;
+  /** Bring the target back into view without issuing a game order. */
+  reveal?: () => void;
+  /** Keep the instruction visible inside the build dossier. */
+  inDialog?: boolean;
+  /** Allow hiding the hint while keeping progress tracking active. */
+  collapsible?: boolean;
   /** Locale key (msgid) of the bubble copy — resolved through `t()` at paint. */
   copy: string;
   advance: StepAdvance;
@@ -224,8 +234,8 @@ export class SpotlightTour {
     // each refresh (a panel that renders its node a frame later is picked up then).
     if (
       step.advance.on === 'tap' &&
-      step.target !== null &&
-      this.host.locate(step.target) === null
+      (step.target !== null || step.selector !== undefined || step.anchor !== undefined) &&
+      this.targetRect(step) === null
     ) {
       if (step.optional) {
         this.next();
@@ -251,9 +261,14 @@ export class SpotlightTour {
     this.enter(this.i + 1);
   }
 
+  private targetRect(step: SpotlightStep): Rect | null {
+    const selector = step.selector?.() ?? step.target;
+    return step.anchor?.() ?? (selector === null ? null : this.host.locate(selector));
+  }
+
   private paint(): void {
     const step = this.current;
-    const target = step.target === null ? null : this.host.locate(step.target);
+    const target = this.targetRect(step);
     const stage =
       step.stage === undefined
         ? undefined

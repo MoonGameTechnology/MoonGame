@@ -1,235 +1,105 @@
 import { describe, expect, it } from 'vitest';
 import { buildFirstMatchTour } from './firstMatchTour';
-import { SpotlightTour, type Rect, type SpotlightHost, type TourResult } from './spotlight';
+import { firstMatchFixture } from './firstMatchTour.fixture';
+import { SpotlightTour, type TourResult } from './spotlight';
 
-// A permissive host: every selector resolves (so `optional` HUD steps highlight
-// rather than skip), and renders are ignored — the test drives the machine.
-const RECT: Rect = { left: 0, top: 0, width: 100, height: 40 };
-function anyHost(): SpotlightHost {
-  return { locate: () => RECT, render: () => {} };
-}
+const host = { locate: () => ({ left: 20, top: 20, width: 100, height: 40 }), render: () => {} };
 
-describe('buildFirstMatchTour — shape', () => {
-  it('walks produce → build → move → capture → score → done', () => {
-    const tour = buildFirstMatchTour({
-      mouse: () => true,
-      homeOpened: () => false,
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    });
-    expect(tour.map((s) => s.id)).toEqual([
-      'welcome',
-      'nav',
-      'home',
-      'mine',
-      'ships-tab',
-      'ship',
-      'fleet',
-      'scan',
-      'troops',
-      'spy',
-      'course',
-      'capture',
-      'score',
-      'done',
-    ]);
-    // the "do X" beats advance on real actions; capture/score/fleet/home on live state
-    expect(tour.find((s) => s.id === 'mine')?.advance).toMatchObject({
-      on: 'action',
-      type: 'building.upgrade',
-    });
-    expect(tour.find((s) => s.id === 'course')?.advance).toMatchObject({
-      on: 'action',
-      type: 'fleet.move',
-    });
-    expect(tour.find((s) => s.id === 'home')?.advance.on).toBe('state');
-    // подсказка про карту: без проверок («Далее») и БЕЗ запрета экрана — её пробуют руками
-    const nav = tour.find((s) => s.id === 'nav');
-    expect(nav?.advance).toEqual({ on: 'tap' });
-    expect(nav?.hands).toBe(true);
-    expect(nav?.gate).toBeUndefined();
-    // жесты показаны плитками под устройство (UIX-8.1), строка шага одна на оба
-    expect(nav?.gestures?.[0]?.anim).toBe('wheel');
-    // «постройте корабль» — это ДВА нажатия по реальным местам панели, а не пустой шаг:
-    // сперва вкладка заказа, потом строка корабля (живой отзыв: «нажимать нечего»)
-    // цели должны существовать в реальной разметке: старый селектор улучшения
-    // (`[data-act="upgrade"]`) не совпадал уже ни с чем, и шаг молча не подсвечивал
-    expect(tour.find((s) => s.id === 'mine')?.target).toBe('[data-codex^="b:mine:"]');
-    expect(tour.find((s) => s.id === 'ships-tab')?.target).toBe('[data-act="tab"][data-arg="ships"]');
-    expect(tour.find((s) => s.id === 'ship')?.target).toBe('[data-buildorder^="unit:"]');
-    expect(tour.find((s) => s.id === 'ship')?.advance).toMatchObject({
-      on: 'action',
-      type: 'unit.build',
-    });
-    // запираем экран ровно там, где цель И ЕСТЬ то, что просят нажать
-    expect(tour.filter((s) => s.gate).map((s) => s.id)).toEqual(['mine', 'ships-tab', 'ship']);
-    // а там, где до места ещё надо добраться (выбрать мир, выбрать флот), — не запираем
-    expect(tour.find((s) => s.id === 'home')?.gate).toBeUndefined();
-    expect(tour.find((s) => s.id === 'course')?.gate).toBeUndefined();
-    expect(tour.find((s) => s.id === 'fleet')?.advance.on).toBe('state');
-    // scan/troops/spy are concept-only (nothing to gate a predicate on) — tap-advance
-    // beats, not gated on a real action
-    expect(tour.find((s) => s.id === 'scan')?.advance.on).toBe('tap');
-    expect(tour.find((s) => s.id === 'troops')?.advance.on).toBe('tap');
-    expect(tour.find((s) => s.id === 'spy')?.advance.on).toBe('tap');
-    expect(tour.find((s) => s.id === 'capture')?.advance.on).toBe('state');
-    expect(tour.find((s) => s.id === 'score')?.advance.on).toBe('state');
+describe('guided first match', () => {
+  it('returns to the buildings tab when a previous lesson left the fleet tab selected', () => {
+    const { deps, facts } = firstMatchFixture();
+    facts.homeOpened = true;
+    facts.buildingsTabOpen = false;
+    const steps = buildFirstMatchTour(deps);
+    const tour = new SpotlightTour(steps, host);
+    tour.start();
+    tour.tap();
+    tour.tap();
+    expect(steps[tour.index]?.id).toBe('buildings-tab');
+    facts.buildingsTabOpen = true;
+    tour.refresh();
+    expect(steps[tour.index]?.id).toBe('mine');
   });
-
-  it('на телефоне шаг про карту показывает жесты пальцев, строка та же', () => {
-    const deps = {
-      homeOpened: () => false,
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
+  it('requires each real task, including research and capture by the frigate', () => {
+    const { facts, deps } = firstMatchFixture();
+    const steps = buildFirstMatchTour(deps);
+    let result: TourResult | undefined;
+    const tour = new SpotlightTour(steps, host, (r) => {
+      result = r;
+    });
+    const at = () => steps[tour.index]!.id;
+    tour.start();
+    tour.tap();
+    tour.tap();
+    expect(at()).toBe('home');
+    const advance = (key: keyof typeof facts, expected: string) => {
+      facts[key] = true;
+      tour.refresh();
+      expect(at()).toBe(expected);
     };
-    const pc = buildFirstMatchTour({ ...deps, mouse: () => true }).find((s) => s.id === 'nav');
-    const phone = buildFirstMatchTour({ ...deps, mouse: () => false }).find((s) => s.id === 'nav');
-    expect(phone?.gestures?.map((g) => g.anim)).toEqual(['pinch', 'swipe', 'double-tap', 'hold']);
-    expect(phone?.copy).toBe(pc?.copy);
+    advance('homeOpened', 'mine');
+    advance('mineCardOpen', 'mine-order');
+    tour.notifyAction('building.upgrade');
+    tour.tap();
+    tour.refresh();
+    expect(at()).toBe('mine-order'); // another world's order is not the task
+    advance('mineOrdered', 'mine-close');
+    advance('dossierClosed', 'mine-wait');
+    advance('mineImproved', 'tech');
+    advance('techOpen', 'research-tab');
+    advance('spaceTabOpen', 'research');
+    advance('researchStarted', 'research-wait');
+    advance('researchDone', 'research-close');
+    facts.techOpen = false;
+    tour.refresh();
+    expect(at()).toBe('ships-tab');
+    advance('shipsTabOpen', 'catalog');
+    advance('catalogOpen', 'ship');
+    advance('shipCardOpen', 'ship-order');
+    tour.notifyAction('unit.build');
+    expect(at()).toBe('ship-order'); // a scout or ground troop does not count
+    advance('shipOrdered', 'catalog-close');
+    facts.catalogOpen = false;
+    tour.refresh();
+    expect(at()).toBe('ship-wait');
+    advance('hasShip', 'fleet');
+    advance('fleetSelected', 'move');
+    advance('moveArmed', 'course');
+    tour.notifyAction('fleet.move');
+    expect(at()).toBe('course'); // wrong fleet/destination does not count
+    advance('courseSet', 'capture');
+    tour.tap();
+    tour.refresh();
+    expect(result).toBeUndefined();
+    advance('capturedWorld', 'score');
+    tour.tap();
+    expect(at()).toBe('done');
+    tour.tap();
+    expect(result?.completed).toBe(true);
   });
 
-  it('карточка мира: шаг «Сведения» между миром и Металлодобычей, на ПК его нет', () => {
-    const deps = {
-      mouse: () => false,
-      homeOpened: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    };
-    const card = buildFirstMatchTour({ ...deps, cardLayout: () => true });
-    expect(card.map((s) => s.id).slice(2, 5)).toEqual(['home', 'details', 'mine']);
-    const details = card.find((s) => s.id === 'details');
-    expect(details?.gate).toBe(true);
-    expect(details?.advance.on).toBe('state');
-    expect(details?.target).toBe('#mobile-sheet .mobile-quick [data-mobile="details"]');
-    const pc = buildFirstMatchTour({ ...deps, cardLayout: () => false });
-    expect(pc.find((s) => s.id === 'details')).toBeUndefined();
+  it('teaches the phone details sheet and destination confirmation explicitly', () => {
+    const { deps } = firstMatchFixture();
+    const steps = buildFirstMatchTour({ ...deps, mouse: () => false, cardLayout: () => true });
+    expect(steps.find((s) => s.id === 'details')?.target).toContain('details');
+    expect(steps.find((s) => s.id === 'course-confirm')?.target).toContain('mobile-send');
+    expect(steps.find((s) => s.id === 'nav')?.gestures?.[0]?.anim).toBe('pinch');
   });
 
-  it('карточка мира: шаг ждёт «Сведений», раскрытая карточка ведёт к Металлодобыче', () => {
-    let open = false;
-    const tour = buildFirstMatchTour({
-      mouse: () => false,
-      homeOpened: () => true,
-      cardLayout: () => true,
-      panelOpen: () => open,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
+  it('can collapse, reopen and skip while a task is still pending, without completion', () => {
+    const { deps } = firstMatchFixture();
+    let result: TourResult | undefined;
+    const tour = new SpotlightTour(buildFirstMatchTour(deps), host, (r) => {
+      result = r;
     });
-    const t = new SpotlightTour(tour, anyHost());
-    t.start();
-    t.tap(); // welcome → nav
-    t.tap(); // nav → home → (мир уже открыт) → details
-    for (let f = 0; f < 10; f++) t.refresh();
-    expect(tour[t.index]?.id).toBe('details');
-    open = true;
-    t.refresh();
-    expect(tour[t.index]?.id).toBe('mine');
-  });
-});
-
-describe('buildFirstMatchTour — capture is gated on real state', () => {
-  it('does not pass the capture step until a world is actually taken', () => {
-    let homeOpen = false;
-    let shipsTab = false;
-    let fleetRaised = false;
-    let captured = false;
-    let scored = false;
-    const tour = buildFirstMatchTour({
-      mouse: () => true,
-      homeOpened: () => homeOpen,
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => shipsTab,
-      hasFleet: () => fleetRaised,
-      capturedWorld: () => captured,
-      scoreRose: () => scored,
-    });
-    let result: TourResult | null = null;
-    const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
-    t.start();
-
-    t.tap(); // welcome → nav (подсказка про карту)
-    t.tap(); // nav → home
-    for (let f = 0; f < 30; f++) t.refresh(); // panel not opened yet — stays put
-    expect(t.index).toBe(2);
-
-    homeOpen = true;
-    t.refresh(); // homeworld panel opened → home advances to mine
-    t.notifyAction('building.upgrade'); // mine → ships-tab
-
-    for (let f = 0; f < 30; f++) t.refresh(); // вкладка заказа не открыта — стоим на месте
-    expect(t.index).toBe(4);
-
-    shipsTab = true;
-    t.refresh(); // вкладка «Корабли» открыта → шаг заказа корабля
-    expect(t.index).toBe(5);
-    t.notifyAction('unit.build'); // заказ отдан → ждём, пока корабль выйдет на орбиту
-    expect(t.index).toBe(6); // parked on the fleet step — a ship must actually auto-rally
-
-    for (let f = 0; f < 30; f++) t.refresh(); // no fleet yet — stays put
-    expect(t.index).toBe(6);
-
-    fleetRaised = true;
-    t.refresh(); // a built ship auto-rallied → fleet advances to the (informational) scan step
-    expect(t.index).toBe(7);
-    t.tap(); // scan → troops
-    expect(t.index).toBe(8); // parked on the (informational) troops step
-    t.tap(); // troops → spy
-    t.tap(); // spy → course
-    t.notifyAction('fleet.move'); // course → capture
-    expect(t.index).toBe(11); // parked on the capture step
-
-    for (let f = 0; f < 30; f++) t.refresh(); // world not yet taken — stays put
-    expect(t.index).toBe(11);
-    expect(result).toBeNull();
-
-    captured = true;
-    t.refresh(); // world taken → capture advances to score
-    expect(t.index).toBe(12);
-
-    scored = true;
-    t.refresh(); // score moved → score advances to the final beat
-    t.tap(); // done → finish
-    expect(result).not.toBeNull();
-    expect(result!.completed).toBe(true);
-    expect(result!.reachedStep).toBe(13);
-  });
-});
-
-describe('buildFirstMatchTour — skippable', () => {
-  it('a skip mid-guide ends the whole chain as skipped', () => {
-    const tour = buildFirstMatchTour({
-      mouse: () => true,
-      homeOpened: () => true, // already open — walk straight onto mine
-      cardLayout: () => false,
-      panelOpen: () => false,
-      shipsTabOpen: () => false,
-      hasFleet: () => false,
-      capturedWorld: () => false,
-      scoreRose: () => false,
-    });
-    let result: TourResult | null = null;
-    const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
-    t.start();
-    t.tap(); // welcome → nav
-    t.tap(); // nav → home → (state already true) → mine
-    t.skip();
-    expect(result).not.toBeNull();
-    expect(result!.skipped).toBe(true);
-    expect(result!.completed).toBe(false);
-    expect(t.active).toBe(false);
+    tour.start();
+    tour.tap();
+    tour.tap();
+    tour.collapse();
+    tour.refresh();
+    tour.reopen();
+    expect(tour.index).toBe(2);
+    tour.skip();
+    expect(result).toMatchObject({ skipped: true, completed: false });
   });
 });

@@ -13,20 +13,12 @@ import { INTROS } from './intros';
 import { FIRST_GOALS } from './firstGoals';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildFirstMatchTour } from './firstMatchTour';
+import { firstMatchFixture } from './firstMatchTour.fixture';
 import { refusalKeyOf } from '../../decisions/refusalText';
 import { PHONE_EDGE_LABEL, PHONE_ITEMS } from '../../decisions/phoneNav';
 
 /** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
-const TOUR_DEPS_STUB = {
-  mouse: () => true,
-  homeOpened: () => false,
-  cardLayout: () => false,
-  panelOpen: () => false,
-  shipsTabOpen: () => false,
-  hasFleet: () => false,
-  capturedWorld: () => false,
-  scoreRose: () => false,
-};
+const TOUR_DEPS_STUB = firstMatchFixture().deps;
 
 // Гейт локализации. Текст живёт в /localization, в коде — только ключи
 // (`t('err.no-capacity')`). Эти тесты держат три инварианта:
@@ -198,6 +190,7 @@ function shippedNames(): Array<[string, string]> {
 const DATA_KEY_GAPS = new Set<string>([]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
+  { prefix: 'onb.guide.', built_by: 'firstMatchTour.ts: step id → copy; checked by tourCopy.test.ts' },
   { prefix: 'meta.material.', built_by: 'metaEconomyScreen.ts: server meta economy material catalog nameKey' },
   { prefix: 'meta.season.', built_by: 'metaEconomyScreen.ts: server season catalog nameKey' },
   { prefix: 'meta.reward.', built_by: 'metaEconomyScreen.ts: server season milestone localization keys' },

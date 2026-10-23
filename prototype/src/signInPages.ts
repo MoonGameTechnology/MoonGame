@@ -185,13 +185,11 @@ export function welcomePassword(): string {
 }
 
 /** Заполнить приветственную карточку: позывной (пустой — придумать новый) и строка пароля.
- *  `focus` — показать и поставить в неё курсор, `show` — только показать, `hide` — спрятать
- *  (сервер без аккаунтов). */
-export function fillWelcome(nick: string, password: 'focus' | 'show' | 'hide'): void {
+ *  `show` — показать без фокуса, `hide` — спрятать (сервер без аккаунтов). */
+export function fillWelcome(nick: string, password: 'show' | 'hide'): void {
   wNickInput.value = nick || suggestCallsign();
   welcomeFeedback.clear();
   wPassRowEl.style.display = password === 'hide' ? 'none' : 'flex';
-  if (password === 'focus') wPassInput.focus();
 }
 
 // --- «Новый командир» → dedicated registration page (its own #connect stage) -------
@@ -218,7 +216,6 @@ function openRegister(): void {
   crPass2Input.value = '';
   registerFeedback.clear();
   game.status('');
-  crPassInput.focus();
 }
 async function submitRegister(): Promise<void> {
   if (signingIn) return; // Enter + click must not double-register
@@ -496,7 +493,6 @@ export function initSignInPages(host: SignInPagesHost): void {
     game.status('');
     if (show) {
       wNickInput.value = (localStorage.getItem('void.nick') ?? '').trim();
-      wNickInput.focus();
     }
   });
   $('cwgo').addEventListener('click', signInByCallsign);
@@ -530,7 +526,6 @@ export function initSignInPages(host: SignInPagesHost): void {
     // вводил строкой выше, а печатать второй раз ровно сейчас — повод бросить.
     crecMailInput.value = carryEmail(crMailInput.value);
     game.status('');
-    crecMailInput.focus();
   });
   $('crecgo').addEventListener('click', () =>
     detach('восстановление пароля: отправка', submitRecover()),

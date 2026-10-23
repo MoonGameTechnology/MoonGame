@@ -23,6 +23,7 @@ import {
   type EntryOffer,
 } from '../../decisions/entrySetup';
 import { nearestHit } from '../../decisions/pointerPick';
+import { GUIDE_MAP } from '../../decisions/firstMatchGuide';
 import { esc } from './format';
 import {
   data,
@@ -534,11 +535,14 @@ export function buildSetupConfig(): SetupConfig {
 }
 
 /** Гид по первому матчу (ONB-2) готовит свою партию: дуэльную карту без соперников и
- *  предсказуемый родной мир. Остальной выбор экрана гид не трогает. */
+ *  предсказуемый родной мир и совет, независимо от предыдущей партии. */
 export function prepareGuidedSetup(): void {
-  setupMapId = DEFAULT_MAP_ID;
+  setupMapId = GUIDE_MAP;
   setupSlots = ['human', 'off']; // no rivals — a safe, calm sandbox
   setupStart = setupPreset().starts[0]!; // a deterministic homeworld
+  setupFaction = 'azure';
+  setupScientists = ['overseer', 'polymath'].filter((id) => data.scientists[id]);
+  setupTeams = false;
 }
 
 /** Сетевой вход (ENTRY-2): экран уже открыт `openSetup('hub')`, карта и места пришли от

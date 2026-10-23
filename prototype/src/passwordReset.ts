@@ -144,7 +144,6 @@ export function initPasswordReset(host: PasswordResetHost): {
       host.showStage();
       clearFields();
       host.status('');
-      host.fields().pass.focus();
       return cleaned;
     },
     submit,
