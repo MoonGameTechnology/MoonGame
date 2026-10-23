@@ -563,6 +563,7 @@ import {
   spinRuns,
   stepBacklog,
 } from '../../decisions/simClock';
+import { simWorkerScript } from '../../decisions/simWorker';
 import {
   NET_VIEW_IDLE,
   netViewAt,
@@ -887,14 +888,16 @@ function mapNow(): number {
 // «сильный» = the full-heuristics one). Default solo = p2 on weak.
 let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
 // Отдельный поток расчёта соло-мира (`simLink.ts`): мир обычной схватки считает он, а кадр
-// только рисует. Пока за флагом дев-сборки — `?sim=worker`; исходник потока кладёт сборка
-// (`build.mjs`), без него поток не поднимается и мир идёт в кадре, как всегда.
+// только рисует. Файл потока (и для дев-сборки с диска — исходник строкой) кладёт сборка
+// (`build.mjs`); откуда поднимать — `decisions/simWorker.ts`. Не поднялся — мир идёт в кадре.
+declare const __SIM_WORKER_URL__: string | undefined;
 declare const __SIM_WORKER_SRC__: string | undefined;
-const SIM_WORKER_SRC = typeof __SIM_WORKER_SRC__ === 'string' ? __SIM_WORKER_SRC__ : '';
-const SIM_WORKER_WANTED =
-  !__PLAYER_BUILD__ &&
-  SIM_WORKER_SRC !== '' &&
-  new URLSearchParams(location.search).get('sim') === 'worker';
+const SIM_WORKER = simWorkerScript({
+  protocol: location.protocol,
+  query: new URLSearchParams(location.search).get('sim'),
+  url: typeof __SIM_WORKER_URL__ === 'string' ? __SIM_WORKER_URL__ : '',
+  source: typeof __SIM_WORKER_SRC__ === 'string' ? __SIM_WORKER_SRC__ : '',
+});
 let simLink: SimLink | null = null;
 /** Поток не поднялся или сломался — до перезагрузки мир идёт в кадре. */
 let simBroken = false;
@@ -907,7 +910,7 @@ let simShownTime = 0;
  *  мир в кадре — там экран сам правит мир и ждёт итог приказа сразу. */
 function simEligible(): boolean {
   return (
-    SIM_WORKER_WANTED &&
+    SIM_WORKER !== null &&
     !simBroken &&
     !netWorld &&
     soloSaveActive &&
@@ -4647,7 +4650,7 @@ function frame(nowReal: number) {
   // приказов, — потом следующий шаг, уже от пришедшего мира.
   if (simLink && !simEligible()) stopSim();
   if (!simLink && simEligible()) {
-    const port = workerPort(SIM_WORKER_SRC);
+    const port = SIM_WORKER && workerPort(SIM_WORKER);
     if (port) simLink = startSimLink(port, s, ME, matchMode());
     else simBroken = true;
   }

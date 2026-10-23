@@ -84,7 +84,7 @@ describe('securityHeaders — документ игры', () => {
 
   it('воркер — только свой и только у хоста, который его отдаёт (правило 9, UIX-4.4)', () => {
     expect(directive(csp(), 'worker-src')).toBe("worker-src 'none'");
-    expect(directive(csp({ serviceWorker: true }), 'worker-src')).toBe("worker-src 'self'");
+    expect(directive(csp({ ownWorker: true }), 'worker-src')).toBe("worker-src 'self'");
   });
 
   // Правило 4: на http://localhost HSTS запомнится браузером для ВСЕГО localhost и

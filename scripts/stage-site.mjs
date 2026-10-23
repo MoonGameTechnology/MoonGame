@@ -9,7 +9,7 @@
  * The main page is the same file GitHub Pages publishes (`.github/workflows/pages.yml`),
  * so both web addresses show one game.
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { headersFile } from './siteHeaders.mjs';
 import { bakeServer, parseServer } from './siteServer.mjs';
 
@@ -34,6 +34,12 @@ for (const [published, built] of Object.entries(PAGES)) {
   staged[published] = bakeServer(readFileSync(`${dist}/${built}`, 'utf8'), server);
   writeFileSync(`${site}/${published}`, staged[published]);
   console.log(`staged ${site}/${published} ← ${built}`);
+}
+// The solo sim worker the pages start (`build.mjs`): the page policy lets in only a worker
+// from this site (`worker-src 'self'`), so it is a file here, not a string in the page.
+for (const name of readdirSync(dist).filter((n) => /^sim-worker-[0-9a-f]+\.js$/.test(n))) {
+  copyFileSync(`${dist}/${name}`, `${site}/${name}`);
+  console.log(`staged ${site}/${name}`);
 }
 // Cloudflare reads `_headers` from the assets folder and does not serve it (siteHeaders.mjs).
 writeFileSync(`${site}/_headers`, headersFile(staged));

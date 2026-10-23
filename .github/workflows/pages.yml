@@ -70,6 +70,8 @@ jobs:
         run: |
           mkdir -p _site
           cp prototype/dist/void-dominion.html _site/index.html
+          # The solo sim worker the page starts from a file next to it (build.mjs).
+          cp prototype/dist/sim-worker-*.js _site/
 
       # Pages must EXIST before this job can publish, and `configure-pages` below cannot
       # always create it: `enablement: true` needs rights the workflow token does not
