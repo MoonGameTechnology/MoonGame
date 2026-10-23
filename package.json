@@ -72,7 +72,8 @@
     "audit": "pnpm audit --audit-level=high",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs-check",
     "docs-check": "node scripts/docs-check.mjs",
-    "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs"
+    "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs",
+    "smoke:training": "pnpm run prototype && node prototype/trainingtest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

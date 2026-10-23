@@ -278,9 +278,9 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       '(TRN-2); полноту держит prototype/src/trainingTour.test.ts',
   },
   {
-    prefix: 'training.tour.',
+    prefix: 'training.guide.',
     built_by:
-      'buildTrainingTour() — `training.tour.<этап>.<шаг>` из id шага (TRN-2); ' +
+      'buildTrainingTour() — `training.guide.<этап>.<шаг>` из id шага (TRN-2); ' +
       'полноту держит prototype/src/trainingTour.test.ts',
   },
 ];
