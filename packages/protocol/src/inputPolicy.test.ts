@@ -155,6 +155,8 @@ describe('multilingual public text moderation', () => {
   it('censors complete words, obfuscated letters and multilingual insults but keeps context', () => {
     expect(censorChatText('Hello f.u.c.k and KURWA!', 240)).toBe('Hello *** and ***!');
     expect(censorChatText('S h 1 t', 240)).toBe('***');
+    expect(censorChatText('你这个傻逼！', 240)).toBe('你这个***！');
+    expect(censorChatText('씨발놈', 240)).toBe('***놈');
     expect(censorChatText('f💥u💥c💥k', 240)).toBe('***');
     expect(censorChatText('sh\u200Bit in the chat', 240)).toBe('*** in the chat');
     expect(censorChatText('You are a connard, Scunthorpe.', 240))
