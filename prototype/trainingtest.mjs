@@ -102,6 +102,16 @@ try {
         ) {
           if (mode === 'phone') await control.tap();
           else await control.click();
+          // Шаг, ждущий состояния, сменяется на следующем кадре подсветки, а нажатие могло
+          // уже спрятать свою кнопку («Отступить» закрывает окно боя): без ожидания цикл
+          // перечитывал старый шаг и падал на пропавшей кнопке.
+          await page
+            .waitForFunction(
+              (id) => document.querySelector('#spotlight')?.dataset.step !== id,
+              step.id,
+              { timeout: 1000 },
+            )
+            .catch(() => {});
         } else if (step.anchor && step.clock) {
           const rect = await page.locator('.sl-ring').boundingBox();
           assert.ok(rect, `missing ring: ${step.id}`);
