@@ -808,9 +808,9 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    остаётся на экране, пока подсказка свёрнута. Кнопки этапа в строке переносятся: на
    телефоне четыре кнопки в одну строку не встают. */
 #spotlight .sl-btns{flex-wrap:wrap;}
-#spotlight .sl-skip-stage,#spotlight .sl-fold{background:none;border:1px solid var(--line);color:var(--ink);
+#spotlight .sl-skip-stage,#spotlight .sl-fold,#spotlight .sl-reveal{background:none;border:1px solid var(--line);color:var(--ink);
   font-size:var(--fs-body);cursor:pointer;padding:5px 9px;border-radius:6px;}
-#spotlight .sl-skip-stage:hover,#spotlight .sl-fold:hover{border-color:var(--cyan);}
+#spotlight .sl-skip-stage:hover,#spotlight .sl-fold:hover,#spotlight .sl-reveal:hover{border-color:var(--cyan);}
 #spotlight-chip{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
   border:1px solid var(--cyan);color:var(--cyan);font-weight:700;font-size:var(--fs-body);
   padding:7px 12px;border-radius:16px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);}

@@ -46,6 +46,7 @@ interface Overlay {
   /** Этапное обучение (полигон, TRN-2): пропустить этап и свернуть подсказку. */
   skipStage: HTMLButtonElement;
   fold: HTMLButtonElement;
+  reveal: HTMLButtonElement;
   /** Кнопка «Подсказка» — открывает свёрнутую подсказку. Живёт ВНЕ `root`: свёрнутый
    *  оверлей скрыт целиком, а кнопка должна оставаться на экране. */
   chip: HTMLButtonElement;
@@ -114,7 +115,9 @@ function ensureOverlay(): Overlay {
   skipStage.type = 'button';
   const fold = el('button', 'sl-fold');
   fold.type = 'button';
-  btns.append(skip, skipStage, fold, next);
+  const reveal = el('button', 'sl-reveal');
+  reveal.type = 'button';
+  btns.append(skip, skipStage, fold, reveal, next);
   bubble.append(arrow, count, copy, gest, btns);
   root.append(...dim, ring, press, bubble);
   const chip = el('button', 'sl-chip');
@@ -122,7 +125,7 @@ function ensureOverlay(): Overlay {
   chip.id = 'spotlight-chip';
   chip.style.display = 'none';
   document.body.append(root, chip);
-  overlay = { root, dim, ring, bubble, arrow, count, copy, gest, press, next, skip, skipStage, fold, chip };
+  overlay = { root, dim, ring, bubble, arrow, count, copy, gest, press, next, skip, skipStage, fold, reveal, chip };
   return overlay;
 }
 
@@ -199,11 +202,12 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   // small phone screen). Hide the spotlight's chrome for as long as the dossier is
   // up; the tour's step/state machine keeps polling underneath untouched, and the
   // very next frame after the dossier closes repaints normally.
-  if (document.getElementById('codex')?.classList.contains('show')) {
+  if (!view.step.inDialog && document.getElementById('codex')?.classList.contains('show')) {
     o.root.style.display = 'none';
     return;
   }
   o.root.style.display = 'block';
+  o.root.dataset.step = view.step.id;
   const vp = { width: window.innerWidth, height: window.innerHeight };
   // Что можно нажимать на этом шаге — `tourGate.ts`: модально («Далее» — единственный
   // ход), заперто на цели (нажимается только подсвеченное окно) или свободно. Запертым
@@ -268,15 +272,23 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   // остаются такими, какими их знают игроки.
   o.skipStage.style.display = view.stage ? 'inline-block' : 'none';
   o.skipStage.textContent = t('onb.tour.skip-stage');
-  o.fold.style.display = view.stage ? 'inline-block' : 'none';
+  o.fold.style.display = view.stage || view.step.collapsible ? 'inline-block' : 'none';
   o.fold.textContent = t('onb.tour.collapse');
+  o.reveal.style.display = view.step.reveal ? 'inline-block' : 'none';
+  o.reveal.textContent = t('onb.tour.reveal');
+  o.reveal.onclick = view.step.reveal ?? null;
 
   // Measure the bubble, then position it (and its arrow) next to the target.
   const b = o.bubble.getBoundingClientRect();
   const size = { width: b.width || 280, height: b.height || 120 };
-  const pos = topAnchored(view, mode)
-    ? { left: Math.max(8, (vp.width - size.width) / 2), top: TOP_GAP, arrow: 'none' as const }
-    : placeBubble(view.target, vp, size, view.step.placement ?? 'auto');
+  // Canvas fleets orbit continuously: the ring follows them, but the controls must
+  // stay still so the player can press Show/Hide/Skip.
+  const pos =
+    !!view.step.anchor ||
+    topAnchored(view, mode) ||
+    (!view.target && view.step.collapsible && mode === 'free')
+      ? { left: Math.max(8, (vp.width - size.width) / 2), top: TOP_GAP, arrow: 'none' as const }
+      : placeBubble(view.target, vp, size, view.step.placement ?? 'auto');
   o.bubble.style.left = `${pos.left}px`;
   o.bubble.style.top = `${pos.top}px`;
   o.arrow.dataset.dir = pos.arrow;
@@ -325,7 +337,10 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   let scrolledFor: string | null = null;
   const host: SpotlightHost = {
     locate: (sel) => {
-      const node = document.querySelector(sel);
+      const node = Array.from(document.querySelectorAll(sel)).find((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
       if (!node) return null;
       const r = node.getBoundingClientRect();
       // A detached / display:none node reports a zero box — treat as absent.

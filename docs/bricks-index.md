@@ -17,6 +17,7 @@
 
 | ID | Ст. | Зоны | Где | Заголовок |
 | --- | --- | --- | --- | --- |
+| ONB-12 | ✅ | proto | `docs/backlog.md` | Пошаговый первый матч: шахта, исследование, постройка |
 | FOG-11 | ✅ | core srv proto | `docs/backlog.md` | Свой бой виден целиком. |
 | FOG-12 | ✅ | proto | `docs/backlog.md` | Чужой захват и гибель чужого флота — не новость. |
 | FOG-13 | ✅ | proto | `docs/backlog.md` | Первый шаг партии журнал судит по её же зрению. |
@@ -1104,7 +1105,8 @@
 | MSB-9 | ✅ | core proto | `docs/multiside-combat-roadmap.md` | Штурм не запирает флот: высадка по таймеру, потом плацдарм |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
-| ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
+| ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (соло без соперников) |
+| ONB-12 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговое обучение Galactic War по действующему интерфейсу |
 | ONB-3 | ✅ | proto | `docs/onboarding-roadmap.md` | Just-in-time интро механик (прогрессивное раскрытие) |
 | ONB-4 | ✅ | proto | `docs/onboarding-roadmap.md` | Help/кодекс-хаб («?» везде) |
 | ONB-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Цели первой сессии / чек-лист успеха |
