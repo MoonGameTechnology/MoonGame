@@ -2448,7 +2448,6 @@ function openCodexHub(): void {
   if (input) input.oninput = () => renderCodexResults(input.value);
   renderCodexResults('');
   box.classList.add('show');
-  input?.focus();
 }
 // One delegated handler for the hub (rebuilt each open, so wire the container once).
 document.getElementById('codexhub')?.addEventListener('click', (ev) => {
@@ -4285,7 +4284,7 @@ const arsenal = __SECTOR_ZERO_ONLY__
         showHub(false);
         showConnect(true);
         showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
       },
       openAuction: () => hubTab('auction'),
       sell: (itemId) => {
@@ -4335,7 +4334,7 @@ const shop = __SECTOR_ZERO_ONLY__
         showHub(false);
         showConnect(true);
         showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
       },
       warrants: () => metaMarket?.balance() ?? 0,
       now: () => Date.now(),
@@ -4788,7 +4787,7 @@ initAccountSession({
     showHub(false);
     showStage('welcome');
     if (!srv) return;
-    fillWelcome(srv.nick ?? '', 'focus');
+    fillWelcome(srv.nick ?? '', 'show');
   },
 });
 
@@ -4874,7 +4873,7 @@ if (bootReset) {
       showConnect(true);
       showStage('welcome');
       const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-      fillWelcome(savedNick, 'focus');
+      fillWelcome(savedNick, 'show');
     })(),
   );
 } else if (document.body.dataset.entry === 'sector-zero') {
@@ -4899,7 +4898,7 @@ if (bootReset) {
       const srv = resolveServer();
       const mode = srv ? await probeAuthMode(srv.base) : authMode;
       const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-      if (mode === 'accounts') fillWelcome(savedNick, connectShown() ? 'focus' : 'show');
+      if (mode === 'accounts') fillWelcome(savedNick, 'show');
       else fillWelcome(savedNick, 'hide');
     })(),
   );
@@ -6479,7 +6478,7 @@ const corp = __SECTOR_ZERO_ONLY__
           showHub(false);
           showConnect(true);
           showStage('welcome');
-          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'focus');
+          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
         },
       },
     });

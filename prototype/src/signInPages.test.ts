@@ -199,17 +199,14 @@ describe('REFM-218 — стадии и позывной', () => {
 describe('REFM-218 — двери приветственной карточки', () => {
   it('позывной кладётся как есть, пустой — подсказывается', async () => {
     const { pages } = await boot();
-    pages.fillWelcome('Orion', 'focus');
+    pages.fillWelcome('Orion', 'show');
     expect(el('cwnick').value).toBe('Orion');
-    pages.fillWelcome('', 'focus');
+    pages.fillWelcome('', 'show');
     expect(el('cwnick').value).toBe(`${t('callsign.rhino')}-1`);
   });
 
-  it('строку пароля показывают с курсором, без курсора или прячут', async () => {
+  it('строку пароля показывают без фокуса или прячут', async () => {
     const { pages } = await boot();
-    pages.fillWelcome('Orion', 'focus');
-    expect([el('cwpassrow').style.display, focused]).toEqual(['flex', 'cwpass']);
-    focused = '';
     pages.fillWelcome('Orion', 'show');
     expect([el('cwpassrow').style.display, focused]).toEqual(['flex', '']);
     pages.fillWelcome('Orion', 'hide');
@@ -274,7 +271,7 @@ describe('REFM-218 — приветствие', () => {
     await settle();
     expect(stages()).toEqual(['cregister']);
     expect(el('crnick').value).not.toBe('');
-    expect([el('crpass').value, focused, env.status.at(-1)]).toEqual(['', 'crpass', '']);
+    expect([el('crpass').value, focused, env.status.at(-1)]).toEqual(['', '', '']);
     expect(env.hub).toEqual([]);
   });
 
@@ -296,7 +293,7 @@ describe('REFM-218 — приветствие', () => {
     expect([el('cwlogin').style.display, el('cwnick').value, focused]).toEqual([
       'flex',
       'Orion',
-      'cwnick',
+      '',
     ]);
     expect(env.status).toEqual(['']);
     click('clogin');
@@ -698,7 +695,7 @@ describe('REFM-218 — восстановление доступа', () => {
     expect([stages(), el('crecmail').value, focused]).toEqual([
       ['crecover'],
       'me@mail.test',
-      'crecmail',
+      '',
     ]);
   });
 
@@ -751,7 +748,7 @@ describe('REFM-218 — сброс пароля по ссылке', () => {
     expect(stages()).toEqual(['creset']);
     expect([env.connect, env.hubShown]).toEqual([[true], [false]]);
     expect(href).toBe('/');
-    expect([el('cresetuser').value, focused]).toEqual(['Orion', 'cresetpass']);
+    expect([el('cresetuser').value, focused]).toEqual(['Orion', '']);
   });
 
   // Ссылку открывают на новом устройстве без позывного: сброс доходит до сервера, а сессия

@@ -186,6 +186,7 @@ describe('сброс пароля — сцена', () => {
     const cleaned = w.api.open('ТОКЕН', 'https://void.example/g?reset=ТОКЕН');
     expect(w.stages()).toBe(1);
     expect(w.pass.value).toBe('');
+    expect(w.pass.focused()).toBe(0);
     expect(cleaned).not.toContain('ТОКЕН');
   });
 

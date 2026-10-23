@@ -361,6 +361,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   одной кнопкой (`decisions/phoneSpeed.ts`), приказ — черновик цели и отправка (`mobileOrders.ts`).
   Свой мир с одним своим флотом — одна карточка с вкладками «Флот» / «Мир», открытая на
   вкладке прошлого раза (`decisions/worldFleetTabs.ts`, `worldFleetCard.ts`).
+- Открытие чатов, справочника, меток, аукциона и форм аккаунта не ставит фокус в поле ввода:
+  клавиатуру вызывает нажатие на поле. Enter между полями и фокус на ошибке формы сохранены.
 - Клавиши ПК по `KeyboardEvent.code` — `decisions/hotkeys.ts` и `pcHotkeys.ts`. Back и Escape:
   стопка слоёв — `backLayers.ts`, Back без слоёв (предупредить, выйти вторым) — `backGesture.ts`.
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
