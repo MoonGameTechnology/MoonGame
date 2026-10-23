@@ -10,7 +10,6 @@ import { rocketMinesUi } from './rocketMinesUi';
 import type { SoloSave } from '../../decisions/soloSave';
 import {
   closeSoloReplace,
-  enterSolo,
   initSoloCheckpoint,
   leaveSolo,
   refreshHubDoor,
@@ -84,19 +83,17 @@ import {
   rttEma,
   serverMatchId,
 } from './netSession';
-import { clearSeatNicks, refreshSeatNicks, seatNick } from './seatNicks';
+import { refreshSeatNicks, seatNick } from './seatNicks';
 import {
   closeSeatPicker,
   connectToMatch,
   initMatchJoin,
-  openSeatPicker,
   stopNetSetupPoll,
 } from './matchJoin';
 import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
-import { shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
-import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, type MapId } from './mapCatalog';
+import { isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -110,19 +107,15 @@ import {
   order,
   canOrder,
   ctx,
-  setMatchMode,
   matchMode,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
-  // SHU-3.1 — челноки: перегрузка порт ⇄ носитель и сам вылет.
-  mergeFleet,
   buildBuilding,
   netIncome,
   capitalOf,
-  type SetupConfig,
   buySupply,
   type AiProfile,
 } from './game';
@@ -180,7 +173,7 @@ import {
   type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import { createBattleModel } from '../../packages/client/src/index';
-import { pveModeId, pveChapter, trainingState, trainingModeId, provingGroundState, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { pveChapter } from '../../packages/client/src/gameData';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
 import { bakedServer, buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
@@ -189,7 +182,7 @@ import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMa
 import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
-import { clearFlak, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
+import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
@@ -225,7 +218,6 @@ import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { initMissionPanel } from './missionPanel';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
-import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
@@ -238,7 +230,6 @@ import {
 } from '../../decisions/sectorZeroTools';
 import {
   changeSectorProgress,
-  chapterWorld,
   initSectorProfile,
   pushCloud,
   saveSectorProgress,
@@ -246,16 +237,12 @@ import {
 } from './sectorProfile';
 import {
   awardSectorRun,
-  beginAttempt,
-  enterRun,
   fleetLabelOf,
   forgetSavedRun,
   initSectorRun,
   isSectorZeroRun,
   isTraining,
-  leaveRun,
   markGameplay,
-  pveDifficulty,
   runChain,
   runInProgress,
   runMissionRows,
@@ -288,19 +275,13 @@ import {
 import {
   buildSetupConfig,
   initSetupScreen,
-  netSetup,
   openSetup,
-  sciWin,
   setupEl,
-  setupMapId,
-  setupSlots,
-  setupSpeed,
 } from './setupScreen';
 import { getPlatform, type PlatformHost } from './platform/host';
 import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
 import {
   changeSectorZeroProgress,
-  prepareSectorZeroRun,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { syncCommanderXp } from './commanderSync';
@@ -314,7 +295,7 @@ import { initPcHotkeys } from './pcHotkeys';
 import { HOTKEY_SILENT_LAYERS, cycledFleets, homeTarget, nextFleet } from '../../decisions/hotkeys';
 import { toScreen } from './screenAnchor';
 import { pickHome } from './openingView';
-import { houseDisplayName, seatAiProfile } from './setupSeats';
+import { houseDisplayName } from './setupSeats';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -356,6 +337,18 @@ import { initTechTree } from './techTree';
 import { initBuildScreen } from './buildScreen';
 import type { MetaMatchRewardsView } from '../../packages/protocol/src/metaEconomyView';
 import { initEndScreen, type MatchEnd } from './endScreen';
+// Жизненный цикл матча (REFM-219): установка, запуски, уход и выходы.
+import {
+  initMatchLifecycle,
+  installMatch,
+  leaveFromEnd,
+  leaveMatch,
+  leavesToSectorZero,
+  startMatch,
+  startProvingGround,
+  startPvEMatch,
+  startTraining,
+} from './matchLifecycle';
 import {
   pcUi,
   glowOn,
@@ -420,19 +413,18 @@ import {
   youColor,
 } from './mapPalette';
 import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, pirateIntroRect, setView, world, worldDist } from './mapCamera';
-import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, resetFogMemory, restoreFogMemory, vision, type Vision } from './mapFog';
+import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder, settleOrder } from './orderPipeline';
 import {
   forceIntroduced,
   hideTrainingBoard,
-  resetTrainingScenario,
   tickTrainingScenario,
   type TrainingScenarioHost,
 } from './trainingScenario';
 import { startSimLink, workerPort, type SimLink } from './simLink';
-import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
+import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
   cancelMobileOrder,
   initCmdActions,
@@ -441,21 +433,19 @@ import {
   mobileTargetLabel,
 } from './cmdActions';
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
-import { flushPinch, forgetAdditive, initMapInput, selectionBox, tapByTouch } from './mapInput';
+import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
 import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct, timeLeft } from './worldQueries';
-import { handleEvents, initEventFeed, killStats, logLines, note, resetEventFeed, toast } from './eventFeed';
+import { handleEvents, initEventFeed, killStats, logLines, note, toast } from './eventFeed';
 import {
   PLAY_BASE,
   applyTimeSpeed,
   closeSwarmDossier,
   forgetStatusLine,
-  hideSwarmDossier,
   initTopBar,
   renderSpeedbar,
   renderSwarmDossier,
   renderTopBar,
-  resetThreatAlerts,
   swarmDossierPinned,
   updateThreatAlerts,
 } from './matchTopBar';
@@ -483,11 +473,8 @@ import { pullNextDevWave } from './sectorZeroDev';
 // snapshot, initSandbox call) + the #sandbox HTML/CSS to cut it cleanly.
 import {
   sandboxConfig,
-  resetSandboxConfig,
-  resetSandboxRuntime,
   enforceSandbox,
   initSandbox,
-  setSandboxButton,
 } from './sandbox';
 // Обучение (ONB-0/1/2/7) — у владельца `guideFlow.ts` (REFM-221): тур по HUD, флаг
 // пройденного обучения, ведомый первый матч, цели первой сессии.
@@ -498,18 +485,15 @@ import {
   loadOnboard,
   maybeStartPendingTour,
   setPendingGuide,
-  stopFirstGoals,
   updateGoals,
 } from './guideFlow';
 // TRN-2 — тур полигона: собирается здесь, запускается лаунчером `guideFlow.ts`.
 import { buildTrainingTour } from './trainingTour';
 import { trainingTourUi } from './trainingTourDom';
-import { trainingFlagshipMerge } from '../../decisions/trainingGuide';
-import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
 // Справка (ONB-3/4/5) — у владельца `helpCenter.ts` (REFM-221): справочник и его поиск,
 // карточка корабля, вводные к механикам, сводка «пока вас не было».
-import { forgetAway, initHelpCenter, maybeIntro, openCodex, openShipCard } from './helpCenter';
+import { initHelpCenter, maybeIntro, openCodex, openShipCard } from './helpCenter';
 import { HOLD_TIP_MS, holdTipPos, movedTooFar } from './tipPlacement';
 import {
   IDLE,
@@ -2266,85 +2250,75 @@ const endScreenPanel = initEndScreen({
     watchAd,
     apply: () => changeSectorProgress({ kind: 'double-reward' }),
   },
-  onLeave: (which, wasNet) => {
-    // Уход — через дверь `leaveMatch` (REFM-205): из сетевого матча без дозвона, гайд и
-    // первые цели гаснут (матч мог закончиться посреди гайда, ONB-2).
-    leaveMatch();
-    // «Повторить обучение» — сразу новый полигон; «В меню» — в меню Sector Zero.
-    if (!wasNet && isTraining()) {
-      if (which === 'again') startTraining();
-      else openSectorZero();
-      return;
-    }
-    if (!wasNet && isSectorZeroRun()) {
-      openSectorZero(which === 'again', which === 'replay');
-      return;
-    }
-    if (which === 'again') {
-      // Соло — сразу в настройку схватки; сеть — в браузер матчей (пересадить тот же
-      // стол клиент не может, это отдельный серверный кирпич).
-      if (wasNet) {
-        openHub();
-        hubTab('games');
-      } else {
-        openSetup('hub');
-      }
-    } else {
-      openHub(); // «В меню»
-    }
-  },
+  onLeave: leaveFromEnd,
 });
 const renderEndScreen = (): void => endScreenPanel.render();
 
-/**
- * Выход из партии — одна дверь (REFM-205). Её зовут ⌂ (а через него ‹, рельс и аппаратный
- * Back), итоговый экран, вход в Sector Zero, «Одиночная игра» в хабе и в обзоре партий и
- * кнопка тестов. Куда вести игрока дальше, решает вызывающий. Пока выход был копиями, они
- * разошлись: итоговый экран не гасил первые цели, три копии не закрывали сокет, и ни одна
- * не гасила дозвон (см. `leaveNetwork`).
- *
- * - Забег Sector Zero сохраняется, и «Продолжить» поднимет его с этой минуты. Вне забега и
- *   после его засчёта `saveRun` ничего не пишет.
- * - Мир под меню встаёт. В соло иначе ИИ доигрывал бы партию, и «Победа!» ложилась поверх
- *   хаба (BF-29). Сетевому миру после выхода снимков больше не будет, а локальный ход
- *   сочинял бы его сам.
- * - Гайд гаснет (ONB-2): его #spotlight — синглтон на document.body, и незакрытый тур
- *   рисовал свой последний шаг поверх хаба и следующего матча (z-50, выше всего).
- * - Первые цели гаснут (ONB-7): список первой сессии живёт ровно одну партию.
- */
-function leaveMatch(): void {
-  saveRun();
-  stopSim();
-  speed = 0;
-  leaveNetwork();
-  clearSeatNicks();
-  stopFirstGoals();
-  activeTour?.stop();
-}
-
-// Speedbar "⌂ В меню": leave the current match from anywhere in-game — through the one
-// door `leaveMatch`; a run or the training ground leads to the Sector Zero menu, the rest
-// to the hub.
-$('tomenu').addEventListener('click', (ev) => {
-  // ⌂ в идущей экспедиции спрашивает (решение владельца 2026-09-26): в меню с сохранением
-  // или завершить и забрать награду. Спрашивает только живой тап — программные выходы
-  // (аппаратный Back, отмена загрузки карты, «В меню» самой карточки) уходят сразу.
-  if (ev.isTrusted && runInProgress()) {
-    openAbandon('exit', $('tomenu'));
-    return;
-  }
-  const toSectorZero = leavesToSectorZero();
-  leaveMatch();
-  if (toSectorZero) openSectorZero();
-  else openHub();
+// Жизненный цикл матча — у владельца, `matchLifecycle.ts` (REFM-219): установка партии,
+// запуск схватки, забега, полигонов и сетевой партии, уход одной дверью и выходы ⌂,
+// «Покинуть сессию» и итогового экрана. Отсюда — то, что принадлежит игре: мир, своё
+// место, места ИИ, кеш мира, итог и баннер, темп, поток симуляции и экраны хаба.
+initMatchLifecycle({
+  world: () => s,
+  me: () => ME,
+  adopt: (state, ai) => {
+    s = state;
+    installMapGeometry(s);
+    syncPlayerNames(s);
+    ME = 'p1';
+    AI_PLAYERS = new Map(ai);
+    for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
+  },
+  resetScreen: () => {
+    pirateIntro.reset();
+    solo.reset();
+    worldMemo = null;
+    banner = null; // clear any end-banner left by the menu-background match (else it sticks)
+    endScreen = null; // a fresh match must not open into the previous result
+    matchEnd.reset(); // новый матч зарабатывает свою награду
+  },
+  stopSim,
+  halt: () => {
+    speed = 0;
+  },
+  mobile: () => MOBILE,
+  scoreLimit: () => SCORE_LIMIT,
+  devSpeedControl: setDevSpeedControl,
+  sound: (name) => snd.play(name),
+  setSandboxHome: (id) => {
+    sandboxHomeId = id;
+  },
+  pulseAlly: () => {
+    allyPulseUntil = performance.now() + 12_000;
+  },
+  // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
+  // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
+  armTrainingTour: () =>
+    setPendingGuide(() => {
+      const baseline = trainingBaseline(s, ME, data);
+      launchTour(
+        buildTrainingTour({
+          world: () => s,
+          me: ME,
+          data,
+          baseline,
+          ui: trainingTourUi({
+            world: () => s, me: () => ME, mobile: MOBILE,
+            expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
+            ships: () => { setPlanetTab('ships'); },
+            // Synchronize the phone selection before Show expands its sheet.
+            render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
+          }),
+          introduced: forceIntroduced,
+        }),
+      );
+    }),
+  showConnect: (show) => showConnect(show), // объявлен ниже, у экрана входа
+  showHub: (show) => showHub(show),
+  openHub: () => openHub(),
+  hubTab: (tab) => hubTab(tab),
+  resolveServer: () => resolveServer(),
 });
-// Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too. На ПК ⌂
-// в полосе скорости спрятан и выход живёт здесь, поэтому в экспедиции спрашивает и он.
-document.getElementById('rail-exit')?.addEventListener('click', (ev) => {
-  if (runInProgress()) openAbandon('exit', ev.currentTarget as HTMLElement);
-  else $('tomenu').click();
-});
-
 // Event-log window: the rail's ≡ opens it; ✕ or the backdrop closes it. The feed
 // (#log) updates in place each frame whether the window is open or not.
 const logWin = document.getElementById('logwin');
@@ -3657,262 +3631,6 @@ function saveMeta(st: MetaState): void {
   localStorage.setItem(metaKey(), JSON.stringify(st));
 }
 
-// Install a ready GameState as the live match: reset all interaction state, queues,
-// camera and log, then hide the setup overlay. `aiPlayers` are the seats the local
-// sim drives. Shared by the normal skirmish and (via a hook) the dev test mode.
-function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
-  leaveNetwork(); // свой мир — уже не сетевая партия: гаснут и дозвон, и признак серверного мира
-  leaveSolo();
-  stopSim(); // поток считал мир прошлого матча
-  forgetAutoAssault();
-  leaveRun();
-  needMapPreparation();
-  // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
-  // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
-  // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.
-  setMatchMode(modeId);
-  s = state;
-  // ROADS-7: состояние из сохранения прошло через JSON и потеряло метку разделяемой сети
-  // дорог — без неё каждый шаг мира копировал бы всю сеть заново.
-  shareRoadNetwork(s.planets);
-  installMapGeometry(s);
-  syncPlayerNames(s);
-  ME = 'p1';
-  AI_PLAYERS = new Map(aiPlayers);
-  for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
-  pirateIntro.reset();
-  hideSwarmDossier();
-  solo.reset();
-  // ONB-2 (found live): a leftover guide from whatever was on screen before (a
-  // tutorial the player exited without finishing/skipping, a stale reconnect) must
-  // never survive into this match — #spotlight is a document.body singleton, so an
-  // un-stopped tour keeps painting its last step over the NEW match too. Runs before
-  // `maybeStartPendingTour()` (below) arms this match's own guide, if any.
-  activeTour?.stop();
-  // Reset interaction + queues + camera to the framed whole-map view.
-  disarm('match', MOBILE); // выбор, прицелы и окна старого матча указывают на то, чего здесь нет
-  forgetAdditive();
-  if (chainMode) exitChainMode(); // режим «Приказ» не переживает смену матча
-  forgetChainRoutes(); // маршруты принадлежат карте СТАРОГО матча
-  resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
-  resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
-  worldMemo = null;
-  forgetRadarContacts();
-  resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
-  clearFlak();
-  forgetAway(); // reset the away-window baseline for the new match
-  banner = null; // clear any end-banner left by the menu-background match (else it sticks)
-  endScreen = null; // a fresh match must not open into the previous result
-  matchEnd.reset(); // новый матч зарабатывает свою награду
-  // The match goal, written AFTER the wipe so it is the first line a player can read.
-  // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
-  // elimination, or on domination — no "capital capture" victory exists.
-  const waves = data.modes[modeId ?? '']?.pve?.waves;
-  note(
-    modeId !== undefined && modeId === trainingModeId()
-      ? t('training.goal') // полигон кончается взятием миров противника, а не очками
-      : waves ? t('hud.goal.pve', { n: waves }) : t('hud.goal', { n: SCORE_LIMIT }),
-  );
-  defaultView(); // phone / flagship console: home; simple desktop: whole-map fit
-  setupEl.style.display = 'none';
-  // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
-  // practice tools off; startMatch() re-arms them if the setup checkbox was ticked.
-  if (!__PLAYER_BUILD__) {
-    resetSandboxRuntime();
-    sandboxConfig.enabled = false;
-    setSandboxButton(false);
-  }
-  // FOG-13: зрение ЭТОЙ партии — до засевающего шага мира, который вызывающий делает
-  // сразу следом, ещё до первого кадра. `s` и `ME` уже новые, а песочница прошлой
-  // партии уже снята: её выключенный туман не должен стать «видно всё» новой
-  // (замечание Codex на #1490).
-  refreshVision();
-  // Start the queued tour after the prepared HUD is actually visible.
-  snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
-}
-function startMatch(setup: SetupConfig, persist = true): void {
-  const st = newGame(setup);
-  // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
-  // Политика локального хоста хранится рядом с миром в одиночном сохранении.
-  const profiles = new Map<string, AiProfile>();
-  for (const seat of setup.seats) {
-    if (!seat.ai) continue;
-    const i = SEAT_META.findIndex((m) => m.id === seat.id);
-    profiles.set(seat.id, (i >= 0 ? seatAiProfile(setupSlots[i]) : null) ?? 'weak');
-  }
-  installMatch(st, profiles, st.modeId);
-  applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
-  // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
-  // checkbox; remember the home world for the immortal-home toggle and show the opener.
-  if (!__PLAYER_BUILD__) {
-    sandboxConfig.enabled = ($('setupsandbox') as HTMLInputElement | null)?.checked ?? false;
-    sandboxHomeId = setup.seats[0]?.start ?? null;
-    setSandboxButton(sandboxConfig.enabled);
-  }
-  enterSolo(persist);
-}
-
-/** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
-function startPvEMatch(dev = false): void {
-  const testing = !__PLAYER_BUILD__ && dev;
-  saveRun(); // preserve a paused normal attempt before replacing the in-memory world
-  beginAttempt(testing);
-  // Новая попытка (`YAG-5.1`); «Продолжить» — та же попытка, её исход придёт своим событием.
-  if (!testing)
-    getPlatform().analytics.emit('pve_started', {
-      chapter: pveChapter(sectorMission).id,
-      difficulty: pveDifficulty,
-      attempt: sectorAttempt,
-    });
-  const st = prepareSectorZeroRun(chapterWorld(sectorMission, pveDifficulty), sectorProgress, data);
-  // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
-  const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
-  // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
-  // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
-  // `pve` он не видел, потому что конфиг ехал без `modeId`.
-  installMatch(st, aiSeats, pveModeId(sectorMission));
-  enterRun(testing ? 'dev' : 'run');
-  if (!__PLAYER_BUILD__ && testing) {
-    resetSandboxConfig();
-    sandboxConfig.enabled = true;
-    sandboxHomeId = Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null;
-    setSandboxButton(true);
-    setDevSpeedControl(true);
-  }
-  // Seed the PvE section through the kernel before the first save. A page can
-  // close before its first animation frame; that must not lose a fresh attempt.
-  apply(advance(s, s.time + 1));
-  // Стартовые флоты главы — одним флотом вокруг корабля героя (решение владельца
-  // 2026-09-26, `decisions/startFleets.ts`). Сливает ядро, приказом: его правила в силе.
-  for (const m of startFleetMerges(s, ME)) {
-    const merged = order(s, mergeFleet(ME, m.from, m.into), s.time);
-    if (!merged.error) apply(merged);
-  }
-  // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
-  // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
-  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
-  showConnect(false);
-  showHub(false);
-  setupEl.style.display = 'none';
-  sciWin.classList.remove('show');
-  saveRun();
-  note(t('setup.pve.started'));
-  // Союзник на связи с первой минуты (`contactAtStart`, главы V и VI): встречи, которая
-  // зажигает чип «⬡ Союзник» в главе IV, не будет — та же заметка и мигание со старта.
-  if (linkedAlly(s, ME)) {
-    note(t('ally.contact.note'));
-    allyPulseUntil = performance.now() + 12_000;
-  }
-}
-
-/**
- * УЧЕБНЫЙ ПОЛИГОН «Протокол допуска» (`docs/sector-zero-map-concepts.md` §14). Не глава и не
- * забег: у мира нет секции `pve`, поэтому ни волн, ни досье Роя (§14.6), ни снимка забега,
- * ни засчёта в профиль. Темп и инструменты — забега (`setRunActive`), чтобы полигон учил
- * тому же управлению, что ждёт в главе I.
- */
-function startTraining(): void {
-  saveRun(); // пауза обычной экспедиции переживает полигон — «Продолжить» её поднимет
-  // Учебный противник сам не ходит (§14.2: соединения вводятся по этапам) — ИИ-мест нет.
-  // Герой, арсенал и оснащение — те же, что поедут в главу I (`prepareSectorZeroRun`):
-  // полигон учит тем кораблям, с которыми игрок пойдёт дальше.
-  // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
-  // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
-  setPendingGuide(() => {
-    const baseline = trainingBaseline(s, ME, data);
-    launchTour(
-      buildTrainingTour({
-        world: () => s,
-        me: ME,
-        data,
-        baseline,
-        ui: trainingTourUi({
-          world: () => s, me: () => ME, mobile: MOBILE,
-          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
-          ships: () => { setPlanetTab('ships'); },
-          // Synchronize the phone selection before Show expands its sheet.
-          render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
-        }),
-        introduced: forceIntroduced,
-      }),
-    );
-  });
-  installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
-  enterRun('training');
-  apply(advance(s, s.time + 1));
-  const merge = trainingFlagshipMerge(s, ME);
-  if (merge) {
-    const prepared = order(s, mergeFleet(ME, merge.from, merge.into), s.time);
-    if (!prepared.error) apply(prepared);
-  }
-  // TRN-3: силы противника, контратака и исход — у сценария; на входе он начинается заново.
-  resetTrainingScenario(s.time);
-  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
-  showConnect(false);
-  showHub(false);
-  setupEl.style.display = 'none';
-  sciWin.classList.remove('show');
-  note(t('training.started'));
-}
-
-/**
- * ПОЛИГОН ОСНОВНОЙ ИГРЫ (M2.15, заказ владельца 2026-09-29): все области и весь каталог,
- * старт песочницей (`provingGroundState`). Обычная партия основной игры — без режима, волн
- * и наград; соперник и Рой ходят местами ИИ, как в главах (`runAiSeats`). В одиночное
- * сохранение полигон не пишется: «Продолжить» в хабе остаётся за обычной партией.
- */
-function startProvingGround(): void {
-  leaveMatch();
-  const st = provingGroundState(data);
-  installMatch(st, runAiSeats(st, PROVING_GROUND_PLAYER, 'weak'));
-  applyTimeSpeed(setupSpeed);
-  showConnect(false);
-  showHub(false);
-  note(t('proving-ground.started'));
-}
-
-let creatingMatch = false;
-function createOnlineMatch(mapId: MapId): void {
-  if (creatingMatch) return;
-  const srv = resolveServer();
-  if (!srv) { note(t('acc.server-down')); return; }
-  // Подписи у двух кнопок свои: «Создать сетевую игру» в настройке схватки, «Создать» на
-  // странице «Матчи» (UIX-17.1). После запроса каждая возвращает свою.
-  const buttons = [
-    { button: $('setup-network-create') as HTMLButtonElement, label: t('setup.network.create') },
-    { button: $('match-create-go') as HTMLButtonElement, label: t('browser.create.go') },
-  ];
-  creatingMatch = true;
-  for (const { button } of buttons) { button.disabled = true; button.textContent = t('setup.network.creating'); }
-  detach('create match', (async () => {
-    try {
-      const pass = tokenFor(localStorage, srv.base, srv.nick);
-      const res = await fetch(`${httpBase(srv.base)}/matches`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(pass ? { authorization: `Bearer ${pass}` } : {}) },
-        body: JSON.stringify({ mapId }),
-      });
-      if (!res.ok) {
-        const refusal = await res.json().catch(() => null) as { error?: string } | null;
-        throw new Error(refusal?.error ?? 'E_CREATE_MATCH');
-      }
-      const body = await res.json() as { matchId: string };
-      await openSeatPicker(body.matchId);
-    } catch (err) {
-      note(t(err instanceof Error && err.message === 'E_MATCH_QUOTA' ? 'setup.network.quota' : 'setup.network.failed'));
-    }
-    finally {
-      creatingMatch = false;
-      for (const { button, label } of buttons) { button.disabled = false; button.textContent = label; }
-    }
-  })());
-}
-$('setup-network-create').addEventListener('click', () => {
-  if (!netSetup) createOnlineMatch(setupMapId);
-});
-$('match-create-go').addEventListener('click', () => {
-  createOnlineMatch(mapPreset(($('match-create-map') as HTMLSelectElement).value).id);
-});
 
 // --- match browser (the meta-shell "Play" tab) -------------------------------
 // The list itself — tabs, filter, archive and the hub's «Мои партии» — lives in
@@ -4473,10 +4191,6 @@ initSectorRun({
   playSpeed: () => Number($('spd-play').dataset.speed),
 });
 
-/** Уход из матча ведёт в меню Sector Zero — из забега и из полигона, а не в хаб. */
-function leavesToSectorZero(): boolean {
-  return isSectorZeroRun() || isTraining();
-}
 
 // Профиль Sector Zero, его облачная копия и вкладка-хозяйка — `sectorProfile.ts` (REFM-209).
 // Здесь только проводка к забегу и экрану. Хуки зовутся позже, по событию или после
