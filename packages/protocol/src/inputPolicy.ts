@@ -99,6 +99,26 @@ const BLOCKED_NAMES = [
   'retard',
   'idiot',
 ];
+
+// Curated severe profanity/abuse across major game audiences. Full words only:
+// word fragments are never matched inside innocent names (e.g. Scunthorpe).
+// Additions require locale-aware positive AND false-positive regression tests.
+// The original RU/EN vocabulary above is retained for compatibility.
+const MULTILINGUAL_BLOCKED_NAMES: Readonly<Record<string, readonly string[]>> = {
+  de: ['arschloch', 'scheiße', 'scheisse', 'hurensohn', 'wichser', 'fotze', 'schlampe'],
+  fr: ['connard', 'connasse', 'enculé', 'encule', 'salope', 'putain', 'merde'],
+  es: ['gilipollas', 'cabron', 'cabrón', 'mierda', 'coño', 'puta', 'puto', 'maricón', 'maricon'],
+  pt: ['caralho', 'porra', 'filhodaputa', 'otário', 'otario', 'vadia'],
+  it: ['stronzo', 'stronza', 'vaffanculo', 'coglione', 'cazzo', 'troia'],
+  pl: ['kurwa', 'skurwysyn', 'pierdolony', 'dziwka', 'chuj', 'chujek'],
+  uk: ['довбойоб', 'йобаний', 'йобана', 'підорас'],
+  tr: ['siktir', 'orospu', 'pezevenk'],
+  ja: ['死ね', 'くたばれ'],
+  ko: ['씨발', '시발', '개새끼', '병신'],
+  zh: ['傻逼', '操你妈', '操你媽', '去死'],
+  ar: ['كسمك', 'شرموطة', 'متناك'],
+  hi: ['मादरचोद', 'बहनचोद'],
+};
 const VISUAL: Readonly<Record<string, string>> = {
   а: 'a',
   б: 'b',
@@ -136,6 +156,17 @@ const VISUAL: Readonly<Record<string, string>> = {
   і: 'i',
   ј: 'j',
   ѕ: 's',
+  // Frequent mixed-script (Greek/Latin) homoglyph substitutions in public names.
+  α: 'a',
+  ε: 'e',
+  ι: 'i',
+  κ: 'k',
+  ο: 'o',
+  ρ: 'p',
+  σ: 's',
+  τ: 't',
+  υ: 'u',
+  χ: 'x',
 };
 const PHONETIC: Readonly<Record<string, string>> = {
   ...VISUAL,
@@ -168,7 +199,10 @@ function fold(text: string, alphabet: Readonly<Record<string, string>>): string 
   }).join('');
 }
 const BLOCKED_KEYS = new Set(
-  BLOCKED_NAMES.flatMap((word) => [fold(word, VISUAL), fold(word, PHONETIC)]),
+  [...BLOCKED_NAMES, ...Object.values(MULTILINGUAL_BLOCKED_NAMES).flat()].flatMap((word) => [
+    fold(word, VISUAL),
+    fold(word, PHONETIC),
+  ]),
 );
 
 export function blockedPublicName(name: string): boolean {
@@ -225,4 +259,71 @@ export function sanitizeChatText(text: string, max: number): string {
   )
     .slice(0, max)
     .join('');
+}
+
+
+/**
+ * Find whole offensive words, including spaced-letter/obfuscated spellings
+ * ("f.u.c.k", "s h 1 t", Cyrillic/Latin homoglyphs). The dictionary is not a
+ * substring search: ordinary words containing a short swear are untouched.
+ * This is a low-cost deterministic safety net, not a semantic hate-speech model.
+ */
+function offensiveSpans(text: string): Array<{ start: number; end: number }> {
+  const words = Array.from(text.matchAll(/[\p{L}\p{M}\p{N}]+/gu), (match) => {
+    const start = match.index ?? 0;
+    return { raw: match[0], start, end: start + match[0].length };
+  });
+  const spans: Array<{ start: number; end: number }> = [];
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]!;
+    if (blockedPublicName(word.raw)) spans.push({ start: word.start, end: word.end });
+    let joined = word.raw;
+    let end = word.end;
+    // Limited to 16 chunks / 36 characters: bounded work even on spammy punctuation.
+    for (let j = i + 1; j < Math.min(words.length, i + 16); j++) {
+      const next = words[j]!;
+      const separator = text.slice(end, next.start);
+      if (
+        !separator ||
+        Array.from(separator).length > 3 ||
+        !/^[\p{P}\p{S}\p{Zs}]+$/u.test(separator)
+      ) break;
+      // Spaces between whole words are normal speech. Only concatenate separated
+      // individual letters when the separator is whitespace alone.
+      if (
+        /^\p{Zs}+$/u.test(separator) &&
+        (Array.from(words[j - 1]!.raw).length !== 1 || Array.from(next.raw).length !== 1)
+      ) break;
+      joined += next.raw;
+      end = next.end;
+      if (Array.from(joined).length > 36) break;
+      if (blockedPublicName(joined)) spans.push({ start: word.start, end });
+    }
+  }
+  return spans;
+}
+
+/** For free-form public text such as coalition descriptions: reject rather than rewrite. */
+export function containsBlockedLanguage(text: string): boolean {
+  return offensiveSpans(sanitizeChatText(text, 512)).length > 0;
+}
+
+/** Sanitize first, then mask offending runs before any chat relay, history or bot callback. */
+export function censorChatText(raw: string, max: number): string {
+  const text = sanitizeChatText(raw, max);
+  const spans = offensiveSpans(text).sort((a, b) => a.start - b.start || a.end - b.end);
+  if (spans.length === 0) return text;
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const span of spans) {
+    const last = merged[merged.length - 1];
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else merged.push({ ...span });
+  }
+  let out = '';
+  let pos = 0;
+  for (const span of merged) {
+    out += text.slice(pos, span.start) + '***';
+    pos = span.end;
+  }
+  return out + text.slice(pos);
 }
