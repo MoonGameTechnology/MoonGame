@@ -1121,6 +1121,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #coalwin .dp-head .cw-title{font-size:var(--fs-body);color:var(--cyan);margin-right:auto;}
 .cw-body{overflow:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;}
 .cw-cap{font-size:var(--fs-caption);color:var(--dim);}
+.cw-create{min-height:44px;padding:9px 14px;border:1px solid var(--cyan);border-radius:7px;
+  background:rgba(53,214,230,.12);color:var(--cyan);font:700 var(--fs-body) var(--sf-font);cursor:pointer;}
+.cw-create:hover,.cw-create:focus-visible{background:rgba(53,214,230,.2);outline:2px solid var(--cyan);outline-offset:2px;}
 .cw-hint{font-size:var(--fs-caption);color:var(--ink);border:1px dashed var(--line);border-radius:7px;padding:7px 9px;line-height:1.5;}
 .cw-list{display:flex;flex-direction:column;gap:6px;min-height:90px;}
 .cw-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;text-align:left;

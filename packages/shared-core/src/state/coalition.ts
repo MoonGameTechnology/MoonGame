@@ -5,10 +5,10 @@ import type { GameState, PlayerId } from './gameState';
  *
  * До неё коалицией называлась только союзная клика (`victory.ts`): у неё не было ни
  * имени, ни эмблемы, ни потолка, и любой мог собрать союз со всей картой. Теперь союз
- * (`alliance`) заключается ТОЛЬКО внутри коалиции: принятое предложение союза создаёт
- * коалицию (или вводит свободного игрока в чужую), выход из неё снимает союз со всеми
- * её членами. Так клика победы и состав коалиции совпадают по построению, а вместимость
- * держит сервер — ядро отбивает вступление сверх потолка.
+ * (`alliance`) заключается ТОЛЬКО внутри коалиции: игрок основывает её сам, принятое
+ * предложение союза создаёт коалицию или вводит свободного игрока в чужую. Выход из
+ * неё снимает союз со всеми её членами. Так клика победы и состав коалиции совпадают
+ * по построению, а вместимость держит сервер — ядро отбивает вступление сверх потолка.
  *
  * Здесь — чистые примитивы над `GameState.coalitions`; действия живут в
  * `modules/diplomacy.ts` (союз — ступень той же лестницы стоек).
@@ -17,7 +17,7 @@ import type { GameState, PlayerId } from './gameState';
 /** Одна коалиция. Состав отсортирован по id — порядок не зависит от истории вступлений. */
 export interface Coalition {
   id: string;
-  /** Кто принял первое предложение — для подписи коалиции в списке. */
+  /** Founder, or their successor after departure; used for the coalition's title. */
   founder: PlayerId;
   members: PlayerId[];
   /** Id эмблемы из {@link COALITION_EMBLEMS}. */
@@ -71,14 +71,14 @@ export function coalitionOf(state: GameState, playerId: PlayerId): Coalition | n
   return null;
 }
 
-/** Создать коалицию из двух игроков. Draft-мутатор. */
-export function foundCoalition(state: GameState, founder: PlayerId, other: PlayerId): Coalition {
+/** Found a singleton, or a pair after a mutually accepted alliance. Draft mutator. */
+export function foundCoalition(state: GameState, founder: PlayerId, other?: PlayerId): Coalition {
   const seq = (state.coalitionSeq ?? 0) + 1;
   state.coalitionSeq = seq;
   const c: Coalition = {
     id: `c${seq}`,
     founder,
-    members: [founder, other].sort(),
+    members: other === undefined || other === founder ? [founder] : [founder, other].sort(),
     emblem: COALITION_EMBLEMS[(seq - 1) % COALITION_EMBLEMS.length]!,
     description: '',
   };
@@ -94,19 +94,19 @@ export function addMember(state: GameState, coalitionId: string, playerId: Playe
 }
 
 /**
- * Вывести игрока из его коалиции. Возвращает тех, кто в ней остался (с ними союз
- * снимает вызывающий). Коалиция из одного человека распускается: союза в ней больше
- * нет, а чат коалиции появляется только у вступивших.
+ * Remove a member and return those who remain; the caller clears their treaties.
+ * Empty coalitions dissolve; a singleton persists and can invite new allies.
  */
 export function removeMember(state: GameState, playerId: PlayerId): PlayerId[] {
   const c = coalitionOf(state, playerId);
   if (!c) return [];
   const rest = c.members.filter((id) => id !== playerId);
-  if (rest.length < 2) {
+  if (rest.length === 0) {
     delete state.coalitions![c.id];
     if (Object.keys(state.coalitions!).length === 0) delete state.coalitions;
   } else {
     c.members = rest;
+    if (c.founder === playerId) c.founder = [...rest].sort()[0]!;
   }
   return rest;
 }

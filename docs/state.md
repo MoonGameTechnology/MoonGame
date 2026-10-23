@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 13278 зелёных** (8 skip; 1056 файлов прошли, 1 skip; PostgreSQL 16, 2026-10-23).
+**Тесты: 13156 зелёных** (160 skip; 1053 файла прошли, 6 skip; локально без PostgreSQL, 2026-10-23).
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -258,8 +258,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `hero.effect.*`: `aura`, `decoy`, `jump`, `recall`, `reveal`.
 - `diplomacy` — `diplomacy.declare/mapshare/decline`: к войне — сразу, к миру — по согласию
   (возможность `diplomacy.declareWar` — та же эскалация по раскрытию шпиона),
-  от чужого предложения можно отказаться; `coalition.leave/edit` — коалиция как сущность
-  (`state/coalition.ts`): принятый союз создаёт её или вводит в неё, вместимость — 15% мест
+  от чужого предложения можно отказаться; `coalition.create/leave/edit` — коалиция как
+  сущность (`state/coalition.ts`): активный человек вне командного режима создаёт её один,
+  принятый союз создаёт её или вводит в неё. Одиночка сохраняется, пустая распускается;
+  уходящий основатель передаёт подпись первому оставшемуся по id. Вместимость — 15% мест
   карты, не меньше двух (карта на 20 — 3), сверх неё ядро отбивает `E_COALITION_FULL`;
   `espionage` — `espionage.spy { planetId, op }`: агент уходит на МИР, операция длится 12 ч и
   решается против того, кто владеет миром в этот час; разведка (`recon`) открывает окно на
@@ -382,6 +384,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `hero.spawn`, `hero.ability`, `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`.
 - Флот: карточка `fleetCard.ts`, десант «кого и сколько» `troopsMenu.ts`, цепочка «◎ Приказ»
   `chainPlanner.ts` (`order.chain`); шаттлы — ангар `hangarPanel.ts`, эскадры `squadronPanel.ts`.
+- «Коалиции» (`coalitionWindow.ts`): «Создать коалицию» отправляет `coalition.create`;
+  карточка с эмблемой и описанием открывается после принятого состояния. Доступность —
+  `decisions/coalitionCreation.ts`; на телефоне окно доступно через «Ещё».
 - Обучение: подсветка `spotlight.ts`, гайд-матч без ботов на ×300 (`firstMatchTour.ts`,
   чек-лист `firstGoals.ts`), 10 разовых вводных `intros.ts`. Сводка «пока тебя не было» —
   `buildRecap` (`packages/shared-core/src/util/recap.ts`) над лентой `eventFeed.ts`.

@@ -122,8 +122,8 @@ function fixedPair(h: HandlerContext, a: PlayerId, b: PlayerId): boolean {
 
 export const diplomacyModule: GameModule = {
   id: 'diplomacy',
-  // 1.5.0: `declareWar` в возможности — война по раскрытию шпиона (SPY-11).
-  version: '1.5.0',
+  // 1.6.0: explicit coalition founding; single-member coalitions persist.
+  version: '1.6.0',
   setup(api) {
     api.provideCapability<DiplomacyCapability>('diplomacy', {
       getRelation: (state, a, b) => stanceToRelation(getStance(state, a, b)),
@@ -230,6 +230,23 @@ export const diplomacyModule: GameModule = {
       }
       setOffer(h.state, me, target, stance);
       h.emit('diplomacy.offered', { from: me, to: target, stance });
+    });
+
+    /** Found an independent coalition without granting a treaty or intel access. */
+    api.onAction('coalition.create', (action, h) => {
+      const actor = h.state.players[action.playerId];
+      if (
+        !coalitionsOn(h) ||
+        !actor ||
+        actor.status !== 'active' ||
+        actor.ai === true ||
+        actor.npc !== undefined ||
+        coalitionOf(h.state, action.playerId)
+      ) {
+        return h.reject('E_FORBIDDEN');
+      }
+      const c = foundCoalition(h.state, action.playerId);
+      h.emit('coalition.joined', { playerId: action.playerId, coalitionId: c.id });
     });
 
     /**
