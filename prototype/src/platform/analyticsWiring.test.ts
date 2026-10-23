@@ -26,6 +26,7 @@ const sites = [
   read('../main.ts'),
   read('../sectorProfile.ts'),
   read('../sectorZeroShell.ts'),
+  read('../matchLifecycle.ts'),
   read('../bootstrap.ts'),
   read('../signInPages.ts'),
   read('../matchBrowser.ts'),

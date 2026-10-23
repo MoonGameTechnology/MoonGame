@@ -34,7 +34,7 @@
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
-| REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
+| REFM-219 | ✅ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-244 | 🔒 | proto | `docs/backlog.md` | Точка сборки |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |

@@ -135,7 +135,8 @@ describe('профиль бота — сложность соперника', ()
     // У забега нет строки места — место в нём ровно одно (Рой) и выключить его нельзя,
     // — поэтому сложность пришла своей кнопкой рядом с запуском. Сторож по исходнику:
     // вернётся зашитый литерал, и кнопка станет декорацией, которая ничего не меняет.
-    const src = read('prototype/src/main.ts');
+    // Запуск забега — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+    const src = read('prototype/src/matchLifecycle.ts');
     const from = src.indexOf('function startPvEMatch');
     expect(from, 'startPvEMatch не найден — сторож ослеп').toBeGreaterThan(-1);
     const body = src.slice(from, src.indexOf('\n}', from));

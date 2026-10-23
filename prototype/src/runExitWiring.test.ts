@@ -19,6 +19,8 @@ const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 // Карточка ухода из забега — у оболочки Sector Zero (`sectorZeroShell.ts`, REFM-243).
 const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
+// ⌂, «Покинуть сессию» и дверь выхода — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
 
 /** Тело обработчика клика по элементу с этим id; `indent` — отступ слушателя в файле. */
 const handler = (id: string, src = SRC, indent = ''): string =>
@@ -28,7 +30,7 @@ const handler = (id: string, src = SRC, indent = ''): string =>
 
 describe('⌂ в экспедиции спрашивает, а не уходит молча', () => {
   it('живой тап по ⌂ в идущей экспедиции открывает выбор, а не уводит в меню', () => {
-    const body = handler('tomenu');
+    const body = handler('tomenu', LIFE, '  ');
     expect(body.length).toBeGreaterThan(200);
     expect(body).toMatch(/if \(ev\.isTrusted && runInProgress\(\)\) \{\s*openAbandon\('exit', \$\('tomenu'\)\);\s*return;\s*\}/);
     // Проверка стоит ДО ухода: иначе забег успел бы сохраниться и закрыться. Уход — дверь
@@ -36,7 +38,7 @@ describe('⌂ в экспедиции спрашивает, а не уходит
     const exit = body.indexOf('leaveMatch();');
     expect(exit).toBeGreaterThan(0);
     expect(body.indexOf("openAbandon('exit'")).toBeLessThan(exit);
-    expect(/function leaveMatch\(\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1]).toContain('saveRun();');
+    expect(/function leaveMatch\(\): void \{([\s\S]*?)\n\}/.exec(LIFE)?.[1]).toContain('saveRun();');
   });
 
   it('«В меню» уходит программным кликом — он не доверенный, поэтому карточка не открывается вновь', () => {
@@ -46,7 +48,7 @@ describe('⌂ в экспедиции спрашивает, а не уходит
   });
 
   it('выход с рельса и шеврон ‹ в экспедиции тоже спрашивают — на ПК ⌂ спрятан', () => {
-    const body = handler('rail-exit');
+    const body = handler('rail-exit', LIFE, '  ');
     expect(body).toMatch(/if \(runInProgress\(\)\) openAbandon\('exit'/);
     expect(body).toContain("else $('tomenu').click();");
     const chevron = handler('topback');

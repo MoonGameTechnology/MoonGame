@@ -417,6 +417,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `decisions/battleForecast.ts`, урон и бафы — `packages/shared-core/src/state/battleReadout.ts`.
 - Боковая панель выбора — `sidePanel.ts` (REFM-225): чья карточка открыта, лист с кэшем и
   дверью перерисовки, живые сроки, досье, нажатия по листу, окно деления, подъём камеры на телефоне.
+- Жизненный цикл матча — `matchLifecycle.ts` (REFM-219): установка любой партии гасит
+  состояние прошлой дверями владельцев, запуски схватки, забега, полигонов и сетевой партии,
+  выход одной дверью `leaveMatch`, уход с итогового экрана, ⌂ и «Покинуть сессию».
 - От 720 px — голографическая консоль ПК и планшета (`holographicUi.ts`, `holographic.css`,
   `bridge-shell.css`; окна переносит `floatingWindows.ts`, масштаб — `decisions/pcScale.ts`).
   Уже 720 px или ниже 520 px на сенсорном — телефон: `mobileHud.ts`, `mobile-*.css`.

@@ -267,6 +267,8 @@ describe('interaction — владелец выбора (REFM-208)', () => {
 describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const count = (needle: string): number => main.split(needle).length - 1;
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
 
   it('every row of the table has a caller: a dead row would be a lie', () => {
     // Ряд команд гасит прицелы у своего владельца (`cmdBar.ts`, REFM-226), а отмену
@@ -287,7 +289,8 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
 
   // Правило 8: соло и сеть меняют матч одной строкой — раньше это были два разных списка.
   it('a new match goes through the table in solo and in the network', () => {
-    expect(count("disarm('match', MOBILE)")).toBe(2);
+    expect(count("disarm('match', MOBILE)")).toBe(1); // впуск в сеть
+    expect(LIFE.split("disarm('match', game.mobile())").length - 1).toBe(1); // установка партии
   });
 
   it('the row buttons go through the table, not a hand-written preamble', () => {
