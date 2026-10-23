@@ -271,6 +271,8 @@ export const shareMap = (playerId: string, target: string, on: boolean) =>
 /** COAL-1: отказаться от предложения стойки, которое сделал `target`. */
 export const declineOffer = (playerId: string, target: string) =>
   act(playerId, 'diplomacy.decline', { target });
+/** Create a coalition before inviting another player. */
+export const createCoalition = (playerId: string) => act(playerId, 'coalition.create', {});
 /** COAL-1: выйти из своей коалиции. */
 export const leaveCoalition = (playerId: string) => act(playerId, 'coalition.leave', {});
 /** COAL-1: эмблема и описание своей коалиции. */

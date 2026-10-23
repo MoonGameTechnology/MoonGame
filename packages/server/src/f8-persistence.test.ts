@@ -274,14 +274,14 @@ describe('invariant #6 · module-manifest check on load', () => {
     await loaded?.dispose();
   });
 
-  it('refuses to load a match created under an older module manifest', async () => {
+  it.each(['ancient', '85'])('refuses a match created under older manifest %s', async (manifest) => {
     const store = new MemoryMatchStore();
     const receiptStore = new MemoryReceiptStore();
     const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
     const snap = snapshotOf(seed);
     await store.save({
       ...snap,
-      state: { ...snap.state, version: { ...snap.state.version, manifest: 'ancient' } },
+      state: { ...snap.state, version: { ...snap.state.version, manifest } },
     });
 
     let flagged: string | undefined;

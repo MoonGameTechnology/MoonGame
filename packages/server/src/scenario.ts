@@ -248,7 +248,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '85'; // COAL-1: коалиции. Членство и порядок не
+export const MODULE_MANIFEST_VERSION = '86'; // Explicit coalition founding; `diplomacy`
+// 1.6.0 preserves single-member coalitions and transfers a departing founder's title.
+// Membership/order and JSON shape are unchanged, but a match on 85 dissolved a
+// coalition when only one member remained and must not resume under different rules.
+// export const MODULE_MANIFEST_VERSION = '85'; // COAL-1: коалиции. Членство и порядок не
 // тронуты; `diplomacy` 1.4.0 — союз заключается только внутри коалиции (`state.coalitions`,
 // вместимость 15% мест), новые действия `diplomacy.decline`, `coalition.leave`,
 // `coalition.edit`. Партия на 84 собрала бы союз сверх потолка.

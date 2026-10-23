@@ -135,8 +135,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // MAPSHARE-1: договор об обмене картами — отдельное соглашение поверх лестницы
   // стоек (заключение по взаимному согласию, расторжение одностороннее).
   'diplomacy.mapshare': z.object({ target: id, on: z.boolean() }),
-  // COAL-1: отказ от предложения стойки, выход из коалиции, её эмблема и описание.
+  // Coalition founding, declined offers, membership and public presentation.
   'diplomacy.decline': z.object({ target: id }),
+  'coalition.create': z.object({}),
   'coalition.leave': z.object({}),
   'coalition.edit': z.object({
     emblem: id,

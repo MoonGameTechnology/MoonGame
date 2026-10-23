@@ -37,6 +37,7 @@ const CLIENT_ACTION_TYPES = [
   'diplomacy.declare',
   'diplomacy.decline',
   'diplomacy.mapshare',
+  'coalition.create',
   'coalition.edit',
   'coalition.leave',
   'espionage.spy',
@@ -127,6 +128,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['diplomacy.declare', { target: 'p2', stance: 'alliance' }], // friendly declare = an offer
       ['diplomacy.mapshare', { target: 'p2', on: true }], // MAPSHARE-1: предложить/принять
       ['diplomacy.mapshare', { target: 'p2', on: false }], // расторгнуть / отозвать
+      ['coalition.create', {}],
       ['espionage.spy', { planetId: 'home_b', op: 'recon' }],
       ['espionage.spy', { planetId: 'home_b', op: 'sabotage' }],
       ['espionage.spy', { planetId: 'home_b', op: 'research' }],
