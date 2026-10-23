@@ -124,7 +124,6 @@ import {
   capitalOf,
   type SetupConfig,
   buySupply,
-  abandonRun,
   type AiProfile,
 } from './game';
 import {
@@ -178,11 +177,10 @@ import {
   type Squadron,
   type ShuttleStrike,
   traderOf,
-  extractionNeedMs,
   type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import { createBattleModel } from '../../packages/client/src/index';
-import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeId, provingGroundState, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { pveModeId, pveChapter, trainingState, trainingModeId, provingGroundState, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
 import { bakedServer, buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
@@ -225,29 +223,21 @@ import { tokenFor } from '../../decisions/sessionStore';
 import { signOutEverywhere } from './accountSession';
 import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
-import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
 import { initMissionPanel } from './missionPanel';
-import { bossTask } from '../../decisions/runBoss';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
-import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
 import { createComicQueue } from './comicQueue';
 import { CHAPTER_COMICS } from './comicArt';
 import type { ComicRegistry } from '../../decisions/chapterComics';
 import {
-  SECTOR_ZERO_ABSENT_HUD,
-  SECTOR_ZERO_ABSENT_TOOLS,
-  SECTOR_ZERO_ABSENT_TWINS,
   toolShown,
   victoryPointsShown,
-  type SessionTool,
 } from '../../decisions/sectorZeroTools';
 import {
   changeSectorProgress,
-  chapterShown,
   chapterWorld,
   initSectorProfile,
   pushCloud,
@@ -257,15 +247,20 @@ import {
 import {
   awardSectorRun,
   beginAttempt,
-  chapterForSettle,
   enterRun,
+  fleetLabelOf,
   forgetSavedRun,
   initSectorRun,
   isSectorZeroRun,
   isTraining,
   leaveRun,
+  markGameplay,
   pveDifficulty,
+  runChain,
   runInProgress,
+  runMissionRows,
+  runPauseEvent,
+  runPauseShown,
   runShipLoadouts,
   runWrite,
   saveRun,
@@ -273,15 +268,21 @@ import {
   sectorDevActive,
   sectorMission,
   sectorRunActive,
+  sectorZeroToolsHidden,
   setRunActive,
+  tickGameplayMark,
   tickRunSave,
 } from './sectorRun';
 import {
+  closeAbandon,
   initSectorZeroShell,
+  openAbandon,
   openSectorZero,
   playChapterComic,
   playTaskComic,
   sectorZeroMenu,
+  syncSectorZeroTools,
+  tickAbandon,
   watchAd,
 } from './sectorZeroShell';
 import {
@@ -300,10 +301,8 @@ import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
 import {
   changeSectorZeroProgress,
   prepareSectorZeroRun,
-  abandonRunReward,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
-import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import { syncCommanderXp } from './commanderSync';
 import { cardCovers } from './panelSlack';
 import { frontierOutline } from './frontierOutline';
@@ -336,7 +335,7 @@ import {
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
-import { buildingDossier, createDossiers, unitTitle } from './dossiers';
+import { buildingDossier, createDossiers } from './dossiers';
 import {
   META_TREE,
   META_BRANCH_RU,
@@ -391,7 +390,7 @@ import { initMarket } from './marketScreen';
 import { initTrader } from './traderScreen';
 import { initAllyScreen } from './allyScreen';
 import { linkedAlly } from '../../decisions/allyPanel';
-import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
+import { extractionCandidates } from '../../decisions/chapterChain';
 import { captiveLoad, extractionStart } from '../../decisions/actions';
 import { captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
@@ -953,77 +952,6 @@ if (typeof ResizeObserver !== 'undefined')
   }).observe(side);
 const logEl = $('log');
 const logPendEl = $('log-pending');
-// «Флот потерян» / «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): без флота
-// игрок минутами смотрел, как Рой штурмует его планету. Карточка встаёт в кадре, когда кораблей
-// стало ноль (`decisions/fleetLost.ts`), и та же открывается кнопкой рельса в любой момент
-// забега. «Завершить» — хостовое `pve.abandon`: поражение ставит ядро, итоги и награду считает
-// обычный конец забега (`tickRunSave`). Фокус — на «остаться»: сдача необратима.
-const abandonCard = $('abandon');
-const railAbandon = $('rail-abandon');
-let abandonOpener: HTMLElement | null = null;
-/** Счёт кораблей прошлого кадра забега; `null` — вне забега, чтобы вход не поднял карточку. */
-let lastRunShips: number | null = null;
-/** Повод карточки: флот потерян, ⚑ «Завершить» или ⌂ «Выйти» (решение владельца 2026-09-26:
- *  ⌂ в экспедиции спрашивает — в меню с сохранением или завершить и забрать награду). */
-type AbandonReason = 'lost' | 'ask' | 'exit';
-const ABANDON_TEXT: Record<AbandonReason, { title: string; text: string; stay: string; go: string }> = {
-  lost: { title: 'run.abandon.lost.title', text: 'run.abandon.lost.text', stay: 'run.abandon.rebuild', go: 'run.abandon.go' },
-  ask: { title: 'run.abandon.ask.title', text: 'run.abandon.ask.text', stay: 'run.abandon.back', go: 'run.abandon.go' },
-  exit: { title: 'run.exit.title', text: 'run.exit.text', stay: 'run.abandon.back', go: 'run.exit.go' },
-};
-function openAbandon(reason: AbandonReason, opener: HTMLElement | null = null): void {
-  const txt = ABANDON_TEXT[reason];
-  const exit = reason === 'exit';
-  $('abandon-title').textContent = t(txt.title);
-  // Сколько заберёт «Завершить» (решение владельца 2026-09-26) — та же формула, что засчёт
-  // после сдачи. Стенд разработчика не платит (`awardSectorRun`), и обещать там нечего.
-  const reward = $('abandon-reward');
-  reward.hidden = sectorDevActive;
-  const r = sectorDevActive
-    ? { research: 0, warrants: 0 }
-    : abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data);
-  if (!sectorDevActive) reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
-  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
-  // там, где его предложат: без рекламы или без награды обещать удвоение значило бы соврать.
-  const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);
-  $('abandon-text').textContent = exit && promise.double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
-  $('abandon-stay').textContent = t(txt.stay);
-  // «Завершить и забрать награду» без награды — просто «Завершить экспедицию».
-  $('abandon-go').textContent = t(exit && !promise.collect ? 'run.abandon.go' : txt.go);
-  $('abandon-menu').hidden = !exit;
-  abandonCard.classList.toggle('exit', exit);
-  abandonOpener = opener;
-  abandonCard.classList.add('show');
-  $('abandon-stay').focus({ preventScroll: true });
-}
-function closeAbandon(): void {
-  abandonCard.classList.remove('show');
-  abandonOpener?.focus({ preventScroll: true });
-  abandonOpener = null;
-}
-railAbandon.addEventListener('click', () => openAbandon('ask', railAbandon));
-$('abandon-stay').addEventListener('click', closeAbandon);
-// «В меню» — тот же выход, что ⌂ вне экспедиции: забег сохраняется, продолжить можно позже.
-// Программный `.click()` не доверенный, поэтому ⌂ не спросит второй раз.
-$('abandon-menu').addEventListener('click', () => {
-  closeAbandon();
-  $('tomenu').click();
-});
-$('abandon-go').addEventListener('click', () => {
-  closeAbandon();
-  if (runInProgress()) playerOrder(abandonRun(ME));
-});
-/** Кадровый такт карточки: кнопка рельса живёт, пока идёт забег; карточка встаёт на переходе
- *  к нулю кораблей и уходит сама, если забег кончился иначе. */
-function tickAbandon(): void {
-  const live = inMatch() && runInProgress();
-  const ships = live ? shipCount(s, ME, data) : null;
-  if (ships !== null && fleetLostPrompt(lastRunShips, ships)) openAbandon('lost');
-  lastRunShips = ships;
-  const shown = live ? '' : 'none';
-  if (railAbandon.style.display !== shown) railAbandon.style.display = shown;
-  if (!live && abandonCard.classList.contains('show')) closeAbandon();
-}
 const topEl = $('top');
 const bannerEl = $('banner');
 let lastBannerHtml = ''; // dirty-check so the banner's restart button isn't recreated each frame
@@ -4248,7 +4176,7 @@ const BACK_LAYERS: BackLayer[] = [
   // необратимое действие на аппаратную кнопку нельзя.
   { id: 'warprompt', isOpen: orderPromptOpen, close: () => cancelWarPrompt() }, // z48
   // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
-  { id: 'abandon', isOpen: () => abandonCard.classList.contains('show'), close: () => closeAbandon() }, // z48
+  { id: 'abandon', isOpen: () => shown('abandon'), close: () => closeAbandon() }, // z48
   { id: 'pushask', isOpen: () => push?.asking() ?? false, close: () => push?.dismiss() }, // z48
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
@@ -4535,57 +4463,15 @@ initSectorRun({
   trainingWon: () => playChapterComic('training-1', 'outro', () => {}),
   finalScenes: () => playTaskComic(runMissionRows(), runChain()),
   chapterWon: () => playChapterComic(pveChapter(sectorMission).id, 'outro', () => {}),
+  playing: () => speed > 0 && !comicQueue.isBusy(),
+  speed: () => speed,
+  setSpeed: (next) => {
+    // Возобновление не нагоняет время паузы — как у соло-сохранения.
+    if (speed <= 0 && next > 0) lastReal = performance.now();
+    speed = next;
+  },
+  playSpeed: () => Number($('spd-play').dataset.speed),
 });
-
-/**
- * Разметка геймплея для площадки — одна дверь на все её поводы (`YAG-1.2a`, `YAG-6.2`).
- * «Геймплей идёт» = забег идёт И мир не стоит: пауза игрока, уход со страницы и выход в
- * меню забега останавливают его так же, как конец забега. Раньше разметку знал только
- * флаг забега, и после выхода в меню индикатор площадки оставался зелёным.
- *
- * Зовётся из сеттера забега (`setRunActive`, хук `runChanged`) и из кадра — при смене
- * ответа: темп мира меняют больше десятка мест (полоса скорости, кнопка паузы, запуск и
- * восстановление), и поставить вызов в каждое — значит однажды забыть одно. Повторы гасит
- * адаптер (`decisions/platformLifecycle`).
- *
- * Площадка берётся через `getPlatform()`, а не через модульный `const platform` ниже:
- * сеттер забега зовут и ВЫШЕ по файлу, и обращение к константе из функции, вызванной до её
- * инициализации, упало бы на временной мёртвой зоне.
- */
-let gameplayMarked: boolean | null = null;
-function markGameplay(): void {
-  const playing = sectorRunActive && speed > 0 && !comicQueue.isBusy();
-  gameplayMarked = playing;
-  const api = getPlatform() as Partial<PlatformHost>;
-  if (playing) api.gameplayStart?.();
-  else api.gameplayStop?.();
-}
-
-/** Идёт ли забег Sector Zero — для ИНТЕРФЕЙСА. Не `isSectorZeroRun()`: тот ждёт ещё и
- *  секцию `s.pve`, а она появляется позже, чем `setRunActive(true)`, — синхронизация на
- *  нём видела «не забег» и оставляла кнопки (поймал `sectorzerotest.mjs`). Флаг же ставят
- *  только забеги Sector Zero. */
-function sectorZeroToolsHidden(): boolean {
-  return sectorRunActive && !NET;
-}
-/** PVR-6.1: мультиплеерных кнопок рельса в забеге Sector Zero нет — чат, почта, маркеры,
- *  корпорация, рынок, «Сон» (`decisions/sectorZeroTools.ts`). Флаг забега меняется только
- *  через `setRunActive`, поэтому синхронизацию зовёт он (хук `runChanged`) и возвращает
- *  кнопки на выходе. */
-function syncSectorZeroTools(): void {
-  const run = sectorZeroToolsHidden();
-  for (const [tool, id] of Object.entries(SECTOR_ZERO_ABSENT_TOOLS)) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = toolShown(tool as SessionTool, run) ? '' : 'none';
-  }
-  // Эмблема с названием и местом, очки победы, день шапки и «Производство» — тоже не про
-  // забег (решения владельца 2026-09-24 и 2026-09-26).
-  for (const [field, id] of Object.entries(SECTOR_ZERO_ABSENT_HUD)) {
-    const twin = SECTOR_ZERO_ABSENT_TWINS[field as keyof typeof SECTOR_ZERO_ABSENT_HUD];
-    for (const el of [id, twin].map((x) => (x ? document.getElementById(x) : null)))
-      if (el) el.style.display = run ? 'none' : '';
-  }
-}
 
 /** Уход из матча ведёт в меню Sector Zero — из забега и из полигона, а не в хаб. */
 function leavesToSectorZero(): boolean {
@@ -4607,16 +4493,6 @@ initSectorProfile({
   saveFailing: saveWarning,
 });
 
-/** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
-function runMissionRows(): MissionRow[] {
-  if (isTraining()) return missionRows(trainingObjectives(), s, ME);
-  const chapter = pveChapter(sectorMission);
-  const rows = missionRows(chapterShown(sectorMission), s, ME, chapter.slots?.base);
-  // Босс — своя задача, пока он на поле или пал в этом забеге (PVR-4.7, `runBoss.ts`).
-  const boss = bossTask(s);
-  return boss ? [...rows, bossMissionRow(boss)] : rows;
-}
-
 // --- панель задач забега (заказ владельца 2026-09-24) ---------------------------------
 // Разметка и клики — `missionPanel.ts`; здесь только проводка к камере и чипу.
 const missionPanel = initMissionPanel({
@@ -4635,24 +4511,6 @@ const missionPanel = initMissionPanel({
     if (playerOrder(captiveLoad(ME, fleetId))) note(t('captive.carrier-warning'));
   },
 });
-
-/** Подпись флота для кнопки «Извлечь флотом …»: его корабли, «2× Крейсер, 1× Фрегат». */
-function fleetLabelOf(fleetId: string): string {
-  const f = s.fleets[fleetId];
-  if (!f) return fleetId;
-  return f.units
-    .filter((u) => u.count > 0)
-    .map((u) => `${u.count}× ${unitTitle(u.unit)}`)
-    .join(', ');
-}
-
-/** Главная цепочка главы: IV (PVR-7.5) — связь → архив → накопитель → вывод; V (PVR-9.7) —
- *  звено сети → очаги; VI (PVR-8.5) — доки → эвакуация → очаги → главные силы. `null` — в этой
- *  главе цепочки нет. Доля работы — под темп матча (`extractionNeedMs` ядра). */
-function runChain(): ChapterStep[] | null {
-  if (!sectorRunActive) return null;
-  return chapterChain(s, ME, extractionNeedMs(s, ctx(s.time, s)), data);
-}
 
 // Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
 // (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
@@ -4710,6 +4568,7 @@ initSectorZeroShell({
   },
   openSettings,
   note,
+  inMatch,
 });
 
 // Часы забега (решение владельца 2026-09-24): пока забег на экране, отсчёты и сроки —
@@ -4890,7 +4749,7 @@ function frame(nowReal: number) {
   if (isTraining()) tickTrainingScenario(trainingScenarioHost);
   else hideTrainingBoard(document.getElementById('trnraid'));
   tickSoloSave(nowReal);
-  if (gameplayMarked !== (sectorRunActive && speed > 0 && !comicQueue.isBusy())) markGameplay();
+  tickGameplayMark();
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   tickAbandon();
@@ -5175,35 +5034,9 @@ addEventListener('visibilitychange', () => {
 
 // --- пауза забега (YAG-6.2) ---------------------------------------------------
 // Резолюция владельца 2026-09-24: мир забега ЗАМИРАЕТ, пока игрока нет, и у игрока есть
-// кнопка паузы на любом устройстве. Правила — `decisions/runPause.ts`; здесь только
-// проводка: кнопка в строке забега, уход со страницы и пауза площадки.
-/** С каким темпом продолжить после паузы — обычным или ускоренным, как шли до неё. */
-let runResumeSpeed = 0;
-/** Паузу поставила площадка — её «продолжить» и снимет. */
-let runPlatformHeld = false;
-/** Кнопка паузы есть, пока идёт забег Sector Zero, — не сетевой и не законченный. */
-function runPauseShown(): boolean {
-  return sectorRunActive && !NET && s.match.status !== 'ended';
-}
-function runPauseEvent(event: RunPauseEvent): void {
-  if (!runPauseShown()) return;
-  const next = runPauseStep(
-    {
-      speed,
-      resumeSpeed: runResumeSpeed || Number($('spd-play').dataset.speed),
-      platformHeld: runPlatformHeld,
-    },
-    event,
-  );
-  // Возобновление не нагоняет время паузы — как у соло-сохранения.
-  if (speed <= 0 && next.speed > 0) lastReal = performance.now();
-  speed = next.speed;
-  runResumeSpeed = next.resumeSpeed;
-  runPlatformHeld = next.platformHeld;
-  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
-    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
-  markGameplay();
-}
+// кнопка паузы на любом устройстве. Правила — `decisions/runPause.ts`, память паузы и её
+// применение — у забега (`sectorRun.ts`, REFM-243); здесь только поводы: уход со страницы и
+// пауза площадки.
 addEventListener('pagehide', () => runPauseEvent('hidden'));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') runPauseEvent('hidden');

@@ -87,7 +87,7 @@
 | REFM-240 | ✅ | proto | `docs/backlog.md` | Конвейер приказа |
 | REFM-241 | ✅ | proto | `docs/backlog.md` | Экран загрузки карты |
 | REFM-242 | ✅ | proto | `docs/backlog.md` | Запросы к миру и очередь стройки |
-| REFM-243 | ⏳ | proto | `docs/backlog.md` | Остатки Sector Zero |
+| REFM-243 | ✅ | proto | `docs/backlog.md` | Остатки Sector Zero |
 | REFM-244 | 🔒 | proto | `docs/backlog.md` | Точка сборки |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |

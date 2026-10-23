@@ -22,6 +22,7 @@ import {
   pveState,
 } from '../../packages/client/src/gameData';
 import type { GameState } from '../../packages/shared-core/src/index';
+import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import type { ChapterStep } from '../../decisions/chapterChain';
 import {
@@ -45,7 +46,18 @@ import {
   localShopDay,
   shopCapabilities,
 } from '../../decisions/sectorZeroShop';
-import { REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD } from '../../decisions/sectorZeroProgress';
+import {
+  abandonRunReward,
+  REPAIR_HP_PER_SOVEREIGN,
+  WARRANTS_PER_REWARD,
+} from '../../decisions/sectorZeroProgress';
+import {
+  SECTOR_ZERO_ABSENT_HUD,
+  SECTOR_ZERO_ABSENT_TOOLS,
+  SECTOR_ZERO_ABSENT_TWINS,
+  type SessionTool,
+  toolShown,
+} from '../../decisions/sectorZeroTools';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { COMIC_TRIGGERS } from './comicArt';
@@ -53,7 +65,8 @@ import type { ComicPlayer } from './comicPlayer';
 import type { createComicQueue } from './comicQueue';
 import { detach } from './detach';
 import { displayUnit } from './format';
-import { data } from './game';
+import { abandonRun, data } from './game';
+import { playerOrder } from './orderPipeline';
 import { getPlatform } from './platform/host';
 import { initRunWallet } from './runWallet';
 import {
@@ -67,6 +80,7 @@ import {
   sectorZeroAccount,
 } from './sectorProfile';
 import {
+  chapterForSettle,
   chooseDifficulty,
   chooseMission,
   isSectorZeroRun,
@@ -76,8 +90,10 @@ import {
   nextSectorMission,
   resetSectorZero,
   restoreRun,
+  runInProgress,
   sectorDevActive,
   sectorMission,
+  sectorZeroToolsHidden,
 } from './sectorRun';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
@@ -113,6 +129,8 @@ export interface SectorZeroShellHost {
   back(): void;
   openSettings(): void;
   note(text: string): void;
+  /** На экране партия, а не меню: кнопка «Завершить» живёт только в идущем забеге. */
+  inMatch(): boolean;
 }
 
 let game: SectorZeroShellHost;
@@ -150,6 +168,20 @@ export async function watchAd(
 export function initSectorZeroShell(hooks: SectorZeroShellHost): void {
   game = hooks;
   const platform = getPlatform();
+  abandonCard = $('abandon');
+  railAbandon = $('rail-abandon');
+  railAbandon.addEventListener('click', () => openAbandon('ask', railAbandon));
+  $('abandon-stay').addEventListener('click', closeAbandon);
+  // «В меню» — тот же выход, что ⌂ вне экспедиции: забег сохраняется, продолжить можно позже.
+  // Программный `.click()` не доверенный, поэтому ⌂ не спросит второй раз.
+  $('abandon-menu').addEventListener('click', () => {
+    closeAbandon();
+    $('tomenu').click();
+  });
+  $('abandon-go').addEventListener('click', () => {
+    closeAbandon();
+    if (runInProgress()) playerOrder(abandonRun(game.me()));
+  });
 
   sectorPreparation = initSectorZeroPreparation({
     data,
@@ -436,4 +468,105 @@ export function openSectorZero(preparation = false, replay = false): void {
       }
     }),
   );
+}
+
+/** Узел разметки по id: карточка ухода и инструменты экрана живут в статичной разметке. */
+const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
+
+// «Флот потерян» / «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): без флота
+// игрок минутами смотрел, как Рой штурмует его планету. Карточка встаёт в кадре, когда кораблей
+// стало ноль (`decisions/fleetLost.ts`), и та же открывается кнопкой рельса в любой момент
+// забега. «Завершить» — хостовое `pve.abandon`: поражение ставит ядро, итоги и награду считает
+// обычный конец забега (`tickRunSave`). Фокус — на «остаться»: сдача необратима.
+let abandonCard: HTMLElement;
+let railAbandon: HTMLElement;
+let abandonOpener: HTMLElement | null = null;
+/** Счёт кораблей прошлого кадра забега; `null` — вне забега, чтобы вход не поднял карточку. */
+let lastRunShips: number | null = null;
+/** Повод карточки: флот потерян, ⚑ «Завершить» или ⌂ «Выйти» (решение владельца 2026-09-26:
+ *  ⌂ в экспедиции спрашивает — в меню с сохранением или завершить и забрать награду). */
+export type AbandonReason = 'lost' | 'ask' | 'exit';
+const ABANDON_TEXT: Record<
+  AbandonReason,
+  { title: string; text: string; stay: string; go: string }
+> = {
+  lost: {
+    title: 'run.abandon.lost.title',
+    text: 'run.abandon.lost.text',
+    stay: 'run.abandon.rebuild',
+    go: 'run.abandon.go',
+  },
+  ask: {
+    title: 'run.abandon.ask.title',
+    text: 'run.abandon.ask.text',
+    stay: 'run.abandon.back',
+    go: 'run.abandon.go',
+  },
+  exit: {
+    title: 'run.exit.title',
+    text: 'run.exit.text',
+    stay: 'run.abandon.back',
+    go: 'run.exit.go',
+  },
+};
+export function openAbandon(reason: AbandonReason, opener: HTMLElement | null = null): void {
+  const txt = ABANDON_TEXT[reason];
+  const exit = reason === 'exit';
+  $('abandon-title').textContent = t(txt.title);
+  // Сколько заберёт «Завершить» (решение владельца 2026-09-26) — та же формула, что засчёт
+  // после сдачи. Стенд разработчика не платит (`awardSectorRun`), и обещать там нечего.
+  const reward = $('abandon-reward');
+  reward.hidden = sectorDevActive;
+  const r = sectorDevActive
+    ? { research: 0, warrants: 0 }
+    : abandonRunReward(sectorProgress, game.world(), chapterForSettle(sectorMission), data);
+  if (!sectorDevActive) reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
+  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
+  // там, где его предложат: без рекламы или без награды обещать удвоение значило бы соврать.
+  const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);
+  $('abandon-text').textContent =
+    exit && promise.double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
+  $('abandon-stay').textContent = t(txt.stay);
+  // «Завершить и забрать награду» без награды — просто «Завершить экспедицию».
+  $('abandon-go').textContent = t(exit && !promise.collect ? 'run.abandon.go' : txt.go);
+  $('abandon-menu').hidden = !exit;
+  abandonCard.classList.toggle('exit', exit);
+  abandonOpener = opener;
+  abandonCard.classList.add('show');
+  $('abandon-stay').focus({ preventScroll: true });
+}
+export function closeAbandon(): void {
+  abandonCard.classList.remove('show');
+  abandonOpener?.focus({ preventScroll: true });
+  abandonOpener = null;
+}
+/** Кадровый такт карточки: кнопка рельса живёт, пока идёт забег; карточка встаёт на переходе
+ *  к нулю кораблей и уходит сама, если забег кончился иначе. */
+export function tickAbandon(): void {
+  const live = game.inMatch() && runInProgress();
+  const ships = live ? shipCount(game.world(), game.me(), data) : null;
+  if (ships !== null && fleetLostPrompt(lastRunShips, ships)) openAbandon('lost');
+  lastRunShips = ships;
+  const shown = live ? '' : 'none';
+  if (railAbandon.style.display !== shown) railAbandon.style.display = shown;
+  if (!live && abandonCard.classList.contains('show')) closeAbandon();
+}
+
+/** PVR-6.1: мультиплеерных кнопок рельса в забеге Sector Zero нет — чат, почта, маркеры,
+ *  корпорация, рынок, «Сон» (`decisions/sectorZeroTools.ts`). Флаг забега меняется только
+ *  через `setRunActive`, поэтому синхронизацию зовёт он (хук `runChanged`) и возвращает
+ *  кнопки на выходе. */
+export function syncSectorZeroTools(): void {
+  const run = sectorZeroToolsHidden();
+  for (const [tool, id] of Object.entries(SECTOR_ZERO_ABSENT_TOOLS)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = toolShown(tool as SessionTool, run) ? '' : 'none';
+  }
+  // Эмблема с названием и местом, очки победы, день шапки и «Производство» — тоже не про
+  // забег (решения владельца 2026-09-24 и 2026-09-26).
+  for (const [field, id] of Object.entries(SECTOR_ZERO_ABSENT_HUD)) {
+    const twin = SECTOR_ZERO_ABSENT_TWINS[field as keyof typeof SECTOR_ZERO_ABSENT_HUD];
+    for (const el of [id, twin].map((x) => (x ? document.getElementById(x) : null)))
+      if (el) el.style.display = run ? 'none' : '';
+  }
 }
