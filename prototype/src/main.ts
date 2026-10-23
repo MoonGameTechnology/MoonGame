@@ -381,6 +381,7 @@ import { reframePresentation } from './holographicLayout';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 import { initRegistrationReward } from './registrationReward';
+import { initTutorialMedal } from './tutorialMedal';
 import { PORTRAITS } from './profileArt';
 import { parseAppearance } from '../../packages/protocol/src/playerProfile';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -493,8 +494,10 @@ import {
 // пройденного обучения, ведомый первый матч, цели первой сессии.
 import {
   activeTour,
+  forgetLesson,
   initGuideFlow,
   launchTour,
+  lessonRunning,
   loadOnboard,
   maybeStartPendingTour,
   setPendingGuide,
@@ -1358,7 +1361,8 @@ initOrderPipeline({
 
 // Обучение — у владельца, `guideFlow.ts` (REFM-221): лаунчер туров, флаг «обучение
 // пройдено», ведомый первый матч и список целей первой сессии. Отсюда — мир, своё место,
-// позывной, раскладка, мета-прогресс, переходы хаба и старт партии.
+// позывной, раскладка, мета-прогресс, переходы хаба, старт партии, лист телефона, рынок и
+// медаль за обучение.
 initGuideFlow({
   world: () => s,
   me: () => ME,
@@ -1370,6 +1374,11 @@ initGuideFlow({
   showHub,
   showConnect: (show) => showConnect(show), // объявлен ниже, у экрана входа
   startMatch,
+  sheetExpanded: (key) => mobileHud.expanded(key),
+  collapseSheet: () => mobileHud.collapse(),
+  refreshSheet: () => updateMobileHud(),
+  openMarket: (good) => market?.open(good),
+  tutorialEnded: (run) => tutorialMedal?.award(run), // объявлена ниже, у наград хаба
   devUi: () => DEV_UI,
 });
 
@@ -2200,6 +2209,7 @@ initTopBar({
   mobile: () => MOBILE,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,
+  lessonSpeed: lessonRunning,
   phoneSpeed: () => phoneSpeed,
   phoneBadges: (battles, unread) => phoneNav.badges(battles, unread),
   allyPulsing: () => performance.now() < allyPulseUntil,
@@ -3172,6 +3182,13 @@ if (!__SECTOR_ZERO_ONLY__) registrationReward = initRegistrationReward({
   authorizedBase: hubAuthorizedBase,
   changed: async () => { await Promise.all([syncProfileAppearance(), syncCommanderFromServer()]); },
 });
+// The tutorial medal: earned on this device per callsign, carried into the account profile.
+const tutorialMedal = __SECTOR_ZERO_ONLY__
+  ? null
+  : initTutorialMedal({
+      key: () => 'vd.medal.tutorial.' + (nickInput.value.trim() || 'guest'),
+      authorizedBase: hubAuthorizedBase,
+    });
 function profileKey(): string {
   return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
 }
@@ -3259,6 +3276,7 @@ function openHub(note = ''): void {
   detach('хаб: портрет аккаунта', syncProfileAppearance());
   detach('account deletion capability', refreshAccountDeletion());
   if (registrationReward) detach('registration reward', registrationReward.show());
+  if (tutorialMedal) detach('tutorial medal claim', tutorialMedal.claim());
 }
 
 // Страницы входа — у своего владельца (`signInPages.ts`, REFM-218): приветствие и вход
@@ -3663,6 +3681,7 @@ function saveMeta(st: MetaState): void {
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
   leaveNetwork(); // свой мир — уже не сетевая партия: гаснут и дозвон, и признак серверного мира
   leaveSolo();
+  forgetLesson(); // startGuidedMatch raises it again after its own install
   stopSim(); // поток считал мир прошлого матча
   forgetAutoAssault();
   leaveRun();
@@ -3730,8 +3749,12 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
-function startMatch(setup: SetupConfig, persist = true): void {
-  const st = newGame(setup);
+function startMatch(
+  setup: SetupConfig,
+  persist = true,
+  scenario: (st: GameState) => GameState = (st) => st,
+): void {
+  const st = scenario(newGame(setup));
   // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
   // Политика локального хоста хранится рядом с миром в одиночном сохранении.
   const profiles = new Map<string, AiProfile>();

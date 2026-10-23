@@ -40,7 +40,12 @@ import p39 from '../../docs/mockups/player-profile/assets/portrait-39.webp';
 import p40 from '../../docs/mockups/player-profile/assets/portrait-40.webp';
 import medals from '../../docs/mockups/player-profile/assets/medals.webp';
 import contribution from '../assets/contribution-medal.svg';
-export const CONTRIBUTION_MEDAL = contribution;
+import tutorial from '../assets/tutorial-medal.svg';
+// The build inlines an SVG as a percent-encoded data URL that keeps its quote marks, and
+// these URLs go into HTML attributes and CSS url('…'): both quotes are encoded as well.
+const quoteSafe = (url: string): string => url.replace(/"/g, '%22').replace(/'/g, '%27');
+export const CONTRIBUTION_MEDAL = quoteSafe(contribution);
+export const TUTORIAL_MEDAL = quoteSafe(tutorial);
 export const PORTRAITS = [
   p1,
   p2,

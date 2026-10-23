@@ -102,6 +102,18 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     await deps.profiles.save(who.accountId, appearance);
     return view(who.accountId, user.login);
   });
+  // The tutorial is played on the device, out of the server's sight: the claim names no
+  // count, the credit is a fixed 1 once per account, and it grants no XP or currency.
+  app.post('/profiles/rewards/tutorial', { bodyLimit: 64 }, async (request, reply) => {
+    if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    const who = await deps.identify(request);
+    if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+    await deps.profiles.credit(`tutorial:${who.accountId}`, [
+      { accountId: who.accountId, progress: { tutorial: 1 } },
+    ]);
+    reply.header('cache-control', 'no-store');
+    return { medalId: 'tutorial' };
+  });
   if (deps.registrationRewards) {
     const rewards = deps.registrationRewards;
     app.get('/profiles/rewards/registration', async (request, reply) => {

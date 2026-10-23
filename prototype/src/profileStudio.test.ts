@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { defaultAppearance, type PlayerProfile } from '../../packages/protocol/src/playerProfile';
 import { profileSaveBarHtml, profileStudioHtml, type StudioState } from './profileStudio';
 import { setLocale } from '../../localization/runtime';
+import { TUTORIAL_MEDAL } from './profileArt';
+import { tutorialMedalHtml } from './tutorialMedal';
 
 const state: StudioState = {
   owner: true,
@@ -103,10 +105,31 @@ describe('profile tabs, collection order and save bar (UIX-15.3)', () => {
       (m) => m[1],
     );
     expect(order[0]).toBe('service');
-    expect(order).toHaveLength(13);
+    expect(order).toHaveLength(14);
     const card = /<button data-medal="service"[^>]*>/.exec(profileStudioHtml(veteran, state))?.[0];
     expect(card).toContain('--p:25%'); // 25 of the 100 matches for grade II
     expect(card).not.toContain('locked');
+  });
+
+  it('the tutorial medal wears its own art and opens with the course', () => {
+    const graduate = { ...profile, progress: { tutorial: 1 } };
+    const card =
+      /<button data-medal="tutorial".*?<\/button>/.exec(profileStudioHtml(graduate, state))?.[0] ??
+      '';
+    expect(card).toContain(TUTORIAL_MEDAL);
+    expect(card).not.toContain('<i>');
+    expect(card).not.toContain('locked');
+    const locked = /<button data-medal="tutorial"[^>]*>/.exec(
+      profileStudioHtml(profile, state),
+    )?.[0];
+    expect(locked).toContain('locked');
+    for (const locale of ['en', 'ru'] as const) {
+      setLocale(locale);
+      const win = tutorialMedalHtml('later');
+      expect(win).toContain(TUTORIAL_MEDAL);
+      expect(win).not.toMatch(/profile\.(tutorial|medal)\./);
+      expect(tutorialMedalHtml('saving')).toMatch(/role="status" aria-live="polite"><\/p>/);
+    }
   });
 
   it('the save bar exists only for the owner with unsaved changes', () => {

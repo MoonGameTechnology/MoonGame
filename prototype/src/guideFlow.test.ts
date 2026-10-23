@@ -136,6 +136,11 @@ async function load(world: () => GameState) {
     showHub: (show) => env.calls.push(`hub:${show}`),
     showConnect: (show) => env.calls.push(`connect:${show}`),
     startMatch: (setup, persist) => env.calls.push(`start:${JSON.stringify(setup)}:${persist}`),
+    sheetExpanded: () => false,
+    collapseSheet: () => {},
+    refreshSheet: () => {},
+    openMarket: (good) => env.calls.push(`market:${good}`),
+    tutorialEnded: (run) => env.calls.push(`medal:${run.completed}:${run.assaultWon}`),
     devUi: () => false,
   });
   return guide;
@@ -245,6 +250,7 @@ describe('REFM-221 · ведомый первый матч и цели', () => {
     env.frames.forEach((f) => f());
     guide.activeTour?.stop();
     expect(onboard()).toMatchObject({ skipped: true });
+    expect(env.calls).toContain('medal:false:false'); // медаль решает сама: курс не пройден
     expect(env.els.get('goals')?.classList.contains('show')).toBe(false);
   });
 

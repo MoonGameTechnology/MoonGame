@@ -19,6 +19,8 @@
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
 import {
   findHealthyStack,
+  fleetHoldFree,
+  fleetShuttleBay,
   knownOwner,
   MAX_CHAIN_STEPS,
   planRoute,
@@ -220,7 +222,11 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
   return {
     units,
     capacity: sumUnitStat(f.units, data, 'cargoCapacity'),
-    used: sumUnitStat(landing, data, 'cargoSize'),
+    // The hold is shared with shuttles (SHU-5.1): squadrons aboard and out on a sortie take
+    // their places too. Counted by the core's own numbers, or «max» offers places the
+    // load is then refused for (`E_NO_CAPACITY`, «the hold is full»).
+    used:
+      sumUnitStat(landing, data, 'cargoSize') + fleetShuttleBay(f, data) - fleetHoldFree(s, f, data),
     reservedCargo: pendingLoadCargo(fleetId),
     plan: planFor(troopsPlan?.fleetId, fleetId, troopsPlan?.plan),
   };
