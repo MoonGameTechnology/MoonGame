@@ -1,4 +1,4 @@
-import { sanitizeChatText } from '@void/protocol';
+import { censorChatText, containsBlockedLanguage } from '@void/protocol';
 import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
@@ -1511,6 +1511,15 @@ export class MatchRoom {
     const advanced = this.computeAdvance(this.stateValue, serverNow);
     if (!advanced.ok) return { kind: 'advance-failed', code: advanced.code };
     const at = Math.max(serverNow, advanced.state.time);
+    // Coalition descriptions are player-authored public text. Apply the same
+    // server-owned language policy in BOTH sync and durable action paths, before
+    // persistence or fan-out. The pure game core has no dependency on protocol.
+    if (action.type === 'coalition.edit' && action.payload && typeof action.payload === 'object') {
+      const { description } = action.payload as { description?: unknown };
+      if (typeof description === 'string' && containsBlockedLanguage(description)) {
+        return { kind: 'rejected', code: 'E_BAD_PAYLOAD', state: advanced.state, events: advanced.events };
+      }
+    }
     const result = this.kernel.applyAction(advanced.state, action, this.context(at));
     if (!result.ok) {
       // SRV-1: действие отвергнуто, но догон уже посчитан и его события (прилёты, бои,
@@ -2398,7 +2407,7 @@ export class MatchRoom {
     };
     if (draft.to) ping.to = draft.to;
     if (draft.payload?.building) ping.payload = { building: draft.payload.building };
-    if (draft.label) ping.label = sanitizeChatText(draft.label, PING_LABEL_MAX);
+    if (draft.label) ping.label = censorChatText(draft.label, PING_LABEL_MAX);
     await this.ephemeral.set(this.pingKey(ping.id), ping, this.pingTtlMs);
     this.pingWindow.record(playerId, wall);
     this.relayToViewers(ping, { type: 'ping.added', matchId: this.id, ping });
@@ -2453,7 +2462,7 @@ export class MatchRoom {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_CHAT_RATE' });
       return;
     }
-    const text = sanitizeChatText(message.text, CHAT_TEXT_MAX);
+    const text = censorChatText(message.text, CHAT_TEXT_MAX);
     if (!text) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_CHAT_TEXT' });
       return;
@@ -2491,7 +2500,7 @@ export class MatchRoom {
         this.state.players[to]?.status !== 'active') return false;
     const wall = this.now();
     if (this.chatWindow.limited(from, wall)) return false;
-    const text = sanitizeChatText(rawText, CHAT_TEXT_MAX);
+    const text = censorChatText(rawText, CHAT_TEXT_MAX);
     if (!text) return false;
     this.chatWindow.record(from, wall);
     this.relayChat({

@@ -6,6 +6,8 @@ import {
   blockedPublicName,
   parseRecoveryEmail,
   sanitizeChatText,
+  censorChatText,
+  containsBlockedLanguage,
   closedInput,
 } from './inputPolicy';
 
@@ -124,5 +126,48 @@ describe('field-specific input handling', () => {
     expect(sanitizeChatText('😀😀😀', 2)).toBe('😀😀');
     expect(sanitizeChatText('<b>hello</b> & "quotes"', 100)).toBe('<b>hello</b> & "quotes"');
     expect(sanitizeChatText('\u0000\u200B', 100)).toBe('');
+  });
+});
+
+
+describe('multilingual public text moderation', () => {
+  it('rejects explicit standalone abuse in multiple languages and scripts', () => {
+    for (const name of [
+      'Scheiße', 'SCHEISSE', 'Connard', 'Gilipollas', 'Caralho',
+      'Vaffanculo', 'Kurwa', 'Йобаний', 'OROSPU', '씨발', '傻逼',
+      'मादरचोद', 'شرموطة',
+      'fυck', // Greek upsilon used to impersonate a Latin u
+    ]) {
+      expect(blockedPublicName(name), name).toBe(true);
+    }
+  });
+
+  it('preserves legitimate names even when a substring resembles an insult', () => {
+    for (const safe of [
+      'Scunthorpe', 'Assassin', 'Classical', 'Dickinson',
+      'Merdeka', 'Shitake', 'Fukushima', 'Корабль',
+    ]) {
+      expect(blockedPublicName(safe), safe).toBe(false);
+      expect(containsBlockedLanguage(safe), safe).toBe(false);
+    }
+  });
+
+  it('censors complete words, obfuscated letters and multilingual insults but keeps context', () => {
+    expect(censorChatText('Hello f.u.c.k and KURWA!', 240)).toBe('Hello *** and ***!');
+    expect(censorChatText('S h 1 t', 240)).toBe('***');
+    expect(censorChatText('你这个傻逼！', 240)).toBe('你这个***！');
+    expect(censorChatText('씨발놈', 240)).toBe('***놈');
+    expect(censorChatText('f💥u💥c💥k', 240)).toBe('***');
+    expect(censorChatText('sh\u200Bit in the chat', 240)).toBe('*** in the chat');
+    expect(censorChatText('You are a connard, Scunthorpe.', 240))
+      .toBe('You are a ***, Scunthorpe.');
+    expect(censorChatText('Clean text', 240)).toBe('Clean text');
+    expect(containsBlockedLanguage('KurWa')).toBe(true);
+    expect(containsBlockedLanguage('No profanity here')).toBe(false);
+  });
+
+  it('does not let masking bypass the existing trim and length cap', () => {
+    expect(censorChatText('  fuck\u0000  ', 240)).toBe('***');
+    expect(censorChatText('hello '.repeat(100), 6)).toBe('hello');
   });
 });
