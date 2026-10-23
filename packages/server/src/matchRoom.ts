@@ -566,6 +566,7 @@ export class MatchRoom {
   /** True while a batch of server orders is in flight: without it a tick could read a
    *  state whose previous batch has not been applied yet and re-issue the same moves. */
   private serverOrdersBusy = false;
+  private serverOrdersWork: Promise<void> = Promise.resolve();
   /** playerId → accountId until the seat is explicitly released (see `evict`).
    *  Ordinary disconnects keep the binding; a kick lets the next owner replace it. */
   private readonly playerAccountId = new Map<PlayerId, string>();
@@ -1673,7 +1674,7 @@ export class MatchRoom {
     if (orders.length === 0) return;
     this.serverOrderSeq += orders.length;
     this.serverOrdersBusy = true;
-    detach('приказы серверной автоматики', (async () => {
+    this.serverOrdersWork = (async () => {
       try {
         for (const action of orders) {
           await this.submitServerAction(action.playerId, action);
@@ -1683,7 +1684,22 @@ export class MatchRoom {
       } finally {
         this.serverOrdersBusy = false;
       }
-    })());
+    })();
+    detach('приказы серверной автоматики', this.serverOrdersWork);
+  }
+
+  /** After the host stops ingress and drivers, await already accepted work before
+   * taking its final snapshot. Internal batches may enqueue their next action only
+   * after the previous commit, so the mailbox alone is not the whole drain. */
+  async drain(): Promise<void> {
+    // An unexpected batch rejection is logged by detach; it must not skip saving
+    // unrelated accepted actions or the world's final snapshot.
+    await this.serverOrdersWork.catch(() => {});
+    let pending: Promise<void>;
+    do {
+      pending = this.mailbox;
+      await pending;
+    } while (pending !== this.mailbox);
   }
 
   /** Wall-ms until the soonest scheduled event comes due — what an offline wakeup

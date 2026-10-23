@@ -155,6 +155,7 @@ import {
   nickSeatAccounts,
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
+import { createSnapshotWriter } from '../packages/server/src/snapshotWriter';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
@@ -384,11 +385,19 @@ const pushDispatch = vapid
   : null;
 const metaCatalog = loadMetaEconomyCatalog(data);
 const starterArsenal = loadStarterArsenal(data);
+let shuttingDown = false;
+const arsenalRefreshes = new Set<Promise<void>>();
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
 const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, dropTables: loadDropTables(data), now: Date.now,
   onEvent: (event) => {
     process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
-    void refreshGrantedArsenal(event.accountId).catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
+    // Final snapshots can themselves issue durable rewards. During shutdown do
+    // not start another room mutation; authenticated rejoin syncs the owned catalog.
+    if (shuttingDown) return;
+    const refresh = refreshGrantedArsenal(event.accountId)
+      .finally(() => { arsenalRefreshes.delete(refresh); });
+    arsenalRefreshes.add(refresh);
+    void refresh.catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
   },
 });
 
@@ -532,6 +541,16 @@ async function createHostedMatch(
   const botSeats = new Set<string>();
   const botIdentities = new Map<string, BotIdentity>();
   const aiEligibleAt = new Map<string, number>();
+  const background = new Set<Promise<void>>();
+  const runBackground = (what: string, work: Promise<unknown>): void => {
+    const tracked = work.then(() => {}).finally(() => { background.delete(tracked); });
+    background.add(tracked);
+    detach(what, tracked);
+  };
+  const drainBackground = async (): Promise<void> => {
+    // detach already reports failures; none may skip the final world snapshot.
+    while (background.size) await Promise.allSettled([...background]);
+  };
 
   async function rememberBots(assignments: readonly BotAssignment[]): Promise<void> {
     for (const assignment of assignments) {
@@ -588,7 +607,7 @@ async function createHostedMatch(
       // written by the room's commit-before-broadcast `persist` callback — skip it
       // here or we double-write. Only the SYNC path (server drivers, ungated actions)
       // has no other durable writer, so it still persists through this branch.
-      detach('сохранение квитанции', receiptStore.save(id, {
+      runBackground('сохранение квитанции', receiptStore.save(id, {
         actionId: ev.actionId,
         playerId: ev.playerId,
         seq: ev.seq,
@@ -597,8 +616,8 @@ async function createHostedMatch(
       }));
     } else if (ev.kind === 'end' && AUTH) {
       // Bank each seated commander's match XP onto their account (idempotent).
-      detach('начисление опыта за матч', creditMatchXp(id, ev.rewards));
-      detach('профиль: итоги матча', creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, room.state));
+      runBackground('начисление опыта за матч', creditMatchXp(id, ev.rewards));
+      runBackground('профиль: итоги матча', creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, room.state));
     }
     // Persist after anything that changes the world (debounced below), and re-arm
     // the offline wakeup: an action may schedule or consume events — both move the
@@ -707,23 +726,8 @@ async function createHostedMatch(
   }
 
   // Snapshot the world after changes, debounced so a burst of actions is one write.
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let saving = false;
-  let saveStopped = false;
-  function scheduleSave(delay = 500): void {
-    if (saveTimer || saveStopped) return;
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      detach('отложенное сохранение мира', doSave());
-    }, delay);
-  }
-  async function doSave(): Promise<void> {
-    if (saving) {
-      scheduleSave(); // a save is in flight — coalesce into the next tick
-      return;
-    }
-    saving = true;
-    try {
+  const snapshots = createSnapshotWriter({
+    async save() {
       const snapshot = {
         matchId: id,
         dataVersion: room.state.version?.data ?? 'proto',
@@ -738,14 +742,15 @@ async function createHostedMatch(
       // The durable roster, not the successfully seated in-memory cache, owns settlement.
       if (snapshot.status === 'ended')
         await settleBotMatch({ snapshot, bots: botStore, profiles: profileStore, accounts: accountStore, now: Date.now() });
-    } catch (e) {
+    },
+    onError(e) {
       process.stderr.write(`snapshot save failed (${id}): ${(e as Error)?.message ?? String(e)}\n`);
       // A finished room has no more AI wakes. Keep one bounded retry until its
       // durable result lands; active roster ownership survives a process restart.
       if (room.state.match.status === 'ended') scheduleSave(5_000);
-    }
-    saving = false;
-  }
+    },
+  });
+  function scheduleSave(delay = 500): void { snapshots.schedule(delay); }
 
   if (AUTH) {
     try {
@@ -754,8 +759,7 @@ async function createHostedMatch(
     } catch (error) {
       // A partially persisted claim belongs to this match and is repaired on
       // restart. Never release it on a timeout or expose a half-admitted room.
-      saveStopped = true;
-      if (saveTimer) clearTimeout(saveTimer);
+      snapshots.stop();
       try {
         await recoverBotMatch({ bots: botStore, profiles: profileStore, accounts: accountStore,
           matches: matchStore, now: Date.now }, id);
@@ -839,9 +843,9 @@ async function createHostedMatch(
           // стоячих драйверов пропадёт вместе с этим ударом сердца. Отцепляем так же,
           // как это делает тик: свой сбой прохода не должен уронить цикл ИИ, а гварду
           // он возьмёт сам — следующая итерация подождёт её штатно.
-          if (standingDue) {
+          if (standingDue && !aiStopped) {
             standingDue = false;
-            detach('серверные драйверы (отложенный проход)', runStandingPass());
+            runBackground('серверные драйверы (отложенный проход)', runStandingPass());
           }
         }
         // Yield between BOTH planning and applying: persistence may resolve already,
@@ -884,6 +888,7 @@ async function createHostedMatch(
   // Один проход стоячих драйверов + истечение заявок на места. Зовут его тик и —
   // если тик не смог взять гварду — цикл ИИ, отпуская её (см. `standingDue`).
   async function runStandingPass(): Promise<void> {
+    if (aiStopped) return;
     driversBusy = true;
     try {
       await runServerStanding(); // CC-2/RETR-2/CC-1: standing orders (auto-storm, retreat, chains)
@@ -937,9 +942,9 @@ async function createHostedMatch(
         if (driversBusy) standingDue = true;
         else {
           standingDue = false; // проход идёт ПРЯМО СЕЙЧАС — прежний долг им и погашен
-          detach('серверные драйверы', runStandingPass());
+          runBackground('серверные драйверы', runStandingPass());
         }
-        detach('распределённые ходы ИИ', runServerAI());
+        runBackground('распределённые ходы ИИ', runServerAI());
       }
       scheduleSave(); // persist the advanced world
     },
@@ -967,16 +972,21 @@ async function createHostedMatch(
     id,
     room,
     restored: !!restoredSnap,
-    flush: doSave,
+    async flush() {
+      if (aiStopped) {
+        // Producers may already be awaiting a durable action when timers stop.
+        // Let them finish before draining the mailbox and capturing the final state.
+        await Promise.all([botArrivals?.drain(), botSocial.drain(), drainBackground()]);
+        await room.drain();
+        await drainBackground(); // a committed terminal action can credit profiles
+      }
+      await snapshots.flush();
+    },
     clearTimers(): void {
       botArrivals?.stop();
       botSocial?.stop();
       aiStopped = true;
-      saveStopped = true;
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
+      snapshots.stop();
       driver?.stop(); // cancel the pending wake
     },
   };
@@ -1040,6 +1050,7 @@ const restoredCount = hosted.filter((h) => h.restored).length;
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
 async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Promise<HostedMatch> {
+  if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
   // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
   const id = await freeMatchId(async (candidate) =>
@@ -1646,6 +1657,8 @@ const printSummary = (): void => {
 };
 
 const shutdown = (): void => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   printSummary();
   // M3: land the aggregated summary as the LAST JSONL line — the per-line log keeps
   // only anomalous broadcast/timing entries, so without this the report script would
@@ -1661,11 +1674,19 @@ const shutdown = (): void => {
   // дойдя до `process.exit`, и оркестратор добивал его по таймауту SIGKILL — то есть
   // последний снапшот мира терялся именно там, где его и сохраняли.
   void (async () => {
-    // Final flush per room so the latest state of EVERY session is durable before exit.
-    for (const h of hosted) await h.flush();
-    // Stop taking requests (Fastify waits for those in flight) before the journals: a
-    // `/telemetry` batch landing after the last flush would be lost at exit.
+    // Stop ingress first: HTTP/WS must not change a world after its final snapshot.
     await server.close();
+    // An HTTP creation already in flight may have registered another hosted room.
+    for (const h of hosted) h.clearTimers();
+    // Meta observers are detached from reward delivery; an earlier refresh can
+    // still submit durable room actions. New refreshes were disabled synchronously.
+    while (arsenalRefreshes.size) await Promise.allSettled([...arsenalRefreshes]);
+    const failures: unknown[] = [];
+    for (const h of hosted) {
+      try { await h.flush(); }
+      catch (error) { failures.push(error); }
+    }
+    if (failures.length) throw new AggregateError(failures, 'E_SHUTDOWN_SAVE');
     await rewardDelivery.stop();
     // The journals last: drain them, THEN write a fresh summary (its counters now match
     // the files; the one above stays as a fallback, the report keeps a run's LAST one)
