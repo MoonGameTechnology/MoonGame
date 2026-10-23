@@ -198,6 +198,17 @@ describe('kernel — manifest & dispatch', () => {
     expect(expectErr(res).code).toBe('E_UNKNOWN_ACTION');
   });
 
+  it('treats a handler that is not callable as absent (fail-secure, no TypeError)', () => {
+    const broken: GameModule = {
+      id: 'broken',
+      version: '1.0.0',
+      setup: (api) => api.onAction('broken.order', 42 as never),
+    };
+    const kernel = createKernel([broken]);
+    const res = kernel.applyAction(baseState(), action('broken.order', {}), ctx());
+    expect(expectErr(res).code).toBe('E_UNKNOWN_ACTION');
+  });
+
   it('rejects a KNOWN action once the match has ended (terminal gate, BF-34)', () => {
     const kernel = createKernel([movementModule]);
     const ongoing = baseState();
