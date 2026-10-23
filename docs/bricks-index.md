@@ -63,7 +63,7 @@
 | REFM-216 | ✅ | proto | `docs/backlog.md` | Сетевой жизненный цикл |
 | REFM-217 | ✅ | proto | `docs/backlog.md` | Обзор партий и выбор места |
 | REFM-218 | ✅ | proto | `docs/backlog.md` | Страницы входа |
-| REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
+| REFM-219 | ✅ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-221 | ✅ | proto | `docs/backlog.md` | Обучение и справка |
 | REFM-222 | ✅ | proto | `docs/backlog.md` | Верхняя полоса |

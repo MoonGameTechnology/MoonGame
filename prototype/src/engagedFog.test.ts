@@ -13,6 +13,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Установка партии и запуски — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
 // Сами вопросы к туману живут у его владельца (`mapFog.ts`, REFM-231); `main.ts` их задаёт.
 const fog = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
 // Разбор событий живёт у ленты (`eventFeed.ts`, REFM-230); `main.ts` её сбрасывает.
@@ -56,7 +58,7 @@ describe('туман спрашивает о флоте и бое только �
   it('память боёв блока зрения не переживает смену матча', () => {
     // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417).
     expect(feed).toMatch(/myBattleLocs\.clear\(\);\n\s*engagedBattleIds\.clear\(\);/);
-    const install = main.slice(main.indexOf('function installMatch('));
+    const install = LIFE.slice(LIFE.indexOf('function installMatch('));
     expect(install.slice(0, install.indexOf('\n}\n'))).toContain('resetEventFeed();');
   });
 });

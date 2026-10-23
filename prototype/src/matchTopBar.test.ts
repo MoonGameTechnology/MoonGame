@@ -832,6 +832,8 @@ describe('досье Роя', () => {
 
 describe('стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
 
   it('main поднимает полосу один раз и зовёт её кадр', () => {
     expect(MAIN.match(/\ninitTopBar\(\{/g)).toHaveLength(1);
@@ -842,8 +844,8 @@ describe('стык с main.ts', () => {
   });
 
   it('смена матча сбрасывает тревоги и прячет досье', () => {
-    expect(MAIN).toMatch(/\n {2}hideSwarmDossier\(\);/);
-    expect(MAIN).toMatch(/\n {2}resetThreatAlerts\(\);/);
+    expect(LIFE).toMatch(/\n {2}hideSwarmDossier\(\);/);
+    expect(LIFE).toMatch(/\n {2}resetThreatAlerts\(\);/);
   });
 
   it('копий полосы в main не осталось', () => {

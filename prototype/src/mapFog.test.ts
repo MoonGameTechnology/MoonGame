@@ -276,6 +276,8 @@ describe('REFM-231 — память разведки', () => {
 
 describe('REFM-231 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const FOG = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
   // Захват, который игрок видел, пишет в память разведки разбор событий (`eventFeed.ts`).
   const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
@@ -302,7 +304,7 @@ describe('REFM-231 — стык с main.ts', () => {
       /\bfunction (computeVision|currentVision|fogVision|myIntel|fleetNode|fleetSeen|fleetKnown|fleetSeenHere|battleKnown|updateMemory|known|admits|seesDetails)\(/,
     );
     // Смена матча чистит память вместе с запомненным зрением, песочница — только зрение.
-    expect(MAIN).toMatch(/resetEventFeed\(\);[^\n]*\n\s*resetFogMemory\(\);/);
+    expect(LIFE).toMatch(/resetEventFeed\(\);[^\n]*\n\s*resetFogMemory\(\);/);
     expect(MAIN).toMatch(/enforceSandbox\(s, ME, sandboxHomeId\);\n\s*forgetVision\(\);/);
     expect(FEED).toContain('rememberScan([p.planetId as string]);');
     expect(MAIN).toContain('restoreFogMemory(save.memory);');

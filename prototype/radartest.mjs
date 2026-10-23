@@ -12,7 +12,7 @@ import {
 // Exercise the actual solo projection AND sweep painter in the shipped client.
 // Радар живёт у своего владельца (`mapRadar.ts`, REFM-239): память контактов снаружи
 // только для чтения, а угол руки задают часы развёртки — робот берёт их своим импортом.
-const hooks = `import { paintedContacts as __painted, SWEEP_DIV as __SWEEP_DIV, SWEEP_PERIOD as __SWEEP_PERIOD } from './mapRadar';
+const hooks = `import { forgetRadarContacts as __forgetRadarContacts, paintedContacts as __painted, SWEEP_DIV as __SWEEP_DIV, SWEEP_PERIOD as __SWEEP_PERIOD } from './mapRadar';
 window.__radarTest = {
   stage(level, grouped = false) {
     const nodes = Object.values(s.planets);
@@ -33,7 +33,7 @@ window.__radarTest = {
       units: [{ unit: 'scout', count }], traits: [] });
     s.fleets = { a: make('a', a.id, grouped ? 3 : 1) };
     if (grouped) s.fleets.b = make('b', b.id, 2);
-    forgetRadarContacts();
+    __forgetRadarContacts();
     this.paint();
     return this.read();
   },

@@ -273,6 +273,8 @@ describe('REFM-234 — вспышки на карте', () => {
 
 describe('REFM-234 — стык вспышек с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const SRC = readFileSync(new URL('./mapEffects.ts', import.meta.url), 'utf8');
   // События партии разбирает лента (`eventFeed.ts`, REFM-230): залпы, захваты и мины она
   // ставит теми же дверями.
@@ -293,7 +295,7 @@ describe('REFM-234 — стык вспышек с main.ts', () => {
     expect(FEED.match(/\bflashProvince\(/g)).toHaveLength(1);
     expect(MAIN.match(/\bflashProvince\(/g)).toHaveLength(1);
     expect(FEED).toContain('flashMines(at, p.position as { x: number; y: number } | undefined);');
-    const install = /function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(MAIN)?.[1];
+    const install = /export function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(LIFE)?.[1];
     expect(install).toContain('clearFlak();');
     expect(MAIN).toContain('ring: flashGo,');
   });

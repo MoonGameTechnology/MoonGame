@@ -390,6 +390,8 @@ describe('REFM-239 — картины дальности', () => {
 
 describe('REFM-239 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const RADAR = readFileSync(new URL('./mapRadar.ts', import.meta.url), 'utf8');
   const init = /initMapRadar\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
@@ -417,7 +419,7 @@ describe('REFM-239 — стык с main.ts', () => {
     expect(MAIN).not.toMatch(/\bradarMemory\.|\b(sweepArms|sweepAng|sweepPrevAng|SWEEP_DIV)\b/);
     expect(MAIN).not.toMatch(/^\s*(netSignatures|sweepOn|sweepOpacity) = /m);
     // Смена матча забывает контакты, снимок сервера кладёт свои — дверями.
-    expect(MAIN).toMatch(/resetFogMemory\(\);[^\n]*\n\s*worldMemo = null;\n\s*forgetRadarContacts\(\);/);
+    expect(LIFE).toMatch(/resetFogMemory\(\);[^\n]*\n\s*forgetRadarContacts\(\);/);
     expect(MAIN).toContain('takeNetSignatures(radarContacts(snap.signatures));');
     // Туман берёт сигнатуры сервера у радара тем же хуком.
     expect(MAIN).toContain('contacts: () => netSignatures,');
