@@ -1,5 +1,6 @@
 import { BOT_PROFILE_HISTORY_LIMIT } from '@void/protocol';
 import type { Pool, PoolClient } from 'pg';
+import { SYSTEM_BOT_NICKNAMES } from './botNicknames';
 
 export interface BotIdentity {
   id: string;
@@ -64,9 +65,9 @@ export const BOT_ROSTER_SIZE = 100;
 const MAX_HISTORY_LIMIT = 50;
 const MAX_TIMESTAMP = 8.64e15;
 
-// Stable callsigns, not user accounts: '~' is outside the human login namespace.
-// Never reorder this catalogue: position determines the persistent ID and personality seed.
-const CALLSIGNS = [
+// Previous public logins are kept only to migrate existing seats by stable identity.
+// Never reorder: each position identifies the same persistent bot.
+const LEGACY_CALLSIGNS = [
   'Orion',
   'Vega',
   'Altair',
@@ -170,10 +171,10 @@ const CALLSIGNS = [
 ] as const;
 
 export const SYSTEM_BOT_ROSTER: readonly Readonly<BotIdentity>[] = Object.freeze(
-  CALLSIGNS.map((name, index) =>
+  SYSTEM_BOT_NICKNAMES.map((name, index) =>
     Object.freeze({
       id: `system-bot:${String(index + 1).padStart(3, '0')}`,
-      login: `~${name}`,
+      login: name,
       portrait: (index % 40) + 1,
       seed: ((index + 1) * 2654435761) >>> 0,
       xp: 0,
@@ -412,17 +413,50 @@ export class PostgresBotRosterStore implements BotRosterStore {
 
   async ensureRoster(): Promise<void> {
     await this.withLock(async (client) => {
-      await client.query(
-        `INSERT INTO bot_roster_identities (id, login, portrait, seed)
-         SELECT * FROM unnest($1::text[], $2::text[], $3::integer[], $4::bigint[])
-         ON CONFLICT (id) DO NOTHING`,
-        [
-          SYSTEM_BOT_ROSTER.map((b) => b.id),
-          SYSTEM_BOT_ROSTER.map((b) => b.login),
-          SYSTEM_BOT_ROSTER.map((b) => b.portrait),
-          SYSTEM_BOT_ROSTER.map((b) => b.seed),
-        ],
-      );
+      // Registration and seat claims cannot race the cosmetic rename. Lock before
+      // reading identities, and change roster + all exact owned seats atomically.
+      await client.query('LOCK TABLE users, seats IN SHARE ROW EXCLUSIVE MODE');
+      for (const [index, bot] of SYSTEM_BOT_ROSTER.entries()) {
+        const legacy = `~${LEGACY_CALLSIGNS[index]}`;
+        const existing = await client.query<{ login: string }>(
+          'SELECT login FROM bot_roster_identities WHERE id=$1',
+          [bot.id],
+        );
+        // Respect an already migrated/custom name, including after a restart.
+        if (existing.rows[0] && existing.rows[0].login !== legacy) continue;
+        const conflict = await client.query(
+          `SELECT 1 WHERE
+           EXISTS (SELECT 1 FROM users WHERE lower(login)=lower($1)) OR
+           EXISTS (SELECT 1 FROM account_deletions
+             WHERE login_hash=encode(sha256(convert_to(lower($1::text),'UTF8')),'hex')) OR
+           EXISTS (SELECT 1 FROM bot_roster_identities WHERE lower(login)=lower($1) AND id<>$2) OR
+           EXISTS (SELECT 1 FROM seats s WHERE lower(s.nick)=lower($1)
+             AND NOT EXISTS (SELECT 1 FROM bot_roster_assignments a
+               WHERE a.bot_id=$2 AND a.match_id=s.room AND a.player_id=s.player_id))`,
+          [bot.login, bot.id],
+        );
+        // A pre-existing human/tombstone wins. Keep that bot's old reserved login
+        // instead of blocking startup or taking another person's identity.
+        const login = conflict.rowCount ? legacy : bot.login;
+        if (existing.rows[0]) {
+          if (login === legacy) continue;
+          await client.query(
+            `UPDATE seats s SET nick=$1 FROM bot_roster_assignments a
+             WHERE a.bot_id=$2 AND a.match_id=s.room AND a.player_id=s.player_id AND s.nick=$3`,
+            [login, bot.id, legacy],
+          );
+          await client.query('UPDATE bot_roster_identities SET login=$1 WHERE id=$2 AND login=$3', [
+            login,
+            bot.id,
+            legacy,
+          ]);
+        } else {
+          await client.query(
+            'INSERT INTO bot_roster_identities (id,login,portrait,seed) VALUES($1,$2,$3,$4)',
+            [bot.id, login, bot.portrait, bot.seed],
+          );
+        }
+      }
     });
   }
 

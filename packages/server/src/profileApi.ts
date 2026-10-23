@@ -60,7 +60,7 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
         : await deps.users.findUser(login);
     // Real accounts always retain their own profile, even if a roster has a colliding name.
     if (user) return view(user.userId, user.login, user.userId === who.accountId);
-    if (!login?.startsWith('~') || !deps.bots)
+    if (!login || !deps.bots)
       return reply.code(404).send({ error: 'E_NO_PROFILE' });
     const bot = await deps.bots.findByLogin(login);
     if (!bot) return reply.code(404).send({ error: 'E_NO_PROFILE' });

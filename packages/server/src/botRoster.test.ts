@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { blockedPublicName, validLogin } from '@void/protocol';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from './store/postgres';
@@ -11,6 +12,7 @@ import {
   type BotMatchResult,
   type BotRosterStore,
 } from './botRoster';
+import { SYSTEM_BOT_NICKNAMES } from './botNicknames';
 
 const result = (seat: BotAssignment, extra: Partial<BotMatchResult> = {}): BotMatchResult => ({
   botId: seat.botId,
@@ -36,15 +38,20 @@ function rosterContract(label: string, create: () => BotRosterStore): void {
       expect(new Set(SYSTEM_BOT_ROSTER.map((b) => b.id)).size).toBe(100);
       expect(new Set(SYSTEM_BOT_ROSTER.map((b) => b.login.toLowerCase())).size).toBe(100);
       expect(new Set(SYSTEM_BOT_ROSTER.map((b) => b.seed)).size).toBe(100);
+      expect(SYSTEM_BOT_ROSTER.map((b) => b.login)).toEqual(SYSTEM_BOT_NICKNAMES);
+      expect(SYSTEM_BOT_NICKNAMES).toContain('babkavtspkax');
+      expect(new Set(SYSTEM_BOT_ROSTER.map((b) => b.login[0]!.toLowerCase())).size).toBeGreaterThan(5);
       for (const bot of SYSTEM_BOT_ROSTER) {
         expect(bot.id).toMatch(/^system-bot:\d{3}$/);
-        expect(bot.login).toMatch(/^~[A-Za-z]+$/);
+        expect(bot.login).toMatch(/^[A-Za-z0-9_-]+$/);
+        expect(validLogin(bot.login)).toBe(true);
+        expect(blockedPublicName(bot.login)).toBe(false);
         expect(bot.portrait).toBeGreaterThanOrEqual(1);
         expect(bot.portrait).toBeLessThanOrEqual(40);
         expect(await store.findByLogin(bot.login.toUpperCase())).toEqual(bot);
         expect(await store.recentMatches(bot.id)).toEqual([]);
       }
-      expect(await store.findByLogin('Orion')).toBeNull();
+      expect(await store.findByLogin('not-a-roster-login')).toBeNull();
       expect(await store.findByLogin("~Orion' OR true --")).toBeNull();
     });
 
@@ -299,7 +306,7 @@ describe.skipIf(!DB)('PostgresBotRosterStore', () => {
   });
   beforeEach(async () => {
     await pool.query(
-      'TRUNCATE bot_roster_results, bot_roster_assignments, bot_roster_matches, bot_roster_identities',
+      'TRUNCATE bot_roster_results, bot_roster_assignments, bot_roster_matches, bot_roster_identities, seats, account_deletions, users CASCADE',
     );
   });
   afterAll(async () => {
@@ -308,6 +315,127 @@ describe.skipIf(!DB)('PostgresBotRosterStore', () => {
     await admin.end();
   });
   rosterContract('durable contract', () => new PostgresBotRosterStore(pool));
+
+  async function seedLegacy(logins: readonly string[]): Promise<void> {
+    await pool.query(
+      `INSERT INTO bot_roster_identities (id, login, portrait, seed)
+       SELECT * FROM unnest($1::text[], $2::text[], $3::integer[], $4::bigint[])`,
+      [
+        SYSTEM_BOT_ROSTER.slice(0, logins.length).map((b) => b.id),
+        logins,
+        SYSTEM_BOT_ROSTER.slice(0, logins.length).map((b) => b.portrait),
+        SYSTEM_BOT_ROSTER.slice(0, logins.length).map((b) => b.seed),
+      ],
+    );
+  }
+
+  it('renames legacy profiles and their owned seats without changing tickets, progression or match history', async () => {
+    await seedLegacy(['~Orion', '~Vega']);
+    // Recreate the original schema contract before running the upgrade.
+    await pool.query('ALTER TABLE bot_roster_identities DROP CONSTRAINT IF EXISTS bot_roster_identities_login_check');
+    await pool.query(
+      "ALTER TABLE bot_roster_identities ADD CONSTRAINT bot_roster_identities_login_check CHECK (left(login, 1) = '~')",
+    );
+    const before = new PostgresBotRosterStore(pool);
+    const [finished] = await before.assign('legacy-finished', ['p1'], 2, 1);
+    await before.finishMatch('legacy-finished', [result(finished!)], 2);
+    const [live] = await before.assign('legacy-live', ['p2'], 2, 3);
+    await pool.query(
+      `INSERT INTO seats (room, nick, player_id, ticket_hash)
+       VALUES ('legacy-finished', $1, 'p1', 'finished-ticket'),
+              ('legacy-live', $2, 'p2', 'live-ticket')`,
+      [finished!.login, live!.login],
+    );
+    const identities = (await pool.query(
+      'SELECT id, portrait, seed, xp, last_assigned_at FROM bot_roster_identities ORDER BY id',
+    )).rows;
+    const history = await before.recentMatches(finished!.botId);
+    await migrate(pool);
+    const after = new PostgresBotRosterStore(pool);
+    await Promise.all([after.ensureRoster(), new PostgresBotRosterStore(pool).ensureRoster()]);
+    await after.ensureRoster();
+    const restarted = new PostgresBotRosterStore(pool);
+    await restarted.ensureRoster();
+    expect((await pool.query(
+      'SELECT id, portrait, seed, xp, last_assigned_at FROM bot_roster_identities WHERE id = ANY($1::text[]) ORDER BY id',
+      [identities.map((b) => b.id)],
+    )).rows).toEqual(identities);
+    expect(await restarted.findByLogin('~Orion')).toBeNull();
+    expect(await restarted.findByLogin('~Vega')).toBeNull();
+    expect((await restarted.findByLogin(SYSTEM_BOT_ROSTER[0]!.login))?.xp).toBe(120);
+    expect(await restarted.recentMatches(finished!.botId)).toEqual(history);
+    expect(await restarted.assignments('legacy-finished')).toEqual([
+      { ...finished, login: SYSTEM_BOT_ROSTER[0]!.login },
+    ]);
+    expect(await restarted.assignments('legacy-live')).toEqual([
+      { ...live, login: SYSTEM_BOT_ROSTER[1]!.login },
+    ]);
+    expect(await restarted.activeMatchIds()).toEqual(['legacy-live']);
+    expect((await pool.query(
+      'SELECT room, nick, player_id, ticket_hash FROM seats ORDER BY room',
+    )).rows).toEqual([
+      { room: 'legacy-finished', nick: SYSTEM_BOT_ROSTER[0]!.login, player_id: 'p1', ticket_hash: 'finished-ticket' },
+      { room: 'legacy-live', nick: SYSTEM_BOT_ROSTER[1]!.login, player_id: 'p2', ticket_hash: 'live-ticket' },
+    ]);
+    // Re-observing an already settled match cannot mint another reward after rename.
+    await restarted.finishMatch('legacy-finished', [result(finished!)], 4);
+    expect((await restarted.findByLogin(SYSTEM_BOT_ROSTER[0]!.login))?.xp).toBe(120);
+    expect(await restarted.recentMatches(finished!.botId)).toEqual(history);
+  });
+
+  it('retains legacy names when a real account, deletion tombstone or foreign seat owns the new handle', async () => {
+    const legacy = ['~Orion', '~Vega', '~Altair', '~Sirius'];
+    await seedLegacy(legacy);
+    await pool.query(
+      `INSERT INTO users (id, login, pass_hash, deletion_requested_at)
+       VALUES ('existing-human', $1, 'human-secret', NULL),
+              ('pending-deletion-human', $2, 'pending-secret', now())`,
+      [SYSTEM_BOT_ROSTER[0]!.login.toUpperCase(), SYSTEM_BOT_ROSTER[3]!.login.toUpperCase()],
+    );
+    await pool.query(
+      `INSERT INTO account_deletions (account_id, request_id, login_hash)
+       VALUES ('erased-human', 'erased-request', encode(sha256(convert_to(lower($1::text), 'UTF8')), 'hex'))`,
+      [SYSTEM_BOT_ROSTER[1]!.login.toUpperCase()],
+    );
+    await pool.query(
+      "INSERT INTO seats (room, nick, player_id, ticket_hash) VALUES ('foreign-match', $1, 'p7', 'human-ticket')",
+      [SYSTEM_BOT_ROSTER[2]!.login.toUpperCase()],
+    );
+    const users = (await pool.query('SELECT * FROM users ORDER BY id')).rows;
+    const tombstones = (await pool.query('SELECT * FROM account_deletions')).rows;
+    const seats = (await pool.query('SELECT * FROM seats')).rows;
+    const store = new PostgresBotRosterStore(pool);
+    await store.ensureRoster();
+    await store.ensureRoster();
+    for (const [index, login] of legacy.entries()) {
+      expect((await store.findByLogin(login))?.id).toBe(SYSTEM_BOT_ROSTER[index]!.id);
+      expect(await store.findByLogin(SYSTEM_BOT_ROSTER[index]!.login)).toBeNull();
+    }
+    expect((await pool.query('SELECT * FROM users ORDER BY id')).rows).toEqual(users);
+    expect((await pool.query('SELECT * FROM account_deletions')).rows).toEqual(tombstones);
+    expect((await pool.query('SELECT * FROM seats')).rows).toEqual(seats);
+    expect((await pool.query('SELECT count(*)::integer AS n FROM bot_roster_identities')).rows[0]?.n).toBe(100);
+  });
+
+  it('keeps a previously customized natural handle instead of resetting a permanent profile', async () => {
+    await seedLegacy(['custom-roster-name']);
+    await pool.query('UPDATE bot_roster_identities SET xp = 77 WHERE id = $1', [SYSTEM_BOT_ROSTER[0]!.id]);
+    const store = new PostgresBotRosterStore(pool);
+    await store.ensureRoster();
+    await store.ensureRoster();
+    expect(await store.findByLogin('custom-roster-name')).toEqual({ ...SYSTEM_BOT_ROSTER[0], login: 'custom-roster-name', xp: 77 });
+    expect(await store.findByLogin(SYSTEM_BOT_ROSTER[0]!.login)).toBeNull();
+  });
+
+  it('preserves another bot that already owns the desired handle', async () => {
+    await seedLegacy(['~Orion', SYSTEM_BOT_ROSTER[0]!.login]);
+    const store = new PostgresBotRosterStore(pool);
+    await store.ensureRoster();
+    await store.ensureRoster();
+    expect((await store.findByLogin('~Orion'))?.id).toBe(SYSTEM_BOT_ROSTER[0]!.id);
+    expect((await store.findByLogin(SYSTEM_BOT_ROSTER[0]!.login))?.id).toBe(SYSTEM_BOT_ROSTER[1]!.id);
+    expect(await store.findByLogin(SYSTEM_BOT_ROSTER[1]!.login)).toBeNull();
+  });
 
   it('survives a store restart without replacing profiles, reassigning live seats or duplicating results', async () => {
     const before = new PostgresBotRosterStore(pool);

@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { GameData, GameState } from '@void/shared-core';
-import { MemoryBotRosterStore } from './botRoster';
+import { MemoryBotRosterStore, SYSTEM_BOT_ROSTER } from './botRoster';
 import {
   botFillSeats,
   botMatchLimit,
@@ -163,7 +163,7 @@ describe('persistent bot population admission', () => {
       'p6',
     );
     expect(['p1', 'p2', 'p3', 'p4']).toContain(human?.playerId);
-    expect((await w.accounts.seatedNicks(w.id)).filter((a) => a.nick.startsWith('~'))).toHaveLength(
+    expect((await w.accounts.seatedNicks(w.id)).filter((a) => SYSTEM_BOT_ROSTER.some((b) => b.login === a.nick))).toHaveLength(
       2,
     );
   });

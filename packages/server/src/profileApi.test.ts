@@ -84,7 +84,7 @@ async function fixture(option?: ProfileApiDeps['bots'] | ProfileApiDeps['premium
 }
 
 describe('persistent bot public profiles', () => {
-  const bot = { id: 'bot-001', login: '~Orion', portrait: 19, seed: 71, xp: 245 };
+  const bot = { id: 'bot-001', login: 'babkavtspkax', portrait: 19, seed: 71, xp: 245 };
   const result = {
     botId: bot.id,
     playerId: 'p3',
@@ -97,7 +97,7 @@ describe('persistent bot public profiles', () => {
   };
   function roster() {
     return {
-      findByLogin: vi.fn(async (login: string) => (login.toLowerCase() === '~orion' ? bot : null)),
+      findByLogin: vi.fn(async (login: string) => (login.toLowerCase() === 'babkavtspkax' ? bot : null)),
       recentMatches: vi.fn(async () => [result]),
     };
   }
@@ -112,7 +112,7 @@ describe('persistent bot public profiles', () => {
         },
       ]);
       const view = await app.inject({
-        url: '/profiles?login=~orion',
+        url: '/profiles?login=BABKAVTSPKAX',
         headers: { authorization: 'Alice' },
       });
       expect(view.statusCode).toBe(200);
@@ -141,12 +141,12 @@ describe('persistent bot public profiles', () => {
         Array.from({ length: 11 }, (_, i) => ({ ...result, matchId: `m-${i}` })),
       );
       const bounded = (
-        await app.inject({ url: '/profiles?login=~Orion', headers: { authorization: 'Alice' } })
+        await app.inject({ url: '/profiles?login=babkavtspkax', headers: { authorization: 'Alice' } })
       ).json();
       expect(bounded.recentMatches).toHaveLength(10);
-      expect((await app.inject({ url: '/profiles?login=~Orion' })).statusCode).toBe(401);
+      expect((await app.inject({ url: '/profiles?login=babkavtspkax' })).statusCode).toBe(401);
       expect(
-        (await app.inject({ url: '/profiles?login=~missing', headers: { authorization: 'Alice' } }))
+        (await app.inject({ url: '/profiles?login=missing-natural-handle', headers: { authorization: 'Alice' } }))
           .statusCode,
       ).toBe(404);
     } finally {
@@ -161,7 +161,7 @@ describe('persistent bot public profiles', () => {
     const { app, profiles, alice } = await fixture(bots);
     try {
       const fresh = (
-        await app.inject({ url: '/profiles?login=~Orion', headers: { authorization: 'Alice' } })
+        await app.inject({ url: '/profiles?login=babkavtspkax', headers: { authorization: 'Alice' } })
       ).json();
       expect(fresh.progress).toEqual({});
       expect(fresh.slots).toEqual(defaultAppearance().slots);
@@ -178,7 +178,7 @@ describe('persistent bot public profiles', () => {
       const look = { ...defaultAppearance(), portrait: 11 };
       const saved = await app.inject({
         method: 'POST',
-        url: '/profiles/me?login=~Orion',
+        url: '/profiles/me?login=babkavtspkax',
         headers: { authorization: 'Alice' },
         payload: look,
       });
@@ -207,7 +207,7 @@ describe('persistent bot public profiles', () => {
           await app.inject({
             method: 'POST',
             url: '/profiles/me',
-            headers: { authorization: '~Orion' },
+            headers: { authorization: 'babkavtspkax' },
             payload: look,
           })
         ).statusCode,
