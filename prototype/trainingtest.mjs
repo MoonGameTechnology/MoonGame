@@ -6,7 +6,7 @@ import { instrumentedGame, launchBrowser, serve, waitForApp } from './harnessKit
 const host = await serve(
   await instrumentedGame(`
 const trainingUiTest = () => trainingTourUi({world:()=>s,me:()=>ME,mobile:MOBILE,
-  expanded:()=>mobileHud.expanded(selPlanet ? 'planet:'+selPlanet : 'fleet:'+selFleet),collapse:()=>mobileHud.collapse(),tab:()=>planetTab,ships:()=>{planetTab='ships';},
+  expanded:()=>mobileHud.expanded(selPlanet ? 'planet:'+selPlanet : 'fleet:'+selFleet),collapse:()=>mobileHud.collapse(),tab:()=>planetTab,ships:()=>{setPlanetTab('ships');},
   render:()=>{invalidatePanel();renderPanel();updateMobileHud();}});
 window.__trainingTest = {
   advance: hours => apply(advance(s,s.time+hours*3600000)),

@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 13190 зелёных** (166 skip; 1057 файлов прошли, 6 skip; локально без PostgreSQL, 2026-10-23).
+**Тесты: 13246 зелёных** (166 skip; 1059 файлов прошли, 6 skip; локально без PostgreSQL, 2026-10-23).
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -358,6 +358,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `main.ts` — хозяин мира и проводки; интерфейс разнесён по модулям `init*(host)` (больше 80) с
   чистыми `*Html`, состояние им даёт `main.ts` хуками. Окно боя — `battleScreen.ts`, прогноз —
   `decisions/battleForecast.ts`, урон и бафы — `packages/shared-core/src/state/battleReadout.ts`.
+- Боковая панель выбора — `sidePanel.ts` (REFM-225): чья карточка открыта, лист с кэшем и
+  дверью перерисовки, живые сроки, досье, нажатия по листу, окно деления, подъём камеры на телефоне.
 - От 720 px — голографическая консоль ПК и планшета (`holographicUi.ts`, `holographic.css`,
   `bridge-shell.css`; окна переносит `floatingWindows.ts`, масштаб — `decisions/pcScale.ts`).
   Уже 720 px или ниже 520 px на сенсорном — телефон: `mobileHud.ts`, `mobile-*.css`.
