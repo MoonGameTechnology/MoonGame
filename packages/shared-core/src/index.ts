@@ -22,6 +22,7 @@ export {
   type Planet,
   type PlanetSnapshot,
   type FogMemory,
+  type ProvinceSurvey,
   type SightRules,
   type TechRules,
   type MatchPricing,

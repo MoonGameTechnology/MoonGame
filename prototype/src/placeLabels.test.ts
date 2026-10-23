@@ -30,8 +30,9 @@ describe('SZ-map-ids — места называются именами', () => 
   it('ни одна подпись холста не пишет сырой id узла', () => {
     // `fillText(n.id …)`, `fillText(p.id …)`, `fillText(id, …)` — прежние формы подписи.
     expect((MAIN + RADAR + OVERLAYS + AIM + MARKS + WORLDS).match(/fillText\(\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
-    // Четыре подписи: метка тумана, схема, поле астероидов, выноска мира.
-    expect(WORLDS.match(/fillText\(placeName\(/g)?.length).toBe(4);
+    // Три подписи: схема, поле астероидов, выноска мира. Помнимый мир подписан выноской,
+    // как при разведке, а метка тумана имени не пишет: имя скрыто вместе с миром.
+    expect(WORLDS.match(/fillText\(placeName\(/g)?.length).toBe(3);
   });
 
   it('заголовок карточки мира — имя, а не id узла (UIX-5.2)', () => {
@@ -60,7 +61,7 @@ describe('UIX-5.3 — надписи холста словами языка иг
   });
 
   it('гарнизон и старые данные на холсте подписаны ключами (UIX-5.4)', () => {
-    expect(WORLDS.match(/t\('map\.callout\.garrison'/g)?.length).toBe(2);
+    expect(WORLDS.match(/t\('map\.callout\.garrison'/g)?.length).toBe(1);
     expect(WORLDS).toContain("t('map.fog.old')");
   });
 
