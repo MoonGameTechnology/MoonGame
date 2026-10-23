@@ -65,6 +65,9 @@ export function endReasonText(reason: string | undefined, operation?: OperationS
       return operationEndText(operation);
     case 'pve-evac-lost':
       return t('ai.end.pve-evac-lost');
+    // TRN-3: исход полигона объявляет его сценарий.
+    case 'training-held':
+      return t('training.end.held');
     default:
       return t('ai.end.over');
   }

@@ -34,10 +34,13 @@ export const DEFAULT_COALITION_FACTOR = 0.7;
 const SESSION_MAX_DAYS: Record<number, number> = { 1: 100, 2: 60, 4: 30 };
 const DEFAULT_SESSION_DAYS = 100;
 
+/** The numeric race rules; `scripted` is a switch of the evaluator, not a published rule. */
+export type VictoryRules = Required<Omit<VictoryConfig, 'scripted'>>;
+
 /** Effective numeric rules used by this evaluator and published by the server.
  *  The mode must already be resolved. Return a fresh allowlisted object so a
  *  browser projection cannot mutate the config or disclose internal extensions. */
-export function effectiveVictoryRules(config?: MatchConfig): Required<VictoryConfig> {
+export function effectiveVictoryRules(config?: MatchConfig): VictoryRules {
   const victory = config?.victory;
   return {
     scoreLimit: victory?.scoreLimit ?? DEFAULT_SCORE_LIMIT,
@@ -394,6 +397,12 @@ function evaluateVictory(h: HandlerContext): void {
   const activeBefore = playerIds.filter(
     (playerId) => h.state.players[playerId]?.status === 'active',
   );
+  // A scripted scenario (TRN-3) ends by its script: a seat without worlds stays in with
+  // its fleets — the training ground's counterattack arrives after its worlds fell.
+  if (h.ctx.config?.victory?.scripted) {
+    endOnSessionCap(h, scores, activeBefore, rules.endsAt);
+    return;
+  }
   // PvE (PVE-4) is decided FIRST, and — importantly — before the `< 2 active` guard
   // below. That guard exists for the PvP race (a one-player board has no race to
   // decide), but in PvE it is exactly the losing position: the Swarm alone on the

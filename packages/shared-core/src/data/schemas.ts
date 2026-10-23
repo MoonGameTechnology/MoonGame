@@ -1337,6 +1337,8 @@ export const ModeVictorySchema = z
     dominationPercent: z.number().gt(0).max(1).optional(),
     scoreLimit: z.number().positive().optional(),
     coalitionFactor: z.number().positive().optional(),
+    /** `VictoryConfig.scripted`: the scenario, not a race, ends the match. */
+    scripted: z.literal(true).optional(),
   })
   .strict();
 

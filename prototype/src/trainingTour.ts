@@ -38,6 +38,9 @@ export interface TrainingTourDeps {
   data: GameData;
   baseline: TrainingBaseline;
   ui: TrainingTourUi;
+  /** Соединение противника уже введено сценарием (TRN-3): патруль, которого ещё не было,
+   *  этап «Бой» не засчитывает. Нет — считаем, что всё на карте с начала. */
+  introduced?: (fleetId: string) => boolean;
 }
 
 export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
@@ -389,7 +392,13 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
           }),
         ]
       : []),
-    ...route('battle', 'patrol', 'hero', 'open_reach', () => fleetGone(d.world(), 'p2_patrol')),
+    ...route(
+      'battle',
+      'patrol',
+      'hero',
+      'open_reach',
+      () => (d.introduced?.('p2_patrol') ?? true) && fleetGone(d.world(), 'p2_patrol'),
+    ),
     ...details('battle', 'details'),
     ...commands('battle', 'hero-commands', 'cast'),
     step('battle', 'hero-open', '[data-cmd="cast"]', visible('[data-cmd="castdo"]')),

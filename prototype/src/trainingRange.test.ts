@@ -43,9 +43,10 @@ describe('учебный полигон: исход', () => {
     expect(s.match.status).not.toBe('ended');
   });
 
-  it('взяты пост и планета-цель — победа игрока, даже без маяка и разведки', () => {
+  it('взяты пост и планета-цель — ещё не победа: исход объявляет сценарий после контратаки (TRN-3)', () => {
     const s = advance(take(start(), ['outpost', 'target']), 2 * HOUR).state;
-    expect({ status: s.match.status, winner: s.match.winner }).toEqual({ status: 'ended', winner: 'p1' });
+    expect(s.match.status).not.toBe('ended');
+    expect(s.players.p2?.status).toBe('active'); // противник без миров не выбывает
     const rows = missionRows(trainingObjectives(), s, 'p1');
     expect(rows.find((r) => r.id === 'mission.training-beacon')?.complete).toBe(false);
   });

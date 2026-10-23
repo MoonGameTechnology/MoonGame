@@ -1,6 +1,16 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { advance, order, setMatchMode } from './game';
+import {
+  RAID,
+  RAID_IDLE,
+  STAGED_FORCES,
+  TRAINING_ENEMY,
+  trainingVerdict,
+  withForce,
+  withVerdict,
+  type ScenarioForce,
+} from '../../decisions/trainingScenario';
 import { data } from './gameData';
 import { trainingModeId, trainingState } from '../../packages/client/src/gameData';
 import { freshSectorZeroProgress, prepareSectorZeroRun } from '../../decisions/sectorZeroProgress';
@@ -46,6 +56,8 @@ function until(s: GameState, ok: (s: GameState) => boolean, limit = 48, quantum 
   for (let h = 0; h < limit && !ok(cur); h += quantum) cur = wait(cur, quantum);
   return cur;
 }
+/** Ввести соединение сценария (TRN-3) — так, как это делает игра на входе в этап. */
+const introduce = (s: GameState, force: ScenarioForce): GameState => withForce(s, force);
 const heroOf = (s: GameState) => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)!;
 /** Ударный флот героя. Вернувшись туда, где стоит свой флот, он вливается в него
  *  (`autoMerge`), и герой едет вместе с кораблями — его `fleetId` и есть ударный флот. */
@@ -97,14 +109,19 @@ describe('учебный полигон: все двенадцать этапо�
     expect(split).toBeDefined();
     s = act(s, 'fleet.merge', { from: split, into: 'p1_2' });
 
-    // 7. Космический бой и герой: разбить патруль на открытом участке, применить способность.
+    // 7. Космический бой и герой: патруль появляется на входе в этап (TRN-3) — разбить
+    // его на открытом участке, применить способность.
+    expect(s.fleets.p2_patrol).toBeUndefined();
+    s = introduce(s, STAGED_FORCES.find((f) => f.id === 'p2_patrol')!);
     s = act(s, 'fleet.move', { fleetId: main(s), to: 'open_reach' });
     s = until(s, (x) => fleetGone(x, 'p2_patrol'));
     expect(fleetGone(s, 'p2_patrol')).toBe(true);
     const hero = heroOf(s);
     s = act(s, 'hero.ability', { heroId: hero.id, abilityId: hero.equipped![0] });
 
-    // 8. Отход и восстановление: войти в бой у планеты-цели, отступить, отремонтироваться.
+    // 8. Отход и восстановление: на входе в этап у цели встаёт охрана (TRN-3) — войти в
+    // бой у планеты-цели, отступить, отремонтироваться.
+    s = introduce(s, STAGED_FORCES.find((f) => f.id === 'p2_guard')!);
     s = act(s, 'fleet.move', { fleetId: main(s), to: 'target' });
     s = until(s, (x) => !!x.fleets[main(x)]?.battleId, 48, 0.01);
     s = act(s, 'fleet.retreat', { fleetId: main(s), to: 'open_reach' });
@@ -159,6 +176,22 @@ describe('учебный полигон: все двенадцать этапо�
     s = until(s, (x) => fortified(x, ME, base));
     expect(fortified(s, ME, base)).toBe(true);
     expect(garrisoned(s, ME, 'outpost')).toBe(true);
+    // Объявленная контратака (TRN-3): три фрегата с открытого участка идут на пост и
+    // разбиваются о форт, ПКО и флот.
+    s = introduce(s, RAID);
+    const raid = order(
+      s,
+      { id: `w:p2:${++seq}`, type: 'fleet.move', playerId: TRAINING_ENEMY, payload: { fleetId: RAID.id, to: RAID.to }, issuedAt: s.time },
+      s.time,
+    );
+    expect(raid.error).toBeUndefined();
+    s = raid.state;
+    const launched = { ...RAID_IDLE, announced: true, launched: true };
+    s = until(s, (x) => fleetGone(x, RAID.id));
+    expect(fleetGone(s, RAID.id)).toBe(true);
+    expect(owns(s, ME, 'outpost')).toBe(true);
+    // Взятые миры сами операцию не кончают: режим сценарный.
+    expect(s.match.status).not.toBe('ended');
 
     // 12. Финал: собрать все крейсеры в один кулак, взять с поста десант и штурмовать
     // планету-цель (форт, батарея, фрегаты) — операция окончена победой.
@@ -195,8 +228,14 @@ describe('учебный полигон: все двенадцать этапо�
       s = act(s, 'fleet.bombard', { fleetId: main(s), on: false });
       expect(s.planets.target!.garrison.some((u) => u.count > 0)).toBe(true);
       s = act(s, 'fleet.assault', { fleetId: main(s) });
-      s = until(s, (x) => owns(x, ME, 'target') || x.match.status === 'ended');
+      s = until(s, (x) => owns(x, ME, 'target'));
     }
+    expect(owns(s, ME, 'target')).toBe(true);
+    // Ни одного мира у противника — а ядро операцию не кончило: исход объявляет сценарий.
+    expect(s.match.status).not.toBe('ended');
+    const verdict = trainingVerdict(s, ME, launched);
+    expect(verdict).toEqual({ winner: ME, reason: 'training-held' });
+    s = withVerdict(s, verdict!);
     expect({ status: s.match.status, winner: s.match.winner }).toEqual({
       status: 'ended',
       winner: ME,

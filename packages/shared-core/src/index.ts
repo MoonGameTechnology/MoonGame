@@ -690,7 +690,7 @@ export {
 export { instantRepairModule } from './modules/instantRepair';
 export { fleetRepairModule } from './modules/fleetRepair';
 export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
-export { victoryModule, effectiveVictoryRules } from './modules/victory';
+export { victoryModule, effectiveVictoryRules, type VictoryRules } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export {
   heroModule,

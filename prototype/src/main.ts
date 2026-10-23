@@ -490,6 +490,13 @@ import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVis
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder, settleOrder } from './orderPipeline';
+import {
+  forceIntroduced,
+  hideTrainingBoard,
+  resetTrainingScenario,
+  tickTrainingScenario,
+  type TrainingScenarioHost,
+} from './trainingScenario';
 import { startSimLink, workerPort, type SimLink } from './simLink';
 import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
@@ -5177,6 +5184,7 @@ function startTraining(): void {
           // Synchronize the phone selection before Show expands its sheet.
           render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
         }),
+        introduced: forceIntroduced,
       }),
     );
   };
@@ -5188,6 +5196,8 @@ function startTraining(): void {
     const prepared = order(s, mergeFleet(ME, merge.from, merge.into), s.time);
     if (!prepared.error) apply(prepared);
   }
+  // TRN-3: силы противника, контратака и исход — у сценария; на входе он начинается заново.
+  resetTrainingScenario(s.time);
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
   showConnect(false);
   showHub(false);
@@ -5986,6 +5996,24 @@ initSectorZeroShell({
 // спрашивают сами, поэтому выход из забега не надо не забыть «выключить».
 setRunClock(isSectorZeroRun);
 
+/** Что сценарию полигона (TRN-3) нужно от игры. */
+const trainingScenarioHost: TrainingScenarioHost = {
+  world: () => s,
+  setWorld: (state) => apply({ state, events: [] }),
+  order: (state, action) => order(state, action, state.time).state,
+  me: () => ME,
+  tour: () => activeTour,
+  note,
+  // Табло — под верхней панелью по её настоящему низу: `--tbh` у раскладок ПК меньше, чем
+  // панель вышла на деле, и табло наезжало на её край.
+  board: () => {
+    const board = document.getElementById('trnraid');
+    const top = document.getElementById('top')?.getBoundingClientRect().bottom;
+    if (board && top !== undefined && top > 0) board.style.top = `${Math.round(top) + 8}px`;
+    return board;
+  },
+};
+
 function frame(nowReal: number) {
   flushPinch();
   const wasHolographic = holographic.active();
@@ -6136,6 +6164,10 @@ function frame(nowReal: number) {
     }
   }
   tickRunSave(nowReal);
+  // TRN-3: сценарий полигона — силы по этапам, контратака и исход. Каждый кадр: силы входят
+  // на входе в этап, даже когда тур держит часы; отсчёт идёт по часам мира и стоит вместе с ними.
+  if (isTraining()) tickTrainingScenario(trainingScenarioHost);
+  else hideTrainingBoard(document.getElementById('trnraid'));
   tickSoloSave(nowReal);
   if (gameplayMarked !== (sectorRunActive && speed > 0 && !comicQueue.isBusy())) markGameplay();
   renderSwarmDossier(nowReal);
