@@ -342,6 +342,22 @@ describe('REFM-228 — погрузка десанта', () => {
     expect(input.plan).toEqual({});
   });
 
+  it('трюм общий с шаттлами: эскадра на борту занимает свои места', async () => {
+    const { go, env, fleet } = await boot();
+    const { data } = await import('./gameData');
+    const { hangarSize } = await import('../../packages/shared-core/src/index');
+    const before = go.troopsInputFor(fleet.id)!.used;
+    // Найдено в обучении: «максимум» меню набирал полный трюм при бомбардировщике на борту,
+    // и ядро отбивало погрузку «трюм полон».
+    const hangar = [{ id: 'sq:p1:1', units: [{ unit: 'bomber', count: 1 }] }];
+    env.world = {
+      ...env.world,
+      fleets: { ...env.world.fleets, [fleet.id]: { ...fleet, hangar } },
+    };
+    expect(go.troopsInputFor(fleet.id)!.used - before).toBe(hangarSize({ hangar }, data));
+    expect(hangarSize({ hangar }, data)).toBeGreaterThan(0);
+  });
+
   it('флот в пути или чужой мир без трюма — меню нет', async () => {
     const { go, env, home, foe, fleet } = await boot();
     const to = home.links![0]!;

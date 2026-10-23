@@ -13,7 +13,11 @@ window.__guideTest = {
   advanceHours: (hours) => apply(advance(s, s.time + hours * 3600000)),
   facts: () => ({ planets: Object.values(s.planets).filter(p => p.owner === ME).map(p => p.id),
     ships: __guideShipCount(s, ME), fleet: __guideFleet(s, ME), onboard: loadOnboard(),
-    xp: loadMeta().xp, mine: __guideMineLevel(s, 'home_1'), tech: s.players[ME]?.technologies, selected: selFleet }),
+    xp: loadMeta().xp, mine: __guideMineLevel(s, 'home_1'), tech: s.players[ME]?.technologies, selected: selFleet,
+    hero: Object.values(s.heroes ?? {}).find(h => h.owner === ME && h.grade === 'main'),
+    lots: (s.market ?? []).filter(o => o.owner === 'npc-guild').length,
+    log: logLines.slice(-6),
+    medal: Object.keys(localStorage).filter(k => k.startsWith('vd.medal.tutorial.')).map(k => JSON.parse(localStorage.getItem(k))) }),
 };`),
 );
 const browser = await launchBrowser();
@@ -23,6 +27,25 @@ const modes = process.argv.includes('--desktop')
   : process.argv.includes('--phone')
     ? ['phone']
     : ['desktop', 'phone'];
+// The operation chapters (firstMatchOperation.ts) name their own steps `<chapter>.<step>`;
+// these wait on the world clock and move forward in one-hour hops, never past a step.
+const opWait = (step) => /^[a-z]+\.(?:[a-z]+-wait|troops-aboard|flight|capture)$/.test(step);
+const shots = new Set([
+  'mine-order',
+  'ship-order',
+  'course',
+  'done',
+  'market.sell',
+  'hero.remove',
+  'hero.world',
+  'ground.militia',
+  'aviation.load',
+  'landing.troops-max',
+  'landing.course',
+  'assault.strike-target',
+  'assault.rally',
+  'assault.capture',
+]);
 const controls = {
   'buildings-tab': '[data-act="tab"][data-arg="buildings"]',
   details: '#mobile-sheet [data-mobile="details"]',
@@ -42,6 +65,41 @@ const controls = {
   move: '[data-cmd="move"]',
   'course-confirm': '[data-cmd="mobile-send"]',
 };
+// The guide scrolls a target below a window's fold into view (smoothly): press it once the
+// highlight stands still on screen, as a player would.
+async function settledRing(page) {
+  const { height } = page.viewportSize();
+  let prev = null;
+  for (let i = 0; i < 40; i++) {
+    const rect = await page.locator('.sl-ring').boundingBox();
+    const centre = rect && rect.y + rect.height / 2;
+    if (
+      rect &&
+      prev &&
+      Math.abs(rect.x - prev.x) < 1 &&
+      Math.abs(rect.y - prev.y) < 1 &&
+      centre > 0 &&
+      centre < height
+    )
+      return rect;
+    prev = rect;
+    await page.waitForTimeout(100);
+  }
+  return prev;
+}
+async function stepMoved(page, step, timeout, required = false) {
+  try {
+    await page.waitForFunction(
+      (previous) => document.querySelector('#spotlight')?.dataset.step !== previous,
+      step,
+      { timeout },
+    );
+    return true;
+  } catch (e) {
+    if (required) throw e;
+    return false;
+  }
+}
 try {
   for (const mode of modes) {
     const page = await browser.newPage(
@@ -76,23 +134,40 @@ try {
         if (pass) await replay();
         else await page.locator('#ob-start').click();
         let last = '';
-        for (let guard = 0; guard < 40; guard++) {
+        for (let guard = 0; guard < 160; guard++) {
           await page.locator('#spotlight').waitFor({ state: 'visible' });
           const step = await page.locator('#spotlight').getAttribute('data-step');
           assert.notEqual(step, last, `stuck at ${step}`);
           last = step;
           console.log(mode, step);
-          if (['mine-order', 'ship-order', 'course', 'done'].includes(step))
+          // The lesson's ×300 rides on the speedbar on PC and on the phone's speed button.
+          if (step === 'welcome')
+            if (mode === 'phone')
+              assert.match(await page.locator('#phone-speed').innerText(), /×300/);
+            else assert.ok(await page.locator('#spd-lesson').isVisible(), 'no ×300');
+          if (pass === 0 && shots.has(step))
             await page.screenshot({ path: `/tmp/gw-onboarding/${mode}-${step}.png` });
-          if (['mine-wait', 'research-wait', 'ship-wait', 'capture'].includes(step)) {
+          if (pass === 1 && step.includes('.')) {
+            // The replay checks the chapter skip: the operation is left for later.
+            await page.locator('.sl-skip-stage').click();
+          } else if (['mine-wait', 'research-wait', 'ship-wait', 'capture'].includes(step)) {
             await page.evaluate(() => window.__guideTest.advanceHours(24));
+          } else if (opWait(step)) {
+            for (let h = 0; h < 48; h++) {
+              await page.evaluate(() => window.__guideTest.advanceHours(1));
+              await page.waitForTimeout(50);
+              if ((await page.locator('#spotlight').getAttribute('data-step')) !== step) break;
+            }
           } else if (['welcome', 'nav', 'score', 'done'].includes(step)) {
             await page.locator('.sl-next').click();
             if (step === 'done') break;
           } else {
-            if (['home', 'fleet', 'course'].includes(step)) {
-              await page.locator('.sl-reveal').click();
-              await page.waitForTimeout(200);
+            if (['home', 'fleet', 'course'].includes(step) || step.includes('.')) {
+              const reveal = page.locator('.sl-reveal');
+              if (await reveal.isVisible()) {
+                await reveal.click();
+                await page.waitForTimeout(200);
+              }
             }
             if (step === 'fleet') {
               const id = await page.evaluate(() => window.__guideTest.facts().fleet.id);
@@ -107,18 +182,38 @@ try {
               if (mode === 'phone') await control.tap();
               else await control.click();
             } else {
-              const rect = await page.locator('.sl-ring').boundingBox();
-              assert.ok(rect && rect.width > 0, `missing target for ${step}`);
-              // A real pointer event at the highlighted target, including canvas objects.
-              if (mode === 'phone')
-                await page.touchscreen.tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
-              else await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+              // A target the guide is still scrolling out from under a panel's edge can
+              // miss the first press; a step that has not moved is pressed again.
+              for (let attempt = 0; attempt < 3; attempt++) {
+                // Four militia: the order button is pressed four times.
+                for (let n = step === 'ground.militia' && attempt === 0 ? 4 : 1; n > 0; n--) {
+                  const rect = await settledRing(page);
+                  assert.ok(rect && rect.width > 0, `missing target for ${step}`);
+                  // A real pointer event at the highlighted target, including canvas objects.
+                  if (mode === 'phone')
+                    await page.touchscreen.tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
+                  else await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+                  if (n > 1) await page.waitForTimeout(150);
+                }
+                if (await stepMoved(page, step, 4000)) break;
+              }
             }
           }
+          await stepMoved(page, step, 30000, true);
+        }
+        const medal = page.locator('#tutorial-medal');
+        if (pass === 0) {
+          // The whole course earns the medal: the award window opens over the match.
+          await medal.waitFor({ state: 'visible' });
           await page.waitForFunction(
-            (previous) => document.querySelector('#spotlight')?.dataset.step !== previous,
-            step,
+            () => document.querySelector('#tutorial-medal [role="status"]')?.textContent,
           );
+          await page.screenshot({ path: `/tmp/gw-onboarding/${mode}-medal.png` });
+          await medal.locator('[data-tmedal="ok"]').click();
+          await medal.waitFor({ state: 'hidden' });
+        } else {
+          await page.waitForTimeout(300);
+          assert.equal(await medal.isVisible(), false, 'the medal window opens once');
         }
         const facts = await page.evaluate(() => window.__guideTest.facts());
         assert.equal(facts.onboard.completed, true);
@@ -126,6 +221,15 @@ try {
         assert.ok(facts.ships >= 1);
         assert.ok(facts.tech.completed.includes('frigate_design'));
         assert.ok(facts.planets.includes('shale'));
+        assert.deepEqual(facts.medal, [{ earned: true, claimed: [] }]);
+        if (pass === 0) {
+          // The operation by real orders: both guild lots, the refit, the deployed hero ship
+          // and the garrisoned world taken by the landing.
+          assert.equal(facts.lots, 0);
+          assert.deepEqual(facts.hero.modules, ['repair_bay', 'cargo_bay']);
+          assert.ok(facts.hero.fleetId);
+          assert.ok(facts.planets.includes('world_1'));
+        }
         assert.equal(await page.evaluate(() => localStorage.getItem('void.solo.v1')), saved);
         if (pass === 0) firstXp = facts.xp;
         else assert.equal(facts.xp, firstXp, 'replay cannot award XP again');
@@ -140,7 +244,7 @@ try {
       assert.equal(await page.evaluate(() => localStorage.getItem('void.solo.v1')), saved);
       assert.deepEqual(errors, []);
       console.log(
-        `${mode}: complete, real research/build/movement/capture; replay/skip/fold and existing save preserved`,
+        `${mode}: complete, real research/build/movement/capture, market/hero/troops/aviation/assault and the medal; replay/chapter skip/skip/fold and existing save preserved`,
       );
     } catch (e) {
       console.error(e);

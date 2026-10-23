@@ -361,3 +361,36 @@ it('counts only completed, seated accounts and handles coalition winners once', 
   expect(await profiles.progress('b')).toMatchObject({ matches: 1, wins: 1, teamWins: 1 });
   expect(await profiles.progress('c')).toEqual({});
 });
+
+describe('tutorial medal claim', () => {
+  it('credits a signed-in account exactly once, without XP, and the medal can be worn', async () => {
+    const { app, profiles, commanders, alice, bob } = await fixture();
+    try {
+      const claim = (authorization?: string) =>
+        app.inject({
+          method: 'POST',
+          url: '/profiles/rewards/tutorial',
+          ...(authorization ? { headers: { authorization } } : {}),
+        });
+      expect((await claim()).statusCode).toBe(401);
+      expect(await profiles.progress(alice)).toEqual({});
+      const results = await Promise.all([claim('Alice'), claim('Alice'), claim('Alice')]);
+      expect(results.map((r) => r.statusCode)).toEqual([200, 200, 200]);
+      expect(results[0]!.json()).toEqual({ medalId: 'tutorial' });
+      expect(results[0]!.headers['cache-control']).toBe('no-store');
+      expect(await profiles.progress(alice)).toEqual({ tutorial: 1 });
+      expect(medalGrade('tutorial', await profiles.progress(alice))).toBe(3);
+      expect(await commanders.xpOf(alice)).toBe(0);
+      expect(await profiles.progress(bob)).toEqual({});
+      const look = defaultAppearance();
+      look.slots[0] = 'tutorial';
+      const wear = (authorization: string) =>
+        app.inject({ method: 'POST', url: '/profiles/me', headers: { authorization }, payload: look });
+      expect((await wear('Bob')).statusCode).toBe(403);
+      expect((await wear('Alice')).statusCode).toBe(200);
+      expect((await profiles.appearance(alice)).slots[0]).toBe('tutorial');
+    } finally {
+      await app.close();
+    }
+  });
+});

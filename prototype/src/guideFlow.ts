@@ -5,23 +5,28 @@
  *
  * Модуль — хозяин живого тура {@link activeTour} и очереди гида: тур полигона собирает
  * `main.ts` и ставит в очередь дверью {@link setPendingGuide}, а запускает тот же лаунчер.
- * Мир, своё место, позывной, раскладку, мета-прогресс, переходы хаба и старт партии модуль
- * получает хуками {@link initGuideFlow}: импорт из `main.ts` был бы циклом.
+ * Мир, своё место, позывной, раскладку, мета-прогресс, переходы хаба, старт партии, лист
+ * телефона, рынок и медаль за обучение модуль получает хуками {@link initGuideFlow}: импорт
+ * из `main.ts` был бы циклом.
  */
 import { isForkSite, type GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import {
+  GUIDE_ASSAULT,
   GUIDE_HULL,
   GUIDE_TARGET,
   GUIDE_TECH,
   guideCourseSet,
   guideFleet,
   guideMineLevel,
+  guideScenario,
   guideShipCount,
 } from '../../decisions/firstMatchGuide';
 import { note } from './eventFeed';
 import { FIRST_GOALS, type GoalSignals, goalsComplete, mergeDone, metGoals } from './firstGoals';
 import { buildFirstMatchTour } from './firstMatchTour';
+import { operationUi } from './firstMatchOperationDom';
+import { data } from './gameData';
 import {
   GOALS_BONUS_XP,
   goalsChanged,
@@ -74,8 +79,19 @@ export interface GuideFlowHost {
   showHub(show: boolean): void;
   /** Показать или скрыть экран входа. */
   showConnect(show: boolean): void;
-  /** Начать партию по настройке; `persist` — помнить её как последнюю. */
-  startMatch(setup: SetupConfig, persist: boolean): void;
+  /** Начать партию по настройке; `persist` — помнить её как последнюю; `scenario` кладёт
+   *  поверх нового мира мир урока. */
+  startMatch(setup: SetupConfig, persist: boolean, scenario?: (st: GameState) => GameState): void;
+  /** Телефонный лист развёрнут именно для этого выбора (`planet:<id>` / `fleet:<id>`). */
+  sheetExpanded(key: string): boolean;
+  /** Свернуть телефонный лист. */
+  collapseSheet(): void;
+  /** Подтянуть телефонный лист к текущему выбору. */
+  refreshSheet(): void;
+  /** Открыть рынок партии на товаре. */
+  openMarket(good: string): void;
+  /** Гид кончился: медаль за обучение решает сама, весь ли курс пройден. */
+  tutorialEnded(run: { completed: boolean; assaultWon: boolean }): void;
   /** Дев-диагностика включена (`?dev`). */
   devUi(): boolean;
 }
@@ -133,6 +149,14 @@ let pendingGuide: (() => void) | null = null;
  *  полигона (TRN-2): его тур собирает `main.ts`, а запускает тот же лаунчер. */
 export function setPendingGuide(run: () => void): void {
   pendingGuide = run;
+}
+// The running match is the guided lesson: its ×300 rides on the speedbar.
+let guidedLesson = false;
+/** Идёт ли урок: полоса скорости показывает его ×300. */
+export const lessonRunning = (): boolean => guidedLesson;
+/** Новая партия — уже не урок (installMatch); startGuidedMatch поднимает флаг после неё. */
+export function forgetLesson(): void {
+  guidedLesson = false;
 }
 export function maybeStartPendingTour(): void {
   if (!pendingGuide || NET) return;
@@ -226,14 +250,41 @@ export function startGuidedMatch(): void {
               ?.click();
         },
         showTarget: () => focusWorld(GUIDE_TARGET),
+        operation: {
+          world: live,
+          me: me(),
+          home,
+          data,
+          ui: operationUi({
+            world: live,
+            me,
+            mobile: game.mobile(),
+            expanded: () =>
+              game.sheetExpanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`),
+            collapse: () => game.collapseSheet(),
+            tab: () => planetTab,
+            ships: () => setPlanetTab('ships'),
+            market: (good) => game.openMarket(good),
+            // Synchronize the phone selection before Show expands its sheet.
+            render: () => {
+              invalidatePanel();
+              renderPanel();
+              game.refreshSheet();
+            },
+          }),
+        },
       }),
       onGuidedTourEnded,
     );
   };
   game.showHub(false);
   game.showConnect(false);
-  game.startMatch(buildSetupConfig(), false); // installMatch → maybeStartPendingTour runs the guide
+  // installMatch → maybeStartPendingTour runs the guide; the scenario adds the operation's
+  // hero refit, granted technologies and the guild's market lots.
+  const setup = buildSetupConfig();
+  game.startMatch(setup, false, (st) => guideScenario(st, setup.seats[0]!.id));
   // The bot-free lesson accelerates the real construction, research and travel clocks.
+  guidedLesson = true;
   applyTimeSpeed(300);
   note(t('onb.tour.speed'));
 }
@@ -247,6 +298,11 @@ function onGuidedTourEnded(r: TourResult): void {
     game.saveMeta({ ...cur, xp: cur.xp + xp });
     note(t('onb.tour.done', { n: xp }));
   }
+  // The medal is for the whole course: the guide's end with the garrisoned world taken.
+  game.tutorialEnded({
+    completed: r.completed,
+    assaultWon: live().planets[GUIDE_ASSAULT]?.owner === me(),
+  });
   stopFirstGoals(); // ONB-7: the checklist belongs to the onboarding session only
   if (game.devUi())
     console.debug(

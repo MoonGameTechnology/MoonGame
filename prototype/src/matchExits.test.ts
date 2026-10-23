@@ -92,6 +92,13 @@ describe('timeControlsShown', () => {
     expect(timeControlsShown(true, false, false, true)).toBe(true);
     expect(timeControlsShown(false, false, false, true)).toBe(true);
   });
+
+  // Правило 7: ×300 урока видно и на ПК без дев-выключателя.
+  it('shows the lesson tempo in the guided first match on a PC without the dev toggle', () => {
+    expect(timeControlsShown(true, false, false, false, true)).toBe(true);
+    expect(timeControlsShown(false, false, false, false, true)).toBe(true);
+    expect(timeControlsShown(true, false, true, false, true)).toBe(false); // правило 5 сильнее
+  });
 });
 
 describe('rule 6 in the markup', () => {
@@ -120,11 +127,13 @@ describe('rule 6 in the frame', () => {
     expect(bar).toContain('const run = game.toolsHidden();');
     expect(bar).toContain("speedbarEl.classList.toggle('spd-run', run);");
     expect(bar).toContain(
-      'timeControlsShown(pcUi(), game.speedControl(), netWorld, run)',
+      'timeControlsShown(pcUi(), game.speedControl(), netWorld, run, lesson)',
     );
+    expect(bar).toContain('const lesson = game.lessonSpeed() && !netWorld;');
     expect(bar).toContain("speedbarShown(pcUi(), showSpdCtl === '', restartShown)");
     expect(main).toContain('toolsHidden: sectorZeroToolsHidden,');
     expect(main).toContain('speedControl: () => devSpeedControl,');
+    expect(main).toContain('lessonSpeed: lessonRunning,');
     expect(main).toMatch(/renderEndScreen\(\);\s*renderSpeedbar\(\);/);
   });
 

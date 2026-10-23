@@ -1108,6 +1108,7 @@
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (соло без соперников) |
 | ONB-12 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговое обучение Galactic War по действующему интерфейсу |
+| ONB-13 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Операция урока и медаль за обучение [proto/srv] |
 | TRN-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговый полигон Sector Zero |
 | ONB-3 | ✅ | proto | `docs/onboarding-roadmap.md` | Just-in-time интро механик (прогрессивное раскрытие) |
 | ONB-4 | ✅ | proto | `docs/onboarding-roadmap.md` | Help/кодекс-хаб («?» везде) |

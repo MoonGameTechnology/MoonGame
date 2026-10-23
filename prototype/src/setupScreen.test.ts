@@ -299,7 +299,10 @@ describe('REFM-212 — что уезжает в матч', () => {
     expect(el('setupslots').innerHTML).toContain('data-teamseat');
     tap('setupmap', { 'data-cand': 'home_3' });
     expect(screen.buildSetupConfig().seats.map((s) => [s.start, s.team])).toEqual([
-      ['home_3', 'B'], ['home_1', 'A'], ['home_2', 'A'], ['home_4', 'B'],
+      ['home_3', 'B'],
+      ['home_1', 'A'],
+      ['home_2', 'A'],
+      ['home_4', 'B'],
     ]);
     tap('setupslots', { 'data-teamseat': '1' });
     expect(screen.buildSetupConfig().seats[1]!.team).toBe('A');
@@ -515,7 +518,11 @@ describe('REFM-212 — стык с main.ts: двери вместо присво
     const guided = body('startGuidedMatch', GUIDE);
     const door = guided.indexOf('prepareGuidedSetup();');
     expect(door).toBeGreaterThan(-1);
-    expect(guided.indexOf('game.startMatch(buildSetupConfig(), false);')).toBeGreaterThan(door);
+    // The lesson's own world (guideScenario) is laid over the setup the door prepared.
+    expect(guided.indexOf('const setup = buildSetupConfig();')).toBeGreaterThan(door);
+    expect(
+      guided.indexOf('game.startMatch(setup, false, (st) => guideScenario(st,'),
+    ).toBeGreaterThan(door);
   });
 
   it('сетевой вход открывает экран, затем ставит сетевой режим; опрос отдаёт места владельцу', () => {

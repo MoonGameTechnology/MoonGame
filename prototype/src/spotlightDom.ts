@@ -248,7 +248,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
     ? t('onb.tour.stage', {
         k: view.stage.index + 1,
         n: view.stage.count,
-        title: t(`training.stage.${view.stage.id}`),
+        title: t(view.step.stageTitle ?? `training.stage.${view.stage.id}`),
       })
     : t('onb.tour.step', { k: view.index + 1, n: view.count });
   o.copy.textContent = t(view.step.copy);
@@ -325,6 +325,22 @@ export interface RunningTour {
 
 let current: SpotlightTour | null = null;
 
+/** Is the target wholly on screen, inside the scrolling panel that holds it? */
+function onScreen(node: Element, r: DOMRect): boolean {
+  let top = 0;
+  let bottom = innerHeight;
+  for (let e = node.parentElement; e; e = e.parentElement) {
+    const overflow = getComputedStyle(e).overflowY;
+    if (overflow === 'auto' || overflow === 'scroll') {
+      const box = e.getBoundingClientRect();
+      top = Math.max(top, box.top);
+      bottom = Math.min(bottom, box.bottom);
+      break;
+    }
+  }
+  return r.top >= top && r.bottom <= bottom;
+}
+
 /**
  * Start a data-described tour over the live HUD. Returns a handle whose
  * `notifyAction` the host wires to its action funnel. A new tour supersedes any
@@ -340,7 +356,13 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   // 'smooth'` scroll would never settle): `scrollIntoView` only actually moves a
   // genuinely scrollable ancestor (the app's own body/window never scroll — fixed
   // single-viewport layout), so this is a no-op for fixed HUD targets like #cmdbar.
+  // A panel that is still opening or re-rendering can cut that smooth scroll short (the
+  // fleet console right after a ship is picked): for the first seconds of a step a
+  // target left outside its panel is scrolled again, at once. Later the player may
+  // scroll the panel freely.
   let scrolledFor: string | null = null;
+  let scrollStart = 0;
+  let scrollCheck = 0;
   const host: SpotlightHost = {
     locate: (sel) => {
       const node = Array.from(document.querySelectorAll(sel)).find((el) => {
@@ -351,9 +373,14 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
       const r = node.getBoundingClientRect();
       // A detached / display:none node reports a zero box — treat as absent.
       if (r.width === 0 && r.height === 0) return null;
+      const now = performance.now();
       if (scrolledFor !== sel) {
         scrolledFor = sel;
+        scrollStart = scrollCheck = now;
         node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (now - scrollStart < 3000 && now - scrollCheck > 500) {
+        scrollCheck = now;
+        if (!onScreen(node, r)) node.scrollIntoView({ block: 'nearest' });
       }
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     },
