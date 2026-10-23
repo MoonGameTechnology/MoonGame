@@ -16,6 +16,7 @@ import {
   retireDatabaseLogin,
 } from './databaseSecurity';
 import { migrate, PostgresUserStore, PostgresMatchStore, PostgresAccountStore } from './store/postgres';
+import { PostgresBotRosterStore, SYSTEM_BOT_ROSTER } from './botRoster';
 
 it('requires an explicit DML grant decision when a migration introduces a table', () => {
   const sql = readFileSync(new URL('./store/postgres.ts', import.meta.url), 'utf8');
@@ -131,6 +132,36 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     await root.end();
   });
 
+  it('migrates bot handles at startup with runtime DML while keeping the deletion ledger protected', async () => {
+    const runtime = connect(app, pass);
+    await prepareRuntimeDatabase(runtime, { DB_AUTO_MIGRATE: '0', DB_REQUIRE_LEAST_PRIVILEGE: '1' });
+    await expect(runtime.query('DELETE FROM account_deletions')).rejects.toMatchObject({ code: '42501' });
+    await expect(runtime.query('UPDATE account_deletions SET completed_at=now()')).rejects.toMatchObject({ code: '42501' });
+    // Runtime startup migrates permanent bot handles using DML privileges only.
+    // Its deletion ledger remains read/append-only throughout the migration.
+    const bot = SYSTEM_BOT_ROSTER[0]!;
+    await admin.query(
+      'INSERT INTO bot_roster_identities(id,login,portrait,seed,xp) VALUES($1,$2,$3,$4,77)',
+      [bot.id, '~Orion', bot.portrait, bot.seed],
+    );
+    const [assignment] = await new PostgresBotRosterStore(admin).assign('runtime-bot-match', ['p2'], 1, 1);
+    const botAccounts = new PostgresAccountStore(runtime);
+    await botAccounts.resolveSeat('runtime-bot-match', '~Orion', ['p2']);
+    await botAccounts.bindSeatTicket('runtime-bot-match', '~Orion', 'retained-bot-ticket');
+    const runtimeBots = new PostgresBotRosterStore(runtime);
+    await runtimeBots.ensureRoster();
+    await runtimeBots.ensureRoster();
+    expect(await runtimeBots.findByLogin(bot.login)).toEqual({ ...bot, xp: 77 });
+    expect(await runtimeBots.findByLogin('~Orion')).toBeNull();
+    expect(await runtimeBots.assignments('runtime-bot-match')).toEqual([
+      { ...assignment, login: bot.login },
+    ]);
+    expect(await botAccounts.seatOf('runtime-bot-match', bot.login)).toBe('p2');
+    expect(await botAccounts.seatTicket('runtime-bot-match', bot.login)).toBe('retained-bot-ticket');
+    await expect(runtime.query('DELETE FROM account_deletions')).rejects.toMatchObject({ code: '42501' });
+    await expect(runtime.query('UPDATE account_deletions SET completed_at=now()')).rejects.toMatchObject({ code: '42501' });
+  });
+
   it('backup/restore retains data and runtime DML while refusing schema ownership', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'restore-acl-'));
     const run = promisify(execFile);
@@ -150,6 +181,7 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       expect(await new PostgresUserStore(runtime).findUser('existing')).toMatchObject({ passHash: 'hash' });
       await expect(runtime.query('UPDATE account_erasure_guard SET required=false')).rejects.toMatchObject({ code: '42501' });
       await expect(runtime.query('DELETE FROM account_deletions')).rejects.toMatchObject({ code: '42501' });
+      await expect(runtime.query('UPDATE account_deletions SET completed_at=now()')).rejects.toMatchObject({ code: '42501' });
       await new PostgresUserStore(runtime).createUser('delete-fixture', 'hash');
       const stored = await new PostgresUserStore(runtime).findUser('delete-fixture');
       const deletion = await new PostgresUserStore(runtime).requestDeletion(stored!);

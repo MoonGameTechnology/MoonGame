@@ -1,3 +1,4 @@
+import { reservedBotLogin } from '../botNicknames';
 import type {
   CorpBuildOrder,
   CorpInfrastructureResult,
@@ -451,12 +452,14 @@ const SCHEMA_SQL = `
     -- Catalogue seeding never replaces their appearance, seed or earned XP.
     CREATE TABLE IF NOT EXISTS bot_roster_identities (
       id text PRIMARY KEY,
-      login text NOT NULL CHECK (left(login, 1) = '~'),
+      login text NOT NULL,
       portrait integer NOT NULL CHECK (portrait BETWEEN 1 AND 40),
       seed bigint NOT NULL CHECK (seed BETWEEN 0 AND 4294967295),
       xp bigint NOT NULL DEFAULT 0 CHECK (xp BETWEEN 0 AND 9007199254740991),
       last_assigned_at bigint CHECK (last_assigned_at BETWEEN 0 AND 8640000000000000)
     );
+    -- Display names no longer carry a mandatory system prefix.
+    ALTER TABLE bot_roster_identities DROP CONSTRAINT IF EXISTS bot_roster_identities_login_check;
     CREATE UNIQUE INDEX IF NOT EXISTS bot_roster_login_idx ON bot_roster_identities (lower(login));
     CREATE TABLE IF NOT EXISTS bot_roster_matches (
       match_id text PRIMARY KEY,
@@ -921,6 +924,7 @@ export class PostgresUserStore implements UserStore {
   ): Promise<
     { ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }
   > {
+    if (reservedBotLogin(login)) return { ok: false, code: 'E_LOGIN_TAKEN' };
     const userId = randomUUID();
     try {
       // Historical snapshots can carry a callsign without an account ID. Reserve

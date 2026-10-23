@@ -11,7 +11,15 @@ import {
 import type { ChatMessage } from '@void/protocol';
 import { MatchRoom, type MatchRoomOptions, type RoomPeer } from './matchRoom';
 import { loadShippedData } from './scenario';
-import { botChatIntent, createBotSocial, type BotSocialOptions } from './botSocial';
+import {
+  botChatIntent,
+  botReplyDelayMs,
+  botSocialAvailable,
+  createBotSocial,
+  BOT_REPLY_DELAY_MAX_MS,
+  BOT_REPLY_DELAY_MIN_MS,
+  type BotSocialOptions,
+} from './botSocial';
 
 class Peer implements RoomPeer {
   messages: { type: string; message?: ChatMessage }[] = [];
@@ -30,6 +38,8 @@ function fixture(
     behavior?: BotSocialOptions['behavior'];
     persist?: MatchRoomOptions['persist'];
     render?: BotSocialOptions['render'];
+    availability?: BotSocialOptions['availability'];
+    replyDelay?: BotSocialOptions['replyDelay'];
   } = {},
 ) {
   const data = loadShippedData();
@@ -72,7 +82,9 @@ function fixture(
   const social = createBotSocial({
     room,
     isBot: (id) => id === 'bot' || id === 'bot2',
-    render: options.render ?? ((key) => key),
+    render: options.render ?? ((key) => key.replace(/\.(?:casual|short)$/, '')),
+    availability: options.availability ?? (() => true),
+    replyDelay: options.replyDelay ?? (() => 1500),
     behavior: options.behavior,
     now: () => Date.now(),
     onError: (code) => failures.push(code),
@@ -100,34 +112,44 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('small bot conversation grammar', () => {
+describe('English-only small bot conversation grammar', () => {
   it.each([
-    ['привет', 'greeting', 'ru'],
-    ['Hello commander', 'greeting', 'en'],
-    ['давай мир', 'peace', 'ru'],
-    ['предлагаю пакт', 'pact', 'ru'],
-    ['/peace', 'peace', 'en'],
-    ['/мир', 'peace', 'ru'],
-    ['make peace', 'peace', 'en'],
-    ['offer pact', 'pact', 'en'],
-    ['объявляю тебе войну', 'war', 'ru'],
-    ['I declare war', 'war', 'en'],
-    ['/war', 'war', 'en'],
-    ['хочу торговать', 'trade', 'ru'],
-    ['trade', 'trade', 'en'],
-    ['alliance', 'alliance', 'en'],
-  ])('recognises a direct phrase %s', (text, intent, locale) => {
-    expect(botChatIntent(text!)).toEqual({ intent, locale });
+    ['Hello commander', 'greeting'],
+    ['yo bro', 'greeting'],
+    ['sup', 'greeting'],
+    ['/peace', 'peace'],
+    ['make peace', 'peace'],
+    ['offer pact', 'pact'],
+    ['I declare war', 'war'],
+    ['/war', 'war'],
+    ['trade', 'trade'],
+    ['alliance', 'alliance'],
+  ])('recognises an English phrase %s', (text, intent) => {
+    expect(botChatIntent(text!)).toEqual({ intent, locale: 'en' });
   });
   it.each([
-    'не хочу мира',
-    'не объявляй войну',
-    'не хочу войны',
-    'он написал война',
-    'как объявить войну?',
-    'война',
-    'он написал объявляю войну',
-    '«объявляю войну»',
+    'привет',
+    'давай мир',
+    '/мир',
+    'предлагаю пакт',
+    'объявляю войну',
+    'こんにちは',
+    '你好',
+    'مرحبا',
+    'hola amigo',
+    'bonjour',
+    'buenos días',
+    'quiero paz',
+    'guten tag',
+    'ciao',
+    'merhaba',
+    'privet',
+    'comment ca va',
+    'szia baratom',
+  ])('asks for English instead of interpreting a foreign message: %s', (text) => {
+    expect(botChatIntent(text)).toEqual({ intent: 'english-only', locale: 'en' });
+  });
+  it.each([
     '"declare war"',
     'declare war?',
     'how do I declare war?',
@@ -136,26 +158,91 @@ describe('small bot conversation grammar', () => {
     'no pact',
     'he said make peace',
     "'make peace'",
-    'мир',
     'peace',
-    'пакт о ненападении',
     'non aggression pact',
     '`declare war`',
     '(declare war)',
     'declare war？',
     'declare war؟',
-  ])('does not turn negation, quotation or discussion into an order: %s', (text) => {
+    'could we build a café',
+  ])('never turns negation, quotation or discussion into an order: %s', (text) => {
     expect(botChatIntent(text).intent).toBe('help');
+  });
+});
+
+describe('sparse social timing', () => {
+  it('gives every bot only five minutes per ninety wall-clock minutes, with separate stable phases', () => {
+    const period = 90 * 60_000;
+    const phases: number[] = [];
+    for (const bot of ['bot', 'bot2', 'bot3', 'bot4']) {
+      const active = Array.from({ length: 90 }, (_, minute) =>
+        botSocialAvailable(bot, minute * 60_000),
+      );
+      expect(active.filter(Boolean)).toHaveLength(5);
+      expect(active).toEqual(
+        Array.from({ length: 90 }, (_, minute) =>
+          botSocialAvailable(bot, period + minute * 60_000),
+        ),
+      );
+      phases.push(active.indexOf(true));
+    }
+    expect(new Set(phases).size).toBeGreaterThan(1);
+    expect(botSocialAvailable('bot', Number.NaN)).toBe(false);
+  });
+
+  it('varies reply delay from twelve to forty-five seconds deterministically', () => {
+    const delays = Array.from({ length: 30 }, (_, index) => {
+      const message = { id: 'chat:' + index, from: 'human', to: 'bot' };
+      const delay = botReplyDelayMs(message);
+      expect(delay).toBe(botReplyDelayMs(message));
+      expect(delay).toBeGreaterThanOrEqual(BOT_REPLY_DELAY_MIN_MS);
+      expect(delay).toBeLessThanOrEqual(BOT_REPLY_DELAY_MAX_MS);
+      return delay;
+    });
+    expect(new Set(delays).size).toBeGreaterThan(20);
+  });
+
+  it('ignores messages while unavailable without waking a timer or answering later', async () => {
+    const availability = vi.fn(() => false);
+    const f = fixture({ availability });
+    await f.send('hello');
+    expect(vi.getTimerCount()).toBe(0);
+    availability.mockReturnValue(true);
+    await vi.advanceTimersByTimeAsync(90 * 60_000);
+    expect(f.human.texts()).toEqual(['hello']);
+    await f.send('hey');
+    expect(vi.getTimerCount()).toBe(1);
+    await f.deliver();
+    expect(f.human.texts().at(-1)).toBe('bot-chat.greeting');
+  });
+
+  it('waits the actual chosen delay without blocking and cancels if availability ends first', async () => {
+    const f = fixture({ replyDelay: botReplyDelayMs });
+    await f.send('hello');
+    const message = f.human.messages.find((entry) => entry.message)?.message;
+    const delay = botReplyDelayMs(message!);
+    await vi.advanceTimersByTimeAsync(delay - 1);
+    expect(f.human.texts()).toEqual(['hello']);
+    expect(f.room.peerCount).toBe(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.human.texts().at(-1)).toBe('bot-chat.greeting');
+    const availability = vi.fn(() => true);
+    const closed = fixture({ availability, replyDelay: () => 45_000 });
+    await closed.send('/war');
+    availability.mockReturnValue(false);
+    await vi.advanceTimersByTimeAsync(45_000);
+    expect(closed.human.texts()).toEqual(['/war']);
+    expect(getStance(closed.room.state, 'human', 'bot')).toBe('peace');
   });
 });
 
 describe('bounded persistent bot DM responder', () => {
   it('uses ordinary private chat/history without synthetic human connections or reply loops', async () => {
     const f = fixture();
-    await f.send('привет');
-    expect(f.human.texts()).toEqual(['привет']);
+    await f.send('hello');
+    expect(f.human.texts()).toEqual(['hello']);
     await f.deliver();
-    expect(f.human.texts()).toEqual(['привет', 'bot-chat.greeting']);
+    expect(f.human.texts()).toEqual(['hello', 'bot-chat.greeting']);
     expect(f.other.texts()).toEqual([]);
     expect(f.room.peerCount).toBe(2);
     expect(f.observations.filter((kind) => kind === 'join')).toHaveLength(2);
@@ -163,7 +250,7 @@ describe('bounded persistent bot DM responder', () => {
     f.room.removePeer('human', f.human);
     const reconnected = new Peer();
     f.room.addPeer('human', reconnected);
-    expect(reconnected.texts()).toEqual(['привет', 'bot-chat.greeting']);
+    expect(reconnected.texts()).toEqual(['hello', 'bot-chat.greeting']);
     expect(f.failures).toEqual([]);
   });
 
@@ -196,7 +283,7 @@ describe('bounded persistent bot DM responder', () => {
     await f.send('hello', 'bot', 'other');
     await f.deliver();
     expect(f.human.texts().filter((text) => text === 'bot-chat.greeting')).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(12_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await f.send('hello');
     await f.deliver();
     expect(f.human.texts().filter((text) => text === 'bot-chat.greeting')).toHaveLength(2);
@@ -225,6 +312,8 @@ describe('bounded persistent bot DM responder', () => {
       },
       isBot: (id) => id === 'bot' || id === 'bot2',
       render: (key) => key,
+      availability: () => true,
+      replyDelay: () => 1500,
     });
     for (let i = 0; i < 500; i++) {
       social.onMessage({
@@ -246,10 +335,10 @@ describe('bounded persistent bot DM responder', () => {
 
   it('cancels delayed work on shutdown, elimination and match end', async () => {
     const stopped = fixture();
-    await stopped.send('давай мир');
+    await stopped.send('make peace');
     stopped.social.stop();
     await stopped.deliver();
-    expect(stopped.human.texts()).toEqual(['давай мир']);
+    expect(stopped.human.texts()).toEqual(['make peace']);
     const ended = fixture();
     await ended.send('hello');
     ended.room.state.match.status = 'ended';
@@ -268,7 +357,9 @@ describe('bounded persistent bot DM responder', () => {
     const f = fixture({
       stance: 'war',
       persist: async (_snapshot, receipt) => {
-        await new Promise<void>((resolve) => { finish = resolve; });
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
         persisted.push(receipt.playerId);
       },
     });
@@ -276,7 +367,9 @@ describe('bounded persistent bot DM responder', () => {
     await f.deliver();
     f.social.stop();
     let drained = false;
-    const closing = f.social.drain().then(() => { drained = true; });
+    const closing = f.social.drain().then(() => {
+      drained = true;
+    });
     await vi.advanceTimersByTimeAsync(0);
     expect(drained).toBe(false);
     finish();
@@ -292,14 +385,14 @@ describe('bounded persistent bot DM responder', () => {
 
   it('revoked consent cannot act for a new owner of the same seat', async () => {
     const f = fixture({ stance: 'war' });
-    await f.send('давай мир');
+    await f.send('make peace');
     f.room.evict('human');
     const next = new Peer();
     f.room.addPeer('human', next);
     await f.deliver();
     expect(getStance(f.room.state, 'human', 'bot')).toBe('war');
     expect(getOffer(f.room.state, 'human', 'bot')).toBeNull();
-    expect(next.texts()).toEqual(['давай мир']);
+    expect(next.texts()).toEqual(['make peace']);
     expect(f.observations.includes('action')).toBe(false);
   });
 
@@ -322,21 +415,21 @@ describe('bounded persistent bot DM responder', () => {
 
   it('refuses via the core decline action and never claims peace when it stayed at war', async () => {
     const f = fixture({ stance: 'war', behavior: () => false });
-    await f.send('давай мир');
+    await f.send('make peace');
     await f.deliver();
     expect(getStance(f.room.state, 'human', 'bot')).toBe('war');
     expect(getOffer(f.room.state, 'human', 'bot')).toBeNull();
-    expect(f.human.texts()).toEqual(['давай мир', 'bot-chat.negotiation-refused']);
+    expect(f.human.texts()).toEqual(['make peace', 'bot-chat.negotiation-refused']);
   });
 
   it('negotiates a real pact, and a unilateral explicit war tears it down', async () => {
     const f = fixture();
-    await f.send('предлагаю пакт');
+    await f.send('offer pact');
     await f.deliver();
     expect(getStance(f.room.state, 'human', 'bot')).toBe('pact');
     expect(f.human.texts().at(-1)).toBe('bot-chat.pact-accepted');
-    await vi.advanceTimersByTimeAsync(15_000);
-    await f.send('объявляю войну');
+    await vi.advanceTimersByTimeAsync(300_000);
+    await f.send('declare war');
     await f.deliver();
     expect(getStance(f.room.state, 'human', 'bot')).toBe('war');
     expect(f.human.texts().at(-1)).toBe('bot-chat.war-confirmed');
@@ -359,14 +452,14 @@ describe('bounded persistent bot DM responder', () => {
   it('discussion, unsupported alliances and trade never invent game actions or transfers', async () => {
     const f = fixture({ stance: 'war' });
     const before = structuredClone(f.room.state);
-    await f.send('как объявить войну?');
+    await f.send('how do I declare war?');
     await f.deliver();
     expect(f.human.texts().at(-1)).toBe('bot-chat.help');
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await f.send('trade');
     await f.deliver();
     expect(f.human.texts().at(-1)).toBe('bot-chat.trade');
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await f.send('alliance');
     await f.deliver();
     expect(f.human.texts().at(-1)).toBe('bot-chat.alliance-refused');
@@ -374,23 +467,40 @@ describe('bounded persistent bot DM responder', () => {
     expect(f.observations.includes('action')).toBe(false);
   });
 
-  it('localizes independently per DM, and contains responder failures without a loop', async () => {
+  it('always renders English, varies short replies, and contains renderer failures without loops', async () => {
     const render = vi.fn((key: string, locale: string) => key + ':' + locale);
     const f = fixture({ render });
     await f.send('привет');
     await f.deliver();
-    expect(f.human.texts().at(-1)).toBe('bot-chat.greeting:ru');
-    await vi.advanceTimersByTimeAsync(15_000);
-    await f.send('hello');
-    await f.deliver();
-    expect(f.human.texts().at(-1)).toBe('bot-chat.greeting:en');
+    expect(f.human.texts().at(-1)).toMatch(/^bot-chat\.english-only(?:\.(?:casual|short))?:en$/);
+    expect(f.observations.includes('action')).toBe(false);
+    for (let index = 0; index < 8; index++) {
+      await vi.advanceTimersByTimeAsync(300_000);
+      await f.send('hello');
+      await f.deliver();
+    }
+    expect(new Set(render.mock.calls.map(([key]) => key)).size).toBeGreaterThan(2);
+    expect(render.mock.calls.every(([, locale]) => locale === 'en')).toBe(true);
     render.mockImplementation(() => {
       throw new Error('private');
     });
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await f.send('hello');
     await f.deliver();
     expect(f.failures).toEqual(['E_BOT_REPLY']);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('asks for English before acting on foreign diplomacy and never cascades into another reply', async () => {
+    const f = fixture({ stance: 'war' });
+    const before = structuredClone(f.room.state);
+    await f.send('давай мир');
+    await f.deliver();
+    expect(f.human.texts()).toEqual(['давай мир', 'bot-chat.english-only']);
+    expect(f.room.state).toEqual(before);
+    expect(f.observations.includes('action')).toBe(false);
+    await vi.advanceTimersByTimeAsync(90 * 60_000);
+    expect(f.human.texts()).toHaveLength(2);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

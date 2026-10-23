@@ -1,3 +1,4 @@
+import { reservedBotLogin } from '../botNicknames';
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
@@ -251,7 +252,8 @@ export class MemoryUserStore implements UserStore {
     { ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }
   > {
     const key = login.toLowerCase();
-    if (this.byLogin.has(key)) return Promise.resolve({ ok: false, code: 'E_LOGIN_TAKEN' });
+    if (reservedBotLogin(login) || this.byLogin.has(key))
+      return Promise.resolve({ ok: false, code: 'E_LOGIN_TAKEN' });
     const mail = email?.toLowerCase();
     if (mail && this.byEmail(mail)) return Promise.resolve({ ok: false, code: 'E_EMAIL_TAKEN' });
     const userId = randomUUID();

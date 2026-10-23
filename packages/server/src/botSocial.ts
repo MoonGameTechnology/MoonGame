@@ -1,71 +1,131 @@
 import { getStance, type Action, type GameState } from '@void/shared-core';
 import type { ChatMessage } from '@void/protocol';
 
-export const BOT_REPLY_KEYS = [
-  'bot-chat.greeting',
-  'bot-chat.help',
-  'bot-chat.trade',
-  'bot-chat.alliance-refused',
-  'bot-chat.peace-current',
-  'bot-chat.peace-accepted',
-  'bot-chat.pact-current',
-  'bot-chat.pact-accepted',
-  'bot-chat.war-current',
-  'bot-chat.war-confirmed',
-  'bot-chat.negotiation-refused',
-  'bot-chat.negotiation-failed',
-] as const;
+const BOT_REPLY_VARIANTS = {
+  'bot-chat.greeting': ['bot-chat.greeting', 'bot-chat.greeting.casual', 'bot-chat.greeting.short'],
+  'bot-chat.help': ['bot-chat.help', 'bot-chat.help.casual', 'bot-chat.help.short'],
+  'bot-chat.english-only': [
+    'bot-chat.english-only',
+    'bot-chat.english-only.casual',
+    'bot-chat.english-only.short',
+  ],
+  'bot-chat.trade': ['bot-chat.trade', 'bot-chat.trade.casual', 'bot-chat.trade.short'],
+  'bot-chat.alliance-refused': [
+    'bot-chat.alliance-refused',
+    'bot-chat.alliance-refused.casual',
+    'bot-chat.alliance-refused.short',
+  ],
+  'bot-chat.peace-current': [
+    'bot-chat.peace-current',
+    'bot-chat.peace-current.casual',
+    'bot-chat.peace-current.short',
+  ],
+  'bot-chat.peace-accepted': [
+    'bot-chat.peace-accepted',
+    'bot-chat.peace-accepted.casual',
+    'bot-chat.peace-accepted.short',
+  ],
+  'bot-chat.pact-current': [
+    'bot-chat.pact-current',
+    'bot-chat.pact-current.casual',
+    'bot-chat.pact-current.short',
+  ],
+  'bot-chat.pact-accepted': [
+    'bot-chat.pact-accepted',
+    'bot-chat.pact-accepted.casual',
+    'bot-chat.pact-accepted.short',
+  ],
+  'bot-chat.war-current': [
+    'bot-chat.war-current',
+    'bot-chat.war-current.casual',
+    'bot-chat.war-current.short',
+  ],
+  'bot-chat.war-confirmed': [
+    'bot-chat.war-confirmed',
+    'bot-chat.war-confirmed.casual',
+    'bot-chat.war-confirmed.short',
+  ],
+  'bot-chat.negotiation-refused': [
+    'bot-chat.negotiation-refused',
+    'bot-chat.negotiation-refused.casual',
+    'bot-chat.negotiation-refused.short',
+  ],
+  'bot-chat.negotiation-failed': [
+    'bot-chat.negotiation-failed',
+    'bot-chat.negotiation-failed.casual',
+    'bot-chat.negotiation-failed.short',
+  ],
+} as const;
+type BotReplyBaseKey = keyof typeof BOT_REPLY_VARIANTS;
+export const BOT_REPLY_KEYS = Object.values(BOT_REPLY_VARIANTS).flat();
 export type BotReplyKey = (typeof BOT_REPLY_KEYS)[number];
 
-type Intent = 'greeting' | 'peace' | 'pact' | 'war' | 'trade' | 'alliance' | 'help';
+type Intent =
+  'greeting' | 'peace' | 'pact' | 'war' | 'trade' | 'alliance' | 'help' | 'english-only';
+// The adapter still supports catalog validation for both locales; bot speech
+// always selects English, independently of the recipient's interface language.
 export type BotReplyLocale = 'ru' | 'en';
 
-/** Deliberately small command grammar. Merely mentioning a war (or negating it)
- * never declares one; unrecognised prose receives help and changes no game state. */
-export function botChatIntent(text: string): { intent: Intent; locale: BotReplyLocale } {
-  const normalized = text.normalize('NFKC');
-  const locale = /[а-яё]/i.test(normalized) ? 'ru' : 'en';
-  // Quoted commands and questions are conversation, never consent to an order.
-  if (/["'«»“”‘’‹›„‟‚‛`?؟()[\]{}<>]/.test(normalized)) return { intent: 'help', locale };
-  const command = /^\/(peace|pact|war|мир|пакт|война)$/i.exec(normalized.trim());
-  if (command) {
-    const word = command[1]!.toLowerCase();
-    return {
-      intent:
-        word === 'peace' || word === 'мир'
-          ? 'peace'
-          : word === 'pact' || word === 'пакт'
-            ? 'pact'
-            : 'war',
-      locale,
-    };
-  }
+/** A small English command grammar, not a general language detector. Foreign
+ * scripts, common foreign words and unknown prose receive an English request.
+ * No translation or inferred consent: only explicit English orders can act. */
+export function botChatIntent(text: string): { intent: Intent; locale: 'en' } {
+  const normalized = text.normalize('NFKC').toLowerCase().trim();
+  const foreignScript = Array.from(normalized).some(
+    (letter) => /\p{L}/u.test(letter) && !/\p{Script=Latin}/u.test(letter),
+  );
   const words = normalized
-    .toLowerCase()
     .replace(/[\p{P}\p{S}]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  const foreignWords =
+    /(?:^|\s)(?:hola|bonjour|bonsoir|salut|ciao|buongiorno|hallo|guten|merhaba|selam|privet|davai|spasibo|gracias|quiero|paz|guerra|merci|paix|frieden|krieg|danke|bitte|grazie|alleanza|obrigado|olá|você|pacto)(?:\s|$)/u;
+  if (foreignScript || foreignWords.test(words)) return { intent: 'english-only', locale: 'en' };
+  const englishWords =
+    /(?:^|\s)(?:i|you|we|he|she|hello|hi|hey|yo|sup|what|whats|how|hows|where|when|why|please|pls|plz|can|could|would|the|and|is|are|my|thanks|thank|gg|gl|hf|nice|trade|buy|sell|market|alliance|coalition|peace|pact|war|stop|make|offer|declare|help|oof|lol|brb|afk|ok|okay|yep|nah|sorry|sry|dude|bro|mate|wanna|gotta|need|want|u|r|ty|np)(?:\s|$)/;
+  if (!englishWords.test(words)) return { intent: 'english-only', locale: 'en' };
+  // Quoted commands and questions are conversation, never consent to an order.
+  if (/["'«»“”‘’‹›„‟‚‛`?؟()[\]{}<>]/.test(normalized)) return { intent: 'help', locale: 'en' };
+  const command = /^\/(peace|pact|war)$/.exec(normalized);
+  if (command) return { intent: command[1] as 'peace' | 'pact' | 'war', locale: 'en' };
   let intent: Intent = 'help';
-  if (/^(?:я )?объявляю (?:тебе )?войну$|^(?:i )?declare war(?: on you)?$/.test(words))
-    intent = 'war';
-  else if (
-    /^(?:давай|предлагаю|заключим) мир$|^давай помиримся$|^давай без войны$|^(?:make peace|let us make peace|i offer peace|stop the war)$/.test(
-      words,
-    )
-  )
+  if (/^(?:i )?declare war(?: on you)?$/.test(words)) intent = 'war';
+  else if (/^(?:make peace|let us make peace|i offer peace|stop the war)$/.test(words))
     intent = 'peace';
-  else if (
-    /^(?:давай|предлагаю|заключим) пакт(?: о ненападении)?$|^(?:offer pact|let us make a pact)$/.test(
-      words,
-    )
-  )
-    intent = 'pact';
-  else if (/\b(?:alliance|coalition)\b|(?:союз|коалици)/.test(words)) intent = 'alliance';
-  else if (/\b(?:trade|buy|sell|market)\b|(?:торгов|купить|продать|рынок)/.test(words))
-    intent = 'trade';
-  else if (/^(?:привет|здравствуй|здравствуйте|салют|hello|hi|hey)(?: |$)/.test(words))
-    intent = 'greeting';
-  return { intent, locale };
+  else if (/^(?:offer pact|let us make a pact)$/.test(words)) intent = 'pact';
+  else if (/\b(?:alliance|coalition)\b/.test(words)) intent = 'alliance';
+  else if (/\b(?:trade|buy|sell|market)\b/.test(words)) intent = 'trade';
+  else if (/^(?:hello|hi|hey|yo|sup)(?: |$)/.test(words)) intent = 'greeting';
+  return { intent, locale: 'en' };
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++)
+    hash = Math.imul(hash ^ value.charCodeAt(index), 16777619) >>> 0;
+  return hash;
+}
+
+const SOCIAL_PERIOD_MS = 90 * 60_000;
+const SOCIAL_WINDOW_MS = 5 * 60_000;
+export const BOT_REPLY_DELAY_MIN_MS = 12_000;
+export const BOT_REPLY_DELAY_MAX_MS = 45_000;
+
+/** Stable, separate wall-clock availability per bot; no polling or world-time
+ * dependence, and restarting the host does not open a fresh availability window. */
+export function botSocialAvailable(botId: string, wall: number): boolean {
+  if (!Number.isFinite(wall)) return false;
+  const phase = stableHash('availability:' + botId) % SOCIAL_PERIOD_MS;
+  const elapsed = (((wall - phase) % SOCIAL_PERIOD_MS) + SOCIAL_PERIOD_MS) % SOCIAL_PERIOD_MS;
+  return elapsed < SOCIAL_WINDOW_MS;
+}
+
+export function botReplyDelayMs(message: Pick<ChatMessage, 'id' | 'from' | 'to'>): number {
+  const seed = JSON.stringify(['delay', message.to, message.from, message.id]);
+  return (
+    BOT_REPLY_DELAY_MIN_MS +
+    (stableHash(seed) % (BOT_REPLY_DELAY_MAX_MS - BOT_REPLY_DELAY_MIN_MS + 1))
+  );
 }
 
 interface BotSocialRoom {
@@ -94,16 +154,19 @@ export interface BotSocialOptions {
     state: GameState,
   ) => boolean;
   now?: () => number;
+  /** Scheduling seams for isolated tests; production hosts use the sparse defaults. */
+  availability?: (botId: string, wall: number) => boolean;
+  replyDelay?: (message: Readonly<ChatMessage>) => number;
   /** Stable diagnostic only; chat text, names and credentials stay out of logs. */
   onError?: (code: 'E_BOT_REPLY') => void;
 }
 
-const PAIR_COOLDOWN_MS = 15_000;
-const BOT_COOLDOWN_MS = 5_000;
+const PAIR_COOLDOWN_MIN_MS = 2 * 60_000;
+const PAIR_COOLDOWN_SPREAD_MS = 3 * 60_000;
+const BOT_COOLDOWN_MS = 2 * 60_000;
 const ROOM_WINDOW_MS = 60_000;
 const ROOM_REPLIES_MAX = 12;
 const COOLDOWN_KEYS_MAX = 256;
-const REPLY_DELAY_MS = 1_500;
 interface PendingReply {
   timer: ReturnType<typeof setTimeout> | null;
 }
@@ -117,6 +180,8 @@ export function createBotSocial(options: BotSocialOptions): {
   drain(): Promise<void>;
 } {
   const now = options.now ?? Date.now;
+  const available = options.availability ?? botSocialAvailable;
+  const replyDelay = options.replyDelay ?? botReplyDelayMs;
   const pairAt = new Map<string, number>();
   const botAt = new Map<string, number>();
   let roomAt: number[] = [];
@@ -144,16 +209,18 @@ export function createBotSocial(options: BotSocialOptions): {
     const bot = message.to!;
     const current = (): boolean =>
       live(human, bot) && options.room.admissionRevision === admissionRevision;
-    if (!current()) return;
+    if (!current() || !available(bot, now())) return;
     const { intent, locale } = botChatIntent(message.text);
-    let key: BotReplyKey =
-      intent === 'greeting'
-        ? 'bot-chat.greeting'
-        : intent === 'trade'
-          ? 'bot-chat.trade'
-          : intent === 'alliance'
-            ? 'bot-chat.alliance-refused'
-            : 'bot-chat.help';
+    let key: BotReplyBaseKey =
+      intent === 'english-only'
+        ? 'bot-chat.english-only'
+        : intent === 'greeting'
+          ? 'bot-chat.greeting'
+          : intent === 'trade'
+            ? 'bot-chat.trade'
+            : intent === 'alliance'
+              ? 'bot-chat.alliance-refused'
+              : 'bot-chat.help';
     const submit = (actor: string, step: string, type: string, payload: Action['payload']) =>
       options.room.submitServerAction(
         actor,
@@ -212,7 +279,11 @@ export function createBotSocial(options: BotSocialOptions): {
       }
     }
     // A shutdown/elimination while awaiting persistence must not speak for a dead bot.
-    if (current()) options.room.sendServerChat(bot, human, options.render(key, locale));
+    if (current()) {
+      const variants = BOT_REPLY_VARIANTS[key];
+      const variant = stableHash(JSON.stringify(['reply', bot, message.id])) % variants.length;
+      options.room.sendServerChat(bot, human, options.render(variants[variant]!, locale));
+    }
   };
 
   return {
@@ -226,9 +297,12 @@ export function createBotSocial(options: BotSocialOptions): {
       )
         return;
       const wall = now();
+      if (!Number.isFinite(wall) || !available(message.to, wall)) return;
       const pair = JSON.stringify([message.from, message.to]);
+      const pairCooldown =
+        PAIR_COOLDOWN_MIN_MS + (stableHash(pair) % (PAIR_COOLDOWN_SPREAD_MS + 1));
       if (
-        wall - (pairAt.get(pair) ?? -Infinity) < PAIR_COOLDOWN_MS ||
+        wall - (pairAt.get(pair) ?? -Infinity) < pairCooldown ||
         wall - (botAt.get(message.to) ?? -Infinity) < BOT_COOLDOWN_MS
       )
         return;
@@ -254,7 +328,7 @@ export function createBotSocial(options: BotSocialOptions): {
           .finally(() => {
             if (pending === work) pending = null;
           });
-      }, REPLY_DELAY_MS);
+      }, replyDelay(accepted));
     },
     stop() {
       stopped = true;
