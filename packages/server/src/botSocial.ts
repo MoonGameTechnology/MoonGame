@@ -114,6 +114,7 @@ interface PendingReply {
 export function createBotSocial(options: BotSocialOptions): {
   onMessage(message: Readonly<ChatMessage>): void;
   stop(): void;
+  drain(): Promise<void>;
 } {
   const now = options.now ?? Date.now;
   const pairAt = new Map<string, number>();
@@ -121,6 +122,7 @@ export function createBotSocial(options: BotSocialOptions): {
   let roomAt: number[] = [];
   let pending: PendingReply | null = null;
   let stopped = false;
+  let inFlight: Promise<void> = Promise.resolve();
   const remember = (map: Map<string, number>, key: string, at: number): void => {
     map.delete(key);
     map.set(key, at);
@@ -241,7 +243,7 @@ export function createBotSocial(options: BotSocialOptions): {
       const admissionRevision = options.room.admissionRevision;
       work.timer = setTimeout(() => {
         work.timer = null;
-        void answer(accepted, admissionRevision)
+        inFlight = answer(accepted, admissionRevision)
           .catch(() => {
             try {
               options.onError?.('E_BOT_REPLY');
@@ -262,5 +264,7 @@ export function createBotSocial(options: BotSocialOptions): {
       botAt.clear();
       roomAt = [];
     },
+    // stop() revokes further consent; wait for a durable action already submitted.
+    drain: () => inFlight,
   };
 }

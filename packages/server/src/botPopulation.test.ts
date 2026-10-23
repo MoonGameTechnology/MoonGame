@@ -519,6 +519,33 @@ describe('bot results and restart recovery', () => {
 describe('gradual bot arrival timing', () => {
   afterEach(() => vi.useRealTimers());
 
+  it.each([false, true])('drains an admission already in flight after stop (failure=%s)', async (failed) => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const admitted: string[] = [];
+    const onError = vi.fn();
+    const join = vi.fn(async () => {
+      await new Promise<void>((resolve) => { finish = resolve; });
+      if (failed) throw new Error('admission unavailable');
+      admitted.push('confirmed');
+    });
+    const loop = startBotArrivals({ config: CONFIG, random: () => 0, canJoin: () => true, join, onError });
+    await vi.advanceTimersByTimeAsync(CONFIG.joinMinMs);
+    expect(join).toHaveBeenCalledTimes(1);
+    loop.stop();
+    let drained = false;
+    const closing = loop.drain().then(() => { drained = true; });
+    await vi.advanceTimersByTimeAsync(CONFIG.joinMaxMs);
+    expect(drained).toBe(false);
+    finish();
+    await closing;
+    expect(admitted).toEqual(failed ? [] : ['confirmed']);
+    expect(onError).toHaveBeenCalledTimes(failed ? 1 : 0);
+    await vi.advanceTimersByTimeAsync(CONFIG.joinMaxMs * 10);
+    expect(join).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('waits before the first arrival, serializes slow admissions, and stops cleanly', async () => {
     vi.useFakeTimers();
     let finish!: () => void;
