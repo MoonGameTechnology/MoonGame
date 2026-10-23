@@ -1,0 +1,75 @@
+{
+  "sample_rate": 48000,
+  "channels": 2,
+  "effects": [
+    {
+      "file": "sfx/01_research_complete.wav",
+      "name": "Исследование завершено",
+      "duration": 3.0,
+      "peak_dbfs": -11.0,
+      "rms_dbfs": -29.6
+    },
+    {
+      "file": "sfx/02_territory_threat.wav",
+      "name": "Угроза территории",
+      "duration": 3.2,
+      "peak_dbfs": -9.0,
+      "rms_dbfs": -28.73
+    },
+    {
+      "file": "sfx/03_objective_complete.wav",
+      "name": "Задача выполнена",
+      "duration": 4.2,
+      "peak_dbfs": -10.0,
+      "rms_dbfs": -26.46
+    },
+    {
+      "file": "sfx/04_swarm_contact.wav",
+      "name": "Контакт с Роем",
+      "duration": 4.2,
+      "peak_dbfs": -11.0,
+      "rms_dbfs": -27.37
+    },
+    {
+      "file": "sfx/05_link_lost.wav",
+      "name": "Связь потеряна",
+      "duration": 3.4,
+      "peak_dbfs": -11.0,
+      "rms_dbfs": -29.66
+    },
+    {
+      "file": "sfx/06_link_restored.wav",
+      "name": "Связь восстановлена",
+      "duration": 3.1,
+      "peak_dbfs": -11.0,
+      "rms_dbfs": -29.66
+    }
+  ],
+  "preview_timeline": [
+    {
+      "start": 0.7,
+      "name": "Исследование завершено"
+    },
+    {
+      "start": 4.5,
+      "name": "Угроза территории"
+    },
+    {
+      "start": 8.5,
+      "name": "Задача выполнена"
+    },
+    {
+      "start": 13.5,
+      "name": "Контакт с Роем"
+    },
+    {
+      "start": 18.5,
+      "name": "Связь потеряна"
+    },
+    {
+      "start": 22.7,
+      "name": "Связь восстановлена"
+    }
+  ],
+  "preview_duration": 26.6
+}
