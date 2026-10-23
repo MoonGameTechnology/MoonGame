@@ -156,7 +156,7 @@ describe('multilingual public text moderation', () => {
     expect(censorChatText('Hello f.u.c.k and KURWA!', 240)).toBe('Hello *** and ***!');
     expect(censorChatText('S h 1 t', 240)).toBe('***');
     expect(censorChatText('f💥u💥c💥k', 240)).toBe('***');
-    expect(censorChatText('sh\\u200Bit in the chat', 240)).toBe('*** in the chat');
+    expect(censorChatText('sh\u200Bit in the chat', 240)).toBe('*** in the chat');
     expect(censorChatText('You are a connard, Scunthorpe.', 240))
       .toBe('You are a ***, Scunthorpe.');
     expect(censorChatText('Clean text', 240)).toBe('Clean text');
@@ -165,7 +165,7 @@ describe('multilingual public text moderation', () => {
   });
 
   it('does not let masking bypass the existing trim and length cap', () => {
-    expect(censorChatText('  fuck\\u0000  ', 240)).toBe('***');
+    expect(censorChatText('  fuck\u0000  ', 240)).toBe('***');
     expect(censorChatText('hello '.repeat(100), 6)).toBe('hello');
   });
 });
