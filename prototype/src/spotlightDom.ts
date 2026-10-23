@@ -182,6 +182,9 @@ function gestureTile(g: MapGesture): string {
 }
 
 function paint(o: Overlay, view: SpotlightView | null): void {
+  const dossierOpen = !view?.step.inDialog && document.getElementById('codex')?.classList.contains('show');
+  // Map destinations must stay tappable even when a battle toast arrives above them.
+  o.root.classList.toggle('sl-map', !!view && !view.collapsed && !dossierOpen && !!view.step.anchor);
   if (!view) {
     o.root.style.display = 'none';
     o.chip.style.display = 'none';
@@ -202,7 +205,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   // small phone screen). Hide the spotlight's chrome for as long as the dossier is
   // up; the tour's step/state machine keeps polling underneath untouched, and the
   // very next frame after the dossier closes repaints normally.
-  if (!view.step.inDialog && document.getElementById('codex')?.classList.contains('show')) {
+  if (dossierOpen) {
     o.root.style.display = 'none';
     return;
   }
@@ -315,6 +318,7 @@ export interface RunningTour {
   /** Force-stop (as if «Пропустить»). */
   stop(): void;
   readonly active: boolean;
+  readonly holdsClock: boolean;
 }
 
 let current: SpotlightTour | null = null;
@@ -398,6 +402,9 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
     stop: () => tour.skip(),
     get active() {
       return running;
+    },
+    get holdsClock() {
+      return tour.holdsClock;
     },
   };
 }

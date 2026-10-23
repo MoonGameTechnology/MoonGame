@@ -559,6 +559,8 @@ import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildFirstMatchTour } from './firstMatchTour';
 import { GUIDE_TARGET, GUIDE_HULL, GUIDE_TECH, guideShipCount, guideFleet, guideMineLevel, guideCourseSet } from '../../decisions/firstMatchGuide';
 import { buildTrainingTour } from './trainingTour';
+import { trainingTourUi } from './trainingTourDom';
+import { trainingFlagshipMerge } from '../../decisions/trainingGuide';
 import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
 // ONB-4 — searchable codex/help index (pure) over the existing article corpus.
@@ -5168,13 +5170,24 @@ function startTraining(): void {
         me: ME,
         data,
         baseline,
-        fleetSelected: () => selFleet !== null && s.fleets[selFleet]?.owner === ME,
+        ui: trainingTourUi({
+          world: () => s, me: () => ME, mobile: MOBILE,
+          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
+          ships: () => { planetTab = 'ships'; },
+          // Synchronize the phone selection before Show expands its sheet.
+          render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
+        }),
       }),
     );
   };
   installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
   enterRun('training');
   apply(advance(s, s.time + 1));
+  const merge = trainingFlagshipMerge(s, ME);
+  if (merge) {
+    const prepared = order(s, mergeFleet(ME, merge.from, merge.into), s.time);
+    if (!prepared.error) apply(prepared);
+  }
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
   showConnect(false);
   showHub(false);
@@ -6023,7 +6036,7 @@ function frame(nowReal: number) {
   }
   // `netWorld`, а не `NET`: на обрыве мир на экране всё ещё серверный, под туманом, и
   // локальный ход по нему выбил бы «безземельных» соперников и объявил ложную победу.
-  const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy(), !!endScreen);
+  const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy() || !!activeTour?.holdsClock, !!endScreen);
   if (simRunning && simLink) {
     simBacklog = stepBacklog(simBacklog, dt, speed, HOUR);
     if (!simLink.busy && simBacklog > 0) {

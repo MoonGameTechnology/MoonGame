@@ -20,6 +20,7 @@ import { buildFirstMatchTour } from './firstMatchTour';
 import { firstMatchFixture } from './firstMatchTour.fixture';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildTrainingTour } from './trainingTour';
+import { trainingUiFixture } from './trainingTour.fixture';
 import { data } from './gameData';
 import type { SpotlightStep } from './spotlight';
 
@@ -43,7 +44,7 @@ const training = buildTrainingTour({
   me: 'p1',
   data,
   baseline: trainingBaseline(world, 'p1', data),
-  fleetSelected: () => false,
+  ui: trainingUiFixture(true),
 });
 
 const steps = [...first(true), ...first(false), ...HUD_ORIENTATION_TOUR, ...training];

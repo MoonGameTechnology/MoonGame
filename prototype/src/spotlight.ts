@@ -44,6 +44,8 @@ export type Placement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 /** One guide step, described by data. */
 export interface SpotlightStep {
   id: string;
+  /** Training simulation pauses while the player reads or finds this control. */
+  holdClock?: boolean;
   /** CSS selector of the element to highlight, or `null` for a centred bubble. */
   target: string | null;
   /** Live canvas target, in screen coordinates. Recomputed after camera movement. */
@@ -135,6 +137,10 @@ export class SpotlightTour {
 
   get active(): boolean {
     return this.running;
+  }
+
+  get holdsClock(): boolean {
+    return this.running && !this.folded && this.current.holdClock === true;
   }
 
   /** Current step index (0-based), or -1 before `start()` / after the end. */

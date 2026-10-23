@@ -703,6 +703,9 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    shows through the gap. .sl-passthrough (action/state steps) lets HUD clicks reach the map;
    default (tap steps) swallows them so «Далее» is the only way forward. */
 #spotlight{position:fixed;inset:0;z-index:50;display:none;}
+/* Canvas guidance owns this tap. Informational toasts return on the next UI step;
+   the persistent save warning stays available. */
+body:has(#spotlight.sl-map) #toasts .toast{visibility:hidden;}
 #spotlight .sl-dim{position:fixed;background:rgba(2,8,11,.72);pointer-events:auto;}
 /* action/state steps: the player must operate the real HUD — let clicks through AND
    drop the dimming so the map stays fully legible (only the ring marks the target).

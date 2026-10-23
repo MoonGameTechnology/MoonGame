@@ -189,7 +189,9 @@ export function initMobileHud(host: MobileHudHost) {
   }
 
   return {
-    expanded: (): boolean => active && expanded,
+    // A guide may poll before the next frame installs the new selection. The old
+    // sheet being expanded must not count as the new fleet's details being open.
+    expanded: (key?: string): boolean => active && expanded && (key === undefined || key === selected),
     collapse: (): void => expand(false),
     sync(enabled: boolean): void {
       if (enabled === active) return;
