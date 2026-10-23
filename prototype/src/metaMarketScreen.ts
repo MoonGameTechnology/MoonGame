@@ -129,7 +129,6 @@ export function initMetaMarket(host: MetaMarketHost): {
         .root()
         .querySelector<HTMLInputElement>(`[data-mm-price="${CSS.escape(wantSell)}"]`);
       price?.scrollIntoView({ block: 'center' });
-      price?.focus({ preventScroll: true });
       wantSell = null;
     }
     host.changed?.();

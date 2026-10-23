@@ -245,7 +245,6 @@ export function initPingUi(host: PingHost): PingUi {
         })),
       );
       el.classList.add('show');
-      (el.querySelector('#pm-text') as HTMLInputElement | null)?.focus();
     }
   }
 
