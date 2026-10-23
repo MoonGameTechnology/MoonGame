@@ -163,6 +163,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'diplomacy.declare': { target: 'p2', stance: 'war' },
   'diplomacy.mapshare': { target: 'p2', on: true },
   'diplomacy.decline': { target: 'p2' },
+  'coalition.create': {},
   'coalition.leave': {},
   'coalition.edit': { emblem: 'star', description: '' },
   'fleet.launch': { planetId: 'home_p1' },

@@ -1121,6 +1121,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #coalwin .dp-head .cw-title{font-size:var(--fs-body);color:var(--cyan);margin-right:auto;}
 .cw-body{overflow:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;}
 .cw-cap{font-size:var(--fs-caption);color:var(--dim);}
+.cw-create{min-height:44px;padding:9px 14px;border:1px solid var(--cyan);border-radius:7px;
+  background:rgba(53,214,230,.12);color:var(--cyan);font:700 var(--fs-body) var(--sf-font);cursor:pointer;}
+.cw-create:hover,.cw-create:focus-visible{background:rgba(53,214,230,.2);outline:2px solid var(--cyan);outline-offset:2px;}
 .cw-hint{font-size:var(--fs-caption);color:var(--ink);border:1px dashed var(--line);border-radius:7px;padding:7px 9px;line-height:1.5;}
 .cw-list{display:flex;flex-direction:column;gap:6px;min-height:90px;}
 .cw-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;text-align:left;
@@ -3564,6 +3567,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background:rgba(53,214,230,.12);box-shadow:0 0 18px rgba(53,214,230,.5),inset 0 0 9px rgba(53,214,230,.3);}
 #hub .hub-bt{position:relative;font-size:18px;letter-spacing:6px;color:var(--cyan);font-weight:700;
   text-shadow:0 0 14px rgba(53,214,230,.45);}
+/* На телефоне бренд — одна строка: высота остаётся списку игр, а не эмблеме. */
+@media (max-width:719px), ((pointer:coarse) and (max-height:519px)){
+  #hub .hub-banner{height:auto;min-height:36px;flex-direction:row;gap:10px;padding:6px 16px;}
+  #hub .hub-crest{width:20px;height:20px;flex:0 0 20px;}
+  #hub .hub-crest .dia{width:12px;height:12px;border-width:1.5px;}
+  #hub .hub-bt{font-size:14px;line-height:1.2;letter-spacing:3px;}
+}
 #hub .hub-id{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
 #hub .hub-av{width:44px;height:44px;border-radius:50%;border:1px solid var(--line-hi);background:rgba(3,12,16,.8);
   display:grid;place-items:center;color:var(--cyan);font-size:17px;flex:0 0 auto;box-shadow:inset 0 0 10px rgba(53,214,230,.1);

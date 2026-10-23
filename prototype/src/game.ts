@@ -204,6 +204,7 @@ export {
   declareWar,
   shareMap,
   declineOffer,
+  createCoalition,
   leaveCoalition,
   editCoalition,
   spyOn,

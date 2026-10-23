@@ -15,6 +15,7 @@ export const ACTION_TYPES = new Set([
   'chain.stamp',
   'construction.cancel',
   'construction.resume',
+  'coalition.create',
   'coalition.edit',
   'coalition.leave',
   'diplomacy.decline',
