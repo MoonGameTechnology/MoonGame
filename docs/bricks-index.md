@@ -1228,6 +1228,7 @@
 | ROS-1.5 | ✅ | core data proto | `docs/roster-roadmap.md` | Десантный челнок: высадка вместо удара 2026-09-09 |
 | ROS-1.6 | ✅ | core proto | `docs/roster-roadmap.md` | Корабли и шаттлы бьют наземные войска 2026-10-12 |
 | ROS-1.6a | ✅ | core | `docs/roster-roadmap.md` | Огонь сверху делит урон по войскам поровну 2026-10-24 |
+| ROS-1.6b | ✅ | core proto | `docs/roster-roadmap.md` | Огонь сверху бьёт пехоту и технику разной долей 2026-10-24 |
 | ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
 | ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |

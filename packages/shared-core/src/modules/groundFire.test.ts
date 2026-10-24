@@ -178,9 +178,9 @@ describe('обстрел с орбиты бьёт войска мира (ROS-1.6
     expect(r.state.planets.P?.owner).toBe('p2');
   });
 
-  it('урон тика ложится поровну на каждого юнита, а не фокусом на один род (ROS-1.6a)', () => {
-    // 10 в час на 4 юнита — по 2,5: ополчению 3 × 2,5 = 7,5, танку 2,5. По правилу боя
-    // всё забрало бы ополчение (`militia` < `tank` по id), а танк остался бы цел.
+  it('урон тика ложится на каждого юнита, а не фокусом на один род (ROS-1.6a)', () => {
+    // По пехоте флот бьёт 10 в час, по технике 5; на 4 юнита — 2,5 каждому ополченцу и 1,25
+    // танку. По правилу боя всё забрало бы ополчение (`militia` < `tank` по id).
     const r = okAdvance(
       orbitKernel().advanceTo(
         siege(cruisers(10, true), [
@@ -192,7 +192,15 @@ describe('обстрел с орбиты бьёт войска мира (ROS-1.6
     );
     const [militia, tank] = r.state.planets.P?.garrison ?? [];
     expect(militia?.hp).toBeCloseTo(34.5); // 42 − 7,5
-    expect(tank?.hp).toBeCloseTo(43.5); // 46 − 2,5
+    expect(tank?.hp).toBeCloseTo(44.75); // 46 − 1,25
+  });
+
+  it('технику корабль бьёт вдвое слабее пехоты (ROS-1.6b)', () => {
+    // 10 крейсеров × атака 10 × 0,05 = 5 в час по двум танкам (92).
+    const r = okAdvance(
+      orbitKernel().advanceTo(siege(cruisers(10, true), [['tank', 2]]), ctx(HOUR)),
+    );
+    expect(garrisonHp(r.state)).toBeCloseTo(87);
   });
 
   it('урон идёт через хук своего канала (фаза bombard)', () => {
@@ -248,13 +256,14 @@ function struck(s: GameState): GameState {
 }
 
 describe('удар шаттлов по миру бьёт его войска (ROS-1.6)', () => {
-  it('за удар ложится четверть атаки каждой машины — больше, чем корабль за час', () => {
-    // 2 бомбардировщика × атака 20 × 0,25 = 10 за удар.
-    expect(garrisonHp(struck(raid([['militia', 3]])), 'B')).toBeCloseTo(32);
+  it('за удар по технике ложится четверть атаки каждой машины, по пехоте — восьмая', () => {
+    // 2 бомбардировщика × атака 20: по технике × 0,25 = 10, по пехоте × 0,125 = 5.
+    expect(garrisonHp(struck(raid([['tank', 2]])), 'B')).toBeCloseTo(82);
+    expect(garrisonHp(struck(raid([['militia', 3]])), 'B')).toBeCloseTo(37);
   });
 
-  it('урон удара тоже делится поровну на каждого юнита (ROS-1.6a)', () => {
-    // 10 за удар на 4 юнита — по 2,5, как у обстрела.
+  it('урон удара тоже делится на каждого юнита, по весу его рода (ROS-1.6a/b)', () => {
+    // По пехоте эскадра бьёт 5, по технике 10; на 4 юнита — 1,25 каждому ополченцу, 2,5 танку.
     const after = struck(
       raid([
         ['militia', 3],
@@ -262,8 +271,8 @@ describe('удар шаттлов по миру бьёт его войска (RO
       ]),
     );
     const [militia, tank] = after.planets.B?.garrison ?? [];
-    expect(militia?.hp).toBeCloseTo(34.5);
-    expect(tank?.hp).toBeCloseTo(43.5);
+    expect(militia?.hp).toBeCloseTo(38.25); // 42 − 3,75
+    expect(tank?.hp).toBeCloseTo(43.5); // 46 − 2,5
   });
 
   it('по войскам не враждебного мира огонь не идёт', () => {
@@ -272,7 +281,7 @@ describe('удар шаттлов по миру бьёт его войска (RO
   });
 
   it('последнего бойца с воздуха не добить', () => {
-    // 6 машин × 5 = 30 за удар против одного ополченца на 14.
+    // 6 машин × 2,5 по пехоте = 15 за удар против одного ополченца на 14.
     const after = struck(raid([['militia', 1]], 6));
     expect(after.planets.B?.garrison[0]?.count).toBe(1);
     expect(garrisonHp(after, 'B')).toBeCloseTo(1);

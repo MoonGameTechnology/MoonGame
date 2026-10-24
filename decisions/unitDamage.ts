@@ -10,10 +10,12 @@
  * 1. **Корабль.** Корабли — `attack` (бой флотов). Здания — обстрел с орбиты:
  *    `siegeDamage`, а без него `attack × BOMBARD_FRACTION` (как `bombardPower`).
  *    Авиация — точечная оборона `pointDefense`. Техника и пехота — тот же обстрел по
- *    войскам мира, `shipGroundDamage` (ROS-1.6), за час.
+ *    войскам мира, `shipGroundDamage` (ROS-1.6), за час, своей долей атаки по каждому роду
+ *    (ROS-1.6b).
  * 2. **Шаттл.** Корабли — `attack` (удар по флоту). Здания — `siegeDamage`, а без него
  *    полный `attack` (как `strikePower` по миру). Авиация — `shuttleDamage` перехватчика.
- *    Техника и пехота — удар по миру задевает его войска, `shuttleGroundDamage` (ROS-1.6).
+ *    Техника и пехота — удар по миру задевает его войска, `shuttleGroundDamage` (ROS-1.6),
+ *    своей долей атаки по каждому роду (ROS-1.6b).
  * 3. **Наземный юнит.** Корабли — `aaDamage` (ПВО гарнизона по флоту на орбите). Здания —
  *    `buildingDamage` (зачистка органов Роя). Техника и пехота — СВОИ числа штурма
  *    (решение владельца 2026-09-25, `util/groundTargets.ts`): атака по роду в нападении и
@@ -83,22 +85,20 @@ export function unitDamageProfile(
     ];
   }
   if (def.traits.includes('shuttle')) {
-    const troops = shuttleGroundDamage(stats);
     by = {
       ships: n('attack'),
       buildings: siege > 0 ? siege : n('attack'),
       air: n('shuttleDamage'),
-      vehicles: troops,
-      infantry: troops,
+      vehicles: shuttleGroundDamage(stats, 'vehicle'),
+      infantry: shuttleGroundDamage(stats, 'infantry'),
     };
   } else {
-    const troops = shipGroundDamage(stats);
     by = {
       ships: n('attack'),
       buildings: siege > 0 ? siege : n('attack') * BOMBARD_FRACTION,
       air: n('pointDefense'),
-      vehicles: troops,
-      infantry: troops,
+      vehicles: shipGroundDamage(stats, 'vehicle'),
+      infantry: shipGroundDamage(stats, 'infantry'),
     };
   }
   return DAMAGE_TARGETS.map((target) => ({ target, value: by[target] }));
