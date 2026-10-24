@@ -5,6 +5,7 @@ import {
   defaultAppearance,
   medalGrade,
   parseAppearance,
+  type MedalRewardGrant,
   type PlayerProfile,
 } from '@void/protocol';
 import type { Identity } from './matchApi';
@@ -22,6 +23,8 @@ export interface ProfileApiDeps {
   registrationRewards?: RegistrationRewardStore;
   /** A running premium account (Meta): shown as the profile frame. */
   premium?(accountId: string): Promise<boolean>;
+  /** Pays reached medal degrees not paid yet (`medalRewards.ts`). */
+  medalRewards?(accountId: string): Promise<MedalRewardGrant[]>;
   identify(request: FastifyRequest): Promise<Identity | null>;
 }
 
@@ -103,7 +106,8 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     return view(who.accountId, user.login);
   });
   // The tutorial is played on the device, out of the server's sight: the claim names no
-  // count, the credit is a fixed 1 once per account, and it grants no XP or currency.
+  // count and the credit is a fixed 1 once per account. Its medal pays Sovereigns only,
+  // through the medal rewards below, never XP or Warrants.
   app.post('/profiles/rewards/tutorial', { bodyLimit: 64 }, async (request, reply) => {
     if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
     const who = await deps.identify(request);
@@ -114,6 +118,18 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     reply.header('cache-control', 'no-store');
     return { medalId: 'tutorial' };
   });
+  // Medal rewards: the server reads the account's own progress, so the claim carries
+  // nothing and a repeat pays nothing twice.
+  if (deps.medalRewards) {
+    const settle = deps.medalRewards;
+    app.post('/profiles/rewards/medals', { bodyLimit: 64 }, async (request, reply) => {
+      if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      const who = await deps.identify(request);
+      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+      reply.header('cache-control', 'no-store');
+      return { granted: await settle(who.accountId) };
+    });
+  }
   if (deps.registrationRewards) {
     const rewards = deps.registrationRewards;
     app.get('/profiles/rewards/registration', async (request, reply) => {

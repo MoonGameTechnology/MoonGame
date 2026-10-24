@@ -11,6 +11,8 @@ import type {
   MetaEconomyAccount,
   MetaEconomyView,
   MetaMatchRewardsView,
+  MedalGradeRef,
+  MedalRewardGrant,
   MetaPremiumDailyCommand,
   MetaRecipeView,
   MetaSalvageCommand,
@@ -84,6 +86,21 @@ export function metaEconomyFingerprint(value: unknown): string {
   return createHash('sha256')
     .update(JSON.stringify(canonical(value)))
     .digest('hex');
+}
+
+/** Account counter that records one paid medal degree. */
+export const medalCounter = (ref: MedalGradeRef): string => `medal:${ref.medalId}:${ref.grade}`;
+
+/** What one medal degree pays under the catalog (`medals`): medals earned without playing
+ *  pay their Sovereigns only. */
+export function medalReward(
+  table: MetaEconomyCatalog['medals'],
+  ref: MedalGradeRef,
+): MedalRewardGrant {
+  const pay = table.grades[ref.grade];
+  return table.sovereignsOnly.includes(ref.medalId)
+    ? { ...ref, sovereigns: pay.sovereigns, warrants: 0, xp: 0 }
+    : { ...ref, ...pay };
 }
 
 class MetaRejection extends Error {
@@ -598,6 +615,50 @@ export class MetaEconomy {
         account.counters[counter] = 1;
         account.sovereigns = safeAdd(account.sovereigns ?? 0, amount);
         receipt.sovereignsGranted = amount;
+      },
+    );
+  }
+
+  /** Medal degrees the account has reached but not been paid for yet. */
+  async unpaidMedals(
+    accountId: string,
+    earned: readonly MedalGradeRef[],
+  ): Promise<MedalGradeRef[]> {
+    if (!validKey(accountId)) return [];
+    const account = await this.deps.store.read(accountId);
+    return earned.filter((ref) => !account.counters[medalCounter(ref)]);
+  }
+
+  /** Pays reached medal degrees once per account: Sovereigns and Warrants here. XP lives in
+   *  the commander store, so the caller credits it per degree BEFORE this call
+   *  (`medalRewards.ts`); the receipt lists the full grant, XP included. */
+  claimMedals(accountId: string, earned: readonly MedalGradeRef[]): Promise<MetaCommandResult> {
+    const keys = earned.map(medalCounter).sort();
+    return this.command(
+      accountId,
+      metaEconomyFingerprint(['medals', keys]),
+      'medal-reward',
+      { medals: keys },
+      async (tx, account, receipt) => {
+        const medals: MedalRewardGrant[] = [];
+        let sovereigns = 0;
+        let warrants = 0;
+        for (const ref of earned) {
+          const counter = medalCounter(ref);
+          if (account.counters[counter]) continue;
+          const grant = medalReward(this.deps.catalog.medals, ref);
+          account.counters[counter] = 1;
+          sovereigns = safeAdd(sovereigns, grant.sovereigns);
+          if (grant.warrants > 0) {
+            await tx.creditWarrants(accountId, grant.warrants, 'medal_reward', counter, receipt.at);
+            warrants = safeAdd(warrants, grant.warrants);
+          }
+          medals.push(grant);
+        }
+        account.sovereigns = safeAdd(account.sovereigns ?? 0, sovereigns);
+        receipt.sovereignsGranted = sovereigns;
+        receipt.warrants = warrants;
+        receipt.medals = medals;
       },
     );
   }

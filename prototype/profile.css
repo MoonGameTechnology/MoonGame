@@ -1,4 +1,4 @@
-:is(#registration-reward, #tutorial-medal) {
+:is(#registration-reward, #tutorial-medal, #medal-rewards) {
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   box-sizing: border-box;
@@ -12,31 +12,37 @@
   font-family: inherit;
   text-align: center;
 }
-:is(#registration-reward, #tutorial-medal)::backdrop { background: #020a14b8; backdrop-filter: blur(5px); }
-:is(#registration-reward, #tutorial-medal) .rw-later { position: absolute; right: 8px; top: 6px; width: 44px; height: 44px; padding: 0; font-size: 26px; cursor: pointer; }
-:is(#registration-reward, #tutorial-medal) .rw-eyebrow { margin: 0 0 12px; color: #9bb9b9; font-size: 12px; }
-:is(#registration-reward, #tutorial-medal) h2 { margin: 0; font-size: clamp(24px, 5vw, 30px); line-height: 1.25; }
-:is(#registration-reward, #tutorial-medal) .rw-subtitle { margin: 12px auto 0; max-width: 300px; font-size: 15px; line-height: 1.5; color: #b9cdcf; }
-:is(#registration-reward, #tutorial-medal) .rw-art { margin: 12px auto 0; width: 160px; height: 210px; background: radial-gradient(ellipse, #6ac9bd20, transparent 70%); }
-:is(#registration-reward, #tutorial-medal) .rw-art img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 12px 18px #0008); }
-:is(#registration-reward, #tutorial-medal) h3 { margin: 0; font-size: 21px; line-height: 1.35; font-weight: 600; }
-:is(#registration-reward, #tutorial-medal) .rw-grade { margin: 8px 0 16px; color: #e2bb81; font-size: 15px; }
-:is(#registration-reward, #tutorial-medal) .rw-xp { display: inline-block; margin: 0; padding: 10px 18px; border: 1px solid #6dbaaa55; border-radius: 999px; background: #6bc7af12; color: #adedd5; font-size: 17px; font-weight: 600; }
-:is(#registration-reward, #tutorial-medal) .rw-notice { color: #ffd29f; font-size: 14px; line-height: 1.45; margin: 14px 0; }
-:is(#registration-reward, #tutorial-medal) .rw-notice:empty { display: none; }
-:is(#registration-reward, #tutorial-medal) .rw-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px; }
-#tutorial-medal .rw-actions { grid-template-columns: 1fr; }
-:is(#registration-reward, #tutorial-medal) .rw-actions button { min-height: 48px; padding: 10px; border: 1px solid #60858b; border-radius: 12px; background: #29404c; color: #edf2ed; font: inherit; font-size: 15px; cursor: pointer; }
-:is(#registration-reward, #tutorial-medal) .rw-actions .rw-equip { background: #b7decc; color: #102e31; border-color: #c8ebd9; font-weight: 600; }
-:is(#registration-reward, #tutorial-medal) button:focus-visible { outline: 2px solid #e3f6b5; outline-offset: 3px; }
-:is(#registration-reward, #tutorial-medal) button:disabled { opacity: .6; cursor: wait; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards)::backdrop { background: #020a14b8; backdrop-filter: blur(5px); }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-later { position: absolute; right: 8px; top: 6px; width: 44px; height: 44px; padding: 0; font-size: 26px; cursor: pointer; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-eyebrow { margin: 0 0 12px; color: #9bb9b9; font-size: 12px; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) h2 { margin: 0; font-size: clamp(24px, 5vw, 30px); line-height: 1.25; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-subtitle { margin: 12px auto 0; max-width: 300px; font-size: 15px; line-height: 1.5; color: #b9cdcf; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-art { margin: 12px auto 0; width: 160px; height: 210px; background: radial-gradient(ellipse, #6ac9bd20, transparent 70%); }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-art img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 12px 18px #0008); }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) h3 { margin: 0; font-size: 21px; line-height: 1.35; font-weight: 600; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-grade { margin: 8px 0 16px; color: #e2bb81; font-size: 15px; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-xp { display: inline-block; margin: 0; padding: 10px 18px; border: 1px solid #6dbaaa55; border-radius: 999px; background: #6bc7af12; color: #adedd5; font-size: 17px; font-weight: 600; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-notice { color: #ffd29f; font-size: 14px; line-height: 1.45; margin: 14px 0; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-notice:empty { display: none; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px; }
+:is(#tutorial-medal, #medal-rewards) .rw-actions { grid-template-columns: 1fr; }
+#medal-rewards .mr-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; text-align: left; }
+#medal-rewards .mr-list li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid #48727680; border-radius: 12px; background: #0b1b2499; }
+#medal-rewards .mr-list b { display: block; font-size: 15px; font-weight: 600; line-height: 1.3; }
+#medal-rewards .mr-list small { color: #e2bb81; font-size: 13px; }
+#medal-rewards .mr-list em { font-style: normal; color: #adedd5; font-size: 14px; font-weight: 600; text-align: right; }
+#medal-rewards .rw-xp { margin-top: 16px; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-actions button { min-height: 48px; padding: 10px; border: 1px solid #60858b; border-radius: 12px; background: #29404c; color: #edf2ed; font: inherit; font-size: 15px; cursor: pointer; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-actions .rw-equip { background: #b7decc; color: #102e31; border-color: #c8ebd9; font-weight: 600; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) button:focus-visible { outline: 2px solid #e3f6b5; outline-offset: 3px; }
+:is(#registration-reward, #tutorial-medal, #medal-rewards) button:disabled { opacity: .6; cursor: wait; }
 @media (prefers-reduced-motion: no-preference) {
-  :is(#registration-reward, #tutorial-medal)[open] .rw-art { animation: reward-arrive .55s ease-out both; }
+  :is(#registration-reward, #tutorial-medal, #medal-rewards)[open] .rw-art { animation: reward-arrive .55s ease-out both; }
   @keyframes reward-arrive { from { opacity: 0; transform: translateY(12px) scale(.9); } to { opacity: 1; transform: none; } }
 }
 @media (max-height: 660px) {
-  :is(#registration-reward, #tutorial-medal) { padding-top: 24px; }
-  :is(#registration-reward, #tutorial-medal) .rw-art { width: 120px; height: 155px; }
+  :is(#registration-reward, #tutorial-medal, #medal-rewards) { padding-top: 24px; }
+  :is(#registration-reward, #tutorial-medal, #medal-rewards) .rw-art { width: 120px; height: 155px; }
 }
 
 #profile .pf-body {
@@ -197,7 +203,7 @@
   min-width: 0;
   transform: rotate(-0.5deg);
 }
-#profile .ps-medal {
+:is(#profile, #medal-rewards) .ps-medal {
   position: relative;
   display: inline-block;
   width: 34px;
@@ -206,7 +212,7 @@
   background-repeat: no-repeat;
   flex: none;
 }
-#profile .ps-medal i {
+:is(#profile, #medal-rewards) .ps-medal i {
   position: absolute;
   top: 11%;
   left: 32%;

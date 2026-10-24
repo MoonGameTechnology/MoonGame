@@ -95,8 +95,9 @@ Claim дропа общий с прежним AvA-контуром: повтор
 ## Суверены и витрина
 
 Баланс Суверенов ◆ лежит в состоянии аккаунта Meta (`sovereigns`) и меняется в той же
-транзакции, что материалы, арсенал и receipts. Зачисляет его только проверенный entitlement
-Commerce: товары `sovereigns_*` (база плюс `bonusSovereigns`). Рекламой ◆ не выдаются.
+транзакции, что материалы, арсенал и receipts. Зачисляют его проверенный entitlement
+Commerce (товары `sovereigns_*`: база плюс `bonusSovereigns`), ежедневные ◆ премиума и
+награды за медали профиля (ниже). Рекламой ◆ не выдаются.
 Возврат пакета снимает ◆, если они ещё на счёте; потраченные уводят возврат в `review-required`.
 
 Витрина (`store` в `data/metaEconomy.json`) продаёт за ◆ четыре вида товаров, по одному на
@@ -113,6 +114,13 @@ Commerce: товары `sovereigns_*` (база плюс `bonusSovereigns`). Р�
 (тест «keeps premium cheaper»). Ещё премиум открывает цвет текста чата и метку ★ в профиле:
 `GET /profile` отдаёт `premium: true`, другим игрокам тоже. `GET /meta-economy/me` отдаёт
 `premiumPerks`, `premiumDaily` (сумма и забран ли сегодня) и `ads` (использовано и предел).
+
+Медали профиля платят за каждую достигнутую степень один раз на аккаунт ◆, ⌖ и опытом
+командира (`medals` в `data/metaEconomy.json`, [ONB-16](onboarding-roadmap.md)): III —
+10/20/50, II — 25/50/150, I — 60/120/400. Медали из `medals.sovereignsOnly` (регистрация и
+урок на устройстве) платят только ◆. `MetaEconomy.claimMedals` ставит счётчики
+`medal:<id>:<grade>` и зачисляет ◆ и ⌖ (`medal_reward` в журнале аукциона) одной
+транзакцией; опыт до неё зачисляет `medalRewards.ts`.
 
 Экран «Магазин» хаба (`prototype/src/shopScreen.ts`, решения — `decisions/shopView.ts`)
 показывает вкладки Суверены, Премиум, Модули и Материалы. Пакеты Суверенов и снабжение за
@@ -145,6 +153,7 @@ Commerce: товары `sovereigns_*` (база плюс `bonusSovereigns`). Р�
 | `POST /meta-economy/season/claim` | `seasonId`, `level`, `defId` для выбора |
 | `POST /meta-economy/store/buy` | `offerId`: покупка за Суверены; отказы `E_SOVEREIGNS`, `E_ALREADY_OWNED`, `E_OFFER_LIMIT` |
 | `POST /meta-economy/premium/daily` | Ежедневные ◆ премиума; отказы `E_PREMIUM`, `E_DAILY_CLAIMED` |
+| `POST /profiles/rewards/medals` | Без body: выплата невыплаченных степеней медалей, ответ `granted` |
 | `GET /meta-market` | Баланс, доступ к торговле, лоты и история |
 | `POST /meta-market/material/list`, `/buy`, `/cancel` | Материальные лоты; list: `materialId,quantity,price,requestId`, buy: `listingId,tradeId`, cancel: `listingId` |
 | `GET /commerce/offers` | Версия и точное содержимое витрины |

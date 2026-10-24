@@ -958,7 +958,11 @@ describe('AC-0.2 · remember-me: /auth/refresh', () => {
     const { token } = reg.json() as { token: string };
     expect((await refresh(server)).statusCode).toBe(401);
     expect((await refresh(server, 'garbage')).statusCode).toBe(401);
-    expect((await refresh(server, token.slice(0, -2) + 'xx')).statusCode).toBe(401);
+    // Flip the signature's first character: its last one carries only 4 of 6 bits, so an
+    // edit at the tail could decode to the same signature and pass.
+    const [head, body, sig] = token.split('.') as [string, string, string];
+    const forged = `${head}.${body}.${sig[0] === 'A' ? 'B' : 'A'}${sig.slice(1)}`;
+    expect((await refresh(server, forged)).statusCode).toBe(401);
     expect((await refresh(server, token, { accountId: 'somebody-else' })).statusCode).toBe(400);
   });
 });

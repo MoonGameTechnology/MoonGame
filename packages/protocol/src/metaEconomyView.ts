@@ -1,5 +1,6 @@
 import type { ArsenalItem } from '@void/shared-core';
 import type { MaterialSource } from './metaEconomy';
+import type { MedalRewardGrant } from './playerProfile';
 
 /** Main-game economy wire model. No Sector Zero balances or client-awarded value. */
 export interface MetaMaterialView {
@@ -127,8 +128,10 @@ export interface MetaCommandReceipt {
   sovereignsSpent?: number;
   /** Premium account expiry after the purchase. */
   premiumUntil?: number;
-  /** Sovereigns credited by the premium daily claim. */
+  /** Sovereigns credited by the premium daily claim or by medal rewards. */
   sovereignsGranted?: number;
+  /** Medal degrees this command paid for, each once per account. */
+  medals?: MedalRewardGrant[];
   soulbound?: boolean;
   drop?: { kind: 'hull' | 'module'; defId: string; forced: boolean } | null;
   dropOdds?: { chance: number; pity: number; forced: boolean; tablesHash: string };

@@ -384,6 +384,7 @@ import { reframePresentation } from './holographicLayout';
 import { initProfile } from './profileScreen';
 import { initRegistrationReward } from './registrationReward';
 import { initTutorialMedal } from './tutorialMedal';
+import { initMedalRewards } from './medalRewards';
 import { PORTRAITS } from './profileArt';
 import { parseAppearance } from '../../packages/protocol/src/playerProfile';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -3195,6 +3196,18 @@ const tutorialMedal = __SECTOR_ZERO_ONLY__
       key: () => 'vd.medal.tutorial.' + (nickInput.value.trim() || 'guest'),
       authorizedBase: hubAuthorizedBase,
     });
+// Medal rewards (owner's order 2026-10-24): every reached degree of a profile medal pays
+// Sovereigns, Warrants and XP once; the window lists the grant, then XP and wallets re-read.
+const medalRewards = __SECTOR_ZERO_ONLY__
+  ? null
+  : initMedalRewards({
+      identity: profileKey,
+      visible: () => hubEl.style.display !== 'none',
+      authorizedBase: hubAuthorizedBase,
+      changed: async () => {
+        await Promise.all([syncCommanderFromServer(), shop?.sync(), metaMarket?.sync()]);
+      },
+    });
 function profileKey(): string {
   return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
 }
@@ -3282,7 +3295,14 @@ function openHub(note = ''): void {
   detach('хаб: портрет аккаунта', syncProfileAppearance());
   detach('account deletion capability', refreshAccountDeletion());
   if (registrationReward) detach('registration reward', registrationReward.show());
-  if (tutorialMedal) detach('tutorial medal claim', tutorialMedal.claim());
+  // The tutorial claim goes first: its medal is then paid by the same hub entry.
+  detach(
+    'tutorial medal claim and medal rewards',
+    (async () => {
+      if (tutorialMedal) await tutorialMedal.claim();
+      if (medalRewards) await medalRewards.claim();
+    })(),
+  );
 }
 
 // Страницы входа — у своего владельца (`signInPages.ts`, REFM-218): приветствие и вход

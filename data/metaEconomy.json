@@ -76,6 +76,14 @@
     }
   },
   "market": { "minimumAccountXp": 100 },
+  "medals": {
+    "grades": {
+      "3": { "sovereigns": 10, "warrants": 20, "xp": 50 },
+      "2": { "sovereigns": 25, "warrants": 50, "xp": 150 },
+      "1": { "sovereigns": 60, "warrants": 120, "xp": 400 }
+    },
+    "sovereignsOnly": ["contribution", "tutorial"]
+  },
   "seasons": [
     {
       "id": "frontier_fleet_2026",

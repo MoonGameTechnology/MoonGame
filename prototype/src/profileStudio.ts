@@ -1,6 +1,7 @@
 import {
   PROFILE_MEDALS,
   medalGrade,
+  type MedalGrade,
   type PlayerProfile,
   type ProfileMedalId,
 } from '../../packages/protocol/src/playerProfile';
@@ -23,12 +24,15 @@ const OWN_ART: Partial<Record<ProfileMedalId, string>> = {
   contribution: CONTRIBUTION_MEDAL,
   tutorial: TUTORIAL_MEDAL,
 };
-function emblem(id: ProfileMedalId, profile: PlayerProfile): string {
+/** A medal's emblem at one degree; also drawn by the medal reward window. */
+export function medalEmblem(id: ProfileMedalId, grade: MedalGrade): string {
   const art = OWN_ART[id];
   if (art) return `<span class="ps-medal" style="background-image:url('${art}');background-size:100% 100%" aria-hidden="true"></span>`;
   const index = PROFILE_MEDALS.findIndex((m) => m.id === id);
-  return `<span class="ps-medal" style="background-image:url('${MEDAL_ATLAS}');background-position:${((index % 4) * 100) / 3}% ${Math.floor(index / 4) * 50}%" aria-hidden="true"><i>${gradeRoman(medalGrade(id, profile.progress) ?? 3)}</i></span>`;
+  return `<span class="ps-medal" style="background-image:url('${MEDAL_ATLAS}');background-position:${((index % 4) * 100) / 3}% ${Math.floor(index / 4) * 50}%" aria-hidden="true"><i>${gradeRoman(grade)}</i></span>`;
 }
+const emblem = (id: ProfileMedalId, profile: PlayerProfile): string =>
+  medalEmblem(id, medalGrade(id, profile.progress) ?? 3);
 
 /** Sections of the owner's editor (UIX-15.3): one job per tab instead of one long scroll. */
 export const PROFILE_TABS = ['portrait', 'medals', 'career'] as const;

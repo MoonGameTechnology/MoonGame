@@ -134,6 +134,20 @@ try {
 
         // Closing is not acceptance; a reload restores the pending award with no extra XP.
         await dialog.locator('[data-reward="later"]').click();
+        // Medal rewards: the window waits for the welcome award, then lists what the medal
+        // paid. «За вклад в развитие» is earned without playing: Sovereigns only.
+        const medals = page.locator('#medal-rewards');
+        await medals.waitFor({ state: 'visible' });
+        const paid = await medals.innerText();
+        assert.match(paid, /\+10 ◆/);
+        assert.doesNotMatch(paid, /⌖/);
+        assert.equal(
+          (await (await fetch(base + '/meta-economy/me', { headers })).json()).sovereigns,
+          10,
+        );
+        await page.screenshot({ path: `.playwright-mcp/medal-rewards-${locale}-${action}.png` });
+        await medals.locator('[data-mreward="ok"]').click();
+        await medals.waitFor({ state: 'hidden' });
         assert.equal((await receipt()).reward.accepted, false);
         await page.reload();
         await waitForApp(page);

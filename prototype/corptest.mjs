@@ -65,6 +65,10 @@ try {
       await page.locator('#registration-reward[open]').waitFor();
       await page.click('#registration-reward [data-reward="accept"]');
       await page.locator('#registration-reward').waitFor({ state: 'hidden' });
+      // Then the medal reward window: the welcome medal pays its Sovereigns.
+      await page.locator('#medal-rewards[open]').waitFor();
+      await page.click('#medal-rewards [data-mreward="ok"]');
+      await page.locator('#medal-rewards').waitFor({ state: 'hidden' });
       const openTab = async () => {
         await page.click('[data-hub="corp"]');
         if (await page.locator('#intro .in-ok').isVisible()) await page.click('#intro .in-ok');
