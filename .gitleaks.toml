@@ -5,6 +5,6 @@
 useDefault = true
 
 [allowlist]
-description = "Public APK manifest verification key (Ed25519), reviewed 2026-10-23"
+description = "Public APK manifest verification key (Ed25519), replaced after key loss, reviewed 2026-10-24"
 regexTarget = "secret"
-regexes = ['''^Y7vQMc6UYZt5gTXJY5UD8tF7DsRoxweey5oSk3xHzjw=$''']
+regexes = ['''^V/7Hgyg34r0Xtvc2k8uYlHCFIlbCOFQf7iwlRnnnNlQ=$''']
