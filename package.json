@@ -58,6 +58,7 @@
     "smoke:proving-ground": "node prototype/provinggroundtest.mjs",
     "smoke:bootfail": "node prototype/bootfailuretest.mjs",
     "smoke:mobile": "node prototype/mobiletest.mjs",
+    "smoke:pings": "node prototype/pingtest.mjs",
     "smoke:hotkeys": "node prototype/hotkeystest.mjs",
     "smoke:intro": "node prototype/introtest.mjs",
     "smoke:sector-zero": "node prototype/sectorzerotest.mjs && node prototype/minestest.mjs",

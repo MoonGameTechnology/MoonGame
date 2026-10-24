@@ -275,6 +275,9 @@ export const declineOffer = (playerId: string, target: string) =>
 export const createCoalition = (playerId: string) => act(playerId, 'coalition.create', {});
 /** COAL-1: выйти из своей коалиции. */
 export const leaveCoalition = (playerId: string) => act(playerId, 'coalition.leave', {});
+/** Schedule another coalition member's departure. */
+export const kickCoalitionMember = (playerId: string, target: string) =>
+  act(playerId, 'coalition.kick', { target });
 /** COAL-1: эмблема и описание своей коалиции. */
 export const editCoalition = (playerId: string, emblem: string, description: string) =>
   act(playerId, 'coalition.edit', { emblem, description });

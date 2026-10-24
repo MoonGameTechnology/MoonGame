@@ -165,6 +165,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'diplomacy.decline': { target: 'p2' },
   'coalition.create': {},
   'coalition.leave': {},
+  'coalition.kick': { target: 'p2' },
   'coalition.edit': { emblem: 'star', description: '' },
   'fleet.launch': { planetId: 'home_p1' },
   'fleet.merge': { from: 'p1_1', into: 'missing-fleet' },

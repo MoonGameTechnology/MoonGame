@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, type GameState } from '../packages/shared-core/src/index';
-import { canCreateCoalition } from './coalitionCreation';
+import { canCreateCoalition, coalitionInviteBlock, canKickCoalitionMember, coalitionTreatyLocked } from './coalitionCreation';
 
 function world(): GameState {
   const state = createInitialState({
@@ -31,5 +31,47 @@ describe('coalition creation availability', () => {
         c1: { id: 'c1', founder: 'p1', members: ['p1'], emblem: 'star', description: '' },
       };
     expect(canCreateCoalition(state, 'p1')).toBe(false);
+  });
+});
+
+
+describe('coalition invitations and departure controls', () => {
+  function pair(): GameState {
+    const state = world();
+    state.players.p2 = { ...state.players.p1!, id: 'p2' };
+    state.coalitions = { c1: { id: 'c1', founder: 'p1', members: ['p1'], emblem: 'star', description: '' } };
+    return state;
+  }
+  it.each(['war', 'peace', 'pact'] as const)('allows an invitation during %s', (stance) => {
+    const state = pair();
+    state.diplomacy = { 'p1|p2': stance };
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBeNull();
+  });
+  it('blocks creation and invitations until the exact cooldown deadline', () => {
+    const state = pair();
+    state.coalitionJoinAfter = { p2: 200 };
+    state.time = 199;
+    expect(canCreateCoalition(state, 'p2')).toBe(false);
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBe('err.coalition-cooldown');
+    state.time = 200;
+    expect(canCreateCoalition(state, 'p2')).toBe(true);
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBeNull();
+  });
+  it('cannot invite through a departing member or kick twice', () => {
+    const state = pair();
+    state.coalitions!.c1!.departures = { p1: { at: 200, by: 'p1', kind: 'leave' } };
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBe('err.coalition-leaving');
+    state.coalitions!.c1!.members.push('p2');
+    expect(canKickCoalitionMember(state, 'p1', 'p2')).toBe(false);
+    state.coalitions!.c1!.departures = { p2: { at: 200, by: 'p1', kind: 'kick' } };
+    expect(canKickCoalitionMember(state, 'p1', 'p2')).toBe(false);
+  });
+  it('only the founder can kick a different member; treaties stay locked during notice', () => {
+    const state = pair();
+    state.coalitions!.c1!.members.push('p2');
+    expect(canKickCoalitionMember(state, 'p1', 'p2')).toBe(true);
+    expect(canKickCoalitionMember(state, 'p2', 'p1')).toBe(false);
+    expect(canKickCoalitionMember(state, 'p1', 'p1')).toBe(false);
+    expect(coalitionTreatyLocked(state, 'p1', 'p2')).toBe(true);
   });
 });

@@ -1140,6 +1140,8 @@ export interface GameState {
   coalitions?: Record<string, Coalition>;
   /** Счётчик, выдающий коалициям id. */
   coalitionSeq?: number;
+  /** Public re-entry deadlines after completed coalition departures. */
+  coalitionJoinAfter?: Record<PlayerId, number>;
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;

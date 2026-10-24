@@ -40,6 +40,7 @@ const CLIENT_ACTION_TYPES = [
   'coalition.create',
   'coalition.edit',
   'coalition.leave',
+  'coalition.kick',
   'espionage.spy',
   'espionage.recall',
   'market.list',

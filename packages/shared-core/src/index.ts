@@ -194,9 +194,12 @@ export {
 export {
   COALITION_EMBLEMS,
   COALITION_DESC_MAX,
+  COALITION_DEPARTURE_MS,
+  COALITION_JOIN_COOLDOWN_MS,
   coalitionCapacity,
   coalitionOf,
   type Coalition,
+  type CoalitionDeparture,
 } from './state/coalition';
 export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {

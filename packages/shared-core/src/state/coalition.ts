@@ -1,4 +1,15 @@
 import type { GameState, PlayerId } from './gameState';
+import { MS_PER_HOUR } from '../util/time';
+
+/** Membership changes use authoritative match-clock time, also while players are offline. */
+export const COALITION_DEPARTURE_MS = 24 * MS_PER_HOUR;
+export const COALITION_JOIN_COOLDOWN_MS = 48 * MS_PER_HOUR;
+
+export interface CoalitionDeparture {
+  at: number;
+  kind: 'leave' | 'kick';
+  by: PlayerId;
+}
 
 /**
  * COAL-1 — коалиция как СУЩНОСТЬ сессии: состав, эмблема, описание, вместимость.
@@ -20,6 +31,8 @@ export interface Coalition {
   /** Founder, or their successor after departure; used for the coalition's title. */
   founder: PlayerId;
   members: PlayerId[];
+  /** Pending departures keep membership and alliances until their deadline. */
+  departures?: Record<PlayerId, CoalitionDeparture>;
   /** Id эмблемы из {@link COALITION_EMBLEMS}. */
   emblem: string;
   /** Описание от членов коалиции; текст игрока, рисуется только экранированным. */
@@ -101,6 +114,10 @@ export function removeMember(state: GameState, playerId: PlayerId): PlayerId[] {
   const c = coalitionOf(state, playerId);
   if (!c) return [];
   const rest = c.members.filter((id) => id !== playerId);
+  if (c.departures) {
+    delete c.departures[playerId];
+    if (Object.keys(c.departures).length === 0) delete c.departures;
+  }
   if (rest.length === 0) {
     delete state.coalitions![c.id];
     if (Object.keys(state.coalitions!).length === 0) delete state.coalitions;

@@ -10,16 +10,21 @@ import { initCoalitionWindow, openCoalitions, syncCoalitions } from './coalition
 function element() {
   const listeners: Array<(event: { target: unknown }) => void> = [];
   const classes = new Set<string>();
-  return {
+  const panel = {
     innerHTML: '',
+    querySelectorAll: (): Array<{ dataset: Record<string, string | undefined>; textContent: string }> => [...panel.innerHTML.matchAll(/<[^>]*data-coal-timer="([^"]+)" data-coal-deadline="([^"]+)"[^>]*>([^<]*)</g)].map((match) => ({
+      dataset: { coalTimer: match[1], coalDeadline: match[2] },
+      set textContent(value: string) { panel.innerHTML = panel.innerHTML.replace(match[0], match[0].replace(match[3]!, value)); },
+    })),
     classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
     addEventListener: (_type: string, listener: (event: { target: unknown }) => void) =>
       listeners.push(listener),
-    click: (selector: string) => {
-      const target = { closest: (s: string) => (s === selector ? { dataset: {} } : null) };
+    click: (selector: string, dataset: Record<string, string> = {}) => {
+      const target = { closest: (s: string) => (s === selector ? { dataset } : null) };
       listeners.forEach((listener) => listener({ target }));
     },
   };
+  return panel;
 }
 
 function world(): GameState {
@@ -117,5 +122,73 @@ describe('session coalition creation', () => {
     env.state.players.p1!.status = 'defeated';
     syncCoalitions();
     expect(panel.innerHTML).not.toContain('class="cw-create"');
+  });
+});
+
+
+describe('coalition invitation, kick and exit UI', () => {
+  function openOwnCard(member = false): void {
+    env.state = ownCoalition(env.state);
+    env.state.players.p2 = { ...env.state.players.p1!, id: 'p2', name: 'Vega' };
+    if (member) env.state.coalitions!.c1!.members.push('p2');
+    openCoalitions();
+    panel.click('[data-coal]', { coal: 'c1' });
+  }
+  it.each(['war', 'peace', 'pact'] as const)('offers an explicit invite during %s', (stance) => {
+    env.state.diplomacy = { 'p1|p2': stance };
+    openOwnCard();
+    expect(panel.innerHTML).toContain('data-invite="p2"');
+    panel.click('[data-invite]', { invite: 'p2' });
+    expect(env.orders).toEqual([expect.objectContaining({ type: 'diplomacy.declare', payload: { target: 'p2', stance: 'alliance' } })]);
+  });
+  it('updates the invitation after the server records it and suppresses another send', () => {
+    openOwnCard();
+    env.state.diplomacyOffers = { 'p1>p2': 'alliance' };
+    syncCoalitions();
+    expect(panel.innerHTML).toContain(t('coal.invite.waiting'));
+    panel.click('[data-invite]', { invite: 'p2' });
+    expect(env.orders).toEqual([]);
+  });
+  it('asks before kicking and shows the server countdown without another kick button', () => {
+    openOwnCard(true);
+    panel.click('[data-kick]', { kick: 'p2' });
+    expect(env.orders).toEqual([]);
+    expect(panel.innerHTML).toContain(t('coal.kick.confirm'));
+    panel.click('[data-kick]', { kick: 'p2' });
+    expect(env.orders).toEqual([expect.objectContaining({ type: 'coalition.kick', payload: { target: 'p2' } })]);
+    env.state.coalitions!.c1!.departures = { p2: { at: env.state.time + 86_400_000, kind: 'kick', by: 'p1' } };
+    syncCoalitions();
+    expect(panel.innerHTML).toContain(t('coal.departure.kick', { time: t('fmt.hours', { n: '24.0' }) }));
+    expect(panel.innerHTML).not.toContain('data-kick="p2"');
+    panel.click('[data-kick]', { kick: 'p2' });
+    expect(env.orders).toHaveLength(1);
+    env.state.time += 3_600_000;
+    syncCoalitions();
+    expect(panel.innerHTML).toContain(t('coal.departure.kick', { time: t('fmt.hours', { n: '23.0' }) }));
+  });
+  it('keeps the member card while leaving and then shows the remaining cooldown', () => {
+    openOwnCard();
+    panel.click('.cw-leave');
+    expect(env.orders).toHaveLength(0);
+    panel.click('.cw-leave');
+    expect(env.orders[0]).toMatchObject({ type: 'coalition.leave', payload: {} });
+    env.state.coalitions!.c1!.departures = { p1: { at: env.state.time + 86_400_000, kind: 'leave', by: 'p1' } };
+    syncCoalitions();
+    expect(panel.innerHTML).not.toContain('class="cw-leave');
+    expect(panel.innerHTML).toContain(t('coal.departure.leave', { time: t('fmt.hours', { n: '24.0' }) }));
+    env.state.coalitions = {};
+    env.state.coalitionJoinAfter = { p1: env.state.time + 172_800_000 };
+    syncCoalitions();
+    expect(panel.innerHTML).not.toContain('class="cw-create"');
+    expect(panel.innerHTML).toContain(t('coal.cooldown', { time: t('fmt.hours', { n: '48.0' }) }));
+  });
+  it('hides kick controls from ordinary members and guards synthetic clicks', () => {
+    openOwnCard(true);
+    env.state.coalitions!.c1!.founder = 'p2';
+    syncCoalitions();
+    expect(panel.innerHTML).not.toContain('data-kick=');
+    panel.click('[data-kick]', { kick: 'p2' });
+    panel.click('[data-kick]', { kick: 'p2' });
+    expect(env.orders).toHaveLength(0);
   });
 });

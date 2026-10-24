@@ -1205,7 +1205,7 @@ export class MatchRoom {
       return;
     }
     if (message.type === 'ping.clear') {
-      await this.handlePingClear(playerId, message.pingId);
+      await this.handlePingClear(playerId, peer, message.pingId);
       return;
     }
     if (message.type === 'chat.send') {
@@ -2347,7 +2347,7 @@ export class MatchRoom {
       return;
     }
     const draft = message.ping;
-    if ((draft.kind === 'move' || draft.kind === 'attack') && draft.to === undefined) {
+    if (draft.kind === 'move' && draft.to === undefined) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_PING_TARGET' });
       return;
     }
@@ -2404,8 +2404,15 @@ export class MatchRoom {
     this.relayToViewers(ping, { type: 'ping.added', matchId: this.id, ping });
   }
 
-  private async handlePingClear(playerId: PlayerId, pingId?: string): Promise<void> {
-    for (const { value: ping } of await this.ephemeral.entries<Ping>(this.pingPrefix)) {
+  private async handlePingClear(playerId: PlayerId, peer: RoomPeer, pingId?: string): Promise<void> {
+    const entries = await this.ephemeral.entries<Ping>(this.pingPrefix);
+    if (pingId !== undefined && !entries.some(({ value }) => value.id === pingId)) {
+      // A ping can expire between the client's last snapshot and this request.
+      // Confirm absence ONLY to its requester; never relay an unverified id to allies.
+      this.send(peer, { type: 'ping.removed', matchId: this.id, pingId, reason: 'expired' });
+      return;
+    }
+    for (const { value: ping } of entries) {
       if (ping.owner !== playerId) continue;
       if (pingId !== undefined && ping.id !== pingId) continue;
       await this.ephemeral.delete(this.pingKey(ping.id));

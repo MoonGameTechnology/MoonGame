@@ -520,3 +520,31 @@ describe('REFM-214 — проводка в main.ts', () => {
     );
   });
 });
+
+
+describe('coalition treaty and invitation controls', () => {
+  it.each(['war', 'peace', 'pact'] as const)('allows a human alliance proposal from %s', async (stance) => {
+    const { win, env } = await boot();
+    env.s = withStance(env.s, 'p1|p3', stance);
+    win.openSeatCard('p3');
+    const button = el('playercard').innerHTML.match(/<button[^>]*data-stance="alliance"[^>]*>/)?.[0];
+    expect(button).toBeDefined();
+    expect(button).not.toContain('disabled');
+    tap('playercard', { '.dp-act': { seat: 'p3', stance: 'alliance' } });
+    expect(env.orders.map(intent)).toEqual([intent(declareWar('p1', 'p3', 'alliance'))]);
+  });
+  it('blocks invitation during cooldown and direct treaty breaks while still a member', async () => {
+    const { win, env } = await boot();
+    env.s.coalitionJoinAfter = { p3: env.s.time + 1000 };
+    win.openSeatCard('p3');
+    tap('playercard', { '.dp-act': { seat: 'p3', stance: 'alliance' } });
+    expect(env.orders).toEqual([]);
+    expect(env.notes).toContain(t('err.coalition-cooldown'));
+    env.s.coalitions = { c1: { id: 'c1', founder: 'p1', members: ['p1', 'p3'], emblem: 'star', description: '' } };
+    env.s = withStance(env.s, 'p1|p3', 'alliance');
+    win.openSeatCard('p3');
+    tap('playercard', { '.dp-act': { seat: 'p3', stance: 'war' } });
+    expect(env.orders).toEqual([]);
+    expect(env.notes).toContain(t('err.coalition-leaving'));
+  });
+});

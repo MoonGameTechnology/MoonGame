@@ -23,6 +23,9 @@ import {
   coalitionCapacity,
   coalitionOf,
   COALITION_DESC_MAX,
+  COALITION_DEPARTURE_MS,
+  COALITION_JOIN_COOLDOWN_MS,
+  type CoalitionDeparture,
   COALITION_EMBLEMS,
   foundCoalition,
   removeMember,
@@ -63,7 +66,46 @@ function leaveCoalition(h: HandlerContext, me: PlayerId, except: PlayerId | null
     setStance(h.state, me, other, 'peace');
     h.emit('diplomacy.changed', { a: me, b: other, stance: 'peace', from: 'alliance' });
   }
+  // Pending invitations must not carry a departed member into another coalition.
+  const offers = h.state.diplomacyOffers;
+  if (offers) {
+    for (const key of Object.keys(offers)) {
+      if (offers[key] === 'alliance' && offerInvolves(key, me)) delete offers[key];
+    }
+    if (Object.keys(offers).length === 0) delete h.state.diplomacyOffers;
+  }
   h.emit('coalition.left', { playerId: me, coalitionId: c.id });
+}
+
+/** Same-coalition treaties cannot be broken before the departure deadline. */
+function coalitionPair(h: HandlerContext, a: PlayerId, b: PlayerId): boolean {
+  return coalitionsOn(h) && (coalitionOf(h.state, a)?.members.includes(b) ?? false);
+}
+
+function canJoinCoalition(h: HandlerContext, playerId: PlayerId): void {
+  if ((h.state.coalitionJoinAfter?.[playerId] ?? 0) > h.ctx.now)
+    h.reject('E_COALITION_COOLDOWN');
+  if (coalitionOf(h.state, playerId)?.departures?.[playerId])
+    h.reject('E_COALITION_LEAVING');
+}
+
+function scheduleDeparture(
+  h: HandlerContext,
+  playerId: PlayerId,
+  by: PlayerId,
+  kind: CoalitionDeparture['kind'],
+): void {
+  const c = coalitionOf(h.state, playerId);
+  if (!c) return h.reject('E_NO_COALITION');
+  if (c.departures?.[playerId]) return h.reject('E_COALITION_LEAVING');
+  const departure = { at: h.ctx.now + COALITION_DEPARTURE_MS, kind, by };
+  (c.departures ??= {})[playerId] = departure;
+  h.schedule(departure.at, 'coalition.departure.due', {
+    playerId,
+    coalitionId: c.id,
+    at: departure.at,
+  });
+  h.emit('coalition.departure.scheduled', { playerId, coalitionId: c.id, ...departure });
 }
 
 /**
@@ -96,8 +138,6 @@ function escalate(
   cause?: string,
 ): void {
   clearOffers(h.state, me, target);
-  // COAL-1: отказ от союза с членом своей коалиции — это выход из неё.
-  if (from === 'alliance' && coalitionsOn(h)) leaveCoalition(h, me, target);
   // MAPSHARE-1: война рвёт договор об обмене картами вместе с переговорами о нём.
   // Делиться разведкой и пускать войска к тому, кому только что объявил войну, —
   // противоречие, и держать такой договор значило бы отдавать врагу свою карту.
@@ -122,13 +162,13 @@ function fixedPair(h: HandlerContext, a: PlayerId, b: PlayerId): boolean {
 
 export const diplomacyModule: GameModule = {
   id: 'diplomacy',
-  // 1.6.0: explicit coalition founding; single-member coalitions persist.
-  version: '1.6.0',
+  // 1.7.0: delayed departures, founder kicks and a post-departure re-entry lock.
+  version: '1.7.0',
   setup(api) {
     api.provideCapability<DiplomacyCapability>('diplomacy', {
       getRelation: (state, a, b) => stanceToRelation(getStance(state, a, b)),
       declareWar: (h, a, b, cause) => {
-        if (a === b || fixedPair(h, a, b)) return false;
+        if (a === b || fixedPair(h, a, b) || coalitionPair(h, a, b)) return false;
         const from = getStance(h.state, a, b);
         if (from === 'war') return false;
         escalate(h, a, b, 'war', from, cause);
@@ -168,6 +208,7 @@ export const diplomacyModule: GameModule = {
       }
 
       if (HOSTILITY[stance] > HOSTILITY[from]) {
+        if (coalitionPair(h, me, target)) return h.reject('E_COALITION_LEAVING');
         escalate(h, me, target, stance, from);
         return;
       }
@@ -181,6 +222,10 @@ export const diplomacyModule: GameModule = {
       // COAL-1: союз заключается только внутри коалиции, и вместимость её держит ядро.
       // Проверка стоит и перед предложением, и перед принятием: за время, пока
       // предложение висело, коалиция могла заполниться.
+      if (stance === 'alliance' && coalitionsOn(h)) {
+        canJoinCoalition(h, me);
+        canJoinCoalition(h, target);
+      }
       const mine = stance === 'alliance' && coalitionsOn(h) ? coalitionOf(h.state, me) : null;
       const theirs = stance === 'alliance' && coalitionsOn(h) ? coalitionOf(h.state, target) : null;
       if (mine && theirs && mine.id !== theirs.id) {
@@ -245,6 +290,7 @@ export const diplomacyModule: GameModule = {
       ) {
         return h.reject('E_FORBIDDEN');
       }
+      canJoinCoalition(h, action.playerId);
       const c = foundCoalition(h.state, action.playerId);
       h.emit('coalition.joined', { playerId: action.playerId, coalitionId: c.id });
     });
@@ -268,14 +314,42 @@ export const diplomacyModule: GameModule = {
       h.emit('diplomacy.declined', { from: target, to: me, stance });
     });
 
-    /**
-     * COAL-1 — `coalition.leave {}`: выйти из своей коалиции. Союз с её членами
-     * сменяется миром.
-     */
+    /** Membership and shared intel remain until the authoritative 24-hour deadline. */
     api.onAction('coalition.leave', (action, h) => {
-      if (!coalitionsOn(h)) return h.reject('E_FORBIDDEN');
-      if (!coalitionOf(h.state, action.playerId)) return h.reject('E_NO_COALITION');
-      leaveCoalition(h, action.playerId, null);
+      const actor = h.state.players[action.playerId];
+      if (!coalitionsOn(h) || !actor || actor.status !== 'active')
+        return h.reject('E_FORBIDDEN');
+      scheduleDeparture(h, action.playerId, action.playerId, 'leave');
+    });
+
+    api.onAction('coalition.kick', (action, h) => {
+      const { target } = action.payload as { target?: unknown };
+      if (typeof target !== 'string' || target === action.playerId)
+        return h.reject('E_BAD_PAYLOAD');
+      const actor = h.state.players[action.playerId];
+      const c = coalitionOf(h.state, action.playerId);
+      if (
+        !coalitionsOn(h) || !actor || actor.status !== 'active' ||
+        !c || c.founder !== action.playerId || !c.members.includes(target)
+      ) return h.reject('E_FORBIDDEN');
+      if (c.departures?.[action.playerId]) return h.reject('E_COALITION_LEAVING');
+      scheduleDeparture(h, target, action.playerId, 'kick');
+    });
+
+    api.on('coalition.departure.due', (event, h) => {
+      const { playerId, coalitionId, at } = event.payload as {
+        playerId: PlayerId;
+        coalitionId: string;
+        at: number;
+      };
+      const c = coalitionOf(h.state, playerId);
+      const departure = c?.departures?.[playerId];
+      // Elimination can remove the member sooner. A stale timer cannot remove a
+      // successor coalition member or move an already established cooldown.
+      if (!c || c.id !== coalitionId || !departure || departure.at !== at || h.ctx.now < at)
+        return;
+      leaveCoalition(h, playerId, null);
+      (h.state.coalitionJoinAfter ??= {})[playerId] = at + COALITION_JOIN_COOLDOWN_MS;
     });
 
     /**

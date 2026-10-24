@@ -189,3 +189,53 @@ describe('ally pings', () => {
     expect(errors).toHaveLength(1); // no NEW rate error after the window expired
   });
 });
+
+
+describe('tactical marker variants and deletion', () => {
+  it.each(['mark', 'defend', 'attack'])('relays a one-point %s marker and only lets its owner clear it', async (kind) => {
+    const room = makeRoom({ teams: { green: 'A', blue: 'A', red: 'B' } });
+    const owner = new Peer(), ally = new Peer(), enemy = new Peer();
+    room.addPeer('green', owner);
+    room.addPeer('blue', ally);
+    room.addPeer('red', enemy);
+    await room.receive('green', owner, place({ kind, target: { node: 'home_green' } }));
+    const ping = owner.ofType('ping.added')[0]!.ping!;
+    expect(ping).toMatchObject({ kind });
+    await room.receive('blue', ally, JSON.stringify({ type: 'ping.clear', pingId: ping.id }));
+    expect(owner.ofType('ping.removed')).toHaveLength(0);
+    await room.receive('green', owner, JSON.stringify({ type: 'ping.clear', pingId: ping.id }));
+    expect(owner.ofType('ping.removed')).toHaveLength(1);
+    expect(ally.ofType('ping.removed')).toHaveLength(1);
+    expect(enemy.ofType('ping.added')).toHaveLength(0);
+    expect(enemy.ofType('ping.removed')).toHaveLength(0);
+    const reconnect = new Peer();
+    room.addPeer('green', reconnect);
+    await flush();
+    expect(reconnect.ofType('ping.added')).toHaveLength(0);
+  });
+  it('still requires a destination for a move arrow', async () => {
+    const room = makeRoom();
+    const owner = new Peer();
+    room.addPeer('green', owner);
+    await room.receive('green', owner, place({ kind: 'move', target: { node: 'home_green' } }));
+    expect(owner.ofType('error')).toContainEqual(expect.objectContaining({ code: 'E_PING_TARGET' }));
+  });
+});
+
+
+it('acknowledges clearing an expired or unknown ping only to the requesting peer', async () => {
+  let now = 0;
+  const room = makeRoom({ teams: { green: 'A', blue: 'A' }, now: () => now, ttl: 1000 });
+  const owner = new Peer(), ally = new Peer();
+  room.addPeer('green', owner);
+  room.addPeer('blue', ally);
+  await room.receive('green', owner, place({ kind: 'mark', target: { node: 'home_green' } }));
+  const id = owner.ofType('ping.added')[0]!.ping!.id;
+  now = 1001;
+  await room.receive('green', owner, JSON.stringify({ type: 'ping.clear', pingId: id }));
+  expect(owner.ofType('ping.removed')).toContainEqual(expect.objectContaining({ pingId: id, reason: 'expired' }));
+  expect(ally.ofType('ping.removed')).toHaveLength(0);
+  await room.receive('green', owner, JSON.stringify({ type: 'ping.clear', pingId: 'invented' }));
+  expect(owner.ofType('ping.removed')).toHaveLength(2);
+  expect(ally.ofType('ping.removed')).toHaveLength(0);
+});

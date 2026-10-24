@@ -199,6 +199,7 @@ supported»), единственная живая замена (`@henkey/postgre
 | --- | --- | --- |
 | `pnpm smoke:browser` | `browsertest.mjs` | собранный бандл грузится, экран входа на месте, консоль пуста |
 | `pnpm smoke:context` | `contexttest.mjs` | контекстные действия на карте |
+| `pnpm smoke:pings` | `pingtest.mjs` | три вида меток: выбор, отображение и удаление из списка и попапа; ПК и телефон |
 | `pnpm smoke:zoom` | `zoomtest.mjs` | зум и семантические уровни карты |
 | `pnpm smoke:frontier` | `frontiertest.mjs` | большая карта Frontier |
 | `pnpm smoke:retreat` | `retreattest.mjs` | кнопка авто-отхода обходит ступени и кладёт приказ в состояние; ручное «Отступить» в бою на ПК — точка тапом по карте уводит флот; в CI — не блокирующим шагом |
