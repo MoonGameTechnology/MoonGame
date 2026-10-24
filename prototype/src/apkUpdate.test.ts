@@ -4,14 +4,16 @@
 // перестала различать «ты свежий» и «сеть не отвечает», и порог, который перестал
 // сдерживать проверку при возврате в передний план.
 import { describe, expect, it } from 'vitest';
-import { CHECK_GAP_MS, shouldCheck, updateMessage } from './apkUpdate';
+import { CHECK_GAP_MS, installMessage, shouldCheck, updateMessage } from './apkUpdate';
 import type { UpdateCheck } from './updater';
 
 const info = {
   versionCode: 42,
+  versionName: 'alpha-deadbee',
   sha: 'deadbee',
   apkUrl: 'https://example.invalid/app.apk',
   notes: 'rolling',
+  apkSha256: 'a'.repeat(64),
 };
 const OUTCOMES: UpdateCheck[] = [
   { kind: 'update', info, local: 41 },
@@ -19,6 +21,8 @@ const OUTCOMES: UpdateCheck[] = [
   { kind: 'offline', error: 'DNS' },
   { kind: 'http', status: 503 },
   { kind: 'unparsable' },
+  { kind: 'unverified' },
+  { kind: 'unsupported' },
   { kind: 'dormant' },
 ];
 
@@ -40,6 +44,19 @@ describe('диагностика проверки', () => {
 
   it('текст приходит из локали, а не ключом', () => {
     for (const line of OUTCOMES.map(updateMessage)) expect(line).not.toMatch(/^upd\./);
+  });
+});
+
+describe('статус проверенной установки', () => {
+  it('подмена файла и отказ в разрешении читаются по-разному', () => {
+    const codes = ['downloading', 'installing', 'E_UPDATE_PERMISSION', 'E_UPDATE_DIGEST', 'E_UPDATE_PACKAGE', 'E_UPDATE_DOWNLOAD'];
+    const said = codes.map(installMessage);
+    expect(new Set(said).size).toBe(codes.length);
+    for (const line of said) expect(line).not.toMatch(/^upd\./);
+  });
+
+  it('незнакомый код — отказ, а не «устанавливаю»', () => {
+    for (const code of [undefined, null, 'ok', 42]) expect(installMessage(code)).toBe(installMessage('E_UPDATE_DOWNLOAD'));
   });
 });
 

@@ -73,6 +73,7 @@
     "audit": "pnpm audit --audit-level=high",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs-check",
     "docs-check": "node scripts/docs-check.mjs",
+    "smoke:apk-site": "node prototype/apksitetest.mjs",
     "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs",
     "smoke:training": "pnpm run prototype && node prototype/trainingtest.mjs"
   },
@@ -85,7 +86,9 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "fast-check": "^4.10.2",
+    "jsqr": "1.4.0",
     "prettier": "^3.9.9",
+    "qrcode": "1.5.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
     "vitest": "^4.1.12",

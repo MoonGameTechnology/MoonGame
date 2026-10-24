@@ -6,11 +6,18 @@
 //     and time-acceleration controls are compiled out of the JS, and the matching
 //     markup (fenced with <!--dev-only--> … <!--/dev-only--> below) is stripped.
 import { build } from 'esbuild';
+import QRCode from 'qrcode';
 import { createHash } from 'node:crypto';
 import { writeFileSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
+
+// One persistent site link for the desktop button and its offline-rendered QR.
+const androidDistribution = JSON.parse(readFileSync(new URL('../mobile/distribution.json', import.meta.url), 'utf8'));
+const androidDownloadUrl = `${androidDistribution.origin}${androidDistribution.basePath}/player/latest.apk`;
+const androidQr = (await QRCode.toString(androidDownloadUrl, { type: 'svg', errorCorrectionLevel: 'M', margin: 4 }))
+  .replace('<svg ', '<svg aria-hidden="true" focusable="false" ');
 
 // A native button keeps keyboard activation and never submits the password form.
 const passwordToggle = (
@@ -3424,6 +3431,23 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .fitpane .hgradeline.g-legendary{color:var(--amber);}
 .fitpane .hgradeline.g-main{color:var(--grn);}
 
+/* APK promotion belongs to the desktop hub; the QR is generated locally at build time. */
+.hub-android{display:none;align-items:center;gap:24px;margin:20px 0;padding:20px;
+  border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.045);}
+.hub-android-copy{flex:1;min-width:0;}
+.hub-android h2{margin:0 0 14px;font-size:var(--fs-title,18px);color:var(--ink);font-weight:600;}
+.hub-android .ha-download{display:inline-flex;min-height:44px;align-items:center;padding:10px 20px;
+  border:1px solid var(--cyan);border-radius:7px;color:var(--cyan);background:rgba(53,214,230,.12);
+  text-decoration:none;font-size:var(--fs-body);}
+.hub-android .ha-download:hover{background:rgba(53,214,230,.22);}
+.hub-android .ha-qr{flex:none;width:132px;text-align:center;text-decoration:none;color:var(--dim);font-size:var(--fs-caption);}
+.hub-android .ha-qr svg{display:block;width:132px;height:132px;background:#fff;margin-bottom:8px;}
+#ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
+#ub-notes:empty{display:none;}
+#ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
+#ub-status:empty{display:none;}
+@media (min-width:801px) and (pointer:fine){.hub-android{display:flex;}}
+
 /* in-app APK update banner + manual check (APK only; updater.ts toggles visibility).
    GLOBAL fixed banner — floats over ANY screen (welcome / hub / match), z above the
    window overlays (47) and testmode (59): an update prompt is deliberately on top. */
@@ -5351,8 +5375,10 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
      A GLOBAL fixed banner so it is seen from ANY screen — welcome, hub, or mid-match:
      the returning-player path lands in the hub and never visits #connect, which is
      where this used to live (and why players never saw their updates). -->
-<div id="updbar">
+<div id="updbar" role="region" aria-live="polite">
   <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
+  <p id="ub-notes"></p>
+  <p id="ub-status"></p>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>
     <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>
@@ -5488,6 +5514,14 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
+      ${external ? '' : `
+      <section class="hub-android" id="hub-android" aria-labelledby="hub-android-title">
+        <div class="hub-android-copy"><h2 id="hub-android-title" data-i18n="hub.android.title"></h2>
+          <a id="hub-android-download" class="ha-download" href="${androidDownloadUrl}" data-i18n="hub.android.download"></a>
+        </div>
+        <a id="hub-android-qr" class="ha-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr">${androidQr}<span data-i18n="hub.android.scan"></span></a>
+      </section>
+      `}
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>

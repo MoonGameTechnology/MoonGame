@@ -1,199 +1,109 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildLabel,
-  checkForUpdate,
-  checkForUpdateDetailed,
-  currentBuild,
-  isNewer,
-  isTrustedApkUrl,
-  parseRelease,
-  type UpdateInfo,
-} from './updater';
-
-interface GlobalWithBuild {
-  __BUILD__?: { versionCode?: unknown; sha?: unknown };
-}
-const g = globalThis as GlobalWithBuild;
-
-function setBuild(b: { versionCode?: unknown; sha?: unknown } | undefined): void {
-  if (b === undefined) delete g.__BUILD__;
-  else g.__BUILD__ = b;
-}
-
-/** A realistic GitHub release payload for tag `alpha`. */
-function release(versionCode: number, sha: string): unknown {
-  return {
-    tag_name: 'alpha',
-    body: `Rolling alpha — the latest debug APK built from main (${sha}).\n\n<!-- void:versionCode=${versionCode} void:sha=${sha} -->\nInstall on Android: download below.`,
-    assets: [
-      { name: 'void-dominion-alpha.apk', browser_download_url: 'https://github.com/x/y/releases/download/alpha/void-dominion-alpha.apk' },
-    ],
-  };
-}
-
-function fetchOk(payload: unknown): typeof fetch {
-  return (async () => ({ ok: true, json: async () => payload })) as unknown as typeof fetch;
-}
-
-afterEach(() => setBuild(undefined));
-
-describe('currentBuild', () => {
-  it('reads a baked build identity', () => {
-    setBuild({ versionCode: 42, sha: 'abc1234' });
-    expect(currentBuild()).toEqual({ versionCode: 42, sha: 'abc1234' });
-  });
-  it('is null in the browser / dev build (no __BUILD__)', () => {
-    setBuild(undefined);
-    expect(currentBuild()).toBeNull();
-  });
-  it('rejects a malformed versionCode', () => {
-    setBuild({ versionCode: 'nope', sha: 'x' });
-    expect(currentBuild()).toBeNull();
-  });
-  it('tolerates a missing sha', () => {
-    setBuild({ versionCode: 7 });
-    expect(currentBuild()).toEqual({ versionCode: 7, sha: '' });
+import { buildLabel, checkForUpdate, checkForUpdateDetailed, currentBuild, isNewer, isTrustedApkUrl, openSignedVersion, parseVersion, VERSION_URL, type UpdateInfo } from './updater';
+const g = globalThis as { __BUILD__?: unknown };
+const root = 'https://77-221-140-87.sslip.io/downloads/android';
+const apkSha256 = 'a'.repeat(64);
+const manifest = (versionCode = 42) => ({ versionCode, versionName: 'alpha-deadbee', sha: 'deadbee',
+  apkUrl: `${root}/alpha/${versionCode}-deadbee/void-dominion-alpha.apk`, notes: 'Changes', apkSha256 });
+// The site serves what CI signed; `appId`/`signerSha256` travel along but are not shown to the player.
+const published = (versionCode = 42) => ({ ...manifest(versionCode), appId: 'com.voiddominion.prototype', signerSha256: 'b'.repeat(64) });
+const b64 = (bytes: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const keyPair = async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']) as CryptoKeyPair;
+  return { privateKey: pair.privateKey, publicKey: b64(await crypto.subtle.exportKey('raw', pair.publicKey)) };
+};
+const keys = await keyPair(), stranger = await keyPair();
+const sign = async (value: unknown, key = keys.privateKey) => {
+  const payload = new TextEncoder().encode(JSON.stringify(value));
+  return { payload: b64(payload), signature: b64(await crypto.subtle.sign({ name: 'Ed25519' }, key, payload)) };
+};
+const fetchOk = (value: unknown): typeof fetch => vi.fn(async () => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+const fetchSigned = async (value: unknown = published()) => fetchOk(await sign(value));
+afterEach(() => { delete g.__BUILD__; vi.useRealTimers(); });
+describe('site APK version contract', () => {
+  it('accepts versionCode, versionName, immutable same-site APK, its digest and notes', () => expect(parseVersion(published())).toEqual(manifest()));
+  it.each([
+    { versionCode: -1 }, { versionCode: 1.5 }, { versionCode: 2100000001 }, { versionCode: '42' },
+    { versionName: '' }, { notes: 'x'.repeat(8193) }, { sha: 'not-a-sha' },
+    { apkUrl: 'https://github.com/a/b/app.apk' }, { apkUrl: `${root}/player/42-deadbee/void-dominion-player.apk` },
+    { apkUrl: `${root}/alpha/41-deadbee/void-dominion-alpha.apk` },
+    { apkSha256: 'A'.repeat(64) }, { apkSha256: 'a'.repeat(63) }, { apkSha256: undefined }, { appId: 'com.voiddominion.player' },
+  ])('rejects invalid or mixed release metadata: %j', (patch) => expect(parseVersion({ ...published(), ...patch })).toBeNull());
+  it('rejects malformed JSON values', () => { for (const x of [null, [], 'version']) expect(parseVersion(x)).toBeNull(); });
+  it('allows only HTTPS APK paths at the configured server', () => {
+    expect(isTrustedApkUrl(manifest().apkUrl)).toBe(true);
+    for (const url of [manifest().apkUrl.replace('https:', 'http:'), manifest().apkUrl+'?x=1', manifest().apkUrl+'#x', 'https://77-221-140-87.sslip.io.evil.test/a.apk', 'https://user@77-221-140-87.sslip.io/downloads/android/alpha/42-deadbee/void-dominion-alpha.apk']) expect(isTrustedApkUrl(url)).toBe(false);
   });
 });
-
-describe('parseRelease', () => {
-  it('extracts versionCode, sha and the apk url from the body marker + assets', () => {
-    expect(parseRelease(release(99, 'deadbee'))).toEqual({
-      versionCode: 99,
-      sha: 'deadbee',
-      apkUrl: 'https://github.com/x/y/releases/download/alpha/void-dominion-alpha.apk',
-      notes: expect.stringContaining('void:versionCode=99'),
-    });
+describe('signed by CI, not trusted because of the host', () => {
+  it('opens exactly the bytes the CI key signed', async () => {
+    expect(await openSignedVersion(await sign(published()), keys.publicKey)).toEqual(manifest());
   });
-  it('returns null when the version marker is absent', () => {
-    expect(parseRelease({ body: 'no marker here', assets: [{ name: 'void-dominion-alpha.apk', browser_download_url: 'u' }] })).toBeNull();
+  it('refuses a manifest signed by any other key, edited, or unsigned', async () => {
+    const good = await sign(published());
+    const other = await sign(published(43));
+    for (const forged of [
+      await sign(published(), stranger.privateKey), { ...good, payload: other.payload }, { payload: good.payload },
+      { ...good, signature: good.signature.slice(4) }, published(), null, 'x',
+    ]) expect(await openSignedVersion(forged, keys.publicKey)).toBeNull();
   });
-  it('returns null when the apk asset is missing', () => {
-    expect(parseRelease({ body: '<!-- void:versionCode=5 -->', assets: [{ name: 'other.txt', browser_download_url: 'u' }] })).toBeNull();
+  it('a valid signature does not excuse invalid metadata', async () => {
+    expect(await openSignedVersion(await sign({ ...published(), apkUrl: 'https://evil.test/a.apk' }), keys.publicKey)).toBeNull();
   });
-  it('returns null on a non-object', () => {
-    expect(parseRelease(null)).toBeNull();
-    expect(parseRelease('string')).toBeNull();
+  it('without a baked key nothing is ever offered', async () => {
+    expect(await openSignedVersion(await sign(published()), '')).toBeNull();
   });
-  it('rejects an apk asset URL that is not an HTTPS GitHub origin', () => {
-    const evil = {
-      body: '<!-- void:versionCode=9 void:sha=abc -->',
-      assets: [{ name: 'void-dominion-alpha.apk', browser_download_url: 'https://evil.example/void-dominion-alpha.apk' }],
-    };
-    expect(parseRelease(evil)).toBeNull();
-    const cleartext = {
-      body: '<!-- void:versionCode=9 void:sha=abc -->',
-      assets: [{ name: 'void-dominion-alpha.apk', browser_download_url: 'http://github.com/x/void-dominion-alpha.apk' }],
-    };
-    expect(parseRelease(cleartext)).toBeNull();
+  it('a WebView without Ed25519 says so instead of passing or blaming the file', async () => {
+    g.__BUILD__ = { versionCode: 41 };
+    const importKey = vi.spyOn(crypto.subtle, 'importKey').mockRejectedValue(new Error('NotSupportedError'));
+    try { expect(await checkForUpdateDetailed(await fetchSigned(), keys.publicKey)).toEqual({ kind: 'unsupported' }); }
+    finally { importKey.mockRestore(); }
+  });
+  it('a forged file is reported as such and never offered', async () => {
+    g.__BUILD__ = { versionCode: 41 };
+    expect(await checkForUpdateDetailed(fetchOk(await sign(published(), stranger.privateKey)), keys.publicKey)).toEqual({ kind: 'unverified' });
+    expect(await checkForUpdateDetailed(fetchOk(published()), keys.publicKey)).toEqual({ kind: 'unverified' });
   });
 });
-
-describe('isTrustedApkUrl', () => {
-  it('accepts HTTPS GitHub release-asset hosts', () => {
-    expect(isTrustedApkUrl('https://github.com/o/r/releases/download/alpha/a.apk')).toBe(true);
-    expect(isTrustedApkUrl('https://objects.githubusercontent.com/x/a.apk')).toBe(true);
+describe('optional update, never a boot dependency', () => {
+  it('checks only our server and bypasses caches without cookies', async () => {
+    g.__BUILD__ = { versionCode: 41, sha: 'abc1234' }; const fetcher = await fetchSigned();
+    expect((await checkForUpdate(fetcher, keys.publicKey))?.versionCode).toBe(42);
+    expect(fetcher).toHaveBeenCalledWith(VERSION_URL, expect.objectContaining({ cache: 'no-store', credentials: 'omit', redirect: 'error' }));
+    expect(VERSION_URL).toBe(`${root}/alpha/latest.json`);
   });
-  it('rejects non-HTTPS, non-GitHub, and malformed URLs', () => {
-    expect(isTrustedApkUrl('http://github.com/o/r/a.apk')).toBe(false); // cleartext
-    expect(isTrustedApkUrl('https://evil.example/a.apk')).toBe(false); // wrong host
-    expect(isTrustedApkUrl('https://github.com.evil.example/a.apk')).toBe(false); // suffix-spoof
-    expect(isTrustedApkUrl('not a url')).toBe(false);
+  it.each([42, 43])('equal or older remote does not prompt (%s)', async (versionCode) => {
+    g.__BUILD__ = { versionCode }; expect(await checkForUpdate(await fetchSigned(), keys.publicKey)).toBeNull();
   });
-});
-
-describe('isNewer', () => {
-  const remote = (vc: number): UpdateInfo => ({ versionCode: vc, sha: '', apkUrl: 'u', notes: '' });
-  it('true only when the remote versionCode is strictly higher', () => {
-    expect(isNewer({ versionCode: 10, sha: '' }, remote(11))).toBe(true);
-    expect(isNewer({ versionCode: 10, sha: '' }, remote(10))).toBe(false);
-    expect(isNewer({ versionCode: 10, sha: '' }, remote(9))).toBe(false);
-  });
-});
-
-describe('checkForUpdate', () => {
-  it('returns the update when the release is newer', async () => {
-    setBuild({ versionCode: 41, sha: 'old1234' });
-    const u = await checkForUpdate(fetchOk(release(42, 'new5678')));
-    expect(u).not.toBeNull();
-    expect(u!.versionCode).toBe(42);
-    expect(u!.apkUrl).toContain('void-dominion-alpha.apk');
-  });
-  it('returns null when the release is the same version', async () => {
-    setBuild({ versionCode: 42, sha: 'same' });
-    expect(await checkForUpdate(fetchOk(release(42, 'same')))).toBeNull();
-  });
-  it('returns null in the browser / dev build (no baked build) without even fetching', async () => {
-    setBuild(undefined);
-    let called = false;
-    const spy = (async () => {
-      called = true;
-      return { ok: true, json: async () => release(99, 'x') };
-    }) as unknown as typeof fetch;
-    expect(await checkForUpdate(spy)).toBeNull();
-    expect(called).toBe(false);
-  });
-  it('returns null when the network throws (offline)', async () => {
-    setBuild({ versionCode: 1, sha: 'x' });
-    const boom = (async () => {
-      throw new Error('offline');
-    }) as unknown as typeof fetch;
-    expect(await checkForUpdate(boom)).toBeNull();
-  });
-  it('returns null on a non-ok response (e.g. rate-limited)', async () => {
-    setBuild({ versionCode: 1, sha: 'x' });
-    const rate = (async () => ({ ok: false, json: async () => ({}) })) as unknown as typeof fetch;
-    expect(await checkForUpdate(rate)).toBeNull();
-  });
-});
-
-describe('buildLabel', () => {
-  it('prefers the alpha-sha form', () => {
-    expect(buildLabel({ versionCode: 42, sha: 'abc1234' })).toBe('alpha-abc1234');
-  });
-  it('falls back to the versionCode when no sha', () => {
-    expect(buildLabel({ versionCode: 42, sha: '' })).toBe('сборка 42');
-  });
-});
-
-describe('checkForUpdateDetailed (diagnosable outcomes)', () => {
-  it('reports "current" with both version numbers when up to date', async () => {
-    setBuild({ versionCode: 442, sha: 'me' });
-    const r = await checkForUpdateDetailed(fetchOk(release(441, 'older')));
-    expect(r).toEqual({ kind: 'current', local: 442, remote: 441 });
-  });
-  it('reports "update" with the info + local version when newer exists', async () => {
-    setBuild({ versionCode: 441, sha: 'me' });
-    const r = await checkForUpdateDetailed(fetchOk(release(442, 'newer')));
-    expect(r.kind).toBe('update');
-    if (r.kind === 'update') expect([r.info.versionCode, r.local]).toEqual([442, 441]);
-  });
-  it('reports "offline" (not a false "current") when the fetch throws', async () => {
-    setBuild({ versionCode: 1, sha: 'me' });
-    const boom = (async () => {
-      throw new Error('net down');
-    }) as unknown as typeof fetch;
-    const r = await checkForUpdateDetailed(boom);
-    expect(r.kind).toBe('offline');
-  });
-  it('reports "http" with the status on a non-ok response', async () => {
-    setBuild({ versionCode: 1, sha: 'me' });
-    const rate = (async () => ({ ok: false, status: 404, json: async () => ({}) })) as unknown as typeof fetch;
-    const r = await checkForUpdateDetailed(rate);
-    expect(r).toEqual({ kind: 'http', status: 404 });
-  });
-  it('reports "dormant" in the browser / dev build', async () => {
-    setBuild(undefined);
-    expect((await checkForUpdateDetailed(fetchOk(release(9, 'x')))).kind).toBe('dormant');
-  });
-});
-
-it('RuStore never contacts GitHub for rolling APK updates', async () => {
-  const previous = (globalThis as { __BUILD__?: unknown }).__BUILD__;
-  (globalThis as { __BUILD__?: unknown }).__BUILD__ = { versionCode: 100, sha: 'abc', channel: 'rustore' };
-  const fetcher = vi.fn();
-  try {
-    expect(await checkForUpdateDetailed(fetcher)).toEqual({ kind: 'dormant' });
+  it('browser and store APK never fetch sideload updates', async () => {
+    const fetcher = await fetchSigned(); expect(await checkForUpdateDetailed(fetcher)).toEqual({ kind: 'dormant' });
+    g.__BUILD__ = { versionCode: 1, channel: 'rustore' }; expect(await checkForUpdateDetailed(fetcher)).toEqual({ kind: 'dormant' });
     expect(fetcher).not.toHaveBeenCalled();
-  } finally { (globalThis as { __BUILD__?: unknown }).__BUILD__ = previous; }
+  });
+  it('network failure is harmless and diagnosable', async () => {
+    g.__BUILD__ = { versionCode: 1 }; const bad = vi.fn(async () => { throw Error('offline'); });
+    expect((await checkForUpdateDetailed(bad)).kind).toBe('offline'); expect(await checkForUpdate(bad)).toBeNull();
+  });
+  it('keeps HTTP failure distinct from current', async () => {
+    g.__BUILD__ = { versionCode: 1 };
+    expect(await checkForUpdateDetailed(vi.fn(async () => new Response('', { status: 503 })))).toEqual({ kind: 'http', status: 503 });
+  });
+  it('rejects corrupt and oversized responses', async () => {
+    g.__BUILD__ = { versionCode: 1 };
+    for (const text of ['not json', ' '.repeat(32769)]) expect((await checkForUpdateDetailed(vi.fn(async () => new Response(text)))).kind).toBe('unparsable');
+  });
+  it('aborts a hanging request instead of holding boot forever', async () => {
+    vi.useFakeTimers(); g.__BUILD__ = { versionCode: 1 };
+    const fetcher: typeof fetch = vi.fn((_url, init) => new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(Error('timeout')))));
+    const result = checkForUpdate(fetcher); await vi.advanceTimersByTimeAsync(5000); expect(await result).toBeNull();
+  });
+});
+it('reads optional versionName and rejects invalid installed version codes', () => {
+  g.__BUILD__ = { versionCode: 1, sha: 'abc1234', versionName: 'alpha-abc1234' };
+  expect(buildLabel(currentBuild()!)).toBe('alpha-abc1234');
+  for (const versionCode of [0, -1, 1.5, '2', NaN]) { g.__BUILD__ = { versionCode }; expect(currentBuild()).toBeNull(); }
+});
+it('comparison depends only on Android versionCode', () => {
+  expect(isNewer({ versionCode: 41, sha: '' }, manifest() as UpdateInfo)).toBe(true);
+  expect(isNewer({ versionCode: 42, sha: '' }, manifest() as UpdateInfo)).toBe(false);
 });

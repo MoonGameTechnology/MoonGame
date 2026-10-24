@@ -1,0 +1,10 @@
+# Optional fresh-install mount. Existing deployments may use a dedicated public
+# subdirectory in their persistent Caddy volume instead (see README).
+services:
+  caddy:
+    volumes:
+      - type: bind
+        source: /var/lib/moongame-apk/public
+        target: /srv/moongame-apk
+        read_only: true
+        bind: { create_host_path: false }

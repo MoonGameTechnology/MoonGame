@@ -170,6 +170,12 @@ jobs:
           fi
         continue-on-error: true
 
+      - name: Site APK update and desktop download smoke
+        run: |
+          pnpm run smoke:browser:install
+          pnpm run prototype
+          pnpm run smoke:apk-site
+
       # YAG-1.1c: робот играет в СОБРАННЫЙ архив площадки (`prototype/dist/yandex/`) —
       # запуск, забег, «Продолжить», ролик за награду, закрытые двери по ссылке. Архив
       # собран с `__SECTOR_ZERO_ONLY__`, и его кода не повторяет ни одна другая сборка:

@@ -41,6 +41,13 @@ env:
 
 Настраиваются в **Settings > Environments > [Name] > Secrets**.
 
+Ключ манифеста APK `APK_MANIFEST_SIGNING_KEY` хранится только в Environment
+`android-release` с выбранной веткой **Branch `main`**. Его repository/org-копии
+удаляются: иначе workflow рабочей ветки сможет получить ключ независимо от условий
+основного workflow. Сборка APK имеет `contents: read`; отдельный main publish-job
+получает Environment secret, запись релизов и OIDC после правил окружения.
+Порядок настройки и отрицательный canary — в [runbook APK](../../deploy/apk/README.md).
+
 ## Методы маскирования (masking)
 
 ### Метод 1: встроенное маскирование Secrets
