@@ -4,6 +4,7 @@ import { COUNTER_POSTED, espionageModule, MISSION_HOURS } from './espionage';
 import { diplomacyModule } from './diplomacy';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
 import { getStance, setStance } from '../state/diplomacy';
+import { coalitionOf } from '../state/coalition';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context, DomainEvent } from '../action/types';
 import type { GameModule } from '../kernel/module';
@@ -181,6 +182,92 @@ describe('SPY-11 — war on exposure', () => {
     if (!sent.ok) throw new Error(sent.code);
     const done = k.advanceTo(sent.state, ctx(END));
     expect(done.ok).toBe(true);
+  });
+});
+
+describe('SPY-11 — coalition protection', () => {
+  const hostileOps = ['recon', 'sabotage', 'theft', 'research'] as const;
+  const action = (type: string, playerId: string, payload: unknown = {}): Action =>
+    ({ id: `coal-spy:${++seq}`, type, playerId, payload, issuedAt: 0 });
+  function join(k: ReturnType<typeof kernel>, s: GameState): GameState {
+    return play(k, s, [
+      action('diplomacy.declare', 'p1', { target: 'p2', stance: 'alliance' }),
+      action('diplomacy.declare', 'p2', { target: 'p1', stance: 'alliance' }),
+    ], s.time, s.time).state;
+  }
+
+  it.each(hostileOps)('refuses %s within a real coalition before agent checks or payment', (op) => {
+    const calls: string[] = [];
+    const k = kernel([{
+      id: 'spy-cost-probe', version: '1', setup(api) {
+        api.hook<number>('espionage.agents', (base) => { calls.push('agents'); return base; });
+        api.hook<Record<string, number>>('espionage.cost', (base) => { calls.push('cost'); return base; });
+      },
+    }]);
+    const s = join(k, baseState());
+    expect(coalitionOf(s, 'p1')?.members).toEqual(['p1', 'p2']);
+    const before = JSON.parse(JSON.stringify(s)) as GameState;
+    expect(k.applyAction(s, spy('p1', 'B', op), ctx())).toMatchObject({ ok: false, code: 'E_BAD_TARGET' });
+    expect(calls).toEqual([]);
+    expect(s).toEqual(before);
+  });
+
+  it.each(['leave', 'kick'] as const)('protects both members throughout a pending %s at ×24, then allows missions', (kind) => {
+    const k = kernel();
+    const s = join(k, baseState());
+    const departureAt = 24 * HOUR * 24;
+    const pending = play(k, s, [
+      action('coalition.clock.rebase', 'p1', { wallTime: 1_800_000_000_000, gameTime: 0, timeScale: 24 }),
+      action(`coalition.${kind}`, kind === 'leave' ? 'p2' : 'p1', kind === 'leave' ? {} : { target: 'p2' }),
+    ], 0, departureAt - 1).state;
+    expect(coalitionOf(pending, 'p2')?.departures?.p2?.at).toBe(departureAt);
+    for (const [actor, target] of [['p1', 'B'], ['p2', 'A']] as const)
+      for (const op of hostileOps)
+        expect(k.applyAction(pending, spy(actor, target, op), ctx(departureAt - 1))).toMatchObject({ ok: false, code: 'E_BAD_TARGET' });
+    const departed = play(k, pending, [], departureAt, departureAt).state;
+    expect(coalitionOf(departed, 'p2')).toBeNull();
+    expect(k.applyAction(departed, spy('p2', 'A', 'theft'), ctx(departureAt)).ok).toBe(true);
+  });
+
+  it.each(hostileOps)('aborts an in-flight %s after joining, without damage, exposure, or RNG draws', (op) => {
+    const k = kernel();
+    const sent = play(k, baseState(), [spy('p1', 'B', op)], 0, 0).state;
+    const allied = join(k, sent);
+    const before = JSON.parse(JSON.stringify(allied)) as GameState;
+    const { state, events } = play(k, allied, [], 0, END);
+    expect(events.filter((event) => event.type.startsWith('espionage.') && event.type !== 'espionage.resolve')).toEqual([
+      expect.objectContaining({ type: 'espionage.aborted', payload: { owner: 'p1', planetId: 'B', kind: op } }),
+    ]);
+    expect(state.players).toEqual(before.players);
+    expect(state.planets).toEqual(before.planets);
+    expect(state.intel).toEqual(before.intel);
+    expect(state.rng).toEqual(before.rng);
+    expect(state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(getStance(state, 'p1', 'p2')).toBe('alliance');
+    expect(coalitionOf(state, 'p1')?.members).toEqual(['p1', 'p2']);
+    expect(ofType(events, 'diplomacy.changed')).toEqual([]);
+  });
+
+  it('rechecks the current world owner and keeps protection during a pending departure', () => {
+    const k = kernel();
+    const s = join(k, baseState());
+    s.planets.B!.owner = 'p3';
+    const sent = play(k, s, [spy('p1', 'B', 'theft')], 0, 0).state;
+    const captured = { ...sent, planets: { ...sent.planets, B: { ...sent.planets.B!, owner: 'p2' } } };
+    const pending = play(k, captured, [action('coalition.leave', 'p2')], 0, 0).state;
+    const { state, events } = play(k, pending, [], 0, END);
+    expect(ofType(events, 'espionage.aborted')).toHaveLength(1);
+    expect(state.players.p2!.resources).toEqual(pending.players.p2!.resources);
+    expect(state.rng).toEqual(pending.rng);
+    expect(coalitionOf(state, 'p2')?.departures?.p2).toEqual(coalitionOf(pending, 'p2')?.departures?.p2);
+  });
+
+  it('still allows a counter-intelligence agent to guard a coalition member', () => {
+    const k = kernel();
+    const { state, events } = play(k, join(k, baseState()), [spy('p1', 'B', 'counter')], 0, END);
+    expect(ofType(events, 'espionage.posted').map((event) => event.payload)).toEqual([{ owner: 'p1', planetId: 'B' }]);
+    expect(state.spyAgents?.p1?.[0]).toMatchObject({ op: 'counter', posted: true, planetId: 'B' });
+    expect(getStance(state, 'p1', 'p2')).toBe('alliance');
   });
 });
 

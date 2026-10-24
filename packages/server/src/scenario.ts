@@ -248,8 +248,9 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '87'; // diplomacy 1.7.0: persisted 24-hour
-// coalition departures and 48-hour rejoin cooldowns. Module membership/order stay fixed.
+export const MODULE_MANIFEST_VERSION = '87'; // diplomacy 1.7.0: real 24/48-hour
+// coalition deadlines; espionage 1.4.0: no hostile missions inside a coalition.
+// Module membership/order stay fixed.
 // export const MODULE_MANIFEST_VERSION = '86'; // Explicit coalition founding; `diplomacy`
 // 1.6.0 preserves single-member coalitions and transfers a departing founder's title.
 // Membership/order and JSON shape are unchanged, but a match on 85 dissolved a

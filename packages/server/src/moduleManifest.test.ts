@@ -115,7 +115,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 84: порядок тот же; movement 1.5.0 — право прохода по видимой границе, невидимую флот встречает в пути (FOG-LEAK).
 // 85: порядок тот же; diplomacy 1.4.0 — коалиции: состав и вместимость, отказ, выход, правка (COAL-1).
 // 86: order unchanged; diplomacy 1.6.0 adds founding and preserves singleton coalitions.
-// 87: order unchanged; diplomacy 1.7.0 persists departure deadlines and rejoin cooldowns.
+// 87: order unchanged; diplomacy 1.7.0 persists real departure/rejoin deadlines;
+// espionage 1.4.0 refuses hostile missions within the same coalition.
 const PINNED_FOR_VERSION = '87';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
