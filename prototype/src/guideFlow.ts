@@ -22,6 +22,7 @@ import {
   guideScenario,
   guideShipCount,
 } from '../../decisions/firstMatchGuide';
+import { nearestClearSpot, type Spot } from '../../decisions/clearSpot';
 import { note } from './eventFeed';
 import { FIRST_GOALS, type GoalSignals, goalsComplete, mergeDone, metGoals } from './firstGoals';
 import { buildFirstMatchTour } from './firstMatchTour';
@@ -37,7 +38,8 @@ import {
 import { goalBaseline, grew, mineLevels } from './goalTally';
 import { pcUi } from './graphicsPrefs';
 import { aiming, mobileDraft, pickWorld, selFleet, selPlanet } from './interaction';
-import { focusWorld, world } from './mapCamera';
+import { focusWorld, panBy, world } from './mapCamera';
+import { pointers } from './mapInput';
 import { applyTimeSpeed } from './matchTopBar';
 import { matchXp, type MetaState } from './meta';
 import type { SetupConfig } from './matchSetup';
@@ -53,7 +55,7 @@ import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildSetupConfig, prepareGuidedSetup } from './setupScreen';
 import { invalidatePanel, planetTab, renderPanel, setPlanetTab } from './sidePanel';
 import { refreshHubDoor } from './soloCheckpoint';
-import type { TourResult } from './spotlight';
+import type { Rect, TourResult } from './spotlight';
 import { type RunningTour, startTour } from './spotlightDom';
 import { activeConstruction, coreQueue } from './worldQueries';
 
@@ -122,10 +124,48 @@ const ORIENTATION_TOUR = __PLAYER_BUILD__
   ? HUD_ORIENTATION_TOUR.filter((step) => step.id !== 'clock')
   : HUD_ORIENTATION_TOUR;
 export function launchTour(steps = ORIENTATION_TOUR, onEnd?: (r: TourResult) => void): void {
-  activeTour = startTour(steps, (r) => {
-    activeTour = null;
-    onEnd?.(r);
-  });
+  activeTour = startTour(
+    steps,
+    (r) => {
+      activeTour = null;
+      onEnd?.(r);
+    },
+    { keepClear: keepMarkClear },
+  );
+}
+
+// ONB-14: a world the guide marks on the map must be pressable. The fleet console, the world
+// card or the hint itself can lie over it: the ring is then drawn over the window and the
+// press lands in the window. After a short moment the camera moves the world to the nearest
+// clear spot (`decisions/clearSpot.ts`), never while a finger or the mouse holds the map.
+const COVER_GRACE_MS = 300;
+const NO_SPOT_RETRY_MS = 2000;
+let coveredSince = 0;
+let retryAt = 0;
+const mapAt = (x: number, y: number): boolean =>
+  document.elementsFromPoint(x, y).find((e) => !e.classList.contains('sl-dim'))?.id === 'map';
+/** The mark's middle and the ends of its cross are all open map. */
+const markClear = (p: Spot): boolean =>
+  [
+    [0, 0],
+    [-22, 0],
+    [22, 0],
+    [0, -22],
+    [0, 22],
+  ].every(([dx, dy]) => mapAt(p.x + dx!, p.y + dy!));
+function keepMarkClear(mark: Rect): void {
+  const at = { x: mark.left + mark.width / 2, y: mark.top + mark.height / 2 };
+  const now = performance.now();
+  if (pointers.size > 0 || markClear(at)) {
+    coveredSince = 0;
+    return;
+  }
+  if (!coveredSince) coveredSince = now;
+  if (now - coveredSince < COVER_GRACE_MS || now < retryAt) return;
+  coveredSince = 0;
+  const spot = nearestClearSpot(at, { width: innerWidth, height: innerHeight }, markClear);
+  if (spot) panBy(spot.x - at.x, spot.y - at.y);
+  else retryAt = now + NO_SPOT_RETRY_MS;
 }
 
 // --- ONB-0/ONB-2 first-run onboarding: flag + funnel + guided first match -----

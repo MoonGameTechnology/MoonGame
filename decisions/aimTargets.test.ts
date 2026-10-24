@@ -71,9 +71,11 @@ describe('aimTargets — цель штурма (правило 4)', () => {
     expect(assaultTargetOk(ME, true, ME)).toBe(false);
   });
 
-  it('ничей мир не годится — не у кого отнимать', () => {
-    expect(assaultTargetOk(null, true, ME)).toBe(false);
-    expect(assaultTargetOk(undefined, true, ME)).toBe(false);
+  // Ядро берёт ничей мир тем же `fleet.assault`: пустой занимает, гарнизон штурмует.
+  it('ничей захватываемый мир годится', () => {
+    expect(assaultTargetOk(null, true, ME)).toBe(true);
+    expect(assaultTargetOk(undefined, true, ME)).toBe(true);
+    expect(assaultTargetOk(null, false, ME)).toBe(false);
   });
 
   it('незахватываемый сектор не годится даже у врага', () => {

@@ -1969,7 +1969,7 @@ export const en: Record<string, string> = {
 
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ pick a target — two fingers move the camera',
-  'hint.assault-enemy-only': "⚔ only someone else's world can be stormed",
+  'hint.assault-target': "⚔ your own worlds and empty space can't be stormed",
   'hint.auto-retreat': '⮐ auto-retreat at {n}% hull → {at}',
   'hint.auto-retreat.off': '⮐ auto-retreat cleared',
   'hint.auto-retreat.nowhere': '⮐ nowhere to fall back to: select your own world or set a capital',
