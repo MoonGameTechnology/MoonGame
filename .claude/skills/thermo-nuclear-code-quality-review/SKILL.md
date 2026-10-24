@@ -221,9 +221,10 @@ If those conditions are not met, leave explicit, actionable feedback and push fo
 импорта модуля из модуля.
 
 **Правило 1000 строк — про переход через порог, а не про абсолют.** В репозитории уже
-есть файлы заметно крупнее (на момент добавления скилла: `prototype/src/main.ts` ~12k,
-`packages/server/src/store/postgres.ts` ~1.9k, `packages/server/src/matchRoom.ts` ~1.9k,
-`prototype/src/prototypeData.ts` ~1.1k, `prototype/netserver.ts` ~1k). Это унаследованный
+есть файлы заметно крупнее (сверено 2026-10-24: `prototype/src/main.ts` ~5.1k,
+`packages/shared-core/src/modules/shuttle.ts` ~2.9k, `packages/server/src/matchRoom.ts` ~2.7k,
+`prototype/src/ai.ts` ~2.6k, `packages/server/src/store/postgres.ts` ~2.6k,
+`prototype/netserver.ts` ~1.7k). Это унаследованный
 долг, а не разрешение: требуй декомпозиции, когда PR переводит файл из «меньше 1k» в
 «больше 1k», и отдельно отмечай, когда PR доливает объём в уже раздутый файл вместо того,
 чтобы вынести новое в отдельный модуль. Разрастание `prototype/src/main.ts` — сигнал

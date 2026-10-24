@@ -158,7 +158,7 @@ Dockerfile             прод-образ: запускает packages/server/d
 wrangler.jsonc         сайт на Cloudflare: статические страницы клиента
 ```
 
-Ещё в корне: `art/`, `examples/`, `engagements/` (отчёт аудита), `playtest-logs/`.
+Ещё в корне: `art/`, `examples/`; `playtest-logs/` (JSONL событий) хост создаёт на ходу, в git его нет.
 
 ## 4. Модель состояния (`GameState`)
 

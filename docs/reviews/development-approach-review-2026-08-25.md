@@ -2,8 +2,8 @@
 
 > Датированный инженерный обзор текущего процесса. Это аналитический снимок, а не
 > новый источник статуса или план работ: фактическое состояние остаётся в
-> [`state.md`](state.md), задачи — в [`backlog.md`](backlog.md), этапы — в
-> [`roadmap.md`](roadmap.md). Предложения ниже не считаются принятыми и намеренно не
+> [`state.md`](../state.md), задачи — в [`backlog.md`](../backlog.md), этапы — в
+> [`roadmap.md`](../roadmap.md). Предложения ниже не считаются принятыми и намеренно не
 > добавлены в backlog без отдельного решения владельца.
 
 ## 1. Область исследования и источники
@@ -15,24 +15,24 @@
 
 Изучены:
 
-- точки входа и правила работы: [`CLAUDE.md`](../CLAUDE.md),
-  [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`README.md`](../README.md) и
-  [`CODE-MAP.md`](../CODE-MAP.md);
-- живые документы: [`state.md`](state.md), [`roadmap.md`](roadmap.md), шапка,
-  легенда и актуальные задачи [`backlog.md`](backlog.md);
+- точки входа и правила работы: [`CLAUDE.md`](../../CLAUDE.md),
+  [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`README.md`](../../README.md) и
+  [`CODE-MAP.md`](../../CODE-MAP.md);
+- живые документы: [`state.md`](../state.md), [`roadmap.md`](../roadmap.md), шапка,
+  легенда и актуальные задачи [`backlog.md`](../backlog.md);
 - исполняемая проверка документации
-  [`scripts/docs-check.mjs`](../scripts/docs-check.mjs) и
-  [шаблон PR](../.github/pull_request_template.md);
+  [`scripts/docs-check.mjs`](../../scripts/docs-check.mjs) и
+  [шаблон PR](../../.github/pull_request_template.md);
 - все репозиторные инструкции из `.claude/skills/*/SKILL.md` и
   `.devin/skills/*/SKILL.md`, в том числе ритуалы `brick`, `new-module`,
   `add-game-content`, `balance-analysis`, `determinism-audit`, `localization`,
   `playtest-report`, `render-profile`, `security-triage`, `sync-state-doc` и
   `refresh-scanner-digests`;
 - существующие обзоры, чтобы не дублировать исторические выводы:
-  [`engineering-review.md`](engineering-review.md),
-  [`engineering-risks.md`](engineering-risks.md),
+  [`engineering-review.md`](../engineering-review.md),
+  [`engineering-risks.md`](../engineering-risks.md),
   [`documentation-connectivity-2026-07-26.md`](documentation-connectivity-2026-07-26.md)
-  и [`reviews/README.md`](reviews/README.md). Файлы `docs/reviews/**` рассматривались
+  и [`reviews/README.md`](README.md). Файлы `docs/reviews/**` рассматривались
   только как исторические снимки и не редактировались;
 - реализация заявленных механизмов: сценарий сервера, загрузчик и схемы данных,
   `prototype/src/game.ts`, ядро и его тесты, action layer, серверные границы,
@@ -42,7 +42,7 @@
 shipped-каталогом, но игровые харнесы и прототип используют инлайновый каталог в
 `prototype/src/game.ts`. Поэтому ниже говорится о **двух каталогах контента**, а не о
 едином источнике правды. Аналогично продуктовая аналитика уже спроектирована в
-[`metrics-roadmap.md`](metrics-roadmap.md), а шаблон живого теста уже собирает
+[`metrics-roadmap.md`](../metrics-roadmap.md), а шаблон живого теста уже собирает
 стабильность, UX-наблюдения и субъективный «фан»; риск состоит не в полном отсутствии
 метрик, а в отсутствии короткого принятого scorecard для регулярной приоритизации.
 

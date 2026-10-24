@@ -1,5 +1,9 @@
 # Engineering risks and decisions
 
+> **Historical document (June 2026), checked 2026-10-24.** The decisions below date from the
+> prototype stage. The current stack is recorded in `tech-stack.md` (PWA client, not
+> React Native; no Redis) and what is built is in `state.md`.
+
 This is a working checklist for the non-obvious problems that will matter once Void Dominion moves from prototype to always-on multiplayer.
 
 ## 1. Real-time simulation without per-second ticking
