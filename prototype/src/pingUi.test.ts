@@ -51,6 +51,7 @@ function fakeWin() {
     },
     addEventListener: (type: string, h: (ev: unknown) => void) => void (on[type] ??= []).push(h),
     querySelector: (sel: string) => (sel === '#pm-text' ? input : null),
+    querySelectorAll: () => [],
   };
   const fire = (type: string, ev: unknown) => {
     for (const h of on[type] ?? []) h(ev);
@@ -88,6 +89,8 @@ function wired(over: Partial<PingHost> = {}, seed: SessionMsg[] = []) {
   const notes: string[] = [];
   const pushed: Array<[string, string, string]> = [];
   const placed: Array<{ node: string; label: string }> = [];
+  const placedKinds: string[] = [];
+  const pushedKinds: Array<string | undefined> = [];
   const cleared: string[] = [];
   const camera: Array<[string, string]> = [];
   let feeds = 0;
@@ -102,7 +105,7 @@ function wired(over: Partial<PingHost> = {}, seed: SessionMsg[] = []) {
     setMessages: (next) => {
       messages = next;
     },
-    push: (to, text, loc) => pushed.push([to, text, loc]),
+    push: (to, text, loc, kind) => { pushed.push([to, text, loc]); pushedKinds.push(kind); },
     net: () => net,
     coalition: () => ['p1', 'p2'],
     name: (id) => ({ p1: 'Вы', p2: 'Красные', p3: 'Синие' })[id] ?? id,
@@ -126,13 +129,15 @@ function wired(over: Partial<PingHost> = {}, seed: SessionMsg[] = []) {
     notes,
     pushed,
     placed,
+    placedKinds,
+    pushedKinds,
     cleared,
     camera,
     feeds: () => feeds,
     messages: () => messages,
     setNet: () => {
       net = {
-        placePing: (p) => placed.push({ node: p.target.node, label: p.label }),
+        placePing: (p) => { placed.push({ node: p.target.node, label: p.label }); placedKinds.push(p.kind); },
         clearPing: (id) => cleared.push(id),
       };
     },
@@ -398,6 +403,18 @@ describe('метки — список: действия', () => {
     expect(w.messages().length).toBe(1); // ждём эха сервера, сами не стираем
   });
 
+  it('clears all own stacked markers at one province without clearing an ally or another province', () => {
+    const original = [msg({ pingId: 'old' }), msg({ from: 'p2', pingId: 'ally' }),
+      msg({ pingId: 'latest', at: 2000 }), msg({ ping: 'C2R1', pingId: 'elsewhere' })];
+    const w = wired({}, original);
+    w.setNet();
+    w.api.openPanel();
+    w.panel.clickOn({ pact: 'del' }, undefined, 'C1R1');
+    expect(w.cleared).toEqual(['latest', 'old']);
+    // Until server confirmation (including an offline/rejected send), keep the authoritative feed.
+    expect(w.messages()).toEqual(original);
+  });
+
   it('правка = снять и поставить заново', () => {
     const w = wired({}, [msg()]);
     w.setAnswer('новый текст');
@@ -497,4 +514,59 @@ describe('метки — попап на карте', () => {
     expect(w.messages()).toEqual([]);
     expect(w.pop.raw.shown).toBe(false);
   });
+});
+
+
+describe('tactical marker kinds', () => {
+  it.each(['mark', 'defend', 'attack'] as const)('sends the selected %s kind through the network', (kind) => {
+    const w = wired();
+    w.setNet();
+    w.api.openMenu();
+    w.menu.clickOn({ pmkind: kind }, '[data-pmkind]');
+    w.api.createTo(COALITION);
+    expect(w.placedKinds).toEqual([kind]);
+  });
+  it('preserves a shield when editing its label', () => {
+    const w = wired({}, [msg({ pingKind: 'defend', pingId: 'shield' })]);
+    w.setNet();
+    w.setAnswer('hold here');
+    w.api.openPanel();
+    w.panel.clickOn({ pact: 'edit' }, undefined, 'C1R1');
+    expect(w.cleared).toEqual(['shield']);
+    expect(w.placedKinds).toEqual(['defend']);
+  });
+  it('preserves a sword when editing its label in solo', () => {
+    const w = wired({}, [msg({ pingKind: 'attack' })]);
+    w.setAnswer('attack here');
+    w.api.openPanel();
+    w.panel.clickOn({ pact: 'edit' }, undefined, 'C1R1');
+    expect(w.pushedKinds).toEqual(['attack']);
+  });
+  it('keeps the selected kind for solo messages too', () => {
+    const w = wired();
+    w.api.openMenu();
+    w.menu.clickOn({ pmkind: 'attack' }, '[data-pmkind]');
+    w.api.createTo(COALITION);
+    expect(w.pushedKinds).toEqual(['attack']);
+  });
+});
+
+
+it('drops positively expired own markers without sending a socket flood; keeps live ones until ACK', () => {
+  const expired = Array.from({ length: 80 }, (_, i) => msg({ pingId: `old-${i}`, pingExpiresAt: 2000 }));
+  const current = msg({ pingId: 'current', pingExpiresAt: 3000 });
+  const w = wired({ now: () => 2000 }, [...expired, current]);
+  w.setNet();
+  w.api.remove('C1R1');
+  expect(w.cleared).toEqual(['current']);
+  expect(w.messages()).toEqual([current]);
+});
+
+it('hides expired markers from both map and list at the server match-time boundary', () => {
+  const expired = msg({ pingId: 'expired', pingExpiresAt: 2000 });
+  const w = wired({ now: () => 2000 }, [expired]);
+  expect(w.api.drawable()).toEqual([]);
+  w.api.openPanel();
+  expect(w.panel.raw.innerHTML).not.toContain('data-ploc=');
+  expect(activePings([expired], 1999)).toHaveLength(1);
 });

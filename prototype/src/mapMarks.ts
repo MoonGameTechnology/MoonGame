@@ -18,6 +18,8 @@ import { isMissileFleet, isRocketMineFleet } from '../../packages/shared-core/sr
 import { rgba } from '../../packages/client/src/holoDraw';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { drawMissile } from '../../packages/client/src/ordnanceView';
+import { pingMarkerKind } from '../../decisions/pingKind';
+import { drawTacticalPingIcon } from './pingIcon';
 import { t } from '../../localization/runtime';
 import { allyPanelView } from '../../decisions/allyPanel';
 import type { ChapterStep } from '../../decisions/chapterChain';
@@ -317,8 +319,9 @@ export function drawPings(now: number): void {
     const x = c.x;
     const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
     const col = ownerColor(m.from);
+    const kind = pingMarkerKind(m.pingKind);
     if (game.holographic()) {
-      drawHolographicPing(cx, c.x, c.y, col, game.clock(), pingPhase(x), glowOn());
+      drawHolographicPing(cx, c.x, c.y, col, game.clock(), pingPhase(x), glowOn(), kind);
       pingHits.push({ loc: m.ping!, x, y: y - 1 });
       continue;
     }
@@ -352,22 +355,26 @@ export function drawPings(now: number): void {
     cx.fillStyle = rgba(col, pulse);
     cx.strokeStyle = 'rgba(4,10,12,.85)';
     cx.lineWidth = 1.4;
-    cx.beginPath(); // teardrop pin: head + tip toward the node
-    cx.moveTo(x, y + 14);
-    cx.lineTo(x - 6.5, y);
-    cx.arc(x, y - 1, 7, Math.PI, 0);
-    cx.lineTo(x, y + 14);
-    cx.fill();
-    cx.stroke();
-    cx.shadowBlur = 0;
-    cx.fillStyle = 'rgba(6,18,22,.95)';
-    cx.beginPath();
-    cx.arc(x, y - 1, 2.7, 0, TAU);
-    cx.fill();
-    cx.fillStyle = rgba(col, pulse); // a blinking ember in the pin's eye
-    cx.beginPath();
-    cx.arc(x, y - 1, 1.4, 0, TAU);
-    cx.fill();
+    if (kind !== 'mark') {
+      drawTacticalPingIcon(cx, x, y - 1, kind);
+    } else {
+      cx.beginPath(); // teardrop pin: head + tip toward the node
+      cx.moveTo(x, y + 14);
+      cx.lineTo(x - 6.5, y);
+      cx.arc(x, y - 1, 7, Math.PI, 0);
+      cx.lineTo(x, y + 14);
+      cx.fill();
+      cx.stroke();
+      cx.shadowBlur = 0;
+      cx.fillStyle = 'rgba(6,18,22,.95)';
+      cx.beginPath();
+      cx.arc(x, y - 1, 2.7, 0, TAU);
+      cx.fill();
+      cx.fillStyle = rgba(col, pulse); // a blinking ember in the pin's eye
+      cx.beginPath();
+      cx.arc(x, y - 1, 1.4, 0, TAU);
+      cx.fill();
+    }
     cx.restore();
     pingHits.push({ loc: m.ping!, x, y: y - 1 });
   }

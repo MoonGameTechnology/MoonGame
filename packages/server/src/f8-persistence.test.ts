@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Action } from '@void/shared-core';
+import { coalitionOf, getStance, type Action } from '@void/shared-core';
 import { createDevMatch, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
 import { MemoryMatchStore, MemoryReceiptStore } from './store';
 import { snapshotOf } from './persistence';
@@ -106,6 +106,69 @@ describe('F8 · persistence + resume', () => {
 });
 
 describe('F8 · clock driver', () => {
+  it.each(['leave', 'kick'] as const)(
+    'persists coalition %s deadlines and completes them offline after a restart',
+    async (kind) => {
+      const hour = 60 * 60 * 1000;
+      let clock = 1000;
+      const store = new MemoryMatchStore();
+      const room = createDevMatch(data, {
+        now: () => clock, time: clock, initiallyStarted: true,
+      });
+      const command = (playerId: string, type: string, payload: unknown, id: string): Action =>
+        ({ id, playerId, type, payload, issuedAt: clock });
+      expect(room.submitAction('green', command('green', 'diplomacy.declare',
+        { target: 'red', stance: 'alliance' }, 'offer')).ok).toBe(true);
+      expect(room.submitAction('red', command('red', 'diplomacy.declare',
+        { target: 'green', stance: 'alliance' }, 'accept')).ok).toBe(true);
+      const actor = kind === 'leave' ? 'red' : 'green';
+      expect(room.submitAction(actor, command(actor, `coalition.${kind}`,
+        kind === 'leave' ? {} : { target: 'red' }, 'departure')).ok).toBe(true);
+      const due = clock + 24 * hour;
+      await store.save(snapshotOf(room));
+
+      // JSON is the actual persistence boundary; no timer closure survives this restart.
+      const stored = JSON.parse(JSON.stringify(await store.load(MATCH)))!;
+      clock += 12 * hour;
+      const restored = createDevMatch(data, {
+        now: () => clock, initialState: stored.state, initialSeq: stored.seq,
+        initiallyStarted: true, initialClock: stored.clock,
+      });
+      let wake: (() => void) | undefined;
+      const driver = startClockDriver(restored, {
+        now: () => clock,
+        schedule: (fn) => { wake = fn; return 1; },
+        cancel: () => {},
+      });
+      try {
+        clock = due - 1;
+        restored.tick();
+        expect(coalitionOf(restored.state, 'red')).not.toBeNull();
+        clock = due;
+        expect(wake).toBeDefined();
+        wake!();
+        expect(coalitionOf(restored.state, 'red')).toBeNull();
+        expect(getStance(restored.state, 'green', 'red')).toBe('peace');
+        expect(restored.state.coalitionJoinAfter?.red).toBe(due + 48 * hour);
+        await store.save(snapshotOf(restored));
+      } finally {
+        driver.stop();
+      }
+
+      const cooldown = JSON.parse(JSON.stringify(await store.load(MATCH)))!;
+      clock = due + 48 * hour - 1;
+      const afterRestart = createDevMatch(data, {
+        now: () => clock, initialState: cooldown.state, initialSeq: cooldown.seq,
+        initiallyStarted: true, initialClock: cooldown.clock,
+      });
+      expect(afterRestart.submitAction('red', command('red', 'coalition.create', {}, 'early')))
+        .toMatchObject({ ok: false, code: 'E_COALITION_COOLDOWN' });
+      clock += 1;
+      expect(afterRestart.submitAction('red', command('red', 'coalition.create', {}, 'ready')).ok)
+        .toBe(true);
+    },
+  );
+
   it('advances the world (fires a due event) with no player action', () => {
     let clock = 1000;
     const room = createDevMatch(data, { now: () => clock, time: 1000 });
@@ -274,7 +337,7 @@ describe('invariant #6 · module-manifest check on load', () => {
     await loaded?.dispose();
   });
 
-  it.each(['ancient', '85'])('refuses a match created under older manifest %s', async (manifest) => {
+  it.each(['ancient', '85', '86'])('refuses a match created under older manifest %s', async (manifest) => {
     const store = new MemoryMatchStore();
     const receiptStore = new MemoryReceiptStore();
     const seed = createDevMatch(data, { now: () => 1000, time: 1000 });

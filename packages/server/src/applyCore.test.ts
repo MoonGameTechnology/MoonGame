@@ -200,7 +200,11 @@ describe('NETA2-8 · оркестрация объявлена ОДИН раз',
   });
 
   it('ВЫЧИСЛЕНИЕ ЖИВЁТ В ОДНОМ МЕСТЕ: догон и применение — только в planApply', () => {
-    expect(methodBody('planApply')).toMatch(/this\.kernel\.applyAction\(/);
+    expect(methodBody('planApply')).toMatch(/this\.reduceAction\(/);
+    expect(src.match(/this\.reduceAction\(/g)).toHaveLength(2);
+    const reducer = methodBody('reduceAction');
+    expect(reducer).toMatch(/this\.kernel\.applyAction\(/);
+    expect(reducer).not.toMatch(/this\.stateValue = |this\.broadcastState\(|this\.record/);
     for (const name of ['applyAndBroadcast', 'commitApply']) {
       expect(methodBody(name)).toMatch(/this\.planApply\(/);
       expect(methodBody(name)).not.toMatch(/this\.computeAdvance\(/);

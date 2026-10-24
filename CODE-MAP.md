@@ -105,7 +105,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 5 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.arrival` | — | `fleet.arrived`, `fleet.departed`, `fleet.leg`, `fleet.parked`, `fleet.stranded`, `fleet.transit` · sched: `fleet.arrival` |
 | 6 | `hero` | `hero.ts` | `hero.ability`, `hero.equip`, `hero.install`, `hero.skill.unlock`, `hero.spawn`, `hero.unequip`, `hero.uninstall` | `fleet.arrived`, `fleet.destroyed`, `fleet.fork`, `fleet.transit`, `hero.path.expire`, `hero.respawn`, `unit.died` | `combat.damage`, `fleet.speed`, `salvage.share` | `hero.ability.used`, `hero.died`, `hero.equipped`, `hero.installed`, `hero.path.created`, `hero.path.expired`, `hero.respawned`, `hero.skill.unlocked`, `hero.spawned`, `hero.unequipped`, `hero.uninstalled`, `planet.destroyed` · sched: `hero.path.expire`, `hero.respawn` |
 | 7 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage` | `hero.aura`, `hero.recalled`, `hero.revealed` |
-| 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `diplomacy.decline`, `diplomacy.mapshare`, `coalition.create`, `coalition.leave`, `coalition.edit` | `player.eliminated` | — | `diplomacy.changed`, `diplomacy.declined`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered`, `diplomacy.offered`, `coalition.joined`, `coalition.left`, `coalition.updated` |
+| 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `diplomacy.decline`, `diplomacy.mapshare`, `coalition.create`, `coalition.leave`, `coalition.kick`, `coalition.edit`, `coalition.clock.rebase` (только хост) | `player.eliminated`, `coalition.departure.due` | — | `diplomacy.changed`, `diplomacy.declined`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered`, `diplomacy.offered`, `coalition.joined`, `coalition.left`, `coalition.updated`, `coalition.departure.scheduled` · sched: `coalition.departure.due` |
 | 9 | `espionage` | `espionage.ts` | `espionage.spy` | `time.advanced` | — | `espionage.detected`, `espionage.failed`, `intel.stolen` |
 | 10 | `orbital` | `orbital.ts` | `fleet.bombard`, `fleet.orbit` | `fleet.arrived`, `time.advanced` | — | `aa.fired`, `fleet.bombard`, `fleet.orbit`, `planet.bombarded` |
 | 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.attack`, `battle.retreat` | `combat.tick`, `fleet.arrived`, `fleet.intercept`, `fleet.transit` | `fleet.speed` | `battle.resolved`, `battle.started`, `combat.round`, `fleet.destroyed`, `fleet.retreated`, `planet.captured`, `unit.died` · sched: `combat.tick` |
@@ -169,6 +169,8 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `building.destroyed` | `construction` | — |
 | `building.upgraded` | `construction` | — |
 | `capital.designated` | `capital` | — |
+| `coalition.departure.due` | `diplomacy`* | `diplomacy` |
+| `coalition.departure.scheduled` | `diplomacy` | — |
 | `coalition.joined` | `diplomacy` | — |
 | `coalition.left` | `diplomacy` | — |
 | `coalition.updated` | `diplomacy` | — |

@@ -21,6 +21,7 @@ import {
   type GameState,
 } from '../../packages/shared-core/src/index';
 import { coalitionChatShown, shownDms } from '../../decisions/diploChats';
+import { pingGlyph, type PingMarkerKind } from '../../decisions/pingKind';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 
@@ -35,6 +36,8 @@ export type SessionMsg = {
   sys: boolean;
   ping?: string;
   pingId?: string;
+  pingKind?: PingMarkerKind;
+  pingExpiresAt?: number;
   chatId?: string;
   realAt?: number;
 };
@@ -150,7 +153,7 @@ export function initConversations(host: ConversationsHost): {
     if (m.ping) {
       return (
         `<div class="dp-line ping" data-ping="${esc(m.ping)}"><span class="dp-when">${stampTxt}</span>` +
-        `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('chat.jump')}</span></div>`
+        `${pingGlyph(m.pingKind)} ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('chat.jump')}</span></div>`
       );
     }
     if (m.sys)
@@ -204,7 +207,7 @@ export function initConversations(host: ConversationsHost): {
         const prev = last
           ? esc(
               (last.from === host.me() ? t('chat.you') + ': ' : '') +
-                (last.ping ? '📍 ' + last.ping : last.text),
+                (last.ping ? pingGlyph(last.pingKind) + ' ' + last.ping : last.text),
             )
           : '—';
         return (

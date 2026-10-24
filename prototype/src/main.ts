@@ -196,6 +196,7 @@ import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFlee
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
 import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { skinIcon } from './holographicIcons';
+import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
@@ -2851,11 +2852,12 @@ const HUB_PANELS: Record<string, string> = {
   supply: 'hp-supply',
   shop: 'hp-shop',
   corp: 'hp-corp',
+  community: 'hp-community',
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 /** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop']);
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -3385,6 +3387,7 @@ document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
 document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
 document.getElementById('hub-shop')?.addEventListener('click', () => hubTab('shop'));
+document.getElementById('hub-community')?.addEventListener('click', () => hubTab('community'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
@@ -4978,9 +4981,9 @@ if (warPromptEl) {
 // --- province ping composer (tap a province → choose where the ping goes) --------
 /** Unknown nodes are valid public coordinates, but remain subject to the server's
  * existing E_PING_UNSEEN rule for identified-node targets. */
-function sendProvincePing(loc: string, label: string): void {
+function sendProvincePing(loc: string, label: string, kind: PingMarkerKind = 'mark'): void {
   const target = provincePingTarget(loc, known(loc), MAP);
-  if (target) netClient?.placePing({ kind: 'mark', target, label });
+  if (target) netClient?.placePing({ kind, target, label });
 }
 // Метка отмечает провинцию и делится ею: адресат — либо канал коалиции (общий маркер на
 // карте, который видят все союзники), либо личка одного игрока (приватный указатель «вот
@@ -4991,6 +4994,7 @@ const pings = __SECTOR_ZERO_ONLY__
   ? null
   : initPingUi({
       menuRoot: () => document.getElementById('pingmenu'),
+      now: () => s.time,
       panelRoot: () => document.getElementById('pingpanel'),
       popRoot: () => document.getElementById('pingpop'),
       me: () => ME,
@@ -4998,11 +5002,11 @@ const pings = __SECTOR_ZERO_ONLY__
       hasProvince: (loc) => !!s.planets[loc],
       messages: () => sessionMessages,
       setMessages: replaceMessages,
-      push: (to, text, loc) => pushMsg(to, text, false, ME, loc),
+      push: (to, text, loc, kind) => pushMsg(to, text, false, ME, loc, kind),
       net: () =>
         NET && netClient
           ? {
-              placePing: (ping) => sendProvincePing(ping.target.node, ping.label),
+              placePing: (ping) => sendProvincePing(ping.target.node, ping.label, ping.kind),
               clearPing: (id) => netClient?.clearPing(id),
             }
           : null,

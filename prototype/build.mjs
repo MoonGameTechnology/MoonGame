@@ -1157,13 +1157,23 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .cw-sec{font-size:var(--fs-caption);color:var(--dim);font-weight:700;margin-top:4px;}
 .cw-mems{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:5px;}
 .cw-mem{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:var(--fs-body);color:var(--ink);}
+.cw-member-name{min-width:0;overflow-wrap:anywhere;flex:1;}
+.cw-timer{display:block;color:var(--amber);font-size:var(--fs-caption);}
+.cw-invites{display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto;flex-shrink:0;}
+.cw-invite-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.cw-invite-row span{overflow-wrap:anywhere;min-width:0;}
+.cw-invite,.cw-kick{min-height:44px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--cyan);padding:6px 9px;cursor:pointer;font:var(--fs-caption) var(--sf-font);}
+.cw-invite:disabled{color:var(--dim);cursor:default;}
+.cw-kick{color:var(--dim);}
+.cw-kick.sure{color:#ff8f8f;border-color:#ff6b6b;}
+.cw-mem{flex-wrap:wrap;}
 .cw-mem.empty{color:var(--dim);border-style:dashed;justify-content:center;}
 .cw-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
 .cw-pick{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
 .cw-eb{height:38px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:20px;
   font-variant-emoji:text;cursor:pointer;}
 .cw-eb.on{color:var(--amber);border-color:var(--amber);background:rgba(255,190,77,.12);}
-#cw-text{width:100%;box-sizing:border-box;resize:vertical;background:#06181c;color:var(--ink);border:1px solid var(--line);
+#cw-text{width:100%;box-sizing:border-box;resize:vertical;min-height:84px;flex-shrink:0;background:#06181c;color:var(--ink);border:1px solid var(--line);
   border-radius:7px;padding:7px 9px;font:var(--fs-body) var(--sf-font);}
 #cw-text:focus{outline:none;border-color:var(--cyan-dim);}
 .cw-text{font-size:var(--fs-body);color:var(--ink);line-height:1.5;white-space:pre-wrap;}
@@ -1314,7 +1324,7 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingpanel.show{display:block;}
 .pp-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(46,150,160,.14);}
 .pp-row.off{opacity:.45;}
-.pp-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.pp-icon{width:24px;text-align:center;font-size:20px;flex:0 0 auto;font-variant-emoji:text;}
 .pp-txt{flex:1;min-width:0;}
 .pp-txt b{display:block;font-size:var(--fs-body);}
 .pp-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1484,6 +1494,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 #pingmenu .pm-close{flex:0 0 auto;width:28px;height:28px;border-radius:6px;font:inherit;} /* вид — .btn-x */
 #pingmenu .pm-head b{color:#eafffb;}
 #pingmenu .pm-sub{color:var(--dim);font-size:var(--fs-caption);line-height:1.5;margin-bottom:11px;}
+#pingmenu .pm-kinds{display:flex;gap:6px;margin:10px 0;}
+#pingmenu .pm-kind{flex:1;min-height:44px;padding:8px 3px;border:1px solid var(--dim);border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:var(--fs-caption);font-variant-emoji:text;}
+#pingmenu .pm-kind[aria-pressed="true"]{border-color:var(--amber);color:var(--amber);background:rgba(255,196,90,.12);}
 #pingmenu .pm-text{width:100%;box-sizing:border-box;margin-bottom:12px;padding:8px 10px;border-radius:6px;
   border:1px solid var(--cyan-dim);background:rgba(4,14,18,.7);color:#eafffb;font:inherit;font-size:var(--fs-body);}
 #pingmenu .pm-lbl{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 6px;}
@@ -5497,15 +5510,17 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>
         <button class="hub-tile" id="hub-upd" type="button" style="display:none"><span class="ht-ic">⟳</span><span data-i18n="hub.tile.updates"></span></button>
         <button class="hub-tile" id="hub-delete-account" hidden type="button"><span class="ht-ic">◉</span><span data-i18n="account.delete.title"></span></button>
-        <button class="hub-tile" data-more="Сообщество" type="button"><span class="ht-ic">◍</span><span data-i18n="hub.tile.community"></span></button>
+        <button class="hub-tile" ${external ? 'data-more="Сообщество"' : 'id="hub-community"'} type="button"><span class="ht-ic">◍</span><span data-i18n="hub.tile.community"></span></button>
         <button class="hub-tile" data-more="Поддержка" type="button"><span class="ht-ic">⚠</span><span data-i18n="hub.tile.support"></span></button>
         <button class="hub-tile" data-more="Уведомления" type="button"><span class="ht-ic">◔</span><span data-i18n="hub.tile.notifications"></span></button>
         <button class="hub-tile" data-more="Чат" type="button"><span class="ht-ic">▭</span><span data-i18n="hub.tile.chat"></span></button>
         <a class="hub-tile" id="hub-privacy" data-i18n="welcome.privacy"></a>
         <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
-      ${external ? '' : `<!-- Контакты: ссылки наружу, отдельным блоком под плитками -->
-      <div class="hub-sec" data-i18n="hub.contacts"></div>
+    </div>
+    <div class="hub-panel" id="hp-community" style="display:none">
+      <div class="hub-sec" data-i18n="hub.tile.community"></div>
+      ${external ? '' : `
       <div class="hub-grid">
         <a class="hub-tile hub-discord" id="hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer" data-i18n-title="hub.discord.desc"><svg class="ht-ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.32 4.37A19.8 19.8 0 0 0 15.4 2.85a13.7 13.7 0 0 0-.63 1.3 18.4 18.4 0 0 0-5.5 0 13 13 0 0 0-.64-1.3 19.7 19.7 0 0 0-4.93 1.52C.6 9.05-.25 13.6.18 18.1a19.9 19.9 0 0 0 6.04 3.05c.49-.66.92-1.36 1.3-2.1a12.9 12.9 0 0 1-2.04-.98l.5-.39a14.2 14.2 0 0 0 12.07 0l.5.39c-.65.39-1.33.71-2.05.98.38.74.81 1.44 1.3 2.1a19.8 19.8 0 0 0 6.04-3.05c.5-5.2-.86-9.71-3.52-13.73ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42s2.18 1.1 2.16 2.42c0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42Z"/></svg><span data-i18n="hub.discord"></span></a>
       </div>`}

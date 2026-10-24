@@ -3,11 +3,11 @@ import { createKernel } from '../kernel/kernel';
 import { diplomacyModule } from './diplomacy';
 import { createInitialState, type GameState, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
-import { getOffer, getStance, setOffer } from '../state/diplomacy';
-import { coalitionCapacity, coalitionOf } from '../state/coalition';
+import { getOffer, getStance, setOffer, setStance, type DiplomacyCapability } from '../state/diplomacy';
+import { coalitionCapacity, coalitionOf, COALITION_DEPARTURE_MS, COALITION_JOIN_COOLDOWN_MS } from '../state/coalition';
 import { isValidActionPayload } from '../actions/payloadSchemas';
 import type { GameModule } from '../kernel/module';
-import type { Action, ApplyResult, Context } from '../action/types';
+import type { Action, ApplyResult, AdvanceResult, Context } from '../action/types';
 import { deepFreeze } from '../util/clone';
 
 const data: GameData = parseGameData({
@@ -46,7 +46,7 @@ function act(playerId: string, type: string, payload: unknown): Action {
   seq += 1;
   return { id: `c:${seq}`, type, playerId, payload, issuedAt: 0 };
 }
-function ok(r: ApplyResult): GameState {
+function ok(r: ApplyResult | AdvanceResult): GameState {
   if (!r.ok) throw new Error(`expected ok, got ${r.code}`);
   return r.state;
 }
@@ -187,7 +187,9 @@ describe('coalition.create — explicit founding', () => {
   it('dissolves the coalition when its last member leaves', () => {
     const created = ok(kernel.applyAction(board(4), act('p1', 'coalition.create', {}), ctx()));
     const left = ok(kernel.applyAction(created, act('p1', 'coalition.leave', {}), ctx()));
-    expect(left.coalitions).toBeUndefined();
+    expect(coalitionOf(left, 'p1')?.members).toEqual(['p1']);
+    const done = ok(kernel.advanceTo(left, { ...ctx(), now: COALITION_DEPARTURE_MS }));
+    expect(done.coalitions).toBeUndefined();
   });
 
   it('removes a defeated singleton without touching another coalition', () => {
@@ -291,26 +293,25 @@ describe('COAL-1 — союз создаёт коалицию и держит е
 
 describe('COAL-1 — выход из коалиции', () => {
   it('coalition.leave снимает союз миром; оставшийся продолжает коалицию', () => {
-    const s = ok(
+    const pending = ok(
       kernel.applyAction(ally(board(20), 'p1', 'p2'), act('p1', 'coalition.leave', {}), ctx()),
     );
+    expect(getStance(pending, 'p1', 'p2')).toBe('alliance');
+    const s = ok(kernel.advanceTo(pending, { ...ctx(), now: COALITION_DEPARTURE_MS }));
     expect(getStance(s, 'p1', 'p2')).toBe('peace');
     expect(coalitionOf(s, 'p1')).toBeNull();
     expect(coalitionOf(s, 'p2')).toMatchObject({ founder: 'p2', members: ['p2'] });
   });
 
-  it('объявление войны члену коалиции — выход из неё', () => {
-    const three = ally(ally(board(20), 'p1', 'p2'), 'p3', 'p2');
-    const r = kernel.applyAction(
+  it.each(['war', 'peace', 'pact'])('cannot bypass departure with stance %s', (stance) => {
+    const three = deepFreeze(ally(ally(board(20), 'p1', 'p2'), 'p3', 'p2'));
+    expect(code(kernel.applyAction(
       three,
-      act('p1', 'diplomacy.declare', { target: 'p2', stance: 'war' }),
+      act('p1', 'diplomacy.declare', { target: 'p2', stance }),
       ctx(),
-    );
-    const s = ok(r);
-    expect(getStance(s, 'p1', 'p2')).toBe('war');
-    expect(getStance(s, 'p1', 'p3')).toBe('peace');
-    expect(coalitionOf(s, 'p1')).toBeNull();
-    expect(coalitionOf(s, 'p2')?.members).toEqual(['p2', 'p3']);
+    ))).toBe('E_COALITION_LEAVING');
+    expect(coalitionOf(three, 'p1')?.members).toEqual(['p1', 'p2', 'p3']);
+    expect(getStance(three, 'p1', 'p2')).toBe('alliance');
   });
 
   it('выбывший освобождает место и теряет союзы, союз оставшихся цел', () => {
@@ -451,5 +452,174 @@ describe('COAL-1 — отказ от предложения', () => {
       ),
     );
     expect(declined.mapShareOffers).toBeUndefined();
+  });
+});
+
+
+describe('coalition departure deadlines and re-entry', () => {
+  const exitAt = COALITION_DEPARTURE_MS;
+  const joinAt = exitAt + COALITION_JOIN_COOLDOWN_MS;
+  const at = (now: number): Context => ({ ...ctx(), now });
+  const declare = (a: string, b: string): Action =>
+    act(a, 'diplomacy.declare', { target: b, stance: 'alliance' });
+
+  it.each(['war', 'peace', 'pact'] as const)('offers and accepts an alliance from %s', (stance) => {
+    const s = board(20);
+    setStance(s, 'p1', 'p2', stance);
+    const offered = ok(kernel.applyAction(deepFreeze(s), declare('p1', 'p2'), ctx()));
+    expect(getStance(offered, 'p1', 'p2')).toBe(stance);
+    const joined = ok(kernel.applyAction(offered, declare('p2', 'p1'), ctx()));
+    expect(coalitionOf(joined, 'p1')?.members).toEqual(['p1', 'p2']);
+  });
+
+  it.each(['leave', 'kick'] as const)('persists the complete %s deadline through reload and offline advance', (kind) => {
+    const original = deepFreeze(ally(board(20), 'p1', 'p2'));
+    const action = kind === 'leave' ? act('p2', 'coalition.leave', {}) : act('p1', 'coalition.kick', { target: 'p2' });
+    const pending = ok(kernel.applyAction(original, action, ctx()));
+    expect(coalitionOf(original, 'p2')?.departures).toBeUndefined();
+    expect(coalitionOf(pending, 'p2')?.departures?.p2).toEqual({ at: exitAt, wallAt: exitAt, by: kind === 'leave' ? 'p2' : 'p1', kind });
+    const before = ok(kernel.advanceTo(JSON.parse(JSON.stringify(pending)) as GameState, at(exitAt - 1)));
+    expect(coalitionOf(before, 'p2')?.members).toEqual(['p1', 'p2']);
+    expect(getStance(before, 'p1', 'p2')).toBe('alliance');
+    const left = ok(kernel.advanceTo(JSON.parse(JSON.stringify(before)) as GameState, at(exitAt)));
+    expect(coalitionOf(left, 'p2')).toBeNull();
+    expect(getStance(left, 'p1', 'p2')).toBe('peace');
+    expect(left.coalitionJoinAfter?.p2).toBe(joinAt);
+    expect(coalitionOf(left, 'p1')?.departures).toBeUndefined();
+    const late = ok(kernel.advanceTo(JSON.parse(JSON.stringify(pending)) as GameState, at(joinAt + 1)));
+    expect(late.coalitionJoinAfter?.p2).toBe(joinAt);
+    expect(ok(kernel.applyAction(late, act('p2', 'coalition.create', {}), at(joinAt + 1))).coalitions).toBeDefined();
+  });
+
+  it('allows only the active founder to kick another member', () => {
+    const s = ally(ally(board(20), 'p1', 'p2'), 'p3', 'p2');
+    for (const [actor, target] of [['p2', 'p3'], ['p4', 'p2'], ['p1', 'p4']])
+      expect(code(kernel.applyAction(s, act(actor!, 'coalition.kick', { target }), ctx()))).toBe('E_FORBIDDEN');
+    expect(code(kernel.applyAction(s, act('p1', 'coalition.kick', { target: 'p1' }), ctx()))).toBe('E_BAD_PAYLOAD');
+    const dead = structuredClone(s);
+    dead.players.p1!.status = 'defeated';
+    expect(code(kernel.applyAction(dead, act('p1', 'coalition.kick', { target: 'p2' }), ctx()))).toBe('E_FORBIDDEN');
+    expect(code(kernel.applyAction(dead, act('p1', 'coalition.leave', {}), ctx()))).toBe('E_FORBIDDEN');
+    expect(code(kernel.applyAction(s, act('p1', 'coalition.kick', { target: 'p2' }), { ...ctx(), config: { timeScale: 1, modeId: 'team_2v2' } }))).toBe('E_FORBIDDEN');
+  });
+
+  it('duplicate leave and kick cannot shorten, extend or replace an existing deadline', () => {
+    const s = ally(board(20), 'p1', 'p2');
+    const pending = deepFreeze(ok(kernel.applyAction(s, act('p2', 'coalition.leave', {}), ctx())));
+    for (const action of [act('p2', 'coalition.leave', {}), act('p1', 'coalition.kick', { target: 'p2' })])
+      expect(code(kernel.applyAction(pending, action, at(1234)))).toBe('E_COALITION_LEAVING');
+    expect(coalitionOf(pending, 'p2')?.departures?.p2).toEqual({ at: exitAt, wallAt: exitAt, by: 'p2', kind: 'leave' });
+  });
+
+  it('blocks pending-member invitations and expires their standing alliance offers at departure', () => {
+    const s = ally(board(20), 'p1', 'p2');
+    setOffer(s, 'p2', 'p3', 'alliance');
+    setOffer(s, 'p4', 'p2', 'alliance');
+    const pending = ok(kernel.applyAction(s, act('p2', 'coalition.leave', {}), ctx()));
+    expect(code(kernel.applyAction(pending, declare('p3', 'p2'), ctx()))).toBe('E_COALITION_LEAVING');
+    expect(code(kernel.applyAction(pending, declare('p2', 'p4'), ctx()))).toBe('E_COALITION_LEAVING');
+    const left = ok(kernel.advanceTo(pending, at(exitAt)));
+    expect(getOffer(left, 'p2', 'p3')).toBeNull();
+    expect(getOffer(left, 'p4', 'p2')).toBeNull();
+  });
+
+  it('blocks creating, joining any coalition and reverse offers throughout the48-hour lock', () => {
+    const pending = ok(kernel.applyAction(ally(board(20), 'p1', 'p2'), act('p2', 'coalition.leave', {}), ctx()));
+    const left = ok(kernel.advanceTo(pending, at(exitAt)));
+    // A third party's older offer must not bypass eligibility on acceptance.
+    setOffer(left, 'p3', 'p2', 'alliance');
+    setOffer(left, 'p2', 'p4', 'alliance');
+    for (const now of [exitAt, joinAt - 1]) {
+      for (const action of [act('p2', 'coalition.create', {}), declare('p2', 'p1'), declare('p2', 'p3'), declare('p4', 'p2'), declare('p3', 'p2')])
+        expect(code(kernel.applyAction(left, action, at(now)))).toBe('E_COALITION_COOLDOWN');
+    }
+    const eligible = ok(kernel.applyAction(left, declare('p2', 'p3'), at(joinAt)));
+    expect(coalitionOf(eligible, 'p2')?.members).toEqual(['p2', 'p3']);
+    expect(ok(kernel.applyAction(left, act('p2', 'coalition.create', {}), at(joinAt))).coalitions).toBeDefined();
+  });
+
+  it('simultaneous departures transfer leadership and dissolve only when the last member goes', () => {
+    let s = ally(ally(board(20), 'p1', 'p2'), 'p3', 'p2');
+    s = ok(kernel.applyAction(s, act('p1', 'coalition.kick', { target: 'p2' }), ctx()));
+    s = ok(kernel.applyAction(s, act('p1', 'coalition.leave', {}), ctx()));
+    const done = ok(kernel.advanceTo(s, at(exitAt)));
+    expect(coalitionOf(done, 'p3')).toMatchObject({ founder: 'p3', members: ['p3'] });
+    expect(done.coalitionJoinAfter).toEqual({ p1: joinAt, p2: joinAt });
+    const last = ok(kernel.applyAction(done, act('p3', 'coalition.leave', {}), at(exitAt)));
+    expect(ok(kernel.advanceTo(last, at(exitAt * 2))).coalitions).toBeUndefined();
+  });
+
+  it('elimination cleans a pending departure and makes its scheduled callback inert', () => {
+    const k = createKernel([diplomacyModule, killer]);
+    const pending = ok(k.applyAction(ally(board(20), 'p1', 'p2'), act('p2', 'coalition.leave', {}), ctx()));
+    const gone = ok(k.applyAction(pending, act('p1', 'test.kill', { id: 'p2' }), at(1)));
+    expect(coalitionOf(gone, 'p1')?.departures).toBeUndefined();
+    const later = ok(k.advanceTo(gone, at(exitAt)));
+    expect(later.coalitionJoinAfter?.p2).toBeUndefined();
+    expect(coalitionOf(later, 'p1')?.members).toEqual(['p1']);
+  });
+
+  it('the war capability cannot bypass coalition departure', () => {
+    let declared = true;
+    const probe: GameModule = { id: 'probe', version: '1', setup(api) {
+      api.onAction('test.war', (_action, h) => {
+        const capability = h.capability<DiplomacyCapability>('diplomacy');
+        if (!capability?.declareWar) throw new Error('expected diplomacy war capability');
+        declared = capability.declareWar(h, 'p1', 'p2', 'spy');
+      });
+    } };
+    const k = createKernel([diplomacyModule, probe]);
+    const s = ok(k.applyAction(ally(board(20), 'p1', 'p2'), act('p1', 'test.war', {}), ctx()));
+    expect(declared).toBe(false);
+    expect(getStance(s, 'p1', 'p2')).toBe('alliance');
+    expect(coalitionOf(s, 'p1')?.members).toEqual(['p1', 'p2']);
+  });
+
+  it('validates kick targets at the public payload boundary', () => {
+    expect(isValidActionPayload('coalition.kick', { target: 'p2' })).toBe(true);
+    for (const payload of [{}, { target: 42 }, { target: '' }, null])
+      expect(isValidActionPayload('coalition.kick', payload)).toBe(false);
+  });
+});
+
+describe('coalition ordinary-hour clock mapping', () => {
+  const hour = 3_600_000;
+  const epoch = 1_800_000_000_000;
+  const rebase = (state: GameState, gameTime: number, wallTime: number, timeScale: number): GameState =>
+    ok(kernel.applyAction(state, act('p1', 'coalition.clock.rebase', { gameTime, wallTime, timeScale }), { ...ctx(), now: gameTime }));
+
+  it.each([1, 24])('keeps a full ordinary day at clock rate %i', (timeScale) => {
+    const anchored = rebase(ally(board(20), 'p1', 'p2'), 0, epoch, timeScale);
+    const pending = ok(kernel.applyAction(anchored, act('p2', 'coalition.leave', {}), ctx()));
+    expect(coalitionOf(pending, 'p2')?.departures?.p2).toMatchObject({ wallAt: epoch + 24 * hour, at: 24 * hour * timeScale });
+    const before = ok(kernel.advanceTo(pending, { ...ctx(), now: 24 * hour * timeScale - 1 }));
+    expect(coalitionOf(before, 'p2')).not.toBeNull();
+    const after = ok(kernel.advanceTo(before, { ...ctx(), now: 24 * hour * timeScale }));
+    expect(coalitionOf(after, 'p2')).toBeNull();
+    expect(after.coalitionJoinAfter?.p2).toBe(epoch + 72 * hour);
+    expect(code(kernel.applyAction(after, act('p2', 'coalition.create', {}), { ...ctx(), now: 72 * hour * timeScale - 1 }))).toBe('E_COALITION_COOLDOWN');
+    expect(kernel.applyAction(after, act('p2', 'coalition.create', {}), { ...ctx(), now: 72 * hour * timeScale }).ok).toBe(true);
+  });
+
+  it.each([2, 48])('re-projects future departure at a clock-rate boundary to %i without moving its wall deadline', (timeScale) => {
+    let state = rebase(ally(board(20), 'p1', 'p2'), 0, epoch, 24);
+    state = ok(kernel.applyAction(state, act('p2', 'coalition.leave', {}), ctx()));
+    const boundary = 12 * hour * 24;
+    state = ok(kernel.advanceTo(state, { ...ctx(), now: boundary }));
+    const before = deepFreeze(state);
+    state = rebase(before, boundary, epoch + 12 * hour, timeScale);
+    const due = boundary + 12 * hour * timeScale;
+    expect(coalitionOf(state, 'p2')?.departures?.p2).toMatchObject({ wallAt: epoch + 24 * hour, at: due });
+    expect(coalitionOf(before, 'p2')?.departures?.p2?.at).toBe(24 * hour * 24);
+    expect(state.scheduled.filter((event) => event.type === 'coalition.departure.due')).toHaveLength(1);
+    const after = ok(kernel.advanceTo(state, { ...ctx(), now: due }));
+    expect(after.coalitionJoinAfter?.p2).toBe(epoch + 72 * hour);
+  });
+
+  it('rejects malformed or time-jumping internal mappings and keeps them off the client catalog', () => {
+    for (const payload of [null, {}, { wallTime: epoch, gameTime: 1, timeScale: 24 }, { wallTime: epoch, gameTime: 0, timeScale: 0 }, { wallTime: epoch, gameTime: 0, timeScale: Infinity }]) {
+      expect(code(kernel.applyAction(board(20), act('p1', 'coalition.clock.rebase', payload), ctx()))).toBe('E_BAD_PAYLOAD');
+    }
+    expect(isValidActionPayload('coalition.clock.rebase', { wallTime: epoch, gameTime: 0, timeScale: 24 })).toBe(false);
   });
 });

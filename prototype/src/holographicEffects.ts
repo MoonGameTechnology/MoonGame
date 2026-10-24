@@ -1,3 +1,5 @@
+import type { PingMarkerKind } from '../../decisions/pingKind';
+import { drawTacticalPingIcon } from './pingIcon';
 /** Presentation-only signals. Callers keep visibility, ownership and hit testing. */
 import { rgba } from '../../packages/client/src/holoDraw';
 
@@ -130,6 +132,7 @@ export function drawHolographicPing(
   clock: number,
   phase: number,
   glow: boolean,
+  kind: PingMarkerKind = 'mark',
 ): void {
   g.save();
   g.translate(x, y);
@@ -165,17 +168,21 @@ export function drawHolographicPing(
   g.lineWidth = 1.5;
   g.shadowColor = color;
   g.shadowBlur = glow ? 7 : 0;
-  g.beginPath();
-  g.moveTo(0, -32);
-  g.lineTo(9, -23);
-  g.lineTo(0, -14);
-  g.lineTo(-9, -23);
-  g.closePath();
-  g.fill();
-  g.stroke();
-  g.fillStyle = rgba(color, 0.95);
-  g.beginPath();
-  g.arc(0, -23, 2, 0, TAU);
-  g.fill();
+  if (kind !== 'mark') {
+    drawTacticalPingIcon(g, 0, -23, kind);
+  } else {
+    g.beginPath();
+    g.moveTo(0, -32);
+    g.lineTo(9, -23);
+    g.lineTo(0, -14);
+    g.lineTo(-9, -23);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    g.fillStyle = rgba(color, 0.95);
+    g.beginPath();
+    g.arc(0, -23, 2, 0, TAU);
+    g.fill();
+  }
   g.restore();
 }

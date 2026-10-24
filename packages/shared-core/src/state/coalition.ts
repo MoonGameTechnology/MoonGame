@@ -1,4 +1,37 @@
 import type { GameState, PlayerId } from './gameState';
+import { MS_PER_HOUR } from '../util/time';
+
+/** Membership changes use ordinary hours, independent of simulation acceleration. */
+export const COALITION_DEPARTURE_MS = 24 * MS_PER_HOUR;
+export const COALITION_JOIN_COOLDOWN_MS = 48 * MS_PER_HOUR;
+
+/** Authoritative wall/game mapping, supplied by a recorded server-only action.
+ * No clock is read by the core: replay receives the identical mapping as data. */
+export interface CoalitionClock {
+  wallTime: number;
+  gameTime: number;
+  timeScale: number;
+}
+
+/** Older/solo states without a host mapping use their 1:1 simulation clock. */
+export function coalitionWallNow(state: GameState, gameTime = state.time): number {
+  const clock = state.coalitionClock;
+  return clock ? clock.wallTime + (gameTime - clock.gameTime) / clock.timeScale : gameTime;
+}
+
+export function coalitionGameTime(state: GameState, wallTime: number): number {
+  const clock = state.coalitionClock;
+  return clock ? clock.gameTime + (wallTime - clock.wallTime) * clock.timeScale : wallTime;
+}
+
+export interface CoalitionDeparture {
+  /** Game-time projection used by the existing scheduler. */
+  at: number;
+  /** Absolute real deadline; optional only for old snapshots. */
+  wallAt?: number;
+  kind: 'leave' | 'kick';
+  by: PlayerId;
+}
 
 /**
  * COAL-1 — коалиция как СУЩНОСТЬ сессии: состав, эмблема, описание, вместимость.
@@ -20,6 +53,8 @@ export interface Coalition {
   /** Founder, or their successor after departure; used for the coalition's title. */
   founder: PlayerId;
   members: PlayerId[];
+  /** Pending departures keep membership and alliances until their deadline. */
+  departures?: Record<PlayerId, CoalitionDeparture>;
   /** Id эмблемы из {@link COALITION_EMBLEMS}. */
   emblem: string;
   /** Описание от членов коалиции; текст игрока, рисуется только экранированным. */
@@ -101,6 +136,10 @@ export function removeMember(state: GameState, playerId: PlayerId): PlayerId[] {
   const c = coalitionOf(state, playerId);
   if (!c) return [];
   const rest = c.members.filter((id) => id !== playerId);
+  if (c.departures) {
+    delete c.departures[playerId];
+    if (Object.keys(c.departures).length === 0) delete c.departures;
+  }
   if (rest.length === 0) {
     delete state.coalitions![c.id];
     if (Object.keys(state.coalitions!).length === 0) delete state.coalitions;
