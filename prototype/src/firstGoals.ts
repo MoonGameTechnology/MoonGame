@@ -1,10 +1,11 @@
 /**
  * ONB-7 · First-session goals — a light "am I playing right?" checklist for the
- * onboarding match. Four short goals close off the CORE loop (produce → build →
- * capture → score); each ticks from live game state, and finishing all four earns
- * praise + a nudge to play a real match (docs/onboarding-roadmap.md ONB-7).
+ * onboarding match. One short goal per chapter of the guided lesson (produce → research →
+ * build → capture, then the operation: market → hero → militia → aviation → landing →
+ * assault); each ticks from live game state, and finishing them all earns praise + a
+ * nudge to play a real match (docs/onboarding-roadmap.md ONB-7, ONB-15).
  *
- * Pure module: no DOM, no game imports — main.ts derives the `GoalSignals` from
+ * Pure module: no DOM, no game imports — `guideFlow.ts` derives the `GoalSignals` from
  * live state (against the match-start baseline) and this decides which goals are
  * met. Completion is monotonic (a met goal never un-ticks).
  */
@@ -14,36 +15,33 @@ export interface Goal {
   labelKey: string; // ключ локали, рендерится через t()
 }
 
-/** Earn the first point beyond the start baseline; the first lesson is not a full match. */
-export const SCORE_GOAL = 1;
-
-/** The four first-match goals, in the order the guided match teaches them. */
-export const FIRST_GOALS: Goal[] = [
+/** The first-session goals, in the order the guided match teaches them. */
+export const FIRST_GOALS = [
   { id: 'mine', labelKey: 'onb.goal.mine' },
+  { id: 'research', labelKey: 'onb.goal.research' },
   { id: 'fleet', labelKey: 'onb.goal.fleet' },
   { id: 'capture', labelKey: 'onb.goal.capture' },
-  { id: 'score', labelKey: 'onb.goal.score' },
-];
+  { id: 'market', labelKey: 'onb.goal.market' },
+  { id: 'hero', labelKey: 'onb.goal.hero' },
+  { id: 'ground', labelKey: 'onb.goal.ground' },
+  { id: 'aviation', labelKey: 'onb.goal.aviation' },
+  { id: 'landing', labelKey: 'onb.goal.landing' },
+  { id: 'assault', labelKey: 'onb.goal.assault' },
+] as const satisfies readonly Goal[];
 
-/** Live progress signals, measured against the onboarding match's start baseline. */
-export interface GoalSignals {
-  // The homeworld starts with a level-1 Mine already built (matchSetup.ts), so
-  // "built" tracks its output growing (an upgrade), not a fresh instance — a
-  // second Mine is impossible anyway (one building of a kind per planet).
-  builtMine: boolean; // grew the Mine's output beyond the starting level
-  launchedFleet: boolean; // raised a mobile fleet
-  capturedWorld: boolean; // owns a world beyond the start
-  score: number; // points earned since the lesson began
-}
+export type GoalId = (typeof FIRST_GOALS)[number]['id'];
+
+/**
+ * Live progress per goal, measured against the onboarding match's start baseline. The
+ * homeworld starts with a level-1 Mine (matchSetup.ts), so `mine` tracks its output
+ * growing, not a fresh instance; `fleet`/`capture` count beyond the start, and `ground`
+ * counts militia at home plus aboard, so loading them does not un-train them.
+ */
+export type GoalSignals = Record<GoalId, boolean>;
 
 /** Which goal ids are currently satisfied by the signals. */
 export function metGoals(sig: GoalSignals): Set<string> {
-  const met = new Set<string>();
-  if (sig.builtMine) met.add('mine');
-  if (sig.launchedFleet) met.add('fleet');
-  if (sig.capturedWorld) met.add('capture');
-  if (sig.score >= SCORE_GOAL) met.add('score');
-  return met;
+  return new Set(FIRST_GOALS.filter((g) => sig[g.id]).map((g) => g.id));
 }
 
 /** Fold newly-met goals into the done-set (monotonic — order preserved). */
@@ -53,7 +51,7 @@ export function mergeDone(prev: readonly string[], met: ReadonlySet<string>): st
   return out;
 }
 
-/** All four goals achieved. */
+/** Every goal achieved. */
 export function goalsComplete(done: readonly string[]): boolean {
   return FIRST_GOALS.every((g) => done.includes(g.id));
 }

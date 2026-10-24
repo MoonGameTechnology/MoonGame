@@ -16,7 +16,7 @@
  *    добавляются, отменить выполненную нечем.
  *
  * 3. **Свёрнутый список — это ЛОТОК, а не спрятанные строки.** Смысл сворачивания —
- *    вернуть карте место; шапка во всю ширину с убранными под неё четырьмя рядами этого
+ *    вернуть карте место; шапка во всю ширину с убранными под неё рядами этого
  *    не даёт, она просто занимает столько же места молча. Поэтому свёрнутая подача — одна
  *    маленькая кнопка со значком и счётчиком.
  *
@@ -66,13 +66,15 @@ export function goalsTrayHtml(title: string, done: number, total: number): strin
  * Развёрнутая подача: заголовок, счётчик, кнопка сворачивания и сами строки.
  * Счёт выполненного приходит ЧИСЛОМ, а не выводится из строк: список выполненного
  * ведёт `firstGoals.ts`, и пересчитывать его здесь значило бы завести вторую истину
- * о том же — разойдутся они молча, а увидит это только игрок.
+ * о том же — разойдутся они молча, а увидит это только игрок. Всего целей тоже
+ * передаётся числом: строк может быть видно меньше (`decisions/goalRows.ts`).
  */
 export function goalsListHtml(
   title: string,
   collapseTitle: string,
   rows: readonly GoalRow[],
   done: number,
+  total = rows.length,
 ): string {
   const items = rows
     .map(
@@ -83,7 +85,7 @@ export function goalsListHtml(
     .join('');
   return (
     `<div class="gl-box"><div class="gl-head"><b>${title}</b>` +
-    `<span class="gl-count">${goalsCounter(done, rows.length)}</span>` +
+    `<span class="gl-count">${goalsCounter(done, total)}</span>` +
     `<button class="gl-tg" id="gl-tg" type="button" title="${esc(collapseTitle)}">▾</button></div>` +
     `<div class="gl-list">${items}</div>`
   );
