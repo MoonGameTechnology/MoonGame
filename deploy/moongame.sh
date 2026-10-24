@@ -12,10 +12,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR="${STATE_DIR:-/var/lib/moongame}"
 SERVICE_NAME="moongame"
-SERVICE_USER="${SERVICE_USER:-moongame}"
+SERVICE_USER="${SERVICE_USER:-root}"
 export STATE_DIR DOCKER_CONFIG="${DOCKER_CONFIG:-$STATE_DIR/docker}"
 
-# Docker и состояние принадлежат сервисной учётке, а команду набирают из-под своей.
+# Управление Docker — привилегированная операция; обычным сервисам оно не выдаётся.
 as_service() {
   if [ "$(id -un)" = "$SERVICE_USER" ]; then
     "$@"

@@ -26,7 +26,7 @@ NC='\033[0m' # No Color
 REPO_URL="${REPO_URL:-https://github.com/MoonGameTechnology/MoonGame.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 INSTALL_DIR="/opt/moongame"
-SERVICE_USER="moongame"
+SERVICE_USER="root"
 SERVICE_NAME="moongame"
 DOCKER_COMPOSE_FILE="$INSTALL_DIR/deploy/docker-compose.yml"
 ENV_FILE="$INSTALL_DIR/deploy/server.env"
@@ -161,17 +161,8 @@ log_success "Docker Compose (плагин) на месте"
 systemctl enable docker
 systemctl start docker
 
-# Создание пользователя для сервиса
-if ! id "$SERVICE_USER" &>/dev/null; then
-    log_info "Создание пользователя $SERVICE_USER..."
-    useradd -m -d /home/$SERVICE_USER -s /bin/bash $SERVICE_USER
-    usermod -aG docker $SERVICE_USER
-    log_success "Пользователь создан"
-else
-    log_success "Пользователь $SERVICE_USER уже существует"
-    usermod -aG docker $SERVICE_USER
-fi
-
+# Docker deployment is a privileged control plane. Application containers use their
+# own nonroot UID; a general-purpose host account must not receive Docker access.
 # Создание директории проекта
 log_info "Подготовка директории установки..."
 if [ -d "$INSTALL_DIR" ]; then

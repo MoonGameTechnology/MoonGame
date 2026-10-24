@@ -46,11 +46,12 @@ Systemd units принадлежат root и автоматически не п�
 
 ## Подготовка существующего хоста
 
-Нужны сервисная учётка с доступом к Docker, Compose с `!override`, действующий TLS/DNS,
+Нужны root-доступ для управления Docker, Compose с `!override`, действующий TLS/DNS,
 сохранённые JWT/DB secrets, выделенные DML/migration роли и файл мигратора. Для установки
 нестандартного daemon unit задайте `DOCKER_SYSTEMD_UNIT=moongame-docker.service`
-(по умолчанию `docker.service`). `SERVICE_USER`, `INSTALL_DIR`, `STATE_DIR` также
-переопределяются; изменение пользователя требует отдельно сверить владение файлами.
+(по умолчанию `docker.service`). `INSTALL_DIR` и `STATE_DIR` переопределяются; `SERVICE_USER` допускает только `root`.
+Старые хосты сначала переводятся через `deploy/harden-autodeploy.sh --apply`:
+состояние и скрипты root-юнитов должны быть недоступны для изменения обычным сервисам.
 
 Если у хоста есть собственный Caddyfile или Compose-policy, заранее создайте постоянный
 оверлей вне каталогов релизов. В `server.env` или окружении установщика задайте:
@@ -84,7 +85,7 @@ registry credentials. Для приватных пакетов GitHub докум
 оператору автоматизации можно создать root-only файл вне checkout с двумя строками
 `VOID_REGISTRY_USER=...` и `VOID_REGISTRY_TOKEN=...`, режим 0600, и сообщить только путь.
 Установщик принимает эти значения через окружение, сохраняет в `registry.env` (0600)
-и делает `docker login --password-stdin` в отдельный `$STATE_DIR/docker` сервисной учётки.
+и делает `docker login --password-stdin` в отдельный `$STATE_DIR/docker` root.
 Игра эти credentials не получает. После ротации повторите login/установку, после
 отзыва токена таймер перестанет получать новые образы, текущие контейнеры продолжат работать.
 

@@ -629,6 +629,11 @@ coarse ≈ fine на полном стеке), `delta` (`applyDelta∘diffState 
 (на узком наборе действий ресурсы с эскроу не растут). Детерминизм: golden `rng.test.ts`,
 `hash.test.ts`, `replayDeterminism.test.ts` (живая комната → реплей → тот же `hashState`).
 
+**Граница развёртывания.** Root-юниты управляют Docker и закрытым `/var/lib/moongame`;
+приложения работают под отдельным UID контейнера. `deploy/harden-autodeploy.sh`
+переводит старый хост без перезапуска контейнеров и отзывает Docker у `moongame`.
+Порядок и ограничения — [ранбук развёртывания](../deploy/README.md).
+
 **CI** — разбор в [security/pipeline.md](security/pipeline.md):
 - `ci.yml` (push не в `main`, PR, очередь): гейт и OSV-Scanner блокируют, `perf` и 7 смоуков — нет.
 - `security.yml`: 16 сканеров и сводка, блокируют Semgrep, Gitleaks, OSV, Trivy fs/image; крон.
