@@ -414,6 +414,52 @@ WebSocket-upgrade; добавь `listen 443 ssl`, пути к сертам и р
 > сборка обязана ходить только по `https/wss` — `cleartext:false` +
 > `androidScheme:'https'` в capacitor-конфиге стор-профиля; dev/LAN-сборка остаётся на
 > `ws://` для локальных тестов.
+### Изолированный стенд ботов
+
+`docker-compose.bots-stage.yml` описывает отдельный существующий bot stage.
+Приложение работает от `65532:65532`, с read-only rootfs, `cap_drop: [ALL]` и
+`no-new-privileges`; PostgreSQL — с `no-new-privileges` и штатным переходом
+entrypoint с root на postgres. Оба сервиса имеют CPU, memory и PID limits,
+ограниченные логи и не публикуют порты хоста. Их единственная сеть —
+`moongame-bots-stage`; Caddy подключается к ней для HTTPS. Имена сервисов
+`stage-server` / `stage-postgres` не перекрывают production DNS aliases
+`server` / `postgres` у общего прокси.
+
+Требуется Compose ≥2.30 (`env_file.format: raw`). В root-owned каталоге
+`/var/lib/moongame-bots-stage` с режимом `0700` оператор хранит `stage.env`
+(все файлы параметров и credentials — `0600`):
+
+```dotenv
+STAGE_SERVER_IMAGE=ghcr.io/moongametechnology/moongame@sha256:<verified-stage-digest>
+STAGE_POSTGRES_IMAGE=postgres@sha256:<reviewed-digest>
+STAGE_RELEASE_DIR=/opt/moongame-bots-runtime/releases/<revision>
+STAGE_SERVER_ENV_FILE=/var/lib/moongame-bots-stage/server.env
+STAGE_POSTGRES_ENV_FILE=/var/lib/moongame-bots-stage/postgres.env
+```
+
+`server.env` и `postgres.env` содержат прежние параметры стенда, по одному
+`KEY=value` на строку, без shell quoting и подстановки переменных. Пароли, JWT и
+metrics token должны отличаться от production. Сохраняйте действующие значения
+при миграции: замена PostgreSQL-пароля в env не меняет пароль в существующей БД.
+Артефакты `client-dist` / `server-dist` монтируются read-only. Внешние сеть
+`moongame-bots-stage` и том `moongame-bots-stage-postgres` должны существовать;
+volume не удаляется командой `compose down -v`.
+
+Перед переводом ручных контейнеров сделайте `pg_dump`, остановите приложение
+для завершения записи, затем БД; сохраните старые контейнеры остановленными с
+другими именами и отключите их от сети. После этого:
+
+```bash
+docker compose --env-file /var/lib/moongame-bots-stage/stage.env \
+  -f deploy/docker-compose.bots-stage.yml up -d --wait --wait-timeout 120
+```
+
+Сверьте health обоих сервисов, прежний том/параметры доступа и публичный HTTPS
+`/health`. При неудаче остановите новые контейнеры, верните старые имена и сеть,
+запустите сначала БД, затем приложение. Не запускайте обе версии PostgreSQL
+одновременно с одним томом. Секретные env files и вывод `compose config` не
+публикуются; KICS читает этот Compose без интерполяции и разрешения env files.
+
 ### 🔒 Публичный HTTPS / WSS через Caddy (HTTPS-2.1)
 
 Для постоянного публичного сервера с настоящим TLS (а не туннелем) — Caddy перед

@@ -61,6 +61,11 @@ Void Dominion (`@void/*`); название продукта — Averion или 
 | `deploy/` | Compose (сервер + Postgres), Caddy/TLS, preflight, бэкапы, автодеплой, мониторинг |
 | `docs/` | дизайн, роадмапы, бэклог, этот снимок |
 
+Caddy собирается на Go 1.27.3 с chi v5.4.0; приёмка блокирует возврат x509/chi CVE
+и отказ сканирования. Изолированный bot stage описан в отдельном Compose:
+no-new-privileges, app cap_drop=ALL, лимиты ресурсов и внешний том БД
+([ранбук](../deploy/README.md#изолированный-стенд-ботов)).
+
 Серверных входов два, оба на общих частях `packages/server`: `prototype/netserver.ts`
 (`pnpm host`, его запускает образ) и `packages/server/src/main.ts` (`pnpm dev:server`).
 Правка только `main.ts` игроков не меняет.

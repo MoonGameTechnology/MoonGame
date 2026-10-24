@@ -21,18 +21,20 @@
 # GHCR; и `build:` в `deploy/docker-compose.tls.yml` — сборка на хосте для плейтеста.
 # В прод едет только образ из второй: `deploy/docker-compose.release-tls.yml`.
 
-# go1.27.2 + GOTOOLCHAIN=local + CADDY_VERSION=v2.11.7 + xcaddy v0.4.7 — всё внутри образа
-# (проверено по истории слоёв тега `2.11.7-builder-alpine` на Docker Hub, 2026-10-12; тег
+# go1.27.3 + GOTOOLCHAIN=local + CADDY_VERSION=v2.11.7 + xcaddy v0.4.7 — всё внутри образа
+# (проверено по истории слоёв тега `2.11.7-builder-alpine` на Docker Hub, 2026-10-24; тег
 # `2-builder-alpine` указывает на тот же индекс). `GOTOOLCHAIN=local` важен: без него
 # go.mod caddy (`go 1.26.0`) мог бы утянуть другой тулчейн, и смысл пересборки бы потерялся.
-# go1.27.2 закрывает stdlib-находки CVE-2026-78667, CVE-2026-78669 и CVE-2026-97031,
-# которые нёс прежний go1.26.8.
-FROM caddy:2-builder-alpine@sha256:aa705b1e8e4bce41a7a30de934c1e00f6821667c1d1206424465065c92cb7674 AS builder
+# go1.27.3 закрывает stdlib-находки CVE-2026-78667, CVE-2026-78669 и CVE-2026-97031,
+# которые нёс прежний go1.26.8. go1.27.3 также закрывает CVE-2026-111943
+# (crypto/x509.Certificate.Verify), присутствовавшую в go1.27.2.
+FROM caddy:2-builder-alpine@sha256:ef9b65adf9a224770c6d5f6d1ae1bf99bc3caaa78d8c4bae3ea949ee6984f301 AS builder
 
-# МОДУЛЬНЫЙ БАМП — один, `x/net`. v2.11.7 сам принёс в `go.mod` всё, что раньше поднимали
+# МОДУЛЬНЫЕ БАМПЫ — `x/net` и `chi`. v2.11.7 сам принёс в `go.mod` всё, что раньше поднимали
 # руками: x/crypto v0.57.0, x/text v0.42.0, grpc v1.83.2 (прежние бампы SEC-40 требовали
 # 0.56.0 / 0.41.0 / 1.83.2), поэтому их аргументы сняты. Остался x/net: в `go.mod` v2.11.7
 # стоит v0.59.0, а CVE-2026-78669 в x/net закрыта в v0.60.0.
+# chi v5.4.0 закрывает CVE-2026-114437 (проверка доверенного TCP peer в ClientIPFromXFF).
 #
 # Аргумент — ПОДПАКЕТ `x/net/http2`, а не корень модуля: xcaddy подставляет blank-импорт
 # КАЖДОГО `--with` в сгенерированный main.go (`environment.go`, шаблон
@@ -41,18 +43,19 @@ FROM caddy:2-builder-alpine@sha256:aa705b1e8e4bce41a7a30de934c1e00f6821667c1d120
 # blank-импорт ничего нового не добавляет.
 #
 # ПРОВЕРЕНО СБОРКОЙ, а не рассуждением: caddy v2.11.7 со standard-модулями и
-# `golang.org/x/net@v0.60.0` собрали на go1.27.2, и `go version -m` у бинаря даёт
-# go1.27.2, x/net v0.60.0, x/crypto v0.57.0, x/text v0.42.0, grpc v1.83.2.
+# `golang.org/x/net@v0.60.0` собрали на go1.27.3, и `go version -m` у бинаря даёт
+# go1.27.3, x/net v0.60.0, x/crypto v0.57.0, x/text v0.42.0, grpc v1.83.2.
 #
 # `xcaddy build` без версии собирает CADDY_VERSION образа (v2.11.7) и кладёт результат в
 # ./caddy при WORKDIR=/usr/bin — отсюда путь в COPY ниже.
-RUN xcaddy build \
-  --with golang.org/x/net/http2@v0.60.0
+RUN GOMAXPROCS=2 GOFLAGS=-p=2 xcaddy build \
+  --with golang.org/x/net/http2@v0.60.0 \
+  --with github.com/go-chi/chi/v5@v5.4.0
 
 # Рантайм — тот же апстримный образ, что стоял в compose до SEC-31: он несёт конфиг,
 # каталоги данных, entrypoint и штатный curl для пробы здоровья. Меняем в нём две вещи:
 # обновляем пакеты базы и подменяем бинарь (до SEC-40 менялся только бинарь).
-FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+FROM caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
 
 # ПАКЕТЫ БАЗЫ (SEC-40). Апстрим пересобирает этот образ реже, чем Alpine выпускает фиксы:
 # с 2026-06-22 по 2026-10-06 в нём лежали curl/libcurl 8.19.0-r0, libcrypto3/libssl3

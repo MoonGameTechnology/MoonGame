@@ -10,12 +10,12 @@
 #
 # ЧТО ИМЕННО ПРОВЕРЯЕТСЯ — три группы, и каждая соответствует одному обещанию Dockerfile'а.
 #
-#   1. ТУЛЧЕЙН (16 находок stdlib). Их закрывает тулчейн сборочной стадии: тринадцать
-#      закрыл go1.26.8 (SEC-31), ещё три — go1.27.2 (2026-10-12). Откатился тулчейн —
+#   1. ТУЛЧЕЙН (17 находок stdlib). Их закрывает тулчейн сборочной стадии: тринадцать
+#      закрыл go1.26.8 (SEC-31), ещё три — go1.27.2 (2026-10-12), x509 — go1.27.3 (2026-10-24). Откатился тулчейн —
 #      находки вернутся сюда.
-#   2. МОДУЛИ (9 находок, SEC-40). x/text, x/crypto и grpc закрывает `go.mod` caddy
+#   2. МОДУЛИ (10 находок, SEC-40). x/text, x/crypto и grpc закрывает `go.mod` caddy
 #      v2.11.7 (их прежние `--with` сняты), x/net — `--with x/net/http2@v0.60.0` в
-#      `deploy/caddy/Dockerfile`. Откат версии caddy или снятый бамп вернут их сюда.
+#      `deploy/caddy/Dockerfile`; chi — `--with chi/v5@v5.4.0`. Откат версии caddy или снятый бамп вернут их сюда.
 #   3. ПАКЕТЫ БАЗЫ (5 пар «пакет → версия», SEC-40). Их закрывает `apk upgrade --no-cache`
 #      в рантайм-стадии. Сверка идёт не по id находки, а по УСТАНОВЛЕННОЙ ВЕРСИИ: пока в
 #      отчёте есть находка на `curl 8.19.0-r0`, значит upgrade не отработал (или бранч
@@ -45,6 +45,15 @@ report="${1:?usage: caddy-rebuild-acceptance.sh <trivy-json>}"
   exit 1
 }
 
+# A malformed report or an absent binary is a failed scan, not a clean result.
+if ! jq -e '[.Results[]? | select(.Target == "usr/bin/caddy")]
+    | length > 0 and all(.[]; (.Vulnerabilities // [])
+        | type == "array" and all(.[];
+            (.VulnerabilityID | type == "string") and (.PkgName | type == "string")))' "$report" >/dev/null; then
+  echo "::error::приёмка Caddy: некорректный отчёт или отсутствует usr/bin/caddy"
+  exit 1
+fi
+
 # --- группы 1–2: находки в бинаре, сверка по паре (id, пакет) ------------------------
 left=""
 while read -r id pkg; do
@@ -72,6 +81,8 @@ CVE-2026-56862 stdlib
 CVE-2026-78667 stdlib
 CVE-2026-78669 stdlib
 CVE-2026-97031 stdlib
+CVE-2026-111943 stdlib
+CVE-2026-114437 github.com/go-chi/chi/v5
 CVE-2026-56852 golang.org/x/text
 CVE-2026-56854 golang.org/x/crypto
 CVE-2026-56855 golang.org/x/crypto
@@ -118,4 +129,4 @@ if [ -n "$stale" ]; then
   rc=1
 fi
 [ "$rc" -eq 0 ] || exit 1
-echo "приёмка пройдена: 25 целевых находок отсутствуют в usr/bin/caddy, пакеты базы обновлены"
+echo "приёмка пройдена: 27 целевых находок отсутствуют в usr/bin/caddy, пакеты базы обновлены"

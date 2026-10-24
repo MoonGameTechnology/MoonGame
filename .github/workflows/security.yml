@@ -931,9 +931,14 @@ jobs:
             docker-compose.release.yml docker-compose.release-tls.yml \
             docker-compose.observability.yml
 
+          # Stage uses private env_file inputs. Preserve paths as placeholders;
+          # never resolve or read operator env files into scanner artifacts.
+          (cd deploy && docker compose -f docker-compose.bots-stage.yml config \
+            --no-interpolate --no-env-resolution) > kics-src/bots-stage.yaml
+
           n=$(find kics-src -name '*.yaml' -size +0 | wc -l)
           echo "copied=$n" >> "$GITHUB_OUTPUT"
-          echo "expected=9" >> "$GITHUB_OUTPUT"
+          echo "expected=10" >> "$GITHUB_OUTPUT"
           ls -l kics-src
       - name: kics
         id: scan
@@ -1015,7 +1020,7 @@ jobs:
           # той же причине, что и сентинел: `${COPIED:-1}` не защищает от строки "0".
           # Сообщение тоже своё: тут виноват не KICS, а исчезнувший glob.
           if [ "${COPIED:-0}" -lt "${EXPECTED:-9}" ]; then
-            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-9} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
+            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-10} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
             exit 1
           fi
           if [ "$SCANNED" -lt "$COPIED" ]; then
