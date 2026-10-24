@@ -902,7 +902,8 @@ sudo bash deploy/harden-autodeploy.sh --apply
 `docker` у `moongame`. Только смены `User=` недостаточно: иначе root исполнял бы
 скрипты, которые может подменить старая учётка. Владельцы файлов сертификатов и закрытых ключей внутри read-only
 bind mounts сохраняются, включая UID 65532 и режим 0400. Внешние
-`BACKUP_READINESS_CHECK`, `ERASURE_READINESS_CHECK` и `COMPOSE_EXTRA_FILE` до
+`BACKUP_READINESS_CHECK`, `ERASURE_READINESS_CHECK`, `COMPOSE_EXTRA_FILE`,
+`PRIVACY_RELEASE_MANIFEST` и его файлы доказательств до
 смены пользователя должны принадлежать root и находиться в защищённых каталогах;
 иначе миграция отказывает до изменения хоста. Контейнеры не перезапускаются; таймер возвращается в прежнее
 состояние. При ошибке посреди применения таймер остаётся приостановленным.

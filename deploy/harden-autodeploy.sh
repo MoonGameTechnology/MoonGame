@@ -17,7 +17,7 @@ die() { echo "$1" >&2; exit 1; }
 # Validate before stopping any timer or changing ownership. Never follow an external
 # symlink or change a hardlinked file outside the deployment tree.
 python3 - "$STATE_DIR" "$SYSTEMD_DIR" "$BIN_DIR" <<'PY'
-import os, stat, sys
+import json, os, stat, sys
 state, systemd, binaries = sys.argv[1:]
 for path in (state, systemd, binaries):
     if not os.path.isabs(path) or os.path.realpath(path) != path or path in ('/', '/var', '/var/lib', '/etc', '/usr', '/usr/local'):
@@ -49,22 +49,21 @@ if not os.path.isfile(os.path.join(state, 'current', 'deploy', 'stack.sh')):
 # Preflight and stack.sh accept the old deploy UID as an owner. After this
 # migration only root is trusted. External dependencies cannot be silently
 # adopted: an old account could still replace them through their parent directory.
-keys = ('BACKUP_READINESS_CHECK', 'ERASURE_READINESS_CHECK', 'COMPOSE_EXTRA_FILE')
+keys = ('BACKUP_READINESS_CHECK', 'ERASURE_READINESS_CHECK', 'COMPOSE_EXTRA_FILE', 'PRIVACY_RELEASE_MANIFEST')
 configured = {}
 with open(os.path.join(state, 'server.env')) as f:
     for line in f:
         key, sep, value = line.rstrip('\r\n').partition('=')
         if sep and key in keys:
             configured[key] = value.strip("\"'")
-for key in keys:
-    value = os.environ.get(key, configured.get(key, ''))
+def dependency(key, value):
     if not value:
-        continue
+        return
     resolved = os.path.realpath(value)
     if not os.path.isabs(value) or os.path.islink(value) or not os.path.isfile(value):
         raise SystemExit('E_DEPLOY_DEPENDENCY: ' + key)
     if value.startswith(state + '/') and resolved.startswith(state + '/') and not resolved.startswith(state + '/certs/'):
-        continue  # The complete protected tree is adopted below.
+        return  # The complete protected tree is adopted below.
     if resolved != value:
         raise SystemExit('E_DEPLOY_DEPENDENCY: ' + key)
     s = os.stat(value)
@@ -76,6 +75,20 @@ for key in keys:
         if s.st_uid != 0 or s.st_mode & 0o022:
             raise SystemExit('E_DEPLOY_DEPENDENCY_PARENT: ' + key)
         parent = os.path.dirname(parent)
+for key in keys:
+    dependency(key, os.environ.get(key, configured.get(key, '')))
+manifest = os.environ.get('PRIVACY_RELEASE_MANIFEST', configured.get('PRIVACY_RELEASE_MANIFEST', ''))
+if manifest:
+    if os.stat(manifest).st_size > 128 * 1024:
+        raise SystemExit('E_DEPLOY_DEPENDENCY: PRIVACY_RELEASE_MANIFEST')
+    with open(manifest) as f:
+        data = json.load(f)
+    evidence = list(data.get('evidence', {}).values())
+    evidence += [item.get('evidence', {}) for item in data.get('stores', [])]
+    for item in evidence:
+        if not isinstance(item, dict) or not isinstance(item.get('path'), str):
+            raise SystemExit('E_DEPLOY_DEPENDENCY: PRIVACY_RELEASE_MANIFEST evidence')
+        dependency('PRIVACY_RELEASE_MANIFEST evidence', item['path'])
 for base, dirs, files in os.walk(state, followlinks=False):
     for name in dirs + files:
         p = os.path.join(base, name)

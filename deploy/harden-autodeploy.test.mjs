@@ -106,6 +106,19 @@ describe('privileged deployment boundary migration', () => {
       });
       expect(readFileSync(f.log, 'utf8')).toBe('');
     });
+  it('validates external privacy evidence before adopting an internal manifest', async () => {
+    const f = fixture();
+    const evidence = join(f.root, 'external-evidence');
+    writeFileSync(evidence, 'synthetic', { mode: 0o600 });
+    if (process.getuid() === 0) chownSync(evidence, 999, 999);
+    const manifest = join(f.state, 'privacy.json');
+    writeFileSync(manifest, JSON.stringify({ evidence: { policy: { path: evidence } } }));
+    writeFileSync(join(f.state, 'server.env'), `PRIVACY_RELEASE_MANIFEST=${manifest}\n`);
+    await expect(run('bash', [script, '--apply'], { env: f.env })).rejects.toMatchObject({
+      code: 1,
+    });
+    expect(readFileSync(f.log, 'utf8')).toBe('');
+  });
   it('protects state, preserves mounted certificates and restores the timer without restarting containers', async () => {
     const f = fixture();
     await run('bash', [script, '--apply'], { env: f.env });
