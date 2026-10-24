@@ -29,6 +29,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
         uid: ownership.get(String(path)) ?? 0,
       }),
     readlink: async (path) => actual.readlink(pathAliases.get(String(path)) ?? path),
+    readFile: async (path, ...args) =>
+      actual.readFile(pathAliases.get(String(path)) ?? path, ...args),
     open: async (...args) => {
       const handle = await actual.open(...args);
       return {
@@ -143,6 +145,13 @@ describe('OBS-0.2 budget guard', () => {
 });
 
 describe('OBS-0.2 fixed service plans', () => {
+  it('includes the verified transport overlay when recreating monitoring services', () => {
+    const plan = composePlan('up', { ...options, transportFile: '/secure/monitoring/compose.yml' });
+    const index = plan.args.indexOf('/secure/monitoring/compose.yml');
+    expect(plan.args[index - 1]).toBe('-f');
+    expect(index).toBeLessThan(plan.args.indexOf('--profile'));
+    expect(plan.args.slice(-4)).toEqual(SERVICES);
+  });
   it('starts only the monitoring services without starting dependencies', () => {
     const plan = composePlan('up', options);
     expect(plan.binary).toBe('docker');
@@ -233,6 +242,7 @@ describe('OBS-0.2 root controller with real private files', () => {
   let directory, stateDir, envFile, runner;
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'obs-stack-test-'));
+    pathAliases.set('/etc/moongame-observability/stack.env', join(directory, 'absent-stack.env'));
     stateDir = join(directory, 'state');
     envFile = join(directory, 'server.env');
     await writeFile(envFile, 'POSTGRES_PASSWORD=fixture-only\n', { mode: 0o600 });
@@ -500,5 +510,21 @@ describe('OBS-0.2 root controller with real private files', () => {
       ([, command]) => command[0] === 'compose' && command.includes('up'),
     );
     expect(up[1][up[1].indexOf('--env-file') + 1]).toBe(canonicalEnv);
+  });
+  it('preserves the installed TLS policy when a manual up uses the default game env', async () => {
+    const stackEnv = join(directory, 'stack.env');
+    const overlay = join(directory, 'transport.yml');
+    await writeFile(overlay, 'services: {}\n', { mode: 0o600 });
+    await writeFile(stackEnv, `OBS_TRANSPORT_FILE=${overlay}\n`, { mode: 0o600 });
+    pathAliases.set('/etc/moongame-observability', directory);
+    pathAliases.set('/etc/moongame-observability/stack.env', stackEnv);
+    pathAliases.set(defaultEnv, envFile);
+    await runStack(['init', '--state-dir', stateDir, '--admin-user', 'alice'], runner);
+    await runStack(['up', '--state-dir', stateDir], runner);
+    const up = runner.mock.calls.find(
+      ([, command]) => command[0] === 'compose' && command.includes('up'),
+    );
+    expect(up[1]).toContain(overlay);
+    expect(up[1][up[1].indexOf('--env-file') + 1]).toBe('/etc/moongame-observability/stack.env');
   });
 });

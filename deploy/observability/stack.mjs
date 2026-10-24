@@ -24,6 +24,7 @@ const DEPLOY = fileURLToPath(new URL('../', import.meta.url));
 const DEFAULT_STATE = '/var/lib/moongame-observability';
 const DEFAULT_ENV = join(DEPLOY, 'server.env');
 const AUTODEPLOY_ENV = '/var/lib/moongame/server.env';
+const INSTALLED_ENV = '/etc/moongame-observability/stack.env';
 export const PROBE_IMAGE =
   'prom/prometheus:v3.13.4@sha256:87861b8cf91579109319ebc300f3f1060e6da9c05d6ae8ad15a20c879e84e32e';
 export const SERVICES = Object.freeze(['obs-grafana', 'obs-prometheus', 'obs-loki', 'obs-alloy']);
@@ -115,7 +116,7 @@ export function parseArgs(args) {
 }
 
 /** Service allowlist is part of the safety boundary: never restart/down the project. */
-export function composePlan(action, { stateDir, envFile, adminUser }) {
+export function composePlan(action, { stateDir, envFile, adminUser, transportFile }) {
   if (!['up', 'restart', 'status', 'config'].includes(action)) throw failure('E_OBS_CONFIG');
   const args = [
     'compose',
@@ -135,6 +136,10 @@ export function composePlan(action, { stateDir, envFile, adminUser }) {
   if (action === 'restart') args.push('restart', '--no-deps', ...SERVICES);
   if (action === 'status') args.push('ps', '--all', '--format', 'json', ...SERVICES);
   if (action === 'config') args.push('config', '--quiet');
+  if (transportFile) {
+    // Insert the operator-owned overlay before the command/profile arguments.
+    args.splice(args.indexOf('--profile'), 0, '-f', absolutePath(transportFile));
+  }
   return {
     binary: 'docker',
     args,
@@ -265,6 +270,14 @@ async function metadata(stateDir) {
 }
 
 async function environmentPath(path) {
+  if (path === DEFAULT_ENV) {
+    try {
+      await lstat(INSTALLED_ENV);
+      return INSTALLED_ENV;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
   let info;
   try {
     info = await lstat(path);
@@ -543,6 +556,40 @@ async function executeStack(args, run) {
       record: (marker) => recordGuard(options.stateDir, marker),
     });
   options = { ...options, envFile: await environmentPath(options.envFile) };
+  await verifyEnvironment(options.envFile, run);
+  // CLI calls must preserve the same overlay as systemd's EnvironmentFile.
+  // Parse only this literal path; never source/eval the environment file.
+  const entries = (await readFile(options.envFile, 'utf8'))
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith('OBS_TRANSPORT_FILE='));
+  // The installed unit uses this file even when CLI --env-file defaults to the
+  // game's environment. Its protected transport policy applies to both paths.
+  const stackEnv = INSTALLED_ENV;
+  let installedTransport;
+  try {
+    await noLinks(stackEnv, false, true);
+    const info = await checkEntry(stackEnv, 0, 0o600, false);
+    if (info.size > 65536) throw failure('E_OBS_CONFIG');
+    installedTransport = (await readFile(stackEnv, 'utf8'))
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('OBS_TRANSPORT_FILE='))
+      .at(-1)
+      ?.slice('OBS_TRANSPORT_FILE='.length);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  let transportFile =
+    process.env.OBS_TRANSPORT_FILE ||
+    installedTransport ||
+    entries.at(-1)?.slice('OBS_TRANSPORT_FILE='.length);
+  if (transportFile && /^(["']).*\1$/.test(transportFile))
+    transportFile = transportFile.slice(1, -1);
+  if (transportFile) {
+    transportFile = absolutePath(transportFile);
+    await noLinks(transportFile, false, true);
+    await checkEntry(transportFile, 0, 0o600, false);
+  }
+  options = { ...options, transportFile };
   const compose = async (action, adminUser) => {
     const plan = composePlan(action, { ...options, adminUser });
     return run(plan.binary, plan.args, {

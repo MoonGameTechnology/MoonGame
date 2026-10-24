@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh MoonGame host-user ACLs after Docker network changes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=moongame-host-access.service
+
+[Install]
+WantedBy=timers.target

@@ -144,7 +144,7 @@ record() {
 running_version() {
   # Что сервер сам говорит о своей сборке (ZTP-1.1). Пусто — образ старше версии на /health.
   local body
-  body="$(curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/health" 2>/dev/null || true)"
+  body="$(release_local_probe "$ENV_FILE" /health 2>/dev/null || true)"
   if [[ "$body" =~ \"version\":\"([0-9a-f]{7,40})\" ]]; then
     printf '%s' "${BASH_REMATCH[1]}"
   fi
@@ -198,6 +198,14 @@ extract_release() {
       return 1
     fi
   done
+  # A host already using verified internal TLS must not boot an older controller
+  # which silently omits its transport/network overlay. Reject before any restart.
+  if [ -n "$(release_effective "$ENV_FILE" COMPOSE_TRANSPORT_FILE)" ] && \
+     [ "$(cat "$dest.tmp/deploy/transport/version" 2>/dev/null || true)" != 1 ]; then
+    rm -rf "$dest.tmp"
+    log "E_RELEASE_TRANSPORT_SUPPORT: candidate predates the enabled transport profile"
+    return 1
+  fi
   # Сертификаты — состояние машины, а не версии: compose монтирует ./certs из каталога
   # версии, и он обязан смотреть в постоянный каталог.
   rm -rf "$dest.tmp/deploy/certs"

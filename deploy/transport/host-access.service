@@ -1,0 +1,20 @@
+[Unit]
+Description=Restrict host users' access to MoonGame private service networks
+After=moongame-docker.service
+Requires=moongame-docker.service
+Before=moongame.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/moongame-transport/host-access.env
+ExecStart=/usr/bin/python3 /opt/moongame-ops/deploy/transport/host-access.py --observer-uid ${TRANSPORT_OBSERVER_UID} $TRANSPORT_NETWORKS
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
