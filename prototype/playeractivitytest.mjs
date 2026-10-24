@@ -32,7 +32,8 @@ try {
     const base = site.url.replace('http:', 'ws:');
     const firstPulse = page.waitForResponse(
       (r) => r.url() === site.url + '/activity/pulse' && r.request().postDataJSON().active,
-      { timeout: 5000 },
+      // Login included, under CI load; still well short of the 30-second timer.
+      { timeout: 15_000 },
     );
     await page.evaluate(({ base }) => {
       document.querySelector('#csrv').value = '  ' + base + '  ';
@@ -50,6 +51,14 @@ try {
     const channel = packets[0].body.channel;
     assert.match(channel, /^[a-f0-9]{32}$/);
     assert(packets.every((p) => p.body.channel === channel));
+    // A loaded CI runner can take over a second to deliver a pulse to the route, so the
+    // visibility steps wait for the packet itself instead of a fixed pause.
+    const lastPulse = async (active) => {
+      const deadline = Date.now() + 10_000;
+      while (packets.at(-1).body.active !== active && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.equal(packets.at(-1).body.active, active);
+    };
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', {
         configurable: true,
@@ -57,8 +66,7 @@ try {
       });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    assert.equal(packets.at(-1).body.active, false);
+    await lastPulse(false);
     const hidden = packets.length;
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal(packets.length, hidden);
@@ -69,8 +77,7 @@ try {
       });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    assert.equal(packets.at(-1).body.active, true);
+    await lastPulse(true);
     await page.unroute('**/activity/pulse');
     await page.route('**/activity/pulse', (route) => route.abort('failed'));
     await new Promise((resolve) => setTimeout(resolve, 400));
