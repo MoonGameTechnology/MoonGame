@@ -44,6 +44,7 @@ import {
   tokenFor,
   type SessionRec,
 } from '../../decisions/sessionStore';
+import { resumeOutcome, type ResumeOutcome } from '../../decisions/sessionResume';
 import { authStatusUrl, identityMode, type IdentityMode } from './identityProbe';
 import { createPendingJoin } from './pendingJoin';
 import { getPlatform } from './platform/host';
@@ -132,6 +133,35 @@ export function sessionRecord(base: string): SessionRec | null {
  *  the login matches. */
 export function sessionToken(base: string): string | null {
   return anyToken(localStorage, base);
+}
+
+/**
+ * «Запомнить вход» (AC-0.2): продлить сохранённую сессию ЭТОГО позывного. Что значит ответ —
+ * `sessionResume.ts`: живая заменяется продлённой, мёртвая стирается, при «не знаю» запись
+ * остаётся как была. `null` — у позывного сохранённой сессии нет, спрашивать нечего.
+ *
+ * Пока запрос летел, игрок мог войти под другим именем или выйти: запись трогаем, только
+ * если в ней всё ещё тот токен, который продлевали, — иначе это уже чужое решение, и
+ * отвечаем «не знаю».
+ */
+export async function resumeSession(base: string, login: string): Promise<ResumeOutcome['kind'] | null> {
+  const token = tokenFor(localStorage, base, login);
+  if (!token) return null;
+  let reply: { status: number; body: unknown } | null = null;
+  try {
+    const res = await fetch(`${httpBase(base)}/auth/refresh`, {
+      method: 'POST', headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    reply = { status: res.status, body: await res.json().catch(() => null) };
+  } catch { /* до сервера не дошли — «не знаю» */ }
+  const outcome = resumeOutcome(reply);
+  const rec = readSession(localStorage, base);
+  if (rec?.token !== token) return 'unknown';
+  if (outcome.kind === 'live') saveSession(localStorage, base, { login: rec.login, token: outcome.token });
+  if (outcome.kind === 'gone') clearSession(localStorage, base);
+  if (outcome.kind !== 'unknown') notifySessionChanged();
+  return outcome.kind;
 }
 
 /** Acknowledged server logout; failures leave the session available for a retry. */

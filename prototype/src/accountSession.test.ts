@@ -346,3 +346,56 @@ describe('acknowledged logout', () => {
     expect(calls[0]).toMatchObject({ url: `${HTTP}/auth/logout`, init: { method: 'POST', headers: { authorization: 'Bearer private-token' } } });
   });
 });
+
+describe('AC-0.2 — запомнить вход', () => {
+  const remembered = (login: string, token: string): void =>
+    void cell.set(sessionKey(BASE), JSON.stringify({ login, token }));
+
+  it('живая сессия заменяется продлённой — пароль не нужен', async () => {
+    const { acc } = await boot();
+    remembered('Ivan', 'T-old');
+    server = () => reply(200, { accountId: 'a1', login: 'Ivan', token: 'T-new' });
+    expect(await acc.resumeSession(BASE, 'ivan')).toBe('live');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      url: `${HTTP}/auth/refresh`,
+      init: { method: 'POST', headers: { authorization: 'Bearer T-old' } },
+    });
+    expect(acc.sessionRecord(BASE)).toEqual({ login: 'Ivan', token: 'T-new' });
+  });
+
+  it('401 стирает сессию, обрыв и сбой сервера её не трогают', async () => {
+    const { acc } = await boot();
+    remembered('Ivan', 'T-old');
+    server = () => reply(503, { error: 'E_AUTH_BUSY' });
+    expect(await acc.resumeSession(BASE, 'Ivan')).toBe('unknown');
+    server = () => {
+      throw new TypeError('Failed to fetch');
+    };
+    expect(await acc.resumeSession(BASE, 'Ivan')).toBe('unknown');
+    expect(acc.sessionToken(BASE)).toBe('T-old');
+    server = () => reply(401, { error: 'E_AUTH' });
+    expect(await acc.resumeSession(BASE, 'Ivan')).toBe('gone');
+    expect(acc.sessionRecord(BASE)).toBeNull();
+  });
+
+  it('чужую сессию не продлевает и сервер не спрашивает', async () => {
+    const { acc } = await boot();
+    expect(await acc.resumeSession(BASE, 'Ivan')).toBeNull();
+    remembered('Petr', 'T-petr');
+    expect(await acc.resumeSession(BASE, 'Ivan')).toBeNull();
+    expect(calls).toEqual([]);
+    expect(acc.sessionToken(BASE)).toBe('T-petr');
+  });
+
+  it('запись, сменившуюся во время запроса, ответ не перезаписывает', async () => {
+    const { acc } = await boot();
+    remembered('Ivan', 'T-old');
+    server = () => {
+      remembered('Petr', 'T-petr'); // пока летел запрос, вошёл другой командир
+      return reply(200, { token: 'T-new' });
+    };
+    expect(await acc.resumeSession(BASE, 'Ivan')).toBe('unknown');
+    expect(acc.sessionRecord(BASE)).toEqual({ login: 'Petr', token: 'T-petr' });
+  });
+});
