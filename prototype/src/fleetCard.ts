@@ -130,7 +130,7 @@ import { restRouteHours } from './travelEta';
 import { unitGlyphSvg } from './unitGlyphs';
 import { veteranTag } from './veteranChevrons';
 import { hangarSectionHtml, unitRows } from './worldCard';
-import { planet, timeLeft } from './worldQueries';
+import { planet } from './worldQueries';
 
 /** Что карточке нужно от игры. Мир, выбор, мины, часы и имена флотов — в `main.ts`. */
 export interface FleetCardHost {
@@ -483,7 +483,7 @@ export function fleetPanelHtml(f: Fleet): string {
   // Bytro-стиль: авто-имя соединения (слово + позывной), тап → сводка. Слово одно на
   // любой размер (SHU-4.1): «эскадра» и прочие авиационные ступени принадлежат челнокам.
   const fleetTitle = fleetTitleOf(f.id);
-  let h = cardHeader(
+  let h = kitCardHeader(
     ownerColor(f.owner),
     fleetTitle,
     (pcUi()
@@ -491,7 +491,7 @@ export function fleetPanelHtml(f: Fleet): string {
       : t('side.fleet.sub', { s: nShips, tr: nTr })) +
       hullTag +
       fleetSubNotes(f, nTr),
-    'fleetinfo',
+    { compact: pcUi(), titleAct: 'fleetinfo', subLive: fleetLandingNote(f) },
   );
   // Тап по имени открыл сводку армии — она встаёт РЯДОМ с карточкой (`objectPanelHtml`),
   // а не вместо неё.
@@ -613,7 +613,8 @@ export function fleetPanelHtml(f: Fleet): string {
   return objectPanelHtml(h, detail);
 }
 
-/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка, высадка. */
+/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка. Высадку пишет
+ *  {@link fleetLandingNote}: у неё живой отсчёт. */
 function fleetSubNotes(f: Fleet, nTr: number): string {
   const s = game.world();
   const ME = game.me();
@@ -626,12 +627,18 @@ function fleetSubNotes(f: Fleet, nTr: number): string {
   return (
     hungry +
     (f.orbit === 'near' ? ' · ' + t('side.fleet.in-orbit') : '') +
-    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '') +
-    // Высадка штурмом идёт по таймеру (решение владельца 2026-09-26): флот стоит до срока.
-    (f.assaultLanding
-      ? ' · ⤓ ' + t('side.fleet.landing', { t: timeLeft(f.assaultLanding.doneAt) })
-      : '')
+    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '')
   );
+}
+
+/** Высадка штурмом идёт по таймеру (решение владельца 2026-09-26): флот стоит до срока.
+ *  В разметке только срок, отсчёт патчит `updatePanelLive` (`.pn-timer`). Цифры в самой
+ *  подписи меняли разметку листа до десяти раз в секунду на быстрой скорости, лист
+ *  пересобирался целиком, и кнопки «Бомбардировать» и «Штурм» под курсором мигали. */
+function fleetLandingNote(f: Fleet): string {
+  if (!f.assaultLanding) return '';
+  const timer = `<span class="pn-timer" data-at="${f.assaultLanding.doneAt}">…</span>`;
+  return ' · ⤓ ' + t('side.fleet.landing', { t: timer });
 }
 
 /** Кнопки ремонта у полосы корпуса. */
@@ -953,6 +960,7 @@ function fleetConsoleHtml(f: Fleet): string {
   // Шапка окна широкая: подзаголовку не нужно сжатие узкой карточки ПК (` · ` → `·`).
   const h = kitCardHeader(ownerColor(f.owner), fleetTitleOf(f.id), sub, {
     titleAct: 'fleetinfo',
+    subLive: fleetLandingNote(f),
   });
   const detail = game.fleetInfoFor() === f.id ? fleetSummaryHtml(f) : '';
 
@@ -1137,8 +1145,9 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
   ];
   const text = aloftOrderText(card);
   // Отсчёт патчит `updatePanelLive` (`.pn-timer`): в разметке только срок, и панель не
-  // перестраивается каждый кадр под пальцем.
-  const timer = `<span class="pn-timer" data-at="${card.until}">${esc(timeLeft(card.until))}</span>`;
+  // перестраивается каждый кадр под пальцем. Поэтому внутри заглушка, а не сами цифры:
+  // с цифрами разметка всё равно менялась бы вместе с ними.
+  const timer = `<span class="pn-timer" data-at="${card.until}">…</span>`;
   let h = cardHeader(ownerColor(ME), strikeTitle(st), notes.join(' · '));
   h += `<div class="row"><b>${esc(text.what)}</b></div>`;
   h += `<div class="row dim">${esc(text.until)} ${timer}</div>`;
