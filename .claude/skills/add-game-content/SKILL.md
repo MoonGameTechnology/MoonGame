@@ -1,6 +1,6 @@
 ---
 name: add-game-content
-description: Добавление и правка игрового контента в data/*.json — юниты, здания, фракции, технологии, модули кораблей, герои, планеты/сектора, ресурсы, награды. Используй, когда просят «добавить юнит/здание/фракцию/технологию/героя/модуль», «новый контент», «завести ресурс», «поправить поле в data/*.json», «взять кирпичик [data]» из docs/backlog.md — и так же для «add a unit/building/faction/tech/hero/ship module», «new game content», «add a resource», «edit data/*.json», «take a [data] brick». Триггерься и на бытовые формулировки («хочу корабль-разведчик», «пусть будет здание-ремонтник») — в этом проекте такой контент почти всегда JSON, а не код. Если же просят ОТБАЛАНСИРОВАТЬ и проверить прогоном (нерф/бафф, «сделай крейсер слабее», balance pass), начни со скилла `balance-analysis` — харнесы читают другой каталог.
+description: Добавление и правка игрового контента в data/*.json — юниты, здания, фракции, технологии, модули кораблей, герои, планеты/сектора, ресурсы, награды. Используй, когда просят «добавить юнит/здание/фракцию/технологию/героя/модуль», «новый контент», «завести ресурс», «поправить поле в data/*.json», «взять кирпичик [data]» из docs/backlog.md — и так же для «add a unit/building/faction/tech/hero/ship module», «new game content», «add a resource», «edit data/*.json», «take a [data] brick». Триггерься и на бытовые формулировки («хочу корабль-разведчик», «пусть будет здание-ремонтник») — в этом проекте такой контент почти всегда JSON, а не код. Если же просят ОТБАЛАНСИРОВАТЬ и проверить прогоном (нерф/бафф, «сделай крейсер слабее», balance pass), начни со скилла `balance-analysis` — там порядок замера и чтения харнесов.
 ---
 
 # Контент в `data/*.json`
@@ -15,28 +15,17 @@ description: Добавление и правка игрового контен�
 Зона `[data]` — самая малоконфликтная: почти всё правится в одиночку и параллельно
 чужим PR.
 
-## 0. Сначала пойми, КАКОЙ каталог ты правишь — их два
+## 0. Каталог контента один — `data/*.json`
 
-В репозитории два независимых каталога контента, и это главная ловушка зоны:
+Прежний рукописный каталог прототипа `prototype/src/prototypeData.ts` удалён (CONV-12b):
+прототип читает тот же бандл через `prototype/src/gameData.ts` → `data/bundle.ts`, сервер —
+с диска через `packages/shared-core/src/data/loadGameData.ts`. Поэтому правку `data/*.json`
+сразу видят и сервер, и играбельный клиент, и все харнесы (`pnpm run selfplay`,
+`econplaytest`, `netserver`).
 
-- **`data/*.json`** — shipped-бандл (собирается `loadGameData.ts`). Его читают
-  `packages/server`, `packages/client` и тесты `shared-core`. Это предмет данного скилла.
-- **инлайновый `parseGameData({ ... })` в `prototype/src/prototypeData.ts`** —
-  рукописное **зеркало** тех же каталогов (в комментариях так и написано: «mirror of
-  data/modules.json»). Его читают прототип и все харнесы: `pnpm run selfplay`,
-  `econplaytest`, `netserver`, играбельный клиент. (Исторически каталог лежал инлайном
-  в `game.ts`; после REFP он вынесен в отдельный файл, а `game.ts` стал фасадом
-  реэкспортов и содержимого каталога больше не несёт.)
-
-Практическое следствие: правка `data/units.json` **не изменит вывод `pnpm run selfplay`**
-и не будет видна в прототипе — харнесы туда не смотрят. Поэтому:
-
-- задача сформулирована как «добавить/поправить контент в бандле» → правь `data/*.json`;
-- задача сформулирована как «отбалансировать, проверить прогоном» → правка нужна в
-  каталоге `prototypeData.ts`, и работать надо по скиллу **`balance-analysis`** (там же
-  описано, как читать вывод харнесов);
-- меняешь правило игры для обоих — синхронизируй оба и скажи об этом в PR явно,
-  иначе зеркала разъедутся молча.
+- задача сформулирована как «добавить/поправить контент» → правь `data/*.json` по этому скиллу;
+- задача сформулирована как «отбалансировать, проверить прогоном» → начни со скилла
+  **`balance-analysis`** (там описано, как читать вывод харнесов).
 
 ## 1. Сначала прочитай схему, потом пиши JSON
 
@@ -56,12 +45,13 @@ description: Добавление и правка игрового контен�
 | `technologies.json` | `TechnologyDefSchema` | `tier, branch, dayGate, conditions[], prerequisites, unlocks, effects` |
 | `sectors.json` / `sectorKinds.json` / `planetTypes.json` | `SectorTypeDefSchema` / `SectorKindDefSchema` / `PlanetTypeDefSchema` | бонусы местности, `allowedBuildings`, `appearance` |
 | `modules.json` | `ModuleDefSchema` | `slot('weapon'\|'defense'\|'utility'), tag('horizontal'\|'vertical'), effects` |
-| `heroes.json`, `heroAbilities.json`, `heroPassives.json`, `heroSkillTrees.json`, `heroFittings.json` | `Hero*Schema` | 5 связанных каталогов героев |
+| `heroes.json`, `heroAbilities.json`, `heroPassives.json`, `heroSkillTrees.json`, `heroGrades.json` | `Hero*Schema` | 5 связанных каталогов героев (`heroFittings.json` удалён) |
 | `scientists.json`, `events.json`, `rewards.json` | `ScientistDefSchema`, `EffectRuleSchema`, `RewardsDefSchema` | учёные, trigger→effect, XP-шкала |
 
 Вне общего бандла (у них свои валидаторы, их читает сервер, а не `loadGameData`):
-`starterArsenal.json`, `dropTables.json`, `medals.json` (см. `packages/server/src/`
-— `scenario.ts`, `arsenal.ts`, `dropRoller.ts`, `medalCatalog.ts`) и `data/maps/*.json`
+`starterArsenal.json`, `dropTables.json`, `medals.json`, `metaEconomy.json`, `corpBuildings.json`
+(см. `packages/server/src/` — `scenario.ts`, `arsenal.ts`, `dropRoller.ts`, `medalCatalog.ts`,
+`metaEconomyCatalog.ts`, `corpConstruction.ts`) и `data/maps/*.json`
 (схема `packages/shared-core/src/data/mapSchema.ts`).
 
 Ориентируйся на соседнюю запись того же файла — она уже прошла схему и балансную
@@ -74,8 +64,8 @@ description: Добавление и правка игрового контен�
   скомпилируется.
 - Часть схем — не голые объекты, а `.refine(...)`: модуль не может расширять
   собственную вместимость слотов и `vertical`-модуль не может быть `soulbound`
-  (анти-pay-to-win); фиттинг героя тоже не растит `slots`. Стоимости героического
-  контента (`heroAbilities`/`heroSkillTrees`/`heroFittings`) — `nonnegative`:
+  (анти-pay-to-win). Стоимости героического
+  контента (`heroAbilities`/`heroSkillTrees`) — `nonnegative`:
   отрицательная цена печатала бы ресурсы через `payCost`.
 - Enum'ы fail-closed: неизвестная ветка героя (`transhuman|psionic`), ветка техов
   (`ground|space|shuttle|missile|command`) или `hook` пассивки роняют парс целиком.
@@ -90,7 +80,7 @@ description: Добавление и правка игрового контен�
 
 - `schemas.test.ts` — «every resource referenced by content exists in the resource
   list», плюс referential integrity для героев (способности/пассивки/`ship.unit`),
-  дерева навыков и фиттингов.
+  дерева навыков.
 - `factions.test.ts` — юниты/здания/ресурсы стартового лоадаута фракции.
 
 Осторожно: часть ссылок тестами **не** покрыта (`technologies.unlocks`,
@@ -146,10 +136,9 @@ Id (ключ записи) — `snake_case`, как у всех существу
    бандлы оставались валидными);
 2. строка в `composeGameDataBundle` (`loadGameData.ts`) — один список фрагментов на
    сервер, тесты и клиент;
-3. импорт + запись в `FRAGMENTS` в `packages/client/src/gameData.ts` (Vite инлайнит
-   JSON на сборке). Там сейчас перечислены не все фрагменты — отсутствующие
-   схлопываются в дефолт `{}`, то есть в вебе каталог просто пуст. Если твой контент
-   нужен веб-клиенту, добавь его туда явно.
+3. импорт + запись в `FRAGMENTS` в `data/bundle.ts` — один список на оба браузерных
+   клиента и хост игроков (сборщик вшивает JSON). Пропавший там фрагмент схлопнулся бы
+   в дефолт `{}`, поэтому полноту списка держит `data/bundle.test.ts`.
 
 ## 7. Гейт и доки
 
@@ -159,8 +148,8 @@ pnpm run check               # lint + typecheck + test + docs-check — пере
 ```
 
 Балансные правки часто ломают тесты, которые **намеренно** прибиты к числам
-(`fort` HP 35→65, `radar` radarRange 180/300/420, закреплённый СПИСОК из шести
-фракций — четыре дома + легаси-пара `vanguard`/`swarm` — в `factions.test.ts`).
+(`fort` HP 40→85 и `radar` radarRange 240 в `schemas.test.ts`, закреплённый СПИСОК из семи
+фракций — четыре дома, легаси-пара `vanguard`/`swarm` и NPC `pirates` — в `factions.test.ts`).
 Красный тест здесь — не помеха, а сигнал: обнови ожидание
 вместе с данными в том же PR, чтобы было видно, что число поменяли осознанно.
 

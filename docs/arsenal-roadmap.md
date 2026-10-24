@@ -13,6 +13,10 @@
 > (SHIP-5 «модули как предметы мета-экономики» 🔒(EC-1.1) — этот роадмап и есть его
 > развёртка), `account-level.md` (гейты по уровню), `main-menu.md` §5 (гардрейлы).
 >
+> **Сверено 2026-10-24:** фитинги героев сняты (HPR-1.5.4, 2026-09-08), арсенал теперь
+> `{hulls, modules}`. Вид `hero_fitting` и действие `hero.fit` в записях ниже — история
+> реализации, в коде их нет.
+>
 > Нарезано лесенкой кирпичей (один ≈ один PR ≈ одна сессия, правило `backlog.md`).
 > Каждый: **опора** (что уже есть), **модель данных**, **реализация**, **тесты**, **DoD**.
 
@@ -25,7 +29,7 @@
 | **Каталог модулей** ✅ | `data/modules.json` + `ModuleDefSchema` (типизированные слоты weapon/defense/utility), эффекты через `effectiveStats`; лоадаут валидируется и оплачивается (`validateLoadout`/`loadoutCost`), корабль после постройки ЗАКРЫТ (no-refit) | `shared-core/util/loadout.ts`, `data/modules.json` |
 | **Верфь (UI)** ✅ | Конструктор корабля в меню; `ShipLoadout` замораживается на сессию (`SetupConfig.ships`) | `prototype/` (SHIP-1/2), `game.ts` |
 | **Снапшот-шов в матч** ✅ | `SlotAssignment { scientists, technologies, heroes, ai }` — пред-матчевые выборы сажаются билдером; тот же паттерн примет арсенал | `shared-core/state/buildFromMap.ts` |
-| **Герои/фитинги** ✅ | `hero.fit` — слот-бюджет архетипа, no-refit; каталоги данными | `modules/hero.ts`, `data/heroFittings.json` |
+| **Модули героя** ✅ | `hero.install`/`hero.uninstall` — обычные `data.modules` в типизированные отсеки корпуса (HPR-1.5.2); прежние `hero.fit`/`heroFittings` сняты 2026-09-08 (HPR-1.5.4) | `modules/hero.ts`, `data/modules.json` |
 | **Место дропа** ✅ | SES-2: `match.ended` несёт `rewards {place, xp}` на игрока — готовый крючок «шанс дропа растёт от места» (GDD §4.4 F2P-кэтчап) | `modules/victory.ts` |
 | **Сальваж-сигнал** ✅ | `battle.resolved` / `unit.died` эмитятся боем — источник осколков | `modules/combat.ts` |
 | **Стор-паттерн** ✅ | `CorpStore`/`AvaChallengeStore`: Memory+Postgres, атомарные инварианты в сторе, сервис-RBAC сверху, контракт-тесты обоих адаптеров | `server/store/*` |
@@ -96,8 +100,8 @@
 ```
 ArsenalItem {
   itemId,                 // uuid экземпляра / стабильный id чертежа
-  kind: hull | module | hero_fitting | blueprint,
-  defId,                  // → data.units / data.modules / data.heroFittings
+  kind: hull | module | blueprint,   // hero_fitting снят в HPR-1.5.4 (2026-09-08)
+  defId,                  // → data.units / data.modules
   grade?,                 // заточка (EC-2.1), только у экземпляров
   soulbound: bool,        // донат/лутбокс — не торгуется (анти-RMT, GDD §4.4)
   durability?,            // износ (ARS-6); отсутствует = не изнашивается

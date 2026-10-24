@@ -1135,30 +1135,30 @@
 | OPS-4.4 | 🔒 | srv sec | `docs/operations-roadmap.md` | Временные полномочия по делу |
 | OPS-4.5 | 🔒 | srv sec ops | `docs/operations-roadmap.md` | Аудит и проверки злоупотреблений сотрудников |
 | PA-0.1 | 🔶 | sec srv | `docs/persistence-accounts-roadmap.md` | Честная аутентификация (ник → JWT/сессии) |
-| PA-0.3 | 🔒 | sec ops | `docs/persistence-accounts-roadmap.md` | (= SE-3) |
-| PA-0.4 | 🔒 | sec ops | `docs/persistence-accounts-roadmap.md` | (= PE-3.1 / SE-9) |
+| PA-0.3 | 🔶 | sec ops | `docs/persistence-accounts-roadmap.md` | (= SE-3) |
+| PA-0.4 | 🔶 | sec ops | `docs/persistence-accounts-roadmap.md` | (= PE-3.1 / SE-9) |
 | PA-1.1 | ✅ | data srv | `docs/persistence-accounts-roadmap.md` | Схема матчей + мест — реализовано |
 | PA-1.2 | ✅ | srv data | `docs/persistence-accounts-roadmap.md` | (= PE-0.2 / E2) |
 | PA-1.3 | 🔒 | data core | `docs/persistence-accounts-roadmap.md` | (= PE-1.2) |
 | PA-2.1 | ✅ | srv | `docs/persistence-accounts-roadmap.md` | Store-слой + снапшоты — реализовано |
 | PA-2.2 | ⏳ | srv core | `docs/persistence-accounts-roadmap.md` | (= PE-1.1 / CR-0.2) |
-| PA-2.3 | ⏳ | srv | `docs/persistence-accounts-roadmap.md` | (= PE-0.3) |
+| PA-2.3 | 🔒 | srv | `docs/persistence-accounts-roadmap.md` | (= PE-0.3) |
 | PA-3.1 | ✅ | srv cli | `docs/persistence-accounts-roadmap.md` | Ник-логин + возврат за свою сторону — реализовано |
 | PA-3.2 | 🔒 | srv sec | `docs/persistence-accounts-roadmap.md` | (= accounts-roadmap) |
 | PA-3.3 | ⏳ | srv core | `docs/persistence-accounts-roadmap.md` | Семантика возврата и offline |
 | PA-4.1 | ✅ | srv | `docs/persistence-accounts-roadmap.md` | v1 (одно-процессная) |
 | PA-4.2 | 🔶 | core srv | `docs/persistence-accounts-roadmap.md` | (= PE-2.2) |
 | PA-5.1 | ✅ | ops | `docs/persistence-accounts-roadmap.md` | Self-hosted Postgres на VPS — реализовано |
-| PA-5.2 | 🔒 | ops srv | `docs/persistence-accounts-roadmap.md` | (↔ metrics-roadmap) |
+| PA-5.2 | ⏳ | ops srv | `docs/persistence-accounts-roadmap.md` | (↔ metrics-roadmap) |
 | PE-0.1 | ✅ | srv | `docs/persistence-roadmap.md` | Схема и load/save GameState |
 | PE-0.2 | ✅ | srv act | `docs/persistence-roadmap.md` | Стор квитанций (идемпотентность) |
-| PE-0.3 | ⏳ | srv | `docs/persistence-roadmap.md` | Hot/cold: Redis горячее, Postgres холодное |
+| PE-0.3 | 🔒 | srv | `docs/persistence-roadmap.md` | Hot/cold: Redis горячее, Postgres холодное |
 | PE-1.1 | ⏳ | srv | `docs/persistence-roadmap.md` | Журнал действий + снапшоты |
 | PE-1.2 | 🔒 | srv data | `docs/persistence-roadmap.md` | Миграция сейв-формата в хранилище |
 | PE-2.1 | ✅ | srv | `docs/persistence-roadmap.md` | Будилка по scheduled-событиям — v1 (одно-процессная), v2 |
 | PE-2.2 | 🔶 | srv core | `docs/persistence-roadmap.md` | Корректный offline-catch-up |
-| PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
-| PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
+| PE-3.1 | 🔶 | srv sec | `docs/persistence-roadmap.md` | Зашифрованные бэкапы + PITR + учение restore |
+| PE-3.2 | 🔶 | srv | `docs/persistence-roadmap.md` | Переживание рестарта посреди матча |
 | OBS-0.1 | ✅ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
 | OBS-0.2 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
 | OBS-0.4 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Первый VPS и защищённый браузерный вход |
@@ -1358,7 +1358,7 @@
 | SE-3.3 | ⏳ | srv | `docs/secure-environment-roadmap.md` | RLS как defense-in-depth |
 | SE-3.4 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Бэкапы + PITR + проверенный restore |
 | SE-3.5 | 🔶 | ops sec | `docs/secure-environment-roadmap.md` | Независимый backup repository и restore-площадка |
-| SE-4.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | ACL / TLS / приватный bind |
+| SE-4.1 | 🔒 | srv sec | `docs/secure-environment-roadmap.md` | ACL / TLS / приватный bind |
 | SE-5.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | Минимальный non-root read-only образ |
 | SE-5.2 | ✅ | sec | `docs/secure-environment-roadmap.md` | Сканирование образа сервера |
 | SE-6.1 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Лимиты соединений и сообщений |

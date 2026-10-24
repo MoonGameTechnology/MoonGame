@@ -19,8 +19,8 @@ seed воспроизводит матч байт-в-байт, а сотня м�
 Новый фрагмент обязан попасть в ОБА сборщика (`loadGameData.ts` и `data/bundle.ts`) — это
 держит `bundle.test.ts`.
 
-Фракций в бандле ШЕСТЬ: четыре дома `azure/crimson/amber/violet` плюс легаси-пара
-`vanguard` / `swarm`; за стол (и в замер) садятся только четыре дома —
+Фракций в бандле СЕМЬ: четыре дома `azure/crimson/amber/violet`, легаси-пара
+`vanguard` / `swarm` и NPC `pirates`; за стол (и в замер) садятся только четыре дома —
 `PLAYABLE_FACTIONS` в `prototype/src/matchSetup.ts`.
 
 Если вывод `selfplay` обязан был измениться, а не изменился, — ищи, читает ли поле хоть

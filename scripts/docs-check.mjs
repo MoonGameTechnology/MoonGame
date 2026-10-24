@@ -46,10 +46,7 @@ const HISTORICAL = [normalize('docs/reviews'), normalize('docs/archive')];
 /** Осознанные forward-ссылки на ещё не созданные файлы (причина + дата). */
 const ALLOW = new Set([
   'core-engine.md', // запланированный архитектурный док — GDD §5.2 прямо зовёт его «ещё не созданным» · 2026-07
-  'data-schemas.md', // запланированный док артиллерийной уязвимости — GDD §11 зовёт его «уточняется при наполнении» · 2026-07 (аудит BR1/BR4)
   'playtest-logs/2026-06-26-notes.md', // пример имени файла, который СОЗДАЁТ автор плейтеста по шаблону · 2026-07
-  'scanner-coverage-2026-07-26.md', // security-отчёт из PR #357 · 2026-07
-  'pipeline-architecture-2026-07-26.md', // security-отчёт из PR #358 · 2026-07
 ]);
 
 /**

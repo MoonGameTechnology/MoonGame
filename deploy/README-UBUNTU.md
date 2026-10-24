@@ -1,5 +1,9 @@
 # Void Dominion — Установка на Ubuntu Server
 
+> **Июльский гайд (2026-07-16), сверено 2026-10-24.** Основной документ по установке и
+> эксплуатации — [README.md](README.md): автодеплой, шифрованные бэкапы, роли БД и проверка
+> перед `PROD=1` описаны только там. При расхождении прав README.
+
 Готовый пакет для развертывания проекта на Ubuntu Server с использованием Docker Compose.
 
 ## 📋 Предварительные требования
@@ -238,13 +242,9 @@ sudo bash /opt/moongame/deploy/install-ubuntu.sh
 
 ### Сохранение/восстановление БД
 
-```bash
-# Экспорт БД
-docker exec -it $(docker ps -qf "name=postgres") pg_dump -U void -d void > /tmp/void-backup.sql
-
-# Импорт БД
-docker exec -i $(docker ps -qf "name=postgres") psql -U void -d void < /tmp/void-backup.sql
-```
+Шифрованный бэкап и восстановление делают штатные `deploy/backup.sh` и `deploy/restore.sh`,
+порядок — в [README.md](README.md), раздел «Бэкап и восстановление БД». Голый `pg_dump` в
+`/tmp` не делайте: дамп ляжет на диск незашифрованным.
 
 ## 📞 Решение проблем
 
