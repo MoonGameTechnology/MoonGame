@@ -341,12 +341,22 @@ function onScreen(node: Element, r: DOMRect): boolean {
   return r.top >= top && r.bottom <= bottom;
 }
 
+/** What a tour needs from the map beyond the HUD. */
+export interface TourMap {
+  /** Every frame a map point is marked (`step.anchor`): keep it pressable (ONB-14). */
+  keepClear(mark: Rect): void;
+}
+
 /**
  * Start a data-described tour over the live HUD. Returns a handle whose
  * `notifyAction` the host wires to its action funnel. A new tour supersedes any
  * running one. `onEnd` fires with how it finished (completed / skipped / stopped).
  */
-export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): RunningTour {
+export function startTour(
+  steps: readonly SpotlightStep[],
+  onEnd?: TourEnd,
+  map?: TourMap,
+): RunningTour {
   const o = ensureOverlay();
   current?.skip(); // one tour at a time
 
@@ -384,7 +394,12 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
       }
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     },
-    render: (view) => paint(o, view),
+    render: (view) => {
+      paint(o, view);
+      // Folded, or hidden over an open dossier: nothing is marked on screen then.
+      if (view?.target && view.step.anchor && o.root.style.display === 'block')
+        map?.keepClear(view.target);
+    },
   };
 
   let running = true;

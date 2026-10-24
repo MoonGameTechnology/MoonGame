@@ -594,19 +594,19 @@ export function selectAt(mx: number, my: number) {
     game.invalidatePanel();
     return;
   }
-  // ШТУРМ armed (PC): the click picks the target world — someone else's capturable
-  // world only. An enemy at war → fly + storm on arrival; a peaceful owner → the
+  // ШТУРМ armed (PC): the click picks the target world — any capturable world that is
+  // not ours, a neutral one too. An enemy at war → fly + storm on arrival; a peaceful owner → the
   // "friendly faction — declare war?" dialog. Anything else keeps the aim armed.
   if (owner === 'assault') {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     const target = n ? s.planets[n.id] : undefined;
     const capturable = !!n && game.capturable(n.id);
-    // Годится только ЧУЖОЙ ЗАХВАТЫВАЕМЫЙ мир (`aimTargets.ts`, правило 4): от этого
+    // Годится только НЕ СВОЙ ЗАХВАТЫВАЕМЫЙ мир (`aimTargets.ts`, правило 4): от этого
     // зависит судьба прицела, а не только отказ ядра.
     const ok = !!target && assaultTargetOk(target.owner, capturable, ME);
     if (MOBILE) {
       stageMobileTarget('assault', ok && n ? { kind: 'planet', id: n.id } : null);
-      if (!ok) game.note(t('hint.assault-enemy-only'));
+      if (!ok) game.note(t('hint.assault-target'));
       return;
     }
     // Судьба прицела — `armedTap.ts` (REFM-88). ШТУРМ единственный ПРОЩАЕТ неподходящую
@@ -614,7 +614,7 @@ export function selectAt(mx: number, my: number) {
     // неточного тыка в скопление миров — наказание за меткость пальца.
     const fate = armedTap(!n ? 'none' : ok ? 'valid' : 'wrong', true);
     if (fate === 'keep') {
-      game.note(t('hint.assault-enemy-only'));
+      game.note(t('hint.assault-target'));
       return;
     }
     if (fate === 'fire') tryAssaultGroup(selectedFleetIds(), n!.id);

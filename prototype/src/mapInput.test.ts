@@ -597,7 +597,19 @@ describe('REFM-236 — тап по карте (`selectAt`)', () => {
     const p = at(home);
     mi.selectAt(p.x, p.y);
     expect(inter.assaultAim).toBe(true);
-    expect(env.notes).toEqual([t('hint.assault-enemy-only')]);
+    expect(env.notes).toEqual([t('hint.assault-target')]);
+  });
+
+  // Ядро берёт ничей мир тем же штурмом: прицел не вправе отказывать ему как своему.
+  it('«Штурм» по ничьему миру — приказ, а не отказ', async () => {
+    const { mi, inter, env, fleet, select, at } = await boot();
+    const neutral = Object.values(env.world.planets).find((p) => p.owner === null)!;
+    select(fleet.id);
+    inter.arm('assaultAim', true);
+    const p = at(neutral);
+    mi.selectAt(p.x, p.y);
+    expect(inter.assaultAim).toBe(false);
+    expect(env.notes).not.toContain(t('hint.assault-target'));
   });
 
   it('прицел эскадры: пропавшее звено и севший вылет называют причину, а не молчат', async () => {

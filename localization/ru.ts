@@ -1976,7 +1976,7 @@ export const ru: Record<string, string> = {
 
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ выберите цель — камера двигается двумя пальцами',
-  'hint.assault-enemy-only': '⚔ штурмовать можно только чужой мир',
+  'hint.assault-target': '⚔ свой мир и пустой космос не штурмуют',
   'hint.auto-retreat': '⮐ авто-отход при {n}% корпуса → {at}',
   'hint.auto-retreat.off': '⮐ авто-отход снят',
   'hint.auto-retreat.nowhere': '⮐ некуда отходить: выбери свой мир или назначь столицу',
