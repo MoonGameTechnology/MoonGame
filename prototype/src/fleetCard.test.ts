@@ -305,6 +305,32 @@ describe('свой флот', () => {
     expect(sub(card('F3'))).toContain(t('side.fleet.sub.pc', { s: 2, tr: 5 }).replace(/ · /g, '·'));
   });
 
+  it('высадка штурмом: в шапке срок под живой патч, разметка не тикает с часами', async () => {
+    // Цифры отсчёта прямо в подписи меняли разметку листа с каждым шагом часов, и лист
+    // пересобирался вместе с кнопками удара под курсором (сообщение владельца 2026-10-24).
+    const { env, card, put } = await boot({ types: { N: { capturable: true, orbit: true } } });
+    const doneAt = env.s.time + 1.5 * HOUR;
+    put(
+      fleet('F3', 'p1', 'N', [{ unit: 'cruiser', count: 2 }], {
+        orbit: 'near',
+        landing: [{ unit: 'militia', count: 6 }],
+        assaultLanding: { planetId: 'N', startAt: env.s.time, doneAt, troops: { militia: 6 } },
+      } as Partial<Fleet>),
+    );
+    const timer = `<span class="pn-timer" data-at="${doneAt}">…</span>`;
+    for (const opts of [
+      { pc: false, console: null },
+      { pc: true, console: 'F3' },
+    ]) {
+      Object.assign(env, opts);
+      env.s.time = doneAt - 1.5 * HOUR;
+      const before = card('F3');
+      expect(before).toContain(`⤓ ${t('side.fleet.landing', { t: timer })}`);
+      env.s.time = doneAt - 0.25 * HOUR;
+      expect(card('F3')).toBe(before);
+    }
+  });
+
   it('хромой флот помечен в шапке, полоса корпуса краснеет', async () => {
     const { card, put } = await boot();
     put(fleet('F3', 'p1', 'Z', [{ unit: 'cruiser', count: 2, hp: 10 }]));
@@ -644,9 +670,8 @@ describe('эскадра в воздухе', () => {
   const order = (name: string, id: string): string => `${act(name)} data-arg="${id}"`;
 
   it('удар по флоту: позывной в шапке, приказ, срок под живой патч и кнопки', async () => {
-    const { m } = await boot();
+    const { m, env } = await boot();
     const sp = await import('./squadronPanel');
-    const { timeLeft } = await import('./worldQueries');
     const st = strike('S1');
     expect(m.strikeTitle(st)).toBe(
       `${t(sp.SQUADRON_KIND_KEY)} «${sp.squadronCallsignOf('sq:S1')}»`,
@@ -658,8 +683,11 @@ describe('эскадра в воздухе', () => {
     expect(sub(html)).toBe(t('side.aloft.sub'));
     expect(html).toContain(`<b>${t('side.aloft.order.strike', { name: 'Флот «F2»' })}</b>`);
     expect(html).toContain(
-      `${t('side.aloft.until.target')} <span class="pn-timer" data-at="${11 * HOUR}">${timeLeft(11 * HOUR)}</span>`,
+      `${t('side.aloft.until.target')} <span class="pn-timer" data-at="${11 * HOUR}">…</span>`,
     );
+    // Цифры приносит живой патч: с ними в разметке лист пересобирался бы с каждым шагом часов.
+    env.s.time += 0.5 * HOUR;
+    expect(m.aloftPanelHtml(st)).toBe(html);
     for (const a of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingrecall'])
       expect(html).toContain(order(a, 'S1'));
     // Сесть некуда — перелёта нет; патруля нет — нечего и держать.

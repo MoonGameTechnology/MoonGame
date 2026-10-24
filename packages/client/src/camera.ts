@@ -49,8 +49,11 @@ export const FIT_MARGIN = 0.94;
 export const MIN_SCALE = 1;
 /** Close enough to read one province + its neighbours on a phone. */
 export const MAX_SCALE = 6;
-/** Fraction of the play area you may pan past each content edge (easy edge navigation). */
-export const PAN_SLACK = 0.16;
+/** Fraction of the play area you may pan past each content edge (easy edge navigation).
+ *  The content edge is the outermost node, and the drawn frame sits further out: at 0.16
+ *  the frame stayed under the HUD on PC (owner's ask 2026-10-24: let the camera fly a
+ *  little further past the map edge). */
+export const PAN_SLACK = 0.3;
 
 export const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 /** Clamp a zoom factor into the allowed range. */

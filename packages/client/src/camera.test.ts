@@ -122,6 +122,18 @@ describe('camera — pan clamp & centring', () => {
     const b = worldToScreen(anchor, after, VP, B);
     expect(Math.abs(a.y - b.y)).toBeLessThan(0.02);
   });
+  it('zoomed in, the outermost node can be pulled 30% of the play area in from the edge', () => {
+    // Owner's ask 2026-10-24: let the camera fly a little further past the map edge.
+    const left = clampCam({ scale: 5, x: 10_000, y: 10_000 }, VP, B);
+    const tl = worldToScreen({ x: 0, y: 0 }, left, VP, B);
+    expect(tl.x).toBeCloseTo(VP.left + 0.3 * 400, 6);
+    expect(tl.y).toBeCloseTo(VP.top + 0.3 * 800, 6);
+    const right = clampCam({ scale: 5, x: -10_000, y: -10_000 }, VP, B);
+    const br = worldToScreen({ x: 1000, y: 1000 }, right, VP, B);
+    expect(br.x).toBeCloseTo(VP.right - 0.3 * 400, 6);
+    expect(br.y).toBeCloseTo(VP.bottom - 0.3 * 800, 6);
+  });
+
   it('parks a smaller-than-viewport axis centred at the min-zoom floor', () => {
     const cam = clampCam({ scale: 1, x: 0, y: 0 }, VP, B);
     // At scale 1 the square map fits the 400px width → its centre sits at the play-area centre.

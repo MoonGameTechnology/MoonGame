@@ -71,6 +71,15 @@ describe('панель — шапка карточки', () => {
     expect(cardHeader('#0ff', 'X', 's')).not.toContain('ptitle-btn');
   });
 
+  it('живой хвост подписи идёт разметкой после подписи и сжимается вместе с ней', () => {
+    const live = ' · ⤓ <span class="pn-timer" data-at="5">…</span>';
+    const airy = cardHeader('#0ff', 'X', 'a · <b>', { subLive: live });
+    expect(airy).toContain(`<span>a · &lt;b&gt;${live}</span>`);
+    const tight = cardHeader('#0ff', 'X', 'a · b', { compact: true, subLive: live });
+    expect(tight).toContain('<span>a·b·⤓ <span class="pn-timer" data-at="5">…</span></span>');
+    expect(cardHeader('#0ff', 'X', 's')).toContain('<span>s</span>');
+  });
+
   it('имя и подпись экранируются', () => {
     const html = cardHeader('#0ff', '<img src=x>', '<script>alert(1)</script>');
     expect(html).not.toContain('<img src=x');
