@@ -9,6 +9,23 @@ const compose = fileURLToPath(new URL('./docker-compose.bots-stage.yml', import.
 const dirs = [];
 afterEach(() => dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
+function composeAvailable() {
+  try {
+    const version = execFileSync('docker', ['compose', 'version', '--short'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+      timeout: 3000,
+    });
+    const match = /^v?(\d+)\.(\d+)/.exec(version.trim());
+    return !!match && (Number(match[1]) > 2 || (Number(match[1]) === 2 && Number(match[2]) >= 30));
+  } catch {
+    return false;
+  }
+}
+const available = composeAvailable();
+if (process.env.CI && !available)
+  throw new Error('Bot stage integration tests require Compose >=2.30 in CI');
+
 function config({ scanner = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'bots-stage-'));
   dirs.push(dir);
@@ -48,7 +65,7 @@ function config({ scanner = false } = {}) {
   );
 }
 
-describe('isolated bot stage deployment', () => {
+describe.skipIf(!available)('isolated bot stage deployment', () => {
   it('renders privilege guards and bounded resources for both services', () => {
     const { services } = config();
     expect(Object.keys(services).sort()).toEqual(['stage-postgres', 'stage-server']);
