@@ -3,6 +3,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingDamage, BuildingHit } from './construction';
 import type { TechnologyGrant } from './technology';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
+import { coalitionOf } from '../state/coalition';
 import { buildingLevel, type GameData } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
@@ -44,6 +45,9 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * owner and the spy's owner — through the `diplomacy` capability's `declareWar`, so an
  * alliance or a pact breaks too. A caught counter-intelligence agent declares nothing:
  * both sides are at war already, and a third party's world is not party to it.
+ * Members of the same coalition cannot launch aggressive missions against each other;
+ * a mission already in flight aborts if its target is a coalition member on arrival.
+ * This protection lasts through the pending departure, without bypassing its timer.
  *
  * After a sabotage, a theft or a research theft the agent comes home (`AGENT_RETURN_HOURS`), as after
  * a failure; `espionage.succeeded` tells the spy what was done.
@@ -257,8 +261,8 @@ function reassign(h: HandlerContext, spy: string, mission: number, next: AgentAw
 export const espionageModule: GameModule = {
   id: 'espionage',
   // 1.1.0: саботаж и кража ресурсов (SPY-9). 1.2.0: кража исследований (SPY-10).
-  // 1.3.0: контрразведчик и война по раскрытию (SPY-11).
-  version: '1.3.0',
+  // 1.4.0: coalition membership blocks hostile missions at launch and resolution.
+  version: '1.4.0',
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -281,6 +285,9 @@ export const espionageModule: GameModule = {
       }
       if (h.state.players[planet.owner]?.status !== 'active') {
         return h.reject('E_NO_PLAYER');
+      }
+      if (!counter && coalitionOf(h.state, action.playerId)?.members.includes(planet.owner)) {
+        return h.reject('E_BAD_TARGET');
       }
       const mineHere = (h.state.spyAgents?.[action.playerId] ?? []).some(
         (a) => a.op === 'counter' && a.planetId === p.planetId && a.until > h.ctx.now,
@@ -356,9 +363,10 @@ export const espionageModule: GameModule = {
         victim === null ||
         victim === spy ||
         h.state.players[victim]?.status !== 'active' ||
-        h.state.players[spy]?.status !== 'active'
+        h.state.players[spy]?.status !== 'active' ||
+        coalitionOf(h.state, spy)?.members.includes(victim)
       ) {
-        // Nobody else holds the world any more: nothing to steal, nothing rolled.
+        // The current owner is no longer a hostile target: no damage or RNG draws.
         reassign(h, spy, mission, comeHome);
         h.emit('espionage.aborted', { owner: spy, planetId, kind: op });
         return;

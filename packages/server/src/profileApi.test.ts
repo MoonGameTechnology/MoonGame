@@ -84,7 +84,7 @@ async function fixture(option?: ProfileApiDeps['bots'] | ProfileApiDeps['premium
 }
 
 describe('persistent bot public profiles', () => {
-  const bot = { id: 'bot-001', login: '~Orion', portrait: 19, seed: 71, xp: 245 };
+  const bot = { id: 'bot-001', login: 'babkavtspkax', portrait: 19, seed: 71, xp: 245 };
   const result = {
     botId: bot.id,
     playerId: 'p3',
@@ -97,7 +97,7 @@ describe('persistent bot public profiles', () => {
   };
   function roster() {
     return {
-      findByLogin: vi.fn(async (login: string) => (login.toLowerCase() === '~orion' ? bot : null)),
+      findByLogin: vi.fn(async (login: string) => (login.toLowerCase() === 'babkavtspkax' ? bot : null)),
       recentMatches: vi.fn(async () => [result]),
     };
   }
@@ -112,7 +112,7 @@ describe('persistent bot public profiles', () => {
         },
       ]);
       const view = await app.inject({
-        url: '/profiles?login=~orion',
+        url: '/profiles?login=BABKAVTSPKAX',
         headers: { authorization: 'Alice' },
       });
       expect(view.statusCode).toBe(200);
@@ -141,12 +141,12 @@ describe('persistent bot public profiles', () => {
         Array.from({ length: 11 }, (_, i) => ({ ...result, matchId: `m-${i}` })),
       );
       const bounded = (
-        await app.inject({ url: '/profiles?login=~Orion', headers: { authorization: 'Alice' } })
+        await app.inject({ url: '/profiles?login=babkavtspkax', headers: { authorization: 'Alice' } })
       ).json();
       expect(bounded.recentMatches).toHaveLength(10);
-      expect((await app.inject({ url: '/profiles?login=~Orion' })).statusCode).toBe(401);
+      expect((await app.inject({ url: '/profiles?login=babkavtspkax' })).statusCode).toBe(401);
       expect(
-        (await app.inject({ url: '/profiles?login=~missing', headers: { authorization: 'Alice' } }))
+        (await app.inject({ url: '/profiles?login=missing-natural-handle', headers: { authorization: 'Alice' } }))
           .statusCode,
       ).toBe(404);
     } finally {
@@ -161,7 +161,7 @@ describe('persistent bot public profiles', () => {
     const { app, profiles, alice } = await fixture(bots);
     try {
       const fresh = (
-        await app.inject({ url: '/profiles?login=~Orion', headers: { authorization: 'Alice' } })
+        await app.inject({ url: '/profiles?login=babkavtspkax', headers: { authorization: 'Alice' } })
       ).json();
       expect(fresh.progress).toEqual({});
       expect(fresh.slots).toEqual(defaultAppearance().slots);
@@ -178,7 +178,7 @@ describe('persistent bot public profiles', () => {
       const look = { ...defaultAppearance(), portrait: 11 };
       const saved = await app.inject({
         method: 'POST',
-        url: '/profiles/me?login=~Orion',
+        url: '/profiles/me?login=babkavtspkax',
         headers: { authorization: 'Alice' },
         payload: look,
       });
@@ -207,7 +207,7 @@ describe('persistent bot public profiles', () => {
           await app.inject({
             method: 'POST',
             url: '/profiles/me',
-            headers: { authorization: '~Orion' },
+            headers: { authorization: 'babkavtspkax' },
             payload: look,
           })
         ).statusCode,
@@ -360,4 +360,37 @@ it('counts only completed, seated accounts and handles coalition winners once', 
   expect(await profiles.progress('a')).toMatchObject({ matches: 1, wins: 1, teamWins: 1 });
   expect(await profiles.progress('b')).toMatchObject({ matches: 1, wins: 1, teamWins: 1 });
   expect(await profiles.progress('c')).toEqual({});
+});
+
+describe('tutorial medal claim', () => {
+  it('credits a signed-in account exactly once, without XP, and the medal can be worn', async () => {
+    const { app, profiles, commanders, alice, bob } = await fixture();
+    try {
+      const claim = (authorization?: string) =>
+        app.inject({
+          method: 'POST',
+          url: '/profiles/rewards/tutorial',
+          ...(authorization ? { headers: { authorization } } : {}),
+        });
+      expect((await claim()).statusCode).toBe(401);
+      expect(await profiles.progress(alice)).toEqual({});
+      const results = await Promise.all([claim('Alice'), claim('Alice'), claim('Alice')]);
+      expect(results.map((r) => r.statusCode)).toEqual([200, 200, 200]);
+      expect(results[0]!.json()).toEqual({ medalId: 'tutorial' });
+      expect(results[0]!.headers['cache-control']).toBe('no-store');
+      expect(await profiles.progress(alice)).toEqual({ tutorial: 1 });
+      expect(medalGrade('tutorial', await profiles.progress(alice))).toBe(3);
+      expect(await commanders.xpOf(alice)).toBe(0);
+      expect(await profiles.progress(bob)).toEqual({});
+      const look = defaultAppearance();
+      look.slots[0] = 'tutorial';
+      const wear = (authorization: string) =>
+        app.inject({ method: 'POST', url: '/profiles/me', headers: { authorization }, payload: look });
+      expect((await wear('Bob')).statusCode).toBe(403);
+      expect((await wear('Alice')).statusCode).toBe(200);
+      expect((await profiles.appearance(alice)).slots[0]).toBe('tutorial');
+    } finally {
+      await app.close();
+    }
+  });
 });

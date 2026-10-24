@@ -637,6 +637,41 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
     }
   });
 
+  it('поток расчёта соло-мира: файл сборки среди assets, и документ его разрешает', async () => {
+    const WORKER = 'self.onmessage=()=>{}';
+    const pictures = createMultiplayerServer({
+      room: makeRoom(),
+      indexHtml: CLIENT,
+      assets: new Map([['fighter-DYTR3J73.webp', Buffer.from('RIFF')]]),
+    });
+    const picturesBase = httpBase(await pictures.listen());
+    try {
+      // Одни картинки — воркера у хоста нет, и политика его не пускает.
+      const csp = (await fetch(`${picturesBase}/`)).headers.get('content-security-policy') ?? '';
+      expect(csp).toContain("worker-src 'none'");
+    } finally {
+      await pictures.close();
+    }
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      indexHtml: CLIENT,
+      assets: new Map([['sim-worker-0a1b2c3d4e.js', Buffer.from(WORKER)]]),
+    });
+    const base = httpBase(await server.listen());
+    try {
+      const sim = await fetch(`${base}/assets/sim-worker-0a1b2c3d4e.js`);
+      expect(sim.status).toBe(200);
+      expect(await sim.text()).toBe(WORKER);
+      expect(sim.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
+      expect(sim.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+      expect(sim.headers.get('content-security-policy')).toContain("default-src 'none'");
+      const csp = (await fetch(`${base}/`)).headers.get('content-security-policy') ?? '';
+      expect(csp).toContain("worker-src 'self'");
+    } finally {
+      await server.close();
+    }
+  });
+
   it('площадке-порталу встраивание разрешается параметром, а не снятием заголовка', async () => {
     const server = createMultiplayerServer({
       room: makeRoom(),

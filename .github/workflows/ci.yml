@@ -201,6 +201,18 @@ jobs:
           path: /tmp/gw-onboarding
           retention-days: 7
 
+      - name: Sector Zero guided training smoke
+        id: training
+        run: node prototype/trainingtest.mjs
+
+      - name: Training failure screenshots
+        if: failure() && steps.training.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sector-zero-training-failure
+          path: /tmp/sz-training
+          retention-days: 7
+
       - name: Platform archive smoke (non-blocking)
         run: |
           if ! pnpm run smoke:browser:install; then

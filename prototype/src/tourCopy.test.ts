@@ -17,9 +17,10 @@ import { en } from '../../localization/en';
 import { trainingBaseline } from '../../decisions/trainingStages';
 import { trainingState } from '../../packages/client/src/gameData';
 import { buildFirstMatchTour } from './firstMatchTour';
-import { firstMatchFixture } from './firstMatchTour.fixture';
+import { firstMatchFixture, operationFixture } from './firstMatchTour.fixture';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildTrainingTour } from './trainingTour';
+import { trainingUiFixture } from './trainingTour.fixture';
 import { data } from './gameData';
 import type { SpotlightStep } from './spotlight';
 
@@ -35,6 +36,7 @@ const first = (mouse: boolean): SpotlightStep[] =>
     panelOpen: () => false,
     shipsTabOpen: () => false,
     capturedWorld: () => false,
+    operation: operationFixture(!mouse),
   });
 
 const world = trainingState(data);
@@ -43,7 +45,7 @@ const training = buildTrainingTour({
   me: 'p1',
   data,
   baseline: trainingBaseline(world, 'p1', data),
-  fleetSelected: () => false,
+  ui: trainingUiFixture(true),
 });
 
 const steps = [...first(true), ...first(false), ...HUD_ORIENTATION_TOUR, ...training];
@@ -65,6 +67,16 @@ describe('строка шага обучения', () => {
     expect(long).toEqual([]);
   });
 
+  it('у каждого шага и этапа первого матча есть текст на обоих языках', () => {
+    const keys = [
+      ...new Set(
+        [...first(true), ...first(false)].flatMap((s) => [s.copy, s.stageTitle ?? s.copy]),
+      ),
+    ];
+    for (const [lang, table] of Object.entries(LOCALES))
+      expect({ lang, missing: keys.filter((k) => !table[k]) }).toEqual({ lang, missing: [] });
+  });
+
   it('глагол не привязан к устройству (правило 2)', () => {
     // Слово целиком, а не подстрока: в «этап» тоже есть «тап».
     const bound = /(?<![а-яё])(тап|клик|навед)|\b(tap|click|hover)/i;
@@ -79,7 +91,6 @@ describe('плитки жестов', () => {
   it('у каждого жеста есть имя и дело на обоих языках', () => {
     const keys = steps.flatMap((s) => s.gestures ?? []).flatMap((g) => [g.name, g.does]);
     expect(keys.length).toBeGreaterThan(0);
-    for (const table of Object.values(LOCALES))
-      expect(keys.filter((k) => !table[k])).toEqual([]);
+    for (const table of Object.values(LOCALES)) expect(keys.filter((k) => !table[k])).toEqual([]);
   });
 });

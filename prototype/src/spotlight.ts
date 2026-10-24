@@ -44,6 +44,8 @@ export type Placement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 /** One guide step, described by data. */
 export interface SpotlightStep {
   id: string;
+  /** Training simulation pauses while the player reads or finds this control. */
+  holdClock?: boolean;
   /** CSS selector of the element to highlight, or `null` for a centred bubble. */
   target: string | null;
   /** Live canvas target, in screen coordinates. Recomputed after camera movement. */
@@ -74,6 +76,8 @@ export interface SpotlightStep {
    *  один этап §14.4. «Пропустить этап» уводит к первому шагу следующего этапа. Нет поля —
    *  обычное обучение без этапов. */
   stage?: string;
+  /** Ключ локали названия этапа; без него — `training.stage.<stage>` учебного полигона. */
+  stageTitle?: string;
   /** Запереть экран на цели этого шага: нажать можно ТОЛЬКО подсвеченное место.
    *  Ставится там, где цель и есть то, что просят нажать; шаги, где до места ещё надо
    *  добраться (выбрать флот, открыть панель), оставляют HUD свободным. Правила и
@@ -137,10 +141,20 @@ export class SpotlightTour {
     return this.running;
   }
 
+  get holdsClock(): boolean {
+    return this.running && !this.folded && this.current.holdClock === true;
+  }
+
   /** Current step index (0-based), or -1 before `start()` / after the end. */
   get index(): number {
     return this.running ? this.i : -1;
   }
+
+  /** Этап текущего шага; нет — тур не идёт или шаг без этапа (сценарий полигона, TRN-3). */
+  get stage(): string | undefined {
+    return this.running ? this.current.stage : undefined;
+  }
+
 
   /** Begin at the first step. An empty chain finishes immediately. */
   start(): void {

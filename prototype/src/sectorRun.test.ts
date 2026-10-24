@@ -83,9 +83,17 @@ async function boot() {
     trainingWon: vi.fn(),
     finalScenes: vi.fn(),
     chapterWon: vi.fn(),
+    // Темп мира — как у `main.ts`: число, которое ставит пауза; 2 — «▶» полосы скорости.
+    playing: () => speed > 0,
+    speed: () => speed,
+    setSpeed: vi.fn((next: number) => {
+      speed = next;
+    }),
+    playSpeed: () => 2,
   };
+  let speed = 2;
   run.initSectorRun(host);
-  return { run, profile, game, host, emitted, world: () => world };
+  return { run, profile, game, host, emitted, world: () => world, speed: () => speed };
 }
 type Env = Awaited<ReturnType<typeof boot>>;
 
@@ -558,3 +566,82 @@ describe('REFM-210 — «Продолжить»', () => {
     expect(await run.loadSavedRun()).toBeNull();
   });
 });
+
+describe('REFM-243 — остатки забега: разметка, пауза, задачи', () => {
+  /** Площадка с разметкой геймплея; кнопки полосы скорости — пустой документ. */
+  async function marked() {
+    vi.stubGlobal('document', { querySelectorAll: () => [] });
+    const env = await boot();
+    const host = await import('./platform/host');
+    const marks: string[] = [];
+    host.setPlatform({
+      ...host.getPlatform(),
+      gameplayStart: () => void marks.push('start'),
+      gameplayStop: () => void marks.push('stop'),
+    } as ReturnType<typeof host.getPlatform>);
+    return { ...env, marks };
+  }
+
+  it('разметка геймплея: забег идёт и мир идёт; кадр размечает заново только при смене ответа', async () => {
+    const { run, marks, host } = await marked();
+    run.markGameplay();
+    expect(marks).toEqual(['stop']); // забега нет
+    run.beginAttempt(true);
+    run.setRunActive(true);
+    run.markGameplay();
+    expect(marks.at(-1)).toBe('start');
+    const before = marks.length;
+    run.tickGameplayMark();
+    expect(marks).toHaveLength(before); // ответ тот же — площадку не дёргаем
+    host.setSpeed(0);
+    run.tickGameplayMark();
+    expect(marks.at(-1)).toBe('stop');
+  });
+
+  it('пауза: кнопка ставит и снимает с прежним темпом; площадка снимает только свою', async () => {
+    const { run, host, speed } = await marked();
+    expect(run.runPauseShown()).toBe(false);
+    run.runPauseEvent('toggle'); // вне забега правило молчит
+    expect(speed()).toBe(2);
+    run.beginAttempt(true);
+    run.setRunActive(true);
+    host.setSpeed(5); // игрок шёл ускоренно
+    run.runPauseEvent('toggle');
+    expect(speed()).toBe(0);
+    run.runPauseEvent('toggle');
+    expect(speed()).toBe(5);
+    run.runPauseEvent('platform-pause');
+    expect(speed()).toBe(0);
+    run.runPauseEvent('platform-resume');
+    expect(speed()).toBe(5);
+    run.runPauseEvent('hidden');
+    run.runPauseEvent('platform-resume'); // уход со страницы — пауза игрока, не площадки
+    expect(speed()).toBe(0);
+  });
+
+  it('пауза и инструменты экрана — только у забега не в сети и не законченного', async () => {
+    const { run, host, world } = await marked();
+    run.beginAttempt(true);
+    run.setRunActive(true);
+    expect(run.sectorZeroToolsHidden()).toBe(true);
+    expect(run.runPauseShown()).toBe(true);
+    world().match.status = 'ended';
+    expect(run.runPauseShown()).toBe(false);
+    host.net.mockReturnValue(true);
+    expect(run.sectorZeroToolsHidden()).toBe(false);
+  });
+
+  it('цепочки главы вне забега нет; подпись флота — его корабли по счёту', async () => {
+    const { run, world } = await marked();
+    expect(run.runChain()).toBeNull();
+    const fleet = Object.values(world().fleets).find((f) => f.owner === 'p1')!;
+    fleet.units = [
+      { unit: 'cruiser', count: 2 },
+      { unit: 'frigate', count: 0 },
+      { unit: 'frigate', count: 1 },
+    ];
+    expect(run.fleetLabelOf(fleet.id)).toMatch(/^2× .+, 1× .+$/);
+    expect(run.fleetLabelOf('nope')).toBe('nope');
+  });
+});
+

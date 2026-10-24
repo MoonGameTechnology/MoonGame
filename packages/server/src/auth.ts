@@ -164,6 +164,12 @@ export interface SessionClaim {
   accountId: string;
   login: string;
   pwfp: string;
+  /** When the password was last typed, Unix seconds (`auth_time`, as in OIDC Core). A
+   *  refresh carries it over unchanged, so renewing a session never moves the moment the
+   *  player last proved the password — `/auth/refresh` refuses once it is too old. Omitted
+   *  when signing ⇒ now (a fresh password entry); a token minted before the claim existed
+   *  reads its `iat` instead. */
+  authTime?: number;
 }
 
 export type SessionTokenResult = { ok: true; claim: SessionClaim } | { ok: false; code: 'E_AUTH' };
@@ -192,20 +198,23 @@ export async function verifySessionToken(
     // A session minted before `pwfp` existed (or otherwise malformed) is rejected — the
     // freshness check can't run without it, so fail secure and force a re-login.
     if (typeof pwfp !== 'string' || pwfp === '') return { ok: false, code: 'E_AUTH' };
-    return { ok: true, claim: { accountId, login, pwfp } };
+    const authTime = payload.auth_time ?? payload.iat;
+    if (typeof authTime !== 'number' || !Number.isSafeInteger(authTime)) return { ok: false, code: 'E_AUTH' };
+    return { ok: true, claim: { accountId, login, pwfp, authTime } };
   } catch {
     return { ok: false, code: 'E_AUTH' };
   }
 }
 
-/** Mint a session token (the /auth/login, /auth/register and /auth/reset endpoints' job). */
+/** Mint a session token (the /auth/login, /auth/register, /auth/reset and /auth/refresh
+ *  endpoints' job). */
 export function signSessionToken(
   claim: SessionClaim,
   config: JoinTokenSignConfig,
   opts: { ttlSeconds: number; now?: () => number },
 ): Promise<string> {
   const nowSec = Math.floor((opts.now?.() ?? Date.now()) / 1000);
-  return new SignJWT({ login: claim.login, pwfp: claim.pwfp })
+  return new SignJWT({ login: claim.login, pwfp: claim.pwfp, auth_time: claim.authTime ?? nowSec })
     .setProtectedHeader({ alg: config.algorithm, typ: SESSION_TOKEN_TYP })
     .setSubject(claim.accountId)
     .setIssuer(config.issuer)

@@ -139,6 +139,7 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'diplomacy.decline': z.object({ target: id }),
   'coalition.create': z.object({}),
   'coalition.leave': z.object({}),
+  'coalition.kick': z.object({ target: id }),
   'coalition.edit': z.object({
     emblem: id,
     description: z.string().max(COALITION_DESC_MAX),

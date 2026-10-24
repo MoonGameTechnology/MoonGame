@@ -11,6 +11,8 @@ const build = src('../prototype/build.mjs');
 const hotkeys = src('../prototype/src/pcHotkeys.ts');
 // Жесты карты (перетаскивание, колесо, двойной клик, щипок) — у ввода на холсте (REFM-236).
 const input = src('../prototype/src/mapInput.ts');
+// Правый клик по плитке листа — у хозяина боковой панели (REFM-225).
+const panel = src('../prototype/src/sidePanel.ts');
 const press = (over: Partial<PressInput>): PressInput => ({
   touch: false,
   shift: false,
@@ -59,8 +61,8 @@ const PROOF: Record<string, () => void> = {
     expect(input).toContain("canvas.addEventListener('contextmenu', rightClick);");
   },
   'quick-build': () => {
-    expect(main).toContain("side.addEventListener('contextmenu'");
-    expect(main).toContain("closest('[data-buildorder]')");
+    expect(panel).toContain("side.addEventListener('contextmenu'");
+    expect(panel).toContain("closest('[data-buildorder]')");
   },
   back: () => expect(src('../prototype/src/backGesture.ts')).toContain("key === 'Escape'"),
   'panel-move': () => {

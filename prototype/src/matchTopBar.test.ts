@@ -191,6 +191,7 @@ async function boot(
     mobile: false,
     aiSeats: 2,
     speedControl: true,
+    lesson: false,
     allyPulsing: false,
     missionsOpen: false,
     desktop: false,
@@ -337,6 +338,7 @@ async function boot(
     mobile: () => env.mobile,
     aiSeats: () => env.aiSeats,
     speedControl: () => env.speedControl,
+    lessonSpeed: () => env.lesson,
     phoneSpeed: () => ({ sync: (...args: unknown[]) => void rec.sync.push(args) }) as never,
     phoneBadges: (battles, unread) => void rec.phone.push([battles, unread]),
     allyPulsing: () => env.allyPulsing,
@@ -740,6 +742,22 @@ describe('полоса скорости', () => {
     env.net = true;
     m.renderSpeedbar();
     expect(el('spd-ctl').style.display).toBe('none');
+    expect(el('speedbar').style.display).toBe('none');
+  });
+
+  it('обучение несёт фишку ×300 и на ПК без дев-управления временем, а в сети — нет', async () => {
+    const { m, el, env } = await boot({ speedControl: false });
+    m.renderSpeedbar();
+    expect(el('spd-lesson').style.display).toBe('none');
+    expect(el('speedbar').style.display).toBe('none');
+    env.lesson = true;
+    m.renderSpeedbar();
+    expect(el('spd-lesson').style.display).toBe('');
+    expect(el('spd-ctl').style.display).toBe('');
+    expect(el('speedbar').style.display).toBe('');
+    env.net = true;
+    m.renderSpeedbar();
+    expect(el('spd-lesson').style.display).toBe('none');
     expect(el('speedbar').style.display).toBe('none');
   });
 

@@ -182,6 +182,9 @@ function gestureTile(g: MapGesture): string {
 }
 
 function paint(o: Overlay, view: SpotlightView | null): void {
+  const dossierOpen = !view?.step.inDialog && document.getElementById('codex')?.classList.contains('show');
+  // Map destinations must stay tappable even when a battle toast arrives above them.
+  o.root.classList.toggle('sl-map', !!view && !view.collapsed && !dossierOpen && !!view.step.anchor);
   if (!view) {
     o.root.style.display = 'none';
     o.chip.style.display = 'none';
@@ -202,7 +205,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   // small phone screen). Hide the spotlight's chrome for as long as the dossier is
   // up; the tour's step/state machine keeps polling underneath untouched, and the
   // very next frame after the dossier closes repaints normally.
-  if (!view.step.inDialog && document.getElementById('codex')?.classList.contains('show')) {
+  if (dossierOpen) {
     o.root.style.display = 'none';
     return;
   }
@@ -245,7 +248,7 @@ function paint(o: Overlay, view: SpotlightView | null): void {
     ? t('onb.tour.stage', {
         k: view.stage.index + 1,
         n: view.stage.count,
-        title: t(`training.stage.${view.stage.id}`),
+        title: t(view.step.stageTitle ?? `training.stage.${view.stage.id}`),
       })
     : t('onb.tour.step', { k: view.index + 1, n: view.count });
   o.copy.textContent = t(view.step.copy);
@@ -315,16 +318,45 @@ export interface RunningTour {
   /** Force-stop (as if «Пропустить»). */
   stop(): void;
   readonly active: boolean;
+  readonly holdsClock: boolean;
+  /** Этап текущего шага: по нему сценарий полигона (TRN-3) вводит силы противника. */
+  readonly stage: string | undefined;
 }
 
 let current: SpotlightTour | null = null;
+
+/** Is the target wholly on screen, inside the scrolling panel that holds it? */
+function onScreen(node: Element, r: DOMRect): boolean {
+  let top = 0;
+  let bottom = innerHeight;
+  for (let e = node.parentElement; e; e = e.parentElement) {
+    const overflow = getComputedStyle(e).overflowY;
+    if (overflow === 'auto' || overflow === 'scroll') {
+      const box = e.getBoundingClientRect();
+      top = Math.max(top, box.top);
+      bottom = Math.min(bottom, box.bottom);
+      break;
+    }
+  }
+  return r.top >= top && r.bottom <= bottom;
+}
+
+/** What a tour needs from the map beyond the HUD. */
+export interface TourMap {
+  /** Every frame a map point is marked (`step.anchor`): keep it pressable (ONB-14). */
+  keepClear(mark: Rect): void;
+}
 
 /**
  * Start a data-described tour over the live HUD. Returns a handle whose
  * `notifyAction` the host wires to its action funnel. A new tour supersedes any
  * running one. `onEnd` fires with how it finished (completed / skipped / stopped).
  */
-export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): RunningTour {
+export function startTour(
+  steps: readonly SpotlightStep[],
+  onEnd?: TourEnd,
+  map?: TourMap,
+): RunningTour {
   const o = ensureOverlay();
   current?.skip(); // one tour at a time
 
@@ -334,7 +366,13 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   // 'smooth'` scroll would never settle): `scrollIntoView` only actually moves a
   // genuinely scrollable ancestor (the app's own body/window never scroll — fixed
   // single-viewport layout), so this is a no-op for fixed HUD targets like #cmdbar.
+  // A panel that is still opening or re-rendering can cut that smooth scroll short (the
+  // fleet console right after a ship is picked): for the first seconds of a step a
+  // target left outside its panel is scrolled again, at once. Later the player may
+  // scroll the panel freely.
   let scrolledFor: string | null = null;
+  let scrollStart = 0;
+  let scrollCheck = 0;
   const host: SpotlightHost = {
     locate: (sel) => {
       const node = Array.from(document.querySelectorAll(sel)).find((el) => {
@@ -345,13 +383,23 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
       const r = node.getBoundingClientRect();
       // A detached / display:none node reports a zero box — treat as absent.
       if (r.width === 0 && r.height === 0) return null;
+      const now = performance.now();
       if (scrolledFor !== sel) {
         scrolledFor = sel;
+        scrollStart = scrollCheck = now;
         node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (now - scrollStart < 3000 && now - scrollCheck > 500) {
+        scrollCheck = now;
+        if (!onScreen(node, r)) node.scrollIntoView({ block: 'nearest' });
       }
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     },
-    render: (view) => paint(o, view),
+    render: (view) => {
+      paint(o, view);
+      // Folded, or hidden over an open dossier: nothing is marked on screen then.
+      if (view?.target && view.step.anchor && o.root.style.display === 'block')
+        map?.keepClear(view.target);
+    },
   };
 
   let running = true;
@@ -398,6 +446,12 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
     stop: () => tour.skip(),
     get active() {
       return running;
+    },
+    get holdsClock() {
+      return tour.holdsClock;
+    },
+    get stage() {
+      return tour.stage;
     },
   };
 }

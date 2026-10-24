@@ -40,6 +40,7 @@ import {
   migrate,
 } from './postgres';
 import { AVA_FEED_KINDS, isAvaFeedEntry } from './types';
+import { SYSTEM_BOT_NICKNAMES } from '../botNicknames';
 import type {
   AccountStore,
   AnnouncementStore,
@@ -337,6 +338,18 @@ function receiptStoreContract(name: string, make: () => ReceiptStore, uniq: (p: 
 /** SE-1.x — login+password accounts, run against BOTH adapters. */
 function userStoreContract(name: string, make: () => UserStore, uniq: (p: string) => string): void {
   describe(`UserStore — ${name}`, () => {
+    it('reserves permanent bot handles in any case even before the roster is seeded', async () => {
+      const store = make();
+      for (const login of SYSTEM_BOT_NICKNAMES) {
+        for (const spelling of [login, login.toUpperCase()]) {
+          expect(await store.createUser(spelling, 'cannot-be-a-human-password')).toEqual({
+            ok: false,
+            code: 'E_LOGIN_TAKEN',
+          });
+        }
+      }
+    });
+
     it('persists a new revocation nonce without changing credentials or another account', async () => {
       const store = make();
       const created = await store.createUser(uniq('logout-owner'), 'unchanged');

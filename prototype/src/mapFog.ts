@@ -29,6 +29,7 @@ import {
   type GameState,
   type IntelGrant,
   type Planet,
+  type ProvinceSurvey,
   type SeenPatrol,
   type SightCircle,
   type SignatureContact,
@@ -313,6 +314,13 @@ function updateMemory(identify: Set<string>): void {
   scans.remember(identify, s.planets);
   const remembered = (s as { remembered?: string[] }).remembered;
   if (remembered?.length) scans.remember(remembered, s.planets);
+}
+
+/** Тип провинции, который корабль игрока узнал, пересекая её границу (`state.surveyed`,
+ *  пишет `visibilityModule`): вид и местность, без хозяина и гарнизона. В соло мир полный и
+ *  берётся своя запись, в сети проекция и так отдаёт только её. */
+export function surveyed(id: string): ProvinceSurvey | undefined {
+  return game.world().surveyed?.[game.me()]?.[id];
 }
 
 /** True if node `id` is identified (full detail); fog off ⇒ always true. */

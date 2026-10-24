@@ -18,7 +18,9 @@ name: Android APK (prototype)
 on:
   workflow_dispatch:
   push:
-    branches: [main, claude/awesome-bohr-ygnunp]
+    # Validate the site-updater candidate with the real SDK and signing secret;
+    # only main is allowed to publish the rolling releases below.
+    branches: [main, claude/project-thread-asxd8m]
     paths:
       - 'prototype/**'
       - 'mobile/**'
@@ -124,6 +126,8 @@ jobs:
         run: |
           mkdir -p www
           cp "../prototype/dist/${HTML}" www/index.html
+          # The solo sim worker the page starts from a file next to it (build.mjs).
+          cp ../prototype/dist/sim-worker-*.js www/
           # Bake window.__BUILD__ into the packaged HTML so the APK knows its own version.
           node inject-build.mjs www/index.html "$VOID_VC" "$VOID_SHA" "$VOID_SERVER"
           # The player APK gets its own applicationId so it installs SIDE BY SIDE with

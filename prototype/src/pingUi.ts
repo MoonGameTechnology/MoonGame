@@ -13,6 +13,7 @@
  * Сеть против соло: в сетевом матче метку ставит и снимает СЕРВЕР (он же штампует id и
  * рассылает эхо), в одиночном — метка просто ложится строкой в ленту коалиции.
  */
+import { PING_KIND_LABEL, PING_MARKER_KINDS, pingIsActive, pingGlyph, pingMarkerKind, type PingMarkerKind } from '../../decisions/pingKind';
 import { t } from '../../localization/runtime';
 import { COALITION, type SessionMsg } from './conversations';
 import { esc } from './format';
@@ -62,6 +63,9 @@ export function pingMenuHtml(where: string, coalitionSize: number, dms: readonly
     `<div class="pm-head"><span>📍 ${t('ping.title')} · <b>${esc(where)}</b></span>` +
     `<button class="pm-close btn-x" data-pmcancel aria-label="${t('card.close')}">✕</button></div>` +
     `<div class="pm-sub">${t('ping.note')}</div>` +
+    `<div class="pm-kinds" role="group" aria-label="${t('ping.kind.label')}">` +
+    PING_MARKER_KINDS.map((kind) => `<button class="pm-kind" data-pmkind="${kind}" aria-pressed="${kind === 'mark'}">${pingGlyph(kind)} ${t(PING_KIND_LABEL[kind])}</button>`).join('') +
+    `</div>` +
     `<input id="pm-text" class="pm-text" maxlength="${PING_DESC_MAX}" placeholder="${t('ping.desc.ph')}" autocomplete="off">` +
     `<div class="pm-lbl">${t('ping.to.coalition')}</div>${coal}` +
     (dms.length
@@ -90,7 +94,7 @@ export function pingPanelHtml(
           const v = view(r);
           return (
             `<div class="pp-row${r.hidden ? ' off' : ''}" data-ploc="${esc(r.loc)}">` +
-            `<i class="pp-dot" style="background:${v.color}"></i>` +
+            `<span class="pp-icon" style="color:${v.color}" title="${t(PING_KIND_LABEL[r.kind])}">${pingGlyph(r.kind)}</span>` +
             `<span class="pp-txt"><b>${esc(v.where)}</b><span>${esc(r.text || '—')} · ${esc(v.who)}</span></span>` +
             `<button data-pact="go" title="${t('ping.panel.go')}">🎯</button>` +
             `<button data-pact="hide" title="${t(r.hidden ? 'ping.panel.show' : 'ping.panel.hide')}">${r.hidden ? '🙈' : '👁'}</button>` +
@@ -124,9 +128,10 @@ export function pingPopHtml(
   color: string,
   text: string,
   mine: boolean,
+  kind: PingMarkerKind = 'mark',
 ): string {
   return (
-    `<div class="pp-top"><b style="color:${color}">📍 ${esc(who)}</b><span>${esc(where)}</span>` +
+    `<div class="pp-top"><b style="color:${color}">${pingGlyph(kind)} ${esc(who)}</b><span>${esc(where)}</span>` +
     `<button class="pp-close btn-x" aria-label="${t('card.close')}">✕</button></div>` +
     `<div class="pp-desc">${text ? esc(text) : `<i>${t('ping.no-desc')}</i>`}</div>` +
     `<div class="pp-act"><button class="pp-jump" data-loc="${esc(loc)}">${t('chat.jump')}</button>` +
@@ -137,15 +142,15 @@ export function pingPopHtml(
 
 /** Активные метки коалиции: одна на провинцию, последняя побеждает. Карта и список
  *  берут метки ОТСЮДА — иначе они разошлись бы между собой. */
-export function activePings(messages: readonly SessionMsg[]): SessionMsg[] {
+export function activePings(messages: readonly SessionMsg[], now = 0): SessionMsg[] {
   const byLoc = new Map<string, SessionMsg>();
-  for (const m of messages) if (m.to === COALITION && m.ping) byLoc.set(m.ping, m);
+  for (const m of messages) if (m.to === COALITION && m.ping && pingIsActive(m, now)) byLoc.set(m.ping, m);
   return [...byLoc.values()];
 }
 
 /** Сетевой путь метки: сервер штампует id и рассылает эхо всем союзникам. */
 export interface PingNet {
-  placePing(p: { kind: 'mark'; target: { node: string }; label: string }): void;
+  placePing(p: { kind: PingMarkerKind; target: { node: string }; label: string }): void;
   clearPing(pingId: string): void;
 }
 
@@ -156,6 +161,8 @@ export interface PingHost {
   panelRoot(): HTMLElement | null;
   popRoot(): HTMLElement | null;
   me(): string;
+  /** Server-synchronized match time, the same clock as Ping.expiresAt. */
+  now?(): number;
   /** Провинция, выбранная в панели: по ней открывается композер. */
   selected(): string | null;
   /** Существует ли такая провинция (метка на пустоту не ставится). */
@@ -165,7 +172,7 @@ export interface PingHost {
   /** Локальное снятие своей метки в одиночном матче. */
   setMessages(next: SessionMsg[]): void;
   /** Положить строку в ленту (соло-путь метки). */
-  push(to: string, text: string, loc: string): void;
+  push(to: string, text: string, loc: string, kind?: PingMarkerKind): void;
   /** Сеть, если матч сетевой. */
   net(): PingNet | null;
   /** Коалиция: я и союзники. Личную метку можно отправить только им (`pingRecipients`). */
@@ -214,9 +221,11 @@ export interface PingUi {
 export function initPingUi(host: PingHost): PingUi {
   let menuLoc: string | null = null;
   let panelOpen = false;
+  let selectedKind: PingMarkerKind = 'mark';
   let hidden: ReadonlySet<string> = new Set();
 
-  const rows = (): PingRow[] => pingRows(host.messages(), host.me(), hidden);
+  const now = (): number => host.now?.() ?? 0;
+  const rows = (): PingRow[] => pingRows(host.messages(), host.me(), hidden, now());
   const rowAt = (loc: string): PingRow | undefined => rows().find((r) => r.loc === loc);
 
   function closeMenu(): void {
@@ -231,6 +240,7 @@ export function initPingUi(host: PingHost): PingUi {
       return;
     }
     menuLoc = loc;
+    selectedKind = 'mark';
     const el = host.menuRoot();
     if (el) {
       el.innerHTML = pingMenuHtml(
@@ -265,8 +275,8 @@ export function initPingUi(host: PingHost): PingUi {
     const fallback = t('ping.mark', { loc: host.provinceName(loc) });
     if (dest === COALITION) {
       const net = host.net();
-      if (net) net.placePing({ kind: 'mark', target: { node: loc }, label: desc });
-      else host.push(COALITION, desc || fallback, loc);
+      if (net) net.placePing({ kind: selectedKind, target: { node: loc }, label: desc });
+      else host.push(COALITION, desc || fallback, loc, selectedKind);
       host.note(t('ping.sent.coalition'));
     } else {
       // Адресата проверяем и здесь, а не только разметкой: союз мог распасться, пока
@@ -276,7 +286,7 @@ export function initPingUi(host: PingHost): PingUi {
         closeMenu();
         return;
       }
-      host.push(dest, desc || fallback, loc);
+      host.push(dest, desc || fallback, loc, selectedKind);
       host.note(t('ping.sent.player', { who: host.name(dest) }));
     }
     closeMenu();
@@ -307,7 +317,7 @@ export function initPingUi(host: PingHost): PingUi {
   }
 
   function openPop(loc: string): void {
-    const m = activePings(host.messages()).find((p) => p.ping === loc);
+    const m = activePings(host.messages(), now()).find((p) => p.ping === loc);
     const at = host.anchor(loc);
     const el = host.popRoot();
     if (!m || !at || !el) return;
@@ -319,6 +329,7 @@ export function initPingUi(host: PingHost): PingUi {
       host.color(m.from),
       m.text,
       mine,
+      pingMarkerKind(m.pingKind),
     );
     el.style.left = `${at.left}px`;
     el.style.top = `${at.top}px`;
@@ -340,10 +351,24 @@ export function initPingUi(host: PingHost): PingUi {
   /** Снять СВОЮ метку. В сети это делает сервер (эхо `ping.removed` уберёт её у всех),
    *  в одиночном — вычёркиваем свои строки из ленты. */
   function remove(loc: string): void {
-    const mine = activePings(host.messages()).find((p) => p.ping === loc && p.from === host.me());
     const net = host.net();
-    if (net && mine?.pingId) {
-      net.clearPing(mine.pingId);
+    if (net) {
+      // Expired markers no longer exist in the server store. Their stamped expiry
+      // permits local removal; do not flood the socket with historical clear requests.
+      const messages = host.messages();
+      const live = messages.filter((m) => !(m.to === COALITION && m.ping === loc &&
+        m.from === host.me() && !pingIsActive(m, now())));
+      if (live.length !== messages.length) {
+        host.setMessages(live);
+        host.onFeedChanged();
+      }
+      // The map folds a province's pings into one marker. Clear every OWN underlying
+      // id there, or the previous ping resurfaces immediately after the latest is removed.
+      // Keep the feed until server echoes: a disconnected/rejected send must not hide it locally.
+      const ids = new Set(host.messages().filter((m) =>
+        m.to === COALITION && m.ping === loc && m.from === host.me(),
+      ).flatMap((m) => m.pingId ? [m.pingId] : []));
+      for (const id of [...ids].reverse()) net.clearPing(id);
       closePop();
       return;
     }
@@ -360,6 +385,14 @@ export function initPingUi(host: PingHost): PingUi {
   const menuEl = host.menuRoot();
   menuEl?.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    const kind = (tg.closest('[data-pmkind]') as HTMLElement | null)?.dataset.pmkind;
+    if (kind && PING_MARKER_KINDS.some((candidate) => candidate === kind)) {
+      selectedKind = pingMarkerKind(kind);
+      menuEl.querySelectorAll<HTMLElement>('[data-pmkind]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.pmkind === selectedKind));
+      });
+      return;
+    }
     const dest = (tg.closest('.pm-dst') as HTMLElement | null)?.dataset.pmdest;
     if (dest) return createTo(dest);
     if (tg.closest('[data-pmcancel]') || tg === menuEl) closeMenu();
@@ -404,8 +437,8 @@ export function initPingUi(host: PingHost): PingUi {
       // Правка = снять и поставить заново (см. шапку модуля).
       remove(id);
       const net = host.net();
-      if (net) net.placePing({ kind: 'mark', target: { node: id }, label: text });
-      else host.push(COALITION, text || t('ping.mark', { loc: host.provinceName(id) }), id);
+      if (net) net.placePing({ kind: row.kind, target: { node: id }, label: text });
+      else host.push(COALITION, text || t('ping.mark', { loc: host.provinceName(id) }), id, row.kind);
       renderPanel();
       return;
     }
@@ -441,7 +474,7 @@ export function initPingUi(host: PingHost): PingUi {
     renderPanel,
     openPop,
     closePop,
-    drawable: () => activePings(host.messages()).filter((m) => !hidden.has(m.ping!)),
+    drawable: () => activePings(host.messages(), now()).filter((m) => !hidden.has(m.ping!)),
     remove,
   };
 }

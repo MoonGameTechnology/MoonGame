@@ -60,7 +60,7 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
         : await deps.users.findUser(login);
     // Real accounts always retain their own profile, even if a roster has a colliding name.
     if (user) return view(user.userId, user.login, user.userId === who.accountId);
-    if (!login?.startsWith('~') || !deps.bots)
+    if (!login || !deps.bots)
       return reply.code(404).send({ error: 'E_NO_PROFILE' });
     const bot = await deps.bots.findByLogin(login);
     if (!bot) return reply.code(404).send({ error: 'E_NO_PROFILE' });
@@ -101,6 +101,18 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     if (!user) return reply.code(401).send({ error: 'E_AUTH' });
     await deps.profiles.save(who.accountId, appearance);
     return view(who.accountId, user.login);
+  });
+  // The tutorial is played on the device, out of the server's sight: the claim names no
+  // count, the credit is a fixed 1 once per account, and it grants no XP or currency.
+  app.post('/profiles/rewards/tutorial', { bodyLimit: 64 }, async (request, reply) => {
+    if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    const who = await deps.identify(request);
+    if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+    await deps.profiles.credit(`tutorial:${who.accountId}`, [
+      { accountId: who.accountId, progress: { tutorial: 1 } },
+    ]);
+    reply.header('cache-control', 'no-store');
+    return { medalId: 'tutorial' };
   });
   if (deps.registrationRewards) {
     const rewards = deps.registrationRewards;

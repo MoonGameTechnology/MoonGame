@@ -190,19 +190,54 @@ function shippedNames(): Array<[string, string]> {
 const DATA_KEY_GAPS = new Set<string>([]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
-  { prefix: 'onb.guide.', built_by: 'firstMatchTour.ts: step id → copy; checked by tourCopy.test.ts' },
-  { prefix: 'meta.material.', built_by: 'metaEconomyScreen.ts: server meta economy material catalog nameKey' },
+  {
+    prefix: 'onb.guide.',
+    built_by: 'firstMatchTour.ts: step id → copy; checked by tourCopy.test.ts',
+  },
+  {
+    prefix: 'onb.stage.',
+    built_by:
+      'firstMatchTour.ts / firstMatchOperation.ts: chapter id → stage title; checked by tourCopy.test.ts',
+  },
+  {
+    prefix: 'meta.material.',
+    built_by: 'metaEconomyScreen.ts: server meta economy material catalog nameKey',
+  },
   { prefix: 'meta.season.', built_by: 'metaEconomyScreen.ts: server season catalog nameKey' },
-  { prefix: 'meta.reward.', built_by: 'metaEconomyScreen.ts: server season milestone localization keys' },
-  { prefix: 'commerce.offer.', built_by: 'metaEconomyScreen.ts: Commerce offer nameKey and contentsKey' },
-  { prefix: 'shop.offer.', built_by: 'shopScreen.ts: store offer id of a set; completeness checked by the catalogue test below' },
-  { prefix: 'profile.portrait.', built_by: 'profileStudio.ts: static portrait index 1..40; completeness checked by profileStudio.test.ts' },
-  { prefix: 'profile.medal.', built_by: 'profileStudio.ts: PROFILE_MEDALS ids; completeness checked by profileStudio.test.ts' },
-  { prefix: 'profile.metric.', built_by: 'profileStudio.ts: PROFILE_MEDALS metrics; completeness checked by profileStudio.test.ts' },
+  {
+    prefix: 'meta.reward.',
+    built_by: 'metaEconomyScreen.ts: server season milestone localization keys',
+  },
+  {
+    prefix: 'commerce.offer.',
+    built_by: 'metaEconomyScreen.ts: Commerce offer nameKey and contentsKey',
+  },
+  {
+    prefix: 'shop.offer.',
+    built_by:
+      'shopScreen.ts: store offer id of a set; completeness checked by the catalogue test below',
+  },
+  {
+    prefix: 'profile.portrait.',
+    built_by:
+      'profileStudio.ts: static portrait index 1..40; completeness checked by profileStudio.test.ts',
+  },
+  {
+    prefix: 'profile.medal.',
+    built_by: 'profileStudio.ts: PROFILE_MEDALS ids; completeness checked by profileStudio.test.ts',
+  },
+  {
+    prefix: 'profile.metric.',
+    built_by:
+      'profileStudio.ts: PROFILE_MEDALS metrics; completeness checked by profileStudio.test.ts',
+  },
   { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
-  { prefix: 'rarity.', built_by: 'карточка предмета Sector Zero — из ступени редкости модуля (PVR-6.4)' },
+  {
+    prefix: 'rarity.',
+    built_by: 'карточка предмета Sector Zero — из ступени редкости модуля (PVR-6.4)',
+  },
   {
     prefix: 'swarm.journal.tier.',
     built_by: 'swarmDossierHtml() — из уверенности строки журнала (PVR-4.5)',
@@ -224,11 +259,13 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   },
   {
     prefix: 'ally.kind.',
-    built_by: 'allyBoxHtml() в allyScreen.ts — из вида приказа союзнику (guard/attack/scout, PVR-7.5)',
+    built_by:
+      'allyBoxHtml() в allyScreen.ts — из вида приказа союзнику (guard/attack/scout, PVR-7.5)',
   },
   {
     prefix: 'ally.step.',
-    built_by: 'allyBoxHtml() — из шага плана операции союзника (`decisions/allyOperation.ts`, PVR-7.5)',
+    built_by:
+      'allyBoxHtml() — из шага плана операции союзника (`decisions/allyOperation.ts`, PVR-7.5)',
   },
   {
     prefix: 'ally.reason.',
@@ -236,7 +273,8 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   },
   {
     prefix: 'chain.',
-    built_by: 'панель задач строит подпись шага главной цепочки главы из `ChapterStep.key` (`decisions/chapterChain.ts`, PVR-7.5)',
+    built_by:
+      'панель задач строит подпись шага главной цепочки главы из `ChapterStep.key` (`decisions/chapterChain.ts`, PVR-7.5)',
   },
   {
     prefix: 'mission.',
@@ -278,9 +316,9 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       '(TRN-2); полноту держит prototype/src/trainingTour.test.ts',
   },
   {
-    prefix: 'training.tour.',
+    prefix: 'training.guide.',
     built_by:
-      'buildTrainingTour() — `training.tour.<этап>.<шаг>` из id шага (TRN-2); ' +
+      'buildTrainingTour() — `training.guide.<этап>.<шаг>` из id шага (TRN-2); ' +
       'полноту держит prototype/src/trainingTour.test.ts',
   },
 ];
@@ -303,7 +341,9 @@ describe('локализация — ключи', () => {
     // таких записей в каждой локали). tsc словари не проверяет — держим тут.
     for (const file of ['localization/ru.ts', 'localization/en.ts']) {
       const seen = new Map<string, number>();
-      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(/^ {2}'([^']+)':/gm)) {
+      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(
+        /^ {2}'([^']+)':/gm,
+      )) {
         seen.set(m[1]!, (seen.get(m[1]!) ?? 0) + 1);
       }
       const dupes = [...seen].filter(([, n]) => n > 1).map(([k]) => k);
@@ -333,20 +373,26 @@ describe('локализация — ключи', () => {
   });
 
   it('каталог снабжения и известное содержимое магазина переведены', () => {
-    const catalog = JSON.parse(readFileSync(path.join(repoRoot, 'data/metaEconomy.json'), 'utf8')) as Record<string, unknown>;
+    const catalog = JSON.parse(
+      readFileSync(path.join(repoRoot, 'data/metaEconomy.json'), 'utf8'),
+    ) as Record<string, unknown>;
     const keys: string[] = [];
     const walk = (node: unknown): void => {
       if (!node || typeof node !== 'object') return;
       for (const [field, value] of Object.entries(node as Record<string, unknown>)) {
-        if ((field === 'nameKey' || field === 'labelKey') && typeof value === 'string') keys.push(value);
+        if ((field === 'nameKey' || field === 'labelKey') && typeof value === 'string')
+          keys.push(value);
         else walk(value);
       }
     };
     walk(catalog);
     const products = (catalog.commerce as { products: Record<string, unknown> }).products;
-    for (const id of Object.keys(products)) keys.push(`commerce.offer.${id}.name`, `commerce.offer.${id}.contents`);
+    for (const id of Object.keys(products))
+      keys.push(`commerce.offer.${id}.name`, `commerce.offer.${id}.contents`);
     // Наборы модулей и материалов магазин называет по id товара (`shopScreen.ts`, storeTitle).
-    const store = (catalog.store as { offers: Record<string, { modules?: string[]; materials?: unknown }> }).offers;
+    const store = (
+      catalog.store as { offers: Record<string, { modules?: string[]; materials?: unknown }> }
+    ).offers;
     for (const [id, offer] of Object.entries(store))
       if ((offer.modules?.length ?? 0) > 1 || offer.materials) keys.push(`shop.offer.${id}.name`);
     expect(keys.filter((key) => !(key in ru) || !(key in en))).toEqual([]);
@@ -455,13 +501,20 @@ describe('локализация — ключи', () => {
     // у русского — дробные) можно не писать: её заменит последняя форма.
     const bad: string[] = [];
     let seen = 0;
-    for (const [id, table] of [['ru', ru], ['en', en]] as const) {
+    for (const [id, table] of [
+      ['ru', ru],
+      ['en', en],
+    ] as const) {
       const cats = pluralCategories(id).length;
       for (const [key, text] of Object.entries(table))
         for (const m of text.matchAll(/\{\w+((?:\|[^|{}]*)+)\}/g)) {
           seen++;
           const forms = m[1]!.slice(1).split('|');
-          if (forms.length < Math.max(2, cats - 1) || forms.length > cats || forms.some((f) => !f.trim()))
+          if (
+            forms.length < Math.max(2, cats - 1) ||
+            forms.length > cats ||
+            forms.some((f) => !f.trim())
+          )
             bad.push(`${id} ${key}: ${m[0]}`);
         }
     }
@@ -550,13 +603,17 @@ describe('локализация — ключи', () => {
       named.set(k, at);
       if (!(k in ru) || !(k in en)) uncovered.add(k);
     }
-    const fresh = [...uncovered].filter((k) => !DATA_KEY_GAPS.has(k)).map((k) => `${named.get(k)} → ${k}`);
+    const fresh = [...uncovered]
+      .filter((k) => !DATA_KEY_GAPS.has(k))
+      .map((k) => `${named.get(k)} → ${k}`);
     expect(fresh.sort(), 'новая сущность без перевода — заведите ключ в ru.ts и en.ts').toEqual([]);
 
     // Обратная половина: без неё список никогда не сократится. Запись, для которой ключ
     // уже появился (или чьё имя переименовали), обязана уйти из DATA_KEY_GAPS в том же
     // PR — иначе allowlist зарастает мёртвыми строками, как это было с мостом LOC-2.
     const stale = [...DATA_KEY_GAPS].filter((k) => !uncovered.has(k));
-    expect(stale.sort(), 'ключ появился или имя ушло — снимите запись из DATA_KEY_GAPS').toEqual([]);
+    expect(stale.sort(), 'ключ появился или имя ушло — снимите запись из DATA_KEY_GAPS').toEqual(
+      [],
+    );
   });
 });

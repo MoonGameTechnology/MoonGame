@@ -42,7 +42,7 @@ import { botMatchLimit, startBotArrivals, botPopulationConfig, prepareBotPopulat
 import { StaggeredAi } from './src/aiScheduler';
 import { aiOrderSlices } from './src/aiOrderSlices';
 import { botAcceptsOffer, botBehaviorOrders, botStyle } from './src/botBehavior';
-import { createBotSocial } from '../packages/server/src/botSocial';
+import { botSocialAvailable, createBotSocial } from '../packages/server/src/botSocial';
 import { botChatText } from '../scripts/botChatText';
 import type { Action } from '../packages/shared-core/src/index';
 import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
@@ -450,7 +450,7 @@ matchStore = rewardDelivery.matches;
 rewardDelivery.start();
 const BOT_POPULATION = botPopulationConfig(process.env);
 await botStore.ensureRoster();
-// '~' identities cannot be registered as human accounts. The authenticated host
+// System handles are reserved and cannot be registered as human accounts. The authenticated host
 // is required even when restoring existing bots with fresh filling disabled.
 if (!AUTH && (BOT_POPULATION.fillPercent > 0 || (await botStore.activeMatchIds()).length > 0))
   throw new Error('E_BOT_AUTH_REQUIRED');
@@ -706,6 +706,10 @@ async function createHostedMatch(
   const botSocial = createBotSocial({
     room,
     isBot: (seat) => botSeats.has(seat),
+    availability: (seat, wall) => {
+      const identity = botIdentities.get(seat);
+      return identity !== undefined && botSocialAvailable(identity.id, wall);
+    },
     render: botChatText,
     behavior: (bot, human, stance, state) => {
       const identity = botIdentities.get(bot);

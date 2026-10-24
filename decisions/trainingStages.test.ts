@@ -1,3 +1,4 @@
+import { STAGED_FORCES, withForce } from './trainingScenario';
 import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { trainingState } from '../packages/client/src/gameData';
@@ -65,9 +66,10 @@ describe('этапы учебного полигона: засчёт по рез
     const s = fresh();
     expect(owns(s, ME, 'base')).toBe(true);
     expect(owns(s, ME, 'outpost')).toBe(false);
-    expect(fleetGone(s, 'p2_patrol')).toBe(false);
-    delete s.fleets.p2_patrol;
+    // Патруль на карте не стоит — его вводит сценарий (TRN-3); введённый живой — не «уничтожен».
     expect(fleetGone(s, 'p2_patrol')).toBe(true);
+    const withPatrol = withForce(s, STAGED_FORCES[0]!);
+    expect(fleetGone(withPatrol, 'p2_patrol')).toBe(false);
     expect(inOrbit(s, ME, 'base')).toBe(true);
     expect(inOrbit(s, ME, 'outpost')).toBe(false);
   });

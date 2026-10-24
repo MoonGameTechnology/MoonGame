@@ -126,6 +126,7 @@ async function boot(over: Record<string, unknown> = {}) {
     pc: true,
     merge: null as { from: string } | null,
     memory: {} as Record<string, Snapshot>,
+    surveyed: {} as Record<string, { kind?: string; at: number }>,
     intel: [] as Array<{ kind: string; target: string; until: number }>,
     stewardTech: false,
     relocate: false,
@@ -144,6 +145,7 @@ async function boot(over: Record<string, unknown> = {}) {
   vi.doMock('./mapAim', () => ({ squadronRelocateSpots: () => (env.relocate ? [{}] : []) }));
   vi.doMock('./mapFog', () => ({
     memory: { get: (id: string) => env.memory[id] },
+    surveyed: (id: string) => env.surveyed[id],
     myIntel: () => env.intel,
   }));
   vi.doMock('./stewardScreen', () => ({ stewardTechDone: () => env.stewardTech }));
@@ -461,6 +463,17 @@ describe('мир вне зрения', () => {
     expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="ping"');
   });
 
+  it('провинция, куда залетал корабль, называет свой тип, но не хозяина', async () => {
+    const { env, m } = await boot();
+    const { SECTOR_TYPES } = await import('./map');
+    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain(tData(SECTOR_TYPES.graveyard!.name));
+    env.surveyed.Z = { kind: 'graveyard', at: 1 };
+    const html = m.unknownPlanetHtml(env.s.planets.Z!);
+    expect(html).toContain(t('side.notelemetry.title'));
+    expect(html).toContain(tData(SECTOR_TYPES.graveyard!.name));
+    expect(html).not.toContain(t('side.scan.owner'));
+  });
+
   it('в забеге Sector Zero память скана не предлагает разведку', async () => {
     const { env, m } = await boot({ hidden: true });
     env.memory.N = { owner: 'p2', garrison: 5, buildings: [] };
@@ -591,8 +604,10 @@ describe('стык с main.ts', () => {
   });
 
   it('панель и карточка флота зовут карточки модуля', () => {
-    expect(MAIN).toContain('if (selFork) return forkPanelHtml(selFork);');
-    expect(MAIN).toContain(
+    // Выбор карточки листа — у хозяина боковой панели (`sidePanel.ts`, REFM-225).
+    const PANEL = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
+    expect(PANEL).toContain('if (selFork) return forkPanelHtml(selFork);');
+    expect(PANEL).toContain(
       'return pick.known ? planetPanelHtml(pick.planet) : unknownPlanetHtml(pick.planet);',
     );
     // Секцию ангара зовёт карточка флота — с REFM-224 она в `fleetCard.ts`.

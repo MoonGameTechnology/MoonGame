@@ -104,7 +104,8 @@ try {
       }
       await page.reload();
       await waitForApp(page);
-      await signIn();
+      // Remember-me (AC-0.2): the reload keeps the account signed in — no password again.
+      await page.locator('#hub').waitFor({ state: 'visible' });
       await openTab();
       await page.click('#hp-corp [data-corpsec="base"]');
       await page.locator('#hp-corp .cb-hud:not(.idle)').waitFor();

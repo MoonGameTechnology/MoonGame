@@ -58,6 +58,7 @@
     "smoke:proving-ground": "node prototype/provinggroundtest.mjs",
     "smoke:bootfail": "node prototype/bootfailuretest.mjs",
     "smoke:mobile": "node prototype/mobiletest.mjs",
+    "smoke:pings": "node prototype/pingtest.mjs",
     "smoke:hotkeys": "node prototype/hotkeystest.mjs",
     "smoke:intro": "node prototype/introtest.mjs",
     "smoke:sector-zero": "node prototype/sectorzerotest.mjs && node prototype/minestest.mjs",
@@ -73,7 +74,8 @@
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs-check",
     "docs-check": "node scripts/docs-check.mjs",
     "smoke:apk-site": "node prototype/apksitetest.mjs",
-    "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs"
+    "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs",
+    "smoke:training": "pnpm run prototype && node prototype/trainingtest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -94,8 +96,8 @@
   },
   "pnpm": {
     "overrides": {
-      "fast-uri@3": "3.1.8",
-      "fast-uri@4": "4.1.5",
+      "fast-uri@3": "3.1.9",
+      "fast-uri@4": "4.2.3",
       "find-my-way@9": "^9.7.0",
       "brace-expansion": "5.0.12",
       "postcss": "^8.5.25",

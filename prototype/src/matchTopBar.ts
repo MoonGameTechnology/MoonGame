@@ -100,6 +100,8 @@ export interface TopBarHost {
   aiSeats(): number;
   /** Разработчик включил управление временем. */
   speedControl(): boolean;
+  /** Идёт обучение первого матча: полоса несёт его ×300 (`matchExits.ts`, правило 7). */
+  lessonSpeed(): boolean;
   /** Кнопка скорости телефона. */
   phoneSpeed(): Pick<ReturnType<typeof initPhoneSpeed>, 'sync'>;
   /** Значки «Событий» и «Ещё» телефона. */
@@ -569,6 +571,8 @@ let speedbarEl: HTMLElement;
 let timeMult = 1;
 /** ▶▶▶ дев-забега; в игроцкой сборке кнопки нет. */
 let devFastBtn: HTMLElement | null = null;
+/** Фишка «×300» обучения первого матча (`matchExits.ts`, правило 7). */
+let lessonChip: HTMLElement | null = null;
 
 /** Подсветить кнопку полосы, темп которой идёт сейчас. */
 function markSpeed(): void {
@@ -614,8 +618,13 @@ export function renderSpeedbar(): void {
   const run = game.toolsHidden();
   speedbarEl.classList.toggle('spd-run', run);
   if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);
+  const lesson = game.lessonSpeed() && !netWorld;
+  if (lessonChip) {
+    const chip = displayOf(lesson);
+    if (lessonChip.style.display !== chip) lessonChip.style.display = chip;
+  }
   const showSpdCtl = displayOf(
-    timeControlsShown(pcUi(), game.speedControl(), netWorld, run),
+    timeControlsShown(pcUi(), game.speedControl(), netWorld, run, lesson),
   );
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
   const showBar = displayOf(speedbarShown(pcUi(), showSpdCtl === '', restartShown));
@@ -769,6 +778,7 @@ export function initTopBar(host: TopBarHost): void {
   // ▶▶▶ дев-забега (заказ владельца 2026-09-24) — свой постоянный темп: пара «играть /
   // ускорить» его не трогает. В игроцкой сборке кнопки нет вовсе (`<!--dev-only-->`).
   devFastBtn = document.getElementById('spd-dev');
+  lessonChip = document.getElementById('spd-lesson');
   if (devFastBtn) devFastBtn.dataset.speed = String(PLAY_BASE * RUN_SPEED_DEV);
   // Restart → back to the skirmish setup (bot selection). The speedbar button serves the
   // no-bots sandbox; the end-banner button (delegated) serves a finished bot match.

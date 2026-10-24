@@ -47,12 +47,13 @@ Recovery-письма обоих хостов форматирует `scripts/re
 отвечает за SMTP/TLS; каталогов локализации в графе серверного пакета нет.
 
 Постоянные боты игрового хоста: `packages/server/src/botRoster.ts` — 100 системных
-профилей, атомарные назначения и история; `botPopulation.ts` — посадка, реальные
+профилей, атомарные назначения и история; `botNicknames.ts` — ники и их резервирование;
+`botPopulation.ts` — посадка, реальные
 итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
 `profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
 `prototype/src/botBehavior.ts` выбирает стратегию и политику переговоров по постоянному seed;
 `packages/server/src/botSocial.ts` отвечает на принятые личные сообщения, а
-`scripts/botChatText.ts` форматирует RU/EN-реплики без изменения протокола.
+`scripts/botChatText.ts` форматирует английские реплики без изменения протокола.
 Реальный HTTP/WS: `pnpm run smoke:bots:chat`; CPU/RSS: `pnpm run perf:bots:load`.
 Параметры включения описаны в [runbook](deploy/README.md#постоянные-боты-для-заполнения-карт).
 
@@ -104,7 +105,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 5 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.arrival` | — | `fleet.arrived`, `fleet.departed`, `fleet.leg`, `fleet.parked`, `fleet.stranded`, `fleet.transit` · sched: `fleet.arrival` |
 | 6 | `hero` | `hero.ts` | `hero.ability`, `hero.equip`, `hero.install`, `hero.skill.unlock`, `hero.spawn`, `hero.unequip`, `hero.uninstall` | `fleet.arrived`, `fleet.destroyed`, `fleet.fork`, `fleet.transit`, `hero.path.expire`, `hero.respawn`, `unit.died` | `combat.damage`, `fleet.speed`, `salvage.share` | `hero.ability.used`, `hero.died`, `hero.equipped`, `hero.installed`, `hero.path.created`, `hero.path.expired`, `hero.respawned`, `hero.skill.unlocked`, `hero.spawned`, `hero.unequipped`, `hero.uninstalled`, `planet.destroyed` · sched: `hero.path.expire`, `hero.respawn` |
 | 7 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage` | `hero.aura`, `hero.recalled`, `hero.revealed` |
-| 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `diplomacy.decline`, `diplomacy.mapshare`, `coalition.create`, `coalition.leave`, `coalition.edit` | `player.eliminated` | — | `diplomacy.changed`, `diplomacy.declined`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered`, `diplomacy.offered`, `coalition.joined`, `coalition.left`, `coalition.updated` |
+| 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `diplomacy.decline`, `diplomacy.mapshare`, `coalition.create`, `coalition.leave`, `coalition.kick`, `coalition.edit`, `coalition.clock.rebase` (только хост) | `player.eliminated`, `coalition.departure.due` | — | `diplomacy.changed`, `diplomacy.declined`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered`, `diplomacy.offered`, `coalition.joined`, `coalition.left`, `coalition.updated`, `coalition.departure.scheduled` · sched: `coalition.departure.due` |
 | 9 | `espionage` | `espionage.ts` | `espionage.spy` | `time.advanced` | — | `espionage.detected`, `espionage.failed`, `intel.stolen` |
 | 10 | `orbital` | `orbital.ts` | `fleet.bombard`, `fleet.orbit` | `fleet.arrived`, `time.advanced` | — | `aa.fired`, `fleet.bombard`, `fleet.orbit`, `planet.bombarded` |
 | 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.attack`, `battle.retreat` | `combat.tick`, `fleet.arrived`, `fleet.intercept`, `fleet.transit` | `fleet.speed` | `battle.resolved`, `battle.started`, `combat.round`, `fleet.destroyed`, `fleet.retreated`, `planet.captured`, `unit.died` · sched: `combat.tick` |
@@ -168,6 +169,8 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `building.destroyed` | `construction` | — |
 | `building.upgraded` | `construction` | — |
 | `capital.designated` | `capital` | — |
+| `coalition.departure.due` | `diplomacy`* | `diplomacy` |
+| `coalition.departure.scheduled` | `diplomacy` | — |
 | `coalition.joined` | `diplomacy` | — |
 | `coalition.left` | `diplomacy` | — |
 | `coalition.updated` | `diplomacy` | — |

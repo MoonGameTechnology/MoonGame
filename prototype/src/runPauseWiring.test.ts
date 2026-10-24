@@ -19,8 +19,10 @@ const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 // Обработчик полосы скорости — у владельца верхней полосы (`matchTopBar.ts`, REFM-222): правило
 // паузы и её поводы остаются в `main.ts` и доходят до полосы дверями `runPauseShown`/`runPauseEvent`.
 const TOPBAR = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
+// Правило паузы и её память — у забега (`sectorRun.ts`, REFM-243); поводы и темп мира — в `main.ts`.
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(RUN)?.[1] ?? '';
 
 describe('YAG-6.2 — каждый повод паузы доходит до правила', () => {
   it('кнопка, уход со страницы и пауза площадки зовут одно правило', () => {
@@ -35,14 +37,16 @@ describe('YAG-6.2 — каждый повод паузы доходит до п�
   });
 
   it('возобновление не нагоняет время паузы', () => {
-    expect(body('runPauseEvent')).toContain(
-      'if (speed <= 0 && next.speed > 0) lastReal = performance.now();',
+    // Темп правило ставит хуком, а хук сбрасывает отметку реального времени.
+    expect(body('runPauseEvent')).toContain('game.setSpeed(next.speed);');
+    expect(SRC).toMatch(
+      /setSpeed: \(next\) => \{[^}]*if \(speed <= 0 && next > 0\) lastReal = performance\.now\(\);\s+speed = next;/,
     );
   });
 
   it('пауза есть только у забега Sector Zero — не сетевого и не законченного', () => {
     expect(body('runPauseShown')).toContain(
-      "return sectorRunActive && !NET && s.match.status !== 'ended';",
+      "return sectorRunActive && !game.net() && game.world().match.status !== 'ended';",
     );
   });
 });

@@ -16,6 +16,7 @@
  *
  * `main.ts` — DOM-вход без юнит-харнеса; вынесенная, эта модель накрывается гейтом.
  */
+import { pingIsActive, pingMarkerKind, type PingMarkerKind } from '../../decisions/pingKind';
 import type { SessionMsg } from './conversations';
 import { COALITION } from './conversations';
 
@@ -31,6 +32,7 @@ export interface PingRow {
   at: number;
   /** Серверный id — нужен, чтобы снять пинг по сети. */
   pingId?: string;
+  kind: PingMarkerKind;
   /** Мой ли это пинг: только свой можно править и снимать. */
   mine: boolean;
   /** Спрятан ли он локально (метка не рисуется на карте у МЕНЯ). */
@@ -48,10 +50,11 @@ export function pingRows(
   messages: readonly SessionMsg[],
   me: string,
   hidden: ReadonlySet<string>,
+  now = 0,
 ): PingRow[] {
   const byLoc = new Map<string, SessionMsg>();
   for (const m of messages) {
-    if (m.to === COALITION && m.ping) byLoc.set(m.ping, m);
+    if (m.to === COALITION && m.ping && pingIsActive(m, now)) byLoc.set(m.ping, m);
   }
   const rows: PingRow[] = [];
   for (const m of byLoc.values()) {
@@ -60,6 +63,7 @@ export function pingRows(
       from: m.from,
       text: m.text,
       at: m.at,
+      kind: pingMarkerKind(m.pingKind),
       ...(m.pingId !== undefined ? { pingId: m.pingId } : {}),
       mine: m.from === me,
       hidden: hidden.has(m.ping!),

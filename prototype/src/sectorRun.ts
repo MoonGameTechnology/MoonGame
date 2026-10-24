@@ -21,8 +21,13 @@ import {
   pveMissionIndex,
   pveMissionOfMap,
   pveModeId,
+  trainingObjectives,
 } from '../../packages/client/src/gameData';
-import type { GameState } from '../../packages/shared-core/src/index';
+import { extractionNeedMs, type GameState } from '../../packages/shared-core/src/index';
+import { chapterChain, type ChapterStep } from '../../decisions/chapterChain';
+import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
+import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
+import { bossTask } from '../../decisions/runBoss';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
 import {
   describeRun,
@@ -57,7 +62,9 @@ import {
   prepareSectorZeroRun,
   settleSectorZeroRun,
 } from '../../decisions/sectorZeroProgress';
+import { unitTitle } from './dossiers';
 import {
+  ctx,
   data,
   matchMode,
   setMatchMode,
@@ -66,9 +73,10 @@ import {
   setMatchVeteranPower,
   type AiProfile,
 } from './game';
-import { getPlatform } from './platform/host';
+import { getPlatform, type PlatformHost } from './platform/host';
 import { readRaw, writeRaw } from './prefs';
 import {
+  chapterShown,
   chapterWorld,
   offerRunToCloud,
   portableRunStore,
@@ -112,6 +120,14 @@ export interface SectorRunHost {
   finalScenes(): void;
   /** …и финал главы поверх итогов, после засчёта. */
   chapterWon(): void;
+  /** Мир идёт: темп больше нуля и комикс не держит экран. */
+  playing(): boolean;
+  /** Темп мира сейчас (0 — пауза). */
+  speed(): number;
+  /** Поставить темп; возобновление не нагоняет время паузы. */
+  setSpeed(next: number): void;
+  /** Обычный темп кнопки ▶ — с ним паузу снимают, если до неё темпа не было. */
+  playSpeed(): number;
 }
 
 let game: SectorRunHost;
@@ -544,4 +560,104 @@ function restorePortable(): boolean {
   saveRun();
   game.note(t('setup.pve.restored-portable', { n: game.world().pve?.waveNumber ?? 0 }));
   return true;
+}
+
+// --- остатки забега из `main.ts` (REFM-243): разметка геймплея, инструменты экрана, задачи и
+// цепочка главы, пауза. Мир, своё место, сеть и темп — хуками {@link initSectorRun}.
+
+/**
+ * Разметка геймплея для площадки — одна дверь на все её поводы (`YAG-1.2a`, `YAG-6.2`).
+ * «Геймплей идёт» = забег идёт И мир не стоит: пауза игрока, уход со страницы и выход в
+ * меню забега останавливают его так же, как конец забега. Раньше разметку знал только
+ * флаг забега, и после выхода в меню индикатор площадки оставался зелёным.
+ *
+ * Зовётся из сеттера забега (`setRunActive`, хук `runChanged`) и из кадра — при смене
+ * ответа: темп мира меняют больше десятка мест (полоса скорости, кнопка паузы, запуск и
+ * восстановление), и поставить вызов в каждое — значит однажды забыть одно. Повторы гасит
+ * адаптер (`decisions/platformLifecycle`).
+ *
+ * «Мир идёт» отвечает игра (хук `playing`): темп и комиксы живут в `main.ts`.
+ */
+let gameplayMarked: boolean | null = null;
+export function markGameplay(): void {
+  const playing = sectorRunActive && game.playing();
+  gameplayMarked = playing;
+  const api = getPlatform() as Partial<PlatformHost>;
+  if (playing) api.gameplayStart?.();
+  else api.gameplayStop?.();
+}
+/** Кадровый такт разметки: ответ «геймплей идёт» сменился — разметить заново. */
+export function tickGameplayMark(): void {
+  if (gameplayMarked !== (sectorRunActive && game.playing())) markGameplay();
+}
+
+/** Идёт ли забег Sector Zero — для ИНТЕРФЕЙСА. Не `isSectorZeroRun()`: тот ждёт ещё и
+ *  секцию `s.pve`, а она появляется позже, чем `setRunActive(true)`, — синхронизация на
+ *  нём видела «не забег» и оставляла кнопки (поймал `sectorzerotest.mjs`). Флаг же ставят
+ *  только забеги Sector Zero. */
+export function sectorZeroToolsHidden(): boolean {
+  return sectorRunActive && !game.net();
+}
+
+/** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
+export function runMissionRows(): MissionRow[] {
+  if (isTraining()) return missionRows(trainingObjectives(), game.world(), game.me());
+  const chapter = pveChapter(sectorMission);
+  const s = game.world();
+  const rows = missionRows(chapterShown(sectorMission), s, game.me(), chapter.slots?.base);
+  // Босс — своя задача, пока он на поле или пал в этом забеге (PVR-4.7, `runBoss.ts`).
+  const boss = bossTask(s);
+  return boss ? [...rows, bossMissionRow(boss)] : rows;
+}
+
+/** Подпись флота для кнопки «Извлечь флотом …»: его корабли, «2× Крейсер, 1× Фрегат». */
+export function fleetLabelOf(fleetId: string): string {
+  const f = game.world().fleets[fleetId];
+  if (!f) return fleetId;
+  return f.units
+    .filter((u) => u.count > 0)
+    .map((u) => `${u.count}× ${unitTitle(u.unit)}`)
+    .join(', ');
+}
+
+/** Главная цепочка главы: IV (PVR-7.5) — связь → архив → накопитель → вывод; V (PVR-9.7) —
+ *  звено сети → очаги; VI (PVR-8.5) — доки → эвакуация → очаги → главные силы. `null` — в этой
+ *  главе цепочки нет. Доля работы — под темп матча (`extractionNeedMs` ядра). */
+export function runChain(): ChapterStep[] | null {
+  if (!sectorRunActive) return null;
+  const s = game.world();
+  return chapterChain(s, game.me(), extractionNeedMs(s, ctx(s.time, s)), data);
+}
+
+// --- пауза забега (YAG-6.2) ---------------------------------------------------
+// Резолюция владельца 2026-09-24: мир забега ЗАМИРАЕТ, пока игрока нет, и у игрока есть
+// кнопка паузы на любом устройстве. Правила — `decisions/runPause.ts`; здесь — память
+// паузы и её применение, поводы подключает `main.ts`.
+/** С каким темпом продолжить после паузы — обычным или ускоренным, как шли до неё. */
+let runResumeSpeed = 0;
+/** Паузу поставила площадка — её «продолжить» и снимет. */
+let runPlatformHeld = false;
+/** Кнопка паузы есть, пока идёт забег Sector Zero, — не сетевой и не законченный. */
+export function runPauseShown(): boolean {
+  return sectorRunActive && !game.net() && game.world().match.status !== 'ended';
+}
+/** Правило паузы забега (`decisions/runPause.ts`) — одно на все поводы: кнопку «‖» полосы
+ *  скорости, уход со страницы и паузу площадки. Возобновление не нагоняет время паузы:
+ *  сброс отметки реального времени делает хук `setSpeed`. */
+export function runPauseEvent(event: RunPauseEvent): void {
+  if (!runPauseShown()) return;
+  const next = runPauseStep(
+    {
+      speed: game.speed(),
+      resumeSpeed: runResumeSpeed || game.playSpeed(),
+      platformHeld: runPlatformHeld,
+    },
+    event,
+  );
+  game.setSpeed(next.speed);
+  runResumeSpeed = next.resumeSpeed;
+  runPlatformHeld = next.platformHeld;
+  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === next.speed);
+  markGameplay();
 }

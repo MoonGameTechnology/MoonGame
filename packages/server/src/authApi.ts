@@ -81,8 +81,9 @@ export interface AuthApiDeps {
   /** Enabled only after the maintenance worker and restore barrier have been provisioned. */
   accountDeletionEnabled?: boolean;
   /** Mint a session token for an authenticated account (from serverConfig). `pwfp` binds
-   *  the session to the current password (see `liveSession`) so a reset revokes it. */
-  signSession(accountId: string, login: string, pwfp: string): Promise<string>;
+   *  the session to the current password (see `liveSession`) so a reset revokes it.
+   *  `authTime` — when the password was typed; omitted ⇒ now (only a refresh passes it). */
+  signSession(accountId: string, login: string, pwfp: string, authTime?: number): Promise<string>;
   /** Recovery (SE-1.x): mint a short-lived reset token bound to `pwfp`. Present together
    *  with `resetBaseUrl` mounts `/auth/recover` + `/auth/reset`; absent leaves them off. */
   signReset?(accountId: string, pwfp: string): Promise<string>;
@@ -137,6 +138,13 @@ const AUTH_BODY_LIMIT = 4096;
 const RATE_MAX = 40;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_IPS = 10_000; // bounded tracker: oldest window evicted first
+
+/** How long one password entry keeps a session renewable. `/auth/refresh` moves the
+ *  session's expiry forward on every visit, so a regular player never retypes the
+ *  password — but never past this age of the password entry itself: a leaked token
+ *  cannot be renewed forever, and the player re-authenticates about once a month
+ *  (ASVS V3.3: periodic re-authentication for "remember me" sessions). */
+export const SESSION_REAUTH_SEC = 30 * 24 * 3600;
 
 /** One recovery mail per account per this window. The per-IP budget alone does not
  *  protect a mailbox: requests from many addresses would each get their own budget and
@@ -359,6 +367,25 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       await deps.users.revokeSessions(who.accountId);
       await deps.onSessionsRevoked?.(who.accountId);
       return reply.code(204).send();
+    });
+    // Remember-me (AC-0.2): trade a LIVE session for a fresh one, so a player who comes
+    // back within the session TTL lands in the game without the password. Same gate as
+    // logout (signature + current fingerprint). The new token repeats the claim as is —
+    // `pwfp` and `authTime` included — so a renewal can neither outlive a logout or a
+    // password change nor push back the re-authentication deadline.
+    app.post('/auth/refresh', { bodyLimit: AUTH_BODY_LIMIT }, async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      if (request.body !== undefined && !closedInput(request.body, []))
+        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+      const header = request.headers.authorization;
+      const verified = header?.startsWith('Bearer ') ? await verify(header.slice(7).trim()) : null;
+      const who = verified?.ok ? await liveSession(verified.claim, deps.users) : null;
+      const authTime = who?.authTime;
+      if (!who || authTime === undefined || Math.floor(now() / 1000) - authTime >= SESSION_REAUTH_SEC)
+        return reply.code(401).send({ error: 'E_AUTH' });
+      const token = await deps.signSession(who.accountId, who.login, who.pwfp, authTime);
+      return { accountId: who.accountId, login: who.login, token };
     });
   }
 

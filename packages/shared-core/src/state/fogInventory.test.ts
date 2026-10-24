@@ -103,6 +103,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   scheduleSeq: 'stripped',
   swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
+  surveyed: 'filtered', // свои обследованные провинции — да; чужие выдали бы, где летал сосед
   // EVT-2: котёл трофеев ключуется узлом и считается по тому, кто там погиб, — то есть
   // рассказал бы про цену боя на мирах, которых зритель не видит. Своё начисление игрок
   // узнаёт адресным `salvage.paid`, а не состоянием.
@@ -119,6 +120,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   mapShareOffers: 'filtered', // предложение обмена — переговоры двоих
   coalitions: 'public', // список коалиций, состав, эмблема и описание — открытые (COAL-1)
   coalitionSeq: 'public',
+  coalitionClock: 'public', // clock rate is a public session rule
+  coalitionJoinAfter: 'public', // membership eligibility is public, like the coalition roster
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
   spyAgents: 'filtered', // сеть агентов (SPY-6) — тот же секрет шпиона
   market: 'public', // сессионный стакан публичен по замыслу
@@ -400,6 +403,10 @@ function maximalState(): GameState {
         Z: { owner: RIVAL, garrison: [{ unit: 'scout', count: 1 }], buildings: [], at: 50 },
       },
     },
+    surveyed: {
+      [VIEWER]: { Z: { kind: 'planet', at: 40 } },
+      [RIVAL]: { A: { kind: 'CANARY_surveyed', at: 60 } },
+    },
     heroes: {
       mine_hero: { id: 'mine_hero', owner: VIEWER, location: 'A', cooldowns: {}, alive: true },
       CANARY_hero: {
@@ -462,6 +469,8 @@ function maximalState(): GameState {
       },
     },
     coalitionSeq: 1,
+    coalitionClock: { wallTime: 0, gameTime: 0, timeScale: 24 },
+    coalitionJoinAfter: { bystanderA: 900 },
     intel: {
       // Своё окно — безобидное (свой же мир), чтобы оно не пробило туман само.
       [VIEWER]: [{ kind: 'planet', target: 'A', until: 900 }],

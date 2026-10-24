@@ -1,7 +1,9 @@
 /** The first Galactic War match: every instruction names an actual control or map target.
  * The host supplies live facts; a click or an unrelated order cannot complete a task.
- * The starter scout cannot capture provinces, so research and build a frigate first. */
+ * The starter scout cannot capture provinces, so research and build a frigate first.
+ * After the first sector the lesson goes on to the operation (`firstMatchOperation.ts`). */
 import { mapGestures } from '../../decisions/mapGestures';
+import { buildOperationSteps, type OperationDeps } from './firstMatchOperation';
 import type { Rect, SpotlightStep } from './spotlight';
 
 export interface FirstMatchDeps {
@@ -35,7 +37,12 @@ export interface FirstMatchDeps {
   showHome: () => void;
   showFleet: () => void;
   showTarget: () => void;
+  /** The second half of the lesson: market, hero, troops, aviation and the assault. */
+  operation: OperationDeps;
 }
+
+/** The chapters of the first half; the operation names its own. */
+type BasicsStage = 'economy' | 'research' | 'fleet' | 'finale';
 
 export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
   const step = (
@@ -59,7 +66,9 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
     advance: { on: 'tap' },
     collapsible: true,
   });
-  return [
+  const chapter = (stage: BasicsStage, steps: SpotlightStep[]): SpotlightStep[] =>
+    steps.map((s) => ({ ...s, stage, stageTitle: `onb.stage.${stage}` }));
+  const economy: SpotlightStep[] = [
     tap('welcome'),
     { ...tap('nav'), hands: true, gestures: mapGestures(d.mouse()) },
     step('home', null, d.homeOpened, { anchor: d.homeAnchor, reveal: d.showHome, gate: true }),
@@ -71,6 +80,8 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
     step('mine-order', '#codex [data-cx-upg="mine"]', d.mineOrdered, { inDialog: true }),
     step('mine-close', '#codex .cx-close', d.dossierClosed, { inDialog: true }),
     step('mine-wait', null, d.mineImproved),
+  ];
+  const research: SpotlightStep[] = [
     ...(d.cardLayout() ? [step('tech-menu', '[data-phone-tab="more"]', d.techAccessible)] : []),
     step(
       'tech',
@@ -81,6 +92,8 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
     step('research', '#tech [data-go="frigate_design"]', d.researchStarted),
     step('research-wait', '#tech [data-tech="frigate_design"]', d.researchDone, { gate: false }),
     step('research-close', '#tech .tw-close', () => !d.techOpen()),
+  ];
+  const fleet: SpotlightStep[] = [
     step('ships-tab', '[data-act="tab"][data-arg="ships"]', d.shipsTabOpen),
     step('catalog', '[data-act="openunits"][data-arg="ships"]', d.catalogOpen),
     step('ship', '#buildwin [data-unit-info="frigate"] .bw-ih b', d.shipCardOpen),
@@ -101,6 +114,12 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
     ...(d.cardLayout() ? [step('course-confirm', '[data-cmd="mobile-send"]', d.courseSet)] : []),
     step('capture', null, d.capturedWorld, { reveal: d.showTarget }),
     tap('score'),
-    tap('done'),
+  ];
+  return [
+    ...chapter('economy', economy),
+    ...chapter('research', research),
+    ...chapter('fleet', fleet),
+    ...buildOperationSteps(d.operation),
+    ...chapter('finale', [tap('done')]),
   ];
 }

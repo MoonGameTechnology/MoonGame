@@ -92,7 +92,7 @@ try {
   }, 201);
   assert.equal(typeof registered.token, 'string');
   sessionToken = registered.token;
-  const botSeats = (layout) => layout.seats.filter((seat) => seat.taken && seat.nick?.startsWith('~'));
+  const botSeats = (layout) => layout.seats.filter((seat) => seat.taken && !!seat.nick && seat.nick !== login);
   const seeded = await request('/matches/proto/seats');
   assert.equal(botSeats(seeded).length, 0, '35% rounds down to zero on a duel');
 
@@ -134,8 +134,8 @@ try {
   }
   const refused = await request('/auth/register', {
     method: 'POST', body: JSON.stringify({ login: allBots[0].nick, password }),
-  }, 400);
-  assert.equal(refused.error, 'E_BAD_CREDENTIALS', 'the bot namespace cannot be registered');
+  }, 409);
+  assert.equal(refused.error, 'E_LOGIN_TAKEN', 'the bot namespace cannot be registered');
   const empty = await request('/metrics');
   assert.equal(empty.connections, 0);
   assert.equal((await request('/metrics/summary')).joins, 0);

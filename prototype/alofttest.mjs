@@ -59,7 +59,7 @@ window.__aloftTest = {
     const st = s.strikes.find((x) => x.squadronId === sq);
     apply(advance(s, st.departedAt + (st.arrivesAt - st.departedAt) / 2));
     clearSelection();
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
     centerOn(strikeWorldPos(st.id), cam.scale);
     return { strikeId: st.id, home: home.id };
@@ -119,7 +119,7 @@ window.__aloftTest = {
   land: (id) => {
     const st = s.strikes.find((x) => x.id === id);
     apply(advance(s, st.arrivesAt));
-    lastPanelHtml = '';
+    invalidatePanel();
     renderPanel();
   },
   focus: (id) => centerOn(strikeWorldPos(id), cam.scale),

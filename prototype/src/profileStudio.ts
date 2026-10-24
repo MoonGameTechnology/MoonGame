@@ -7,7 +7,7 @@ import {
 import { tunicFit, profileMetricKey } from '../../decisions/playerProfile';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { PORTRAITS, MEDAL_ATLAS, CONTRIBUTION_MEDAL } from './profileArt';
+import { PORTRAITS, MEDAL_ATLAS, CONTRIBUTION_MEDAL, TUTORIAL_MEDAL } from './profileArt';
 
 export const gradeRoman = (grade: number): string => ['', 'I', 'II', 'III'][grade] ?? '';
 export const portraitName = (id: number): string => t(`profile.portrait.${id}`);
@@ -18,8 +18,14 @@ export function medalName(id: ProfileMedalId, profile: PlayerProfile): string {
     (grade ? ` · ${t('profile.grade', { grade: gradeRoman(grade) })}` : '')
   );
 }
+/** Single-class medals drawn on their own, outside the graded atlas. */
+const OWN_ART: Partial<Record<ProfileMedalId, string>> = {
+  contribution: CONTRIBUTION_MEDAL,
+  tutorial: TUTORIAL_MEDAL,
+};
 function emblem(id: ProfileMedalId, profile: PlayerProfile): string {
-  if (id === 'contribution') return `<span class="ps-medal" style="background-image:url('${CONTRIBUTION_MEDAL}');background-size:100% 100%" aria-hidden="true"></span>`;
+  const art = OWN_ART[id];
+  if (art) return `<span class="ps-medal" style="background-image:url('${art}');background-size:100% 100%" aria-hidden="true"></span>`;
   const index = PROFILE_MEDALS.findIndex((m) => m.id === id);
   return `<span class="ps-medal" style="background-image:url('${MEDAL_ATLAS}');background-position:${((index % 4) * 100) / 3}% ${Math.floor(index / 4) * 50}%" aria-hidden="true"><i>${gradeRoman(medalGrade(id, profile.progress) ?? 3)}</i></span>`;
 }

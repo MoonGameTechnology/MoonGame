@@ -1043,6 +1043,11 @@ function project(
   if (Object.keys(contacts).length) view.swarmIntel = { [viewerId]: contacts };
   else delete view.swarmIntel;
 
+  // Обследованные провинции — знание ИГРОКА: свои уходят ему, чужие сняты. Чужой список
+  // показал бы, где летали корабли соседа.
+  if (view.surveyed?.[viewerId]) view.surveyed = { [viewerId]: view.surveyed[viewerId]! };
+  else delete view.surveyed;
+
   // PVR-4.5: журнал адаптаций — знание ИГРОКА, поэтому фильтруется по зрителю тем же
   // правилом, что досье: своё видно, чужое снято целиком. Чужой журнал показал бы, что
   // успел выяснить сосед, — это разведка чужой разведки.
@@ -1197,6 +1202,7 @@ function project(
   // one never identified shows nothing.
   const remembered: PlanetId[] = [];
   const memory = state.fog?.[viewerId];
+  const surveyed = state.surveyed?.[viewerId];
   // Миры, на земле которых идёт СВОЙ наземный бой зрителя (или его блока зрения). Бой
   // проекция и так оставляет (`engagementOf`), а обе его стороны живут в самом мире —
   // гарнизон и плацдармы. Без них неопознанный мир отдавал бы бой с пустыми сторонами или
@@ -1286,9 +1292,15 @@ function project(
       planet.garrison = [];
       planet.buildings = [];
       planet.resources = {};
-      delete planet.terrain;
-      delete planet.planetType;
-      delete planet.kind;
+      // A province the viewer's ship has been inside keeps the type that ship found there
+      // (`surveyed`), and only the type: owner and contents still take a scan.
+      const found = surveyed?.[planet.id];
+      if (found?.terrain === undefined) delete planet.terrain;
+      else planet.terrain = found.terrain;
+      if (found?.planetType === undefined) delete planet.planetType;
+      else planet.planetType = found.planetType;
+      if (found?.kind === undefined) delete planet.kind;
+      else planet.kind = found.kind;
     }
     // Свой наземный бой: его стороны — живые. Хозяин, гарнизон и плацдармы боя — то, с чем и
     // против кого зритель дерётся прямо сейчас; постройки, склады и посторонние берега мира

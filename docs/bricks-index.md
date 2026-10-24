@@ -66,11 +66,11 @@
 | REFM-218 | ✅ | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
-| REFM-221 | ⏳ | proto | `docs/backlog.md` | Обучение и справка |
+| REFM-221 | ✅ | proto | `docs/backlog.md` | Обучение и справка |
 | REFM-222 | ✅ | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ✅ | proto | `docs/backlog.md` | Карточка мира |
 | REFM-224 | ✅ | proto | `docs/backlog.md` | Карточка флота |
-| REFM-225 | ⏳ | proto | `docs/backlog.md` | Хозяин боковой панели |
+| REFM-225 | ✅ | proto | `docs/backlog.md` | Хозяин боковой панели |
 | REFM-226 | ✅ | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
 | REFM-227 | ✅ | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
 | REFM-228 | ✅ | proto | `docs/backlog.md` | Приказы группе |
@@ -88,7 +88,7 @@
 | REFM-240 | ✅ | proto | `docs/backlog.md` | Конвейер приказа |
 | REFM-241 | ✅ | proto | `docs/backlog.md` | Экран загрузки карты |
 | REFM-242 | ✅ | proto | `docs/backlog.md` | Запросы к миру и очередь стройки |
-| REFM-243 | ⏳ | proto | `docs/backlog.md` | Остатки Sector Zero |
+| REFM-243 | ✅ | proto | `docs/backlog.md` | Остатки Sector Zero |
 | REFM-244 | 🔒 | proto | `docs/backlog.md` | Точка сборки |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
@@ -108,7 +108,8 @@
 | AUDM-4 | ✅ | proto | `docs/backlog.md` | Погрузка десанта отменяется молча. |
 | AUDM-5 | ⏳ | docs | `docs/backlog.md` | Карта механик устарела. |
 | AUDM-6 | ✅ | core proto | `docs/backlog.md` | Приказ флоту с погрузкой и граница в тумане |
-| TRN-3 | ⏳ | proto data | `docs/backlog.md` | Учебные соединения и объявленная контратака (§14.2, §14.9). |
+| TRN-7 | ✅ | proto | `docs/backlog.md` | Пошаговый полигон по действующему интерфейсу. |
+| TRN-3 | ✅ | proto data core | `docs/backlog.md` | Учебные соединения и объявленная контратака (§14.2, §14.9). |
 | TRN-4 | ⏳ | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
@@ -1108,6 +1109,9 @@
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (соло без соперников) |
 | ONB-12 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговое обучение Galactic War по действующему интерфейсу |
+| ONB-13 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Операция урока и медаль за обучение [proto/srv] |
+| ONB-14 | ✅ | proto | `docs/onboarding-roadmap.md` | Отмеченный мир не прячется под окном |
+| TRN-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговый полигон Sector Zero |
 | ONB-3 | ✅ | proto | `docs/onboarding-roadmap.md` | Just-in-time интро механик (прогрессивное раскрытие) |
 | ONB-4 | ✅ | proto | `docs/onboarding-roadmap.md` | Help/кодекс-хаб («?» везде) |
 | ONB-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Цели первой сессии / чек-лист успеха |

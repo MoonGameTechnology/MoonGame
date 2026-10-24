@@ -17,6 +17,7 @@
  * Окно дипломатии (`diploWindow.ts`), плавающий чат, часы мира и сетевой клиент модуль
  * получает хуками {@link initMessageLog}: импорт окна или `main.ts` был бы циклом.
  */
+import { pingMarkerKind, type PingMarkerKind } from '../../decisions/pingKind';
 import { t } from '../../localization/runtime';
 import type {
   MultiplayerChatMessage,
@@ -69,8 +70,9 @@ export function pushMsg(
   sys: boolean,
   from = game.me(),
   ping?: string,
+  pingKind?: PingMarkerKind,
 ): void {
-  add({ at: game.now(), from, to, text, sys, ping, realAt: Date.now() });
+  add({ at: game.now(), from, to, text, sys, ping, ...(pingKind ? { pingKind } : {}), realAt: Date.now() });
 }
 
 /** Метка от сервера — союзника или эхо своей (её прячут от врагов, решает сервер).
@@ -91,6 +93,8 @@ export function takePing(ping: MultiplayerPing, node: string | null): void {
     sys: false,
     ping: node,
     pingId: ping.id,
+    pingKind: pingMarkerKind(ping.kind),
+    pingExpiresAt: ping.expiresAt,
     realAt: Date.now(),
   });
 }

@@ -165,6 +165,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'diplomacy.decline': { target: 'p2' },
   'coalition.create': {},
   'coalition.leave': {},
+  'coalition.kick': { target: 'p2' },
   'coalition.edit': { emblem: 'star', description: '' },
   'fleet.launch': { planetId: 'home_p1' },
   'fleet.merge': { from: 'p1_1', into: 'missing-fleet' },
@@ -908,8 +909,20 @@ export async function runRehearsal(
     // RESIL-6: под настоящей базой мир поднимается из НЕЁ. Снапшот в памяти при этом
     // не выбрасывается, а служит эталоном — с ним сверяется то, что вернул JSONB.
     await reloadFromDatabase();
+    const durableSequence = snapshot.seq;
+    const durableHash = hashState(snapshot.state);
 
     room = makeRoom();
+    // Проверяем именно сохранённый мир: исходный флот после суток боёв мог
+    // законно погибнуть или слиться. Счётчик комнаты — счётчик квитанций, тогда
+    // как `seq` в welcome относится только к дельтам конкретного игрока.
+    const restoredHash = hashState(room.state);
+    if (room.sequence < expectedSequence || room.sequence !== durableSequence ||
+        restoredHash !== durableHash || (options.gameHours === 0 && !room.state.fleets.p1_1)) {
+      throw new Error(
+        `restart did not restore the durable snapshot (minimum seq ${expectedSequence}, saved ${durableSequence}, got ${room.sequence}, hash matches ${restoredHash === durableHash})`,
+      );
+    }
     server = createMultiplayerServer({ room, auth });
     url = await server.listen();
     serverRestarts += 1;
@@ -922,13 +935,6 @@ export async function runRehearsal(
         options.timeoutMs,
       );
       const client = clients[i]!;
-      // Счётчик квитанций комнаты, а не `seq` из welcome: на проводе у каждого игрока свой
-      // счёт дельт, и о поднятом снапшоте он ничего не говорит.
-      if (room.sequence < expectedSequence || !room.state.fleets.p1_1) {
-        throw new Error(
-          `restart did not restore the durable snapshot (minimum seq ${expectedSequence}, got ${room.sequence})`,
-        );
-      }
       const expected = baseView(room.state, client.playerId, data);
       if (hashState(client.welcome.state) !== hashState(expected)) hashMismatches += 1;
       // Грубая проверка «чужого флота не видно» держится ТОЛЬКО в неподвижном мире, где

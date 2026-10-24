@@ -50,6 +50,8 @@ const WRITE = process.argv.includes('--write');
 // Обозреватель партий живёт в своём модуле (REFM-217): ленту ему кладёт дверь `showLists`,
 // импорт стоит прямо в хуках — в `main.ts` она не нужна.
 const hooks = `import { showLists as __showLists } from './matchBrowser';
+// Приказ атаки нажимает лист (REFM-225): \`main.ts\` его больше не импортирует.
+import { engageFleet as __engageFleet } from './game';
 window.__sizeTest = {
   layers: () => BACK_LAYERS.filter((l) => l.isOpen()).map((l) => l.id),
   myFleet: () => Object.values(s.fleets).find((f) => f.owner === ME && f.location && f.units.some((u) => u.count > 0))?.id,
@@ -64,7 +66,7 @@ window.__sizeTest = {
     mine.location = away; mine.movement = null;
     foe.location = away; foe.movement = null; foe.battleId = null;
     s.diplomacy = { ...(s.diplomacy ?? {}), [[ME, foe.owner].sort().join('|')]: 'war' };
-    playerOrder(engageFleet(ME, mine.id, foe.id));
+    playerOrder(__engageFleet(ME, mine.id, foe.id));
     return s.fleets[mine.id]?.battleId ?? null;
   },
   openBattle: (id) => battleWindow.open(id),

@@ -21,11 +21,10 @@
  * и плавающий чат живут в `main.ts`; модуль получает их хуками {@link initDiploWindow} —
  * импорт оттуда был бы циклом.
  */
+import { coalitionInviteBlock, coalitionTreatyLocked } from '../../decisions/coalitionCreation';
 import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { t, tData } from '../../localization/runtime';
 import {
-  coalitionCapacity,
-  coalitionOf,
   getOffer,
   getStance,
   isForkSite,
@@ -337,6 +336,8 @@ function proposeStance(target: string, to: DiplomaticStance): void {
     game.note(t('comms.bots-no-coalition'));
     return;
   }
+  const block = to === 'alliance' ? allianceBar(target) : coalitionTreatyLocked(s, ME, target) ? 'err.coalition-leaving' : null;
+  if (block) { game.note(t(block)); return; }
   // diplomacy.declare escalates / files the offer / commits a matching counter-offer;
   // feedback comes back uniformly via handleEvents (solo and NET alike).
   game.playerOrder(declareWar(ME, target, to));
@@ -470,12 +471,7 @@ function allianceBar(id: string): string | null {
   const s = game.state();
   const ME = game.me();
   if (getStance(s, ME, id) === 'alliance') return null;
-  const mine = coalitionOf(s, ME);
-  const theirs = coalitionOf(s, id);
-  if (mine && theirs && mine.id !== theirs.id) return 'err.coalition-other';
-  const joining = mine ?? theirs;
-  if (joining && joining.members.length >= coalitionCapacity(s)) return 'err.coalition-full';
-  return null;
+  return coalitionInviteBlock(s, ME, id);
 }
 /** Кнопки стоек и договора карт для места — общие у ростера, карточки и лички. */
 function stanceButtonsHtml(id: string): string {
@@ -485,7 +481,7 @@ function stanceButtonsHtml(id: string): string {
   const st = getStance(s, ME, id);
   return (
     STANCES.map((sk) => {
-      const barKey = sk === 'alliance' ? allianceBar(id) : null;
+      const barKey = sk === 'alliance' ? allianceBar(id) : coalitionTreatyLocked(s, ME, id) ? 'err.coalition-leaving' : null;
       const barred = barKey !== null;
       // Чей ход — `offerAffordance.ts` (REFM-201), та же формула, что у кнопки карт.
       // ЗДЕСЬ подавитель — запрет: предложить коалицию боту нельзя вовсе, поэтому и
@@ -494,18 +490,9 @@ function stanceButtonsHtml(id: string): string {
       const mark = offerMark(aff);
       const cls = offerClass('dp-act', sk === st, aff);
       const label = mark ? `${mark} ${stanceRu(sk)}` : stanceRu(sk);
-      const title =
-        barKey === 'comms.bots-no-coalition'
-          ? t('comms.bots-no-coalition')
-          : barKey === 'err.coalition-other'
-            ? t('err.coalition-other')
-            : barKey === 'err.coalition-full'
-              ? t('err.coalition-full')
-              : aff === 'accept'
-                ? t('comms.offer.incoming', { who: NAME[id] ?? id })
-                : aff === 'waiting'
-                  ? t('comms.offer.sent')
-                  : '';
+      const title = barKey ? t(barKey)
+        : aff === 'accept' ? t('comms.offer.incoming', { who: NAME[id] ?? id })
+          : aff === 'waiting' ? t('comms.offer.sent') : '';
       return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${game.stanceCol(sk)}"${offerDisabled(aff, barred) ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') + mapShareBtnHtml(id)
   );
@@ -528,7 +515,7 @@ function threadDiploHtml(id: string): string {
   if (inSt) {
     // Союз сверх вместимости или с членом чужой коалиции ядро отобьёт: кнопка гаснет
     // с той же причиной, что и кнопка союза в ростере.
-    const bar = inSt === 'alliance' ? allianceBar(id) : null;
+    const bar = inSt === 'alliance' ? allianceBar(id) : coalitionTreatyLocked(s, ME, id) ? 'err.coalition-leaving' : null;
     const barAttr = bar ? ` disabled title="${esc(t(bar))}"` : '';
     cards.push(
       incoming(

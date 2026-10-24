@@ -16,6 +16,9 @@ export const PROFILE_MEDALS = [
   { id: 'legend', metric: 'wins', goals: [100, 250, 500] },
   { id: 'explorer', metric: 'explored', goals: [100, 250, 500] },
   { id: 'contribution', metric: 'registered', goals: [1] },
+  // The guided first match runs on the device: the claim carries no counter, only a fixed
+  // 1 per account, and grants no XP or currency (POST /profiles/rewards/tutorial).
+  { id: 'tutorial', metric: 'tutorial', goals: [1] },
 ] as const;
 export type ProfileMedalId = (typeof PROFILE_MEDALS)[number]['id'];
 export type ProfileMetric = (typeof PROFILE_MEDALS)[number]['metric'];

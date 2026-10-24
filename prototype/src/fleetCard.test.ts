@@ -984,6 +984,8 @@ describe('всплывашка надбавок', () => {
 
 describe('стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Лист и выбор его карточки — у хозяина боковой панели (`sidePanel.ts`, REFM-225).
+  const PANEL = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
 
   it('main поднимает карточку один раз и отдаёт ей своё состояние', () => {
     expect(MAIN.match(/\ninitFleetCard\(\{/g)).toHaveLength(1);
@@ -1005,18 +1007,18 @@ describe('стык с main.ts', () => {
   });
 
   it('панель зовёт карточки модуля', () => {
-    expect(MAIN).toContain("if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);");
-    expect(MAIN).toContain("if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);");
+    expect(PANEL).toContain("if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);");
+    expect(PANEL).toContain("if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);");
     expect(MAIN).toContain('garrisonTiles: garrisonTilesHtml,');
-    expect(MAIN).toContain('if (aloft) return aloftPanelHtml(aloft);');
+    expect(PANEL).toContain('if (aloft) return aloftPanelHtml(aloft);');
   });
 
   it('всплывашку main поднимает до подсказок терминов, держит листом и закрывает «Назад»', () => {
     expect(MAIN.match(/\ninitStatPop\(\);/g)).toHaveLength(1);
     expect(MAIN.indexOf('\ninitStatPop();')).toBeLessThan(MAIN.indexOf('\ninitTermTips();'));
     // `renderPanel` зовёт её на обеих ветках: открытый лист и спрятанный.
-    expect(MAIN.match(/\n {4}renderStatPop\(\);\n {4}return;/g)).toHaveLength(1);
-    expect(MAIN.match(/\n {2}renderStatPop\(\);\n\}/g)).toHaveLength(1);
+    expect(PANEL.match(/\n {4}renderStatPop\(\);\n {4}return;/g)).toHaveLength(1);
+    expect(PANEL.match(/\n {2}renderStatPop\(\);\n\}/g)).toHaveLength(1);
     expect(MAIN).toContain("{ id: 'statpop', isOpen: statPopOpen, close: closeStatPop }");
   });
 

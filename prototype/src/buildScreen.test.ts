@@ -498,8 +498,11 @@ describe('окно построек — подключение к main.ts', () =
   const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
   it('кнопка «Построить» панели открывает окно выбранного мира', () => {
-    expect(src).toContain("act === 'openbuild'");
-    expect(src).toContain('buildWin.open(selPlanet!)');
+    // Нажатия листа — у хозяина боковой панели (`sidePanel.ts`, REFM-225), окно — хуком.
+    const panel = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
+    expect(panel).toContain("act === 'openbuild'");
+    expect(panel).toContain('game.buildWin().open(selPlanet!)');
+    expect(src).toContain('buildWin: () => buildWin,');
   });
 
   it('окно стоит в лестнице Android-Back', () => {
@@ -525,7 +528,9 @@ describe('окно построек — подключение к main.ts', () =
       /upgrade: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'upgrade', id, count: 1 \}\)/,
     );
     // Мир карточки — `codexWorld()`: из хаба выбранного мира нет (справочник поверх хаба).
-    expect(src).toContain("enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 })");
+    // Карточка здания — у справки (`helpCenter.ts`, REFM-221).
+    const help = readFileSync(new URL('./helpCenter.ts', import.meta.url), 'utf8');
+    expect(help).toContain("enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 })");
   });
 });
 

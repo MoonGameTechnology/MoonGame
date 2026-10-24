@@ -5,9 +5,9 @@
  * зовёт `gameplayStart`/`gameplayStop`. Тогда «забег идёт» и «площадка знает, что забег
  * идёт» не могут разойтись — это одно и то же действие.
  *
- * Флаг и сеттер живут у владельца забега (`sectorRun.ts`, REFM-210), а дверь разметки — в
- * `main.ts`: сеттер зовёт её хуком `runChanged`. Поэтому сторож читает оба файла и держит
- * обе стороны стыка — вызов хука в сеттере и сам хук в проводке.
+ * Флаг, сеттер и дверь разметки живут у владельца забега (`sectorRun.ts`, REFM-210 и
+ * REFM-243): сеттер зовёт дверь хуком `runChanged`, а «мир идёт» ей отвечает `main.ts` хуком
+ * `playing` — темп и комиксы его. Поэтому сторож читает оба файла и держит обе стороны стыка.
  *
  * Почему не поведенческий тест. `main.ts` — 14 тысяч строк, которым нужен DOM, канвас,
  * данные и живое ядро; поднять его в vitest ради одного флага невозможно без мока
@@ -36,7 +36,7 @@ const lines = [
 /** Тело функции по имени — пусто, если её нет (проверки ниже тогда падают). */
 const bodyIn = (src: string, name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
-const fnBody = (name: string): string => bodyIn(SRC, name);
+const fnBody = (name: string): string => bodyIn(RUN, name);
 
 describe('YAG-1.2a — разметка геймплея не может разойтись с состоянием забега', () => {
   it('сеттер существует и зовёт дверь разметки, а дверь — ОБА её конца', () => {
@@ -44,7 +44,7 @@ describe('YAG-1.2a — разметка геймплея не может раз�
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('sectorRunActive = on');
     expect(body).toContain('game.runChanged();');
-    // Хук сеттера в проводке `main.ts` — это и есть дверь разметки (и инструменты рельса).
+    // Хук сеттера в проводке `main.ts` зовёт дверь разметки (и инструменты рельса).
     expect(SRC).toMatch(
       /runChanged: \(\) => \{\s+syncSectorZeroTools\(\);\s+markGameplay\(\);\s+\},/,
     );
@@ -56,19 +56,19 @@ describe('YAG-1.2a — разметка геймплея не может раз�
   it('YAG-6.2: «геймплей идёт» = забег идёт И мир не стоит — и это видит каждый кадр', () => {
     // Темп мира меняют больше десятка мест; дверь зовётся из кадра при смене ответа, иначе
     // пауза, чтение комикса или выход в меню оставили бы индикатор площадки зелёным.
-    expect(fnBody('markGameplay')).toContain(
-      'const playing = sectorRunActive && speed > 0 && !comicQueue.isBusy();',
+    expect(fnBody('markGameplay')).toContain('const playing = sectorRunActive && game.playing();');
+    expect(SRC).toContain('playing: () => speed > 0 && !comicQueue.isBusy(),');
+    expect(fnBody('tickGameplayMark')).toContain(
+      'if (gameplayMarked !== (sectorRunActive && game.playing())) markGameplay();',
     );
-    expect(SRC).toContain(
-      'if (gameplayMarked !== (sectorRunActive && speed > 0 && !comicQueue.isBusy())) markGameplay();',
-    );
+    expect(SRC).toMatch(/\n {2}tickGameplayMark\(\);/);
     expect(fnBody('runPauseEvent')).toContain('markGameplay()');
   });
 
   it('звать площадку напрямую, мимо двери, нельзя', () => {
-    const direct = SRC.match(/\.gameplay(Start|Stop)\?\.\(\)/g) ?? [];
+    const direct = `${SRC}\n${RUN}`.match(/\.gameplay(Start|Stop)\?\.\(\)/g) ?? [];
     expect(direct).toHaveLength(2);
-    expect(RUN).not.toMatch(/\.gameplay(Start|Stop)\b/);
+    expect(SRC).not.toMatch(/\.gameplay(Start|Stop)\b/);
     const mark = fnBody('markGameplay');
     expect(mark.match(/\.gameplay(Start|Stop)\?\.\(\)/g)).toHaveLength(2);
   });
@@ -109,8 +109,8 @@ describe('YAG-1.2a — разметка геймплея не может раз�
 
   it('площадка берётся через `getPlatform()`, а не через константу выше по файлу', () => {
     const body = fnBody('markGameplay');
-    // Присваивания стоят ВЫШЕ объявления `const platform`, и обращение к нему из функции,
-    // вызванной раньше инициализации, упало бы на временной мёртвой зоне.
+    // Площадку ставит тело `main.ts` уже ПОСЛЕ импорта модуля (дев-сборка, смоуки): взятая
+    // при импорте, она была бы не той.
     expect(body).toContain('getPlatform()');
   });
 });

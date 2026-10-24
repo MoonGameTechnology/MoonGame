@@ -273,3 +273,16 @@ describe('REFM-214 — проводка в main.ts', () => {
     expect(MAIN).toMatch(/\n {6}onFeedChanged: repaintFeeds,\n/);
   });
 });
+
+
+describe('marker icon delivery', () => {
+  it('keeps the server kind and removes all cleared ids without resurrecting a stacked marker', async () => {
+    const log = await boot();
+    log.takePing(ping({ id: 'old', owner: 'p1', kind: 'mark' }), 'n7');
+    log.takePing(ping({ id: 'new', owner: 'p1', kind: 'defend' }), 'n7');
+    expect(log.sessionMessages[1]).toMatchObject({ pingKind: 'defend' });
+    log.dropPing('old');
+    log.dropPing('new');
+    expect(log.sessionMessages).toEqual([]);
+  });
+});

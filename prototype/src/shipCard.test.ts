@@ -80,12 +80,13 @@ describe('карточка корабля — проводка', () => {
   // Сторож проводки: плитка корабля во флоте открывает карточку стека, а не справочник
   // корпуса, где про надетое не было ни слова. Наземные плитки остаются со справочником.
   it('плитка корабля ведёт в карточку, наземная — в справочник', () => {
-    const main = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
-    // Плитки состава рисует карточка флота (`fleetCard.ts`, REFM-224), тап по ним ловит `main.ts`.
+    // Плитки состава рисует карточка флота (`fleetCard.ts`, REFM-224), тап по ним ловит лист
+    // (`sidePanel.ts`, REFM-225).
+    const panel = readFileSync(fileURLToPath(new URL('./sidePanel.ts', import.meta.url)), 'utf8');
     const card = readFileSync(fileURLToPath(new URL('./fleetCard.ts', import.meta.url)), 'utf8');
     expect(card).toMatch(
       /def\.domain === 'space'\s*\?\s*`data-shipcard="\$\{esc\(f\.id\)\}\|\$\{index\}"`\s*:\s*`data-codex="u:\$\{esc\(u\.unit\)\}"`/,
     );
-    expect(main).toMatch(/if \(bEl\.dataset\.shipcard\) \{[\s\S]{0,300}openShipCard\(/);
+    expect(panel).toMatch(/if \(bEl\.dataset\.shipcard\) \{[\s\S]{0,300}openShipCard\(/);
   });
 });

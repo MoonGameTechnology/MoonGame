@@ -22,6 +22,7 @@ export {
   type Planet,
   type PlanetSnapshot,
   type FogMemory,
+  type ProvinceSurvey,
   type SightRules,
   type TechRules,
   type MatchPricing,
@@ -193,9 +194,15 @@ export {
 export {
   COALITION_EMBLEMS,
   COALITION_DESC_MAX,
+  COALITION_DEPARTURE_MS,
+  COALITION_JOIN_COOLDOWN_MS,
   coalitionCapacity,
+  coalitionWallNow,
+  coalitionGameTime,
   coalitionOf,
   type Coalition,
+  type CoalitionClock,
+  type CoalitionDeparture,
 } from './state/coalition';
 export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {
@@ -690,7 +697,7 @@ export {
 export { instantRepairModule } from './modules/instantRepair';
 export { fleetRepairModule } from './modules/fleetRepair';
 export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
-export { victoryModule, effectiveVictoryRules } from './modules/victory';
+export { victoryModule, effectiveVictoryRules, type VictoryRules } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export {
   heroModule,

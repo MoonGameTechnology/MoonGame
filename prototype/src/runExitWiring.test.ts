@@ -17,12 +17,14 @@ const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 // Засчёт конца забега живёт у его владельца (`sectorRun.ts`, REFM-210).
 const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+// Карточка ухода из забега — у оболочки Sector Zero (`sectorZeroShell.ts`, REFM-243).
+const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
 
-/** Тело обработчика клика по элементу с этим id. */
-const handler = (id: string): string =>
+/** Тело обработчика клика по элементу с этим id; `indent` — отступ слушателя в файле. */
+const handler = (id: string, src = SRC, indent = ''): string =>
   new RegExp(
-    `(?:\\$\\('${id}'\\)|document\\.getElementById\\('${id}'\\)\\?)\\.addEventListener\\('click', \\(([^)]*)\\) => \\{([\\s\\S]*?)\\n\\}\\);`,
-  ).exec(SRC)?.[2] ?? '';
+    `(?:\\$\\('${id}'\\)|document\\.getElementById\\('${id}'\\)\\?)\\.addEventListener\\('click', \\(([^)]*)\\) => \\{([\\s\\S]*?)\\n${indent}\\}\\);`,
+  ).exec(src)?.[2] ?? '';
 
 describe('⌂ в экспедиции спрашивает, а не уходит молча', () => {
   it('живой тап по ⌂ в идущей экспедиции открывает выбор, а не уводит в меню', () => {
@@ -38,7 +40,7 @@ describe('⌂ в экспедиции спрашивает, а не уходит
   });
 
   it('«В меню» уходит программным кликом — он не доверенный, поэтому карточка не открывается вновь', () => {
-    const body = handler('abandon-menu');
+    const body = handler('abandon-menu', SHELL, '  ');
     expect(body).toContain('closeAbandon();');
     expect(body).toContain("$('tomenu').click();");
   });
@@ -53,22 +55,26 @@ describe('⌂ в экспедиции спрашивает, а не уходит
 
   it('карточка называет сумму «Завершить» тем же профилем и главой, что засчёт', () => {
     // Превью и засчёт — одна формула (`runPayout`); разойтись они могут только входами.
-    expect(SRC).toContain('abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data)');
+    expect(SHELL).toContain(
+      'abandonRunReward(sectorProgress, game.world(), chapterForSettle(sectorMission), data)',
+    );
     expect(RUN).toMatch(
       /settleSectorZeroRun\(\s*sectorProgress,\s*sectorAttempt,\s*s,\s*chapterForSettle\(sectorMission\),\s*data,?\s*\)/,
     );
     expect(RUN).toMatch(/export function awardSectorRun\(\): number \{\n\s+if \(sectorDevActive\) return 0;\n\s+const s = game\.world\(\);/);
     // Стенд разработчика не платит — и суммы не обещает.
-    expect(SRC).toContain('reward.hidden = sectorDevActive;');
+    expect(SHELL).toContain('reward.hidden = sectorDevActive;');
     // Сдача до первой волны не платит (2026-09-28): ×2 и «забрать награду» — по той же сумме.
-    expect(SRC).toContain('const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);');
-    expect(SRC).toContain("t(exit && !promise.collect ? 'run.abandon.go' : txt.go)");
+    expect(SHELL).toContain('const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);');
+    expect(SHELL).toContain("t(exit && !promise.collect ? 'run.abandon.go' : txt.go)");
     expect(BUILD).toMatch(/<div class="wp-reward" id="abandon-reward" hidden><\/div>/);
   });
 
   it('у выбора ⌂ свои слова и своя кнопка «В меню», скрытая у прочих поводов', () => {
-    expect(SRC).toMatch(/exit: \{ title: 'run\.exit\.title', text: 'run\.exit\.text', stay: 'run\.abandon\.back', go: 'run\.exit\.go' \}/);
-    expect(SRC).toContain("$('abandon-menu').hidden = !exit;");
+    expect(SHELL).toMatch(
+      /exit: \{\s+title: 'run\.exit\.title',\s+text: 'run\.exit\.text',\s+stay: 'run\.abandon\.back',\s+go: 'run\.exit\.go',\s+\}/,
+    );
+    expect(SHELL).toContain("$('abandon-menu').hidden = !exit;");
     expect(BUILD).toMatch(/<button type="button" id="abandon-menu"[^>]*data-i18n="run\.exit\.menu" hidden><\/button>/);
   });
 });

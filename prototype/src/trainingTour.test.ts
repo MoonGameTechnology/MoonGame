@@ -1,79 +1,92 @@
 import { describe, it, expect } from 'vitest';
-
 import { buildTrainingTour } from './trainingTour';
+import { trainingUiFixture } from './trainingTour.fixture';
 import { SpotlightTour, type SpotlightView } from './spotlight';
 import { data } from './gameData';
 import { trainingState } from '../../packages/client/src/gameData';
 import { TRAINING_STAGES, trainingBaseline } from '../../decisions/trainingStages';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
-import type { GameState } from '../../packages/shared-core/src/index';
 
-function tour(world: () => GameState, selected = () => false) {
-  return buildTrainingTour({
+const world = () => trainingState(data);
+const steps = (mobile = false) =>
+  buildTrainingTour({
     world,
     me: 'p1',
     data,
     baseline: trainingBaseline(world(), 'p1', data),
-    fleetSelected: selected,
-  });
-}
-
-describe('цепочка подсказок учебного полигона (TRN-2)', () => {
-  const s = trainingState(data);
-  const steps = tour(() => s);
-
-  it('проходит все двенадцать этапов §14.4 по порядку', () => {
-    const order = steps.map((x) => x.stage).filter((x, i, a) => a.indexOf(x) === i);
-    expect(order).toEqual([...TRAINING_STAGES]);
+    ui: trainingUiFixture(mobile),
   });
 
-  it('ни один шаг не листается кнопкой «Далее» — этап закрывает дело', () => {
-    expect(steps.filter((x) => x.advance.on === 'tap').map((x) => x.id)).toEqual([]);
+describe('пошаговый полигон Sector Zero', () => {
+  it('сохраняет двенадцать этапов и проверку каждого действия', () => {
+    const all = steps(true);
+    expect([...new Set(all.map((s) => s.stage))]).toEqual([...TRAINING_STAGES]);
+    expect(new Set(all.map((s) => s.id)).size).toBe(all.length);
+    expect(all.every((s) => s.advance.on !== 'tap')).toBe(true);
+    expect(all.filter((s) => s.target || s.anchor || s.selector).length).toBeGreaterThan(75);
   });
-
-  it('текст каждого шага и название каждого этапа есть в обеих локалях', () => {
-    const keys = [...steps.map((x) => x.copy), ...TRAINING_STAGES.map((x) => `training.stage.${x}`)];
-    expect(keys.filter((k) => !(k in ru))).toEqual([]);
-    expect(keys.filter((k) => !(k in en))).toEqual([]);
+  it('каждая инструкция переведена; кнопки телефона не попадают на ПК', () => {
+    for (const s of steps(true)) {
+      expect(ru[s.copy], s.copy).toBeTruthy();
+      expect(en[s.copy], s.copy).toBeTruthy();
+    }
+    expect(steps().some((s) => s.target?.includes('mobile-send'))).toBe(false);
+    expect(steps(true).some((s) => s.target?.includes('mobile-send'))).toBe(true);
   });
-
-  it('подсказки без цели — пузырь не закрывает карту', () => {
-    expect(steps.every((x) => x.target === null)).toBe(true);
-  });
-
-  it('этап засчитывается по состоянию мира и сразу, если дело уже сделано', () => {
-    let world = s;
-    let selected = false;
+  it('пропуск и сворачивание работают при недоступной цели, а пауза отпускается', () => {
     const views: (SpotlightView | null)[] = [];
-    const t = new SpotlightTour(tour(() => world, () => selected), {
-      locate: () => null,
-      render: (v) => views.push(v),
-    });
+    const t = new SpotlightTour(steps(), { locate: () => null, render: (v) => views.push(v) });
     t.start();
-    expect(views.at(-1)?.stage).toEqual({ id: 'prep', index: 0, count: 12 });
-    t.tap(); // «Далее» у этапа нет — не листается
-    expect(views.at(-1)?.stage?.id).toBe('prep');
-    selected = true;
-    t.refresh();
+    expect(t.holdsClock).toBe(true);
+    t.tap();
+    expect(views.at(-1)?.step.id).toBe('prep.base');
+    t.collapse();
+    expect(t.holdsClock).toBe(false);
+    t.reopen();
+    expect(t.holdsClock).toBe(true);
+    t.skipStage();
     expect(views.at(-1)?.stage?.id).toBe('economy');
-    // Нейтральная планета уже взята, пока игрок шёл по экономике: этап расширения
-    // засчитается сразу, как только до него дойдёт очередь.
-    world = structuredClone(s);
-    world.planets.neutral!.owner = 'p1';
-    t.skipStage(); // экономика
-    t.skipStage(); // исследование → расширение засчитано на входе
-    expect(views.at(-1)?.stage?.id).toBe('missions');
+    t.skip();
+    expect(t.holdsClock).toBe(false);
+    expect(t.active).toBe(false);
   });
-
-  it('действие засчитывает только свой приказ', () => {
-    const t = new SpotlightTour(steps, { locate: () => null, render: () => {} });
+  it('пауза не останавливает ожидание строительства, исследования и погрузки', () => {
+    const waits = [
+      'economy.mine',
+      'economy.ship',
+      'research.grid',
+      'assault.load',
+      'finale.load',
+      'retreat.battle',
+    ];
+    for (const id of waits) expect(steps().find((s) => s.id === id)?.holdClock, id).toBe(false);
+  });
+  it('обстрел не завершается после первого попадания: ждёт разрушения форта', () => {
+    const s = world();
+    const all = buildTrainingTour({
+      world: () => s,
+      me: 'p1',
+      data,
+      baseline: trainingBaseline(s, 'p1', data),
+      ui: trainingUiFixture(),
+    });
+    const wait = all.find((x) => x.id === 'finale.target-bombard-wait')!;
+    expect(wait.holdClock).toBe(false);
+    if (wait.advance.on !== 'state') throw new Error('expected a state check');
+    const fort = s.planets.target!.buildings.find((b) => b.type === 'fort')!;
+    fort.hp = 1;
+    expect(wait.advance.when()).toBe(false);
+    s.planets.target!.buildings = s.planets.target!.buildings.filter((b) => b !== fort);
+    expect(wait.advance.when()).toBe(true);
+  });
+  it('неверный приказ не завершает разделение флота', () => {
+    const split = steps().find((s) => s.id === 'fleet.split')!;
+    const t = new SpotlightTour([split], { locate: () => null, render: () => {} });
     t.start();
-    for (let i = 0; i < 5; i++) t.skipStage(); // к «Управлению флотом»
-    expect(steps[t.index]?.id).toBe('fleet.split');
     t.notifyAction('fleet.move');
-    expect(steps[t.index]?.id).toBe('fleet.split');
+    expect(t.active).toBe(true);
     t.notifyAction('fleet.split');
-    expect(steps[t.index]?.id).toBe('fleet.merge');
+    expect(t.active).toBe(false);
   });
 });
