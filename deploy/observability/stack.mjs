@@ -553,8 +553,26 @@ async function executeStack(args, run) {
   const entries = (await readFile(options.envFile, 'utf8'))
     .split(/\r?\n/)
     .filter((line) => line.startsWith('OBS_TRANSPORT_FILE='));
+  // The installed unit uses this file even when CLI --env-file defaults to the
+  // game's environment. Its protected transport policy applies to both paths.
+  const stackEnv = '/etc/moongame-observability/stack.env';
+  let installedTransport;
+  try {
+    await noLinks(stackEnv, false, true);
+    const info = await checkEntry(stackEnv, 0, 0o600, false);
+    if (info.size > 65536) throw failure('E_OBS_CONFIG');
+    installedTransport = (await readFile(stackEnv, 'utf8'))
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('OBS_TRANSPORT_FILE='))
+      .at(-1)
+      ?.slice('OBS_TRANSPORT_FILE='.length);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
   let transportFile =
-    process.env.OBS_TRANSPORT_FILE ?? entries.at(-1)?.slice('OBS_TRANSPORT_FILE='.length);
+    process.env.OBS_TRANSPORT_FILE ||
+    installedTransport ||
+    entries.at(-1)?.slice('OBS_TRANSPORT_FILE='.length);
   if (transportFile && /^(["']).*\1$/.test(transportFile))
     transportFile = transportFile.slice(1, -1);
   if (transportFile) {

@@ -185,6 +185,10 @@ def main():
                 error_log = backup / "compose-error.log"
                 error_log.write_bytes(result.stderr); error_log.chmod(0o600)
                 raise RuntimeError("E_TRANSPORT_COMPOSE")
+            # A profile without proxy_networks does not recreate Caddy. A bind
+            # file update must also be applied to the already running process.
+            run("docker", "exec", "deploy-caddy-1", "caddy", "reload", "--config",
+                "/etc/caddy/Caddyfile", "--adapter", "caddyfile")
             # Both local authenticated identity checks and the public edge must pass.
             for path in ["/health", "/ready"]:
                 run("bash", "-c", '. "$1"; release_local_probe "$2" "$3" >/dev/null', "probe",
@@ -203,7 +207,9 @@ def main():
             if changed and compose:
                 base, env = compose
                 rollback = subprocess.run(base + ["up", "-d", "--no-build", "--pull", "never", "--wait", "--wait-timeout", "120"], env=env, capture_output=True)
-                if rollback.returncode:
+                reload = subprocess.run(["docker", "exec", "deploy-caddy-1", "caddy", "reload", "--config",
+                    "/etc/caddy/Caddyfile", "--adapter", "caddyfile"], capture_output=True)
+                if rollback.returncode or reload.returncode:
                     print("E_TRANSPORT_ROLLBACK: operator inspection required")
             raise
         finally:

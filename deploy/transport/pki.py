@@ -39,6 +39,11 @@ def private_file(path, data, mode=0o600, uid=None):
             if uid is not None:
                 os.chown(tmp, uid, uid if os.geteuid() == 0 else os.getgid())
             os.replace(tmp, path)
+            directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
         finally:
             tmp.unlink(missing_ok=True)
 
@@ -114,9 +119,32 @@ def valid_for(path, seconds):
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
+def pending_roles(root, profile):
+    file = root / "pending.json"
+    if not file.exists():
+        return set()
+    info = file.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+            or info.st_nlink != 1 or info.st_mode & 0o077):
+        raise ValueError("E_TRANSPORT_PENDING")
+    roles = json.loads(file.read_text())
+    if not isinstance(roles, list) or any(role not in {"app", "db", *profile.get("extra_roles", {})} for role in roles):
+        raise ValueError("E_TRANSPORT_PENDING")
+    return set(roles)
+
+
+def key_matches(cert, key):
+    try:
+        return command("openssl", "x509", "-in", str(cert), "-noout", "-pubkey") == command(
+            "openssl", "pkey", "-in", str(key), "-pubout")
+    except RuntimeError:
+        return False
+
+
 def prepare(profile):
     root = Path(profile["directory"])
     with locked(root):
+        pending = pending_roles(root, profile)
         private = root / "private"
         private.mkdir(mode=0o700, exist_ok=True)
         if private.is_symlink() or private.stat().st_uid != os.geteuid() or private.stat().st_mode & 0o077:
@@ -144,6 +172,7 @@ def prepare(profile):
         public.mkdir(mode=0o755, exist_ok=True)
         if public.is_symlink() or public.stat().st_uid != os.geteuid() or public.stat().st_mode & 0o022:
             raise ValueError("E_TRANSPORT_DIRECTORY")
+        os.chmod(public, 0o755)
         private_file(public / "ca.crt", ca.read_bytes(), 0o644)
         changed = []
         for kind in ["app", "db", *profile.get("extra_roles", {})]:
@@ -152,15 +181,18 @@ def prepare(profile):
             folder.mkdir(mode=0o755, exist_ok=True)
             if folder.is_symlink() or folder.stat().st_uid != os.geteuid() or folder.stat().st_mode & 0o022:
                 raise ValueError("E_TRANSPORT_DIRECTORY")
+            # mkdir's requested mode is filtered by the service's umask 0077.
+            # Docker mounts this directory itself; its non-root UID needs traversal.
+            os.chmod(folder, 0o755)
             cert, key = folder / "server.crt", folder / "server.key"
-            if cert.exists() != key.exists():
+            if cert.exists() != key.exists() and kind not in pending:
                 raise ValueError("E_TRANSPORT_LEAF_INCOMPLETE")
             if key.exists():
                 if key.is_symlink() or key.stat().st_nlink != 1:
                     raise ValueError("E_TRANSPORT_KEY")
                 os.chmod(key, 0o400)
                 os.chown(key, item["uid"], item["uid"] if os.geteuid() == 0 else os.getgid())
-            if not cert.exists() or not valid_for(cert, 30 * 86400):
+            if not cert.exists() or not key.exists() or not valid_for(cert, 30 * 86400) or not key_matches(cert, key):
                 with tempfile.TemporaryDirectory(dir=private) as work:
                     work = Path(work)
                     sans = ",".join("DNS:" + name for name in item["dns"])
@@ -175,6 +207,10 @@ def prepare(profile):
                             "-set_serial", "0x" + os.urandom(16).hex(), "-days", "90", "-sha256",
                             "-extfile", str(work / "extensions"), "-out", str(work / "cert"))
                     command("openssl", "verify", "-CAfile", str(ca), "-verify_hostname", item["dns"][0], str(work / "cert"))
+                    # Persist intent before publishing either leaf file. A crash
+                    # or failed Docker command must not lose the required apply.
+                    pending.add(kind)
+                    private_file(root / "pending.json", json.dumps(sorted(pending)))
                     private_file(key, (work / "key").read_bytes(), 0o400, item["uid"])
                     private_file(cert, (work / "cert").read_bytes(), 0o644)
                 changed.append(kind)
@@ -250,22 +286,32 @@ def caddy_upstream(p):
   }}'''+"\n}\n"
 
 
+def apply_pending(profile):
+    root = Path(profile["directory"])
+    applied = []
+    with locked(root):
+        pending = pending_roles(root, profile)
+        for role in sorted(pending):
+            item = profile[role] if role in ["app", "db"] else profile["extra_roles"][role]
+            running = command("docker", "inspect", "--format", "{{.State.Running}}", item["container"]).strip()
+            if running != b"true":
+                continue
+            if profile.get("kind") != "monitoring" and role == "db":
+                command("docker", "exec", item["container"], "sh", "-c",
+                        'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "SELECT pg_reload_conf()"')
+            else:
+                command("docker", "restart", "--time", "30", item["container"])
+            pending.remove(role)
+            private_file(root / "pending.json", json.dumps(sorted(pending)))
+            applied.append(role)
+    return applied
+
+
 def renew(profile):
     if os.geteuid() != 0:
         raise ValueError("E_TRANSPORT_ROOT")
-    changed = prepare(profile)
-    for role in changed:
-        item = profile[role] if role in ["app", "db"] else profile["extra_roles"][role]
-        # Renewal never starts a service deliberately stopped by its operator.
-        running = command("docker", "inspect", "--format", "{{.State.Running}}", item["container"]).strip()
-        if running != b"true":
-            continue
-        if profile.get("kind") != "monitoring" and role == "db":
-            command("docker", "exec", item["container"], "sh", "-c",
-                    'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "SELECT pg_reload_conf()"')
-        else:
-            command("docker", "restart", "--time", "30", item["container"])
-    return changed
+    prepare(profile)
+    return apply_pending(profile)
 
 
 def main():

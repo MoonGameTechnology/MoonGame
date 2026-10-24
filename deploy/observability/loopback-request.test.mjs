@@ -180,4 +180,62 @@ describe.skipIf(!tools)('verified local operator transport', () => {
     writeFileSync(file, JSON.stringify(profile), { mode: 0o600 });
     expect(() => execFileSync('python3', [pki, 'prepare', file], { stdio: 'pipe' })).toThrow();
   });
+  it('makes leaf directories traversable under a private operator umask', () => {
+    const profile = JSON.parse(readFileSync(join(root, 'profile.json'), 'utf8'));
+    profile.directory = join(root, 'private-umask');
+    const file = join(root, 'private-umask.json');
+    writeFileSync(file, JSON.stringify(profile), { mode: 0o600 });
+    const script =
+      'import sys,os;sys.path.insert(0,sys.argv[1]);import pki;os.umask(0o077);pki.prepare(pki.profile_from_file(sys.argv[2]))';
+    execFileSync(
+      'python3',
+      ['-c', script, fileURLToPath(new URL('../transport', import.meta.url)), file],
+      { stdio: 'pipe' },
+    );
+    expect(statSync(profile.directory).mode & 0o777).toBe(0o700);
+    for (const role of ['app', 'db']) {
+      expect(statSync(join(profile.directory, role)).mode & 0o777).toBe(0o755);
+      expect(statSync(join(profile.directory, role, 'server.key')).mode & 0o777).toBe(0o400);
+    }
+  });
+  it.each(['inspect', 'restart', 'exec'])(
+    'retries certificate application after Docker %s fails',
+    (operation) => {
+      const profile = JSON.parse(readFileSync(join(root, 'profile.json'), 'utf8'));
+      profile.directory = join(root, 'retry-' + operation);
+      const file = join(root, 'retry-' + operation + '.json');
+      writeFileSync(file, JSON.stringify(profile), { mode: 0o600 });
+      const script = `import sys,json
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import pki
+p=pki.profile_from_file(sys.argv[2]); pki.prepare(p)
+original=pki.command; failed=False; calls=[]
+def command(*args):
+    global failed
+    if args[0]!='docker': return original(*args)
+    calls.append(args[1])
+    if args[1]==sys.argv[3] and not failed:
+        failed=True
+        raise RuntimeError('fixture temporary failure')
+    return b'true' if args[1]=='inspect' else b''
+pki.command=command
+try: pki.apply_pending(p)
+except RuntimeError: pass
+pending=json.loads((Path(p['directory'])/'pending.json').read_text())
+issued=pki.prepare(p); calls.clear(); pki.apply_pending(p)
+print(json.dumps({'pendingAfterFailure':pending,'issuedOnRetry':issued,'retryCalls':calls,'remaining':json.loads((Path(p['directory'])/'pending.json').read_text())}))`;
+      const result = JSON.parse(
+        execFileSync(
+          'python3',
+          ['-c', script, fileURLToPath(new URL('../transport', import.meta.url)), file, operation],
+          { encoding: 'utf8', stdio: 'pipe' },
+        ),
+      );
+      expect(result.pendingAfterFailure.length).toBeGreaterThan(0);
+      expect(result.issuedOnRetry).toEqual([]);
+      expect(result.retryCalls.length).toBeGreaterThan(0);
+      expect(result.remaining).toEqual([]);
+    },
+  );
 });
