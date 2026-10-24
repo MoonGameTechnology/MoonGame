@@ -41,21 +41,24 @@ export function pcols(blocks: readonly string[]): string {
  * пробелы вокруг разделителей убираются и в строку влезает больше. `titleAct` делает имя
  * кнопкой (Bytro-стиль: тап по имени открывает сводку) — без него это просто заголовок,
  * и прочие панели не меняются. `badge` — короткая метка рядом с именем (очки победы мира);
- * это готовая разметка, собранная вызывающим из экранированных частей.
+ * это готовая разметка, собранная вызывающим из экранированных частей. `subLive` — хвост
+ * подписи с живым отсчётом (`.pn-timer`, его патчит `updatePanelLive`), тоже готовая
+ * разметка: отсчёт в тексте подписи менял бы разметку листа каждый кадр, и лист
+ * пересобирался бы вместе с кнопками под курсором.
  */
 export function cardHeader(
   color: string,
   title: string,
   sub: string,
-  opts: { compact?: boolean; titleAct?: string; badge?: string } = {},
+  opts: { compact?: boolean; titleAct?: string; badge?: string; subLive?: string } = {},
 ): string {
-  const subFit = opts.compact ? sub.replace(/ · /g, '·') : sub;
+  const fit = (text: string): string => (opts.compact ? text.replace(/ · /g, '·') : text);
   const tt = opts.titleAct
     ? `<button class="ptitle-btn" data-act="${esc(opts.titleAct)}" data-arg="">${esc(title)} ▸</button>`
     : `<b>${esc(title)}</b>`;
   return `<div class="phead">
     <span class="pflag" style="background:${color}"></span>
-    <div class="ptitle">${tt}<span>${esc(subFit)}</span></div>${opts.badge ?? ''}
+    <div class="ptitle">${tt}<span>${esc(fit(sub))}${fit(opts.subLive ?? '')}</span></div>${opts.badge ?? ''}
     <button class="pclose btn-x" data-act="close" data-arg="">✕</button>
   </div>`;
 }

@@ -229,12 +229,15 @@ export function initMobileHud(host: MobileHudHost) {
         panelNode = host.side.firstChild;
         title =
           host.side.querySelector('.ptitle > :first-child')?.textContent?.replace(/ ▸$/, '') ?? '';
-        sub = host.side.querySelector('.ptitle > span')?.textContent ?? '';
         const mark = host.side.querySelector<HTMLElement>('.phead .pbadge');
         badgeText = mark?.textContent ?? '';
         badgeKey = mark?.dataset.desc ?? '';
         badge.setAttribute('aria-label', mark?.getAttribute('aria-label') ?? badgeText);
       }
+      // Подпись читается каждый кадр, а не на пересборке листа: живой отсчёт в ней (высадка,
+      // `.pn-timer`) патчится на месте, и снимок с пересборки застыл бы на первой цифре.
+      if (host.side.style.display !== 'none')
+        sub = host.side.querySelector('.ptitle > span')?.textContent ?? '';
       choiceList = list;
       const choosing = list.length > 0;
       const html = list
