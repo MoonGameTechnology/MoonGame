@@ -46,7 +46,10 @@ report="${1:?usage: caddy-rebuild-acceptance.sh <trivy-json>}"
 }
 
 # A malformed report or an absent binary is a failed scan, not a clean result.
-if ! jq -e '[.Results[]? | select(.Target == "usr/bin/caddy")] | length > 0' "$report" >/dev/null; then
+if ! jq -e '[.Results[]? | select(.Target == "usr/bin/caddy")]
+    | length > 0 and all(.[]; (.Vulnerabilities // [])
+        | type == "array" and all(.[];
+            (.VulnerabilityID | type == "string") and (.PkgName | type == "string")))' "$report" >/dev/null; then
   echo "::error::приёмка Caddy: некорректный отчёт или отсутствует usr/bin/caddy"
   exit 1
 fi

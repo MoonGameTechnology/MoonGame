@@ -36,7 +36,7 @@ describe('Caddy release security acceptance', () => {
   ])('rejects the vulnerable Caddy dependency %s', (VulnerabilityID, PkgName) => {
     expect(acceptance(binary([{ VulnerabilityID, PkgName }]))).toBe(1);
   });
-  it.each(['', '{broken', {}, { Results: [] }])(
+  it.each(['', '{broken', {}, { Results: [] }, binary('invalid'), binary([{}])])(
     'rejects a failed or incomplete scan: %j',
     (report) => {
       expect(acceptance(report)).toBe(1);

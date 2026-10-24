@@ -53,8 +53,16 @@ services:
       stage-postgres:
         condition: service_healthy
     volumes:
-      - ${STAGE_RELEASE_DIR:?Set the stage artifact directory}/client-dist:/app/prototype/dist:ro
-      - ${STAGE_RELEASE_DIR:?Set the stage artifact directory}/server-dist:/app/packages/server/dist:ro
+      - type: bind
+        source: ${STAGE_RELEASE_DIR:?Set the stage artifact directory}/client-dist
+        target: /app/prototype/dist
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${STAGE_RELEASE_DIR:?Set the stage artifact directory}/server-dist
+        target: /app/packages/server/dist
+        read_only: true
+        bind: { create_host_path: false }
     tmpfs:
       - /app/playtest-logs:rw,nosuid,noexec,size=32m,uid=65532,gid=65532,mode=0700
       - /tmp:rw,nosuid,noexec,size=16m
