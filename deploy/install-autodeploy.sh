@@ -3,7 +3,7 @@
 # Перевод хоста на автодеплой (ZTP-1.2): ОДИН раз, от root, на машине, поставленной
 # install-ubuntu.sh.
 #
-#   cd /opt/moongame && sudo -u moongame git pull     # получить этот файл
+#   cd /opt/moongame && sudo git pull --ff-only     # получить этот файл
 #   # Введите read-only registry credentials через read -s или защищённый файл;
 #   # подробная команда — deploy/README.md, раздел «Автодеплой».
 #   sudo --preserve-env=VOID_REGISTRY_USER,VOID_REGISTRY_TOKEN \
@@ -30,7 +30,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME="moongame"
-SERVICE_USER="${SERVICE_USER:-moongame}"
+SERVICE_USER="${SERVICE_USER:-root}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/moongame}"
 STATE_DIR="${STATE_DIR:-/var/lib/moongame}"
 SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system}"
@@ -47,6 +47,10 @@ die() {
 }
 
 [ "$(id -u)" = 0 ] || die "запускать от root: sudo bash $0"
+[ "$SERVICE_USER" = root ] || die E_DEPLOY_PRIVILEGED_USER
+if [ -e "$STATE_DIR/current" ] && [ "$(stat -c %u "$STATE_DIR")" != 0 ]; then
+  die E_DEPLOY_MIGRATION_REQUIRED
+fi
 id "$SERVICE_USER" >/dev/null 2>&1 || die "нет пользователя $SERVICE_USER — хост ставился не install-ubuntu.sh?"
 
 as_service() {
@@ -181,6 +185,10 @@ Requires=$DOCKER_SYSTEMD_UNIT
 Type=oneshot
 RemainAfterExit=yes
 User=$SERVICE_USER
+Group=root
+Environment=SERVICE_USER=root
+NoNewPrivileges=yes
+UMask=0077
 Environment=STATE_DIR=$STATE_DIR
 Environment=DOCKER_CONFIG=$DOCKER_CONFIG_DIR
 ExecStart=/bin/bash $STATE_DIR/current/deploy/stack.sh up
@@ -201,6 +209,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 User=$SERVICE_USER
+Group=root
+Environment=SERVICE_USER=root
+NoNewPrivileges=yes
+UMask=0077
 Environment=STATE_DIR=$STATE_DIR
 Environment=DOCKER_CONFIG=$DOCKER_CONFIG_DIR
 ExecStart=/bin/bash $STATE_DIR/current/deploy/autoupdate.sh
