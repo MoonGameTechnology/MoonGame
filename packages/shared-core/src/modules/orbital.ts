@@ -293,7 +293,8 @@ export const orbitalModule: GameModule = {
   // 1.1.0: обстрел сообщает, каким прикрытием он срезан (`hit` + `factor`, FORT-5.16).
   // 1.2.0: мина не встаёт на орбиту, не обстреливает и не делит залп ПВО (ревью #1411).
   // 1.3.0: обстрел бьёт и войска мира, без последнего бойца (ROS-1.6).
-  version: '1.3.0',
+  // 1.4.0: урон обстрела по войскам делится поровну на каждого юнита, а не фокусом (ROS-1.6a).
+  version: '1.4.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this

@@ -312,43 +312,59 @@ function damageLine(
     if (remaining <= 0) {
       break;
     }
-    const def = data.units[stack.unit];
-    if (!def) {
-      continue;
-    }
-    const eff = effectiveStats(def, stack, data);
-    const { perShip, pool: startPool } = stackHull(stack, eff.hp);
+    remaining = damageStack(stack, remaining, data, deaths);
+  }
+  return remaining;
+}
 
-    // Ablative shield absorbs first (shields-roadmap SH-0.2); only the overflow
-    // reaches the hull. A shield never kills — a ship dies only when its hull hits 0.
-    const shieldPerShip = eff.shield ?? 0;
-    if (shieldPerShip > 0) {
-      let shield = stack.shieldHp ?? stack.count * shieldPerShip;
-      const shieldAbsorbed = Math.min(remaining, shield);
-      shield -= shieldAbsorbed;
-      remaining -= shieldAbsorbed;
-      stack.shieldHp = shield;
-      if (remaining <= 0) {
-        continue; // shield soaked it all — hull untouched
-      }
-    }
+/**
+ * Damage ONE stack: spends `amount` on its shield, then its hull pool, and RETURNS
+ * what the stack could not absorb. Whole ships/troops are lost as the pool drops;
+ * the residual pool persists on the stack (`hp`).
+ */
+function damageStack(
+  stack: UnitStack,
+  amount: number,
+  data: GameData,
+  deaths: { unit: string; count: number }[],
+): number {
+  const def = data.units[stack.unit];
+  if (!def) {
+    return amount;
+  }
+  let remaining = amount;
+  const eff = effectiveStats(def, stack, data);
+  const { perShip, pool: startPool } = stackHull(stack, eff.hp);
 
-    let pool = startPool;
-    const absorbed = Math.min(remaining, pool);
-    pool -= absorbed;
-    remaining -= absorbed;
+  // Ablative shield absorbs first (shields-roadmap SH-0.2); only the overflow
+  // reaches the hull. A shield never kills — a ship dies only when its hull hits 0.
+  const shieldPerShip = eff.shield ?? 0;
+  if (shieldPerShip > 0) {
+    let shield = stack.shieldHp ?? stack.count * shieldPerShip;
+    const shieldAbsorbed = Math.min(remaining, shield);
+    shield -= shieldAbsorbed;
+    remaining -= shieldAbsorbed;
+    stack.shieldHp = shield;
+    if (remaining <= 0) {
+      return remaining; // shield soaked it all — hull untouched
+    }
+  }
 
-    const newCount = pool <= 0 ? 0 : Math.ceil(pool / perShip);
-    const lost = stack.count - newCount;
-    if (lost > 0) {
-      deaths.push({ unit: stack.unit, count: lost });
-    }
-    stack.count = newCount;
-    stack.hp = newCount > 0 ? pool : 0;
-    // Dead ships take their shields with them: cap the pool at surviving capacity.
-    if (shieldPerShip > 0) {
-      stack.shieldHp = newCount > 0 ? Math.min(stack.shieldHp ?? 0, newCount * shieldPerShip) : 0;
-    }
+  let pool = startPool;
+  const absorbed = Math.min(remaining, pool);
+  pool -= absorbed;
+  remaining -= absorbed;
+
+  const newCount = pool <= 0 ? 0 : Math.ceil(pool / perShip);
+  const lost = stack.count - newCount;
+  if (lost > 0) {
+    deaths.push({ unit: stack.unit, count: lost });
+  }
+  stack.count = newCount;
+  stack.hp = newCount > 0 ? pool : 0;
+  // Dead ships take their shields with them: cap the pool at surviving capacity.
+  if (shieldPerShip > 0) {
+    stack.shieldHp = newCount > 0 ? Math.min(stack.shieldHp ?? 0, newCount * shieldPerShip) : 0;
   }
   return remaining;
 }
@@ -436,6 +452,58 @@ export function damageByClass(
     deaths.push(...damageUnits(subset, pools[cls], data).deaths);
   }
   return { survivors: units.filter((s) => s.count > 0), deaths };
+}
+
+/**
+ * Урон ПОРОВНУ на каждого живого юнита стороны, без линий и без очереди по id (ROS-1.6a,
+ * заказ владельца 2026-10-24: огонь сверху «равномерно распределяет урон тика по всем
+ * наземным юнитам, а не по фокусу»).
+ *
+ * Формула: на каждого из N живых юнитов приходится `totalDamage / N`, поэтому стек из
+ * `count` юнитов получает `totalDamage × count / N` и тратит его на свой щит и запас
+ * корпуса так же, как в {@link damageUnits}.
+ *
+ * Стек, которому досталось больше, чем он держит, гибнет, а его остаток делится между
+ * выжившими по той же формуле: урон не пропадает. Каждый проход либо тратит всё, либо
+ * опустошает хотя бы один стек, поэтому проходов не больше, чем стеков. Мутирует стеки
+ * так же; выжившие — в исходном порядке.
+ */
+export function damageEvenly(
+  units: UnitStack[],
+  totalDamage: number,
+  data: GameData,
+): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
+  const deaths: { unit: string; count: number }[] = [];
+  let remaining = totalDamage;
+  while (remaining > 0) {
+    const live = units.filter((s) => isTargetable(s, data));
+    const alive = live.reduce((n, s) => n + s.count, 0);
+    if (alive === 0) {
+      break; // nothing left that can be hit
+    }
+    let allocated = 0;
+    let leftover = 0;
+    for (const [i, stack] of live.entries()) {
+      // Последний стек берёт точный остаток, как последняя линия в `damageUnits`:
+      // деление на доли не теряет и не чеканит урон на округлении.
+      const slice =
+        i === live.length - 1 ? remaining - allocated : (remaining * stack.count) / alive;
+      allocated += slice;
+      leftover += damageStack(stack, slice, data, deaths);
+    }
+    if (leftover >= remaining) {
+      break; // absorbed nothing — cannot happen with live stacks, but never spin
+    }
+    remaining = leftover;
+  }
+  // Стек, задетый в двух проходах, теряет юнитов дважды; наружу — одна строка на род юнита,
+  // в порядке первой потери.
+  const lost = new Map<string, number>();
+  for (const d of deaths) lost.set(d.unit, (lost.get(d.unit) ?? 0) + d.count);
+  return {
+    survivors: units.filter((s) => s.count > 0),
+    deaths: [...lost].map(([unit, count]) => ({ unit, count })),
+  };
 }
 
 /** The bus-facing wrapper over {@link damageUnits}: each loss is announced via
@@ -616,6 +684,9 @@ export function applyDamageToSide(
    *  burst names the world's owner; a shuttle strike names the strike's owner. Omitted
    *  when nobody owns the fire (a neutral garrison). */
   killedBy?: PlayerId | null,
+  /** `'even'` — урон поровну на каждого юнита стороны ({@link damageEvenly}): так огонь
+   *  сверху бьёт гарнизон (ROS-1.6a). Не передан — линиями, как в бою. */
+  spread?: 'even',
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -648,13 +719,18 @@ export function applyDamageToSide(
       f.lastDamagedAt = h.ctx.now;
     }
   }
-  if (!byClass) {
+  const laid =
+    spread === 'even'
+      ? damageEvenly(units, dmg, data)
+      : byClass
+        ? damageByClass(units, byClass, data)
+        : null;
+  if (!laid) {
     setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
     return;
   }
-  const { survivors, deaths } = damageByClass(units, byClass, data);
-  for (const d of deaths) h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
-  setSideUnits(h.state, ref, survivors);
+  for (const d of laid.deaths) h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
+  setSideUnits(h.state, ref, laid.survivors);
 }
 
 /** Delete a fleet whose LAST ship just died outside a battle (orbital AA or

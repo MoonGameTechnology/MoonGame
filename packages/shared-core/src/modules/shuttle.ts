@@ -1925,7 +1925,9 @@ export const shuttleModule: GameModule = {
   // 1.16.0: ракета — воздушная цель (SM-3.7d): патруль и удар бьют её `shuttleDamage`, а
   //         патруль стреляет и в момент, когда ракета влетает в его круг (возможность
   //         `missile.flew`, и по последнему отрезку до цели — замечание Codex на #1644).
-  version: '1.16.0',
+  // 1.17.0: урон удара по войскам мира делится поровну на каждого юнита, а не фокусом
+  //         (ROS-1.6a, то же правило, что у обстрела с орбиты).
+  version: '1.17.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`

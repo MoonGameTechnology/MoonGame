@@ -21,6 +21,11 @@
  *    обороняемый мир сами.
  * 5. **Бьют только гарнизон** — войска хозяина мира. Чужие плацдармы на нём не задеты:
  *    обстрел и удар целятся в мир, и противник у них — его хозяин.
+ * 6. **Урон ложится поровну на каждого юнита гарнизона, а не фокусом** (ROS-1.6a, заказ
+ *    владельца 2026-10-24). На каждого из N живых юнитов приходится `урон / N`, стек из
+ *    `count` юнитов получает `урон × count / N` (`damageEvenly`). До этого огонь сверху шёл
+ *    правилом боя: все наземные юниты стоят в одной линии, а внутри линии урон берёт стеки
+ *    по очереди id — и обстрел выбивал один род войск целиком, не задев остальных.
  *
  * Урон идёт через хук `combat.damage` в фазе своего канала (`bombard` и `shuttle`), поэтому
  * прикрытие мира постройками и техи «космос» и «шаттлы» доходят и до войск.
@@ -62,7 +67,8 @@ export function garrisonRoom(planet: Planet, data: GameData): number {
 }
 
 /** Положить огонь сверху на гарнизон `planet`. Урон уже прошёл хук своего канала; здесь
- *  только порог и приёмник. Павших записывает на `killedBy`, как и любой другой канал. */
+ *  только порог и приёмник, который делит урон поровну на юнитов (правило 6). Павших
+ *  записывает на `killedBy`, как и любой другой канал. */
 export function fireOnGarrison(
   h: HandlerContext,
   planet: Planet,
@@ -72,5 +78,15 @@ export function fireOnGarrison(
   const landed = capHooked(dealt, garrisonRoom(planet, h.ctx.data));
   if (!(landed > 0)) return;
   const ref = { kind: 'garrison' as const, planetId: planet.id };
-  applyDamageToSide(h, ref, landed, h.ctx.data, planet.id, undefined, undefined, killedBy);
+  applyDamageToSide(
+    h,
+    ref,
+    landed,
+    h.ctx.data,
+    planet.id,
+    undefined,
+    undefined,
+    killedBy,
+    'even',
+  );
 }
