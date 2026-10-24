@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Fleet, UnitStack } from '../state/gameState';
-import { damageUnits, laneOccupancy, lineShares, posAt, unitTier } from './combat';
+import { damageEvenly, damageUnits, laneOccupancy, lineShares, posAt, unitTier } from './combat';
 
 // Every line present takes a slice of the same volley (GDD §7.2). cruiser: 40 hp,
 // shielded frigate: 20 hp + 10 shield/ship, picket sits mid, healer in the rear.
@@ -28,6 +28,7 @@ const data: GameData = parseGameData({
       domain: 'ground',
       line: 'rear',
     },
+    walker: { faction: 'x', stats: { attack: 8, defense: 8, speed: 3, hp: 48 }, domain: 'ground' },
     ghost: { faction: 'x', stats: { attack: 1, defense: 1, speed: 1, hp: 0 }, line: 'front' },
   },
   factions: {},
@@ -198,6 +199,71 @@ describe('damageUnits — the pure damage model', () => {
     const { survivors, deaths } = damageUnits([stack('unknown', 5)], 100, data);
     expect(survivors).toEqual([{ unit: 'unknown', count: 5 }]);
     expect(deaths).toEqual([]);
+  });
+});
+
+describe('damageEvenly — урон поровну на каждого юнита (ROS-1.6a)', () => {
+  it('каждый юнит получает урон / N, стек — по числу своих юнитов', () => {
+    // 4 юнита, 40 урона — по 10 на каждого: трём солдатам 30, шагоходу 10.
+    const units = [stack('trooper', 3), stack('walker', 1)]; // 72 + 48
+    const { survivors, deaths } = damageEvenly(units, 40, data);
+    expect(survivors).toEqual([
+      { unit: 'trooper', count: 2, hp: 42 },
+      { unit: 'walker', count: 1, hp: 38 },
+    ]);
+    expect(deaths).toEqual([{ unit: 'trooper', count: 1 }]);
+  });
+
+  it('в отличие от боя, не выбирает стек первым по id', () => {
+    const focused = [stack('trooper', 3), stack('walker', 1)];
+    damageUnits(focused, 40, data);
+    // Бой: оба наземные, одна линия, `trooper` < `walker` — весь урон на солдат.
+    expect(focused[1]).toEqual({ unit: 'walker', count: 1 });
+    const even = [stack('trooper', 3), stack('walker', 1)];
+    damageEvenly(even, 40, data);
+    expect(even[1]?.hp).toBe(38);
+  });
+
+  it('порядок стеков исход не меняет', () => {
+    const a = [stack('trooper', 3), stack('walker', 1)];
+    const b = [stack('walker', 1), stack('trooper', 3)];
+    damageEvenly(a, 40, data);
+    damageEvenly(b, 40, data);
+    expect(a).toEqual(b.slice().reverse());
+  });
+
+  it('остаток погибшего стека делится между выжившими — урон не пропадает', () => {
+    // 4 юнита, 120 урона, по 30. Солдат держит 24: гибнет, его 6 уходят шагоходам.
+    const units = [stack('trooper', 1), stack('walker', 3)]; // 24 + 144
+    const { survivors, deaths } = damageEvenly(units, 120, data);
+    expect(survivors).toEqual([{ unit: 'walker', count: 1, hp: 48 }]); // 144 − 90 − 6
+    // Шагоходы теряли юнитов в двух проходах — наружу одна строка.
+    expect(deaths).toEqual([
+      { unit: 'trooper', count: 1 },
+      { unit: 'walker', count: 2 },
+    ]);
+  });
+
+  it('урон во весь запас корпуса выбивает всех', () => {
+    const { survivors } = damageEvenly([stack('trooper', 1), stack('walker', 2)], 120, data);
+    expect(survivors).toEqual([]);
+  });
+
+  it('щит у стека принимает его долю первым', () => {
+    // 4 юнита, 40 урона, по 10: фрегаты (щит 2 × 10) гасят свои 20 щитом целиком.
+    const units = [stack('frigate', 2), stack('cruiser', 2)];
+    damageEvenly(units, 40, data);
+    expect(units[0]).toEqual({ unit: 'frigate', count: 2, shieldHp: 0 });
+    expect(units[1]).toEqual({ unit: 'cruiser', count: 2, hp: 60 });
+  });
+
+  it('стек без описания в данных не задет и не входит в N', () => {
+    const units = [stack('unknown', 5), stack('walker', 1)];
+    damageEvenly(units, 10, data);
+    expect(units).toEqual([
+      { unit: 'unknown', count: 5 },
+      { unit: 'walker', count: 1, hp: 38 },
+    ]);
   });
 });
 

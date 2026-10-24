@@ -238,4 +238,52 @@ print(json.dumps({'pendingAfterFailure':pending,'issuedOnRetry':issued,'retryCal
       expect(result.remaining).toEqual([]);
     },
   );
+  it.each(['ssl=no-verify', 'ssl=', 'sslmode=require', 'sslrootcert=%2Ftmp%2Fca.pem'])(
+    'rejects URL TLS overrides before activation: %s',
+    (query) => {
+      const script = `import sys
+sys.path.insert(0,sys.argv[1])
+from activate import validate_database_urls
+validate_database_urls({'DATABASE_URL':'postgresql://fixture@postgres/fixture'})
+try: validate_database_urls({'DATABASE_URL':'postgresql://fixture@postgres/fixture?'+sys.argv[2]})
+except RuntimeError: print('rejected')
+else: raise SystemExit('fixture accepted unsafe TLS override')`;
+      expect(
+        execFileSync(
+          'python3',
+          ['-c', script, fileURLToPath(new URL('../transport', import.meta.url)), query],
+          { encoding: 'utf8', stdio: 'pipe' },
+        ).trim(),
+      ).toBe('rejected');
+    },
+  );
+  it.each(['load', 'renew'])('continues independent profiles after a %s failure', (operation) => {
+    const script = `import sys,io,json,contextlib
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import renew as scheduler
+attempted=[]; applied=[]
+def load(path):
+    attempted.append(path.stem)
+    if path.stem=='monitoring' and sys.argv[2]=='load': raise ValueError('fixture secret')
+    return {'name':path.stem}
+def renew(profile):
+    if profile['name']=='monitoring': raise RuntimeError('fixture secret')
+    applied.append(profile['name']); return []
+scheduler.profile_from_file=load; scheduler.renew=renew
+log=io.StringIO()
+with contextlib.redirect_stdout(log): failed=scheduler.renew_profiles([Path(n+'.json') for n in ['monitoring','prod','stage']])
+print(json.dumps({'attempted':attempted,'applied':applied,'failed':failed,'log':log.getvalue()}))`;
+    const result = JSON.parse(
+      execFileSync(
+        'python3',
+        ['-c', script, fileURLToPath(new URL('../transport', import.meta.url)), operation],
+        { encoding: 'utf8', stdio: 'pipe' },
+      ),
+    );
+    expect(result.attempted).toEqual(['monitoring', 'prod', 'stage']);
+    expect(result.applied).toEqual(['prod', 'stage']);
+    expect(result.failed).toEqual(['monitoring']);
+    expect(result.log).not.toContain('fixture secret');
+  });
 });

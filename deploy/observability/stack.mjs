@@ -24,6 +24,7 @@ const DEPLOY = fileURLToPath(new URL('../', import.meta.url));
 const DEFAULT_STATE = '/var/lib/moongame-observability';
 const DEFAULT_ENV = join(DEPLOY, 'server.env');
 const AUTODEPLOY_ENV = '/var/lib/moongame/server.env';
+const INSTALLED_ENV = '/etc/moongame-observability/stack.env';
 export const PROBE_IMAGE =
   'prom/prometheus:v3.13.4@sha256:87861b8cf91579109319ebc300f3f1060e6da9c05d6ae8ad15a20c879e84e32e';
 export const SERVICES = Object.freeze(['obs-grafana', 'obs-prometheus', 'obs-loki', 'obs-alloy']);
@@ -269,6 +270,14 @@ async function metadata(stateDir) {
 }
 
 async function environmentPath(path) {
+  if (path === DEFAULT_ENV) {
+    try {
+      await lstat(INSTALLED_ENV);
+      return INSTALLED_ENV;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
   let info;
   try {
     info = await lstat(path);
@@ -555,7 +564,7 @@ async function executeStack(args, run) {
     .filter((line) => line.startsWith('OBS_TRANSPORT_FILE='));
   // The installed unit uses this file even when CLI --env-file defaults to the
   // game's environment. Its protected transport policy applies to both paths.
-  const stackEnv = '/etc/moongame-observability/stack.env';
+  const stackEnv = INSTALLED_ENV;
   let installedTransport;
   try {
     await noLinks(stackEnv, false, true);

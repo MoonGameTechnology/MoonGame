@@ -525,5 +525,6 @@ describe('OBS-0.2 root controller with real private files', () => {
       ([, command]) => command[0] === 'compose' && command.includes('up'),
     );
     expect(up[1]).toContain(overlay);
+    expect(up[1][up[1].indexOf('--env-file') + 1]).toBe('/etc/moongame-observability/stack.env');
   });
 });

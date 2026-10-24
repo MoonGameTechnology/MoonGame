@@ -48,6 +48,15 @@ def preflight_environment(release, state):
     return dict(BACKUP_READINESS_VERIFIED=readiness[0], BACKUP_READINESS_DEFERRED=readiness[1])
 
 
+def validate_database_urls(environment):
+    from urllib.parse import urlsplit, parse_qs
+    for key, value in environment.items():
+        if (key.endswith("DATABASE_URL") or key == "DB_MIGRATION_URL") and value:
+            query = parse_qs(urlsplit(value).query, keep_blank_values=True)
+            if any(k.lower().startswith("ssl") or k.lower() == "uselibpqcompat" for k in query):
+                raise RuntimeError("E_TRANSPORT_DATABASE_URL_OVERRIDE")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true")
@@ -93,12 +102,7 @@ def main():
             app, edge = inspect(profile["app"]["container"]), inspect("deploy-caddy-1")
             environment = dict(value.split("=", 1) for value in app["Config"]["Env"] if "=" in value)
             # URL TLS overrides must not defeat PGSSLMODE or certificate checks.
-            from urllib.parse import urlsplit, parse_qs
-            for key, value in environment.items():
-                if key.endswith("DATABASE_URL") and value:
-                    query = parse_qs(urlsplit(value).query)
-                    if any(k in query for k in ["sslmode", "sslrootcert", "sslcert", "sslkey", "uselibpqcompat"]):
-                        raise RuntimeError("E_TRANSPORT_DATABASE_URL_OVERRIDE")
+            validate_database_urls(environment)
             run("docker", "network", "inspect", profile["db_network"], "deploy_monitor_front")
             release = (state / "current/deploy").resolve()
             # Compose needs the readiness result exported by the same protected
