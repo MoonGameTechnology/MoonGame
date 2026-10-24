@@ -45,8 +45,22 @@ describe.skipIf(!url)('on real PostgreSQL', () => {
   });
   afterAll(async () => {
     await pool?.end();
-    await admin?.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
-    await admin?.end();
+    if (!admin) return;
+    try {
+      // pg-pool resolves end() before every socket has closed. Let PostgreSQL
+      // observe their closure instead of interrupting idle clients with 57P01.
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const { rows } = await admin.query(
+          'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1',
+          [name],
+        );
+        if (rows[0].n === 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+    } finally {
+      await admin.end();
+    }
   });
   it('round-trips kinds, and an empty list is not «every kind»', async () => {
     await roundTrip(new PostgresPushStore(pool));
