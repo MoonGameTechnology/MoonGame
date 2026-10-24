@@ -79,6 +79,11 @@ describe('goalsPanel — разметка', () => {
     expect(html).toContain('>3/1<');
   });
 
+  it('видно меньше строк, чем целей, — счётчик считает все цели', () => {
+    const html = goalsListHtml('Цели', 'свернуть', [{ label: 'рынок', done: false }], 4, 10);
+    expect(html).toContain('>4/10<');
+  });
+
   it('пустой список не ломает разметку', () => {
     const html = goalsListHtml('Цели', 'свернуть', [], 0);
     expect(html).toContain('>0/0<');

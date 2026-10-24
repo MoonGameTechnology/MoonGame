@@ -1,56 +1,54 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  FIRST_GOALS,
-  goalsComplete,
-  mergeDone,
-  metGoals,
-  SCORE_GOAL,
-  type GoalSignals,
-} from './firstGoals';
+import { FIRST_GOALS, goalsComplete, mergeDone, metGoals, type GoalSignals } from './firstGoals';
 
-const NONE: GoalSignals = {
-  builtMine: false,
-  launchedFleet: false,
-  capturedWorld: false,
-  score: 0,
-};
+const NONE = Object.fromEntries(FIRST_GOALS.map((g) => [g.id, false])) as GoalSignals;
+const ALL = Object.fromEntries(FIRST_GOALS.map((g) => [g.id, true])) as GoalSignals;
+
+describe('FIRST_GOALS — one goal per lesson chapter (ONB-15)', () => {
+  it('follows the chapters in the order the lesson teaches them', () => {
+    expect(FIRST_GOALS.map((g) => g.id)).toEqual([
+      'mine',
+      'research',
+      'fleet',
+      'capture',
+      'market',
+      'hero',
+      'ground',
+      'aviation',
+      'landing',
+      'assault',
+    ]);
+  });
+
+  it('labels every goal with its own locale key', () => {
+    for (const g of FIRST_GOALS) expect(g.labelKey).toBe(`onb.goal.${g.id}`);
+  });
+});
 
 describe('metGoals — each goal closes on its own signal', () => {
   it('is empty with no progress', () => {
     expect(metGoals(NONE).size).toBe(0);
   });
 
-  it('closes the mine goal when a mine is built', () => {
-    expect(metGoals({ ...NONE, builtMine: true })).toEqual(new Set(['mine']));
-  });
-
-  it('closes the fleet goal when a fleet is launched', () => {
-    expect(metGoals({ ...NONE, launchedFleet: true })).toEqual(new Set(['fleet']));
-  });
-
-  it('closes the capture goal when a world is taken', () => {
-    expect(metGoals({ ...NONE, capturedWorld: true })).toEqual(new Set(['capture']));
-  });
-
-  it('closes the score goal only at the threshold', () => {
-    expect(metGoals({ ...NONE, score: SCORE_GOAL - 1 }).has('score')).toBe(false);
-    expect(metGoals({ ...NONE, score: SCORE_GOAL }).has('score')).toBe(true);
+  it.each(FIRST_GOALS.map((g) => g.id))('closes only "%s" on its signal', (id) => {
+    expect(metGoals({ ...NONE, [id]: true })).toEqual(new Set([id]));
   });
 });
 
 describe('mergeDone — monotonic', () => {
   it('adds newly-met goals in canonical order', () => {
-    let done = mergeDone([], metGoals({ ...NONE, builtMine: true }));
+    let done = mergeDone([], metGoals({ ...NONE, mine: true }));
     expect(done).toEqual(['mine']);
-    done = mergeDone(done, metGoals({ ...NONE, capturedWorld: true }));
+    done = mergeDone(done, metGoals({ ...NONE, capture: true }));
     expect(done).toEqual(['mine', 'capture']); // order follows FIRST_GOALS
   });
 
   it('never un-ticks a goal even if its signal drops', () => {
-    const done = mergeDone(['mine'], metGoals(NONE)); // mine signal now false
-    expect(done).toEqual(['mine']); // stays done
+    // The bomber leaves the hold for the strike: the aviation goal stays done.
+    const done = mergeDone(['aviation'], metGoals(NONE));
+    expect(done).toEqual(['aviation']);
   });
 
   it('does not duplicate an already-done goal', () => {
@@ -61,17 +59,13 @@ describe('mergeDone — monotonic', () => {
 describe('goalsComplete', () => {
   it('is true only when every goal is done', () => {
     expect(goalsComplete([])).toBe(false);
-    expect(goalsComplete(['mine', 'fleet', 'capture'])).toBe(false);
+    expect(goalsComplete(['mine', 'research', 'fleet', 'capture'])).toBe(false);
     const all = FIRST_GOALS.map((g) => g.id);
     expect(goalsComplete(all)).toBe(true);
   });
 
   it('is reached by folding the full-progress signals', () => {
-    const done = mergeDone(
-      [],
-      metGoals({ builtMine: true, launchedFleet: true, capturedWorld: true, score: 150 }),
-    );
-    expect(goalsComplete(done)).toBe(true);
+    expect(goalsComplete(mergeDone([], metGoals(ALL)))).toBe(true);
   });
 });
 
