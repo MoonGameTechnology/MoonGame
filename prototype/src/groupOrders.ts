@@ -226,7 +226,9 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
     // their places too. Counted by the core's own numbers, or «max» offers places the
     // load is then refused for (`E_NO_CAPACITY`, «the hold is full»).
     used:
-      sumUnitStat(landing, data, 'cargoSize') + fleetShuttleBay(f, data) - fleetHoldFree(s, f, data),
+      sumUnitStat(landing, data, 'cargoSize') +
+      fleetShuttleBay(f, data) -
+      fleetHoldFree(s, f, data),
     reservedCargo: pendingLoadCargo(fleetId),
     plan: planFor(troopsPlan?.fleetId, fleetId, troopsPlan?.plan),
   };
@@ -265,8 +267,9 @@ function peaceBlocked(action: Action): boolean {
 }
 /** Кого назвать в окне войны, когда ядро уже сказало «заперто». Список — объяснение,
  *  а не решение: вердикт выше принят ядром. */
-function peaceBlockers(from: string | null, toId: string): string[] {
-  if (!from || from === toId) return [];
+function peaceBlockers(fleet: Fleet, toId: string): string[] {
+  const from = fleetNode(fleet);
+  if (!from) return [];
   const s = game.world();
   const ME = game.me();
   // FOG-LEAK: и закрыт, и виден — тем же правилом, каким ядро отбило приказ. Хозяин
@@ -280,7 +283,10 @@ function peaceBlockers(from: string | null, toId: string): string[] {
   // owner (landing on their world genuinely needs the war declaration).
   const route = planRoute(s, from, toId, peaceLocked) ?? planRoute(s, from, toId) ?? [toId];
   const set = new Set<string>();
-  for (const hop of route) if (peaceLocked(hop)) set.add(s.planets[hop]!.owner!);
+  // A parked ship has not reached the routing node yet. Dijkstra omits it,
+  // but entering that endpoint may be exactly why the core rejected the move.
+  const entered = fleet.edge ? [from, ...route] : route;
+  for (const hop of entered) if (peaceLocked(hop)) set.add(s.planets[hop]!.owner!);
   return [...set];
 }
 /** Живые флоты из выбора: ссылка могла пережить сам флот (погиб, слился, доставлен). */
@@ -298,9 +304,7 @@ export function tryMoveGroup(fleetIds: string[], destId: string, askLoading = tr
   if (askLoading && stageLoadPrompt(movers, { kind: 'move', to: destId })) return;
   const blockers = collectBlockers(movers, (id) =>
     // ядро пропускает — объезд есть, виновников по этому флоту нет
-    peaceBlocked(moveFleet(ME, id, destId))
-      ? peaceBlockers(fleetNode(game.world().fleets[id]!), destId)
-      : [],
+    peaceBlocked(moveFleet(ME, id, destId)) ? peaceBlockers(game.world().fleets[id]!, destId) : [],
   );
   if (blockers.length) {
     warPrompt = { fleetIds: movers, destId, blockers };
@@ -320,7 +324,7 @@ export function tryAssaultGroup(fleetIds: string[], destId: string, askLoading =
   if (!movers.length) return;
   if (askLoading && stageLoadPrompt(movers, { kind: 'assault', to: destId })) return;
   const blockers = collectBlockers(movers, (id) =>
-    peaceBlocked(moveFleet(ME, id, destId)) ? peaceBlockers(fleetNode(s.fleets[id]!), destId) : [],
+    peaceBlocked(moveFleet(ME, id, destId)) ? peaceBlockers(s.fleets[id]!, destId) : [],
   );
   // Штурм — не просто ход: даже по свободному маршруту нельзя высадиться на мир
   // НЕвраждебного игрока (ядро: `E_FORBIDDEN`). Спросить об этом ядро нельзя — флот
@@ -457,8 +461,8 @@ export function tryMoveEdgeGroup(
   // Марш упирается в ОБА конца лейна (`warOrders.ts`, REFM-59), а не только в «куда».
   const blockers = collectBlockers(fleetIds, (id) => {
     if (!peaceBlocked(moveFleetEdge(ME, id, edge))) return [];
-    const node = fleetNode(game.world().fleets[id]!);
-    return laneEnds(edge).flatMap((end) => peaceBlockers(node, end));
+    const fleet = game.world().fleets[id]!;
+    return laneEnds(edge).flatMap((end) => peaceBlockers(fleet, end));
   });
   if (blockers.length) {
     warPrompt = { fleetIds: [...fleetIds], destId: edge.to, edge, blockers };
@@ -515,7 +519,9 @@ export function confirmLoadPrompt(choice: 'after' | 'now'): void {
   if (choice === 'after' && lp.order.kind !== 'edge') {
     const plans = (game.world() as { orders?: Record<string, { steps: ChainStep[] }> }).orders;
     for (const id of lp.busy) {
-      playerOrder(orderChain(ME, id, afterLoadSteps(lp.order, plans?.[id]?.steps ?? [], MAX_CHAIN_STEPS)));
+      playerOrder(
+        orderChain(ME, id, afterLoadSteps(lp.order, plans?.[id]?.steps ?? [], MAX_CHAIN_STEPS)),
+      );
     }
     ids = ids.filter((id) => !lp.busy.includes(id));
     if (!ids.length) return;
@@ -531,7 +537,9 @@ function renderLoadPrompt(): void {
   if (!el || !loadPrompt) return;
   // Точку на лейне в план не поставить — шаг плана умеет только мир (`loadingOrders.ts`).
   const after =
-    loadPrompt.order.kind === 'edge' ? '' : `<button class="lp-after">${t('loadprompt.after')}</button>`;
+    loadPrompt.order.kind === 'edge'
+      ? ''
+      : `<button class="lp-after">${t('loadprompt.after')}</button>`;
   el.innerHTML =
     `<div class="wpbox">` +
     `<div class="wp-head">⏳ ${t('loadprompt.title')}</div>` +

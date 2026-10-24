@@ -118,7 +118,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 87: order unchanged; diplomacy 1.7.0 persists real departure/rejoin deadlines;
 // espionage 1.4.0 refuses hostile missions within the same coalition.
 // 88: порядок тот же; orbital 1.4.0, shuttle 1.17.0 — огонь сверху делит урон по войскам поровну (ROS-1.6a).
-const PINNED_FOR_VERSION = '88';
+// 89: movement 1.6.0 and visibility 2.4.0 — discover before halting; legal edge detours.
+const PINNED_FOR_VERSION = '89';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

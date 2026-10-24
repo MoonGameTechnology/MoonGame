@@ -248,7 +248,9 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '88'; // ROS-1.6a: огонь сверху делит урон по войскам
+export const MODULE_MANIFEST_VERSION = '89'; // Recon before border halt; legal parked-fleet detours
+// movement 1.6.0, visibility 2.4.0; module order unchanged.
+// export const MODULE_MANIFEST_VERSION = '88'; // ROS-1.6a: огонь сверху делит урон
 // поровну на каждого юнита гарнизона, а не фокусом. Членство и порядок не тронуты; `orbital`
 // 1.4.0, `shuttle` 1.17.0. Партия на 87 выбивала бы гарнизон по одному роду войск.
 // export const MODULE_MANIFEST_VERSION = '87'; // diplomacy 1.7.0: real 24/48-hour
