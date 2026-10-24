@@ -23,10 +23,13 @@ applicationId не меняются. Это playtest/debug-профили; RuSto
 - Кнопка хаба и QR всегда ведут на **player/latest.apk**. Параметры ПК не берутся
   из произвольного ввода игрока. SVG генерируется локально из этой же ссылки.
 
-`android.yml` собирает оба профиля, сохраняет прежний ключ, проверяет signer,
-реальные appId/versionCode/versionName через apksigner/aapt и создаёт version.json,
-подписанный ключом из секрета `APK_MANIFEST_SIGNING_KEY`. Без секрета, или если он не
-в паре с `manifestPublicKey` из `mobile/distribution.json`, сборка останавливается.
+`android.yml` собирает оба профиля с прежним сертификатом APK. Build-job имеет только
+`contents: read`, не получает приватный ключ и сохраняет APK-кандидат без манифеста.
+Отдельный publish-job запускается только с `main`, использует Environment
+`android-release`, повторно проверяет APK из того же workflow run через apksigner/aapt
+и создаёт подписанный version.json. Только этот job получает запись релизов и OIDC.
+Без Environment secret `APK_MANIFEST_SIGNING_KEY`, или если он не в паре с
+`manifestPublicKey` из `mobile/distribution.json`, публикация останавливается.
 Changelog — последние восемь commit subjects, ограниченные2048 символами.
 GitHub хранит артефакты сборки; устройства скачивают только с VPS. Маркер старого
 rolling release сохраняется, чтобы уже установленные старые APK могли получить
@@ -50,11 +53,33 @@ rolling release сохраняется, чтобы уже установленн
 node -e "const k=require('crypto').generateKeyPairSync('ed25519');process.stdout.write(k.privateKey.export({type:'pkcs8',format:'pem'}));console.log(Buffer.from(k.publicKey.export({format:'jwk'}).x,'base64url').toString('base64'))"
 ```
 
-PEM целиком — в секрет репозитория `APK_MANIFEST_SIGNING_KEY` (Settings → Secrets and
-variables → Actions), последняя строка (44 символа base64) — в `manifestPublicKey`.
+PEM целиком — в Environment secret `APK_MANIFEST_SIGNING_KEY` окружения
+`android-release`; последняя строка (44 символа base64) — в `manifestPublicKey`.
 Копию PEM хранить офлайн. Потеря ключа не ломает игру, но новые обновления установленные
 APK примут только после ручной установки сборки с новым публичным ключом. Смена ключа
 — та же процедура: выпустить сборку с новым `manifestPublicKey`, подписанную старым.
+
+### Однократная настройка GitHub владельцем
+
+1. Settings → Environments → New environment → `android-release`.
+2. Deployment branches and tags → **Selected branches and tags** → Add deployment
+   branch or tag rule → Ref type **Branch**, Name pattern **main**. Разрешена ровно
+   эта ветка; без wildcard, tag-правил и других веток. Вариант «Protected branches
+   only» здесь не используется: при отсутствии classic branch protection GitHub
+   допускает все ветки, даже если `main` защищён отдельным ruleset.
+3. Environment secrets → Add secret → `APK_MANIFEST_SIGNING_KEY`, значение — весь
+   PKCS8 PEM из офлайн-копии. Обычным релизам не нужны дополнительные ручные approvals.
+4. Settings → Secrets and variables → Actions → удалить repository-копию с этим
+   именем; не давать репозиторию organization-копию. Маскирование логов не ограничивает
+   доступ рабочего workflow к repository secret.
+5. Повторить branch APK build. Canary передаёт процессу только булево значение и
+   требует отсутствия repository/org-копии. Сам private PEM доступен лишь protected
+   publish-job. Кандидат проверяет SDK/Java; пользователям раздаётся только main-релиз.
+
+Политика окружения задаётся в GitHub, отдельно от YAML; одного `if: main` недостаточно.
+Перед выпуском проверить выбранную branch policy и отрицательный canary. После merge
+первый main publish-job подтверждает доступность Environment secret и пару ключей.
+См. [правила окружений GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 
 Host `publish.mjs` каждые5мин опрашивает только фиксированные GitHub release URLs.
 HTTPS redirects ограничены GitHub/CDN allowlist, JSON≤64KiB/metadata≤32KiB,

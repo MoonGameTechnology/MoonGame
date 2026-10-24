@@ -119,7 +119,8 @@ public class MainActivity extends BridgeActivity {
             report("downloading");
             new Thread(() -> {
                 try {
-                    report(downloadVerifyInstall(url, sha256));
+                    String error = downloadVerifyInstall(url, sha256);
+                    if (error != null) report(error);
                 } finally {
                     busy.set(false);
                 }
@@ -166,11 +167,12 @@ public class MainActivity extends BridgeActivity {
                 activity.runOnUiThread(() -> {
                     try {
                         activity.startActivity(install);
+                        report("installing");
                     } catch (Exception e) {
                         report("E_UPDATE_INSTALL");
                     }
                 });
-                return "installing";
+                return null;
             } catch (Exception e) {
                 return "E_UPDATE_DOWNLOAD";
             } finally {

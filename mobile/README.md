@@ -80,7 +80,11 @@ Install a new site-aware APK once; subsequent checks read only our HTTPS site:
 `/downloads/android/{alpha|player}/latest.json`. It is a signed envelope
 `{payload, signature}`: `payload` is the manifest (`versionCode`, `versionName`,
 `apkUrl`, `notes`, `sha`, `apkSha256`, `appId`, `signerSha256`) and `signature` is
-Ed25519 over those exact bytes, made in CI with the `APK_MANIFEST_SIGNING_KEY` secret.
+Ed25519 over those exact bytes, made only by the main publication job with the
+`APK_MANIFEST_SIGNING_KEY` Environment secret in `android-release`. That environment
+must allow only the selected Branch `main`; remove repository/org copies of the key.
+Branch builds have read-only contents permission and produce APK candidates without
+the private key or a signed release manifest. See [operator setup](../deploy/apk/README.md).
 The app checks it against `manifestPublicKey` in `mobile/distribution.json` through
 WebCrypto and ignores anything else, so the download host cannot forge a version.
 The APK URL is immutable and belongs to the same origin/lane.
