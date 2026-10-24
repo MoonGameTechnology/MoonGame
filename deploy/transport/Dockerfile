@@ -7,3 +7,6 @@ RUN --network=none gofmt -w probe.go && go build -trimpath -ldflags="-s -w" -o /
 
 FROM scratch
 COPY --from=builder /probe /probe
+USER 65532:65532
+# This stage exports a binary for existing services; it has no running daemon.
+HEALTHCHECK NONE
