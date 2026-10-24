@@ -120,6 +120,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   mapShareOffers: 'filtered', // предложение обмена — переговоры двоих
   coalitions: 'public', // список коалиций, состав, эмблема и описание — открытые (COAL-1)
   coalitionSeq: 'public',
+  coalitionClock: 'public', // clock rate is a public session rule
   coalitionJoinAfter: 'public', // membership eligibility is public, like the coalition roster
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
   spyAgents: 'filtered', // сеть агентов (SPY-6) — тот же секрет шпиона
@@ -468,6 +469,7 @@ function maximalState(): GameState {
       },
     },
     coalitionSeq: 1,
+    coalitionClock: { wallTime: 0, gameTime: 0, timeScale: 24 },
     coalitionJoinAfter: { bystanderA: 900 },
     intel: {
       // Своё окно — безобидное (свой же мир), чтобы оно не пробило туман само.

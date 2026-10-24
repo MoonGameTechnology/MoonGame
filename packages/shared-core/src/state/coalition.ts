@@ -1,12 +1,34 @@
 import type { GameState, PlayerId } from './gameState';
 import { MS_PER_HOUR } from '../util/time';
 
-/** Membership changes use authoritative match-clock time, also while players are offline. */
+/** Membership changes use ordinary hours, independent of simulation acceleration. */
 export const COALITION_DEPARTURE_MS = 24 * MS_PER_HOUR;
 export const COALITION_JOIN_COOLDOWN_MS = 48 * MS_PER_HOUR;
 
+/** Authoritative wall/game mapping, supplied by a recorded server-only action.
+ * No clock is read by the core: replay receives the identical mapping as data. */
+export interface CoalitionClock {
+  wallTime: number;
+  gameTime: number;
+  timeScale: number;
+}
+
+/** Older/solo states without a host mapping use their 1:1 simulation clock. */
+export function coalitionWallNow(state: GameState, gameTime = state.time): number {
+  const clock = state.coalitionClock;
+  return clock ? clock.wallTime + (gameTime - clock.gameTime) / clock.timeScale : gameTime;
+}
+
+export function coalitionGameTime(state: GameState, wallTime: number): number {
+  const clock = state.coalitionClock;
+  return clock ? clock.gameTime + (wallTime - clock.wallTime) * clock.timeScale : wallTime;
+}
+
 export interface CoalitionDeparture {
+  /** Game-time projection used by the existing scheduler. */
   at: number;
+  /** Absolute real deadline; optional only for old snapshots. */
+  wallAt?: number;
   kind: 'leave' | 'kick';
   by: PlayerId;
 }

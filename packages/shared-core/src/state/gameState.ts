@@ -1,6 +1,6 @@
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
-import type { Coalition } from './coalition';
+import type { Coalition, CoalitionClock } from './coalition';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -1140,7 +1140,9 @@ export interface GameState {
   coalitions?: Record<string, Coalition>;
   /** Счётчик, выдающий коалициям id. */
   coalitionSeq?: number;
-  /** Public re-entry deadlines after completed coalition departures. */
+  /** Clock mapping for ordinary-hour coalition rules; absent means 1:1. */
+  coalitionClock?: CoalitionClock;
+  /** Public UTC re-entry deadlines after completed coalition departures. */
   coalitionJoinAfter?: Record<PlayerId, number>;
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */

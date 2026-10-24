@@ -5510,15 +5510,17 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>
         <button class="hub-tile" id="hub-upd" type="button" style="display:none"><span class="ht-ic">⟳</span><span data-i18n="hub.tile.updates"></span></button>
         <button class="hub-tile" id="hub-delete-account" hidden type="button"><span class="ht-ic">◉</span><span data-i18n="account.delete.title"></span></button>
-        <button class="hub-tile" data-more="Сообщество" type="button"><span class="ht-ic">◍</span><span data-i18n="hub.tile.community"></span></button>
+        <button class="hub-tile" ${external ? 'data-more="Сообщество"' : 'id="hub-community"'} type="button"><span class="ht-ic">◍</span><span data-i18n="hub.tile.community"></span></button>
         <button class="hub-tile" data-more="Поддержка" type="button"><span class="ht-ic">⚠</span><span data-i18n="hub.tile.support"></span></button>
         <button class="hub-tile" data-more="Уведомления" type="button"><span class="ht-ic">◔</span><span data-i18n="hub.tile.notifications"></span></button>
         <button class="hub-tile" data-more="Чат" type="button"><span class="ht-ic">▭</span><span data-i18n="hub.tile.chat"></span></button>
         <a class="hub-tile" id="hub-privacy" data-i18n="welcome.privacy"></a>
         <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
-      ${external ? '' : `<!-- Контакты: ссылки наружу, отдельным блоком под плитками -->
-      <div class="hub-sec" data-i18n="hub.contacts"></div>
+    </div>
+    <div class="hub-panel" id="hp-community" style="display:none">
+      <div class="hub-sec" data-i18n="hub.tile.community"></div>
+      ${external ? '' : `
       <div class="hub-grid">
         <a class="hub-tile hub-discord" id="hub-discord" href="https://discord.gg/DywYCufkK" target="_blank" rel="noopener noreferrer" data-i18n-title="hub.discord.desc"><svg class="ht-ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.32 4.37A19.8 19.8 0 0 0 15.4 2.85a13.7 13.7 0 0 0-.63 1.3 18.4 18.4 0 0 0-5.5 0 13 13 0 0 0-.64-1.3 19.7 19.7 0 0 0-4.93 1.52C.6 9.05-.25 13.6.18 18.1a19.9 19.9 0 0 0 6.04 3.05c.49-.66.92-1.36 1.3-2.1a12.9 12.9 0 0 1-2.04-.98l.5-.39a14.2 14.2 0 0 0 12.07 0l.5.39c-.65.39-1.33.71-2.05.98.38.74.81 1.44 1.3 2.1a19.8 19.8 0 0 0 6.04-3.05c.5-5.2-.86-9.71-3.52-13.73ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42s2.18 1.1 2.16 2.42c0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42Z"/></svg><span data-i18n="hub.discord"></span></a>
       </div>`}

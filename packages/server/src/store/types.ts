@@ -1,5 +1,5 @@
 import type { CorpBuildOrder, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
-import type { ArsenalItem, GameState, PlayerId } from '@void/shared-core';
+import type { ArsenalItem, CoalitionClock, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
  *  server restart. `state` is the JSON-serializable `GameState` (the core invariant
@@ -10,6 +10,9 @@ export interface MatchClock {
   gameTime: number;
   timeScale: number;
   running: boolean;
+  /** Unapplied rate boundaries, oldest first. A snapshot may precede the first
+   * catch-up after a restart; retain every segment needed by real-time deadlines. */
+  coalitionTransitions?: CoalitionClock[];
 }
 
 /** Server-only observation captured with the first confirmed-seat snapshot. */

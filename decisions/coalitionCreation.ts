@@ -1,4 +1,4 @@
-import { coalitionCapacity, coalitionOf, hasFixedSides, type GameState } from '../packages/shared-core/src/index';
+import { coalitionCapacity, coalitionOf, coalitionWallNow, hasFixedSides, type GameState } from '../packages/shared-core/src/index';
 
 /** The server validates the intent again; this only controls the session button. */
 export function canCreateCoalition(state: GameState, playerId: string): boolean {
@@ -10,7 +10,7 @@ export function canCreateCoalition(state: GameState, playerId: string): boolean 
     !player.npc &&
     !hasFixedSides(state.modeId) &&
     !coalitionOf(state, playerId) &&
-    (state.coalitionJoinAfter?.[playerId] ?? 0) <= state.time
+    (state.coalitionJoinAfter?.[playerId] ?? 0) <= coalitionWallNow(state)
   );
 }
 
@@ -24,7 +24,8 @@ export function coalitionInviteBlock(state: GameState, playerId: string, target:
   const mine = coalitionOf(state, playerId);
   const theirs = coalitionOf(state, target);
   if (mine && theirs && mine.id === theirs.id) return null;
-  if ((state.coalitionJoinAfter?.[playerId] ?? 0) > state.time || (state.coalitionJoinAfter?.[target] ?? 0) > state.time)
+  const now = coalitionWallNow(state);
+  if ((state.coalitionJoinAfter?.[playerId] ?? 0) > now || (state.coalitionJoinAfter?.[target] ?? 0) > now)
     return 'err.coalition-cooldown';
   if (mine?.departures?.[playerId] || theirs?.departures?.[target]) return 'err.coalition-leaving';
   if (mine && theirs) return 'err.coalition-other';

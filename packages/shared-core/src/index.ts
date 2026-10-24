@@ -197,8 +197,11 @@ export {
   COALITION_DEPARTURE_MS,
   COALITION_JOIN_COOLDOWN_MS,
   coalitionCapacity,
+  coalitionWallNow,
+  coalitionGameTime,
   coalitionOf,
   type Coalition,
+  type CoalitionClock,
   type CoalitionDeparture,
 } from './state/coalition';
 export { diffState, applyDelta, type StateDelta } from './state/delta';

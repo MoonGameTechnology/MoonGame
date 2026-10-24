@@ -13,13 +13,14 @@ import {
   COALITION_EMBLEMS,
   coalitionCapacity,
   coalitionOf,
+  coalitionWallNow,
   hasFixedSides,
   getOffer,
   type Action,
   type Coalition,
   type GameState,
 } from '../../packages/shared-core/src/index';
-import { esc, fmtEta } from './format';
+import { esc } from './format';
 import { createCoalition, editCoalition, leaveCoalition, kickCoalitionMember, declareWar } from '../../decisions/actions';
 
 /** Что окну нужно от игры. */
@@ -83,7 +84,9 @@ function seatsHtml(c: Coalition, cap: number): string {
 }
 
 function remaining(at: number): string {
-  return fmtEta(Math.max(0, at - game.state().time) / 3_600_000);
+  const hours = Math.max(0, at - coalitionWallNow(game.state())) / 3_600_000;
+  // These are real durations; Sector Zero's accelerated display clock must not rescale them.
+  return hours >= 1 ? t('fmt.hours', { n: hours.toFixed(1) }) : t('fmt.minutes', { n: Math.ceil(hours * 60) });
 }
 
 function timerText(kind: string, at: number): string {
@@ -92,7 +95,7 @@ function timerText(kind: string, at: number): string {
 }
 function cooldownHtml(): string {
   const at = game.state().coalitionJoinAfter?.[game.me()] ?? 0;
-  return at > game.state().time
+  return at > coalitionWallNow(game.state())
     ? `<div class="cw-hint" data-coal-timer="cooldown" data-coal-deadline="${at}">${timerText('cooldown', at)}</div>` : '';
 }
 function invitationsHtml(c: Coalition): string {
@@ -154,8 +157,9 @@ function cardHtml(c: Coalition): string {
   const emblem = draftEmblem ?? c.emblem;
   const members = c.members.map((id) => {
     const departure = c.departures?.[id];
+    const deadline = departure ? (departure.wallAt ?? coalitionWallNow(s, departure.at)) : 0;
     const status = departure
-      ? `<span class="cw-timer" data-coal-timer="${departure.kind}" data-coal-deadline="${departure.at}">${timerText(departure.kind, departure.at)}</span>` : '';
+      ? `<span class="cw-timer" data-coal-timer="${departure.kind}" data-coal-deadline="${deadline}">${timerText(departure.kind, deadline)}</span>` : '';
     const kick = canKickCoalitionMember(s, game.me(), id)
       ? `<button class="cw-kick${confirmKick === id ? ' sure' : ''}" data-kick="${esc(id)}">${confirmKick === id ? t('coal.kick.confirm') : t('coal.kick')}</button>` : '';
     return `<div class="cw-mem"><span class="cw-dot" style="background:${game.ownerColor(id)}"></span>` +
@@ -203,7 +207,7 @@ export function renderCoalitions(): void {
   const area = document.getElementById('cw-text') as HTMLTextAreaElement | null;
   const typed = area && area.value !== drawnDesc ? area.value : null;
   drawn = signature();
-  drawnTimerMinute = Math.floor(game.state().time / 60_000);
+  drawnTimerMinute = Math.floor(coalitionWallNow(game.state()) / 60_000);
   drawnDesc = card?.description ?? '';
   el.innerHTML =
     `<div class="dpbox cwbox">` +
@@ -215,10 +219,19 @@ export function renderCoalitions(): void {
 
 function signature(): string {
   const s = game.state();
+  // Only the absolute deadline is visible; a host clock rebase changes the internal
+  // projection without changing this card or replacing its focused editor.
+  const coalitions = Object.values(s.coalitions ?? {}).map((c) => ({
+    ...c,
+    departures: Object.entries(c.departures ?? {}).map(([id, departure]) => [
+      id, departure.kind, departure.by, departure.wallAt ?? coalitionWallNow(s, departure.at),
+    ]),
+  }));
   return JSON.stringify([
-    s.modeId, game.me(), s.coalitions ?? null, coalitionCapacity(s),
+    s.modeId, game.me(), coalitions, coalitionCapacity(s),
     canCreateCoalition(s, game.me()), s.coalitionJoinAfter, s.diplomacyOffers,
-    Object.values(s.players).map((p) => [p.id, p.status, p.ai, p.npc]),
+    Object.values(s.players).map((p) => [p.id, p.status, p.ai, p.npc,
+      (s.coalitionJoinAfter?.[p.id] ?? 0) > coalitionWallNow(s)]),
   ]);
 }
 /** Новый снимок мира: перерисовать открытое окно, если коалиции изменились. Чужую
@@ -226,7 +239,7 @@ function signature(): string {
 export function syncCoalitions(): void {
   if (!coalOpen) return;
   if (signature() !== drawn) return renderCoalitions();
-  const minute = Math.floor(game.state().time / 60_000);
+  const minute = Math.floor(coalitionWallNow(game.state()) / 60_000);
   if (minute === drawnTimerMinute) return;
   drawnTimerMinute = minute;
   // Timer ticks never replace the textarea, preserving focus and the mobile keyboard.

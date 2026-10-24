@@ -2852,11 +2852,12 @@ const HUB_PANELS: Record<string, string> = {
   supply: 'hp-supply',
   shop: 'hp-shop',
   corp: 'hp-corp',
+  community: 'hp-community',
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 /** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop']);
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -3386,6 +3387,7 @@ document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
 document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
 document.getElementById('hub-shop')?.addEventListener('click', () => hubTab('shop'));
+document.getElementById('hub-community')?.addEventListener('click', () => hubTab('community'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);

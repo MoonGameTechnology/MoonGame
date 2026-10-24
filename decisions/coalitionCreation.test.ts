@@ -57,6 +57,22 @@ describe('coalition invitations and departure controls', () => {
     expect(canCreateCoalition(state, 'p2')).toBe(true);
     expect(coalitionInviteBlock(state, 'p1', 'p2')).toBeNull();
   });
+  it('keeps the 48 real-hour joining lock at ×24 and after a ×2 restart', () => {
+    const state = pair();
+    const hour = 3_600_000;
+    const wall = 1_800_000_000_000;
+    state.coalitionClock = { wallTime: wall, gameTime: 0, timeScale: 24 };
+    state.coalitionJoinAfter = { p2: wall + 48 * hour };
+    state.time = 48 * hour; // Only two real hours have elapsed.
+    expect(canCreateCoalition(state, 'p2')).toBe(false);
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBe('err.coalition-cooldown');
+    state.coalitionClock = { wallTime: wall + 2 * hour, gameTime: state.time, timeScale: 2 };
+    state.time += 46 * hour * 2 - 1;
+    expect(canCreateCoalition(state, 'p2')).toBe(false);
+    state.time += 1;
+    expect(canCreateCoalition(state, 'p2')).toBe(true);
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBeNull();
+  });
   it('cannot invite through a departing member or kick twice', () => {
     const state = pair();
     state.coalitions!.c1!.departures = { p1: { at: 200, by: 'p1', kind: 'leave' } };

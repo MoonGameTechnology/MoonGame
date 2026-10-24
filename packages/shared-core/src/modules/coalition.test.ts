@@ -477,7 +477,7 @@ describe('coalition departure deadlines and re-entry', () => {
     const action = kind === 'leave' ? act('p2', 'coalition.leave', {}) : act('p1', 'coalition.kick', { target: 'p2' });
     const pending = ok(kernel.applyAction(original, action, ctx()));
     expect(coalitionOf(original, 'p2')?.departures).toBeUndefined();
-    expect(coalitionOf(pending, 'p2')?.departures?.p2).toEqual({ at: exitAt, by: kind === 'leave' ? 'p2' : 'p1', kind });
+    expect(coalitionOf(pending, 'p2')?.departures?.p2).toEqual({ at: exitAt, wallAt: exitAt, by: kind === 'leave' ? 'p2' : 'p1', kind });
     const before = ok(kernel.advanceTo(JSON.parse(JSON.stringify(pending)) as GameState, at(exitAt - 1)));
     expect(coalitionOf(before, 'p2')?.members).toEqual(['p1', 'p2']);
     expect(getStance(before, 'p1', 'p2')).toBe('alliance');
@@ -508,7 +508,7 @@ describe('coalition departure deadlines and re-entry', () => {
     const pending = deepFreeze(ok(kernel.applyAction(s, act('p2', 'coalition.leave', {}), ctx())));
     for (const action of [act('p2', 'coalition.leave', {}), act('p1', 'coalition.kick', { target: 'p2' })])
       expect(code(kernel.applyAction(pending, action, at(1234)))).toBe('E_COALITION_LEAVING');
-    expect(coalitionOf(pending, 'p2')?.departures?.p2).toEqual({ at: exitAt, by: 'p2', kind: 'leave' });
+    expect(coalitionOf(pending, 'p2')?.departures?.p2).toEqual({ at: exitAt, wallAt: exitAt, by: 'p2', kind: 'leave' });
   });
 
   it('blocks pending-member invitations and expires their standing alliance offers at departure', () => {
@@ -579,5 +579,47 @@ describe('coalition departure deadlines and re-entry', () => {
     expect(isValidActionPayload('coalition.kick', { target: 'p2' })).toBe(true);
     for (const payload of [{}, { target: 42 }, { target: '' }, null])
       expect(isValidActionPayload('coalition.kick', payload)).toBe(false);
+  });
+});
+
+describe('coalition ordinary-hour clock mapping', () => {
+  const hour = 3_600_000;
+  const epoch = 1_800_000_000_000;
+  const rebase = (state: GameState, gameTime: number, wallTime: number, timeScale: number): GameState =>
+    ok(kernel.applyAction(state, act('p1', 'coalition.clock.rebase', { gameTime, wallTime, timeScale }), { ...ctx(), now: gameTime }));
+
+  it.each([1, 24])('keeps a full ordinary day at clock rate %i', (timeScale) => {
+    const anchored = rebase(ally(board(20), 'p1', 'p2'), 0, epoch, timeScale);
+    const pending = ok(kernel.applyAction(anchored, act('p2', 'coalition.leave', {}), ctx()));
+    expect(coalitionOf(pending, 'p2')?.departures?.p2).toMatchObject({ wallAt: epoch + 24 * hour, at: 24 * hour * timeScale });
+    const before = ok(kernel.advanceTo(pending, { ...ctx(), now: 24 * hour * timeScale - 1 }));
+    expect(coalitionOf(before, 'p2')).not.toBeNull();
+    const after = ok(kernel.advanceTo(before, { ...ctx(), now: 24 * hour * timeScale }));
+    expect(coalitionOf(after, 'p2')).toBeNull();
+    expect(after.coalitionJoinAfter?.p2).toBe(epoch + 72 * hour);
+    expect(code(kernel.applyAction(after, act('p2', 'coalition.create', {}), { ...ctx(), now: 72 * hour * timeScale - 1 }))).toBe('E_COALITION_COOLDOWN');
+    expect(kernel.applyAction(after, act('p2', 'coalition.create', {}), { ...ctx(), now: 72 * hour * timeScale }).ok).toBe(true);
+  });
+
+  it.each([2, 48])('re-projects future departure at a clock-rate boundary to %i without moving its wall deadline', (timeScale) => {
+    let state = rebase(ally(board(20), 'p1', 'p2'), 0, epoch, 24);
+    state = ok(kernel.applyAction(state, act('p2', 'coalition.leave', {}), ctx()));
+    const boundary = 12 * hour * 24;
+    state = ok(kernel.advanceTo(state, { ...ctx(), now: boundary }));
+    const before = deepFreeze(state);
+    state = rebase(before, boundary, epoch + 12 * hour, timeScale);
+    const due = boundary + 12 * hour * timeScale;
+    expect(coalitionOf(state, 'p2')?.departures?.p2).toMatchObject({ wallAt: epoch + 24 * hour, at: due });
+    expect(coalitionOf(before, 'p2')?.departures?.p2?.at).toBe(24 * hour * 24);
+    expect(state.scheduled.filter((event) => event.type === 'coalition.departure.due')).toHaveLength(1);
+    const after = ok(kernel.advanceTo(state, { ...ctx(), now: due }));
+    expect(after.coalitionJoinAfter?.p2).toBe(epoch + 72 * hour);
+  });
+
+  it('rejects malformed or time-jumping internal mappings and keeps them off the client catalog', () => {
+    for (const payload of [null, {}, { wallTime: epoch, gameTime: 1, timeScale: 24 }, { wallTime: epoch, gameTime: 0, timeScale: 0 }, { wallTime: epoch, gameTime: 0, timeScale: Infinity }]) {
+      expect(code(kernel.applyAction(board(20), act('p1', 'coalition.clock.rebase', payload), ctx()))).toBe('E_BAD_PAYLOAD');
+    }
+    expect(isValidActionPayload('coalition.clock.rebase', { wallTime: epoch, gameTime: 0, timeScale: 24 })).toBe(false);
   });
 });

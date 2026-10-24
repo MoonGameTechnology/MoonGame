@@ -3,7 +3,10 @@ import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
 import type {
   Action,
+  ApplyResult,
   Context,
+  CoalitionClock,
+  ReplayStep,
   DomainEvent,
   GameData,
   GameState,
@@ -17,6 +20,7 @@ import type {
 } from '@void/shared-core';
 import {
   CLIENT_ACTION_TYPES,
+  coalitionWallNow,
   diffState,
   effectiveVictoryRules,
   flashBattles,
@@ -345,9 +349,9 @@ type ApplyPlan =
   /** Мир не удалось догнать: состояние не меняется вовсе, дальше — только отказ. */
   | { kind: 'advance-failed'; code: string }
   /** Ядро отвергло действие, но догон УЖЕ посчитан: коммитится он один (SRV-1). */
-  | { kind: 'rejected'; code: string; state: GameState; events: DomainEvent[] }
+  | { kind: 'rejected'; code: string; state: GameState; events: DomainEvent[]; steps: ReplayStep[] }
   /** Действие принято: коммитится итоговое состояние и события догона + применения. */
-  | { kind: 'applied'; state: GameState; events: DomainEvent[]; at: number; advanced: GameState };
+  | { kind: 'applied'; state: GameState; events: DomainEvent[]; at: number; advanced: GameState; steps: ReplayStep[] };
 /** План, у которого есть что коммитить (всё, кроме несостоявшегося догона). */
 type CommittablePlan = Extract<ApplyPlan, { kind: 'rejected' | 'applied' }>;
 
@@ -527,6 +531,9 @@ export class MatchRoom {
   private clockFloor = 0;
   private lobbyAccrued = 0; // game-ms accrued while running
   private lobbyRunningSince: number | null = null; // raw ms when running began, else null
+  /** Historical boundaries not necessarily reached by the saved world yet. Only
+   * snapshot metadata: applying them still goes through recorded module actions. */
+  private readonly coalitionTransitions: CoalitionClock[];
   /** Manual-start lobby (host presses Start). `host` = first player to connect. */
   private readonly manualStart: boolean;
   private host: PlayerId | null = null;
@@ -669,6 +676,16 @@ export class MatchRoom {
     if (anchor && (!Number.isFinite(anchor.wallTime) || !Number.isFinite(anchor.gameTime) ||
         anchor.gameTime < 0 || !Number.isFinite(anchor.timeScale) || anchor.timeScale <= 0 ||
         typeof anchor.running !== 'boolean')) throw new Error('E_CLOCK_SNAPSHOT');
+    const transitions = anchor?.coalitionTransitions ?? [];
+    if (!Array.isArray(transitions) || transitions.some((segment, index) =>
+      !segment || !Number.isFinite(segment.wallTime) || !Number.isFinite(segment.gameTime) ||
+      segment.gameTime < 0 || !Number.isFinite(segment.timeScale) || segment.timeScale <= 0 ||
+      segment.gameTime > anchor!.gameTime ||
+      (index > 0 && segment.gameTime < transitions[index - 1]!.gameTime)))
+      throw new Error('E_CLOCK_SNAPSHOT');
+    this.coalitionTransitions = options.initialState.coalitionClock
+      ? transitions.map(({ wallTime, gameTime, timeScale }) => ({ wallTime, gameTime, timeScale }))
+      : [];
     this.clockFloor = options.initialState.time;
     if (anchor) {
       const wall = this.now();
@@ -824,10 +841,17 @@ export class MatchRoom {
 
   /** Capture once so the persisted wall/game pair cannot drift between reads. */
   get clockSnapshot(): MatchSnapshot['clock'] {
+    return this.captureClock(this.stateValue);
+  }
+
+  private captureClock(state: GameState): MatchSnapshot['clock'] {
     if (!this.clockAnchored) return undefined;
     const wallTime = this.now();
-    return { wallTime, gameTime: this.clock(wallTime), timeScale: this.timeScale,
-      running: this.isClockRunning && this.stateValue.match.status !== 'ended' };
+    const gameTime = this.clock(wallTime);
+    const coalitionTransitions = this.pendingCoalitionClocks(state);
+    return { wallTime, gameTime, timeScale: this.timeScale,
+      running: this.isClockRunning && state.match.status !== 'ended',
+      ...(coalitionTransitions.length > 0 ? { coalitionTransitions } : {}) };
   }
 
   get economyActivitySnapshot(): Record<string, string[]> {
@@ -1501,6 +1525,12 @@ export class MatchRoom {
     return { kind: 'pass' };
   }
 
+  /** The single pure reducer entry for player orders and trusted clock actions.
+   * Planning owns their ordering; callers own durable commits and replay. */
+  private reduceAction(state: GameState, action: Action, at: number): ApplyResult {
+    return this.kernel.applyAction(state, action, this.context(at));
+  }
+
   /**
    * ЧИСТАЯ половина подачи (NETA2-8): догнать мир и применить действие, НИЧЕГО не
    * фиксируя — ни `stateValue`, ни `seq`, ни рассылки. Ровно это позволяет durable-пути
@@ -1508,14 +1538,22 @@ export class MatchRoom {
    * а sync-пути — закоммитить сразу: разница между путями сжимается до одного `await`.
    */
   private planApply(action: Action, serverNow: number): ApplyPlan {
-    const advanced = this.computeAdvance(this.stateValue, serverNow);
+    let advanced = this.computeAdvance(this.stateValue, serverNow);
     if (!advanced.ok) return { kind: 'advance-failed', code: advanced.code };
+    if (!advanced.state.coalitionClock &&
+        (action.type === 'coalition.leave' || action.type === 'coalition.kick') &&
+        this.kernel.manifest.modules.some((module) => module.id === 'diplomacy') &&
+        advanced.state.match.status !== 'ended') {
+      const rebased = this.rebaseCoalitionClock(advanced.state, this.liveCoalitionClock());
+      if (!rebased.ok) return { kind: 'advance-failed', code: rebased.code };
+      advanced = { ...advanced, state: rebased.state, events: [...advanced.events, ...rebased.events], steps: [...advanced.steps, rebased.step] };
+    }
     const at = Math.max(serverNow, advanced.state.time);
-    const result = this.kernel.applyAction(advanced.state, action, this.context(at));
+    const result = this.reduceAction(advanced.state, action, at);
     if (!result.ok) {
       // SRV-1: действие отвергнуто, но догон уже посчитан и его события (прилёты, бои,
       // захваты) терять нельзя — коммитится и рассылается ОН, без результата действия.
-      return { kind: 'rejected', code: result.code, state: advanced.state, events: advanced.events };
+      return { kind: 'rejected', code: result.code, state: advanced.state, events: advanced.events, steps: advanced.steps };
     }
     return {
       kind: 'applied',
@@ -1523,6 +1561,7 @@ export class MatchRoom {
       events: [...advanced.events, ...result.events],
       at,
       advanced: advanced.state,
+      steps: advanced.steps,
     };
   }
 
@@ -1541,7 +1580,7 @@ export class MatchRoom {
   ): void {
     // RPL-2: граница, которой мир ДЕЙСТВИТЕЛЬНО достиг (throttled-догон не доходит до
     // `now`) — пустой догон границей не считается, чтобы журнал не пух.
-    if (plan.state.time > this.stateValue.time) this.record?.({ at: plan.state.time });
+    for (const step of plan.steps) this.record?.(step);
     this.economyActivity = captureMetaEconomyActivity(
       this.economyActivity,
       plan.events,
@@ -1713,6 +1752,7 @@ export class MatchRoom {
     // "nothing to wake for" so a driver idles instead of spinning on skipped ticks and
     // tripping its stall guard — the submit re-arms the driver when it commits.
     if (this.waiting || this.committing) return null;
+    if (this.pendingCoalitionClocks(this.stateValue).length > 0) return 0;
     const scheduled = this.stateValue.scheduled;
     if (scheduled.length === 0) return null;
     let soonest = Infinity;
@@ -1750,15 +1790,109 @@ export class MatchRoom {
   /** Advance `this.stateValue` to `now`, committing the catch-up in place. Thin wrapper
    *  over the pure `computeAdvance` — used by the sync `submitAction` and `tick`. */
   private advance(now: number): { ok: true; events: DomainEvent[] } | { ok: false; code: string } {
-    const from = this.stateValue.time;
     const r = this.computeAdvance(this.stateValue, now);
     if (!r.ok) return { ok: false, code: r.code };
     this.economyActivity = captureMetaEconomyActivity(this.economyActivity, r.events, this.stateValue);
     this.stateValue = r.state;
     // RPL-2: the boundary the world ACTUALLY reached (a throttled advance stops
     // short of `now`) — a no-op advance is not a boundary, keep the log compact.
-    if (r.state.time > from) this.record?.({ at: r.state.time });
+    for (const step of r.steps) this.record?.(step);
     return { ok: true, events: r.events };
+  }
+
+  /** Linear mapping for the CURRENT running-clock segment. The previous mapping
+   * stays in state until catch-up reaches this segment's game-time boundary. */
+  private liveCoalitionClock(): CoalitionClock {
+    if (!this.clockAnchored) return { wallTime: 0, gameTime: 0, timeScale: 1 };
+    return {
+      wallTime: this.lobbyRunningSince ?? this.now(),
+      gameTime: this.lobbyAccrued,
+      timeScale: this.timeScale,
+    };
+  }
+
+  private coalitionClockChanged(state: GameState, clock = this.liveCoalitionClock()): boolean {
+    return !!state.coalitionClock && (
+      state.coalitionClock.timeScale !== clock.timeScale ||
+      Math.abs(coalitionWallNow(state, clock.gameTime) - clock.wallTime) > 0.001
+    );
+  }
+
+  /** Derive the remaining boundaries from the committed/prospective mapping,
+   * never by consuming a mutable cursor before the durable write succeeds. */
+  private pendingCoalitionClocks(state: GameState): CoalitionClock[] {
+    if (!state.coalitionClock || state.match.status === 'ended') return [];
+    const segments: CoalitionClock[] = [];
+    for (const clock of [...this.coalitionTransitions, this.liveCoalitionClock()]) {
+      const previous = segments.at(-1);
+      // Equivalent consecutive mappings need only their first boundary.
+      if (previous && previous.timeScale === clock.timeScale &&
+          Math.abs(previous.wallTime + (clock.gameTime - previous.gameTime) / previous.timeScale - clock.wallTime) <= 0.001)
+        continue;
+      segments.push({ ...clock });
+    }
+    // A same-rate restart can move the anchor forward without changing time.
+    // Such a first segment does not require catching up to its anchor to apply it.
+    while (segments[0] && !this.coalitionClockChanged(state, segments[0])) segments.shift();
+    let applied = -1;
+    for (let index = 0; index < segments.length; index++) {
+      const clock = segments[index]!;
+      if (clock.gameTime <= state.time && !this.coalitionClockChanged(state, clock)) applied = index;
+    }
+    return segments.slice(applied + 1);
+  }
+
+  private rebaseCoalitionClock(state: GameState, clock: CoalitionClock):
+    | { ok: true; state: GameState; events: DomainEvent[]; step: ReplayStep }
+    | { ok: false; code: string } {
+    // Re-anchor at the reached instant, so the action never silently advances time.
+    const mapping: CoalitionClock = {
+      wallTime: clock.wallTime + (state.time - clock.gameTime) / clock.timeScale,
+      gameTime: state.time,
+      timeScale: clock.timeScale,
+    };
+    const action: Action = {
+      id: `coalition-clock:${mapping.wallTime}:${mapping.gameTime}:${mapping.timeScale}`,
+      type: 'coalition.clock.rebase',
+      playerId: Object.keys(state.players).sort()[0] ?? '__system',
+      issuedAt: state.time,
+      payload: mapping,
+    };
+    const result = this.reduceAction(state, action, state.time);
+    if (!result.ok) return result;
+    return { ok: true, state: result.state, events: result.events, step: { at: state.time, action } };
+  }
+
+  /** Preserve the old clock's offline segment, then record the mapping change and
+   * re-project future coalition events. Pure plans carry their replay steps until
+   * the durable caller has acknowledged the resulting snapshot. */
+  private computeAdvance(from: GameState, now: number):
+    | { ok: true; state: GameState; events: DomainEvent[]; steps: ReplayStep[] }
+    | { ok: false; code: string } {
+    const steps: ReplayStep[] = [];
+    const events: DomainEvent[] = [];
+    let state = from;
+    for (const clock of this.pendingCoalitionClocks(state)) {
+      const boundary = Math.max(state.time, Math.min(now, clock.gameTime));
+      const old = this.computeAdvanceRaw(state, boundary);
+      if (!old.ok) return old;
+      if (old.state.time > state.time) steps.push({ at: old.state.time });
+      state = old.state;
+      events.push(...old.events);
+      // A bounded catch-up can stop before the boundary. Keep the old mapping
+      // intact and resume that same segment on the next tick.
+      if (state.time < boundary || state.match.status === 'ended')
+        return { ok: true, state, events, steps };
+      const rebased = this.rebaseCoalitionClock(state, clock);
+      if (!rebased.ok) return rebased;
+      state = rebased.state;
+      events.push(...rebased.events);
+      steps.push(rebased.step);
+    }
+    const current = this.computeAdvanceRaw(state, now);
+    if (!current.ok) return current;
+    if (current.state.time > state.time) steps.push({ at: current.state.time });
+    return { ok: true, state: current.state, events: [...events, ...current.events], steps };
   }
 
   /**
@@ -1770,7 +1904,7 @@ export class MatchRoom {
    * enormous-but-legit backlog finishes without hanging the event loop, and a
    * same-instant runaway (clock stops progressing) is surfaced instead of looping.
    */
-  private computeAdvance(
+  private computeAdvanceRaw(
     from: GameState,
     now: number,
   ): { ok: true; state: GameState; events: DomainEvent[] } | { ok: false; code: string } {
@@ -1873,7 +2007,7 @@ export class MatchRoom {
     events: readonly DomainEvent[] = [],
     order?: OwnOrder,
   ): MatchSnapshot {
-    const clock = this.clockSnapshot;
+    const clock = this.captureClock(state);
     return {
       matchId: this.id,
       dataVersion: state.version.data,

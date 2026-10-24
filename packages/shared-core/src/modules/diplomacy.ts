@@ -21,6 +21,9 @@ import {
 import {
   addMember,
   coalitionCapacity,
+  coalitionWallNow,
+  coalitionGameTime,
+  type CoalitionClock,
   coalitionOf,
   COALITION_DESC_MAX,
   COALITION_DEPARTURE_MS,
@@ -83,7 +86,7 @@ function coalitionPair(h: HandlerContext, a: PlayerId, b: PlayerId): boolean {
 }
 
 function canJoinCoalition(h: HandlerContext, playerId: PlayerId): void {
-  if ((h.state.coalitionJoinAfter?.[playerId] ?? 0) > h.ctx.now)
+  if ((h.state.coalitionJoinAfter?.[playerId] ?? 0) > coalitionWallNow(h.state, h.ctx.now))
     h.reject('E_COALITION_COOLDOWN');
   if (coalitionOf(h.state, playerId)?.departures?.[playerId])
     h.reject('E_COALITION_LEAVING');
@@ -98,7 +101,8 @@ function scheduleDeparture(
   const c = coalitionOf(h.state, playerId);
   if (!c) return h.reject('E_NO_COALITION');
   if (c.departures?.[playerId]) return h.reject('E_COALITION_LEAVING');
-  const departure = { at: h.ctx.now + COALITION_DEPARTURE_MS, kind, by };
+  const wallAt = coalitionWallNow(h.state, h.ctx.now) + COALITION_DEPARTURE_MS;
+  const departure = { at: coalitionGameTime(h.state, wallAt), wallAt, kind, by };
   (c.departures ??= {})[playerId] = departure;
   h.schedule(departure.at, 'coalition.departure.due', {
     playerId,
@@ -314,6 +318,34 @@ export const diplomacyModule: GameModule = {
       h.emit('diplomacy.declined', { from: target, to: me, stance });
     });
 
+    /** Server-only and intentionally absent from the client payload catalog. The host
+     * records this action at the rate-change boundary AFTER old-clock catch-up. */
+    api.onAction('coalition.clock.rebase', (action, h) => {
+      const clock = action.payload as Partial<CoalitionClock> | null;
+      if (!clock || typeof clock.wallTime !== 'number' || !Number.isFinite(clock.wallTime) ||
+          typeof clock.gameTime !== 'number' || !Number.isFinite(clock.gameTime) ||
+          typeof clock.timeScale !== 'number' || !Number.isFinite(clock.timeScale) ||
+          clock.timeScale <= 0 || clock.gameTime !== h.ctx.now) return h.reject('E_BAD_PAYLOAD');
+      // Fill legacy absolute deadlines BEFORE replacing the old mapping.
+      const pending: Array<{ coalitionId: string; playerId: PlayerId; departure: CoalitionDeparture }> = [];
+      for (const coalitionId of Object.keys(h.state.coalitions ?? {}).sort()) {
+        const c = h.state.coalitions![coalitionId]!;
+        for (const playerId of Object.keys(c.departures ?? {}).sort()) {
+          const departure = c.departures![playerId]!;
+          departure.wallAt ??= coalitionWallNow(h.state, departure.at);
+          pending.push({ coalitionId: c.id, playerId, departure });
+        }
+      }
+      h.state.coalitionClock = { wallTime: clock.wallTime, gameTime: clock.gameTime, timeScale: clock.timeScale };
+      // Only this module's pending events are replaced; unrelated queue entries keep
+      // their order. h.schedule assigns deterministic sequence numbers as usual.
+      h.state.scheduled = h.state.scheduled.filter((event) => event.type !== 'coalition.departure.due');
+      for (const { coalitionId, playerId, departure } of pending) {
+        departure.at = Math.max(h.ctx.now, coalitionGameTime(h.state, departure.wallAt!));
+        h.schedule(departure.at, 'coalition.departure.due', { coalitionId, playerId, at: departure.at });
+      }
+    });
+
     /** Membership and shared intel remain until the authoritative 24-hour deadline. */
     api.onAction('coalition.leave', (action, h) => {
       const actor = h.state.players[action.playerId];
@@ -349,7 +381,8 @@ export const diplomacyModule: GameModule = {
       if (!c || c.id !== coalitionId || !departure || departure.at !== at || h.ctx.now < at)
         return;
       leaveCoalition(h, playerId, null);
-      (h.state.coalitionJoinAfter ??= {})[playerId] = at + COALITION_JOIN_COOLDOWN_MS;
+      (h.state.coalitionJoinAfter ??= {})[playerId] =
+        (departure.wallAt ?? coalitionWallNow(h.state, at)) + COALITION_JOIN_COOLDOWN_MS;
     });
 
     /**
