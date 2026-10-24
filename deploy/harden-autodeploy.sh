@@ -46,11 +46,43 @@ if os.path.islink(os.path.join(binaries, 'moongame')) or os.path.islink(os.path.
     raise SystemExit('E_DEPLOY_PATH')
 if not os.path.isfile(os.path.join(state, 'current', 'deploy', 'stack.sh')):
     raise SystemExit('E_DEPLOY_LAYOUT')
+# Preflight and stack.sh accept the old deploy UID as an owner. After this
+# migration only root is trusted. External dependencies cannot be silently
+# adopted: an old account could still replace them through their parent directory.
+keys = ('BACKUP_READINESS_CHECK', 'ERASURE_READINESS_CHECK', 'COMPOSE_EXTRA_FILE')
+configured = {}
+with open(os.path.join(state, 'server.env')) as f:
+    for line in f:
+        key, sep, value = line.rstrip('\r\n').partition('=')
+        if sep and key in keys:
+            configured[key] = value.strip("\"'")
+for key in keys:
+    value = os.environ.get(key, configured.get(key, ''))
+    if not value:
+        continue
+    resolved = os.path.realpath(value)
+    if not os.path.isabs(value) or os.path.islink(value) or not os.path.isfile(value):
+        raise SystemExit('E_DEPLOY_DEPENDENCY: ' + key)
+    if value.startswith(state + '/') and resolved.startswith(state + '/') and not resolved.startswith(state + '/certs/'):
+        continue  # The complete protected tree is adopted below.
+    if resolved != value:
+        raise SystemExit('E_DEPLOY_DEPENDENCY: ' + key)
+    s = os.stat(value)
+    if s.st_uid != 0 or s.st_mode & 0o022:
+        raise SystemExit('E_DEPLOY_DEPENDENCY: ' + key + ' requires a reviewed root-owned file')
+    parent = os.path.dirname(value)
+    while parent != '/':
+        s = os.stat(parent)
+        if s.st_uid != 0 or s.st_mode & 0o022:
+            raise SystemExit('E_DEPLOY_DEPENDENCY_PARENT: ' + key)
+        parent = os.path.dirname(parent)
 for base, dirs, files in os.walk(state, followlinks=False):
     for name in dirs + files:
         p = os.path.join(base, name)
         s = os.lstat(p)
         if stat.S_ISLNK(s.st_mode):
+            if p == os.path.join(state, 'certs') or (p.startswith(state + '/certs/') and not os.path.realpath(p).startswith(state + '/certs/')):
+                raise SystemExit('E_DEPLOY_CERT_LINK')
             if not os.path.realpath(p).startswith(state + '/'):
                 raise SystemExit('E_DEPLOY_EXTERNAL_LINK')
         elif stat.S_ISREG(s.st_mode):
@@ -76,6 +108,16 @@ flock -n 9 || die E_DEPLOY_BUSY
 
 backup="$(mktemp -d "$STATE_DIR/deploy-boundary.XXXXXX")"
 chmod 700 "$backup"
+# Preserve file ownership needed by nonroot processes through read-only cert
+# mounts. The certificate directory itself and the host parent remain root-only.
+cert_paths=()
+cert_owners=()
+if [ -d "$STATE_DIR/certs" ]; then
+  while IFS= read -r -d '' path; do
+    cert_paths+=("$path")
+    cert_owners+=("$(stat -c %u:%g -- "$path")")
+  done < <(find "$STATE_DIR/certs" -type f -print0)
+fi
 for unit in moongame.service moongame-autoupdate.service; do
   [ -f "$SYSTEMD_DIR/$unit" ] || die E_DEPLOY_UNIT
   cp -p "$SYSTEMD_DIR/$unit" "$backup/$unit"
@@ -87,6 +129,9 @@ migration_state=1
 chown root:root "$STATE_DIR"
 chmod 700 "$STATE_DIR"
 chown -hR root:root "$STATE_DIR"
+for i in "${!cert_paths[@]}"; do
+  chown "${cert_owners[$i]}" -- "${cert_paths[$i]}"
+done
 find "$STATE_DIR" -type d -exec chmod go-w {} +
 find "$STATE_DIR" -type f -exec chmod go-w {} +
 for unit in moongame.service moongame-autoupdate.service; do

@@ -860,7 +860,8 @@ caddy есть. Сборка на хосте при этом никуда не �
 2. **Перевод хоста:**
 
    ```bash
-   cd /opt/moongame && sudo git pull --ff-only
+   clone_owner="$(stat -c %U /opt/moongame)"
+   sudo -u "$clone_owner" git -C /opt/moongame pull --ff-only
    read -r -p 'GitHub login: ' VOID_REGISTRY_USER
    read -r -s -p 'GHCR read token: ' VOID_REGISTRY_TOKEN
    export VOID_REGISTRY_USER VOID_REGISTRY_TOKEN
@@ -899,8 +900,11 @@ sudo bash deploy/harden-autodeploy.sh --apply
 Она защищает весь `/var/lib/moongame` (root:root, 0700), включая `current`, скрипты,
 секреты и credentials реестра, ставит root-owned systemd drop-ins и отзывает группу
 `docker` у `moongame`. Только смены `User=` недостаточно: иначе root исполнял бы
-скрипты, которые может подменить старая учётка. Права чтения сертификатов внутри
-bind mounts сохраняются. Контейнеры не перезапускаются; таймер возвращается в прежнее
+скрипты, которые может подменить старая учётка. Владельцы файлов сертификатов и закрытых ключей внутри read-only
+bind mounts сохраняются, включая UID 65532 и режим 0400. Внешние
+`BACKUP_READINESS_CHECK`, `ERASURE_READINESS_CHECK` и `COMPOSE_EXTRA_FILE` до
+смены пользователя должны принадлежать root и находиться в защищённых каталогах;
+иначе миграция отказывает до изменения хоста. Контейнеры не перезапускаются; таймер возвращается в прежнее
 состояние. При ошибке посреди применения таймер остаётся приостановленным.
 
 Копии исходных юнитов сохраняются в закрытом `deploy-boundary.*` внутри каталога

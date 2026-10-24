@@ -3,7 +3,8 @@
 # Перевод хоста на автодеплой (ZTP-1.2): ОДИН раз, от root, на машине, поставленной
 # install-ubuntu.sh.
 #
-#   cd /opt/moongame && sudo git pull --ff-only     # получить этот файл
+#   clone_owner="$(stat -c %U /opt/moongame)"
+#   sudo -u "$clone_owner" git -C /opt/moongame pull --ff-only
 #   # Введите read-only registry credentials через read -s или защищённый файл;
 #   # подробная команда — deploy/README.md, раздел «Автодеплой».
 #   sudo --preserve-env=VOID_REGISTRY_USER,VOID_REGISTRY_TOKEN \

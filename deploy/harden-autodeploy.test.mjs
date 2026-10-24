@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   chmodSync,
+  chownSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -62,6 +63,8 @@ function fixture({ busy = false, userBusy = false } = {}) {
     systemd,
     bin,
     log,
+    root,
+    stub,
     env: {
       ...process.env,
       STATE_DIR: state,
@@ -73,6 +76,36 @@ function fixture({ busy = false, userBusy = false } = {}) {
   };
 }
 describe('privileged deployment boundary migration', () => {
+  it('restores private TLS key ownership after adopting the deploy tree', async () => {
+    const f = fixture();
+    const key = join(f.state, 'certs', 'privkey.pem');
+    writeFileSync(key, 'synthetic-private-key', { mode: 0o400 });
+    // CI need not be root: model the runtime UID reported by stat, while exercising
+    // the real migration, file modes and ordering of ownership operations.
+    f.stub(
+      'stat',
+      'if [ "$1" = -c ] && [ "$2" = %u:%g ] && [[ "${!#}" = */privkey.pem ]]; then echo 65532:65532; else exec /usr/bin/stat "$@"; fi\n',
+    );
+    await run('bash', [script, '--apply'], { env: f.env });
+    const calls = readFileSync(f.log, 'utf8');
+    const adopt = calls.indexOf(`chown -hR root:root ${f.state}`);
+    const restore = calls.indexOf(`chown 65532:65532 -- ${key}`);
+    expect(adopt).toBeGreaterThan(-1);
+    expect(restore).toBeGreaterThan(adopt);
+    expect(statSync(key).mode & 0o777).toBe(0o400);
+  });
+  for (const name of ['BACKUP_READINESS_CHECK', 'COMPOSE_EXTRA_FILE'])
+    it(`rejects an old-user-owned external ${name} before changing the host`, async () => {
+      const f = fixture();
+      const dependency = join(f.root, 'external-policy');
+      writeFileSync(dependency, 'synthetic', { mode: 0o700 });
+      if (process.getuid() === 0) chownSync(dependency, 999, 999);
+      writeFileSync(join(f.state, 'server.env'), `${name}=${dependency}\n`);
+      await expect(run('bash', [script, '--apply'], { env: f.env })).rejects.toMatchObject({
+        code: 1,
+      });
+      expect(readFileSync(f.log, 'utf8')).toBe('');
+    });
   it('protects state, preserves mounted certificates and restores the timer without restarting containers', async () => {
     const f = fixture();
     await run('bash', [script, '--apply'], { env: f.env });
@@ -104,6 +137,16 @@ describe('privileged deployment boundary migration', () => {
   it('rejects external links before touching the timer or files', async () => {
     const f = fixture();
     symlinkSync('/etc', join(f.state, 'external'));
+    await expect(run('bash', [script, '--apply'], { env: f.env })).rejects.toMatchObject({
+      code: 1,
+    });
+    expect(readFileSync(f.log, 'utf8')).toBe('');
+  });
+  it('rejects a TLS key redirected outside the preserved certificate tree', async () => {
+    const f = fixture();
+    const key = join(f.state, 'runtime-key');
+    writeFileSync(key, 'synthetic', { mode: 0o400 });
+    symlinkSync(key, join(f.state, 'certs', 'privkey.pem'));
     await expect(run('bash', [script, '--apply'], { env: f.env })).rejects.toMatchObject({
       code: 1,
     });
