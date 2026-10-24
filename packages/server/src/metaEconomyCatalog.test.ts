@@ -78,3 +78,30 @@ describe('main-game meta content', () => {
     expect(() => parseMetaEconomyCatalog(adCurrency, data)).toThrow('E_META_AD_PRODUCT');
   });
 });
+
+describe('profile medal rewards', () => {
+  it('pays more for each higher degree and only Sovereigns for medals earned without play', () => {
+    const { medals } = loadMetaEconomyCatalog(data);
+    const { 1: top, 2: middle, 3: first } = medals.grades;
+    for (const key of ['sovereigns', 'warrants', 'xp'] as const) {
+      expect(first[key]).toBeGreaterThan(0);
+      expect(middle[key]).toBeGreaterThan(first[key]);
+      expect(top[key]).toBeGreaterThan(middle[key]);
+    }
+    expect(medals.sovereignsOnly).toEqual(['contribution', 'tutorial']);
+  });
+
+  it('rejects an unknown medal and a missing degree', () => {
+    const catalog = loadMetaEconomyCatalog(data);
+    expect(() =>
+      parseMetaEconomyCatalog(
+        { ...catalog, medals: { ...catalog.medals, sovereignsOnly: ['nonexistent'] } },
+        data,
+      ),
+    ).toThrow('E_META_MEDAL');
+    const { 1: _top, ...partial } = catalog.medals.grades;
+    expect(() =>
+      parseMetaEconomyCatalog({ ...catalog, medals: { ...catalog.medals, grades: partial } }, data),
+    ).toThrow();
+  });
+});

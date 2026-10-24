@@ -776,3 +776,54 @@ describe('MetaEconomy Sovereign store', () => {
     expect((await f.service.readModel('alice')).sovereigns).toBe(0);
   });
 });
+
+describe('MetaEconomy medal rewards', () => {
+  it('pays each reached degree once: Sovereigns and Warrants here, XP listed for the caller', async () => {
+    const f = setup();
+    const warrantsBefore = await f.market.balance('alice');
+    const earned = [
+      { medalId: 'first' as const, grade: 3 as const },
+      { medalId: 'first' as const, grade: 2 as const },
+      { medalId: 'tutorial' as const, grade: 3 as const },
+    ];
+    expect(await f.service.unpaidMedals('alice', earned)).toEqual(earned);
+    const paid = await f.service.claimMedals('alice', earned);
+    const { grades } = f.catalog.medals;
+    expect(paid).toMatchObject({
+      ok: true,
+      receipt: {
+        kind: 'medal-reward',
+        sovereignsGranted: grades[3].sovereigns + grades[2].sovereigns + grades[3].sovereigns,
+        warrants: grades[3].warrants + grades[2].warrants,
+        medals: [
+          { medalId: 'first', grade: 3, ...grades[3] },
+          { medalId: 'first', grade: 2, ...grades[2] },
+          // Earned without playing: Sovereigns only.
+          { medalId: 'tutorial', grade: 3, sovereigns: grades[3].sovereigns, warrants: 0, xp: 0 },
+        ],
+      },
+    });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(
+      grades[3].sovereigns * 2 + grades[2].sovereigns,
+    );
+    expect((await f.market.balance('alice')) - warrantsBefore).toBe(
+      grades[3].warrants + grades[2].warrants,
+    );
+    expect(await f.service.unpaidMedals('alice', earned)).toEqual([]);
+    // A new degree beside paid ones pays only the new one.
+    const next = [...earned, { medalId: 'first' as const, grade: 1 as const }];
+    expect(await f.service.unpaidMedals('alice', next)).toEqual([{ medalId: 'first', grade: 1 }]);
+    const again = await f.service.claimMedals('alice', next);
+    expect(again.ok && again.receipt.medals).toEqual([{ medalId: 'first', grade: 1, ...grades[1] }]);
+  });
+
+  it('refuses a malformed account id without touching any wallet', async () => {
+    const f = setup();
+    const earned = [{ medalId: 'first' as const, grade: 3 as const }];
+    expect(await f.service.unpaidMedals('__proto__', earned)).toEqual([]);
+    expect(await f.service.claimMedals('__proto__', earned)).toEqual({
+      ok: false,
+      code: 'E_META_REQUEST',
+    });
+  });
+});

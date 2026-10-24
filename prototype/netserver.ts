@@ -27,6 +27,7 @@ import { MemoryAnnouncementStore, MemoryAvaFeedStore, PostgresAnnouncementStore,
 import { registerNewsApi } from '../packages/server/src/newsApi';
 import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
+import { settleMedalRewards } from '../packages/server/src/medalRewards';
 // UIX-4.4 (часть 1): push до игроков — тот же приёмник подписки и та же рассылка «своё и
 // срочное», что у канонического хоста; без VAPID в окружении не монтируется ничего.
 import { registerPushApi } from '../packages/server/src/pushApi';
@@ -1357,7 +1358,9 @@ const server = createMultiplayerServer({
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
-      registerProfileApi(app, { registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId), identify: identifySession });
+      registerProfileApi(app, { registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId),
+        medalRewards: (accountId) => settleMedalRewards({ profiles: profileStore, commanders: commanderStore, economy: metaEconomy, table: metaCatalog.medals }, accountId),
+        identify: identifySession });
       // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа
       // монтируется только при заданных VAPID.
       registerPushApi(app, {

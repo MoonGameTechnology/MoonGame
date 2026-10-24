@@ -7,6 +7,7 @@ import { useRemoteCorporations } from './corporateRemote';
 import { securityAuditFromEnv } from './securityAudit';
 import rateLimit from '@fastify/rate-limit';
 import { registerProfileApi } from './profileApi';
+import { settleMedalRewards } from './medalRewards';
 import { registerPlayerActivityApi } from './playerActivityApi';
 import { creditProfileMatch } from './profileCredit';
 import { nickSeatAccounts } from './commanderCredit';
@@ -669,6 +670,16 @@ const server = createMultiplayerServer({
               users: stores.userStore,
               commanders: stores.commanderStore,
               premium: (accountId) => metaEconomy.isPremium(accountId),
+              medalRewards: (accountId) =>
+                settleMedalRewards(
+                  {
+                    profiles: stores.profileStore,
+                    commanders: stores.commanderStore,
+                    economy: metaEconomy,
+                    table: metaCatalog.medals,
+                  },
+                  accountId,
+                ),
               identify,
             });
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с

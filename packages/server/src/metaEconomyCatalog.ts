@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { GameData } from '@void/shared-core';
+import { PROFILE_MEDALS } from '@void/protocol';
 
 const id = z
   .string()
@@ -31,6 +32,15 @@ const storeOffer = z
     materials: quantities.optional(),
     /** Lifetime purchases per account. */
     limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+/** What one degree of a profile medal pays, once per account. */
+const medalPay = z
+  .object({
+    sovereigns: z.number().int().min(0).max(1_000_000),
+    warrants: z.number().int().min(0).max(1_000_000),
+    xp: z.number().int().min(0).max(1_000_000),
   })
   .strict();
 
@@ -74,6 +84,15 @@ const schema = z
       })
       .strict(),
     market: z.object({ minimumAccountXp: z.number().int().nonnegative() }).strict(),
+    /** Profile medal rewards by degree (3 = class III, the first goal). */
+    medals: z
+      .object({
+        grades: z.object({ '1': medalPay, '2': medalPay, '3': medalPay }).strict(),
+        /** Medals earned without playing a match (registration, the on-device tutorial):
+         *  Warrants and XP there would let a fresh alt account farm the market gate. */
+        sovereignsOnly: z.array(id).max(20),
+      })
+      .strict(),
     seasons: z
       .array(
         z
@@ -174,6 +193,8 @@ export function parseMetaEconomyCatalog(
   checkMaterials(catalog.rewards.materials);
   if (catalog.rewards.dailyWarrants < catalog.rewards.warrants)
     throw new Error('E_META_WARRANT_CAP');
+  if (catalog.medals.sovereignsOnly.some((medal) => !PROFILE_MEDALS.some((m) => m.id === medal)))
+    throw new Error('E_META_MEDAL');
   if (
     catalog.rewards.resultBonuses.some(
       (row, i, rows) => i > 0 && row.maxPlace <= rows[i - 1]!.maxPlace,
