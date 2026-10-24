@@ -29,6 +29,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
         uid: ownership.get(String(path)) ?? 0,
       }),
     readlink: async (path) => actual.readlink(pathAliases.get(String(path)) ?? path),
+    readFile: async (path, ...args) =>
+      actual.readFile(pathAliases.get(String(path)) ?? path, ...args),
     open: async (...args) => {
       const handle = await actual.open(...args);
       return {
