@@ -235,7 +235,7 @@ EOF
 cat > "$BIN_DIR/moongame" << EOF
 #!/bin/bash
 # Хост на автодеплое (install-autodeploy.sh): команда живёт в текущей версии deploy/.
-exec env STATE_DIR="$STATE_DIR" bash "$STATE_DIR/current/deploy/moongame.sh" "\$@"
+exec env SERVICE_USER=root STATE_DIR="$STATE_DIR" bash "$STATE_DIR/current/deploy/moongame.sh" "\$@"
 EOF
 chmod 755 "$BIN_DIR/moongame"
 

@@ -113,4 +113,16 @@ describe('installer bootstrap boundary', () => {
       'DB_MIGRATION_URL=fixture-only\n',
     );
   });
+
+  it('keeps root selected when the installed CLI runs an older release helper', async () => {
+    const f = installer();
+    await run('bash', [join(f.deploy, 'install-autodeploy.sh')], { env: f.env });
+    writeFileSync(
+      join(f.state, 'current/deploy/moongame.sh'),
+      '#!/bin/bash\n[ "${SERVICE_USER:-moongame}" = root ] || exit 97\n',
+    );
+    await expect(
+      run(join(f.env.BIN_DIR, 'moongame'), ['history'], { env: { ...f.env, SERVICE_USER: '' } }),
+    ).resolves.toMatchObject({ stderr: '' });
+  });
 });
