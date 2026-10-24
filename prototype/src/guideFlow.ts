@@ -13,16 +13,25 @@ import { isForkSite, type GameState } from '../../packages/shared-core/src/index
 import { t } from '../../localization/runtime';
 import {
   GUIDE_ASSAULT,
+  GUIDE_HERO_MODULE,
   GUIDE_HULL,
   GUIDE_TARGET,
   GUIDE_TECH,
+  GUIDE_TROOPS,
   guideCourseSet,
   guideFleet,
+  guideHeroFleet,
+  guideHeroModules,
+  guideLot,
   guideMineLevel,
   guideScenario,
   guideShipCount,
+  guideTroopsAboard,
+  guideTroopsHome,
+  guideWingsAboard,
 } from '../../decisions/firstMatchGuide';
 import { nearestClearSpot, type Spot } from '../../decisions/clearSpot';
+import { visibleGoalRows } from '../../decisions/goalRows';
 import { note } from './eventFeed';
 import { FIRST_GOALS, type GoalSignals, goalsComplete, mergeDone, metGoals } from './firstGoals';
 import { buildFirstMatchTour } from './firstMatchTour';
@@ -204,7 +213,6 @@ export function maybeStartPendingTour(): void {
   pendingGuide = null;
   requestAnimationFrame(run); // let the fresh HUD paint a frame so selectors resolve
 }
-const myScore = (): number => Math.round(live().match?.scores?.[me()]?.total ?? 0);
 // Крепость на развилке (FORT-6.1) — не мир: её постройка не «захват нового мира».
 const myWorldCount = (): number =>
   Object.values(live().planets).filter((p) => p.owner === me() && !isForkSite(p)).length;
@@ -228,7 +236,7 @@ export function startGuidedMatch(): void {
     const planetBox = (id: string) =>
       box(live().planets[id] ? world(live().planets[id]!.position) : null);
     const dossier = (selector: string) => !!document.querySelector(`#codex.show ${selector}`);
-    startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
+    startFirstGoals(home); // ONB-7: the first-session checklist rides alongside the guide
     launchTour(
       buildFirstMatchTour({
         mouse: pcUi,
@@ -351,31 +359,41 @@ function onGuidedTourEnded(r: TourResult): void {
 }
 
 // --- ONB-7 first-session goals checklist -------------------------------------
-// A light "am I playing right?" list, shown only in the onboarding match: four
-// goals tick from live state (mine improved, frigate built, sector taken, first point),
-// and finishing all four praises the player + nudges them to a real match.
+// A light "am I playing right?" list, shown only in the onboarding match: one goal per
+// lesson chapter ticks from live state (ONB-15), and finishing them all praises the
+// player + nudges them to a real match.
 let goalsActive = false;
 let goalsCollapsed = false;
 let goalsRewarded = false;
 let goalsDone: string[] = [];
 let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
-let goalScoreBase = 0;
 let goalShipBase = 0;
+let goalHome = '';
+let goalMilitiaBase = 0;
 // Чем меряется прогресс — `goalTally.ts` (REFM-99): от базы на момент запуска списка,
 // а шахты суммой УРОВНЕЙ, потому что домашняя шахта уже стоит.
 const myMineLevel = (): number => mineLevels(Object.values(live().planets), me());
 function goalSignals(): GoalSignals {
+  const s = live();
+  const aboard = guideTroopsAboard(s, me());
   return {
-    builtMine: grew(myMineLevel(), goalBase.mineLevel),
-    launchedFleet: grew(guideShipCount(live(), me()), goalShipBase),
-    capturedWorld: grew(myWorldCount(), goalBase.worlds),
-    score: Math.max(0, myScore() - goalScoreBase),
+    mine: grew(myMineLevel(), goalBase.mineLevel),
+    research: s.players[me()]?.technologies?.completed.includes(GUIDE_TECH) === true,
+    fleet: grew(guideShipCount(s, me()), goalShipBase),
+    capture: grew(myWorldCount(), goalBase.worlds),
+    market: !guideLot(s, 'buy') && !guideLot(s, 'sell'),
+    hero: guideHeroModules(s, me()).includes(GUIDE_HERO_MODULE) && !!guideHeroFleet(s, me()),
+    ground: guideTroopsHome(s, goalHome) + aboard >= goalMilitiaBase + GUIDE_TROOPS,
+    aviation: guideWingsAboard(s, me()) > 0,
+    landing: aboard >= GUIDE_TROOPS,
+    assault: s.planets[GUIDE_ASSAULT]?.owner === me(),
   };
 }
-function startFirstGoals(): void {
+function startFirstGoals(home: string): void {
   goalBase = goalBaseline(Object.values(live().planets), Object.values(live().fleets), me());
-  goalScoreBase = myScore();
   goalShipBase = guideShipCount(live(), me());
+  goalHome = home;
+  goalMilitiaBase = guideTroopsHome(live(), home);
   goalsDone = [];
   goalsRewarded = loadOnboard().goalsRewarded === true;
   goalsCollapsed = false;
@@ -413,7 +431,7 @@ function renderGoals(): void {
   if (!el) return;
   // Collapsed = a small tappable tray badge (icon + count), not just the list hidden
   // under a still-full-width header — the whole point is to give the map its room
-  // back, not just the four rows.
+  // back, not just the goal rows.
   // Свёрнутая подача — ЛОТОК, а не спрятанные строки: смысл сворачивания вернуть карте
   // место, а шапка во всю ширину этого не даёт (`goalsPanel.ts`, правило 3).
   if (goalsCollapsed) {
@@ -424,8 +442,14 @@ function renderGoals(): void {
   el.innerHTML = goalsListHtml(
     t('onb.goals.title'),
     t('onb.goal.collapse.title'),
-    FIRST_GOALS.map((g) => ({ label: t(g.labelKey), done: goalsDone.includes(g.id) })),
+    visibleGoalRows(
+      FIRST_GOALS.map((g) => ({
+        label: t(g.labelKey, { n: GUIDE_TROOPS }), // `{n}` only in the militia goal
+        done: goalsDone.includes(g.id),
+      })),
+    ),
     goalsDone.length,
+    FIRST_GOALS.length,
   );
   el.classList.add('show');
 }

@@ -12,6 +12,16 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { GameState } from '../../packages/shared-core/src/index';
+import {
+  GUIDE_ASSAULT,
+  GUIDE_HERO_MODULE,
+  GUIDE_TECH,
+  GUIDE_TROOP,
+  GUIDE_TROOPS,
+  GUIDE_WING,
+  guideHero,
+  guideScenario,
+} from '../../decisions/firstMatchGuide';
 import type { TourEnd } from './spotlight';
 import type { MetaState } from './meta';
 
@@ -217,8 +227,8 @@ describe('REFM-221 · ведомый первый матч и цели', () => {
     expect(env.els.get('goals')?.classList.contains('show')).toBe(true);
   });
 
-  it('все четыре цели — похвала и XP ровно один раз; флаг помнит награду по позывному', async () => {
-    let s = game.newGame();
+  it('все цели урока — похвала и XP ровно один раз; флаг помнит награду по позывному', async () => {
+    let s = guideScenario(game.newGame(), 'p1');
     const guide = await load(() => s);
     guide.startGuidedMatch();
     guide.maybeStartPendingTour();
@@ -229,10 +239,20 @@ describe('REFM-221 · ведомый первый матч и цели', () => {
     home.buildings.find((b) => b.type === 'mine')!.level += 1;
     const other = Object.values(next.planets).find((p) => p.owner !== 'p1' && p.kind === 'planet')!;
     other.owner = 'p1';
-    Object.values(next.fleets)
-      .find((f) => f.owner === 'p1')!
-      .units.push({ unit: 'frigate', count: 1 });
-    next.match.scores.p1 = { controlledPlanets: 2, fleets: 1, units: 1, total: 1_000 };
+    // Карта теста — не карта урока: мир операции добавлен, уже взятый.
+    next.planets[GUIDE_ASSAULT] = { ...structuredClone(other), id: GUIDE_ASSAULT };
+    next.players.p1!.technologies!.completed.push(GUIDE_TECH);
+    next.market = []; // оба лота гильдии взяты
+    const hero = guideHero(next, 'p1')!;
+    hero.modules = [GUIDE_HERO_MODULE, 'repair_bay'];
+    const ship = next.fleets[hero.fleetId!]!;
+    ship.units.push({ unit: 'frigate', count: 1 });
+    ship.landing = [{ unit: GUIDE_TROOP, count: GUIDE_TROOPS }];
+    ship.hangar = [{ id: 'sq-1', units: [{ unit: GUIDE_WING, count: 1 }] }];
+    // Девять глав из десяти — ещё не награда: лоты гильдии на месте, рынок не пройден.
+    s = { ...next, market: s.market };
+    guide.updateGoals();
+    expect(env.calls.filter((c) => c.startsWith('xp:'))).toHaveLength(0);
     s = next;
     guide.updateGoals();
     guide.updateGoals();
