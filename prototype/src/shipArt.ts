@@ -5,6 +5,7 @@ import type { GameData } from '../../packages/shared-core/src/index';
 import { UNIT_SHAPE, type ShipShapeId } from '../../packages/client/src/shipShapes';
 import { unitShape } from '../../packages/client/src/shipGlyphs';
 import fighter from '../art/ships/fighter.webp';
+import scoutDrone from '../art/ships/scout-drone.webp';
 import strikeCraft from '../art/ships/strike-craft.webp';
 import frigate from '../art/ships/frigate.webp';
 import cruiser from '../art/ships/cruiser.webp';
@@ -109,6 +110,10 @@ export function portraitArt(
   // Until its catalogue entry is shipped, unknown module pages stay empty.
   const mine = kind === 'md' && (id === 'mine_layer' || id === 'rocket_mine_layer') && !!data.modules[id];
   const def = kind === 'u' ? data.units[id] : undefined;
+  // The unmanned drone has its own portrait; Swarm owners keep their faction art.
+  if (def?.domain === 'space' && id === 'scout_drone' && (ownerFaction ?? def.faction) !== 'swarm') {
+    return { key: 'scoutDrone', src: scoutDrone };
+  }
   const shape = def
     ? def.domain !== 'space'
       ? undefined

@@ -7,7 +7,8 @@
 
 | Файл | Игровые id | Исходный концепт, id генерации |
 | --- | --- | --- |
-| fighter.webp | scout_drone, interceptor | c7a3dacf-39c4-45dd-854d-5e7f57f8f350 |
+| fighter.webp | interceptor | c7a3dacf-39c4-45dd-854d-5e7f57f8f350 |
+| scout-drone.webp | scout_drone (кроме Роя) | exec-69b28198-29bf-4f27-8ad7-10f818b6977c |
 | strike-craft.webp | bomber | 7209a6bf-2341-4fdd-aefa-0dbf1a343daf |
 | frigate.webp | frigate | 57819bfc-efbc-492c-b8a1-e2aa552c5281 |
 | cruiser.webp | cruiser | a7b515a9-4d12-44c3-81f6-8f0e12c09ca0 |
@@ -15,6 +16,20 @@
 | transport.webp | shuttle_carrier | de184b15-ab06-42a1-8711-c48c030796da |
 | dropship.webp | landing_shuttle | ee5b6c0f-638b-491b-96b8-d04ebc7993d5 |
 | station.webp | здания starfort, metal_station | 35d9c5c5-27aa-4928-b202-6d2e0be2ea56 |
+
+## Разведдрон (2026-10-24)
+
+Отдельный портрет `scout_drone` создан встроенным Imagegen по стилю `fighter.webp`:
+беспилотный корпус без кабины, оптический блок, антенны и сенсорные панели.
+Исходник 1536×1024 уменьшен до 768×512 (Lanczos), WebP quality 83, method 6.
+`shipArt.ts` выбирает его по id юнита после определения фракции; у Роя остаётся
+`swarmScout`, у истребителя — `fighter.webp`, у разведчика `scout` — `scout.webp`.
+Ключ портрета `scoutDrone` не наследует координаты отсеков истребителя.
+Векторный силуэт карты этим изменением не затрагивается.
+
+Промпт (изображение истребителя использовано только как референс стиля):
+
+> Use case: stylized-concept. Project asset: one realistic spacecraft portrait for the scout_drone reconnaissance drone in Void Dominion / Averion. Input image is STYLE REFERENCE ONLY: match this fleet's realistic gray gunmetal angular armor, purposeful mechanical joints, restrained cyan engine glow, plain navy-black #071018 background and three-quarter elevated view. Create a DISTINCT small unmanned reconnaissance craft, no cockpit, no windshield, no pilot. Compact tapered armored central pod with a clearly visible forward optical sensor cluster (one large dark glass lens and two smaller lenses in a protected gimbal), two short swept sensor-outrigger fins with visibly attached flat phased-array panels, two modest block-shaped rear engine nacelles and short functional antennae. Emphasize sensing equipment rather than weapons; no large guns. Maintain twin-engine, tapered-body family resemblance but make it much shorter and more compact than the fighter and the needle-like manned scout. Entire craft centered in landscape 3:2 frame, nose upper right, rear engines lower left, 8% margins around all extremities. Believable functional construction, clean readable silhouette at thumbnail size, detailed hard-surface cinematic game art, soft directional neutral lighting, enough contrast to see sensors. No text, no logo, no border, no UI, no people, no stars, no planet, no action scene, no decorative excessive neon, no quadcopter rotors. Deliver only this single finished art-only portrait.
 
 ## Дополнение Sector Zero (SHIPART-4, 2026-09-26)
 
