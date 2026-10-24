@@ -386,6 +386,24 @@ describe('REFM-232 — слой живых границ', () => {
     expect(dh! / sh!).toBeCloseTo(1.25, 6);
   });
 
+  it('медленное устройство: зум дальше MAX_STRETCH растягивает слой, а не рисует его заново', async () => {
+    const { ml, show, painted, blits, camera } = await boot();
+    // Каждое чтение часов — 60 мс: целая выпечка карты дороже GESTURE_BAKE_MS.
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    show(1000);
+    show(1000 + SETTLE_MS);
+    expect(ml.mapCostly).toBe(true);
+    painted();
+    blits();
+    camera.zoomAt(800, 450, 4);
+    expect(show(2000)).toBe(true);
+    expect(painted()).toEqual({ whole: 0, rects: 0 });
+    const [b] = blits();
+    const [, , , sw, , , , dw] = b!.args as number[];
+    expect(dw! / sw!).toBeCloseTo(4, 6);
+  });
+
   it('в кадре новой выпечки слой не рисуется, а ждёт следующего (правило 4)', async () => {
     const { ml, show, painted, blits, camera } = await boot();
     show(1000);
