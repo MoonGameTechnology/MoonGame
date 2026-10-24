@@ -1,6 +1,14 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { registerAuthApi, liveSession, pwFingerprint, authRateFromEnv, type RecoveryMail } from './authApi';
+import { decodeJwt } from 'jose';
+import {
+  registerAuthApi,
+  liveSession,
+  pwFingerprint,
+  authRateFromEnv,
+  SESSION_REAUTH_SEC,
+  type RecoveryMail,
+} from './authApi';
 import {
   signSessionToken,
   verifySessionToken,
@@ -545,6 +553,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       users,
       signSession: (accountId, login, pwfp) =>
         signSessionToken({ accountId, login, pwfp }, SIGN, { ttlSeconds: 3600 }),
+      verifySession: (token) => verifySessionToken(token, VERIFY),
       signReset: (accountId, pwfp) =>
         signResetToken({ accountId, pwfp }, RESET_SIGN, { ttlSeconds: 900 }),
       verifyReset: async (token) => {
@@ -579,6 +588,7 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
       { url: '/auth/login', body: { login: 'limit_probe', password: 'orbit-longenough' } },
       { url: '/auth/recover', body: { email: 'limit_probe@example.com' } },
       { url: '/auth/reset', body: { token: 'irrelevant', password: 'orbit-longenough' } },
+      { url: '/auth/refresh', body: undefined },
     ];
     for (const route of ROUTES) {
       // Своя копия приложения на каждый роут: лимитер общий на IP, и без этого первый
@@ -856,5 +866,99 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
     const users = new MemoryUserStore();
     const claim = { accountId: 'ghost', login: 'ghost', pwfp: pwFingerprint('whatever') };
     expect(await liveSession(claim, users)).toBeNull();
+  });
+});
+
+describe('AC-0.2 · remember-me: /auth/refresh', () => {
+  /** Mirrors the serverConfig composition: the refresh passes `authTime` through. */
+  function refreshApp(users = new MemoryUserStore()): { server: FastifyInstance; users: MemoryUserStore } {
+    app = Fastify();
+    registerAuthApi(app, {
+      users,
+      signSession: (accountId, login, pwfp, authTime) =>
+        signSessionToken({ accountId, login, pwfp, ...(authTime !== undefined ? { authTime } : {}) }, SIGN, {
+          ttlSeconds: 3600,
+        }),
+      verifySession: (token) => verifySessionToken(token, VERIFY),
+      scryptParams: FAST,
+    });
+    return { server: app, users };
+  }
+  const refresh = (server: FastifyInstance, token?: string, payload?: object) =>
+    server.inject({
+      method: 'POST',
+      url: '/auth/refresh',
+      ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+      ...(payload ? { payload } : {}),
+    });
+  /** A session for an existing account, minted with chosen times (as if issued earlier). */
+  const sessionFor = async (users: MemoryUserStore, login: string, at: { iatMs?: number; authTime?: number }) => {
+    const user = (await users.findUser(login))!;
+    return signSessionToken(
+      { accountId: user.userId, login: user.login, pwfp: pwFingerprint(user.passHash), ...(at.authTime ? { authTime: at.authTime } : {}) },
+      SIGN,
+      { ttlSeconds: 3600, ...(at.iatMs ? { now: () => at.iatMs! } : {}) },
+    );
+  };
+
+  it('a live session renews: later expiry, same account, fingerprint and password moment', async () => {
+    const { server, users } = refreshApp();
+    await post(server, '/auth/register', { login: 'remy', password: 'orbit-longenough' });
+    const old = await sessionFor(users, 'remy', { iatMs: Date.now() - 600_000 });
+    const response = await refresh(server, old);
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    const body = response.json() as { accountId: string; login: string; token: string };
+    const before = await verifySessionToken(old, VERIFY);
+    const after = await verifySessionToken(body.token, VERIFY);
+    if (!before.ok || !after.ok) throw new Error('both sessions verify');
+    expect(after.claim).toEqual(before.claim);
+    expect(body).toEqual({ accountId: before.claim.accountId, login: 'remy', token: body.token });
+    expect(decodeJwt(body.token).exp!).toBeGreaterThan(decodeJwt(old).exp!);
+    // The renewed session is a real session: it renews again.
+    expect((await refresh(server, body.token)).statusCode).toBe(200);
+  });
+
+  it('never revives a session that logout or a password change killed', async () => {
+    const { server, users } = refreshApp();
+    const reg = await post(server, '/auth/register', { login: 'lou', password: 'orbit-longenough' });
+    const { token, accountId } = reg.json() as { token: string; accountId: string };
+    expect((await refresh(server, token)).statusCode).toBe(200);
+    await users.setPassword(accountId, await hashPassword('another-orbit-signal', FAST));
+    expect((await refresh(server, token)).json()).toEqual({ error: 'E_AUTH' });
+
+    const login = await post(server, '/auth/login', { login: 'lou', password: 'another-orbit-signal' });
+    const fresh = (login.json() as { token: string }).token;
+    const renewed = (await refresh(server, fresh)).json() as { token: string };
+    expect((await server.inject({ method: 'POST', url: '/auth/logout', headers: { authorization: `Bearer ${fresh}` } })).statusCode).toBe(204);
+    for (const dead of [fresh, renewed.token]) {
+      const response = await refresh(server, dead);
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toEqual({ error: 'E_AUTH' });
+    }
+  });
+
+  it('stops renewing once the password entry is SESSION_REAUTH_SEC old', async () => {
+    const { server, users } = refreshApp();
+    await post(server, '/auth/register', { login: 'ria', password: 'orbit-longenough' });
+    const nowSec = Math.floor(Date.now() / 1000);
+    const nearly = await sessionFor(users, 'ria', { authTime: nowSec - SESSION_REAUTH_SEC + 60 });
+    const renewed = await refresh(server, nearly);
+    expect(renewed.statusCode).toBe(200);
+    expect(decodeJwt((renewed.json() as { token: string }).token).auth_time).toBe(nowSec - SESSION_REAUTH_SEC + 60);
+    const stale = await sessionFor(users, 'ria', { authTime: nowSec - SESSION_REAUTH_SEC });
+    const refused = await refresh(server, stale);
+    expect(refused.statusCode).toBe(401);
+    expect(refused.json()).toEqual({ error: 'E_AUTH' });
+  });
+
+  it('refuses a missing or forged bearer and any body', async () => {
+    const { server } = refreshApp();
+    const reg = await post(server, '/auth/register', { login: 'fay', password: 'orbit-longenough' });
+    const { token } = reg.json() as { token: string };
+    expect((await refresh(server)).statusCode).toBe(401);
+    expect((await refresh(server, 'garbage')).statusCode).toBe(401);
+    expect((await refresh(server, token.slice(0, -2) + 'xx')).statusCode).toBe(401);
+    expect((await refresh(server, token, { accountId: 'somebody-else' })).statusCode).toBe(400);
   });
 });

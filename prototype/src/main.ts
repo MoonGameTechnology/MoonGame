@@ -25,6 +25,7 @@ import {
   initAccountSession,
   pendingJoinAfterAuth,
   probeAuthMode,
+  resumeSession,
   sessionRecord,
   sessionToken,
 } from './accountSession';
@@ -3590,9 +3591,13 @@ if (bootReset) {
       // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
       // into the browser console (and into any screen recording of a playtest).
       const cached = srv ? sessionRecord(srv.base) : null;
+      // Закладка на партию — тоже возвращение: продлеваем сессию и здесь (AC-0.2), иначе
+      // игрок, входящий только по ссылке, через неделю снова упрётся в пароль. Мёртвую
+      // сессию продление стирает, и посадка честно ведёт на карточку входа.
+      const resumed = srv && cached && authMode === 'accounts' ? await resumeSession(srv.base, cached.login) : null;
       const where = joinLanding({
         identity: authMode,
-        hasSession: !!cached,
+        hasSession: !!cached && resumed !== 'gone',
         refused: false,
       });
       if (where === 'match') {
@@ -3618,13 +3623,13 @@ if (bootReset) {
   showConnect(false);
   showHub(false);
 } else {
-  // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
-  // hub — like every game's login screen. Previously a cached `void.nick` in
-  // localStorage skipped straight to `openHub()`, but that left the player in
-  // the hub with no valid session, so every Join silently failed (the session
-  // JWT was missing or stale). Now the welcome card is the boot screen; a
-  // returning player types their password once, gets a fresh JWT, and lands
-  // on the hub with a live session — exactly the standard game-login flow.
+  // Auth gate at boot: the welcome/login card is the boot screen, before the hub.
+  // A cached `void.nick` alone once skipped straight to `openHub()` and left the player
+  // in the hub with no valid session, so every Join silently failed. Remember-me
+  // (AC-0.2) skips the card only on PROOF: the server renews the stored session of
+  // this callsign (`resumeSession`), and only a live renewal opens the hub. A dead one
+  // is erased, an unanswered one is kept — both show the card as before, password row
+  // included, so the player can still sign in by hand.
   showConnect(true);
   showHub(false);
   showStage('welcome');
@@ -3634,8 +3639,18 @@ if (bootReset) {
       const srv = resolveServer();
       const mode = srv ? await probeAuthMode(srv.base) : authMode;
       const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-      if (mode === 'accounts') fillWelcome(savedNick, 'show');
-      else fillWelcome(savedNick, 'hide');
+      if (mode === 'accounts') {
+        const resumed = srv && savedNick ? await resumeSession(srv.base, savedNick) : null;
+        // Пока продлевали, игрок мог уйти с карточки (регистрация, восстановление) или
+        // уже войти сам — тогда хаб его не перебивает.
+        const stillWelcome = connectShown() && $('connect').dataset.stage === 'welcome';
+        if (resumed === 'live' && stillWelcome) {
+          nickInput.value = savedNick;
+          openHub();
+          return;
+        }
+        fillWelcome(savedNick, 'show');
+      } else fillWelcome(savedNick, 'hide');
     })(),
   );
 }

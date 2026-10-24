@@ -167,7 +167,39 @@ describe('SE-1.x · session tokens (typ/audience separation from join tokens)', 
       { ttlSeconds: 3600 },
     );
     const result = await verifySessionToken(token, sessionVerify);
-    expect(result).toEqual({ ok: true, claim: { accountId: 'acct-1', login: 'Vasya', pwfp: 'fp-abc' } });
+    expect(result).toEqual({
+      ok: true,
+      claim: { accountId: 'acct-1', login: 'Vasya', pwfp: 'fp-abc', authTime: expect.any(Number) },
+    });
+  });
+
+  it('auth_time: a fresh sign stamps now, a refresh keeps the given moment, a legacy token reads iat', async () => {
+    const at = Date.now() - 5_000;
+    const fresh = await signSessionToken(
+      { accountId: 'acct-1', login: 'Vasya', pwfp: 'fp-abc' },
+      sessionSign,
+      { ttlSeconds: 3600, now: () => at },
+    );
+    const renewed = await signSessionToken(
+      { accountId: 'acct-1', login: 'Vasya', pwfp: 'fp-abc', authTime: 1_800_000_000 },
+      sessionSign,
+      { ttlSeconds: 3600 },
+    );
+    const legacy = await new SignJWT({ login: 'Vasya', pwfp: 'fp-abc' })
+      .setProtectedHeader({ alg: 'HS256', typ: 'session+jwt' })
+      .setSubject('acct-1')
+      .setIssuer('void')
+      .setAudience('session')
+      .setIssuedAt(1_700_000_000)
+      .setExpirationTime('1h')
+      .sign(secret);
+    const authTime = async (token: string) => {
+      const r = await verifySessionToken(token, sessionVerify);
+      return r.ok ? r.claim.authTime : null;
+    };
+    expect(await authTime(fresh)).toBe(Math.floor(at / 1000));
+    expect(await authTime(renewed)).toBe(1_800_000_000);
+    expect(await authTime(legacy)).toBe(1_700_000_000);
   });
 
   it('rejects a session with no pwfp (pre-upgrade / forged) — fail-secure', async () => {

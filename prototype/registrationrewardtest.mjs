@@ -90,13 +90,11 @@ try {
         const profile = async () => (await fetch(base + '/profiles', { headers })).json();
         const receipt = async () =>
           (await fetch(base + '/profiles/rewards/registration', { headers })).json();
+        // Remember-me (AC-0.2): a reload renews the stored session and lands in the hub
+        // without the password being typed again.
         const signBackIn = async () => {
-          await page.locator('#cwpass').waitFor({ state: 'visible' });
-          if (!(await page.locator('#cwnick').isVisible())) await page.click('#clogin');
-          await page.fill('#cwnick', login);
-          await page.fill('#cwpass', password);
-          await page.click('#cwgo');
           await page.locator('#hub').waitFor({ state: 'visible' });
+          assert.equal(await page.locator('#cwpass').isVisible(), false, 'no password after reload');
         };
         const dialog = page.locator('#registration-reward');
         await dialog.waitFor({ state: 'visible' });
