@@ -6,6 +6,7 @@ import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { ACTION_TYPES, REJECT_CODES } from './game-exporter-catalog.mjs';
+import { loopbackRequestFromEnv } from './loopback-request.mjs';
 
 const SOURCES = { health: '/health', ready: '/ready', metrics: '/metrics', summary: '/metrics/summary', activity:'/metrics/activity' };
 const MAX_BODY = 65536, MAX_SAMPLES = 5000, MAX_EXPOSITION = 1048576;
@@ -147,7 +148,7 @@ async function sourceJson(source, port, token, request, timeoutMs) {
 
 /** Shared scrape, fresh projections only. The 1500ms default leaves response headroom
  *  below the consumer's 2s deadline; explicit local overrides still have a 2s cap. */
-export function createExporter({ sourcePort = 8788, token, request = fetch, now = Date.now, timeoutMs = 1500 } = {}) {
+export function createExporter({ sourcePort = 8788, token, request = loopbackRequestFromEnv(), now = Date.now, timeoutMs = 1500 } = {}) {
   if (!Number.isInteger(sourcePort) || sourcePort < 1 || sourcePort > 65535 || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2000) throw new Error('E_OBS_CONFIG');
   const lastSuccess = new Map(); let inFlight, rejectedSeries = 0;
   const scrape = () => {

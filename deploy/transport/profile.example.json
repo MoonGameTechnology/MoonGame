@@ -1,0 +1,18 @@
+{
+  "name": "prod",
+  "directory": "/var/lib/moongame-transport/prod",
+  "app": {
+    "service": "server",
+    "container": "deploy-server-1",
+    "uid": 65532,
+    "dns": ["server", "localhost"]
+  },
+  "db": {
+    "service": "postgres",
+    "container": "deploy-postgres-1",
+    "uid": 70,
+    "dns": ["postgres", "localhost"]
+  },
+  "front_network": "deploy_default",
+  "db_network": "deploy_database"
+}

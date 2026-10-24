@@ -13,10 +13,17 @@ case "${1:-}" in --pending|--replay) ;; *) exit 2 ;; esac
 [[ "$ERASURE_LEDGER" = /* && -f "$ERASURE_LEDGER" && ! -L "$ERASURE_LEDGER" ]] || exit 1
 image="$(docker inspect --format '{{.Image}}' "${ERASURE_DOCKER_SERVER:-deploy-server-1}")"
 [[ "$image" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+transport_args=()
+if [ -n "${ERASURE_DB_TLS_CA_FILE:-}" ]; then
+  [[ "$ERASURE_DB_TLS_CA_FILE" = /* && -f "$ERASURE_DB_TLS_CA_FILE" && ! -L "$ERASURE_DB_TLS_CA_FILE" ]] || exit 1
+  transport_args=(--mount "type=bind,src=$ERASURE_DB_TLS_CA_FILE,dst=/run/moongame-db-ca.pem,readonly"
+    --env PGSSLMODE=verify-full --env NODE_EXTRA_CA_CERTS=/run/moongame-db-ca.pem)
+fi
 # Root is confined to the two data mounts; CHOWN preserves original log ownership.
 # The root filesystem is read-only and no host ports or Docker socket are exposed.
 exec docker run --rm --pull never --read-only --user 0:0 \
   --network "$ERASURE_DOCKER_NETWORK" --env-file "$ERASURE_DOCKER_ENV" \
+  "${transport_args[@]}" \
   --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE \
   --security-opt no-new-privileges:true --pids-limit 128 --memory 512m \
   --mount "type=bind,src=$(dirname "$ERASURE_LEDGER"),dst=/erasure" \

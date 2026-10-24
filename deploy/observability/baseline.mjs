@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { loopbackRequestFromEnv } from './loopback-request.mjs';
 
 const run = promisify(execFile);
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -62,7 +63,7 @@ export function projectSource(source, input) {
 }
 
 /** Fixed loopback destinations, bounded body/time, no redirect or automatic retries. */
-export async function readJson(path, token, request = fetch) {
+export async function readJson(path, token, request = loopbackRequestFromEnv()) {
   try {
     if (!Object.values(PATHS).includes(path)) throw new Error();
     const response = await request(`http://127.0.0.1:8788${path}`, {

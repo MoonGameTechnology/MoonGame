@@ -42,10 +42,16 @@ if release_tls "$ENV_FILE"; then
   export VOID_CADDY_IMAGE
 fi
 EXTRA="$(release_effective "$ENV_FILE" COMPOSE_EXTRA_FILE)"
+TRANSPORT="$(release_effective "$ENV_FILE" COMPOSE_TRANSPORT_FILE)"
 if [ -n "$EXTRA" ]; then
   if [[ "$EXTRA" != /* ]] || [ -L "$EXTRA" ] || [ ! -f "$EXTRA" ]; then echo E_DEPLOY_EXTRA_FILE >&2; exit 1; fi
   owner="$(stat -c %u "$EXTRA")"; mode="$(stat -c %a "$EXTRA")"
   if (( (8#$mode & 0022) != 0 )) || { [ "$owner" != 0 ] && [ "$owner" != "$(id -u)" ]; }; then echo E_DEPLOY_EXTRA_FILE >&2; exit 1; fi
+fi
+if [ -n "$TRANSPORT" ]; then
+  if [[ "$TRANSPORT" != /* ]] || [ -L "$TRANSPORT" ] || [ ! -f "$TRANSPORT" ]; then echo E_DEPLOY_TRANSPORT_FILE >&2; exit 1; fi
+  owner="$(stat -c %u "$TRANSPORT")"; mode="$(stat -c %a "$TRANSPORT")"
+  if [ "$owner" != 0 ] || (( (8#$mode & 0077) != 0 )); then echo E_DEPLOY_TRANSPORT_FILE >&2; exit 1; fi
 fi
 
 # Образ берётся из точки отката, если его не передали явно (так делает update.sh, когда
@@ -69,6 +75,7 @@ compose() {
   files+=(-f "$HERE/docker-compose.release.yml")
   if [ "$TLS" = 1 ]; then files+=(-f "$HERE/docker-compose.release-tls.yml"); fi
   if [ -n "$EXTRA" ]; then files+=(-f "$EXTRA"); fi
+  if [ -n "$TRANSPORT" ]; then files+=(-f "$TRANSPORT"); fi
   docker compose --env-file "$ENV_FILE" "${files[@]}" "$@"
 }
 

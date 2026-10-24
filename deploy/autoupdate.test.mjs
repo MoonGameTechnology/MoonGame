@@ -301,6 +301,13 @@ describe('autoupdate.sh — когда катить', () => {
 });
 
 describe('autoupdate.sh — гейты', () => {
+  it('rejects controllers without transport support before restarting a TLS-isolated host', async () => {
+    const sb = sandbox({ serverEnv: 'COMPOSE_TRANSPORT_FILE=/protected/transport.yml\n' });
+    await agent(sb);
+    expect(sb.lastGood()).toBe(OLD);
+    expect(sb.currentTarget()).toBe(OLD_ID);
+    expect(sb.readLog()).not.toContain('update.sh(new)');
+  });
   it('подпись не подтвердилась: образ не скачан, сервер не тронут, в журнале одна строка на дайджест', async () => {
     const sb = sandbox({ verifyExit: 1 });
     const first = await agent(sb);

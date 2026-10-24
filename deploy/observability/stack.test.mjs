@@ -143,6 +143,13 @@ describe('OBS-0.2 budget guard', () => {
 });
 
 describe('OBS-0.2 fixed service plans', () => {
+  it('includes the verified transport overlay when recreating monitoring services', () => {
+    const plan = composePlan('up', { ...options, transportFile: '/secure/monitoring/compose.yml' });
+    const index = plan.args.indexOf('/secure/monitoring/compose.yml');
+    expect(plan.args[index - 1]).toBe('-f');
+    expect(index).toBeLessThan(plan.args.indexOf('--profile'));
+    expect(plan.args.slice(-4)).toEqual(SERVICES);
+  });
   it('starts only the monitoring services without starting dependencies', () => {
     const plan = composePlan('up', options);
     expect(plan.binary).toBe('docker');

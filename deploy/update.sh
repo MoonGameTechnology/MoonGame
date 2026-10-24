@@ -130,6 +130,7 @@ env_value() {
 # поэтому без этого шага каждое изменение схемы откатывало бы выкатку. При
 # `DB_AUTO_MIGRATE` по умолчанию (1) миграцию делает сам сервер — здесь ничего.
 migrate_db() {
+  local transport_args=() transport_ca network
   [ "$(env_value DB_AUTO_MIGRATE)" = "0" ] || return 0
   if [ ! -f "$MIGRATION_ENV" ]; then
     echo "[✗] DB_AUTO_MIGRATE=0, а файла мигратора $MIGRATION_ENV нет (DB_MIGRATION_URL)." >&2
@@ -145,16 +146,23 @@ migrate_db() {
       up -d --no-build --pull missing --wait --wait-timeout 60 postgres; then echo E_DEPLOY_DATABASE_UNAVAILABLE >&2; return 1; fi
   fi
   echo "[*] Миграция схемы образом $1..."
+  transport_ca="$(release_effective "$ENV_FILE" LOCAL_TLS_CA_FILE)"
+  network="$(release_effective "$ENV_FILE" DB_NETWORK)"; network="${network:-deploy_default}"
+  if [ -n "$transport_ca" ]; then
+    [[ "$transport_ca" = /* && -f "$transport_ca" && ! -L "$transport_ca" ]] || { echo E_DEPLOY_TRANSPORT_CA >&2; return 1; }
+    transport_args=(--mount "type=bind,src=$transport_ca,dst=/run/moongame-db-ca.pem,readonly"
+      --env PGSSLMODE=verify-full --env NODE_EXTRA_CA_CERTS=/run/moongame-db-ca.pem)
+  fi
   docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
-    --memory 512m --pids-limit 64 --network "${DB_NETWORK:-deploy_default}" \
+    --memory 512m --pids-limit 64 --network "$network" "${transport_args[@]}" \
     --env-file "$MIGRATION_ENV" "$1" packages/server/dist/database-admin.mjs migrate
 }
 
 health_ok() {
   local i
   for ((i = 1; i <= HEALTH_TRIES; i++)); do
-    if curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1 \
-      && curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/ready" >/dev/null 2>&1; then
+    if release_local_probe "$ENV_FILE" /health >/dev/null 2>&1 \
+      && release_local_probe "$ENV_FILE" /ready >/dev/null 2>&1; then
       if [ "$TLS" = 0 ] || curl -fsS --max-time 5 "https://${DOMAIN}/ready" >/dev/null 2>&1; then return 0; fi
     fi
     sleep 2

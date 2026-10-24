@@ -65,6 +65,10 @@ Caddy собирается на Go 1.27.3 с chi v5.4.0; приёмка блок
 и отказ сканирования. Изолированный bot stage описан в отдельном Compose:
 no-new-privileges, app cap_drop=ALL, лимиты ресурсов и внешний том БД
 ([ранбук](../deploy/README.md#изолированный-стенд-ботов)).
+Внутренний transport-профиль добавляет проверяемый HTTPS до приложения/мониторинга,
+PostgreSQL `verify-full`, отдельные backend-сети, host-user ACL и продление leaf-ключей
+([эксплуатация](../deploy/transport/README.md)). Шифрование диска и независимый backup
+этот профиль не подтверждает.
 
 Серверных входов два, оба на общих частях `packages/server`: `prototype/netserver.ts`
 (`pnpm host`, его запускает образ) и `packages/server/src/main.ts` (`pnpm dev:server`).

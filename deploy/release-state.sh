@@ -8,6 +8,24 @@ release_effective() {
   if [[ -v "$2" ]]; then printf '%s' "${!2}"; else release_value "$1" "$2"; fi
 }
 release_tls() { [ -n "$(release_effective "$1" DOMAIN)" ]; }
+
+# Local operator probes follow native TLS too. Never disable verification or use
+# a proxy for a request that carries local readiness/operational information.
+release_local_probe() {
+  local file="$1" path="$2" port ca name
+  case "$path" in /health|/ready) ;; *) return 1 ;; esac
+  port="$(release_effective "$file" PORT)"; port="${port:-8788}"
+  [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( port > 0 && port < 65536 )) || return 1
+  if [ -n "$(release_effective "$file" TLS_CERT_FILE)" ]; then
+    ca="$(release_effective "$file" LOCAL_TLS_CA_FILE)"
+    name="$(release_effective "$file" HEALTHCHECK_TLS_SERVERNAME)"; name="${name:-localhost}"
+    [[ "$ca" = /* && -f "$ca" && "$name" =~ ^[A-Za-z0-9.-]+$ ]] || return 1
+    curl -fsS --max-time 3 --noproxy '*' --cacert "$ca" \
+      --resolve "$name:$port:127.0.0.1" "https://$name:$port$path"
+  else
+    curl -fsS --max-time 3 "http://127.0.0.1:$port$path"
+  fi
+}
 release_ref_valid() { [[ "$1" =~ ^[a-z0-9][a-z0-9./:_-]+@sha256:[0-9a-f]{64}$ ]]; }
 release_pair_read() {
   local file="$1"
