@@ -14,6 +14,7 @@
  * сохранения поток раз в {@link FULL_EVERY_MS} присылает их целиком, и {@link SimLink.saved}
  * подкладывает их под мир на экране.
  */
+import type { SimWorkerScript } from '../../decisions/simWorker';
 import type { Action, DomainEvent, GameState } from '../../packages/shared-core/src/index';
 import { applyDelta } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
@@ -66,10 +67,14 @@ export interface SimLink {
   stop(): void;
 }
 
-/** Поток из исходника бандла (`simWorker.ts`), строкой. `null` — поток не поднялся. */
-export function workerPort(source: string): SimPort | null {
+/** Поток `simWorker.ts` из файла сборки или из исходника строкой (`decisions/simWorker.ts`).
+ *  `null` — поток не поднялся. */
+export function workerPort(script: SimWorkerScript): SimPort | null {
   try {
-    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    const inline = 'source' in script;
+    const url = inline
+      ? URL.createObjectURL(new Blob([script.source], { type: 'text/javascript' }))
+      : script.url;
     const worker = new Worker(url);
     return {
       post: (request) => worker.postMessage(request),
@@ -82,7 +87,7 @@ export function workerPort(source: string): SimPort | null {
       },
       close: () => {
         worker.terminate();
-        URL.revokeObjectURL(url);
+        if (inline) URL.revokeObjectURL(url);
       },
     };
   } catch {

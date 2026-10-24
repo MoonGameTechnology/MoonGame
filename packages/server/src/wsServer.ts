@@ -17,7 +17,7 @@ import { verifyJoinToken, type JoinTokenVerifyConfig, type JoinClaim } from './a
 import { serializeServerMessage, type ServerErrorCode } from './protocol';
 import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
-import { assetType } from './staticAssets';
+import { assetType, isWorkerAsset } from './staticAssets';
 import { slidingWindowIpLimiter } from './rateLimit';
 import { isOperatorRequest } from './operatorAccess';
 
@@ -42,7 +42,8 @@ export interface MultiplayerServerOptions {
    *  запустился бы вовсе. */
   documents?: readonly { routes: readonly string[]; html: string }[];
   /** Картинки, вынесенные сборкой из документа (`readAssetDir`): имя файла → байты.
-   *  Отдаются по `/assets/<имя>` с годовым кэшем — имя несёт хеш содержимого. */
+   *  Отдаются по `/assets/<имя>` с годовым кэшем — имя несёт хеш содержимого. Есть среди
+   *  них поток расчёта соло-мира — документы разрешают свой воркер (`worker-src 'self'`). */
   assets?: ReadonlyMap<string, Buffer>;
   /** Service worker push-уведомлений (UIX-4.4): текст скрипта, отдаётся по `/sw.js`.
    *  С ним документы разрешают свой воркер (`worker-src 'self'`); нет — нет ни маршрута,
@@ -525,6 +526,9 @@ export function createMultiplayerServer(
     for (const id of ids) connections += registry.get(id)?.peerCount ?? 0;
     return { matches: ids.length, connections };
   });
+  // Правило 9 политики: свой воркер разрешён, только если хост его отдаёт.
+  const ownWorker =
+    options.serviceWorker !== undefined || [...(options.assets?.keys() ?? [])].some(isWorkerAsset);
   // The single-file client changes every rebuild; never let a browser serve a stale
   // cached copy (else client fixes silently don't reach the player).
   const serveDocument = (html: string) => {
@@ -543,7 +547,7 @@ export function createMultiplayerServer(
         inline,
         https: overHttps(options, request.raw),
         ...(options.frameAncestors ? { frameAncestors: options.frameAncestors } : {}),
-        ...(options.serviceWorker !== undefined ? { serviceWorker: true } : {}),
+        ...(ownWorker ? { ownWorker } : {}),
       });
       for (const [name, value] of Object.entries(headers)) void reply.header(name, value);
       return body;
@@ -582,7 +586,8 @@ export function createMultiplayerServer(
   if (assets !== undefined && assets.size > 0) {
     // Имя несёт хеш содержимого, поэтому кэш на год безопасен: новая картинка придёт под
     // новым именем вместе с новым документом. Политика API (`default-src 'none'`) с хука
-    // остаётся: SVG, открытый напрямую, не исполнит ни строчки.
+    // остаётся: SVG, открытый напрямую, не исполнит ни строчки, а потоку расчёта сеть не
+    // нужна — он говорит только со своей страницей.
     app.get('/assets/:file', async (request: FastifyRequest, reply: FastifyReply) => {
       const name = (request.params as { file: string }).file;
       const bytes = assets.get(name);
@@ -590,8 +595,8 @@ export function createMultiplayerServer(
       void reply.header('content-type', assetType(name));
       void reply.header('cache-control', 'public, max-age=31536000, immutable');
       // Отдаются байты, прочитанные со своего диска при старте, а не ввод клиента: от
-      // запроса зависит только выбор ключа в карте. Тип — картинка, политика `default-src
-      // 'none'`, так что исполнить в ответе нечего.
+      // запроса зависит только выбор ключа в карте. Тип — картинка или скрипт потока из
+      // той же сборки, политика `default-src 'none'`: внедрить в ответ нечего.
       // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
       return reply.send(bytes);
     });

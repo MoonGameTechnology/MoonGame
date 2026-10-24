@@ -41,9 +41,11 @@
  *    обновлений (плейтест 2026-10-09, PT-02; смоук `nettest` насчитывал 108 нарушений).
  *    Атрибут не исполняет скрипт, а `url()` в нём по-прежнему проходит `img-src`/`font-src`,
  *    поэтому послабление трогает только вид. Скрипты и блоки стилей остаются на хешах.
- * 9. **Воркер — только свой и только у хоста, который его отдаёт** (UIX-4.4). Service
- *    worker push-уведомлений лежит на том же origin (`/sw.js`); `worker-src 'self'` пускает
- *    ровно его, а не чужой скрипт. Хост без worker'а оставляет `'none'`.
+ * 9. **Воркер — только свой и только у хоста, который его отдаёт.** Service worker
+ *    push-уведомлений (`/sw.js`, UIX-4.4) и поток расчёта соло-мира
+ *    (`/assets/sim-worker-<хеш>.js`) лежат на том же origin; `worker-src 'self'` пускает их,
+ *    а не чужой скрипт и не поток из строки (`blob:`). Хост без своего worker'а оставляет
+ *    `'none'`.
  *
  * Чего здесь НЕТ: `require-trusted-types-for 'script'` (SE-7.1 остаётся 🔶). Прототип
  * рисует интерфейс через `innerHTML` в полутора сотнях мест — Trusted Types уронит его
@@ -91,8 +93,8 @@ export interface SecurityHeaderOptions {
   https?: boolean;
   /** Кому разрешено встраивать документ; по умолчанию никому (правило 5). */
   frameAncestors?: readonly string[];
-  /** Хост отдаёт service worker push-уведомлений (`/sw.js`, UIX-4.4) — правило 9. */
-  serviceWorker?: boolean;
+  /** Хост отдаёт свой скрипт worker'а: push-уведомлений или поток расчёта — правило 9. */
+  ownWorker?: boolean;
 }
 
 const PERMISSIONS = [
@@ -130,7 +132,7 @@ export function securityHeaders(options: SecurityHeaderOptions = {}): Record<str
     `frame-ancestors ${ancestors}`,
     "object-src 'none'",
     // Правило 9: свой worker — только со своего origin и только там, где хост его отдаёт.
-    `worker-src ${options.serviceWorker ? "'self'" : "'none'"}`,
+    `worker-src ${options.ownWorker ? "'self'" : "'none'"}`,
   ].join('; ');
   return {
     'content-security-policy': csp,

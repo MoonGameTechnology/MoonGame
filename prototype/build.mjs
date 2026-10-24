@@ -6,7 +6,8 @@
 //     and time-acceleration controls are compiled out of the JS, and the matching
 //     markup (fenced with <!--dev-only--> … <!--/dev-only--> below) is stripped.
 import { build } from 'esbuild';
-import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { writeFileSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
@@ -27,9 +28,11 @@ const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.m
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
 
-/** Отдельный поток расчёта соло-мира (`simWorker.ts`) — строкой в бандл экрана: так поток
- *  поднимается и в однофайловой сборке, открытой с диска (`simLink.ts`). Пока он за флагом
- *  дев-сборки (`?sim=worker`), поэтому сборка игрока его не несёт. */
+/** Отдельный поток расчёта соло-мира (`simWorker.ts`) — свой файл рядом со страницей: политика
+ *  CSP сервера и сайта пускает только поток со своего origin (`decisions/simWorker.ts`). Имя
+ *  несёт хеш содержимого: страница и поток одной сборки не разъедутся, а сервер держит файл в
+ *  кэше год (`/assets/`). Однофайловая дев-сборка несёт ещё и исходник строкой — её
+ *  открывают с диска, а с `file://` поток из файла не поднимается. */
 const simWorkerSource = (
   await build({
     entryPoints: ['prototype/src/simWorker.ts'],
@@ -44,7 +47,10 @@ const simWorkerSource = (
   })
 ).outputFiles[0].text;
 
-const bundleOptions = (playerBuild) => ({
+const simWorkerFile = `sim-worker-${createHash('sha256').update(simWorkerSource).digest('hex').slice(0, 10)}.js`;
+
+/** `workerUrl` — адрес файла потока для этой страницы; `inlineWorker` — нести и исходник. */
+const bundleOptions = (playerBuild, workerUrl = simWorkerFile, inlineWorker = !playerBuild) => ({
   entryPoints: ['prototype/src/bootstrap.ts'],
   bundle: true,
   format: 'iife',
@@ -57,7 +63,8 @@ const bundleOptions = (playerBuild) => ({
   define: {
     __PLAYER_BUILD__: String(playerBuild),
     __SECTOR_ZERO_ONLY__: 'false',
-    ...(playerBuild ? {} : { __SIM_WORKER_SRC__: JSON.stringify(simWorkerSource) }),
+    __SIM_WORKER_URL__: JSON.stringify(workerUrl),
+    ...(inlineWorker ? { __SIM_WORKER_SRC__: JSON.stringify(simWorkerSource) } : {}),
   },
 });
 
@@ -69,11 +76,12 @@ const bundle = async (playerBuild) => (await build(bundleOptions(playerBuild))).
  * с `no-store`, и игрок перекачивал 16 МБ арта при каждом открытии; файл с хешем в имени
  * браузер держит год (`/assets/:file` в `wsServer.ts`). Путь АБСОЛЮТНЫЙ: тот же документ
  * открывается и на `/game/<id>`, где относительный `assets/…` ушёл бы в `/game/assets/…`.
+ * Поток расчёта лежит там же (`assets/sim-worker-…js`), исходника строкой документ не несёт.
  * Однофайловые сборки остаются как были: их открывают с диска и кладут в APK.
  */
 const bundleServed = async (playerBuild) => {
   const res = await build({
-    ...bundleOptions(playerBuild),
+    ...bundleOptions(playerBuild, `/assets/${simWorkerFile}`, false),
     loader: { '.webp': 'file', '.svg': 'file' },
     assetNames: 'assets/[name]-[hash]',
     entryNames: playerBuild ? 'player' : 'dev',
@@ -5722,6 +5730,15 @@ const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
 writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
+// Файл потока — рядом с однофайловыми страницами: его забирают сайт (`stage-site.mjs`),
+// GitHub Pages и APK. Поток прошлой сборки удаляется: страница его уже не позовёт.
+for (const name of readdirSync('prototype/dist')) {
+  if (/^sim-worker-[0-9a-f]+\.js$/.test(name)) rmSync(`prototype/dist/${name}`);
+}
+writeFileSync(`prototype/dist/${simWorkerFile}`, simWorkerSource);
+console.log(
+  `wrote prototype/dist/${simWorkerFile} (` + (simWorkerSource.length / 1024).toFixed(0) + ' KB)',
+);
 console.log(
   'wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)',
 );
@@ -5745,6 +5762,7 @@ const servedDev = await bundleServed(false);
 const servedPlayer = await bundleServed(true);
 writeServedAssets(servedDev.assets);
 writeServedAssets(servedPlayer.assets);
+writeFileSync(`prototype/dist/served/assets/${simWorkerFile}`, simWorkerSource);
 const servedPlayerHtml = stripDevMarkup(page(servedPlayer.js));
 writeFileSync('prototype/dist/served/dev.html', page(servedDev.js));
 writeFileSync('prototype/dist/served/player.html', servedPlayerHtml);

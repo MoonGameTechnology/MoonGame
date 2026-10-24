@@ -6,7 +6,8 @@ const PAGE = '<!doctype html><style>b{color:red}</style><script>boot()</script><
 
 describe('static site headers (Cloudflare `_headers`)', () => {
   it("is the server's page policy with `https:` added to connect-src", () => {
-    const server = securityHeaders({ inline: inlineHashes(PAGE), https: true });
+    // The site stages the sim worker next to the pages, so it is a host with its own worker.
+    const server = securityHeaders({ inline: inlineHashes(PAGE), https: true, ownWorker: true });
     const expected = server['content-security-policy']!.replace(
       "connect-src 'self' wss:",
       "connect-src 'self' https: wss:",
