@@ -3,6 +3,7 @@ import { RUN_SPEED_NORMAL } from './runTempo';
 import { createInitialState, type GameState } from '../packages/shared-core/src/index';
 import {
   dueForces,
+  outpostFortified,
   RAID,
   RAID_DELAY_MS,
   RAID_IDLE,
@@ -70,6 +71,31 @@ describe('TRN-3 · сценарий полигона', () => {
     const launched = { ...c, launched: true };
     expect(raidDue(launched)).toBe(false);
     expect(raidTick(launched, 'finale', MIN)).toBe(launched);
+  });
+
+  it('пост игрока укреплён ПКО — объявленная контратака выходит сразу', () => {
+    // До объявления укреплённый пост ничего не запускает: сначала игрок узнаёт о контратаке.
+    let c = raidTick(RAID_IDLE, 'assault', MIN, true);
+    expect(c.announced).toBe(false);
+    c = raidTick(c, 'fortify', MIN, true);
+    expect(c).toMatchObject({ announced: true, elapsed: 0 });
+    expect(raidDue(raidTick(c, 'fortify', 0, false))).toBe(false);
+    // ПКО встала — выходит без остатка отсчёта, даже пока тур держит часы.
+    c = raidTick(c, 'fortify', 0, true);
+    expect(raidDue(c)).toBe(true);
+    expect(raidLeft(c)).toBe(0);
+  });
+
+  it('укреплён — это ПКО на посту игрока; форт без ПКО и чужая ПКО не в счёт', () => {
+    const post = (owner: string, types: string[]) => {
+      const s = world({ base: 'p1', outpost: owner, target: 'p2' });
+      s.planets.outpost!.buildings = types.map((type) => ({ type, level: 1, hp: 100 }));
+      return s;
+    };
+    expect(outpostFortified(post('p1', ['fort', 'orbital_aa']), 'p1')).toBe(true);
+    expect(outpostFortified(post('p1', ['fort']), 'p1')).toBe(false);
+    expect(outpostFortified(post('p2', ['orbital_aa']), 'p1')).toBe(false);
+    expect(outpostFortified(world({ base: 'p1' }), 'p1')).toBe(false);
   });
 
   it('контратака — три фрегата с открытого участка на передовой пост', () => {

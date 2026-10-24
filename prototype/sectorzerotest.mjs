@@ -872,7 +872,7 @@ try {
     assert(await page.locator('#trnraid').isHidden(), 'полигон: до «Закрепления» контратака не объявлена');
     await toStage(11);
     await page.locator('#trnraid').waitFor({ state: 'visible' });
-    assert.match(await page.locator('#trnraid').innerText(), /Контратака через \d+:\d\d\. Отсчёт ждёт|Counterattack in \d+:\d\d\. The countdown waits/, 'полигон: отсчёт ждёт чтения');
+    assert.match(await page.locator('#trnraid').innerText(), /Контратака не позже чем через \d+:\d\d\. Отсчёт ждёт|Counterattack in \d+:\d\d at the latest\. The countdown waits/, 'полигон: отсчёт ждёт чтения');
     await page.locator('#spotlight .sl-fold').click();
     await page.waitForFunction(() => !/ждёт|waits/.test(document.getElementById('trnraid').textContent));
     await page.screenshot({ path: process.env.TRN3_SHOT ?? '/dev/null' }).catch(() => {});

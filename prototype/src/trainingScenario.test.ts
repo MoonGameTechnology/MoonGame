@@ -78,11 +78,27 @@ describe('TRN-3 · сценарий полигона в кадре игры', ()
     expect(r.board.textContent).toContain('Отсчёт ждёт');
     r.tour.holdsClock = false;
     r.tick(RAID_DELAY_MS / 2);
-    expect(r.board.textContent).toMatch(/^Контратака через \d+:\d\d$/);
+    expect(r.board.textContent).toMatch(/^Контратака не позже чем через \d+:\d\d$/);
     r.tick(RAID_DELAY_MS / 2);
     expect(r.world().fleets[RAID.id]).toMatchObject({ owner: 'p2' });
     expect(r.orders.at(-1)).toMatchObject({ type: 'fleet.move', playerId: 'p2', payload: { fleetId: RAID.id, to: 'outpost' } });
     expect(r.world().fleets[RAID.id]?.movement).not.toBeNull();
+    expect(r.board.hidden).toBe(true);
+  });
+
+  it('контратака выходит, как только на посту игрока встала ПКО, не дожидаясь отсчёта', () => {
+    const r = rig();
+    r.tour.stage = 'fortify';
+    r.tick();
+    r.tick(RAID_DELAY_MS / 10);
+    expect(r.world().fleets[RAID.id]).toBeUndefined(); // пост ещё не укреплён — идёт отсчёт
+    const built = structuredClone(r.world());
+    built.planets.outpost!.owner = 'p1';
+    built.planets.outpost!.buildings.push({ type: 'orbital_aa', level: 1, hp: 100 });
+    r.setWorld(built);
+    r.tick();
+    expect(r.orders.at(-1)).toMatchObject({ type: 'fleet.move', playerId: 'p2', payload: { fleetId: RAID.id, to: 'outpost' } });
+    expect(r.notes.at(-1)).toBe('Контратака началась: 3 фрегата идут на пост.');
     expect(r.board.hidden).toBe(true);
   });
 
