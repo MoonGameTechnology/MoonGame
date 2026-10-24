@@ -9,10 +9,12 @@
  *    открытом участке, когда игрок дошёл до боя, охрана цели — когда дошёл до отхода: урок
  *    отступления и идёт против неё. Ранний бой не мешает учить экономику, а этап «Бой» не
  *    засчитывается, пока патруля не было.
- * 2. **Контратака объявляется заранее.** В начале «Закрепления» объявлены три фрегата и
- *    отсчёт {@link RAID_DELAY_MS} (десять минут на часах забега); кончился отсчёт — они выходят с открытого
- *    участка на передовой пост, который игрок как раз укрепляет (цель на этом этапе ещё у
- *    противника).
+ * 2. **Контратака объявляется заранее и выходит, как только на посту встала ПКО.** В начале
+ *    «Закрепления» объявлены три фрегата; когда на передовом посту игрока достроено
+ *    Орбитальное ПКО, они выходят с открытого участка на пост (цель на этом этапе ещё у
+ *    противника). Решение владельца 2026-10-24: десять минут ожидания после постройки были
+ *    долгими. ПКО так и не встала (этап пропущен) — выходят по отсчёту {@link RAID_DELAY_MS}
+ *    (десять минут на часах забега), иначе операция не смогла бы кончиться.
  * 3. **Пока игрок читает, отсчёт стоит.** Отсчёт идёт по игровому времени, а его держит
  *    тур (пока игрок ищет нужную кнопку, часы стоят — TRN-7) и пауза: что не двигает мир,
  *    не двигает и контратаку.
@@ -55,9 +57,12 @@ export const RAID: ScenarioForce & { to: string } = {
   to: 'outpost',
   units: [{ unit: 'frigate', count: 3 }],
 };
-/** Отсчёт до выхода контратаки — десять минут на часах забега (`runClock.ts`): полигон
- *  показывает время реальным, на обычном темпе это 25 игровых часов. */
+/** Отсчёт до выхода контратаки, если пост так и не укреплён (правило 2), — десять минут на
+ *  часах забега (`runClock.ts`): полигон показывает время реальным, на обычном темпе это
+ *  25 игровых часов. */
 export const RAID_DELAY_MS = 10 * 60_000 * RUN_SPEED_NORMAL;
+/** Постройка, с которой пост считается укреплённым (правило 2). */
+export const RAID_TRIGGER_BUILDING = 'orbital_aa';
 
 const stageIndex = (stage: TrainingStage): number => TRAINING_STAGES.indexOf(stage);
 
@@ -100,14 +105,23 @@ export interface RaidClock {
 
 export const RAID_IDLE: RaidClock = { announced: false, elapsed: 0, launched: false };
 
-/** Шаг часов: `dt` — сколько игрового времени прошло с прошлого шага. */
+/** На передовом посту игрока достроено ПКО (правило 2). */
+export const outpostFortified = (s: GameState, me: PlayerId): boolean => {
+  const post = s.planets[RAID.to];
+  return post?.owner === me && post.buildings.some((b) => b.type === RAID_TRIGGER_BUILDING);
+};
+
+/** Шаг часов: `dt` — сколько игрового времени прошло с прошлого шага; `fortified` — пост
+ *  укреплён ({@link outpostFortified}), объявленной контратаке пора выходить. */
 export function raidTick(
   clock: RaidClock,
   current: TrainingStage | undefined,
   dt: number,
+  fortified = false,
 ): RaidClock {
   if (clock.launched) return clock;
   if (!clock.announced) return reached(current, RAID.stage) ? { ...clock, announced: true } : clock;
+  if (fortified) return { ...clock, elapsed: RAID_DELAY_MS };
   if (dt <= 0) return clock;
   return { ...clock, elapsed: Math.min(RAID_DELAY_MS, clock.elapsed + dt) };
 }

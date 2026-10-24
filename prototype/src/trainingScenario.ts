@@ -13,6 +13,7 @@ import { runClockText } from '../../decisions/runClock';
 import type { TrainingStage } from '../../decisions/trainingStages';
 import {
   dueForces,
+  outpostFortified,
   RAID,
   RAID_IDLE,
   raidDue,
@@ -103,9 +104,9 @@ export function tickTrainingScenario(host: TrainingScenarioHost): void {
   }
 
   const announced = clock.announced;
-  clock = raidTick(clock, stage, dt);
+  clock = raidTick(clock, stage, dt, outpostFortified(s, host.me()));
   if (!announced && clock.announced) {
-    host.note(t('training.raid.announced', { time: runClockText(raidLeft(clock)) }));
+    host.note(t('training.raid.announced'));
   }
   if (raidDue(clock)) {
     s = host.order(withForce(s, RAID), moveFleet(TRAINING_ENEMY, RAID.id, RAID.to));
