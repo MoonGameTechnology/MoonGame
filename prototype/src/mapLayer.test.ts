@@ -428,6 +428,9 @@ describe('REFM-232 — статический слой карты', () => {
 
   it('потерянный контекст выпечки: карта рисуется прямо в кадр', async () => {
     const { ml, frame, layer, drawn } = await boot();
+    // Часы стоят: выпечка ничего не стоит, устройство быстрое. По настоящим часам загруженная
+    // машина гейта делала его медленным, и кольца обзора рисовал бы кадр (правило 8).
+    vi.stubGlobal('performance', { now: () => 0 });
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     layer.lost = true;
