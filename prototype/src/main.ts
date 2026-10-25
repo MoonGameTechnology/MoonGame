@@ -373,6 +373,11 @@ import {
   windowOpacityPct,
   setUiScale,
   uiScalePct,
+  mapSharpChosen,
+  mapSharpOn,
+  mapSlowSeen,
+  markMapSlow,
+  setMapSharp,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
 import { initPush } from './pushSetup';
@@ -567,6 +572,13 @@ import {
   stepBacklog,
 } from '../../decisions/simClock';
 import { simWorkerScript } from '../../decisions/simWorker';
+import {
+  JUDGE_WARMUP_MS,
+  judgingFrames,
+  mapDpr,
+  sharpnessMatters,
+  slowFrames,
+} from '../../decisions/mapSharpness';
 import {
   NET_VIEW_IDLE,
   netViewAt,
@@ -1071,7 +1083,8 @@ function setPlayerEmblem(g: string): void {
 
 let VW = 1280; // viewport size in CSS pixels (drives layout + projection)
 let VH = 720;
-let DPR = 1;
+let SCREEN_DPR = 1; // the screen's pixel density, capped
+let DPR = 1; // the map canvas's: the screen's, or one pixel a point (`decisions/mapSharpness.ts`)
 let MOBILE = false;
 function resize() {
   // The two decisions under this — the DPR cap and what counts as a phone — live in
@@ -1079,7 +1092,8 @@ function resize() {
   const v = measureViewport();
   VW = v.w;
   VH = v.h;
-  DPR = v.dpr;
+  SCREEN_DPR = v.dpr;
+  DPR = mapDpr(v.dpr, mapSharpOn());
   MOBILE = v.mobile;
   // WebView can repeat resize notifications without changing the viewport.
   // Assigning even the SAME canvas size erases its bitmap and resets the context;
@@ -3477,6 +3491,8 @@ const settings = initSettings({
     touchOnly: !pcUi(),
     speedKeys: devSpeedControl,
     ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
+    // Чёткость карты есть у экрана, которому есть что понижать (`decisions/mapSharpness.ts`).
+    ...(sharpnessMatters(SCREEN_DPR) ? { mapSharp: mapSharpOn() } : {}),
     // Размер интерфейса — множитель зума ПК (`holographicUi.ts`), у телефона его нет.
     ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
     // Нижняя панель есть там, где телефонная раскладка (UIX-3.3); настраивают её и с хаба.
@@ -3494,6 +3510,10 @@ const settings = initSettings({
   setOwnPings: setShowOwnPings,
   setGlow: setGlowFx,
   setStarfield: setStarfield,
+  setMapSharp: (v) => {
+    setMapSharp(v);
+    resize();
+  },
   setMotion: setMotion,
   setRenderCompatibility: setCanvasCompatibility,
   renderingReport: mapRenderingReport,
@@ -4658,6 +4678,34 @@ const trainingScenarioHost: TrainingScenarioHost = {
   },
 };
 
+// Чёткость карты на слабом устройстве (`decisions/mapSharpness.ts`): кадры матча судят
+// устройство, пока игрок не выбрал сам и вердикта нет. Слабое — карта переходит на пиксель на
+// точку сразу, и это запоминается.
+const sharpGaps: number[] = []; // the frame gaps judged so far
+let sharpFrom = -1; // when the gaps start counting, after the warm-up; -1 — the map is not shown
+let sharpJudged = false; // this session's frames found the device fine
+function judgeMapSharpness(nowReal: number, dt: number): void {
+  if (!judgingFrames(SCREEN_DPR, mapSharpChosen(), mapSlowSeen(), sharpJudged)) return;
+  if (!inMatch() || mapPreparation.active) {
+    sharpFrom = -1;
+    sharpGaps.length = 0;
+    return;
+  }
+  if (sharpFrom < 0) sharpFrom = nowReal + JUDGE_WARMUP_MS;
+  if (nowReal < sharpFrom || !saneGap(dt)) return;
+  sharpGaps.push(dt);
+  const slow = slowFrames(sharpGaps);
+  if (slow === null) return;
+  sharpGaps.length = 0;
+  if (!slow) {
+    sharpJudged = true;
+    return;
+  }
+  markMapSlow();
+  resize();
+  toast(t('settings.gfx.map-sharp.auto'));
+}
+
 function frame(nowReal: number) {
   flushPinch();
   const wasHolographic = holographic.active();
@@ -4684,6 +4732,7 @@ function frame(nowReal: number) {
     fpsEma = fpsNext(fpsEma, dt);
     countNetFrame(dt);
   }
+  judgeMapSharpness(nowReal, dt);
   // Отдельный поток расчёта: сначала то, что он прислал, — мир, события и исходы своих
   // приказов, — потом следующий шаг, уже от пришедшего мира.
   if (simLink && !simEligible()) stopSim();

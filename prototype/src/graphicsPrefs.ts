@@ -14,6 +14,7 @@
  * Форма REFM: имена функций сохранены (`fxBlur`, `pcUi`), поэтому их вызовы в рендере не
  * изменились — переехало только объявление.
  */
+import { mapSharp } from '../../decisions/mapSharpness';
 import { readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
 import { breath, type Breath } from './pulseFx';
 
@@ -96,6 +97,32 @@ export const starfieldOn = (): boolean => starfield;
 export function setStarfield(v: boolean): void {
   starfield = v;
   writeBool('void.starfield', v);
+}
+
+/**
+ * Чёткая карта (`decisions/mapSharpness.ts`): холст карты в полную плотность экрана или в
+ * пиксель на точку. По умолчанию — по вердикту кадров: слабое устройство снимает чёткость само
+ * и помнит это. Явный тумблер игрока перекрывает вердикт в обе стороны — как у свечения.
+ */
+const readChoice = (key: string): boolean | null => {
+  const raw = readRaw(key);
+  return raw === '1' ? true : raw === '0' ? false : null;
+};
+let mapSharpChoice = readChoice('void.mapSharp');
+let mapSlow = readBool('void.mapSlow', false);
+/** Выбор игрока; `null` — не выбирал, решают кадры. */
+export const mapSharpChosen = (): boolean | null => mapSharpChoice;
+/** Кадры однажды сказали, что устройство слабое (правило 2). */
+export const mapSlowSeen = (): boolean => mapSlow;
+export const mapSharpOn = (): boolean => mapSharp(mapSharpChoice, mapSlow);
+export function setMapSharp(v: boolean): void {
+  mapSharpChoice = v;
+  writeBool('void.mapSharp', v);
+}
+/** Запомнить вердикт кадров «устройство слабое». */
+export function markMapSlow(): void {
+  mapSlow = true;
+  writeBool('void.mapSlow', true);
 }
 
 /** Счётчик кадров в углу. По умолчанию ВЫКЛ (dev-режим и рассинхрон включают его сами). */

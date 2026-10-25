@@ -243,13 +243,13 @@ describe('настройки — разметка', () => {
 
   const HOME: Record<string, readonly string[]> = {
     sound: ['set-snd', 'set-snd-vol'],
-    graphics: ['set-ui-scale', 'set-window-opacity', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
+    graphics: ['set-ui-scale', 'set-window-opacity', 'set-map-sharp', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
     map: ['set-sweep', 'set-ownpings', 'set-colyou', 'set-colneutral', 'set-colreset'],
     controls: [],
   };
 
   it('каждая настройка живёт ровно в одной вкладке, «Готово» — во всех', () => {
-    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9, uiScale: 1 });
+    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9, uiScale: 1, mapSharp: true });
     const all = Object.values(HOME).flat();
     for (const { id: tab } of SETTINGS_TABS) {
       const html = settingsBoxHtml(view, false, tab);
@@ -344,6 +344,16 @@ describe('настройки — разметка', () => {
     expect(html).toContain('value="#abcdef"');
   });
 
+  it('чёткая карта — только там, где экрану есть что понижать, и с её состоянием', () => {
+    expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-map-sharp"');
+    const on = settingsBoxHtml(viewOf({ mapSharp: true }), false, 'graphics');
+    const off = settingsBoxHtml(viewOf({ mapSharp: false }), false, 'graphics');
+    expect(on).toMatch(/id="set-map-sharp" type="checkbox" checked/);
+    expect(off).toContain('id="set-map-sharp" type="checkbox"');
+    expect(off).not.toMatch(/id="set-map-sharp" type="checkbox" checked/);
+    expect(on).toContain(t('settings.gfx.map-sharp.hint'));
+  });
+
   it('ползунок непрозрачности окон — только там, где есть стеклянные окна', () => {
     expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-window-opacity"');
     const html = settingsBoxHtml(viewOf({ windowOpacity: 0.9 }), false, 'graphics');
@@ -395,6 +405,18 @@ describe('настройки — окно и обработчики', () => {
       w.win.fire(`set-${id}`);
     }
     expect(w.calls.map(([k]) => k)).toEqual(['ownpings', 'glow', 'starfield', 'fps']);
+  });
+
+  it('тумблер чёткой карты зовёт свой сеттер', () => {
+    const sharp: boolean[] = [];
+    const w = wired({ setMapSharp: (v) => sharp.push(v) }, viewOf({ mapSharp: false }));
+    w.api.open();
+    w.win.tab('graphics');
+    w.win.node('set-map-sharp')!.checked = true;
+    w.win.fire('set-map-sharp');
+    expect(sharp).toEqual([true]);
+    expect(w.calls).toEqual([]);
+    expect(w.win.node('set-map-sharp-val')?.textContent).toBe(t('settings.on'));
   });
 
   it('движение можно отключить без переключения на старый интерфейс', () => {
