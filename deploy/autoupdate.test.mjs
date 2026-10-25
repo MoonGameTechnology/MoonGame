@@ -301,6 +301,24 @@ describe('autoupdate.sh — когда катить', () => {
 });
 
 describe('autoupdate.sh — гейты', () => {
+  it('keeps the running release when an enabled disk guard meets a controller without stop protection', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.state, 'resource-guard.version'), '1\n');
+    const result = await agent(sb);
+    expect(result.stdout).toContain('E_RELEASE_RESOURCE_SUPPORT');
+    expect(sb.lastGood()).toBe(OLD);
+    expect(sb.currentTarget()).toBe(OLD_ID);
+    expect(sb.readLog()).not.toContain('update.sh(new)');
+  });
+  it('allows a controller that preserves the installed disk-pressure policy', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.state, 'resource-guard.version'), '1\n');
+    mkdirSync(join(sb.env.IMAGE_DEPLOY, 'resources'));
+    writeFileSync(join(sb.env.IMAGE_DEPLOY, 'resources/version'), '1\n');
+    await agent(sb);
+    expect(sb.lastGood()).toBe(NEW);
+    expect(sb.readLog()).toContain('update.sh(new)');
+  });
   it('rejects controllers without transport support before restarting a TLS-isolated host', async () => {
     const sb = sandbox({ serverEnv: 'COMPOSE_TRANSPORT_FILE=/protected/transport.yml\n' });
     await agent(sb);

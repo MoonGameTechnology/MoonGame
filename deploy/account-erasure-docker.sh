@@ -25,7 +25,7 @@ exec docker run --rm --pull never --read-only --user 0:0 \
   --network "$ERASURE_DOCKER_NETWORK" --env-file "$ERASURE_DOCKER_ENV" \
   "${transport_args[@]}" \
   --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE \
-  --security-opt no-new-privileges:true --pids-limit 128 --memory 512m \
+  --security-opt no-new-privileges:true --pids-limit 128 --memory 512m --cpus 0.5 \
   --mount "type=bind,src=$(dirname "$ERASURE_LEDGER"),dst=/erasure" \
   --mount "type=volume,src=$ERASURE_DOCKER_LOG_VOLUME,dst=/app/playtest-logs" \
   --env "ERASURE_LEDGER=/erasure/$(basename "$ERASURE_LEDGER")" \

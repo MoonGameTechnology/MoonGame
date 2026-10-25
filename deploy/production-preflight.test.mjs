@@ -37,6 +37,15 @@ async function check(f) {
 }
 
 describe('production deployment data protection preflight', () => {
+  it('does not restart a circuit-breaker stop even when backups are explicitly deferred', async () => {
+    const f = fixture();
+    writeFileSync(join(f.dir, 'resource-pressure.json'), '{}');
+    writeFileSync(f.envFile, f.config + 'BACKUP_POLICY=deferred-playtest\n');
+    await expect(run('bash', ['-c', '. "$1"; production_preflight "$2"', '_', preflight, f.envFile], {
+      env: { ...process.env, STATE_DIR: f.dir, PROD: '1' },
+    })).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('E_RESOURCE_PRESSURE') });
+    expect(readFileSync(f.calls, 'utf8')).toBe('');
+  });
   it('blocks public release without privacy evidence and rejects playtest backup deferral', async () => {
     for (const extra of ['PUBLIC_RELEASE=1\n', 'PUBLIC_RELEASE=1\nBACKUP_POLICY=deferred-playtest\n', 'PUBLIC_RELEASE=1\nPROD=0\nSERVER_BIND=127.0.0.1\n']) {
       const f = fixture();
