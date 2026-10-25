@@ -41,9 +41,10 @@ The public download source is our VPS over HTTPS, configured once in
 - **Dev client** (`com.voiddominion.prototype`):
   https://77-221-140-87.sslip.io/downloads/android/alpha/latest.apk
 
-The desktop hub offers the player APK and a locally generated QR of the same
-stable link. No third-party QR service is contacted. The promotion is hidden on
-touch phones and removed from packaged APKs; the Yandex archive excludes its markup.
+The hub header offers the player APK next to the game mark in every browser except
+iPhone/iPad (iOS cannot install it); on a mouse PC, hovering the button opens a locally
+generated QR of the same stable link. No third-party QR service is contacted. The button
+is removed from packaged APKs (`decisions/apkOffer.ts`); the Yandex archive excludes its markup.
 GitHub rolling releases remain build inputs/archive and a migration path for old
 installed APKs, whose hardcoded updater cannot be changed without installing a new APK.
 
