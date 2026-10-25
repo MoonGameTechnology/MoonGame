@@ -15,12 +15,12 @@ import type { BorderSegment, ClassifiedBorders, TerritoryPalette } from '../../p
 import { layerTransform, type LayerTransform, type MapProjection, type PixelRect } from '../../decisions/mapLayerView';
 import {
   LIVING_BANDS,
-  MIN_LAYER_SEGMENTS,
   bandEdges,
   borderLayerAction,
   framedRect,
   glassPixels,
   intersectRect,
+  layerHolds,
   layerShift,
   staleBand,
   uncoveredRects,
@@ -52,6 +52,8 @@ export interface BorderLayerHost {
   dpr(): number;
   /** Часы голограммы: на них дышат границы; стоят при выключенном движении. */
   clock(): number;
+  /** Часы голограммы стоят по выбору игрока — выключено движение — и сами не пойдут. */
+  still(): boolean;
 }
 
 let game: BorderLayerHost;
@@ -72,7 +74,7 @@ const mapContextOptions = canvasCompatibilityOptions();
  *  match, so neither a stop of the camera nor a gesture costs a new backing store. */
 const borderLayer = document.createElement('canvas');
 const borderLayerX = (mapContextOptions ? borderLayer.getContext('2d', mapContextOptions) : borderLayer.getContext('2d')) as CanvasRenderingContext2D;
-let borderHeld = ''; // what the layer holds but the camera and detail ('' — nothing): screen, glass, colours
+let borderHeld = ''; // what the layer holds but the camera and detail ('' — nothing): screen, glass, colours, still clock
 let borderAt: MapProjection = { a: 1, x: 0, y: 0 }; // the projection of the map its pixels stand at
 let borderDetail = 0; // the province detail it was drawn at (`mapLod.ts`)
 let borderLevel = 0; // the points of the borders it was drawn with (`territoryLod.ts`)
@@ -122,7 +124,8 @@ export function blitBorderLayer(detail: number, borders: ClassifiedBorders): boo
   // Rule 1: the layer stands at a projection of the map, not at a bake: the glass is held in
   // the map's own units, and a new bake under the same camera keeps the layer.
   const glass = [(f.x - at.x) / at.a, (f.y - at.y) / at.a, f.width / at.a, f.height / at.a];
-  const held = `${VW}x${VH}:${DPR}|${glass.map((v) => v.toPrecision(9)).join(',')}|${tints}`;
+  // A still clock lets the layer hold the few borders the frame strokes otherwise (rule 5).
+  const held = `${VW}x${VH}:${DPR}|${glass.map((v) => v.toPrecision(9)).join(',')}|${tints}|${game.still()}`;
   const framed: MapProjection = { a: at.a * mapView.k, x: at.x * mapView.k + mapView.tx, y: at.y * mapView.k + mapView.ty };
   const level = livingLevel(geo);
   const rest = mapSettled && mapView.k === 1;
@@ -238,8 +241,8 @@ function scrollBorderLayer(shift: { x: number; y: number }, borders: ClassifiedB
 }
 
 /** Rule 2: the border layer's bands — rows of the canvas holding even shares of the segments
- *  the frame strokes inside `rect`, counted by the row of their middle; `[]` when they are few
- *  (rule 5). */
+ *  the frame strokes inside `rect`, counted by the row of their middle; `[]` when the layer
+ *  holds none of them (rule 5). */
 function borderBands(borders: ClassifiedBorders, detail: number, geo: MapLayerGeometry, rect: PixelRect): number[] {
   const DPR = game.dpr();
   const work = new Float64Array(canvas.height);
@@ -262,7 +265,7 @@ function borderBands(borders: ClassifiedBorders, detail: number, geo: MapLayerGe
   };
   for (const segs of borders.ownedFront.values()) count(segs);
   if (detail > 0) count(borders.neutralEdge);
-  return total < MIN_LAYER_SEGMENTS ? [] : bandEdges(work, LIVING_BANDS);
+  return layerHolds(total, game.still()) ? bandEdges(work, LIVING_BANDS) : [];
 }
 
 /** Repaint `rect` (device px) of {@link borderLayer} at the hologram's time now, in the

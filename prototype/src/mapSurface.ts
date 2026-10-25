@@ -2,6 +2,7 @@
  * Поверхность карты (REFM-235, часть 2): всё, что кадр рисует в пространстве выпечки поверх
  * политической карты, — живые границы провинций голографической карты, стекло с бликами
  * рельефа и волной, выделение выбранной провинции и волна над перекрашенной, рамка стекла.
+ * Голограмму, которую игрок остановил (выключено движение), её волну и рамку держит выпечка.
  *
  * Своё у модуля — пульс выделения: с какого момента провинция выбрана. Выбор другого мира
  * перезапускает его сам, а повторный тап по тому же миру — дверью {@link markSelection}.
@@ -34,6 +35,9 @@ export interface MapSurfaceHost {
   dpr(): number;
   /** Часы голограммы: стоят на паузе и при отключённой анимации. */
   clock(): number;
+  /** Часы голограммы стоят по выбору игрока — выключено движение: рамку и волну стекла держит
+   *  выпечка карты (`mapLayer.ts`). */
+  still(): boolean;
   /** Голографический вид карты. */
   holographic(): boolean;
 }
@@ -97,7 +101,7 @@ export function drawMapSurface(now: number, lod: MapLod): void {
       }
       cx.restore();
     }
-    drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
+    if (!game.still()) drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
   }
   if (paintedSelection !== selPlanet) {
     paintedSelection = selPlanet;
@@ -108,7 +112,7 @@ export function drawMapSurface(now: number, lod: MapLod): void {
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
   if (holographicMapOn()) {
     cx.restore();
-    drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
+    if (!game.still()) drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
   }
   cx.restore(); // back to screen space
 }
