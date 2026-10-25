@@ -14,7 +14,7 @@ function composeAvailable() {
     const version = execFileSync('docker', ['compose', 'version', '--short'], {
       encoding: 'utf8',
       stdio: 'pipe',
-      timeout: 3000,
+      timeout: 30000, // a loaded CI runner can take >3 s; a false "missing" fails the gate
     });
     const match = /^v?(\d+)\.(\d+)/.exec(version.trim());
     return !!match && (Number(match[1]) > 2 || (Number(match[1]) === 2 && Number(match[2]) >= 30));
