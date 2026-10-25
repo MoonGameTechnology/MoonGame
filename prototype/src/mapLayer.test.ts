@@ -250,7 +250,9 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000);
     expect(ml.mapSettled).toBe(false);
     expect(ml.mapView).toEqual({ k: 1, tx: 0, ty: 0 });
-    expect(drawn(frame).map((d) => d.src)).toEqual([layer]);
+    // Первый кадр печёт карту: её растр делается пикселем в кадр, чтобы цена выпечки его
+    // учла (правило 8), потом выпечка ложится под камеру.
+    expect(drawn(frame).map((d) => d.src)).toEqual([layer, layer]);
     expect(drawn(bg)).toEqual([]);
     frame.calls.length = 0;
     ml.blitStaticLayer(1000 + SETTLE_MS);
@@ -327,8 +329,108 @@ describe('REFM-232 — статический слой карты', () => {
     expect(spare.width).toBeGreaterThan(0);
   });
 
+  it('медленное устройство: приближение в жесте не перепекает карту, полосы ждут покоя', async () => {
+    // Быстрое устройство: растянутую вчетверо выпечку жест перепекает сразу. Часы стоят:
+    // цена выпечки не зависит от того, чем ещё занята машина с тестами.
+    const fast = await boot();
+    vi.stubGlobal('performance', { now: () => 0 });
+    fast.ml.blitStaticLayer(1000);
+    fast.ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(fast.ml.mapCostly).toBe(false);
+    const fastGeo = fast.ml.provinceGeometry;
+    fast.camera.zoomAt(800, 450, 4);
+    fast.ml.blitStaticLayer(2000);
+    expect(fast.ml.provinceGeometry).not.toBe(fastGeo);
+    vi.resetModules();
+    const { ml, camera, spare } = await boot();
+    // Каждое чтение часов — 60 мс: целая выпечка дороже GESTURE_BAKE_MS.
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(ml.mapCostly).toBe(true);
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 4);
+    ml.blitStaticLayer(2000);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(ml.mapView.k).toBeCloseTo(4, 6);
+    expect(spare.width).toBe(0);
+    // Покой: чёткая выпечка печётся в фоне, на экране растянутая.
+    let now = 2000 + SETTLE_MS;
+    ml.blitStaticLayer(now);
+    expect(spare.width).toBeGreaterThan(0);
+    expect(ml.provinceGeometry).toBe(geo);
+    // Новый жест: полоса не рисуется, пока камера не встанет.
+    camera.zoomAt(800, 450, 1.1);
+    const painted = spare.calls.length;
+    ml.blitStaticLayer((now += 16));
+    ml.blitStaticLayer((now += 16));
+    expect(spare.calls.length).toBe(painted);
+    expect(ml.provinceGeometry).toBe(geo);
+    now += SETTLE_MS;
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    expect(ml.provinceGeometry).not.toBe(geo);
+  });
+
+  it('медленное устройство: кольца обзора рисует кадр, а не растянутая выпечка', async () => {
+    const arcs = (c: FakeCanvas) => c.calls.filter((x) => x.name === 'arc').length;
+    // Быстрое: кольца в выпечке, готовый кадр — одна её копия.
+    const fast = await boot();
+    vi.stubGlobal('performance', { now: () => 0 });
+    fast.ml.blitStaticLayer(1000);
+    fast.ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(fast.ml.provinceGeometry?.rings).toBe(true);
+    expect(arcs(fast.layer)).toBeGreaterThan(0);
+    expect(fast.drawn(fast.bg).map((d) => d.src)).toEqual([fast.layer]);
+    vi.resetModules();
+    const { ml, camera, nodes, bg, frame, spare, drawn } = await boot();
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1000 + SETTLE_MS);
+    // Первую выпечку испекли, когда цена устройства ещё не была известна: кольца в ней.
+    expect(ml.mapCostly).toBe(true);
+    expect(ml.provinceGeometry?.rings).toBe(true);
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 1.1);
+    let now = 2000;
+    ml.blitStaticLayer(now);
+    now += SETTLE_MS;
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    // Выпечка медленного устройства колец не несёт: растянутая, она раздула бы их.
+    expect(ml.provinceGeometry?.rings).toBe(false);
+    expect(arcs(spare)).toBe(0);
+    // Их кладёт в готовый кадр сам кадр, картинкой на каждое кольцо на экране.
+    const lod = mapLod(camera.worldDist(mapSpacing(nodes)), camera.cam.scale);
+    expect(lod.art).toBeLessThan(1);
+    const reach = Math.round(lod.markerRadius * 10) / 10 + 1;
+    const onScreen = ml.provinceGeometry!.nodes.filter((n) => {
+      const c = camera.world(n);
+      return c.x >= -reach && c.x <= 1600 + reach && c.y >= -reach && c.y <= 900 + reach;
+    }).length;
+    expect(onScreen).toBeGreaterThan(0);
+    bg.calls.length = 0;
+    bg.fire('contextlost');
+    ml.blitStaticLayer((now += 16));
+    const [map, ...rings] = drawn(bg).map((d) => d.src);
+    expect(map).toBe(spare);
+    expect(rings).toHaveLength(onScreen);
+    expect(new Set(rings).size).toBe(1);
+    // В движении — тоже, их здесь немного (LIVE_RING_BUDGET).
+    camera.panBy(5, 0);
+    frame.calls.length = 0;
+    ml.blitStaticLayer(now + 16);
+    expect(ml.mapSettled).toBe(false);
+    expect(drawn(frame).filter((d) => d.src === rings[0]).length).toBeGreaterThan(0);
+  });
+
   it('потерянный контекст выпечки: карта рисуется прямо в кадр', async () => {
     const { ml, frame, layer, drawn } = await boot();
+    // Часы стоят: выпечка ничего не стоит, устройство быстрое. По настоящим часам загруженная
+    // машина гейта делала его медленным, и кольца обзора рисовал бы кадр (правило 8).
+    vi.stubGlobal('performance', { now: () => 0 });
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     layer.lost = true;
