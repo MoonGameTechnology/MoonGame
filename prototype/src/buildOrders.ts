@@ -20,7 +20,7 @@
  *    Два соседних смещения на единицу, и оба легко перепутать.)
  */
 import type { Action, GameData, GameState } from '../../packages/shared-core/src/index';
-import { matchCost } from '../../packages/shared-core/src/index';
+import { matchCost, matchUnitCost } from '../../packages/shared-core/src/index';
 import { buildBuilding, buildUnit, upgradeBuilding } from './game';
 import type { BuildKind, BuildLane, QueuedBuild } from './buildQueue';
 import { landerCost } from '../../decisions/landerTroops';
@@ -57,7 +57,7 @@ export function queuedCost(
     const per =
       data.units[q.id] && q.troop
         ? landerCost(data, q.id, q.troop, state)
-        : matchCost(state, data.units[q.id]?.cost);
+        : matchUnitCost(state, data.units[q.id]);
     if (!per) return undefined;
     const n = q.count ?? 1;
     return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));

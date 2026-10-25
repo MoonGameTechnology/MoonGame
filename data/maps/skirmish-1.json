@@ -21,7 +21,7 @@
       "owner": "green",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "radar"
@@ -48,7 +48,7 @@
       "owner": "red",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",

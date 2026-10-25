@@ -55,6 +55,7 @@ const {
   aiOrders,
   scoreParts,
   splitDeadContent,
+  deadContentCandidates,
   researchableTechIds,
   scientistGatedNodes,
   PLAYABLE_FACTIONS,
@@ -914,7 +915,7 @@ const topUsage = [...usageTotal.entries()]
 // «Мёртвый контент» — то, что не построено НИ РАЗУ и при этом не раздаётся на старте:
 // посеянный юнит без построек не мёртв, он просто не строится (герой), и мешать эти два
 // случая — значит гнать балансную правку туда, где всё работает.
-const neverBuilt = Object.keys({ ...data.units, ...data.buildings }).filter(
+const neverBuilt = deadContentCandidates(data).filter(
   (k) => !usageTotal.has(k),
 );
 const zeros = neverBuilt.filter((k) => !seededTotal.has(k));

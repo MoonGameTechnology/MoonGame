@@ -24,7 +24,7 @@ function fixture({ checkExit = 0, insecureChecker = false } = {}) {
 }
 
 async function check(f) {
-  const env = { ...process.env, BACKUP_READINESS_VERIFIED: '1' };
+  const env = { ...process.env, STATE_DIR: f.dir, BACKUP_READINESS_VERIFIED: '1' };
   // Vite sets PROD for its own build mode; that is not a deployment override.
   delete env.PROD;
   try {
@@ -117,7 +117,7 @@ describe('production deployment data protection preflight', () => {
     const docker = join(f.dir, 'docker');
     writeFileSync(docker, `#!/bin/bash\necho "docker verified=$BACKUP_READINESS_VERIFIED $*" >> '${f.calls}'\n`);
     chmodSync(docker, 0o700);
-    const env = { ...process.env, PATH: `${f.dir}:${process.env.PATH}`, ENV_FILE: f.envFile, COMPOSE_EXTRA_FILE: '/host/policy.yml' };
+    const env = { ...process.env, STATE_DIR: f.dir, PATH: `${f.dir}:${process.env.PATH}`, ENV_FILE: f.envFile, COMPOSE_EXTRA_FILE: '/host/policy.yml' };
     delete env.PROD;
     await expect(run('bash', [join(f.dir, 'launch.sh'), '--no-build'], { env })).rejects.toBeDefined();
     expect(readFileSync(f.calls, 'utf8')).not.toContain('docker');

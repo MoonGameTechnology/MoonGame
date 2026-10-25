@@ -19,7 +19,7 @@ import type { Action } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
-import { matchCost, matchHours } from '../util/pricing';
+import { matchCost, matchUnitCost, matchHours } from '../util/pricing';
 import { buildProgress } from '../util/construction';
 import { isAllied, mitigationFactor, type DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
@@ -133,12 +133,12 @@ function orderSpec(
     // окно верфи складывает те же части, и округление у них не разойдётся.
     const hull =
       p.modules && p.modules.length > 0
-        ? sumBags(matchCost(state, def.cost), matchCost(state, loadoutCost(p.modules, data)))
-        : matchCost(state, def.cost);
+        ? sumBags(matchUnitCost(state, def), matchCost(state, loadoutCost(p.modules, data)))
+        : matchUnitCost(state, def);
     // Десантный челнок: цена — челнок ПЛЮС его боец, срок — дольший из двух (SHU-5.2).
     const troop = typeof p.troop === 'string' ? data.units[p.troop] : undefined;
     if (p.troop !== undefined && !troop) return null;
-    const perShip = troop ? sumBags(hull, matchCost(state, troop.cost)) : hull;
+    const perShip = troop ? sumBags(hull, matchUnitCost(state, troop)) : hull;
     const hours = troop ? Math.max(def.buildTimeHours, troop.buildTimeHours) : def.buildTimeHours;
     return { hours: matchHours(state, hours), cost: scaleCost(perShip, p.count) };
   }
@@ -795,7 +795,9 @@ export const constructionModule: GameModule = {
   // 1.2.0: снос постройки пересчитывает прикрытие для остатка того же обстрела (FORT-5.16).
   // 1.3.0: бой с орудиями крепости на развилке ставит её стройку на паузу (Codex на #1410).
   // 1.5.0: возможность `building.damage` — прицельный урон по выбранным постройкам (SPY-9).
-  version: '1.5.0',
+  // 1.6.0: retired entries refuse new orders; accepted work remains valid. Ship
+  // prices also honour the optional match-pinned hull multipliers.
+  version: '1.6.0',
   setup(api) {
     api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.onAction('building.construct', (action, h) => {
@@ -811,6 +813,11 @@ export const constructionModule: GameModule = {
       const def = h.ctx.data.buildings[payload.building];
       if (!def) {
         return h.reject('E_UNKNOWN_BUILDING');
+      }
+      // Retirement affects new intent only. Existing production, accepted queue
+      // entries, paid completions and paused sites retain their original contract.
+      if (def.retired) {
+        return h.reject('E_BUILDING_RETIRED');
       }
       // 0. Органы Роя (`infected`) растит только Рой (решение владельца 2026-09-24):
       //    у остальных они не работают, и яма биомассы у людей была источником биомассы.

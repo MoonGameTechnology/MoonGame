@@ -80,7 +80,7 @@ describe('учебный полигон: все двенадцать этапо�
     expect(heroOf(s).alive).toBe(true);
 
     // 2. База и экономика: улучшить добычу, заказать корабль, дождаться верфи.
-    s = act(s, 'building.construct', { planetId: 'base', building: 'mine' });
+    s = act(s, 'building.upgrade', { planetId: 'base', building: 'mine' });
     s = until(s, (x) => productionGrew(x, ME, base, data));
     expect(productionGrew(s, ME, base, data)).toBe(true);
     s = act(s, 'unit.build', { planetId: 'base', unit: 'cruiser' });

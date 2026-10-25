@@ -14,6 +14,7 @@ const data: GameData = parseGameData({
   units: {
     cruiser: {
       faction: 'x',
+      hullClass: 'medium',
       stats: { attack: 10, defense: 8, speed: 6, hp: 40, shield: 15, cargoCapacity: 2 },
       cost: { metal: 220 },
       slots: { weapon: 1, defense: 1, utility: 1 },
@@ -163,6 +164,18 @@ describe('loadout editor — equip / unequip', () => {
 });
 
 describe('loadout editor — build resolution', () => {
+  it('quotes the ship premium only on hulls and blocks a budget short of the displayed total', () => {
+    const model = ok(createLoadoutEditor('cruiser', data, { metal: 1800 }, {
+      modules: ['targeting'], count: 2,
+      pricing: { cost: { metal: 1.5 }, shipCost: { metal: 2.5 } },
+    }));
+    expect(model.hullCost).toEqual({ metal: 1650 });
+    expect(model.modulesCost).toEqual({ metal: 180 });
+    expect(model.totalCost).toEqual({ metal: 1830 });
+    expect(model.affordable).toBe(false);
+    expect(err(resolveLoadoutBuild(model, 'planetA'))).toBe('E_INSUFFICIENT');
+  });
+
   it('emits a unit.build intent carrying the loadout', () => {
     const m0 = ok(createLoadoutEditor('cruiser', data, rich));
     const m1 = ok(applyLoadoutAction({ kind: 'equip', moduleId: 'targeting' }, m0, data, rich));

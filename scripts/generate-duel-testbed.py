@@ -161,8 +161,8 @@ add('reach_e', 930, -200, 'dead_world', 'empty_space')
 # уровня (классы корпусов FORT-5.5 иначе отняли бы крейсер). Базы обитателей — с тем,
 # что им разрешает каталог вида.
 BUILDINGS = {
-    'home_a': [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}],
-    'home_b': [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}],
+    'home_a': [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}],
+    'home_b': [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}],
     'globule': [{'type': 'shipyard'}, {'type': 'radar'}],
     'observatory': [{'type': 'shipyard'}, {'type': 'radar'}, {'type': 'power_plant'}],
 }

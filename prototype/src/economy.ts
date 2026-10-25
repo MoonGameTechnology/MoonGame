@@ -16,6 +16,9 @@ import {
   buildProgress,
   thresholdRamp,
   matchHours,
+  matchCost,
+  matchUnitCost,
+  loadoutCost,
   creditsBonusOf,
 } from '../../packages/shared-core/src/index';
 import {
@@ -28,6 +31,28 @@ import {
 import { data } from './gameData';
 import { feedsOnBiomass, isInfected } from '../../packages/shared-core/src/util/infestation';
 import { HOUR } from './time';
+
+/** Investment represented by a completed unit order, for the economy harness.
+ * The event carries the hull, modules, carried troop and quantity; quote the same
+ * separate parts as construction rather than treating catalogue hull cost as the
+ * money spent. This is completed-work accounting, not payment-time cash flow. */
+export function completedUnitSpend(
+  state: Pick<GameState, 'pricing'>,
+  payload: { unit: string; count?: number; modules?: readonly string[]; troop?: string },
+): Record<string, number> {
+  const hull = data.units[payload.unit];
+  if (!hull) return {};
+  const out: Record<string, number> = {};
+  const parts = [
+    matchUnitCost(state, hull),
+    matchCost(state, loadoutCost(payload.modules ?? [], data)),
+    payload.troop ? matchUnitCost(state, data.units[payload.troop]) : undefined,
+  ];
+  for (const part of parts)
+    for (const [resource, amount] of Object.entries(part ?? {}))
+      out[resource] = (out[resource] ?? 0) + amount * (payload.count ?? 1);
+  return out;
+}
 
 /** ECON-6: почасовой экономический срез для пайплайна наблюдений хоста — казна /
  *  чистый приток / arrears per player на мировом времени `state.time`. Чистая

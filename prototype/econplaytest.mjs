@@ -40,6 +40,7 @@ const {
   START_CANDIDATES,
   networkSeats,
   matchCost,
+  completedUnitSpend,
 } = mod.exports;
 const SEATS = MAP !== undefined ? networkSeats('ffa', MAP).length : SEATS_N;
 
@@ -104,10 +105,10 @@ function runMatch(seed, n) {
       } else if (e.type === 'unit.built') {
         const owner = p.owner ?? ownerOfPlanet(state, p.planetId);
         if (owner && spend[owner]) {
-          const cost = matchCost(state, data.units[p.unit]?.cost ?? {});
+          const cost = completedUnitSpend(state, p);
           const cnt = p.count ?? 1;
           for (const [r, v] of Object.entries(cost))
-            spend[owner].unit[r] = (spend[owner].unit[r] ?? 0) + v * cnt;
+            spend[owner].unit[r] = (spend[owner].unit[r] ?? 0) + v;
           built[owner][p.unit] = (built[owner][p.unit] ?? 0) + cnt;
         }
       } else if (e.type === 'market.listed') {

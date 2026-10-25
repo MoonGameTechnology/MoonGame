@@ -26,11 +26,26 @@
  * бандл, и `node:fs` здесь означал бы сломанную сборку клиента. Файл читает вызывающий —
  * харнес (`selfplay.mjs`) и тест.
  */
+import type { GameData } from '../../packages/shared-core/src/index';
+
 export interface DeadContentSplit {
   /** Бот не заказывает это никогда — прибор не покрывает механику. */
   offRepertoire: string[];
   /** Бот умеет, но условие не наступило ни разу — это про баланс. */
   unbuilt: string[];
+}
+
+/** Entries eligible for the harness's construction-usage diagnosis. Retired
+ * buildings remain in saved worlds, but new orders are forbidden by design and
+ * zero usage must not be reported as a balance or bot-coverage failure. Unit ids
+ * stay eligible even if a retired building happens to share their identifier. */
+export function deadContentCandidates(data: Pick<GameData, 'units' | 'buildings'>): string[] {
+  return [
+    ...new Set([
+      ...Object.keys(data.units),
+      ...Object.keys(data.buildings).filter((id) => !data.buildings[id]?.retired),
+    ]),
+  ];
 }
 
 /** Экранирование id для регулярного выражения: id приходят из данных, а не из кода. */

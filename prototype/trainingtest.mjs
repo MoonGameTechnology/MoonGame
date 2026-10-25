@@ -10,7 +10,7 @@ const trainingUiTest = () => trainingTourUi({world:()=>s,me:()=>ME,mobile:MOBILE
   render:()=>{invalidatePanel();renderPanel();updateMobileHud();}});
 window.__trainingTest = {
   advance: hours => apply(advance(s,s.time+hours*3600000)),
-  facts: () => ({state:s,selected:selFleet,paused:!!activeTour?.holdsClock,tab:planetTab,
+  facts: () => ({state:s,selected:selFleet,selectedWorld:selPlanet,aiming:trainingUiTest().intent('move'),pickedTarget:trainingUiTest().intent('picked:target'),paused:!!activeTour?.holdsClock,tab:planetTab,
     rewards:{research:sectorProgress.research,warrants:sectorProgress.warrants,sovereigns:sectorProgress.sovereigns,
       nextAttempt:sectorProgress.nextAttempt,settledThrough:sectorProgress.settledThrough}}),
   current: () => {
@@ -88,9 +88,14 @@ try {
         ) {
           if (repeated === 0 && (await page.locator('.sl-reveal').isVisible())) {
             await page.locator('.sl-reveal').click();
+            // Show may select a world/fleet and satisfy this step immediately.
+            // Never act on the previous step's target after that transition.
             await page.waitForTimeout(180);
+            if ((await page.evaluate(() => window.__trainingTest.current()))?.id !== step.id)
+              continue;
           }
         }
+        let tapped = false;
         const control = step.target
           ? page.locator(step.target).filter({ visible: true }).first()
           : null;
@@ -102,22 +107,14 @@ try {
         ) {
           if (mode === 'phone') await control.tap();
           else await control.click();
-          // Шаг, ждущий состояния, сменяется на следующем кадре подсветки, а нажатие могло
-          // уже спрятать свою кнопку («Отступить» закрывает окно боя): без ожидания цикл
-          // перечитывал старый шаг и падал на пропавшей кнопке.
-          await page
-            .waitForFunction(
-              (id) => document.querySelector('#spotlight')?.dataset.step !== id,
-              step.id,
-              { timeout: 1000 },
-            )
-            .catch(() => {});
+          tapped = true;
         } else if (step.anchor && step.clock) {
           const rect = await page.locator('.sl-ring').boundingBox();
           assert.ok(rect, `missing ring: ${step.id}`);
           if (mode === 'phone')
             await page.touchscreen.tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
           else await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+          tapped = true;
         } else if (!step.clock) {
           // «Итог» ждёт объявленную контратаку (TRN-3): 25 игровых часов отсчёта и бой о
           // форт поста — мелкий шаг упёрся бы в предел повторов.
@@ -125,7 +122,39 @@ try {
             (hours) => window.__trainingTest.advance(hours),
             step.id.endsWith('bombard-wait') ? 0.1 : step.id === 'finale.result' ? 2 : 0.25,
           );
-        } else throw new Error(`missing control: ${step.id} ${step.target}`);
+        } else {
+          // A state step can change before the command panel has repainted. Wait
+          // for that real control (or the next step), but still fail if it is absent.
+          await page
+            .waitForFunction(
+              ({ id, target }) =>
+                document.querySelector('#spotlight')?.dataset.step !== id ||
+                (target &&
+                  [...document.querySelectorAll(target)].some(
+                    (e) =>
+                      e.getBoundingClientRect().width > 0 &&
+                      e.getBoundingClientRect().height > 0 &&
+                      !e.disabled,
+                  )),
+              { id: step.id, target: step.target },
+              { timeout: 3000 },
+            )
+            .catch(() => {
+              throw new Error(`missing control: ${step.id} ${step.target}`);
+            });
+          continue;
+        }
+        // Map taps need the same frame handoff as button taps. Otherwise a slow
+        // frame can leave the old ring actionable after its condition is already true.
+        if (tapped) {
+          await page
+            .waitForFunction(
+              (id) => document.querySelector('#spotlight')?.dataset.step !== id,
+              step.id,
+              { timeout: 3000 },
+            )
+            .catch(() => {});
+        }
         await page.waitForTimeout(80);
       }
       const facts = await page.evaluate(() => window.__trainingTest.facts());

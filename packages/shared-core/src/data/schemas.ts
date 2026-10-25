@@ -381,6 +381,10 @@ export const BuildingLevelSchema = z.object({
 
 export const BuildingDefSchema = z.object({
   name: z.string(),
+  /** Retained for existing worlds and accepted construction orders, but no longer
+   *  available for new construction. Omitted on active catalogue entries so old
+   *  parsed bundles keep their original shape and content hash. */
+  retired: z.boolean().optional(),
   cost: ResourceBagSchema.default({}),
   buildTimeHours: z.number().nonnegative().default(0),
   produces: ResourceBagSchema.default({}),
@@ -1491,6 +1495,8 @@ export const TechnologyRulesSchema = z
 export const MatchPricingSchema = z
   .object({
     cost: z.record(z.string(), z.number().positive()).optional(),
+    /** Additional resource multipliers for ship hulls; other orders retain `cost`. */
+    shipCost: z.record(z.string(), z.number().positive()).optional(),
     hours: z.number().positive().optional(),
     start: z.record(z.string(), z.number().positive()).optional(),
   })

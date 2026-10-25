@@ -52,7 +52,7 @@ P = collections.OrderedDict([
     ('staging',       (-560, 600, 'planet', 'empty_space', 'p1',
                        [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
                         {'unit': 'garrison', 'count': 2}],
-                       [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
+                       [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                         {'type': 'fort', 'level': 2}])),
     # Свободная колония за базой — первая планета, которую можно занять и развить.
     ('west_colony',   (-900, 700, 'planet', 'empty_space', None, [], [])),
@@ -74,7 +74,7 @@ P = collections.OrderedDict([
     ('ally_base',     (600, 620, 'planet', 'empty_space', 'ally',
                        [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
                         {'unit': 'garrison', 'count': 2}],
-                       [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
+                       [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                         {'type': 'fort', 'level': 2}])),
     ('ally_field',    (880, 720, 'asteroid', 'asteroid_field', 'ally', [], [])),
     ('outpost_east',  (880, 400, 'void_station', 'empty_space', 'swarm',

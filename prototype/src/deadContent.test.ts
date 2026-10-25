@@ -14,9 +14,40 @@
 // разъехалось с ботом.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { splitDeadContent } from './deadContent';
+import { data } from './gameData';
+import { deadContentCandidates, splitDeadContent } from './deadContent';
 
 describe('AI-BAL-10 — диагноз мёртвого контента', () => {
+  it('does not diagnose retired extractors as dead content even when never built or seeded', () => {
+    const candidates = deadContentCandidates(data);
+    expect(candidates).not.toContain('mine_t1');
+    expect(candidates).not.toContain('mine_t2');
+    expect(candidates).toContain('mine');
+    expect(candidates).toContain('metal_station');
+    // This is the harness path with an entirely empty usage/seed history.
+    const split = splitDeadContent(candidates, "build('mine'); build('mine_t2');");
+    expect(split.unbuilt).not.toContain('mine_t2');
+    expect(split.offRepertoire).not.toContain('mine_t1');
+    expect(split.unbuilt).toContain('mine');
+    expect(split.offRepertoire).toContain('metal_station');
+  });
+
+  it('keeps a live unit eligible when a retired building shares its id', () => {
+    const catalog = {
+      units: { same: data.units.scout! },
+      buildings: {
+        same: { ...data.buildings.mine!, retired: true },
+        live: data.buildings.mine!,
+        retired: { ...data.buildings.mine!, retired: true },
+      },
+    };
+    expect(deadContentCandidates(catalog)).toEqual(['same', 'live']);
+    expect(splitDeadContent(deadContentCandidates(catalog), '').offRepertoire).toEqual([
+      'same',
+      'live',
+    ]);
+  });
+
   it('id, которого нет в исходнике бота, попадает в «вне репертуара»', () => {
     const split = splitDeadContent(['radar'], "const CHAIN = ['mine', 'refinery'];");
     expect(split.offRepertoire).toEqual(['radar']);

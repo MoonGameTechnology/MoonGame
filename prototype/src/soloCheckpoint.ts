@@ -15,7 +15,8 @@
 import { t } from '../../localization/runtime';
 import { hashJson, type GameState } from '../../packages/shared-core/src/index';
 import { hubDoor } from '../../decisions/hubDoor';
-import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { parseCompatibleSoloSave } from '../../decisions/soloSaveMigration';
 import { gameDay } from './format';
 import { data } from './game';
 import { mapNodesFromState, mapPreset } from './mapCatalog';
@@ -138,7 +139,7 @@ function settleBackground(seq: number, raw: string | null): void {
  */
 export function refreshHubDoor(): void {
   const stored = soloStore.load();
-  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  const save = stored.ok ? parseCompatibleSoloSave(stored.raw, soloRules) : null;
   const door = hubDoor(
     // Сохранение без карты — «Нексус»: так его читает и `mapPreset` при загрузке.
     save
@@ -178,7 +179,7 @@ export function closeSoloReplace(): void {
 export function restoreSolo(): void {
   if (game.net()) return;
   const stored = soloStore.load();
-  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  const save = stored.ok ? parseCompatibleSoloSave(stored.raw, soloRules) : null;
   if (!save) {
     refreshHubDoor();
     return;

@@ -15,6 +15,18 @@ const DATA = {
 };
 
 describe('buildCodexIndex', () => {
+  it('keeps retired compatibility definitions out of the browsable catalogue', () => {
+    const idx = buildCodexIndex({
+      ...DATA,
+      buildings: {
+        ...DATA.buildings,
+        old_mine: { name: 'Old Mine', produces: { metal: 20 }, retired: true },
+      },
+    });
+    expect(idx.some((e) => e.key === 'b:old_mine')).toBe(false);
+    expect(idx.some((e) => e.key === 'b:mine')).toBe(true);
+  });
+
   it('indexes every unit, building and glossary term with deep-link keys', () => {
     const idx = buildCodexIndex(DATA, GLOSSARY);
     expect(idx.filter((e) => e.category === 'unit')).toHaveLength(3);
