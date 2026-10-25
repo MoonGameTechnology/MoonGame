@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Prepare an isolated evaluation; never change production configuration."""
 import hashlib
-import http.client
 import os
 from pathlib import Path
 import shutil
@@ -40,18 +39,17 @@ for repo, tag, commit, name in [
 run('git', 'apply', '--check', str(HERE / 'connector.patch'), cwd=BASE / 'coraza-caddy')
 run('git', 'apply', str(HERE / 'connector.patch'), cwd=BASE / 'coraza-caddy')
 archive = BASE / 'crs.tar.gz'
-connection = http.client.HTTPSConnection('codeload.github.com', timeout=60)
-try:
-    connection.request('GET', '/coreruleset/coreruleset/tar.gz/e03a4f6dabc7a30ebd8c52c97d28a154f590a48f')
-    response = connection.getresponse()
-    if response.status != 200:
-        raise SystemExit(f'CRS download failed: HTTP {response.status}; redirects are not followed')
-    payload = response.read(2 * 1024 * 1024)
-finally:
-    connection.close()
+download = subprocess.run([
+    'curl', '--disable', '--proto', '=https', '--tlsv1.2', '--fail', '--silent', '--show-error',
+    '--max-time', '60', '--max-filesize', '2097152', '--output', str(archive),
+    '--write-out', '%{http_code}',
+    'https://codeload.github.com/coreruleset/coreruleset/tar.gz/e03a4f6dabc7a30ebd8c52c97d28a154f590a48f',
+], check=True, capture_output=True, text=True, timeout=65)
+if download.stdout != '200':
+    raise SystemExit(f'CRS download failed: HTTP {download.stdout}; redirects are not followed')
+payload = archive.read_bytes()
 if hashlib.sha256(payload).hexdigest() != 'bdd0dec65d47fcae5aaa48aa681e0f4c151a8c1d9eb3040f6f65ebb8b2273c75':
     raise SystemExit('CRS source checksum mismatch')
-archive.write_bytes(payload)
 (BASE / 'coreruleset').mkdir()
 run('tar', '-xzf', str(archive), '--strip-components=1', '-C', str(BASE / 'coreruleset'))
 

@@ -5,7 +5,7 @@
 Патч `connector.patch` меняет журналирование чувствительных данных и обработку
 MaxBytesError в coraza-caddy 2.6.2; тесты upstream уточняют новый контракт журнала.
 
-Нужны Linux, Docker, Python 3, Git, OpenSSL, Node, зависимости репозитория (`pnpm install`)
+Нужны Linux, Docker, Python 3, Git, OpenSSL, curl с HTTP/2, Node, зависимости репозитория (`pnpm install`)
 и установленный Playwright Chromium. Подготовка скачивает пиненные исходники/образы;
 GHCR game image должен быть доступен Docker. На разработческой машине оставьте
 примерно 6 GiB диска и 2 GiB свободной RAM. Сборка ограничена 1 CPU / 1536 MiB. Необязательный `WAF_BUILD_CACHE` задаёт каталог
