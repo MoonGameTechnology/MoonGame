@@ -51,6 +51,7 @@ function frame(over: Partial<MapLayerFrame>): MapLayerFrame {
     scroll: { x: 0, y: 0 },
     settled: false,
     costly: false,
+    underlay: false,
     ...over,
   };
 }
@@ -378,6 +379,45 @@ describe('mapLayerView', () => {
       expect(mapLayerAction(slow({ settled: true, transform: { k: 1, tx: 37.5, ty: -21 } }))).toBe(
         'snap',
       );
+    });
+  });
+
+  describe('правило 9: отдаление медленного устройства открывает подложку', () => {
+    const zoom = (k: number) => ({ k, tx: 800 * (1 - k), ty: 450 * (1 - k) });
+    const backed = (over: Partial<MapLayerFrame>) =>
+      frame({ costly: true, underlay: true, ...over });
+
+    it('открытый край посреди жеста закрывает подложка, сколько бы выпечку ни сжало', () => {
+      for (const k of [0.66, 0.4, 1 / 6, 0.02]) {
+        expect(mapLayerAction(frame({ costly: true, transform: zoom(k) }))).toBe('rebake');
+        expect(mapLayerAction(backed({ transform: zoom(k) }))).toBe('show');
+      }
+      // Щипок у края экрана: выпечка ушла вбок, но на экране.
+      expect(mapLayerAction(backed({ transform: { k: 0.5, tx: 1300, ty: 100 } }))).toBe('show');
+    });
+
+    it('в покое выпечку сменяет новая, в фоне', () => {
+      const rest = backed({ settled: true, transform: zoom(0.4) });
+      expect(mapLayerAction(rest)).toBe('refresh');
+      expect(mapLayerAction({ ...rest, underlay: false })).toBe('rebake');
+    });
+
+    it('подложка только у медленного устройства и только свежая', () => {
+      expect(mapLayerAction(frame({ underlay: true, transform: zoom(0.66) }))).toBe('rebake');
+      expect(mapLayerAction(backed({ fresh: false, transform: zoom(0.66) }))).toBe('rebake');
+    });
+
+    it('выпечку, ушедшую с экрана целиком, перепекает прыжок камеры', () => {
+      expect(mapLayerAction(backed({ transform: { k: 4, tx: 5000, ty: 0 } }))).toBe('rebake');
+      expect(mapLayerAction(backed({ transform: { k: 0.5, tx: -1300, ty: 0 } }))).toBe('rebake');
+      expect(mapLayerAction(backed({ transform: { k: 1, tx: 2400, ty: 0 } }))).toBe('rebake');
+    });
+
+    it('покрытый экран — как без подложки', () => {
+      expect(mapLayerAction(backed({ transform: zoom(0.79) }))).toBe('show');
+      expect(mapLayerAction(backed({ settled: true, transform: zoom(0.79) }))).toBe('refresh');
+      expect(mapLayerAction(backed({ transform: zoom(4) }))).toBe('show');
+      expect(mapLayerAction(backed({ transform: { k: 1, tx: 420, ty: 0 } }))).toBe('scroll');
     });
   });
 

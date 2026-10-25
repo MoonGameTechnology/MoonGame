@@ -22,6 +22,7 @@ import {
   clampCam as camClampCam,
   centerOn as camCenterOn,
   fitTransform as camFitTransform,
+  MIN_SCALE,
 } from '../../packages/client/src/camera';
 import { data } from './gameData';
 import { isFrontier } from './mapCatalog';
@@ -219,6 +220,18 @@ export function setView(v: { scale: number; x: number; y: number }): void {
   camera.scale = v.scale;
   camera.x = v.x;
   camera.y = v.y;
+}
+/** Сделать `fn` при камере на виде всей карты и вернуть камеру, как стояла, что бы `fn` ни
+ *  бросила. Так слой карты меряет подложку на обзоре, не сдвинув экрана
+ *  (`decisions/mapLayerView.ts`, правило 9). */
+export function atOverview<T>(fn: () => T): T {
+  const was = { scale: camera.scale, x: camera.x, y: camera.y };
+  setView({ scale: MIN_SCALE, x: 0, y: 0 });
+  try {
+    return fn();
+  } finally {
+    setView(was);
+  }
 }
 
 /** Обе дороги к точке карты. Чем прыжок из текста отличается от перехода по ссылке из
