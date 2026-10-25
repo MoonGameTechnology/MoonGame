@@ -1,0 +1,49 @@
+{
+    auto_https off
+    order coraza_waf first
+    servers {
+        max_header_size 16KB
+        timeouts {
+            read_header 5s
+            read_body 10s
+            idle 30s
+        }
+    }
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+                headers delete
+                uri delete
+                error delete
+            }
+        }
+    }
+}
+(probe) {
+    route {
+        request_body {
+            max_size 1MB
+        }
+        coraza_waf {
+            directives `
+                Include /probe/policy.conf
+                SecComponentSignature "MoonGame-WAF-probe-1"
+            `
+        }
+        reverse_proxy https://backend:8081 {
+            transport http {
+                tls_trust_pool file /probe/test-ca.crt
+                tls_server_name backend
+            }
+        }
+    }
+}
+http://:8080 {
+    import probe
+}
+https://play.example.test:8443 {
+    tls /probe/edge.crt /probe/edge.key
+    import probe
+}

@@ -193,6 +193,7 @@
 | `docs/security/scanner-coverage-2026-07-26.md` | Отчёт: охват сканеров безопасности — 2026-07-26 | Глубокий анализ DevSecOps-пайплайна Void Dominion: инвентаризация сканеров, |
 | `docs/security/security-master-plan.md` | Security Master Plan — «самое безопасное приложение и игра» | Зонтичный план над тремя техническими треками безопасности проекта. Он не |
 | `docs/security/setup-github-secrets.md` | Настройка секретов и переменных в GitHub | Этот гайд поясняет, как правильно настроить CI/CD пайплайн в GitHub для безопасной работы. |
+| `docs/security/waf-evaluation-2026-10-25.md` | Coraza WAF: проверка перед включением, 2026-10-25 |  |
 | `docs/security/zero-trust-rollout.md` | Внедрение базовых мер Zero Trust | Этот документ описывает доступные механизмы и порядок их включения. Проверка исходников |
 
 ## docs/zero-touch-prod/
