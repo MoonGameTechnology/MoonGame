@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, netIncome, data, HOUR, advance } from './game';
-import { BROWNOUT, allowedBuildings, type GameState } from '../../packages/shared-core/src/index';
+import {
+  BROWNOUT,
+  allowedBuildings,
+  bombardedPlanets,
+  isInhabited,
+  setStance,
+  type GameState,
+} from '../../packages/shared-core/src/index';
 
 describe('building economy — the prototype resource loop', () => {
   it('ships the loop-closing roster: farm / fusion plant / microelectronics fab', () => {
@@ -67,6 +74,61 @@ describe('building economy — the prototype resource loop', () => {
     const above = netIncome(withScheduled(s.time + 0.25 * totalMs), 'p1').energy ?? 0; // 75% built
     expect(below).toBeCloseTo(baseline); // still under the 50% mark → no bonus shown yet
     expect(above).toBeCloseTo(baseline + plantEnergy * 0.75); // 75% of the plant's energy/h
+  });
+
+  it('стройка идёт в доход своего мира: обстрел гасит только стройку обстрелянного', () => {
+    // Доход читает карту одним проходом, а стройки берёт из расписания по миру: доля стройки
+    // обязана лечь на свой мир и погаснуть вместе с ним, а не с соседом.
+    const s = newGame();
+    s.players.p1!.faction = 'crimson';
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!;
+    const second = Object.values(s.planets).find(
+      (p) => p.owner === null && p.id !== home.id && isInhabited(data, p),
+    )!;
+    second.owner = 'p1';
+    const foreign = Object.values(s.planets).find((p) => p.owner !== null && p.owner !== 'p1')!;
+    const totalMs = data.buildings.power_plant!.buildTimeHours * HOUR;
+    const site = (planetId: string, playerId: string) => ({
+      id: `site-${planetId}`,
+      at: s.time + 0.25 * totalMs, // 75% построено
+      type: 'construction.complete',
+      payload: { kind: 'building', planetId, building: 'power_plant', playerId },
+      seq: 900,
+    });
+    const energy = (st: GameState, ...sites: Array<[string, string]>): number =>
+      netIncome(
+        { ...st, scheduled: [...st.scheduled, ...sites.map(([at, who]) => site(at, who))] },
+        'p1',
+      ).energy ?? 0;
+    const none = energy(s);
+    const atHome = energy(s, [home.id, 'p1']) - none;
+    const atSecond = energy(s, [second.id, 'p1']) - none;
+    expect(atHome).toBeGreaterThan(0);
+    expect(atSecond).toBeGreaterThan(0);
+    // Чужая стройка между своими ничего не добавляет и не сбивает их.
+    const both = energy(s, [home.id, 'p1'], [foreign.id, foreign.owner!], [second.id, 'p1']);
+    expect(both - none).toBeCloseTo(atHome + atSecond, 9);
+    const besieged: GameState = {
+      ...s,
+      diplomacy: { ...s.diplomacy },
+      fleets: {
+        ...s.fleets,
+        siege: {
+          id: 'siege',
+          owner: foreign.owner!,
+          location: second.id,
+          movement: null,
+          units: [{ unit: 'cruiser', count: 1 }],
+          traits: [],
+          orbit: 'near',
+          bombarding: true,
+        },
+      },
+    };
+    setStance(besieged, foreign.owner!, 'p1', 'war');
+    expect(bombardedPlanets(besieged, data).has(second.id)).toBe(true);
+    const shelled = energy(besieged, [home.id, 'p1'], [second.id, 'p1']) - energy(besieged);
+    expect(shelled).toBeCloseTo(atHome, 9);
   });
 
   it('the settlement runs the loop: consumption past the passive supply drains to arrears', () => {
