@@ -19,9 +19,15 @@
  *    быстрее, и суд по ней вернул бы чёткость, а за ней и медленные кадры. Нормальное
  *    устройство не запоминается: его кадры судят в каждом сеансе.
  * 3. **Выбор игрока сильнее вердикта в обе стороны**, как у свечения: тумблер «Чёткая карта»
- *    держит своё значение, что бы ни сказали кадры, и пока он выбран, кадры не судят.
+ *    держит своё значение, что бы ни сказали кадры.
  * 4. **Пониженная чёткость — {@link SOFT_MAP_DPR} пиксель на точку.** Экрану, у которого
- *    плотность не выше, понижать нечего: у него нет ни тумблера, ни суда кадров.
+ *    плотность не выше, понижать нечего: у него нет тумблера.
+ * 5. **Слабое устройство останавливает и голограмму** (вариант «Замирает» с карточки владельца
+ *    в том же треде, 2026-10-25). Тот же вердикт выключает «Движение слоёв», если игрок его не
+ *    выбирал, а система и так не просит меньше движения: стоящую голограмму кадр не
+ *    перерисовывает (`decisions/livingBorderLayer.ts`, правило 5). Выбор игрока сильнее и здесь.
+ *    Кадры судят устройство, пока вердикту есть что поменять: чёткость или движение
+ *    ({@link slowVerdictReach}).
  */
 
 /** Сколько кадров матча судят устройство (правило 1). */
@@ -51,15 +57,37 @@ export function mapDpr(screenDpr: number, sharp: boolean): number {
   return sharp ? screenDpr : Math.min(screenDpr, SOFT_MAP_DPR);
 }
 
-/** Судят ли кадры этого сеанса устройство (правила 2–4). `judged` — кадры сеанса уже сказали,
- *  что устройство не слабое. */
-export function judgingFrames(
+/** Включено ли движение слоёв: выбор игрока, а без него — не просит ли система меньше движения
+ *  и не слабое ли устройство (правило 5). */
+export function motionLive(chosen: boolean | null, reducedMotion: boolean, slow: boolean): boolean {
+  return chosen ?? (!reducedMotion && !slow);
+}
+
+/** Что поменял бы вердикт «слабое» (правила 3–5). */
+export interface SlowVerdictReach {
+  /** Чёткость: экрану есть что понижать, и игрок её не выбирал. */
+  readonly sharp: boolean;
+  /** Движение: игрок его не выбирал, и система не просит меньше движения. */
+  readonly motion: boolean;
+}
+
+/** Что поменял бы вердикт «слабое» на этом экране при этих выборах (правила 3–5). */
+export function slowVerdictReach(
   screenDpr: number,
-  chosen: boolean | null,
-  slow: boolean,
-  judged: boolean,
-): boolean {
-  return sharpnessMatters(screenDpr) && chosen === null && !slow && !judged;
+  sharpChosen: boolean | null,
+  motionChosen: boolean | null,
+  reducedMotion: boolean,
+): SlowVerdictReach {
+  return {
+    sharp: sharpnessMatters(screenDpr) && sharpChosen === null,
+    motion: motionChosen === null && !reducedMotion,
+  };
+}
+
+/** Судят ли кадры этого сеанса устройство (правила 2–5): вердикту есть что поменять, а его ещё
+ *  нет. `judged` — кадры сеанса уже сказали, что устройство не слабое. */
+export function judgingFrames(reach: SlowVerdictReach, slow: boolean, judged: boolean): boolean {
+  return (reach.sharp || reach.motion) && !slow && !judged;
 }
 
 /** Слабое ли устройство по промежуткам между кадрами матча, мс (правило 1); `null` — кадров

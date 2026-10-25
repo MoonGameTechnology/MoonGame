@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -234,5 +234,24 @@ describe('графика — чёткая карта', () => {
     setMapSharp(false);
     expect(mapSharpChosen()).toBe(false);
     expect(mapSharpOn()).toBe(false);
+  });
+});
+
+// Движение на слабом устройстве (`decisions/mapSharpness.ts`, правило 5) — на свежей загрузке
+// модуля: блоки выше уже выбрали движение тумблером.
+describe('графика — слабое устройство останавливает слои', () => {
+  it('без выбора игрока вердикт «слабое» выключает движение, а выбор сильнее вердикта', async () => {
+    vi.resetModules();
+    const prefs = await import('./graphicsPrefs');
+    expect(prefs.motionChosen()).toBeNull();
+    expect(prefs.reducedMotionAsked()).toBe(false);
+    expect(prefs.motionOn()).toBe(true);
+    prefs.markMapSlow();
+    expect(prefs.motionOn()).toBe(false);
+    // Слой стоит в середине размаха — виден, но не качается.
+    expect(prefs.fxBreath(1234, { period: 200, base: 0.5, amp: 0.5 })).toBe(0.5);
+    prefs.setMotion(true);
+    expect(prefs.motionChosen()).toBe(true);
+    expect(prefs.motionOn()).toBe(true);
   });
 });
