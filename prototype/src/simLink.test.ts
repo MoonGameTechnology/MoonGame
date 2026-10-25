@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { moveFleet } from '../../decisions/actions';
+import { parseSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { HOUR } from './time';
 import { newGame } from './matchSetup';
 import { createSimHost } from './simHost';
@@ -148,6 +149,67 @@ describe('отдельный поток расчёта соло-мира', () =>
     const saved = link.saved(shown);
     expect(saved.fog).toEqual(ref.state().fog);
     expect(saved.swarmIntel).toEqual(ref.state().swarmIntel);
+  });
+
+  it('строку сохранения собирает поток: его полный мир и политики экрана', () => {
+    const start = newGame();
+    const link = startSimLink(threadPort(), start, 'p1', undefined);
+    const ref = createSoloSim(structuredClone(start), 'p1');
+    for (let hour = 1; hour <= 6; hour++) {
+      link.step(hour * HOUR, true, AI, NONE, 0);
+      ref.step(hour * HOUR, true, AI, NONE);
+    }
+    link.take();
+    const planet = Object.keys(start.planets)[0]!;
+    const host: Omit<SoloSave, 'state'> = {
+      ai: [['p2', 'strong']],
+      normalSpeed: 50,
+      fastSpeed: 150,
+      autoAssault: ['f1'],
+      memory: [[planet, { owner: null, garrison: 3, buildings: [] }]],
+    };
+    const raws: Array<string | null> = [];
+    link.save(host, 'rules-1', (raw) => raws.push(raw));
+    expect(raws).toHaveLength(1);
+    const save = parseSoloSave(raws[0]!, 'rules-1')!;
+    // Мир — полный мир потока: память тумана всех мест, а не только своя, как у копии экрана.
+    expect(save.state).toEqual(JSON.parse(JSON.stringify(ref.state())));
+    expect(Object.keys(save.state.fog ?? {}).length).toBeGreaterThan(1);
+    expect({ ...save, state: undefined }).toEqual({ ...host, state: undefined });
+    // Чужая сверка правил строку не примет.
+    expect(parseSoloSave(raws[0]!, 'rules-2')).toBeNull();
+  });
+
+  it('кончившуюся партию поток в слот не отдаёт', () => {
+    const start = newGame();
+    const ended = { ...start, match: { ...start.match, status: 'ended' as const, winner: 'p1' } };
+    const link = startSimLink(threadPort(), ended, 'p1', undefined);
+    const raws: Array<string | null> = [];
+    link.save({ ai: [], normalSpeed: 1, fastSpeed: 2, autoAssault: [], memory: [] }, 'r', (raw) =>
+      raws.push(raw),
+    );
+    expect(raws).toEqual([null]);
+  });
+
+  it('остановленный поток строку не отдаёт', () => {
+    const replies: SimReply[] = [];
+    const host = createSimHost((reply) => replies.push(structuredClone(reply)));
+    let listener: (reply: SimReply) => void = () => {};
+    const port: SimPort = {
+      post: (request) => host(structuredClone(request)),
+      listen: (handler) => {
+        listener = handler;
+      },
+      close: () => {},
+    };
+    const link = startSimLink(port, newGame(), 'p1', undefined);
+    const raws: Array<string | null> = [];
+    link.save({ ai: [], normalSpeed: 1, fastSpeed: 2, autoAssault: [], memory: [] }, 'r', (raw) =>
+      raws.push(raw),
+    );
+    link.stop();
+    for (const reply of replies.splice(0)) listener(reply);
+    expect(raws).toEqual([]);
   });
 
   it('сломавшийся поток сообщает об этом', () => {

@@ -7,6 +7,7 @@
  * Разность считается от того, что экран уже получил, а не от мира до шага: приказ между
  * шагами тоже меняет мир, и копия экрана должна узнать о нём той же разностью.
  */
+import { serializeSoloSave } from '../../decisions/soloSave';
 import { diffState, shareRoadNetwork, type GameState } from '../../packages/shared-core/src/index';
 import { setMatchMode } from './protoKernel';
 import { createSoloSim, type SoloSim } from './soloSim';
@@ -56,6 +57,20 @@ export function createSimHost(post: (reply: SimReply) => void): (request: SimReq
         const out = sim.order(request.action);
         const outcome = out.error ? { id: request.id, error: out.error } : { id: request.id };
         sync({ events: [], driverOrders: [], orders: [outcome], stepped: false, ms: 0 });
+      } else if (request.kind === 'save') {
+        // Строку слота собирает поток: на карте в 1675 провинций это сотни мс, и кадр стоял
+        // их каждые 15 с. Мир — свой, полный (память тумана всех мест). Кончившуюся партию
+        // слот не пишет — его сотрёт экран, увидев конец.
+        const state = sim.state();
+        let raw: string | null = null;
+        if (state.match.status !== 'ended') {
+          try {
+            raw = serializeSoloSave({ state, ...request.host }, request.rules);
+          } catch {
+            // Слот остаётся прежним, как при сбое записи в кадре; мир потока цел.
+          }
+        }
+        post({ kind: 'saved', id: request.id, raw });
       } else {
         const state = sim.state();
         post({ kind: 'full', fog: state.fog, swarmIntel: state.swarmIntel });

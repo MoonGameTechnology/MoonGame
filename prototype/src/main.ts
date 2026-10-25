@@ -4520,8 +4520,12 @@ window.addEventListener('keydown', (e) => {
 // `soloCheckpoint.ts` (REFM-213). Здесь только снимок политик хоста и проводка к миру, темпу
 // и экранам.
 function currentSoloSave(): SoloSave {
+  return { state: simLink ? simLink.saved(s) : s, ...soloSaveHost() };
+}
+/** Политики хоста в сохранении — всё, кроме мира. */
+function soloSaveHost(): Omit<SoloSave, 'state'> {
   return {
-    state: simLink ? simLink.saved(s) : s, ai: [...AI_PLAYERS],
+    ai: [...AI_PLAYERS],
     normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
     fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
     autoAssault: [...soloAutoAssault], memory: memory.dump(),
@@ -4533,6 +4537,11 @@ initSoloCheckpoint({
   practice: () => !__PLAYER_BUILD__ && sandboxConfig.enabled,
   inMatch,
   snapshot: currentSoloSave,
+  saveInBackground: (rules, done) => {
+    if (!simLink) return false;
+    simLink.save(soloSaveHost(), rules, done);
+    return true;
+  },
   halt: () => {
     speed = 0;
     // Мир стоит, пока игрок не нажмёт ▶, — ряд скорости показывает паузу, а не прежний темп.

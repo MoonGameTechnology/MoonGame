@@ -11,10 +11,12 @@
  * поток отверг (мир успел измениться за шаг), возвращается отказом с опозданием.
  *
  * Чего у копии нет — памяти тумана и разведки Роя чужих мест (`screenView`). Для
- * сохранения поток раз в {@link FULL_EVERY_MS} присылает их целиком, и {@link SimLink.saved}
- * подкладывает их под мир на экране.
+ * сохранения на уходе со страницы поток раз в {@link FULL_EVERY_MS} присылает их целиком, и
+ * {@link SimLink.saved} подкладывает их под мир на экране. Строку сохранения по такту
+ * собирает сам поток ({@link SimLink.save}) из своего полного мира.
  */
 import type { SimWorkerScript } from '../../decisions/simWorker';
+import type { SoloSave } from '../../decisions/soloSave';
 import type { Action, DomainEvent, GameState } from '../../packages/shared-core/src/index';
 import { applyDelta } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
@@ -64,6 +66,9 @@ export interface SimLink {
   take(): SimSync | null;
   /** Мир на экране с памятью тумана всех мест — для сохранения. */
   saved(state: GameState): GameState;
+  /** Собрать строку сохранения в потоке; `done` получит её, `null` — писать нечего. Поток
+   *  остановлен или сломался — `done` не позовут. */
+  save(host: Omit<SoloSave, 'state'>, rules: string, done: (raw: string | null) => void): void;
   stop(): void;
 }
 
@@ -109,7 +114,16 @@ export function startSimLink(
   let fullAt = -Infinity;
   let extras = { fog: state.fog, swarmIntel: state.swarmIntel };
   const inbox: SimReply[] = [];
+  const saves = new Map<number, (raw: string | null) => void>();
+  let nextSave = 1;
   port.listen((reply) => {
+    // Строка слота идёт в слот сразу, между кадрами, а не ждёт кадр в очереди разностей.
+    if (reply.kind === 'saved') {
+      const done = saves.get(reply.id);
+      saves.delete(reply.id);
+      done?.(reply.raw);
+      return;
+    }
     if (reply.kind === 'sync' && reply.stepped) stepsOut -= 1;
     if (reply.kind === 'fail') failed = reply.message;
     inbox.push(reply);
@@ -170,6 +184,14 @@ export function startSimLink(
       fog: merge(extras.fog, shown.fog),
       swarmIntel: merge(extras.swarmIntel, shown.swarmIntel),
     }),
-    stop: () => port.close(),
+    save(host, rules, done) {
+      const id = nextSave++;
+      saves.set(id, done);
+      port.post({ kind: 'save', id, rules, host });
+    },
+    stop: () => {
+      saves.clear();
+      port.close();
+    },
   };
 }
