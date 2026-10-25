@@ -10,19 +10,20 @@
  * совпадает с миром потока, как только поток их применит. Приказ, который экран принял, а
  * поток отверг (мир успел измениться за шаг), возвращается отказом с опозданием.
  *
- * Чего у копии нет — памяти тумана и разведки Роя чужих мест (`screenView`). Для
- * сохранения на уходе со страницы поток раз в {@link FULL_EVERY_MS} присылает их целиком, и
- * {@link SimLink.saved} подкладывает их под мир на экране. Строку сохранения по такту
- * собирает сам поток ({@link SimLink.save}) из своего полного мира.
+ * Чего у копии нет — памяти тумана и разведки Роя чужих мест и мнений ботов о чужих местах
+ * (`screenView`). Для сохранения на уходе со страницы поток раз в {@link FULL_EVERY_MS}
+ * присылает их целиком, и {@link SimLink.saved} подкладывает их под мир на экране. Строку
+ * сохранения по такту собирает сам поток ({@link SimLink.save}) из своего полного мира.
  */
 import type { SimWorkerScript } from '../../decisions/simWorker';
 import type { SoloSave } from '../../decisions/soloSave';
 import type { Action, DomainEvent, GameState } from '../../packages/shared-core/src/index';
 import { applyDelta } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
+import { approvalLedger, fullApproval } from './botFavour';
 import { order } from './protoKernel';
 import type { DriverOrder } from './soloSim';
-import type { SimReply, SimRequest } from './simProtocol';
+import { screenView, type SimReply, type SimRequest } from './simProtocol';
 
 /** Как часто экран просит у потока память тумана всех мест для сохранения. */
 export const FULL_EVERY_MS = 10_000;
@@ -64,7 +65,8 @@ export interface SimLink {
   forward(action: Action): void;
   /** Собрать пришедшее; `null` — разностей не было. */
   take(): SimSync | null;
-  /** Мир на экране с памятью тумана всех мест — для сохранения. */
+  /** Мир на экране с тем, чего у копии нет (память тумана всех мест, весь стол симпатий), —
+   *  для сохранения и для мира, который кадр ведёт сам, когда поток сломался. */
   saved(state: GameState): GameState;
   /** Собрать строку сохранения в потоке; `done` получит её, `null` — писать нечего. Поток
    *  остановлен или сломался — `done` не позовут. */
@@ -106,13 +108,15 @@ export function startSimLink(
   me: string,
   modeId: string | undefined,
 ): SimLink {
-  let base = state;
+  // Копия с самого начала такая, какой её держит поток (`shown` в `simHost.ts`): его разности
+  // считаются от неё, и стол симпатий, который в первых шагах не менялся, не остался бы полным.
+  let base = screenView(state, me);
   const pending: Array<{ id: number; action: Action }> = [];
   let nextId = 1;
   let stepsOut = 0;
   let failed: string | null = null;
   let fullAt = -Infinity;
-  let extras = { fog: state.fog, swarmIntel: state.swarmIntel };
+  let extras = { fog: state.fog, swarmIntel: state.swarmIntel, approval: approvalLedger(state) };
   const inbox: SimReply[] = [];
   const saves = new Map<number, (raw: string | null) => void>();
   let nextSave = 1;
@@ -160,7 +164,8 @@ export function startSimLink(
       let stepped = false;
       let synced = false;
       for (const reply of inbox.splice(0)) {
-        if (reply.kind === 'full') extras = { fog: reply.fog, swarmIntel: reply.swarmIntel };
+        if (reply.kind === 'full')
+          extras = { fog: reply.fog, swarmIntel: reply.swarmIntel, approval: reply.approval };
         if (reply.kind !== 'sync') continue;
         synced = true;
         base = applyDelta(base, reply.delta);
@@ -179,11 +184,15 @@ export function startSimLink(
       for (const p of pending) shown = order(shown, p.action, shown.time).state;
       return { state: shown, events, driverOrders, refused, stepped };
     },
-    saved: (shown) => ({
-      ...shown,
-      fog: merge(extras.fog, shown.fog),
-      swarmIntel: merge(extras.swarmIntel, shown.swarmIntel),
-    }),
+    saved: (shown) =>
+      fullApproval(
+        {
+          ...shown,
+          fog: merge(extras.fog, shown.fog),
+          swarmIntel: merge(extras.swarmIntel, shown.swarmIntel),
+        },
+        extras.approval,
+      ),
     save(host, rules, done) {
       const id = nextSave++;
       saves.set(id, done);

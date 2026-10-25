@@ -4816,7 +4816,11 @@ function frame(nowReal: number) {
     }
     if (simLink.failed !== null) {
       // Мир на экране цел (последняя разность и неподтверждённые приказы) — кадр ведёт его дальше.
+      // Чего у копии нет (чужая память тумана, мнения ботов о чужих местах), он берёт из последней
+      // полной посылки потока: без них соперники в кадре забыли бы разведку, а боты — что думают
+      // друг о друге.
       console.warn('sim worker failed:', simLink.failed);
+      apply({ state: simLink.saved(s), events: [] });
       stopSim();
       simBroken = true;
     }
