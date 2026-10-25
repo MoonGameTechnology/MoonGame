@@ -45,6 +45,21 @@ describe('цепочка главы IV', () => {
     ]);
   });
 
+  it('место встречи — первое по id, в каком бы порядке ни лежали миры в записи', () => {
+    const s = start();
+    const meet = s.planets.rendezvous!;
+    // Второе место встречи с id меньше — и положено в запись ПОСЛЕ первого.
+    const planets = {
+      ...s.planets,
+      a_rendezvous: { ...meet, id: 'a_rendezvous', rendezvous: 'p2' },
+    };
+    expect(rendezvousOf({ ...s, planets })).toEqual({ at: 'a_rendezvous', ally: 'p2' });
+    const noMeet = Object.fromEntries(
+      Object.entries(s.planets).map(([id, p]) => [id, { ...p, rendezvous: undefined }]),
+    );
+    expect(rendezvousOf({ ...s, planets: noMeet })).toBeNull();
+  });
+
   it('шаги закрываются по миру: связь, очищенный архив, доля работы, носитель в пути', () => {
     let s: GameState = { ...start(), missionFacts: { contacted: { p1: ['rendezvous'] } } };
     expect(ids(s)[1]).toEqual(['archive', false, true]);

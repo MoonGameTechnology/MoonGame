@@ -32,6 +32,7 @@ import {
   type GameState,
   type Squadron,
 } from '../../packages/shared-core/src/index';
+import { recordValues } from '../../packages/shared-core/src/util/records';
 
 /** Вид оружия — он же ключ цвета. Цвета живут в `main.ts` рядом с остальной палитрой;
  *  здесь только вид, чтобы модуль не знал про канву. */
@@ -132,9 +133,11 @@ export function aaRings(
   visible: (planetId: string) => boolean,
 ): RangeRing[] {
   const rings: RangeRing[] = [];
-  for (const planet of Object.values(state.planets)) {
-    if (aaStrength(planet, data) <= 0) continue;
+  for (const planet of recordValues(state.planets)) {
+    // Сначала туман: проверка «опознан ли» дешевле подсчёта зубов, а под туманом почти вся
+    // большая карта.
     if (planet.owner !== me && !visible(planet.id)) continue;
+    if (aaStrength(planet, data) <= 0) continue;
     rings.push({
       kind: 'aa',
       x: planet.position.x,

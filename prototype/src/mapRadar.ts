@@ -25,6 +25,7 @@ import {
   type SightCircle,
   type SignatureContact,
 } from '../../packages/shared-core/src/index';
+import { recordValues } from '../../packages/shared-core/src/util/records';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { t } from '../../localization/runtime';
 import { contactAlpha, contactLost, paintedThisFrame } from './alerts';
@@ -143,13 +144,15 @@ export function ownRadarSources(): RadarSources {
   const s = game.world();
   const ME = game.me();
   const worlds: RadarSources['worlds'] = [];
-  for (const p of Object.values(s.planets)) {
+  // `recordValues`, а не `Object.values`: запись в 1675 миров — словарь движка, и там
+  // `Object.values` в разы медленнее чтения по ключам (`util/records.ts`).
+  for (const p of recordValues(s.planets)) {
     if (p.owner !== ME) continue;
     const reach = planetRadar(p);
     if (reach > 0) worlds.push({ at: p.position, reach });
   }
   const fleets: RadarSources['fleets'] = [];
-  for (const f of Object.values(s.fleets)) {
+  for (const f of recordValues(s.fleets)) {
     if (f.owner !== ME) continue;
     const reach = fleetRadar(f);
     if (reach > 0) fleets.push({ fleet: f, reach });

@@ -59,13 +59,15 @@ export interface ChapterStep {
 
 type Step = Omit<ChapterStep, 'active'>;
 
-/** Место встречи этого мира (первое по id — карта объявляет одно). */
+/** Место встречи этого мира (первое по id — карта объявляет одно). Кадр спрашивает его на
+ *  каждый новый мир, поэтому первое по id ищется одним проходом, без сортировки всех ключей:
+ *  на 1675 провинциях она стоила слабому телефону миллисекунду кадра. */
 export function rendezvousOf(state: GameState): { at: string; ally: PlayerId } | null {
-  for (const id of Object.keys(state.planets).sort()) {
-    const ally = state.planets[id]!.rendezvous;
-    if (ally) return { at: id, ally };
+  let at: string | null = null;
+  for (const id of Object.keys(state.planets)) {
+    if (state.planets[id]!.rendezvous && (at === null || id < at)) at = id;
   }
-  return null;
+  return at === null ? null : { at, ally: state.planets[at]!.rendezvous! };
 }
 
 /**
