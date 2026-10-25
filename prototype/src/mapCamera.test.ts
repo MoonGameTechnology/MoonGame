@@ -158,6 +158,31 @@ describe('REFM-231 — двери камеры', () => {
     expect(camera.cam.x).toBeLessThan(10_000);
   });
 
+  it('протяжка за край тянется упруго, а отпущенная камера плывёт обратно в предел', async () => {
+    // Просьба владельца 2026-10-25: у границы карты камера упиралась будто в стену.
+    const { camera } = await boot();
+    camera.setView({ scale: 2, x: 1e6, y: 0 });
+    camera.clampCam();
+    const edge = { ...camera.cam };
+    camera.dragBy(200, 0);
+    const pulled = camera.cam.x;
+    expect(pulled).toBeGreaterThan(edge.x); // не стена: камера идёт за край
+    expect(pulled).toBeLessThan(edge.x + 200); // но медленнее пальца
+    camera.easeCam(1000);
+    expect(camera.cam.x).toBe(pulled); // пока палец держит, камера стоит растянутой
+    camera.releaseCam();
+    camera.easeCam(16);
+    const easing = camera.cam.x;
+    expect(easing).toBeLessThan(pulled);
+    expect(easing).toBeGreaterThan(edge.x); // плывёт, а не прыгает
+    camera.holdCam();
+    camera.easeCam(1000);
+    expect(camera.cam.x).toBe(easing); // палец снова взял карту — возврат встал
+    camera.releaseCam();
+    for (let i = 0; i < 60; i++) camera.easeCam(16);
+    expect(camera.cam).toEqual(edge);
+  });
+
   it('вид ставится целиком, и камера для чтения — тот же живой объект', async () => {
     const { camera } = await boot();
     const seen = camera.cam;
@@ -337,11 +362,12 @@ describe('REFM-231 — стык с main.ts', () => {
     expect(MAIN).toContain(
       'setView(reframePresentation(cam, previousViewport, insets(), mapBounds()));',
     );
-    // Протяжку пальцем двигает ввод, покой на сетку выпечки ставит слой карты, третий сдвиг —
-    // подъём выбора над листом телефона (`sidePanel.ts`).
+    // Протяжку пальцем двигает ввод (упругой дверью `dragBy`), покой на сетку выпечки ставит
+    // слой карты, второй сдвиг — подъём выбора над листом телефона (`sidePanel.ts`).
     expect(MAIN).not.toMatch(/\bpanBy\(/);
     expect(PANEL.match(/\bpanBy\(/g)).toHaveLength(1);
-    expect(INPUT.match(/\bpanBy\(/g)).toHaveLength(1);
+    expect(INPUT).not.toMatch(/\bpanBy\(/);
+    expect(INPUT.match(/\bdragBy\(/g)).toHaveLength(1);
     expect(LAYER.match(/\bpanBy\(/g)).toHaveLength(1);
   });
 
