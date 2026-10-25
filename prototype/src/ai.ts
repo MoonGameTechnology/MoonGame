@@ -124,6 +124,12 @@ import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
 import { planAllyOperation } from '../../decisions/allyOperation';
 import { allyCaptiveOrders } from '../../decisions/captive';
+import {
+  isPirateClan,
+  pirateRaidZone,
+  pirateShipCap,
+  pirateShipCount,
+} from '../../decisions/pirateReach';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
  *  (SES-2.2). `steward` — «Хранитель»: the player's OWN autopilot, a defensive
@@ -556,6 +562,8 @@ export function aiOrders(
 ): Action[] {
   const state = provincesOnly(full);
   if (state.players[ai]?.npc === 'neutral') return allySeatOrders(state, ai, posture, profile);
+  if (isPirateClan(state, ai) && !state.pve)
+    return capPirateFleet(state, ai, baseAiOrders(state, ai, posture, profile, new Set()));
   if (state.pve?.npcPlayerId !== ai) return baseAiOrders(state, ai, posture, profile, new Set());
   // Сеть Роя (`docs/swarm-behavior.md`): посты-ретрансляторы стоят там, куда их ставит
   // сеть, — общий бот их не двигает и не сливает (`swarmNetPlan`, то же правило на сервере).
@@ -623,6 +631,23 @@ export function aiOrders(
   ];
 }
 
+/** Потолок флота пиратского клана (`decisions/pirateReach.ts`): заказы кораблей сверх
+ *  него снимаются, остальные приказы идут как есть. Снимаем на выходе, а не в каждой из
+ *  веток постройки: веток у бота несколько, а потолок один. */
+function capPirateFleet(state: GameState, ai: string, orders: Action[]): Action[] {
+  const isShip = (u: string): boolean => !!data.units[u] && !data.units[u]!.traits.includes('ground');
+  let room = pirateShipCap(state) - pirateShipCount(state, ai, isShip);
+  return orders.filter((a) => {
+    if (a.type !== 'unit.build') return true;
+    const p = a.payload as { unit?: string; count?: number };
+    if (!p.unit || !isShip(p.unit)) return true;
+    const n = p.count ?? 1;
+    if (n > room) return false;
+    room -= n;
+    return true;
+  });
+}
+
 /**
  * Житель-союзник главы IV (PVR-7.4): операция — приказ игрока или своя задача — ведётся по
  * плану `planAllyOperation` (то же решение показывает игроку карточка операции), а его
@@ -681,6 +706,10 @@ function baseAiOrders(
   if (state.players[ai]!.npc === 'pirate') posture = 'expand';
   // NPC pirates replenish their own roster; ordinary and legacy seats retain theirs.
   const pirate = state.players[ai]!.faction === 'pirates';
+  // Угодья клана (`decisions/pirateReach.ts`): набег только в пределах двух переходов от
+  // логова. Sector Zero и прочий PvE держат свой сценарий и сюда не попадают.
+  const raidZone = isPirateClan(state, ai) && !state.pve ? pirateRaidZone(state, ai) : null;
+  const inReach = (p: Planet): boolean => raidZone === null || raidZone.has(p.id);
   const swarmInhabitant = state.players[ai]!.npc === 'swarm';
   // ОДИН РЕПЕРТУАР, РАЗНАЯ РУКА (заказ владельца 2026-09-28: «слабый бот тоже умный, но
   // менее шустрый и чаще ошибается»). Эвристики блока AI-BAL достаются ОБОИМ профилям
@@ -731,7 +760,7 @@ function baseAiOrders(
     const at = fl.location ? state.planets[fl.location] : undefined;
     if (!at) return undefined;
     return Object.values(state.planets)
-      .filter((p) => p.owner !== ai && capturable(p) && canTraverse(state, ai, p.owner))
+      .filter((p) => p.owner !== ai && capturable(p) && canTraverse(state, ai, p.owner) && inReach(p))
       .sort(
         (a, b) =>
           d(at.position, a.position) - d(at.position, b.position) ||
@@ -1073,6 +1102,7 @@ function baseAiOrders(
         here0.owner !== ai &&
         capturable(here0) &&
         canTraverse(state, ai, here0.owner) &&
+        inReach(here0) &&
         !reconBare(f) &&
         (!here0.garrison.some((st) => st.count > 0) ||
           // ПРАВИЛО ВЛАДЕЛЬЦА №2 (2026-09-16): штурмовать, только будучи УВЕРЕННЫМ, что
@@ -1167,6 +1197,7 @@ function baseAiOrders(
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
+      if (!inReach(p)) continue; // за угодьями клана пираты не ходят
       // Ничью планету с гарнизоном, которую этот десант наверняка не возьмёт, не
       // выбирают, иначе флот повиснет на её орбите до конца матча.
       if (
@@ -1258,6 +1289,8 @@ function baseAiOrders(
     // Взять нечего тем, что в трюме, — домой, за десантом.
     if (!best && neutralGuarded && base && f.location !== base.id && skilled)
       best = base;
+    // Пиратский флот за пределами угодий (застрял там до потолка, отступил) идёт к логову.
+    if (!best && raidZone && base && !raidZone.has(f.location)) best = base;
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
   // War when the race is being LOST (self-play M4 finding): a passive bot loses the
