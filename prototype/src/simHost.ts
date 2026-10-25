@@ -9,6 +9,7 @@
  */
 import { serializeSoloSave } from '../../decisions/soloSave';
 import { diffState, shareRoadNetwork, type GameState } from '../../packages/shared-core/src/index';
+import { approvalLedger } from './botFavour';
 import { setMatchMode } from './protoKernel';
 import { createSoloSim, type SoloSim } from './soloSim';
 import { screenView, type SimReply, type SimRequest } from './simProtocol';
@@ -73,7 +74,12 @@ export function createSimHost(post: (reply: SimReply) => void): (request: SimReq
         post({ kind: 'saved', id: request.id, raw });
       } else {
         const state = sim.state();
-        post({ kind: 'full', fog: state.fog, swarmIntel: state.swarmIntel });
+        post({
+          kind: 'full',
+          fog: state.fog,
+          swarmIntel: state.swarmIntel,
+          approval: approvalLedger(state),
+        });
       }
     } catch (error) {
       sim = null;

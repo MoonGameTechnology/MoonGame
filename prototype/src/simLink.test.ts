@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Action, GameState } from '../../packages/shared-core/src/index';
-import { moveFleet } from '../../decisions/actions';
+import type { Action, GameState, StateDelta } from '../../packages/shared-core/src/index';
+import { declareWar, moveFleet } from '../../decisions/actions';
 import { parseSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { approvalLedger, type ApprovalLedger } from './botFavour';
 import { HOUR } from './time';
-import { newGame } from './matchSetup';
+import { DEFAULT_SETUP, networkSeats, newGame } from './matchSetup';
+import { order } from './protoKernel';
 import { createSimHost } from './simHost';
 import { startSimLink, type SimPort } from './simLink';
 import { screenView, type SimReply, type SimRequest } from './simProtocol';
@@ -15,9 +17,12 @@ import { createSoloSim } from './soloSim';
  * — общих ссылок между копией экрана и миром потока нет, как и в игре. Эталон — тот же
  * соло-мир (`soloSim.ts`), прогнанный теми же шагами напрямую.
  */
-function threadPort(): SimPort {
+function threadPort(tap?: (reply: SimReply) => void): SimPort {
   let listener: (reply: SimReply) => void = () => {};
-  const host = createSimHost((reply) => listener(structuredClone(reply)));
+  const host = createSimHost((reply) => {
+    tap?.(reply);
+    listener(structuredClone(reply));
+  });
   return {
     post: (request) => host(structuredClone(request)),
     listen: (handler) => {
@@ -149,6 +154,38 @@ describe('отдельный поток расчёта соло-мира', () =>
     const saved = link.saved(shown);
     expect(saved.fog).toEqual(ref.state().fog);
     expect(saved.swarmIntel).toEqual(ref.state().swarmIntel);
+  });
+
+  it('из стола симпатий копии идёт только мнение ботов об игроке, сохранению — весь стол', () => {
+    // Человек и ДВА бота в войне друг с другом: их мнения друг о друге тают каждый отрезок.
+    const seats = [...DEFAULT_SETUP.seats, { ...networkSeats('ffa')[2]!, id: 'p3', ai: true }];
+    const start = order(newGame({ seats }), declareWar('p2', 'p3'), 0).state;
+    const ai = new Map([
+      ['p2', 'weak' as const],
+      ['p3', 'weak' as const],
+    ]);
+    const deltas: StateDelta[] = [];
+    const port = threadPort((reply) => {
+      if (reply.kind === 'sync') deltas.push(reply.delta);
+    });
+    const link = startSimLink(port, start, 'p1', undefined);
+    const ref = createSoloSim(structuredClone(start), 'p1');
+    let shown = start;
+    for (let hour = 1; hour <= 6; hour++) {
+      link.step(hour * HOUR, true, ai, NONE, hour * 20_000);
+      ref.step(hour * HOUR, true, ai, NONE);
+      shown = link.take()!.state;
+      expect(shown).toEqual(screenView(ref.state(), 'p1'));
+    }
+    // Весь стол за эти часы менялся, а в разностях не было ни одного мнения о другом месте.
+    expect(approvalLedger(ref.state())).not.toEqual(approvalLedger(start));
+    for (const delta of deltas) {
+      const ledger = (delta.meta?.approval ?? {}) as ApprovalLedger;
+      for (const meter of Object.values(ledger)) expect(Object.keys(meter)).toEqual(['p1']);
+    }
+    expect(Object.keys(approvalLedger(shown)!.p2!)).toEqual(['p1']);
+    // Сохранение и мир, который кадр подхватит при сбое потока, — со всем столом.
+    expect(approvalLedger(link.saved(shown))).toEqual(approvalLedger(ref.state()));
   });
 
   it('строку сохранения собирает поток: его полный мир и политики экрана', () => {
