@@ -33,7 +33,7 @@
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingInstance, GameState } from '../state/gameState';
-import { matchCost } from '../util/pricing';
+import { matchCost, matchUnitCost } from '../util/pricing';
 import type { GameData } from '../data/schemas';
 import { refundCost } from '../util/treasury';
 import { receivesResource } from '../util/infestation';
@@ -109,7 +109,7 @@ export const salvageModule: GameModule = {
       const count = p['count'];
       if (typeof at !== 'string' || typeof unit !== 'string') return;
       if (typeof count !== 'number' || !(count > 0)) return;
-      addBag(entryAt(h, at).pool, matchCost(h.state, h.ctx.data.units[unit]?.cost), count);
+      addBag(entryAt(h, at).pool, matchUnitCost(h.state, h.ctx.data.units[unit]), count);
     });
 
     api.on('battle.resolved', (event, h) => {

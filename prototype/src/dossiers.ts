@@ -23,6 +23,7 @@ import {
   buildingLevel,
   buildingMaxLevel,
   matchCost,
+  matchUnitCost,
   matchHours,
   thresholdRamp,
   signatureSize,
@@ -709,7 +710,7 @@ export function createDossiers(host: DossierHost): {
     if (!def) return '';
     const st = def.stats;
     const rows = [
-      cxRow(t('codex.row.cost'), cost(matchCost(host.state(), def.cost), treasury())),
+      cxRow(t('codex.row.cost'), cost(matchUnitCost(host.state(), def), treasury())),
       cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchHours(host.state(), def.buildTimeHours ?? 0) })),
       cxRow(t('codex.row.atk-def'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
       cxRow(t('codex.row.hull'), String(st.hp ?? 0)),

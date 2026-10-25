@@ -163,6 +163,7 @@ describe('полигон — песочница игрока', () => {
       const roster = allowedBuildings(data, capital);
       return (
         isBuildable(data, capital) &&
+        !def.retired &&
         !def.traits.includes('infected') &&
         (def.onlyOn === undefined || def.onlyOn.includes(capital.kind ?? '')) &&
         (roster === undefined || roster.includes(id))

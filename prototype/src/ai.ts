@@ -11,6 +11,7 @@ import {
   buildingLevel,
   buildingMaxLevel,
   matchCost,
+  matchUnitCost,
   HERO_ACTIVE_CAP,
   abilityRange,
   getStance,
@@ -1438,6 +1439,68 @@ function baseAiOrders(
       out.push(buildBuilding(ai, p.id, 'mine'));
       break; // spread the economy one world per tick
     }
+    // Invest while metal is tight, keeping one usable line hull and the normal
+    // order reserve. A rich treasury does not need another source of stockpiles.
+    // Only one mining investment may be pending anywhere in the empire.
+    const minePending =
+      out.some(
+        (a) =>
+          (a.type === 'building.construct' || a.type === 'building.upgrade') &&
+          (a.payload as { building?: string }).building === 'mine',
+      ) ||
+      Object.values(state.planets).some(
+        (p) =>
+          p.owner === ai &&
+          [...(p.buildQueue ?? []), ...(p.pausedConstruction ?? [])].some(
+            (q) => (q.kind === 'building' || q.kind === 'upgrade') && q.building === 'mine',
+          ),
+      ) ||
+      state.scheduled.some((e) => {
+        if (e.type !== 'construction.complete') return false;
+        const q = e.payload as { kind?: string; planetId?: string; building?: string };
+        return (
+          (q.kind === 'building' || q.kind === 'upgrade') &&
+          q.building === 'mine' &&
+          state.planets[q.planetId ?? '']?.owner === ai
+        );
+      });
+    if (skilled && !minePending && data.buildings.mine) {
+      const hull = matchUnitCost(state, data.units[lineUnit]) ?? {};
+      const reserve = (r: string): number => (hull[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0);
+      for (const p of [
+        base,
+        ...worldsInOrder(state, ai, 'mine-upgrade', skilled).filter((p) => p.id !== base.id),
+      ]) {
+        if (p.owner !== ai || p.kind !== 'planet') continue;
+        const mine = p.buildings.find((b) => b.type === 'mine' && b.hp > 0);
+        if (!mine || mine.level >= buildingMaxLevel(data.buildings.mine)) continue;
+        if (p.buildQueue?.length || p.pausedConstruction?.length) continue;
+        if (
+          out.some(
+            (a) =>
+              (a.type === 'building.construct' || a.type === 'building.upgrade') &&
+              (a.payload as { planetId?: string }).planetId === p.id,
+          )
+        )
+          continue;
+        const cost = matchCost(state, buildingLevel(data.buildings.mine, mine.level + 1).cost);
+        if (
+          (pl.resources.metal ?? 0) >=
+          (cost.metal ?? 0) + 2 * (hull.metal ?? 0) + pad('metal', ORDER_RESERVE.metal ?? 0)
+        )
+          continue;
+        if (
+          !Object.keys({ ...cost, ...hull, ...ORDER_RESERVE }).every(
+            (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + reserve(r),
+          )
+        )
+          continue;
+        const order = upgradeBuilding(ai, p.id, 'mine');
+        if (canOrder(state, order) !== null) continue;
+        out.push(order);
+        break;
+      }
+    }
     // МЁРТВЫЙ МИР — тоже экономика (AI-BAL-8). До аннигиляции ни одного `dead_world` на
     // карте прототипа не существовало, поэтому `metal_station` числилась мёртвым
     // контентом «по УСЛОВИЮ» (AI-BAL-10, случай «в»). Теперь герой их создаёт — но обычная
@@ -1626,7 +1689,10 @@ function baseAiOrders(
             (!data.units[u]?.traits.includes('shuttle') || owned(u) < strikeCap) &&
             canOrder(state, buildUnit(ai, base.id, u, 1)) === null,
         ) ?? lineUnit;
-      out.push(buildUnit(ai, base.id, hull, 1));
+      const order = buildUnit(ai, base.id, hull, 1);
+      // Resource floors are a strategy reserve, not an affordability check: the
+      // pinned ship premium can raise any component above those old floors.
+      if (canOrder(state, order) === null) out.push(order);
     }
     // Wartime posture (self-play M4: wars were free walk-in raids — the leader had no
     // garrisons, so whoever attacked always came back and won): at war the bot
@@ -1652,7 +1718,30 @@ function baseAiOrders(
         out.push(buildUnit(ai, base.id, militiaUnit, 2));
       }
       if (ownFleets < 8 && (pl.resources.metal ?? 0) > pad('metal', 140)) {
-        out.push(buildUnit(ai, base.id, scoutUnit, 1));
+        // Scouts use spare money after the next line hull. Otherwise a 75-metal
+        // scout bought every two hours drains more than the opening mine earns,
+        // keeping the treasury below the line-production floor indefinitely.
+        // NPC rosters and Sector Zero keep their existing scenario behaviour.
+        const lineBlock = canOrder(state, buildUnit(ai, base.id, lineUnit, 1));
+        const saveForLine =
+          scoutUnit === 'scout' &&
+          !pl.npc &&
+          !state.pve &&
+          (lineBlock === null || lineBlock === 'E_INSUFFICIENT');
+        const scoutCost = matchUnitCost(state, data.units[scoutUnit]) ?? {};
+        const lineCost = matchUnitCost(state, data.units[lineUnit]) ?? {};
+        const afterScout = (r: string): number =>
+          (pl.resources[r] ?? 0) - (scoutCost[r] ?? 0);
+        const keepsLineBudget =
+          afterScout('metal') > pad('metal', 220) &&
+          afterScout('credits') > pad('credits', 120) &&
+          afterScout('microelectronics') >= pad('microelectronics', 3) &&
+          Object.keys({ ...lineCost, ...ORDER_RESERVE }).every(
+            (r) => afterScout(r) >= (lineCost[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0),
+          );
+        // A technology or facility gate is not something hoarding can fix: keep
+        // scouting while the ordinary research/building policy opens that gate.
+        if (!saveForLine || keepsLineBudget) out.push(buildUnit(ai, base.id, scoutUnit, 1));
       }
     }
     // ═══ СИЛЬНЫЙ БОТ (AI-BAL-3): наземная кампания ═══
@@ -1682,8 +1771,8 @@ function baseAiOrders(
         });
       // `troop` — боец десантного челнока (SHU-5.2): платится вместе с машиной.
       const affordableUnit = (unit: string, count: number, troop?: string): boolean => {
-        const hull = matchCost(state, data.units[unit]?.cost) ?? {};
-        const extra = troop !== undefined ? (matchCost(state, data.units[troop]?.cost) ?? {}) : {};
+        const hull = matchUnitCost(state, data.units[unit]) ?? {};
+        const extra = troop !== undefined ? (matchUnitCost(state, data.units[troop]) ?? {}) : {};
         return Object.keys({ ...hull, ...extra }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
@@ -1857,7 +1946,7 @@ function baseAiOrders(
       // Бот держит пару таких крейсеров на войне: без них миры он рушил бы только
       // `attack × BOMBARD_FRACTION` линейных корпусов. Заднюю линию теперь держит
       // шаттл-носитель выше.
-      const lineCost = matchCost(state, data.units[lineUnit]?.cost) ?? {};
+      const lineCost = matchUnitCost(state, data.units[lineUnit]) ?? {};
       const siegeCost = matchCost(state, data.modules[SIEGE_MODULE]?.cost) ?? {};
       if (
         warFooting &&
@@ -2254,7 +2343,9 @@ function baseAiOrders(
         };
         const patrolWing = (sq: Squadron): boolean => {
           const machines = sq.units.filter((st) => st.count > 0);
-          return machines.length > 0 && machines.every((st) => PATROL_WING.includes(st.unit as never));
+          return (
+            machines.length > 0 && machines.every((st) => PATROL_WING.includes(st.unit as never))
+          );
         };
         const issue = (order: Action): boolean => {
           if (canOrder(state, order) !== null) return false;

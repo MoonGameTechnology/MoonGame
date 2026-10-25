@@ -14,7 +14,7 @@
       "owner": "p1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -80,7 +80,7 @@
       "owner": "p1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -128,7 +128,7 @@
       "owner": "p1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",

@@ -44,7 +44,7 @@ for i, ((x, y), angles) in enumerate(zip(homes, angles), 1):
     slot = f'slot_{i}'
     slots[slot] = dict(team='A' if i <= 3 else 'B', spawn='fixed', resources=dict(credits=300, metal=300))
     add(f'home_{i}', x, y, 'planet', planetType='terran', owner=slot,
-        buildings=[dict(type='mine_t1'), dict(type='shipyard', level=2)],
+        buildings=[dict(type='mine'), dict(type='shipyard', level=2)],
         garrison=[dict(unit='militia', count=3)])
     fleets[f'fleet_{i}'] = dict(owner=slot, location=f'home_{i}', units=[dict(unit='scout', count=1)])
     # Every district opens with the same pair of worlds: a temperate one and an ocean.
@@ -254,6 +254,7 @@ PLACED.update(spent)
 content = dict(id='team-3v3', seed='shattered-crown-20261014', sectors=sectors,
     regions=[dict(id=name, sectors=ids) for name, ids in REGION_SECTORS.items()],
     players=players, slots=slots, fleets=fleets,
+    pricing=json.loads((ROOT / 'data/maps/duel-1.json').read_text())['pricing'],
     techRules=dict(ruleset='main', starting=['scout_design'], dayGates=True, exclude=[]))
 (ROOT / 'data/maps/team-3v3.json').write_text(json.dumps(content, ensure_ascii=False, indent=2) + '\n')
 print('provinces:', len(sectors), {name: len(ids) for name, ids in REGION_SECTORS.items()})

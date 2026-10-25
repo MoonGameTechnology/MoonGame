@@ -10,6 +10,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { pveState, PVE_MISSION_COUNT } from '../packages/client/src/gameData';
 import { shippedGameData } from './bundle';
+import { buildingLevel, matchCost, matchStart, matchUnitCost } from '../packages/shared-core/src/index';
+import { MatchPricingSchema } from '../packages/shared-core/src/data/schemas';
 
 const data = shippedGameData();
 const dir = new URL('./maps/', import.meta.url);
@@ -34,6 +36,18 @@ describe('цены основной игры', () => {
   it('правило одно на все карты основной игры', () => {
     const first = mainMaps[0]!.json.pricing;
     for (const m of mainMaps) expect(m.json.pricing, m.file).toEqual(first);
+  });
+
+  it('the opening metal budget buys either two cruisers or one cruiser and a mine upgrade', () => {
+    const pricing = MatchPricingSchema.parse(mainMaps[0]!.json.pricing);
+    const state = { pricing };
+    const start = matchStart(pricing, { metal: 320 }).metal!;
+    const cruiser = matchUnitCost(state, data.units.cruiser!).metal!;
+    const upgrade = matchCost(state, buildingLevel(data.buildings.mine!, 2).cost).metal!;
+    expect(2 * cruiser).toBeLessThanOrEqual(start);
+    expect(cruiser + upgrade).toBeLessThanOrEqual(start);
+    expect(2 * cruiser + upgrade).toBeGreaterThan(start);
+    expect(matchUnitCost(state, data.units.heavy_cruiser!).metal! + upgrade).toBeGreaterThan(start);
   });
 
   it('цены партии есть только у карт основной игры', () => {

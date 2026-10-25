@@ -34,6 +34,17 @@ const authoredMap = (): MatchMap => {
 };
 
 describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
+  it('pins an independent ship-price table so future map edits cannot reprice a match', () => {
+    const map = exampleMap();
+    map.pricing = { cost: { metal: 1.5 }, shipCost: { metal: 2.5, credits: 2 } };
+    const state = buildStateFromMap(map, data);
+    expect(state.pricing).toEqual(map.pricing);
+    expect(state.pricing?.shipCost).not.toBe(map.pricing.shipCost);
+    map.pricing.shipCost!.metal = 10;
+    expect(state.pricing?.shipCost?.metal).toBe(2.5);
+    expect(JSON.parse(JSON.stringify(state)).pricing.shipCost.metal).toBe(2.5);
+  });
+
   it('builds a GameState from the example map', () => {
     const state = buildStateFromMap(exampleMap(), data);
     expect(Object.keys(state.planets).sort()).toEqual([
@@ -312,9 +323,9 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
 
   it('sets building HP from the data and carries terrain/planetType', () => {
     const state = buildStateFromMap(exampleMap(), data);
-    const mine = state.planets.home_green!.buildings.find((b) => b.type === 'mine_t1');
+    const mine = state.planets.home_green!.buildings.find((b) => b.type === 'mine');
     expect(mine).toBeDefined();
-    expect(mine!.hp).toBe(data.buildings.mine_t1!.hp);
+    expect(mine!.hp).toBe(data.buildings.mine!.hp);
     expect(state.planets.drift!.terrain).toBe('asteroid_field');
     expect(state.planets.veil!.planetType).toBe('gas_giant');
   });

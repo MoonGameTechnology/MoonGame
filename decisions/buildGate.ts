@@ -45,7 +45,7 @@ export function canBuildHere(
   eatsBiomass: boolean,
 ): boolean {
   const def = data.buildings[building];
-  if (!def) return false;
+  if (!def || def.retired) return false;
   if (!eatsBiomass && isInfected(def)) return false;
   if (!isBuildable(data, node)) return false;
   const roster = allowedBuildings(data, node);

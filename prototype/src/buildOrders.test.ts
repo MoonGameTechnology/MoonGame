@@ -4,7 +4,10 @@ import type { QueuedBuild } from './buildQueue';
 import { afford, laneOf, queuedAction, queuedCost } from './buildOrders';
 
 const data = {
-  units: { corvette: { cost: { credits: 20, alloy: 5 } }, hero: {} },
+  units: {
+    corvette: { cost: { credits: 20, alloy: 5 }, hullClass: 'light', domain: 'space', traits: [] },
+    hero: {},
+  },
   buildings: {
     mine: {
       cost: { credits: 100 },
@@ -60,6 +63,13 @@ describe('очередь — хватает ли казны', () => {
 });
 
 describe('очередь — цена головы', () => {
+  it('uses the ship hull price before multiplying a waiting order by quantity', () => {
+    const state = worldWith(1);
+    state.pricing = { cost: { alloy: 1.5 }, shipCost: { alloy: 2.5, credits: 2 } };
+    expect(queuedCost(state, data, 'C1R1', q({ kind: 'unit', id: 'corvette', count: 3 })))
+      .toEqual({ credits: 120, alloy: 57 });
+  });
+
   it('здание берёт цену из данных', () => {
     expect(queuedCost(worldWith(1), data, 'C1R1', q())).toEqual({ credits: 100 });
   });

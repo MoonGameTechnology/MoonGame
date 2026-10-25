@@ -13,6 +13,7 @@ import {
   buildingMaxLevel,
   type GameState,
   matchCost,
+  matchUnitCost,
 } from '../../packages/shared-core/src/index';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { t, tData } from '../../localization/runtime';
@@ -157,7 +158,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(matchCost(live(), data.buildings[id]?.cost), myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, live().players[me()]?.faction)} ${t('codex.build-here')} · ${cost(matchCost(live(), data.units[id]?.cost), myRes())}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, live().players[me()]?.faction)} ${t('codex.build-here')} · ${cost(matchUnitCost(live(), data.units[id]), myRes())}</button>`;
   }
   return '';
 }

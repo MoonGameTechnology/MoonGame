@@ -57,7 +57,7 @@
       "owner": "slot_a1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -81,7 +81,7 @@
       "owner": "slot_a2",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -105,7 +105,7 @@
       "owner": "slot_b1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -129,7 +129,7 @@
       "owner": "slot_b2",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",

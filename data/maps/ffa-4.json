@@ -12,7 +12,7 @@
       "owner": "slot_1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -36,7 +36,7 @@
       "owner": "slot_2",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -60,7 +60,7 @@
       "owner": "slot_3",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -84,7 +84,7 @@
       "owner": "slot_4",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -514,8 +514,21 @@
     "exclude": []
   },
   "pricing": {
-    "cost": { "metal": 1.5, "microelectronics": 2, "credits": 3 },
+    "cost": {
+      "metal": 1.5,
+      "microelectronics": 2,
+      "credits": 3
+    },
     "hours": 2,
-    "start": { "metal": 1.5, "microelectronics": 2, "credits": 2 }
+    "start": {
+      "metal": 1.5,
+      "microelectronics": 2,
+      "credits": 2
+    },
+    "shipCost": {
+      "metal": 2.5,
+      "credits": 2,
+      "microelectronics": 1.5
+    }
   }
 }

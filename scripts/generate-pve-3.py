@@ -39,7 +39,7 @@ P = collections.OrderedDict([
     ('bastion',     (40, -470, 'planet', 'empty_space', 'p1',
                      [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
                       {'unit': 'garrison', 'count': 2}],
-                     [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
+                     [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                       {'type': 'fort', 'level': 2}])),
     ('north_reach', (-230, -600, 'dead_world', 'deep_void', None, [], [])),
     ('gate_yard',   (-70, -280, 'dead_world', 'depleted_system', None, [], [])),
@@ -51,7 +51,7 @@ P = collections.OrderedDict([
     # `construction-yard-port.test.ts`), первого уровня — лёгкие корпуса строятся на месте.
     ('west_colony', (-600, -300, 'planet', 'empty_space', 'p1',
                      [{'unit': 'militia', 'count': 2}],
-                     [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 1}])),
+                     [{'type': 'mine'}, {'type': 'shipyard', 'level': 1}])),
     ('ore_shelf',   (-470, -500, 'asteroid_cluster', 'asteroid_cluster', None, [], [])),
     ('watch_post',  (-560, -130, 'asteroid', 'asteroid_field', None, [], [])),
     ('front_w',     (-300, -190, 'asteroid', 'asteroid_field', None, [], [])),
@@ -60,7 +60,7 @@ P = collections.OrderedDict([
     # краю; восточный переход — обход сквозь плотную часть облака.
     ('east_colony', (420, -390, 'planet', 'empty_space', 'p1',
                      [{'unit': 'militia', 'count': 2}],
-                     [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 1}])),
+                     [{'type': 'mine'}, {'type': 'shipyard', 'level': 1}])),
     ('hinter_veil', (600, -580, 'dense_nebula', 'dense_nebula', None, [], [])),
     ('east_haze',   (560, -150, 'nebula', 'nebula', None, [], [])),
     ('front_e',     (390, -120, 'nebula', 'nebula', None, [], [])),

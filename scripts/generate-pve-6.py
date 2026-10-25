@@ -51,7 +51,7 @@ P = collections.OrderedDict([
     ('forward_base', (-740, 270, 'planet', 'empty_space', 'p1',
                       [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
                        {'unit': 'garrison', 'count': 2}],
-                      [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
+                      [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                        {'type': 'fort', 'level': 2}])),
     # Ближняя экономика за базой — доступна до главного штурма (§8.2).
     ('free_colony',  (-940, 490, 'planet', 'empty_space', None, [], [])),
@@ -64,7 +64,7 @@ P = collections.OrderedDict([
     ('ally_camp',    (-700, 720, 'planet', 'empty_space', 'ally',
                       [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
                        {'unit': 'garrison', 'count': 2}],
-                      [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
+                      [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                        {'type': 'fort', 'level': 2}])),
 
     # ── ЮЖНАЯ ДУГА — внешний виток спирали и путь эвакуации от доков к базе. Два ряда: потеря

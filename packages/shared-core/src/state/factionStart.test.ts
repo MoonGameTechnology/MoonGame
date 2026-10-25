@@ -18,7 +18,7 @@ describe('factionStart — match-start assembly by faction (B3 / CR-1.3)', () =>
       { unit: 'scout_drone', count: 1 },
     ]);
     expect(start.garrison).toEqual([{ unit: 'militia', count: 2 }]);
-    expect(start.buildings).toEqual([{ type: 'mine_t1', level: 1, hp: 15 }]); // hp resolved from data
+    expect(start.buildings).toEqual([{ type: 'mine', level: 1, hp: 20 }]); // hp resolved from data
   });
 
   it('is deterministic and returns a fresh clone (no shared refs with game data)', () => {

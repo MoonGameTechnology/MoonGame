@@ -171,7 +171,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     step(stage, id, null, state(arrived), { reveal: () => ui.show(planet) }),
     ...(role === 'hero' ? [fleet(stage, `${id}-arrived-fleet`, role)] : []),
   ];
-  const building = (stage: TrainingStage, id: string, type: string) => [
+  const building = (stage: TrainingStage, id: string, type: string, upgrade = false) => [
     step(stage, `${id}-catalog`, '[data-act="openbuild"]', visible('#buildwin.show [data-bwtab]'), {
       copy: 'training.guide.build.catalog',
     }),
@@ -179,12 +179,16 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       stage,
       `${id}-all`,
       '#buildwin [data-bwtab="*"]',
-      visible(`#buildwin [data-bw-go="${type}"]`),
+      visible(`#buildwin [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`),
       { copy: 'training.guide.build.all' },
     ),
-    step(stage, `${id}-order`, `#buildwin [data-bw-go="${type}"]`, action('building.construct'), {
-      copy: `training.guide.build.${type}`,
-    }),
+    step(
+      stage,
+      `${id}-order`,
+      `#buildwin [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`,
+      action(upgrade ? 'building.upgrade' : 'building.construct'),
+      { copy: `training.guide.build.${type}` },
+    ),
     close(stage, `${id}-close`),
   ];
   const troops = (stage: TrainingStage, id: string, n: number) => [
@@ -276,7 +280,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     world('economy', 'base', 'base'),
     ...details('economy', 'details'),
     tab('economy', 'buildings', 'buildings'),
-    ...building('economy', 'mine', 'mine'),
+    ...building('economy', 'mine', 'mine', true),
     step(
       'economy',
       'mine',

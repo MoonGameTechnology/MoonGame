@@ -155,7 +155,7 @@ describe('shipped province types: what each one hosts (ORB-4 golden table)', () 
       const actual = hosts(kind);
       if (expected === null) {
         const anything = Object.keys(data.buildings).filter(
-          (b) => !SELF_RESTRICTED.includes(b) && !SWARM_ONLY.includes(b),
+          (b) => !SELF_RESTRICTED.includes(b) && !SWARM_ONLY.includes(b) && !data.buildings[b]?.retired,
         );
         expect(actual.sort()).toEqual(anything.sort());
       } else {

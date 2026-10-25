@@ -10,7 +10,7 @@ export { playablePlayerIds } from './state/playableSeats';
 export { Rng, seedRng, type RngState } from './rng/rng';
 
 // Цены партии (основная игра дороже каталога, резолюция владельца 2026-10-18)
-export { matchCost, matchHours, matchStart } from './util/pricing';
+export { matchCost, matchUnitCost, matchHours, matchStart } from './util/pricing';
 
 // State model
 export {

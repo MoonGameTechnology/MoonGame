@@ -29,6 +29,7 @@ export {
   MAX_STEWARD_HOLD_POINTS,
   techInMatch,
   matchCost,
+  matchUnitCost,
 } from '../../packages/shared-core/src/index';
 
 // --- assembling the match ----------------------------------------------------
@@ -73,12 +74,12 @@ export {
   inhabitedWorldCount,
 } from '../../packages/shared-core/src/index';
 export { HUNGER_MULT, hungerModule } from './hunger';
-export { economySnapshot, netIncome, hpOfLevel } from './economy';
+export { completedUnitSpend, economySnapshot, netIncome, hpOfLevel } from './economy';
 // BAL-5: разложение счёта на слагаемые — читает харнес замера (`selfplay.mjs`).
 export { scoreParts, type ScoreParts } from './scoreParts';
 // AI-BAL-10: диагноз мёртвого контента для харнеса замера. Чистая функция (исходник бота
 // приходит строкой), поэтому фасад её реэкспортирует, а `node:fs` остаётся у вызывающего.
-export { splitDeadContent, type DeadContentSplit } from './deadContent';
+export { deadContentCandidates, splitDeadContent, type DeadContentSplit } from './deadContent';
 // BAL-12: что из дерева технологий прибор замера видит — настоящее дерево против
 // мета-грантов и слой `has_scientist` с причиной каждого нуля.
 export {
