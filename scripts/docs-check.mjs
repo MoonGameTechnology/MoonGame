@@ -40,7 +40,8 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.claude'
 
 /** Датированные исторические снапшоты — ссылки в них не проверяются (см. шапку).
  *  `docs/archive` — прежние полные тексты живых доков, снятые при сжатии в снимок
- *  (первый — `state-2026-10-19.md`, 2026-10-19): верны на свою дату, их не правят. */
+ *  (первый — `state-2026-10-19.md`, 2026-10-19), и устаревшие разборы, перенесённые
+ *  туда по решению владельца 2026-10-25: верны на свою дату, их не правят. */
 const HISTORICAL = [normalize('docs/reviews'), normalize('docs/archive')];
 
 /** Осознанные forward-ссылки на ещё не созданные файлы (причина + дата). */
@@ -102,6 +103,10 @@ function resolves(src, ref) {
   if (ALLOW.has(target)) return true;
   const fromRoot = normalize(target.replace(/^\//, ''));
   if (fileSet.has(fromRoot)) return true;
+  // `.claude/` обход пропускает (SKIP_DIRS), но скиллы в нём — наши: путь проверяем по диску.
+  // До 2026-10-25 такие упоминания проходили лишь по совпадению имени `SKILL.md` со
+  // скиллом в `.devin/`, удалённым при ревизии документации.
+  if (fromRoot.startsWith(normalize('.claude/skills') + sep) && existsSync(join(ROOT, fromRoot))) return true;
   const fromFile = normalize(join(dirname(src), target));
   if (fileSet.has(fromFile)) return true;
   // «голое» упоминание `имя.md` — так доки ссылаются друг на друга через каталоги

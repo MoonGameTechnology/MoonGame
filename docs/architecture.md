@@ -363,7 +363,7 @@ PostgreSQL — постоянное состояние
 | Этап | Проверяемый результат | Почему этот порядок | Документ-владелец дальнейшей работы |
 | --- | --- | --- | --- |
 | Зафиксировать поведение | Тестируемый контракт рабочего входа и сценариев восстановления | Нельзя безопасно объединять неизвестные различия | [server-roadmap.md](server-roadmap.md) |
-| Укрепить фиксацию | Согласованная запись действия, долговечный публичный профиль | Потеря состояния дороже косметического рефакторинга | [engineering-risks.md](engineering-risks.md), [operations-roadmap.md](operations-roadmap.md) |
+| Укрепить фиксацию | Согласованная запись действия, долговечный публичный профиль | Потеря состояния дороже косметического рефакторинга | [engineering-risks.md](archive/engineering-risks.md), [operations-roadmap.md](operations-roadmap.md) |
 | Уточнить время и версии | Явная политика простоя, ревизии и совместимые сейвы | После этого можно обещать поведение длительного матча | [versioning.md](versioning.md), [server-roadmap.md](server-roadmap.md) |
 | Свести пути выполнения | Общая серверная композиция и адресное переиспользование UI | Изменения перестают попадать только в один вход | [CODE-MAP.md](../CODE-MAP.md), [decisions/README.md](../decisions/README.md) |
 | Закрепить продуктовые сборки | Самостоятельный Sector Zero и проверки целевого артефакта | Общая библиотека ещё не означает готовый продукт | [sector-zero-roadmap.md](sector-zero-roadmap.md), [platform-adapters.md](platform-adapters.md), [cross-platform-roadmap.md](cross-platform-roadmap.md) |

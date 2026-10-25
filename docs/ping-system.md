@@ -69,4 +69,4 @@
 - `pnpm smoke:pings` (`prototype/pingtest.mjs`, после сборки прототипа): настоящий браузер,
   ПК и тач, три вида меток и удаление кнопками списка и попапа.
 
-Направления дальнейшего развития — [open-questions-visuals-content-pings.md](open-questions-visuals-content-pings.md).
+Направления дальнейшего развития — [open-questions-visuals-content-pings.md](archive/open-questions-visuals-content-pings.md).
