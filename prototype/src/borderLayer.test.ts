@@ -149,7 +149,7 @@ async function boot() {
     surfacesLost: bl.forgetBorderLayer,
   });
   bl.initBorderLayer({ ctx, vw: () => env.vw, vh: () => env.vh, dpr: () => 1, clock: () => env.clock });
-  const border = made[3]!;
+  const border = made[4]!;
   /** Кадр: слой карты под живыми границами, потом сами границы при полной детализации. */
   const show = (now: number, detail = 1): boolean => {
     ml.blitStaticLayer(now);

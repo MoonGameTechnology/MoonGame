@@ -172,6 +172,25 @@ describe('REFM-231 — двери камеры', () => {
     expect(typeof write).toBe('function');
   });
 
+  it('обзор на время мерки: камера на виде всей карты и возвращается, даже если мерка бросила', async () => {
+    const { camera } = await boot();
+    camera.setView({ scale: 3, x: 11, y: -22 });
+    const fit = camera.world({ x: 500, y: 250 });
+    expect(camera.atOverview(() => ({ ...camera.cam }))).toEqual({ scale: 1, x: 0, y: 0 });
+    // На обзоре середина карты — в середине поля, как на общем плане.
+    expect(camera.atOverview(() => camera.world({ x: 500, y: 250 }))).toEqual(
+      middle(camera.insets()),
+    );
+    expect(camera.cam).toEqual({ scale: 3, x: 11, y: -22 });
+    expect(() =>
+      camera.atOverview(() => {
+        throw new Error('мерка');
+      }),
+    ).toThrow('мерка');
+    expect(camera.cam).toEqual({ scale: 3, x: 11, y: -22 });
+    expect(camera.world({ x: 500, y: 250 })).toEqual(fit);
+  });
+
   it('зум держит точку под пальцем на месте', async () => {
     const { camera } = await boot();
     const focus = { x: 600, y: 400 };
