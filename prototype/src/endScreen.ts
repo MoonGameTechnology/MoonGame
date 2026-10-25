@@ -43,6 +43,9 @@ export interface MatchEnd {
   runSummary?: RunSummary;
   /** Итог учебного полигона (§14): без опыта, счёта и места; «ещё раз» — повтор полигона. */
   training?: boolean;
+  /** Стартовый пакет полигона, выданный ЭТОЙ победой (§14.7). Нет — не победа или пакет
+   *  уже получен раньше. */
+  trainingReward?: { research: number; warrants: number };
   /** Игрок закрыл панель, чтобы посмотреть на замерший стол. */
   dismissed?: boolean;
 }
@@ -106,7 +109,11 @@ export function endScreenHtml(
   const xpLine = end.runSummary
     ? runSummaryHtml(end.runSummary)
     : end.training
-      ? `<div class="es-xp">${t('training.end.none')}</div>`
+      ? `<div class="es-xp">${
+          end.trainingReward
+            ? t('training.end.reward', { n: end.trainingReward.research, m: end.trainingReward.warrants })
+            : t(end.won ? 'training.end.reward-taken' : 'training.end.none')
+        }</div>`
       : end.runReward !== undefined
       ? `<div class="es-xp">${t('sector-zero.end.reward', { n: end.runReward })}</div>`
       : end.xp > 0

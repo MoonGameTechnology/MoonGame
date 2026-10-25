@@ -132,7 +132,14 @@ try {
       assert.equal(facts.state.match.winner, 'p1');
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/sz-training/${mode}-complete.png` });
-      assert.deepEqual(facts.rewards, rewards, 'training cannot grant campaign rewards');
+      // Первая победа на полигоне платит стартовый пакет (§14.7) и больше ничего: ни забега,
+      // ни Суверенов.
+      const won = {
+        ...rewards,
+        research: rewards.research + 3,
+        warrants: rewards.warrants + 20,
+      };
+      assert.deepEqual(facts.rewards, won, 'training grants exactly its starter pack');
       if (await page.locator('#comic').isVisible()) {
         await page.locator('#comic-next').click();
         await page.locator('#comic').waitFor({ state: 'hidden' });
@@ -143,10 +150,18 @@ try {
       const replay = await page.evaluate(() => window.__trainingTest.facts());
       assert.equal(replay.state.match.status, 'ongoing');
       assert.equal(replay.state.planets.target.owner, 'p2');
-      assert.deepEqual(replay.rewards, rewards);
+      assert.deepEqual(replay.rewards, won, 'replay does not pay the pack again');
       await page.locator('.sl-skip').click();
       await page.locator('#spotlight').waitFor({ state: 'hidden' });
       assert.equal((await page.evaluate(() => window.__trainingTest.facts())).paused, false);
+      // «Вернуть обучение» поднимает подсказки снова, с начала этапа, где их закрыли.
+      await page.locator('#training-resume').click();
+      await page.locator('#spotlight').waitFor({ state: 'visible' });
+      assert.match((await page.evaluate(() => window.__trainingTest.current()))?.id ?? '', /^prep\./);
+      assert.equal(await page.locator('#training-resume').isVisible(), false);
+      await page.locator('.sl-skip').click();
+      await page.locator('#spotlight').waitFor({ state: 'hidden' });
+      await page.locator('#training-resume').waitFor({ state: 'visible' });
       for (const [key, value] of Object.entries(saved))
         assert.equal(
           await page.evaluate((k) => localStorage.getItem(k), key),
@@ -154,7 +169,7 @@ try {
           `preserve ${key}`,
         );
       assert.deepEqual(errors, []);
-      console.log(mode, 'all twelve stages, pause/fold, replay/skip, rewards and save isolation');
+      console.log(mode, 'all twelve stages, pause/fold, replay/skip/resume, starter pack and save isolation');
     } catch (e) {
       console.error(e);
       await page.screenshot({ path: `/tmp/sz-training/${mode}-failure.png` }).catch(() => {});
