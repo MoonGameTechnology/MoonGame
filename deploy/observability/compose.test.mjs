@@ -15,7 +15,7 @@ function composeAvailable() {
   try {
     const version = execFileSync('docker', ['compose', 'version', '--short'], {
       encoding: 'utf8',
-      timeout: 3000,
+      timeout: 30000, // a loaded runner can take >3 s; a false "missing" skips the suite
       maxBuffer: 8192,
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
