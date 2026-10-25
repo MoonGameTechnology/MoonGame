@@ -104,8 +104,8 @@ function fakeWin() {
           return nodes.get(key) as never;
         });
       }
-      // Места и окна нижней панели (UIX-3.3) — тоже из разметки.
-      const bar = /data-(barslot|baritem)/.exec(sel)?.[1];
+      // Места и окна нижней панели (UIX-3.3) и единица дохода — тоже из разметки.
+      const bar = /data-(barslot|baritem|rate)/.exec(sel)?.[1];
       if (bar) {
         return [...el.innerHTML.matchAll(new RegExp(`data-${bar}="([a-z0-9]+)"`, 'g'))].map(([, id]) => {
           const key = `${bar}:${id}`;
@@ -140,6 +140,8 @@ function fakeWin() {
     /** Нажать место нижней панели или окно для него. */
     barSlot: (i: number) => nodes.get(`barslot:${i}`)?.on.click?.(),
     barItem: (id: string) => nodes.get(`baritem:${id}`)?.on.click?.(),
+    /** Нажать кнопку единицы дохода. */
+    rate: (id: string) => nodes.get(`rate:${id}`)?.on.click?.(),
     /** Нажать вкладку. Узлы строятся при отрисовке — тут их только находим. */
     tab: (id: string) => nodes.get(`tab:${id}`)?.on.click?.(),
     /** Клавиша на кнопке вкладки. */
@@ -663,6 +665,51 @@ describe('настройки — окно и обработчики', () => {
     w.api.open();
     w.win.fire('set-close', 'click');
     expect(w.win.shown()).toBe(false);
+  });
+});
+
+describe('настройки — доход в час или в сутки', () => {
+  it('вкладка «Игра» есть там, где есть единица дохода, и стоит перед «Уведомлениями»', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('data-settab="game"');
+    const html = settingsBoxHtml(
+      viewOf({ rateUnit: 'hour', push: { state: 'off', kinds: [], failed: false } }),
+    );
+    expect(html).toContain(`>${t('settings.tab.game')}</button>`);
+    expect(html.indexOf('data-settab="controls"')).toBeLessThan(html.indexOf('data-settab="game"'));
+    expect(html.indexOf('data-settab="game"')).toBeLessThan(html.indexOf('data-settab="push"'));
+  });
+
+  it('две кнопки — «в час» и «в сутки», выбранная подсвечена и нажата', () => {
+    const html = settingsBoxHtml(viewOf({ rateUnit: 'day' }), false, 'game');
+    expect(html).toContain(t('settings.rate'));
+    expect(html).toContain('data-rate="hour" aria-pressed="false">в час</button>');
+    expect(html).toContain('class="set-pal on" data-rate="day" aria-pressed="true">в сутки</button>');
+    // Единица живёт только во «Игре».
+    for (const { id } of SETTINGS_TABS)
+      expect(settingsBoxHtml(viewOf({ rateUnit: 'day' }), false, id)).not.toContain('data-rate=');
+  });
+
+  it('нажатая единица уходит в сеттер, окно перерисовывается и остаётся на «Игре»', () => {
+    const view = viewOf({ rateUnit: 'hour' });
+    const set: string[] = [];
+    const w = wired(
+      {
+        setRateUnit: (u) => {
+          set.push(u);
+          view.rateUnit = u;
+        },
+      },
+      view,
+    );
+    w.api.open();
+    w.win.tab('game');
+    expect(w.win.selected()).toBe('game');
+    const renders = w.win.renderCount();
+    w.win.rate('day');
+    expect(set).toEqual(['day']);
+    expect(w.win.renderCount()).toBe(renders + 1);
+    expect(w.win.selected()).toBe('game');
+    expect(w.win.html()).toContain('class="set-pal on" data-rate="day"');
   });
 });
 

@@ -329,8 +329,10 @@ import {
 // REFM-2: the pure presentation formatters live in `format.ts` now (no state, no DOM)
 import {
   esc,
+  setRateUnit,
   setRunClock,
 } from './format';
+import { parseRateUnit } from '../../decisions/rateUnit';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
   RES_SVG,
@@ -1117,6 +1119,11 @@ function setShowOwnPings(v: boolean): void {
   showOwnPings = v;
   writeBool('void.showOwnPings', v);
 }
+// Доход ресурсов в час или в сутки (client-only, localStorage): единица всех скоростей
+// ресурсов на экране. Форматтеры спрашивают её сами (`format.ts`), поэтому смена видна на
+// следующем кадре — бар и панели перерисуются по изменившейся разметке.
+let rateUnit = parseRateUnit(readRaw('void.rateUnit'));
+setRateUnit(() => rateUnit);
 // --- graphics preferences (client-only, localStorage) ------------------------
 // Тумблеры косметики и режима вёрстки живут в `graphicsPrefs.ts` (REFM-21): свечение,
 // звёздное поле, счётчик кадров и ПК-гейт. Здесь остаётся только то, что завязано на
@@ -3499,6 +3506,8 @@ const settings = initSettings({
     ...(MOBILE ? { phoneBar: phoneNav.bar() } : {}),
     // Push (UIX-4.4): вкладка есть там, где браузер умеет уведомления.
     ...(push?.view() ? { push: push.view()! } : {}),
+    // В сборке одного Sector Zero скорость всегда за минуту забега — выбирать там нечего.
+    ...(__SECTOR_ZERO_ONLY__ ? {} : { rateUnit }),
   }),
   setSweepOpacity,
   setWindowOpacity: (v) => {
@@ -3524,6 +3533,10 @@ const settings = initSettings({
   setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
   resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
   setPhoneBar: (bar) => phoneNav.setBar(bar),
+  setRateUnit: (unit) => {
+    rateUnit = unit;
+    writeRaw('void.rateUnit', unit);
+  },
   setPush: async (on) => push?.setEnabled(on),
   setPushKind: async (kind, on) => push?.setKind(kind, on),
 });

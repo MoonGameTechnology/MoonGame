@@ -72,7 +72,9 @@ describe('окно построек — категории из данных', (
 describe('окно построек — строка эффекта', () => {
   it('производство и содержание читаются с одного взгляда', () => {
     expect(buildFx(data.buildings.mine!, 1)).toContain('+12');
-    expect(buildFx(data.buildings.refinery!, 1)).toContain('−40'); // upkeep — со знаком минус (BAL-3)
+    // Upkeep — со знаком минус (BAL-3). В данных он за СУТКИ: 40 в сутки — это −1.7 в час,
+    // а не «−40/ч», которые строка печатала до настройки «доход в час / в сутки».
+    expect(buildFx(data.buildings.refinery!, 1)).toContain('−1.7<');
     // Доля защиты мира (решение владельца 2026-09-26): у форта своя, по уровню.
     expect(buildFx(data.buildings.fort!, 1)).toContain('−15% урона по миру');
     expect(buildFx(data.buildings.fort!, 3)).toContain('−45% урона по миру');

@@ -92,9 +92,11 @@ export function buildFx(def: BuildingDef, level: number): string {
   // было вовсе: строку «строит корабли» здание делило с верфью, а про челноки не
   // говорило ничего.
   if ((lv.shuttleBay ?? 0) > 0) fx.push(t('build.fx.hangar', { n: lv.shuttleBay ?? 0 }));
+  // Содержание здания в данных — за СУТКИ (как у юнитов): `per: 'd'` пересчитывает его в
+  // единицу игрока, а не подписывает суточное число часовым суффиксом.
   const keep = resLine(
     Object.fromEntries(Object.entries(lv.upkeep ?? {}).map(([r, n]) => [r, -(n ?? 0)])),
-    { sign: true, per: 'h' },
+    { sign: true, per: 'd' },
   );
   if (keep) fx.push(keep);
   return fx.join(' · ');
