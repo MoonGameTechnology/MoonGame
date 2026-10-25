@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialState, type GameState, type Planet } from '@void/shared-core';
-import { MemoryArsenalStore, MemoryDropStore, MemoryMatchStore, type MatchSnapshot } from './store';
+import { MemoryArsenalStore, MemoryDropStore, MemoryMatchStore, MemoryReceiptStore, type MatchSnapshot } from './store';
+import { commitMatch } from './matchCommit';
 import { MemoryMetaMarket } from './metaMarket';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { createMetaRewardDelivery, type MetaRewardDeliveryDeps } from './metaEconomyDelivery';
@@ -74,6 +75,23 @@ function fixture() {
 }
 
 describe('reward delivery from persisted match facts', () => {
+  it('preserves atomic command commits and observations through the production reward decorator', async () => {
+    const { create, matches } = fixture();
+    const delivery = create(); const receipts = new MemoryReceiptStore();
+    const initial = snapshot();
+    const receipt = { actionId: 'seat:p1:1', playerId: 'p1', seq: initial.seq, ok: true };
+    await commitMatch(delivery.matches, receipts, initial, receipt);
+    await delivery.stop();
+    expect(await receipts.loadAll(initial.matchId)).toEqual([receipt]);
+    expect((await matches.load(initial.matchId))?.economyObservations).toBeDefined();
+    const committed = await matches.load(initial.matchId);
+    receipts.prepareSave = () => { throw new Error('injected receipt preparation failure'); };
+    await expect(commitMatch(delivery.matches, receipts, explored(initial), { ...receipt, actionId: 'seat:p1:2', seq: 2 }))
+      .rejects.toThrow('injected receipt preparation failure');
+    expect(await matches.load(initial.matchId)).toEqual(committed);
+    expect(await receipts.loadAll(initial.matchId)).toHaveLength(1);
+    await delivery.stop();
+  });
   it('does not turn initial visibility, passive participation XP or a finished untouched seat into income', async () => {
     const { create, settle } = fixture();
     const delivery = create();

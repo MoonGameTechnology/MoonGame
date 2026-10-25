@@ -9,6 +9,7 @@ import {
 import type { MatchRewardFacts } from './metaEconomy';
 import type { MetaEconomyStore } from './metaEconomyStore';
 import type { MatchSnapshot, MatchStore } from './store';
+import { commitMatch } from './matchCommit';
 import type { SeatAccounts } from './commanderCredit';
 import type { MetaEconomyCatalog } from './metaEconomyCatalog';
 
@@ -235,17 +236,24 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
     });
     return scanning;
   };
+  const withObservations = (snapshot: MatchSnapshot): MatchSnapshot => {
+    const economyObservations = {
+      ...captureEconomyObservations(snapshot.state),
+      ...snapshot.economyObservations,
+    };
+    return {
+      ...snapshot,
+      ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
+    };
+  };
   const matches: MatchStore = {
     load: (id) => deps.matches.load(id),
     save: async (snapshot) => {
-      const economyObservations = {
-        ...captureEconomyObservations(snapshot.state),
-        ...snapshot.economyObservations,
-      };
-      await deps.matches.save({
-        ...snapshot,
-        ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
-      });
+      await deps.matches.save(withObservations(snapshot));
+      schedule(snapshot.matchId);
+    },
+    saveWithReceipt: async (snapshot, receipt, receipts) => {
+      await commitMatch(deps.matches, receipts, withObservations(snapshot), receipt);
       schedule(snapshot.matchId);
     },
     ongoingMatchIds: () => deps.matches.ongoingMatchIds(),
