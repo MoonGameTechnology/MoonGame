@@ -47,16 +47,22 @@ def request(port, method='GET', path='/health', body=None, headers=None):
         connection.close()
 
 
-def case(port, name, expected, method='GET', path='/health', body=None, headers=None):
+def case(port, name, expected, method='GET', path='/health', body=None, headers=None, expected_body=None):
     headers = {'User-Agent': 'MoonGame-WAF-probe', 'Accept': '*/*', 'X-Probe-ID': name, **(headers or {})}
     before = json.loads(request(port, path='/stats')[1]).get(name, 0)
     start = time.monotonic()
     status, response = request(port, method, path, body, headers)
     after = json.loads(request(port, path='/stats')[1]).get(name, 0)
     blocked = status >= 400
-    record(name, status in expected and (not blocked or after == before),
+    body_matches = expected_body is None or response == expected_body
+    body_evidence = {} if expected_body is None else {
+        'expected_response_bytes': len(expected_body),
+        'response_sha256': hashlib.sha256(response).hexdigest(),
+        'expected_response_sha256': hashlib.sha256(expected_body).hexdigest(),
+    }
+    record(name, status in expected and (not blocked or after == before) and body_matches,
            status=status, expected=expected, reached_backend=after > before,
-           ms=round((time.monotonic() - start) * 1000, 2), response_bytes=len(response))
+           ms=round((time.monotonic() - start) * 1000, 2), response_bytes=len(response), **body_evidence)
 
 
 def websocket(port, secure=False):
@@ -178,7 +184,7 @@ def main():
         for method in ['PUT', 'PATCH', 'DELETE']:
             case(port, 'unsupported-method-' + method.lower(), [403], method, '/probe')
         case(port, 'normal-head', [200], 'HEAD')
-        case(port, 'large-download', [200], path='/large')
+        case(port, 'large-download', [200], path='/large', expected_body=b'A' * (2 * 1024 * 1024))
         attack = "' OR 1=1 --"
         case(port, 'sqli-query', [403], path='/search?q=' + urllib.parse.quote(attack))
         case(port, 'xss-query', [403], path='/search?q=' + urllib.parse.quote('<script>alert(1)</script>'))

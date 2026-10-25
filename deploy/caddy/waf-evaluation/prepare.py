@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Prepare an isolated evaluation; never change production configuration."""
 import hashlib
+import http.client
 import os
 from pathlib import Path
 import shutil
 import subprocess
-import urllib.request
 
 HERE = Path(__file__).resolve().parent
 BASE = Path(os.environ['WAF_WORKDIR']).resolve()
@@ -40,8 +40,15 @@ for repo, tag, commit, name in [
 run('git', 'apply', '--check', str(HERE / 'connector.patch'), cwd=BASE / 'coraza-caddy')
 run('git', 'apply', str(HERE / 'connector.patch'), cwd=BASE / 'coraza-caddy')
 archive = BASE / 'crs.tar.gz'
-with urllib.request.urlopen('https://codeload.github.com/coreruleset/coreruleset/tar.gz/e03a4f6dabc7a30ebd8c52c97d28a154f590a48f', timeout=60) as response:
+connection = http.client.HTTPSConnection('codeload.github.com', timeout=60)
+try:
+    connection.request('GET', '/coreruleset/coreruleset/tar.gz/e03a4f6dabc7a30ebd8c52c97d28a154f590a48f')
+    response = connection.getresponse()
+    if response.status != 200:
+        raise SystemExit(f'CRS download failed: HTTP {response.status}; redirects are not followed')
     payload = response.read(2 * 1024 * 1024)
+finally:
+    connection.close()
 if hashlib.sha256(payload).hexdigest() != 'bdd0dec65d47fcae5aaa48aa681e0f4c151a8c1d9eb3040f6f65ebb8b2273c75':
     raise SystemExit('CRS source checksum mismatch')
 archive.write_bytes(payload)
