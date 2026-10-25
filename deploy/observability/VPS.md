@@ -32,7 +32,9 @@ Alloy. Пустой bootstrap-каталог не содержит `*.prom` и �
    Не включать `server.env`/migration env в копию. Использовать физический путь
    к JS entrypoint: Node разрешает symlink до проверки `import.meta.url`.
 2. Создать системного `moon-observer` без shell и групп Docker. Записать только
-   действующий `METRICS_TOKEN` в root0600 `/etc/moongame-observability/game-token`.
+   отдельный `METRICS_READER_TOKEN` в root0600 `/etc/moongame-observability/game-token`
+   и защищённый env Game. Полный `METRICS_TOKEN` observer не получает; при переходе
+   со старой установки его также ротируют ([проверка](GAME-EXPORTER.md)).
    Не копировать туда весь env и не передавать значение в argv/stdout.
 3. Установить `moongame-observer.service`. `LoadCredential` передаёт ключ юниту;
    приватная копия в RuntimeDirectory имеет0600 (systemd credential может иметь

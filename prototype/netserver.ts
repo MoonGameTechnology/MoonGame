@@ -161,7 +161,8 @@ import { commitMatch } from '../packages/server/src/matchCommit';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
-import { isOperatorRequest, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
+import { isMetricsReaderRequest, isOperatorRequest, metricsReaderTokenFromEnv, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
+import { metricsReaderSummary } from '../packages/server/src/metrics';
 const { Pool } = pgPkg;
 
 // RESIL-3 — ДО всего остального. Этот хост важнее близнеца: именно он собирается в
@@ -249,6 +250,7 @@ const SEAT_LOCK = process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'tr
 // Operator access to /metrics/* from beyond loopback (prod behind Docker). Unset or
 // shorter than 32 chars = loopback only. See `operatorAccess.ts`.
 const METRICS_TOKEN = operatorTokenFromEnv(process.env);
+const METRICS_READER_TOKEN = metricsReaderTokenFromEnv(process.env);
 const TIME_SCALE = Math.max(1, Number(process.env.TIME_SCALE ?? 1) || 1);
 
 // Serve the built prototype HTML so a peer just opens `http://host:port/` (no file
@@ -1118,8 +1120,9 @@ const server = createMultiplayerServer({
   // This host is what the image runs, so it is the one that has to report it.
   version: buildVersion(process.env.GIT_SHA),
   ready: () => matchStore.ping?.() ?? Promise.resolve(true),
-  // `GET /metrics` is operator-only, like the `/metrics/*` routes below (same token).
+  // Aggregate metrics accept a separate observer credential; raw routes do not.
   ...(METRICS_TOKEN ? { operatorToken: METRICS_TOKEN } : {}),
+  ...(METRICS_READER_TOKEN ? { metricsReaderToken: METRICS_READER_TOKEN } : {}),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
@@ -1134,26 +1137,28 @@ const server = createMultiplayerServer({
     // колбэк выполняется внутри `createMultiplayerServer` выше по файлу, а сам хук
     // объявлен ниже — прямая ссылка упала бы в TDZ ещё на старте.
     registerBrowserApi(app, registry, AUTH ? (request) => identifySession(request) : undefined);
-    // The /metrics/* family is OPERATOR-ONLY (`operatorAccess.ts`): a direct loopback
-    // peer, or `Authorization: Bearer $METRICS_TOKEN`. The JSONL tail carries pre-fog
+    // Raw /metrics/* routes are OPERATOR-ONLY (`operatorAccess.ts`): the configured
+    // bearer is required even on loopback; tokenless loopback is for dev only. The JSONL tail carries pre-fog
     // domain events (fleet routes, captures) and every player's economy — served to the
     // internet it was a map hack for every match on the host. Anyone else gets the
     // ordinary 404, as if the route did not exist.
     const operator = (req: { socket: { remoteAddress?: string }; headers: Record<string, unknown> }): boolean =>
       isOperatorRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN);
+    const metricsReader = (req: { socket: { remoteAddress?: string }; headers: Record<string, unknown> }): boolean =>
+      isMetricsReaderRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN, METRICS_READER_TOKEN);
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary, one `curl` from the host.
     // PTM-2.3: plus the telemetry pipeline itself — is it flowing during a test? Aggregates only.
-    app.get('/metrics/summary', async (req, reply) =>
-      operator(req)
-        ? {
-            ...metrics.summary(),
-            journal: { match: matchLog.stats(), client: clientLog.stats() },
-            ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
-          }
-        : reply.callNotFound(),
-    );
+    app.get('/metrics/summary', async (req, reply) => {
+      if (!metricsReader(req)) return reply.callNotFound();
+      const summary = metrics.summary();
+      return {
+        ...(operator(req) ? summary : metricsReaderSummary(summary)),
+        journal: { match: matchLog.stats(), client: clientLog.stats() },
+        ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
+      };
+    });
     // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
     // derived from the live MetricsAggregator. Returns a compact status with
     // thresholds so a playtest host can `curl /metrics/health` and read a single
@@ -1220,7 +1225,7 @@ const server = createMultiplayerServer({
     if (AUTH) registerPlayerActivityApi(app, {
       store: pool ? new PostgresPlayerActivityStore(pool) : new MemoryPlayerActivityStore(),
       identify: identifySession,
-      operator,
+      operator: metricsReader,
       ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
     });
     telemetryStats = registerTelemetryApi(app, {
