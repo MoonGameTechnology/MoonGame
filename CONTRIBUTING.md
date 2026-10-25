@@ -1,8 +1,8 @@
 # Contributing — как мы работаем
 
 Короткий рабочий регламент команды. Архитектура и инварианты — в `CLAUDE.md`;
-живой снимок состояния — `docs/state.md`; план — `docs/roadmap.md` и
-`docs/deep-technical-roadmap.md`.
+живой снимок состояния — `docs/state.md`; план — `docs/roadmap.md` и блочные роадмапы
+(какой док про что — `docs/index.md`).
 
 ## TL;DR
 
