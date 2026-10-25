@@ -526,7 +526,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   берёт Яндекс, только если поднят лоадер SDK, иначе и при сбое SDK — веб.
 - Архив `dist/yandex/` (`platformBuild.mjs`, `__SECTOR_ZERO_ONLY__`) — только Sector Zero и один
   язык; реклама только rewarded (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
-- APK — Capacitor (`mobile/`), ленты `alpha` и `player` в `android.yml`; обновления берёт с VPS
+- APK — Capacitor (`mobile/`), ленты `alpha` и `player` в `android.yml`; кнопка «Скачать APK» —
+  в шапке хаба в любом браузере, кроме iPhone/iPad и самого APK (`decisions/apkOffer.ts`); обновления берёт с VPS
   по манифесту, подписанному в CI, и ставит только файл с подписанным SHA-256
   (открытый ключ Ed25519 закреплён в `mobile/distribution.json` как `manifestPublicKey`)
   ([runbook](../deploy/apk/README.md)); RuStore — `rustore.yml`,

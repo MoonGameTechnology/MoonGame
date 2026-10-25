@@ -13,7 +13,7 @@ import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
 
-// One persistent site link for the desktop button and its offline-rendered QR.
+// One persistent site link for the hub's download button and its offline-rendered QR.
 const androidDistribution = JSON.parse(readFileSync(new URL('../mobile/distribution.json', import.meta.url), 'utf8'));
 const androidDownloadUrl = `${androidDistribution.origin}${androidDistribution.basePath}/player/latest.apk`;
 const androidQr = (await QRCode.toString(androidDownloadUrl, { type: 'svg', errorCorrectionLevel: 'M', margin: 4 }))
@@ -3431,22 +3431,10 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .fitpane .hgradeline.g-legendary{color:var(--amber);}
 .fitpane .hgradeline.g-main{color:var(--grn);}
 
-/* APK promotion belongs to the desktop hub; the QR is generated locally at build time. */
-.hub-android{display:none;align-items:center;gap:24px;margin:20px 0;padding:20px;
-  border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.045);}
-.hub-android-copy{flex:1;min-width:0;}
-.hub-android h2{margin:0 0 14px;font-size:var(--fs-title,18px);color:var(--ink);font-weight:600;}
-.hub-android .ha-download{display:inline-flex;min-height:44px;align-items:center;padding:10px 20px;
-  border:1px solid var(--cyan);border-radius:7px;color:var(--cyan);background:rgba(53,214,230,.12);
-  text-decoration:none;font-size:var(--fs-body);}
-.hub-android .ha-download:hover{background:rgba(53,214,230,.22);}
-.hub-android .ha-qr{flex:none;width:132px;text-align:center;text-decoration:none;color:var(--dim);font-size:var(--fs-caption);}
-.hub-android .ha-qr svg{display:block;width:132px;height:132px;background:#fff;margin-bottom:8px;}
 #ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
 #ub-notes:empty{display:none;}
 #ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
 #ub-status:empty{display:none;}
-@media (min-width:801px) and (pointer:fine){.hub-android{display:flex;}}
 
 /* in-app APK update banner + manual check (APK only; updater.ts toggles visibility).
    GLOBAL fixed banner — floats over ANY screen (welcome / hub / match), z above the
@@ -3627,6 +3615,56 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   #hub .hub-crest{width:20px;height:20px;flex:0 0 20px;}
   #hub .hub-crest .dia{width:12px;height:12px;border-width:1.5px;}
   #hub .hub-bt{font-size:14px;line-height:1.2;letter-spacing:3px;}
+}
+/* «Скачать APK» — в шапке хаба рядом со знаком игры, в любом браузере, кроме iPhone/iPad и
+   самого APK (decisions/apkOffer.ts). Зелёный Android выделяет кнопку из бирюзы интерфейса;
+   раз в пять секунд по ней проходит блик и стрелка кивает вниз — движение редкое, а не сплошное.
+   QR для телефона генерируется при сборке и открывается наведением мыши на ПК. */
+#hub .hub-apk{position:relative;flex:0 0 auto;display:flex;margin-left:6px;}
+#hub .hub-apk-btn{position:relative;display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 16px;
+  overflow:hidden;border:1px solid rgba(61,220,132,.8);border-radius:999px;color:#d4ffe6;text-decoration:none;
+  background:linear-gradient(135deg,rgba(61,220,132,.26),rgba(53,214,230,.14));
+  box-shadow:0 0 14px rgba(61,220,132,.3),inset 0 0 10px rgba(61,220,132,.16);
+  font:600 var(--fs-body) var(--sf-font);white-space:nowrap;transition:background .2s,box-shadow .2s,color .2s;}
+#hub .hub-apk-btn::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.42) 50%,transparent 62%) 160% 0/250% 100% no-repeat;}
+#hub .hub-apk-ic{flex:none;width:18px;height:18px;}
+#hub .hub-apk-btn:hover{color:#fff;background:linear-gradient(135deg,rgba(61,220,132,.4),rgba(53,214,230,.22));
+  box-shadow:0 0 22px rgba(61,220,132,.5),inset 0 0 12px rgba(61,220,132,.24);}
+#hub .hub-apk-btn:active{transform:translateY(1px);}
+#hub .hub-apk-btn:focus-visible{outline:2px solid #d4ffe6;outline-offset:3px;}
+#hub .hub-apk-qr{display:none;}
+@media (prefers-reduced-motion:no-preference){
+  body:not(.holo-still) #hub .hub-apk-btn{animation:hub-apk-glow 5s ease-in-out infinite;}
+  body:not(.holo-still) #hub .hub-apk-btn::after{animation:hub-apk-shine 5s ease-in-out infinite;}
+  body:not(.holo-still) #hub .hub-apk-ic{animation:hub-apk-nod 5s ease-in-out infinite;}
+}
+@keyframes hub-apk-glow{0%,100%{box-shadow:0 0 14px rgba(61,220,132,.3),inset 0 0 10px rgba(61,220,132,.16);}
+  12%{box-shadow:0 0 26px rgba(61,220,132,.62),inset 0 0 14px rgba(61,220,132,.3);}}
+@keyframes hub-apk-shine{0%{background-position:160% 0;}22%,100%{background-position:-60% 0;}}
+@keyframes hub-apk-nod{0%,24%,100%{transform:none;}8%{transform:translateY(3px);}16%{transform:translateY(-1px);}}
+/* Телефон: шапка — одна тонкая строка, кнопка ниже и плотнее. Совсем узкий экран оставляет
+   только стрелку: имя кнопки остаётся подсказкой и для экранного диктора (aria-label). */
+@media (max-width:719px), ((pointer:coarse) and (max-height:519px)){
+  #hub .hub-apk{margin-left:2px;}
+  #hub .hub-apk-btn{height:30px;padding:0 11px;gap:5px;font-size:13px;}
+  #hub .hub-apk-ic{width:15px;height:15px;}
+  #hub .hub-bt{white-space:nowrap;}
+}
+@media (max-width:379px){#hub .hub-banner{gap:8px;}#hub .hub-apk-btn{padding:0 9px;gap:4px;font-size:12px;}}
+@media (max-width:349px){#hub .hub-apk-lbl{display:none;}#hub .hub-apk-btn{padding:0 8px;}}
+/* QR — ПК с мышью: файл нужен телефону, а не компьютеру. Наведение или фокус с клавиатуры
+   раскрывают карточку под кнопкой; невидимый мостик сверху держит её, пока мышь идёт вниз. */
+@media (hover:hover) and (pointer:fine){
+  #hub .hub-banner{overflow:visible;z-index:3;}
+  #hub .hub-apk-qr{position:absolute;top:100%;left:50%;z-index:5;width:204px;margin-top:12px;padding:14px 14px 12px;
+    transform:translateX(-50%);border:1px solid rgba(61,220,132,.55);border-radius:12px;background:rgba(4,20,26,.97);
+    box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 18px rgba(61,220,132,.18);text-align:center;text-decoration:none;
+    color:var(--dim);font-size:var(--fs-caption);}
+  #hub .hub-apk-qr::before{content:"";position:absolute;left:0;right:0;top:-14px;height:14px;}
+  #hub .hub-apk:is(:hover,:focus-within) .hub-apk-qr{display:block;}
+  #hub .hub-apk-qr b{display:block;color:var(--ink);font-size:var(--fs-body);font-weight:600;}
+  #hub .hub-apk-qr svg{display:block;width:132px;height:132px;margin:10px auto 8px;background:#fff;border-radius:4px;}
 }
 #hub .hub-id{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
 #hub .hub-av{width:44px;height:44px;border-radius:50%;border:1px solid var(--line-hi);background:rgba(3,12,16,.8);
@@ -5480,6 +5518,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div class="hub-banner">
     <div class="hub-crest"><span class="dia"></span></div>
     <div class="hub-bt">VOID DOMINION</div>
+    ${external ? '' : `<div class="hub-apk" id="hub-android">
+      <a id="hub-android-download" class="hub-apk-btn" href="${androidDownloadUrl}" data-i18n-aria="hub.android.download">
+        <svg class="hub-apk-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+        <span class="hub-apk-lbl" data-i18n="hub.android.download"></span>
+      </a>
+      <a id="hub-android-qr" class="hub-apk-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr"><b data-i18n="hub.android.title"></b>${androidQr}<span data-i18n="hub.android.scan"></span></a>
+    </div>`}
   </div>
   <div class="hub-id">
     <button type="button" class="hub-av" id="hubav" data-i18n-title="hub.avatar.title" data-i18n-aria="hub.avatar.title">◆</button>
@@ -5514,14 +5559,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
-      ${external ? '' : `
-      <section class="hub-android" id="hub-android" aria-labelledby="hub-android-title">
-        <div class="hub-android-copy"><h2 id="hub-android-title" data-i18n="hub.android.title"></h2>
-          <a id="hub-android-download" class="ha-download" href="${androidDownloadUrl}" data-i18n="hub.android.download"></a>
-        </div>
-        <a id="hub-android-qr" class="ha-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr">${androidQr}<span data-i18n="hub.android.scan"></span></a>
-      </section>
-      `}
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
