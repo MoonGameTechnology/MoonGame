@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ADOPT_EVERY_MS,
   FPS_GAP_MS,
+  adoptDue,
   advanceTarget,
   fpsNext,
   saneGap,
@@ -107,6 +109,17 @@ describe('часы кадра — шаг отдельного потока ра�
   it('нулевой и отрицательный разрыв ничего не копят', () => {
     expect(stepBacklog(5, 0, 1, ЧАС)).toBe(5);
     expect(stepBacklog(5, -16, 1, ЧАС)).toBe(5);
+  });
+});
+
+describe('часы кадра — мир отдельного потока на экране', () => {
+  it('первый мир кадр берёт сразу', () => {
+    expect(adoptDue(0, -Infinity)).toBe(true);
+  });
+
+  it('следующий — не раньше, чем через ADOPT_EVERY_MS после прошлого', () => {
+    expect(adoptDue(1000 + ADOPT_EVERY_MS - 1, 1000)).toBe(false);
+    expect(adoptDue(1000 + ADOPT_EVERY_MS, 1000)).toBe(true);
   });
 });
 

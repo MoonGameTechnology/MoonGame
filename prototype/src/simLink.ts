@@ -3,12 +3,16 @@
  * приказы и собирать его разности в мир на экране.
  *
  * Мир ведёт поток; у экрана две копии. `base` — мир потока, каким его сделала последняя
- * пришедшая разность. Мир на экране — `base` плюс приказы игрока, которые поток ещё не
- * подтвердил: экран применяет приказ сам, сразу (отказ слышен в момент нажатия, флот
+ * разность, которую забрал кадр. Мир на экране — `base` плюс приказы игрока, которые поток ещё
+ * не подтвердил: экран применяет приказ сам, сразу (отказ слышен в момент нажатия, флот
  * трогается без ожидания) и отсылает его потоку. С каждой разностью неподтверждённые
  * приказы накладываются на свежий `base` заново тем же ядром, поэтому мир на экране
  * совпадает с миром потока, как только поток их применит. Приказ, который экран принял, а
  * поток отверг (мир успел измениться за шаг), возвращается отказом с опозданием.
+ *
+ * Присланное экран забирает не в каждом кадре (правило 7 в `decisions/simClock.ts`), и мир на
+ * экране отстаёт от мира потока на шаги, которых он ещё не взял. Поэтому следующий шаг
+ * отсчитывается от {@link SimLink.time}, а не от мира на экране.
  *
  * Чего у копии нет — памяти тумана и разведки Роя чужих мест и мнений ботов о чужих местах
  * (`screenView`). Для сохранения на уходе со страницы поток раз в {@link FULL_EVERY_MS}
@@ -47,6 +51,10 @@ export interface SimSync {
   refused: DriverOrder[];
   /** Был ли среди них шаг мира (часы картинки меряют ход по шагам). */
   stepped: boolean;
+  /** Кадр, в котором пришёл последний шаг ({@link SimLink.frame}). Взять мир кадр мог позже, а
+   *  часы картинки отсчитывают его от прихода: иначе ход картинки гулял бы с тем, сколько мир
+   *  ждал кадра. */
+  steppedAt: number;
 }
 
 export interface SimLink {
@@ -54,6 +62,8 @@ export interface SimLink {
   readonly busy: boolean;
   /** Почему поток сломался; `null` — работает. */
   readonly failed: string | null;
+  /** Время мира потока после всех отосланных шагов: цель последнего из них. */
+  readonly time: number;
   step(
     target: number,
     drivers: boolean,
@@ -63,6 +73,9 @@ export interface SimLink {
   ): void;
   /** Приказ игрока, который экран уже применил к своему миру. */
   forward(action: Action): void;
+  /** Начался кадр `now`: шаг, пришедший после прошлого кадра, получает его время. Зовётся
+   *  каждый кадр, и когда мир кадр не берёт. */
+  frame(now: number): void;
   /** Собрать пришедшее; `null` — разностей не было. */
   take(): SimSync | null;
   /** Мир на экране с тем, чего у копии нет (память тумана всех мест, весь стол симпатий), —
@@ -114,6 +127,9 @@ export function startSimLink(
   const pending: Array<{ id: number; action: Action }> = [];
   let nextId = 1;
   let stepsOut = 0;
+  let time = state.time;
+  let arrived = false;
+  let steppedAt = 0;
   let failed: string | null = null;
   let fullAt = -Infinity;
   let extras = { fog: state.fog, swarmIntel: state.swarmIntel, approval: approvalLedger(state) };
@@ -128,7 +144,10 @@ export function startSimLink(
       done?.(reply.raw);
       return;
     }
-    if (reply.kind === 'sync' && reply.stepped) stepsOut -= 1;
+    if (reply.kind === 'sync' && reply.stepped) {
+      stepsOut -= 1;
+      arrived = true;
+    }
     if (reply.kind === 'fail') failed = reply.message;
     inbox.push(reply);
   });
@@ -143,8 +162,12 @@ export function startSimLink(
     get failed() {
       return failed;
     },
+    get time() {
+      return time;
+    },
     step(target, drivers, ai, autoAssault, now) {
       stepsOut += 1;
+      time = target;
       port.post({ kind: 'step', target, drivers, ai: [...ai], autoAssault: [...autoAssault] });
       if (now - fullAt >= FULL_EVERY_MS) {
         fullAt = now;
@@ -155,6 +178,11 @@ export function startSimLink(
       const id = nextId++;
       pending.push({ id, action });
       port.post({ kind: 'order', id, action });
+    },
+    frame(now) {
+      if (!arrived) return;
+      arrived = false;
+      steppedAt = now;
     },
     take() {
       if (inbox.length === 0) return null;
@@ -182,7 +210,7 @@ export function startSimLink(
       if (!synced) return null;
       let shown = base;
       for (const p of pending) shown = order(shown, p.action, shown.time).state;
-      return { state: shown, events, driverOrders, refused, stepped };
+      return { state: shown, events, driverOrders, refused, stepped, steppedAt };
     },
     saved: (shown) =>
       fullApproval(
