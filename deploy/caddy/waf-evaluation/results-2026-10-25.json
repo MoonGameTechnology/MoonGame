@@ -1,0 +1,504 @@
+{
+  "date": "2026-10-25",
+  "scope": "isolated evaluation, not a production rollout",
+  "tested_build": {
+    "caddy": "2.11.7",
+    "coraza": "3.8.1",
+    "connector": "2.6.2 + connector.patch",
+    "crs": "4.30.0",
+    "binary_sha256": "8a30476eebc3f7a3ad3e58628a5c0f9b2c08e45cdb10f32ef4a3207eb567f46c"
+  },
+  "network_probes": [
+    {
+      "case": "startup",
+      "passed": true,
+      "caddy_version": "v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4="
+    },
+    {
+      "case": "tls-http2-and-verified-tls-upstream",
+      "passed": true,
+      "response": "200 2"
+    },
+    {
+      "case": "http2-oversize-headers",
+      "passed": true,
+      "status": "000 0",
+      "curl_exit": 16,
+      "healthy_after": true
+    },
+    {
+      "case": "http3-normal",
+      "passed": true,
+      "evidence": {
+        "bytes": 21,
+        "protocol": "HTTP/3.0",
+        "read_error": false,
+        "status": 200
+      }
+    },
+    {
+      "case": "http3-sqli-blocked",
+      "passed": true,
+      "evidence": {
+        "bytes": 0,
+        "protocol": "HTTP/3.0",
+        "read_error": false,
+        "status": 403
+      }
+    },
+    {
+      "case": "http3-oversize-headers",
+      "passed": true,
+      "evidence": {
+        "bytes": 0,
+        "protocol": "HTTP/3.0",
+        "read_error": false,
+        "status": 431
+      },
+      "healthy_after": true
+    },
+    {
+      "case": "normal-json",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 4.99,
+      "response_bytes": 22
+    },
+    {
+      "case": "android-user-agent",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 24.34,
+      "response_bytes": 21
+    },
+    {
+      "case": "cors-preflight",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 3.62,
+      "response_bytes": 21
+    },
+    {
+      "case": "unsupported-method-put",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.02,
+      "response_bytes": 0
+    },
+    {
+      "case": "unsupported-method-patch",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.03,
+      "response_bytes": 0
+    },
+    {
+      "case": "unsupported-method-delete",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.57,
+      "response_bytes": 0
+    },
+    {
+      "case": "normal-head",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 5.73,
+      "response_bytes": 0
+    },
+    {
+      "case": "large-download",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 16.13,
+      "response_bytes": 2097152,
+      "expected_response_bytes": 2097152,
+      "response_sha256": "5b766f6d76a999636fd93b4e039d5a32187f84a19c0950449f0c721da0223914",
+      "expected_response_sha256": "5b766f6d76a999636fd93b4e039d5a32187f84a19c0950449f0c721da0223914"
+    },
+    {
+      "case": "sqli-query",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.77,
+      "response_bytes": 0
+    },
+    {
+      "case": "xss-query",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.47,
+      "response_bytes": 0
+    },
+    {
+      "case": "pl1-short-command-signature-gap",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 2.32,
+      "response_bytes": 21
+    },
+    {
+      "case": "path-shell-expression",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.26,
+      "response_bytes": 0
+    },
+    {
+      "case": "file-traversal",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.29,
+      "response_bytes": 0
+    },
+    {
+      "case": "json-sqli",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.44,
+      "response_bytes": 0
+    },
+    {
+      "case": "json-dotted-collision",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.36,
+      "response_bytes": 0
+    },
+    {
+      "case": "json-case-collision",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.75,
+      "response_bytes": 0
+    },
+    {
+      "case": "form-content-type-parameter",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.87,
+      "response_bytes": 0
+    },
+    {
+      "case": "mixed-case-forbidden-charset",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.2,
+      "response_bytes": 0
+    },
+    {
+      "case": "get-argument-overflow",
+      "passed": true,
+      "status": 400,
+      "expected": [400],
+      "reached_backend": false,
+      "ms": 2.13,
+      "response_bytes": 0
+    },
+    {
+      "case": "json-argument-overflow",
+      "passed": true,
+      "status": 400,
+      "expected": [400],
+      "reached_backend": false,
+      "ms": 2.33,
+      "response_bytes": 0
+    },
+    {
+      "case": "deep-json",
+      "passed": true,
+      "status": 400,
+      "expected": [400],
+      "reached_backend": false,
+      "ms": 2.2,
+      "response_bytes": 0
+    },
+    {
+      "case": "truncated-json",
+      "passed": true,
+      "status": 400,
+      "expected": [400],
+      "reached_backend": false,
+      "ms": 1.72,
+      "response_bytes": 0
+    },
+    {
+      "case": "xml-attribute-injection",
+      "passed": true,
+      "status": 403,
+      "expected": [400, 403],
+      "reached_backend": false,
+      "ms": 2.19,
+      "response_bytes": 0
+    },
+    {
+      "case": "multipart-parser-no-fatal-exit",
+      "passed": true,
+      "status": 400,
+      "expected": [400, 403],
+      "reached_backend": false,
+      "ms": 1.84,
+      "response_bytes": 0
+    },
+    {
+      "case": "multipart-truncated",
+      "passed": true,
+      "status": 400,
+      "expected": [400],
+      "reached_backend": false,
+      "ms": 1.93,
+      "response_bytes": 0
+    },
+    {
+      "case": "multipart-dangerous-extension",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.25,
+      "response_bytes": 0
+    },
+    {
+      "case": "oversize-body",
+      "passed": true,
+      "status": 413,
+      "expected": [413],
+      "reached_backend": false,
+      "ms": 3.7,
+      "response_bytes": 0
+    },
+    {
+      "case": "oversize-headers",
+      "passed": true,
+      "status": 431,
+      "expected": [431],
+      "reached_backend": false,
+      "ms": 52.76,
+      "response_bytes": 35
+    },
+    {
+      "case": "websocket-upgrade",
+      "passed": true
+    },
+    {
+      "case": "websocket-frames-outside-waf",
+      "passed": true,
+      "interpretation": "Expected boundary: the WAF does not inspect upgraded frames"
+    },
+    {
+      "case": "wss-upgrade",
+      "passed": true
+    },
+    {
+      "case": "wss-frames-outside-waf",
+      "passed": true,
+      "interpretation": "Expected boundary: the WAF does not inspect upgraded frames"
+    },
+    {
+      "case": "synthetic-log-secret",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.59,
+      "response_bytes": 0
+    },
+    {
+      "case": "synthetic-body-secret",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.18,
+      "response_bytes": 0
+    },
+    {
+      "case": "synthetic-header-secret",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 2.31,
+      "response_bytes": 0
+    },
+    {
+      "case": "log-privacy",
+      "passed": true,
+      "synthetic_secret_found": false
+    },
+    {
+      "case": "bounded-benchmark-waf-on",
+      "passed": true,
+      "requests": 200,
+      "concurrency": 4,
+      "seconds": 0.335,
+      "p50_ms": 3.47,
+      "p95_ms": 49.16,
+      "max_ms": 61.16
+    },
+    {
+      "case": "included-policy-reload-stale-boundary",
+      "passed": true,
+      "status": 200,
+      "interpretation": "Confirmed unsafe file-only reload: old policy remains. Require revision change or recreate."
+    },
+    {
+      "case": "versioned-policy-reload",
+      "passed": true,
+      "status": 403
+    },
+    {
+      "case": "pl3-short-command-detected",
+      "passed": true,
+      "status": 403,
+      "expected": [403],
+      "reached_backend": false,
+      "ms": 3.54,
+      "response_bytes": 0
+    },
+    {
+      "case": "detection-only-allows-attack",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 3.68,
+      "response_bytes": 21
+    },
+    {
+      "case": "detection-only-normal-json",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 3.64,
+      "response_bytes": 22
+    },
+    {
+      "case": "detection-only-secret-canary",
+      "passed": true,
+      "status": 200,
+      "expected": [200],
+      "reached_backend": true,
+      "ms": 2.68,
+      "response_bytes": 21
+    },
+    {
+      "case": "detection-only-oversize-body",
+      "passed": true,
+      "status": 413,
+      "expected": [413],
+      "reached_backend": false,
+      "ms": 3.18,
+      "response_bytes": 0
+    },
+    {
+      "case": "detection-log-privacy",
+      "passed": true
+    },
+    {
+      "case": "wrong-upstream-certificate-name-rejected",
+      "passed": true,
+      "status": 502
+    },
+    {
+      "case": "bounded-benchmark-waf-off",
+      "passed": true,
+      "requests": 200,
+      "concurrency": 4,
+      "seconds": 0.144,
+      "p50_ms": 1.16,
+      "p95_ms": 6.86,
+      "max_ms": 51.02
+    },
+    {
+      "case": "container-no-oom",
+      "passed": true,
+      "restart_count": 0
+    }
+  ],
+  "actual_game_browser": [
+    {
+      "case": "actual-image-browser-load",
+      "passed": true
+    },
+    {
+      "case": "actual-api-register",
+      "passed": true
+    },
+    {
+      "case": "actual-api-login",
+      "passed": true
+    },
+    {
+      "case": "actual-api-rejects-wrong-password",
+      "passed": true
+    },
+    {
+      "case": "actual-browser-account-login",
+      "passed": true
+    },
+    {
+      "case": "actual-browser-registration-reward",
+      "passed": true
+    },
+    {
+      "case": "actual-browser-authenticated-wss-join",
+      "passed": true
+    },
+    {
+      "case": "actual-browser-order-after-wss-idle",
+      "passed": true
+    },
+    {
+      "case": "actual-browser-rejoin-after-reload",
+      "passed": true
+    },
+    {
+      "case": "actual-browser-no-page-errors",
+      "passed": true
+    }
+  ],
+  "collected_at": "2026-10-25T15:31:00Z",
+  "upstream_tests": {
+    "connector": "go test -count=1 ./... passed with connector.patch",
+    "engine_packages": ["bodyprocessors", "transformations", "corazawaf", "auditlog"],
+    "engine_result": "passed on read-only rootfs"
+  }
+}
