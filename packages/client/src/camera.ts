@@ -129,18 +129,24 @@ export function screenToWorld(
   return { x: b.minX + (baseX - offX) / scale, y: b.minY + (baseY - offY) / scale };
 }
 
-/** Keep the map filling the play area with SLACK at the edges (an edge can sit a margin
- *  inside); at the whole-map floor a smaller-than-viewport axis parks centred. Optional
- *  `extra` (EdgeSlack) widens the range past a given edge — the "panel open" overshoot —
- *  including from the parked centre, so the map can be pulled out from under an overlay
- *  even at the min-zoom fit. Returns a new camera with `scale` unchanged, `x`/`y` bounded. */
-export function clampCam(cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack = {}): Cam {
+/** The pan range at `scale`: the camera rests with `x` in [minX, maxX], `y` in [minY, maxY].
+ *  The map fills the play area with SLACK at the edges (an edge can sit a margin inside);
+ *  at the whole-map floor a smaller-than-viewport axis parks centred. Optional `extra`
+ *  (EdgeSlack) widens the range past a given edge — the "panel open" overshoot — including
+ *  from the parked centre, so the map can be pulled out from under an overlay even at the
+ *  min-zoom fit. */
+export function panRange(
+  scale: number,
+  vp: Viewport,
+  b: Bounds,
+  extra: EdgeSlack = {},
+): { minX: number; maxX: number; minY: number; maxY: number } {
   const tl = projectBase({ x: b.minX, y: b.minY }, vp, b);
   const br = projectBase({ x: b.maxX, y: b.maxY }, vp, b);
-  const pL = tl.x * cam.scale;
-  const pR = br.x * cam.scale;
-  const pT = tl.y * cam.scale;
-  const pB = br.y * cam.scale;
+  const pL = tl.x * scale;
+  const pR = br.x * scale;
+  const pT = tl.y * scale;
+  const pB = br.y * scale;
   // Open the edge slack continuously as the map grows past the fitted axis.
   // Switching straight from a parked centre to full slack causes a visible jump.
   const mx = Math.min(
@@ -158,16 +164,107 @@ export function clampCam(cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack = {
   // A covered right edge lets you drag further LEFT (lower x bound); a covered bottom
   // edge further UP (lower y bound) — and symmetrically for left/top overlays.
   const parkedX = (vp.left + vp.right - pL - pR) / 2;
-  const x =
+  const [minX, maxX] =
     pR - pL >= vp.right - vp.left
-      ? clamp(cam.x, vp.right - pR - mx - eR, vp.left - pL + mx + eL)
-      : clamp(cam.x, parkedX - eR, parkedX + eL);
+      ? [vp.right - pR - mx - eR, vp.left - pL + mx + eL]
+      : [parkedX - eR, parkedX + eL];
   const parkedY = (vp.top + vp.bottom - pT - pB) / 2;
-  const y =
+  const [minY, maxY] =
     pB - pT >= vp.bottom - vp.top
-      ? clamp(cam.y, vp.bottom - pB - my - eB, vp.top - pT + my + eT)
-      : clamp(cam.y, parkedY - eB, parkedY + eT);
-  return { scale: cam.scale, x, y };
+      ? [vp.bottom - pB - my - eB, vp.top - pT + my + eT]
+      : [parkedY - eB, parkedY + eT];
+  return { minX, maxX, minY, maxY };
+}
+
+/** Bound the camera into its pan range ({@link panRange}). Returns a new camera with
+ *  `scale` unchanged, `x`/`y` bounded. */
+export function clampCam(cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack = {}): Cam {
+  const r = panRange(cam.scale, vp, b, extra);
+  return { scale: cam.scale, x: clamp(cam.x, r.minX, r.maxX), y: clamp(cam.y, r.minY, r.maxY) };
+}
+
+/** Elastic edge (owner's ask 2026-10-25: at the map border the camera "hit a wall"). A
+ *  drag past the pan range is not stopped dead: the map keeps following the finger with
+ *  growing resistance, and on release it eases back ({@link settleCam}). The stretch never
+ *  reaches this fraction of the play area, however far the finger goes. */
+export const ELASTIC_REACH = 0.25;
+/** How readily the edge gives at first: just past the range the map follows the finger at
+ *  this rate, and slower the further it is stretched. */
+const ELASTIC_GIVE = 0.55;
+/** Time constant (ms) of the ease back into range: ~95% of the way in three of them. */
+const SETTLE_MS = 70;
+
+/** A pull `over` px past the edge → the stretch shown (asymptotic to `reach`). */
+export function rubberBand(over: number, reach: number): number {
+  if (over <= 0 || reach <= 0) return 0;
+  return reach * (1 - 1 / ((over * ELASTIC_GIVE) / reach + 1));
+}
+/** The pull that shows as stretch `shown` (inverse of {@link rubberBand}). */
+function unband(shown: number, reach: number): number {
+  if (shown <= 0 || reach <= 0) return 0;
+  const s = Math.min(shown, reach * 0.999);
+  return s / (ELASTIC_GIVE * (1 - s / reach));
+}
+// One axis: where the finger has pulled → where the camera shows, and back.
+const stretch = (raw: number, lo: number, hi: number, reach: number): number =>
+  raw > hi ? hi + rubberBand(raw - hi, reach) : raw < lo ? lo - rubberBand(lo - raw, reach) : raw;
+const unstretch = (shown: number, lo: number, hi: number, reach: number): number =>
+  shown > hi ? hi + unband(shown - hi, reach) : shown < lo ? lo - unband(lo - shown, reach) : shown;
+
+/** {@link clampCam} with an elastic edge: an unbounded camera (where the gesture would put
+ *  it) → the one shown, stretched past the range instead of stopped at it. */
+export function elasticCam(cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack = {}): Cam {
+  const r = panRange(cam.scale, vp, b, extra);
+  return {
+    scale: cam.scale,
+    x: stretch(cam.x, r.minX, r.maxX, (vp.right - vp.left) * ELASTIC_REACH),
+    y: stretch(cam.y, r.minY, r.maxY, (vp.bottom - vp.top) * ELASTIC_REACH),
+  };
+}
+
+/** The pull behind a shown camera: where the gesture had put it before the elastic edge
+ *  stretched it (inverse of {@link elasticCam}). A gesture that starts on a stretched
+ *  camera takes this as its baseline, so it carries on from where the map is, without a
+ *  jump. */
+export function elasticPull(cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack = {}): Cam {
+  const r = panRange(cam.scale, vp, b, extra);
+  return {
+    scale: cam.scale,
+    x: unstretch(cam.x, r.minX, r.maxX, (vp.right - vp.left) * ELASTIC_REACH),
+    y: unstretch(cam.y, r.minY, r.maxY, (vp.bottom - vp.top) * ELASTIC_REACH),
+  };
+}
+
+/** Drag the shown camera by a finger delta (dx, dy) with the elastic edge. Stateless: the
+ *  pull is recovered from the camera itself ({@link elasticPull}), so a finger that grabs
+ *  the map mid-ease carries on from where it is. */
+export function dragCam(
+  cam: Cam,
+  dx: number,
+  dy: number,
+  vp: Viewport,
+  b: Bounds,
+  extra: EdgeSlack = {},
+): Cam {
+  const pull = elasticPull(cam, vp, b, extra);
+  return elasticCam({ scale: cam.scale, x: pull.x + dx, y: pull.y + dy }, vp, b, extra);
+}
+
+/** One frame (`dtMs`) of the ease back into range after an elastic drag. Returns the next
+ *  camera and whether it has arrived (then it is exactly {@link clampCam}). */
+export function settleCam(
+  cam: Cam,
+  dtMs: number,
+  vp: Viewport,
+  b: Bounds,
+  extra: EdgeSlack = {},
+): { cam: Cam; done: boolean } {
+  const to = clampCam(cam, vp, b, extra);
+  const k = 1 - Math.exp(-Math.max(0, dtMs) / SETTLE_MS);
+  const x = cam.x + (to.x - cam.x) * k;
+  const y = cam.y + (to.y - cam.y) * k;
+  if (Math.abs(to.x - x) < 0.5 && Math.abs(to.y - y) < 0.5) return { cam: to, done: true };
+  return { cam: { scale: cam.scale, x, y }, done: false };
 }
 
 /** Zoom by `factor` anchored on the focal point (cursor / pinch centre): the map-space
@@ -189,7 +286,9 @@ export function zoomAt(
 }
 
 /** A whole two-finger gesture, relative to its starting camera and touch pair.
- * Clamping intermediate pointer events must never become the next zoom baseline. */
+ * Clamping intermediate pointer events must never become the next zoom baseline.
+ * `edge` bounds the result: the hard {@link clampCam}, or {@link elasticCam} for a
+ * surface that eases the camera back after the gesture. */
 export function pinchAt(
   startCam: Cam,
   start: { dist: number; mid: { x: number; y: number } },
@@ -197,12 +296,13 @@ export function pinchAt(
   vp: Viewport,
   b: Bounds,
   extra: EdgeSlack = {},
+  edge: (cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack) => Cam = clampCam,
 ): Cam {
   if (start.dist <= 0) return { ...startCam };
   const scale = clampScale(startCam.scale * (current.dist / start.dist), maxScaleForBounds(b));
   const bx = (start.mid.x - startCam.x) / startCam.scale;
   const by = (start.mid.y - startCam.y) / startCam.scale;
-  return clampCam(
+  return edge(
     { scale, x: current.mid.x - bx * scale, y: current.mid.y - by * scale },
     vp,
     b,

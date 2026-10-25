@@ -433,7 +433,7 @@ import {
   stanceCol,
   youColor,
 } from './mapPalette';
-import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, pirateIntroRect, setView, world, worldDist } from './mapCamera';
+import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, pirateIntroRect, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, resetFogMemory, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
@@ -4764,6 +4764,7 @@ function frame(nowReal: number) {
   if (selfHealArm(backArmed, topLayerOpen(), inMatch(), performance.now(), backHintAt)) armBack();
   const dt = nowReal - lastReal;
   lastReal = nowReal;
+  easeCam(dt); // камера, отпущенная растянутой за край карты, плывёт обратно
   // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
   // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
   if (saneGap(dt)) {
