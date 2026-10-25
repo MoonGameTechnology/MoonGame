@@ -43,6 +43,14 @@ describe('isOperatorRequest', () => {
     expect(isOperatorRequest(req('127.0.0.1'), undefined)).toBe(true);
   });
 
+  it('requires the configured operator credential even on loopback', () => {
+    for (const address of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+      expect(isOperatorRequest(req(address), TOKEN)).toBe(false);
+      expect(isOperatorRequest(req(address, { authorization: 'Basic ignored' }), TOKEN)).toBe(false);
+      expect(isOperatorRequest(req(address, { authorization: `Bearer ${TOKEN}` }), TOKEN)).toBe(true);
+    }
+  });
+
   it('refuses a public peer, with or without a configured token', () => {
     expect(isOperatorRequest(req('203.0.113.7'), undefined)).toBe(false);
     expect(isOperatorRequest(req('203.0.113.7'), TOKEN)).toBe(false);
@@ -70,6 +78,8 @@ describe('aggregate-only monitoring credential', () => {
     expect(metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: READER, METRICS_TOKEN: TOKEN })).toBe(READER);
     expect(() => metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: 'short' })).toThrow('E_METRICS_READER_CONFIG');
     expect(() => metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: TOKEN, METRICS_TOKEN: TOKEN })).toThrow('E_METRICS_READER_CONFIG');
+    expect(() => metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: READER })).toThrow('E_METRICS_READER_CONFIG');
+    expect(() => metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: READER, METRICS_TOKEN: 'short' })).toThrow('E_METRICS_READER_CONFIG');
   });
 
   it('allows aggregates without granting operator access, including from forwarded loopback', () => {

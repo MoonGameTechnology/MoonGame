@@ -135,7 +135,7 @@ export interface MultiplayerServerOptions {
    *  `WS_MAX_PER_IP_DEFAULT`. */
   wsMaxPerIp?: number;
   /** `METRICS_TOKEN` for operator access to `GET /metrics` (`operatorAccess.ts`): a bearer
-   *  with this token, or a direct loopback peer, reads it; anyone else gets a 404. Absent
+   *  with this token reads it, including on loopback; anyone else gets a 404. Absent
    *  ⇒ loopback only. */
   operatorToken?: string;
   /** Separate bearer for aggregate metrics; grants no raw journal access. */

@@ -1137,8 +1137,8 @@ const server = createMultiplayerServer({
     // колбэк выполняется внутри `createMultiplayerServer` выше по файлу, а сам хук
     // объявлен ниже — прямая ссылка упала бы в TDZ ещё на старте.
     registerBrowserApi(app, registry, AUTH ? (request) => identifySession(request) : undefined);
-    // Raw /metrics/* routes are OPERATOR-ONLY (`operatorAccess.ts`): a direct loopback
-    // peer, or `Authorization: Bearer $METRICS_TOKEN`. The JSONL tail carries pre-fog
+    // Raw /metrics/* routes are OPERATOR-ONLY (`operatorAccess.ts`): the configured
+    // bearer is required even on loopback; tokenless loopback is for dev only. The JSONL tail carries pre-fog
     // domain events (fleet routes, captures) and every player's economy — served to the
     // internet it was a map hack for every match on the host. Anyone else gets the
     // ordinary 404, as if the route did not exist.

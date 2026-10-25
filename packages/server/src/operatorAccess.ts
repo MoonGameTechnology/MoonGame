@@ -8,11 +8,13 @@ import { createHash, timingSafeEqual } from 'node:crypto';
  * and every action. Served to anyone, that is a map hack for every match on the host.
  *
  * Two ways in, nothing else:
- * - a direct loopback peer with no `X-Forwarded-For` (a playtest host, `pnpm smoke:net`).
+ * - when no operator credential is configured, a direct loopback peer with no
+ *   `X-Forwarded-For` (a development host, `pnpm smoke:net`).
  *   A forwarded request came through a proxy on this machine, so the loopback peer is
  *   the proxy, not the operator. The raw socket address is used, never `req.ip`, which
  *   follows `X-Forwarded-For` when `TRUST_PROXY=1` and is therefore client-controlled;
- * - `Authorization: Bearer <METRICS_TOKEN>` (prod behind Docker, where the operator's
+ * - when configured, `Authorization: Bearer <METRICS_TOKEN>` is required even on
+ *   loopback (prod behind Docker, where the operator's
  *   curl arrives from the bridge gateway, not loopback).
  *
  * A token shorter than {@link MIN_OPERATOR_TOKEN_LENGTH} counts as unset.
@@ -41,7 +43,7 @@ export function operatorTokenFromEnv(env: Record<string, string | undefined>): s
 export function metricsReaderTokenFromEnv(env: Record<string, string | undefined>): string | undefined {
   const token = env.METRICS_READER_TOKEN;
   if (!token) return undefined;
-  if (token.length < MIN_OPERATOR_TOKEN_LENGTH || token === env.METRICS_TOKEN)
+  if (token.length < MIN_OPERATOR_TOKEN_LENGTH || !operatorTokenFromEnv(env) || token === env.METRICS_TOKEN)
     throw new Error('E_METRICS_READER_CONFIG');
   return token;
 }
@@ -54,7 +56,7 @@ export function isOperatorRequest(req: OperatorRequestView, token: string | unde
     // A presented token is judged on its own: a wrong one never falls back to loopback.
     return token !== undefined && timingSafeEqual(digest(auth.slice(7)), digest(token));
   }
-  if (req.headers['x-forwarded-for'] !== undefined) return false;
+  if (token !== undefined || req.headers['x-forwarded-for'] !== undefined) return false;
   return isLoopbackAddress(req.remoteAddress);
 }
 

@@ -78,6 +78,7 @@ it('a stolen observer credential reads aggregate sources but cannot read raw eve
   // Invalid n fails BEFORE reading a journal; 400 proves only that the full
   // operator passed authorization. Reader and unknown credentials must get 404.
   for (const path of ['/metrics/recent?n=invalid', '/metrics/health']) {
+    expect((await fetch(`http://127.0.0.1:${port}${path}`)).status).toBe(404);
     expect((await get(path, reader)).status).toBe(404);
     expect((await get(path, 'wrong')).status).toBe(404);
   }
