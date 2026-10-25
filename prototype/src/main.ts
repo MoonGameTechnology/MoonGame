@@ -303,7 +303,10 @@ import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
 import {
   changeSectorZeroProgress,
   prepareSectorZeroRun,
+  TRAINING_REWARD,
 } from '../../decisions/sectorZeroProgress';
+import { resumeStep } from '../../decisions/tourResume';
+import { initTrainingResume } from './trainingResume';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { syncCommanderXp } from './commanderSync';
 import { cardCovers } from './panelSlack';
@@ -1489,6 +1492,9 @@ const matchEnd = initMatchEnd({
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
   training: isTraining,
+  // Стартовый пакет полигона (§14.7) — один раз на профиль; dev-полигон не платит.
+  trainingAward: () =>
+    !sectorDevActive && changeSectorProgress({ kind: 'training-reward' }) ? TRAINING_REWARD : null,
   // Dev-забег не засчитывается — его разбивки нет, и чужую (прошлого забега) не показываем.
   runSummary: () =>
     sectorDevActive || sectorProgress.lastRun?.attempt !== sectorAttempt ? null : sectorProgress.lastRun,
@@ -2342,6 +2348,9 @@ const renderEndScreen = (): void => endScreenPanel.render();
  *   рисовал свой последний шаг поверх хаба и следующего матча (z-50, выше всего).
  * - Первые цели гаснут (ONB-7): список первой сессии живёт ровно одну партию.
  */
+// «Вернуть обучение» полигона: кнопку держит `trainingResume.ts`, тур — `startTraining`.
+let trainingResumeRun: ((from: number) => void) | null = null;
+const trainingResume = initTrainingResume((from) => trainingResumeRun?.(from));
 function leaveMatch(): void {
   saveRun();
   stopSim();
@@ -2350,6 +2359,7 @@ function leaveMatch(): void {
   clearSeatNicks();
   stopFirstGoals();
   activeTour?.stop();
+  trainingResume.hide(); // остановка тура выше — не «Пропустить» игрока
 }
 
 // Speedbar "⌂ В меню": leave the current match from anywhere in-game — through the one
@@ -3902,10 +3912,10 @@ function startTraining(): void {
   // полигон учит тем кораблям, с которыми игрок пойдёт дальше.
   // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
   // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
+  trainingResume.hide();
   setPendingGuide(() => {
     const baseline = trainingBaseline(s, ME, data);
-    launchTour(
-      buildTrainingTour({
+    const steps = buildTrainingTour({
         world: () => s,
         me: ME,
         data,
@@ -3918,8 +3928,20 @@ function startTraining(): void {
           render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
         }),
         introduced: forceIntroduced,
-      }),
-    );
+      });
+    // «Пропустить обучение» оставляет кнопку «Вернуть обучение» (заказ владельца
+    // 2026-10-25): подсказки вернутся с начала этапа, на котором их закрыли.
+    const run = (from: number): void =>
+      launchTour(
+        steps,
+        (r) => {
+          if (r.skipped && isTraining() && s.match.status !== 'ended')
+            trainingResume.offer(resumeStep(steps.map((step) => step.stage), r.reachedStep));
+        },
+        from,
+      );
+    trainingResumeRun = run;
+    run(0);
   });
   installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
   enterRun('training');
@@ -4544,7 +4566,10 @@ initSectorRun({
   cameFromLink: () => cameFromLink,
   inMatch,
   note,
-  trainingWon: () => playChapterComic('training-1', 'outro', () => {}),
+  trainingWon: () => {
+    trainingResume.hide();
+    playChapterComic('training-1', 'outro', () => {});
+  },
   finalScenes: () => playTaskComic(runMissionRows(), runChain()),
   chapterWon: () => playChapterComic(pveChapter(sectorMission).id, 'outro', () => {}),
   playing: () => speed > 0 && !comicQueue.isBusy(),

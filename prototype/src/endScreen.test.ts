@@ -301,8 +301,20 @@ describe('итог учебного полигона (§14)', () => {
   it('без счёта, места и опыта; «ещё раз» — повтор обучения', () => {
     const html = endScreenHtml(scored(), 'p1', endOf({ training: true }), view);
     expect(html).not.toContain('Итоговый счёт');
-    expect(html).toContain('опыт и награды профиля не начисляются');
+    expect(html).toContain(t('training.end.reward-taken'));
     expect(html).toContain('Повторить обучение');
+  });
+
+  it('первая победа показывает стартовый пакет, поражение — за что он выдаётся (§14.7)', () => {
+    const won = endScreenHtml(
+      scored(),
+      'p1',
+      endOf({ training: true, trainingReward: { research: 3, warrants: 20 } }),
+      view,
+    );
+    expect(won).toContain(t('training.end.reward', { n: 3, m: 20 }));
+    const lost = endScreenHtml(scored(), 'p1', endOf({ training: true, won: false }), view);
+    expect(lost).toContain(t('training.end.none'));
   });
 });
 

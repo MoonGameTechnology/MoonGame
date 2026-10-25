@@ -156,15 +156,15 @@ export class SpotlightTour {
   }
 
 
-  /** Begin at the first step. An empty chain finishes immediately. */
-  start(): void {
+  /** Begin at step `from` (the first by default). An empty chain finishes immediately. */
+  start(from = 0): void {
     if (this.running) return;
     if (this.steps.length === 0) {
       this.end({ completed: true, skipped: false, stopped: false, reachedStep: -1 });
       return;
     }
     this.running = true;
-    this.enter(0);
+    this.enter(Math.min(Math.max(0, Math.trunc(from) || 0), this.steps.length - 1));
   }
 
   /** «Далее/Понятно» — advances a `tap` step; ignored otherwise. Свёрнутая подсказка

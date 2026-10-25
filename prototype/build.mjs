@@ -829,10 +829,10 @@ body:has(#spotlight.sl-map) #toasts .toast{visibility:hidden;}
 #spotlight .sl-skip-stage,#spotlight .sl-fold,#spotlight .sl-reveal{background:none;border:1px solid var(--line);color:var(--ink);
   font-size:var(--fs-body);cursor:pointer;padding:5px 9px;border-radius:6px;}
 #spotlight .sl-skip-stage:hover,#spotlight .sl-fold:hover,#spotlight .sl-reveal:hover{border-color:var(--cyan);}
-#spotlight-chip{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
+#spotlight-chip,#training-resume{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
   border:1px solid var(--cyan);color:var(--cyan);font-weight:700;font-size:var(--fs-body);
   padding:7px 12px;border-radius:16px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);}
-#spotlight-chip:hover{filter:brightness(1.1);}
+#spotlight-chip:hover,#training-resume:hover{filter:brightness(1.1);}
 /* codex popup — full stats + description on tile click */
 #codex{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}

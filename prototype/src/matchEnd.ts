@@ -167,8 +167,10 @@ export interface MatchEndHost {
   runAward?(): number | null;
   /** Разбивка этого засчёта для экрана итогов (PVR-5.4); зовётся после `runAward`. */
   runSummary?(): RunSummary | null;
-  /** Идёт учебный полигон (§14): итог без карьерного опыта и без выплат профиля. */
+  /** Идёт учебный полигон (§14): итог без карьерного опыта основной игры. */
   training?(): boolean;
+  /** Выдать стартовый пакет полигона за победу (§14.7); `null` — уже получен раньше. */
+  trainingAward?(): { research: number; warrants: number } | null;
 }
 
 export interface MatchEndWatch {
@@ -198,8 +200,14 @@ export function initMatchEnd(host: MatchEndHost): MatchEndWatch {
       };
     }
     // Полигон не платит карьерный опыт основной игры (§14.7) — это не партия, а симуляция.
-    if (host.training?.())
-      return { won, draw, why: endReasonText(s.match.reason, s.operation), xp: 0, levelUp: null, training: true, dismissed: false };
+    // Победа один раз на профиль приносит стартовый пакет Sector Zero.
+    if (host.training?.()) {
+      const trainingReward = won ? (host.trainingAward?.() ?? null) : null;
+      return {
+        won, draw, why: endReasonText(s.match.reason, s.operation), xp: 0, levelUp: null, training: true,
+        ...(trainingReward ? { trainingReward } : {}), dismissed: false,
+      };
+    }
     const key = awardKeyFor(host.nick());
     const stamp = endStampOf(s.match);
     const reward = s.match.rewards?.[host.me()];
