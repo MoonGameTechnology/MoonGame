@@ -103,7 +103,7 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
       { id: 'p2', name: 'B', faction: 'crimson', start: game.START_CANDIDATES[1]!, ai: false },
     ],
   });
-  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900 };
+  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900, clock: 0, still: false };
   const nodes = (await import('./mapCatalog')).mapNodesFromState(world);
   const camera = await import('./mapCamera');
   camera.initMapCamera({
@@ -145,6 +145,8 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
     },
     lod: () => mapLod(camera.worldDist(mapSpacing(nodes)), camera.cam.scale),
     surfacesLost: () => env.lost++,
+    clock: () => env.clock,
+    still: () => env.still,
   });
   const [bg, layer, spare, under] = made as [FakeCanvas, FakeCanvas, FakeCanvas, FakeCanvas];
   /** Источники `drawImage` холста, с режимом наложения. */
@@ -559,6 +561,36 @@ describe('REFM-232 — статический слой карты', () => {
     expect(ml.holographicFrame.width).toBeGreaterThan(0);
   });
 
+  it('движение выключено: стоящие рамку и волну стекла печёт выпечка, движение отдаёт их кадру', async () => {
+    const { ml, env, layer } = await boot({ holo: true });
+    vi.stubGlobal('performance', { now: () => 0 });
+    // Рамку выдаёт её тление — единственный конический градиент выпечки; волну — её кривая,
+    // проведённая в режиме 'screen'.
+    const glass = () => {
+      const rims = layer.calls.filter((c) => c.name === 'createConicGradient').length;
+      const waves = layer.calls.filter((c) => c.name === 'bezierCurveTo' && c.op === 'screen').length;
+      layer.calls.length = 0;
+      return { rims, waves: waves > 0 };
+    };
+    ml.blitStaticLayer(1000);
+    expect(glass()).toEqual({ rims: 0, waves: false });
+    env.still = true;
+    let geo = ml.provinceGeometry;
+    ml.blitStaticLayer(1050);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(glass()).toEqual({ rims: 1, waves: true });
+    // Та же картинка: кадр её только кладёт.
+    geo = ml.provinceGeometry;
+    ml.blitStaticLayer(1100);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(glass()).toEqual({ rims: 0, waves: false });
+    // Движение включено: новая выпечка без стекла, его рисует кадр.
+    env.still = false;
+    ml.blitStaticLayer(1150);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(glass()).toEqual({ rims: 0, waves: false });
+  });
+
   it('рецепт подготовки: фон, геометрия, местность каждой провинции, последняя выпечка', async () => {
     const { ml, nodes } = await boot({ holo: true });
     const jobs = ml.mapPreparationJobs();
@@ -744,6 +776,8 @@ describe('REFM-232 — стык с main.ts', () => {
       'sectorType: sectorTypeOf,',
       'wave: provinceWave,',
       'lod: currentMapLod,',
+      'clock: () => hologramTime,',
+      'still: hologramStill,',
     ])
       expect(init, hook).toContain(hook);
     // Слой живых границ забывает картинку своей дверью (`borderLayer.ts`, часть 2).

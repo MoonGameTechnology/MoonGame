@@ -1273,6 +1273,9 @@ function fleetTitleOf(id: string): string {
  *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
 
 let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
+// Motion off: the hologram's clock stands until the player turns it on again, so its borders,
+// glass rim and wave are a picture, drawn once (`borderLayer.ts`, `mapLayer.ts`).
+const hologramStill = (): boolean => !motionOn();
 
 // Реакция на события мира и лента — у владельца, `eventFeed.ts` (REFM-230). Отсюда — то, что
 // принадлежит игре: мир, своё место, имена, выбор флота, окна и пульс союзника.
@@ -1599,6 +1602,8 @@ initMapLayer({
   wave: provinceWave,
   lod: currentMapLod,
   surfacesLost: forgetBorderLayer,
+  clock: () => hologramTime,
+  still: hologramStill,
 });
 
 // Слой живых границ — `borderLayer.ts` (REFM-232, часть 2). Контекст кадра, экран и часы
@@ -1609,6 +1614,7 @@ initBorderLayer({
   vh: () => VH,
   dpr: () => DPR,
   clock: () => hologramTime,
+  still: hologramStill,
 });
 
 // Поверхность карты — живые границы, стекло, блики, выделение провинции и волна захвата —
@@ -1620,6 +1626,7 @@ initMapSurface({
   vh: () => VH,
   dpr: () => DPR,
   clock: () => hologramTime,
+  still: hologramStill,
   holographic: holographicMapOn,
 });
 

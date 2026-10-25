@@ -5,9 +5,9 @@
  * них свой тест. Здесь — то, что собирается только вместе: слой стоит на выпечке слоя карты,
  * рисуется целиком в покое и потом по полосе за кадр на часах голограммы, едет за камерой в
  * панораме, растягивается в зуме, забывает картинку дверью и при потере своего холста, а
- * без выпечки или над малым числом границ отдаёт обводку кадру. Холсты поддельные и
- * записывают вызовы; мир, камера, туман и выпечка карты — настоящие. Каждый тест — свежая
- * загрузка модулей.
+ * без выпечки или над малым числом границ, пока голограмма движется, отдаёт обводку кадру.
+ * Холсты поддельные и записывают вызовы; мир, камера, туман и выпечка карты — настоящие.
+ * Каждый тест — свежая загрузка модулей.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -108,7 +108,7 @@ async function boot() {
       { id: 'p2', name: 'B', faction: 'crimson', start: game.START_CANDIDATES[1]!, ai: false },
     ],
   });
-  const env = { world, clock: 0, vw: 1600, vh: 900, segment: 26 };
+  const env = { world, clock: 0, still: false, vw: 1600, vh: 900, segment: 26 };
   const nodes = (await import('./mapCatalog')).mapNodesFromState(world);
   const camera = await import('./mapCamera');
   camera.initMapCamera({
@@ -147,8 +147,10 @@ async function boot() {
     },
     lod: () => mapLod(camera.worldDist(mapSpacing(nodes)), camera.cam.scale),
     surfacesLost: bl.forgetBorderLayer,
+    clock: () => env.clock,
+    still: () => env.still,
   });
-  bl.initBorderLayer({ ctx, vw: () => env.vw, vh: () => env.vh, dpr: () => 1, clock: () => env.clock });
+  bl.initBorderLayer({ ctx, vw: () => env.vw, vh: () => env.vh, dpr: () => 1, clock: () => env.clock, still: () => env.still });
   const border = made[4]!;
   /** Кадр: слой карты под живыми границами, потом сами границы при полной детализации. */
   const show = (now: number, detail = 1): boolean => {
@@ -320,6 +322,22 @@ describe('REFM-232 — слой живых границ', () => {
     expect(painted().whole).toBe(0);
   });
 
+  it('движение выключено — слой держит и малые границы, а кадр только кладёт его (правило 5)', async () => {
+    const { show, painted, blits, env } = await boot();
+    env.still = true;
+    expect(show(1000, 0)).toBe(true);
+    expect(show(1000 + SETTLE_MS, 0)).toBe(true);
+    expect(painted().whole).toBe(1);
+    blits();
+    // Часы не пойдут: ни одной полосы, слой ложится как есть.
+    expect(show(1100 + SETTLE_MS, 0)).toBe(true);
+    expect(painted()).toEqual({ whole: 0, rects: 0 });
+    expect(blits()).toHaveLength(1);
+    // Движение включено снова: малые границы опять обводит кадр.
+    env.still = false;
+    expect(show(1200 + SETTLE_MS, 0)).toBe(false);
+  });
+
   it('панорама везёт слой копией и дорисовывает открывшуюся полосу', async () => {
     const { show, painted, blits, camera, border, env } = await boot();
     // Стекло шире экрана: панорама открывает его край, которого на слое ещё нет.
@@ -453,6 +471,22 @@ describe('REFM-232 — слой живых границ', () => {
     expect(painted()).toEqual({ whole: 0, rects: 0 });
   });
 
+  it('прорежение сменилось под стоящей камерой — в покое слой берёт его (правило 4)', async () => {
+    const { ml, show, painted, env } = await boot();
+    // Движение выключено: слой держит и прорежённые границы, как бы мало их ни осталось.
+    env.still = true;
+    show(1000);
+    show(1000 + SETTLE_MS);
+    painted();
+    // Как после прыжка камеры: слой нарисован по старой выпечке, а новая проредила границы.
+    env.segment = 2;
+    expect(ml.livingLevel(ml.provinceGeometry!)).toBeGreaterThan(0);
+    expect(show(1001 + SETTLE_MS)).toBe(true);
+    expect(painted().whole).toBe(1);
+    expect(show(1002 + SETTLE_MS)).toBe(true);
+    expect(painted()).toEqual({ whole: 0, rects: 0 });
+  });
+
   it('отдаление сжимает слой, а открывшиеся края стекла обводит кадр', async () => {
     const { show, painted, blits, camera, frame } = await boot();
     camera.zoomAt(800, 450, 2);
@@ -477,7 +511,7 @@ describe('REFM-232 — стык слоя живых границ с main.ts', ()
   const init = /initBorderLayer\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
   it('хуки — кадр, экран и часы голограммы; сброс — дверью из слоя карты', () => {
-    for (const hook of ['ctx: () => cx,', 'vw: () => VW,', 'vh: () => VH,', 'dpr: () => DPR,', 'clock: () => hologramTime,'])
+    for (const hook of ['ctx: () => cx,', 'vw: () => VW,', 'vh: () => VH,', 'dpr: () => DPR,', 'clock: () => hologramTime,', 'still: hologramStill,'])
       expect(init, hook).toContain(hook);
     expect(MAIN).toContain('surfacesLost: forgetBorderLayer,');
     // Кадр кладёт слой из поверхности карты (`mapSurface.ts`, REFM-235).

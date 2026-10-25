@@ -72,7 +72,7 @@ import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { SECTOR_TYPES, type MapNode } from './game';
 import { data } from './gameData';
 import { glowOn, starfieldOn } from './graphicsPrefs';
-import { clipGlassSurface, drawGlassScreen, type TerrainField } from './holographicSurface';
+import { clipGlassSurface, drawGlassRim, drawGlassScreen, drawGlassWave, type TerrainField } from './holographicSurface';
 import { atOverview, cam, insets, mapBounds, panBy, world } from './mapCamera';
 import { known, memory, surveyed } from './mapFog';
 import { pinchStart } from './mapInput';
@@ -117,6 +117,11 @@ export interface MapLayerHost {
   lod(): MapLod;
   /** Холсты карты потеряли пиксели: слой живых границ забывает свои тоже. */
   surfacesLost(): void;
+  /** Часы голограммы. */
+  clock(): number;
+  /** Часы голограммы стоят по выбору игрока — выключено движение: рамку и волну стекла держит
+   *  выпечка, а не кадр. */
+  still(): boolean;
 }
 
 let game: MapLayerHost;
@@ -395,6 +400,8 @@ function mapLayerSignature(): string {
       (id) => knownEnvironment(s.planets[id], known(id), memory.get(id), surveyed(id))),
     starfield: starfieldOn(),
   }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
+    // A standing hologram's glass is baked at the moment its clock stands at.
+    `|still:${holographicMapOn() && game.still() ? game.clock() : '-'}` +
     // The roads: a hero's corridor lays new lanes mid-match. A scroll paints its strips with
     // the roads of the moment, so a bake that missed them would end at the strip's edge.
     `|topo:${roadDrawingOf(s).topology}`;
@@ -873,6 +880,13 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
       drawSchematicNode(g, c, lod.markerRadius);
     }
     g.restore();
+  }
+  // Motion off: the hologram stands, and the glass wave and rim the frame lays over the map
+  // (`mapSurface.ts`) are part of its picture. Baked over all of it, they cost a strip of the
+  // bake only where they pass.
+  if (holographicMapOn() && game.still()) {
+    drawGlassWave(g, geo.frame, game.vw(), game.vh(), game.clock(), glowOn(), view);
+    drawGlassRim(g, geo.frame, game.clock(), glowOn(), view);
   }
   return fields;
 }

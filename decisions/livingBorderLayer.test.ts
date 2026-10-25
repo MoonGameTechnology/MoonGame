@@ -10,6 +10,7 @@ import {
   framedRect,
   glassPixels,
   intersectRect,
+  layerHolds,
   layerShift,
   staleBand,
   uncoveredRects,
@@ -114,8 +115,18 @@ describe('staleBand — какую полосу перерисовать (пра
   });
 });
 
-it('через слой идут границы от тысячи отрезков (правило 5)', () => {
-  expect(MIN_LAYER_SEGMENTS).toBe(1000);
+describe('layerHolds — какие границы держит слой (правило 5)', () => {
+  it('пока голограмма движется — от тысячи отрезков в стекле', () => {
+    expect(MIN_LAYER_SEGMENTS).toBe(1000);
+    expect(layerHolds(999, false)).toBe(false);
+    expect(layerHolds(1000, false)).toBe(true);
+  });
+
+  it('движение выключено — любые, а пустое стекло слой не держит', () => {
+    expect(layerHolds(1, true)).toBe(true);
+    expect(layerHolds(5000, true)).toBe(true);
+    expect(layerHolds(0, true)).toBe(false);
+  });
 });
 
 describe('layerShift — слой едет за камерой на целые пиксели (правило 3)', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { drawTerrainEnvironmentTile } from '../../packages/client/src/terrainEnvironmentDraw';
-import { drawTerrainField, makeTerrainField, type TerrainField } from './holographicSurface';
+import { drawGlassRim, drawGlassWave, drawTerrainField, makeTerrainField, type TerrainField } from './holographicSurface';
 
 vi.mock('../../packages/client/src/terrainEnvironmentDraw', () => ({ drawTerrainEnvironmentTile: vi.fn() }));
 
@@ -91,5 +91,47 @@ describe('terrain presentation respects discovered geometry', () => {
     drawTerrainField(g, field, 14000, true);
     expect(drawTerrainEnvironmentTile).toHaveBeenCalledTimes(1);
     expect(g.save).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the glass rim and wave keep to the strip of the bake they can touch', () => {
+  const frame = { x: 0, y: 0, width: 400, height: 800 };
+  /** A context that counts the strokes it is asked for. */
+  function counting(): { g: CanvasRenderingContext2D; strokes: () => number } {
+    let strokes = 0;
+    const g = new Proxy({}, {
+      get: (_, name) => (name === 'stroke' ? () => { strokes++; }
+        : typeof name === 'string' && name.startsWith('create') ? () => ({ addColorStop() {} }) : () => undefined),
+      set: () => true,
+    }) as CanvasRenderingContext2D;
+    return { g, strokes: () => strokes };
+  }
+  const rim = (box?: { x0: number; y0: number; x1: number; y1: number }): number => {
+    const { g, strokes } = counting();
+    drawGlassRim(g, frame, 0, false, box);
+    return strokes();
+  };
+  const wave = (box?: { x0: number; y0: number; x1: number; y1: number }): number => {
+    const { g, strokes } = counting();
+    drawGlassWave(g, frame, 390, 844, 0, false, box);
+    return strokes();
+  };
+
+  it('the rim: drawn where a strip meets the frame edge, not deep in the glass nor far outside', () => {
+    const whole = rim();
+    expect(whole).toBeGreaterThan(0);
+    expect(rim({ x0: -5, y0: 300, x1: 5, y1: 310 })).toBe(whole);
+    expect(rim({ x0: 2, y0: 2, x1: 12, y1: 12 })).toBe(whole); // the rounded corner
+    expect(rim({ x0: 100, y0: 100, x1: 300, y1: 700 })).toBe(0);
+    expect(rim({ x0: -100, y0: 0, x1: -50, y1: 800 })).toBe(0);
+  });
+
+  it('the wave: drawn where a strip meets its line inside the glass', () => {
+    // At clock 0 the line crosses the glass at 5% of its height.
+    const whole = wave();
+    expect(whole).toBeGreaterThan(0);
+    expect(wave({ x0: 0, y0: 30, x1: 400, y1: 50 })).toBe(whole);
+    expect(wave({ x0: 0, y0: 300, x1: 400, y1: 400 })).toBe(0);
+    expect(wave({ x0: 450, y0: 0, x1: 500, y1: 800 })).toBe(0);
   });
 });
