@@ -458,6 +458,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - ИИ ходит раз в 2 игровых часа со сдвигом фаз мест (`StaggeredAi`, `aiScheduler.ts`): кадр
   строит один план, выдаёт до 32 порций; зависимая пара приказов — одна порция (`aiOrderSlices.ts`).
 - Базы `pirate_base`/`neutral_base` ведёт ИИ своих NPC `npc-<узел>` (`matchSetup.ts`), без мест.
+  Пираты вне PvE нападают только в двух переходах от логова и держат флот не больше
+  6 + 2 за игровой день, до 14 (`decisions/pirateReach.ts`, BAL-17).
 - Схватка сохраняется в слот `void.solo.v1` (`soloCheckpoint.ts`, формат — `decisions/soloSave.ts`)
   раз в 15 с и при уходе со страницы; сеть, PvE и песочница слот не пишут.
 
