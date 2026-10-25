@@ -19,7 +19,7 @@ import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
 import { assetType, isWorkerAsset } from './staticAssets';
 import { slidingWindowIpLimiter } from './rateLimit';
-import { isOperatorRequest } from './operatorAccess';
+import { isMetricsReaderRequest } from './operatorAccess';
 
 export interface MultiplayerServerOptions {
   securityAudit?: SecurityAudit;
@@ -134,10 +134,12 @@ export interface MultiplayerServerOptions {
    *  отбивается 429, пока один из открытых не закроется. По умолчанию
    *  `WS_MAX_PER_IP_DEFAULT`. */
   wsMaxPerIp?: number;
-  /** `METRICS_TOKEN` for the operator-only `GET /metrics` (`operatorAccess.ts`): a bearer
+  /** `METRICS_TOKEN` for operator access to `GET /metrics` (`operatorAccess.ts`): a bearer
    *  with this token, or a direct loopback peer, reads it; anyone else gets a 404. Absent
    *  ⇒ loopback only. */
   operatorToken?: string;
+  /** Separate bearer for aggregate metrics; grants no raw journal access. */
+  metricsReaderToken?: string;
 }
 
 /** Рукопожатий на адрес за окно. Плейтест сидит за одним NAT (~10 игроков): каждый
@@ -516,11 +518,11 @@ export function createMultiplayerServer(
   });
   // Minimal ops metrics (OPS-0.1): AGGREGATE gauges only — live match count and total
   // connected sockets. No match ids (F-13). Richer per-match metrics / a Prometheus
-  // exposition are a later ops brick. OPERATOR-ONLY, like `/metrics/*`: the live socket
+  // exposition are a later ops brick. Requires operator or aggregate-reader access: the live socket
   // count, polled, tells an outsider when players come and go.
   app.get('/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
     const view = { remoteAddress: request.raw.socket.remoteAddress, headers: request.headers };
-    if (!isOperatorRequest(view, options.operatorToken)) return reply.callNotFound();
+    if (!isMetricsReaderRequest(view, options.operatorToken, options.metricsReaderToken)) return reply.callNotFound();
     const ids = registry.ids();
     let connections = 0;
     for (const id of ids) connections += registry.get(id)?.peerCount ?? 0;

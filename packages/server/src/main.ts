@@ -32,7 +32,7 @@ import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer
 import { createStores, snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
-import { isOperatorRequest, operatorTokenFromEnv } from './operatorAccess';
+import { isMetricsReaderRequest, metricsReaderTokenFromEnv, operatorTokenFromEnv } from './operatorAccess';
 import { createAvaRoom, createMatchLoader, declareAvaWar } from './serverWiring';
 import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { freeMatchId } from './matchId';
@@ -550,8 +550,9 @@ const server = createMultiplayerServer({
   ready: () => stores.store.ping?.() ?? Promise.resolve(true),
   // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
   version: buildVersion(process.env.GIT_SHA),
-  // `GET /metrics` is operator-only: a direct loopback peer, or `Bearer $METRICS_TOKEN`.
+  // Aggregate metrics also accept the separate observer credential.
   operatorToken: operatorTokenFromEnv(process.env),
+  metricsReaderToken: metricsReaderTokenFromEnv(process.env),
   auth,
   // A join token is bound to the account's password: a reset refuses the old one here.
   ...(auth
@@ -642,7 +643,7 @@ const server = createMultiplayerServer({
           registerPlayerActivityApi(scope, {
             store: stores.playerActivity,
             identify,
-            operator: (req) => isOperatorRequest({remoteAddress:req.raw.socket.remoteAddress,headers:req.headers},operatorTokenFromEnv(process.env)),
+            operator: (req) => isMetricsReaderRequest({remoteAddress:req.raw.socket.remoteAddress,headers:req.headers},operatorTokenFromEnv(process.env),metricsReaderTokenFromEnv(process.env)),
             ...(allowedOrigins ? { allowedOrigins } : {}),
           });
             registerCorporateMaintenance(scope, process.env.CORPORATIONS_MAINTENANCE === '1');

@@ -55,6 +55,24 @@ export interface MetricsSummary {
   end: { winner: PlayerId | null; reason?: string } | null;
 }
 
+/** Server-side allowlist for the observer credential. The full operator summary
+ * includes per-player economy and winner data; filtering only in the collector
+ * would not protect them after that collector or its credential is compromised. */
+export function metricsReaderSummary(summary: MetricsSummary) {
+  const { joins, leaves, actions, desyncs, deadLetters, advanceOverflows,
+    submitMs, broadcastMs, deltaBytes, clientFps, clientRttMs } = summary;
+  const series = (s: SeriesStat & { avg: number }) =>
+    ({ count: s.count, total: s.total, max: s.max, avg: s.avg });
+  return {
+    joins, leaves, desyncs, deadLetters, advanceOverflows,
+    actions: { total: actions.total, ok: actions.ok, rejected: actions.rejected,
+      byType: { ...actions.byType }, rejectByCode: { ...actions.rejectByCode } },
+    submitMs: series(submitMs), broadcastMs: series(broadcastMs), deltaBytes: series(deltaBytes),
+    clientFps: clientFps ? { ...series(clientFps), min: clientFps.min } : null,
+    clientRttMs: clientRttMs ? series(clientRttMs) : null,
+  };
+}
+
 function series(): SeriesStat {
   return { count: 0, total: 0, max: 0 };
 }

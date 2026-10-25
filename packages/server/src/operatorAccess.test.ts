@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   isLoopbackAddress,
   isOperatorRequest,
+  isMetricsReaderRequest,
+  metricsReaderTokenFromEnv,
   MIN_OPERATOR_TOKEN_LENGTH,
   operatorTokenFromEnv,
 } from './operatorAccess';
 
 const TOKEN = 'x'.repeat(MIN_OPERATOR_TOKEN_LENGTH);
+const READER = 'y'.repeat(MIN_OPERATOR_TOKEN_LENGTH);
 const req = (remoteAddress: string | undefined, headers: Record<string, unknown> = {}) => ({
   remoteAddress,
   headers,
@@ -58,5 +61,32 @@ describe('isOperatorRequest', () => {
   it('refuses a wrong token even from loopback', () => {
     expect(isOperatorRequest(req('127.0.0.1', { authorization: 'Bearer nope' }), TOKEN)).toBe(false);
     expect(isOperatorRequest(req('127.0.0.1', { authorization: `Bearer ${TOKEN}` }), undefined)).toBe(false);
+  });
+});
+
+describe('aggregate-only monitoring credential', () => {
+  it('refuses short credentials and accidental reuse of the operator credential', () => {
+    expect(metricsReaderTokenFromEnv({})).toBeUndefined();
+    expect(metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: READER, METRICS_TOKEN: TOKEN })).toBe(READER);
+    expect(() => metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: 'short' })).toThrow('E_METRICS_READER_CONFIG');
+    expect(() => metricsReaderTokenFromEnv({ METRICS_READER_TOKEN: TOKEN, METRICS_TOKEN: TOKEN })).toThrow('E_METRICS_READER_CONFIG');
+  });
+
+  it('allows aggregates without granting operator access, including from forwarded loopback', () => {
+    for (const address of ['172.18.0.1', '127.0.0.1']) {
+      const request = req(address, { authorization: `Bearer ${READER}`, 'x-forwarded-for': '127.0.0.1' });
+      expect(isMetricsReaderRequest(request, TOKEN, READER)).toBe(true);
+      expect(isOperatorRequest(request, TOKEN)).toBe(false);
+    }
+  });
+
+  it('does not fall back to loopback for an invalid, unset or retired token', () => {
+    for (const token of ['wrong', READER]) {
+      const request = req('127.0.0.1', { authorization: `Bearer ${token}` });
+      expect(isMetricsReaderRequest(request, TOKEN, undefined)).toBe(false);
+      expect(isMetricsReaderRequest(request, TOKEN, 'replacement-reader-token-for-this-fixture')).toBe(false);
+    }
+    expect(isMetricsReaderRequest(req('172.18.0.1'), TOKEN, READER)).toBe(false);
+    expect(isMetricsReaderRequest(req('172.18.0.1', { authorization: `Bearer ${TOKEN}` }), TOKEN, READER)).toBe(true);
   });
 });

@@ -37,6 +37,15 @@ export function operatorTokenFromEnv(env: Record<string, string | undefined>): s
   return token.length >= MIN_OPERATOR_TOKEN_LENGTH ? token : undefined;
 }
 
+/** Separate aggregate-only credential. Reusing the operator key defeats its scope. */
+export function metricsReaderTokenFromEnv(env: Record<string, string | undefined>): string | undefined {
+  const token = env.METRICS_READER_TOKEN;
+  if (!token) return undefined;
+  if (token.length < MIN_OPERATOR_TOKEN_LENGTH || token === env.METRICS_TOKEN)
+    throw new Error('E_METRICS_READER_CONFIG');
+  return token;
+}
+
 const digest = (s: string): Buffer => createHash('sha256').update(s).digest();
 
 export function isOperatorRequest(req: OperatorRequestView, token: string | undefined): boolean {
@@ -47,4 +56,16 @@ export function isOperatorRequest(req: OperatorRequestView, token: string | unde
   }
   if (req.headers['x-forwarded-for'] !== undefined) return false;
   return isLoopbackAddress(req.remoteAddress);
+}
+
+/** Use only on explicitly aggregate routes, never raw journals or operator actions. */
+export function isMetricsReaderRequest(
+  req: OperatorRequestView,
+  operatorToken: string | undefined,
+  readerToken: string | undefined,
+): boolean {
+  if (isOperatorRequest(req, operatorToken)) return true;
+  const auth = req.headers.authorization;
+  return readerToken !== undefined && typeof auth === 'string' && auth.startsWith('Bearer ') &&
+    timingSafeEqual(digest(auth.slice(7)), digest(readerToken));
 }
