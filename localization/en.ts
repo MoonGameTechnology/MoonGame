@@ -4371,8 +4371,10 @@ export const en: Record<string, string> = {
   'settings.gfx.map-sharp.hint':
     'off draws the map softer and faster; a weak device turns it off by itself',
   'settings.gfx.motion': 'Layer motion',
+  'settings.gfx.motion.auto':
+    'Map hologram stilled for smoothness. Restore motion: Settings → Graphics',
   'settings.gfx.motion.hint':
-    'breathing of markers, glows and engines; off freezes them without hiding them',
+    'breathing of markers, glows and engines; off freezes them without hiding them; a weak device turns it off by itself',
   'settings.gfx.render-compat': 'Rendering compatibility',
   'settings.gfx.render-compat.hint':
     'requests software map rendering; may lower FPS; applies after restart',
@@ -4380,6 +4382,8 @@ export const en: Record<string, string> = {
   'settings.gfx.render-report': 'Rendering report',
   'settings.gfx.render-report.hint':
     'technical details for troubleshooting — select and copy the report text',
+  'settings.gfx.slow.auto':
+    'Map softened and hologram stilled for smoothness. Restore: Settings → Graphics',
   'settings.gfx.starfield': 'Star backdrop',
   'settings.gfx.starfield.hint':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',

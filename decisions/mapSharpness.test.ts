@@ -6,8 +6,10 @@ import {
   judgingFrames,
   mapDpr,
   mapSharp,
+  motionLive,
   sharpnessMatters,
   slowFrames,
+  slowVerdictReach,
 } from './mapSharpness';
 
 /** Кадры с одним и тем же промежутком. */
@@ -58,12 +60,40 @@ describe('чёткость карты — кто решает (правила 2�
     expect(mapSharp(false, false)).toBe(false);
   });
 
-  it('кадры судят, только пока игрок не выбрал, вердикта нет и сеанс ещё не решил', () => {
-    expect(judgingFrames(2, null, false, false)).toBe(true);
-    expect(judgingFrames(2, true, false, false)).toBe(false);
-    expect(judgingFrames(2, false, false, false)).toBe(false);
-    expect(judgingFrames(2, null, true, false)).toBe(false);
-    expect(judgingFrames(2, null, false, true)).toBe(false);
+  it('кадры судят, только пока вердикту есть что поменять, его нет и сеанс ещё не решил', () => {
+    const both = { sharp: true, motion: true };
+    expect(judgingFrames(both, false, false)).toBe(true);
+    expect(judgingFrames({ sharp: true, motion: false }, false, false)).toBe(true);
+    expect(judgingFrames({ sharp: false, motion: true }, false, false)).toBe(true);
+    expect(judgingFrames({ sharp: false, motion: false }, false, false)).toBe(false);
+    expect(judgingFrames(both, true, false)).toBe(false);
+    expect(judgingFrames(both, false, true)).toBe(false);
+  });
+
+  it('вердикт меняет чёткость, пока её не выбрали, и движение, пока его не выбрали', () => {
+    expect(slowVerdictReach(2, null, null, false)).toEqual({ sharp: true, motion: true });
+    expect(slowVerdictReach(2, true, null, false)).toEqual({ sharp: false, motion: true });
+    expect(slowVerdictReach(2, false, null, false)).toEqual({ sharp: false, motion: true });
+    expect(slowVerdictReach(2, null, true, false)).toEqual({ sharp: true, motion: false });
+    expect(slowVerdictReach(2, null, false, false)).toEqual({ sharp: true, motion: false });
+  });
+});
+
+describe('движение слоёв на слабом устройстве (правило 5)', () => {
+  it('без выбора игрока: система просит меньше движения или устройство слабое — слои стоят', () => {
+    expect(motionLive(null, false, false)).toBe(true);
+    expect(motionLive(null, true, false)).toBe(false);
+    expect(motionLive(null, false, true)).toBe(false);
+  });
+
+  it('ВЫБОР ИГРОКА СИЛЬНЕЕ ВЕРДИКТА и системы в обе стороны', () => {
+    expect(motionLive(true, true, true)).toBe(true);
+    expect(motionLive(false, false, false)).toBe(false);
+  });
+
+  it('система уже просит меньше движения — вердикту в движении менять нечего', () => {
+    expect(slowVerdictReach(2, null, null, true)).toEqual({ sharp: true, motion: false });
+    expect(slowVerdictReach(1, null, null, true)).toEqual({ sharp: false, motion: false });
   });
 });
 
@@ -75,11 +105,12 @@ describe('чёткость карты — плотность холста (пр�
     expect(mapDpr(1.5, false)).toBe(SOFT_MAP_DPR);
   });
 
-  it('экрану с плотностью не выше пониженной понижать нечего: ни тумблера, ни суда', () => {
+  it('экрану с плотностью не выше пониженной понижать нечего: кадры судят его только ради движения', () => {
     expect(sharpnessMatters(1)).toBe(false);
     expect(sharpnessMatters(0.75)).toBe(false);
     expect(mapDpr(0.75, false)).toBe(0.75);
-    expect(judgingFrames(1, null, false, false)).toBe(false);
+    expect(slowVerdictReach(1, null, null, false)).toEqual({ sharp: false, motion: true });
+    expect(judgingFrames(slowVerdictReach(1, null, false, false), false, false)).toBe(false);
     expect(sharpnessMatters(1.25)).toBe(true);
   });
 });

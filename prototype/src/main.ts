@@ -371,7 +371,9 @@ import {
   setStarfield,
   showFpsOn,
   setShowFps,
+  motionChosen,
   motionOn,
+  reducedMotionAsked,
   setMotion,
   setWindowOpacity,
   windowAlpha,
@@ -583,6 +585,7 @@ import {
   mapDpr,
   sharpnessMatters,
   slowFrames,
+  slowVerdictReach,
 } from '../../decisions/mapSharpness';
 import {
   NET_VIEW_IDLE,
@@ -4723,14 +4726,20 @@ const trainingScenarioHost: TrainingScenarioHost = {
   },
 };
 
-// Чёткость карты на слабом устройстве (`decisions/mapSharpness.ts`): кадры матча судят
-// устройство, пока игрок не выбрал сам и вердикта нет. Слабое — карта переходит на пиксель на
-// точку сразу, и это запоминается.
+// Слабое устройство (`decisions/mapSharpness.ts`): кадры матча судят его, пока вердикту есть что
+// поменять — чёткость или движение, которых игрок не выбирал, — а вердикта нет. Слабое — карта
+// сразу переходит на пиксель на точку, голограмма замирает, и это запоминается.
 const sharpGaps: number[] = []; // the frame gaps judged so far
 let sharpFrom = -1; // when the gaps start counting, after the warm-up; -1 — the map is not shown
 let sharpJudged = false; // this session's frames found the device fine
 function judgeMapSharpness(nowReal: number, dt: number): void {
-  if (!judgingFrames(SCREEN_DPR, mapSharpChosen(), mapSlowSeen(), sharpJudged)) return;
+  const reach = slowVerdictReach(
+    SCREEN_DPR,
+    mapSharpChosen(),
+    motionChosen(),
+    reducedMotionAsked(),
+  );
+  if (!judgingFrames(reach, mapSlowSeen(), sharpJudged)) return;
   if (!inMatch() || mapPreparation.active) {
     sharpFrom = -1;
     sharpGaps.length = 0;
@@ -4747,8 +4756,9 @@ function judgeMapSharpness(nowReal: number, dt: number): void {
     return;
   }
   markMapSlow();
-  resize();
-  toast(t('settings.gfx.map-sharp.auto'));
+  if (reach.sharp) resize();
+  if (!reach.motion) toast(t('settings.gfx.map-sharp.auto'));
+  else toast(reach.sharp ? t('settings.gfx.slow.auto') : t('settings.gfx.motion.auto'));
 }
 
 function frame(nowReal: number) {
