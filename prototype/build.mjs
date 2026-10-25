@@ -703,6 +703,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .set-pal{padding:5px 10px;font-size:var(--fs-caption);cursor:pointer;color:var(--dim);
   background:rgba(53,214,230,.05);border:1px solid var(--line-hi);border-radius:4px;}
 .set-pal.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.14);}
+/* «Доход ресурсов: в час / в сутки» — выбор из двух значений, кнопки крупнее пресетов палитры. */
+.set-rate .set-pal{min-width:96px;min-height:36px;font-size:var(--fs-body);}
 .set-ctl input[type=color]{width:42px;height:26px;padding:0;border:1px solid var(--line-hi);
   border-radius:4px;background:none;cursor:pointer;}
 /* mini tile (ground garrison): a nameless icon·count chip — hover/tap dossier names it */
@@ -1043,9 +1045,10 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-body);color:var(--ink);}
 .set-lbl .set-sub{font-size:var(--fs-caption);color:var(--dim);}
 /* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
-/* UX-SET-1: четыре вкладки (Звук · Графика · Карта · Управление). Ширина — по подписи, а не
-   поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на телефоне. */
-.set-tabs{display:flex;gap:6px;margin:0 0 12px;}
+/* UX-SET-1: вкладки (Звук · Графика · Карта · Управление · Игра · Уведомления). Ширина — по
+   подписи, а не поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на
+   телефоне. Не влезли в строку — переносятся второй строкой, а не наезжают подписями. */
+.set-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
 .set-tabs button{flex:1 1 auto;min-height:36px;padding:0 8px;white-space:nowrap;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 @media (max-width:360px){.set-tabs{gap:4px;}.set-tabs button{padding:0 5px;font-size:var(--fs-caption);letter-spacing:0;}}
 .set-tabs button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}

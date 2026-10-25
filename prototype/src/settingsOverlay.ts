@@ -21,6 +21,7 @@ import {
 } from '../../decisions/phoneNav';
 import { phoneIcon } from './phoneIcons';
 import { PUSH_KIND_LABEL, PUSH_KINDS, type PushKind } from '../../decisions/pushNotice';
+import { RATE_UNITS, RATE_WORD_KEY, type RateUnit } from '../../decisions/rateUnit';
 import type { PushView } from './pushSetup';
 
 /** Снимок всех настроек на момент отрисовки. */
@@ -63,6 +64,9 @@ export interface SettingsView {
   phoneBar?: readonly PhoneItemId[];
   /** Push-уведомления (UIX-4.4). Нет — браузер их не умеет, и вкладки нет. */
   push?: PushView;
+  /** Доход ресурсов в час или в сутки (`decisions/rateUnit.ts`). Нет — нет и вкладки «Игра»:
+   *  в сборке одного Sector Zero скорость всегда читается за минуту забега. */
+  rateUnit?: RateUnit;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -115,7 +119,7 @@ function rangeRow(
 /** Вкладки окна (UX-SET-1, заказ владельца 2026-09-23: «разнеси по вкладкам звук,
  *  графику и т. д.»). Справка по управлению жила отдельно и раньше — таблица клавиш
  *  длинная и в общем списке прятала под собой кнопку «Готово» (UX-KEYS-1). */
-export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls' | 'push';
+export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls' | 'game' | 'push';
 
 /** Вкладки по порядку кнопок; первая — та, на которой окно открывается. Каждая настройка
  *  живёт ровно в одной вкладке (сторож в тесте), иначе её было бы две правды на экране. */
@@ -128,12 +132,19 @@ export const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; key: string }> = [
 
 const DEFAULT_TAB: SettingsTab = SETTINGS_TABS[0]!.id;
 
+/** «Игра» — единица дохода ресурсов; есть там, где есть {@link SettingsView.rateUnit}. */
+export const GAME_TAB: { id: SettingsTab; key: string } = { id: 'game', key: 'settings.tab.game' };
+
 /** «Уведомления» (UIX-4.4) — последней и только там, где браузер умеет push. */
 export const PUSH_TAB: { id: SettingsTab; key: string } = { id: 'push', key: 'settings.tab.push' };
 
-/** Вкладки этого окна: постоянные плюс «Уведомления», когда они есть. */
+/** Вкладки этого окна: постоянные плюс «Игра» и «Уведомления», когда они есть. */
 export function tabsFor(view: SettingsView): ReadonlyArray<{ id: SettingsTab; key: string }> {
-  return view.push ? [...SETTINGS_TABS, PUSH_TAB] : SETTINGS_TABS;
+  return [
+    ...SETTINGS_TABS,
+    ...(view.rateUnit ? [GAME_TAB] : []),
+    ...(view.push ? [PUSH_TAB] : []),
+  ];
 }
 
 /** Вкладка по её id из разметки; чужое значение — вкладка по умолчанию. */
@@ -225,9 +236,28 @@ function tabHtml(
       return mapHtml(view);
     case 'controls':
       return controlsHtml(view, barSlot);
+    case 'game':
+      return gameHtml(view);
     case 'push':
       return pushHtml(view.push);
   }
+}
+
+/** «Игра»: в чём читать скорость ресурсов — в час или в сутки. Выбор из двух кнопок, а не
+ *  тумблер: у тумблера «вкл/выкл», а здесь оба положения — значения. */
+function gameHtml(view: SettingsView): string {
+  if (!view.rateUnit) return '';
+  const units = RATE_UNITS.map(
+    (u) =>
+      `<button type="button" class="set-pal${view.rateUnit === u ? ' on' : ''}" data-rate="${u}"` +
+      ` aria-pressed="${view.rateUnit === u}">${t(RATE_WORD_KEY[u])}</button>`,
+  ).join('');
+  return (
+    `<div class="set-row">` +
+    `<div class="set-lbl">${t('settings.rate')}<span class="set-sub">${t('settings.rate.hint')}</span></div>` +
+    `<div class="set-ctl set-pals set-rate" role="group" aria-label="${t('settings.rate')}">${units}</div>` +
+    `</div>`
+  );
 }
 
 /** «Уведомления» (UIX-4.4): общий выключатель и четыре вида. Без входа и при запрете в
@@ -377,6 +407,8 @@ export interface SettingsHost {
   setColors(you: string, neutral: string, palette: string): void;
   /** Вернуть цвета к заводским. */
   resetColors(): void;
+  /** Доход ресурсов в час или в сутки (есть там, где есть {@link SettingsView.rateUnit}). */
+  setRateUnit?(unit: RateUnit): void;
   /** Новая раскладка нижней панели телефона (есть там, где есть {@link SettingsView.phoneBar}). */
   setPhoneBar?(bar: readonly PhoneItemId[]): void;
   /** Включить или выключить push (есть там, где есть {@link SettingsView.push}). */
@@ -567,6 +599,15 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       host.setPhoneBar?.(DEFAULT_PHONE_BAR);
       refocus(`[data-barslot="${barSlot}"]`);
     });
+    // Единица дохода: выбранная кнопка подсвечивается — перерисовка с фокусом на ней.
+    for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-rate]'))) {
+      b.addEventListener('click', () => {
+        const unit = RATE_UNITS.find((u) => u === b.dataset.rate);
+        if (!unit) return;
+        host.setRateUnit?.(unit);
+        refocus(`[data-rate="${unit}"]`);
+      });
+    }
     q('set-close')?.addEventListener('click', () => host.root().classList.remove('show'));
   }
 

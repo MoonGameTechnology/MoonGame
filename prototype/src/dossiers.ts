@@ -36,7 +36,20 @@ import { HOUR } from './time';
 import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
 import { termBody, termPlain, termTextHtml } from './termTip';
-import { esc, hl, round1, cost, displayUnit, fmtEta, fmtHrs, resChip, resLine } from './format';
+import {
+  esc,
+  hl,
+  round1,
+  cost,
+  displayUnit,
+  flowPer,
+  flowRate,
+  flowWord,
+  fmtEta,
+  fmtHrs,
+  resChip,
+  resLine,
+} from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
 import { catalogPortraitHtml } from './shipArt';
 import { unitDamageHtml } from './unitDamageView';
@@ -93,19 +106,22 @@ export function buildingDossier(id: string, level: number): Dossier | null {
   if (!def) return null;
   const lv = buildingLevel(def, Math.max(1, level));
   const pct = (n: number) => `+${Math.round(n * 100)}%`;
-  const metal = lv.produces.metal ?? 0;
-  const credits = lv.produces.credits ?? 0;
+  // Выработка в прозе — в единице игрока («в час» / «в сутки»), как в баре и таблице.
+  const out = (n: number | undefined) => hl(round1(flowRate(n ?? 0)));
+  const per = flowWord();
+  const metal = lv.produces.metal;
+  const credits = lv.produces.credits;
   const name = tData(def.name);
   switch (id) {
     case 'mine':
       return {
         name,
-        body: t('dossier.building.mine', { m: hl(metal) }),
+        body: t('dossier.building.mine', { m: out(metal), per }),
       };
     case 'refinery':
       return {
         name,
-        body: t('dossier.building.refinery', { c: hl(credits) }),
+        body: t('dossier.building.refinery', { c: out(credits), per }),
       };
     case 'barracks':
       return {
@@ -150,7 +166,7 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'metal_station':
       return {
         name,
-        body: t('dossier.building.metal-station', { m: hl(metal) }),
+        body: t('dossier.building.metal-station', { m: out(metal), per }),
       };
     case 'tax_office':
       return {
@@ -168,17 +184,17 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'farm':
       return {
         name,
-        body: t('dossier.building.farm', { f: hl(lv.produces.food ?? 0) }),
+        body: t('dossier.building.farm', { f: out(lv.produces.food), per }),
       };
     case 'power_plant':
       return {
         name,
-        body: t('dossier.building.power-plant', { e: hl(lv.produces.energy ?? 0) }),
+        body: t('dossier.building.power-plant', { e: out(lv.produces.energy), per }),
       };
     case 'fabricator':
       return {
         name,
-        body: t('dossier.building.fabricator', { m: hl(lv.produces.microelectronics ?? 0) }),
+        body: t('dossier.building.fabricator', { m: out(lv.produces.microelectronics), per }),
       };
     default:
       return { name, body: t('dossier.building.default') };
@@ -407,8 +423,9 @@ export function taskDossier(
         // Ресурс — чипом (иконка+цвет), как везде: строка «что даёт сейчас → по
         // готовности» стоит рядом с ценником и обязана читаться так же.
         r: resChip(res, ''),
-        now: hl(round1(now)),
-        final: hl(round1(f)),
+        now: hl(round1(flowRate(now))),
+        final: hl(round1(flowRate(f))),
+        per: flowPer(),
       }),
     );
   }
@@ -631,7 +648,8 @@ export function createDossiers(host: DossierHost): {
       // над ней и капсулы бара, а не переводом слова обратно в ресурс.
       const prod = resLine(lv.produces ?? {}, { per: 'h' });
       if (prod) rows.push(cxRow(t('codex.row.produces'), prod));
-      const keep = resLine(lv.upkeep ?? {}, { per: 'h' });
+      // Содержание здания лежит в данных за сутки, выработка — за час.
+      const keep = resLine(lv.upkeep ?? {}, { per: 'd' });
       if (keep) rows.push(cxRow(t('codex.row.upkeep'), keep));
       if ((lv.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE)
         rows.push(

@@ -1842,25 +1842,25 @@ export const en: Record<string, string> = {
     'Trains infantry. {hp} structure HP.',
   'dossier.building.default': 'A planetary structure.',
   'dossier.building.fabricator':
-    'Prints {m}▦ per hour for shuttles and siege doctrines. Consumes energy and food.',
+    'Prints {m}▦ {per} for shuttles and siege doctrines. Consumes energy and food.',
   'dossier.building.farm':
-    'Grows {f}❖ per hour. Food is consumed by ground troops and the Microelectronics Fab.',
+    'Grows {f}❖ {per}. Food is consumed by ground troops and the Microelectronics Fab.',
   'dossier.building.fort':
     'A planetary bastion: damage to the world from ground assault and orbital bombardment is {d} lower, {hp} structure HP. Every other intact building adds {b}, up to {cap} in total.',
   'dossier.building.metal-station':
-    "Mines {m}⬢ per hour from a dead world's crust.",
+    "Mines {m}⬢ {per} from a dead world's crust.",
   'dossier.building.mine':
-    'Mines {m}⬢ per hour.',
+    'Mines {m}⬢ {per}.',
   'dossier.building.orbital-aa':
     'Deals {dmg} damage per hour to ships in orbit. Does not fire on shuttles or block capture.',
   'dossier.building.zonal-aa':
     'Deals {dmg} damage to a shuttle wave striking the world. Does not fire on ships in orbit.',
   'dossier.building.power-plant':
-    'Generates {e}↯ per hour. When energy runs short, buildings run at half strength.',
+    'Generates {e}↯ {per}. When energy runs short, buildings run at half strength.',
   'dossier.building.radar':
     'Range {r}. Level {lv}: {s}. Ships within 40 units of a group anchor combine their signals: medium from 5, high from 13. Close identification reveals composition.',
   'dossier.building.refinery':
-    'Yields {c}¤ per hour.',
+    'Yields {c}¤ {per}.',
   'dossier.building.starfort':
     'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level.',
   'dossier.building.counterintel':
@@ -1895,7 +1895,7 @@ export const en: Record<string, string> = {
     'The spaceport squadron: the machines (△) sit in the world\'s hangar and never appear on the map. The strike button sends a sortie out; the target is picked by a tap on the map. A ship with a hold takes a squadron along — the hold is shown in the fleet panel.',
   'dossier.tab.shuttle.name': 'Squadron',
   'dossier.task.eta': 'Remaining: {r}',
-  'dossier.task.output': '{r}: {now}/h now → {final}/h once finished',
+  'dossier.task.output': '{r}: {now}{per} now → {final}{per} once finished',
   'dossier.task.queued': 'Queued — not started yet.',
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
@@ -2600,6 +2600,9 @@ export const en: Record<string, string> = {
   'res.per.day': '/d',
   'res.per.hour': '/h',
   'res.per.minute': '/min',
+  'res.rate.day': 'per day',
+  'res.rate.hour': 'per hour',
+  'res.rate.minute': 'per minute',
   'res.of.biomass': 'biomass',
   'res.of.credits': 'credits',
   'res.of.energy': 'energy',
@@ -4404,6 +4407,9 @@ export const en: Record<string, string> = {
   'settings.push.blocked': 'Notifications are blocked in the browser. Allow them in the site settings.',
   'settings.push.guest': 'Sign in to turn on notifications.',
   'settings.push.failed': 'Could not turn on notifications.',
+  'settings.rate': 'Resource income',
+  'settings.rate.hint': 'building output, upkeep and treasury flow',
+  'settings.tab.game': 'Game',
   'push.kind.attacked': 'Attacks on your worlds',
   'push.kind.battle': 'Battle results',
   'push.kind.built': 'Finished buildings',
