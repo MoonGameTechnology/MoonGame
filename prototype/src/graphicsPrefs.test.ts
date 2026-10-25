@@ -20,6 +20,11 @@ import {
   setUiScale,
   uiScalePct,
   UI_SCALE_DEFAULT,
+  mapSharpChosen,
+  mapSharpOn,
+  mapSlowSeen,
+  markMapSlow,
+  setMapSharp,
 } from './graphicsPrefs';
 
 // REFM-21. Модуль читает окружающее хранилище на импорте, поэтому тесты работают с ЖИВЫМ
@@ -206,5 +211,28 @@ describe('движение слоёв', () => {
         expect(fxBreath(now, b)).toBe(b.base);
       }
     });
+  });
+});
+
+// Чёткая карта (`decisions/mapSharpness.ts`). Вердикт «слабое» назад не отменяется, поэтому
+// блок стоит последним в файле: после него устройство остаётся слабым.
+describe('графика — чёткая карта', () => {
+  it('без выбора и вердикта карта чёткая, слабое устройство её снимает', () => {
+    expect(mapSharpChosen()).toBeNull();
+    expect(mapSlowSeen()).toBe(false);
+    expect(mapSharpOn()).toBe(true);
+    markMapSlow();
+    expect(mapSlowSeen()).toBe(true);
+    expect(mapSharpOn()).toBe(false);
+  });
+
+  it('ВЫБОР ИГРОКА СИЛЬНЕЕ ВЕРДИКТА в обе стороны', () => {
+    markMapSlow();
+    setMapSharp(true);
+    expect(mapSharpChosen()).toBe(true);
+    expect(mapSharpOn()).toBe(true);
+    setMapSharp(false);
+    expect(mapSharpChosen()).toBe(false);
+    expect(mapSharpOn()).toBe(false);
   });
 });

@@ -4364,6 +4364,11 @@ export const ru: Record<string, string> = {
   'settings.gfx.glow': 'Свечение и ореолы',
   'settings.gfx.glow.hint':
     'мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости',
+  'settings.gfx.map-sharp': 'Чёткая карта',
+  'settings.gfx.map-sharp.auto':
+    'Карта мягче ради плавности. Вернуть чёткость: Настройки → Графика',
+  'settings.gfx.map-sharp.hint':
+    'выкл рисует карту мягче и быстрее; слабое устройство выключает её само',
   'settings.gfx.motion': 'Движение слоёв',
   'settings.gfx.motion.hint':
     'дыхание меток, свечений и двигателей; выкл замораживает их, но не прячет',

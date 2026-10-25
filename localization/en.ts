@@ -4359,6 +4359,11 @@ export const en: Record<string, string> = {
   'settings.gfx.glow': 'Glow & haloes',
   'settings.gfx.glow.hint':
     'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
+  'settings.gfx.map-sharp': 'Sharp map',
+  'settings.gfx.map-sharp.auto':
+    'Map softened for smoothness. Restore sharpness: Settings → Graphics',
+  'settings.gfx.map-sharp.hint':
+    'off draws the map softer and faster; a weak device turns it off by itself',
   'settings.gfx.motion': 'Layer motion',
   'settings.gfx.motion.hint':
     'breathing of markers, glows and engines; off freezes them without hiding them',

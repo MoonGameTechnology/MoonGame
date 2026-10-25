@@ -30,6 +30,9 @@ export interface SettingsView {
   /** Показывать ли СВОИ метки на карте (чужие видны всегда). */
   ownPings: boolean;
   glow: boolean;
+  /** Чёткая карта (`decisions/mapSharpness.ts`). Нет — нет и тумблера: экрану с плотностью в
+   *  пиксель на точку понижать нечего. */
+  mapSharp?: boolean;
   starfield: boolean;
   /** Непрерывное «дыхание» слоёв карты. Выкл замораживает их, но не прячет. */
   motion: boolean;
@@ -289,8 +292,8 @@ function mapHtml(view: SettingsView): string {
   );
 }
 
-/** «Графика»: размер интерфейса, стекло окон, свечение, звёзды, движение, счётчик кадров,
- *  совместимость отрисовки. */
+/** «Графика»: размер интерфейса, стекло окон, чёткость карты, свечение, звёзды, движение,
+ *  счётчик кадров, совместимость отрисовки. */
 function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): string {
   return (
     (view.uiScale !== undefined
@@ -309,6 +312,14 @@ function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): st
           t('settings.gfx.window-opacity'),
           t('settings.gfx.window-opacity.hint'),
           view.windowOpacity,
+        )
+      : '') +
+    (view.mapSharp !== undefined
+      ? switchRow(
+          'map-sharp',
+          t('settings.gfx.map-sharp'),
+          t('settings.gfx.map-sharp.hint'),
+          view.mapSharp,
         )
       : '') +
     switchRow('glow', t('settings.gfx.glow'), t('settings.gfx.glow.hint'), view.glow) +
@@ -350,6 +361,8 @@ export interface SettingsHost {
   setUiScale?(v: number): void;
   setOwnPings(v: boolean): void;
   setGlow(v: boolean): void;
+  /** Чёткая карта (есть там, где есть {@link SettingsView.mapSharp}). */
+  setMapSharp?(v: boolean): void;
   setStarfield(v: boolean): void;
   setMotion(v: boolean): void;
   setRenderCompatibility?(on: boolean): void;
@@ -432,6 +445,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     };
     toggle('ownpings', host.setOwnPings);
     toggle('glow', host.setGlow);
+    toggle('map-sharp', (on) => host.setMapSharp?.(on));
     toggle('starfield', host.setStarfield);
     toggle('motion', host.setMotion);
     toggle('fps', host.setFps);
