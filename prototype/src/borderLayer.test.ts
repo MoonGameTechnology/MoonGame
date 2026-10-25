@@ -471,6 +471,22 @@ describe('REFM-232 — слой живых границ', () => {
     expect(painted()).toEqual({ whole: 0, rects: 0 });
   });
 
+  it('прорежение сменилось под стоящей камерой — в покое слой берёт его (правило 4)', async () => {
+    const { ml, show, painted, env } = await boot();
+    // Движение выключено: слой держит и прорежённые границы, как бы мало их ни осталось.
+    env.still = true;
+    show(1000);
+    show(1000 + SETTLE_MS);
+    painted();
+    // Как после прыжка камеры: слой нарисован по старой выпечке, а новая проредила границы.
+    env.segment = 2;
+    expect(ml.livingLevel(ml.provinceGeometry!)).toBeGreaterThan(0);
+    expect(show(1001 + SETTLE_MS)).toBe(true);
+    expect(painted().whole).toBe(1);
+    expect(show(1002 + SETTLE_MS)).toBe(true);
+    expect(painted()).toEqual({ whole: 0, rects: 0 });
+  });
+
   it('отдаление сжимает слой, а открывшиеся края стекла обводит кадр', async () => {
     const { show, painted, blits, camera, frame } = await boot();
     camera.zoomAt(800, 450, 2);

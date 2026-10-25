@@ -129,8 +129,10 @@ export function blitBorderLayer(detail: number, borders: ClassifiedBorders): boo
   const framed: MapProjection = { a: at.a * mapView.k, x: at.x * mapView.k + mapView.tx, y: at.y * mapView.k + mapView.ty };
   const level = livingLevel(geo);
   const rest = mapSettled && mapView.k === 1;
-  // Rule 4: in motion the layer keeps its own province detail; at rest it takes the frame's.
-  const fresh = held === borderHeld && borderSource !== null && (detail === borderDetail || !rest) &&
+  // Rule 4: in motion the layer keeps its own province detail and border points; at rest it takes
+  // the frame's.
+  const fresh = held === borderHeld && borderSource !== null &&
+    ((detail === borderDetail && level === borderLevel) || !rest) &&
     (level === borderLevel ? borders : territoryGeometry.borders(geo.shape, geo.seeds, borderLevel)) === borderSource;
   const rel = layerTransform(borderAt, framed);
   // Rule 4: not in the frame that baked the map anew, unless it waited one already.
