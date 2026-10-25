@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "generator": "image_gen (built-in)",
+  "useCase": "stylized-concept",
+  "pathsRelativeTo": "art/corporations",
+  "noteRu": "18 точных исходных промптов повторной генерации, использованные уточнения и семь восстановленных оригиналов с prompt: null. Пустое значение не заменено реконструкцией.",
+  "assets": [
+    {
+      "styleId": "standard",
+      "buildingId": "headquarters",
+      "path": "standard/headquarters.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "supply_center",
+      "path": "standard/supply_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: strategy-game corporation building concept triptych. Input image is architectural rendering/material/camera reference ONLY: standard space corporation HQ. Create a DIFFERENT functional SUPPLY CENTER building, shown as three cumulative upgrades from left to right in a wide 3:1 transparent PNG. Three equal presentation cells with generous transparent gutters; all buildings completely inside frame and same three-quarter/isometric camera, scale and light. Keep the original low warehouse core and front loading apron exactly recognizable through all three levels. LEFT level I: low grey metal and pale concrete warehouse with two large amber-lit cargo doors, modest blue-glass logistics office, containers safely at side of loading apron; obvious truck/cart access. MIDDLE level II: retain that entire core, add a second warehouse behind it and a supported yard crane able to move containers between the gate and side storage; increase cargo apron sensibly. RIGHT level III: retain both warehouses, add a higher covered sorting/transshipment hall in rear with exposed load-bearing trusses and overhead handling gantry; keep original loading gates visible and access clear. Grounded standard space industrial architecture, angular panels, grey metal/pale concrete, muted blue glass and small warm amber windows, weathered but maintained. Detailed game-town building illustration, painterly 3D clarity matching reference, independent practical building silhouettes. All supports reach foundations, cranes have rails/counterweight and realistic sweep, doors are reachable. No headquarters tower, no church, no weapons, no random decorative pipes, no people, no text/numerals/labels/logo/watermark. Actual transparent alpha around the three discrete foundations; no background scenery. Preserve progression logic rather than scaling up one building.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "engineering_complex",
+      "path": "standard/engineering_complex.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: strategy-game corporation building concept triptych. Input image is architectural rendering/material/camera reference ONLY: standard space corporation HQ. Create a DIFFERENT functional ENGINEERING COMPLEX building as three cumulative upgrades left-to-right, wide 3:1 transparent PNG. Three separated presentation cells with obvious transparent gutters. CRITICAL: keep every roof tip, foundation edge, crane and antenna completely within frame with at least 6% empty transparent outer margin, especially above level III. Same three-quarter/isometric camera, building scale and light in all three. Keep original low engineering workshop and front apron clearly recognizable in all levels. LEFT level I: grey metal/pale concrete workshop with broad open machining bay, visible machine-tool spindle and workbench inside, small blue-glass supervisor booth, practical pedestrian service door and unobstructed front loading apron. MIDDLE level II: retain original workshop exactly, add a second workshop behind and a supported overhead gantry crane moving a metal structural component, with service walkway and real crane rails. RIGHT level III: retain original and second workshops, add taller rear assembly hall with strong exposed roof trusses, roof-mounted heat-exchange/cooling units connected to hall, and an integrated overhead crane visible through wide assembly door. Logical growth of industrial engineering capacity, no invented magical technology. Grounded standard space industrial architecture: angular panels, grey metal/pale concrete, muted blue glass and small warm amber lights, worn but maintained. Detailed painterly 3D strategy-town concept, readable miniature silhouettes matching reference. Distinguish from cargo warehouse: machine tools, workbenches, jigs, assembly hall; no piled shipping containers. All beams transfer load to columns and foundations, all doors accessible, no floating parts. No headquarters tower, no church, no weapons, no people, no scenery, no text/numerals/labels/logos/watermarks. Real transparent alpha around three discrete foundations, no colored background. Preserve cumulative geometry, not merely scaled copies.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "shipyard",
+      "path": "standard/shipyard.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "research_center",
+      "path": "standard/research_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "headquarters",
+      "path": "soviet-retrofuturism/headquarters.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "supply_center",
+      "path": "soviet-retrofuturism/supply_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Create a new game building asset for Void Dominion: Soviet retrofuturist CORPORATE SUPPLY CENTER, a logistics warehouse, NOT an office headquarters. The provided image is a reference only for the pale concrete, weathered realistic miniature rendering, red utility doors, dark amber horizontal window bands, practical 1960s-80s Soviet space-age design, and elevated three-quarter camera. Output one wide horizontal transparent PNG triptych, exactly three separate fully visible buildings left to right, same scale and camera, generous gaps, no text or numerals. Level I: low flat-roof concrete warehouse, two broad roll-up cargo loading doors, loading apron, a few standardized cargo containers, short access ramp and small attached dispatch office. Level II: preserve Level I warehouse and recognizable front geometry exactly, add a second connected warehouse wing behind and a grounded rail-mounted cargo gantry over the expanded loading yard. Level III: preserve earlier structures, add a high covered sorting/transshipment hall at the back with visible roof trusses and large cargo access, and a compact circular dispatch control room on structural sloped piers. All additions serve logistics. Keep cargo doors wide and reachable, roads clear, cranes able to service the containers, support every elevated mass; no floating parts or arbitrary towers. Buildable upgrade evolution like classic strategy game town sprites. Match reference light and detail. Real transparent alpha background, no environment, no frame, no labels, no people, no logos, no sci-fi magic.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "engineering_complex",
+      "path": "soviet-retrofuturism/engineering_complex.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Make a new game building asset for Void Dominion: Soviet retrofuturist CORPORATE ENGINEERING COMPLEX, a machine workshop and assembly plant. Reference image is only for material style/rendering/camera: weathered pale concrete, red service accents, dark amber horizontal windows, realistic miniature three-quarter isometric view, 1960s-80s Soviet space-age functional architecture. One wide horizontal transparent PNG, exactly three isolated fully visible buildings left to right showing upgrade levels I II III, same camera and scale, roomy transparent gaps and margins, no writing. Level I: low concrete machine workshop with one broad open industrial bay, visible lathe and mechanical component inside, overhead utility pipes, simple small staff entrance. Level II: preserve original workshop and same front geometry, extend to a second attached workshop with two work bays and supported red steel overhead gantry crane serving the work yard. Level III: preserve earlier workshop blocks, add tall rear assembly hall with visible concrete/steel roof trusses and a larger bridge crane, cooling/service block on the side. Contrast clearly with a cargo warehouse: visible machining, assembly machinery, work components, no piles of shipping containers. All structural supports and machine rails logical, cranes above reachable machinery, doors accessible. Matching HQ style does not mean copying its round office tower. Keep entire stages inside canvas. No labels, no people, no logos, no environment, no floating parts. Real transparent alpha background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "shipyard",
+      "path": "soviet-retrofuturism/shipyard.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. A peaceful civilian SPACEPORT MAINTENANCE WORKSHOP for a strategy game's corporation city. Soviet space-age retrofuturist architecture matching the attached HQ reference: pale concrete, red service accents, horizontal amber windows, practical workshop structures, same realistic miniature render and elevated three-quarter camera. One wide horizontal transparent PNG contains three completely separated upgrade stages with ample transparent gaps, all structures fully in frame at consistent scale. Left: a small rounded white civilian cargo shuttle with windows, sitting securely on a ground-level servicing cradle beside a low concrete repair workshop and a modest service arm. Middle: retain the same first shuttle and workshop, add a second parallel servicing cradle with another rounded civilian passenger/cargo shuttle, and a red rail crane for lifting spare engines. Right: retain both cradles and workshops, add an overhead assembly gantry supported on four grounded legs, visible rails and maintenance manipulators, and a rear enclosed walkway connecting workshops. Every crane has logical reach and structural supports. Focus on civil engineering, transport and repair. All spacecraft unarmed and friendly industrial design; no weaponry, conflict, damage, smoke, personnel or insignia. No text, labels, frame or landscape. Actual transparent alpha background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "research_center",
+      "path": "soviet-retrofuturism/research_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Create a new Soviet retrofuturist CORPORATE SCIENCE CENTER building asset for a strategy game. The attached HQ is architectural rendering reference only: weathered pale concrete, red service doors/accents, amber horizontal windows, grounded 1960s-80s Soviet space-age research institute, realistic miniature, elevated three-quarter camera. One wide transparent PNG with exactly three fully separated upgrade stages left to right, consistent scale/camera/light, ample transparent gaps and margins; show entire structures. Stage I: a low flat-roof laboratory with one rounded glazed research room connected to a rectangular lab wing; a small roof instrument and functional service entrance. Stage II: preserve that same original lab geometry, add two laboratory wings joined by enclosed corridors and a low technical cooling annex, with a modest dish on a properly supported mount. Stage III: retain all earlier labs, add a large steerable radio telescope on a sturdy concrete pedestal in the rear courtyard and a tall computing block with visible air-cooling equipment on its side; connect through service galleries. Purpose is scientific research, not headquarters: observational instruments, laboratory wings and computing services. Telescope can rotate without hitting roofs, support structures obey gravity, all entrances reachable. Progressive additive architecture, not three unrelated buildings. No text, no labels, no symbols, no people, no environment, no magic, actual transparent alpha background.",
+      "correctionPrompts": [
+        "Use case: precise-object-edit. Revise this Soviet retrofuturist science-center triptych so it has a DISTINCT RESEARCH architecture. Preserve the three-stage left-to-right layout, miniature render, pale concrete, red accents, amber glazing, camera, and transparency. Across ALL THREE STAGES replace the large elevated saucer-shaped glazed headquarters room and its tall slanted piers with a LOW ground-level hemispherical observatory dome with narrow shutter opening, attached directly to a low rectangular laboratory. The dome should be a recognizably scientific instrument enclosure, not an office disc; the low base should have no tall stilts. Keep this exact low dome/lab core consistent across all stages. Stage I only the low dome and low lab. Stage II adds the side laboratory wings, enclosed corridors, small dish and cooling annex around this same low core. Stage III retains all of that, adds the large rear radio telescope and a tall computer block with side cooling plant. This targeted correction is essential: silhouette must clearly differ from HQ. Keep telescope supports and access physically plausible, preserve functional additions. Increase transparent outer margins so no platform touches canvas edges. Exactly three isolated stages, no text or numbers, no people, no other scenery."
+      ],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "headquarters",
+      "path": "imperial/headquarters.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "supply_center",
+      "path": "imperial/supply_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: corporation building game concept triptych for Void Dominion.\nReference image: Imperial headquarters architectural language and rendering style only; create a DIFFERENT functional building, a SUPPLY CENTER.\nThree complete isolated views of the SAME building evolving at stages I II III arranged left to right on a wide transparent canvas, no text anywhere. Same three-quarter isometric-like camera, viewing front and right sides, same scale and light. Preserve original core from stage to stage; clearly add useful working infrastructure.\nImperial monumental industrial architecture: pale stone-ceramic wall panels, charcoal structural frames, restrained brass trim, amber slit windows, symmetrical rhythm, stepped FLAT roofs. Absolutely no gothic arch or spire.\nStage I left: compact low warehouse with two wide roll-up loading gates onto an accessible level loading apron, short service ramp, several cargo containers, loading canopy on real columns.\nStage II center: retain exact warehouse and doors, add side warehouse connected by short enclosed passage, wider paved loading yard, one anchored rail gantry crane positioned over container handling area.\nStage III right: retain earlier warehouse and side block, add a higher rear covered sorting and transshipment hall with grounded structural frame, overhead crane for moving crates, organized container bays and additional loading positions.\nBuilding function must read as cargo/logistics, not a palace or HQ. Keep accessible roads and doors unobstructed; crane supports bear loads, machinery connected logically. Readable silhouettes at game thumbnail size, detailed hand-painted realistic 3D strategy-game asset, no people, no logos, no ornamental extra towers. All three structures fully inside frame with transparent gaps, nothing cropped. True alpha transparent background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "engineering_complex",
+      "path": "imperial/engineering_complex.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: corporation building game concept triptych for Void Dominion.\nReference image: Imperial headquarters architectural style and rendering only; create a DIFFERENT functional building, an ENGINEERING COMPLEX.\nThree complete isolated views of SAME building evolving in stages I II III left to right on wide transparent canvas. No text. Match reference three-quarter camera, front and right visible, same scale and illumination. Preserve base core exactly as upgrades add logical modules.\nImperial industrial monumental architecture: pale stone ceramic wall panels within charcoal heavy load frames, restrained brass details, warm amber strip windows, geometric symmetry, stepped flat roofs. NO gothic arches or spires.\nStage I left: squat machine workshop with a clearly visible open rectangular maintenance bay, a workbench, a compact robot arm and metal components inside, service door, grounded utility cabinet, flat roof ventilators.\nStage II center: preserve that workshop, attach second workshop at side/rear with accessible connecting service route and an external gantry crane on two strong piers spanning a work platform with a machinery assembly.\nStage III right: preserve both prior workshops, add a taller rear assembly hall supported by straight columns and roof trusses, a visible overhead bridge crane through the open high bay, grounded side cooling ducts and a service gallery linked to existing building.\nReadable industrial engineering function, not warehouse or palace. Machinery access and lifting paths physically plausible. No floating architecture, no decorative towers, no people, no text or labels or logos. Detailed hand-painted realistic 3D strategy-game asset, clear small-scale silhouettes. All 3 full buildings in frame with transparent separation and margins, genuinely transparent background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "shipyard",
+      "path": "imperial/shipyard.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: corporation game building concept triptych for Void Dominion.\nReference image: Imperial architectural palette and rendering ONLY. Create a futuristic SHIPYARD, unmistakably a spacecraft construction facility.\nThree complete isolated views of the SAME shipyard at upgrades I II III from left to right in a wide triptych on transparent background. No text. Same camera front and right sides, same object scale and lighting across all three. Base geometry retained; later levels add physically useful structures.\nImperial style: pale stone-ceramic maintenance buildings, charcoal heavy structural frames, brass machinery, restrained warm amber glazing, monumental symmetry and stepped FLAT roofs. No gothic spires or arches.\nStage I left: a low service building alongside a single open spacecraft cradle. One compact small spacecraft rests solidly in the cradle, aligned along the platform, one small articulated assembly manipulator mounted on a sturdy pedestal.\nStage II center: preserve exact original ship cradle and service building. Add a second empty parallel assembly slip with a small unfinished hull segment, a second service wing and a practical rail-mounted lifting crane that can reach the slips. Clear access routes between them.\nStage III right: preserve both slips and original building. Add a large overhead assembly gantry on grounded columns spanning the spacecraft work areas with hanging lifting tackle and two articulated machinery arms. Add rear parts-preparation hall and enclosed service gallery, all structurally supported, no unnecessary HQ towers.\nShow real spacecraft construction logic: cradles support hulls, cranes reach hulls, doors connect to paved access areas, maintenance paths unobstructed, no floating modules. Detailed hand-painted realistic 3D strategy-game asset. At each stage all structures fully visible, nothing cut off, plenty of transparent separation, no people, no logos, no captions, genuine alpha transparency.",
+      "correctionPrompts": [
+        "Edit this existing shipyard triptych. Change ONLY framing: zoom the entire three-building composition out slightly so every leftmost and rightmost foundation/platform edge and outermost building wing is fully visible with a generous clear transparent margin of approximately 5% canvas width on both sides. Reconstruct any tiny missing boundary edges. Preserve the exact three existing designs, stages, spacecraft, materials, viewing angle and lighting. Preserve all three side-by-side views and true alpha transparent background. No text, no new buildings, no new design changes."
+      ],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "research_center",
+      "path": "imperial/research_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: corporation building game concept triptych for Void Dominion.\nReference image: Imperial headquarters architecture materials and rendering style ONLY. Design a SCIENTIFIC RESEARCH CENTER visually distinct from HQ, warehouse and factory.\nThree complete isolated views of the SAME research center evolving through three upgrade stages left to right on a wide transparent canvas. No text or labels. Three-quarter view front and right sides, same scale and lighting. Original laboratory core clearly retained across upgrades.\nImperial architecture: pale stone-ceramic panels within charcoal structural frames, restrained brass trim, warm amber scientific office windows, strong geometric symmetry and stepped flat roofs. NO gothic spires or arches.\nStage I left: low compact laboratory block with a distinctive small hemispherical instrument enclosure embedded in the flat roof, glass-fronted observation room, accessible entrance, grounded cooling/utility cabinets.\nStage II center: retain exact lab core and roof instrument, add two low side laboratory wings connected to the core by enclosed galleries, visible roof ventilation and an instrument mast attached to proper support.\nStage III right: preserve existing laboratory wings, add a rear computing/analysis block with grounded cooling ducts and a medium parabolic radio telescope on a strong service platform behind the labs, linked by an accessible maintenance walkway. Telescope points upward and has no visual collision with roofs. Restrained scientific campus silhouette, not a palace; no extra command towers.\nDetail clearly conveys research instruments, contained labs, computing and cooling, no magic energy effects. Physically supported components and useful access routes. Fine realistic hand-painted strategy-game asset, readable at miniature scale. All 3 buildings fully within frame with generous transparent outer margins and gaps, no clipping, no people, logos, captions, no background scenery. True alpha transparency.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "headquarters",
+      "path": "high-tech/headquarters.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "supply_center",
+      "path": "high-tech/supply_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: strategy game corporation building upgrade triptych. Use attached high-tech headquarters ONLY as architectural materials, camera and rendering reference; design a distinct functional SUPPLY CENTER. Create one wide PNG showing exactly THREE separate full buildings, levels I, II, III left to right with generous gaps, same three-quarter isometric view, same lighting and consistent scale, no text or numbers, genuinely transparent background. High-tech: rounded white ceramic cladding, titanium structure, blue-gray glass strips and subtle cyan status lights, physically supported roof shells. Stage I: compact low warehouse with two broad loading gates opening onto a clear cargo apron, a few cargo containers, accessible service entry and rooftop ventilation. Stage II: preserve entire stage-I warehouse and gate placement; add a second warehouse behind it, a wider loading yard and a rail-mounted cargo crane that reaches the containers. Stage III: preserve these base volumes; add a tall covered sorting/transshipment hall behind the two low warehouses, supported by visible columns and beams, connecting conveyors and rooftop cooling. Show logical roads, load paths, maintenance access and realistic door clearances. Rich tactile painterly 3D game-building rendering like the reference; cohesive coherent architecture, readable silhouettes even as small town icons. No humans, no logos, no floating structures, no fantasy ornament, no decorative random machinery. All three fully inside frame; isolated small foundations, no landscape, no gray backdrop or glow.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "engineering_complex",
+      "path": "high-tech/engineering_complex.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Create an ENGINEERING COMPLEX strategy-game upgrade triptych, a new functional industrial building in exactly the high-tech architectural language of the attached headquarters reference. One wide transparent PNG, exactly three separate complete buildings of successive stages left to right, generous gaps, equal three-quarter isometric camera and scale. No text. Rounded white ceramic panels on titanium load frames, dark blue-gray glass bands, cyan service lights, tactile detailed game-rendered materials. Stage I: a broad one-story machine workshop with one open assembly bay containing a mechanical frame, a compact attached service room, visible ventilation and a clear paved loading apron. Stage II: retain the original workshop unchanged in front; extend with a second workshop behind and a real overhead travelling gantry crane spanning a machinery yard; rails, beams and columns carry the crane. Stage III: preserve those workshops; add a taller rear assembly hall with roof trusses, large functional doors, an overhead industrial crane and substantial cooling equipment. All additions must serve manufacturing and maintenance; do not resemble offices or warehouses. Clear access paths and plausible structural support. Original low front workshop visibly remains through all stages. Same lighting/angle as reference. Entire each building fits frame, visible separate foundations, no landscape or backdrop, no humans, logos, weapons, random decorative machinery or floating modules.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "shipyard",
+      "path": "high-tech/shipyard.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: strategy game building upgrades. Design a SPACE SHIPYARD in the high-tech materials and three-quarter isometric rendering of the attached headquarters reference. New building purpose, not an office. One wide transparent PNG, exactly THREE separate complete upgrade stages left to right, consistent camera and scale, generous empty gaps, NO text. Rounded white ceramic service modules, titanium structural frames, blue-gray glass and small cyan indicators. Stage I: one open grounded dry-dock cradle with a small sleek spacecraft visibly resting on several mechanical supports, a low rounded service shed alongside it, a compact articulated maintenance arm reaching the ship, clear ramp access. Stage II: preserve original cradle, spacecraft and shed; add a second parallel empty fitting-out slip, a parts depot behind, and a rail-mounted crane reaching the slips. Stage III: preserve both dock positions and service shed; add a large overhead assembly gantry spanning the slipways on four strong supported legs, with travelling hoist and two articulated service arms; a rear elevated service gallery on supports connects service buildings. Real mechanisms must reach their targets; columns outside ship clearance, reachable doors and ramps, sensible weight-bearing connections. Detailed tactile painterly 3D game asset, elegant but practical high-tech design. Entire structures inside frame, isolated small foundations, no city, no stars, no atmospheric background, no people, text, logos, floating modules or meaningless ornamental gadgets.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "research_center",
+      "path": "high-tech/research_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Asset type: corporation upgrade concept triptych for a strategy game. Create a RESEARCH CENTER in the architectural materials, angle and detailed rendering of attached high-tech HQ reference. A distinct science building, with laboratory function clear from its silhouette. One wide transparent PNG showing exactly three separate complete progressive stages left to right, generous gaps, no labels or any text, consistent scale and same three-quarter isometric camera. White rounded ceramic shells, titanium frames, blue-gray glass, restrained cyan instrument lights, realistic service infrastructure. Stage I: compact rounded low laboratory with a central glazed experiment dome, a small accessible entrance airlock, rooftop air treatment and a separate low utility cabinet; a simple small foundation. Stage II: retain the original front lab and dome; add two narrow side laboratory wings connected by enclosed corridors and a rear instrument room with small roof antenna. Stage III: preserve dome and both side labs; add a substantial rear computing block with visible cooling units, and a large directional radio telescope dish on a load-bearing pedestal behind one wing, with clear turning clearance and believable structural bracing. Laboratory corridors must meet actual doors; all upper elements supported, vents placed outside walking paths. Rich tactile painterly 3D town-building game illustration, high-tech but plausible. All structures including dish fully inside frame. No people, landscaping, city, stars, background, fake transparency, glow, logos, writing, magic or floating components.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "headquarters",
+      "path": "imperial-gothic/headquarters.png",
+      "generator": "image_gen (built-in)",
+      "prompt": null,
+      "correctionPrompts": [],
+      "provenanceRecovered": true,
+      "provenanceNoteRu": "Ранее одобренный оригинал восстановлен; точный промпт не сохранился."
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "supply_center",
+      "path": "imperial-gothic/supply_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Create one wide transparent PNG triptych for the space strategy game Void Dominion: IMPERIAL GOTHIC SUPPLY CENTER upgrading through three stages, left to right. Reference image is only the architectural/material/rendering style reference; do not copy its headquarters building. Match its detailed isometric three-quarter game-building illustration, charcoal folded metal roofs, pale gray stone/ceramic ribs, pointed structural arches, golden amber windows, soft upper-left light. Stage 1 is a practical low warehouse with two WIDE rectangular loading gates framed by subtle pointed arches, an unobstructed front loading apron, a stack of freight containers and a small side office. Stage 2 retains that exact warehouse and apron and adds a second warehouse behind it plus a side gantry cargo crane above a container lane. Stage 3 retains all prior geometry and adds a tall covered sorting/transshipment hall behind the warehouses with supported roof trusses, service cooling units and loading corridors. Every new element must have a purpose: no decorative towers pretending to be equipment. Load-bearing buttresses touch the ground, crane beams connect to pillars and hooks reach cargo, gates stay reachable. Gothic architectural notes, NOT a cathedral and not religious. THREE separate full buildings with clear transparent gaps, identical viewing angle and consistent component scale, every building fully in frame with generous margin, stages aligned on same ground line. No landscape, no characters, no lettering, no numbers, no labels, no border, no watermark, no crosses, no skulls, no random spikes. Actual transparent background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "engineering_complex",
+      "path": "imperial-gothic/engineering_complex.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. One wide transparent PNG triptych showing the IMPERIAL GOTHIC ENGINEERING COMPLEX through three cumulative upgrade stages for a space strategy game. Reference image is architectural/rendering style only, do not reproduce the HQ. Detailed isometric three-quarter miniature game art, same camera and upper-left light as reference, dark folded metal roofs, pale gray structural ribs/buttresses, brass trim, amber windows and work lights, restrained pointed arches integrated into industrial construction. Stage 1: a compact engineering workshop with a broad open assembly bay, visible workbench and a large metal machine component, side service room, ground-level accessible apron. Stage 2: preserve that exact front workshop and add a second parallel machine workshop behind it, joined by a supported overhead bridge crane with visible hoist above the shared fabrication yard. Stage 3: preserve these and add a higher rear assembly hall with visible structural trusses, a spanning overhead crane positioned to lift components, and practical cooling/extraction units on the side. It is manufacturing/engineering, not a warehouse or church. No ceremonial front stairs blocking the machinery entrance; all bay floors level with apron; supports reach ground; crane span attached to sturdy pillars. Three fully separated complete buildings, clear transparent gutters, consistent scale of original workshop in all three, upgrades only ADD functional elements. Generous frame margin, every roof and crane fully visible. No text, no numbers, no borders, no characters, no terrain backdrop, no religious crosses, skulls, random spikes or fantasy magic. Truly transparent background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "shipyard",
+      "path": "imperial-gothic/shipyard.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. Create a wide transparent PNG triptych of an IMPERIAL GOTHIC SPACE SHIPYARD upgrading in three stages from left to right, for Void Dominion space strategy game. Reference image supplies architectural materials and detailed isometric rendering only, this must look like a practical open shipyard not the headquarters or church. Same three-quarter view and light, pale gray load-bearing ribs and buttresses, dark steel platforms/folded roof service blocks, brass accents and amber utility windows. Stage 1: one small spacecraft held horizontally in a ground-supported drydock cradle, a compact side maintenance shop with pointed arch window and low folded roof, one practical articulated maintenance arm, front access walkway. Stage 2 preserves exactly the first ship, cradle and shop, adds a second parallel vacant assembly slip behind it, a large side cargo crane whose boom and hook reach both slips, and a small parts depot. Stage 3 preserves these and adds an enormous structurally supported overhead assembly gantry across the slips with hoists and robotic manipulators, plus an elevated enclosed service gallery along the back. Gothic pointed profiles should appear in GANTRY TRUSSES and supporting structural ribs, not decorative spires. Clear physical supports, usable ship exits at the front, no wall blocking the dock, machinery cannot intersect ships. Three complete separated building complexes, transparent gutters, matching camera and consistent original ship scale, no overlapping stages, all crane extremities inside frame with margin. No text, no labels, no number, no watermark, no scenery, no people, no crosses, no skulls, no random spikes. Actual transparent background.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "research_center",
+      "path": "imperial-gothic/research_center.png",
+      "generator": "image_gen (built-in)",
+      "prompt": "Use case: stylized-concept. One wide transparent PNG triptych: IMPERIAL GOTHIC RESEARCH CENTER, three cumulative upgrade stages left to right, for a space strategy game. The reference headquarters establishes material palette, isometric camera and detailed painterly game-building rendering ONLY. A different scientific laboratory building with a distinct low horizontal silhouette. Pale gray stone/ceramic ribs, charcoal folded metal roofs, brass details, warm amber laboratory windows, soft upper-left lighting; restrained pointed arch profiles and structural buttresses. Stage 1 is a compact low central laboratory with a small polygonal instrument dome, a sealed entrance airlock at ground level, and a side utilities module. Stage 2 preserves the exact central lab and instrument dome and adds two lower side laboratory wings connected by short enclosed corridors plus a roof antenna. Stage 3 preserves all prior construction and adds a rear observation platform with a scientifically plausible steerable parabolic radiotelescope on a supported mount, and a rear computational block with obvious radiator fins and cooling units. The telescope dish faces up and remains unobstructed; lab access stays usable; pipe routes connect to utility equipment. Do not add HQ towers, ornamental steeples or churches. Three separate complete buildings with clear transparent gaps and generous image margins, same viewing angle, original lab maintains consistent scale and geometry across levels, stages share ground alignment. No text, labels, letters, numbers, watermark, borders, people, scenery, crosses, skulls, random spikes, floating or magical parts. Actual clean transparent background, clean neutral antialiased edges without colored halo or stray red/yellow pixels.",
+      "correctionPrompts": [],
+      "provenanceRecovered": false,
+      "provenanceNoteRu": "Точный промпт повторной генерации сохранён без изменения."
+    }
+  ]
+}
