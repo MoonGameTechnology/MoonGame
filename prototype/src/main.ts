@@ -571,6 +571,7 @@ import {
 import {
 } from './fleetEffects';
 import {
+  adoptDue,
   advanceTarget,
   fpsNext,
   saneGap,
@@ -930,6 +931,8 @@ let simBacklog = 0;
 /** Часы картинки между шагами потока — те же, что у сети между снимками сервера. */
 let simView = NET_VIEW_IDLE;
 let simShownTime = 0;
+/** Когда кадр в последний раз взял мир потока (правило 7 в `simClock.ts`). */
+let simAdoptedAt = -Infinity;
 /** Поток считает только обычную схватку: забег, обучение, полигон, песочница и сеть ведут
  *  мир в кадре — там экран сам правит мир и ждёт итог приказа сразу. */
 function simEligible(): boolean {
@@ -948,6 +951,7 @@ function stopSim(): void {
   simLink = null;
   simBacklog = 0;
   simView = NET_VIEW_IDLE;
+  simAdoptedAt = -Infinity;
 }
 // SANDBOX — the home world of the local player (immortal-home target), captured at
 // launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
@@ -4799,8 +4803,8 @@ function frame(nowReal: number) {
     countNetFrame(dt);
   }
   judgeMapSharpness(nowReal, dt);
-  // Отдельный поток расчёта: сначала то, что он прислал, — мир, события и исходы своих
-  // приказов, — потом следующий шаг, уже от пришедшего мира.
+  // Отдельный поток расчёта: сначала то, что он прислал (мир, события и исходы своих
+  // приказов), потом следующий шаг.
   if (simLink && !simEligible()) stopSim();
   if (!simLink && simEligible()) {
     const port = SIM_WORKER && workerPort(SIM_WORKER);
@@ -4808,11 +4812,17 @@ function frame(nowReal: number) {
     else simBroken = true;
   }
   if (simLink) {
-    const sync = simLink.take();
+    // Присланное кадр берёт не чаще раза в `ADOPT_EVERY_MS` (`simClock.ts`, правило 7): каждый
+    // взятый мир он разбирает заново, а движение между мирами досчитывают часы картинки.
+    // Сломавшийся поток отдаёт всё, что успел прислать, сразу.
+    simLink.frame(nowReal);
+    const due = adoptDue(nowReal, simAdoptedAt) || simLink.failed !== null;
+    const sync = due ? simLink.take() : null;
     if (sync) {
+      simAdoptedAt = nowReal;
       apply({ state: sync.state, events: sync.events });
       for (const o of [...sync.driverOrders, ...sync.refused]) settleOrder(o.type, o.error);
-      if (sync.stepped) simView = netViewSnapshot(simView, s.time, nowReal);
+      if (sync.stepped) simView = netViewSnapshot(simView, s.time, sync.steppedAt);
     }
     if (simLink.failed !== null) {
       // Мир на экране цел (последняя разность и неподтверждённые приказы) — кадр ведёт его дальше.
@@ -4831,7 +4841,8 @@ function frame(nowReal: number) {
   if (simRunning && simLink) {
     simBacklog = stepBacklog(simBacklog, dt, speed, HOUR);
     if (!simLink.busy && simBacklog > 0) {
-      simLink.step(s.time + simBacklog, !comicQueue.isBusy(), AI_PLAYERS, soloAutoAssault, nowReal);
+      // От цели прошлого шага, а не от мира на экране: тот отстаёт на шаги, которых кадр не взял.
+      simLink.step(simLink.time + simBacklog, !comicQueue.isBusy(), AI_PLAYERS, soloAutoAssault, nowReal);
       simBacklog = 0;
     }
   } else if (simRunning) {

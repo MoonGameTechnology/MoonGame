@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Action, GameState, StateDelta } from '../../packages/shared-core/src/index';
+import type {
+  Action,
+  DomainEvent,
+  GameState,
+  StateDelta,
+} from '../../packages/shared-core/src/index';
 import { declareWar, moveFleet } from '../../decisions/actions';
 import { parseSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { approvalLedger, type ApprovalLedger } from './botFavour';
@@ -58,6 +63,29 @@ describe('отдельный поток расчёта соло-мира', () =>
       expect(shown).toEqual(screenView(ref.state(), 'p1'));
     }
     expect(Object.keys(shown.fleets).length).toBeGreaterThan(0);
+  });
+
+  it('шаги, которых кадр ещё не взял, идут от цели прошлого шага; взятие отдаёт их разом', () => {
+    const start = newGame();
+    const link = startSimLink(threadPort(), start, 'p1', undefined);
+    const ref = createSoloSim(structuredClone(start), 'p1');
+    const events: DomainEvent[] = [];
+    expect(link.time).toBe(start.time);
+    for (let hour = 1; hour <= 3; hour++) {
+      link.step(link.time + HOUR, true, AI, NONE, hour * 1000);
+      link.frame(hour * 100); // кадр, который увидел пришедший шаг, но мир не взял
+      events.push(...ref.step(start.time + hour * HOUR, true, AI, NONE).events);
+    }
+    link.frame(400); // новых шагов нет: время прихода остаётся прежним
+    expect(link.time).toBe(start.time + 3 * HOUR);
+    const sync = link.take()!;
+    expect(sync.stepped).toBe(true);
+    // Часы картинки отсчитывают мир от кадра, в котором пришёл последний шаг.
+    expect(sync.steppedAt).toBe(300);
+    expect(sync.state).toEqual(screenView(ref.state(), 'p1'));
+    expect(events.length).toBeGreaterThan(0);
+    expect(sync.events).toEqual(events);
+    expect(link.take()).toBeNull();
   });
 
   it('приказ игрока виден сразу и совпадает с тем, как его применил поток', () => {
