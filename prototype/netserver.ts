@@ -157,6 +157,7 @@ import {
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
 import { createSnapshotWriter } from '../packages/server/src/snapshotWriter';
+import { commitMatch } from '../packages/server/src/matchCommit';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
@@ -694,8 +695,7 @@ async function createHostedMatch(
     // `observe` above becomes a harmless coalesced extra for actions (still needed for
     // tick-driven advances, which are recomputable and persist after the fact).
     persist: async (snapshot, receipt) => {
-      await matchStore.save(snapshot);
-      await receiptStore.save(id, receipt);
+      await commitMatch(matchStore, receiptStore, snapshot, receipt);
     },
     timeScale: TIME_SCALE, // playtest fast-forward (1 = real-time)
     // REL-4: the action-layer front-door — envelope validate→authorize→sequence→dedup

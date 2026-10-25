@@ -75,6 +75,24 @@ export class MemoryMatchStore implements MatchStore {
   }
 
   save(snapshot: MatchSnapshot): Promise<void> {
+    const prepared = this.prepareSnapshot(snapshot);
+    if (prepared) this.snaps.set(snapshot.matchId, prepared);
+    return Promise.resolve();
+  }
+
+  saveWithReceipt(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void> {
+    if (!(receipts instanceof MemoryReceiptStore)) return Promise.reject(new Error('E_MATCH_COMMIT_BACKEND'));
+    const prepared = this.prepareSnapshot(snapshot);
+    if (!prepared) return Promise.reject(new Error('E_MATCH_COMMIT_STALE'));
+    // Prepare both detached values before changing either map. Publishing them is
+    // synchronous, so no reader or failed clone can observe half of a command.
+    const publishReceipt = receipts.prepareSave(snapshot.matchId, receipt);
+    this.snaps.set(snapshot.matchId, prepared);
+    publishReceipt();
+    return Promise.resolve();
+  }
+
+  private prepareSnapshot(snapshot: MatchSnapshot): MatchSnapshot | null {
     const prev = this.snaps.get(snapshot.matchId);
     if (!prev || snapshot.seq >= prev.seq) {
       const economyObservations = { ...snapshot.economyObservations, ...prev?.economyObservations };
@@ -83,13 +101,13 @@ export class MemoryMatchStore implements MatchStore {
       for (const [key, ids] of Object.entries(snapshot.economyActivity ?? {})) {
         economyActivity[key] = [...new Set([...(economyActivity[key] ?? []), ...ids])].slice(0, MAX_META_ACTIVITY_FACTS_PER_ROLE);
       }
-      this.snaps.set(snapshot.matchId, clone({
+      return clone({
         ...snapshot,
         ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
         ...(Object.keys(economyActivity).length ? { economyActivity } : {}),
-      })); // optimistic: keep the newest while retaining committed reward evidence
+      }); // optimistic: keep the newest while retaining committed reward evidence
     }
-    return Promise.resolve();
+    return null;
   }
 
   ongoingMatchIds(): Promise<string[]> {
@@ -855,13 +873,19 @@ export class MemoryReceiptStore implements ReceiptStore {
   }
 
   save(matchId: string, receipt: StoredReceipt): Promise<void> {
-    let m = this.byMatch.get(matchId);
-    if (!m) {
-      m = new Map();
-      this.byMatch.set(matchId, m);
-    }
-    if (!m.has(receipt.actionId)) m.set(receipt.actionId, receipt); // receipts are immutable
+    this.prepareSave(matchId, receipt)();
     return Promise.resolve();
+  }
+
+  /** Stage a detached receipt for the paired match adapter's synchronous commit. */
+  prepareSave(matchId: string, receipt: StoredReceipt): () => void {
+    const detached = structuredClone(receipt);
+    const initial = this.byMatch.get(matchId) ?? new Map<string, StoredReceipt>();
+    return () => {
+      const current = this.byMatch.get(matchId) ?? initial;
+      if (!current.has(detached.actionId)) current.set(detached.actionId, detached);
+      this.byMatch.set(matchId, current);
+    };
   }
 }
 

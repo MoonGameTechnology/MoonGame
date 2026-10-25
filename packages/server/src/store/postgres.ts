@@ -622,9 +622,31 @@ export class PostgresMatchStore implements MatchStore {
   }
 
   async save(snapshot: MatchSnapshot): Promise<void> {
+    await this.saveUsing(this.pool, snapshot);
+  }
+
+  async saveWithReceipt(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void> {
+    if (!(receipts instanceof PostgresReceiptStore) || !receipts.sharesPool(this.pool))
+      throw new Error('E_MATCH_COMMIT_BACKEND');
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const written = await this.saveUsing(client, snapshot);
+      if (!written) throw new Error('E_MATCH_COMMIT_STALE');
+      await receipts.saveUsing(client, snapshot.matchId, receipt);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async saveUsing(query: Pick<Pool, 'query'>, snapshot: MatchSnapshot): Promise<boolean> {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
-    await this.pool.query(
+    const result = await query.query(
       `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET
@@ -681,6 +703,7 @@ export class PostgresMatchStore implements MatchStore {
         MAX_META_ACTIVITY_FACTS_PER_ROLE,
       ],
     );
+    return result.rowCount === 1;
   }
 
   async ongoingMatchIds(): Promise<string[]> {
@@ -1436,6 +1459,8 @@ interface ReceiptRow {
 export class PostgresReceiptStore implements ReceiptStore {
   constructor(private readonly pool: Pool) {}
 
+  sharesPool(pool: Pool): boolean { return this.pool === pool; }
+
   async loadAll(matchId: string): Promise<StoredReceipt[]> {
     const r = await this.pool.query<ReceiptRow>(
       `SELECT action_id, player_id, seq, ok, code FROM receipts WHERE match_id = $1`,
@@ -1451,8 +1476,13 @@ export class PostgresReceiptStore implements ReceiptStore {
   }
 
   async save(matchId: string, receipt: StoredReceipt): Promise<void> {
+    await this.saveUsing(this.pool, matchId, receipt);
+  }
+
+  /** Used by the paired match adapter with its transaction client. */
+  async saveUsing(query: Pick<Pool, 'query'>, matchId: string, receipt: StoredReceipt): Promise<void> {
     // Receipts are immutable — first write wins; a re-save of the same action is a no-op.
-    await this.pool.query(
+    await query.query(
       `INSERT INTO receipts (match_id, action_id, player_id, seq, ok, code)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (match_id, action_id) DO NOTHING`,

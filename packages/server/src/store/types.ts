@@ -47,6 +47,9 @@ export interface MatchStore {
   /** Upsert the snapshot. Optimistic by `seq`: a save with an older `seq` than the
    *  stored one is a no-op, so a late write can't clobber fresher state. */
   save(snapshot: MatchSnapshot): Promise<void>;
+  /** Atomically commit a command's state and receipt. Both adapters must belong to
+   * the same backend; unsupported custom stores fail closed at the host boundary. */
+  saveWithReceipt?(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void>;
   /** Ids of every match still `ongoing` (not ended). Cheap — reads the normalized
    *  `status` column (never the JSONB blob), so the match factory and the open-matches
    *  feed can enumerate joinable matches without loading each snapshot. Restart-safe:

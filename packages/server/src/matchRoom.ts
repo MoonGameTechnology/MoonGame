@@ -1133,6 +1133,13 @@ export class MatchRoom {
    */
   evict(playerId: PlayerId, code: ServerErrorCode = 'E_KICKED'): number {
     this.admissionVersion += 1;
+    // A released empire may be inherited by another account; private talk may not.
+    // Ordinary disconnect/logout keeps the seat and does not take this path.
+    for (let i = this.chatHistory.length - 1; i >= 0; i -= 1) {
+      const message = this.chatHistory[i]!;
+      if (message.channel === 'dm' && (message.from === playerId || message.to === playerId))
+        this.chatHistory.splice(i, 1);
+    }
     this.playerAccountId.delete(playerId);
     const playerPeers = this.peers.get(playerId);
     if (!playerPeers) return 0;
@@ -1378,17 +1385,25 @@ export class MatchRoom {
     if (!this.peers.get(playerId)?.has(peer)) return;
     const accepted = this.admitDecision(playerId, peer, envelope, sessionId);
     if (!accepted) return;
-    await this.maybeSyncArsenal(playerId, accepted.action);
-    const verdict = await this.commitApply(playerId, accepted.action, peer);
-    if (verdict.ok) {
-      this.gate!.commit(accepted.envelope, { ok: true });
-    } else if (verdict.durable) {
-      this.gate!.commit(accepted.envelope, { ok: false, code: verdict.code });
-    } else {
-      // Transient failure (store down): release the sequence reservation so a backoff-retry
-      // of the same clientSeq is admitted again instead of hitting E_REPLAY. Safe because
-      // this admit→commit ran serialized in the mailbox — nothing reserved past it.
-      this.gate!.rollback(accepted.envelope);
+    const isCurrent = () => this.peers.get(playerId)?.has(peer) === true;
+    let durable = false;
+    try {
+      await this.maybeSyncArsenal(playerId, accepted.action, isCurrent);
+      if (!isCurrent()) return;
+      const verdict = await this.commitApply(playerId, accepted.action, peer);
+      if (verdict.ok) {
+        this.gate!.commit(accepted.envelope, { ok: true });
+        durable = true;
+      } else if (verdict.durable) {
+        this.gate!.commit(accepted.envelope, { ok: false, code: verdict.code });
+        durable = true;
+      }
+    } catch {
+      if (isCurrent()) this.sendReject(peer, playerId, accepted.envelope.actionId, 'E_UNAVAILABLE');
+    } finally {
+      // Reads can fail before commitApply supplies a verdict. Release their cursor
+      // too, so a transient failure never turns the retry into E_REPLAY.
+      if (!durable) this.gate!.rollback(accepted.envelope);
     }
   }
 
@@ -2071,7 +2086,9 @@ export class MatchRoom {
   ): Promise<void> {
     if (peer && !this.peers.get(playerId)?.has(peer)) return;
     if (this.frontGate(playerId, action.id, peer).kind !== 'pass') return;
-    await this.maybeSyncArsenal(playerId, action);
+    const isCurrent = () => !peer || this.peers.get(playerId)?.has(peer) === true;
+    await this.maybeSyncArsenal(playerId, action, isCurrent);
+    if (!isCurrent()) return;
     await this.commitApply(playerId, action, peer);
   }
 
@@ -2084,7 +2101,7 @@ export class MatchRoom {
    *  `commitApply` — a REAL, persisted, broadcast, hash-consistent action, never a
    *  silent state patch) BEFORE the caller's `commitApply` for the original action,
    *  so the unchanged ARS-3 check in `construction.ts` sees current ownership. */
-  private async maybeSyncArsenal(playerId: PlayerId, action: Action): Promise<void> {
+  private async maybeSyncArsenal(playerId: PlayerId, action: Action, isCurrent: () => boolean): Promise<void> {
     if (!this.arsenalStore || action.type !== 'unit.build') return;
     const accountId = this.playerAccountId.get(playerId);
     if (!accountId) return;
@@ -2100,9 +2117,10 @@ export class MatchRoom {
       modules.every((m) => player.arsenal!.modules.includes(m));
     if (alreadyOwned) return; // covered by the boot snapshot — no live read needed
     const fresh = arsenalSnapshotOf(await this.arsenalStore.listOf(accountId));
+    if (!isCurrent() || this.playerAccountId.get(playerId) !== accountId) return;
     if (sameArsenal(player.arsenal, fresh)) return; // still doesn't own it — the
     // unchanged core check below will reject with E_NOT_OWNED as before
-    await this.commitApply(
+    const synced = await this.commitApply(
       playerId,
       {
         id: `srv:arsenal-sync:${playerId}:${this.seq}`,
@@ -2113,6 +2131,9 @@ export class MatchRoom {
       },
       undefined,
     );
+    // A failed refresh must not turn a temporary persistence outage into a
+    // durable E_NOT_OWNED verdict for the original build.
+    if (!synced.ok) throw new Error('E_UNAVAILABLE');
   }
 
   /**

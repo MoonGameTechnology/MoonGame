@@ -18,6 +18,7 @@ import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { standingOrderTickActions } from './standingOrderDriver';
 import { expiredSeatClaims } from './seatExpiry';
 import { detach } from './detach';
+import { commitMatch } from './matchCommit';
 
 /**
  * The match-loading wiring `main.ts` hands to the LazyRoomRegistry, extracted
@@ -119,8 +120,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     // Strict commit-before-broadcast: the room awaits this durable write of the new
     // snapshot + receipt before committing state / broadcasting the delta.
     const persist = async (snapshot: MatchSnapshot, receipt: StoredReceipt): Promise<void> => {
-      await stores.store.save(snapshot);
-      await stores.receiptStore.save(matchId, receipt);
+      await commitMatch(stores.store, stores.receiptStore, snapshot, receipt);
     };
     // The committed path already persists each action; `observe` re-arms the driver
     // (an action may have scheduled a new event the sleeping timer can't see) and
