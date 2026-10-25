@@ -1,0 +1,22 @@
+[Unit]
+Description=MoonGame disk reserve and persistent volume budgets
+After=moongame-docker.service moongame.service
+Requires=moongame-docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/moongame-ops/deploy/resources/guard.py enforce
+TimeoutStartSec=420
+MemoryMax=128M
+CPUQuota=10%
+TasksMax=32
+Nice=15
+IOSchedulingClass=idle
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/moongame /var/lib/moongame-resource-guard

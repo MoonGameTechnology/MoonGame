@@ -12,6 +12,10 @@ deploy_env_value() {
 
 production_preflight() {
   local file="$1" prod checker mode owner key
+  if [ -e "${STATE_DIR:-/var/lib/moongame}/resource-pressure.json" ]; then
+    echo '[✗] E_RESOURCE_PRESSURE: inspect disk pressure and explicitly resume the resource guard.' >&2
+    return 1
+  fi
   if [ -e "${STATE_DIR:-/var/lib/moongame}/account-erasure.pending" ]; then
     echo '[✗] E_ERASURE_MAINTENANCE: finish account erasure before starting/updating runtimes.' >&2
     return 1

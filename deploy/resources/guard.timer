@@ -1,0 +1,11 @@
+[Unit]
+Description=Check MoonGame volume budgets and free disk reserve
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=30s
+AccuracySec=2s
+Unit=moongame-resource-guard.service
+
+[Install]
+WantedBy=timers.target

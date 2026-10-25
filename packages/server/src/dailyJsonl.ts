@@ -6,8 +6,8 @@
 // throws — telemetry losing a line is acceptable, a room stalling on a slow disk is not.
 // Pure observation: nothing here feeds back into any room.
 
-import { mkdirSync } from 'node:fs';
-import { appendFile, opendir, unlink } from 'node:fs/promises';
+import { constants, mkdirSync } from 'node:fs';
+import { open, opendir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface DailyJsonlStats {
@@ -22,6 +22,10 @@ export interface DailyJsonlOptions {
   prefix: string;
   /** Lines waiting for a flush before new ones are dropped. */
   maxQueued?: number;
+  /** Bound queued UTF-8 bytes as well as line count. Default: 4 MiB. */
+  maxQueuedBytes?: number;
+  /** Stop recording this day at the byte budget; never truncate evidence. Default: 16 MiB. */
+  maxFileBytes?: number;
   /** Delay before a scheduled flush (ms). 0 ⇒ next macrotask. */
   flushDelayMs?: number;
   now?: () => number;
@@ -40,6 +44,9 @@ export class DailyJsonl {
   private flushing: Promise<void> | undefined;
   private readonly stats_: DailyJsonlStats = { written: 0, dropped: 0, failed: 0 };
   private readonly maxQueued: number;
+  private readonly maxQueuedBytes: number;
+  private readonly maxFileBytes: number;
+  private queuedBytes = 0;
   private readonly flushDelayMs: number;
   private readonly now: () => number;
   private prunedDay: string | undefined;
@@ -48,10 +55,17 @@ export class DailyJsonl {
 
   constructor(private readonly options: DailyJsonlOptions) {
     this.maxQueued = options.maxQueued ?? 10_000;
+    this.maxQueuedBytes = options.maxQueuedBytes ?? 4 * 1024 * 1024;
+    this.maxFileBytes = options.maxFileBytes ?? 16 * 1024 * 1024;
     this.flushDelayMs = options.flushDelayMs ?? 250;
     this.now = options.now ?? Date.now;
     this.retentionDays = options.retentionDays ?? 30;
-    if (!/^[a-z][a-z0-9-]*$/.test(options.prefix) || !Number.isInteger(this.retentionDays) || this.retentionDays < 1)
+    if (
+      !/^[a-z][a-z0-9-]*$/.test(options.prefix) ||
+      ![this.retentionDays, this.maxQueued, this.maxQueuedBytes, this.maxFileBytes].every(
+        (value) => Number.isSafeInteger(value) && value > 0,
+      )
+    )
       throw new Error('E_JOURNAL_CONFIG');
     mkdirSync(options.dir, { recursive: true, mode: 0o700 });
   }
@@ -72,18 +86,28 @@ export class DailyJsonl {
       return;
     }
     let line: string;
+    let day: string;
     try {
-      line = JSON.stringify({ t: this.now(), ...record }) + '\n';
+      const now = this.now();
+      const t = typeof record.t === 'number' ? record.t : now;
+      day = utcDay(t);
+      // Caller timestamps must not create an unbounded set of daily files.
+      if (day > utcDay(now) || day < utcDay(now - this.retentionDays * 86_400_000)) {
+        this.stats_.dropped++;
+        return;
+      }
+      line = JSON.stringify({ t: now, ...record }) + '\n';
     } catch {
       this.stats_.failed++;
       return;
     }
-    if (Buffer.byteLength(line, 'utf8') > 64 * 1024) {
+    const bytes = Buffer.byteLength(line, 'utf8');
+    if (bytes > 64 * 1024 || this.queuedBytes + bytes > this.maxQueuedBytes) {
       this.stats_.dropped++;
       return;
     }
-    const t = typeof record.t === 'number' ? record.t : this.now();
-    this.queue.push({ day: utcDay(t), line });
+    this.queuedBytes += bytes;
+    this.queue.push({ day, line });
     this.schedule();
   }
 
@@ -121,6 +145,7 @@ export class DailyJsonl {
     const byDay = new Map<string, string>();
     for (const { day, line } of this.queue) byDay.set(day, (byDay.get(day) ?? '') + line);
     this.queue = [];
+    this.queuedBytes = 0;
     return byDay;
   }
 
@@ -143,13 +168,42 @@ export class DailyJsonl {
   private async drain(): Promise<void> {
     for (const [day, text] of this.takeByDay()) {
       try {
-        await appendFile(this.fileFor(day), text, { mode: 0o600 });
-        this.stats_.written += countLines(text);
+        const file = await open(
+          this.fileFor(day),
+          constants.O_WRONLY |
+            constants.O_APPEND |
+            constants.O_CREAT |
+            constants.O_NOFOLLOW |
+            constants.O_NONBLOCK,
+          0o600,
+        );
+        try {
+          const metadata = await file.stat();
+          if (!metadata.isFile() || metadata.nlink !== 1) throw new Error('E_JOURNAL_FILE');
+          const bytes = Buffer.from(text, 'utf8');
+          const remaining = Math.max(0, this.maxFileBytes - metadata.size);
+          // Only complete UTF-8 JSONL records fit; a restart re-reads the actual size.
+          const end =
+            bytes.length <= remaining
+              ? bytes.length
+              : remaining === 0
+                ? 0
+                : bytes.lastIndexOf(10, remaining - 1) + 1;
+          const accepted = bytes.subarray(0, end);
+          if (accepted.length) await file.writeFile(accepted);
+          const written = countLines(accepted.toString('utf8'));
+          this.stats_.written += written;
+          this.stats_.dropped += countLines(text) - written;
+        } finally {
+          await file.close();
+        }
       } catch {
         this.stats_.failed += countLines(text);
       }
     }
-    try { await this.prune(); } catch {
+    try {
+      await this.prune();
+    } catch {
       const day = utcDay(this.now());
       if (this.pruneErrorDay !== day) {
         this.pruneErrorDay = day;
