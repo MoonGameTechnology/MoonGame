@@ -87,20 +87,32 @@ async function boot() {
     started: 0,
     installed: [] as SoloSave[],
     notes: [] as string[],
+    snapshots: 0,
+    /** Поток расчёта есть: такт записи заказывает строку ему, заказы копятся здесь. */
+    worker: false,
+    jobs: [] as Array<{ rules: string; done: (raw: string | null) => void }>,
   };
   solo.initSoloCheckpoint({
     world: () => env.s,
     net: () => env.net,
     practice: () => env.practice,
     inMatch: () => env.inMatch,
-    snapshot: () => ({
-      state: env.s,
-      ai: [['p2', 'strong']],
-      normalSpeed: 50,
-      fastSpeed: 150,
-      autoAssault: ['f1'],
-      memory: [],
-    }),
+    snapshot: () => {
+      env.snapshots++;
+      return {
+        state: env.s,
+        ai: [['p2', 'strong']],
+        normalSpeed: 50,
+        fastSpeed: 150,
+        autoAssault: ['f1'],
+        memory: [],
+      };
+    },
+    saveInBackground: (rules, done) => {
+      if (!env.worker) return false;
+      env.jobs.push({ rules, done });
+      return true;
+    },
     halt: () => void env.halts++,
     // Как `installMatch`: сначала уходит со схватки — последней записью слота, — потом
     // ставит мир.
@@ -233,6 +245,94 @@ describe('REFM-213 — запись слота', () => {
     env.net = true;
     solo.suspendSolo();
     expect(env.halts).toBe(1);
+  });
+});
+
+describe('такт записи в потоке расчёта', () => {
+  /** Строка, какую собрал бы поток из мира `state`: тот же формат и та же сверка правил. */
+  async function threadRaw(state: GameState, rules: string): Promise<string> {
+    const { serializeSoloSave } = await import('../../decisions/soloSave');
+    return serializeSoloSave(
+      {
+        state,
+        ai: [['p2', 'strong']],
+        normalSpeed: 50,
+        fastSpeed: 150,
+        autoAssault: [],
+        memory: [],
+      },
+      rules,
+    );
+  }
+
+  it('кадр снимок не собирает, строку из потока кладёт в слот, и «Продолжить» её поднимает', async () => {
+    const first = await boot();
+    first.env.worker = true;
+    first.solo.enterSolo(true);
+    const start = first.env.s.time;
+    const built = first.env.snapshots;
+    first.env.s = first.game.advance(first.env.s, start + 500).state;
+    first.solo.tickSoloSave(20_000);
+    expect(first.env.snapshots).toBe(built);
+    expect(first.env.jobs).toHaveLength(1);
+    expect(stored()?.time).toBe(start);
+    const job = first.env.jobs[0]!;
+    job.done(await threadRaw(first.env.s, job.rules));
+    expect(stored()?.time).toBe(first.env.s.time);
+    expect(first.env.notes).toEqual([]);
+    // Такт тот же: следующий заказ — не раньше чем через 15 с.
+    first.solo.tickSoloSave(34_999);
+    expect(first.env.jobs).toHaveLength(1);
+
+    const { solo, env } = await boot();
+    solo.restoreSolo();
+    expect(env.installed).toHaveLength(1);
+    expect(env.installed[0]!.state.time).toBe(first.env.s.time);
+  });
+
+  it('строка из потока не затирает запись свежее себя и не пишет закрытый слот', async () => {
+    const { solo, game, env } = await boot();
+    env.worker = true;
+    solo.enterSolo(true);
+    const old = env.s;
+    solo.tickSoloSave(20_000);
+    env.s = game.advance(env.s, env.s.time + 500).state;
+    solo.saveSolo(true);
+    env.jobs[0]!.done(await threadRaw(old, env.jobs[0]!.rules));
+    expect(stored()?.time).toBe(env.s.time);
+    solo.tickSoloSave(40_000);
+    solo.leaveSolo();
+    const left = stored()?.time;
+    env.jobs[1]!.done(await threadRaw(old, env.jobs[1]!.rules));
+    expect(stored()?.time).toBe(left);
+  });
+
+  it('«писать нечего» оставляет слот прежним, сбой записи — одна строка в ленте', async () => {
+    const { solo, game, env } = await boot();
+    env.worker = true;
+    solo.enterSolo(true);
+    const start = env.s.time;
+    solo.tickSoloSave(20_000);
+    env.jobs[0]!.done(null);
+    expect(stored()?.time).toBe(start);
+    expect(env.notes).toEqual([]);
+    env.s = game.advance(env.s, start + 500).state;
+    failWrites = true;
+    solo.tickSoloSave(40_000);
+    env.jobs[1]!.done(await threadRaw(env.s, env.jobs[1]!.rules));
+    solo.tickSoloSave(60_000);
+    env.jobs[2]!.done(await threadRaw(env.s, env.jobs[2]!.rules));
+    expect(env.notes).toEqual([t('solo.save.failed')]);
+    expect(stored()?.time).toBe(start);
+  });
+
+  it('без потока такт собирает снимок в кадре, как раньше', async () => {
+    const { solo, game, env } = await boot();
+    solo.enterSolo(true);
+    env.s = game.advance(env.s, env.s.time + 500).state;
+    solo.tickSoloSave(20_000);
+    expect(env.jobs).toEqual([]);
+    expect(stored()?.time).toBe(env.s.time);
   });
 });
 
