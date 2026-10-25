@@ -463,6 +463,11 @@ export function damageByClass(
  * `count` юнитов получает `totalDamage × count / N` и тратит его на свой щит и запас
  * корпуса так же, как в {@link damageUnits}.
  *
+ * `weights` — вес рода войск цели (ROS-1.6b: стрелки бьют пехоту и технику разным уроном).
+ * Тогда N считается взвешенно, `Σ count × вес`, и юнит рода с весом `w` получает
+ * `totalDamage × w / Σ count × вес`. Род с весом 0 урона не получает. Не передан — у всех
+ * вес 1.
+ *
  * Стек, которому досталось больше, чем он держит, гибнет, а его остаток делится между
  * выжившими по той же формуле: урон не пропадает. Каждый проход либо тратит всё, либо
  * опустошает хотя бы один стек, поэтому проходов не больше, чем стеков. Мутирует стеки
@@ -472,13 +477,17 @@ export function damageEvenly(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
+  weights?: ClassPools,
 ): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
+  const weightOf = (s: UnitStack): number =>
+    weights ? Math.max(0, weights[targetClassOf(data.units[s.unit])]) : 1;
   const deaths: { unit: string; count: number }[] = [];
   let remaining = totalDamage;
   while (remaining > 0) {
-    const live = units.filter((s) => isTargetable(s, data));
-    const alive = live.reduce((n, s) => n + s.count, 0);
-    if (alive === 0) {
+    // `> 0` отсекает и вес NaN: такой род не бьётся вовсе, а не ломает деление.
+    const live = units.filter((s) => isTargetable(s, data) && weightOf(s) > 0);
+    const alive = live.reduce((n, s) => n + s.count * weightOf(s), 0);
+    if (!(alive > 0)) {
       break; // nothing left that can be hit
     }
     let allocated = 0;
@@ -487,7 +496,9 @@ export function damageEvenly(
       // Последний стек берёт точный остаток, как последняя линия в `damageUnits`:
       // деление на доли не теряет и не чеканит урон на округлении.
       const slice =
-        i === live.length - 1 ? remaining - allocated : (remaining * stack.count) / alive;
+        i === live.length - 1
+          ? remaining - allocated
+          : (remaining * stack.count * weightOf(stack)) / alive;
       allocated += slice;
       leftover += damageStack(stack, slice, data, deaths);
     }
@@ -496,7 +507,7 @@ export function damageEvenly(
     }
     remaining = leftover;
   }
-  // Стек, задетый в двух проходах, теряет юнитов дважды; наружу — одна строка на род юнита,
+  // Стек, задетый в двух проходах, теряет юнитов дважды; наружу — одна строка на юнит,
   // в порядке первой потери.
   const lost = new Map<string, number>();
   for (const d of deaths) lost.set(d.unit, (lost.get(d.unit) ?? 0) + d.count);
@@ -684,9 +695,9 @@ export function applyDamageToSide(
    *  burst names the world's owner; a shuttle strike names the strike's owner. Omitted
    *  when nobody owns the fire (a neutral garrison). */
   killedBy?: PlayerId | null,
-  /** `'even'` — урон поровну на каждого юнита стороны ({@link damageEvenly}): так огонь
-   *  сверху бьёт гарнизон (ROS-1.6a). Не передан — линиями, как в бою. */
-  spread?: 'even',
+  /** Урон поровну на каждого юнита стороны, с весом его рода войск ({@link damageEvenly}):
+   *  так огонь сверху бьёт гарнизон (ROS-1.6a/b). Не передан — линиями, как в бою. */
+  evenly?: ClassPools,
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -720,8 +731,8 @@ export function applyDamageToSide(
     }
   }
   const laid =
-    spread === 'even'
-      ? damageEvenly(units, dmg, data)
+    evenly
+      ? damageEvenly(units, dmg, data, evenly)
       : byClass
         ? damageByClass(units, byClass, data)
         : null;

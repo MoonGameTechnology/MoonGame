@@ -17,20 +17,25 @@ const profile = (unit: string): Record<string, number> => {
 };
 
 describe('урон юнита по целям', () => {
-  it('корабль: атака по кораблям, половина её по зданиям, ПРО по авиации, десятая по войскам', () => {
+  it('корабль: атака по кораблям, половина её по зданиям, ПРО по авиации, доля по войскам', () => {
     const st = data.units.cruiser!.stats;
     expect(profile('cruiser')).toEqual({
       ships: st.attack,
       buildings: st.attack * 0.5,
       air: st.pointDefense ?? 0,
-      vehicles: st.attack * 0.1,
+      vehicles: st.attack * 0.05,
       infantry: st.attack * 0.1,
     });
   });
 
+  it('корабль сильнее по пехоте, шаттл — по технике (ROS-1.6b)', () => {
+    expect(profile('cruiser').infantry).toBe(2 * profile('cruiser').vehicles!);
+    expect(profile('bomber').vehicles).toBe(2 * profile('bomber').infantry!);
+  });
+
   it('по войскам шаттл бьёт сильнее корабля той же атаки (ROS-1.6)', () => {
     const bomber = data.units.bomber!.stats;
-    expect(profile('bomber').infantry).toBe(bomber.attack * 0.25);
+    expect(profile('bomber').infantry).toBe(bomber.attack * 0.125);
     expect(profile('bomber').vehicles).toBe(bomber.attack * 0.25);
     // Безоружный десантный челнок по войскам не бьёт.
     expect(profile('landing_shuttle').infantry).toBe(0);

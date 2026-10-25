@@ -87,7 +87,7 @@ import {
   type HookedDamage,
 } from '../util/combat';
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
-import { fireOnGarrison, shuttleGroundDamage } from '../util/groundFire';
+import { fireOnGarrison, groundVolley, shuttleGroundDamage, type GroundVolley } from '../util/groundFire';
 import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -620,10 +620,9 @@ function strikeAirPower(strike: ShuttleStrike, data: GameData): number {
 
 /** Огонь вылета по ВОЙСКАМ мира за удар (ROS-1.6): той же линией огня и в той же доле
  *  живого корпуса, что и удар по постройкам. */
-function strikeGroundPower(strike: ShuttleStrike, data: GameData): number {
-  return (
-    cappedUnitStat(strike.units, data, shuttleGroundDamage) * hullShare(strike.units, strike.damage, data)
-  );
+function strikeGroundPower(strike: ShuttleStrike, target: Planet, data: GameData): GroundVolley {
+  const volley = groundVolley(strike.units, target.garrison, data, shuttleGroundDamage);
+  return { ...volley, total: volley.total * hullShare(strike.units, strike.damage, data) };
 }
 
 /** Носитель, пустивший этот вылет, для `DamageHookArgs.attackerFleet` (CORE-DMG-3).
@@ -1666,16 +1665,16 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
           // ROS-1.6: удар задевает и войска мира — сильнее обстрела с орбиты, но без
           // последнего бойца (`util/groundFire.ts`). Только у врага или ничейного мира:
           // по чужим, но не враждебным войскам огонь не идёт.
-          const troops = strikeGroundPower(strike, h.ctx.data);
-          if (troops > 0 && (target.owner === null || isHostile(h, strike.owner, target.owner))) {
-            const toTroops = hookedDamage(h, troops, {
+          const troops = strikeGroundPower(strike, target, h.ctx.data);
+          if (troops.total > 0 && (target.owner === null || isHostile(h, strike.owner, target.owner))) {
+            const toTroops = hookedDamage(h, troops.total, {
               phase: 'shuttle',
               location: target.id,
               attacker: strike.owner,
               defender: target.owner ?? '',
               ...strikeAttackerFleet(strike),
             });
-            fireOnGarrison(h, target, toTroops, strike.owner);
+            fireOnGarrison(h, target, toTroops, strike.owner, troops.weights);
           }
           repelStrike(h, strike, answer, {
             kind: 'planet',
@@ -1927,7 +1926,8 @@ export const shuttleModule: GameModule = {
   //         `missile.flew`, и по последнему отрезку до цели — замечание Codex на #1644).
   // 1.17.0: урон удара по войскам мира делится поровну на каждого юнита, а не фокусом
   //         (ROS-1.6a, то же правило, что у обстрела с орбиты).
-  version: '1.17.0',
+  // 1.18.0: удар по миру бьёт технику и пехоту разной долей атаки (ROS-1.6b).
+  version: '1.18.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`

@@ -19,7 +19,7 @@ import {
   type DamageHookArgs,
 } from '../util/combat';
 import { splitVolley } from '../util/volley';
-import { fireOnGarrison, shipGroundDamage } from '../util/groundFire';
+import { fireOnGarrison, groundVolley, shipGroundDamage, type GroundVolley } from '../util/groundFire';
 import { recordValues } from '../util/records';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
@@ -104,9 +104,14 @@ function bombardPower(fleet: Fleet, data: GameData): number {
   });
 }
 
-/** Огонь обстреливающего флота по ВОЙСКАМ мира за час (ROS-1.6) — той же линией огня. */
-function shipGroundPower(fleet: Fleet, data: GameData): number {
-  return cappedUnitStat(fleet.units, data, shipGroundDamage);
+/** Огонь обстреливающего флота по ВОЙСКАМ мира за час (ROS-1.6) — той же линией огня,
+ *  по роду каждого юнита гарнизона (ROS-1.6b). */
+function shipGroundPower(
+  fleet: Fleet,
+  planet: { garrison: UnitStack[] },
+  data: GameData,
+): GroundVolley {
+  return groundVolley(fleet.units, planet.garrison, data, shipGroundDamage);
 }
 
 /** Resolves the orbital layer over one continuous time span: planetary AA fires
@@ -271,8 +276,11 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
           }
           // ROS-1.6: тот же обстрел бьёт и войска мира — слабо и без последнего бойца
           // (`util/groundFire.ts`). Те же аргументы хука: прикрытие мира режет и этот урон.
-          const troops = shipGroundPower(f, data) * hours;
-          if (troops > 0) fireOnGarrison(h, planet, hookedDamage(h, troops, hit), f.owner);
+          const troops = shipGroundPower(f, planet, data);
+          const onTroops = troops.total * hours;
+          if (onTroops > 0) {
+            fireOnGarrison(h, planet, hookedDamage(h, onTroops, hit), f.owner, troops.weights);
+          }
         }
       }
     }
@@ -294,7 +302,8 @@ export const orbitalModule: GameModule = {
   // 1.2.0: мина не встаёт на орбиту, не обстреливает и не делит залп ПВО (ревью #1411).
   // 1.3.0: обстрел бьёт и войска мира, без последнего бойца (ROS-1.6).
   // 1.4.0: урон обстрела по войскам делится поровну на каждого юнита, а не фокусом (ROS-1.6a).
-  version: '1.4.0',
+  // 1.5.0: обстрел бьёт пехоту и технику разной долей атаки (ROS-1.6b).
+  version: '1.5.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this
