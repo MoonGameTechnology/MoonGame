@@ -143,3 +143,23 @@ describe('память разведки — владелец и срок жиз�
     expect(mem.ownerOf('A')).toBeNull();
   });
 });
+
+describe('память разведки — номер правки', () => {
+  it('растёт с записью, очисткой и восстановлением, а чтение его не трогает', () => {
+    const mem = createScanMemory();
+    const fresh = mem.version();
+    mem.remember(['A'], worlds(world('A')));
+    const written = mem.version();
+    expect(written).toBeGreaterThan(fresh);
+    mem.get('A');
+    mem.has('A');
+    mem.ownerOf('A');
+    const saved = mem.dump();
+    expect(mem.version()).toBe(written);
+    mem.clear();
+    const cleared = mem.version();
+    expect(cleared).toBeGreaterThan(written);
+    mem.restore(saved);
+    expect(mem.version()).toBeGreaterThan(cleared);
+  });
+});

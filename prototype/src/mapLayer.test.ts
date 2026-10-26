@@ -155,6 +155,12 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
   return { ml, fog, camera, env, nodes, page, frame, bg, layer, spare, under, drawn, home };
 }
 
+/** Кадру — новый мир. Соло и сеть заменяют мир целиком, а не правят прежний (договор
+ *  `visionMemo` в `mapFog.ts`): тест правит его на месте и отдаёт новый объект. */
+function newWorld(env: { world: GameState }): void {
+  env.world = { ...env.world };
+}
+
 describe('REFM-232 — статический слой карты', () => {
   it('ввод до первого кадра выпекает карту, и под миром — его провинция', async () => {
     // Прямые границы: `insideProvince` судит клетку как выпуклую, а волна (M2.9) делает её
@@ -223,11 +229,13 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     env.world.planets[hidden.id]!.owner = 'p2';
+    newWorld(env);
     expect(ml.knownOwner(hidden.id)).toBeNull();
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).toBe(geo);
     // Своя провинция сменила владельца — это знание, и карта перепекается.
     env.world.planets[mine]!.owner = 'p2';
+    newWorld(env);
     expect(ml.knownOwner(mine)).toBe('p2');
     ml.blitStaticLayer(1032);
     expect(ml.provinceGeometry).not.toBe(geo);
@@ -239,12 +247,51 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     hidden.terrain = 'asteroid_field';
+    newWorld(env);
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).toBe(geo);
     // Своя провинция сменила местность — это знание, и карта перепекается.
     home('p1').terrain = 'asteroid_field';
+    newWorld(env);
     ml.blitStaticLayer(1032);
     expect(ml.provinceGeometry).not.toBe(geo);
+  });
+
+  it('знание о мирах кадр сверяет, только когда сменилось то, что оно читает', async () => {
+    const { ml, fog, env, home } = await boot();
+    vi.stubGlobal('performance', { now: () => 0 }); // часы стоят: выпечка не дорогая (правило 8)
+    const { KnowledgeRevision } = await import('./staticLayerCache');
+    const check = vi.spyOn(KnowledgeRevision.prototype, 'check');
+    const hidden = Object.values(env.world.planets).find(
+      (p) => !fog.known(p.id) && !fog.memory.has(p.id) && !fog.surveyed(p.id),
+    )!;
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1016);
+    expect(check).toHaveBeenCalledTimes(1);
+    const geo = ml.provinceGeometry;
+    // Новый мир с прежним знанием: сверка есть, выпечки нет.
+    newWorld(env);
+    ml.blitStaticLayer(1032);
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(ml.provinceGeometry).toBe(geo);
+    // Мир и зрение прежние, а в память разведки лёг снимок мира за туманом (дверь
+    // `rememberScan`): его местность теперь известна, и карта перепекается.
+    fog.rememberScan([hidden.id]);
+    ml.blitStaticLayer(1048);
+    expect(check).toHaveBeenCalledTimes(3);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    // Без тумана зрения нет, а песочница правит мир на месте: сверка каждым кадром.
+    const { sandboxConfig } = await import('./sandbox');
+    sandboxConfig.enabled = true;
+    sandboxConfig.fog = false;
+    fog.refreshVision();
+    ml.blitStaticLayer(1064);
+    ml.blitStaticLayer(1080);
+    expect(check).toHaveBeenCalledTimes(5);
+    const open = ml.provinceGeometry;
+    home('p1').owner = 'p2';
+    ml.blitStaticLayer(1096);
+    expect(ml.provinceGeometry).not.toBe(open);
   });
 
   it('кадр: в движении небо и карта рисуются живьём, на покое — одна копия готового кадра', async () => {
@@ -479,7 +526,7 @@ describe('REFM-232 — статический слой карты', () => {
   });
 
   it('устаревшую подложку кадр не показывает: отдаление перепекает карту, как раньше', async () => {
-    const { ml, camera, frame, under, drawn, home } = await boot();
+    const { ml, camera, env, frame, under, drawn, home } = await boot();
     camera.zoomAt(800, 450, 4);
     let clock = 0;
     vi.stubGlobal('performance', { now: () => (clock += 60) });
@@ -489,6 +536,7 @@ describe('REFM-232 — статический слой карты', () => {
     expect(under.width).toBeGreaterThan(0);
     // Своя провинция сменила владельца: выпечка перепекается сразу, подложка устарела.
     home('p1').owner = 'p2';
+    newWorld(env);
     ml.blitStaticLayer((now += 16));
     const geo = ml.provinceGeometry;
     camera.zoomAt(800, 450, 1 / 3);
@@ -645,6 +693,7 @@ describe('REFM-232 — статический слой карты', () => {
     expect(geometry.seeds[index]!.kind).toBe('nebula');
     hidden.kind = 'graveyard';
     hidden.terrain = 'graveyard';
+    newWorld(env);
     const authoritative = structuredClone(env.world);
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).toBe(geometry);
@@ -690,7 +739,7 @@ describe('REFM-232 — статический слой карты', () => {
   });
 
   it('захват меняет политическую заливку, сохраняя ту же мировую среду и её растры', async () => {
-    const { ml, home } = await boot({ holo: true });
+    const { ml, env, home } = await boot({ holo: true });
     const mine = home('p1');
     mine.terrain = 'asteroid_field';
     ml.blitStaticLayer(1000);
@@ -699,6 +748,7 @@ describe('REFM-232 — статический слой карты', () => {
     const fingerprints = environment.tiles.map(t => [t.id, t.fingerprint]);
     expect(fingerprints.length).toBeGreaterThan(0);
     mine.owner = 'p2';
+    newWorld(env);
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).not.toBe(geometry);
     expect(ml.knownOwner(mine.id)).toBe('p2');

@@ -43,6 +43,9 @@ export interface ScanMemory {
   has(id: string): boolean;
   /** Последний известный владелец узла — `null`, если помним его ничейным или не помним. */
   ownerOf(id: string): string | null;
+  /** Номер правки памяти: растёт с каждой записью, очисткой и восстановлением. Пока он
+   *  прежний, прежнее и всё, что из памяти читают. */
+  version(): number;
   /** Забыть всё: память принадлежит матчу. */
   clear(): void;
   dump(): Array<[string, Snapshot]>;
@@ -52,8 +55,10 @@ export interface ScanMemory {
 /** Завести память разведки. Внутри обычная карта — состояние живёт здесь, не в хозяине. */
 export function createScanMemory(): ScanMemory {
   const seen = new Map<string, Snapshot>();
+  let version = 0;
   return {
     remember(identify, planets) {
+      version++;
       for (const id of identify) {
         const p = planets[id];
         if (p) seen.set(id, snapshotOf(p));
@@ -62,9 +67,14 @@ export function createScanMemory(): ScanMemory {
     get: (id) => seen.get(id),
     has: (id) => seen.has(id),
     ownerOf: (id) => seen.get(id)?.owner ?? null,
-    clear: () => seen.clear(),
+    version: () => version,
+    clear: () => {
+      version++;
+      seen.clear();
+    },
     dump: () => [...seen].map(([id, snap]) => [id, structuredClone(snap)]),
     restore(entries) {
+      version++;
       seen.clear();
       for (const [id, snap] of entries) seen.set(id, structuredClone(snap));
     },

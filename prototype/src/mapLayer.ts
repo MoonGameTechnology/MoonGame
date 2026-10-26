@@ -74,7 +74,7 @@ import { data } from './gameData';
 import { glowOn, starfieldOn } from './graphicsPrefs';
 import { clipGlassSurface, drawGlassRim, drawGlassScreen, drawGlassWave, type TerrainField } from './holographicSurface';
 import { atOverview, cam, insets, mapBounds, panBy, world } from './mapCamera';
-import { known, memory, surveyed } from './mapFog';
+import { known, memory, surveyed, vision, type Vision } from './mapFog';
 import { pinchStart } from './mapInput';
 import { GRID, ownerColor } from './mapPalette';
 import type { PreparationJob } from './mapPreparation';
@@ -367,6 +367,40 @@ export function knownOwner(id: string): string | null {
 /** Знание игрока о мирах для подписи выпечки: сверяется каждым кадром без строки по всем
  *  мирам (`staticLayerCache.ts`, правило 2). */
 const knowledge = new KnowledgeRevision();
+/** С чем знание о мирах сверено в последний раз. Знание читает мир, зрение кадра, память
+ *  разведки, игрока и узлы карты. Мир не правят на месте, а заменяют целиком, зрение
+ *  меняется вместе с ним (договор `visionMemo` в `mapFog.ts`), память считает свои правки
+ *  (`version`). Пока всё это прежнее, прежний и номер, и обход всех миров карты (на большой
+ *  их больше тысячи) кадр пропускает. Без тумана зрения нет, а песочница правит мир на
+ *  месте: там сверка идёт каждым кадром, как раньше. */
+let knowledgeSeen: {
+  world: GameState;
+  vision: Vision;
+  scans: number;
+  me: string;
+  nodes: readonly MapNode[];
+  revision: number;
+} | null = null;
+/** Номер знания о мирах: сверка, только когда сменилось то, что она читает. */
+function knowledgeRevision(s: GameState, me: string): number {
+  const nodes = game.nodes();
+  const scans = memory.version();
+  const seen = knowledgeSeen;
+  if (
+    seen &&
+    seen.world === s &&
+    seen.vision === vision &&
+    seen.scans === scans &&
+    seen.me === me &&
+    seen.nodes === nodes
+  )
+    return seen.revision;
+  const revision = knowledge.check(nodes, knownOwner, (id) =>
+    knownEnvironment(s.planets[id], known(id), memory.get(id), surveyed(id)),
+  );
+  knowledgeSeen = vision ? { world: s, vision, scans, me, nodes, revision } : null;
+  return revision;
+}
 
 /** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
  *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
@@ -402,8 +436,7 @@ function mapLayerSignature(): string {
     me: ME,
     // Подпись читает ЗНАНИЕ игрока (`knownOwner`, `knownEnvironment`), а не правду — см.
     // `staticLayerCache.ts` (REFM-60): иначе скрытый захват выдал бы себя самим фактом перерисовки.
-    knowledge: knowledge.check(game.nodes(), knownOwner,
-      (id) => knownEnvironment(s.planets[id], known(id), memory.get(id), surveyed(id))),
+    knowledge: knowledgeRevision(s, ME),
     starfield: starfieldOn(),
   }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
     // A standing hologram's glass is baked at the moment its clock stands at.
