@@ -1,7 +1,3 @@
-import {
-  attackBattle,
-} from '../../decisions/actions';
-import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { startPlayerActivity } from '../../packages/client/src/playerActivity';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
@@ -90,7 +86,6 @@ import {
 } from './matchJoin';
 import { initMatchBrowser, refreshMatches } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
-import { kernel as soloKernel } from './protoKernel';
 import { isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -144,7 +139,6 @@ import {
   initStatPop,
   statPopOpen,
   strikeTitle,
-  unitTileHtml,
 } from './fleetCard';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
@@ -171,7 +165,6 @@ import {
   traderOf,
   type ModeTrader,
 } from '../../packages/shared-core/src/index';
-import { createBattleModel } from '../../packages/client/src/index';
 import { pveChapter } from '../../packages/client/src/gameData';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
 import { bakedServer, buildLabel, currentBuild } from './updater';
@@ -213,7 +206,6 @@ import {
 import { buildRoster } from './planetTabs';
 import { tileLock, type TileLock } from './catalogTile';
 import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
-import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { initMissionPanel } from './missionPanel';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
@@ -432,7 +424,7 @@ import {
   type TrainingScenarioHost,
 } from './trainingScenario';
 import { forwardToSim, initSimDriver, saveSimInBackground, settleSimClock, simOn, simSaved, simShownTime, stepSim, stopSim, syncSim } from './simDriver';
-import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
+import { cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
   cancelMobileOrder,
   initCmdActions,
@@ -443,7 +435,7 @@ import {
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
-import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct, timeLeft } from './worldQueries';
+import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct } from './worldQueries';
 import { handleEvents, initEventFeed, killStats, logLines, note, toast } from './eventFeed';
 import {
   PLAY_BASE,
@@ -460,7 +452,7 @@ import {
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; its read-only helpers are shared with
 // the threat alert (`stewFmtDur`, `matchTopBar.ts`), the side panel (`stewardTechDone`)
 // and the morning report (`stewMetrics`).
-import { battleRetreats, initBattleWindow } from './battleScreen';
+import { armRetreat, battleRetreatAim, battleWindow, clearBattleRetreatAim, initBattleView } from './battleView';
 import {
   initSteward,
 } from './stewardScreen';
@@ -2115,10 +2107,8 @@ initMapInput({
   closePingPop: () => pings?.closePop(),
   openPingPop: (loc) => pings?.openPop(loc),
   openBattle: (id) => battleWindow.open(id),
-  battleRetreatAim: () => battleRetreatAim,
-  clearBattleRetreatAim: () => {
-    battleRetreatAim = null;
-  },
+  battleRetreatAim,
+  clearBattleRetreatAim,
   markSelection: () => {
     markSelection(lastReal);
   },
@@ -2411,76 +2401,13 @@ const steward = __SECTOR_ZERO_ONLY__
     });
 document.getElementById('rail-steward')?.addEventListener('click', () => steward?.open());
 
-// --- окно боя (заказ владельца 2026-09-15) -----------------------------------
-// Значок боя на карте и так показывал фазу и отсчёт до раунда; теперь он ОТКРЫВАЕТСЯ.
-// До этого расклад можно было увидеть единственным путём — выделив свой флот в этом
-// бою, — то есть про чужую схватку рядом узнать было нечем.
-const battleWin = $('battlewin');
-/** Взвести «Отступить» для флота: остальные прицелы гаснут, окно боя уступает карту. */
-let battleRetreatAim: string | null = null;
-function armRetreat(fleetId: string): void {
-  battleRetreatAim = null;
-  arm('retreatAim', fleetId);
-  battleWin.classList.remove('show');
-  note(t('hint.pick-retreat'));
-  invalidatePanel();
-}
-let battleReadoutCache: ReturnType<typeof inspectBattle> = {};
-let battleReadoutId = '';
-let battleReadoutAt = -Infinity;
-const battleWindow = initBattleWindow({
-  root: () => battleWin,
-  body: () => $('battlewinbody'),
-  head: () => $('battlewinhead'),
-  state: () => s,
+// Окно боя — у владельца проводки, `battleView.ts` (REFM-246): кэш разбора боя, прицел
+// «Отступить всем» и нажатия по плиткам. Отсюда — мир, своё место и имена мест и сторон.
+initBattleView({
+  world: () => s,
   me: () => ME,
-  model: (id) => {
-    // VET-6: тот же конфиг матча, на котором считает редьюсер, — иначе окно показало бы
-    // надбавку ветерана там, где хост её не дал.
-    const m = createBattleModel(s, id, ME, data, ctx(s.time, s).config);
-    if (!m.ok) return null;
-    const now = performance.now();
-    if (id !== battleReadoutId || now - battleReadoutAt >= 250) {
-      battleReadoutCache = inspectBattle(soloKernel, s, ctx(s.time, s), id);
-      battleReadoutAt = now;
-      battleReadoutId = id;
-    }
-    for (const side of m.sides) side.readout = side.key ? battleReadoutCache[side.key] : undefined;
-    return m;
-  },
-  attack: (id, side) => playerOrder(attackBattle(ME, id, side)),
-  retreatAll: (id) => {
-    const first = battleRetreats(s, id, ME)[0];
-    if (!first) return;
-    armRetreat(first);
-    battleRetreatAim = id;
-  },
-  // Отступление из окна боя — тот же прицел, что и кнопкой боковой панели.
-  retreat: (fleetId) => armRetreat(fleetId),
-  view: {
-    color: ownerColor,
-    ownerName: (owner) => owner ? NAME[owner] ?? owner : t('side.neutral'),
-    tiles: (side, limit, color) => (side.stacks ?? side.units).map((u, index) => ({ u, index }))
-      .filter(({ u }) => u.count > 0).slice(0, limit).map(({ u, index }) => {
-        const open = side.ref?.kind === 'fleet' && side.mine
-          ? `data-shipcard="${esc(side.ref.fleetId)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
-        return unitTileHtml(u, side.owner, open, true, color);
-      }).join(''),
-    fleetName: fleetCallsign,
-    placeName,
-    autoRetreatAt,
-    timeLeft,
-    // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
-    forecast: (sides) => battleForecast(sides, data, battleHostility(s)),
-  },
-});
-battleWin.addEventListener('click', (event) => {
-  const tile = (event.target as HTMLElement).closest<HTMLButtonElement>('button.ptile');
-  if (!tile) return;
-  if (tile.dataset.shipcard) {
-    const at = tile.dataset.shipcard.lastIndexOf('|');
-    openShipCard(tile.dataset.shipcard.slice(0, at), Number(tile.dataset.shipcard.slice(at + 1)));
-  } else if (tile.dataset.codex) openCodex(tile.dataset.codex);
+  seatName: (owner) => NAME[owner],
+  placeName,
 });
 /** Сколько экрана вокруг дома занимают его значки — стек флотов, гарнизон, подписи (YAG-7.2). */
 const HOME_CLEARANCE_PX = 80;

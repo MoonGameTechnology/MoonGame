@@ -224,7 +224,7 @@ module.exports = {
     clearSelection();
     const badge = __battleBadgePoint(world(__battleAnchor(s.battles['ui-battle'])));
     __selectAt(badge.x, badge.y);
-    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
+    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; document.getElementById('battlewin').classList.remove('show'); clearSelection(); } };
   },
   links: (id) => [...(s.planets[id].links ?? [])],
   tapWorld: (id) => { const p = world(s.planets[id].position); __selectAt(p.x, p.y); },
