@@ -65,6 +65,31 @@ describe('отдельный поток расчёта соло-мира', () =>
     expect(Object.keys(shown.fleets).length).toBeGreaterThan(0);
   });
 
+  it('казна, сменившаяся у места одна, едет числами, а не записью места', () => {
+    const syncs: Array<Extract<SimReply, { kind: 'sync' }>> = [];
+    const start = newGame();
+    const link = startSimLink(
+      threadPort((reply) => {
+        if (reply.kind === 'sync') syncs.push(reply);
+      }),
+      start,
+      'p1',
+      undefined,
+    );
+    const ref = createSoloSim(structuredClone(start), 'p1');
+    for (let hour = 1; hour <= 6; hour++) {
+      link.step(hour * HOUR, true, AI, NONE, hour * 1000);
+      ref.step(hour * HOUR, true, AI, NONE);
+    }
+    expect(link.take()!.state).toEqual(screenView(ref.state(), 'p1'));
+    const packed = syncs.flatMap((s) => s.treasuries.ids);
+    expect(packed).toContain('p1');
+    expect(packed).toContain('p2');
+    for (const s of syncs) {
+      for (const id of s.treasuries.ids) expect(s.delta.changed.players?.[id]).toBeUndefined();
+    }
+  });
+
   it('шаги, которых кадр ещё не взял, идут от цели прошлого шага; взятие отдаёт их разом', () => {
     const start = newGame();
     const link = startSimLink(threadPort(), start, 'p1', undefined);
@@ -156,6 +181,7 @@ describe('отдельный поток расчёта соло-мира', () =>
     listener({
       kind: 'sync',
       delta: { changed: {}, removed: {} },
+      treasuries: { ids: [], at: new Uint32Array(0), values: new Float64Array(0) },
       events: [],
       driverOrders: [],
       orders: [{ id: 1, error: 'E_NO_ROUTE' }],

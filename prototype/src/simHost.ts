@@ -12,7 +12,7 @@ import { diffState, shareRoadNetwork, type GameState } from '../../packages/shar
 import { approvalLedger } from './botFavour';
 import { setMatchMode } from './protoKernel';
 import { createSoloSim, type SoloSim } from './soloSim';
-import { screenView, type SimReply, type SimRequest } from './simProtocol';
+import { packTreasuries, screenView, type SimReply, type SimRequest } from './simProtocol';
 
 export function createSimHost(post: (reply: SimReply) => void): (request: SimRequest) => void {
   let sim: SoloSim | null = null;
@@ -20,9 +20,11 @@ export function createSimHost(post: (reply: SimReply) => void): (request: SimReq
   /** Копия экрана, какой её сделала последняя отправленная разность. */
   let shown: GameState | null = null;
 
-  const sync = (reply: Omit<Extract<SimReply, { kind: 'sync' }>, 'kind' | 'delta'>): void => {
+  const sync = (
+    reply: Omit<Extract<SimReply, { kind: 'sync' }>, 'kind' | 'delta' | 'treasuries'>,
+  ): void => {
     const next = screenView(sim!.state(), me);
-    post({ kind: 'sync', delta: diffState(shown!, next), ...reply });
+    post({ kind: 'sync', ...packTreasuries(shown!, diffState(shown!, next)), ...reply });
     shown = next;
   };
 
