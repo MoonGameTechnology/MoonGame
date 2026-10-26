@@ -38,7 +38,7 @@
 | REFM-220 | ✅ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-244 | ✅ | proto | `docs/backlog.md` | Точка сборки |
 | REFM-245 | ✅ | proto | `docs/backlog.md` | Поток расчёта соло-мира |
-| REFM-246 | ⏳ | proto | `docs/backlog.md` | Проводка окна боя |
+| REFM-246 | ✅ | proto | `docs/backlog.md` | Проводка окна боя |
 | REFM-247 | ⏳ | proto | `docs/backlog.md` | Экран подключения |
 | REFM-248 | ⏳ | proto | `docs/backlog.md` | Проводка настроек |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
