@@ -177,7 +177,7 @@ import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinef
 import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
@@ -349,30 +349,17 @@ import {
 } from './matchLifecycle';
 import {
   pcUi,
-  glowOn,
-  setGlowFx,
-  starfieldOn,
-  setStarfield,
   showFpsOn,
-  setShowFps,
   motionChosen,
   motionOn,
   reducedMotionAsked,
-  setMotion,
-  setWindowOpacity,
-  windowAlpha,
-  windowOpacityPct,
-  setUiScale,
-  uiScalePct,
   mapSharpChosen,
   mapSharpOn,
   mapSlowSeen,
   markMapSlow,
-  setMapSharp,
 } from './graphicsPrefs';
-import { initSettings } from './settingsOverlay';
-import { initPush } from './pushSetup';
-import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
+import { initSettingsView, openSettings, push } from './settingsView';
+import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { initHolographicUi } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
@@ -402,18 +389,16 @@ import { COLOR, paletteOf } from './sideColors';
 // REFM-237 — цвета сторон, места матча и константы карты: у владельца, `mapPalette.ts`.
 import {
   initMapPalette,
-  neutralColor,
   ownerColor,
   rivalPaletteId,
   SEAT_META,
-  setSideColors,
   stanceCol,
   youColor,
 } from './mapPalette';
 import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, pirateIntroRect, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
@@ -540,7 +525,6 @@ import {
   JUDGE_WARMUP_MS,
   judgingFrames,
   mapDpr,
-  sharpnessMatters,
   slowFrames,
   slowVerdictReach,
 } from '../../decisions/mapSharpness';
@@ -2764,123 +2748,26 @@ const refreshAccountDeletion = mountAccountDeletion(() => resolveServer()?.base 
   statusEl.textContent = t('account.delete.pending');
 }, () => !__SECTOR_ZERO_ONLY__ && authMode === 'accounts');
 
-// --- settings overlay (hub → «Ещё» → Настройки) -----------------------------
-// Окно живёт в `settingsOverlay.ts` (REFM-22); здесь проводка. Модуль настройками не
-// владеет — каждая живёт там, где её читают (графика, цвета сторон, звук, развёртка), а
-// оверлей только показывает снимок и отдаёт изменение обратно.
-const settingsEl = $('settings');
-/** On-demand diagnostics: no pixel readbacks (those alter canvas heuristics),
- * no match/account state, and no automatic upload. Attributes are requests, not
- * proof of which raster backend WebView actually selected.
- */
-function mapRenderingReport(): string {
-  const rect = canvas.getBoundingClientRect();
-  const active = canvasCompatibilityActive();
-  const requested = canvasCompatibilityRequested();
-  return JSON.stringify({
-    schema: 1,
-    build: currentBuild(),
-    userAgent: navigator.userAgent,
-    compatibility: { active, requested, restartPending: active !== requested },
-    viewport: { width: VW, height: VH, devicePixelRatio: window.devicePixelRatio,
-      renderDpr: DPR, visualScale: window.visualViewport?.scale ?? null },
-    canvas: { width: canvas.width, height: canvas.height, cssWidth: rect.width, cssHeight: rect.height,
-      attributes: cx.getContextAttributes?.() ?? null, contextLost: cx.isContextLost?.() ?? null,
-      events: { ...mapContextEvents } },
-    background: { attributes: bgx.getContextAttributes?.() ?? null,
-      contextLost: bgx.isContextLost?.() ?? null, events: { ...backgroundContextEvents } },
-    frameErrors: frameErrs,
-    estimatedFps: Math.round(fpsEma),
-    cameraScale: cam.scale,
-  }, null, 2);
-}
-/** Стекло окон ПК и планшета берёт альфу из переменной на `body` (`holographic.css`). */
-function applyWindowOpacity(): void {
-  document.body.style.setProperty('--holo-window-alpha', String(windowAlpha(windowOpacityPct())));
-}
-applyWindowOpacity();
-const settings = initSettings({
-  root: () => settingsEl,
-  view: () => ({
-    sweepOpacity,
-    ownPings: showOwnPings,
-    glow: glowOn(),
-    starfield: starfieldOn(),
-    motion: motionOn(),
-    renderCompatibility: canvasCompatibilityRequested(),
-    renderCompatibilityActive: canvasCompatibilityActive(),
-    renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
-    fps: showFpsOn(),
-    soundOn: snd.enabled(),
-    volume: snd.volume(),
-    youColor,
-    neutralColor,
-    palette: rivalPaletteId,
-    touchOnly: !pcUi(),
-    speedKeys: devSpeedControl,
-    ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
-    // Чёткость карты есть у экрана, которому есть что понижать (`decisions/mapSharpness.ts`).
-    ...(sharpnessMatters(SCREEN_DPR) ? { mapSharp: mapSharpOn() } : {}),
-    // Размер интерфейса — множитель зума ПК (`holographicUi.ts`), у телефона его нет.
-    ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
-    // Нижняя панель есть там, где телефонная раскладка (UIX-3.3); настраивают её и с хаба.
-    ...(MOBILE ? { phoneBar: phoneNav.bar() } : {}),
-    // Push (UIX-4.4): вкладка есть там, где браузер умеет уведомления.
-    ...(push?.view() ? { push: push.view()! } : {}),
-    // В сборке одного Sector Zero скорость всегда за минуту забега — выбирать там нечего.
-    ...(__SECTOR_ZERO_ONLY__ ? {} : { rateUnit }),
-  }),
-  setSweepOpacity,
-  setWindowOpacity: (v) => {
-    setWindowOpacity(Math.round(v * 100));
-    applyWindowOpacity();
-  },
-  // Новый зум подхватит `holographic.sync` на ближайшем кадре.
-  setUiScale: (v) => setUiScale(Math.round(v * 100)),
+// Окно настроек — у владельца проводки, `settingsView.ts` (REFM-248): снимок для окна и двери
+// обратно, прозрачность окон, диагностика рендера и окно согласия на push. Отсюда — свои пинги,
+// звук, темп, экран, нижняя панель телефона, единица дохода, канвас и счётчик кадров.
+initSettingsView({
+  ownPings: () => showOwnPings,
   setOwnPings: setShowOwnPings,
-  setGlow: setGlowFx,
-  setStarfield: setStarfield,
-  setMapSharp: (v) => {
-    setMapSharp(v);
-    resize();
-  },
-  setMotion: setMotion,
-  setRenderCompatibility: setCanvasCompatibility,
-  renderingReport: mapRenderingReport,
-  setFps: setShowFps,
-  setSound: (v) => snd.setEnabled(v),
-  setVolume: (v) => snd.setVolume(v),
-  previewSound: () => snd.play('tap'),
-  setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
-  resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
+  sound: snd,
+  speedKeys: () => devSpeedControl,
+  screenDpr: () => SCREEN_DPR,
+  mobile: () => MOBILE,
+  phoneBar: () => phoneNav.bar(),
   setPhoneBar: (bar) => phoneNav.setBar(bar),
+  rateUnit: () => rateUnit,
   setRateUnit: (unit) => {
     rateUnit = unit;
     writeRaw('void.rateUnit', unit);
   },
-  setPush: async (on) => push?.setEnabled(on),
-  setPushKind: async (kind, on) => push?.setKind(kind, on),
+  resize,
+  probe: () => ({ canvas, cx, vw: VW, vh: VH, dpr: DPR, frameErrors: frameErrs, fps: fpsEma }),
 });
-// Push-уведомления (UIX-4.4) — у владельца, `pushSetup.ts`: вопрос о согласии, worker,
-// подписка и виды. Стоит ПОСЛЕ окна настроек: `changed` перерисовывает его.
-const push = __SECTOR_ZERO_ONLY__
-  ? null
-  : initPush({
-      authorizedBase: hubAuthorizedBase,
-      askRoot: () => $('pushask'),
-      changed: () => {
-        if (settingsEl.classList.contains('show')) settings.render();
-      },
-    });
-/** Окно настроек; вход и подписка перечитываются — вкладка «Уведомления» покажет их свежими. */
-function openSettings(): void {
-  settings.open();
-  push?.refresh().catch(() => undefined); // не вышло перечитать — вкладка покажет прошлое
-}
-$('hub-settings').addEventListener('click', openSettings);
-$('hub-gear').addEventListener('click', openSettings);
-// Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
-document.getElementById('rail-settings')?.addEventListener('click', openSettings);
 
 // Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
 // загрузочного блока: его ветка по ссылке может попросить войти.
