@@ -287,6 +287,20 @@ describe('REFM-231 — память разведки', () => {
     fog.refreshVision();
     expect([fog.known('D'), fog.memory.has('D')]).toEqual([false, true]);
   });
+
+  it('новый мир с прежними мирами память не переснимает, забвение песочницы — переснимает (W8)', async () => {
+    const { fog, env } = await boot();
+    fog.refreshVision();
+    const first = fog.memory.get('A');
+    env.world = { ...env.world };
+    fog.refreshVision();
+    expect(fog.memory.get('A')).toBe(first);
+    // Песочница правит мир на месте и потому забывает зрение каждым кадром.
+    env.world.planets.A!.garrison.push({ unit: 'militia', count: 4 });
+    fog.forgetVision();
+    fog.refreshVision();
+    expect(fog.memory.get('A')?.garrison).toBe(4);
+  });
 });
 
 describe('REFM-231 — стык с main.ts', () => {
