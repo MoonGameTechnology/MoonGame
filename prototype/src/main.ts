@@ -195,7 +195,7 @@ import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinef
 import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
@@ -4812,17 +4812,18 @@ function frame(nowReal: number) {
     else simBroken = true;
   }
   if (simLink) {
-    // Присланное кадр берёт не чаще раза в `ADOPT_EVERY_MS` (`simClock.ts`, правило 7): каждый
-    // взятый мир он разбирает заново, а движение между мирами досчитывают часы картинки.
-    // Сломавшийся поток отдаёт всё, что успел прислать, сразу.
-    simLink.frame(nowReal);
-    const due = adoptDue(nowReal, simAdoptedAt) || simLink.failed !== null;
+    // Присланное кадр берёт не чаще раза в `ADOPT_EVERY_MS`, а пока камера движется — в
+    // `ADOPT_MOVING_MS` (`simClock.ts`, правило 7): каждый взятый мир он разбирает заново, а
+    // движение между мирами досчитывают часы картинки. Им время мира потока идёт с каждым
+    // пришедшим шагом, а не со взятием. Сломавшийся поток отдаёт всё, что успел прислать, сразу.
+    const arrived = simLink.frame();
+    if (arrived !== null) simView = netViewSnapshot(simView, arrived, nowReal);
+    const due = adoptDue(nowReal, simAdoptedAt, mapMoving(nowReal)) || simLink.failed !== null;
     const sync = due ? simLink.take() : null;
     if (sync) {
       simAdoptedAt = nowReal;
       apply({ state: sync.state, events: sync.events });
       for (const o of [...sync.driverOrders, ...sync.refused]) settleOrder(o.type, o.error);
-      if (sync.stepped) simView = netViewSnapshot(simView, s.time, sync.steppedAt);
     }
     if (simLink.failed !== null) {
       // Мир на экране цел (последняя разность и неподтверждённые приказы) — кадр ведёт его дальше.

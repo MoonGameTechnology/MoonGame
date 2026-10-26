@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ADOPT_EVERY_MS,
+  ADOPT_MOVING_MS,
   FPS_GAP_MS,
   adoptDue,
   advanceTarget,
@@ -114,12 +115,20 @@ describe('часы кадра — шаг отдельного потока ра�
 
 describe('часы кадра — мир отдельного потока на экране', () => {
   it('первый мир кадр берёт сразу', () => {
-    expect(adoptDue(0, -Infinity)).toBe(true);
+    expect(adoptDue(0, -Infinity, false)).toBe(true);
+    expect(adoptDue(0, -Infinity, true)).toBe(true);
   });
 
   it('следующий — не раньше, чем через ADOPT_EVERY_MS после прошлого', () => {
-    expect(adoptDue(1000 + ADOPT_EVERY_MS - 1, 1000)).toBe(false);
-    expect(adoptDue(1000 + ADOPT_EVERY_MS, 1000)).toBe(true);
+    expect(adoptDue(1000 + ADOPT_EVERY_MS - 1, 1000, false)).toBe(false);
+    expect(adoptDue(1000 + ADOPT_EVERY_MS, 1000, false)).toBe(true);
+  });
+
+  it('пока камера движется — не раньше, чем через ADOPT_MOVING_MS', () => {
+    expect(ADOPT_MOVING_MS).toBeGreaterThan(ADOPT_EVERY_MS);
+    expect(adoptDue(1000 + ADOPT_EVERY_MS, 1000, true)).toBe(false);
+    expect(adoptDue(1000 + ADOPT_MOVING_MS - 1, 1000, true)).toBe(false);
+    expect(adoptDue(1000 + ADOPT_MOVING_MS, 1000, true)).toBe(true);
   });
 });
 
