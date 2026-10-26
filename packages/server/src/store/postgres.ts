@@ -553,17 +553,25 @@ export async function migrate(pool: Pool | PoolClient): Promise<void> {
     await pool.query(SCHEMA_SQL);
     return;
   }
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
-    await client.query(SCHEMA_SQL);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
+  // The advisory lock serializes migrations, not the schema's DDL against other sessions'
+  // DML on the same tables: Postgres may abort the attempt as a deadlock (40P01) and asks
+  // the client to retry it. The schema is idempotent, so a retried attempt is safe; any
+  // other error, or a third deadlock, still fails the boot.
+  for (let attempt = 0; ; attempt++) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
+      await client.query(SCHEMA_SQL);
+      await client.query('COMMIT');
+      return;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if (attempt < 2 && (error as { code?: unknown }).code === '40P01') continue;
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
