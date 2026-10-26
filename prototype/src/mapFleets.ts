@@ -26,18 +26,18 @@ import { mapHeroes, type PortraitHit } from '../../decisions/heroIdentity';
 import { fleetVeteranGrade } from '../../decisions/veteranMark';
 import { battleMark } from './battleMark';
 import { chainStepsOf } from './chainComposer';
-import { battleAnchor, fleetAnchor, orbitRingRadius } from './fleetGeometry';
+import { battleAnchor, fleetAnchor, fleetPos, orbitRingRadius } from './fleetGeometry';
 import { drawFleetHoldBadge } from './fleetHoldView';
 import { emblemTally } from './fleetTally';
 import { data, type SECTOR_TYPES } from './game';
 import { fxBlur, fxBreath, glowOn, motionOn } from './graphicsPrefs';
 import { drawHolographicBattle } from './holographicEffects';
 import { selFleet, selFleets } from './interaction';
-import { visible, world } from './mapCamera';
+import { visible, visibleOnMap, world } from './mapCamera';
 import { battleKnown, fleetSeen } from './mapFog';
 import { drawBattlePulse, targetBrackets } from './mapOverlays';
 import { ORBIT_COLOR, TAU, ownerColor } from './mapPalette';
-import { ringShown } from './orbitRing';
+import { ORBIT_R_MAX, ringShown } from './orbitRing';
 import { isWingUnit } from './planetSummary';
 import { phaseOfId } from './pulseFx';
 import { chevronAlpha } from './semanticZoom';
@@ -254,6 +254,12 @@ export function drawFleets(now: number, lod: MapLod): void {
     unglow();
     cx.lineJoin = lineJoin; // drawShipShape rounds the joins
   };
+  // Флот за краем экрана не рисуется, и место на кольце ему не раскладывают: его точку на
+  // карте сверяют с экраном раньше якоря. Якорь стоящего флота — не дальше кольца от центра
+  // мира, у остальных это сама точка флота; лишний пиксель — на округление. На большой карте
+  // вблизи на экране треть флотов, а якорь каждого — радиус кольца и место в строю.
+  const pad = 120;
+  const near = visibleOnMap(pad + ORBIT_R_MAX + 1);
   for (const f of Object.values(s.fleets)) {
     // Мину рисует `drawMinefields` своим знаком (SM-3.6), ракету — `drawMissiles` (SM-3.7b).
     if (isOrdnanceFleet(f, data)) continue;
@@ -262,8 +268,11 @@ export function drawFleets(now: number, lod: MapLod): void {
       // swept signature (drawRadarContacts), painted by the arm — never live here.
       continue;
     }
+    const at = fleetPos(f);
+    if (!at || at.x < near.minX || at.x > near.maxX || at.y < near.minY || at.y > near.maxY)
+      continue;
     const A = fleetAnchor(f);
-    if (!A || !visible(A, 120)) continue;
+    if (!A || !visible(A, pad)) continue;
     const col = ownerColor(f.owner);
     // ROADS-4: флот на развилке — засада (`ambushOf` спрашивает у ядра, стоит ли он РОВНО на
     // ней): пунктирный ромб цвета владельца под корпусом.

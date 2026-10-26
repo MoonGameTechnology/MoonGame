@@ -121,6 +121,25 @@ export function world(p: { x: number; y: number }): { x: number; y: number } {
 export function unworld(p: { x: number; y: number }): { x: number; y: number } {
   return camScreenToWorld(p, cam, insets(), mapBounds());
 }
+/** Экран с запасом `pad` px — в координатах КАРТЫ. Проекция — равномерный масштаб со сдвигом,
+ *  поэтому точка карты внутри этой рамки — та, чья экранная точка внутри экрана с тем же
+ *  запасом ({@link visible}), с точностью до округления. Так с экраном сверяют много точек
+ *  карты, не переводя каждую. */
+export function visibleOnMap(pad: number): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  const a = unworld({ x: -pad, y: -pad });
+  const b = unworld({ x: game.vw() + pad, y: game.vh() + pad });
+  return {
+    minX: Math.min(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxX: Math.max(a.x, b.x),
+    maxY: Math.max(a.y, b.y),
+  };
+}
 /** Дальность карты в пикселях — ЕДИНСТВЕННЫЙ перевод на весь рендер (`mapRadius.ts`,
  *  REFM-132). Там же причина, почему множитель — подгон карты под экран × зум камеры:
  *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */

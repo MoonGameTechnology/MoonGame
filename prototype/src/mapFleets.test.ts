@@ -21,6 +21,7 @@ import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { orbitSeats } from '../../decisions/orbitSeats';
 import { bracketStrokes } from './mapShapes';
+import { ORBIT_R_MAX } from './orbitRing';
 import { phaseOfId } from './pulseFx';
 
 interface Call {
@@ -391,6 +392,39 @@ describe('REFM-235 — флоты на карте', () => {
     expect(halo(frame.calls)).toBe(false);
     const [bx, by, , h] = badges(frame.calls)[0]!;
     expect(call(frame.calls, 'fillText', '2', bx! + 20, by! + h! / 2)).toBeTruthy();
+  });
+
+  it('флот у мира за краем экрана рисуется, пока его место на кольце — в пределах запаса', async () => {
+    const { fleets, frame, geo, camera, env, game, home, fleet, keepFleets } = await boot();
+    keepFleets('p1-1');
+    expect(fleet('p1-1').location).toBe(home.id);
+    // Кольцо во всю ширину — край, который обязан покрыть отбор флотов за экраном: вблизи
+    // раздутие упирается в потолок, а зазор до соседа велик.
+    geo.initFleetGeometry({
+      world: () => env.world,
+      me: () => 'p1',
+      now: () => env.world.time,
+      lod: () => LOD({ scale: 9 }),
+      forkMarks: () => [],
+      orbits: () =>
+        orbitSeats(Object.values(env.world.fleets), (g) => isEmplacementFleet(g, game.data)),
+    });
+    camera.setView({ scale: 6, x: 0, y: 0 });
+    const r = geo.orbitRingRadius(home);
+    expect(r).toBe(ORBIT_R_MAX);
+    const base = camera.world(home.position);
+    // Мир ниже края экрана, место флота на «12 часах»: последний пиксель запаса и пиксель за ним.
+    for (const [below, drawn] of [
+      [120 + r - 1, true],
+      [120 + r + 1, false],
+    ] as const) {
+      frame.calls.length = 0;
+      camera.setView({ scale: 6, x: 800 - base.x, y: 900 + below - base.y });
+      const A = geo.fleetAnchor(fleet('p1-1'))!;
+      expect(A.y).toBeCloseTo(900 + below - r, 6);
+      fleets.drawFleets(0, LOD({ scale: 9 }));
+      expect(translateAt(frame.calls, A) >= 0, `${below}`).toBe(drawn);
+    }
   });
 
   it('чужой флот в тумане не рисуется; опознанный — цветом владельца', async () => {
