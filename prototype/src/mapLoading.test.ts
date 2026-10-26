@@ -370,6 +370,8 @@ describe('REFM-241 — «Отмена» и клавиши', () => {
 
 describe('REFM-241 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const SRC = readFileSync(new URL('./mapLoading.ts', import.meta.url), 'utf8');
   const init = /initMapLoading\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
@@ -386,7 +388,8 @@ describe('REFM-241 — стык с main.ts', () => {
   });
 
   it('новую подготовку заказывают дверью: вход с фанфарами, новая геометрия, новый матч', () => {
-    expect(MAIN.match(/needMapPreparation\(\);/g)).toHaveLength(3);
+    expect(MAIN.match(/needMapPreparation\(\);/g)).toHaveLength(2);
+    expect(LIFE.match(/needMapPreparation\(\);/g)).toHaveLength(1); // новый матч
     expect(MAIN).toMatch(/if \(fanfare\) needMapPreparation\(\);/);
     expect(MAIN).not.toMatch(/mapNeedsPreparation/);
   });

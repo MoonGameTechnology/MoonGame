@@ -19,6 +19,9 @@ const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 // Зрение кадра и его двери живут у тумана (`mapFog.ts`, REFM-231): `main.ts` зовёт дверь
 // `refreshVision()`, а присваивает `vision` только она.
 const fog = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
+// Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219): новый мир и
+// своё место ставит хук `adopt`, остальное — двери владельцев.
+const life = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
 const count = (needle: string, src = main): number => src.split(needle).length - 1;
 /** Тело функции верхнего уровня — до следующей функции верхнего уровня. */
 const functionBody = (start: string, src = main): string => {
@@ -37,13 +40,15 @@ describe('зрение журнала на первом шаге партии (F
   });
 
   it('смена партии переписывает зрение до засевающего шага мира', () => {
-    const install = functionBody('function installMatch(');
+    const install = /export function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(life)?.[1] ?? '';
     const fresh = install.indexOf('refreshVision();');
     expect(fresh).toBeGreaterThan(install.indexOf('resetFogMemory();'));
     expect(install.indexOf('resetFogMemory();')).toBeGreaterThan(-1);
-    // Новое зрение считается по НОВОМУ миру и игроку — оба присвоены раньше.
-    expect(install.indexOf('s = state;')).toBeLessThan(fresh);
-    expect(install.indexOf("ME = 'p1';")).toBeLessThan(fresh);
+    // Новое зрение считается по НОВОМУ миру и игроку — оба поставлены раньше.
+    const adopt = install.indexOf('game.adopt(state, aiPlayers);');
+    expect(adopt).toBeGreaterThan(-1);
+    expect(adopt).toBeLessThan(fresh);
+    expect(main).toMatch(/adopt: \(state, ai\) => \{\n\s+s = state;[\s\S]*?ME = 'p1';/);
     // ...и уже без песочницы прошлой партии: её выключенный туман не должен стать «видно
     // всё» засевающего шага (замечание Codex на #1490).
     expect(install.indexOf('sandboxConfig.enabled = false;')).toBeLessThan(fresh);
@@ -62,7 +67,8 @@ describe('зрение журнала на первом шаге партии (F
 
   it('кадр берёт зрение той же функцией, а других присваиваний нет', () => {
     expect(main).toContain('refreshVision(); // fog projection for this frame');
-    expect(count('refreshVision()')).toBe(3);
+    expect(count('refreshVision()')).toBe(2);
+    expect(count('refreshVision()', life)).toBe(1); // установка партии
     // Присваивает зрение одна дверь, и пересчитывает она его той же `fogVision`.
     expect(fog.match(/^\s*vision = /gm)).toHaveLength(1);
     expect(functionBody('export function refreshVision(', fog)).toContain('vision = fogVision();');

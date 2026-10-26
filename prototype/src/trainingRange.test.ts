@@ -105,7 +105,8 @@ describe('учебный полигон: герой экспедиции', () =>
   });
 
   it('кнопка «Обучение» готовит мир тем же правилом, что и главы', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    // Запуск полигона — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+    const src = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
     const body = /function startTraining\(\)[^{]*\{([\s\S]*?)\n\}/.exec(src)?.[1] ?? '';
     expect(body).toContain('prepareSectorZeroRun(trainingState(data), sectorProgress, data)');
   });

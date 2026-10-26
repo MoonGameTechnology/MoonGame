@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Установка партии и запуски — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
 // Конец забега засчитывает его владелец (`sectorRun.ts`, REFM-210) и зовёт комиксы хуками.
 const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 // Меню, вход и комиксы глав — у оболочки Sector Zero (REFM-211); запуск партии — в `main.ts`.
@@ -25,7 +27,7 @@ describe('комиксы глав — проводка', () => {
     // Мимо комикса забег стартует только в дев-забеге (он не пишет профиль) и из самого
     // `launchSectorRun`: объявление + дев-вход + хук запуска, который оболочка зовёт ровно
     // один раз — после комикса.
-    expect(MAIN.match(/\bstartPvEMatch\(/g)).toHaveLength(3);
+    expect(`${MAIN}\n${LIFE}`.match(/\bstartPvEMatch\(/g)).toHaveLength(3);
     expect(MAIN).toContain('startRun: () => startPvEMatch(),');
     expect(MAIN).toContain('startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),');
     expect(SHELL.match(/\bgame\.startRun\(/g)).toHaveLength(1);

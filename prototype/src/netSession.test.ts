@@ -732,6 +732,8 @@ describe('REFM-216 — метки, чат и события', () => {
 
 describe('REFM-216 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const NETS = readFileSync(new URL('./netSession.ts', import.meta.url), 'utf8');
   const hook = (name: string): string =>
     new RegExp(`\\n {2}${name}: \\([^)]*\\) => \\{([\\s\\S]*?)\\n {2}\\},\\n`).exec(MAIN)?.[1] ??
@@ -743,7 +745,7 @@ describe('REFM-216 — стык с main.ts', () => {
     expect(MAIN).toContain('const simRunning = simRuns(netWorld, speed,');
     expect(MAIN).not.toMatch(/simRuns\(NET\b/);
     expect(MAIN).toContain('return netWorld ? netShownTime');
-    expect(MAIN).toMatch(/function installMatch\([^)]*\): void \{\n {2}leaveNetwork\(\);/);
+    expect(LIFE).toMatch(/export function installMatch\([^)]*\): void \{\n {2}leaveNetwork\(\);/);
     const ORD = readFileSync(new URL('./orderPipeline.ts', import.meta.url), 'utf8');
     expect(ORD).toContain('reconnecting: reconnecting || (netWorld && !NET)');
   });
