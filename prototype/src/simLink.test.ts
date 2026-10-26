@@ -56,8 +56,8 @@ describe('отдельный поток расчёта соло-мира', () =>
     let shown = start;
     for (let hour = 1; hour <= 30; hour++) {
       link.step(hour * HOUR, true, AI, NONE, hour * 1000);
+      expect(link.frame()).toBe(hour * HOUR);
       const sync = link.take();
-      expect(sync?.stepped).toBe(true);
       shown = sync!.state;
       ref.step(hour * HOUR, true, AI, NONE);
       expect(shown).toEqual(screenView(ref.state(), 'p1'));
@@ -73,15 +73,14 @@ describe('отдельный поток расчёта соло-мира', () =>
     expect(link.time).toBe(start.time);
     for (let hour = 1; hour <= 3; hour++) {
       link.step(link.time + HOUR, true, AI, NONE, hour * 1000);
-      link.frame(hour * 100); // кадр, который увидел пришедший шаг, но мир не взял
+      // Кадр, который увидел пришедший шаг, но мир не взял: часы картинки получают время мира
+      // потока с приходом шага.
+      expect(link.frame()).toBe(start.time + hour * HOUR);
       events.push(...ref.step(start.time + hour * HOUR, true, AI, NONE).events);
     }
-    link.frame(400); // новых шагов нет: время прихода остаётся прежним
+    expect(link.frame()).toBeNull(); // новых шагов нет
     expect(link.time).toBe(start.time + 3 * HOUR);
     const sync = link.take()!;
-    expect(sync.stepped).toBe(true);
-    // Часы картинки отсчитывают мир от кадра, в котором пришёл последний шаг.
-    expect(sync.steppedAt).toBe(300);
     expect(sync.state).toEqual(screenView(ref.state(), 'p1'));
     expect(events.length).toBeGreaterThan(0);
     expect(sync.events).toEqual(events);
@@ -130,12 +129,13 @@ describe('отдельный поток расчёта соло-мира', () =>
     expect(link.busy).toBe(true);
     // Пришла только первая разность (приказ); вторая (шаг) ещё в пути.
     listener(replies.shift()!);
+    expect(link.frame()).toBeNull(); // приказ — не шаг: часам картинки нечего отсчитывать
     let sync = link.take()!;
     expect(sync.state.fleets[id]?.movement).not.toBeNull();
     listener(replies.shift()!);
     expect(link.busy).toBe(false);
+    expect(link.frame()).toBe(HOUR);
     sync = link.take()!;
-    expect(sync.stepped).toBe(true);
     expect(sync.state.time).toBe(HOUR);
     expect(requests.map((r) => r.kind)).toEqual(['init', 'order', 'step', 'full']);
   });

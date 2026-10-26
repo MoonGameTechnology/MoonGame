@@ -250,6 +250,12 @@ let camMovedAt = -Infinity;
 export let provinceGeometry: MapLayerGeometry | null = null;
 /** The camera has rested `SETTLE_MS` (as {@link blitStaticLayer} judged this frame). */
 export let mapSettled = false;
+/** The camera is moving at `now`: a pinch is open, or a frame saw it move less than `SETTLE_MS`
+ *  ago. Judged at the moment asked, so a camera that stopped while the map was not drawn is not
+ *  moving. */
+export function mapMoving(now: number): boolean {
+  return pinchStart !== null || now - camMovedAt < SETTLE_MS;
+}
 /** A whole bake costs this device more than `GESTURE_BAKE_MS`: a gesture does not wait for one
  *  (rule 8, as {@link blitStaticLayer} judged this frame). */
 export let mapCostly = false;
@@ -1347,7 +1353,7 @@ export function blitStaticLayer(now: number): void {
     camMovedAt = now;
   }
   // A pinch stays open while its fingers pause: no bake at each intermediate scale.
-  const settled = pinchStart === null && now - camMovedAt >= SETTLE_MS;
+  const settled = !mapMoving(now);
   mapSettled = settled;
   const costly = bakeCostMs > GESTURE_BAKE_MS;
   mapCostly = costly;

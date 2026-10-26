@@ -254,6 +254,9 @@ describe('REFM-232 — статический слой карты', () => {
     vi.stubGlobal('performance', { now: () => 0 });
     ml.blitStaticLayer(1000);
     expect(ml.mapSettled).toBe(false);
+    // Движется ли камера, судится по моменту вопроса: кадра, рисующего карту, для этого не ждут.
+    expect(ml.mapMoving(1000 + SETTLE_MS - 1)).toBe(true);
+    expect(ml.mapMoving(1000 + SETTLE_MS)).toBe(false);
     expect(ml.mapView).toEqual({ k: 1, tx: 0, ty: 0 });
     // Первый кадр печёт карту: её растр делается пикселем в кадр, чтобы цена выпечки его
     // учла (правило 8), потом выпечка ложится под камеру.
