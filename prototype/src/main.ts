@@ -1197,11 +1197,6 @@ initWorldQueries({
 // Само правило живёт в `planetSummary.ts` (REFM-38) — одно место, где «крыло»
 // отделено от корабля линии, иначе один и тот же корпус считается дважды.
 const isShuttle = (u: string) => isWingUnit(u, data);
-/** Compact number like Iron Order's bar: 15.7k, 728, … */
-
-// Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
-/** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
- *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
 // Геометрия флотов — у владельца, `fleetGeometry.ts` (REFM-238). Отсюда — то, что
 // принадлежит игре: мир, своё место, часы картинки, детализация и кэши дорог и кадра.
 initFleetGeometry({
@@ -1221,10 +1216,6 @@ function fleetTitleOf(id: string): string {
   return `${t(FLEET_KIND_KEY)} «${fleetCallsign(id)}»`;
 }
 
-
-/** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
- *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
- *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
 
 let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
 // Motion off: the hologram's clock stands until the player turns it on again, so its borders,
@@ -1873,12 +1864,6 @@ function repaintFeeds(): void {
   chatWin?.refreshIfVisible();
 }
 
-/** A compact codex tile (icon + a one-line label) that opens the full info panel on
- *  tap. `label` is the build cost for buildables, or ×count for a fleet's ships. The
- *  tiles live in context — building tiles in the build menu, ship tiles in the fleet
- *  panel — not in a global HUD strip. Identification is the game tooltip only: the
- *  PC cursor dossier (#objtip, via data-desc) and the mobile long-press bubble
- *  (data-name). No native `title` — it duplicated #objtip as a second, uglier popup. */
 /** A building is one-per-planet BY DEFAULT — since RULES-2 the number is the catalogue's
  *  `maxPerPlanet`, and the core (not this helper) enforces it; the whole shipped catalogue
  *  is still on the default 1.
@@ -1901,8 +1886,6 @@ function buildingLocked(planetId: string, id: string): TileLock {
     coreQueue(planetId, 'buildings').some((q) => q.building === id),
   );
 }
-/** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
- *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
 let mineViewState: typeof s | undefined;
 let mineViewOwner = '';
 let mineViewCache: ReturnType<typeof visibleOrdnance>;
@@ -3245,15 +3228,6 @@ if (!__SECTOR_ZERO_ONLY__) activity = startPlayerActivity(() => {
   const token=base ? sessionToken(base) : null;
   return base && token ? {base:httpBase(base),token} : null;
 });
-
-// MUST stay a hoisted function declaration — NOT a `const` arrow. The boot block
-// (~900 lines above) does `await probeAuthMode(...)` during module evaluation, and an
-// async body runs synchronously up to its first `await` — so httpBase is CALLED long
-// before a `const` on this line would be initialized. esbuild's minifier lowers a
-// top-level `const` to `var`, so instead of a loud TDZ error this surfaced in the
-// deployed bundle as `TypeError: Kn is not a function`, which rejected the whole boot
-// chain: the welcome card never revealed its password field and a `?join=<id>` deep-link
-// never reached connectToMatch (the seat was never claimed).
 
 // --- accounts (SES-2.5) -------------------------------------------------------
 // The account flow itself — the server's identity mode, the stored session, login-or-
