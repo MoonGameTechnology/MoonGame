@@ -185,9 +185,13 @@ describe('REFM-237 — стык с main.ts', () => {
   });
 
   it('настройки меняют цвета только дверью палитры', () => {
-    expect(MAIN).toContain(
+    // Проводка окна настроек — у своего владельца (`settingsView.ts`, REFM-248).
+    const SETTINGS = readFileSync(new URL('./settingsView.ts', import.meta.url), 'utf8');
+    expect(SETTINGS).toContain(
       'setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),',
     );
-    expect(MAIN).toContain("resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),");
+    expect(SETTINGS).toContain(
+      "resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),",
+    );
   });
 });
