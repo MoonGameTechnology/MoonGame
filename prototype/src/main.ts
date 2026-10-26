@@ -12,8 +12,6 @@ import {
   closeSoloReplace,
   initSoloCheckpoint,
   leaveSolo,
-  refreshHubDoor,
-  restoreSolo,
   saveSolo,
   soloSaveActive,
   suspendSolo,
@@ -91,7 +89,7 @@ import {
   initMatchJoin,
   stopNetSetupPoll,
 } from './matchJoin';
-import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
+import { initMatchBrowser, refreshMatches } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
 import { kernel as soloKernel } from './protoKernel';
 import { isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
@@ -214,8 +212,6 @@ import {
 } from './worldCard';
 import { buildRoster } from './planetTabs';
 import { tileLock, type TileLock } from './catalogTile';
-import { tokenFor } from '../../decisions/sessionStore';
-import { signOutEverywhere } from './accountSession';
 import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { initMissionPanel } from './missionPanel';
@@ -289,7 +285,6 @@ import {
 import { resumeStep } from '../../decisions/tourResume';
 import { initTrainingResume } from './trainingResume';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
-import { syncCommanderXp } from './commanderSync';
 import { cardCovers } from './panelSlack';
 import { frontierOutline } from './frontierOutline';
 import { initMobileHud, type MobileChoice } from './mobileHud';
@@ -324,18 +319,6 @@ import {
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
 import { buildingDossier, createDossiers } from './dossiers';
-import {
-  META_TREE,
-  META_BRANCH_RU,
-  metaLevel,
-  metaLevelProgress,
-  metaPoints,
-  canUnlock,
-  unlockNode,
-  parseMetaState,
-  type MetaState,
-  type MetaBranch,
-} from './meta';
 // ARS-5 — arsenal witryna: the hub tab itself (`arsenalScreen.ts`, REFM-5 —
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
@@ -344,6 +327,25 @@ import { initTechTree } from './techTree';
 import { initBuildScreen } from './buildScreen';
 import type { MetaMatchRewardsView } from '../../packages/protocol/src/metaEconomyView';
 import { initEndScreen, type MatchEnd } from './endScreen';
+// Хаб, его вкладки, прокачка и профиль (REFM-220).
+import {
+  arsenal,
+  corp,
+  hubAuthorizedBase,
+  hubEl,
+  hubNote,
+  hubTab,
+  initHubScreen,
+  loadMeta,
+  news,
+  openHub,
+  premiumRunning,
+  profile,
+  saveMeta,
+  shop,
+  showHub,
+  tutorialMedal,
+} from './hubScreen';
 // Жизненный цикл матча (REFM-219): установка, запуски, уход и выходы.
 import {
   initMatchLifecycle,
@@ -352,7 +354,6 @@ import {
   leaveMatch,
   leavesToSectorZero,
   startMatch,
-  startProvingGround,
   startPvEMatch,
   startTraining,
 } from './matchLifecycle';
@@ -385,15 +386,6 @@ import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatib
 import { initHolographicUi } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
-// «Профиль командира» — карьерное досье (REFM-10).
-import { initProfile } from './profileScreen';
-import { initRegistrationReward } from './registrationReward';
-import { initTutorialMedal } from './tutorialMedal';
-import { initMedalRewards } from './medalRewards';
-import { PORTRAITS } from './profileArt';
-import { parseAppearance } from '../../packages/protocol/src/playerProfile';
-// AVA-C1/C2 — корпоративный кабинет (REFM-11).
-import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
 import { initTrader } from './traderScreen';
@@ -472,12 +464,6 @@ import { battleRetreats, initBattleWindow } from './battleScreen';
 import {
   initSteward,
 } from './stewardScreen';
-import { initArsenal } from './arsenalScreen';
-import { initMetaMarket } from './metaMarketScreen';
-import { initMetaEconomy } from './metaEconomyScreen';
-import { initShop } from './shopScreen';
-import { initNews } from './newsScreen';
-import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -581,7 +567,6 @@ import {
 } from '../../decisions/netViewClock';
 import { mountLocaleMenu } from './localeMenu';
 import { mapLod, mapSpacing, type MapLod } from '../../packages/client/src/mapLod';
-import { authorizedBase } from '../../decisions/hubAuth';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
@@ -593,9 +578,6 @@ import { defaultServerField, resolveAddress, resolveBase } from '../../decisions
 import { apkOfferShown } from '../../decisions/apkOffer';
 import { radarContacts } from './snapshotIngest';
 import { GOTO_MIN_ZOOM } from './mapJump';
-// FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
-import { initFriends } from './friendsScreen';
-import { initRank } from './rankScreen';
 import { aaRings, type RangeRing } from './combatRanges';
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
 // ONB-0 — какой хаб показать новичку (флаг обучения хранит `guideFlow.ts`).
@@ -977,7 +959,6 @@ const cmdbar = $('cmdbar');
 const railEl = $('rail');
 const railToggle = $('railtoggle');
 const railGlyph = $('railglyph');
-const crestMark = $('crestmark');
 const holoCoarsePointer = window.matchMedia?.('(pointer: coarse)');
 const holographic = initHolographicUi({
   commands: cmdbar,
@@ -1052,27 +1033,6 @@ function cardTabs() {
       ? ({ kind: 'fleet', id: ids[0]! } as const)
       : null;
   return tabsForSelection(sel, pairFacts(s, ME));
-}
-
-// Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
-// wears in the in-match top-bar corner. Client-side only (localStorage) — never match
-// state, never sent to the server. Falls back to the first glyph if unset/unknown.
-const EMBLEMS = ['◆', '◇', '⬡', '⬢', '✦', '✧', '★', '⚛', '◉', '⌖', '❖', '⟡'];
-function playerEmblem(): string {
-  const e = readRaw('void.emblem') ?? '';
-  return EMBLEMS.includes(e) ? e : EMBLEMS[0]!;
-}
-function applyEmblem(): void {
-  const g = playerEmblem();
-  const hubAv = document.getElementById('hubav');
-  if (hubAv) { hubAv.textContent = g; hubAv.classList.remove('portrait'); }
-  if (!__SECTOR_ZERO_ONLY__) applyProfilePortrait();
-  crestMark.textContent = g;
-}
-function setPlayerEmblem(g: string): void {
-  if (!EMBLEMS.includes(g)) return;
-  writeRaw('void.emblem', g);
-  applyEmblem();
 }
 
 // --- viewport, galaxy backdrop & map projection ------------------------------
@@ -2857,483 +2817,26 @@ function enterBrowse(): void {
   showStage('browse');
   detach('обозреватель: список партий', refreshMatches());
 }
-// --- meta-shell hub: post-login home + bottom nav (docs/main-menu.md) -------
-// After identity you land on the hub (home + PLAY + bottom nav), not the raw match
-// list. The nav routes into the existing flow: "Игры"/"ИГРАТЬ" → the match browser
-// (стадия 2 of #connect, untouched), «Корпорация» → вкладка `corpScreen.ts` (CORP-3), Ещё →
-// настройки. Social sign-in is a guest stub (accounts AC-1.1) with a "скоро" note.
-const hubEl = $('hub');
-const hubNote = $('hub-note');
-let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
-function showHub(show: boolean): void {
-  if (!show) registrationReward?.close();
-  if (!show) arsenal?.close();
-  if (!show) shop?.close();
-  if (!show) corp?.hideHub();
-  // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
-  if (show) document.getElementById('codex')?.classList.remove('show');
-  hubEl.style.display = show ? 'flex' : 'none';
-  // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
-  // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
-  document.body.classList.toggle('hub-open', show);
-}
-const HUB_PANELS: Record<string, string> = {
-  home: 'hp-home',
-  rank: 'hp-rank',
-  meta: 'hp-meta',
-  friends: 'hp-friends',
-  arsenal: 'hp-arsenal',
-  auction: 'hp-auction',
-  supply: 'hp-supply',
-  shop: 'hp-shop',
-  corp: 'hp-corp',
-  community: 'hp-community',
-  more: 'hp-more',
-};
-let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
-/** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community']);
-function hubTab(tab: string): void {
-  hubNote.textContent = '';
-  hubWallet?.render();
-  if (tab === 'games') {
-    showHub(false);
-    showConnect(true);
-    enterBrowse(); // hand off to the existing match browser
-    return;
-  }
-  currentHubTab = tab;
-  // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
-  // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
-  if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
-  // Кошелёк Варрантов в шапке (UIX-10.2) — тихо: гостю и при сбое сервера остаётся прежнее число.
-  if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
-  // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
-  if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
-  if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());
-  if (tab !== 'home') news?.close(); // the feed sheet lives over the home panel
-  if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
-  if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
-  if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
-  if (tab !== 'arsenal') arsenal?.close(); // the phone sheet lives over the hub, not in the tab
-  if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
-  if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
-  if (tab === 'shop' && shop) detach('хаб: магазин', shop.refresh());
-  if (tab !== 'shop') shop?.close(); // the phone sheet lives over the hub, like the arsenal's
-  for (const [k, pid] of Object.entries(HUB_PANELS))
-    $(pid).style.display = k === tab ? 'flex' : 'none';
-  // CORP-3: the corporation tab paints after its panel is visible — the panorama centres by width.
-  if (tab === 'corp') corp?.showHub();
-  else corp?.hideHub();
-  const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
-  for (const b of Array.from(document.querySelectorAll('.hub-tab')))
-    b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
-}
-
-// --- «Прокачка» — the commander's meta-progression trees (hub tab) -----------------
-// Three straight tracks (командование/экономика/наука); XP comes ONLY from finished
-// matches, a node costs its tier in points. Effects are session-start snapshots
-// (hidden techs / council level / starting treasury) — see prototype/src/meta.ts.
-function renderMetaPanel(): void {
-  const el = $('hp-meta');
-  const st = loadMeta();
-  const lvl = metaLevel(st.xp);
-  const [got, need] = metaLevelProgress(st.xp);
-  const pts = metaPoints(st);
-  let h =
-    `<div class="mp-head"><b>${t('meta.level', { n: lvl })}</b>` +
-    `<span class="mp-xp">${t('meta.xp', { got, need })}</span>` +
-    `<span class="mp-pts">${t('meta.points', { n: pts })}</span></div>`;
-  h += `<div class="mp-track"><div class="mp-fill" style="width:${Math.round((got / need) * 100)}%"></div></div>`;
-  for (const branch of ['command', 'economy', 'science'] as MetaBranch[]) {
-    h += `<div class="mp-branch"><div class="mp-bt">${t(META_BRANCH_RU[branch])}</div>`;
-    for (const node of META_TREE.filter((x) => x.branch === branch)) {
-      const owned = st.spent.includes(node.id);
-      const can = canUnlock(st, node.id);
-      h +=
-        `<div class="mp-node ${owned ? 'own' : can ? 'can' : 'lock'}">` +
-        `<div class="mp-nm">${owned ? '✓ ' : ''}${esc(t(node.name))} <em>· ${t('meta.cost', { n: node.tier })}</em></div>` +
-        `<div class="mp-ds">${esc(t(node.desc))}</div>` +
-        (owned
-          ? ''
-          : `<button class="mp-buy" data-meta="${node.id}" ${can ? '' : 'disabled'}>${can ? t('hero.tree.unlock') : t('meta.locked')}</button>`) +
-        `</div>`;
-    }
-    h += `</div>`;
-  }
-  h += `<p class="mp-note">${t('meta.note')}</p>`;
-  el.innerHTML = h;
-}
-$('hp-meta').addEventListener('click', (ev) => {
-  const b = (ev.target as HTMLElement).closest('[data-meta]') as HTMLElement | null;
-  if (!b || (b as HTMLButtonElement).disabled) return;
-  const next = unlockNode(loadMeta(), b.dataset.meta!);
-  if (next) {
-    saveMeta(next);
-    renderMetaPanel();
-  }
+// Хаб — у владельца, `hubScreen.ts` (REFM-220): вкладки и их экраны, прокачка, профиль,
+// портрет, сверка опыта, вход в хаб, его кнопки и корпорация. Отсюда — поля экрана входа,
+// его строка статуса и показ, обозреватель партий, темп и проверка удаления аккаунта.
+initHubScreen({
+  nick: () => nickInput.value,
+  setNick: (nick) => {
+    nickInput.value = nick;
+  },
+  serverField: () => srvInput.value,
+  resolveServer: () => resolveServer(),
+  status: (text) => {
+    statusEl.textContent = text;
+  },
+  showConnect,
+  enterBrowse,
+  halt: () => {
+    speed = 0;
+  },
+  refreshAccountDeletion: () => refreshAccountDeletion(), // объявлен ниже, у страниц входа
 });
-
-// --- «Друзья» — the account's roster (hub tab, FRIENDS-1) --------------------
-// Экран живёт в `friendsScreen.ts`; здесь только доступ к серверу. Политика та же,
-// что у «Арсенала»: вкладка ПЕРЕИСПОЛЬЗУЕТ сессию, которую уже добыл вход, но никогда
-// не спрашивает пароль ради того, чтобы просто посмотреть — нет сервера, нет режима
-// аккаунтов или нет сохранённой сессии читаются одинаково (гостевое состояние).
-/**
- * Авторизованный адрес для вкладок хаба — ОДИН на все пять (`hubAuth.ts`, REFM-138).
- * Там же причины: три условия обязательны, режим аккаунтов пробуется у сервера, а ради
- * просмотра пароль не спрашивают — любой отказ это гостевое состояние.
- */
-async function hubAuthorizedBase(): Promise<{ base: string; token: string } | null> {
-  const srv = resolveServer();
-  if (srv) await probeAuthMode(srv.base); // проба режима — только когда есть у кого
-  return authorizedBase(
-    {
-      server: srv,
-      accountsMode: authMode === 'accounts',
-      token: srv ? sessionToken(srv.base) : null,
-    },
-    httpBase,
-  );
-}
-
-const friends = __SECTOR_ZERO_ONLY__
-  ? null
-  : initFriends({
-      root: () => $('hp-friends'),
-      authorizedBase: hubAuthorizedBase,
-      openPlayer: (login) => profile?.open(login),
-    });
-
-// --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
-// Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по
-// присланной странице, поэтому клиент его вывести и не смог бы. Доступ — та же
-// политика, что у «Друзей»: переиспользуем добытую входом сессию, пароль ради
-// просмотра не спрашиваем; нет сессии — гостевое состояние с причиной.
-const rank = __SECTOR_ZERO_ONLY__
-  ? null
-  : initRank({
-      root: () => $('hp-rank'),
-      authorizedBase: hubAuthorizedBase,
-      openPlayer: (login) => profile?.open(login),
-    });
-
-// --- «Арсенал» — the account's persistent collection and its workshop (hub tab, ARS-5) ----
-// The tab itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks. Cache key is
-// per callsign, like the meta store. `authorizedBase` encodes the tab's policy: it may reuse
-// a session token a prior join already stashed, but must never prompt for a password just to
-// LOOK at the collection — no server, no accounts or no stashed session all read the same way
-// (the starter kit and a sign-in). Narrow = the tab is too narrow for the detail beside the
-// list (the `@container arsenal` rule in build.mjs uses the same width), and then the detail
-// opens as a sheet over the hub.
-const ARSENAL_WIDE_MIN = 700;
-const arsenal = __SECTOR_ZERO_ONLY__
-  ? null
-  : initArsenal({
-      root: () => $('hp-arsenal'),
-      sheet: () => $('arsenal-sheet'),
-      narrow: () => $('hp-arsenal').clientWidth < ARSENAL_WIDE_MIN,
-      readCache: () => {
-        try {
-          return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
-        } catch {
-          return null;
-        }
-      },
-      writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
-      openCodex,
-      authorizedBase: hubAuthorizedBase,
-      canSignIn: () => !!resolveServer() && authMode === 'accounts',
-      signIn: () => {
-        showHub(false);
-        showConnect(true);
-        showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
-      },
-      openAuction: () => hubTab('auction'),
-      sell: (itemId) => {
-        metaMarket?.focusSell(itemId);
-        hubTab('auction');
-      },
-      openSeason: () => hubTab('supply'),
-      openStore: (offerId) => {
-        shop?.show('modules', offerId);
-        hubTab('shop');
-      },
-      changed: async () => {
-        await metaMarket?.sync();
-      },
-    });
-if (arsenal && typeof ResizeObserver !== 'undefined')
-  new ResizeObserver(() => arsenal.relayout()).observe($('hp-arsenal'));
-// EC-3 «Аукцион»: витрина торговли мета-предметами. Лоты и кошелёк живут на сервере,
-// поэтому кэша, как у арсенала, здесь нет — экран всегда спрашивает свежее.
-const metaMarket = __SECTOR_ZERO_ONLY__
-  ? null
-  : initMetaMarket({
-      root: () => $('hp-auction'),
-      arsenal: () => arsenal?.items() ?? [],
-      authorizedBase: hubAuthorizedBase,
-      note: (message) => {
-        hubNote.textContent = message;
-      },
-      changed: () => hubWallet?.render(),
-      inventoryChanged: async () => { await arsenal?.refresh(); },
-    });
-// «Магазин» (заказ владельца 2026-10-20): Суверены, премиум, модули и материалы за ◆.
-// Единственное место покупок — Снабжение и Арсенал ведут сюда. Баланс ◆ и срок премиума
-// приходят с ответом аккаунта: плашка хаба показывает число, чат помнит премиум по позывному
-// (цвет шрифта — его бонус; сам срок проверяется по часам при каждом открытии настроек).
-const SHOP_WIDE_MIN = 700;
-const premiumKey = (): string => 'vd.premium.' + (nickInput.value.trim() || 'guest');
-const shop = __SECTOR_ZERO_ONLY__
-  ? null
-  : initShop({
-      root: () => $('hp-shop'),
-      sheet: () => $('shop-sheet'),
-      narrow: () => $('hp-shop').clientWidth < SHOP_WIDE_MIN,
-      authorizedBase: hubAuthorizedBase,
-      canSignIn: () => !!resolveServer() && authMode === 'accounts',
-      signIn: () => {
-        showHub(false);
-        showConnect(true);
-        showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
-      },
-      warrants: () => metaMarket?.balance() ?? 0,
-      now: () => Date.now(),
-      accountChanged: (view) => {
-        if (view) writeRaw(premiumKey(), String(view.premiumUntil ?? 0));
-        hubWallet?.render();
-      },
-      changed: async () => {
-        await arsenal?.refresh();
-        await metaMarket?.sync();
-      },
-    });
-if (shop && typeof ResizeObserver !== 'undefined')
-  new ResizeObserver(() => shop.relayout()).observe($('hp-shop'));
-// CORP-2 «Домой»: лента новостей. Экран — `newsScreen.ts`, решения — `decisions/newsFeed.ts`.
-// Ленту сервер отдаёт без входа, поэтому ей нужен только адрес; сессия хаба — для «Моей
-// корпорации», карточки корпорации и заявки.
-const news = __SECTOR_ZERO_ONLY__
-  ? null
-  : initNews({
-      column: () => $('news-col'),
-      teaser: () => $('news-teaser'),
-      sheet: () => $('news-sheet'),
-      publicBase: () => {
-        const step = resolveBase(srvInput.value, location.protocol === 'https:');
-        return step.kind === 'ok' ? httpBase(step.base) : null;
-      },
-      authorizedBase: hubAuthorizedBase,
-      note: (text) => {
-        hubNote.textContent = text;
-      },
-      errText,
-      openCorp: (tab) => {
-        corp?.showSection(tab === 'hq' ? 'base' : 'battles');
-        hubTab('corp');
-      },
-      now: () => Date.now(),
-    });
-/** Premium is running for this callsign, by the last account read on this device. */
-function premiumRunning(): boolean {
-  return Number(readRaw(premiumKey()) ?? 0) > Date.now();
-}
-// Main-game supply has its own server-owned state; Sector Zero remains independent.
-const metaEconomy = __SECTOR_ZERO_ONLY__
-  ? null
-  : initMetaEconomy({
-      root: () => $('hp-supply'),
-      authorizedBase: hubAuthorizedBase,
-      changed: async () => {
-        await arsenal?.refresh();
-        await metaMarket?.sync();
-      },
-    });
-// Кошелёк главного экрана (UIX-10.2, заказ владельца 2026-10-01): Суверены — та же плашка с
-// «+», что в строке статуса партии; Варранты аукциона — плашкой, которая и есть дверь в аукцион.
-const hubWallet = __SECTOR_ZERO_ONLY__
-  ? null
-  : initHubWallet({
-      root: $('hubwallet'),
-      wallet: () => ({ sovereigns: shop?.sovereigns() ?? null, warrants: metaMarket?.balance() ?? 0 }),
-      donate: () => {
-        shop?.show('sovereigns');
-        hubTab('shop');
-      },
-      auction: () => hubTab('auction'),
-    });
-
-function arsenalKey(): string {
-  return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
-}
-
-
-// --- Профиль командира — the career dossier (docs/main-menu.md §4.2) ------------
-// Само досье живёт в `profileScreen.ts` (REFM-10); здесь только его хуки. Ключ кэша
-// медалей — по позывному, рядом с остальными ключами. `authorizedBase` кодирует ту же
-// политику, что у «Арсенала»: за паролем ради ПОСМОТРЕТЬ витрину не ходим.
-const profile = __SECTOR_ZERO_ONLY__
-  ? null
-  : initProfile({
-      root: () => $('profile'),
-      identity: () => profileKey(),
-      readAppearance: readProfileAppearance,
-      writeAppearance: (value) => writeRaw(profileKey(), JSON.stringify(value)),
-      appearanceChanged: applyProfilePortrait,
-      view: () => {
-        const st = loadMeta();
-        return {
-          nick: nickInput.value,
-          xp: st.xp,
-          stats: st.stats,
-          corp: (() => {
-            const c = corp?.mine().corp;
-            return c ? { name: c.name, influence: c.influence } : null;
-          })(),
-          sovereigns: shop?.sovereigns() ?? null,
-        };
-      },
-      readCache: () => {
-        try {
-          return JSON.parse(localStorage.getItem(medalsKey()) ?? 'null');
-        } catch {
-          return null;
-        }
-      },
-      writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
-      authorizedBase: async () => {
-        const srv = resolveServer();
-        if (!srv) return null;
-        const session = await hubAuthorizedBase();
-        return session && tokenFor(localStorage, srv.base, nickInput.value.trim()) === session.token ? session : null;
-      },
-    });
-const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
-if (!__SECTOR_ZERO_ONLY__) registrationReward = initRegistrationReward({
-  identity: profileKey,
-  visible: () => hubEl.style.display !== 'none',
-  authorizedBase: hubAuthorizedBase,
-  changed: async () => { await Promise.all([syncProfileAppearance(), syncCommanderFromServer()]); },
-});
-// The tutorial medal: earned on this device per callsign, carried into the account profile.
-const tutorialMedal = __SECTOR_ZERO_ONLY__
-  ? null
-  : initTutorialMedal({
-      key: () => 'vd.medal.tutorial.' + (nickInput.value.trim() || 'guest'),
-      authorizedBase: hubAuthorizedBase,
-    });
-// Medal rewards (owner's order 2026-10-24): every reached degree of a profile medal pays
-// Sovereigns, Warrants and XP once; the window lists the grant, then XP and wallets re-read.
-const medalRewards = __SECTOR_ZERO_ONLY__
-  ? null
-  : initMedalRewards({
-      identity: profileKey,
-      visible: () => hubEl.style.display !== 'none',
-      authorizedBase: hubAuthorizedBase,
-      changed: async () => {
-        await Promise.all([syncCommanderFromServer(), shop?.sync(), metaMarket?.sync()]);
-      },
-    });
-function profileKey(): string {
-  return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
-}
-function readProfileAppearance(): unknown {
-  try { return JSON.parse(readRaw(profileKey()) ?? 'null'); } catch { return null; }
-}
-function applyProfilePortrait(portrait?: number): void {
-  if (__SECTOR_ZERO_ONLY__) return;
-  const id = portrait ?? parseAppearance(readProfileAppearance())?.portrait;
-  const src = id ? PORTRAITS[id - 1] : undefined;
-  const avatar = document.getElementById('hubav');
-  if (!avatar) return;
-  if (!src) { avatar.textContent = playerEmblem(); avatar.classList.remove('portrait'); return; }
-  const img = document.createElement('img');
-  img.src = src;
-  img.alt = t('profile.title');
-  avatar.replaceChildren(img);
-  avatar.classList.add('portrait');
-}
-
-async function syncProfileAppearance(): Promise<void> {
-  if (__SECTOR_ZERO_ONLY__) return;
-  const key = profileKey();
-  const srv = resolveServer();
-  if (!srv) return;
-  const session = await hubAuthorizedBase();
-  if (!session || tokenFor(localStorage, srv.base, nickInput.value.trim()) !== session.token) return;
-  try {
-    const response = await fetch(`${session.base}/profiles`, { headers: { authorization: `Bearer ${session.token}` } });
-    if (!response.ok) return;
-    const raw = await response.json() as { portrait?: unknown; slots?: unknown };
-    const appearance = parseAppearance({ portrait: raw.portrait, slots: raw.slots });
-    if (!appearance || key !== profileKey()) return;
-    writeRaw(key, JSON.stringify(appearance));
-    applyProfilePortrait(appearance.portrait);
-  } catch { /* Keep the previously saved portrait while offline. */ }
-}
-
-// --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
-
-/** Accounts mode (EC-*): pull the DURABLE account XP into the local meta mirror, so
- *  the commander level/progress a player sees is account-backed and follows them to a
- *  new device — not the per-callsign localStorage that only lived in one browser. The
- *  server total is authoritative (it sums every credited match across devices); the
- *  per-match award still lands optimistically at checkEnd (same formula as the core's
- *  `data.rewards`, so they agree). Guest/nick mode has no account → keeps localStorage. */
-async function syncCommanderFromServer(): Promise<void> {
-  const srv = resolveServer();
-  if (!srv) return;
-  await probeAuthMode(srv.base);
-  if (authMode !== 'accounts') return;
-  const session = sessionToken(srv.base);
-  if (!session) return;
-  try {
-    const res = await fetch(`${httpBase(srv.base)}/commander/me`, {
-      headers: { authorization: `Bearer ${session}` },
-    });
-    if (!res.ok) return;
-    const cur = loadMeta();
-    // Merging the two totals is `commanderSync.ts` (REFM-53): XP only ever grows, an
-    // unreadable answer leaves the local figure alone, and only a real change repaints.
-    const sync = syncCommanderXp(cur.xp, await res.json().catch(() => null));
-    if (sync.changed) {
-      saveMeta({ ...cur, xp: sync.xp }); // local `spent` tree is kept
-      // repaint the open hub panel so the new level/points show without a manual switch
-      if (hubEl.style.display !== 'none' && (currentHubTab === 'home' || currentHubTab === 'meta'))
-        hubTab(currentHubTab);
-    }
-  } catch {
-    // offline — the last mirrored total stays; a later login reconciles
-  }
-}
-function openHub(note = ''): void {
-  if (soloSaveActive) { saveSolo(); speed = 0; }
-  if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
-  const nick = nickInput.value.trim();
-  $('hub-name').textContent = nick || t('auth.commander');
-  applyProfilePortrait();
-  showConnect(false);
-  showHub(true);
-  hubTab('home');
-  hubNote.textContent = note;
-  refreshHubDoor(); // после позывного: пройденное обучение помнится по нику (`onboardKey`)
-  detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
-  detach('хаб: портрет аккаунта', syncProfileAppearance());
-  detach('account deletion capability', refreshAccountDeletion());
-  if (registrationReward) detach('registration reward', registrationReward.show());
-  // The tutorial claim goes first: its medal is then paid by the same hub entry.
-  detach(
-    'tutorial medal claim and medal rewards',
-    (async () => {
-      if (tutorialMedal) await tutorialMedal.claim();
-      if (medalRewards) await medalRewards.claim();
-    })(),
-  );
-}
 
 // Страницы входа — у своего владельца (`signInPages.ts`, REFM-218): приветствие и вход
 // по позывному, регистрация, восстановление и сброс пароля. Строку статуса, поле позывного
@@ -3401,56 +2904,6 @@ const refreshAccountDeletion = mountAccountDeletion(() => resolveServer()?.base 
   leaveMatch(); showHub(false); showConnect(true); showStage('welcome');
   statusEl.textContent = t('account.delete.pending');
 }, () => !__SECTOR_ZERO_ONLY__ && authMode === 'accounts');
-
-// hub interactions
-$('hub-play').addEventListener('click', () => hubTab('games'));
-// Single-player entry from the hub home — offline skirmish vs bots (both builds).
-$('hub-solo').addEventListener('click', () => {
-  leaveMatch();
-  showHub(false);
-  openSetup('hub');
-});
-$('hub-solo-continue').addEventListener('click', restoreSolo);
-$('hub-sector-zero').addEventListener('click', () => openSectorZero());
-$('hub-proving-ground').addEventListener('click', () => startProvingGround());
-$('hub-msg').addEventListener('click', () => {
-  hubNote.textContent = t('hub.messages.soon');
-});
-$('hub-logout').addEventListener('click', async () => {
-  // «Сменить командира» must really switch identity: drop this server's session so
-  // the next sign-in authenticates the NEW callsign instead of replaying the old JWT.
-  const srv = resolveServer();
-  if (srv && !(await signOutEverywhere(srv.base))) {
-    hubNote.textContent = t('auth.logout.failed');
-    return;
-  }
-  leaveMatch();
-  statusEl.textContent = '';
-  showHub(false);
-  showConnect(true);
-  showStage('welcome');
-});
-for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
-  b.addEventListener('click', () => hubTab((b as HTMLElement).dataset.hub ?? 'home'));
-}
-// «Прокачка», а с UIX-10.1 и «Рейтинг» с «Друзьями» уехали из нижней навигации (вкладок в ней
-// пять) в «Ещё»: плитка открывает ТУ ЖЕ панель, а не свою копию экрана.
-document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
-document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
-document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
-document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
-document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
-document.getElementById('hub-shop')?.addEventListener('click', () => hubTab('shop'));
-document.getElementById('hub-community')?.addEventListener('click', () => hubTab('community'));
-for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
-  tile.addEventListener('click', () => {
-    // The tile's own label span is already localized (localizeStaticDom ran at boot);
-    // read IT, not the Russian-only data-more attribute, so the toast matches the UI language.
-    const label =
-      tile.querySelector('[data-i18n]')?.textContent ?? (tile as HTMLElement).dataset.more ?? '';
-    hubNote.textContent = t('soon.generic', { what: label });
-  });
-}
 
 // --- settings overlay (hub → «Ещё» → Настройки) -----------------------------
 // Окно живёт в `settingsOverlay.ts` (REFM-22); здесь проводка. Модуль настройками не
@@ -3744,20 +3197,6 @@ initSetupScreen({
   // и на карте партии, и игрок с CVD-палитрой не получит красно-зелёную пару.
   sideColors: () => ({ you: youColor, rival: paletteOf(rivalPaletteId).war }),
 });
-
-// --- meta-progression (прокачка командующего) --------------------------------
-// Per-callsign account state; v1 lives in localStorage next to the guest identity —
-// the server account (SE-1.x) takes this over when the meta-layer lands there.
-function metaKey(): string {
-  return 'vd.meta.' + (nickInput.value.trim() || 'guest');
-}
-function loadMeta(): MetaState {
-  return parseMetaState(localStorage.getItem(metaKey()));
-}
-function saveMeta(st: MetaState): void {
-  localStorage.setItem(metaKey(), JSON.stringify(st));
-}
-
 
 // --- match browser (the meta-shell "Play" tab) -------------------------------
 // The list itself — tabs, filter, archive and the hub's «Мои партии» — lives in
@@ -4806,9 +4245,6 @@ $('topback').addEventListener('click', () => {
   else history.back();
 });
 
-// mirror the chosen emblem into the top-left corner + the hub avatar
-applyEmblem();
-
 // collapsible rail — the hamburger toggles the tool panel; picking a tool closes it.
 function setRailOpen(open: boolean): void {
   railEl.classList.toggle('open', open);
@@ -4819,27 +4255,6 @@ railToggle.addEventListener('click', () => setRailOpen(!railEl.classList.contain
 document.getElementById('railtools')?.addEventListener('click', () => setRailOpen(false));
 document.getElementById('holo-tech')?.addEventListener('click', () => $('rail-tech').click());
 document.getElementById('holo-constructor')?.addEventListener('click', () => $('rail-constructor').click());
-
-// The hub avatar now opens the account portrait and medal editor.
-const emblemPick = document.getElementById('emblempick');
-document.getElementById('hubav')?.addEventListener('click', () => profile?.open());
-// Both the portrait and identity strip open the same saved profile.
-document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile?.open());
-document
-  .getElementById('ep-close')
-  ?.addEventListener('click', () => emblemPick?.classList.remove('show'));
-emblemPick?.addEventListener('click', (e) => {
-  const t = e.target as HTMLElement;
-  if (t.id === 'emblempick') {
-    emblemPick.classList.remove('show'); // backdrop tap closes
-    return;
-  }
-  const cell = t.closest('.ep-cell') as HTMLElement | null;
-  if (cell?.dataset.emblem) {
-    setPlayerEmblem(cell.dataset.emblem);
-    emblemPick.classList.remove('show');
-  }
-});
 
 // War prompt: a move routed through a player you're at peace with asks for
 // confirmation — DECLARE WAR dispatches it (after declaring war), CANCEL/backdrop drops it.
@@ -4974,34 +4389,3 @@ if (!apkOfferShown({ insideApk: currentBuild() !== null, userAgent: navigator.us
   document.getElementById('hub-android')?.remove();
 if (!__SECTOR_ZERO_ONLY__) initApkUpdater();
 
-// --- corporation cabinet (AVA-C1/C2) -----------------------------------------
-// Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки: окно в партии
-// открывает рельса матча, а в хабе корпорация — своя вкладка (CORP-3, `hubTab('corp')`).
-// `authorizedBase` — та же политика, что у «Арсенала» и профиля; кэша сознательно нет.
-const corp = __SECTOR_ZERO_ONLY__
-  ? null
-  : initCorp({
-      root: () => $('corp'),
-      head: () => $('corphd'),
-      tabs: () => $('corptabs'),
-      body: () => $('corpbody'),
-      note,
-      errText,
-      onIntro: maybeIntro,
-      authorizedBase: hubAuthorizedBase,
-      hub: {
-        root: () => $('hp-corp'),
-        sheet: () => $('corp-sheet'),
-        note: (text) => {
-          hubNote.textContent = text;
-        },
-        canSignIn: () => !!resolveServer() && authMode === 'accounts',
-        signIn: () => {
-          showHub(false);
-          showConnect(true);
-          showStage('welcome');
-          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
-        },
-      },
-    });
-$('railcorp').addEventListener('click', () => corp?.open());
