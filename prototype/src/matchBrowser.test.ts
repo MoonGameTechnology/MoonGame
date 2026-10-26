@@ -939,6 +939,8 @@ describe('REFM-217 — стык с main.ts', () => {
   const BROWSER = readFileSync(new URL('./matchBrowser.ts', import.meta.url), 'utf8');
   // Заход домой — у хаба (`hubScreen.ts`, REFM-220).
   const HUB = readFileSync(new URL('./hubScreen.ts', import.meta.url), 'utf8');
+  // Вход в обозреватель — у экрана подключения (`connectScreen.ts`, REFM-247).
+  const CONNECT = readFileSync(new URL('./connectScreen.ts', import.meta.url), 'utf8');
   const SIZES = readFileSync(new URL('../sizetest.mjs', import.meta.url), 'utf8');
 
   it('лента, вкладка и фильтр живут только у владельца', () => {
@@ -956,7 +958,7 @@ describe('REFM-217 — стык с main.ts', () => {
   });
 
   it('вход в обозреватель и заход домой переспрашивают ленту дверями владельца', () => {
-    expect(MAIN).toContain("detach('обозреватель: список партий', refreshMatches());");
+    expect(CONNECT).toContain("detach('обозреватель: список партий', refreshMatches());");
     expect(HUB).toContain("if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());");
   });
 
