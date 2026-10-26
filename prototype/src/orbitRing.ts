@@ -43,6 +43,10 @@
 
 /** Базовый радиус кольца в экранных px — до множителя зума. */
 export const ORBIT_R = 31;
+/** Потолок раздутия кольца вблизи (правило 2). */
+const BLOOM_MAX = 2.4;
+/** Шире этого кольцо не бывает ни на каком зуме и ни при каком зазоре, px (правила 2–4). */
+export const ORBIT_R_MAX = ORBIT_R * BLOOM_MAX;
 /** Ближе этого масштаба камеры орбитальный слой открывается (правило 1). */
 export const ORBIT_ZOOM_IN = 1.6;
 /** Скорость обхода кольца, рад/мс игрового времени. */
@@ -56,7 +60,7 @@ export function orbitsLive(scale: number): boolean {
 /** Множитель радиуса от зума: 0.5 вдали → до 2.4 вблизи (правило 2). */
 export function orbitBloom(scale: number): number {
   if (scale <= ORBIT_ZOOM_IN) return 0.5;
-  return Math.max(0.5, Math.min(2.4, 0.5 + (scale - ORBIT_ZOOM_IN) * 1.2));
+  return Math.max(0.5, Math.min(BLOOM_MAX, 0.5 + (scale - ORBIT_ZOOM_IN) * 1.2));
 }
 
 /** Радиус кольца в px: раздутый зумом, но зажатый зазором до соседа (правила 3–4).

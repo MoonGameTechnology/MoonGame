@@ -138,6 +138,21 @@ describe('REFM-231 — перевод «карта ↔ экран»', () => {
     expect(back.y).toBeCloseTo(p.y, 9);
   });
 
+  it('экран с запасом в координатах карты: внутри рамки — те точки, что видны с тем же запасом', async () => {
+    const { camera } = await boot();
+    camera.setView({ scale: 2.5, x: -700, y: -300 });
+    const r = camera.visibleOnMap(40);
+    const lo = camera.world({ x: r.minX, y: r.minY });
+    const hi = camera.world({ x: r.maxX, y: r.maxY });
+    expect([lo.x, lo.y, hi.x, hi.y].map((v) => +v.toFixed(9))).toEqual([-40, -40, 1640, 940]);
+    for (let x = -200; x <= 1200; x += 37) {
+      for (let y = -200; y <= 700; y += 41) {
+        const inside = x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY;
+        expect(inside, `${x},${y}`).toBe(camera.visible(camera.world({ x, y }), 40));
+      }
+    }
+  });
+
   it('дальность карты в пикселях — тот же множитель, что у перевода, и растёт с зумом', async () => {
     const { camera } = await boot();
     const span = camera.world({ x: 100, y: 0 }).x - camera.world({ x: 0, y: 0 }).x;
