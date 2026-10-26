@@ -10,7 +10,7 @@
  * сохранения писали в память разведки. Теперь они зовут двери модуля
  * ({@link refreshVision}, {@link forgetVision}, {@link resetFogMemory}, {@link rememberScan},
  * {@link restoreFogMemory}), а снаружи зрение — живая привязка только для чтения, и память
- * разведки отдаёт только чтение (`get`/`has`/`ownerOf`/`dump`).
+ * разведки отдаёт только чтение (`get`/`has`/`ownerOf`/`dump`/`version`).
  *
  * Мир на экране, своё место, режим сети, контакты радара с сервера и круги обзора (они
  * считаются раз на мир в кэше кадра) живут в `main.ts`; модуль получает их хуками
@@ -294,7 +294,7 @@ export function battleKnown(b: Battle): boolean {
 // мир, и память принадлежит матчу.
 const scans = createScanMemory();
 /** Память разведки для чтения: писать в неё можно только дверями модуля. */
-export const memory: Pick<ScanMemory, 'get' | 'has' | 'ownerOf' | 'dump'> = scans;
+export const memory: Pick<ScanMemory, 'get' | 'has' | 'ownerOf' | 'dump' | 'version'> = scans;
 /**
  * Записать в память разведки то, что видно СЕЙЧАС, и то, что помнит СЕРВЕР (FOG-10).
  *
