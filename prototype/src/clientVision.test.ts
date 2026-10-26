@@ -128,7 +128,7 @@ describe('RULES-5 — карта спрашивает ядро, а не выво
     const src = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
     const body = src.slice(src.indexOf('function computeVision('));
     const fn = body.slice(0, body.indexOf('\n}\n') + 3);
-    expect(fn).toContain('sensorCoverage(s, ME, data)');
+    expect(fn).toContain('sensorCoverage(s, ME, data, planets)');
     for (const reDerived of ['planetRadar(', 'fleetRadar(', 'withinRadius', 'floodHops(']) {
       expect(fn).not.toContain(reDerived);
     }
@@ -149,7 +149,9 @@ describe('круги везде — граница обзора на карте 
     }
     const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
     const init = /initMapRadar\(\{([\s\S]*?)\n\}\);/.exec(main)?.[1] ?? '';
-    expect(init).toContain("sight: () => perWorld('sight', () => sightCircles(s, ME, data)),");
+    expect(init).toContain(
+      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+    );
   });
 });
 

@@ -106,6 +106,7 @@ async function boot(w: GameState = base(), opts: { conic?: boolean; net?: boolea
     world: w,
     sources: { worlds: [], fleets: [] } as RadarSources,
     sight: [] as SightCircle[],
+    planets: null as Planet[] | null,
     contacts: [] as SignatureContact[],
     notes: [] as Array<[string, string | undefined]>,
     pings: 0,
@@ -130,6 +131,7 @@ async function boot(w: GameState = base(), opts: { conic?: boolean; net?: boolea
     net: () => opts.net ?? false,
     contacts: () => env.contacts,
     sight: () => env.sight,
+    planets: () => Object.values(env.world.planets),
   });
   const geo = await import('./fleetGeometry');
   geo.initFleetGeometry({
@@ -149,6 +151,7 @@ async function boot(w: GameState = base(), opts: { conic?: boolean; net?: boolea
     vh: () => 900,
     sources: () => env.sources,
     sight: () => env.sight,
+    planets: () => env.planets ?? Object.values(env.world.planets),
     note: (text, at) => env.notes.push([text, at]),
     placeName: (id) => `«${id}»`,
     ping: () => env.pings++,
@@ -200,6 +203,16 @@ describe('REFM-239 — дальность и источники', () => {
     expect(own.fleets.map((v) => v.fleet.id)).toEqual(['s']);
     expect(own.fleets[0]!.reach).toBe(radar.fleetRadar(w.fleets.s!));
     expect(own.fleets[0]!.reach).toBeGreaterThan(0);
+  });
+
+  it('миры источники берут списком из кэша кадра (W7), а не обходом записи', async () => {
+    const w = base((st) => {
+      st.planets.A!.buildings = [{ type: 'radar', level: 1, hp: 18 }];
+    });
+    const { radar, env } = await boot(w);
+    expect(radar.ownRadarSources().worlds).toHaveLength(1);
+    env.planets = Object.values(w.planets).filter((p) => p.id !== 'A');
+    expect(radar.ownRadarSources().worlds).toEqual([]);
   });
 
   it('чужому миру — только масштаб режима; мир без массива слуха не имеет', async () => {
@@ -403,7 +416,8 @@ describe('REFM-239 — стык с main.ts', () => {
       'vw: () => VW,',
       'vh: () => VH,',
       "sources: () => perWorld('radar', ownRadarSources),",
-      "sight: () => perWorld('sight', () => sightCircles(s, ME, data)),",
+      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+      'planets: worldPlanets,',
       'note,',
       'placeName,',
       "ping: () => snd.play('radar'),",

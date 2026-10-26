@@ -12,8 +12,8 @@
  * {@link restoreFogMemory}), а снаружи зрение — живая привязка только для чтения, и память
  * разведки отдаёт только чтение (`get`/`has`/`ownerOf`/`dump`/`version`).
  *
- * Мир на экране, своё место, режим сети, контакты радара с сервера и круги обзора (они
- * считаются раз на мир в кэше кадра) живут в `main.ts`; модуль получает их хуками
+ * Мир на экране, своё место, режим сети, контакты радара с сервера, круги обзора и список
+ * миров (они считаются в кэше кадра) живут в `main.ts`; модуль получает их хуками
  * {@link initMapFog} — импорт оттуда был бы циклом.
  */
 import {
@@ -59,6 +59,10 @@ export interface MapFogHost {
   contacts(): SignatureContact[];
   /** Круги обзора этого мира — из кэша кадра (`perWorld`): ракете нужна позиция в круге. */
   sight(): SightCircle[];
+  /** Миры этого мира (`world().planets`) в порядке записи — из кэша кадра: запись обходится
+   *  раз, а не каждым читателем. Тот же мир — тот же список, поэтому в проверку
+   *  `visionMemo` он не входит. */
+  planets(): readonly Planet[];
 }
 
 let game: MapFogHost;
@@ -143,7 +147,8 @@ function computeVision(): Vision {
   const ME = game.me();
   const NET = game.net();
   const netSignatures = game.contacts();
-  const { identify, radar } = sensorCoverage(s, ME, data);
+  const planets = game.planets();
+  const { identify, radar } = sensorCoverage(s, ME, data, planets);
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
   // is remembered after the window closes).
   grantVision({ identify, radar }, targetsOf(myIntel(), 'planet'), (id) => !!s.planets[id]);
@@ -151,7 +156,7 @@ function computeVision(): Vision {
   return {
     identify,
     radar,
-    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt),
+    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt, planets),
     engaged: engagementOf(s, ME),
     seenAt,
     seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),

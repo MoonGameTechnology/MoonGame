@@ -155,6 +155,18 @@ describe('RANGE-UX — отметки ПКО из памяти по миру (ш
     expect(visible).not.toHaveBeenCalled();
   });
 
+  it('миры списком от кадра (W7): тот же ответ, и читается список, а не запись', () => {
+    const s = withAa();
+    const list = Object.values(s.planets);
+    expect(aaRings(s, data, ME, seen, list)).toEqual(aaRings(s, data, ME, seen));
+    const [first] = aaRings(s, data, ME, seen);
+    expect(first).toBeDefined();
+    const without = list.filter((p) => p.id !== first!.sourceId);
+    expect(aaRings(s, data, ME, seen, without).map((r) => r.sourceId)).not.toContain(
+      first!.sourceId,
+    );
+  });
+
   it('круг вылета остаётся первым, отметки ПКО идут за ним', () => {
     const { s, fleet } = withFleet([{ unit: 'shuttle_carrier', count: 1 }]);
     const carrier: Fleet = { ...fleet, hangar: [squad('interceptor', 2)] };

@@ -60,6 +60,9 @@ export interface MapRadarHost {
   sources(): RadarSources;
   /** Круги обзора блока зрения — из кэша кадра, те же, по которым ядро считает туман. */
   sight(): SightCircle[];
+  /** Миры этого мира (`world().planets`) в порядке записи — из кэша кадра, тот же список,
+   *  что у тумана. */
+  planets(): readonly Planet[];
   /** Строка в ленту: развёртка впервые засекла контакт. */
   note(text: string, at?: string): void;
   /** Имя места для игрока. */
@@ -144,9 +147,9 @@ export function ownRadarSources(): RadarSources {
   const s = game.world();
   const ME = game.me();
   const worlds: RadarSources['worlds'] = [];
-  // `recordValues`, а не `Object.values`: запись в 1675 миров — словарь движка, и там
-  // `Object.values` в разы медленнее чтения по ключам (`util/records.ts`).
-  for (const p of recordValues(s.planets)) {
+  // Миры — списком из кэша кадра: запись в 1675 миров — словарь движка, и обход её по
+  // ключам стоит слабому телефону ~0,7 мс, а список один на всех читателей.
+  for (const p of game.planets()) {
     if (p.owner !== ME) continue;
     const reach = planetRadar(p);
     if (reach > 0) worlds.push({ at: p.position, reach });

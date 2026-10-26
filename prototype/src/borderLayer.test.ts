@@ -122,7 +122,14 @@ async function boot() {
   camera.frameMap(nodes);
   camera.setView({ scale: 1, x: 0, y: 0 });
   const fog = await import('./mapFog');
-  fog.initMapFog({ world: () => env.world, me: () => 'p1', net: () => false, contacts: () => [], sight: () => [] });
+  fog.initMapFog({
+    world: () => env.world,
+    me: () => 'p1',
+    net: () => false,
+    contacts: () => [],
+    sight: () => [],
+    planets: () => Object.values(env.world.planets),
+  });
   fog.refreshVision();
   const ctx = () => frame.getContext() as CanvasRenderingContext2D;
   (await import('./mapPalette')).initMapPalette({ world: () => env.world, me: () => 'p1', ctx, dpr: () => 1 } as never);

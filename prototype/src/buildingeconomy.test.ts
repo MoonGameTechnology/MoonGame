@@ -38,6 +38,15 @@ describe('building economy — the prototype resource loop', () => {
     expect(flow.food ?? 0).toBeLessThan((type.baseOutput.food ?? 0) * mult);
   });
 
+  it('netIncome reads the worlds list the frame hands it (W7): same flow, no own walk', () => {
+    const s = newGame();
+    const list = Object.values(s.planets);
+    expect(netIncome(s, 'p1', list)).toEqual(netIncome(s, 'p1'));
+    // Without p1's worlds in the list their output is gone: the record itself is not read.
+    const others = list.filter((p) => p.owner !== 'p1');
+    expect(netIncome(s, 'p1', others).energy ?? 0).toBeLessThan(netIncome(s, 'p1').energy ?? 0);
+  });
+
   it('netIncome mirrors the brownout: an energy arrears halves the refinery line', () => {
     const s = newGame();
     s.players.p1!.faction = 'crimson'; // isolate brownout from the faction production bonus (BF-35)

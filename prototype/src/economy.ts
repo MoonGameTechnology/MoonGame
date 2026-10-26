@@ -92,8 +92,14 @@ export function economySnapshot(state: GameState): {
  *  walks (two here, plus the province and inhabited-world counts) and a scan of the whole
  *  schedule per owned world were ~5 ms of a weak phone's frame. The sums run in the same
  *  order as before — world by world in map order, then fleets, then garrisons and
- *  beachheads — so the numbers are bit-for-bit the same (the AI reads them too). */
-export function netIncome(state: GameState, playerId: string): Record<string, number> {
+ *  beachheads — so the numbers are bit-for-bit the same (the AI reads them too).
+ *  `planets` — the worlds of `state.planets` in record order when the caller already
+ *  holds them (the frame keeps the list), so the HUD does not walk the record itself. */
+export function netIncome(
+  state: GameState,
+  playerId: string,
+  planets: readonly Planet[] = recordValues(state.planets),
+): Record<string, number> {
   const out: Record<string, number> = {};
   const arrears = state.players[playerId]?.arrears ?? [];
   // My worlds in map order, the two counts the bonuses need (`ownedProvinceCount`,
@@ -102,7 +108,7 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
   const stationed: Array<Array<{ unit: string; count: number }>> = [];
   let provinces = 0;
   let inhabited = 0; // for the diminishing civic tax
-  for (const p of recordValues(state.planets)) {
+  for (const p of planets) {
     if (p.owner === playerId) {
       owned.push(p);
       if (!isForkSite(p)) provinces += 1;

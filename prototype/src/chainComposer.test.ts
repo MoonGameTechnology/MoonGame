@@ -91,6 +91,7 @@ async function boot() {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   const geo = await import('./fleetGeometry');
   geo.initFleetGeometry({

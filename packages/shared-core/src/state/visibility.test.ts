@@ -16,6 +16,8 @@ import {
   fleetRadarRange,
   identifiedNodes,
   isVisibleTo,
+  radarSignatures,
+  radarSources,
   sensorCoverage,
   sensorCoverageOf,
   sightCircles,
@@ -1477,5 +1479,32 @@ describe('свой бой виден целиком (баг владельца 2
     after.battles = {};
     after.fleets.foe = { ...after.fleets.foe!, battleId: null };
     expect(visibleState(after, 'p1', data).fleets.foe).toBeUndefined();
+  });
+});
+
+describe('миры списком от вызывающего (W7): тот же ответ без своего обхода записи', () => {
+  it('полный список в порядке записи даёт ровно то же, что обход записи', () => {
+    const s = scenario();
+    const list = Object.values(s.planets);
+    expect(sightCircles(s, 'p1', data, list)).toEqual(sightCircles(s, 'p1', data));
+    expect(sensorCoverage(s, 'p1', data, list)).toEqual(sensorCoverage(s, 'p1', data));
+    expect(sensorCoverageOf(s, ['p1', 'p2'], data, list)).toEqual(
+      sensorCoverageOf(s, ['p1', 'p2'], data),
+    );
+    expect(radarSources(s, 'p1', data, list)).toEqual(radarSources(s, 'p1', data));
+    const identify = identifiedNodes(s, 'p1', data);
+    expect(radarSignatures(s, 'p1', data, identify, undefined, list)).toEqual(
+      radarSignatures(s, 'p1', data, identify),
+    );
+  });
+
+  it('читается список, а не запись: мира, которого нет в списке, нет и в ответе', () => {
+    const s = scenario();
+    const withoutA = Object.values(s.planets).filter((p) => p.id !== 'A');
+    // A — единственный мир p1 и его единственный радар; у крейсера на A радара нет.
+    expect(sensorCoverage(s, 'p1', data).radar.has('C')).toBe(true);
+    expect(sightCircles(s, 'p1', data, withoutA).map((c) => c.source.kind)).not.toContain('world');
+    expect(radarSources(s, 'p1', data, withoutA)).toEqual([]);
+    expect(sensorCoverage(s, 'p1', data, withoutA).radar.has('C')).toBe(false);
   });
 });

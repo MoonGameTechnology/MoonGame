@@ -167,6 +167,7 @@ import {
 } from './backGesture';
 import {
   sightCircles,
+  type Planet,
   type SightCircle,
   type Squadron,
   type ShuttleStrike,
@@ -604,6 +605,7 @@ import type {
   GameState,
   Fleet,
 } from '../../packages/shared-core/src/index';
+import { recordValues } from '../../packages/shared-core/src/util/records';
 
 // --- constants ---------------------------------------------------------------
 
@@ -1145,7 +1147,8 @@ initMapRadar({
   vw: () => VW,
   vh: () => VH,
   sources: () => perWorld('radar', ownRadarSources),
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
+  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  planets: worldPlanets,
   note,
   placeName,
   ping: () => snd.play('radar'),
@@ -1317,7 +1320,8 @@ initMapFog({
   me: () => ME,
   net: () => NET,
   contacts: () => netSignatures,
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
+  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  planets: worldPlanets,
 });
 
 /** Производные мира для кадра (шаг 9 плавности) — по тому же договору, что `visionMemo`.
@@ -1354,6 +1358,20 @@ function perWorld<K extends keyof WorldDerived>(
     memo = worldMemo = { state: s, me: ME, vision, got: {} };
   if (!(key in memo.got)) memo.got[key] = compute();
   return memo.got[key] as WorldDerived[K];
+}
+
+/** Миры мира на экране в порядке записи (`recordValues`) — один список на запись миров
+ *  (W7). Запись в 1675 миров — словарь движка, и обход её по ключам на слабом телефоне
+ *  стоит ~0,7 мс; зрение кадра (дважды), круги обзора, радар, ПКО и доход обходили её
+ *  каждый сам, шесть раз на новый мир. Мир не правят на месте, а заменяют, и запись миров
+ *  тоже: та же запись — те же миры, и прежний список верен. Нетронутую запись `applyDelta`
+ *  оставляет прежней, а в идущей партии миры меняются редко, поэтому список переживает
+ *  смену мира. Песочница правит мир на месте и сбрасывает список вместе с `worldMemo`. */
+let planetList: { record: GameState['planets']; list: Planet[] } | null = null;
+function worldPlanets(): readonly Planet[] {
+  if (planetList?.record !== s.planets)
+    planetList = { record: s.planets, list: recordValues(s.planets) };
+  return planetList.list;
 }
 
 /** Имя места для игрока — одно на подписи, журнал, окно боя и метки (`planetName.ts`):
@@ -1511,7 +1529,7 @@ initMapOverlays({
   me: () => ME,
   ctx: () => cx,
   now: () => mapNow(),
-  aa: () => perWorld('aa', () => aaRings(s, data, ME, known)),
+  aa: () => perWorld('aa', () => aaRings(s, data, ME, known, worldPlanets())),
   aimSquadron,
 });
 
@@ -2236,7 +2254,7 @@ initTopBar({
   toolsHidden: sectorZeroToolsHidden,
   scoreLimit: () => SCORE_LIMIT,
   nick: () => nickInput.value,
-  income: () => perWorld('income', () => netIncome(s, ME)),
+  income: () => perWorld('income', () => netIncome(s, ME, worldPlanets())),
   mobile: () => MOBILE,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,
@@ -4600,11 +4618,13 @@ function frame(nowReal: number) {
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
   // The sandbox edits the world in place (here and from its panel), so the same world
-  // object no longer means the same world: a sandboxed match keeps no vision or world memo.
+  // object no longer means the same world: a sandboxed match keeps no vision, world memo
+  // or planet list.
   if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) {
     enforceSandbox(s, ME, sandboxHomeId);
     forgetVision();
     worldMemo = null;
+    planetList = null;
   }
   refreshVision(); // fog projection for this frame; recomputed only when the world changes
   const preparingMap = prepareEnteringMap();
