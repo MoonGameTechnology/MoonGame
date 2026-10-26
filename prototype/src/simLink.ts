@@ -28,7 +28,7 @@ import type { AiProfile } from './ai';
 import { approvalLedger, fullApproval } from './botFavour';
 import { order } from './protoKernel';
 import type { DriverOrder } from './soloSim';
-import { screenView, type SimReply, type SimRequest } from './simProtocol';
+import { screenView, spreadTreasuries, type SimReply, type SimRequest } from './simProtocol';
 
 /** Как часто экран просит у потока память тумана всех мест для сохранения. */
 export const FULL_EVERY_MS = 10_000;
@@ -183,12 +183,12 @@ export function startSimLink(
       const events: DomainEvent[] = [];
       const driverOrders: DriverOrder[] = [];
       const refused: DriverOrder[] = [];
-      let synced = false;
+      const syncs: Array<Extract<SimReply, { kind: 'sync' }>> = [];
       for (const reply of inbox.splice(0)) {
         if (reply.kind === 'full')
           extras = { fog: reply.fog, swarmIntel: reply.swarmIntel, approval: reply.approval };
         if (reply.kind !== 'sync') continue;
-        synced = true;
+        syncs.push(reply);
         base = applyDelta(base, reply.delta);
         events.push(...reply.events);
         driverOrders.push(...reply.driverOrders);
@@ -199,7 +199,8 @@ export function startSimLink(
           if (outcome.error) refused.push({ type: done!.action.type, error: outcome.error });
         }
       }
-      if (!synced) return null;
+      if (syncs.length === 0) return null;
+      base = spreadTreasuries(base, syncs);
       let shown = base;
       for (const p of pending) shown = order(shown, p.action, shown.time).state;
       return { state: shown, events, driverOrders, refused };
