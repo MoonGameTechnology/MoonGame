@@ -110,6 +110,7 @@ async function boot(w: GameState = base()) {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   const geo = await import('./fleetGeometry');
   geo.initFleetGeometry({

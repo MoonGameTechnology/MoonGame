@@ -156,6 +156,7 @@ async function boot(opts: { fog?: boolean } = {}) {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.s.planets),
   });
   if (opts.fog !== false) fog.refreshVision();
   const geometry = await import('./fleetGeometry');

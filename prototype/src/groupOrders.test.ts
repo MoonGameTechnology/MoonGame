@@ -70,6 +70,7 @@ async function boot() {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   const note = (text: string, at?: string) => env.notes.push([text, at]);
   const pipe = await import('./orderPipeline');

@@ -369,10 +369,17 @@ function patrolEyes(state: GameState, byOwner: Map<PlayerId, SightCircle[]>): vo
 }
 
 /** Все круги, которыми видит `viewerId`: его собственные и его блока зрения (союз, обмен
- *  картами). Порядок фиксирован — зритель, затем `state.players` (инвариант №1). */
-export function sightCircles(state: GameState, viewerId: PlayerId, data: GameData): SightCircle[] {
+ *  картами). Порядок фиксирован — зритель, затем `state.players` (инвариант №1).
+ *  `planets` — миры `state.planets` в порядке записи (`recordValues`), если они у
+ *  вызывающего уже есть: ответ тот же, без своего обхода записи. */
+export function sightCircles(
+  state: GameState,
+  viewerId: PlayerId,
+  data: GameData,
+  planets?: readonly Planet[],
+): SightCircle[] {
   const bloc = visionBloc(state, viewerId);
-  const byOwner = circlesByOwner(state, bloc, data, sightRulesOf(state));
+  const byOwner = circlesByOwner(state, bloc, data, sightRulesOf(state), planets);
   return bloc.flatMap((memberId) => byOwner.get(memberId)!);
 }
 
@@ -493,9 +500,17 @@ export function patrolsSeenBy(state: GameState, viewerId: PlayerId, data: GameDa
  *  This is the single point the whole fog boundary reads: the per-player projection
  *  (`project`), the remembered-fog writer (`visibilityModule`), the broadcast event
  *  filter (`matchRoom`) and threat scanning all route through here, so shared vision
- *  stays consistent across every surface instead of being re-derived per caller. */
-export function sensorCoverage(state: GameState, viewerId: PlayerId, data: GameData): Coverage {
-  return sensorCoverageOf(state, [viewerId], data).get(viewerId)!;
+ *  stays consistent across every surface instead of being re-derived per caller.
+ *
+ *  `planets` — the worlds of `state.planets` in record order (`recordValues`) when the
+ *  caller already holds them: the same answer without a walk of its own. */
+export function sensorCoverage(
+  state: GameState,
+  viewerId: PlayerId,
+  data: GameData,
+  planets?: readonly Planet[],
+): Coverage {
+  return sensorCoverageOf(state, [viewerId], data, planets).get(viewerId)!;
 }
 
 /** Сторона клетки сетки миров в `sensorCoverageOf`. Ответ от неё не зависит: сетка лишь
@@ -567,8 +582,8 @@ export function sensorCoverageOf(
   state: GameState,
   viewerIds: readonly PlayerId[],
   data: GameData,
+  planets: readonly Planet[] = recordValues(state.planets),
 ): Map<PlayerId, Coverage> {
-  const planets = recordValues(state.planets);
   const { xs, ys, cells } = planetGrid(planets);
   const blocs = viewerIds.map((viewerId) => visionBloc(state, viewerId));
   const byOwner = circlesByOwner(
@@ -653,11 +668,13 @@ export function identifiedNodes(
 }
 
 /** Shared radar projection for the server and solo client. It deliberately contains
- * no fleet identity, owner, count or loadout; identification remains a separate rule. */
+ * no fleet identity, owner, count or loadout; identification remains a separate rule.
+ * `planets` — the worlds of `state.planets` in record order, as `sensorCoverageOf` takes them. */
 export function radarSources(
   state: GameState,
   viewerId: PlayerId,
   data: GameData,
+  planets: readonly Planet[] = recordValues(state.planets),
 ): RadarSource[] {
   const sources: RadarSource[] = [];
   const scale = sightRulesOf(state).radarScale;
@@ -666,7 +683,7 @@ export function radarSources(
     const add = (at: { x: number; y: number }, range: number, level: number): void => {
       if (range * mult > 0) sources.push({ ...at, range: range * mult, level });
     };
-    for (const planet of Object.values(state.planets)) {
+    for (const planet of planets) {
       if (planet.owner !== owner) continue;
       for (const b of planet.buildings) {
         const def = data.buildings[b.type];
@@ -730,8 +747,9 @@ export function radarSignatures(
   data: GameData,
   identify: ReadonlySet<PlanetId> = identifiedNodes(state, viewerId, data),
   seenAt: ReadonlySet<FleetId> = fleetsSeenByPosition(state, viewerId, data),
+  planets?: readonly Planet[],
 ): SignatureContact[] {
-  const sources = radarSources(state, viewerId, data);
+  const sources = radarSources(state, viewerId, data, planets);
   if (!sources.length) return [];
   // A fleet in the viewer's own battle is shown in full (`engagementOf`) — no blip on top.
   const engaged = engagementOf(state, viewerId).fleets;
@@ -763,7 +781,7 @@ export function radarSignatures(
     if (isMissileFleet(fleet, data)) {
       const at = fleetPosition(state, fleet);
       if (!at) continue;
-      if (missileVisible(state, fleet, viewerId, data, (eyes ??= sightCircles(state, viewerId, data)))) continue;
+      if (missileVisible(state, fleet, viewerId, data, (eyes ??= sightCircles(state, viewerId, data, planets)))) continue;
       const location = nearestOf((provinces ??= publicProvinces(state)), state, at);
       if (location === null) continue;
       emitters.push({ location, ...at, inTransit: true, strength: fleetSignalStrength(fleet, data) });

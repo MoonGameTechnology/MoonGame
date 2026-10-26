@@ -144,6 +144,7 @@ async function boot(opts: { pc?: boolean } = {}) {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   fog.refreshVision(); // без зрения туман выключен, и чужое видно отовсюду
   const geo = await import('./fleetGeometry');

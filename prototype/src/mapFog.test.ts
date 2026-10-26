@@ -81,7 +81,13 @@ function base(patch: (st: GameState) => void = () => {}): GameState {
 }
 
 async function boot(w: GameState = base()) {
-  const env = { world: w, me: 'p1', net: false, contacts: [] as SignatureContact[] };
+  const env = {
+    world: w,
+    me: 'p1',
+    net: false,
+    contacts: [] as SignatureContact[],
+    planets: null as Planet[] | null,
+  };
   const fog = await import('./mapFog');
   fog.initMapFog({
     world: () => env.world,
@@ -89,6 +95,7 @@ async function boot(w: GameState = base()) {
     net: () => env.net,
     contacts: () => env.contacts,
     sight: () => [],
+    planets: () => env.planets ?? Object.values(env.world.planets),
   });
   return { fog, env };
 }
@@ -126,6 +133,14 @@ describe('REFM-231 — зрение кадра', () => {
     fog.refreshVision();
     expect(fog.vision).not.toBe(third);
     expect(fog.memory.has('A')).toBe(true);
+  });
+
+  it('пересчёт берёт миры списком из кэша кадра (W7), а не обходом записи', async () => {
+    const { fog, env } = await boot();
+    // A — свой мир и единственные глаза: без него в списке опознавать нечего и нечем.
+    env.planets = Object.values(env.world.planets).filter((p) => p.id !== 'A');
+    fog.refreshVision();
+    expect(fog.known('A')).toBe(false);
   });
 
   it('смена своего места — тоже пересчёт', async () => {
@@ -283,16 +298,23 @@ describe('REFM-231 — стык с main.ts', () => {
   const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
   const init = /initMapFog\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
-  it('хуки тумана — мир, своё место, сеть, контакты радара и круги обзора кадра', () => {
+  it('хуки тумана — мир, своё место, сеть, контакты радара, круги обзора и миры кадра', () => {
     for (const hook of [
       'world: () => s,',
       'me: () => ME,',
       'net: () => NET,',
       'contacts: () => netSignatures,',
-      "sight: () => perWorld('sight', () => sightCircles(s, ME, data)),",
+      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+      'planets: worldPlanets,',
     ]) {
       expect(init, hook).toContain(hook);
     }
+  });
+
+  it('список миров кадра — один на запись миров, песочница его сбрасывает (W7)', () => {
+    const body = MAIN.slice(MAIN.indexOf('function worldPlanets('));
+    expect(body.slice(0, body.indexOf('\n}\n'))).toContain('planetList?.record !== s.planets');
+    expect(MAIN).toMatch(/forgetVision\(\);\n\s*worldMemo = null;\n\s*planetList = null;/);
   });
 
   it('зрение и память разведки меняют только двери владельца', () => {

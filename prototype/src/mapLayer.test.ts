@@ -117,7 +117,14 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
   camera.frameMap(nodes);
   camera.setView({ scale: 1, x: 0, y: 0 });
   const fog = await import('./mapFog');
-  fog.initMapFog({ world: () => env.world, me: () => 'p1', net: () => false, contacts: () => [], sight: () => [] });
+  fog.initMapFog({
+    world: () => env.world,
+    me: () => 'p1',
+    net: () => false,
+    contacts: () => [],
+    sight: () => [],
+    planets: () => Object.values(env.world.planets),
+  });
   fog.refreshVision();
   (await import('./mapPalette')).initMapPalette({
     world: () => env.world,
