@@ -13,7 +13,6 @@ import {
   initSoloCheckpoint,
   leaveSolo,
   saveSolo,
-  soloSaveActive,
   suspendSolo,
   tickSoloSave,
 } from './soloCheckpoint';
@@ -187,7 +186,7 @@ import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinef
 import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
@@ -425,14 +424,14 @@ import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, in
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
-import { apply, initOrderPipeline, playerOrder, settleOrder } from './orderPipeline';
+import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
   hideTrainingBoard,
   tickTrainingScenario,
   type TrainingScenarioHost,
 } from './trainingScenario';
-import { startSimLink, workerPort, type SimLink } from './simLink';
+import { forwardToSim, initSimDriver, saveSimInBackground, settleSimClock, simOn, simSaved, simShownTime, stepSim, stopSim, syncSim } from './simDriver';
 import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
   cancelMobileOrder,
@@ -541,15 +540,12 @@ import {
 import {
 } from './fleetEffects';
 import {
-  adoptDue,
   advanceTarget,
   fpsNext,
   saneGap,
   simRuns,
   spinRuns,
-  stepBacklog,
 } from '../../decisions/simClock';
-import { simWorkerScript } from '../../decisions/simWorker';
 import {
   JUDGE_WARMUP_MS,
   judgingFrames,
@@ -559,11 +555,8 @@ import {
   slowVerdictReach,
 } from '../../decisions/mapSharpness';
 import {
-  NET_VIEW_IDLE,
-  netViewAt,
   netViewFollow,
   netViewSettled,
-  netViewSnapshot,
   type NetViewShown,
 } from '../../decisions/netViewClock';
 import { mountLocaleMenu } from './localeMenu';
@@ -873,53 +866,22 @@ let netShown: NetViewShown | null = null;
 function mapNow(): number {
   // Серверный мир рисуется по часам картинки и на обрыве (`netWorld`): иначе флоты на миг
   // отъезжали бы ко времени последнего снимка и прыгали обратно на переподключении.
-  return netWorld ? netShownTime : simLink ? simShownTime : s.time;
+  return netWorld ? netShownTime : simOn() ? simShownTime() : s.time;
 }
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
 // «сильный» = the full-heuristics one). Default solo = p2 on weak.
 let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
-// Отдельный поток расчёта соло-мира (`simLink.ts`): мир обычной схватки считает он, а кадр
-// только рисует. Файл потока (и для дев-сборки с диска — исходник строкой) кладёт сборка
-// (`build.mjs`); откуда поднимать — `decisions/simWorker.ts`. Не поднялся — мир идёт в кадре.
-declare const __SIM_WORKER_URL__: string | undefined;
-declare const __SIM_WORKER_SRC__: string | undefined;
-const SIM_WORKER = simWorkerScript({
-  protocol: location.protocol,
-  query: new URLSearchParams(location.search).get('sim'),
-  url: typeof __SIM_WORKER_URL__ === 'string' ? __SIM_WORKER_URL__ : '',
-  source: typeof __SIM_WORKER_SRC__ === 'string' ? __SIM_WORKER_SRC__ : '',
+// Поток расчёта соло-мира — у владельца, `simDriver.ts` (REFM-245): связь с потоком, его
+// часы картинки и решение, ведёт ли он мир. Отсюда — мир, своё место, экран матча, места ИИ
+// и очередь комиксов.
+initSimDriver({
+  world: () => s,
+  me: () => ME,
+  inMatch: () => inMatch(),
+  aiPlayers: () => AI_PLAYERS,
+  comicBusy: () => comicQueue.isBusy(),
 });
-let simLink: SimLink | null = null;
-/** Поток не поднялся или сломался — до перезагрузки мир идёт в кадре. */
-let simBroken = false;
-/** Игровое время, накопленное кадрами к следующему шагу потока (`stepBacklog`). */
-let simBacklog = 0;
-/** Часы картинки между шагами потока — те же, что у сети между снимками сервера. */
-let simView = NET_VIEW_IDLE;
-let simShownTime = 0;
-/** Когда кадр в последний раз взял мир потока (правило 7 в `simClock.ts`). */
-let simAdoptedAt = -Infinity;
-/** Поток считает только обычную схватку: забег, обучение, полигон, песочница и сеть ведут
- *  мир в кадре — там экран сам правит мир и ждёт итог приказа сразу. */
-function simEligible(): boolean {
-  return (
-    SIM_WORKER !== null &&
-    !simBroken &&
-    !netWorld &&
-    soloSaveActive &&
-    !s.pve &&
-    inMatch() &&
-    !(!__PLAYER_BUILD__ && sandboxConfig.enabled)
-  );
-}
-function stopSim(): void {
-  simLink?.stop();
-  simLink = null;
-  simBacklog = 0;
-  simView = NET_VIEW_IDLE;
-  simAdoptedAt = -Infinity;
-}
 // SANDBOX — the home world of the local player (immortal-home target), captured at
 // launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
 let sandboxHomeId: string | null = null;
@@ -1349,7 +1311,7 @@ initOrderPipeline({
   tour: () => activeTour,
   intro: maybeIntro,
   steward: () => steward,
-  forward: (action) => simLink?.forward(action),
+  forward: forwardToSim,
 });
 
 // Обучение — у владельца, `guideFlow.ts` (REFM-221): лаунчер туров, флаг «обучение
@@ -3666,7 +3628,7 @@ window.addEventListener('keydown', (e) => {
 // `soloCheckpoint.ts` (REFM-213). Здесь только снимок политик хоста и проводка к миру, темпу
 // и экранам.
 function currentSoloSave(): SoloSave {
-  return { state: simLink ? simLink.saved(s) : s, ...soloSaveHost() };
+  return { state: simSaved(s), ...soloSaveHost() };
 }
 /** Политики хоста в сохранении — всё, кроме мира. */
 function soloSaveHost(): Omit<SoloSave, 'state'> {
@@ -3683,11 +3645,7 @@ initSoloCheckpoint({
   practice: () => !__PLAYER_BUILD__ && sandboxConfig.enabled,
   inMatch,
   snapshot: currentSoloSave,
-  saveInBackground: (rules, done) => {
-    if (!simLink) return false;
-    simLink.save(soloSaveHost(), rules, done);
-    return true;
-  },
+  saveInBackground: (rules, done) => saveSimInBackground(soloSaveHost(), rules, done),
   halt: () => {
     speed = 0;
     // Мир стоит, пока игрок не нажмёт ▶, — ряд скорости показывает паузу, а не прежний темп.
@@ -3942,49 +3900,12 @@ function frame(nowReal: number) {
   }
   judgeMapSharpness(nowReal, dt);
   // Отдельный поток расчёта: сначала то, что он прислал (мир, события и исходы своих
-  // приказов), потом следующий шаг.
-  if (simLink && !simEligible()) stopSim();
-  if (!simLink && simEligible()) {
-    const port = SIM_WORKER && workerPort(SIM_WORKER);
-    if (port) simLink = startSimLink(port, s, ME, matchMode());
-    else simBroken = true;
-  }
-  if (simLink) {
-    // Присланное кадр берёт не чаще раза в `ADOPT_EVERY_MS`, а пока камера движется — в
-    // `ADOPT_MOVING_MS` (`simClock.ts`, правило 7): каждый взятый мир он разбирает заново, а
-    // движение между мирами досчитывают часы картинки. Им время мира потока идёт с каждым
-    // пришедшим шагом, а не со взятием. Сломавшийся поток отдаёт всё, что успел прислать, сразу.
-    const arrived = simLink.frame();
-    if (arrived !== null) simView = netViewSnapshot(simView, arrived, nowReal);
-    const due = adoptDue(nowReal, simAdoptedAt, mapMoving(nowReal)) || simLink.failed !== null;
-    const sync = due ? simLink.take() : null;
-    if (sync) {
-      simAdoptedAt = nowReal;
-      apply({ state: sync.state, events: sync.events });
-      for (const o of [...sync.driverOrders, ...sync.refused]) settleOrder(o.type, o.error);
-    }
-    if (simLink.failed !== null) {
-      // Мир на экране цел (последняя разность и неподтверждённые приказы) — кадр ведёт его дальше.
-      // Чего у копии нет (чужая память тумана, мнения ботов о чужих местах), он берёт из последней
-      // полной посылки потока: без них соперники в кадре забыли бы разведку, а боты — что думают
-      // друг о друге.
-      console.warn('sim worker failed:', simLink.failed);
-      apply({ state: simLink.saved(s), events: [] });
-      stopSim();
-      simBroken = true;
-    }
-  }
+  // приказов), потом следующий шаг (`simDriver.ts`).
+  syncSim(nowReal);
   // `netWorld`, а не `NET`: на обрыве мир на экране всё ещё серверный, под туманом, и
   // локальный ход по нему выбил бы «безземельных» соперников и объявил ложную победу.
   const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy() || !!activeTour?.holdsClock, !!endScreen);
-  if (simRunning && simLink) {
-    simBacklog = stepBacklog(simBacklog, dt, speed, HOUR);
-    if (!simLink.busy && simBacklog > 0) {
-      // От цели прошлого шага, а не от мира на экране: тот отстаёт на шаги, которых кадр не взял.
-      simLink.step(simLink.time + simBacklog, !comicQueue.isBusy(), AI_PLAYERS, soloAutoAssault, nowReal);
-      simBacklog = 0;
-    }
-  } else if (simRunning) {
+  if (simRunning && !stepSim(dt, speed, nowReal)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for
     // an empty seat — so we only render its snapshots (no local AI runs here).
@@ -4013,12 +3934,7 @@ function frame(nowReal: number) {
   if (netView.t === null || netView.bornAt > (netShown?.at ?? -Infinity)) netShown = null;
   netShown = netViewFollow(netShown, netView, nowReal, s.time);
   netShownTime = netShown.time;
-  // На паузе картинка стоит на мире: досчитывать вперёд нечего.
-  if (!simRunning) {
-    simBacklog = 0;
-    simView = NET_VIEW_IDLE;
-  }
-  simShownTime = netViewAt(simView, nowReal, s.time);
+  settleSimClock(nowReal, simRunning);
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.

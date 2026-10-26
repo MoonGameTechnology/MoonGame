@@ -103,6 +103,8 @@ function makeContext(canvas) {
     createRadialGradient: () => ({ addColorStop() {} }),
     createLinearGradient: () => ({ addColorStop() {} }),
     createConicGradient: () => ({ addColorStop() {} }),
+    // `drawFleets` puts the screen transform back by hand instead of a save() per fleet.
+    getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     save: () => stack.push(state.globalAlpha),
     restore: () => { state.globalAlpha = stack.pop() ?? 1; },
   };
