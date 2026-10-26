@@ -1,4 +1,4 @@
-import { startPlayerActivity } from '../../packages/client/src/playerActivity';
+import { connectEl, connectShown, enterBrowse, initConnectScreen, nickInput, refreshActivity, resolveServer, showConnect, srvInput, startActivity, statusEl } from './connectScreen';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
@@ -19,7 +19,6 @@ import {
   probeAuthMode,
   resumeSession,
   sessionRecord,
-  sessionToken,
 } from './accountSession';
 import {
   dispatchChat,
@@ -59,7 +58,6 @@ import {
   openReset,
   showStage,
   startAuthProbe,
-  suggestCallsign,
   welcomePassword,
 } from './signInPages';
 import {
@@ -84,7 +82,7 @@ import {
   initMatchJoin,
   stopNetSetupPoll,
 } from './matchJoin';
-import { initMatchBrowser, refreshMatches } from './matchBrowser';
+import { initMatchBrowser } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
 import { isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
@@ -167,7 +165,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { pveChapter } from '../../packages/client/src/gameData';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
-import { bakedServer, buildLabel, currentBuild } from './updater';
+import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
@@ -557,10 +555,8 @@ import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
 import { claimIntent, matchIdFrom } from '../../decisions/matchAddress';
-import { httpBase } from '../../decisions/matchQuery';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
-import { defaultServerField, resolveAddress, resolveBase } from '../../decisions/serverAddress';
 import { apkOfferShown } from '../../decisions/apkOffer';
 import { radarContacts } from './snapshotIngest';
 import { GOTO_MIN_ZOOM } from './mapJump';
@@ -841,8 +837,8 @@ initNetSession({
   pingProvince: (target) => provinceForPing(target, MAP),
   closePingPop: () => pings?.closePop(),
   fps: () => fpsEma,
-  showConnect: (show) => showConnect(show),
-  connectShown: () => connectShown(),
+  showConnect,
+  connectShown,
   openHub,
   cameFromLink: () => cameFromLink,
 });
@@ -1319,7 +1315,7 @@ initGuideFlow({
   loadMeta,
   saveMeta,
   showHub,
-  showConnect: (show) => showConnect(show), // объявлен ниже, у экрана входа
+  showConnect,
   startMatch,
   sheetExpanded: (key) => mobileHud.expanded(key),
   collapseSheet: () => mobileHud.collapse(),
@@ -2298,11 +2294,11 @@ initMatchLifecycle({
       run(0);
     }),
   hideTrainingResume: () => trainingResume.hide(),
-  showConnect: (show) => showConnect(show), // объявлен ниже, у экрана входа
+  showConnect,
   showHub: (show) => showHub(show),
   openHub: () => openHub(),
   hubTab: (tab) => hubTab(tab),
-  resolveServer: () => resolveServer(),
+  resolveServer,
 });
 // Event-log window: the rail's ≡ opens it; ✕ or the backdrop closes it. The feed
 // (#log) updates in place each frame whether the window is open or not.
@@ -2620,28 +2616,9 @@ const shipyard = initShipyard({
 });
 document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
 
-// --- connect overlay (single-player vs join a live session) ------------------
-// Entry screen: pick a faction, then run a local skirmish or connect to a server
-// (`pnpm dev:proto-server`, or a tunnel URL a friend shared). The last-used URL
-// is remembered so the APK reconnects with one tap.
-const connectEl = $('connect');
-const srvInput = $('csrv') as HTMLInputElement;
-const nickInput = $('cnick') as HTMLInputElement;
-const statusEl = $('cstatus');
-const showConnect = (show: boolean): void => {
-  connectEl.style.display = show ? 'flex' : 'none';
-};
-/** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли
- *  игрок написанное в его строку статуса. Пришёл ли он по ссылке — отдельный вопрос и
- *  отдельный признак (`cameFromLink`): оверлей держится до впуска в обоих случаях. */
-const connectShown = (): boolean => connectEl.style.display !== 'none';
-// Remembered server, then the one baked into the APK, then the page's own origin
-// (`serverAddress.ts`, rule 8).
-srvInput.value = defaultServerField(localStorage.getItem('void.server'), bakedServer(), location);
-// Remember the side you last commanded, so reopening the link drops you back onto
-// your own seat — the server maps nick→side, so a returning name resumes its own
-// faction (nick-login; full accounts in docs/persistence-accounts-roadmap.md).
-nickInput.value = localStorage.getItem('void.nick') ?? '';
+// Экран подключения — у владельца, `connectScreen.ts` (REFM-247): узлы экрана, показ, адрес и
+// позывной по умолчанию, разбор адреса, вход в обозреватель и такт активности игрока.
+initConnectScreen();
 
 // The dev test mode is a DEV-CLIENT feature: the player build compiles it out (and
 // build.mjs strips its button/markup), so a regular player's client has no test overlay
@@ -2699,14 +2676,6 @@ if (!__PLAYER_BUILD__) {
   });
 }
 
-// --- welcome stage → match browser ------------------------------------------------
-// Страницы входа и переключатель стадий `#connect` живут в `signInPages.ts` (REFM-218);
-// отсюда обозреватель партий открывается своей стадией.
-function enterBrowse(): void {
-  if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
-  showStage('browse');
-  detach('обозреватель: список партий', refreshMatches());
-}
 // Хаб — у владельца, `hubScreen.ts` (REFM-220): вкладки и их экраны, прокачка, профиль,
 // портрет, сверка опыта, вход в хаб, его кнопки и корпорация. Отсюда — поля экрана входа,
 // его строка статуса и показ, обозреватель партий, темп и проверка удаления аккаунта.
@@ -2716,7 +2685,7 @@ initHubScreen({
     nickInput.value = nick;
   },
   serverField: () => srvInput.value,
-  resolveServer: () => resolveServer(),
+  resolveServer,
   status: (text) => {
     statusEl.textContent = text;
   },
@@ -2915,10 +2884,9 @@ document.getElementById('rail-settings')?.addEventListener('click', openSettings
 
 // Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
 // загрузочного блока: его ветка по ссылке может попросить войти.
-let activity: ReturnType<typeof startPlayerActivity> | undefined;
 initAccountSession({
   sessionChanged: () => {
-    activity?.refresh();
+    refreshActivity();
     arsenal?.forget();
   },
   status: (text) => {
@@ -3088,35 +3056,8 @@ initSetupScreen({
   sideColors: () => ({ you: youColor, rival: paletteOf(rivalPaletteId).war }),
 });
 
-// --- match browser (the meta-shell "Play" tab) -------------------------------
-// The list itself — tabs, filter, archive and the hub's «Мои партии» — lives in
-// `matchBrowser.ts` (REFM-217); the server box it reads stays here.
-
-/** Normalize the pasted server box to a ws(s):// ORIGIN + read the nick. Returns
- *  null (and sets the status line) when either is missing/invalid. Shared by the
- *  match browser and `connect()`. */
-function resolveServer(): { base: string; nick: string } | null {
-  // Разбор набранного — `serverAddress.ts` (REFM-162): схема правится (скопированный из
-  // браузера `https://` → `wss://`, голый хост дополняется схемой страницы, а на
-  // HTTPS-странице `ws://` поднимается до `wss://` — иначе браузер молча режет сокет),
-  // путь отбрасывается, а пустой ПОЗЫВНОЙ не пускает дальше МОЛЧА: пробу режима
-  // аккаунтов зовут из загрузочного блока, до того как игрок что-то напечатал.
-  const step = resolveAddress({
-    server: srvInput.value,
-    nick: nickInput.value,
-    pageHttps: location.protocol === 'https:',
-  });
-  if (step.kind === 'ok') return { base: step.base, nick: step.nick };
-  if (step.kind !== 'need-nick') statusEl.textContent = t(step.key);
-  return null;
-}
-
-if (!__SECTOR_ZERO_ONLY__) activity = startPlayerActivity(() => {
-  const step=resolveBase(srvInput.value,location.protocol==='https:');
-  const base=step.kind==='ok' ? step.base : null;
-  const token=base ? sessionToken(base) : null;
-  return base && token ? {base:httpBase(base),token} : null;
-});
+// Такт активности игрока — у экрана подключения (`connectScreen.ts`): он читает поле сервера.
+startActivity();
 
 // --- accounts (SES-2.5) -------------------------------------------------------
 // The account flow itself — the server's identity mode, the stored session, login-or-
