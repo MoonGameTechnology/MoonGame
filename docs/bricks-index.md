@@ -36,7 +36,11 @@
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | REFM-219 | ✅ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ✅ | proto | `docs/backlog.md` | Хаб и настройки |
-| REFM-244 | ⏳ | proto | `docs/backlog.md` | Точка сборки |
+| REFM-244 | ✅ | proto | `docs/backlog.md` | Точка сборки |
+| REFM-245 | ⏳ | proto | `docs/backlog.md` | Поток расчёта соло-мира |
+| REFM-246 | ⏳ | proto | `docs/backlog.md` | Проводка окна боя |
+| REFM-247 | ⏳ | proto | `docs/backlog.md` | Экран подключения |
+| REFM-248 | ⏳ | proto | `docs/backlog.md` | Проводка настроек |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | TXT-8 | 🔒 | proto docs | `docs/backlog.md` | (LORE-1) Досье кораблей и зданий: описание о роли, числа в |
