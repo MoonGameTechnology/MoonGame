@@ -24,6 +24,33 @@ describe('corporation infrastructure presentation', () => {
     }
   });
 
+  it('reads level requirements and the counts they are checked against (CORP-6)', () => {
+    const valid = fixture();
+    const hq = valid.buildings[0]!;
+    expect(hq.levels[3]).toMatchObject({ members: 15, battles: 10 });
+    expect(parseCorpInfrastructure({ ...valid, members: 7, battles: 3 })).toMatchObject({
+      members: 7,
+      battles: 3,
+    });
+    // A server before CORP-6 sends no counts: none is assumed.
+    const { members: _m, battles: _b, ...old } = valid;
+    expect(parseCorpInfrastructure(old)).toMatchObject({ members: 0, battles: 0 });
+    const blocked = { ...hq, blocked: 'E_CORP_BUILD_BATTLES' };
+    expect(parseCorpInfrastructure({ ...valid, buildings: [blocked] })).not.toBe(null);
+    const badLevel = {
+      ...hq,
+      levels: hq.levels.map((l, i) => (i === 3 ? { ...l, members: -1 } : l)),
+    };
+    for (const input of [
+      { ...valid, members: -1 },
+      { ...valid, battles: 1.5 },
+      { ...valid, members: '7' },
+      { ...valid, buildings: [badLevel] },
+    ]) {
+      expect(parseCorpInfrastructure(input)).toBe(null);
+    }
+  });
+
   it('countdown reaches zero without granting a level locally', () => {
     const data = fixture();
     data.construction = {

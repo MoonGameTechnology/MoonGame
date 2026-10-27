@@ -403,11 +403,13 @@ if (DATABASE_URL) {
   // One feed for both writers: the corp store announces a corp's own facts into it.
   const memoryFeed = new MemoryAvaFeedStore();
   feedStore = memoryFeed;
-  corpStore = new MemoryCorpStore(memoryFeed);
+  // The corp store counts played battles for the level requirements (CORP-6).
+  const memoryResults = new MemoryAvaResultStore();
+  resultStore = memoryResults;
+  corpStore = new MemoryCorpStore(memoryFeed, memoryResults);
   announcementStore = new MemoryAnnouncementStore();
   challengeStore = new MemoryAvaChallengeStore();
   rosterStore = new MemoryAvaRosterStore();
-  resultStore = new MemoryAvaResultStore();
   sessionStore = new MemoryAvaSessionStore(memoryMatches);
   medalStore = new MemoryMedalStore();
   corpRentStore = new MemoryCorpRentStore();

@@ -5,6 +5,16 @@ export interface CorpBuildingLevel {
   headquarters: number;
   influencePerDay: number;
   constructionReduction: number;
+  /** Members the corporation needs to order this level, recruits not counted (CORP-6). */
+  members?: number;
+  /** AvA battles the corporation has played, on either side, to order this level. */
+  battles?: number;
+}
+
+/** What the level requirements are checked against (CORP-6). */
+export interface CorpStanding {
+  members: number;
+  battles: number;
 }
 
 export interface CorpBuildingDef {
@@ -43,6 +53,8 @@ export type CorpBuildError =
   | 'E_CORP_BUILD_LEVEL'
   | 'E_CORP_BUILD_MAX'
   | 'E_CORP_BUILD_REQUIRES'
+  | 'E_CORP_BUILD_MEMBERS'
+  | 'E_CORP_BUILD_BATTLES'
   | 'E_INSUFFICIENT';
 
 export interface CorpBuildingView extends CorpBuildingDef {
@@ -51,7 +63,7 @@ export interface CorpBuildingView extends CorpBuildingDef {
   blocked: CorpBuildError | null;
 }
 
-export interface CorpInfrastructureView {
+export interface CorpInfrastructureView extends CorpStanding {
   corpId: string;
   serverNow: number;
   influence: number;

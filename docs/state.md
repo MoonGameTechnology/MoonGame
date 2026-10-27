@@ -638,7 +638,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 | Срез | Код (`packages/server/src`) | Хост игроков |
 | --- | --- | --- |
-| Корпорации: роли, влияние, стройка | `corpService.ts`, `corpConstruction.ts` | вкл. |
+| Корпорации: роли, влияние, стройка, пять уровней штаба | `corpService.ts`, `corpConstruction.ts` | вкл. |
 | Лента новостей: жизнь корпораций, битвы, объявления администратора | `corpNews.ts`, `newsApi.ts`, `newsScreen.ts` | вкл. (`GET /news`, «Домой» в хабе) |
 | Арсенал: стартовый набор, дроп, гейт `E_NOT_OWNED` | `mainGameArsenal.ts`, `arsenal.ts` | вкл. |
 | Мета-экономика: материалы, крафт, выплаты, сезон, Суверены, витрина за ◆, перки премиума, награды за медали | `metaEconomy*.ts`, `medalRewards.ts` | вкл. |

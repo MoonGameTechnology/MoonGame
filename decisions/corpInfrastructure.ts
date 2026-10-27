@@ -18,7 +18,9 @@ const level = (v: unknown): v is CorpBuildingLevel =>
   integer(v.headquarters) &&
   integer(v.influencePerDay) &&
   integer(v.constructionReduction) &&
-  v.constructionReduction <= 50;
+  v.constructionReduction <= 50 &&
+  (v.members === undefined || integer(v.members)) &&
+  (v.battles === undefined || integer(v.battles));
 const ERRORS = new Set([
   'E_FORBIDDEN',
   'E_CORP_BUILDING',
@@ -26,6 +28,8 @@ const ERRORS = new Set([
   'E_CORP_BUILD_LEVEL',
   'E_CORP_BUILD_MAX',
   'E_CORP_BUILD_REQUIRES',
+  'E_CORP_BUILD_MEMBERS',
+  'E_CORP_BUILD_BATTLES',
   'E_INSUFFICIENT',
 ]);
 
@@ -39,6 +43,8 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
     !integer(raw.influencePerDay) ||
     !integer(raw.constructionReduction) ||
     raw.constructionReduction > 50 ||
+    (raw.members !== undefined && !integer(raw.members)) ||
+    (raw.battles !== undefined && !integer(raw.battles)) ||
     typeof raw.canBuild !== 'boolean' ||
     !Array.isArray(raw.buildings) ||
     raw.buildings.length === 0 ||
@@ -87,7 +93,12 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
     )
       return null;
   }
-  return raw as unknown as CorpInfrastructureView;
+  // A server before CORP-6 sends no counts and no level asks for them.
+  return {
+    ...(raw as unknown as CorpInfrastructureView),
+    members: integer(raw.members) ? raw.members : 0,
+    battles: integer(raw.battles) ? raw.battles : 0,
+  };
 }
 
 /** Server time + elapsed local display time; changing the device clock cannot complete a job. */

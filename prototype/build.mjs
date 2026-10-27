@@ -4189,6 +4189,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-lvtable th{font-weight:600;color:var(--sf-dim);}
 .cb-lvtable tr.cur td{background:var(--sf-sel);}
 .cb-lvtable td:first-child{font-weight:700;color:var(--sf-hi);white-space:nowrap;}
+/* CORP-6: участники и битвы, без которых штаб этого уровня не заказать */
+.cb-lvtable .cb-lv-cond{display:block;margin-top:2px;color:var(--sf-dim);}
 .cb-ms-h{display:flex;align-items:center;gap:14px;}
 .cb-ms-h small{display:block;margin-top:2px;font-size:var(--fs-caption);color:var(--sf-dim);}
 .cb-ms-acts{display:flex;flex-wrap:wrap;gap:8px;}

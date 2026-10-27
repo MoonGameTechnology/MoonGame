@@ -25,6 +25,24 @@
           "headquarters": 2,
           "influencePerDay": 72,
           "constructionReduction": 0
+        },
+        {
+          "cost": 800,
+          "durationMs": 86400000,
+          "headquarters": 3,
+          "influencePerDay": 96,
+          "constructionReduction": 0,
+          "members": 15,
+          "battles": 10
+        },
+        {
+          "cost": 1500,
+          "durationMs": 172800000,
+          "headquarters": 4,
+          "influencePerDay": 120,
+          "constructionReduction": 0,
+          "members": 20,
+          "battles": 25
         }
       ]
     },

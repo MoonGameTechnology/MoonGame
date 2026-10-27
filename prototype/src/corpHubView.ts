@@ -22,6 +22,7 @@ import {
   corpLevelTable,
   corpLotState,
   corpRequirements,
+  type CorpCondition,
   type CorpLotState,
   type CorpOpening,
 } from '../../decisions/corpBase';
@@ -90,6 +91,16 @@ const MEMBER_ACTION: Readonly<Record<Exclude<CorpMemberAction, 'accept' | 'decli
   transfer: 'corp.hub.member.transfer',
   kick: 'corp.hub.member.kick',
 };
+
+/** Условие уровня (CORP-6): «есть из нужных» в листе и строке здания, «нужно» в таблице. */
+const CONDITION_KEY: Readonly<Record<CorpCondition['kind'], { have: string; need: string }>> = {
+  members: { have: 'corp.hub.req.members', need: 'corp.hub.levels.members' },
+  battles: { have: 'corp.hub.req.battles', need: 'corp.hub.levels.battles' },
+};
+const conditionText = (c: Pick<CorpCondition, 'kind' | 'need' | 'have'>): string =>
+  t(CONDITION_KEY[c.kind].have, { n: c.need, have: c.have });
+const conditionHtml = (c: CorpCondition): string =>
+  `<li class="${c.ok ? 'ok' : 'no'}">${esc(conditionText(c))}</li>`;
 
 /** Карточка стиля без кнопки: что о нём сказать. */
 const STYLE_STATE: Readonly<Record<Exclude<CorpStyleCard, 'apply' | 'shop'>, string>> = {
@@ -343,7 +354,7 @@ function levelCardHtml(view: CorpInfrastructureView, elapsedMs: number): string 
     ? `<div class="cb-lvc-job"><b>${esc(t('corp.hub.st.job', { n: next.level }))}</b>${jobBar(view, elapsedMs)}</div>`
     : `<ul class="cb-reqs"><li class="${next.enough ? 'ok' : 'no'}">${esc(
         t('corp.hub.level.need', { n: next.level, cost: price(next.cost), time: duration(next.durationMs) }),
-      )}</li></ul>`;
+      )}</li>${next.conditions.map(conditionHtml).join('')}</ul>`;
   return (
     `<section class="cb-lvc">${top}` +
     `<div><h4>${esc(t('corp.hub.level.to', { n: next.level }))}</h4>${need}</div>` +
@@ -364,6 +375,9 @@ function statusHtml(view: CorpInfrastructureView, b: CorpBuildingView, elapsedMs
       return { kind: 'max', html: esc(t('corp.buildings.max')) };
     case 'locked':
       return { kind: 'locked', html: `🔒 ${esc(t('corp.buildings.requirement', { n: st.headquarters }))}` };
+    case 'members':
+    case 'battles':
+      return { kind: 'locked', html: `🔒 ${esc(conditionText(st))}` };
     case 'busy':
       return { kind: 'busy', html: esc(t('corp.hub.st.busy')) };
     case 'short':
@@ -639,6 +653,7 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
         corpRequirements(view, b)
           .map((r) => {
             if (r.kind === 'hq') return `<li class="${r.ok ? 'ok' : 'no'}">${esc(t('corp.hub.req.hq', { n: r.level }))}</li>`;
+            if (r.kind === 'members' || r.kind === 'battles') return conditionHtml(r);
             if (r.kind === 'cost')
               return `<li class="${r.ok ? 'ok' : 'no'}">${esc(
                 r.cost > 0 ? t('corp.hub.req.cost', { cost: nfmt(r.cost), n: nfmt(r.treasury) }) : t('corp.buildings.free'),
@@ -703,7 +718,11 @@ function levelsSheetHtml(view: CorpInfrastructureView): string {
     .map(
       (r) =>
         `<tr class="${r.current ? 'cur' : ''}"><td>${r.level}${r.current ? ` · ${esc(t('corp.hub.levels.here'))}` : ''}</td>` +
-        `<td>${esc(price(r.cost))} · ${esc(duration(r.durationMs))}</td>` +
+        `<td>${esc(price(r.cost))} · ${esc(duration(r.durationMs))}` +
+        (r.conditions.length
+          ? `<span class="cb-lv-cond">${esc(r.conditions.map((c) => t(CONDITION_KEY[c.kind].need, { n: c.need })).join(' · '))}</span>`
+          : '') +
+        `</td>` +
         `<td>${r.opens.length ? r.opens.map((o) => esc(o.level === 1 ? t(o.nameKey) : `${t(o.nameKey)} ${o.level}`)).join(', ') : '—'}</td></tr>`,
     )
     .join('');

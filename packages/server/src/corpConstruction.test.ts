@@ -2,7 +2,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import type { CorpInfrastructureResult, CorpInfrastructureView } from '@void/protocol';
-import { MemoryCorpStore, PostgresCorpStore, migrate, type CorpStore } from './store';
+import {
+  MemoryAvaResultStore,
+  MemoryCorpStore,
+  PostgresAvaResultStore,
+  PostgresCorpStore,
+  migrate,
+  type AvaResultStore,
+  type CorpStore,
+} from './store';
 import { CORP_BUILDINGS, parseCorpBuildings } from './corpConstruction';
 
 const HOUR = 3_600_000;
@@ -12,13 +20,19 @@ function view(result: CorpInfrastructureResult): CorpInfrastructureView {
   return result.infrastructure;
 }
 
-function contract(make: () => CorpStore): void {
-  async function setup(): Promise<{ store: CorpStore; corpId: string; head: string }> {
-    const store = make();
+/** `results` — where the corporation's played battles are recorded (CORP-6). */
+function contract(make: () => { store: CorpStore; results: AvaResultStore }): void {
+  async function setup(): Promise<{
+    store: CorpStore;
+    results: AvaResultStore;
+    corpId: string;
+    head: string;
+  }> {
+    const { store, results } = make();
     const head = randomUUID();
     const created = await store.createCorp(head, head, 'Head');
     if (!created.ok) throw new Error(created.code);
-    return { store, corpId: created.corpId, head };
+    return { store, results, corpId: created.corpId, head };
   }
 
   it('starts free headquarters, completes offline, then credits only the elapsed completed period', async () => {
@@ -154,7 +168,7 @@ function contract(make: () => CorpStore): void {
         buildingId: 'headquarters',
         expectedLevel: 3,
       }),
-    ).toEqual({ ok: false, code: 'E_CORP_BUILD_MAX' });
+    ).toEqual({ ok: false, code: 'E_CORP_BUILD_MEMBERS' });
     const engineering = view(
       await store.infrastructure(corpId, head, now, {
         buildingId: 'engineering_complex',
@@ -172,6 +186,72 @@ function contract(make: () => CorpStore): void {
     expect(supply.construction!.completesAt - supply.construction!.startedAt).toBe(3 * HOUR * 0.9);
   });
 
+  it('orders headquarters 4 and 5 only with enough members and played battles (CORP-6)', async () => {
+    const { store, results, corpId, head } = await setup();
+    await store.addInfluence(corpId, 5000);
+    let now = 0;
+    const hq = async (level: number): Promise<CorpInfrastructureResult> =>
+      store.infrastructure(corpId, head, now, { buildingId: 'headquarters', expectedLevel: level });
+    for (let level = 0; level < 3; level += 1)
+      now = view(await hq(level)).construction!.completesAt;
+    const join = async (n: number, role: 'member' | 'recruit' = 'member'): Promise<void> => {
+      for (let i = 0; i < n; i += 1) await store.addMember(corpId, randomUUID(), `m${i}`, role);
+    };
+    const play = async (n: number): Promise<void> => {
+      for (let i = 0; i < n; i += 1) {
+        const other = randomUUID();
+        // Either side counts, a draw too.
+        await results.record({
+          matchupId: randomUUID(),
+          challengerCorp: i % 2 ? corpId : other,
+          targetCorp: i % 2 ? other : corpId,
+          winnerCorp: i % 3 ? other : null,
+          at: now,
+        });
+      }
+    };
+    expect(await hq(3)).toEqual({ ok: false, code: 'E_CORP_BUILD_MEMBERS' });
+    // Recruits are applications, not members.
+    await join(13);
+    await join(5, 'recruit');
+    expect(view(await store.infrastructure(corpId, head, now))).toMatchObject({
+      members: 14,
+      battles: 0,
+    });
+    expect(await hq(3)).toEqual({ ok: false, code: 'E_CORP_BUILD_MEMBERS' });
+    await join(1);
+    expect(await hq(3)).toEqual({ ok: false, code: 'E_CORP_BUILD_BATTLES' });
+    // Another corporation's battle does not count.
+    await results.record({
+      matchupId: randomUUID(),
+      challengerCorp: randomUUID(),
+      targetCorp: randomUUID(),
+      winnerCorp: null,
+      at: now,
+    });
+    await play(9);
+    expect(await hq(3)).toEqual({ ok: false, code: 'E_CORP_BUILD_BATTLES' });
+    await play(1);
+    const fourth = view(await hq(3));
+    expect(fourth).toMatchObject({ members: 15, battles: 10 });
+    expect(fourth.construction).toMatchObject({ level: 4, cost: 800 });
+    expect(fourth.construction!.completesAt - fourth.construction!.startedAt).toBe(24 * HOUR);
+    now = fourth.construction!.completesAt;
+
+    expect(await hq(4)).toEqual({ ok: false, code: 'E_CORP_BUILD_MEMBERS' });
+    await join(5);
+    expect(await hq(4)).toEqual({ ok: false, code: 'E_CORP_BUILD_BATTLES' });
+    await play(15);
+    const fifth = view(await hq(4));
+    expect(fifth.construction).toMatchObject({ level: 5, cost: 1500 });
+    expect(fifth.construction!.completesAt - fifth.construction!.startedAt).toBe(48 * HOUR);
+    now = fifth.construction!.completesAt;
+    const top = view(await store.infrastructure(corpId, head, now));
+    expect(top.buildings[0]).toMatchObject({ level: 5, next: null, blocked: 'E_CORP_BUILD_MAX' });
+    expect(top.influencePerDay).toBe(120);
+    expect(await hq(5)).toEqual({ ok: false, code: 'E_CORP_BUILD_MAX' });
+  });
+
   it('deletes infrastructure on disband while retaining its audit', async () => {
     const { store, corpId, head } = await setup();
     await store.infrastructure(corpId, head, 0, { buildingId: 'headquarters', expectedLevel: 0 });
@@ -184,12 +264,19 @@ function contract(make: () => CorpStore): void {
   });
 }
 
-describe('corporation infrastructure — memory', () => contract(() => new MemoryCorpStore()));
+describe('corporation infrastructure — memory', () =>
+  contract(() => {
+    const results = new MemoryAvaResultStore();
+    return { store: new MemoryCorpStore(undefined, results), results };
+  }));
 describe.skipIf(!process.env.DATABASE_URL)('corporation infrastructure — postgres', () => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   beforeAll(() => migrate(pool));
   afterAll(() => pool.end());
-  contract(() => new PostgresCorpStore(pool));
+  contract(() => ({
+    store: new PostgresCorpStore(pool),
+    results: new PostgresAvaResultStore(pool),
+  }));
   it('survives a fresh store instance', async () => {
     const store = new PostgresCorpStore(pool);
     const head = randomUUID();
@@ -215,4 +302,9 @@ it('validates the meta catalog before it reaches either adapter', () => {
   const broken = structuredClone(CORP_BUILDINGS);
   broken[0]!.levels[0]!.cost = -1;
   expect(() => parseCorpBuildings({ buildings: broken })).toThrow('E_CORP_CATALOG');
+  for (const field of ['members', 'battles'] as const) {
+    const bad = structuredClone(CORP_BUILDINGS);
+    bad[0]!.levels[3]![field] = 1.5;
+    expect(() => parseCorpBuildings({ buildings: bad })).toThrow('E_CORP_CATALOG');
+  }
 });

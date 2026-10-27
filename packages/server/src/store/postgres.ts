@@ -1113,6 +1113,14 @@ export class PostgresCorpStore implements CorpStore {
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_FORBIDDEN' };
       }
+      // CORP-6: what the level requirements count — members without recruits and the AvA
+      // battles the corporation played on either side.
+      const standing = await client.query<{ members: number; battles: number }>(
+        `SELECT
+           (SELECT count(*) FROM corp_members WHERE corp_id = $1 AND role <> 'recruit')::int AS members,
+           (SELECT count(*) FROM ava_results WHERE challenger_corp = $1 OR target_corp = $1)::int AS battles`,
+        [corpId],
+      );
       const updated = updateCorpInfrastructure(
         corpId,
         actor,
@@ -1121,6 +1129,7 @@ export class PostgresCorpStore implements CorpStore {
         corp.infrastructure,
         now,
         order,
+        { members: standing.rows[0]?.members ?? 0, battles: standing.rows[0]?.battles ?? 0 },
       );
       await client.query(
         `UPDATE corps SET influence = $2, infrastructure = $3::jsonb WHERE id = $1`,
