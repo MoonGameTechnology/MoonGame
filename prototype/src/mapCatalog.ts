@@ -1,4 +1,5 @@
 import {
+  effectiveVictoryRules,
   matchMapEdges,
   parseMatchMap,
   validateMatchMap,
@@ -24,11 +25,16 @@ export type MapId = (typeof MAP_IDS)[number] | 'nexus' | 'frontier-50' | 'fronti
 export const isCurrentMap = (id: string | undefined): boolean => MAP_IDS.some((map) => map === id);
 export const isFrontier = (id: string | undefined): boolean =>
   id === 'frontier-50' || id === 'frontier-100';
+/** Карты битв корпораций (CORP-5). Партию на них заводит только сервер по запертому составу,
+ *  поэтому среди карт новой партии их нет: клиенту нужны лишь их подпись и порог победы. */
+export const AVA_MAP_IDS = ['ava-duel-1', 'ava-2v2-1'] as const;
+type AvaMapId = (typeof AVA_MAP_IDS)[number];
+export const isAvaMap = (id: string | undefined): boolean => AVA_MAP_IDS.some((map) => map === id);
 /** Порог победы по карте — ОДНА таблица. Раньше те же числа стояли двумя наборами
  *  литералов: в пресете и в `scoreLimitFor`. Их читают разные потребители (HUD берёт
  *  предел через `scoreLimitFor`, победа в матче — из пресета), так что правка одного
  *  места молча разводила полосу прогресса с настоящим порогом конца партии. */
-const SCORE_LIMITS: Record<MapId, number> = {
+const SCORE_LIMITS: Record<MapId | AvaMapId, number> = {
   // BAL-16 (резолюция владельца 2026-10-15): порог — очки всей застроенной карты. Половина
   // карты, взятая без боя, даёт 55–59% порога, остальное добирают выигранные бои (замер
   // 2026-10-14: 120 партий ботов по 30 дней).
@@ -43,6 +49,10 @@ const SCORE_LIMITS: Record<MapId, number> = {
   nexus: 1100,
   'frontier-50': 7500,
   'frontier-100': 15000,
+  // Битва корпораций идёт до порога ядра: тем же числом её судит боевой вход, где правил
+  // победы ей не задают. Своего порога крошечным картам битв не назначали.
+  'ava-duel-1': effectiveVictoryRules().scoreLimit,
+  'ava-2v2-1': effectiveVictoryRules().scoreLimit,
 };
 export interface MapPreset {
   id: MapId;
@@ -181,7 +191,7 @@ export function teamForStart(mapId: MapId, start: string): string | undefined {
 
 export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
   const id = state.mapId;
-  return (id !== undefined && SCORE_LIMITS[id as MapId]) || SCORE_LIMITS.nexus;
+  return (id !== undefined && SCORE_LIMITS[id as MapId | AvaMapId]) || SCORE_LIMITS.nexus;
 }
 /** Доля захваченных провинций, которая побеждает сразу (BAL-16, та же резолюция): 80%
  *  вместо умолчания ядра 60%, иначе на дуэли захват кончал партию на 4-й день, до боёв.

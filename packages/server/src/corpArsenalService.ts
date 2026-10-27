@@ -124,11 +124,37 @@ export class CorpArsenalService {
    *  warehouse exactly once — win or lose, no burn-on-loss. Ticks `durability` as
    *  the soft sink and records one audit line per item. Safe to call on a matchup
    *  with no rentals (no-op) and safe to replay (each item closes at most once). */
-  async returnWar(matchupId: string): Promise<number> {
+  returnWar(matchupId: string): Promise<number> {
+    return this.returnRentals(matchupId, 1);
+  }
+
+  /** CORP-5: a cancelled battle (short roster, no map) never ran, so everything handed
+   *  out for it goes back to the warehouse WITHOUT wear. A sweep rather than a hook on
+   *  the cancel: the cancel happens in the corporations process, the rentals live in the
+   *  game database, and a handout that raced the cancel still lands on the next pass.
+   *  Safe to replay — each item closes at most once. */
+  async returnCancelled(): Promise<number> {
+    let returned = 0;
+    let failure: unknown;
+    for (const matchupId of await this.rentals.pendingMatchups()) {
+      try {
+        const matchup = await this.challenges.getChallenge(matchupId);
+        if (matchup?.status === 'cancelled') returned += await this.returnRentals(matchupId, 0);
+      } catch (error) {
+        failure ??= error; // one stuck matchup must not hold back the others
+      }
+    }
+    if (failure !== undefined) throw failure;
+    return returned;
+  }
+
+  private async returnRentals(matchupId: string, wear: number): Promise<number> {
     const rows = await this.rentals.activeForMatchup(matchupId);
     if (this.rentals.completeReturn && this.rentals.pendingReturnAudits && this.rentals.markReturnAudited) {
       let returned = 0;
-      for (const row of rows) if (await this.rentals.completeReturn(matchupId, row.itemId, this.now())) returned++;
+      for (const row of rows) {
+        if (await this.rentals.completeReturn(matchupId, row.itemId, this.now(), wear)) returned++;
+      }
       for (const entry of await this.rentals.pendingReturnAudits(matchupId)) {
         await this.corps.appendAudit(entry);
         await this.rentals.markReturnAudited(entry.eventId!);
@@ -138,11 +164,11 @@ export class CorpArsenalService {
     let returned = 0;
     for (const row of rows) {
       if (!(await this.rentals.closeRent(matchupId, row.itemId))) continue; // already closed (replay)
-      await this.arsenal.wear(row.itemId, 1);
+      if (wear > 0) await this.arsenal.wear(row.itemId, wear);
       await this.corps.appendAudit({
         corpId: row.corpId,
         at: this.now(),
-        actor: 'system', // war-end sweep, no acting human (same convention as AvaService.refund)
+        actor: 'system', // server-driven return, no acting human (same convention as AvaService.refund)
         action: 'rent_return',
         target: row.accountId,
         detail: row.itemId,

@@ -286,9 +286,9 @@ JSONL (EC-5.1 позже заберёт).
 (`packages/server/src/arsenalApi.ts`) — session-gated GET как medals/corp
 (`identify` из сессии, никогда accountId из payload), отдаёт `stores.arsenalStore
 .listOf(accountId)` как есть (не проекцию `PlayerArsenal` — витрине нужны
-grade/durability/origin по каждой вещи). Не подключён в `prototype/netserver.ts`
-(дев-харнесс для плейтестов матчей) — как и corp/medals/AvA API, он туда не
-дублируется; путь живёт на реальном Stage-3 сервере.
+grade/durability/origin по каждой вещи). Тогда он не подключался в
+`prototype/netserver.ts`, как и API корпораций, медалей и AvA; теперь все они есть на
+обоих хостах (медали и AvA — с CORP-5).
 
 **Реализация (проверено по коду).**
 - `prototype/src/arsenal.ts` — чистый модуль (без DOM): `filterArsenal`/

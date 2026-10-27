@@ -3,10 +3,17 @@ import { getStance, type Action } from '@void/shared-core';
 import { AvaOrchestrator } from './avaOrchestrator';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
-import { createStores } from './persistence';
+import type { RoomPeer } from './matchRoom';
+import { createStores, snapshotOf } from './persistence';
 import type { LoadedMatch } from './roomRegistry';
-import { loadAvaMaps, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
-import { createAvaRoom, createMatchLoader, declareAvaWar } from './serverWiring';
+import { createDevMatch, loadAvaMaps, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
+import {
+  createAvaRoom,
+  createMatchLoader,
+  declareAvaWar,
+  type MatchExtras,
+} from './serverWiring';
+import { MemoryArsenalStore, MemoryMatchStore, MemoryReceiptStore } from './store';
 
 // CORP-4 — one corporation battle from the lock to the settlement, on the host's own
 // composition: the roster sweep locks the matchup, the orchestrator raises the session
@@ -165,5 +172,78 @@ describe('AvA battle end to end (CORP-4)', () => {
     expect((await stores.resultStore.get(ch.id))?.winnerCorp).toBe(a.corpId);
     // 500 − 100 for the challenge + 150 for the win
     expect((await stores.corpStore.getCorp(a.corpId))?.influence).toBe(550);
+  });
+});
+
+// CORP-5 — a battle deck is locked with the roster (ARS-3), corporation handouts included
+// (ARS-6). The live re-read of the personal arsenal before a build (LARS-1) would replace
+// that deck, so a battle room is built without the arsenal store.
+describe('AvA battle deck stays frozen (CORP-5)', () => {
+  class CountingArsenal extends MemoryArsenalStore {
+    reads = 0;
+    override listOf(accountId: string): ReturnType<MemoryArsenalStore['listOf']> {
+      this.reads++;
+      return super.listOf(accountId);
+    }
+  }
+
+  /** Builds a cruiser with a module the seat's frozen deck lacks but the account owns. */
+  async function buildPastTheDeck(extras: MatchExtras | null) {
+    const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
+    const green = seed.state.players.green!;
+    // The cruiser also costs microelectronics (CONV-12): the test is about ownership.
+    green.resources = { ...green.resources, microelectronics: 10 };
+    green.arsenal = { hulls: ['cruiser'], modules: [] };
+    const store = new MemoryMatchStore();
+    await store.save(snapshotOf(seed));
+    const arsenal = new CountingArsenal();
+    for (const [itemId, kind, defId] of [
+      ['hull', 'hull', 'cruiser'],
+      ['module', 'module', 'targeting_array'],
+    ] as const) {
+      await arsenal.grant({ itemId, accountId: 'acc-1', kind, defId, form: 'blueprint',
+        soulbound: false, origin: 'craft', acquiredAt: 0 });
+    }
+    const load = createMatchLoader({
+      stores: { store, receiptStore: new MemoryReceiptStore() },
+      data,
+      now: () => 1000,
+      arsenalStore: arsenal,
+      matchExtras: async () => extras,
+    });
+    const { room, dispose } = (await load('dev'))!;
+    const refused: string[] = [];
+    const peer: RoomPeer = {
+      send: (raw) => {
+        const message = JSON.parse(raw) as { type: string; code?: string };
+        if (message.type === 'rejection') refused.push(message.code ?? '');
+      },
+    };
+    room.addPeer('green', peer, undefined, undefined, 'acc-1');
+    const build: Action = {
+      id: 't:green:1',
+      type: 'unit.build',
+      playerId: 'green',
+      payload: { planetId: 'home_green', unit: 'cruiser', modules: ['targeting_array'] },
+      issuedAt: 0,
+    };
+    await room.receive('green', peer, JSON.stringify({ type: 'action', action: build }));
+    const modules = room.state.players.green?.arsenal?.modules;
+    await dispose();
+    return { refused, reads: arsenal.reads, modules };
+  }
+
+  it('a battle room never re-reads the personal arsenal', async () => {
+    const { refused, reads, modules } = await buildPastTheDeck({ frozenArsenal: true });
+    expect(reads).toBe(0);
+    expect(refused).toEqual(['E_NOT_OWNED']);
+    expect(modules).toEqual([]);
+  });
+
+  it('an ordinary room still picks up a module bought mid-match', async () => {
+    const { refused, reads, modules } = await buildPastTheDeck(null);
+    expect(reads).toBe(1);
+    expect(refused).toEqual([]);
+    expect(modules).toEqual(['targeting_array']);
   });
 });

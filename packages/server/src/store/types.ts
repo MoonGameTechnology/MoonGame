@@ -682,10 +682,14 @@ export interface CorpRent {
  *  `AvaChallengeStore.endMatchup` — the caller must not apply the durability sink
  *  twice on a replayed match-end). */
 export interface CorpRentStore {
-  /** Production return: close, wear and queue audit in one inventory transaction. */
-  completeReturn?(matchupId: string, itemId: string, at: number): Promise<boolean>;
+  /** Production return: close, wear (0 for a battle that never ran) and queue audit in
+   *  one inventory transaction. */
+  completeReturn?(matchupId: string, itemId: string, at: number, wear: number): Promise<boolean>;
   pendingReturnAudits?(matchupId: string): Promise<CorpAuditEntry[]>;
   markReturnAudited?(eventId: string): Promise<void>;
+  /** Every matchup that still holds an active rental or an undelivered return audit —
+   *  what the cancelled-battle return sweep (CORP-5) walks. */
+  pendingMatchups(): Promise<string[]>;
   /** Atomic: creates the row only if this item has no currently-active rental
    *  anywhere (including other matchups) — false = already on rent, nothing
    *  changed. */

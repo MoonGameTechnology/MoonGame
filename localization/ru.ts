@@ -196,6 +196,7 @@ export const ru: Record<string, string> = {
   "data.black-hole": "Чёрная дыра",
   "map.frontier": "Фронтир",
   "map.nexus": "Нексус",
+  "map.ava": "Битва корпораций",
   "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
   'battle.win.open': '⚔ Открыть бой',
@@ -2872,6 +2873,8 @@ export const ru: Record<string, string> = {
   'err.already-shared': 'карта этой державе уже открыта',
   'err.already-taken': 'это усиление уже взято',
   'err.already-unlocked': 'узел уже изучен',
+  'err.ava-diplomacy': 'в битве корпораций войну не объявляют',
+  'err.ava-steward': 'Хранитель не ведёт битву корпораций',
   'err.bad-effect': 'способность настроена некорректно',
   'err.bad-payload': 'некорректный приказ',
   'err.bad-posture': 'неизвестный режим Хранителя',

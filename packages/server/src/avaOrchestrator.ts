@@ -98,6 +98,27 @@ const DEFAULT_PEACE_MS = 24 * 60 * 60 * 1000;
 /** The two sides of a matchup, in seating order (challenger → the first team of the map). */
 const SIDES: readonly AvaSide[] = ['challenger', 'target'];
 
+/** The id an AvA battle's match is hosted under — one per matchup, so a re-raise lands on
+ *  the same room and snapshot. A host tells an AvA room from an ordinary one by it. */
+export const avaMatchId = (matchupId: string): string => `ava-${matchupId}`;
+export const isAvaMatchId = (matchId: string): boolean => matchId.startsWith('ava-');
+
+/**
+ * Player intents a corporations battle refuses, on both hosts. The orchestrator alone moves
+ * the sides from peace to war (AVA-8), and no AI plays an absent player's seat, the Steward
+ * included (corporation-wars.md §7): attacks come only from a player who is in.
+ */
+export const avaDeniedAction = (type: string): string | null =>
+  type === 'diplomacy.declare' ? 'E_AVA_DIPLOMACY' : type === 'steward.delegate' ? 'E_AVA_STEWARD' : null;
+
+/**
+ * A side's bot plays by the same refusals as a player. Its orders reach the room through
+ * the server path, past the players' deny list, so the host drops what a player would be
+ * refused: the AI's own war on the race leader would end the peace before the orchestrator.
+ */
+export const avaBotOrders = <A extends { type: string }>(orders: readonly A[]): A[] =>
+  orders.filter((order) => avaDeniedAction(order.type) === null);
+
 export interface AvaSeating {
   /** slotId → assignment, covering EVERY slot the map declares (empties get an AI bot). */
   slots: Record<string, SlotAssignment>;
@@ -242,16 +263,18 @@ export class AvaOrchestrator {
     // S5 peaceful start — cross-team stances seed at `peace` (combat-lock is free from the
     // seed; the orchestrator escalates to war on a timer in AVA-8). Each seat carries its
     // side (`Player.team`), and the mode persisted in the state makes the loader run the
-    // room with fixed sides (CORP-4).
+    // room with fixed sides (CORP-4). The map id rides in the state too (CORP-5): the
+    // match browser names the battle by it and the client reads its score limit from it.
     const state: GameState = {
       ...buildStateFromMap(map, this.data, {
         slots,
         crossTeamStart: 'peace',
         manifest: this.manifest,
       }),
+      mapId: map.id,
       ...(modeId !== undefined ? { modeId } : {}),
     };
-    const matchId = `ava-${matchupId}`;
+    const matchId = avaMatchId(matchupId);
 
     // Raise the room FIRST (persist its snapshot — idempotent by match id), then record the
     // session link. If the link insert loses a race, the room is a harmless duplicate save

@@ -193,6 +193,7 @@ export const en: Record<string, string> = {
   "data.black-hole": "Black Hole",
   "map.frontier": "Frontier",
   "map.nexus": "Nexus",
+  "map.ava": "Corporation battle",
   "setup.map.hole": "Black hole · no paths",
   // --- map-loading — initial map preparation ---
   'battle.win.open': '⚔ Open battle',
@@ -2865,6 +2866,8 @@ export const en: Record<string, string> = {
   'err.already-shared': 'your map is already shared with them',
   'err.already-taken': 'that boon is already taken',
   'err.already-unlocked': 'that node is already unlocked',
+  'err.ava-diplomacy': 'war is not declared in a corporation battle',
+  'err.ava-steward': 'the Steward does not run a corporation battle',
   'err.bad-effect': 'the ability is misconfigured',
   'err.bad-payload': 'malformed order',
   'err.bad-posture': 'unknown Steward posture',
