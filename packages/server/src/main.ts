@@ -70,7 +70,8 @@ import { registerPushApi } from './pushApi';
 import { configureWebPush, sendPush, vapidFromEnv } from './push';
 import { createPushDispatcher } from './pushDispatch';
 import { loadMedalCatalog } from './medalCatalog';
-import { AvaOrchestrator } from './avaOrchestrator';
+import { AvaOrchestrator, avaDeniedAction } from './avaOrchestrator';
+import { createAvaSweeps } from './avaSweeps';
 import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry, revokeAccountConnections } from './roomRegistry';
 import { buildVersion } from './buildVersion';
@@ -245,8 +246,7 @@ const loadMatch = createMatchLoader({
       seatAccount[slotId] = accountId;
     }
     return {
-      denyPlayerActions: (type: string) =>
-        type === 'diplomacy.declare' ? 'E_AVA_DIPLOMACY' : null,
+      denyPlayerActions: avaDeniedAction,
       // ARS-4 salvage: shards to each battle's winner, priced by the fallen enemy
       // composition — credited durably per observed batch (server-side, outside the
       // reducer; bots have no account and earn nothing).
@@ -262,7 +262,7 @@ const loadMatch = createMatchLoader({
         }
       },
         onEnd: (_winner: string | null, rewards) => {
-          void deliverAvaResults().catch((err: unknown) => {
+          void avaSweeps.deliverResults().catch((err: unknown) => {
             process.stderr.write(`ava result delivery failed: ${String(err)}\n`);
         });
         // Meta rewards and the pity-guarded drop are delivered independently
@@ -419,13 +419,14 @@ const matchApi: MatchApiDeps = {
         );
     // Какое место достаётся и переписывать ли дом — `joinSeat.ts` (там же причины, по
     // которым AvA-ростер и возврат в свой матч выбор дома не применяют).
+    const seatId = ava?.playerId ?? resolved?.playerId;
     const claim = seatClaim({
       avaPlayerId: ava?.playerId,
       resolved,
       // Возврат решает состояние, а не хранилище: бронь без заявки — это всё ещё первый
-      // захват (правило 6 в joinSeat.ts).
-        claimed: resolved
-          ? snap.state.players[resolved.playerId]?.claimedAt !== undefined
+      // захват (правило 6 в joinSeat.ts). На AvA-месте брони нет вовсе (правило 1).
+        claimed: seatId !== undefined
+          ? snap.state.players[seatId]?.claimedAt !== undefined
           : undefined,
       preferredFaction,
       // Дома ЭТОГО матча — ровно то, что сервер отдаёт в `/matches/:id/seats` и из чего
@@ -502,6 +503,20 @@ const medalCatalog = loadMedalCatalog();
   resultStore: stores.resultStore,
   medalStore: stores.medalStore,
   catalog: medalCatalog,
+});
+
+// The AvA background loop (avaSweeps.ts, shared with the players' host): result
+// delivery, the war clock, expiry and roster windows, sessions for locked matchups and
+// the return of a cancelled battle's handouts. Built before the server listens, so a
+// match that ends on its first load already finds it; started once the server is up.
+const avaSweeps = createAvaSweeps({
+  sessionStore: stores.sessionStore,
+  resultStore: stores.resultStore,
+  ava: avaService,
+  orchestrator: avaOrchestrator,
+  corpArsenal: corpArsenalService,
+  maintenance: () => process.env.CORPORATIONS_MAINTENANCE === '1',
+  log: (message) => process.stderr.write(`${message}\n`),
 });
 
 // Match factory (SV-2.5): keep OPEN_MATCHES joinable matches available so the feed is
@@ -797,64 +812,10 @@ const httpUrl = wsBase.replace(/^ws/, 'http').replace(/\/matches.*$/, '');
 // on an interval (a slow, cheap safety net; joins fill matches between ticks).
 keeper?.start(30_000);
 
-// AvA sweeps on one interval: challenge expiry (AVA-4, close+refund unanswered) and
-// the roster window (AVA-6, lock a full roster / cancel+refund a short one) — the same
-// no-client-needed model as the offline scheduler. Unref'd so it never holds the
-// process open; errors are swallowed so one bad sweep can't crash the server.
-  let deliveringResults = false;
-  async function deliverAvaResults(): Promise<void> {
-    if (
-      process.env.CORPORATIONS_MAINTENANCE === '1' ||
-      deliveringResults ||
-      !stores.sessionStore.pendingResults
-    )
-      return;
-    deliveringResults = true;
-    try {
-      for (const result of await stores.sessionStore.pendingResults()) {
-        try {
-          // Inventory returns commit locally; their remote audit remains retryable.
-          await corpArsenalService.returnWar(result.matchupId);
-          await avaOrchestrator.onMatchEnded(result.matchId, result.winner);
-          if (!(await stores.resultStore.get(result.matchupId)))
-            throw Error('E_AVA_RESULT_PENDING');
-          await stores.sessionStore.markResultDelivered?.(result.matchId);
-        } catch (error) {
-          await stores.sessionStore.markResultRetry?.(result.matchId);
-          process.stderr.write(`ava result ${result.matchId} pending: ${String(error)}\n`);
-        }
-      }
-    } finally {
-      deliveringResults = false;
-    }
-  }
-const avaSweep = setInterval(() => {
-    void deliverAvaResults().catch((err: unknown) => {
-      process.stderr.write(`ava result retry pending: ${String(err)}\n`);
-    });
-    void avaOrchestrator.sweepWar().catch((err: unknown) => {
-      process.stderr.write(`ava war clock failed: ${String(err)}\n`);
-    });
-    if (process.env.CORPORATIONS_MAINTENANCE === '1') return;
-  void avaService.sweepExpired().catch((err) => {
-    process.stderr.write(
-      `ava expiry sweep failed — ${err instanceof Error ? err.message : String(err)}\n`,
-    );
-  });
-  void avaService
-    .sweepRosters()
-    .then(() =>
-      // Raise a live session for every freshly-locked matchup (AVA-7) — after the roster
-      // sweep in the same tick, so a lock and its session land together.
-      avaOrchestrator.sweep(),
-    )
-    .catch((err) => {
-      process.stderr.write(
-        `ava roster/session sweep failed — ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    });
-}, 60_000);
-avaSweep.unref?.();
+// AvA sweeps on one interval (avaSweeps.ts) — the same no-client-needed model as the
+// offline scheduler. Unref'd so it never holds the process open; each sweep logs its
+// own failure, so one bad sweep can't crash the server or hold back the others.
+avaSweeps.start(60_000);
 
 process.stdout.write(
   [

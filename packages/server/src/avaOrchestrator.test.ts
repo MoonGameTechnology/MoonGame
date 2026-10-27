@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildStateFromMap, getStance, pairKey, parseMatchMap } from '@void/shared-core';
 import {
   AvaOrchestrator,
+  avaDeniedAction,
   avaModeId,
   seatAvaRoster,
   warDeclarationsFor,
@@ -154,7 +155,7 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
     expect(res.seats).toEqual({ 'acc-a1': 'slot_a1', 'acc-a2': 'slot_a2', 'acc-b1': 'slot_b1' });
   });
 
-  it('pins the host’s module manifest, each seat’s side and the team mode (CORP-4)', async () => {
+  it('pins the host’s module manifest, each seat’s side, the team mode (CORP-4) and the map (CORP-5)', async () => {
     const h = harness();
     await lockedMatchup(h, 'mu-duel', ['acc-a'], ['acc-b']);
     await lockedMatchup(h, 'mu-team', ['acc-a1', 'acc-a2'], ['acc-b1']);
@@ -167,6 +168,10 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
     // A 1-on-1 needs no sides; a 2-on-2 is a fixed-side team match.
     expect(duel!.modeId).toBeUndefined();
     expect(team!.modeId).toBe('team_2v2');
+    // The map the battle is played on is part of the match (CORP-5): the match browser
+    // names the battle by it.
+    expect(duel!.mapId).toBe('ava-duel-1');
+    expect(team!.mapId).toBe('ava-2v2-1');
     // Every seat, bots included, carries its side from the map's slots.
     expect(Object.fromEntries(Object.values(team!.players).map((p) => [p.id, p.team]))).toEqual({
       slot_a1: 'A',
@@ -312,6 +317,16 @@ describe('avaModeId (CORP-4) — the mode a battle format plays under', () => {
     // No fixed-side mode for 4-on-4 yet: such a battle is cancelled, never played
     // every seat for itself.
     expect(avaModeId(4)).toBeNull();
+  });
+});
+
+describe('avaDeniedAction (CORP-5) — what a battle refuses its players', () => {
+  it('keeps the war with the orchestrator and the Steward off every seat; orders pass', () => {
+    expect(avaDeniedAction('diplomacy.declare')).toBe('E_AVA_DIPLOMACY');
+    expect(avaDeniedAction('steward.delegate')).toBe('E_AVA_STEWARD');
+    // Recalling a Steward that never ran harms nothing; the player's own orders are the game.
+    for (const type of ['steward.recall', 'fleet.move', 'fleet.assault', 'diplomacy.mapshare'])
+      expect(avaDeniedAction(type)).toBeNull();
   });
 });
 

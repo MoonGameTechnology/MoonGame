@@ -960,6 +960,17 @@ function corpRentStoreContract(
       // the item is free again — a NEW war can rent it
       expect(await store.rent({ itemId: item, corpId: corp, matchupId: uniq('mu2'), accountId: acc, rentedAt: 2 })).toBe(true);
     });
+
+    it('pendingMatchups lists each matchup holding a rental once, until it is returned', async () => {
+      const store = make();
+      const [itemA, itemB, corp, mu, acc] = [uniq('it-p1'), uniq('it-p2'), uniq('corp'), uniq('mu-p'), uniq('acc')];
+      await store.rent({ itemId: itemA, corpId: corp, matchupId: mu, accountId: acc, rentedAt: 1 });
+      await store.rent({ itemId: itemB, corpId: corp, matchupId: mu, accountId: acc, rentedAt: 1 });
+      expect((await store.pendingMatchups()).filter((id) => id === mu)).toEqual([mu]);
+      await store.closeRent(mu, itemA);
+      await store.closeRent(mu, itemB);
+      expect(await store.pendingMatchups()).not.toContain(mu);
+    });
   });
 }
 

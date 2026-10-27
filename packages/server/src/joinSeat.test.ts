@@ -97,6 +97,19 @@ describe('seatClaim (ENTRY-1/ENTRY-3)', () => {
         claim: {},
       });
     });
+
+    it('возврат на заявленное AvA-место заявку не подаёт', () => {
+      expect(seatClaim(input({ avaPlayerId: 'p5', claimed: true }))).toEqual({
+        ok: true,
+        playerId: 'p5',
+        claim: null,
+      });
+      expect(seatClaim(input({ avaPlayerId: 'p5', claimed: false }))).toEqual({
+        ok: true,
+        playerId: 'p5',
+        claim: {},
+      });
+    });
   });
 
   describe('каталог домов (правило 4)', () => {
@@ -235,6 +248,28 @@ describe('admitSeat — отказ не оставляет кресла (PT-09)'
       error: 'E_CLAIM_REFUSED',
     });
     expect(await accounts.seatOf('m1', 'ann')).toBe(orphan!.playerId);
+  });
+
+  // CORP-5: участник битвы корпораций, вышедший из неё, входит снова. Брони в сторе у
+  // AvA-места нет, поэтому возврат решает только заявка в состоянии.
+  it('рострованный участник AvA возвращается на своё место', async () => {
+    const { room } = setup();
+    const id = Object.keys(room.state.players)[0]!;
+    const enter = () =>
+      admitSeat({
+        matchId: 'm1',
+        claim: seatClaim({
+          avaPlayerId: id,
+          claimed: room.state.players[id]?.claimedAt !== undefined,
+          knownFactions: [],
+        }),
+        reserved: false,
+        release: async () => undefined,
+        room,
+      });
+    expect(await enter()).toEqual({ ok: true, playerId: id });
+    expect(room.state.players[id]?.claimedAt).toBeDefined();
+    expect(await enter()).toEqual({ ok: true, playerId: id });
   });
 
   it('заявленное место на возврате заявку не подаёт — дом не переписывается', async () => {

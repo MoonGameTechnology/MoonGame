@@ -974,6 +974,10 @@ export class MemoryCorpRentStore implements CorpRentStore {
     );
   }
 
+  pendingMatchups(): Promise<string[]> {
+    return Promise.resolve([...new Set([...this.active.values()].map((r) => r.matchupId))].sort());
+  }
+
   closeRent(matchupId: string, itemId: string): Promise<boolean> {
     const row = this.active.get(itemId);
     if (!row || row.matchupId !== matchupId) return Promise.resolve(false);

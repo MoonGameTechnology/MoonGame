@@ -191,3 +191,51 @@ describe('CorpArsenalService — war end (ARS-0.3: always returns, win or lose)'
     expect(await f.service.returnWar(f.matchupId)).toBe(0);
   });
 });
+
+describe('CorpArsenalService — cancelled battle (CORP-5: returns without wear)', () => {
+  it('returnCancelled brings a cancelled battle’s handouts back unworn, audited, exactly once', async () => {
+    const f = await fixture();
+    await f.service.rentOut(asActor(HEAD), f.corpA, f.itemId, f.matchupId, FIGHTER.accountId);
+    expect(await f.challenges.closeMatchup(f.matchupId, 'cancelled')).toBe(true); // short roster
+    expect(await f.service.returnCancelled()).toBe(1);
+    expect((await f.arsenal.get(f.itemId))?.durability).toBe(5); // the battle never ran
+    expect(await f.rentals.activeForMatchup(f.matchupId)).toHaveLength(0);
+    expect(await f.corps.auditOf(f.corpA)).toContainEqual(
+      expect.objectContaining({ action: 'rent_return', target: FIGHTER.accountId, detail: f.itemId }),
+    );
+    expect(await f.service.returnCancelled()).toBe(0); // replay changes nothing
+    expect((await f.arsenal.get(f.itemId))?.durability).toBe(5);
+  });
+
+  it('leaves a battle that is still gathering or fighting alone', async () => {
+    const f = await fixture();
+    await f.service.rentOut(asActor(HEAD), f.corpA, f.itemId, f.matchupId, FIGHTER.accountId);
+    expect(await f.service.returnCancelled()).toBe(0); // accepted: roster window open
+    await f.challenges.closeMatchup(f.matchupId, 'locked');
+    expect(await f.service.returnCancelled()).toBe(0); // locked: the war is on
+    expect(await f.rentals.activeForMatchup(f.matchupId)).toHaveLength(1);
+  });
+
+  it('one unreadable matchup does not hold back the others', async () => {
+    const f = await fixture();
+    await f.service.rentOut(asActor(HEAD), f.corpA, f.itemId, f.matchupId, FIGHTER.accountId);
+    await f.challenges.closeMatchup(f.matchupId, 'cancelled');
+    // An earlier matchup (sorted first) whose lookup fails.
+    await f.rentals.rent({ itemId: 'other', corpId: f.corpA, matchupId: 'mu-0', accountId: 'x', rentedAt: 1 });
+    const flaky = new CorpArsenalService({
+      corpStore: f.corps,
+      arsenalStore: f.arsenal,
+      rentStore: f.rentals,
+      challengeStore: new Proxy(f.challenges, {
+        get(target, name) {
+          if (name !== 'getChallenge') return Reflect.get(target, name);
+          return (id: string) => (id === 'mu-0' ? Promise.reject(Error('outage')) : target.getChallenge(id));
+        },
+      }),
+      rosterStore: new MemoryAvaRosterStore(),
+    });
+    await expect(flaky.returnCancelled()).rejects.toThrow('outage');
+    expect(await f.rentals.activeForMatchup(f.matchupId)).toHaveLength(0); // still returned
+    expect(await f.rentals.activeForMatchup('mu-0')).toHaveLength(1);
+  });
+});

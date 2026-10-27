@@ -55,7 +55,7 @@
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
 | UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
-| CORP-5 | ⏳ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
+| CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
 | CORP-6 | ⏳ | data srv | `docs/backlog.md` | Уровни корпорации 4 и 5. |
 | CORP-7 | 🔒 | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
 | CORP-8 | 🔒 | data srv | `docs/backlog.md` | Карта под формат. |

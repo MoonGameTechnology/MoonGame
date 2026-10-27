@@ -341,6 +341,7 @@ const SCHEMA_SQL = `
       event_id text PRIMARY KEY, matchup_id text NOT NULL, entry jsonb NOT NULL, delivered boolean NOT NULL DEFAULT false
     );
     CREATE INDEX IF NOT EXISTS corp_arsenal_rent_matchup_idx ON corp_arsenal_rent (matchup_id);
+    CREATE INDEX IF NOT EXISTS corp_return_audit_pending_idx ON corp_return_audit (matchup_id) WHERE NOT delivered;
 
     -- MetaMarket (EC-3): кошелёк Варрантов, книга лотов и леджер сделок.
     -- CHECK (warrants >= 0) — последний рубеж против ухода в минус: покупка запирает
@@ -2296,7 +2297,7 @@ export class PostgresArsenalStore implements ArsenalStore {
 }
 
 export class PostgresCorpRentStore implements CorpRentStore {
-  async completeReturn(matchupId: string, itemId: string, at: number): Promise<boolean> {
+  async completeReturn(matchupId: string, itemId: string, at: number, wear: number): Promise<boolean> {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
@@ -2310,8 +2311,8 @@ export class PostgresCorpRentStore implements CorpRentStore {
         return false;
       }
       const updated = await db.query(
-        'UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-1) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id',
-        [itemId, row.corp_id],
+        'UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-$3) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id',
+        [itemId, row.corp_id, wear],
       );
       if (updated.rowCount !== 1) throw Error('E_CORP_ITEM_MISSING');
       const eventId = JSON.stringify(['rent_return', matchupId, itemId]);
@@ -2348,6 +2349,14 @@ export class PostgresCorpRentStore implements CorpRentStore {
     await this.pool.query('UPDATE corp_return_audit SET delivered=true WHERE event_id=$1', [
       eventId,
     ]);
+  }
+  async pendingMatchups(): Promise<string[]> {
+    const result = await this.pool.query<{ matchup_id: string }>(
+      `SELECT matchup_id FROM corp_arsenal_rent
+       UNION SELECT matchup_id FROM corp_return_audit WHERE NOT delivered
+       ORDER BY matchup_id`,
+    );
+    return result.rows.map((row) => row.matchup_id);
   }
 
   constructor(private readonly pool: Pool) {}

@@ -36,6 +36,7 @@
     "mcp:browser": "node scripts/mcp-browser.mjs",
     "smoke:corporation-service": "node prototype/corporationservicetest.mjs",
     "smoke:corporation": "pnpm run prototype && node prototype/corptest.mjs",
+    "smoke:ava": "pnpm run prototype && node prototype/avatest.mjs",
     "smoke:registration-reward": "pnpm run prototype && node prototype/registrationrewardtest.mjs",
     "smoke:bots": "node prototype/botpopulationtest.mjs",
     "smoke:bots:chat": "node prototype/botsocialtest.mjs",

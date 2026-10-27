@@ -84,7 +84,7 @@ import {
 } from './matchJoin';
 import { initMatchBrowser } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
-import { isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
+import { isAvaMap, isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -1528,6 +1528,7 @@ function mapLabel(mapId: string | undefined): string {
   if (mapId === 'team-3v3') return t('setup.map.team-3v3');
   if (mapId === 'ffa-20') return t('setup.map.ffa-20');
   if (mapId === 'ffa-50') return t('setup.map.ffa-50');
+  if (isAvaMap(mapId)) return t('map.ava');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 

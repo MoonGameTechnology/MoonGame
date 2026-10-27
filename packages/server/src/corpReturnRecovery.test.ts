@@ -100,7 +100,7 @@ describe.skipIf(!url)('durable corporate handoff', () => {
         'CREATE TRIGGER corp_wear_test_failure BEFORE UPDATE ON arsenal FOR EACH ROW EXECUTE FUNCTION corp_wear_test_failure()',
       );
       try {
-        await expect(rentals.completeReturn(id, itemId, 10)).rejects.toThrow();
+        await expect(rentals.completeReturn(id, itemId, 10, 1)).rejects.toThrow();
         expect(await rentals.activeForMatchup(id)).toHaveLength(1);
         expect((await arsenal.get(itemId))?.durability).toBe(5);
       } finally {
@@ -134,8 +134,68 @@ describe.skipIf(!url)('durable corporate handoff', () => {
       expect(await corps.auditOf(corpId)).toHaveLength(1);
       await rentals.markReturnAudited(entries[0]!.eventId!);
       expect(await rentals.pendingReturnAudits(id)).toHaveLength(0);
-      expect(await rentals.completeReturn(id, itemId, 20)).toBe(false);
+      expect(await rentals.completeReturn(id, itemId, 20, 1)).toBe(false);
       expect((await arsenal.get(itemId))?.durability).toBe(4);
+    } finally {
+      await pool.end();
+    }
+  });
+  it('returns a cancelled battle’s handout unworn and keeps it pending until the audit lands', async () => {
+    const pool = new Pool({ connectionString: url });
+    try {
+      const id = randomUUID(),
+        itemId = `item-${id}`,
+        corpId = `corp-${id}`;
+      const arsenal = new PostgresArsenalStore(pool),
+        rentals = new PostgresCorpRentStore(pool),
+        corps = new PostgresCorpStore(pool),
+        challenges = new PostgresAvaChallengeStore(pool);
+      await arsenal.grant({
+        itemId,
+        accountId: corpId,
+        kind: 'hull',
+        form: 'instance',
+        defId: 'cruiser',
+        soulbound: false,
+        durability: 5,
+        origin: 'auction',
+        acquiredAt: 0,
+      });
+      await challenges.createChallenge({
+        id,
+        challengerCorp: corpId,
+        targetCorp: `other-${id}`,
+        cost: 0,
+        status: 'cancelled',
+        createdAt: 0,
+        expiresAt: 0,
+      });
+      await rentals.rent({ itemId, corpId, matchupId: id, accountId: 'fighter', rentedAt: 0 });
+      let corporationsDown = true;
+      const service = new CorpArsenalService({
+        corpStore: new Proxy(corps, {
+          get(target, name) {
+            if (name === 'appendAudit' && corporationsDown)
+              return async () => {
+                throw Error('synthetic corporate outage');
+              };
+            return Reflect.get(target, name);
+          },
+        }),
+        arsenalStore: arsenal,
+        rentStore: rentals,
+        challengeStore: challenges,
+        rosterStore: new PostgresAvaRosterStore(pool),
+        now: () => 10,
+      });
+      await expect(service.returnCancelled()).rejects.toThrow('synthetic corporate outage');
+      expect(await rentals.activeForMatchup(id)).toHaveLength(0);
+      expect((await arsenal.get(itemId))?.durability).toBe(5);
+      expect(await rentals.pendingMatchups()).toContain(id); // the audit still owes
+      corporationsDown = false;
+      expect(await service.returnCancelled()).toBe(0);
+      expect(await corps.auditOf(corpId)).toHaveLength(1);
+      expect(await rentals.pendingMatchups()).not.toContain(id);
     } finally {
       await pool.end();
     }
