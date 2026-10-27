@@ -468,8 +468,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
   Материалы; покупка за ◆, пакеты ◆ ждут провайдера оплаты.
   «Корпорация» (`corpHubView.ts`, решения — `decisions/corpHub.ts`, `corpBase.ts`,
-  `corpMembers.ts`, `corpTreasury.ts`): База (голограммы зданий `corpSprites.ts`, лист здания
-  шторкой), Битвы, Состав, Казна; без корпорации — создание и список с заявкой. Окно
+  `corpMembers.ts`, `corpTreasury.ts`): База (картинки уровней зданий `corpSprites.ts` и
+  `corpArt.ts`, лист здания шторкой), Битвы, Состав, Казна; без корпорации — создание и список с заявкой. Окно
   корпорации в партии — `corpScreen.ts`, 7 вкладок; постройки — `data/corpBuildings.json`.
 - «Производство» (`shipyard.ts`): Корабли, Поддержка, Шаттлы, Пехота, Техника, Герои; отсеки —
   `packages/client/src/loadoutEditor.ts` и `decisions/slotCallouts.ts`. «Герои» — `heroStaff.ts`:

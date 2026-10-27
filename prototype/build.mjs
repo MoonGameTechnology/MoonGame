@@ -3948,22 +3948,18 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-lot.open .cb-tagl{border-style:dashed;}
 .cb-lot.locked .cb-tagl,.cb-lot.locked .cb-tagl :is(b,i){color:var(--sf-dim);}
 .cb-bdg{display:none;}
-/* Голограммы: корпус, крыша, бок, окна, линии. Закрытое здание — пунктир первой части,
-   строящийся уровень — штриховка лесов (узор #corpHatch лежит в разметке хаба). */
+/* Нарисованные здания — картинки; голограммы их уровней красят фильтры #corpGhost и
+   #corpScaf из разметки хаба. Здание без рисунка — корпус: крыша, бок, окна; закрытое —
+   пунктир, строящееся — штриховка лесов (узор #corpHatch там же). */
 :is(#hp-corp,#corp-sheet) .spr{display:block;overflow:visible;}
 :is(#hp-corp,#corp-sheet) .spr .f{fill:rgba(53,214,230,.14);stroke:#35d6e6;stroke-width:1.4;stroke-linejoin:round;}
 :is(#hp-corp,#corp-sheet) .spr .t{fill:rgba(120,236,246,.3);stroke:#35d6e6;stroke-width:1.2;stroke-linejoin:round;}
 :is(#hp-corp,#corp-sheet) .spr .s{fill:rgba(20,90,110,.38);stroke:#35d6e6;stroke-width:1.2;stroke-linejoin:round;}
 :is(#hp-corp,#corp-sheet) .spr .w{fill:#a8f6fc;}
 :is(#hp-corp,#corp-sheet) .spr .wd{fill:rgba(168,246,252,.2);}
-:is(#hp-corp,#corp-sheet) .spr .ln{fill:none;stroke:#35d6e6;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-:is(#hp-corp,#corp-sheet) .spr .acc{fill:#ffb43a;}
-:is(#hp-corp,#corp-sheet) .spr .vi{fill:#b48cff;}
 :is(#hp-corp,#corp-sheet) .spr .ghost :is(.f,.t,.s){fill:none;stroke:rgba(140,233,242,.6);stroke-dasharray:4 4;}
-:is(#hp-corp,#corp-sheet) .spr .ghost .ln{stroke:rgba(140,233,242,.6);stroke-dasharray:4 4;}
-:is(#hp-corp,#corp-sheet) .spr .ghost :is(.w,.wd,.acc,.vi){opacity:.18;}
+:is(#hp-corp,#corp-sheet) .spr .ghost :is(.w,.wd){opacity:.18;}
 :is(#hp-corp,#corp-sheet) .spr .ghost.scaf :is(.f,.t,.s){fill:url(#corpHatch);stroke:#ffb43a;stroke-opacity:.85;}
-:is(#hp-corp,#corp-sheet) .spr .ghost.scaf .ln{stroke:#ffb43a;stroke-opacity:.85;}
 .cb-hud{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:12px;max-width:360px;padding:10px 14px;
   border-radius:12px;background:rgba(3,12,20,.86);border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);}
 .cb-hud.idle{border-color:var(--sf-edge);}
@@ -5622,7 +5618,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div id="news-sheet"></div>
   <div id="corp-sheet"></div>
   <!-- Штриховка «идёт стройка» для голограмм зданий корпорации: одна на документ, спрайты ссылаются по id -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><pattern id="corpHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(255,180,58,.07)"/><rect width="2.2" height="7" fill="rgba(255,180,58,.5)"/></pattern></defs></svg>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><pattern id="corpHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(255,180,58,.07)"/><rect width="2.2" height="7" fill="rgba(255,180,58,.5)"/></pattern><filter id="corpGhost" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".09 .3 .03 0 .08 .2 .66 .07 0 .3 .2 .69 .07 0 .34 0 0 0 .6 0"/></filter><filter id="corpScaf" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".19 .64 .07 0 .35 .13 .44 .05 0 .22 .04 .14 .01 0 .05 0 0 0 .7 0"/></filter></defs></svg>
 </div>
 <div id="emblempick">
   <div class="ep-box">

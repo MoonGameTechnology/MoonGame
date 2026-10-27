@@ -57,6 +57,11 @@ const FORBIDDEN = {
 };
 /** Большие карты фронтира: Sector Zero играет только на картах глав. */
 const FRONTIER = ['data/frontier-50.json', 'data/frontier-100.json'];
+/** Картинки базы корпорации (CORP-13): база — экран хаба, в забеге её нет. Список — из
+ *  папки: новый стиль попадает под сторожа сам. */
+const CORP_ART = readdirSync(new URL('../../art/corp/', import.meta.url), { recursive: true, encoding: 'utf8' })
+  .filter((file) => file.endsWith('.webp'))
+  .map((file) => `prototype/art/corp/${file}`);
 /** Тексты языков (`YAG-1.1d`): в архиве они едут отдельными файлами, по одному на язык.
  *  Список — из `LOCALE_IDS`: новый язык попадает под сторожа сам. */
 const LOCALES = LOCALE_IDS.map((id) => `localization/${id}.ts`);
@@ -104,6 +109,12 @@ describe('YAG-1.1c — в архиве площадки только Sector Zero
 
   it('карт фронтира в архиве нет вовсе', () => {
     for (const file of FRONTIER) expect([file, bytes(archive, file)]).toEqual([file, 0]);
+  });
+
+  it('картинок базы корпорации в архиве нет вовсе', () => {
+    // Картинка в полной сборке есть — иначе пути описи разошлись с папкой и проверка пуста.
+    expect(CORP_ART.some((file) => bytes(full, file) > 0)).toBe(true);
+    for (const file of CORP_ART) expect([file, bytes(archive, file)]).toEqual([file, 0]);
   });
 
   it('текстов языков в бандле нет вовсе — игрок скачивает файл только своего (YAG-1.1d)', () => {
