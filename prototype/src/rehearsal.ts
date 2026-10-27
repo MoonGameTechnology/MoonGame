@@ -226,27 +226,27 @@ async function waitFor(check: () => boolean, ms: number, label: string): Promise
   }
 }
 
-/** Дождаться, пока комната затихнет: ни одной новой квитанции за `quietMs`. Приказ,
- *  зафиксированный уже ПОСЛЕ сдвига часов, догоняет мир внутри себя, а соседу, который из
- *  него ничего не видит, сервер этот догон не шлёт (дельта в тот же миг выдала бы время и
- *  число чужих приказов) — его доносит следующий тик. Поэтому часы двигаются только в
- *  тихой комнате: тогда догон делает тик, и его рассылка достаётся всем. */
+/** Дождаться, пока комната зафиксирует все отправленные приказы: её счётчик квитанций
+ *  дойдёт до `committed`. Приказ, зафиксированный уже ПОСЛЕ сдвига часов, догоняет мир
+ *  внутри себя, а соседу, который из него ничего не видит, сервер этот догон не шлёт
+ *  (дельта в тот же миг выдала бы время и число чужих приказов) — его доносит следующий
+ *  тик. Поэтому часы двигаются только после последней квитанции: тогда догон делает тик,
+ *  и его рассылка достаётся всем.
+ *
+ *  Ждать именно квитанций, а не тишины: прежде здесь ждали 30 мс без новых квитанций, а
+ *  Postgres под нагрузкой CI пишет дольше. Часы сдвигались между двумя приказами, сосед
+ *  оставался без догона, и сверка хэшей падала. Приказ, прошедший шлюз, — ровно одна
+ *  квитанция, принят он или отбит правилами (это проверяет фаза каталога). */
 async function settle(
   room: { readonly sequence: number },
+  committed: number,
   ms: number,
-  quietMs = 30,
 ): Promise<void> {
-  const deadline = Date.now() + ms;
-  let seen = room.sequence;
-  let since = Date.now();
-  while (Date.now() - since < quietMs) {
-    if (Date.now() > deadline) throw new Error('комната не затихла');
-    await sleep(1);
-    if (room.sequence !== seen) {
-      seen = room.sequence;
-      since = Date.now();
-    }
-  }
+  await waitFor(
+    () => room.sequence >= committed,
+    ms,
+    'комната не зафиксировала отправленные приказы',
+  );
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -703,6 +703,7 @@ export async function runRehearsal(
     let botActions = 0;
     if (options.gameHours > 0) {
       const HOUR = 3_600_000;
+      const liveFrom = room.sequence;
       const timer: { fn: (() => void) | null } = { fn: null };
       const driver = startClockDriver(room, {
         schedule: (fn) => {
@@ -757,8 +758,9 @@ export async function runRehearsal(
           driver.reschedule(); // действия могли запланировать новое — взвести под них
         }
         // Ещё один удар сердца после последних приказов (см. `settle`): на живом сервере
-        // это секундный пульс, здесь его надо выстрелить руками, когда комната затихла.
-        await settle(room, options.timeoutMs);
+        // это секундный пульс, здесь его надо выстрелить руками, когда комната зафиксировала
+        // все приказы ботов.
+        await settle(room, liveFrom + botActions, options.timeoutMs);
         clock.now += 1_000;
         const beatDeadline = Date.now() + options.timeoutMs;
         while (room.state.time < clock.now) {
@@ -877,12 +879,17 @@ export async function runRehearsal(
       // Пока вкладка спит, ЖИЗНЬ НЕ ОСТАНАВЛИВАЕТСЯ: соседи играют, и часы идут. Без
       // второго догонять было бы почти нечего — большинство чужих действий туман до
       // спящего не доносит, и цепочка `applyDelta` вышла бы длиной в один шаг.
+      const napFrom = room.sequence;
+      let napOrders = 0;
       for (const client of clients) {
         if (client === sleeper) continue;
         const orders = aiOrders(room.state, client.playerId).slice(0, options.botActionsPerHour);
-        for (const order of orders) await client.send(order.type, order.payload);
+        for (const order of orders) {
+          await client.send(order.type, order.payload);
+          napOrders += 1;
+        }
       }
-      await settle(room, options.timeoutMs);
+      await settle(room, napFrom + napOrders, options.timeoutMs);
       clock.now += 2 * 3_600_000;
       // Довести мир, а не стрельнуть разок: пропущенный из-за фиксации тик оставил бы
       // спящей вкладке нечего догонять, и проверка позеленела бы на пустом месте.
