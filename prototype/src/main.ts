@@ -160,8 +160,6 @@ import {
   type SightCircle,
   type Squadron,
   type ShuttleStrike,
-  traderOf,
-  type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import { pveChapter } from '../../packages/client/src/gameData';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
@@ -207,7 +205,7 @@ import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { initMissionPanel } from './missionPanel';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
-import { initPirateIntro } from './pirateIntro';
+import { allyScreen, initExpeditionWindows, pirateIntro, runTrader, tickAlly, tickTrader, trader } from './expeditionWindows';
 import { initComicPlayer } from './comicPlayer';
 import { createComicQueue } from './comicQueue';
 import { CHAPTER_COMICS } from './comicArt';
@@ -275,7 +273,6 @@ import {
 import { resumeStep } from '../../decisions/tourResume';
 import { initTrainingResume } from './trainingResume';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
-import { cardCovers } from './panelSlack';
 import { frontierOutline } from './frontierOutline';
 import { initMobileHud, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
@@ -365,8 +362,6 @@ import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
-import { initTrader } from './traderScreen';
-import { initAllyScreen } from './allyScreen';
 import { linkedAlly } from '../../decisions/allyPanel';
 import { extractionCandidates } from '../../decisions/chapterChain';
 import { captiveLoad, extractionStart } from '../../decisions/actions';
@@ -395,7 +390,7 @@ import {
   stanceCol,
   youColor,
 } from './mapPalette';
-import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, pirateIntroRect, setView, world, worldDist } from './mapCamera';
+import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
@@ -489,7 +484,6 @@ import {
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
 import {
-  allyAim,
   anyArmed,
   arm,
   cmdMore,
@@ -2389,26 +2383,14 @@ initBattleView({
   seatName: (owner) => NAME[owner],
   placeName,
 });
-/** Сколько экрана вокруг дома занимают его значки — стек флотов, гарнизон, подписи (YAG-7.2). */
-const HOME_CLEARANCE_PX = 80;
-const pirateIntro = initPirateIntro({
-  root: $('pirate-intro'),
-  copy: $('pirate-copy'),
-  action: $('pirate-action'),
-  close: $('pirate-close'),
-  focus: focusWorld,
-  openBattle: (id) => battleWindow.open(id),
-  // Воронка обучения (`YAG-5.1`): первый бой с пиратами — это и есть обучение забега.
-  onStage: (step) => {
-    if (isSectorZeroRun())
-      getPlatform().analytics.emit('onboarding_step', { guide: 'pirates', step, attempt: sectorAttempt });
-  },
-  // YAG-7.2: подсказка встаёт после первого хода часов, когда стартовый вид уже выбран. Если
-  // она легла на дом (и его флоты рядом), вид пересчитывается — теперь с припуском под ней.
-  onFirstShow: () => {
-    const home = pickHome(Object.values(s.planets), ME);
-    if (home && cardCovers(pirateIntroRect(), world(home.position), HOME_CLEARANCE_PX)) defaultView();
-  },
+// Окна экспедиции — у владельца, `expeditionWindows.ts` (REFM-249): подсказка первого боя с
+// пиратами, торговец с кнопкой рельса и связь с союзником, их кадровые такты. Отсюда — мир, своё
+// место, имя места и связь с союзником по кэшу мира.
+initExpeditionWindows({
+  world: () => s,
+  me: () => ME,
+  placeName,
+  allyLinked: () => !!perWorld('ally', () => linkedAlly(s, ME)),
 });
 // Комиксы глав (решение владельца 2026-09-24): арт рисует владелец, реестр — `comicArt.ts`.
 // Реестр читается через держатель, чтобы робот мог подложить свой комикс.
@@ -2454,77 +2436,6 @@ const market = __SECTOR_ZERO_ONLY__
       onOpen: () => maybeIntro('market'),
     });
 document.getElementById('rail-market')?.addEventListener('click', () => market?.open());
-
-// --- торговец экспедиции («живой курс», решение владельца 2026-09-26) -------------------
-// Рынок основной игры — книга заявок живых игроков, и в забеге его нет; здесь торгуют с самим
-// рынком (`modules/trader.ts`). Окно — `traderScreen.ts`; открыт торговец, пока идёт забег
-// режима с разделом `trader`: кнопка рельса и карточка ресурса спрашивают `runTrader()`.
-const traderWin = $('trader');
-/** Раздел торговца, если он у текущего забега есть. */
-function runTrader(): ModeTrader | undefined {
-  return runInProgress() ? traderOf(ctx(s.time, s)) : undefined;
-}
-const trader = initTrader({
-  root: () => traderWin,
-  state: () => s,
-  me: () => ME,
-  ctx: () => ctx(s.time, s),
-  cfg: runTrader,
-  order: playerOrder,
-});
-const railTrader = $('rail-trader');
-railTrader.addEventListener('click', () => trader.open());
-/** Кадровый такт торговца: кнопка рельса — пока он есть, окно следит за курсом (он плывёт к
- *  базе) и закрывается само, когда забег кончился. */
-function tickTrader(): void {
-  const live = runTrader() !== undefined;
-  const shown = live ? '' : 'none';
-  if (railTrader.style.display !== shown) railTrader.style.display = shown;
-  if (!live) {
-    if (trader.isOpen()) trader.close();
-    return;
-  }
-  trader.refresh();
-}
-
-// --- связь с союзником (глава IV, PVR-7.5) ---------------------------------------------
-// Окно — `allyScreen.ts`, статус операции — тот же план, по которому ходит бот союзника
-// (`decisions/allyPanel.ts`). Вход — чип «⬡ Союзник» в строке статуса: он есть и на ПК, и на
-// телефоне, и появляется только после встречи.
-const allyWin = $('ally');
-const allyScreen = initAllyScreen({
-  root: () => allyWin,
-  state: () => s,
-  me: () => ME,
-  data: () => data,
-  targetName: (planet, fleet) => {
-    if (planet) return placeName(planet);
-    const f = fleet ? s.fleets[fleet] : undefined;
-    const at = f ? (f.location ?? f.movement?.to) : undefined;
-    return at ? placeName(at) : '—';
-  },
-  arm: (kind) => {
-    arm('allyAim', kind);
-    note(t('ally.pick', { order: t(`ally.kind.${kind}`) }));
-  },
-  armed: () => allyAim,
-  findFleet: (fleetId) => {
-    const f = s.fleets[fleetId];
-    const at = f ? (f.location ?? f.movement?.to) : undefined;
-    if (at) jumpTo(at, 'goto');
-  },
-  order: playerOrder,
-  sees: fleetSeen,
-});
-/** Кадровый такт окна союзника: связи нет — окно закрыто и прицел снят. */
-function tickAlly(): void {
-  if (!perWorld('ally', () => linkedAlly(s, ME))) {
-    if (allyScreen.isOpen()) allyScreen.close();
-    drop('allyAim');
-    return;
-  }
-  allyScreen.refresh();
-}
 
 // --- resource card (RC-1): tap a resource chip → popup with stats + market button -
 const resCardEl = $('rescard');

@@ -41,7 +41,7 @@
 | REFM-246 | ✅ | proto | `docs/backlog.md` | Проводка окна боя |
 | REFM-247 | ✅ | proto | `docs/backlog.md` | Экран подключения |
 | REFM-248 | ✅ | proto | `docs/backlog.md` | Проводка настроек |
-| REFM-249 | ⏳ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
+| REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | TXT-8 | 🔒 | proto docs | `docs/backlog.md` | (LORE-1) Досье кораблей и зданий: описание о роли, числа в |

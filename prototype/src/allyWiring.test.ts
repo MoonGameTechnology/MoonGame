@@ -18,6 +18,8 @@ const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
 const TOPBAR = readFileSync(new URL('./matchTopBar.ts', import.meta.url), 'utf8');
 // Цепочка главы — у забега (`sectorRun.ts`, REFM-243).
 const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
+// Окно связи — у владельца окон экспедиции (`expeditionWindows.ts`, REFM-249).
+const WINDOWS = readFileSync(new URL('./expeditionWindows.ts', import.meta.url), 'utf8');
 
 describe('глава IV — проводка интерфейса', () => {
   it('окно есть в разметке; вход — чип строки статуса', () => {
@@ -77,6 +79,6 @@ describe('глава VI — проводка интерфейса (PVR-8.4, PVR-
   });
 
   it('окно связи видит флоты так же, как карта: предложение охранять доки — по видимому', () => {
-    expect(MAIN).toMatch(/order: playerOrder,\s*sees: fleetSeen,\s*\}\);/);
+    expect(WINDOWS).toMatch(/order: playerOrder,\s*sees: fleetSeen,\s*\}\);/);
   });
 });
