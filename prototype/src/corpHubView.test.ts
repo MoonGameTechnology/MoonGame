@@ -3,6 +3,7 @@ import { setLocale, t } from '../../localization/runtime';
 import type { CorpInfrastructureState } from '../../packages/protocol/src/corpInfrastructure';
 import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruction';
 import type { CorpMembership, CorpRole } from './corp';
+import { corpArt } from './corpArt';
 import { corpHubHtml, corpHubSheetHtml, type CorpHubPaint } from './corpHubView';
 import { CORP_LOTS } from './corpSprites';
 
@@ -40,6 +41,7 @@ function paint(over: Partial<CorpHubPaint> = {}): CorpHubPaint {
     me: HEAD,
     members: ROSTER,
     view: base({ headquarters: 1 }, 500),
+    style: null,
     elapsedMs: 0,
     rank: 3,
     journal: [],
@@ -217,10 +219,46 @@ describe('вкладка «Корпорация»: казна', () => {
   });
 });
 
+const styles = (head: boolean, active = 'standard', owned: string[] = ['high_tech']) => ({ head, active, owned });
+
+describe('вкладка «Корпорация»: стиль базы (CORP-14)', () => {
+  it('шапка называет стиль, и здания рисуются в нём', () => {
+    const html = corpHubHtml(paint({ style: styles(true, 'high_tech') }));
+    expect(html).toContain(
+      `data-corphub="style">${t('corp.style.current', { name: t('corp.style.high-tech') })}</button>`,
+    );
+    expect(html).toContain(`href="${corpArt('headquarters', 1, 'high_tech')!.src}"`);
+    expect(html).not.toContain(`href="${corpArt('headquarters', 1)!.src}"`);
+  });
+
+  it('стиль не прочитан — здания стандартные, кнопки стиля нет', () => {
+    const html = corpHubHtml(paint());
+    expect(html).not.toContain('data-corphub="style"');
+    expect(html).toContain(`href="${corpArt('headquarters', 1)!.src}"`);
+    expect(corpHubSheetHtml(paint(), { kind: 'style' }, '')).toBe('');
+  });
+
+  it('шторка: глава применяет купленный и идёт в магазин за остальными, участник смотрит', () => {
+    const head = corpHubSheetHtml(paint({ style: styles(true, 'high_tech') }), { kind: 'style' }, '');
+    expect(head).toContain('data-corpstyle="standard"');
+    expect(head).not.toContain('data-corpstyle="high_tech"');
+    expect(head).toContain('data-corpshop="imperial_gothic"');
+    expect(head).toContain(t('corp.style.applied'));
+    const asMember = corpHubSheetHtml(
+      paint({ me: member('a3', 'Лира', 'member'), style: styles(false, 'high_tech') }),
+      { kind: 'style' },
+      '',
+    );
+    expect(asMember).not.toMatch(/data-corp(style|shop)=/);
+    expect(asMember).toContain(t('corp.style.owned'));
+    expect(asMember).toContain(t('corp.style.locked'));
+  });
+});
+
 describe('вкладка «Корпорация»: текст и кнопки', () => {
   const all = (): string[] => {
     const sections = (['base', 'battles', 'members', 'treasury'] as const).map((section) =>
-      corpHubHtml(paint({ section, battles: '<p class="chint">—</p>' })),
+      corpHubHtml(paint({ section, battles: '<p class="chint">—</p>', style: styles(true) })),
     );
     const states = (['guest', 'loading', 'offline', 'none', 'pending'] as const).map((state) =>
       corpHubHtml(paint({ state, canSignIn: true })),
@@ -229,6 +267,8 @@ describe('вкладка «Корпорация»: текст и кнопки', 
       corpHubSheetHtml(paint(), { kind: 'building', id: 'headquarters' }, ''),
       corpHubSheetHtml(paint(), { kind: 'levels' }, ''),
       corpHubSheetHtml(paint(), { kind: 'member', accountId: 'a2' }, ''),
+      corpHubSheetHtml(paint({ style: styles(true, 'high_tech') }), { kind: 'style' }, ''),
+      corpHubSheetHtml(paint({ style: styles(false) }), { kind: 'style' }, ''),
     ];
     return [...sections, ...states, ...sheets];
   };

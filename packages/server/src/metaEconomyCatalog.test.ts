@@ -77,6 +77,29 @@ describe('main-game meta content', () => {
     adCurrency.commerce.products.rewarded_supply!.sovereigns = 10;
     expect(() => parseMetaEconomyCatalog(adCurrency, data)).toThrow('E_META_AD_PRODUCT');
   });
+
+  it('sells each corporation base style once and never the free standard one', () => {
+    const shipped = Object.values(loadMetaEconomyCatalog(data).store.offers).filter(
+      (offer) => offer.corpStyle,
+    );
+    expect(shipped.map((offer) => offer.corpStyle).sort()).toEqual([
+      'high_tech',
+      'imperial_gothic',
+    ]);
+    expect(shipped.every((offer) => offer.category === 'styles' && offer.price)).toBe(true);
+    const free = loadMetaEconomyCatalog(data);
+    free.store.offers.corp_style_high_tech!.corpStyle = 'standard';
+    const twice = loadMetaEconomyCatalog(data);
+    twice.store.offers.corp_style_high_tech!.corpStyle = 'imperial_gothic';
+    const limited = loadMetaEconomyCatalog(data);
+    limited.store.offers.corp_style_high_tech!.limit = 1;
+    const shelved = loadMetaEconomyCatalog(data);
+    shelved.store.offers.corp_style_high_tech!.category = 'premium';
+    const unpriced = loadMetaEconomyCatalog(data);
+    delete unpriced.store.offers.corp_style_high_tech!.price;
+    for (const catalog of [free, twice, limited, shelved, unpriced])
+      expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_STORE');
+  });
 });
 
 describe('profile medal rewards', () => {

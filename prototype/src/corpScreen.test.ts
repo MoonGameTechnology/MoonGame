@@ -383,6 +383,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
       '/corps/c1/infrastructure': built.infrastructure,
       '/corps/c1/audit': { audit: [] },
       '/leaderboard': { corps: { me: { rank: 3 } } },
+      '/meta-economy/corp-style': { corp: { head: true, active: 'standard', owned: ['high_tech'] } },
     };
   }
 
@@ -510,5 +511,50 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     api.hideHub();
     expect(api.hubSheetOpen()).toBe(false);
     expect(hubSheet.open()).toBe(false);
+  });
+
+  it('стиль базы (CORP-14): плашка в шапке открывает шторку, глава применяет купленный', async () => {
+    const calls = server({ ...headCorp(), 'POST /meta-economy/corp-style/apply': { ok: true } });
+    const sent: unknown[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: { method?: string; body?: string }) => {
+      if (init?.body) sent.push(JSON.parse(init.body));
+      return inner(url, init);
+    });
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    expect(hubRoot.html()).toContain(t('corp.style.current', { name: t('corp.style.standard') }));
+    hubRoot.fire(press({ corphub: 'style' }));
+    expect(api.hubSheetOpen()).toBe(true);
+    expect(hubSheet.html()).toContain('data-corpstyle="high_tech"');
+    hubSheet.fire(press({ corpstyle: 'high_tech' }));
+    await tick();
+    expect(calls).toContain('POST /meta-economy/corp-style/apply');
+    expect(sent).toEqual([{ requestId: expect.any(String), styleId: 'high_tech' }]);
+  });
+
+  it('стиль базы (CORP-14): некупленный ведёт в магазин, на этот стиль', async () => {
+    server(headCorp());
+    const hubRoot = fakeHubEl();
+    const hubSheet = fakeHubEl();
+    const shop: string[] = [];
+    const { api } = wire({
+      ...session,
+      hub: {
+        root: () => hubRoot,
+        sheet: () => hubSheet,
+        note: () => undefined,
+        canSignIn: () => false,
+        signIn: () => undefined,
+        openShop: (style) => shop.push(style),
+      },
+    });
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corphub: 'style' }));
+    expect(hubSheet.html()).toContain('data-corpshop="imperial_gothic"');
+    hubSheet.fire(press({ corpshop: 'imperial_gothic' }));
+    expect(shop).toEqual(['imperial_gothic']);
   });
 });

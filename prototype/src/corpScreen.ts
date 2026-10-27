@@ -1,6 +1,8 @@
 import { corpHubBadges, corpHubState } from '../../decisions/corpHub';
 import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
+import { parseCorpStyle } from '../../decisions/corpStyle';
 import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
+import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import { corpBuildingsHtml, updateCorpConstructionCountdown } from './corpBuildingsView';
 import {
   CORP_HUB_SECTIONS,
@@ -244,6 +246,8 @@ export interface CorpHost {
     /** Accounts are on, so a guest can be offered a sign-in. */
     canSignIn(): boolean;
     signIn(): void;
+    /** CORP-14 — a base style the corporation lacks is bought in the shop; open it there. */
+    openShop?(style: string): void;
   };
 }
 
@@ -269,6 +273,8 @@ export function initCorp(host: CorpHost): {
   let infrastructure: CorpInfrastructureView | null = null;
   let infrastructureAt = 0;
   let infrastructureTimer: ReturnType<typeof setInterval> | undefined;
+  // Стиль базы (CORP-14); null — не прочитан, здания рисуются стандартными.
+  let corpStyle: MetaCorpStyleView | null = null;
   let intentBusy = false;
   let avaAvailable = true;
   let medalsAvailable = true;
@@ -423,7 +429,11 @@ export function initCorp(host: CorpHost): {
         infrastructure = parseCorpInfrastructure(await corpFetch(`/corps/${encodeURIComponent(corpId)}/infrastructure`));
         infrastructureAt = performance.now();
         if (infrastructure && corpMine.corp) corpMine.corp.influence = infrastructure.influence;
-      } else infrastructure = null;
+        corpStyle = parseCorpStyle(await corpFetch('/meta-economy/corp-style')) ?? null;
+      } else {
+        infrastructure = null;
+        corpStyle = null;
+      }
       if (canManage(corpMine.membership.role)) {
         const auditRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}/audit`)) as {
           audit?: unknown;
@@ -437,6 +447,7 @@ export function initCorp(host: CorpHost): {
       corpDetail = null;
       corpAudit = [];
       infrastructure = null;
+      corpStyle = null;
       const listRaw = (await corpFetch('/corps')) as { corps?: unknown } | null;
       corpBrowseList = parseCorpSummaries(listRaw?.corps);
     }
@@ -1066,6 +1077,7 @@ export function initCorp(host: CorpHost): {
       me,
       members,
       view: infrastructure,
+      style: corpStyle,
       elapsedMs: performance.now() - infrastructureAt,
       rank: corpRank,
       journal: me && canManage(me.role) ? corpAudit : null,
@@ -1184,11 +1196,27 @@ export function initCorp(host: CorpHost): {
     if (nav) {
       const what = nav.dataset.corphub;
       if (what === 'levels') openSheet({ kind: 'levels' }, 'data-corphub', 'levels');
+      else if (what === 'style') openSheet({ kind: 'style' }, 'data-corphub', 'style');
       else if (what === 'member') {
         const id = nav.dataset.corparg ?? '';
         openSheet({ kind: 'member', accountId: id }, 'data-corparg', id);
       } else if (what === 'refresh') detach('корпорация: обновление вкладки', refreshCorp());
       else if (what === 'signin') host.hub.signIn();
+      return;
+    }
+    // Стиль базы (CORP-14): применяет глава; некупленный покупают в магазине.
+    const apply = tg.closest<HTMLElement>('[data-corpstyle]');
+    if (apply) {
+      if (!(apply as HTMLButtonElement).disabled)
+        corpSend('стиль базы', '/meta-economy/corp-style/apply', {
+          requestId: crypto.randomUUID(),
+          styleId: apply.dataset.corpstyle ?? '',
+        });
+      return;
+    }
+    const buy = tg.closest<HTMLElement>('[data-corpshop]')?.dataset.corpshop;
+    if (buy) {
+      host.hub.openShop?.(buy);
       return;
     }
     const btn = tg.closest<HTMLElement>('[data-corpact]');

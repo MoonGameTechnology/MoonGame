@@ -1594,7 +1594,8 @@ const server = createMultiplayerServer({
       const refreshAccountArsenal = async (who: { accountId: string; login: string }): Promise<void> => {
         await syncAccountArsenal({ ...who, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: (id) => !isAvaMatchId(id) });
       };
-      registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal });
+      registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal,
+        corpOf: (accountId) => corpStore.membershipOf(accountId) });
       registerMetaCommerce(app, metaEconomy, metaEconomyStore);
       app.get('/commerce/offers', async (_request, reply) => {
         reply.header('cache-control', 'no-store');

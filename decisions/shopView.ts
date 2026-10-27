@@ -13,11 +13,14 @@
  * 3. **Покрытие рецепта считается в единицах материала**, как прогресс в Арсенале
  *    (`recipeProgress`): «Ферросплавы 25 из 25 и ничего больше» — не 100% рецепта.
  * 4. **Выгода срока — к самому короткому сроку**, по цене дня: игрок сравнивает ровно это.
+ *
+ * Стили базы корпорации (полка «Стили») покупает глава для всей корпорации: их кнопку
+ * решает `decisions/corpStyle.ts`, а не `buyState`.
  */
 import type { CommerceOffer } from '../packages/protocol/src/commerce';
 import type { MetaRecipeView, MetaStoreOfferView } from '../packages/protocol/src/metaEconomyView';
 
-export const SHOP_TABS = ['sovereigns', 'premium', 'modules', 'materials'] as const;
+export const SHOP_TABS = ['sovereigns', 'premium', 'modules', 'materials', 'styles'] as const;
 export type ShopTab = (typeof SHOP_TABS)[number];
 
 const DAY = 86_400_000;

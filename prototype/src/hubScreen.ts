@@ -680,6 +680,11 @@ export function initHubScreen(host: HubScreenHost): void {
           showStage('welcome');
           fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
         },
+        // CORP-14: стиль базы покупают в магазине, на вкладке «Стили».
+        openShop: (style) => {
+          shop?.show('styles', style);
+          hubTab('shop');
+        },
       },
     });
   $('railcorp').addEventListener('click', () => corp?.open());

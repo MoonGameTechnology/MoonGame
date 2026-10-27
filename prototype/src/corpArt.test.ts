@@ -1,7 +1,7 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import manifest from '../art/corp/manifest.json';
-import { CORP_ART_BUILDINGS, corpArt } from './corpArt';
+import { CORP_ART_BUILDINGS, CORP_STYLES, corpArt, corpStyleName } from './corpArt';
 import { CORP_LOTS, corpSprite } from './corpSprites';
 
 const images = (svg: string): string[] => [...svg.matchAll(/<image [^>]*>/g)].map((m) => m[0]);
@@ -30,6 +30,33 @@ describe('рисунки зданий корпорации (CORP-13)', () => {
     expect(corpArt('headquarters', 0)?.src).toBe(corpArt('headquarters', 1)?.src);
     expect(corpArt('headquarters', 5)?.src).toBe(corpArt('headquarters', 3)?.src);
     expect(corpArt('orbital_dock', 1)).toBeNull();
+  });
+});
+
+describe('стили базы (CORP-14)', () => {
+  it('каждый стиль из магазина нарисован целиком, и все стили разные', () => {
+    const catalog = JSON.parse(
+      readFileSync(new URL('../../data/metaEconomy.json', import.meta.url), 'utf8'),
+    ) as { store: { offers: Record<string, { corpStyle?: string }> } };
+    const sold = Object.values(catalog.store.offers).flatMap((o) => (o.corpStyle ? [o.corpStyle] : []));
+    expect([...CORP_STYLES].sort()).toEqual(['standard', ...sold].sort());
+    const srcs = new Set<string>();
+    for (const style of CORP_STYLES)
+      for (const id of CORP_ART_BUILDINGS)
+        for (const level of [1, 2, 3]) srcs.add(corpArt(id, level, style)!.src);
+    expect(srcs.size).toBe(CORP_STYLES.length * CORP_ART_BUILDINGS.length * 3);
+  });
+
+  it('стиль без рисунков в этой сборке рисуется и называется стандартным', () => {
+    expect(corpArt('headquarters', 2, 'art_deco')).toEqual(corpArt('headquarters', 2));
+    expect(corpStyleName('art_deco')).toBe(corpStyleName('standard'));
+    expect(corpStyleName('high_tech')).toBe('corp.style.high-tech');
+  });
+
+  it('здание на панораме стоит в стиле базы — и строящийся уровень тоже', () => {
+    const [scaf, current] = images(corpSprite('headquarters', 1, 'build', 'imperial_gothic'));
+    expect(scaf).toContain(`href="${corpArt('headquarters', 2, 'imperial_gothic')!.src}"`);
+    expect(current).toContain(`href="${corpArt('headquarters', 1, 'imperial_gothic')!.src}"`);
   });
 });
 
@@ -65,7 +92,7 @@ describe('здание на панораме (corpSprite)', () => {
     expect(corpSprite('headquarters', 1, 'built')).not.toContain('class="hit"');
     const lot = CORP_LOTS.headquarters!;
     const hit = /class="hit" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/.exec(
-      corpSprite('headquarters', 1, 'built', true),
+      corpSprite('headquarters', 1, 'built', 'standard', true),
     );
     const [x, y, w, h] = hit!.slice(1).map(Number) as [number, number, number, number];
     expect(x).toBeGreaterThanOrEqual(0);
