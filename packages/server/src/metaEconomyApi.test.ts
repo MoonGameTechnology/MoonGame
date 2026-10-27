@@ -2,12 +2,19 @@ import Fastify from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MetaCommandResult, MetaEconomyView } from '@void/protocol';
 import { registerMetaEconomyApi, type MetaEconomyApiDeps } from './metaEconomyApi';
+import type { CorpMembership } from './store';
 
 const apps: ReturnType<typeof Fastify>[] = [];
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
-function setup(options: { authenticated?: boolean; rateMax?: number } = {}) {
+function setup(
+  options: {
+    authenticated?: boolean;
+    rateMax?: number;
+    corpOf?: (accountId: string) => Promise<CorpMembership | null>;
+  } = {},
+) {
   const view: MetaEconomyView = {
     catalogVersion: 'v0',
     materials: [],
@@ -29,6 +36,9 @@ function setup(options: { authenticated?: boolean; rateMax?: number } = {}) {
     chooseSeasonReward: vi.fn(async () => ok),
     buyOffer: vi.fn(async () => ok),
     claimPremiumDaily: vi.fn(async () => ok),
+    corpStyle: vi.fn(async () => ({ active: 'high_tech', owned: ['high_tech'] })),
+    buyCorpStyle: vi.fn(async () => ok),
+    applyCorpStyle: vi.fn(async () => ok),
   };
   const app = Fastify();
   apps.push(app);
@@ -38,9 +48,16 @@ function setup(options: { authenticated?: boolean; rateMax?: number } = {}) {
       options.authenticated === false ? null : { accountId: 'session-owner', login: 'Player' },
     now: () => 0,
     rateMax: options.rateMax,
+    ...(options.corpOf ? { corpOf: options.corpOf } : {}),
   });
   return { app, economy };
 }
+const member = (role: CorpMembership['role']) => async (): Promise<CorpMembership> => ({
+  corpId: 'corp-1',
+  accountId: 'session-owner',
+  login: 'Player',
+  role,
+});
 const craft = { requestId: 'request-1', recipeId: 'armor', allowSoulbound: false };
 
 describe('main economy HTTP boundary', () => {
@@ -193,6 +210,95 @@ describe('main economy HTTP boundary', () => {
     });
     expect(ok.statusCode).toBe(200);
     expect(economy.claimPremiumDaily).toHaveBeenCalledWith('session-owner', claim);
+  });
+
+  it('mounts the base style routes only with the corporation lookup', async () => {
+    const { app } = setup();
+    expect((await app.inject({ url: '/meta-economy/corp-style' })).statusCode).toBe(404);
+    const buy = { requestId: 'style-1', offerId: 'corp_style_high_tech' };
+    expect(
+      (await app.inject({ method: 'POST', url: '/meta-economy/corp-style/buy', payload: buy }))
+        .statusCode,
+    ).toBe(404);
+  });
+
+  it('reads the base style of the session owner’s corporation', async () => {
+    const outside = setup({ corpOf: async () => null });
+    expect((await outside.app.inject({ url: '/meta-economy/corp-style' })).json()).toEqual({
+      corp: null,
+    });
+    const recruit = setup({ corpOf: member('recruit') });
+    expect((await recruit.app.inject({ url: '/meta-economy/corp-style' })).json()).toEqual({
+      corp: null,
+    });
+    expect(recruit.economy.corpStyle).not.toHaveBeenCalled();
+    for (const [role, head] of [
+      ['member', false],
+      ['head', true],
+    ] as const) {
+      const { app, economy } = setup({ corpOf: member(role) });
+      const response = await app.inject({ url: '/meta-economy/corp-style?corpId=other' });
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.json()).toEqual({
+        corp: { head, active: 'high_tech', owned: ['high_tech'] },
+      });
+      expect(economy.corpStyle).toHaveBeenCalledWith('corp-1');
+    }
+    const down = setup({
+      corpOf: async () => {
+        throw Error('E_CORPORATIONS_UNAVAILABLE');
+      },
+    });
+    const response = await down.app.inject({ url: '/meta-economy/corp-style' });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: 'E_UNAVAILABLE' });
+  });
+
+  it('lets only the head buy and apply a base style, for the session’s own corporation', async () => {
+    const buy = { requestId: 'style-1', offerId: 'corp_style_high_tech' };
+    const apply = { requestId: 'style-2', styleId: 'high_tech' };
+    for (const [corpOf, code] of [
+      [async () => null, 'E_NOT_MEMBER'],
+      [member('recruit'), 'E_NOT_MEMBER'],
+      [member('officer'), 'E_FORBIDDEN'],
+      [member('member'), 'E_FORBIDDEN'],
+    ] as const) {
+      const { app, economy } = setup({ corpOf });
+      for (const [url, payload] of [
+        ['/meta-economy/corp-style/buy', buy],
+        ['/meta-economy/corp-style/apply', apply],
+      ] as const) {
+        const response = await app.inject({ method: 'POST', url, payload });
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toEqual({ error: code });
+      }
+      expect(economy.buyCorpStyle).not.toHaveBeenCalled();
+      expect(economy.applyCorpStyle).not.toHaveBeenCalled();
+    }
+    const { app, economy } = setup({ corpOf: member('head') });
+    for (const forged of [
+      { ...buy, corpId: 'victim-corp' },
+      { ...buy, price: 0 },
+      { ...apply, corpId: 'victim-corp' },
+    ]) {
+      const url = 'offerId' in forged ? 'corp-style/buy' : 'corp-style/apply';
+      const response = await app.inject({
+        method: 'POST',
+        url: `/meta-economy/${url}`,
+        payload: forged,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    expect(
+      (await app.inject({ method: 'POST', url: '/meta-economy/corp-style/buy', payload: buy }))
+        .statusCode,
+    ).toBe(200);
+    expect(economy.buyCorpStyle).toHaveBeenCalledWith('session-owner', 'corp-1', buy);
+    expect(
+      (await app.inject({ method: 'POST', url: '/meta-economy/corp-style/apply', payload: apply }))
+        .statusCode,
+    ).toBe(200);
+    expect(economy.applyCorpStyle).toHaveBeenCalledWith('corp-1', apply);
   });
 
   it('limits writes and returns stable errors without database details', async () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { GameData } from '@void/shared-core';
-import { PROFILE_MEDALS } from '@void/protocol';
+import { CORP_STYLE_STANDARD, PROFILE_MEDALS } from '@void/protocol';
 
 const id = z
   .string()
@@ -22,7 +22,7 @@ const grant = z
 
 const storeOffer = z
   .object({
-    category: z.enum(['premium', 'modules', 'materials']),
+    category: z.enum(['premium', 'modules', 'materials', 'styles']),
     /** Fixed Sovereign price; module offers take theirs from `modulePrices` instead. */
     price: amount.optional(),
     premiumDays: z.number().int().min(1).max(366).optional(),
@@ -30,6 +30,8 @@ const storeOffer = z
     modules: z.array(id).min(1).max(20).optional(),
     discountPercent: z.number().int().min(1).max(90).optional(),
     materials: quantities.optional(),
+    /** A corporation base style: the head buys it for the whole corporation (`buyCorpStyle`). */
+    corpStyle: id.optional(),
     /** Lifetime purchases per account. */
     limit: z.number().int().min(1).max(100).optional(),
   })
@@ -257,11 +259,16 @@ export function parseMetaEconomyCatalog(
     checkModule(defId);
     if (!Number.isSafeInteger(price)) throw new Error('E_META_STORE');
   }
+  const corpStyles = new Set<string>();
   for (const offer of Object.values(catalog.store.offers)) {
     // One kind of goods per offer: the store card and the refund rule stay simple.
-    const kinds = [offer.premiumDays, offer.premiumSeason, offer.modules, offer.materials].filter(
-      (kind) => kind !== undefined,
-    );
+    const kinds = [
+      offer.premiumDays,
+      offer.premiumSeason,
+      offer.modules,
+      offer.materials,
+      offer.corpStyle,
+    ].filter((kind) => kind !== undefined);
     if (kinds.length !== 1) throw new Error('E_META_STORE');
     if (offer.modules) {
       if (
@@ -273,8 +280,24 @@ export function parseMetaEconomyCatalog(
     } else if (offer.price === undefined || offer.discountPercent !== undefined) {
       throw new Error('E_META_STORE');
     }
-    const category = offer.modules ? 'modules' : offer.materials ? 'materials' : 'premium';
+    const category = offer.modules
+      ? 'modules'
+      : offer.materials
+        ? 'materials'
+        : offer.corpStyle
+          ? 'styles'
+          : 'premium';
     if (offer.category !== category) throw new Error('E_META_STORE');
+    if (offer.corpStyle) {
+      // The free style is never sold; a style is owned once, so no purchase limit either.
+      if (
+        offer.corpStyle === CORP_STYLE_STANDARD ||
+        corpStyles.has(offer.corpStyle) ||
+        offer.limit !== undefined
+      )
+        throw new Error('E_META_STORE');
+      corpStyles.add(offer.corpStyle);
+    }
     checkMaterials(offer.materials);
     if (offer.premiumSeason && !seasonIds.has(offer.premiumSeason)) throw new Error('E_META_STORE');
   }

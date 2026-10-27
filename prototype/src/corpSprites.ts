@@ -1,8 +1,8 @@
 /**
- * Здания базы корпорации на панораме и в карточках (CORP-3, рисунки CORP-13).
+ * Здания базы корпорации на панораме и в карточках (CORP-3, рисунки CORP-13, стили CORP-14).
  *
  * Панорама — мир 1200×540: у каждого здания свой участок (`CORP_LOTS`, низ участка — земля).
- * Нарисованное здание (`corpArt.ts`) стоит в участке картинкой своего уровня. Строящийся
+ * Нарисованное здание (`corpArt.ts`) стоит в участке картинкой своего уровня в стиле базы. Строящийся
  * уровень — картинка следующего уровня янтарной голограммой позади нынешнего здания,
  * закрытое и доступное к стройке здание — голограмма первого уровня (фильтры `#corpScaf` и
  * `#corpGhost` лежат в разметке хаба).
@@ -11,6 +11,7 @@
  * SVG и в панораму не встаёт — карточка и лист у него всё равно есть.
  */
 import type { CorpLotState } from '../../decisions/corpBase';
+import { CORP_STYLE_STANDARD } from '../../packages/protocol/src/corpStyle';
 import { corpArt, type CorpArt } from './corpArt';
 
 /** Участок здания на панораме и где у его подписи место — над участком или под ним. */
@@ -60,7 +61,15 @@ const svg = (lot: CorpLot, body: string): string =>
 const n = (v: number): number => Math.round(v * 10) / 10;
 
 /** Картинки здания в участке: холст вписан в участок и стоит на его нижней кромке. */
-function artSprite(id: string, lot: CorpLot, level: number, mode: CorpLotState, top: CorpArt, hit: boolean): string {
+function artSprite(
+  id: string,
+  lot: CorpLot,
+  level: number,
+  mode: CorpLotState,
+  style: string,
+  top: CorpArt,
+  hit: boolean,
+): string {
   const k = Math.min(lot.w / top.w, lot.h / top.h);
   const w = top.w * k;
   const h = top.h * k;
@@ -68,7 +77,7 @@ function artSprite(id: string, lot: CorpLot, level: number, mode: CorpLotState, 
   const y = lot.h - h;
   const image = (art: CorpArt, attrs = ''): string =>
     `<image href="${art.src}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${attrs}/>`;
-  const current = mode === 'build' && level > 0 ? corpArt(id, level) : null;
+  const current = mode === 'build' && level > 0 ? corpArt(id, level, style) : null;
   const body =
     mode === 'built'
       ? image(top)
@@ -88,12 +97,18 @@ function artSprite(id: string, lot: CorpLot, level: number, mode: CorpLotState, 
   return svg(lot, zone + body);
 }
 
-/** Здание уровня `level` в состоянии участка `mode`. `hit` — прозрачная зона нажатия по
- *  нарисованному (только на панораме, где участки перекрываются). */
-export function corpSprite(id: string, level: number, mode: CorpLotState, hit = false): string {
+/** Здание уровня `level` в состоянии участка `mode` и в стиле базы `style`. `hit` — прозрачная
+ *  зона нажатия по нарисованному (только на панораме, где участки перекрываются). */
+export function corpSprite(
+  id: string,
+  level: number,
+  mode: CorpLotState,
+  style: string = CORP_STYLE_STANDARD,
+  hit = false,
+): string {
   // Строится следующий уровень; закрытое и доступное к стройке здание показывает первый.
-  const top = corpArt(id, mode === 'built' ? level : mode === 'build' ? level + 1 : 1);
-  if (top) return artSprite(id, CORP_LOTS[id] ?? PLAIN_LOT, level, mode, top, hit);
+  const top = corpArt(id, mode === 'built' ? level : mode === 'build' ? level + 1 : 1, style);
+  if (top) return artSprite(id, CORP_LOTS[id] ?? PLAIN_LOT, level, mode, style, top, hit);
   const solid = mode === 'built' || (mode === 'build' && level > 0) ? PLAIN : '';
   const ghost = mode === 'built' ? '' : PLAIN;
   return svg(PLAIN_LOT, `<g class="solid">${solid}</g><g class="ghost${mode === 'build' ? ' scaf' : ''}">${ghost}</g>`);

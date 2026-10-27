@@ -678,7 +678,12 @@ const server = createMultiplayerServer({
             }
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
-          registerMetaEconomyApi(scope, { economy: metaEconomy, identify, onChanged: refreshAccountArsenal });
+          registerMetaEconomyApi(scope, {
+            economy: metaEconomy,
+            identify,
+            onChanged: refreshAccountArsenal,
+            corpOf: (accountId) => stores.corpStore.membershipOf(accountId),
+          });
           scope.get('/commerce/offers', async (_request, reply) => {
             reply.header('cache-control', 'no-store');
             return { offers: commerceOffers() };

@@ -264,7 +264,13 @@
         "category": "materials",
         "price": 200,
         "materials": { "technology_archives": 1 }
-      }
+      },
+      "corp_style_imperial_gothic": {
+        "category": "styles",
+        "price": 490,
+        "corpStyle": "imperial_gothic"
+      },
+      "corp_style_high_tech": { "category": "styles", "price": 490, "corpStyle": "high_tech" }
     },
     "premium": { "dailySovereigns": 5, "extraDailyAds": 1 }
   },

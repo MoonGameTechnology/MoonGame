@@ -4172,6 +4172,17 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-lt.fut .cb-art .spr{opacity:.5;}
 .cb-lt figcaption{font-size:var(--fs-caption);line-height:1.35;color:var(--sf-dim);}
 .cb-lt figcaption b{margin-right:4px;color:var(--sf-hi);}
+/* Стили базы (CORP-14): штаб III уровня в каждом стиле, применённый обведён. */
+.cb-styles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.cb-sty{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0;}
+.cb-sty .cb-art{height:150px;padding:10px 10px 6px;border-radius:12px;border:1px solid var(--line);}
+.cb-sty.cur .cb-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-sty figcaption{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+.cb-sty figcaption b{font-weight:600;color:var(--sf-hi);}
+.cb-sty-st{min-height:28px;display:inline-flex;align-items:center;padding:0 10px;border-radius:999px;border:1px solid var(--sf-edge);
+  font-size:var(--fs-caption);font-weight:600;color:var(--sf-dim);}
+.cb-sty-st.applied{color:var(--grn);border-color:color-mix(in srgb,var(--grn) 50%,transparent);}
+.cb-sty-st.owned{color:var(--cyan);border-color:var(--cyan-dim);}
 .cb-tablewrap{overflow-x:auto;}
 .cb-lvtable{width:100%;border-collapse:collapse;font-size:var(--fs-caption);}
 .cb-lvtable :is(th,td){padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
@@ -4572,6 +4583,12 @@ span.ar-fchip{cursor:default;}
 .sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
 .sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
 .sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
+/* Стиль базы (CORP-14): здания III уровня рисунками — в карточке штаб, в описании все. */
+.sh-art-style{align-items:flex-end;}
+.sh-art-style img{display:block;height:64px;width:auto;max-width:100%;object-fit:contain;}
+.sh-dt .sh-art-style{justify-content:center;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
+  background:radial-gradient(120% 90% at 50% 100%,#0d3447,#04121c 70%);}
+.sh-dt .sh-art-style img{flex:1 1 0;min-width:0;height:auto;max-height:120px;}
 .sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
   background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
 .sh-mi.own{filter:grayscale(1);opacity:.5;}
@@ -4637,9 +4654,16 @@ span.ar-fchip{cursor:default;}
   .sh-tab{flex:0 0 auto;justify-content:flex-start;}
 }
 @container shop (max-width:520px){
-  /* four tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen */
-  .sh-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+  /* all tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen.
+     A column is never narrower than its label: equal when the strip has room, otherwise each
+     label keeps its own width instead of being cut. */
+  .sh-tabs{display:grid;grid-template-columns:repeat(5,minmax(min-content,1fr));}
   .sh-tab{flex-direction:column;gap:2px;min-height:52px;padding:6px 2px;font-size:var(--fs-caption);}
+}
+@container shop (max-width:320px){
+  /* the smallest phones (320 px): the five labels fit only without gaps */
+  .sh-tabs{gap:0;padding:2px;}
+  .sh-tab{padding:6px 0;}
 }
 @container shop (max-width:699px){
   .sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}

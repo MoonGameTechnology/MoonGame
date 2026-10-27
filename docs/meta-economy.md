@@ -100,13 +100,21 @@ Commerce (товары `sovereigns_*`: база плюс `bonusSovereigns`), е�
 награды за медали профиля (ниже). Рекламой ◆ не выдаются.
 Возврат пакета снимает ◆, если они ещё на счёте; потраченные уводят возврат в `review-required`.
 
-Витрина (`store` в `data/metaEconomy.json`) продаёт за ◆ четыре вида товаров, по одному на
+Витрина (`store` в `data/metaEconomy.json`) продаёт за ◆ пять видов товаров, по одному на
 предложение: дни премиум-аккаунта (`premiumDays`, новый срок продлевает идущий, итог —
-`premiumUntil`), премиум-дорожку сезона, модули и материалы. Цена модуля — `modulePrices`;
+`premiumUntil`), премиум-дорожку сезона, модули, материалы и стили базы корпорации
+(`corpStyle`). Цена модуля — `modulePrices`;
 набор платит только за модули, которых в арсенале ещё нет, со скидкой `discountPercent`, и
 выдаёт только их. Всё купленное привязано (`commerce`, soulbound): модули приходят чертежами.
 `limit` ограничивает покупки на аккаунт. Цену и доступность для аккаунта сервер отдаёт в
 `GET /meta-economy/me` (`store`), клиент цену не присылает.
+
+Стиль базы корпорации (CORP-14) покупает глава за свои ◆ для всей корпорации через
+`POST /meta-economy/corp-style/buy`; `store/buy` его не продаёт. Купленные стили и
+применённый лежат в записи корпорации `corp:<corpId>` того же хранилища, а списание ◆ и
+запись стиля идут одной транзакцией над двумя записями. Стиль остаётся у корпорации при
+смене главы и пропадает с ней; стандартный есть у каждой корпорации бесплатно. Правила —
+[corporation-building-art.md](corporation-building-art.md), раздел 4.
 
 Премиум (`store.premium`, пока идёт `premiumUntil`) даёт `dailySovereigns` (5 ◆) раз в UTC-день
 по `POST /meta-economy/premium/daily` и `extraDailyAds` (+1) к дневному пределу снабжения за
@@ -123,10 +131,11 @@ Commerce (товары `sovereigns_*`: база плюс `bonusSovereigns`), е�
 транзакцией; опыт до неё зачисляет `medalRewards.ts`.
 
 Экран «Магазин» хаба (`prototype/src/shopScreen.ts`, решения — `decisions/shopView.ts`)
-показывает вкладки Суверены, Премиум, Модули и Материалы. Пакеты Суверенов и снабжение за
-рекламу берутся из `GET /commerce/offers` и пока недоступны: провайдера оплаты нет.
-Остальные вкладки продают витрину за ◆. Арсенал ведёт на штучный товар модуля, «Снабжение»
-больше ничего не продаёт.
+показывает вкладки Суверены, Премиум, Модули, Материалы и Стили. Пакеты Суверенов и
+снабжение за рекламу берутся из `GET /commerce/offers` и пока недоступны: провайдера оплаты
+нет. Остальные вкладки продают витрину за ◆. Кнопку стиля решает `decisions/corpStyle.ts`
+по `GET /meta-economy/corp-style`: купить и применить может глава, остальные видят причину.
+Арсенал ведёт на штучный товар модуля, «Снабжение» больше ничего не продаёт.
 
 `frontier_fleet_2026`: 56 дней, 50 уровней, 200 XP на уровень после первого,
 бесплатные и premium milestones, восемь еженедельно открываемых контрактов.
@@ -153,6 +162,9 @@ Commerce (товары `sovereigns_*`: база плюс `bonusSovereigns`), е�
 | `POST /meta-economy/season/claim` | `seasonId`, `level`, `defId` для выбора |
 | `POST /meta-economy/store/buy` | `offerId`: покупка за Суверены; отказы `E_SOVEREIGNS`, `E_ALREADY_OWNED`, `E_OFFER_LIMIT` |
 | `POST /meta-economy/premium/daily` | Ежедневные ◆ премиума; отказы `E_PREMIUM`, `E_DAILY_CLAIMED` |
+| `GET /meta-economy/corp-style` | Стили своей корпорации: `corp: { head, active, owned }`, `null` вне корпорации и у новобранца |
+| `POST /meta-economy/corp-style/buy` | `offerId`: стиль базы за ◆ главы; отказы `E_NOT_MEMBER`, `E_FORBIDDEN`, `E_SOVEREIGNS`, `E_ALREADY_OWNED`, `E_META_OFFER` |
+| `POST /meta-economy/corp-style/apply` | `styleId`: купленный стиль или `standard`; отказы `E_NOT_MEMBER`, `E_FORBIDDEN`, `E_CORP_STYLE` |
 | `POST /profiles/rewards/medals` | Без body: выплата невыплаченных степеней медалей, ответ `granted` |
 | `GET /meta-market` | Баланс, доступ к торговле, лоты и история |
 | `POST /meta-market/material/list`, `/buy`, `/cancel` | Материальные лоты; list: `materialId,quantity,price,requestId`, buy: `listingId,tradeId`, cancel: `listingId` |

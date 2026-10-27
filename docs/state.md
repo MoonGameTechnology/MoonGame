@@ -466,10 +466,12 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   карточка открывается шторкой. «Снабжение» (материалы, сезон) и аукцион —
   `metaEconomyScreen.ts`, `metaMarketScreen.ts`, общая сессия экономики — `metaEconomyClient.ts`.
   «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
-  Материалы; покупка за ◆, пакеты ◆ ждут провайдера оплаты.
+  Материалы, Стили; покупка за ◆, пакеты ◆ ждут провайдера оплаты. Стиль базы корпорации
+  покупает и применяет глава (`decisions/corpStyle.ts`, CORP-14).
   «Корпорация» (`corpHubView.ts`, решения — `decisions/corpHub.ts`, `corpBase.ts`,
-  `corpMembers.ts`, `corpTreasury.ts`): База (картинки уровней зданий `corpSprites.ts` и
-  `corpArt.ts`, лист здания шторкой), Битвы, Состав, Казна; без корпорации — создание и список с заявкой. Окно
+  `corpMembers.ts`, `corpTreasury.ts`): База (картинки уровней зданий в стиле базы
+  `corpSprites.ts` и `corpArt.ts`, лист здания и стиль базы шторкой), Битвы, Состав, Казна;
+  без корпорации — создание и список с заявкой. Окно
   корпорации в партии — `corpScreen.ts`, 7 вкладок; постройки — `data/corpBuildings.json`.
 - «Производство» (`shipyard.ts`): Корабли, Поддержка, Шаттлы, Пехота, Техника, Герои; отсеки —
   `packages/client/src/loadoutEditor.ts` и `decisions/slotCallouts.ts`. «Герои» — `heroStaff.ts`:

@@ -75,7 +75,7 @@ export interface MetaDropOddsView {
 /** One shelf of the Sovereign store, priced for THIS account (owned modules leave the price). */
 export interface MetaStoreOfferView {
   id: string;
-  category: 'premium' | 'modules' | 'materials';
+  category: 'premium' | 'modules' | 'materials' | 'styles';
   /** Sovereigns to pay now. */
   price: number;
   /** Price before the pack discount, when a discount applies. */
@@ -84,6 +84,10 @@ export interface MetaStoreOfferView {
   premiumSeason?: string;
   modules?: Array<{ defId: string; owned: boolean }>;
   materials?: Record<string, number>;
+  /** A corporation base style (CORP-14). Bought by the head for the corporation through
+   *  `/meta-economy/corp-style/buy`, so `blocked` never covers it: the caller's corporation
+   *  is in `GET /meta-economy/corp-style`. */
+  corpStyle?: string;
   /** Lifetime purchases allowed per account; absent = unlimited. */
   limit?: number;
   bought: number;
@@ -130,6 +134,8 @@ export interface MetaCommandReceipt {
   premiumUntil?: number;
   /** Sovereigns credited by the premium daily claim or by medal rewards. */
   sovereignsGranted?: number;
+  /** The corporation base style bought or applied. */
+  corpStyle?: string;
   /** Medal degrees this command paid for, each once per account. */
   medals?: MedalRewardGrant[];
   soulbound?: boolean;

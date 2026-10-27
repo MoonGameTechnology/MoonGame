@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { EntitlementCommandV1 } from '@void/protocol';
 import {
+  corpEconomyKey,
   MetaEconomy,
   metaEconomyFingerprint,
   metaSettlementReceiptKey,
@@ -777,6 +778,95 @@ describe('MetaEconomy Sovereign store', () => {
   });
 });
 
+describe('MetaEconomy corporation base styles', () => {
+  const buyPack = async (f: ReturnType<typeof setup>) =>
+    f.service.applyEntitlement(f.entitlement('pack', 'sovereigns_1440'));
+  const buy = (f: ReturnType<typeof setup>, requestId: string, corpId = 'corp-1') =>
+    f.service.buyCorpStyle('alice', corpId, { requestId, offerId: 'corp_style_high_tech' });
+
+  it('the head pays personal Sovereigns, the corporation owns the style', async () => {
+    const f = setup();
+    await buyPack(f);
+    const bought = await buy(f, 'style-1');
+    expect(bought).toMatchObject({
+      ok: true,
+      receipt: { sovereignsSpent: 490, corpStyle: 'high_tech' },
+    });
+    // A retry is the same receipt and charges once; the style is not the head's own.
+    expect(await buy(f, 'style-1')).toEqual(bought);
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 490);
+    expect((await f.store.read('alice')).cosmetics).toEqual([]);
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'standard',
+      owned: ['high_tech'],
+    });
+    // Another corporation does not get it; the same one cannot buy it twice.
+    expect(await f.service.corpStyle('corp-2')).toEqual({ active: 'standard', owned: [] });
+    expect(await buy(f, 'style-2')).toEqual({ ok: false, code: 'E_ALREADY_OWNED' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 490);
+    // The same request id for another corporation is a different request: refused.
+    expect(await buy(f, 'style-1', 'corp-2')).toEqual({
+      ok: false,
+      code: 'E_IDEMPOTENCY_CONFLICT',
+    });
+  });
+
+  it('refuses a purchase without the Sovereigns or of an offer that is not a style', async () => {
+    const f = setup();
+    expect(await buy(f, 'poor')).toEqual({ ok: false, code: 'E_SOVEREIGNS' });
+    expect(await f.service.corpStyle('corp-1')).toEqual({ active: 'standard', owned: [] });
+    await buyPack(f);
+    for (const offerId of ['premium_7', 'nope'])
+      expect(
+        await f.service.buyCorpStyle('alice', 'corp-1', { requestId: offerId, offerId }),
+      ).toEqual({ ok: false, code: 'E_META_OFFER' });
+    // A style is bought for a corporation, never through the personal store.
+    expect(
+      await f.service.buyOffer('alice', { requestId: 'own', offerId: 'corp_style_high_tech' }),
+    ).toEqual({ ok: false, code: 'E_META_OFFER' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440);
+  });
+
+  it('shows a style offer to everyone without deciding who can buy it', async () => {
+    const f = setup();
+    const offer = (await f.service.readModel('alice')).store!.find(
+      (o) => o.id === 'corp_style_imperial_gothic',
+    );
+    expect(offer).toEqual({
+      id: 'corp_style_imperial_gothic',
+      category: 'styles',
+      price: 490,
+      corpStyle: 'imperial_gothic',
+      bought: 0,
+    });
+  });
+
+  it('applies a bought style or the standard one, and nothing else', async () => {
+    const f = setup();
+    const apply = (requestId: string, styleId: string) =>
+      f.service.applyCorpStyle('corp-1', { requestId, styleId });
+    expect(await apply('a1', 'high_tech')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
+    await buyPack(f);
+    await buy(f, 'style-1');
+    expect(await apply('a2', 'high_tech')).toMatchObject({
+      ok: true,
+      receipt: { corpStyle: 'high_tech' },
+    });
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'high_tech',
+      owned: ['high_tech'],
+    });
+    expect(await apply('a3', 'imperial_gothic')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
+    expect((await apply('a4', 'standard')).ok).toBe(true);
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'standard',
+      owned: ['high_tech'],
+    });
+    // The record is the corporation's, apart from every player's.
+    expect((await f.store.read(corpEconomyKey('corp-1'))).cosmetics).toEqual(['high_tech']);
+  });
+});
+
 describe('MetaEconomy medal rewards', () => {
   it('pays each reached degree once: Sovereigns and Warrants here, XP listed for the caller', async () => {
     const f = setup();
@@ -814,7 +904,9 @@ describe('MetaEconomy medal rewards', () => {
     const next = [...earned, { medalId: 'first' as const, grade: 1 as const }];
     expect(await f.service.unpaidMedals('alice', next)).toEqual([{ medalId: 'first', grade: 1 }]);
     const again = await f.service.claimMedals('alice', next);
-    expect(again.ok && again.receipt.medals).toEqual([{ medalId: 'first', grade: 1, ...grades[1] }]);
+    expect(again.ok && again.receipt.medals).toEqual([
+      { medalId: 'first', grade: 1, ...grades[1] },
+    ]);
   });
 
   it('refuses a malformed account id without touching any wallet', async () => {
