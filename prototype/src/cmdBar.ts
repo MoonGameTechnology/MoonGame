@@ -57,6 +57,7 @@ import {
   merging,
   mobileDraft,
   pickMode,
+  retreatAim,
   retreatMenu,
   splitState,
   stageDraft,
@@ -234,6 +235,13 @@ export function renderCmdBar(): void {
     return;
   }
   document.body.classList.remove('chain-mode');
+  // Ручной ОТХОД: точка — сосед узла боя. Лист прицел уже прячет (`sidePanel.ts`, PT-01), но в
+  // консоли ПК ряд стоит в том же окне выбора, и окно ловило клик по точке вместо карты.
+  // Приказы ряда отходу не нужны: прицел снимают тап по точке, Escape и Back.
+  if (retreatAim) {
+    cmdbar.classList.remove('show');
+    return;
+  }
   const s = game.world();
   const ME = game.me();
   const MOBILE = game.mobile();
