@@ -537,17 +537,24 @@ export class PostgresMetaMarket implements MetaMarket {
         if (!tx.sql) throw new Error('E_STORAGE_MISMATCH');
         return work(tx.sql, tx);
       });
-    const c = await this.pool.connect();
-    try {
-      await c.query('BEGIN');
-      const result = await work(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (error) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      c.release();
+    for (let attempt = 0; ; attempt++) {
+      const c = await this.pool.connect();
+      try {
+        await c.query('BEGIN');
+        const result = await work(c);
+        await c.query('COMMIT');
+        return result;
+      } catch (error) {
+        await c.query('ROLLBACK').catch(() => undefined);
+        // Сериализация или deadlock сняли попытку — Postgres просит её повторить. Работа трогает
+        // только базу, а откат вернул базу как было, поэтому повтор безопасен (тот же приём, что
+        // в `corporateTransactions.ts`). Любая другая ошибка и третий отказ уходят наверх.
+        const code = (error as { code?: unknown }).code;
+        if (attempt < 2 && (code === '40001' || code === '40P01')) continue;
+        throw error;
+      } finally {
+        c.release();
+      }
     }
   }
 
