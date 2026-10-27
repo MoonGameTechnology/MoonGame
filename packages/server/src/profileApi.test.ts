@@ -219,6 +219,20 @@ describe('persistent bot public profiles', () => {
 });
 
 describe('profile API authority and public projection', () => {
+  it('rejects a NUL in a lookup before reaching storage', async () => {
+    const { app } = await fixture();
+    try {
+      const result = await app.inject({
+        url: '/profiles?login=Alice%00',
+        headers: { authorization: 'Bob' },
+      });
+      expect(result.statusCode).toBe(400);
+      expect(result.json()).toEqual({ error: 'E_BAD_REQUEST' });
+    } finally {
+      await app.close();
+    }
+  });
+
   it('shows a running premium as a frame to everyone, and a failed premium read leaves it off', async () => {
     let failing = false;
     const holders = new Set<string>();

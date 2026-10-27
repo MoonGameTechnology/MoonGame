@@ -32,7 +32,10 @@ const NEWS_KINDS: readonly FeedKind[] = ['founded', 'level', 'medal', 'matchup',
 export function registerNewsApi(app: FastifyInstance, deps: NewsApiDeps): void {
   const now = deps.now ?? ((): number => Date.now());
   app.get('/news', async (request, reply) => {
-    const q = request.query as { limit?: string; before?: string; kinds?: string };
+    const q = request.query as { limit?: string; before?: string; kinds?: unknown };
+    if (q.kinds !== undefined && typeof q.kinds !== 'string') {
+      return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+    }
     const parsedLimit = Number(q.limit);
     const limit =
       q.limit !== undefined && Number.isFinite(parsedLimit)
