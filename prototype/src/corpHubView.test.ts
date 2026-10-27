@@ -171,6 +171,17 @@ describe('вкладка «Корпорация»: база', () => {
     expect(go).toContain(`<li class="ok">${t('corp.hub.req.battles', { n: 10, have: 10 })}</li>`);
   });
 
+  it('оперативный центр: карточка и лист называют, до какого формата он открывает битвы (CORP-7)', () => {
+    const open = corpHubHtml(paint({ view: base({ headquarters: 2 }, 500) }));
+    expect(open).toContain('data-corpbld="operations_center"');
+    expect(open).toContain(t('corp.hub.gives', { what: t('corp.buildings.format', { n: 5 }) }));
+    const built = base({ headquarters: 2, operations_center: 1 }, 500);
+    const sheet = corpHubSheetHtml(paint({ view: built }), { kind: 'building', id: 'operations_center' }, '');
+    expect(sheet).toContain(`<b>${t('corp.buildings.format', { n: 5 })}</b>`); // сейчас
+    expect(sheet).toContain(`<b>${t('corp.buildings.format', { n: 7 })}</b>`); // следующий уровень
+    expect(sheet).toContain(`<b>3</b>${t('corp.buildings.format', { n: 10 })}`); // таблица уровней
+  });
+
   it('ответ сервера в шторке — над её содержимым', () => {
     const sheet = corpHubSheetHtml(paint(), { kind: 'levels' }, '✖ отказ');
     expect(sheet.indexOf('cb-notice')).toBeLessThan(sheet.indexOf('cb-lvtable'));

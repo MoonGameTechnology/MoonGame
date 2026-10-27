@@ -51,6 +51,19 @@ describe('corporation infrastructure presentation', () => {
     }
   });
 
+  it('reads the battle format a level opens (CORP-7)', () => {
+    const valid = fixture();
+    const ops = valid.buildings.find((b) => b.id === 'operations_center')!;
+    expect(ops.levels.map((l) => l.maxFormat)).toEqual([5, 7, 10]);
+    expect(parseCorpInfrastructure(valid)?.buildings).toContainEqual(
+      expect.objectContaining({ id: 'operations_center' }),
+    );
+    for (const maxFormat of [1, 4.5, '5']) {
+      const bad = { ...ops, levels: ops.levels.map((l, i) => (i === 0 ? { ...l, maxFormat } : l)) };
+      expect(parseCorpInfrastructure({ ...valid, buildings: [bad] })).toBe(null);
+    }
+  });
+
   it('countdown reaches zero without granting a level locally', () => {
     const data = fixture();
     data.construction = {

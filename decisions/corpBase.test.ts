@@ -134,6 +134,7 @@ describe('база корпорации (CORP-3)', () => {
     expect(corpOpensAt(v, 3).map((o) => [o.buildingId, o.level])).toEqual([
       ['supply_center', 3],
       ['engineering_complex', 3],
+      ['operations_center', 2],
     ]);
     expect(corpOpensAt(v, 9)).toEqual([]);
   });

@@ -9,6 +9,8 @@ export interface CorpBuildingLevel {
   members?: number;
   /** AvA battles the corporation has played, on either side, to order this level. */
   battles?: number;
+  /** The largest AvA battle this level opens, players per side (CORP-7, operations center). */
+  maxFormat?: number;
 }
 
 /** What the level requirements are checked against (CORP-6). */

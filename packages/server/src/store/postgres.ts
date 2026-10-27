@@ -203,6 +203,9 @@ const SCHEMA_SQL = `
       corp_id text PRIMARY KEY,
       since   bigint NOT NULL
     );
+    -- CORP-7: the battle formats (players per side) the corp is ready for; corps already in
+    -- the pool read as ready for 2 на 2, the only battle there was.
+    ALTER TABLE corp_ready ADD COLUMN IF NOT EXISTS formats integer[] NOT NULL DEFAULT '{2}';
     -- Player-flag: a player's standing consent to offline deployment, bound to their
     -- CURRENT corp (account_id PK = one consent per account; leaving the corp clears it).
     CREATE TABLE IF NOT EXISTS player_ready (
@@ -230,6 +233,8 @@ const SCHEMA_SQL = `
     -- AVA-6: the roster window deadline, stamped on accept (S3 opens at S2).
     -- ALTER … IF NOT EXISTS backfills pre-AVA-6 rows with NULL = window closed.
     ALTER TABLE ava_challenges ADD COLUMN IF NOT EXISTS pause_ends_at bigint;
+    -- CORP-7: players per side; challenges written before the formats were 2 на 2.
+    ALTER TABLE ava_challenges ADD COLUMN IF NOT EXISTS format integer NOT NULL DEFAULT 2;
 
     -- AvA rosters (AVA-6): one row per (matchup, account) — the PK is the
     -- one-entry-per-account invariant; the per-side cap is guarded inside the
@@ -1358,13 +1363,13 @@ export class PostgresCorpStore implements CorpStore {
     return (r.rowCount ?? 0) > 0 ? { ok: true } : { ok: false, code: 'E_INSUFFICIENT' };
   }
 
-  async setCorpReady(corpId: string, since: number): Promise<void> {
-    // Only a real corp joins the pool; keep the earliest `since` (idempotent set).
+  async setCorpReady(corpId: string, since: number, formats: readonly number[]): Promise<void> {
+    // Only a real corp joins the pool; keep the earliest `since`, take the new formats.
     await this.pool.query(
-      `INSERT INTO corp_ready (corp_id, since)
-       SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM corps WHERE id = $1)
-       ON CONFLICT (corp_id) DO NOTHING`,
-      [corpId, since],
+      `INSERT INTO corp_ready (corp_id, since, formats)
+       SELECT $1, $2, $3::integer[] WHERE EXISTS (SELECT 1 FROM corps WHERE id = $1)
+       ON CONFLICT (corp_id) DO UPDATE SET formats = EXCLUDED.formats`,
+      [corpId, since, formats],
     );
   }
 
@@ -1372,20 +1377,21 @@ export class PostgresCorpStore implements CorpStore {
     await this.pool.query(`DELETE FROM corp_ready WHERE corp_id = $1`, [corpId]);
   }
 
-  async listReadyCorps(): Promise<Array<CorpSummary & { readySince: number }>> {
+  async listReadyCorps(): Promise<Array<CorpSummary & { readySince: number; formats: number[] }>> {
     const r = await this.pool.query<{
       id: string;
       name: string;
       influence: string;
       members: string;
       since: string;
+      formats: number[];
     }>(
-      `SELECT c.id, c.name, c.influence, r.since,
+      `SELECT c.id, c.name, c.influence, r.since, r.formats,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corp_ready r
        JOIN corps c ON c.id = r.corp_id
        LEFT JOIN corp_members m ON m.corp_id = c.id
-       GROUP BY c.id, c.name, c.influence, r.since
+       GROUP BY c.id, c.name, c.influence, r.since, r.formats
        ORDER BY lower(c.name)`,
     );
     return r.rows.map((row) => ({
@@ -1394,12 +1400,16 @@ export class PostgresCorpStore implements CorpStore {
       influence: Number(row.influence),
       members: Number(row.members),
       readySince: Number(row.since),
+      formats: row.formats.map(Number),
     }));
   }
 
-  async isCorpReady(corpId: string): Promise<boolean> {
-    const r = await this.pool.query(`SELECT 1 FROM corp_ready WHERE corp_id = $1`, [corpId]);
-    return (r.rowCount ?? 0) > 0;
+  async readyFormatsOf(corpId: string): Promise<number[] | null> {
+    const r = await this.pool.query<{ formats: number[] }>(
+      `SELECT formats FROM corp_ready WHERE corp_id = $1`,
+      [corpId],
+    );
+    return r.rows[0] ? r.rows[0].formats.map(Number) : null;
   }
 
   async setPlayerReady(accountId: string, corpId: string, since: number): Promise<void> {
@@ -1513,6 +1523,7 @@ interface ChallengeRow {
   id: string;
   challenger_corp: string;
   target_corp: string;
+  format: number;
   cost: string;
   status: string;
   created_at: string;
@@ -1525,6 +1536,7 @@ function challengeOf(row: ChallengeRow): AvaChallenge {
     id: row.id,
     challengerCorp: row.challenger_corp,
     targetCorp: row.target_corp,
+    format: Number(row.format),
     cost: Number(row.cost),
     status: row.status as AvaChallengeStatus,
     createdAt: Number(row.created_at),
@@ -1543,8 +1555,8 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
   ): Promise<{ ok: true } | { ok: false; code: 'E_ALREADY_CHALLENGED' }> {
     const inserted = await this.pool.query(
       `INSERT INTO ava_challenges
-         (id, challenger_corp, target_corp, cost, status, created_at, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id`,
+         (id, challenger_corp, target_corp, cost, status, created_at, expires_at, format)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING RETURNING id`,
       [
         challenge.id,
         challenge.challengerCorp,
@@ -1553,6 +1565,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
         challenge.status,
         challenge.createdAt,
         challenge.expiresAt,
+        challenge.format,
       ],
     );
     return inserted.rowCount ? { ok: true } : { ok: false, code: 'E_ALREADY_CHALLENGED' };
@@ -1560,7 +1573,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async getChallenge(id: string): Promise<AvaChallenge | null> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
        FROM ava_challenges WHERE id = $1`,
       [id],
     );
@@ -1569,7 +1582,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async challengesOf(corpId: string, limit = DEFAULT_CHALLENGES_LIMIT): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
        FROM ava_challenges
        WHERE challenger_corp = $1 OR target_corp = $1
        ORDER BY created_at DESC, id LIMIT $2`,
@@ -1590,7 +1603,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async duePending(now: number): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
        FROM ava_challenges
        WHERE status = 'pending' AND expires_at <= $1
        ORDER BY expires_at, id`,
@@ -1618,7 +1631,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async dueRosters(now: number): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
        FROM ava_challenges
        WHERE status = 'accepted' AND pause_ends_at IS NOT NULL AND pause_ends_at <= $1
        ORDER BY pause_ends_at, id`,
@@ -1629,7 +1642,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async lockedMatchups(limit = DEFAULT_LOCKED_MATCHUPS_LIMIT): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
        FROM ava_challenges
        WHERE status = 'locked'
        ORDER BY created_at DESC, id LIMIT $1`,

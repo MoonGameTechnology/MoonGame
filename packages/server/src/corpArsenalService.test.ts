@@ -56,6 +56,7 @@ async function fixture(status: AvaChallenge['status'] = 'accepted'): Promise<Fix
     id: matchupId,
     challengerCorp: a.corpId,
     targetCorp: b.corpId,
+    format: 2,
     cost: 0,
     status,
     createdAt: 0,

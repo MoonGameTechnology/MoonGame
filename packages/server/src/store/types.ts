@@ -329,12 +329,15 @@ export interface CorpStore {
     corpId: string,
     cost: number,
   ): Promise<{ ok: true } | { ok: false; code: 'E_INSUFFICIENT' }>;
-  /** AvA readiness (AVA-3): the head's corp-flag puts the corp into the ready pool. */
-  setCorpReady(corpId: string, since: number): Promise<void>;
+  /** AvA readiness (AVA-3): the head's corp-flag puts the corp into the ready pool, ready
+   *  for `formats` (CORP-7: players per side, ascending). A corp already in the pool only
+   *  changes its formats: `since` stays. */
+  setCorpReady(corpId: string, since: number, formats: readonly number[]): Promise<void>;
   clearCorpReady(corpId: string): Promise<void>;
-  /** Ready-pool read-model: every corp-flagged corp (name + influence ride along). */
-  listReadyCorps(): Promise<Array<CorpSummary & { readySince: number }>>;
-  isCorpReady(corpId: string): Promise<boolean>;
+  /** Ready-pool read-model: every corp-flagged corp (name + influence + formats ride along). */
+  listReadyCorps(): Promise<Array<CorpSummary & { readySince: number; formats: number[] }>>;
+  /** The formats a corp in the ready pool plays (CORP-7); null when it is not in the pool. */
+  readyFormatsOf(corpId: string): Promise<number[] | null>;
   /** AvA readiness (AVA-3): a player's standing consent to offline deployment,
    *  bound to their CURRENT corp — leaving/kick/disband clears it. */
   setPlayerReady(accountId: string, corpId: string, since: number): Promise<void>;
@@ -363,6 +366,9 @@ export interface AvaChallenge {
   id: string;
   challengerCorp: string;
   targetCorp: string;
+  /** Players per side (CORP-7): sets the roster cap, the lock minimum and the win reward.
+   *  Rows written before the formats read as 2 на 2. */
+  format: number;
   /** Influence spent by the challenger — refunded on decline/expiry. */
   cost: number;
   status: AvaChallengeStatus;

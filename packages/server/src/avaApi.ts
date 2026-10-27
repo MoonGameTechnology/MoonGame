@@ -9,11 +9,11 @@ import { slidingWindowIpLimiter } from './rateLimit';
  * the payload), so it is only registered on auth-enabled servers. The service enforces
  * the rights matrix; this layer parses, identifies, rate-limits and maps stable codes.
  *
- *   GET  /ava/pool                     ready-corp pool (name + influence + members)
+ *   GET  /ava/pool                     ready-corp pool (name + influence + members + formats)
  *   GET  /ava/challenges               my incoming + outgoing challenges
- *   POST /ava/ready/corp    (+clear)   corp readiness flag (head only)
+ *   POST /ava/ready/corp    (+clear)   corp readiness flag (head only), {formats?} (CORP-7)
  *   POST /ava/ready/player  (+clear)   player readiness flag (own corp member)
- *   POST /ava/challenge     {target}   challenge a ready corp (head; spends influence)
+ *   POST /ava/challenge     {target, format?}  challenge a ready corp (head; spends influence)
  *   POST /ava/challenge/:id/accept     accept → S2 matchup (target head)
  *   POST /ava/challenge/:id/decline    decline → refund (target head)
  *   GET  /ava/matchup/:id              my side's roster + both headcounts (AVA-6)
@@ -43,6 +43,9 @@ const STATUS: Record<AvaErrorCode, number> = {
   E_ROSTER_LOCKED: 409,
   E_WINDOW_CLOSED: 409,
   E_MATCHUP_CLOSED: 409,
+  E_FORMAT: 400,
+  E_FORMAT_LOCKED: 409,
+  E_NO_COMMON_FORMAT: 409,
 };
 
 /** AvA writes are a spam surface like the corp API — share the same per-IP budget. */
@@ -103,7 +106,16 @@ export function registerAvaApi(app: FastifyInstance, deps: AvaApiDeps): void {
   app.post('/ava/ready/corp', async (request, reply) => {
     const who = await guardedWrite(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
-    const result = await service.setCorpReady(who);
+    // CORP-7: `{ formats: [2, 3] }` — the battle formats the corp is ready for. A list is
+    // short: nine formats exist, so a long one is malformed, not deduplicated.
+    const formats = (request.body as { formats?: unknown } | null)?.formats;
+    if (
+      formats !== undefined &&
+      !(Array.isArray(formats) && formats.length <= 16 && formats.every(Number.isSafeInteger))
+    ) {
+      return failed(reply, 'E_FORMAT');
+    }
+    const result = await service.setCorpReady(who, formats as number[] | undefined);
     if (!result.ok) return failed(reply, result.code);
     return result;
   });
@@ -135,9 +147,12 @@ export function registerAvaApi(app: FastifyInstance, deps: AvaApiDeps): void {
   app.post('/ava/challenge', async (request, reply) => {
     const who = await guardedWrite(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
-    const target = (request.body as { target?: unknown } | null)?.target;
+    const body = request.body as { target?: unknown; format?: unknown } | null;
+    const target = body?.target;
     if (typeof target !== 'string' || target.length === 0) return failed(reply, 'E_NO_CHALLENGE');
-    const result = await service.challenge(who, target);
+    const format = body?.format;
+    if (format !== undefined && !Number.isSafeInteger(format)) return failed(reply, 'E_FORMAT');
+    const result = await service.challenge(who, target, format as number | undefined);
     if (!result.ok) return failed(reply, result.code);
     void reply.code(201);
     return { id: result.id };

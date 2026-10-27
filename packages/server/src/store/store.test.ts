@@ -560,11 +560,16 @@ function corpStoreContract(name: string, make: () => CorpStore, uniq: (p: string
       const created = await store.createCorp(uniq('Ready'), uniq('acc-rdyh'), 'head');
       if (!created.ok) throw new Error('expected ok');
       await store.addMember(created.corpId, uniq('acc-rdyp'), 'pat', 'member');
-      expect(await store.isCorpReady(created.corpId)).toBe(false);
-      await store.setCorpReady(created.corpId, 111);
-      expect(await store.isCorpReady(created.corpId)).toBe(true);
+      expect(await store.readyFormatsOf(created.corpId)).toBeNull();
+      await store.setCorpReady(created.corpId, 111, [2]);
+      expect(await store.readyFormatsOf(created.corpId)).toEqual([2]);
       const pool = (await store.listReadyCorps()).find((c) => c.corpId === created.corpId);
-      expect(pool).toMatchObject({ name: uniq('Ready'), readySince: 111 });
+      expect(pool).toMatchObject({ name: uniq('Ready'), readySince: 111, formats: [2] });
+      // CORP-7: readying again changes the formats only — the corp keeps its place in the pool.
+      await store.setCorpReady(created.corpId, 999, [2, 3, 5]);
+      expect(await store.readyFormatsOf(created.corpId)).toEqual([2, 3, 5]);
+      const again = (await store.listReadyCorps()).find((c) => c.corpId === created.corpId);
+      expect(again).toMatchObject({ readySince: 111, formats: [2, 3, 5] });
 
       await store.setPlayerReady(uniq('acc-rdyp'), created.corpId, 222);
       await store.setPlayerReady(uniq('acc-rdyh'), created.corpId, 223);
@@ -574,7 +579,7 @@ function corpStoreContract(name: string, make: () => CorpStore, uniq: (p: string
       expect(await store.readyPlayersOf(created.corpId)).toEqual([uniq('acc-rdyh')]);
       // disband clears the corp flag AND remaining consents
       await store.removeCorp(created.corpId);
-      expect(await store.isCorpReady(created.corpId)).toBe(false);
+      expect(await store.readyFormatsOf(created.corpId)).toBeNull();
       expect(await store.readyPlayersOf(created.corpId)).toHaveLength(0);
     });
   });
@@ -591,6 +596,7 @@ function challenge(
     id,
     challengerCorp: challenger,
     targetCorp: target,
+    format: 2,
     cost: 100,
     status: 'pending',
     createdAt: 0,
@@ -615,6 +621,18 @@ function avaChallengeStoreContract(
       });
       expect(await store.challengesOf(a)).toHaveLength(1);
       expect(await store.challengesOf(b)).toHaveLength(1); // visible to the target too
+    });
+
+    it('CORP-7: a challenge keeps its format', async () => {
+      const store = make();
+      const [a, b] = [uniq('c-a7'), uniq('c-b7')];
+      await store.createChallenge({
+        ...challenge(uniq('ch-5v5'), a, b, 500),
+        format: 5,
+        cost: 250,
+      });
+      expect(await store.getChallenge(uniq('ch-5v5'))).toMatchObject({ format: 5, cost: 250 });
+      expect((await store.challengesOf(b))[0]).toMatchObject({ format: 5 });
     });
 
     it('rejects a second PENDING challenge for the same pair', async () => {
@@ -1298,5 +1316,23 @@ describe.skipIf(!DB)('Postgres adapters', () => {
   it('migrates idempotently', async () => {
     await migrate(pool);
     await migrate(pool); // twice → no error (IF NOT EXISTS)
+  });
+
+  it('CORP-7: a challenge and a ready corp from before the formats read as 2 на 2', async () => {
+    const id = `legacy_${stamp}`;
+    // Rows written by the pre-CORP-7 INSERTs, without the columns the formats added.
+    await pool.query(
+      `INSERT INTO ava_challenges (id, challenger_corp, target_corp, cost, status, created_at, expires_at)
+       VALUES ($1, $2, $3, 100, 'declined', 0, 0)`,
+      [id, `${id}_a`, `${id}_b`],
+    );
+    await pool.query(`INSERT INTO corp_ready (corp_id, since) VALUES ($1, 0)`, [`${id}_a`]);
+    try {
+      expect((await new PostgresAvaChallengeStore(pool).getChallenge(id))?.format).toBe(2);
+      expect(await new PostgresCorpStore(pool).readyFormatsOf(`${id}_a`)).toEqual([2]);
+    } finally {
+      await pool.query(`DELETE FROM ava_challenges WHERE id = $1`, [id]);
+      await pool.query(`DELETE FROM corp_ready WHERE corp_id = $1`, [`${id}_a`]);
+    }
   });
 });

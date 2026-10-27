@@ -101,6 +101,37 @@
           "constructionReduction": 30
         }
       ]
+    },
+    {
+      "id": "operations_center",
+      "nameKey": "corp.building.operations-center",
+      "descriptionKey": "corp.building.operations-center.desc",
+      "levels": [
+        {
+          "cost": 150,
+          "durationMs": 21600000,
+          "headquarters": 2,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "maxFormat": 5
+        },
+        {
+          "cost": 400,
+          "durationMs": 43200000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "maxFormat": 7
+        },
+        {
+          "cost": 900,
+          "durationMs": 86400000,
+          "headquarters": 4,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "maxFormat": 10
+        }
+      ]
     }
   ]
 }
