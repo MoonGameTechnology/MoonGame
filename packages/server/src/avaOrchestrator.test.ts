@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildStateFromMap, getStance, pairKey, parseMatchMap } from '@void/shared-core';
 import {
   AvaOrchestrator,
+  avaBotOrders,
   avaDeniedAction,
   avaModeId,
   seatAvaRoster,
@@ -327,6 +328,15 @@ describe('avaDeniedAction (CORP-5) — what a battle refuses its players', () =>
     // Recalling a Steward that never ran harms nothing; the player's own orders are the game.
     for (const type of ['steward.recall', 'fleet.move', 'fleet.assault', 'diplomacy.mapshare'])
       expect(avaDeniedAction(type)).toBeNull();
+  });
+
+  it('a side’s bot loses the same intents from its plan: the war stays on the orchestrator’s clock', () => {
+    const plan = [
+      { type: 'fleet.move', id: 'm' },
+      { type: 'diplomacy.declare', id: 'war-on-the-leader' },
+      { type: 'unit.build', id: 'b' },
+    ];
+    expect(avaBotOrders(plan).map((order) => order.id)).toEqual(['m', 'b']);
   });
 });
 

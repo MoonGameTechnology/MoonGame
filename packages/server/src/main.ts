@@ -247,6 +247,9 @@ const loadMatch = createMatchLoader({
     }
     return {
       denyPlayerActions: avaDeniedAction,
+      // The battle deck is locked with the roster (ARS-3, corp handouts ARS-6): no live
+      // re-read of the personal arsenal mid-battle.
+      frozenArsenal: true,
       // ARS-4 salvage: shards to each battle's winner, priced by the fallen enemy
       // composition — credited durably per observed batch (server-side, outside the
       // reducer; bots have no account and earn nothing).

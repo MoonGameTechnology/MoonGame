@@ -34,7 +34,7 @@ import { MedalService } from '../packages/server/src/medalService';
 import { loadMedalCatalog } from '../packages/server/src/medalCatalog';
 import { registerAvaApi, registerAvaFeed } from '../packages/server/src/avaApi';
 import { registerMedalApi } from '../packages/server/src/medalApi';
-import { AvaOrchestrator, avaDeniedAction, isAvaMatchId, type AvaSessionSpec } from '../packages/server/src/avaOrchestrator';
+import { AvaOrchestrator, avaBotOrders, avaDeniedAction, isAvaMatchId, type AvaSessionSpec } from '../packages/server/src/avaOrchestrator';
 import { createAvaSweeps } from '../packages/server/src/avaSweeps';
 import { CorpArsenalService } from '../packages/server/src/corpArsenalService';
 import { registerCorpArsenalApi } from '../packages/server/src/corpArsenalApi';
@@ -806,7 +806,9 @@ async function createHostedMatch(
     // each player gets only the bots' opinion of THEM, not every bot's of every seat.
     hostFog: approvalView,
     securityAudit,
-    arsenalStore,
+    // Колода битвы заморожена при закрытии ростера (ARS-3) вместе с выдачей корпорации
+    // (ARS-6): живое перечитывание личного арсенала (LARS-1) заменило бы её целиком.
+    ...(ava ? {} : { arsenalStore }),
     observe, // M0: log every room event to JSONL + count for the on-exit summary
     initialReceipts, // rehydrated idempotency (deduped action stays deduped after restart)
     // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
@@ -976,9 +978,13 @@ async function createHostedMatch(
         driversBusy = true;
         try {
           const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
-            (seat, policy) => botSeats.has(seat)
-              ? botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed)
-              : aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
+            (seat, policy) => {
+              if (botSeats.has(seat)) return botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed);
+              const plan = aiOrders(room.state, seat, postureOf(policy));
+              // CORP-5: бот стороны подчиняется запретам битвы, как игрок, — войну между
+              // сторонами открывает оркестратор, а не план ИИ.
+              return aiOrderSlices(ava ? avaBotOrders(plan) : plan);
+            });
           if (!step.worked) return;
           const group = step.action ?? [];
           // Политику спрашиваем ОДИН раз на порцию. Перепроверка перед каждым приказом

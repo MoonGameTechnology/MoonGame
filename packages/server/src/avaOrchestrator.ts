@@ -111,6 +111,14 @@ export const isAvaMatchId = (matchId: string): boolean => matchId.startsWith('av
 export const avaDeniedAction = (type: string): string | null =>
   type === 'diplomacy.declare' ? 'E_AVA_DIPLOMACY' : type === 'steward.delegate' ? 'E_AVA_STEWARD' : null;
 
+/**
+ * A side's bot plays by the same refusals as a player. Its orders reach the room through
+ * the server path, past the players' deny list, so the host drops what a player would be
+ * refused: the AI's own war on the race leader would end the peace before the orchestrator.
+ */
+export const avaBotOrders = <A extends { type: string }>(orders: readonly A[]): A[] =>
+  orders.filter((order) => avaDeniedAction(order.type) === null);
+
 export interface AvaSeating {
   /** slotId → assignment, covering EVERY slot the map declares (empties get an AI bot). */
   slots: Record<string, SlotAssignment>;

@@ -49,7 +49,8 @@ export interface MatchLoaderDeps {
    *  is handed to the settlement. `null` ⇒ an ordinary match, no extras. */
   matchExtras?: (matchId: string) => Promise<MatchExtras | null>;
   /** LARS-1 live ownership read (see `MatchRoom.arsenalStore`) — shared by every
-   *  loaded room (a live re-read is keyed per-account, not per-room). */
+   *  loaded room (a live re-read is keyed per-account, not per-room) except one whose
+   *  extras freeze the deck ({@link MatchExtras.frozenArsenal}). */
   arsenalStore?: ArsenalStore;
   /** Every room observation, tagged with its match — the UIX-4.3 push dispatcher reads
    *  joins, leaves and event batches from it. Observation-only: never feeds back. */
@@ -60,6 +61,11 @@ export interface MatchLoaderDeps {
 export interface MatchExtras {
   /** Wire-level deny rule for player-submitted action types (server drivers pass). */
   denyPlayerActions?: (type: string) => string | null;
+  /** The seats' build catalog stays as the match was created with it: the room gets no
+   *  `arsenalStore`, so no LARS-1 re-read replaces it. An AvA battle locks each deck at
+   *  roster lock (ARS-3), corporation handouts included (ARS-6); a live read of the
+   *  personal arsenal would drop the handouts and pull in modules bought after the lock. */
+  frozenArsenal?: boolean;
   /** Called once per observed room `end` (the room fires it on the terminal commit).
    *  `rewards` is the core's session-end table (SES-2: place/xp per seated player) —
    *  the ARS-4 drop roller keys its per-place roll off it. */
@@ -154,7 +160,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       ...(snap.clock ? { initiallyStarted: true, initialClock: snap.clock } : {}),
       gate: deps.gateFactory?.(),
       ...(extras?.denyPlayerActions ? { denyPlayerActions: extras.denyPlayerActions } : {}),
-      ...(deps.arsenalStore ? { arsenalStore: deps.arsenalStore } : {}),
+      ...(deps.arsenalStore && !extras?.frozenArsenal ? { arsenalStore: deps.arsenalStore } : {}),
     });
 
     if (snap.state.match.status === 'ended' && deps.onTerminalState)
