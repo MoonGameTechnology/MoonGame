@@ -144,6 +144,8 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     const commanders = new MemoryCommanderStore();
     // One feed for both writers: the corp store announces a corp's own facts into it.
     const feed = new MemoryAvaFeedStore();
+    // The corp store counts played battles for the level requirements (CORP-6).
+    const results = new MemoryAvaResultStore();
     return {
       playerActivity: new MemoryPlayerActivityStore(),
       profileStore: profiles,
@@ -152,11 +154,11 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       receiptStore: new MemoryReceiptStore(),
       accountStore: new MemoryAccountStore(),
       userStore: users,
-      corpStore: new MemoryCorpStore(feed),
+      corpStore: new MemoryCorpStore(feed, results),
       commanderStore: commanders,
       challengeStore: new MemoryAvaChallengeStore(),
       rosterStore: new MemoryAvaRosterStore(),
-      resultStore: new MemoryAvaResultStore(),
+      resultStore: results,
       feedStore: feed,
       announcementStore: new MemoryAnnouncementStore(),
       sessionStore: new MemoryAvaSessionStore(memoryMatches),

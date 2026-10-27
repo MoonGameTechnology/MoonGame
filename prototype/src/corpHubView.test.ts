@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setLocale, t } from '../../localization/runtime';
-import type { CorpInfrastructureState } from '../../packages/protocol/src/corpInfrastructure';
+import type { CorpInfrastructureState, CorpStanding } from '../../packages/protocol/src/corpInfrastructure';
 import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruction';
 import type { CorpMembership, CorpRole } from './corp';
 import { corpArt } from './corpArt';
@@ -17,9 +17,10 @@ function base(
   influence: number,
   role: CorpRole = 'head',
   construction: CorpInfrastructureState['construction'] = null,
+  standing: CorpStanding = { members: 3, battles: 0 },
 ) {
   const saved: CorpInfrastructureState = { levels, construction, accruedAt: 0, remainder: 0 };
-  const result = updateCorpInfrastructure('c1', 'a1', role, influence, saved, 0).result;
+  const result = updateCorpInfrastructure('c1', 'a1', role, influence, saved, 0, undefined, standing).result;
   if (!result.ok) throw new Error(result.code);
   return result.infrastructure;
 }
@@ -146,6 +147,28 @@ describe('вкладка «Корпорация»: база', () => {
     expect(sheet).not.toContain('data-corpact="build"');
     expect(sheet).toMatch(/class="btn-main" aria-disabled="true" disabled/);
     expect(sheet).toContain('cb-note warn');
+  });
+
+  it('штаб 4: участники и сыгранные битвы — в карточке уровня, в листе штаба и в таблице (CORP-6)', () => {
+    const few = base({ headquarters: 3 }, 2000, 'head', null, { members: 7, battles: 3 });
+    const members = t('corp.hub.req.members', { n: 15, have: 7 });
+    const html = corpHubHtml(paint({ view: few }));
+    expect(html).toContain(`<li class="no">${members}</li>`);
+    expect(html).toContain(`<li class="no">${t('corp.hub.req.battles', { n: 10, have: 3 })}</li>`);
+    expect(html).toContain(`🔒 ${members}`);
+    const sheet = corpHubSheetHtml(paint({ view: few }), { kind: 'building', id: 'headquarters' }, '');
+    expect(sheet).toContain(`<li class="no">${members}</li>`);
+    expect(sheet).not.toContain('data-corpact="build"');
+    const levels = corpHubSheetHtml(paint({ view: few }), { kind: 'levels' }, '');
+    expect(levels).toContain(
+      `<span class="cb-lv-cond">${t('corp.hub.levels.members', { n: 20 })} · ${t('corp.hub.levels.battles', { n: 25 })}</span>`,
+    );
+    expect(levels.match(/class="cb-lv-cond"/g)).toHaveLength(2);
+
+    const ready = base({ headquarters: 3 }, 2000, 'head', null, { members: 15, battles: 10 });
+    const go = corpHubSheetHtml(paint({ view: ready }), { kind: 'building', id: 'headquarters' }, '');
+    expect(go).toContain('data-corpact="build" data-corparg="headquarters"');
+    expect(go).toContain(`<li class="ok">${t('corp.hub.req.battles', { n: 10, have: 10 })}</li>`);
   });
 
   it('ответ сервера в шторке — над её содержимым', () => {

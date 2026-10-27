@@ -13,6 +13,8 @@ const errorKey = {
   E_CORP_BUILD_LEVEL: 'err.corp-build-level',
   E_CORP_BUILD_MAX: 'err.corp-build-max',
   E_CORP_BUILD_REQUIRES: 'err.corp-build-requires',
+  E_CORP_BUILD_MEMBERS: 'err.corp-build-members',
+  E_CORP_BUILD_BATTLES: 'err.corp-build-battles',
   E_INSUFFICIENT: 'err.insufficient',
 };
 

@@ -338,22 +338,32 @@ export class MemoryCorpStore implements CorpStore {
   private readonly infrastructureStates = new Map<string, CorpInfrastructureState>();
 
   /** CORP-1: the public feed the corporation's own facts go to (founded, reached a level)
-   *  — the memory twin of the Postgres store writing them in the same transaction. */
-  constructor(private readonly feed?: Pick<AvaFeedStore, 'append'>) {}
+   *  — the memory twin of the Postgres store writing them in the same transaction.
+   *  CORP-6: `results` — the AvA outcomes the played-battle requirement counts; without
+   *  them the corporation has played none. */
+  constructor(
+    private readonly feed?: Pick<AvaFeedStore, 'append'>,
+    private readonly results?: Pick<AvaResultStore, 'statsForCorp'>,
+  ) {}
 
-  infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+  async infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+    // Played battles only grow: read them before the step below.
+    const battles = (await this.results?.statsForCorp(corpId))?.matches ?? 0;
     // No await between the authorization read and commit: one event-loop operation.
     const member = this.members.get(actor);
     const corp = this.corps.get(corpId);
     if (!corp || !member || member.corpId !== corpId || member.role === 'recruit' || (order && member.role !== 'head')) {
-      return Promise.resolve({ ok: false, code: 'E_FORBIDDEN' });
+      return { ok: false, code: 'E_FORBIDDEN' };
     }
-    const updated = updateCorpInfrastructure(corpId, actor, member.role, corp.influence, this.infrastructureStates.get(corpId) ?? null, now, order);
+    let members = 0;
+    for (const m of this.members.values()) if (m.corpId === corpId && m.role !== 'recruit') members += 1;
+    const updated = updateCorpInfrastructure(corpId, actor, member.role, corp.influence, this.infrastructureStates.get(corpId) ?? null, now, order, { members, battles });
     corp.influence = updated.influence;
     this.infrastructureStates.set(corpId, updated.state);
     this.audit.push(...updated.audit);
     const result = structuredClone(updated.result);
-    return this.publish(corpLevelNews(corpId, corp.name, updated.audit)).then(() => result);
+    await this.publish(corpLevelNews(corpId, corp.name, updated.audit));
+    return result;
   }
 
   private async publish(entries: readonly CorpFeedEntry[]): Promise<void> {

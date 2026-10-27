@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { CorpInfrastructureState } from '../packages/protocol/src/corpInfrastructure';
+import type {
+  CorpInfrastructureState,
+  CorpStanding,
+} from '../packages/protocol/src/corpInfrastructure';
 import type { CorpRole } from '../packages/server/src/store/types';
 import { updateCorpInfrastructure } from '../packages/server/src/corpConstruction';
 import {
@@ -17,16 +20,18 @@ import {
 
 const H = 3_600_000;
 
-/** Ответ сервера для корпорации с такими уровнями, казной и стройкой — тем же кодом,
- *  каким его собирает сервер, чтобы тест не разошёлся с настоящим ответом. */
+/** Ответ сервера для корпорации с такими уровнями, казной, стройкой, участниками и битвами —
+ *  тем же кодом, каким его собирает сервер, чтобы тест не разошёлся с настоящим ответом. */
 function view(
   levels: Record<string, number>,
   influence: number,
   role: CorpRole = 'head',
   construction: CorpInfrastructureState['construction'] = null,
+  standing: CorpStanding = { members: 1, battles: 0 },
 ) {
   const saved: CorpInfrastructureState = { levels, construction, accruedAt: 0, remainder: 0 };
-  const result = updateCorpInfrastructure('c', 'a', role, influence, saved, 0).result;
+  const result = updateCorpInfrastructure('c', 'a', role, influence, saved, 0, undefined, standing)
+    .result;
   if (!result.ok) throw new Error(result.code);
   return result.infrastructure;
 }
@@ -53,7 +58,7 @@ describe('база корпорации (CORP-3)', () => {
 
   it('строка под зданием: своя стройка, максимум, нужен штаб, очередь, влияние, можно', () => {
     const job = { buildingId: 'supply_center', level: 2, startedAt: 0, completesAt: H, cost: 180 };
-    const busy = view({ headquarters: 3, supply_center: 1, engineering_complex: 3 }, 1000, 'head', job);
+    const busy = view({ headquarters: 5, supply_center: 1, engineering_complex: 3 }, 1000, 'head', job);
     expect(corpBuildingStatus(busy, building(busy, 'supply_center'))).toEqual({ kind: 'job', level: 2 });
     // Последний уровень называется последним, даже пока очередь занята другим зданием.
     expect(corpBuildingStatus(busy, building(busy, 'engineering_complex'))).toEqual({ kind: 'max' });
@@ -135,12 +140,12 @@ describe('база корпорации (CORP-3)', () => {
 
   it('карточка уровня: следующий штаб, хватает ли казны, что откроет; на высшем — ничего', () => {
     const fresh = corpLevelPlan(view({}, 0))!;
-    expect(fresh).toMatchObject({ level: 0, max: 3 });
-    expect(fresh.next).toMatchObject({ level: 1, cost: 0, durationMs: H, enough: true });
+    expect(fresh).toMatchObject({ level: 0, max: 5 });
+    expect(fresh.next).toMatchObject({ level: 1, cost: 0, durationMs: H, enough: true, conditions: [] });
     expect(fresh.next!.opens).toHaveLength(2);
     const poor = corpLevelPlan(view({ headquarters: 1 }, 100))!;
     expect(poor.next).toMatchObject({ level: 2, cost: 120, enough: false });
-    expect(corpLevelPlan(view({ headquarters: 3 }, 0))).toEqual({ level: 3, max: 3, next: null });
+    expect(corpLevelPlan(view({ headquarters: 5 }, 0))).toEqual({ level: 5, max: 5, next: null });
   });
 
   it('таблица уровней: цена и время по каталогу, текущий отмечен', () => {
@@ -149,6 +154,8 @@ describe('база корпорации (CORP-3)', () => {
       [1, 0, H, false],
       [2, 120, 6 * H, true],
       [3, 360, 12 * H, false],
+      [4, 800, 24 * H, false],
+      [5, 1500, 48 * H, false],
     ]);
     expect(rows[0]!.opens.map((o) => o.buildingId)).toEqual(['supply_center', 'engineering_complex']);
   });
@@ -165,8 +172,55 @@ describe('база корпорации (CORP-3)', () => {
     const hq = corpRequirements(view({ headquarters: 1 }, 500), building(view({ headquarters: 1 }, 500), CORP_HQ));
     expect(hq.map((r) => r.kind)).toEqual(['cost', 'queue', 'time']);
     expect(hq[1]).toEqual({ kind: 'queue', ok: true, busyWith: null });
-    const top = view({ headquarters: 3 }, 0);
+    const top = view({ headquarters: 5 }, 0);
     expect(corpRequirements(top, building(top, CORP_HQ))).toEqual([]);
+  });
+
+  it('штабу 4 и 5 нужны участники и сыгранные битвы (CORP-6): та же причина, что у сервера', () => {
+    const few = view({ headquarters: 3 }, 2000, 'head', null, { members: 7, battles: 3 });
+    const hq = building(few, CORP_HQ);
+    expect(hq.blocked).toBe('E_CORP_BUILD_MEMBERS');
+    expect(corpBuildingStatus(few, hq)).toEqual({ kind: 'members', need: 15, have: 7 });
+    expect(corpRequirements(few, hq).slice(0, 3)).toEqual([
+      { kind: 'members', need: 15, have: 7, ok: false },
+      { kind: 'battles', need: 10, have: 3, ok: false },
+      { kind: 'cost', cost: 800, treasury: 2000, ok: true },
+    ]);
+    expect(corpLevelPlan(few)!.next).toMatchObject({
+      level: 4,
+      cost: 800,
+      enough: true,
+      conditions: [
+        { kind: 'members', need: 15, have: 7, ok: false },
+        { kind: 'battles', need: 10, have: 3, ok: false },
+      ],
+    });
+
+    const crowd = view({ headquarters: 3 }, 2000, 'head', null, { members: 15, battles: 3 });
+    expect(building(crowd, CORP_HQ).blocked).toBe('E_CORP_BUILD_BATTLES');
+    expect(corpBuildingStatus(crowd, building(crowd, CORP_HQ))).toEqual({
+      kind: 'battles',
+      need: 10,
+      have: 3,
+    });
+    const ready = view({ headquarters: 3 }, 2000, 'head', null, { members: 15, battles: 10 });
+    expect(building(ready, CORP_HQ).blocked).toBeNull();
+    expect(corpBuildingStatus(ready, building(ready, CORP_HQ))).toEqual({
+      kind: 'can',
+      cost: 800,
+      durationMs: 24 * H,
+      first: false,
+    });
+    // Не главе сервер отвечает E_FORBIDDEN, а строка называет ту же причину по счёту.
+    const member = view({ headquarters: 3 }, 2000, 'member', null, { members: 7, battles: 3 });
+    expect(building(member, CORP_HQ).blocked).toBe('E_FORBIDDEN');
+    expect(corpBuildingStatus(member, building(member, CORP_HQ)).kind).toBe('members');
+    // Штаб 1–3 условий не просит.
+    expect(
+      corpLevelTable(few).map((r) => r.conditions.map((c) => [c.kind, c.need])),
+    ).toEqual([[], [], [], [['members', 15], ['battles', 10]], [['members', 20], ['battles', 25]]]);
+    const low = view({ headquarters: 1 }, 2000);
+    expect(corpLevelPlan(low)!.next!.conditions).toEqual([]);
   });
 
   it('знак на гербе: первые буквы двух слов или две буквы одного слова', () => {
