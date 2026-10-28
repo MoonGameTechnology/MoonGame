@@ -20,9 +20,11 @@ import {
   type PhoneItemId,
 } from '../../decisions/phoneNav';
 import { phoneIcon } from './phoneIcons';
+import { esc } from './format';
 import { PUSH_KIND_LABEL, PUSH_KINDS, type PushKind } from '../../decisions/pushNotice';
 import { RATE_UNITS, RATE_WORD_KEY, type RateUnit } from '../../decisions/rateUnit';
 import type { PushView } from './pushSetup';
+import { matchNumberText } from '../../decisions/matchNumber';
 
 /** Снимок всех настроек на момент отрисовки. */
 export interface SettingsView {
@@ -67,6 +69,9 @@ export interface SettingsView {
   /** Доход ресурсов в час или в сутки (`decisions/rateUnit.ts`). Нет — нет и вкладки «Игра»:
    *  в сборке одного Sector Zero скорость всегда читается за минуту забега. */
   rateUnit?: RateUnit;
+  /** Номер партии, в которой игрок сейчас (FRIENDS-2). Нет — вне сетевой партии, и строки
+   *  с кнопкой «Скопировать номер» нет: копировать нечего. */
+  matchId?: string;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -142,7 +147,7 @@ export const PUSH_TAB: { id: SettingsTab; key: string } = { id: 'push', key: 'se
 export function tabsFor(view: SettingsView): ReadonlyArray<{ id: SettingsTab; key: string }> {
   return [
     ...SETTINGS_TABS,
-    ...(view.rateUnit ? [GAME_TAB] : []),
+    ...(view.rateUnit || view.matchId ? [GAME_TAB] : []),
     ...(view.push ? [PUSH_TAB] : []),
   ];
 }
@@ -246,13 +251,21 @@ function tabHtml(
 /** «Игра»: в чём читать скорость ресурсов — в час или в сутки. Выбор из двух кнопок, а не
  *  тумблер: у тумблера «вкл/выкл», а здесь оба положения — значения. */
 function gameHtml(view: SettingsView): string {
-  if (!view.rateUnit) return '';
+  // Номер партии — первой строкой: его копируют и отправляют друзьям (FRIENDS-2).
+  const match = view.matchId
+    ? `<div class="set-row">` +
+      `<div class="set-lbl">${t('settings.match.number')}<span class="set-sub">${esc(matchNumberText(view.matchId))}</span></div>` +
+      `<div class="set-ctl"><button type="button" class="set-pal" id="set-copy-match">${t('hub.mine.copy')}</button></div>` +
+      `</div>`
+    : '';
+  if (!view.rateUnit) return match;
   const units = RATE_UNITS.map(
     (u) =>
       `<button type="button" class="set-pal${view.rateUnit === u ? ' on' : ''}" data-rate="${u}"` +
       ` aria-pressed="${view.rateUnit === u}">${t(RATE_WORD_KEY[u])}</button>`,
   ).join('');
   return (
+    match +
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.rate')}<span class="set-sub">${t('settings.rate.hint')}</span></div>` +
     `<div class="set-ctl set-pals set-rate" role="group" aria-label="${t('settings.rate')}">${units}</div>` +
@@ -409,6 +422,8 @@ export interface SettingsHost {
   resetColors(): void;
   /** Доход ресурсов в час или в сутки (есть там, где есть {@link SettingsView.rateUnit}). */
   setRateUnit?(unit: RateUnit): void;
+  /** Скопировать номер партии в буфер обмена; `false` — буфер недоступен. */
+  copyMatchId?(): Promise<boolean>;
   /** Новая раскладка нижней панели телефона (есть там, где есть {@link SettingsView.phoneBar}). */
   setPhoneBar?(bar: readonly PhoneItemId[]): void;
   /** Включить или выключить push (есть там, где есть {@link SettingsView.push}). */
@@ -608,6 +623,14 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
         refocus(`[data-rate="${unit}"]`);
       });
     }
+    q('set-copy-match')?.addEventListener('click', () => {
+      // Не вышло — номер остаётся написанным в строке, его можно выделить вручную.
+      const said = (ok: boolean): void => {
+        const btn = q('set-copy-match');
+        if (btn) btn.textContent = ok ? t('hub.mine.copied') : t('hub.mine.copy-manual');
+      };
+      (host.copyMatchId?.() ?? Promise.resolve(false)).then(said, () => said(false));
+    });
     q('set-close')?.addEventListener('click', () => host.root().classList.remove('show'));
   }
 

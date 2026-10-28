@@ -3299,6 +3299,17 @@ export const ru: Record<string, string> = {
   'friends.search.ph': 'Поиск по позывному…',
   'friends.sent': 'заявка отправлена',
   'friends.sent.ok': 'заявка отправлена: {who}',
+  'friends.act.join': 'Войти',
+  'friends.act.invite': 'Позвать',
+  'friends.act.dismiss': 'отклонить приглашение',
+  'friends.err.not-seated': 'вас нет в этой партии',
+  'friends.invite.from': 'зовёт в партию {n}',
+  'friends.invite.none': 'звать некуда: у вас нет идущих партий',
+  'friends.invite.pick': 'Куда позвать {who}?',
+  'friends.invite.sent': 'приглашение отправлено: {who}',
+  'friends.privacy.hide': 'Скрывать мои партии от друзей',
+  'friends.privacy.hide.hint': 'друзья не увидят, где вы играете, и не смогут войти к вам',
+  'settings.match.number': 'Номер партии',
 
   // --- rank — Вкладка «Рейтинги» в хабе: доски командиров и корпораций.
   'rank.empty.corps': 'Корпораций пока нет',

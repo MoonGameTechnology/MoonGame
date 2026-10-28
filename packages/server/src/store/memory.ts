@@ -1112,6 +1112,19 @@ export class MemoryFriendStore implements FriendStore {
     if (!this.rows.delete(key)) return Promise.resolve({ ok: false, code: 'E_NO_EDGE' as const });
     return Promise.resolve({ ok: true as const });
   }
+
+  /** FRIENDS-2 · accounts that hide their matches from friends. */
+  private readonly hiding = new Set<string>();
+
+  hidesMatches(accountId: string): Promise<boolean> {
+    return Promise.resolve(this.hiding.has(accountId));
+  }
+
+  setHidesMatches(accountId: string, hide: boolean): Promise<void> {
+    if (hide) this.hiding.add(accountId);
+    else this.hiding.delete(accountId);
+    return Promise.resolve();
+  }
 }
 
 export class MemoryPushStore implements PushStore {

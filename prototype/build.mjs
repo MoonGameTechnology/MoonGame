@@ -1310,6 +1310,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .fr-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fr-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
 .fr-wait{font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 12px 4px 31px;font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick > span{flex:1 0 100%;}
+.fr-priv{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;}
+.fr-priv input{margin-top:3px;accent-color:var(--cyan);}
+.fr-priv b{display:block;font-size:var(--fs-body);color:var(--ink);font-weight:600;}
+.fr-priv span span{display:block;font-size:var(--fs-caption);color:var(--dim);}
 @media(max-width:640px){
   /* кнопки строки — под палец, как в окне меток */
   .fr-b{padding:11px 12px;}

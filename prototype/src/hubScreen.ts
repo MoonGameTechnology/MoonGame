@@ -27,7 +27,7 @@ import { esc } from './format';
 import { initFriends } from './friendsScreen';
 import { maybeIntro, openCodex } from './helpCenter';
 import { initHubWallet } from './hubWallet';
-import { refreshMyMatches } from './matchBrowser';
+import { inviteTargets, joinByNumber, refreshMyMatches } from './matchBrowser';
 import { leaveMatch, startProvingGround } from './matchLifecycle';
 import {
   canUnlock,
@@ -449,6 +449,8 @@ export function initHubScreen(host: HubScreenHost): void {
       root: () => $('hp-friends'),
       authorizedBase: hubAuthorizedBase,
       openPlayer: (login) => profile?.open(login),
+      myMatches: inviteTargets,
+      joinMatch: joinByNumber,
     });
   // --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
   // Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по

@@ -43,6 +43,7 @@ import { neutralColor, rivalPaletteId, setSideColors, youColor } from './mapPale
 import { setSweepOpacity, sweepOpacity } from './mapRadar';
 import { initPush } from './pushSetup';
 import { initSettings } from './settingsOverlay';
+import { serverMatchId } from './netSession';
 import { COLOR } from './sideColors';
 import type { SoundApi } from './sound';
 import { currentBuild } from './updater';
@@ -178,6 +179,8 @@ export function initSettingsView(host: SettingsViewHost): void {
       ...(push?.view() ? { push: push.view()! } : {}),
       // В сборке одного Sector Zero скорость всегда за минуту забега — выбирать там нечего.
       ...(__SECTOR_ZERO_ONLY__ ? {} : { rateUnit: game.rateUnit() }),
+      // Номер сетевой партии — его копируют и отправляют друзьям (FRIENDS-2).
+      ...(serverMatchId() ? { matchId: serverMatchId()! } : {}),
     }),
     setSweepOpacity,
     setWindowOpacity: (v) => {
@@ -204,6 +207,14 @@ export function initSettingsView(host: SettingsViewHost): void {
     resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
     setPhoneBar: (bar) => game.setPhoneBar(bar),
     setRateUnit: (unit) => game.setRateUnit(unit),
+    copyMatchId: async () => {
+      const id = serverMatchId();
+      if (!id || !navigator.clipboard) return false;
+      return navigator.clipboard.writeText(id).then(
+        () => true,
+        () => false,
+      );
+    },
     setPush: async (on) => push?.setEnabled(on),
     setPushKind: async (kind, on) => push?.setKind(kind, on),
   });

@@ -105,3 +105,47 @@ describe('разметка — кнопки ровно по виду ребра'
     expect(html).toContain('hub-empty');
   });
 });
+
+describe('FRIENDS-2 — войти к другу, позвать, скрыть свои партии', () => {
+  it('у друга в партии с номером есть «Войти», без номера — нет', () => {
+    const open = friendsPanelHtml([row({ presence: { kind: 'match', day: 2, matchId: '48219370' } })]);
+    expect(open).toContain('data-fr-act="join" data-fr-match="48219370"');
+    // Сервер не прислал номер (друг скрыл партии или старый сервер) — входить некуда.
+    const hidden = friendsPanelHtml([row({ presence: { kind: 'match', day: 2 } })]);
+    expect(hidden).not.toContain('data-fr-act="join"');
+  });
+
+  it('«Позвать» есть только у друга, не у заявок', () => {
+    expect(friendsPanelHtml([row()])).toContain('data-fr-act="invite"');
+    expect(friendsPanelHtml([row({ kind: 'incoming' })])).not.toContain('data-fr-act="invite"');
+    expect(friendsPanelHtml([row({ kind: 'outgoing' })])).not.toContain('data-fr-act="invite"');
+  });
+
+  it('приглашение показывает, кто и куда зовёт, с «Войти» и «✕»', () => {
+    const html = friendsPanelHtml([], {
+      signedIn: true,
+      invites: [{ fromId: 'a9', fromLogin: '<b>x</b>', matchId: '48219370' }],
+    });
+    expect(html).toContain('data-fr-act="join" data-fr-match="48219370"');
+    expect(html).toContain('data-fr-act="dismiss" data-fr-id="a9"');
+    expect(html).toContain('№ 48219370');
+    expect(html).not.toContain('<b>x</b>'); // позывной чужой — экранируется
+  });
+
+  it('выбор партии раскрывается под тем другом, кого зовут', () => {
+    const html = friendsPanelHtml([row({ accountId: 'a1' }), row({ accountId: 'a2', login: 'Б' })], {
+      signedIn: true,
+      pick: { accountId: 'a2', matches: [{ matchId: 'm-1', label: 'Карта · № m-1' }] },
+    });
+    expect(html).toContain('data-fr-act="invite-to" data-fr-id="a2" data-fr-match="m-1"');
+    expect(html).not.toContain('data-fr-id="a1" data-fr-match');
+  });
+
+  it('переключатель «скрывать мои партии» показывает то, что знает сервер', () => {
+    expect(friendsPanelHtml([], { signedIn: true, hideMatches: true })).toContain(
+      'id="fr-hide" checked',
+    );
+    expect(friendsPanelHtml([], { signedIn: true })).not.toContain('checked');
+    expect(friendsPanelHtml([], { signedIn: false })).not.toContain('fr-hide');
+  });
+});

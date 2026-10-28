@@ -349,6 +349,7 @@
 | UI-STD | ✅ | proto | `docs/backlog-archive.md` | Кнопки окна меток — стандартные; дерево технологий — |
 | CMD-VIS | ✅ | core proto | `docs/backlog-archive.md` | Стоп в коридоре запрещён; «нет приказа — нет |
 | FRIENDS-1 | ✅ | srv proto | `docs/backlog-archive.md` | Вкладка «Друзья» в хабе — с настоящим сервером. |
+| FRIENDS-2 | ✅ | srv proto | `docs/backlog-archive.md` | Войти к другу, позвать друга, скрыть свои партии. |
 | BUILD-1 | ✅ | proto | `docs/backlog-archive.md` | Окно построек мира + карточка здания с уровнями. |
 | ABIL-RING | ✅ | proto | `docs/backlog-archive.md` | Радиусы способностей — фиолетовым пунктиром, и не только |
 | SENSOR-1 | ✅ | data core proto | `docs/backlog-archive.md` | Сенсорный фрегат: носитель радара — и сам радар |

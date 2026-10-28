@@ -3290,6 +3290,17 @@ export const en: Record<string, string> = {
   'friends.search.ph': 'Search by callsign…',
   'friends.sent': 'request sent',
   'friends.sent.ok': 'request sent: {who}',
+  'friends.act.join': 'Join',
+  'friends.act.invite': 'Invite',
+  'friends.act.dismiss': 'decline the invite',
+  'friends.err.not-seated': 'you are not in this match',
+  'friends.invite.from': 'invites you to match {n}',
+  'friends.invite.none': 'nowhere to invite: you have no running matches',
+  'friends.invite.pick': 'Invite {who} where?',
+  'friends.invite.sent': 'invite sent: {who}',
+  'friends.privacy.hide': 'Hide my matches from friends',
+  'friends.privacy.hide.hint': 'friends will not see where you play and cannot join you',
+  'settings.match.number': 'Match number',
 
   // --- rank — the hub's Rankings tab: commander and corporation boards.
   'rank.empty.corps': 'No corporations yet',

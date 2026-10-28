@@ -39,6 +39,8 @@ import {
   type FilterState,
 } from './matchFilter';
 import { openSessionTab } from './matchJoin';
+import { inviteMatches } from '../../decisions/friendInvite';
+import type { InviteMatch } from './friendsScreen';
 import { isMatchDescriptionOpen, openMatchDescription } from './matchDescription';
 import {
   fmtJoinWindow,
@@ -537,6 +539,21 @@ export async function refreshMyMatches(): Promise<void> {
   renderMyMatches();
 }
 
+/** Войти в партию по номеру: своя — возвращение, чужая — выбор места, как у строки. Этой
+ *  же дверью входят к другу и по приглашению (FRIENDS-2). */
+export function joinByNumber(id: string): void {
+  const seated = (matchLists?.active ?? []).some((m) => m.matchId === id);
+  openSessionTab(id, seated);
+}
+
+/** Свои идущие партии, куда можно позвать друга (FRIENDS-2, `decisions/friendInvite.ts`). */
+export function inviteTargets(): InviteMatch[] {
+  return inviteMatches(matchLists?.active ?? []).map((m) => ({
+    matchId: m.matchId,
+    label: `${game.mapLabel(m.mapId)} · ${matchNumberText(m.matchId)}`,
+  }));
+}
+
 /** Положить готовую ленту и показать «Доступные», без похода на сервер. Ею харнес размеров
  *  (`sizetest.mjs`) мерит обозреватель: сервера там нет. */
 export function showLists(lists: Record<MatchTab, MatchRow[]>): void {
@@ -586,8 +603,7 @@ export function initMatchBrowser(host: MatchBrowserHost): void {
       game.status(t('browser.number.bad'));
       return;
     }
-    const seated = (matchLists?.active ?? []).some((m) => m.matchId === id);
-    openSessionTab(id, seated);
+    joinByNumber(id);
   });
 
   for (const btn of Array.from(document.querySelectorAll('.mtab')))
