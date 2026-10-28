@@ -16,12 +16,15 @@
  * показывает заглушку, а не ломается"), not simulated.
  */
 
+import { isCorpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/corpIdentity';
+
 export type CorpRole = 'head' | 'officer' | 'member' | 'recruit';
 
 export interface CorpRecord {
   corpId: string;
   name: string;
   influence: number;
+  emblemId?: CorpEmblemId;
 }
 export interface CorpSummary extends CorpRecord {
   members: number;
@@ -108,7 +111,8 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
  *  (a network hiccup or an old cached response should never break the cabinet). */
 export function parseCorpRecord(raw: unknown): CorpRecord | null {
   if (!isObj(raw) || !isStr(raw.corpId) || !isStr(raw.name) || !isNum(raw.influence)) return null;
-  return { corpId: raw.corpId, name: raw.name, influence: raw.influence };
+  return { corpId: raw.corpId, name: raw.name, influence: raw.influence,
+    ...(isCorpEmblemId(raw.emblemId) ? { emblemId: raw.emblemId } : {}) };
 }
 
 export function parseCorpSummaries(raw: unknown): CorpSummary[] {
@@ -116,7 +120,8 @@ export function parseCorpSummaries(raw: unknown): CorpSummary[] {
   const out: CorpSummary[] = [];
   for (const r of raw) {
     if (isObj(r) && isStr(r.corpId) && isStr(r.name) && isNum(r.influence) && isNum(r.members)) {
-      out.push({ corpId: r.corpId, name: r.name, influence: r.influence, members: r.members });
+      out.push({ corpId: r.corpId, name: r.name, influence: r.influence, members: r.members,
+        ...(isCorpEmblemId(r.emblemId) ? { emblemId: r.emblemId } : {}) });
     }
   }
   return out;
@@ -200,7 +205,8 @@ export function parseReadyPool(raw: unknown): Array<CorpSummary & { readySince: 
       isNum(r.members) &&
       isNum(r.readySince)
     ) {
-      out.push({ corpId: r.corpId, name: r.name, influence: r.influence, members: r.members, readySince: r.readySince });
+      out.push({ corpId: r.corpId, name: r.name, influence: r.influence, members: r.members, readySince: r.readySince,
+        ...(isCorpEmblemId(r.emblemId) ? { emblemId: r.emblemId } : {}) });
     }
   }
   return out;

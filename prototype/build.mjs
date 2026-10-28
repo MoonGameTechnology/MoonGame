@@ -3440,8 +3440,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .fitpane .hgradeline.g-legendary{color:var(--amber);}
 .fitpane .hgradeline.g-main{color:var(--grn);}
 
-#ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
-#ub-notes:empty{display:none;}
 #ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
 #ub-status:empty{display:none;}
 
@@ -3453,7 +3451,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   padding:12px 14px;border:1px solid var(--cyan);border-radius:10px;
   background:rgba(4,20,26,.94);box-shadow:0 6px 28px rgba(0,0,0,.55),0 0 22px rgba(53,214,230,.16);}
 #updbar .ub-t{font-size:var(--fs-body);color:var(--dim);line-height:1.5;}
-#updbar .ub-t b{color:var(--ink);}
 #updbar .ub-row{display:flex;gap:10px;margin-top:10px;}
 #updbar .ub-go{flex:1;text-align:center;padding:11px 10px;border-radius:8px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.18);color:var(--cyan);font-size:var(--fs-body);text-decoration:none;cursor:pointer;}
@@ -3903,8 +3900,16 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb{display:flex;flex-direction:column;gap:14px;}
 .cb-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;}
 .cb-emb{flex:0 0 auto;display:block;overflow:visible;}
-.cb-emb path{fill:color-mix(in srgb,var(--cyan) 20%,transparent);stroke:var(--cyan);stroke-width:1.6;}
-.cb-emb text{fill:var(--sf-hi);font-weight:700;font-family:var(--sf-font);}
+.cb-emb-frame{fill:color-mix(in srgb,var(--cyan) 12%,transparent);stroke:var(--cyan);stroke-width:1.2;}
+.cb-emb-mark{fill:none;stroke:var(--cyan);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.cb-emblem-edit{display:grid;place-items:center;flex:none;min-width:56px;min-height:60px;padding:2px;border:1px solid transparent;border-radius:10px;background:transparent;cursor:pointer;}
+.cb-emblem-edit:hover{background:color-mix(in srgb,var(--cyan) 8%,transparent);border-color:var(--cyan);}
+.cb-emblems{display:grid;grid-template-columns:repeat(5,minmax(44px,1fr));gap:8px;max-width:380px;margin:10px 0 14px;}
+.cb-emblem-choice{display:grid;place-items:center;min-width:44px;min-height:50px;padding:5px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(5,23,30,.6);cursor:pointer;}
+.cb-emblem-choice:hover{border-color:var(--cyan);}
+.cb-emblem-choice[aria-pressed="true"]{border-color:var(--cyan);background:rgba(53,214,230,.16);box-shadow:inset 0 0 0 1px var(--cyan);}
+.cb-emblem-choice:focus-visible,.cb-emblem-edit:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
+.cb-emblem-choice:disabled,.cb-emblem-edit:disabled{opacity:.5;cursor:default;}
 .cb-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .cb-id h2{margin:0;font-size:var(--fs-title);font-weight:700;line-height:1.2;color:var(--sf-hi);overflow-wrap:anywhere;}
 .cb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:var(--fs-caption);color:var(--sf-dim);}
@@ -4093,9 +4098,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-nc-hero h2{margin:0 0 6px;font-size:var(--fs-title);color:var(--sf-hi);}
 .cb-nc-hero p{margin:0 0 12px;max-width:56ch;}
 .cb-create{display:flex;flex-wrap:wrap;gap:8px;}
-.cb-create input{flex:1 1 200px;min-width:0;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--sf-edge);
-  background:var(--sf-inset);color:var(--sf-hi);font:500 15px var(--sf-font);}
-.cb-create input:focus{outline:2px solid var(--sf-accent);outline-offset:1px;border-color:var(--sf-accent);}
 .cb-rlist{display:flex;flex-direction:column;}
 .cb-rrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);}
 .cb-rrow:last-child{border-bottom:0;}
@@ -5445,8 +5447,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
      the returning-player path lands in the hub and never visits #connect, which is
      where this used to live (and why players never saw their updates). -->
 <div id="updbar" role="region" aria-live="polite">
-  <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
-  <p id="ub-notes"></p>
+  <div class="ub-t" data-i18n="upd.available"></div>
   <p id="ub-status"></p>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>

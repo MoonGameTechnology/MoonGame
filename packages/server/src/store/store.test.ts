@@ -416,6 +416,29 @@ function userStoreContract(name: string, make: () => UserStore, uniq: (p: string
  *  runs on the shared Postgres tables (names/accounts must not collide across tests). */
 function corpStoreContract(name: string, make: () => CorpStore, uniq: (p: string) => string): void {
   describe(`CorpStore — ${name}`, () => {
+    it('persists insignia in detail, browse and readiness; only the current head may change it', async () => {
+      const store = make(), head = uniq('identity-head'), officer = uniq('identity-officer');
+      const created = await store.createCorp(uniq('Insignia'), head, 'head', 1, 'falcon');
+      if (!created.ok) throw Error('fixture');
+      const id = created.corpId;
+      await store.addMember(id, officer, 'officer', 'officer');
+      expect(await store.setEmblem(id, officer, 'wolf', 2)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(await store.setEmblem(id, uniq('outsider'), 'wolf', 2)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(await store.getCorp(id)).toMatchObject({ emblemId: 'falcon' });
+      expect(await store.setEmblem(id, head, 'phoenix', 3)).toEqual({ ok: true });
+      expect(await store.setEmblem(id, head, 'phoenix', 4)).toEqual({ ok: true });
+      expect(await store.getCorp(id)).toMatchObject({ emblemId: 'phoenix' });
+      expect((await store.listCorps()).find(c => c.corpId === id)).toMatchObject({ emblemId: 'phoenix' });
+      await store.setCorpReady(id, 5, [2]);
+      expect((await store.listReadyCorps()).find(c => c.corpId === id)).toMatchObject({ emblemId: 'phoenix' });
+      expect((await store.auditOf(id)).filter(e => e.action === 'emblem')).toEqual([
+        expect.objectContaining({ actor: head, detail: 'phoenix', at: 3 }),
+      ]);
+      await store.swapHead(id, head, officer);
+      expect(await store.setEmblem(id, head, 'dragon', 6)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(await store.setEmblem(id, officer, 'dragon', 7)).toEqual({ ok: true });
+    });
+
     it('creates a corp with the founder as head; the name is taken case-insensitively', async () => {
       const store = make();
       const corpName = uniq('Void Miners');

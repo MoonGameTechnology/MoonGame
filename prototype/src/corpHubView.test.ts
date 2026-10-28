@@ -75,12 +75,14 @@ describe('вкладка «Корпорация»: что стоит вмест�
     expect(offline).not.toContain('corp-hub-name');
   });
 
-  it('без корпорации: поле названия с кнопкой и корпорации, куда подать заявку', () => {
+  it('без корпорации: выбор эмблемы, случайное название и список для заявок', () => {
     const html = corpHubHtml(
       paint({ state: 'none', me: null, corp: null, browse: [{ corpId: 'c9', name: 'Рой', influence: 40, members: 3 }] }),
     );
-    expect(html).toContain('id="corp-hub-name"');
-    expect(html).toContain('data-corpact="create" data-corpinput="corp-hub-name"');
+    expect(html).not.toContain('<input');
+    expect(html.match(/data-corpdraft=/g)).toHaveLength(20);
+    expect(html).toContain(t('corp.create.generated'));
+    expect(html).toContain('data-corpact="create"');
     expect(html).toContain('data-corpact="apply" data-corparg="c9"');
   });
 
@@ -300,6 +302,7 @@ describe('вкладка «Корпорация»: текст и кнопки', 
     const sheets = [
       corpHubSheetHtml(paint(), { kind: 'building', id: 'headquarters' }, ''),
       corpHubSheetHtml(paint(), { kind: 'levels' }, ''),
+      corpHubSheetHtml(paint(), { kind: 'emblem' }, ''),
       corpHubSheetHtml(paint(), { kind: 'member', accountId: 'a2' }, ''),
       corpHubSheetHtml(paint({ style: styles(true, 'high_tech') }), { kind: 'style' }, ''),
       corpHubSheetHtml(paint({ style: styles(false) }), { kind: 'style' }, ''),
@@ -317,7 +320,7 @@ describe('вкладка «Корпорация»: текст и кнопки', 
   });
 
   it('у каждой кнопки приказа — один из трёх стилей или крестик', () => {
-    const own = /class="(cb-tab|cb-lvl|cb-lot|cb-bc)\b/;
+    const own = /class="(cb-tab|cb-lvl|cb-lot|cb-bc|cb-emblem-edit|cb-emblem-choice)\b/;
     const bare = all()
       .flatMap(buttons)
       .filter((tag) => !own.test(tag) && !/class="[^"]*\b(btn-main|btn-second|btn-quiet|btn-x)\b/.test(tag));

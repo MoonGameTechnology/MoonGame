@@ -603,3 +603,45 @@
     font-size: 14px;
   }
 }
+
+/* Account-backed career and the corporation door share the dossier's existing tiles. */
+.pf-account-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.pf-account-level progress {
+  flex: 1;
+  min-width: 80px;
+  accent-color: var(--cyan, #29d5e8);
+}
+.pf-corp-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.pf-corporation,
+[data-profile-corp-back] {
+  min-height: 44px;
+  padding: 8px 14px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.pf-career-details {
+  margin: 16px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.pf-career-details summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.pf-career-details ul {
+  padding-left: 20px;
+}

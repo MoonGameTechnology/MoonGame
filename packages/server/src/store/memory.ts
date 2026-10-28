@@ -1,7 +1,7 @@
 import { reservedBotLogin } from '../botNicknames';
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
-import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
+import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
 import { randomUUID } from 'node:crypto';
@@ -385,15 +385,16 @@ export class MemoryCorpStore implements CorpStore {
     headAccountId: string,
     headLogin: string,
     at: number = Date.now(),
+    emblemId?: CorpEmblemId,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
+    if (this.members.has(headAccountId)) return Promise.resolve({ ok: false, code: 'E_IN_CORP' });
     const key = name.toLowerCase();
     for (const corp of this.corps.values()) {
       if (corp.name.toLowerCase() === key)
         return Promise.resolve({ ok: false, code: 'E_NAME_TAKEN' });
     }
-    if (this.members.has(headAccountId)) return Promise.resolve({ ok: false, code: 'E_IN_CORP' });
     const corpId = randomUUID();
-    this.corps.set(corpId, { corpId, name, influence: 0 });
+    this.corps.set(corpId, { corpId, name, influence: 0, ...(emblemId ? { emblemId } : {}) });
     this.members.set(headAccountId, {
       corpId,
       accountId: headAccountId,
@@ -401,6 +402,17 @@ export class MemoryCorpStore implements CorpStore {
       role: 'head',
     });
     return this.publish([corpFoundedNews(corpId, name, at)]).then(() => ({ ok: true as const, corpId }));
+  }
+
+  setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }> {
+    const corp = this.corps.get(corpId), member = this.members.get(actor);
+    if (!corp || member?.corpId !== corpId || member.role !== 'head')
+      return Promise.resolve({ ok: false, code: 'E_FORBIDDEN' });
+    if (corp.emblemId !== emblemId) {
+      this.corps.set(corpId, { ...corp, emblemId });
+      this.audit.push({ corpId, actor, at, action: 'emblem', detail: emblemId });
+    }
+    return Promise.resolve({ ok: true });
   }
 
   getCorp(corpId: string): Promise<CorpRecord | null> {

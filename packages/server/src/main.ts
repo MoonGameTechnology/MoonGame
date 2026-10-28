@@ -154,6 +154,7 @@ const metaEconomy = new MetaEconomy({ store: stores.metaEconomy, catalog: metaCa
   },
 });
 const rewardDelivery = createMetaRewardDelivery({
+  career: (snapshot) => stores.profileStore.creditCareer?.(snapshot) ?? Promise.resolve(),
   store: stores.metaEconomy,
   matches: stores.store,
   seats: (matchId) => async () => {
@@ -183,6 +184,10 @@ const loadMatch = createMatchLoader({
   stores,
   data,
   securityAudit,
+  careerAccounts: async (matchId) => {
+    const session = await stores.sessionStore.byMatch(matchId);
+    return session ? Object.fromEntries(Object.entries(session.seats).map(([account,player])=>[player,account])) : nickSeatAccounts(stores.accountStore, stores.userStore, matchId)();
+  },
   onTerminalState: async (matchId, state) => {
     if (!auth || !signSession) return;
     const session = await stores.sessionStore.byMatch(matchId);
@@ -695,6 +700,7 @@ const server = createMultiplayerServer({
             return { offers: commerceOffers() };
           });
             registerProfileApi(scope, {
+              corporations: stores.corpStore,
               profiles: stores.profileStore,
               registrationRewards: stores.registrationRewards,
               users: stores.userStore,

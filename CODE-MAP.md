@@ -51,6 +51,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 `botPopulation.ts` — посадка, реальные
 итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
 `profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
+Серверная карьера: `playerCareer.ts` — private ledger снимка, `profileStore.ts` —
+однократное начисление после durable завершения; `decisions/playerCareer.ts` —
+проверка публичного контракта и уровень аккаунта.
 `prototype/src/botBehavior.ts` выбирает стратегию и политику переговоров по постоянному seed;
 `packages/server/src/botSocial.ts` отвечает на принятые личные сообщения, а
 `scripts/botChatText.ts` форматирует английские реплики без изменения протокола.
@@ -480,6 +483,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `avaMapPool.ts` | `pickAvaMap` | AvA-карты |
 | `avaApi.ts` / `avaService.ts` | AvA API/service | AvA-логика |
 | `corpApi.ts` / `corpService.ts` | corp API/service | корпорации и инфраструктура; оба серверных входа |
+| `corpNames.ts` | разрешённые имена корпораций | серверный подбор из `data/corpNames.json`, ограниченный повтор только при коллизии |
 | `corporationMain.ts` / `corporationServer.ts` | самостоятельный corporate entrypoint | бандл `corporation-server.mjs`, отдельная PostgreSQL; [карта](docs/corporation-service.md) |
 | `corporateTransport.ts` / `corporateRemote.ts` | signed gateway / RPC | оба игровых входа, проверка личности в Game, подпись ответов и durable nonce |
 | `dependencyGuard.ts` | ограничение нагрузки / circuit breaker | общий исходящий предохранитель; применяется к Corp HTTP/RPC, без очереди и автоповтора; [роадмап](docs/service-resilience-roadmap.md) |
@@ -550,6 +554,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `veteran.json` · `promotion.json` | надбавка ветерана и бросок «отмеченной» партии |
 | `sectorZeroShop.json` · `sectorZeroStars.json` | Sector Zero: витрина магазина, ступени звёзд |
 | `corpBuildings.json` | постройки базы корпорации; серверный каталог вне `GameData` |
+| `corpNames.json` | белый список для случайных названий корпораций, вне `GameData` |
 | `events.json` | тёмные события |
 | `dropTables.json` | таблицы дропа (ARS-4) |
 | `metaEconomy.json` | серверный каталог v0: материалы, рецепты, сезон, лимиты; вне `GameData` |

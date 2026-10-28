@@ -16,7 +16,6 @@
 import {
   CORP_HQ,
   corpBuildingStatus,
-  corpInitials,
   corpLevel,
   corpLevelPlan,
   corpLevelTable,
@@ -38,6 +37,8 @@ import type {
 } from '../../packages/protocol/src/corpInfrastructure';
 import { CORP_STYLE_STANDARD, type MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import { t } from '../../localization/runtime';
+import { corpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/corpIdentity';
+import { corpEmblem, corpEmblemPicker } from './corpEmblems';
 import type { CorpAuditEntry, CorpMembership, CorpRecord, CorpRole, CorpSummary } from './corp';
 import { CORP_STYLES, corpStyleName } from './corpArt';
 import {
@@ -68,6 +69,7 @@ export type CorpHubSheet =
   | { kind: 'building'; id: string }
   | { kind: 'levels' }
   | { kind: 'member'; accountId: string }
+  | { kind: 'emblem' }
   | { kind: 'style' };
 
 const ROLE_LABEL: Readonly<Record<CorpRole, string>> = {
@@ -131,6 +133,7 @@ export interface CorpHubPaint {
   browse: readonly CorpSummary[];
   /** Приказ ушёл и ждёт ответа: кнопки приказов погашены. */
   busy: boolean;
+  draftEmblem?: CorpEmblemId;
   /** Взведённая кнопка необратимого приказа. */
   armed: string | null;
   badges: { members: number; battles: number };
@@ -172,16 +175,6 @@ function effects(level: CorpBuildingLevel | undefined): string {
 }
 
 const initial = (s: string): string => (Array.from(s.trim())[0] ?? '?').toUpperCase();
-
-/** Герб: шестигранник со знаком корпорации. */
-export function corpEmblem(name: string, size = 40): string {
-  const tag = corpInitials(name);
-  return (
-    `<svg class="cb-emb" width="${size}" height="${Math.round(size * 1.1)}" viewBox="0 0 40 44" aria-hidden="true">` +
-    `<path d="M20 1.5L37.5 11.5V32.5L20 42.5L2.5 32.5V11.5Z"/>` +
-    `<text x="20" y="26.5" text-anchor="middle" font-size="${tag.length > 2 ? 10 : 13}">${esc(tag)}</text></svg>`
-  );
-}
 
 function hexNum(n: number): string {
   return (
@@ -246,7 +239,10 @@ function headHtml(p: CorpHubPaint, corp: CorpRecord): string {
       )}</button>`
     : '';
   return (
-    `<header class="cb-head">${corpEmblem(corp.name, 50)}` +
+    `<header class="cb-head">` +
+    (p.me?.role === 'head'
+      ? `<button type="button" class="cb-emblem-edit" data-corphub="emblem" aria-label="${esc(t('corp.emblem.change'))}" title="${esc(t('corp.emblem.change'))}"${off(p.busy)}>${corpEmblem(corp.corpId, corp.emblemId, 50)}</button>`
+      : corpEmblem(corp.corpId, corp.emblemId, 50)) +
     `<div class="cb-id"><h2>${esc(corp.name)}</h2><div class="cb-meta">` +
     (p.view ? levelPill(p.view) : '') +
     style +
@@ -563,7 +559,7 @@ function noneHtml(p: CorpHubPaint): string {
   const rows = p.browse
     .map(
       (c) =>
-        `<div class="cb-rrow">${corpEmblem(c.name, 36)}<span><b>${esc(c.name)}</b>` +
+        `<div class="cb-rrow">${corpEmblem(c.corpId, c.emblemId, 36)}<span><b>${esc(c.name)}</b>` +
         `<small>${esc(t('corp.members.count', { n: c.members }))} · ${nfmt(c.influence)} ⟡</small></span>` +
         `<button type="button" class="btn-second" data-corpact="apply" data-corparg="${esc(c.corpId)}"${off(p.busy)}>${esc(t('corp.apply'))}</button></div>`,
     )
@@ -571,9 +567,9 @@ function noneHtml(p: CorpHubPaint): string {
   return (
     `<div class="cb-nc"><section class="cb-nc-hero"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built')}</div>` +
     `<div class="cb-nc-b"><h2>${esc(t('corp.hub.none.title'))}</h2><p>${esc(t('corp.hub.none.text'))}</p>` +
-    `<div class="cb-create"><input id="corp-hub-name" maxlength="24" autocomplete="off" ` +
-    `placeholder="${esc(t('corp.create.name-ph'))}" aria-label="${esc(t('corp.create.name-ph'))}">` +
-    `<button type="button" class="btn-main" data-corpact="create" data-corpinput="corp-hub-name"${off(p.busy)}>${esc(t('corp.create.title'))}</button></div>` +
+    `<p class="cb-note">${esc(t('corp.create.generated'))}</p>` +
+    corpEmblemPicker(p.draftEmblem ?? 'falcon', p.busy, true) +
+    `<div class="cb-create"><button type="button" class="btn-main" data-corpact="create"${off(p.busy)}>${esc(t('corp.create.title'))}</button></div>` +
     `</div></section>` +
     `<section class="cb-card"><div class="cb-card-h"><h3>${esc(t('corp.browse.title'))}</h3></div>` +
     (rows ? `<div class="cb-rlist">${rows}</div>` : `<p class="cb-note">${esc(t('corp.browse.empty'))}</p>`) +
@@ -584,7 +580,7 @@ function noneHtml(p: CorpHubPaint): string {
 function pendingHtml(p: CorpHubPaint): string {
   const name = p.corp?.name ?? '';
   return (
-    `<section class="cb-card cb-pending">${corpEmblem(name || '?', 50)}` +
+    `<section class="cb-card cb-pending">${corpEmblem(p.corp?.corpId ?? '', p.corp?.emblemId, 50)}` +
     `<div><h3>${esc(t('corp.hub.pending.title', { name }))}</h3><p class="cb-note">${esc(t('corp.hub.pending.text'))}</p></div>` +
     `<button type="button" class="btn-second" data-corpact="cancel"${off(p.busy)}>${esc(t('corp.hub.pending.cancel'))}</button></section>`
   );
@@ -789,6 +785,10 @@ export function corpHubSheetHtml(p: CorpHubPaint, sheet: CorpHubSheet, notice: s
     if (p.view) body = levelsSheetHtml(p.view);
   } else if (sheet.kind === 'style') {
     if (p.style) body = styleSheetHtml(p, p.style);
+  } else if (sheet.kind === 'emblem') {
+    if (p.corp && p.me?.role === 'head')
+      body = `<h3 id="cb-sheet-title">${esc(t('corp.emblem.title'))}</h3>` +
+        corpEmblemPicker(corpEmblemId(p.corp.corpId, p.corp.emblemId), p.busy);
   } else {
     const m = p.members.find((x) => x.accountId === sheet.accountId && x.role !== 'recruit');
     if (p.me && m) body = memberSheetHtml(p, p.me, m);

@@ -1,7 +1,6 @@
 // Shared publication contract. APK clients consume the public projection, not GitHub.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyApk } from './apk-verify.mjs';
@@ -46,7 +45,9 @@ export function openSignedManifest(envelope, lane, publicKey = distribution.mani
 async function main() {
   const [apk, out] = process.argv.slice(2);
   if (!apk || !out || process.argv.length !== 4) throw new Error('E_APK_CONFIG');
-  const notes = execFileSync('git', ['log', '-8', '--pretty=format:%s', 'HEAD'], { encoding: 'utf8', maxBuffer: 65536 }).slice(0,2048);
+  // Older APKs require this field. Keep it empty: commit subjects and other
+  // build metadata must never become player-facing update copy.
+  const notes = '';
   const m = createManifest({ lane: process.env.RELEASE_TAG, versionCode: Number(process.env.VOID_VC),
     versionName: process.env.VOID_VN, sha: process.env.VOID_SHA, notes,
     signerSha256: process.env.VOID_SIGNER_CERT_SHA256,

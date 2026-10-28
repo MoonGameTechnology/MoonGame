@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
+import { generatedCorpName } from './corpNames';
 import { parseMedalCatalog, type MedalCatalog } from './medalCatalog';
 import {
   MemoryAvaChallengeStore,
@@ -51,7 +52,8 @@ async function fixture(
   const challenges = new MemoryAvaChallengeStore();
   let t = 0;
   const now = (): number => ++t;
-  const corp = new CorpService({ store, now });
+  let catalogueIndex = 0;
+  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ });
   const ava = new AvaService({
     corpStore: store,
     challengeStore: challenges,
@@ -442,9 +444,9 @@ describe('AvaService — public feed (AVA-9)', () => {
     expect(feed[0]).toMatchObject({
       kind: 'matchup',
       challengerCorp: f.corpA,
-      challengerName: 'Alliance A',
+      challengerName: generatedCorpName(0),
       targetCorp: f.corpB,
-      targetName: 'Alliance B',
+      targetName: generatedCorpName(1),
     });
     expect(feed[0]?.winnerCorp).toBeUndefined();
     // Drive to a lock, then settle → the S7 result is appended (newest first).
@@ -501,7 +503,7 @@ describe('AvaService — medal news (CORP-1)', () => {
     const [entry] = (await f.feed.recent(50, undefined, ['medal'])).filter(
       (e) => e.id === `medal:${f.corpB}:two`,
     );
-    expect(entry).toMatchObject({ kind: 'medal', corpId: f.corpB, corpName: 'Alliance B', medalId: 'two' });
+    expect(entry).toMatchObject({ kind: 'medal', corpId: f.corpB, corpName: generatedCorpName(1), medalId: 'two' });
   });
 
   it('without the catalog a settlement is no medal news', async () => {

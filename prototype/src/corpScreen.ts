@@ -33,6 +33,8 @@ import {
  * services explicitly.
  */
 import { t } from '../../localization/runtime';
+import { corpEmblemId, isCorpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/corpIdentity';
+import { CORP_EMBLEM_LABEL, corpEmblem, corpEmblemPicker } from './corpEmblems';
 import { esc, nfmt } from './format';
 import { readRaw, writeRaw } from './prefs';
 import { detach } from './detach';
@@ -89,6 +91,7 @@ export const CORP_ROLE_DOT: Record<CorpRole, string> = {
 };
 export const CORP_AUDIT_RU: Record<string, string> = {
   create: 'corp.audit.create',
+  emblem: 'corp.audit.emblem',
   accept: 'corp.audit.accept',
   decline: 'corp.audit.decline',
   kick: 'corp.audit.kick',
@@ -317,6 +320,7 @@ export function initCorp(host: CorpHost): {
   let hubShown = false;
   let hubSection: CorpHubSection = 'base';
   let hubSheet: CorpHubSheet | null = null;
+  let draftEmblem: CorpEmblemId = 'falcon';
   // Взведённая кнопка необратимого приказа: второе нажатие исполняет, любое другое снимает.
   let hubArmed: string | null = null;
   // Отказ сервера, пока открыта шторка: строка хаба лежит под ней.
@@ -525,6 +529,8 @@ export function initCorp(host: CorpHost): {
   }
 
   function auditText(entry: CorpAuditEntry): string {
+    if (entry.action === 'emblem') return t('corp.audit.emblem') +
+      (isCorpEmblemId(entry.detail) ? ` · ${t(CORP_EMBLEM_LABEL[entry.detail])}` : '');
     if (entry.action === 'building_income') return t('corp.buildings.income-earned', { n: entry.detail ?? '0' });
     const name = infrastructure?.buildings.find((b) => b.id === entry.target)?.nameKey;
     if (name && entry.action === 'building_complete') return t('corp.buildings.completed', { name: t(name), n: entry.detail ?? '' });
@@ -559,8 +565,9 @@ export function initCorp(host: CorpHost): {
     return (
       `<div class="ccols">` +
       `<section class="ccard"><h4>${t('corp.create.title')}</h4>` +
-      `<div class="cinput"><input id="corpnewname" placeholder="${t('corp.create.name-ph')}" maxlength="24">` +
-      `<button class="cbtn2 btn-main" data-corpact="create">${t('corp.create.go')}</button></div></section>` +
+      `<p class="chint">${esc(t('corp.create.generated'))}</p>` +
+      corpEmblemPicker(draftEmblem, intentBusy, true) +
+      `<button class="cbtn2 btn-main" data-corpact="create">${t('corp.create.go')}</button></section>` +
       `<section class="ccard"><h4>${t('corp.browse.title')}</h4>` +
       `<div class="ctable">${rows || `<p class="chint">${t('corp.browse.empty')}</p>`}</div></section>` +
       `</div>`
@@ -634,6 +641,8 @@ export function initCorp(host: CorpHost): {
       `<section class="ccard"><h4>${t('corp.settings.identity')}</h4>` +
       `<div class="cline"><span>${t('corp.settings.name')}</span><em>${esc(corpMine.corp.name)}</em></div>` +
       `<div class="cline"><span>${t('corp.my-role')}</span><em>${corpRoleLabel(mine.role)}</em></div>` +
+      (mine.role === 'head' ? `<h4>${esc(t('corp.emblem.title'))}</h4>` +
+        corpEmblemPicker(corpEmblemId(corpMine.corp.corpId, corpMine.corp.emblemId), intentBusy) : '') +
       `<p class="chint">${t('corp.settings.identity.hint')}</p></section>` +
       `<section class="ccard"><h4>${t('corp.settings.soon')}</h4>` +
       `<div class="cline"><span>${t('corp.holdings.soon')}</span></div>` +
@@ -816,7 +825,7 @@ export function initCorp(host: CorpHost): {
     // Шапка: кто мы, сколько нас и какое место — и отдельной плашкой то самое число,
     // ради которого корпорацию и качают.
     host.head().innerHTML = c
-      ? `<div class="chrow"><span class="cemblem">⬢</span>` +
+      ? `<div class="chrow">${corpEmblem(c.corpId, c.emblemId, 40)}` +
         `<div class="cident"><b>${esc(c.name)}</b><span class="csub">` +
         `${members === null ? '' : t('corp.members.count', { n: String(members) })}` +
         `${members === null ? '' : ' · '}` +
@@ -888,6 +897,17 @@ export function initCorp(host: CorpHost): {
     host.root().style.display = 'none';
   }
 
+  function pickDraft(tg: HTMLElement): boolean {
+    const button = tg.closest<HTMLElement>('[data-corpdraft]');
+    if (!button || (button as HTMLButtonElement).disabled || !isCorpEmblemId(button.dataset.corpdraft)) return false;
+    const id = button.dataset.corpdraft;
+    draftEmblem = id;
+    paint();
+    const scope = hubShown ? host.hub.root() : host.root();
+    scope.querySelector<HTMLElement>(`[data-corpdraft="${id}"]`)?.focus();
+    return true;
+  }
+
   host.tabs().addEventListener('click', (e) => {
     const b = (e.target as HTMLElement | null)?.closest('[data-corptab]') as HTMLElement | null;
     if (!b) return;
@@ -899,6 +919,7 @@ export function initCorp(host: CorpHost): {
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement | null;
     if (!tg) return;
+    if (pickDraft(tg)) return;
     if (tg.id === 'corpclose' || tg.id === 'corp') {
       hideCorp();
       return;
@@ -953,10 +974,15 @@ export function initCorp(host: CorpHost): {
         break;
       }
       case 'create': {
-        // Поле названия — своё у окна и у вкладки хаба; кнопка называет его сама.
-        const input = document.getElementById(btn.dataset.corpinput ?? 'corpnewname') as HTMLInputElement | null;
-        const name = input?.value.trim() ?? '';
-        if (name) corpSend(act, '/corps', { name });
+        corpSend(act, '/corps', { emblemId: draftEmblem });
+        break;
+      }
+      case 'emblem': {
+        if (isCorpEmblemId(arg)) detach('корпорация: эмблема',
+          corpIntent(`/corps/${encodeURIComponent(corpId)}/emblem`, { emblemId: arg }).finally(() => {
+            const scope = hubShown ? host.hub.sheet() : host.root();
+            scope.querySelector<HTMLElement>(`[data-corpact="emblem"][data-corparg="${arg}"]`)?.focus();
+          }));
         break;
       }
       case 'apply':
@@ -1083,6 +1109,7 @@ export function initCorp(host: CorpHost): {
       journal: me && canManage(me.role) ? corpAudit : null,
       browse: corpBrowseList,
       busy: intentBusy,
+      draftEmblem,
       armed: hubArmed,
       badges: corpHubBadges(me, members, avaChallenges),
       // «Битвы» до CORP-10 — те же построители, что у окна в партии.
@@ -1095,18 +1122,10 @@ export function initCorp(host: CorpHost): {
   function renderHub(): void {
     if (!hubShown) return;
     const root = host.hub.root();
-    // Перерисовка не теряет набранное название и место на панораме.
-    const input = root.querySelector<HTMLInputElement>('#corp-hub-name');
-    const typed = input?.value ?? '';
-    const focused = input !== null && input === document.activeElement;
+    // Перерисовка сохраняет место на панораме; выбор эмблемы держит контроллер.
     const scroll = root.querySelector<HTMLElement>('.cb-pano-scroll')?.scrollLeft ?? null;
     const p = hubPaint();
     root.innerHTML = corpHubHtml(p);
-    const nextInput = root.querySelector<HTMLInputElement>('#corp-hub-name');
-    if (nextInput) {
-      nextInput.value = typed;
-      if (focused) nextInput.focus();
-    }
     // Панорама впервые на экране — штабом в середину: на телефоне она шире экрана.
     const pano = root.querySelector<HTMLElement>('.cb-pano-scroll');
     if (pano) pano.scrollLeft = scroll ?? (pano.scrollWidth - pano.clientWidth) / 2;
@@ -1163,6 +1182,7 @@ export function initCorp(host: CorpHost): {
   function onHubClick(e: Event): void {
     const tg = e.target as HTMLElement | null;
     if (!tg) return;
+    if (pickDraft(tg)) return;
     // Любое нажатие снимает взвод; второе нажатие по взведённой кнопке исполняет приказ.
     const armed = hubArmed;
     hubArmed = null;
@@ -1196,6 +1216,7 @@ export function initCorp(host: CorpHost): {
     if (nav) {
       const what = nav.dataset.corphub;
       if (what === 'levels') openSheet({ kind: 'levels' }, 'data-corphub', 'levels');
+      else if (what === 'emblem') openSheet({ kind: 'emblem' }, 'data-corphub', 'emblem');
       else if (what === 'style') openSheet({ kind: 'style' }, 'data-corphub', 'style');
       else if (what === 'member') {
         const id = nav.dataset.corparg ?? '';
@@ -1258,12 +1279,6 @@ export function initCorp(host: CorpHost): {
 
   host.hub.root().addEventListener('click', onHubClick);
   host.hub.sheet().addEventListener('click', onHubClick);
-  // Enter в поле названия — то же, что кнопка «Создать корпорацию».
-  host.hub.root().addEventListener('keydown', (e) => {
-    if ((e as KeyboardEvent).key !== 'Enter' || (e.target as HTMLElement | null)?.id !== 'corp-hub-name') return;
-    const create = host.hub.root().querySelector<HTMLElement>('[data-corpinput="corp-hub-name"]');
-    if (create) runAct(create);
-  });
 
   return {
     open: openCorp,

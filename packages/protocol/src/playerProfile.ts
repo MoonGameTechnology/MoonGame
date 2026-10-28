@@ -49,7 +49,24 @@ export interface BotProfileMatch {
   xp: number;
   place: number | null;
 }
+/** Server-confirmed career only. Missing statistics mean not recorded, never zero. */
+export interface PlayerCareer {
+  matches: number;
+  wins: number;
+  since: number;
+  pvp: {
+    destroyed: number;
+    lost: number;
+    destroyedCost: Record<string, number>;
+    lostCost: Record<string, number>;
+  };
+  modes: Record<string, { matches: number; wins: number }>;
+}
 export interface PlayerProfile extends ProfileAppearance {
+  career?: PlayerCareer | null;
+  statistics?: { matches: number; wins: number };
+  corporation?: { id: string; name: string } | null;
+
   login: string;
   xp: number;
   progress: ProfileProgress;

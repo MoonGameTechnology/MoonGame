@@ -1,3 +1,4 @@
+import { parseCareer } from './playerCareer';
 import {
   BOT_PROFILE_HISTORY_LIMIT,
   PROFILE_MEDALS,
@@ -57,7 +58,7 @@ export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
     typeof v.login !== 'string' ||
     v.login.length > 64 ||
     typeof v.xp !== 'number' ||
-    !Number.isFinite(v.xp) ||
+    !Number.isSafeInteger(v.xp) ||
     v.xp < 0 ||
     (v.kind !== undefined && v.kind !== 'bot') ||
     (v.kind === 'bot' && !Number.isSafeInteger(v.xp))
@@ -74,6 +75,35 @@ export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
     )
       return null;
     if (typeof value === 'number') progress[metric] = value;
+  }
+  const career = v.career == null ? v.career : parseCareer(v.career);
+  if (v.career != null && !career) return null;
+  let statistics: PlayerProfile['statistics'];
+  if (v.statistics !== undefined) {
+    const st = v.statistics as { matches?: unknown; wins?: unknown } | null;
+    if (
+      !st ||
+      !Number.isSafeInteger(st.matches) ||
+      !Number.isSafeInteger(st.wins) ||
+      Number(st.wins) < 0 ||
+      Number(st.matches) < Number(st.wins)
+    )
+      return null;
+    statistics = { matches: Number(st.matches), wins: Number(st.wins) };
+  }
+  let corporation: PlayerProfile['corporation'];
+  if (v.corporation === null) corporation = null;
+  else if (v.corporation !== undefined) {
+    const c = v.corporation as { id?: unknown; name?: unknown } | null;
+    if (
+      !c ||
+      !historyId(c.id) ||
+      typeof c.name !== 'string' ||
+      !c.name.trim() ||
+      c.name.length > 128
+    )
+      return null;
+    corporation = { id: c.id, name: c.name };
   }
   let recentMatches: BotProfileMatch[] | undefined;
   if (v.recentMatches !== undefined) {
@@ -92,6 +122,9 @@ export function parsePlayerProfile(raw: unknown): PlayerProfile | null {
   }
   return {
     ...appearance,
+    ...(career !== undefined ? { career } : {}),
+    ...(statistics !== undefined ? { statistics } : {}),
+    ...(corporation !== undefined ? { corporation } : {}),
     login: v.login,
     xp: v.xp,
     progress,

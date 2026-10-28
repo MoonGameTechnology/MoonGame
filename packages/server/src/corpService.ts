@@ -1,4 +1,6 @@
-import { blockedPublicName, type CorpBuildOrder, type CorpInfrastructureResult } from '@void/protocol';
+import { CORP_EMBLEMS, isCorpEmblemId, blockedPublicName, type CorpBuildOrder, type CorpInfrastructureResult } from '@void/protocol';
+import { randomInt } from 'node:crypto';
+import { CORP_NAME_COUNT, generatedCorpName } from './corpNames';
 import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } from './store';
 
 /**
@@ -22,6 +24,7 @@ import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } fro
 
 export type CorpErrorCode =
   | 'E_BAD_NAME'
+  | 'E_BAD_EMBLEM'
   | 'E_BAD_ROLE'
   | 'E_BAD_TARGET'
   | 'E_NO_CORP'
@@ -48,15 +51,19 @@ export interface CorpServiceDeps {
   store: CorpStore;
   /** Injectable clock for the audit trail (deterministic tests). */
   now?: () => number;
+  /** Uniform starting point in the curated name catalogue; injectable for collision tests. */
+  nameIndex?: () => number;
 }
 
 export class CorpService {
   private readonly store: CorpStore;
   private readonly now: () => number;
+  private readonly nameIndex: () => number;
 
   constructor(deps: CorpServiceDeps) {
     this.store = deps.store;
     this.now = deps.now ?? ((): number => Date.now());
+    this.nameIndex = deps.nameIndex ?? (() => randomInt(CORP_NAME_COUNT));
   }
 
   infrastructure(who: CorpActor, corpId: string, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
@@ -64,14 +71,31 @@ export class CorpService {
   }
 
   /** createCorp — the founder becomes the head. */
-  async create(who: CorpActor, name: string): Promise<{ ok: true; corpId: string } | CorpFail> {
-    if (typeof name !== 'string' || name.length > 128) return { ok: false, code: 'E_BAD_NAME' };
-    const trimmed = name.trim();
-    if (!NAME_RE.test(trimmed) || blockedPublicName(trimmed)) return { ok: false, code: 'E_BAD_NAME' };
-    const created = await this.store.createCorp(trimmed, who.accountId, who.login, this.now());
-    if (!created.ok) return created;
-    await this.audit(created.corpId, who, 'create', undefined, trimmed);
-    return created;
+  async create(who: CorpActor, legacyName?: string, emblemId?: unknown): Promise<{ ok: true; corpId: string } | CorpFail> {
+    // Old APKs still send a name. Validate the old envelope but NEVER store its text.
+    if (legacyName !== undefined && (typeof legacyName !== 'string' || legacyName.length > 128 ||
+        !NAME_RE.test(legacyName.trim()) || blockedPublicName(legacyName)))
+      return { ok: false, code: 'E_BAD_NAME' };
+    if (emblemId !== undefined && !isCorpEmblemId(emblemId)) return { ok: false, code: 'E_BAD_EMBLEM' };
+    const emblem = emblemId ?? CORP_EMBLEMS[randomInt(CORP_EMBLEMS.length)]!;
+    const start = this.nameIndex();
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const name = generatedCorpName((start + attempt) % CORP_NAME_COUNT);
+      const created = await this.store.createCorp(name, who.accountId, who.login, this.now(), emblem);
+      if (!created.ok) {
+        if (created.code === 'E_NAME_TAKEN') continue;
+        return created;
+      }
+      await this.audit(created.corpId, who, 'create', undefined, name);
+      return created;
+    }
+    return { ok: false, code: 'E_NAME_TAKEN' };
+  }
+
+  /** The store commits the head check, emblem and audit together. */
+  async setEmblem(who: CorpActor, corpId: string, emblemId: unknown): Promise<{ ok: true } | CorpFail> {
+    if (!isCorpEmblemId(emblemId)) return { ok: false, code: 'E_BAD_EMBLEM' };
+    return this.store.setEmblem(corpId, who.accountId, emblemId, this.now());
   }
 
   /** applyToCorp — creates the recruit row (the pending application). */

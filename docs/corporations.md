@@ -91,7 +91,7 @@
 ## 5. Интенты (клиент → сервер)
 
 ```
-createCorp(name, …)                                (игрок: уровень ≥ порога → создатель = Глава)
+createCorp(emblemId?, …)                           (сервер выбирает имя из белого списка → создатель = Глава)
 applyToCorp(corpId) / cancelApplication            (игрок)
 acceptApplicant(playerId) / declineApplicant(...)  (глава/офицер)
 kickMember(playerId)                               (глава: любой; офицер: рядовой/рекрут)

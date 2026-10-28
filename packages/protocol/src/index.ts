@@ -1,6 +1,7 @@
 export * from './ava';
 export * from './corpInfrastructure';
 export * from './corpStyle';
+export * from './corpIdentity';
 export * from './news';
 export type * from './metaEconomy';
 export type * from './metaEconomyView';

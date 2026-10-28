@@ -26,6 +26,11 @@ describe('corp cabinet — fail-secure parsing (AVA-C1/C2)', () => {
     expect(parseCorpRecord(null)).toBeNull();
     expect(parseCorpRecord({ corpId: 'c1' })).toBeNull();
     expect(parseCorpRecord({ corpId: 'c1', name: 'x', influence: 'not-a-number' })).toBeNull();
+    expect(parseCorpRecord({ corpId: 'c1', name: 'Vanguard', influence: 0, emblemId: 'phoenix' }))
+      .toMatchObject({ emblemId: 'phoenix' });
+    for (const emblemId of ['<svg>', 'https://evil.test/a.svg', '__proto__'])
+      expect(parseCorpRecord({ corpId: 'c1', name: 'Vanguard', influence: 0, emblemId }))
+        .not.toHaveProperty('emblemId');
   });
 
   it('parseCorpSummaries drops malformed rows instead of throwing', () => {

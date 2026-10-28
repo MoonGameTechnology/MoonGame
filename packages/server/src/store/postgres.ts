@@ -1,4 +1,5 @@
 import { reservedBotLogin } from '../botNicknames';
+import { isCorpEmblemId, type CorpEmblemId } from '@void/protocol';
 import type {
   CorpBuildOrder,
   CorpInfrastructureResult,
@@ -84,6 +85,9 @@ const SCHEMA_SQL = `
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS clock jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS career jsonb;
+    CREATE TABLE IF NOT EXISTS profile_career (account_id text PRIMARY KEY, career jsonb NOT NULL);
+    CREATE TABLE IF NOT EXISTS profile_career_credits (match_id text NOT NULL, account_id text NOT NULL, PRIMARY KEY(match_id,account_id));
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
 
     CREATE TABLE IF NOT EXISTS seats (
@@ -172,6 +176,7 @@ const SCHEMA_SQL = `
     -- ALTER … IF NOT EXISTS backfills pre-AVA-2 corps rows with the 0 default.
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS influence bigint NOT NULL DEFAULT 0;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS infrastructure jsonb;
+    ALTER TABLE corps ADD COLUMN IF NOT EXISTS emblem_id text;
 
     -- account_id as the PRIMARY KEY is the one-corp-per-account invariant: a member
     -- (recruit rows included — a recruit row IS the pending application) can't join
@@ -606,6 +611,7 @@ interface MatchRow {
   clock: MatchSnapshot['clock'] | null;
   economy_observations: MatchSnapshot['economyObservations'] | null;
   economy_activity: MatchSnapshot['economyActivity'] | null;
+  career: MatchSnapshot['career'] | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
@@ -634,7 +640,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -644,6 +650,7 @@ export class PostgresMatchStore implements MatchStore {
       dataVersion: row.data_version,
       seq: row.seq,
       status: row.status === 'ended' ? 'ended' : 'ongoing',
+      ...(row.career ? { career: row.career } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
       ...(row.economy_observations ? { economyObservations: row.economy_observations } : {}),
@@ -655,7 +662,11 @@ export class PostgresMatchStore implements MatchStore {
     await this.saveUsing(this.pool, snapshot);
   }
 
-  async saveWithReceipt(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void> {
+  async saveWithReceipt(
+    snapshot: MatchSnapshot,
+    receipt: StoredReceipt,
+    receipts: ReceiptStore,
+  ): Promise<void> {
     if (!(receipts instanceof PostgresReceiptStore) || !receipts.sharesPool(this.pool))
       throw new Error('E_MATCH_COMMIT_BACKEND');
     const client = await this.pool.connect();
@@ -677,14 +688,15 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
          status       = EXCLUDED.status,
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
+         career       = EXCLUDED.career,
          economy_observations = CASE
            WHEN matches.economy_observations IS NULL AND EXCLUDED.economy_observations IS NULL THEN NULL
            ELSE COALESCE(EXCLUDED.economy_observations, '{}'::jsonb) || COALESCE(matches.economy_observations, '{}'::jsonb)
@@ -731,6 +743,7 @@ export class PostgresMatchStore implements MatchStore {
             )
           : null,
         MAX_META_ACTIVITY_FACTS_PER_ROLE,
+        snapshot.career ? JSON.stringify(snapshot.career) : null,
       ],
     );
     return result.rowCount === 1;
@@ -1183,6 +1196,7 @@ export class PostgresCorpStore implements CorpStore {
     headAccountId: string,
     headLogin: string,
     at: number = Date.now(),
+    emblemId?: CorpEmblemId,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
     // One transaction, two atomic claims: the corp_members PK is the one-corp-per-
     // account claim, the lower(name) unique index is the name claim. ON CONFLICT
@@ -1202,8 +1216,10 @@ export class PostgresCorpStore implements CorpStore {
         return { ok: false, code: 'E_IN_CORP' };
       }
       try {
-        await client.query(`INSERT INTO corps (id, name) VALUES ($1, $2)`, [corpId, name]);
-      } catch {
+        await client.query(`INSERT INTO corps (id, name, emblem_id) VALUES ($1, $2, $3)`, [corpId, name, emblemId ?? null]);
+      } catch (error) {
+        const conflict = error as { code?: unknown; constraint?: unknown };
+        if (conflict.code !== '23505' || conflict.constraint !== 'corps_name_idx') throw error;
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_NAME_TAKEN' };
       }
@@ -1220,12 +1236,37 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async getCorp(corpId: string): Promise<CorpRecord | null> {
-    const r = await this.pool.query<{ id: string; name: string; influence: string }>(
-      `SELECT id, name, influence FROM corps WHERE id = $1`,
+    const r = await this.pool.query<{ id: string; name: string; influence: string; emblem_id: string | null }>(
+      `SELECT id, name, influence, emblem_id FROM corps WHERE id = $1`,
       [corpId],
     );
     const row = r.rows[0];
-    return row ? { corpId: row.id, name: row.name, influence: Number(row.influence) } : null;
+    return row ? { corpId: row.id, name: row.name, influence: Number(row.influence),
+      ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}) } : null;
+  }
+
+  async setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const allowed = await client.query<{ emblem_id: string | null }>(
+        `SELECT c.emblem_id FROM corps c JOIN corp_members m ON m.corp_id=c.id
+         WHERE c.id=$1 AND m.account_id=$2 AND m.role='head' FOR UPDATE OF c,m`, [corpId, actor]);
+      if (!allowed.rows[0]) {
+        await client.query('ROLLBACK');
+        return { ok: false, code: 'E_FORBIDDEN' };
+      }
+      if (allowed.rows[0].emblem_id !== emblemId) {
+        await client.query('UPDATE corps SET emblem_id=$2 WHERE id=$1', [corpId, emblemId]);
+        await client.query(`INSERT INTO corp_audit (corp_id,at,actor,action,detail) VALUES ($1,$2,$3,'emblem',$4)`,
+          [corpId, at, actor, emblemId]);
+      }
+      await client.query('COMMIT');
+      return { ok: true };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   async listCorps(): Promise<CorpSummary[]> {
@@ -1234,8 +1275,9 @@ export class PostgresCorpStore implements CorpStore {
       name: string;
       influence: string;
       members: string;
+      emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence,
+      `SELECT c.id, c.name, c.influence, c.emblem_id,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corps c
        LEFT JOIN corp_members m ON m.corp_id = c.id
@@ -1247,6 +1289,7 @@ export class PostgresCorpStore implements CorpStore {
       name: row.name,
       influence: Number(row.influence),
       members: Number(row.members),
+      ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
   }
 
@@ -1401,8 +1444,9 @@ export class PostgresCorpStore implements CorpStore {
       members: string;
       since: string;
       formats: number[];
+      emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence, r.since, r.formats,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, r.since, r.formats,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corp_ready r
        JOIN corps c ON c.id = r.corp_id
@@ -1417,6 +1461,7 @@ export class PostgresCorpStore implements CorpStore {
       members: Number(row.members),
       readySince: Number(row.since),
       formats: row.formats.map(Number),
+      ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
   }
 
@@ -1503,7 +1548,9 @@ interface ReceiptRow {
 export class PostgresReceiptStore implements ReceiptStore {
   constructor(private readonly pool: Pool) {}
 
-  sharesPool(pool: Pool): boolean { return this.pool === pool; }
+  sharesPool(pool: Pool): boolean {
+    return this.pool === pool;
+  }
 
   async loadAll(matchId: string): Promise<StoredReceipt[]> {
     const r = await this.pool.query<ReceiptRow>(
@@ -1524,7 +1571,11 @@ export class PostgresReceiptStore implements ReceiptStore {
   }
 
   /** Used by the paired match adapter with its transaction client. */
-  async saveUsing(query: Pick<Pool, 'query'>, matchId: string, receipt: StoredReceipt): Promise<void> {
+  async saveUsing(
+    query: Pick<Pool, 'query'>,
+    matchId: string,
+    receipt: StoredReceipt,
+  ): Promise<void> {
     // Receipts are immutable — first write wins; a re-save of the same action is a no-op.
     await query.query(
       `INSERT INTO receipts (match_id, action_id, player_id, seq, ok, code)
@@ -2018,17 +2069,37 @@ function feedEntryOf(row: FeedRow): FeedEntry | null {
         ...(row.kind === 'result' ? { winnerCorp: row.winner_corp } : {}),
       };
     case 'founded':
-      return { id: row.id, at, kind: 'founded', corpId: row.challenger_corp, corpName: row.challenger_name };
+      return {
+        id: row.id,
+        at,
+        kind: 'founded',
+        corpId: row.challenger_corp,
+        corpName: row.challenger_name,
+      };
     case 'level': {
       const level = row.detail?.level;
       return typeof level === 'number' && Number.isSafeInteger(level)
-        ? { id: row.id, at, kind: 'level', corpId: row.challenger_corp, corpName: row.challenger_name, level }
+        ? {
+            id: row.id,
+            at,
+            kind: 'level',
+            corpId: row.challenger_corp,
+            corpName: row.challenger_name,
+            level,
+          }
         : null;
     }
     case 'medal': {
       const medalId = row.detail?.medalId;
       return typeof medalId === 'string'
-        ? { id: row.id, at, kind: 'medal', corpId: row.challenger_corp, corpName: row.challenger_name, medalId }
+        ? {
+            id: row.id,
+            at,
+            kind: 'medal',
+            corpId: row.challenger_corp,
+            corpName: row.challenger_name,
+            medalId,
+          }
         : null;
     }
     default:
@@ -2394,7 +2465,12 @@ export class PostgresArsenalStore implements ArsenalStore {
 }
 
 export class PostgresCorpRentStore implements CorpRentStore {
-  async completeReturn(matchupId: string, itemId: string, at: number, wear: number): Promise<boolean> {
+  async completeReturn(
+    matchupId: string,
+    itemId: string,
+    at: number,
+    wear: number,
+  ): Promise<boolean> {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
