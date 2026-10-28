@@ -484,6 +484,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
   Материалы, Стили; покупка за ◆, пакеты ◆ ждут провайдера оплаты. Стиль базы корпорации
   и фон базы покупает и применяет глава (`decisions/corpStyle.ts`, CORP-14, CORP-15).
+  Фоны — четыре WebP-окружения 1800×810 в `prototype/art/corp/backdrops`, одинаковые
+  в панораме и превью; здания и площадки остаются отдельными слоями.
   «Корпорация» (`corpHubView.ts`, решения — `decisions/corpHub.ts`, `corpBase.ts`,
   `corpMembers.ts`, `corpTreasury.ts`): База (картинки уровней зданий в стиле базы
   `corpSprites.ts` и `corpArt.ts`, лист здания и стиль базы шторкой), Битвы, Состав, Казна;
