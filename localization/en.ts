@@ -4856,7 +4856,7 @@ export const en: Record<string, string> = {
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).
   'upd.apk-only': 'updates are only available in the APK',
-  'upd.available': 'A new build is available',
+  'upd.available': 'An update is available',
   'upd.bad-version': "✗ got a response, but couldn't parse the version",
   'upd.build': 'build {b}',
   'upd.checking': 'check: {msg}',
