@@ -45,7 +45,9 @@ export function mountAccountDeletion(base: () => string | null, accepted: () => 
   button?.addEventListener('click', () => {
     if (button.hidden || !allowed()) return;
     const server = base();
-    if (!server || !sessionToken(server)) return;
+    const token = server ? sessionToken(server) : null;
+    if (!server || !token) return;
+    const current = (): boolean => server === base() && sessionToken(server) === token && allowed();
     const dialog = document.createElement('dialog');
     dialog.style.cssText =
       'max-width:32rem;width:90%;padding:1.5rem;color:inherit;background:var(--panel,#17202b);border:1px solid currentColor';
@@ -101,6 +103,13 @@ export function mountAccountDeletion(base: () => string | null, accepted: () => 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (busy || !check.checked || !password.value) return;
+      // Confirmation is for the account/server that opened this dialog. A login
+      // from another tab must never turn it into confirmation for another account.
+      if (!current()) {
+        dialog.close();
+        await refresh();
+        return;
+      }
       busy = true;
       submit.disabled = true;
       cancel.disabled = true;
@@ -112,6 +121,13 @@ export function mountAccountDeletion(base: () => string | null, accepted: () => 
       busy = false;
       submit.disabled = false;
       cancel.disabled = false;
+      const sameTarget = server === base() && allowed() &&
+        (result === 'pending' ? sessionToken(server) === null : sessionToken(server) === token);
+      if (result === 'superseded' || !sameTarget) {
+        dialog.close();
+        await refresh();
+        return;
+      }
       if (result === 'pending') {
         dialog.close();
         accepted();

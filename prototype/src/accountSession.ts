@@ -164,8 +164,8 @@ export async function resumeSession(base: string, login: string): Promise<Resume
   return outcome.kind;
 }
 
-/** Acknowledged server logout; failures leave the session available for a retry. */
-export async function signOutEverywhere(base: string): Promise<boolean> {
+/** Acknowledged server logout; null means a newer session superseded this request. */
+export async function signOutEverywhere(base: string): Promise<boolean | null> {
   const token = sessionToken(base);
   if (token) {
     try {
@@ -173,8 +173,9 @@ export async function signOutEverywhere(base: string): Promise<boolean> {
         method: 'POST', headers: { authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(10_000),
       });
+      if (sessionToken(base) !== token) return null;
       if (response.status !== 204 && response.status !== 401) return false;
-    } catch { return false; }
+    } catch { return sessionToken(base) === token ? false : null; }
   }
   clearSession(localStorage, base);
   notifySessionChanged();
@@ -296,6 +297,9 @@ export async function fetchJoinToken(
   faction?: string,
   scientists?: readonly string[],
 ): Promise<{ token: string; playerId: string } | null> {
+  const startingToken = sessionToken(base);
+  if (startingToken !== null && startingToken !== session) return null;
+  const current = (): boolean => sessionToken(base) === startingToken;
   try {
     // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
     // seat's default faction (BF-30: faction decoupled from start point).
@@ -308,15 +312,20 @@ export async function fetchJoinToken(
         headers: { authorization: `Bearer ${session}` },
       },
     );
+    if (!current()) return null;
     const outcome = joinOutcome(res.status);
     if (outcome !== 'ok') {
-      if (dropsSession(outcome)) clearSession(localStorage, base);
+      if (dropsSession(outcome)) {
+        clearSession(localStorage, base);
+        notifySessionChanged();
+      }
       game.status(t(JOIN_REASON[outcome]));
       return null;
     }
-    return parseJoinPass(await res.json().catch(() => null));
+    const body = await res.json().catch(() => null);
+    return current() ? parseJoinPass(body) : null;
   } catch {
-    game.status(t('acc.server-down'));
+    if (current()) game.status(t('acc.server-down'));
     return null;
   }
 }
@@ -376,27 +385,32 @@ export function askSignIn(
 }
 
 /** A 202 means queued, never that all backups have already been erased. */
-export async function requestAccountDeletion(base: string, password: string): Promise<'pending' | 'failed' | 'password' | 'unavailable'> {
+export async function requestAccountDeletion(base: string, password: string): Promise<'pending' | 'failed' | 'password' | 'unavailable' | 'superseded'> {
   const token = sessionToken(base);
   if (!token || !validLoginPassword(password)) return 'password';
   try {
     const key = `vd.deletion.${httpBase(base)}`;
     const session = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))), n => n.toString(16).padStart(2, '0')).join('');
-    const old = JSON.parse(localStorage.getItem(key) ?? 'null') as { session?: string; requestId?: string } | null;
-    const requestId = old?.session === session && typeof old.requestId === 'string' ? old.requestId : crypto.randomUUID();
+    if (sessionToken(base) !== token) return 'superseded';
+    let old: { session?: unknown; requestId?: unknown } | null = null;
+    try { old = JSON.parse(localStorage.getItem(key) ?? 'null'); } catch { /* A damaged retry record is not a deletion gate. */ }
+    const requestId = old?.session === session && typeof old.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(old.requestId) ? old.requestId : crypto.randomUUID();
     localStorage.setItem(key, JSON.stringify({ session, requestId }));
     const response = await fetch(`${httpBase(base)}/auth/delete-account`, {
       method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ password, confirm: 'DELETE', requestId }), signal: AbortSignal.timeout(15_000),
     });
+    if (sessionToken(base) !== token) return 'superseded';
     if (response.status === 401) return 'password';
     if (response.status === 503) return 'unavailable';
     if (response.status !== 202) return 'failed';
     const body = await response.json() as { status?: unknown; requestId?: unknown };
+    if (sessionToken(base) !== token) return 'superseded';
     if (body.status !== 'pending' || body.requestId !== requestId) return 'failed';
     clearSession(localStorage, base);
     localStorage.removeItem(key);
     pendingJoinToken = null;
+    notifySessionChanged();
     return 'pending';
-  } catch { return 'failed'; }
+  } catch { return sessionToken(base) === token ? 'failed' : 'superseded'; }
 }
