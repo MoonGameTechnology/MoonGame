@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import { defaultAppearance, medalGrade } from '@void/protocol';
 import { registerProfileApi, type ProfileApiDeps } from './profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
-import { MemoryCommanderStore, MemoryUserStore, migrate } from './store';
+import { MemoryCommanderStore, MemoryUserStore, MemoryCorpStore, migrate } from './store';
 import { creditProfileMatch } from './profileCredit';
 import { createInitialState } from '@void/shared-core';
 
@@ -54,7 +54,10 @@ describe.skipIf(!process.env.DATABASE_URL)('durable profile store', () => {
   );
 });
 
-async function fixture(option?: ProfileApiDeps['bots'] | ProfileApiDeps['premium']) {
+async function fixture(
+  option?: ProfileApiDeps['bots'] | ProfileApiDeps['premium'],
+  corporations?: ProfileApiDeps['corporations'],
+) {
   const premium = typeof option === 'function' ? option : undefined;
   const bots = typeof option === 'object' ? option : undefined;
   const app = Fastify();
@@ -66,6 +69,7 @@ async function fixture(option?: ProfileApiDeps['bots'] | ProfileApiDeps['premium
   if (!alice.ok || !bob.ok) throw new Error('fixture');
   registerProfileApi(app, {
     profiles,
+    corporations,
     users,
     commanders,
     ...(premium ? { premium } : {}),
@@ -97,7 +101,9 @@ describe('persistent bot public profiles', () => {
   };
   function roster() {
     return {
-      findByLogin: vi.fn(async (login: string) => (login.toLowerCase() === 'babkavtspkax' ? bot : null)),
+      findByLogin: vi.fn(async (login: string) =>
+        login.toLowerCase() === 'babkavtspkax' ? bot : null,
+      ),
       recentMatches: vi.fn(async () => [result]),
     };
   }
@@ -141,13 +147,20 @@ describe('persistent bot public profiles', () => {
         Array.from({ length: 11 }, (_, i) => ({ ...result, matchId: `m-${i}` })),
       );
       const bounded = (
-        await app.inject({ url: '/profiles?login=babkavtspkax', headers: { authorization: 'Alice' } })
+        await app.inject({
+          url: '/profiles?login=babkavtspkax',
+          headers: { authorization: 'Alice' },
+        })
       ).json();
       expect(bounded.recentMatches).toHaveLength(10);
       expect((await app.inject({ url: '/profiles?login=babkavtspkax' })).statusCode).toBe(401);
       expect(
-        (await app.inject({ url: '/profiles?login=missing-natural-handle', headers: { authorization: 'Alice' } }))
-          .statusCode,
+        (
+          await app.inject({
+            url: '/profiles?login=missing-natural-handle',
+            headers: { authorization: 'Alice' },
+          })
+        ).statusCode,
       ).toBe(404);
     } finally {
       await app.close();
@@ -161,7 +174,10 @@ describe('persistent bot public profiles', () => {
     const { app, profiles, alice } = await fixture(bots);
     try {
       const fresh = (
-        await app.inject({ url: '/profiles?login=babkavtspkax', headers: { authorization: 'Alice' } })
+        await app.inject({
+          url: '/profiles?login=babkavtspkax',
+          headers: { authorization: 'Alice' },
+        })
       ).json();
       expect(fresh.progress).toEqual({});
       expect(fresh.slots).toEqual(defaultAppearance().slots);
@@ -283,7 +299,9 @@ describe('profile API authority and public projection', () => {
       expect(saved.json().progress).toEqual({ wins: 1, matches: 1 });
       expect(seen.body).not.toMatch(/private|email|passHash|accountId|sovereigns/);
       expect(await profiles.appearance(bob)).toEqual(defaultAppearance());
-      await profiles.credit('promotion', [{ accountId: alice, progress: { wins: 13, explored: 999 } }]);
+      await profiles.credit('promotion', [
+        { accountId: alice, progress: { wins: 13, explored: 999 } },
+      ]);
       const updated = (
         await app.inject({
           method: 'GET',
@@ -385,7 +403,12 @@ describe('tutorial medal claim', () => {
       const look = defaultAppearance();
       look.slots[0] = 'tutorial';
       const wear = (authorization: string) =>
-        app.inject({ method: 'POST', url: '/profiles/me', headers: { authorization }, payload: look });
+        app.inject({
+          method: 'POST',
+          url: '/profiles/me',
+          headers: { authorization },
+          payload: look,
+        });
       expect((await wear('Bob')).statusCode).toBe(403);
       expect((await wear('Alice')).statusCode).toBe(200);
       expect((await profiles.appearance(alice)).slots[0]).toBe('tutorial');
@@ -393,4 +416,52 @@ describe('tutorial medal claim', () => {
       await app.close();
     }
   });
+});
+
+it('public career exposes exact match counters and live accepted corporation membership only', async () => {
+  const corporations = new MemoryCorpStore();
+  const { app, profiles, alice } = await fixture(undefined, corporations);
+  try {
+    await profiles.credit('public-career', [
+      { accountId: alice, progress: { matches: 7, wins: 3, explored: 999 } },
+    ]);
+    const created = await corporations.createCorp('Live Corp', alice, 'Alice');
+    if (!created.ok) throw Error('fixture');
+    const read = () =>
+      app.inject({ url: '/profiles?login=Alice', headers: { authorization: 'Bob' } });
+    const response = await read();
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.json()).toMatchObject({
+      statistics: { matches: 7, wins: 3 },
+      career: null,
+      corporation: { id: created.corpId, name: 'Live Corp' },
+      progress: {},
+    });
+    expect(response.body).not.toMatch(/999|accountId|private@example/);
+    await corporations.setRole(created.corpId, alice, 'recruit');
+    expect((await read()).json().corporation).toBeNull();
+    await corporations.removeCorp(created.corpId);
+    expect((await read()).json().corporation).toBeNull();
+  } finally {
+    await app.close();
+  }
+});
+it('corporation service failure leaves the profile readable with membership unknown', async () => {
+  const { app } = await fixture(undefined, {
+    membershipOf: async () => {
+      throw Error('private');
+    },
+    getCorp: async () => null,
+  });
+  try {
+    const response = await app.inject({
+      url: '/profiles?login=Alice',
+      headers: { authorization: 'Bob' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().corporation).toBeUndefined();
+    expect(response.body).not.toContain('private');
+  } finally {
+    await app.close();
+  }
 });

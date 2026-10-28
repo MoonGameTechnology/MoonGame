@@ -25,6 +25,7 @@ export interface EconomyObservation {
 }
 
 export interface MatchSnapshot {
+  career?: import('../playerCareer').CareerLedger;
   matchId: string;
   dataVersion: string;
   seq: number;
@@ -49,7 +50,11 @@ export interface MatchStore {
   save(snapshot: MatchSnapshot): Promise<void>;
   /** Atomically commit a command's state and receipt. Both adapters must belong to
    * the same backend; unsupported custom stores fail closed at the host boundary. */
-  saveWithReceipt?(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void>;
+  saveWithReceipt?(
+    snapshot: MatchSnapshot,
+    receipt: StoredReceipt,
+    receipts: ReceiptStore,
+  ): Promise<void>;
   /** Ids of every match still `ongoing` (not ended). Cheap — reads the normalized
    *  `status` column (never the JSONB blob), so the match factory and the open-matches
    *  feed can enumerate joinable matches without loading each snapshot. Restart-safe:

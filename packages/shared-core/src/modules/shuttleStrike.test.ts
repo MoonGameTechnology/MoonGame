@@ -305,6 +305,16 @@ describe('перехват — свои челноки поднимаются н
     expect(after.strikes ?? []).toHaveLength(0);
   });
 
+  it('interception emits private career casualties without changing the expedition tally', () => {
+    const state = apply(defended({ attackers: 3 }), strike({ targetPlanetId: 'B' }));
+    const result = kernel.advanceTo(state, { now: state.time + 2 * 3_600_000, data });
+    if (!result.ok) throw new Error(result.code);
+    const casualties = result.events.filter(event => event.type === 'career.casualty');
+    expect(casualties.length).toBeGreaterThan(0);
+    expect(casualties[0]!.payload).toMatchObject({ owner: 'p1', killedBy: 'p2', count: 2, lossCost: {} });
+    expect(result.events.filter(event => event.type === 'unit.died' && (event.payload as { owner?: string }).owner === 'p1')).toEqual([]);
+  });
+
   it('перехват тратит топливо базы — бесконечно поднимать нельзя', () => {
     // Смотрим состояние СРАЗУ после перехвата: дальше вступает перезарядка (час мира =
     // раунд), и через пару часов бак снова полон — это другой механизм, SHU-1.2.

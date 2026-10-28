@@ -51,6 +51,8 @@ export interface MetaRewardDeliveryDeps {
   seats(matchId: string): SeatAccounts;
   settle(facts: MatchRewardFacts): Promise<{ ok: boolean; code?: string }>;
   stageCount: number;
+  /** Independent idempotent career projection, retried by the same bounded sweep. */
+  career?(snapshot: MatchSnapshot): Promise<void>;
   participation?: Participation;
   /** Season XP for one UTC day of the account's own orders (idempotent per account+day). */
   activeDay?(accountId: string, day: number): Promise<{ ok: boolean; code?: string }>;
@@ -89,6 +91,9 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
     // Sector Zero runs are client-local and never delivered by either host.
     // This additional guard also keeps imported run snapshots out of main economy.
     if (state.modeId === 'sector-zero' || state.modeId === 'sector_zero') return;
+    if (state.match.status === 'ended' && snapshot.career && deps.career) {
+      try { await deps.career(snapshot); } catch (error) { deps.onError(error); }
+    }
     const seats = await deps.seats(matchId)();
     for (const [player, accountId] of Object.entries(seats)) {
       const seat = state.players[player];

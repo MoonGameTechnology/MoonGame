@@ -1,5 +1,13 @@
+import { captureCasualtyCost } from './casualtyCost';
 import type { HandlerContext } from '../kernel/module';
-import type { CombatantRef, Fleet, GameState, PlanetId, PlayerId, UnitStack } from '../state/gameState';
+import type {
+  CombatantRef,
+  Fleet,
+  GameState,
+  PlanetId,
+  PlayerId,
+  UnitStack,
+} from '../state/gameState';
 import type { GameData, UnitDef } from '../data/schemas';
 import { cappedUnitBreakdown, type StackContribution } from './stacks';
 import { TARGET_CLASSES, targetClassOf, type ClassPools } from './groundTargets';
@@ -207,7 +215,8 @@ export function creditVolley(
     if (row.damage <= 0) continue;
     const stack = units[row.index];
     if (!stack || stack.count <= 0) continue;
-    stack.damageDealt = (stack.damageDealt ?? 0) + (row.damage / shot.total) * dealt / stack.count;
+    stack.damageDealt =
+      (stack.damageDealt ?? 0) + ((row.damage / shot.total) * dealt) / stack.count;
   }
 }
 
@@ -215,7 +224,11 @@ export function creditVolley(
  *  (`FactionDef.veterans: false` — Рой). Игрок без фракции или с неизвестной — растут,
  *  как и было до флага. Проверяют ВСЕ места начисления заслуги, иначе у запрещённой
  *  фракции копилась бы одна из двух линий медалей. */
-export function earnsMerit(state: GameState, owner: string | null | undefined, data: Pick<GameData, 'factions'>): boolean {
+export function earnsMerit(
+  state: GameState,
+  owner: string | null | undefined,
+  data: Pick<GameData, 'factions'>,
+): boolean {
   const faction = owner ? state.players[owner]?.faction : undefined;
   return faction === undefined || data.factions[faction]?.veterans !== false;
 }
@@ -524,15 +537,17 @@ export function applyDamage(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
-  source: Record<string, string>,
+  source: Record<string, unknown>,
 ): UnitStack[] {
+  const value = captureCasualtyCost(h.state, units, data);
   const { survivors, deaths } = damageUnits(units, totalDamage, data);
+  const costs = value();
   for (const d of deaths) {
     // A missile (SM-3.7b) does not die as a unit: shot down by shuttles it leaves spent,
     // exactly like a point-defense kill — otherwise the expedition tally, loot drops and
     // hero XP would score an interception as a kill.
     if (unitHasTrait(data, d.unit, MISSILE_TRAIT)) continue;
-    h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
+    h.emit('unit.died', { unit: d.unit, count: d.count, ...source, lossCost: costs[d.unit] ?? {} });
   }
   return survivors;
 }
@@ -698,6 +713,7 @@ export function applyDamageToSide(
   /** Урон поровну на каждого юнита стороны, с весом его рода войск ({@link damageEvenly}):
    *  так огонь сверху бьёт гарнизон (ROS-1.6a/b). Не передан — линиями, как в бою. */
   evenly?: ClassPools,
+  damageShares?: Record<string, number>,
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -705,10 +721,11 @@ export function applyDamageToSide(
   }
   // Плацдарм адресуется миром, как и гарнизон: флота у него нет (ROS-1.5).
   const onPlanet = ref.kind === 'garrison' || ref.kind === 'beachhead';
-  const source: Record<string, string> = onPlanet
+  const source: Record<string, unknown> = onPlanet
     ? { at: location, planetId: ref.planetId }
     : { at: location, fleetId: ref.fleetId };
   if (battleId !== undefined) source.battleId = battleId;
+  if (damageShares) source.damageShares = damageShares;
   if (killedBy != null) source.killedBy = killedBy;
   // Tag the casualty's owner NOW: a wiped fleet is deleted before the `unit.died`
   // event drains, so listeners (heroes / score) can't re-find it. У плацдарма
@@ -730,17 +747,25 @@ export function applyDamageToSide(
       f.lastDamagedAt = h.ctx.now;
     }
   }
-  const laid =
-    evenly
-      ? damageEvenly(units, dmg, data, evenly)
-      : byClass
-        ? damageByClass(units, byClass, data)
-        : null;
+  const value = captureCasualtyCost(h.state, units, data);
+  const laid = evenly
+    ? damageEvenly(units, dmg, data, evenly)
+    : byClass
+      ? damageByClass(units, byClass, data)
+      : null;
   if (!laid) {
     setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
     return;
   }
-  for (const d of laid.deaths) h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
+  const costs = value();
+  for (const d of laid.deaths) {
+    h.emit('unit.died', {
+      unit: d.unit,
+      count: d.count,
+      ...source,
+      ...(!unitHasTrait(data, d.unit, MISSILE_TRAIT) ? { lossCost: costs[d.unit] ?? {} } : {}),
+    });
+  }
   setSideUnits(h.state, ref, laid.survivors);
 }
 

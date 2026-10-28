@@ -496,6 +496,7 @@ const authCfg = configFromEnv(process.env);
 const securityAudit = securityAuditFromEnv(process.env);
 const AUTH = authCfg.auth !== undefined;
 const rewardDelivery = createMetaRewardDelivery({
+  career: (snapshot) => profileStore.creditCareer?.(snapshot) ?? Promise.resolve(),
   store: metaEconomyStore,
   matches: matchStore,
   seats: (id) => AUTH ? nickSeatAccounts(accountStore, userStore, id) : async () => ({}),
@@ -835,6 +836,8 @@ async function createHostedMatch(
       ...(sessionModeId !== undefined ? { modeId: sessionModeId } : {}),
       victory: victoryFor(initialState),
     },
+    initialCareer: restoredSnap?.career,
+    careerAccounts: AUTH ? await nickSeatAccounts(accountStore, userStore, id)() : {},
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value
     // Strict commit-before-broadcast: await the durable write of the new snapshot +
@@ -843,6 +846,7 @@ async function createHostedMatch(
     // tick-driven advances, which are recomputable and persist after the fact).
     persist: async (snapshot, receipt) => {
       await commitMatch(matchStore, receiptStore, snapshot, receipt);
+      if (snapshot.status === 'ended') detach('career settlement', profileStore.creditCareer?.(snapshot) ?? Promise.resolve());
     },
     timeScale: matchTimeScale, // persisted per-session wall/game rate
     // CORP-5: стороны битвы от мира к войне переводит оркестратор, а не игроки; Хранителя
@@ -869,6 +873,7 @@ async function createHostedMatch(
     onError: (code) => process.stderr.write(`${code}\n`),
   });
 
+  if (AUTH && restoredSnap?.status === 'ended') await profileStore.creditCareer?.(restoredSnap);
   if (AUTH && initialState.match.status === 'ended')
     await creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, initialState);
 
@@ -891,8 +896,10 @@ async function createHostedMatch(
         state: room.state,
         clock: room.clockSnapshot,
         economyActivity: room.economyActivitySnapshot,
+        career: room.careerSnapshot,
       };
       await matchStore.save(snapshot);
+      if (snapshot.status === 'ended') await profileStore.creditCareer?.(snapshot);
       // Admission may cross the terminal deadline before it can update botSeats.
       // The durable roster, not the successfully seated in-memory cache, owns settlement.
       if (snapshot.status === 'ended')
@@ -1624,7 +1631,7 @@ const server = createMultiplayerServer({
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
-      registerProfileApi(app, { registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId),
+      registerProfileApi(app, { corporations: corpStore, registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId),
         medalRewards: (accountId) => settleMedalRewards({ profiles: profileStore, commanders: commanderStore, economy: metaEconomy, table: metaCatalog.medals }, accountId),
         identify: identifySession });
       // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа

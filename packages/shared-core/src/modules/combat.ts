@@ -1606,8 +1606,15 @@ export const combatModule: GameModule = {
       // Чей огонь добил сторону: кто положил в неё больше всех за раунд (PVR-6.20 —
       // боевой счёт экспедиции засчитывает павших ему). Равный вклад решает меньший id,
       // а не порядок сторон: иначе засчитанная победа зависела бы от того, кто вошёл первым.
+      const damageShares = new Map<BattleSide, Record<string, number>>();
       const topShooter = new Map<BattleSide, { owner: PlayerId; dealt: number }>();
       const noteShooter = (target: BattleSide, side: BattleSide, dealt: number): void => {
+        if (dealt > 0) {
+          const source = side.owner ?? '\u0000neutral';
+          const shares = damageShares.get(target) ?? {};
+          shares[source] = (shares[source] ?? 0) + dealt;
+          damageShares.set(target, shares);
+        }
         const top = topShooter.get(target);
         if (
           side.owner !== null &&
@@ -1685,6 +1692,8 @@ export const combatModule: GameModule = {
           battle.id,
           split,
           topShooter.get(side)?.owner,
+          undefined,
+          damageShares.get(side),
         );
       }
 

@@ -1,11 +1,23 @@
-import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from './registrationRewardStore';
+import {
+  MemoryRegistrationRewardStore,
+  PostgresRegistrationRewardStore,
+  type RegistrationRewardStore,
+} from './registrationRewardStore';
 import { createCorporateServices } from './corporateTransactions';
-import { MemoryPlayerActivityStore, PostgresPlayerActivityStore, type PlayerActivityStore } from './playerActivity';
+import {
+  MemoryPlayerActivityStore,
+  PostgresPlayerActivityStore,
+  type PlayerActivityStore,
+} from './playerActivity';
 import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
 import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
-import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from './metaEconomyStore';
+import {
+  MemoryMetaEconomyStore,
+  PostgresMetaEconomyStore,
+  type MetaEconomyStore,
+} from './metaEconomyStore';
 import {
   MemoryAccountStore,
   MemoryAnnouncementStore,
@@ -225,6 +237,7 @@ export function snapshotOf(room: MatchRoom): MatchSnapshot {
     status: state.match.status,
     state,
     economyActivity: room.economyActivitySnapshot,
+    career: room.careerSnapshot,
     ...(clock ? { clock } : {}),
   };
 }

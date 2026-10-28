@@ -82,6 +82,9 @@ const SCHEMA_SQL = `
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS clock jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS career jsonb;
+    CREATE TABLE IF NOT EXISTS profile_career (account_id text PRIMARY KEY, career jsonb NOT NULL);
+    CREATE TABLE IF NOT EXISTS profile_career_credits (match_id text NOT NULL, account_id text NOT NULL, PRIMARY KEY(match_id,account_id));
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
 
     CREATE TABLE IF NOT EXISTS seats (
@@ -596,6 +599,7 @@ interface MatchRow {
   clock: MatchSnapshot['clock'] | null;
   economy_observations: MatchSnapshot['economyObservations'] | null;
   economy_activity: MatchSnapshot['economyActivity'] | null;
+  career: MatchSnapshot['career'] | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
@@ -624,7 +628,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -634,6 +638,7 @@ export class PostgresMatchStore implements MatchStore {
       dataVersion: row.data_version,
       seq: row.seq,
       status: row.status === 'ended' ? 'ended' : 'ongoing',
+      ...(row.career ? { career: row.career } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
       ...(row.economy_observations ? { economyObservations: row.economy_observations } : {}),
@@ -645,7 +650,11 @@ export class PostgresMatchStore implements MatchStore {
     await this.saveUsing(this.pool, snapshot);
   }
 
-  async saveWithReceipt(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void> {
+  async saveWithReceipt(
+    snapshot: MatchSnapshot,
+    receipt: StoredReceipt,
+    receipts: ReceiptStore,
+  ): Promise<void> {
     if (!(receipts instanceof PostgresReceiptStore) || !receipts.sharesPool(this.pool))
       throw new Error('E_MATCH_COMMIT_BACKEND');
     const client = await this.pool.connect();
@@ -667,14 +676,15 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
          status       = EXCLUDED.status,
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
+         career       = EXCLUDED.career,
          economy_observations = CASE
            WHEN matches.economy_observations IS NULL AND EXCLUDED.economy_observations IS NULL THEN NULL
            ELSE COALESCE(EXCLUDED.economy_observations, '{}'::jsonb) || COALESCE(matches.economy_observations, '{}'::jsonb)
@@ -721,6 +731,7 @@ export class PostgresMatchStore implements MatchStore {
             )
           : null,
         MAX_META_ACTIVITY_FACTS_PER_ROLE,
+        snapshot.career ? JSON.stringify(snapshot.career) : null,
       ],
     );
     return result.rowCount === 1;
@@ -1493,7 +1504,9 @@ interface ReceiptRow {
 export class PostgresReceiptStore implements ReceiptStore {
   constructor(private readonly pool: Pool) {}
 
-  sharesPool(pool: Pool): boolean { return this.pool === pool; }
+  sharesPool(pool: Pool): boolean {
+    return this.pool === pool;
+  }
 
   async loadAll(matchId: string): Promise<StoredReceipt[]> {
     const r = await this.pool.query<ReceiptRow>(
@@ -1514,7 +1527,11 @@ export class PostgresReceiptStore implements ReceiptStore {
   }
 
   /** Used by the paired match adapter with its transaction client. */
-  async saveUsing(query: Pick<Pool, 'query'>, matchId: string, receipt: StoredReceipt): Promise<void> {
+  async saveUsing(
+    query: Pick<Pool, 'query'>,
+    matchId: string,
+    receipt: StoredReceipt,
+  ): Promise<void> {
     // Receipts are immutable — first write wins; a re-save of the same action is a no-op.
     await query.query(
       `INSERT INTO receipts (match_id, action_id, player_id, seq, ok, code)
@@ -1949,17 +1966,37 @@ function feedEntryOf(row: FeedRow): FeedEntry | null {
         ...(row.kind === 'result' ? { winnerCorp: row.winner_corp } : {}),
       };
     case 'founded':
-      return { id: row.id, at, kind: 'founded', corpId: row.challenger_corp, corpName: row.challenger_name };
+      return {
+        id: row.id,
+        at,
+        kind: 'founded',
+        corpId: row.challenger_corp,
+        corpName: row.challenger_name,
+      };
     case 'level': {
       const level = row.detail?.level;
       return typeof level === 'number' && Number.isSafeInteger(level)
-        ? { id: row.id, at, kind: 'level', corpId: row.challenger_corp, corpName: row.challenger_name, level }
+        ? {
+            id: row.id,
+            at,
+            kind: 'level',
+            corpId: row.challenger_corp,
+            corpName: row.challenger_name,
+            level,
+          }
         : null;
     }
     case 'medal': {
       const medalId = row.detail?.medalId;
       return typeof medalId === 'string'
-        ? { id: row.id, at, kind: 'medal', corpId: row.challenger_corp, corpName: row.challenger_name, medalId }
+        ? {
+            id: row.id,
+            at,
+            kind: 'medal',
+            corpId: row.challenger_corp,
+            corpName: row.challenger_name,
+            medalId,
+          }
         : null;
     }
     default:
@@ -2325,7 +2362,12 @@ export class PostgresArsenalStore implements ArsenalStore {
 }
 
 export class PostgresCorpRentStore implements CorpRentStore {
-  async completeReturn(matchupId: string, itemId: string, at: number, wear: number): Promise<boolean> {
+  async completeReturn(
+    matchupId: string,
+    itemId: string,
+    at: number,
+    wear: number,
+  ): Promise<boolean> {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');

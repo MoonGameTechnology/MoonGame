@@ -51,6 +51,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 `botPopulation.ts` — посадка, реальные
 итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
 `profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
+Серверная карьера: `playerCareer.ts` — private ledger снимка, `profileStore.ts` —
+однократное начисление после durable завершения; `decisions/playerCareer.ts` —
+проверка публичного контракта и уровень аккаунта.
 `prototype/src/botBehavior.ts` выбирает стратегию и политику переговоров по постоянному seed;
 `packages/server/src/botSocial.ts` отвечает на принятые личные сообщения, а
 `scripts/botChatText.ts` форматирует английские реплики без изменения протокола.

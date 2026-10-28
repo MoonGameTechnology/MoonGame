@@ -296,3 +296,18 @@ describe('rewards only for time in the match', () => {
     expect(activeDay.mock.calls.map(([, day]) => day)).toEqual([20741, 20742, 20743, 20743]);
   });
 });
+
+
+it('retries a temporarily unavailable career projection from durable snapshots, independently of economy', async () => {
+  const { matches,create,onError } = fixture();
+  const final=ended(snapshot());
+  final.career={since:100,owners:{p1:{accountId:'account',claimedAt:1}},players:{}};
+  await matches.save(final);
+  const career=vi.fn().mockRejectedValueOnce(Error('career temporarily down')).mockResolvedValue(undefined);
+  await create(1000,{career}).deliver(final);
+  expect(onError).toHaveBeenCalled();
+  const restarted=create(2000,{career});
+  await restarted.sweep();
+  expect(career).toHaveBeenCalledTimes(2);
+  expect(career.mock.calls[1]![0]).toEqual(final);
+});

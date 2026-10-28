@@ -44,6 +44,8 @@ export const APP_TABLES = [
   'commander_credits',
   'player_profiles',
   'profile_progress',
+  'profile_career',
+  'profile_career_credits',
   'profile_credits',
   'bot_roster_identities',
   'bot_roster_matches',
@@ -104,13 +106,17 @@ async function migrateLocked(pool: Pool): Promise<void> {
 /** Legacy dev boots still migrate. The hardened process NEVER receives migration creds. */
 export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv): Promise<void> {
   try {
-    if ((env.PROD === '1' || env.PROD === 'true') &&
-        (env.DB_AUTO_MIGRATE !== '0' || env.DB_REQUIRE_LEAST_PRIVILEGE !== '1'))
+    if (
+      (env.PROD === '1' || env.PROD === 'true') &&
+      (env.DB_AUTO_MIGRATE !== '0' || env.DB_REQUIRE_LEAST_PRIVILEGE !== '1')
+    )
       throw new Error('E_DB_RUNTIME_ROLE');
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1' && env.DB_AUTO_MIGRATE !== '0')
       throw new Error('E_DB_RUNTIME_ROLE');
     if (env.DB_AUTO_MIGRATE !== '0') await migrateLocked(pool);
-    const erasure = await pool.query<{ required: boolean }>('SELECT required FROM account_erasure_guard WHERE id=1');
+    const erasure = await pool.query<{ required: boolean }>(
+      'SELECT required FROM account_erasure_guard WHERE id=1',
+    );
     if (erasure.rows[0]?.required !== false) throw Error('E_ERASURE_RESTORE_REQUIRED');
     if (env.DB_REQUIRE_LEAST_PRIVILEGE === '1') {
       if (env.DB_AUTO_MIGRATE !== '0') throw new Error('E_DB_RUNTIME_ROLE');
@@ -137,7 +143,12 @@ export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv)
       if (revision[0]?.fingerprint !== schemaFingerprint()) throw new Error('E_DB_SCHEMA_REVISION');
       for (const table of APP_TABLES) {
         const maintenance = table === 'account_erasure_guard' || table === 'account_deletions';
-        const required = table === 'account_erasure_guard' ? ['SELECT'] : table === 'account_deletions' ? ['SELECT', 'INSERT'] : ['SELECT','INSERT','UPDATE','DELETE'];
+        const required =
+          table === 'account_erasure_guard'
+            ? ['SELECT']
+            : table === 'account_deletions'
+              ? ['SELECT', 'INSERT']
+              : ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
         const { rows: all } = await pool.query<{ ok: boolean }>(
           `SELECT bool_and(has_table_privilege(current_user, $1, privilege)) AS ok
            FROM unnest($2::text[]) AS privilege`,
@@ -145,8 +156,14 @@ export async function prepareRuntimeDatabase(pool: Pool, env: NodeJS.ProcessEnv)
         );
         if (!all[0]?.ok) throw new Error('E_DB_RUNTIME_ROLE');
         if (maintenance) {
-          const forbidden = table === 'account_erasure_guard' ? 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER' : 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER';
-          const check = await pool.query<{ unsafe: boolean }>('SELECT has_table_privilege(current_user,$1,$2) AS unsafe', [`public.${table}`, forbidden]);
+          const forbidden =
+            table === 'account_erasure_guard'
+              ? 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
+              : 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER';
+          const check = await pool.query<{ unsafe: boolean }>(
+            'SELECT has_table_privilege(current_user,$1,$2) AS unsafe',
+            [`public.${table}`, forbidden],
+          );
           if (check.rows[0]?.unsafe) throw new Error('E_DB_RUNTIME_ROLE');
         }
       }
