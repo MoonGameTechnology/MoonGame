@@ -180,6 +180,8 @@ import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
 import { isMetricsReaderRequest, isOperatorRequest, metricsReaderTokenFromEnv, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
+import { registerOperatorMatchApi } from '../packages/server/src/operatorMatchApi';
+import { sessionSpeed } from '../packages/server/src/sessionSpeed';
 import { metricsReaderSummary } from '../packages/server/src/metrics';
 const { Pool } = pgPkg;
 
@@ -639,6 +641,7 @@ async function createHostedMatch(
   id: string,
   mapId: MapId = DEFAULT_MAP_ID,
   modeId?: string,
+  requestedTimeScale?: number,
 ): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates the empty-seat AI)
   // CORP-5: битва корпораций. Её мир собирает оркестратор (`raiseAvaBattle`), а не `newGame`.
@@ -675,6 +678,7 @@ async function createHostedMatch(
   }
 
   const restoredSnap = await matchStore.load(id);
+  const matchTimeScale = sessionSpeed(restoredSnap?.clock, TIME_SCALE, requestedTimeScale);
   // Битва рождается только из снимка оркестратора: свежий мир под её номером был бы чужой партией.
   if (ava && !restoredSnap) throw new Error('E_NO_MATCH');
   let initialState =
@@ -837,7 +841,7 @@ async function createHostedMatch(
     persist: async (snapshot, receipt) => {
       await commitMatch(matchStore, receiptStore, snapshot, receipt);
     },
-    timeScale: TIME_SCALE, // playtest fast-forward (1 = real-time)
+    timeScale: matchTimeScale, // persisted per-session wall/game rate
     // CORP-5: стороны битвы от мира к войне переводит оркестратор, а не игроки; Хранителя
     // битва не принимает — список отказов общий с каноническим сервером.
     ...(ava ? { denyPlayerActions: avaDeniedAction } : {}),
@@ -1181,7 +1185,7 @@ refreshGrantedArsenal = async (accountId) => {
  *  реального окна от создания сессии. */
 const browserMeta = (room: MatchRoom): MatchMeta =>
   sessionMeta(room, {
-    timeScale: TIME_SCALE,
+    timeScale: room.clockScale,
     createdAt: Date.now(),
     entryWindowMs: ENTRY_WINDOW_MS,
   });
@@ -1217,14 +1221,14 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  */
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
-async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string, timeScale?: number): Promise<HostedMatch> {
   if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
   // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
   const id = await freeMatchId(async (candidate) =>
     registry.has(candidate) || (await matchStore.load(candidate)) !== null,
   );
-  const h = await createHostedMatch(id, mapId, modeId);
+  const h = await createHostedMatch(id, mapId, modeId, timeScale);
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
@@ -1243,7 +1247,7 @@ async function hostAvaMatch(id: string): Promise<HostedMatch> {
   hosted.push(h);
   registry.register(
     h.room,
-    sessionMeta(h.room, { timeScale: TIME_SCALE, createdAt: Date.now(), entryWindowMs: 0 }),
+    sessionMeta(h.room, { timeScale: h.room.clockScale, createdAt: Date.now(), entryWindowMs: 0 }),
   );
   return h;
 }
@@ -1383,6 +1387,14 @@ const server = createMultiplayerServer({
       isOperatorRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN);
     const metricsReader = (req: { socket: { remoteAddress?: string }; headers: Record<string, unknown> }): boolean =>
       isMetricsReaderRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN, METRICS_READER_TOKEN);
+    registerOperatorMatchApi(app, {
+      token: METRICS_TOKEN,
+      mapIds: MAP_IDS,
+      createMatch: async ({ mapId, timeScale }) => {
+        const h = await hostNewMatch(mapPreset(mapId).id, undefined, timeScale);
+        return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
+      },
+    });
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary, one `curl` from the host.

@@ -449,6 +449,8 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `matchRegistry.ts` | `LazyRoomRegistry` | multi-match registry + hibernation |
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |
+| `operatorMatchApi.ts` | `POST /metrics/matches` | создание сессии с картой и скоростью; полный операторский ключ |
+| `sessionSpeed.ts` | `sessionSpeed` | скорость из сохранённых часов либо настройка новой сессии |
 | `clockDriver.ts` | `clockDriver` | v1 offline scheduler (`msUntilNextEvent` → tick) |
 | `standingOrderDriver.ts` | `standingOrderDriver` | драйвер постоянных приказов |
 | `pveOrchestrator.ts` | `pveOrders(state, data, {session, seq})` | PVE-5: тактика волн Роя — ЧИСТАЯ функция → `Action[]`, подаётся через `serverOrders` (ADR `docs/explanations/05-pve-ai-placement.md`: тактика NPC не входит в контракт реплея, поэтому живёт на сервере, а не в модуле ядра) |
