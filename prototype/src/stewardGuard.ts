@@ -19,6 +19,7 @@ import {
   estimateTravelHours,
   identifiedNodes,
   hoursToMs,
+  fleetHoldFree,
   portDisabled,
   squadronPatrol,
   squadronReach,
@@ -31,7 +32,7 @@ import {
   type Squadron,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
-import { findHealthyStack, sumUnitStat } from '../../packages/shared-core/src/util/stacks';
+import { findHealthyStack } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import {
   act,
@@ -137,12 +138,9 @@ export function stewardGuardOrders(
   const tasked = new Set<string>();
   const idleOwn = (f: Fleet): boolean =>
     f.owner === ai && f.location != null && !f.movement && !f.battleId && !tasked.has(f.id);
-  // Свободный трюм = грузоподъёмность кораблей минус уже погруженный десант.
-  // Раньше это считал `fleetCargoFree` из division.ts, потому что трюм делили с
-  // дивизиями; после H4-REVERT делить не с кем — остаётся одна вычитание.
-  // too — a transport already ferrying a formation must not be over-filled.
-  const freeHold = (f: Fleet): number =>
-    sumUnitStat(f.units, data, 'cargoCapacity') - sumUnitStat(f.landing ?? [], data, 'cargoSize');
+  // Ground troops share the hold with loading claims and shuttle squadrons,
+  // including squadrons away on a sortie. Use the same capacity as army.load.
+  const freeHold = (f: Fleet): number => fleetHoldFree(state, f, data);
 
   for (const p of mine) {
     const threats = threatsOf(p.id);
@@ -490,6 +488,7 @@ export function stewardGuardOrders(
   // The SITREP stamp rides LAST: it narrates the orders above. Applied through
   // the same kernel path (steward.report — server-driver-only, gate refuses it
   // from the wire), so the journal lands in state and survives the night.
-  if (report.length > 0) out.push(act(ai, 'steward.report', { entries: report }));
+  if (report.length > 0 && state.players[ai]?.steward)
+    out.push(act(ai, 'steward.report', { entries: report }));
   return out;
 }

@@ -154,7 +154,8 @@ export interface MatchRoomOptions {
    *  `max(serverNow, state.time)`). Feed the entries into `ReplayLog.steps` as-is:
    *  advance boundaries are part of the log BY CONTRACT — span accrual is float-
    *  partition-sensitive (see shared-core replay.ts), so the log must mirror what
-   *  the room did, not an idealized timeline. Covers players, server drivers
+   *  the room did, not an idealized timeline. A same-instant terminal event keeps
+   *  its advance request horizon so replay executes that event. Covers players, server drivers
    *  (`submitServerAction`) and both the sync and durable apply paths. */
   record?: (step: { at: number; action?: Action }) => void;
   /** Seed the idempotency receipts (e.g. rehydrated from a ReceiptStore on restart),
@@ -873,6 +874,7 @@ export class MatchRoom {
    *  auto-started room (`initiallyStarted`, no lobby) accrues scaled time from
    *  its anchor at `initialState.time` (SES-2.1). */
   private clock(wall = this.now()): number {
+    if (this.stateValue.match.status === 'ended') return this.stateValue.time;
     const raw = !this.clockAnchored
       ? wall
       : this.lobbyAccrued +
@@ -897,7 +899,8 @@ export class MatchRoom {
   private captureClock(state: GameState): MatchSnapshot['clock'] {
     if (!this.clockAnchored) return undefined;
     const wallTime = this.now();
-    const gameTime = this.clock(wallTime);
+    // A planned durable snapshot may finish before stateValue is committed.
+    const gameTime = state.match.status === 'ended' ? state.time : this.clock(wallTime);
     const coalitionTransitions = this.pendingCoalitionClocks(state);
     return {
       wallTime,
@@ -983,14 +986,17 @@ export class MatchRoom {
     return this.started;
   }
 
-  /** Whether the world clock is currently ADVANCING (vs. frozen in a pre-start lobby).
+  /** Whether the world clock is currently ADVANCING (vs. a lobby or ended match).
    *  Mirrors the `clock()` gate exactly: a no-lobby room (auto-start SES-2.1, or the
    *  plain dev match) always runs; a waitForPlayers/manualStart lobby runs only once
    *  released (`lobbyRunningSince` set). The offline heartbeat beats only a running
    *  room — a frozen lobby has no live clock to keep on-screen, and its "due" events
    *  must not fire (which would also trip the driver's stall guard). */
   get isClockRunning(): boolean {
-    return !this.clockAnchored || this.lobbyRunningSince !== null;
+    return (
+      this.stateValue.match.status !== 'ended' &&
+      (!this.clockAnchored || this.lobbyRunningSince !== null)
+    );
   }
 
   /** Number of connected sockets across all seats — 0 means the match is unwatched
@@ -1765,7 +1771,7 @@ export class MatchRoom {
     // committed to `stateValue` (commit-before-broadcast), so advancing here would race
     // the submit's pending commit. `msUntilNextEvent` reports null while committing, so a
     // driver idles rather than firing skipped ticks; the submit re-arms it on commit.
-    if (this.waiting || this.committing) return false;
+    if (this.waiting || this.committing || this.stateValue.match.status === 'ended') return false;
     const before = this.stateValue.time;
     const startedAt = this.observe ? performance.now() : 0;
     const advanced = this.advance(this.clock());
@@ -1804,7 +1810,7 @@ export class MatchRoom {
    * bearing. It is swallowed the same way a throwing observer is.
    */
   private runServerOrders(): void {
-    if (!this.serverOrders || this.serverOrdersBusy) return;
+    if (!this.serverOrders || this.serverOrdersBusy || this.stateValue.match.status === 'ended') return;
     let orders: Action[];
     try {
       orders = this.serverOrders(this.stateValue, this.serverOrderSeq);
@@ -1817,6 +1823,7 @@ export class MatchRoom {
     this.serverOrdersWork = (async () => {
       try {
         for (const action of orders) {
+          if (this.stateValue.match.status === 'ended') break;
           await this.submitServerAction(action.playerId, action);
         }
       } catch {
@@ -1852,7 +1859,7 @@ export class MatchRoom {
     // `stateValue` yet, so the still-pending events read as overdue (ms 0). Report
     // "nothing to wake for" so a driver idles instead of spinning on skipped ticks and
     // tripping its stall guard — the submit re-arms the driver when it commits.
-    if (this.waiting || this.committing) return null;
+    if (this.waiting || this.committing || this.stateValue.match.status === 'ended') return null;
     if (this.pendingCoalitionClocks(this.stateValue).length > 0) return 0;
     const scheduled = this.stateValue.scheduled;
     if (scheduled.length === 0) return null;
@@ -1900,8 +1907,8 @@ export class MatchRoom {
     );
     this.career = foldCareerEvents(this.career, r.events, this.stateValue, this.careerHumans);
     this.stateValue = r.state;
-    // RPL-2: the boundary the world ACTUALLY reached (a throttled advance stops
-    // short of `now`) — a no-op advance is not a boundary, keep the log compact.
+    // RPL-2: actual boundaries, or the request horizon for a same-instant finish.
+    // A no-op advance is not a boundary; a terminal event still needs replaying.
     for (const step of r.steps) this.record?.(step);
     return { ok: true, events: r.events };
   }
@@ -1998,11 +2005,18 @@ export class MatchRoom {
     const steps: ReplayStep[] = [];
     const events: DomainEvent[] = [];
     let state = from;
+    // If an event at the starting instant ends the match, preserve its request
+    // horizon: runUntil skips an advance whose target already equals state.time.
+    // No further world steps follow this terminal boundary.
     for (const clock of this.pendingCoalitionClocks(state)) {
       const boundary = Math.max(state.time, Math.min(now, clock.gameTime));
       const old = this.computeAdvanceRaw(state, boundary);
       if (!old.ok) return old;
-      if (old.state.time > state.time) steps.push({ at: old.state.time });
+      if (
+        old.state.time > state.time ||
+        (old.events.length > 0 && old.state.match.status === 'ended')
+      )
+        steps.push({ at: old.state.time > state.time ? old.state.time : boundary });
       state = old.state;
       events.push(...old.events);
       // A bounded catch-up can stop before the boundary. Keep the old mapping
@@ -2017,7 +2031,11 @@ export class MatchRoom {
     }
     const current = this.computeAdvanceRaw(state, now);
     if (!current.ok) return current;
-    if (current.state.time > state.time) steps.push({ at: current.state.time });
+    if (
+      current.state.time > state.time ||
+      (current.events.length > 0 && current.state.match.status === 'ended')
+    )
+      steps.push({ at: current.state.time > state.time ? current.state.time : now });
     return { ok: true, state: current.state, events: [...events, ...current.events], steps };
   }
 
