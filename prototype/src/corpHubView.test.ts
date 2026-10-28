@@ -298,8 +298,8 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
   it('фон базы: панорама в применённом фоне, в шторке фоны рядом со стилями (CORP-15)', () => {
     const view = styles(true, 'high_tech', ['high_tech', 'nebula'], 'nebula');
     const html = corpHubHtml(paint({ style: view }));
-    expect(html).toContain('url(#cbSky-nebula)');
-    expect(html).not.toContain('url(#cbSky-orbit)');
+    expect(html).toContain('<image data-corp-backdrop="nebula"');
+    expect(html).not.toContain('<image data-corp-backdrop="orbit"');
     const sheet = corpHubSheetHtml(paint({ style: view }), { kind: 'style' }, '');
     expect(sheet).toContain(t('corp.backdrop.title'));
     expect(sheet).toContain('data-corpstyle="orbit"');
@@ -307,7 +307,7 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
     expect(sheet).toContain('data-corpshop="ice_moon"');
     expect(sheet).toContain('data-corpshop="gas_giant"');
     // Без прочитанного стиля панорама — в бесплатном фоне.
-    expect(corpHubHtml(paint())).toContain('url(#cbSky-orbit)');
+    expect(corpHubHtml(paint())).toContain('<image data-corp-backdrop="orbit"');
   });
 });
 

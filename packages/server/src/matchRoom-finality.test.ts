@@ -55,6 +55,35 @@ function initial() {
 }
 
 describe('ended room lifecycle', () => {
+  it('records a terminal event at the current instant so replay can execute it', () => {
+    let wall = 0;
+    const starting = initial();
+    starting.scheduled[0]!.at = 0;
+    const steps: ReplayStep[] = [];
+    const room = new MatchRoom({
+      id: 'same-instant-finality',
+      initialState: starting,
+      kernel: createKernel([module]),
+      data,
+      now: () => wall,
+      initiallyStarted: true,
+      record: (step) => steps.push(step),
+    });
+    wall = 1;
+    room.tick();
+    expect(room.state.match.status).toBe('ended');
+    expect(room.state.time).toBe(0);
+    // Replay chains only positive advances. Retain the request horizon when
+    // an event at the starting instant ends the world without moving its clock.
+    expect(steps).toEqual([{ at: 1 }]);
+    const replay = runReplay(createKernel([module]), data, {
+      dataVersion: data.version,
+      initial: starting,
+      steps,
+    });
+    expect(replay.hash).toBe(hashState(room.state));
+  });
+
   it('stops an in-flight automation batch when its first order ends the match', async () => {
     let wall = 0;
     const observations: RoomObservation[] = [];

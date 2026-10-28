@@ -154,7 +154,8 @@ export interface MatchRoomOptions {
    *  `max(serverNow, state.time)`). Feed the entries into `ReplayLog.steps` as-is:
    *  advance boundaries are part of the log BY CONTRACT — span accrual is float-
    *  partition-sensitive (see shared-core replay.ts), so the log must mirror what
-   *  the room did, not an idealized timeline. Covers players, server drivers
+   *  the room did, not an idealized timeline. A same-instant terminal event keeps
+   *  its advance request horizon so replay executes that event. Covers players, server drivers
    *  (`submitServerAction`) and both the sync and durable apply paths. */
   record?: (step: { at: number; action?: Action }) => void;
   /** Seed the idempotency receipts (e.g. rehydrated from a ReceiptStore on restart),
@@ -1906,8 +1907,8 @@ export class MatchRoom {
     );
     this.career = foldCareerEvents(this.career, r.events, this.stateValue, this.careerHumans);
     this.stateValue = r.state;
-    // RPL-2: the boundary the world ACTUALLY reached (a throttled advance stops
-    // short of `now`) — a no-op advance is not a boundary, keep the log compact.
+    // RPL-2: actual boundaries, or the request horizon for a same-instant finish.
+    // A no-op advance is not a boundary; a terminal event still needs replaying.
     for (const step of r.steps) this.record?.(step);
     return { ok: true, events: r.events };
   }
@@ -2004,11 +2005,18 @@ export class MatchRoom {
     const steps: ReplayStep[] = [];
     const events: DomainEvent[] = [];
     let state = from;
+    // If an event at the starting instant ends the match, preserve its request
+    // horizon: runUntil skips an advance whose target already equals state.time.
+    // No further world steps follow this terminal boundary.
     for (const clock of this.pendingCoalitionClocks(state)) {
       const boundary = Math.max(state.time, Math.min(now, clock.gameTime));
       const old = this.computeAdvanceRaw(state, boundary);
       if (!old.ok) return old;
-      if (old.state.time > state.time) steps.push({ at: old.state.time });
+      if (
+        old.state.time > state.time ||
+        (old.events.length > 0 && old.state.match.status === 'ended')
+      )
+        steps.push({ at: old.state.time > state.time ? old.state.time : boundary });
       state = old.state;
       events.push(...old.events);
       // A bounded catch-up can stop before the boundary. Keep the old mapping
@@ -2023,7 +2031,11 @@ export class MatchRoom {
     }
     const current = this.computeAdvanceRaw(state, now);
     if (!current.ok) return current;
-    if (current.state.time > state.time) steps.push({ at: current.state.time });
+    if (
+      current.state.time > state.time ||
+      (current.events.length > 0 && current.state.match.status === 'ended')
+    )
+      steps.push({ at: current.state.time > state.time ? current.state.time : now });
     return { ok: true, state: current.state, events: [...events, ...current.events], steps };
   }
 
