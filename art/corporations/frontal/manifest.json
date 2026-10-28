@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "collection": "corporation-frontal-concepts",
+  "date": "2026-10-28",
+  "kind": "concept-contact-sheets",
+  "camera": "front-elevation",
+  "readyForRuntime": false,
+  "sheetCount": 5,
+  "depictedStageCount": 75,
+  "layout": {
+    "rows": 5,
+    "columns": 3,
+    "rowOrder": [
+      "standard",
+      "soviet-retrofuturism",
+      "imperial",
+      "high-tech",
+      "imperial-gothic"
+    ],
+    "columnLevels": [
+      1,
+      2,
+      3
+    ]
+  },
+  "styles": [
+    {
+      "id": "standard",
+      "name": "Стандартный"
+    },
+    {
+      "id": "soviet-retrofuturism",
+      "name": "Советский футуризм"
+    },
+    {
+      "id": "imperial",
+      "name": "Имперский космический"
+    },
+    {
+      "id": "high-tech",
+      "name": "Хайтек"
+    },
+    {
+      "id": "imperial-gothic",
+      "name": "Имперская готика"
+    }
+  ],
+  "generation": {
+    "tool": "image_gen",
+    "referenceSheet": "headquarters.png",
+    "notes": "The approved headquarters sheet guided the four other building sheets. Original generated PNG bytes are preserved."
+  },
+  "sheets": [
+    {
+      "buildingId": "headquarters",
+      "name": "Штаб корпорации",
+      "catalogStatus": "current-catalog",
+      "file": "headquarters.png",
+      "width": 1086,
+      "height": 1448,
+      "colorMode": "RGB",
+      "transparentBackground": false,
+      "depictedStageCount": 15,
+      "byteLength": 2189632,
+      "sha256": "1c2d72c00072b47d47b920ebc3aa191c6d06861d94beb71be20f6ce8322c47f9"
+    },
+    {
+      "buildingId": "supply_center",
+      "name": "Центр снабжения",
+      "catalogStatus": "current-catalog",
+      "file": "supply_center.png",
+      "width": 1086,
+      "height": 1448,
+      "colorMode": "RGB",
+      "transparentBackground": false,
+      "depictedStageCount": 15,
+      "byteLength": 2138353,
+      "sha256": "8dbad34ff11d44fd499bad45868a3105272ec833cfcc3848bbf4a42e998e9dcc"
+    },
+    {
+      "buildingId": "engineering_complex",
+      "name": "Инженерный комплекс",
+      "catalogStatus": "current-catalog",
+      "file": "engineering_complex.png",
+      "width": 1086,
+      "height": 1448,
+      "colorMode": "RGB",
+      "transparentBackground": false,
+      "depictedStageCount": 15,
+      "byteLength": 2280866,
+      "sha256": "b725667f2c6ac80dc344578806ebb56b09a0fa0ef0ce57829d8c032bc92135a5"
+    },
+    {
+      "buildingId": "shipyard",
+      "name": "Космическая верфь",
+      "catalogStatus": "future-concept",
+      "file": "shipyard.png",
+      "width": 1086,
+      "height": 1448,
+      "colorMode": "RGB",
+      "transparentBackground": false,
+      "depictedStageCount": 15,
+      "byteLength": 2332258,
+      "sha256": "89ec6120f890216a80bc2b38936141952a015012bfa57bc0625d8d8fe12e48e8"
+    },
+    {
+      "buildingId": "research_center",
+      "name": "Исследовательский центр",
+      "catalogStatus": "future-concept",
+      "file": "research_center.png",
+      "width": 1086,
+      "height": 1448,
+      "colorMode": "RGB",
+      "transparentBackground": false,
+      "depictedStageCount": 15,
+      "byteLength": 2160973,
+      "sha256": "9ffe538556cb741991940394dff8a1c66f93ac98b4f918b170c7fa75f2ab701b"
+    }
+  ]
+}
