@@ -307,7 +307,7 @@ describe('магазин — «Стили»: стили базы корпора�
     expect(html).toContain('Туманность');
     expect(html).toContain('Фон базы корпорации');
     expect(html).toMatch(/data-sh-pick="corp_backdrop_nebula"[^]*?sh-sov">290/);
-    expect(html).toContain('url(#cbSky-nebula)');
+    expect(html).toContain('<image data-corp-backdrop="nebula"');
     const detail = shopDetailHtml(styles({ pick: 'nebula' }));
     expect(detail).toContain('data-sh-buy="corp_backdrop_nebula"');
     expect(detail).toContain('Фон принадлежит корпорации');

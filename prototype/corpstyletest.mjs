@@ -95,7 +95,7 @@ async function account(name) {
 
 /** The base's pictures on the panorama, in drawing order. */
 const panorama = (page) =>
-  page.$$eval('#hp-corp .cb-pano image', (images) => images.map((image) => image.getAttribute('href')));
+  page.$$eval('#hp-corp .cb-lot image', (images) => images.map((image) => image.getAttribute('href')));
 
 const browser = await launchBrowser();
 mkdirSync('.playwright-mcp', { recursive: true });
