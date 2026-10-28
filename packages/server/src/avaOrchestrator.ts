@@ -14,7 +14,7 @@ import { avaMatchId } from '@void/protocol';
 import { pickAvaMap } from './avaMapPool';
 import { avaModeId } from './avaFormats';
 import { mergeArsenal } from './arsenal';
-import { avaBattleReport } from './avaBattleView';
+import { avaBattleReport, warOpenedAt } from './avaBattleView';
 import type {
   AvaBattleReport,
   AvaChallengeStore,
@@ -392,7 +392,7 @@ export class AvaOrchestrator {
     const state = this.endedState ? await this.endedState(session.matchId) : null;
     if (!state) return null;
     const logins = this.loginsOf ? await this.loginsOf(Object.keys(session.seats)) : {};
-    return avaBattleReport(state, this.data, session.seats, logins, session.warDeclaredAt);
+    return avaBattleReport(state, this.data, session.seats, logins, warOpenedAt(session, state));
   }
 }
 

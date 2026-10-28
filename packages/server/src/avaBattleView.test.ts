@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildStateFromMap, type GameState } from '@void/shared-core';
+import { buildStateFromMap, setStance, type GameState } from '@void/shared-core';
 import { avaBattleReport, avaWarView, parseAvaBattleReport } from './avaBattleView';
 import { seatAvaRoster } from './avaOrchestrator';
 import { loadAvaMaps, loadShippedData } from './scenario';
@@ -23,11 +23,13 @@ function battle(mapId = 'ava-2v2-1'): { state: GameState; seats: Record<string, 
   return { state: buildStateFromMap(map, data, { slots, crossTeamStart: 'peace' }), seats };
 }
 
-/** Day N of the 2 на 2: the challenger took a province each and the bot's home, the bot is
- *  out, the target's player took one. */
+/** Day N of the 2 на 2's war: the challenger took a province each and the bot's home, the
+ *  bot is out, the target's player took one. */
 function midWar(): { state: GameState; seats: Record<string, string> } {
   const b = battle();
   const { state } = b;
+  for (const a of ['slot_a1', 'slot_a2'])
+    for (const t of ['slot_b1', 'bot:slot_b2']) setStance(state, a, t, 'war');
   state.planets.west!.owner = 'slot_a1';
   state.planets.home_b2!.owner = 'slot_a2';
   state.planets.east!.owner = 'slot_b1';
@@ -198,6 +200,7 @@ describe('avaWarView (CORP-9) — the war of one side, from the hub', () => {
     });
     expect(view).toMatchObject({
       phase: 'ended',
+      warAt: 9_100,
       score: 301,
       provinces: 2,
       mine: [
@@ -212,6 +215,22 @@ describe('avaWarView (CORP-9) — the war of one side, from the hub', () => {
         ],
       },
     });
+  });
+
+  it('a battle that ended before its war has no war time, though the sweep stamped it', () => {
+    const { state, seats } = battle();
+    state.match.status = 'ended';
+    const view = avaWarView({
+      matchupId: 'mu',
+      side: 'challenger',
+      session: { seats, warAt: 9_000, warDeclaredAt: 9_500 },
+      state,
+      rules,
+      data,
+      logins,
+    });
+    expect(view?.phase).toBe('ended');
+    expect(view).not.toHaveProperty('warAt');
   });
 
   it('a side of one races to the score limit itself', () => {

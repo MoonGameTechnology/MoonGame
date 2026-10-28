@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  getStance,
   isCapturable,
   isForkSite,
   type GameData,
@@ -82,6 +83,23 @@ function seatsOf(
     });
   }
   return { seats, capturable };
+}
+
+/** When the battle's war opened, wall clock: the war sweep's stamp. The sweep also stamps a
+ *  battle that ended before its war, only to drop it from its queue, so an ended battle's
+ *  war opened only if its sides are at war: some pair of seats across them holds `war`. */
+export function warOpenedAt(
+  session: Pick<AvaSession, 'warDeclaredAt'>,
+  state: GameState,
+): number | undefined {
+  if (state.match.status !== 'ended') return session.warDeclaredAt;
+  const seats = Object.entries(state.players).filter(([, player]) => player.team !== undefined);
+  const atWar = seats.some(([a, one], i) =>
+    seats
+      .slice(i + 1)
+      .some(([b, other]) => one.team !== other.team && getStance(state, a, b) === 'war'),
+  );
+  return atWar ? session.warDeclaredAt : undefined;
 }
 
 /** playerId → the account seated there (`AvaSession.seats` is accountId → playerId). A seat
@@ -189,7 +207,7 @@ export interface AvaWarView {
    *  is on its way to the corporations (`/ava/battles` carries the breakdown). */
   phase: 'peace' | 'war' | 'ended';
   /** When the war opens (peace) or opened (war, ended), wall clock. Absent on a session
-   *  without a war schedule. */
+   *  without a war schedule and on a battle that ended before its war. */
   warAt?: number;
   /** The side's score and the score that wins the battle. */
   score: number;
@@ -223,13 +241,9 @@ export function avaWarView(input: {
   const facts = seatsOf(state, input.data);
   if (!facts) return null;
   const accountOf = accountsBySeat(session.seats);
-  const phase =
-    state.match.status === 'ended'
-      ? 'ended'
-      : session.warDeclaredAt !== undefined
-        ? 'war'
-        : 'peace';
-  const warAt = session.warDeclaredAt ?? session.warAt;
+  const opened = warOpenedAt(session, state);
+  const phase = state.match.status === 'ended' ? 'ended' : opened !== undefined ? 'war' : 'peace';
+  const warAt = phase === 'peace' ? session.warAt : opened;
   const loginOf = (accountId: string | null): string | null =>
     accountId === null ? null : (logins[accountId] ?? null);
   const own = facts.seats.filter((seat) => seat.side === side);

@@ -592,7 +592,7 @@ export class AvaService {
     const challenges = await this.challenges.challengesOf(corpId);
     const results = await this.results.resultsOf(corpId);
     const tally = await this.results.tallyOf(corpId);
-    const rivals = new Set<string>();
+    const rivals = new Set<string>(tally.map((row) => row.opponent));
     for (const row of [...challenges, ...results]) {
       rivals.add(row.challengerCorp === corpId ? row.targetCorp : row.challengerCorp);
     }

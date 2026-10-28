@@ -10,6 +10,7 @@ import {
   MemoryAvaRosterStore,
   MemoryCorpStore,
   type AvaBattleReport,
+  type AvaResult,
 } from './store';
 
 // AVA-2/3/4 — readiness + the S0→S2 challenge state machine — and AVA-6, the roster
@@ -45,6 +46,7 @@ async function fixture(
     influenceA?: number;
     influenceB?: number;
     medals?: MedalCatalog;
+    results?: MemoryAvaResultStore;
   } = {},
 ): Promise<Fixture> {
   const feed = new MemoryAvaFeedStore();
@@ -58,7 +60,7 @@ async function fixture(
     corpStore: store,
     challengeStore: challenges,
     rosterStore: new MemoryAvaRosterStore(),
-    resultStore: new MemoryAvaResultStore(),
+    resultStore: opts.results ?? new MemoryAvaResultStore(),
     feedStore: feed,
     ...(opts.medals ? { medals: opts.medals } : {}),
     now,
@@ -715,6 +717,30 @@ describe('AvaService — the «Битвы» tab (CORP-9)', () => {
       B_HEAD.accountId,
       undefined,
     ]);
+  });
+
+  it('names every rival of the record, past the battles it lists', async () => {
+    // The lists keep the latest battles only; the record keeps a rival met long before.
+    class LatestOnly extends MemoryAvaResultStore {
+      override resultsOf(): Promise<Array<AvaResult & { format: number }>> {
+        return Promise.resolve([]);
+      }
+    }
+    const results = new LatestOnly();
+    const f = await fixture({ results });
+    await results.record({
+      matchupId: 'long-ago',
+      challengerCorp: f.corpA,
+      targetCorp: f.corpB,
+      winnerCorp: f.corpB,
+      at: 1,
+      format: 2,
+    });
+    const view = await f.ava.battles(A_MEMBER);
+    if ('ok' in view) throw new Error(view.code);
+    expect([view.challenges, view.results]).toEqual([[], []]);
+    expect(view.tally).toEqual([{ opponent: f.corpB, format: 2, wins: 0, losses: 1, draws: 0 }]);
+    expect(view.names).toEqual({ [f.corpB]: generatedCorpName(1) });
   });
 
   it('is for members: an outsider and a recruit are refused', async () => {

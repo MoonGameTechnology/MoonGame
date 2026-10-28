@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { avaShape, buildStateFromMap, getStance, pairKey, parseMatchMap, type MatchMap } from '@void/shared-core';
+import { avaShape, buildStateFromMap, getStance, pairKey, parseMatchMap, setStance, type MatchMap } from '@void/shared-core';
 import {
   AvaOrchestrator,
   avaBotOrders,
@@ -562,6 +562,10 @@ describe('AvaOrchestrator.onMatchEnded (AVA-8, S7) — the settlement hook', () 
     const ended = structuredClone(h.built[0]!.state);
     ended.match.status = 'ended';
     ended.match.reason = 'domination';
+    const seats = Object.keys(ended.players).filter((id) => ended.players[id]!.team !== undefined);
+    for (const a of seats)
+      for (const b of seats)
+        if (ended.players[a]!.team !== ended.players[b]!.team) setStance(ended, a, b, 'war');
     const reports: Array<AvaBattleReport | null> = [];
     const settles = (endedState: (matchId: string) => Promise<typeof ended | null>) =>
       new AvaOrchestrator({
@@ -593,6 +597,12 @@ describe('AvaOrchestrator.onMatchEnded (AVA-8, S7) — the settlement hook', () 
     // A host that keeps no ended snapshot settles without one.
     await settles(() => Promise.resolve(null)).onMatchEnded('ava-mu-r', 'slot_a1');
     expect(reports[1]).toBeNull();
+    // A battle that ended in peace: the war sweep stamped it only to drop it from its queue.
+    const peaceful = structuredClone(h.built[0]!.state);
+    peaceful.match.status = 'ended';
+    await settles(() => Promise.resolve(peaceful)).onMatchEnded('ava-mu-r', 'slot_a1');
+    expect(reports[2]).toMatchObject({ provinces: 9 });
+    expect(reports[2]).not.toHaveProperty('warAt');
   });
 
   it('winnerSideOf: unknown slots yield null (no influence on a broken mapping)', () => {
