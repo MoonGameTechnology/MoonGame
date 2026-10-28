@@ -37,7 +37,8 @@ Void Dominion (`@void/*`); название продукта — Averion или 
 | **Sector Zero** | PvE-кампания против Роя: 6 глав, свой прогресс, своя сборка |
 
 Карты Galactic War — `duel-1`, `ffa-4`, `team-2v2`, `team-3v3`, `ffa-20`, `ffa-50`
-(`prototype/src/mapCatalog.ts`). Главы Sector Zero — `data/maps/pve-1…6.json`, режим
+(`prototype/src/mapCatalog.ts`); порог победы у каждой свой, одна таблица ядра на оба хоста
+(`mapVictoryRules`). Главы Sector Zero — `data/maps/pve-1…6.json`, режим
 `pve_waves` (10 волн); архив под Яндекс Игры собирает `prototype/platformBuild.mjs`.
 
 **Где играют игроки.** Клиент игроков — `prototype/` (имя историческое). Его раздают образ

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStance, type Action } from '@void/shared-core';
+import { getStance, mapVictoryRules, type Action } from '@void/shared-core';
 import { AvaOrchestrator } from './avaOrchestrator';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
@@ -234,6 +234,8 @@ describe('AvA battle on the 20-start map (CORP-8)', () => {
     const room = live!.room;
     room.tick();
     expect(room.modeId).toBe('team_4v4');
+    // Judged by the map's threshold, the one the players' host and the HUD use, not the core's.
+    expect(room.victoryRules.scoreLimit).toBe(mapVictoryRules('ffa-20')?.scoreLimit);
     expect(room.state.match.status).toBe('ongoing');
     const seats = Object.values(room.state.players).filter((p) => !p.npc);
     expect(seats.map((p) => p.team).sort()).toEqual(['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B']);
