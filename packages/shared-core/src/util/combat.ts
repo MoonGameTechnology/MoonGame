@@ -1,4 +1,4 @@
-import { captureCasualtyCost } from './casualtyCost';
+import { captureCasualtyCost, partitionCasualtyCost } from './casualtyCost';
 import type { HandlerContext } from '../kernel/module';
 import type {
   CombatantRef,
@@ -541,13 +541,13 @@ export function applyDamage(
 ): UnitStack[] {
   const value = captureCasualtyCost(h.state, units, data);
   const { survivors, deaths } = damageUnits(units, totalDamage, data);
-  const costs = value();
-  for (const d of deaths) {
+  const costs = partitionCasualtyCost(deaths, value());
+  for (const [index,d] of deaths.entries()) {
     // A missile (SM-3.7b) does not die as a unit: shot down by shuttles it leaves spent,
     // exactly like a point-defense kill — otherwise the expedition tally, loot drops and
     // hero XP would score an interception as a kill.
     if (unitHasTrait(data, d.unit, MISSILE_TRAIT)) continue;
-    h.emit('unit.died', { unit: d.unit, count: d.count, ...source, lossCost: costs[d.unit] ?? {} });
+    h.emit('unit.died', { unit: d.unit, count: d.count, ...source, lossCost: costs[index] ?? {} });
   }
   return survivors;
 }
@@ -757,13 +757,13 @@ export function applyDamageToSide(
     setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
     return;
   }
-  const costs = value();
-  for (const d of laid.deaths) {
+  const costs = partitionCasualtyCost(laid.deaths, value());
+  for (const [index,d] of laid.deaths.entries()) {
     h.emit('unit.died', {
       unit: d.unit,
       count: d.count,
       ...source,
-      ...(!unitHasTrait(data, d.unit, MISSILE_TRAIT) ? { lossCost: costs[d.unit] ?? {} } : {}),
+      ...(!unitHasTrait(data, d.unit, MISSILE_TRAIT) ? { lossCost: costs[index] ?? {} } : {}),
     });
   }
   setSideUnits(h.state, ref, laid.survivors);
