@@ -1,4 +1,4 @@
-import type { CorpBuildOrder, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
+import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
 import type { ArsenalItem, CoalitionClock, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
@@ -218,6 +218,8 @@ export type CorpRole = 'head' | 'officer' | 'member' | 'recruit';
 export interface CorpRecord {
   corpId: string;
   name: string;
+  /** Absent on legacy records; clients derive a stable default from corpId. */
+  emblemId?: CorpEmblemId;
   /** AvA influence points (AVA-2) — the corp's inter-match currency: spent on a
    *  challenge, earned by a war victory. Never negative (spend is atomic+guarded). */
   influence: number;
@@ -250,6 +252,7 @@ export interface CorpAuditEntry {
   actor: string;
   action:
     | 'create'
+    | 'emblem'
     | 'accept'
     | 'decline'
     | 'kick'
@@ -303,7 +306,10 @@ export interface CorpStore {
     headAccountId: string,
     headLogin: string,
     at?: number,
+    emblemId?: CorpEmblemId,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }>;
+  /** Head authorization, appearance and audit commit atomically. */
+  setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }>;
   getCorp(corpId: string): Promise<CorpRecord | null>;
   /** Every corp with its accepted-member count, ordered by name (case-insensitive). */
   listCorps(): Promise<CorpSummary[]>;

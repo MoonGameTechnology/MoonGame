@@ -25,6 +25,7 @@ import { esc, kfmt, nfmt } from './format';
 import { SOV_SVG } from './icons';
 import { averagePlace, leagueKey, winRate, type MetaStats } from './meta';
 import { parseMedals, parseCorpRecord } from './corp';
+import { corpEmblem } from './corpEmblems';
 import { accountLevel } from '../../decisions/playerCareer';
 import { detach } from './detach';
 import {
@@ -555,7 +556,7 @@ export function initProfile(host: ProfileHost): {
               return v && v.role !== 'recruit' && typeof v.login === 'string' ? [v.login] : [];
             });
             if (!current(n) || request !== corporationRequest) return;
-            corporationHtml = `<h2>${esc(corp.name)}</h2><div class="pf-grid">${pfCell(t('profile.influence'), nfmt(corp.influence))}</div><h3>${esc(t('profile.corporation.members', { n: names.length }))}</h3><ul>${names.map((name) => `<li>${esc(name)}</li>`).join('')}</ul>`;
+            corporationHtml = `${corpEmblem(corp.corpId, corp.emblemId, 56)}<h2>${esc(corp.name)}</h2><div class="pf-grid">${pfCell(t('profile.influence'), nfmt(corp.influence))}</div><h3>${esc(t('profile.corporation.members', { n: names.length }))}</h3><ul>${names.map((name) => `<li>${esc(name)}</li>`).join('')}</ul>`;
           } catch {
             if (!current(n) || request !== corporationRequest) return;
             corporationHtml = `<p class="pf-hint">${esc(t('profile.corporation.error'))}</p>`;

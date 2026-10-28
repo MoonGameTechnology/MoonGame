@@ -5,9 +5,14 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { launchBrowser, waitForApp, withDiagnostics } from './harnessKit.mjs';
 import { bundleNetserver } from './bundle-netserver.mjs';
+
+const names = JSON.parse(readFileSync('data/corpNames.json', 'utf8'));
+const allowedNames = new Set(names.prefixes.flatMap(prefix => names.nouns.map(noun => `${prefix} ${noun}`)));
+const buildingCount = JSON.parse(readFileSync('data/corpBuildings.json', 'utf8')).buildings.length;
+const identityOnly = process.argv.includes('--identity-only');
 
 // Run after pnpm prototype. Bind only loopback with disposable accounts/storage.
 await bundleNetserver();
@@ -74,10 +79,45 @@ try {
         if (await page.locator('#intro .in-ok').isVisible()) await page.click('#intro .in-ok');
       };
       await openTab();
-      await page.fill('#corp-hub-name', `Builders ${locale}`);
+      await page.locator('#hp-corp [data-corpdraft="falcon"]').waitFor();
+      assert.equal(await page.locator('#corp-hub-name').count(), 0, 'creation has no free-text name');
+      assert.equal(await page.locator('#hp-corp [data-corpdraft]').count(), 20);
+      await page.locator('#hp-corp [data-corpdraft="wolf"]').focus();
+      await page.keyboard.press('Enter');
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-corpdraft')), 'wolf');
+      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-identity-create.png` });
       await page.click('#hp-corp [data-corpact="create"]');
-      await page.locator('#hp-corp .cb-id h2').filter({ hasText: `Builders ${locale}` }).waitFor();
-      assert.equal(await page.locator('#hp-corp .cb-bc').count(), 3);
+      await page.locator('#hp-corp .cb-id h2').waitFor();
+      const corporationName = (await page.locator('#hp-corp .cb-id h2').textContent()).trim();
+      assert.ok(allowedNames.has(corporationName), 'name comes from the server catalogue');
+      await page.locator('#hp-corp .cb-head [data-corp-emblem="wolf"]').waitFor();
+      await page.click('#hp-corp [data-corphub="emblem"]');
+      await page.locator('#corp-sheet.open').waitFor();
+      assert.equal(await page.locator('#corp-sheet [data-corpact="emblem"]').count(), 20);
+      assert.equal(await page.locator('#corp-sheet [data-corparg="wolf"]').getAttribute('aria-pressed'), 'true');
+      await page.waitForFunction(() => document.querySelector('#corp-sheet .cb-sheet')
+        .getAnimations().every(animation => animation.playState !== 'running'));
+      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-identity-picker.png` });
+      await page.locator('#corp-sheet [data-corpact="emblem"][data-corparg="phoenix"]').focus();
+      await page.keyboard.press('Enter');
+      await page.locator('#hp-corp .cb-head [data-corp-emblem="phoenix"]').waitFor();
+      await page.waitForFunction(() => document.activeElement?.getAttribute('data-corparg') === 'phoenix');
+      await page.keyboard.press('Escape');
+      await page.locator('#corp-sheet.open').waitFor({ state: 'detached' });
+      if (identityOnly) {
+        await page.reload();
+        await waitForApp(page);
+        await page.locator('#hub').waitFor({ state: 'visible' });
+        await openTab();
+        await page.locator('#hp-corp .cb-head [data-corp-emblem="phoenix"]').waitFor();
+        assert.equal((await page.locator('#hp-corp .cb-id h2').textContent()).trim(), corporationName);
+        assert.equal(await page.$eval('#hp-corp', el => el.scrollWidth > el.clientWidth + 1), false);
+        await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-identity-restored.png` });
+        assert.deepEqual(errors, []);
+        console.log(`PASS identity ${locale} ${width}x${height}: 20 emblems → generated name → head selection → reload, no overflow/errors`);
+        return;
+      }
+      assert.equal(await page.locator('#hp-corp .cb-bc').count(), buildingCount);
       assert.equal(await page.locator('#hp-corp .cb-lot').count(), 3);
       await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-base.png` });
       // A locked building's sheet explains the lock instead of offering an order.
@@ -112,6 +152,8 @@ try {
       await page.locator('#hub').waitFor({ state: 'visible' });
       await openTab();
       await page.click('#hp-corp [data-corpsec="base"]');
+      await page.locator('#hp-corp .cb-head [data-corp-emblem="phoenix"]').waitFor();
+      assert.equal((await page.locator('#hp-corp .cb-id h2').textContent()).trim(), corporationName);
       await page.locator('#hp-corp .cb-hud:not(.idle)').waitFor();
       await page.locator('#hp-corp .cb-lot.build[data-corpbld="headquarters"]').waitFor();
       assert.deepEqual(errors, []);

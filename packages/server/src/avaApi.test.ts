@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { registerAvaApi, registerAvaFeed } from './avaApi';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
+import { generatedCorpName } from './corpNames';
 import {
   MemoryAvaChallengeStore,
   MemoryAvaFeedStore,
@@ -36,7 +37,8 @@ async function harness(): Promise<Harness> {
   const challenges = new MemoryAvaChallengeStore();
   let t = 0;
   const now = (): number => ++t;
-  const corp = new CorpService({ store, now });
+  let catalogueIndex = 0;
+  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ });
   const service = new AvaService({
     corpStore: store,
     challengeStore: challenges,
@@ -128,8 +130,8 @@ describe('AVA · readiness + challenge API', () => {
     expect(feed.feed).toHaveLength(1);
     expect(feed.feed[0]).toMatchObject({
       kind: 'matchup',
-      challengerName: 'Alliance A',
-      targetName: 'Alliance B',
+      challengerName: generatedCorpName(0),
+      targetName: generatedCorpName(1),
     });
     await app.close();
   });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CorpService, type CorpActor } from './corpService';
+import { generatedCorpName } from './corpNames';
 import { MemoryCorpStore } from './store';
 
 // CORP-0 — the rights matrix from docs/corporations.md §2, enforced fail-secure.
@@ -46,13 +47,13 @@ async function roleOf(store: MemoryCorpStore, actor: CorpActor): Promise<string 
 describe('CORP-0 · create / apply / accept / decline', () => {
   it('creating a corp makes the founder its head; bad names are rejected', async () => {
     const store = new MemoryCorpStore();
-    const service = new CorpService({ store });
+    const service = new CorpService({ store, nameIndex: () => 0 });
     for (const bad of ['ab', ' a', 'x'.repeat(25), 'два%знака', '', 'Д_у_р_а_к', 'fuck you', 'mуdаk', 'safe\u202Ename']) {
       expect(await service.create(HEAD, bad)).toEqual({ ok: false, code: 'E_BAD_NAME' });
     }
-    const created = await service.create(HEAD, '  Красная Гвардия  '); // trimmed, cyrillic ok
+    const created = await service.create(HEAD, '  Красная Гвардия  '); // a valid legacy name is ignored
     if (!created.ok) throw new Error('expected ok');
-    expect(await store.getCorp(created.corpId)).toMatchObject({ name: 'Красная Гвардия' });
+    expect(await store.getCorp(created.corpId)).toMatchObject({ name: generatedCorpName(0) });
     expect(await roleOf(store, HEAD)).toBe('head');
   });
 
