@@ -97,6 +97,10 @@ const JSON_RECORDS = [
     'UPDATE ava_sessions SET seats=$2::jsonb WHERE match_id=$1',
   ],
   [
+    'SELECT matchup_id AS key,report AS value FROM ava_results WHERE matchup_id>$1 AND report IS NOT NULL ORDER BY matchup_id LIMIT 100',
+    'UPDATE ava_results SET report=$2::jsonb WHERE matchup_id=$1',
+  ],
+  [
     'SELECT event_id AS key,entry AS value FROM corp_return_audit WHERE event_id>$1 ORDER BY event_id LIMIT 100',
     'UPDATE corp_return_audit SET entry=$2::jsonb WHERE event_id=$1',
   ],

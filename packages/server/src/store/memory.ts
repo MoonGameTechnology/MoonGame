@@ -20,6 +20,7 @@ import type {
   AvaSession,
   AvaSessionStore,
   AvaSide,
+  AvaTally,
   CommanderStore,
   CorpAuditEntry,
   CorpFeedEntry,
@@ -666,21 +667,54 @@ export class MemoryAvaResultStore implements AvaResultStore {
   record(result: AvaResult): Promise<void> {
     // The locked→ended transition guarantees one call per matchup; keep the first
     // write should it ever be called twice (idempotent by matchupId).
-    if (!this.rows.has(result.matchupId)) this.rows.set(result.matchupId, { ...result });
+    if (!this.rows.has(result.matchupId)) this.rows.set(result.matchupId, structuredClone(result));
     return Promise.resolve();
   }
 
   get(matchupId: string): Promise<AvaResult | null> {
     const row = this.rows.get(matchupId);
-    return Promise.resolve(row ? { ...row } : null);
+    return Promise.resolve(row ? structuredClone(row) : null);
   }
 
   recent(limit = DEFAULT_RESULTS_LIMIT): Promise<AvaResult[]> {
+    return Promise.resolve(this.newest().slice(0, limit).map((r) => structuredClone(r)));
+  }
+
+  resultsOf(
+    corpId: string,
+    limit = DEFAULT_RESULTS_LIMIT,
+  ): Promise<Array<AvaResult & { format: number }>> {
     return Promise.resolve(
-      [...this.rows.values()]
-        .sort((a, b) => b.at - a.at || (a.matchupId < b.matchupId ? -1 : 1))
+      this.newest()
+        .filter((r) => r.challengerCorp === corpId || r.targetCorp === corpId)
         .slice(0, limit)
-        .map((r) => ({ ...r })),
+        .map((r) => ({ ...structuredClone(r), format: r.format ?? 2 })),
+    );
+  }
+
+  tallyOf(corpId: string): Promise<AvaTally[]> {
+    const byKey = new Map<string, AvaTally>();
+    for (const r of this.rows.values()) {
+      if (r.challengerCorp !== corpId && r.targetCorp !== corpId) continue;
+      const opponent = r.challengerCorp === corpId ? r.targetCorp : r.challengerCorp;
+      const format = r.format ?? 2;
+      const key = `${opponent}\u0000${format}`;
+      const row = byKey.get(key) ?? { opponent, format, wins: 0, losses: 0, draws: 0 };
+      if (r.winnerCorp === null) row.draws += 1;
+      else if (r.winnerCorp === corpId) row.wins += 1;
+      else row.losses += 1;
+      byKey.set(key, row);
+    }
+    return Promise.resolve(
+      [...byKey.values()].sort((a, b) =>
+        a.opponent < b.opponent ? -1 : a.opponent > b.opponent ? 1 : a.format - b.format,
+      ),
+    );
+  }
+
+  private newest(): AvaResult[] {
+    return [...this.rows.values()].sort(
+      (a, b) => b.at - a.at || (a.matchupId < b.matchupId ? -1 : 1),
     );
   }
 

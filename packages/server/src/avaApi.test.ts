@@ -68,6 +68,7 @@ describe('AVA · readiness + challenge API', () => {
     const routes = [
       { method: 'GET' as const, url: '/ava/pool' },
       { method: 'GET' as const, url: '/ava/challenges' },
+      { method: 'GET' as const, url: '/ava/battles' },
       { method: 'POST' as const, url: '/ava/ready/corp' },
       { method: 'POST' as const, url: '/ava/ready/player' },
       { method: 'POST' as const, url: '/ava/challenge', payload: { target: 'x' } },
@@ -267,6 +268,35 @@ describe('AVA · readiness + challenge API', () => {
       headers: as('carol'),
     });
     expect(carol.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('the battles tab over HTTP (CORP-9): a closed challenge stays listed, members only', async () => {
+    const { app, corpB } = await harness();
+    await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('alice') });
+    await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('bob') });
+    const challenge = await app.inject({
+      method: 'POST',
+      url: '/ava/challenge',
+      headers: as('alice'),
+      payload: { target: corpB },
+    });
+    const { id } = challenge.json() as { id: string };
+    await app.inject({ method: 'POST', url: `/ava/challenge/${id}/decline`, headers: as('bob') });
+
+    const tab = await app.inject({ method: 'GET', url: '/ava/battles', headers: as('alice') });
+    expect(tab.statusCode).toBe(200);
+    expect(tab.json()).toMatchObject({
+      ready: { corp: true, formats: [2], player: false, players: [] },
+      challenges: [{ id, status: 'declined' }],
+      results: [],
+      tally: [],
+      names: { [corpB]: generatedCorpName(1) },
+    });
+    // carol belongs to no corp: no battles to show her
+    const carol = await app.inject({ method: 'GET', url: '/ava/battles', headers: as('carol') });
+    expect(carol.statusCode).toBe(403);
+    expect(carol.json()).toEqual({ error: 'E_FORBIDDEN' });
     await app.close();
   });
 });

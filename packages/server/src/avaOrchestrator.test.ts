@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { avaShape, buildStateFromMap, getStance, pairKey, parseMatchMap, type MatchMap } from '@void/shared-core';
+import { avaShape, buildStateFromMap, getStance, pairKey, parseMatchMap, setStance, type MatchMap } from '@void/shared-core';
 import {
   AvaOrchestrator,
   avaBotOrders,
@@ -15,6 +15,7 @@ import {
   MemoryAvaChallengeStore,
   MemoryAvaRosterStore,
   MemoryAvaSessionStore,
+  type AvaBattleReport,
   type AvaChallenge,
   type AvaSide,
 } from './store';
@@ -551,6 +552,57 @@ describe('AvaOrchestrator.onMatchEnded (AVA-8, S7) — the settlement hook', () 
     expect(h.settled).toEqual([{ matchupId: 'mu12', side: null }]);
     await h.orch.onMatchEnded('dev', 'green'); // a regular match — not ours
     expect(h.settled).toHaveLength(1);
+  });
+
+  it('sends the ended battle’s breakdown along (CORP-9)', async () => {
+    const h = harness();
+    await lockedMatchup(h, 'mu-r', ['acc-a1', 'acc-a2'], ['acc-b1']);
+    await h.orch.orchestrate('mu-r');
+    await h.sessions.markWarDeclared('ava-mu-r', 77);
+    const ended = structuredClone(h.built[0]!.state);
+    ended.match.status = 'ended';
+    ended.match.reason = 'domination';
+    const seats = Object.keys(ended.players).filter((id) => ended.players[id]!.team !== undefined);
+    for (const a of seats)
+      for (const b of seats)
+        if (ended.players[a]!.team !== ended.players[b]!.team) setStance(ended, a, b, 'war');
+    const reports: Array<AvaBattleReport | null> = [];
+    const settles = (endedState: (matchId: string) => Promise<typeof ended | null>) =>
+      new AvaOrchestrator({
+        challengeStore: h.challenges,
+        rosterStore: h.roster,
+        sessionStore: h.sessions,
+        data,
+        maps,
+        manifest: MODULE_MANIFEST_VERSION,
+        createRoom: () => Promise.resolve(),
+        settle: (_matchupId, _side, report) => {
+          reports.push(report);
+          return Promise.resolve();
+        },
+        endedState,
+        loginsOf: (ids) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, id.toUpperCase()]))),
+      });
+    await settles((matchId) => Promise.resolve(matchId === 'ava-mu-r' ? ended : null)).onMatchEnded(
+      'ava-mu-r',
+      'slot_a1',
+    );
+    expect(reports[0]).toMatchObject({ reason: 'domination', warAt: 77, provinces: 9 });
+    expect(reports[0]?.seats.map((seat) => [seat.side, seat.accountId, seat.login])).toEqual([
+      ['target', null, null], // the bot on the target's empty seat
+      ['challenger', 'acc-a1', 'ACC-A1'],
+      ['challenger', 'acc-a2', 'ACC-A2'],
+      ['target', 'acc-b1', 'ACC-B1'],
+    ]);
+    // A host that keeps no ended snapshot settles without one.
+    await settles(() => Promise.resolve(null)).onMatchEnded('ava-mu-r', 'slot_a1');
+    expect(reports[1]).toBeNull();
+    // A battle that ended in peace: the war sweep stamped it only to drop it from its queue.
+    const peaceful = structuredClone(h.built[0]!.state);
+    peaceful.match.status = 'ended';
+    await settles(() => Promise.resolve(peaceful)).onMatchEnded('ava-mu-r', 'slot_a1');
+    expect(reports[2]).toMatchObject({ provinces: 9 });
+    expect(reports[2]).not.toHaveProperty('warAt');
   });
 
   it('winnerSideOf: unknown slots yield null (no influence on a broken mapping)', () => {
