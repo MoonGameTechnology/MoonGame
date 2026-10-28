@@ -345,6 +345,101 @@ describe('acknowledged logout', () => {
     expect(acc.sessionToken(BASE)).toBe(status === 500 ? 'private-token' : null);
     expect(calls[0]).toMatchObject({ url: `${HTTP}/auth/logout`, init: { method: 'POST', headers: { authorization: 'Bearer private-token' } } });
   });
+
+  it.each([204, 401])('a delayed %s for the old account preserves a newer login and join pass', async (status) => {
+    const { acc } = await boot();
+    cell.set(sessionKey(BASE), JSON.stringify({ login: 'Ivan', token: 'old-session' }));
+    let finish!: (response: Reply) => void;
+    vi.stubGlobal('fetch', () => new Promise<Reply>(resolve => { finish = resolve; }));
+    const pending = acc.signOutEverywhere(BASE);
+    cell.set(sessionKey(BASE), JSON.stringify({ login: 'Petr', token: 'new-session' }));
+    acc.holdJoinToken('new-join-pass');
+    finish(reply(status));
+    expect(await pending).toBeNull();
+    expect(acc.sessionToken(BASE)).toBe('new-session');
+    expect(acc.takeJoinToken()).toBe('new-join-pass');
+  });
+});
+
+describe('account changes while joining or deleting', () => {
+  const remember = (login: string, token: string): void =>
+    void cell.set(sessionKey(BASE), JSON.stringify({ login, token }));
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  const deletionKey = `vd.deletion.${HTTP}`;
+
+  it.each([200, 401])('a delayed join %s cannot use or clear a different account', async (status) => {
+    const { acc, env } = await boot();
+    remember('Ivan', 'old-session');
+    let finish!: (response: Reply) => void;
+    vi.stubGlobal('fetch', () => new Promise<Reply>(resolve => { finish = resolve; }));
+    const pending = acc.fetchJoinToken(BASE, 'm1', 'old-session');
+    remember('Petr', 'new-session');
+    finish(reply(status, { token: 'old-join-pass', playerId: 'p1' }));
+    expect(await pending).toBeNull();
+    expect(acc.sessionToken(BASE)).toBe('new-session');
+    expect(env.status).toEqual([]);
+  });
+
+  it('a join pass whose response body arrives after logout is discarded', async () => {
+    const { acc } = await boot();
+    remember('Ivan', 'old-session');
+    let finish!: (body: unknown) => void;
+    server = () => ({ ...reply(200), json: () => new Promise(resolve => { finish = resolve; }) });
+    const pending = acc.fetchJoinToken(BASE, 'm1', 'old-session');
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    cell.delete(sessionKey(BASE));
+    finish({ token: 'old-join-pass', playerId: 'p1' });
+    expect(await pending).toBeNull();
+  });
+
+  it.each(['digest', 'response', 'body'] as const)('deletion does not touch a new session while awaiting its %s', async phase => {
+    const { acc } = await boot();
+    remember('Ivan', 'old-session');
+    let finishDigest!: (digest: ArrayBuffer) => void;
+    let finishResponse!: (response: Reply) => void;
+    let finishBody!: (body: unknown) => void;
+    vi.stubGlobal('crypto', {
+      randomUUID: () => requestId,
+      subtle: { digest: () => phase === 'digest'
+        ? new Promise<ArrayBuffer>(resolve => { finishDigest = resolve; })
+        : Promise.resolve(new ArrayBuffer(32)) },
+    });
+    vi.stubGlobal('fetch', () => phase === 'response'
+      ? new Promise<Reply>(resolve => { finishResponse = resolve; })
+      : Promise.resolve(phase === 'body'
+        ? { ...reply(202), json: () => new Promise(resolve => { finishBody = resolve; }) }
+        : reply(202, { status: 'pending', requestId })));
+    const pending = acc.requestAccountDeletion(BASE, 'secret phrase');
+    if (phase !== 'digest') await vi.waitFor(() =>
+      expect(phase === 'response' ? finishResponse : finishBody).toBeTypeOf('function'));
+    remember('Petr', 'new-session');
+    acc.holdJoinToken('new-join-pass');
+    if (phase === 'digest') finishDigest(new ArrayBuffer(32));
+    else if (phase === 'response') finishResponse(reply(202, { status: 'pending', requestId }));
+    else finishBody({ status: 'pending', requestId });
+    expect(await pending).toBe('superseded');
+    expect(acc.sessionToken(BASE)).toBe('new-session');
+    expect(acc.takeJoinToken()).toBe('new-join-pass');
+    if (phase === 'digest') expect(cell.has(deletionKey)).toBe(false);
+  });
+
+  it.each([
+    '{broken-json',
+    JSON.stringify({ session: '0'.repeat(64), requestId: 'invalid-request-id' }),
+  ])('a damaged deletion retry record %s does not block a confirmed deletion', async record => {
+    const { acc } = await boot();
+    remember('Ivan', 'old-session');
+    cell.set(deletionKey, record);
+    vi.stubGlobal('crypto', {
+      randomUUID: () => requestId,
+      subtle: { digest: async () => new ArrayBuffer(32) },
+    });
+    server = () => reply(202, { status: 'pending', requestId });
+    expect(await acc.requestAccountDeletion(BASE, 'secret phrase')).toBe('pending');
+    expect(sent('/auth/delete-account')).toEqual({ password: 'secret phrase', confirm: 'DELETE', requestId });
+    expect(acc.sessionToken(BASE)).toBeNull();
+    expect(cell.has(deletionKey)).toBe(false);
+  });
 });
 
 describe('AC-0.2 — запомнить вход', () => {

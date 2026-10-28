@@ -708,9 +708,13 @@ export function initHubScreen(host: HubScreenHost): void {
     // «Сменить командира» must really switch identity: drop this server's session so
     // the next sign-in authenticates the NEW callsign instead of replaying the old JWT.
     const srv = game.resolveServer();
-    if (srv && !(await signOutEverywhere(srv.base))) {
-      hubNote.textContent = t('auth.logout.failed');
-      return;
+    if (srv) {
+      const result = await signOutEverywhere(srv.base);
+      if (result === null) return;
+      if (!result) {
+        hubNote.textContent = t('auth.logout.failed');
+        return;
+      }
     }
     leaveMatch();
     game.status('');
