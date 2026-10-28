@@ -8,6 +8,7 @@ import {
   MemoryAvaResultStore,
   MemoryAvaRosterStore,
   MemoryCorpStore,
+  type AvaBattleReport,
 } from './store';
 
 // AVA-2/3/4 — readiness + the S0→S2 challenge state machine — and AVA-6, the roster
@@ -630,5 +631,94 @@ describe('AvaService — battle formats (CORP-7)', () => {
     expect(await f.ava.settleMatch(id, 'target')).toEqual({ ok: true, winnerCorp: f.corpB });
     expect((await f.store.getCorp(f.corpB))?.influence).toBe(725);
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(350);
+  });
+});
+
+describe('AvaService — the «Битвы» tab (CORP-9)', () => {
+  /** The breakdown the host sends with a settlement: two challengers, the target's head
+   *  and a bot. */
+  const report = (): AvaBattleReport => ({
+    reason: 'score',
+    warAt: 5,
+    provinces: 9,
+    sides: { challenger: { score: 900, provinces: 5 }, target: { score: 300, provinces: 2 } },
+    seats: [
+      { side: 'challenger', accountId: A_HEAD.accountId, login: 'ahead', score: 600, provinces: 3, out: false },
+      { side: 'challenger', accountId: A_MEMBER.accountId, login: 'amember', score: 300, provinces: 2, out: false },
+      { side: 'target', accountId: B_HEAD.accountId, login: 'bhead', score: 300, provinces: 2, out: false },
+      { side: 'target', accountId: null, login: null, score: 0, provinces: 0, out: true },
+    ],
+  });
+
+  it('records the battle’s format and breakdown with its result', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f);
+    expect(await f.ava.settleMatch(id, 'challenger', report())).toEqual({ ok: true, winnerCorp: f.corpA });
+    expect((await f.ava.matchHistory())[0]).toMatchObject({ matchupId: id, format: 2, report: report() });
+  });
+
+  it('drops a malformed breakdown and settles all the same', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f);
+    const bad = { ...report(), seats: 'everyone' } as unknown as AvaBattleReport;
+    expect(await f.ava.settleMatch(id, 'challenger', bad)).toEqual({ ok: true, winnerCorp: f.corpA });
+    const [result] = await f.ava.matchHistory();
+    expect(result).toMatchObject({ matchupId: id, format: 2 });
+    expect(result).not.toHaveProperty('report');
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(550); // the win still paid
+  });
+
+  it('shows a member the readiness, every challenge, the battles and the record', async () => {
+    const f = await fixture();
+    const won = await lockedMatchup(f);
+    await f.ava.settleMatch(won, 'challenger', report());
+    const again = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!again.ok) throw new Error('challenge failed');
+    await f.ava.decline(B_HEAD, again.id); // closed, and still listed
+    await f.ava.setPlayerReady(A_MEMBER);
+
+    const view = await f.ava.battles(A_MEMBER);
+    if ('ok' in view) throw new Error(view.code);
+    expect(view.corpId).toBe(f.corpA);
+    expect(view.ready).toEqual({ corp: true, formats: [2], player: true, players: [A_MEMBER.accountId] });
+    expect(view.challenges.map((c) => [c.id, c.status])).toEqual([
+      [again.id, 'declined'],
+      [won, 'ended'],
+    ]);
+    expect(view.tally).toEqual([{ opponent: f.corpB, format: 2, wins: 1, losses: 0, draws: 0 }]);
+    expect(view.names).toEqual({ [f.corpB]: 'Alliance B' });
+    expect(view.results).toHaveLength(1);
+    expect(view.results[0]).toMatchObject({ matchupId: won, side: 'challenger', format: 2, winnerCorp: f.corpA });
+    // The corp's own seats name their accounts; a rival is known by login, a bot by nothing.
+    expect(view.results[0]?.report?.seats).toEqual([
+      { side: 'challenger', accountId: A_HEAD.accountId, bot: false, login: 'ahead', score: 600, provinces: 3, out: false },
+      { side: 'challenger', accountId: A_MEMBER.accountId, bot: false, login: 'amember', score: 300, provinces: 2, out: false },
+      { side: 'target', bot: false, login: 'bhead', score: 300, provinces: 2, out: false },
+      { side: 'target', bot: true, login: null, score: 0, provinces: 0, out: true },
+    ]);
+  });
+
+  it('the rival sees the same battle from its own side', async () => {
+    const f = await fixture();
+    await f.ava.settleMatch(await lockedMatchup(f), 'challenger', report());
+    const view = await f.ava.battles(B_MEMBER);
+    if ('ok' in view) throw new Error(view.code);
+    expect(view.ready).toMatchObject({ corp: true, player: false, players: [] });
+    expect(view.tally).toEqual([{ opponent: f.corpA, format: 2, wins: 0, losses: 1, draws: 0 }]);
+    expect(view.names).toEqual({ [f.corpA]: 'Alliance A' });
+    expect(view.results[0]?.side).toBe('target');
+    expect(view.results[0]?.report?.seats.map((seat) => seat.accountId)).toEqual([
+      undefined,
+      undefined,
+      B_HEAD.accountId,
+      undefined,
+    ]);
+  });
+
+  it('is for members: an outsider and a recruit are refused', async () => {
+    const f = await fixture();
+    expect(await f.ava.battles(OUTSIDER)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    await f.corp.apply(OUTSIDER, f.corpA); // an application makes a recruit
+    expect(await f.ava.battles(OUTSIDER)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
   });
 });

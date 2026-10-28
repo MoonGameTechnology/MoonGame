@@ -66,6 +66,7 @@ import { registerArsenalApi } from './arsenalApi';
 import { registerMetaMarketApi } from './metaMarketApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
+import { registerAvaWarApi } from './avaWarApi';
 import { registerPushApi } from './pushApi';
 import { configureWebPush, sendPush, vapidFromEnv } from './push';
 import { createPushDispatcher } from './pushDispatch';
@@ -356,7 +357,10 @@ const avaOrchestrator = new AvaOrchestrator({
   },
   // AVA-8 (S7): settle the ended war — archive the matchup, record the outcome,
   // award influence to the winning corp (exactly-once by the locked→ended gate).
-  settle: (matchupId, winnerSide) => avaService.settleMatch(matchupId, winnerSide),
+  // CORP-9: with the battle's breakdown, counted from its ended snapshot.
+  settle: (matchupId, winnerSide, report) => avaService.settleMatch(matchupId, winnerSide, report),
+  endedState: async (matchId) => (await stores.store.load(matchId))?.state ?? null,
+  loginsOf: (accountIds) => stores.userStore.loginsOf(accountIds),
   // ARS-3: snapshot each rostered account's arsenal at launch — the seat builds
   // only what it owned at the lock (GDD §2); later purchases wait for LARS-1.
   arsenalOf: async (accountId) => arsenalSnapshotOf(await stores.arsenalStore.listOf(accountId)),
@@ -716,6 +720,24 @@ const server = createMultiplayerServer({
             canTrade: async (accountId) => (await stores.commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
+          // CORP-9 — the war of one side for the hub's «Битвы»: served here, where the
+          // battle runs, not by the corporations authority. A battle nobody plays this
+          // minute wakes for the reading, like for an admin's roster, and with nobody at
+          // its table goes back to sleep after the idle window.
+          registerAvaWarApi(scope, {
+            identify,
+            corps: stores.corpStore,
+            challenges: stores.challengeStore,
+            sessions: stores.sessionStore,
+            users: stores.userStore,
+            battle: async (matchId) => {
+              const room = registry.get(matchId) ?? (await registry.resolve(matchId));
+              if (!room) return undefined;
+              registry.release(matchId);
+              return { state: room.state, victoryRules: room.victoryRules };
+            },
+            data,
+          });
           // Friends (FRIENDS-1) — roster + requests, session-gated. Presence is read
           // from the LIVE registry at request time (never stored): a friend seated in
           // a running match reads as «в матче · день N».

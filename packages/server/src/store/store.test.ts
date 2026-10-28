@@ -50,6 +50,7 @@ import type {
   DropStore,
   OwnedArsenalItem,
   UserStore,
+  AvaBattleReport,
   AvaChallenge,
   AvaChallengeStore,
   AvaFeedEntry,
@@ -765,6 +766,62 @@ function resultStoreContract(
       expect(await store.statsForCorp(b)).toEqual({ matches: 2, wins: 1 });
       expect(await store.statsForCorp(uniq('none'))).toEqual({ matches: 0, wins: 0 });
     });
+
+    it('keeps the battle’s format and breakdown (CORP-9)', async () => {
+      const store = make();
+      const [mu, a, b] = [uniq('f-mu'), uniq('f-a'), uniq('f-b')];
+      const report: AvaBattleReport = {
+        reason: 'domination',
+        warAt: 7,
+        provinces: 9,
+        sides: { challenger: { score: 420, provinces: 6 }, target: { score: 90, provinces: 1 } },
+        seats: [
+          { side: 'challenger', accountId: 'acc-1', login: 'one', score: 420, provinces: 6, out: false },
+          { side: 'target', accountId: null, login: null, score: 90, provinces: 1, out: true },
+        ],
+      };
+      await store.record({ matchupId: mu, challengerCorp: a, targetCorp: b, winnerCorp: a, at: 3, format: 4, report });
+      expect(await store.get(mu)).toEqual({
+        matchupId: mu,
+        challengerCorp: a,
+        targetCorp: b,
+        winnerCorp: a,
+        at: 3,
+        format: 4,
+        report: structuredClone(report),
+      });
+      report.seats[0]!.score = 0; // the stored breakdown is not the caller's object
+      expect((await store.get(mu))?.report?.seats[0]?.score).toBe(420);
+    });
+
+    it('resultsOf: a corp’s battles on either side, newest first, 2 на 2 without a format (CORP-9)', async () => {
+      const store = make();
+      const [a, b, c] = [uniq('o-a'), uniq('o-b'), uniq('o-c')];
+      await store.record({ matchupId: uniq('o1'), challengerCorp: a, targetCorp: b, winnerCorp: a, at: 1 });
+      await store.record({ matchupId: uniq('o2'), challengerCorp: c, targetCorp: a, winnerCorp: c, at: 2, format: 5 });
+      await store.record({ matchupId: uniq('o3'), challengerCorp: b, targetCorp: c, winnerCorp: b, at: 3, format: 3 });
+      expect((await store.resultsOf(a)).map((r) => [r.matchupId, r.format])).toEqual([
+        [uniq('o2'), 5],
+        [uniq('o1'), 2],
+      ]);
+      expect(await store.resultsOf(a, 1)).toHaveLength(1);
+      expect(await store.resultsOf(uniq('o-none'))).toEqual([]);
+    });
+
+    it('tallyOf: the record per rival and format (CORP-9)', async () => {
+      const store = make();
+      const [a, b, c] = [uniq('t-a'), uniq('t-b'), uniq('t-c')];
+      await store.record({ matchupId: uniq('t1'), challengerCorp: a, targetCorp: b, winnerCorp: a, at: 1, format: 2 });
+      await store.record({ matchupId: uniq('t2'), challengerCorp: b, targetCorp: a, winnerCorp: b, at: 2, format: 2 });
+      await store.record({ matchupId: uniq('t3'), challengerCorp: a, targetCorp: b, winnerCorp: null, at: 3, format: 3 });
+      await store.record({ matchupId: uniq('t4'), challengerCorp: c, targetCorp: a, winnerCorp: a, at: 4 });
+      expect(await store.tallyOf(a)).toEqual([
+        { opponent: b, format: 2, wins: 1, losses: 1, draws: 0 },
+        { opponent: b, format: 3, wins: 0, losses: 0, draws: 1 },
+        { opponent: c, format: 2, wins: 1, losses: 0, draws: 0 },
+      ]);
+      expect(await store.tallyOf(uniq('t-none'))).toEqual([]);
+    });
   });
 }
 
@@ -1333,6 +1390,39 @@ describe.skipIf(!DB)('Postgres adapters', () => {
     } finally {
       await pool.query(`DELETE FROM ava_challenges WHERE id = $1`, [id]);
       await pool.query(`DELETE FROM corp_ready WHERE corp_id = $1`, [`${id}_a`]);
+    }
+  });
+
+  it('CORP-9: a result from before the breakdowns takes its challenge’s format', async () => {
+    const id = `legacy9_${stamp}`;
+    const [a, b] = [`${id}_a`, `${id}_b`];
+    await pool.query(
+      `INSERT INTO ava_challenges (id, challenger_corp, target_corp, format, cost, status, created_at, expires_at)
+       VALUES ($1, $2, $3, 4, 200, 'ended', 0, 0)`,
+      [id, a, b],
+    );
+    // Written by the pre-CORP-9 INSERT: no format, no breakdown.
+    await pool.query(
+      `INSERT INTO ava_results (matchup_id, challenger_corp, target_corp, winner_corp, at)
+       VALUES ($1, $2, $3, $2, 0)`,
+      [id, a, b],
+    );
+    try {
+      const store = new PostgresAvaResultStore(pool);
+      expect((await store.get(id))?.format).toBeUndefined();
+      await migrate(pool);
+      expect(await store.get(id)).toEqual({
+        matchupId: id,
+        challengerCorp: a,
+        targetCorp: b,
+        winnerCorp: a,
+        at: 0,
+        format: 4,
+      });
+      expect(await store.tallyOf(a)).toEqual([{ opponent: b, format: 4, wins: 1, losses: 0, draws: 0 }]);
+    } finally {
+      await pool.query(`DELETE FROM ava_results WHERE matchup_id = $1`, [id]);
+      await pool.query(`DELETE FROM ava_challenges WHERE id = $1`, [id]);
     }
   });
 });

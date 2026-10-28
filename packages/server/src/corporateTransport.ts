@@ -256,7 +256,7 @@ export function registerCorporateMaintenance(app: FastifyInstance, enabled: bool
   if (!enabled) return;
   app.addHook('preHandler', async (request, reply) => {
     if (
-      ['/corps', '/ava', '/medals', '/corp-arsenal'].some(
+      ['/corps', '/ava', '/ava-war', '/medals', '/corp-arsenal'].some(
         (prefix) =>
           request.url === prefix ||
           request.url.startsWith(`${prefix}/`) ||

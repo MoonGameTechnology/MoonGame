@@ -440,6 +440,46 @@ export interface AvaResult {
   targetCorp: string;
   winnerCorp: string | null;
   at: number;
+  /** Players per side (CORP-9 records it; an earlier result takes its challenge's format). */
+  format?: number;
+  /** CORP-9: how the battle went; absent on results recorded before it. */
+  report?: AvaBattleReport;
+}
+
+/** CORP-9: one seat of a corporations battle in its breakdown. The login is taken at the
+ *  end, like the corp names in the feed, so the breakdown reads on its own later. */
+export interface AvaSeatReport {
+  side: AvaSide;
+  /** null: a bot played the seat. */
+  accountId: string | null;
+  login: string | null;
+  score: number;
+  /** Capturable provinces the seat held at the end. */
+  provinces: number;
+  /** The seat lost its last province. */
+  out: boolean;
+}
+
+/** CORP-9: the breakdown of a corporations battle, recorded with its result by the host
+ *  that ran it: how it ended, both sides' score and provinces, every seat's score. */
+export interface AvaBattleReport {
+  /** The match's end reason; null when the state names none of the four. */
+  reason: 'domination' | 'elimination' | 'score' | 'timeout' | null;
+  /** When the war opened (wall clock); absent when the battle ended before it. */
+  warAt?: number;
+  /** Capturable provinces of the map: the share a domination win counts against. */
+  provinces: number;
+  sides: Record<AvaSide, { score: number; provinces: number }>;
+  seats: AvaSeatReport[];
+}
+
+/** CORP-9: a corp's record against one opponent in one format. */
+export interface AvaTally {
+  opponent: string;
+  format: number;
+  wins: number;
+  losses: number;
+  draws: number;
 }
 
 /** Persistence for AvA results (AVA-8). One row per matchup — the matchup's exactly-once
@@ -454,6 +494,11 @@ export interface AvaResultStore {
    *  side) and matches it won. The objective source medal conditions (corporations.md §3)
    *  are checked against — server-side, never in the deterministic core. */
   statsForCorp(corpId: string): Promise<{ matches: number; wins: number }>;
+  /** CORP-9: the corp's battles (either side), newest first, each with its format: 2 на 2
+   *  when no format is known, like a challenge written before the formats. */
+  resultsOf(corpId: string, limit?: number): Promise<Array<AvaResult & { format: number }>>;
+  /** CORP-9: the corp's whole record, per opponent and format. */
+  tallyOf(corpId: string): Promise<AvaTally[]>;
   close?(): Promise<void>;
 }
 

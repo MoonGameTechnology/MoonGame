@@ -39,6 +39,7 @@ import { isAvaMatchId } from '../packages/protocol/src/ava';
 import { createAvaSweeps } from '../packages/server/src/avaSweeps';
 import { CorpArsenalService } from '../packages/server/src/corpArsenalService';
 import { registerCorpArsenalApi } from '../packages/server/src/corpArsenalApi';
+import { registerAvaWarApi } from '../packages/server/src/avaWarApi';
 import { createCorporateServices } from '../packages/server/src/corporateTransactions';
 import { declareAvaWar } from '../packages/server/src/serverWiring';
 import { salvageFromEvents } from '../packages/server/src/dropRoller';
@@ -606,7 +607,10 @@ const avaOrchestrator = new AvaOrchestrator({
     const room = registry.get(matchId);
     return room ? declareAvaWar(room, matchId) : false;
   },
-  settle: (matchupId, winnerSide) => avaService.settleMatch(matchupId, winnerSide),
+  // CORP-9: итог уходит с разбором битвы, посчитанным по её снимку на конец.
+  settle: (matchupId, winnerSide, report) => avaService.settleMatch(matchupId, winnerSide, report),
+  endedState: async (matchId) => (await matchStore.load(matchId))?.state ?? null,
+  loginsOf: (accountIds) => userStore.loginsOf(accountIds),
   // ARS-3: арсенал учётки на момент блокировки состава; ARS-6: плюс выданное со склада.
   arsenalOf: async (accountId) => arsenalSnapshotOf(await arsenalStore.listOf(accountId)),
   corpRentalOf: (accountId, matchupId) => corpArsenalService.rentedArsenalOf(accountId, matchupId),
@@ -1608,6 +1612,20 @@ const server = createMultiplayerServer({
       }
       // Corp-warehouse handouts (ARS-6): a head/officer lends a corp item to a rostered fighter.
       registerCorpArsenalApi(app, { service: corpArsenalService, identify: identifySession });
+      // CORP-9: ход войны своей стороны для «Битв» хаба отдаёт хост, где идёт битва, а не
+      // корпорации: только у него её комната.
+      registerAvaWarApi(app, {
+        identify: identifySession,
+        corps: corpStore,
+        challenges: challengeStore,
+        sessions: sessionStore,
+        users: userStore,
+        battle: async (matchId) => {
+          const room = registry.get(matchId);
+          return room ? { state: room.state, victoryRules: room.victoryRules } : undefined;
+        },
+        data,
+      });
       // MetaMarket (EC-3) — тот же слайс аукциона, что в проде: прото-хост не заводит
       // свою торговлю. Фаусет — из окружения, по умолчанию выключен.
       registerArsenalApi(app, { store: arsenalStore, identify: identifySession });

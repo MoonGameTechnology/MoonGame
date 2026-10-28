@@ -14,7 +14,15 @@ import { avaMatchId } from '@void/protocol';
 import { pickAvaMap } from './avaMapPool';
 import { avaModeId } from './avaFormats';
 import { mergeArsenal } from './arsenal';
-import type { AvaChallengeStore, AvaRosterStore, AvaSessionStore, AvaSide } from './store';
+import { avaBattleReport } from './avaBattleView';
+import type {
+  AvaBattleReport,
+  AvaChallengeStore,
+  AvaRosterStore,
+  AvaSession,
+  AvaSessionStore,
+  AvaSide,
+} from './store';
 
 /**
  * AVA-7 — the phase-machine step S4: turn a LOCKED matchup (a frozen roster, AVA-6) into a
@@ -80,9 +88,19 @@ export interface AvaOrchestratorDeps {
   /** The game owns active match status; no corporate call on the war-clock path. */
   isMatchEnded?: (matchId: string) => Promise<boolean>;
   /** AVA-8 (S7): settle the ended war — `AvaService.settleMatch` (archive + record +
-   *  award influence, exactly-once by the matchup's locked→ended transition).
-   *  Absent ⇒ `onMatchEnded` observes nothing. */
-  settle?: (matchupId: string, winnerSide: AvaSide | null) => Promise<unknown>;
+   *  award influence, exactly-once by the matchup's locked→ended transition), with the
+   *  battle's breakdown when there is one (CORP-9). Absent ⇒ `onMatchEnded` observes
+   *  nothing. */
+  settle?: (
+    matchupId: string,
+    winnerSide: AvaSide | null,
+    report: AvaBattleReport | null,
+  ) => Promise<unknown>;
+  /** CORP-9: the ended match's state, the breakdown's source. Absent, or no snapshot ⇒
+   *  the result is recorded without a breakdown. */
+  endedState?: (matchId: string) => Promise<GameState | null>;
+  /** CORP-9: the seated accounts' logins for the breakdown (`UserStore.loginsOf`). */
+  loginsOf?: (accountIds: readonly string[]) => Promise<Record<string, string>>;
   /** ARS-3: the account's ownership snapshot at launch (GDD §2 «консервация деки» —
    *  the roster lock/launch IS the snapshot instant). Attached to each HUMAN seat's
    *  `SlotAssignment.arsenal`, so `unit.build`/`hero.fit` enforce `E_NOT_OWNED`
@@ -178,7 +196,9 @@ export class AvaOrchestrator {
   private readonly now: () => number;
   private readonly peaceMs: number;
   private readonly escalateWar?: (matchId: string) => Promise<boolean>;
-  private readonly settle?: (matchupId: string, winnerSide: AvaSide | null) => Promise<unknown>;
+  private readonly settle?: AvaOrchestratorDeps['settle'];
+  private readonly endedState?: AvaOrchestratorDeps['endedState'];
+  private readonly loginsOf?: AvaOrchestratorDeps['loginsOf'];
   private readonly arsenalOf?: (accountId: string) => Promise<PlayerArsenal>;
   private readonly corpRentalOf?: (accountId: string, matchupId: string) => Promise<PlayerArsenal>;
 
@@ -197,6 +217,8 @@ export class AvaOrchestrator {
     this.peaceMs = deps.peaceMs ?? DEFAULT_PEACE_MS;
     if (deps.escalateWar) this.escalateWar = deps.escalateWar;
     if (deps.settle) this.settle = deps.settle;
+    if (deps.endedState) this.endedState = deps.endedState;
+    if (deps.loginsOf) this.loginsOf = deps.loginsOf;
     if (deps.arsenalOf) this.arsenalOf = deps.arsenalOf;
     if (deps.corpRentalOf) this.corpRentalOf = deps.corpRentalOf;
   }
@@ -349,7 +371,8 @@ export class AvaOrchestrator {
   /** AVA-8 (S7) — the settlement hook the host calls from the room's `end` observation:
    *  a non-AvA match is ignored; an AvA one maps the winning PLAYER (a slot id, or a
    *  `bot:`-prefixed one; null = draw/tie) to its SIDE via the session's map and settles
-   *  the matchup (`settle` = `AvaService.settleMatch` — exactly-once by its own gate). */
+   *  the matchup (`settle` = `AvaService.settleMatch` — exactly-once by its own gate),
+   *  sending the battle's breakdown along (CORP-9). */
   async onMatchEnded(matchId: string, winnerPlayerId: string | null): Promise<void> {
     if (!this.settle) return;
     const session = await this.sessions.byMatch(matchId);
@@ -360,7 +383,16 @@ export class AvaOrchestrator {
     if (winnerPlayerId !== null)
       for (const map of [...this.maps, ...this.retiredMaps])
         if (map.id === session.mapId) side ??= winnerSideOf(map, winnerPlayerId);
-    await this.settle(session.matchupId, side);
+    await this.settle(session.matchupId, side, await this.reportOf(session));
+  }
+
+  /** CORP-9: the breakdown of a finished battle, from its ended snapshot; none when the
+   *  host keeps no snapshot or the state is not a two-sided battle. */
+  private async reportOf(session: AvaSession): Promise<AvaBattleReport | null> {
+    const state = this.endedState ? await this.endedState(session.matchId) : null;
+    if (!state) return null;
+    const logins = this.loginsOf ? await this.loginsOf(Object.keys(session.seats)) : {};
+    return avaBattleReport(state, this.data, session.seats, logins, session.warDeclaredAt);
   }
 }
 

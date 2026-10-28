@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AVA_FEED_KINDS, isAvaFeedEntry } from './store';
 import type {
+  AvaBattleReport,
   AvaChallenge,
   AvaChallengeStore,
   AvaFeedEntry,
@@ -9,12 +10,15 @@ import type {
   AvaResultStore,
   AvaRosterEntry,
   AvaRosterStore,
+  AvaSeatReport,
   AvaSide,
+  AvaTally,
   CorpMembership,
   CorpStore,
   CorpSummary,
 } from './store';
 import type { CorpActor } from './corpService';
+import { parseAvaBattleReport } from './avaBattleView';
 import {
   AVA_FORMATS,
   avaFormat,
@@ -77,6 +81,42 @@ export interface AvaRosterView {
   mine: AvaRosterEntry[];
   /** Headcounts of both sides (the opponent's roster stays private). */
   counts: Record<AvaSide, number>;
+}
+
+/** CORP-9: a seat of a finished battle as one of its corporations sees it. The account
+ *  is named on the caller's own side only; a rival is known by login, a bot by nothing. */
+export interface AvaBattleSeat extends Omit<AvaSeatReport, 'accountId'> {
+  accountId?: string;
+  bot: boolean;
+}
+
+/** CORP-9: a finished battle as one of its corporations sees it — its side, the format,
+ *  and the breakdown when the battle has one (results before CORP-9 have none). */
+export interface AvaBattleResult extends Omit<AvaResult, 'report'> {
+  format: number;
+  side: AvaSide;
+  report?: Omit<AvaBattleReport, 'seats'> & { seats: AvaBattleSeat[] };
+}
+
+/** CORP-9: the «Битвы» tab of a corporation, for its members. */
+export interface AvaBattlesView {
+  corpId: string;
+  ready: {
+    /** The corp is in the ready pool, for these formats. */
+    corp: boolean;
+    formats: number[];
+    /** The caller's own consent to deployment, and every member who gave it. */
+    player: boolean;
+    players: string[];
+  };
+  /** Open and closed challenges, newest first (`AvaChallengeStore.challengesOf`). */
+  challenges: AvaChallenge[];
+  /** Finished battles, newest first. */
+  results: AvaBattleResult[];
+  /** The whole record, per rival and format. */
+  tally: AvaTally[];
+  /** corpId → name of every rival above; a disbanded corp is absent. */
+  names: Record<string, string>;
 }
 
 /** Default challenge expiry (tunable via deps). Price, roster bounds and the win reward
@@ -463,10 +503,13 @@ export class AvaService {
    *  transition is the exactly-once gate — a replayed `match.ended` loses the race and
    *  no-ops, so influence is never awarded twice. `winnerSide` is null for a draw (result
    *  recorded, no influence); a format the catalog no longer knows awards none either.
-   *  Server-driven (past the action gate) like the expiry/roster sweeps — no client. */
+   *  The result carries the matchup's format and, when the host sends one, the battle's
+   *  breakdown (CORP-9, `avaBattleReport`). Server-driven (past the action gate) like the
+   *  expiry/roster sweeps — no client. */
   async settleMatch(
     matchupId: string,
     winnerSide: AvaSide | null,
+    report?: AvaBattleReport | null,
   ): Promise<{ ok: true; winnerCorp: string | null } | AvaFail> {
     const matchup = await this.challenges.getChallenge(matchupId);
     if (!matchup) return { ok: false, code: 'E_NO_CHALLENGE' };
@@ -482,12 +525,16 @@ export class AvaService {
           ? matchup.challengerCorp
           : matchup.targetCorp;
     const at = this.now();
+    // CORP-9: the breakdown the host sent, if it holds up; a bad one never blocks the result.
+    const breakdown = parseAvaBattleReport(report);
     await this.results.record({
       matchupId,
       challengerCorp: matchup.challengerCorp,
       targetCorp: matchup.targetCorp,
       winnerCorp,
       at,
+      format: matchup.format,
+      ...(breakdown ? { report: breakdown } : {}),
     });
     const reward = avaFormat(this.formats, matchup.format)?.reward;
     if (winnerCorp !== null && reward !== undefined) {
@@ -529,6 +576,44 @@ export class AvaService {
    *  foundation the public feed (AVA-9), medal conditions and rating read from. */
   matchHistory(limit?: number): Promise<AvaResult[]> {
     return this.results.recent(limit);
+  }
+
+  // ---- CORP-9 · the «Битвы» tab ---------------------------------------------
+
+  /** The caller's corporation at war: its readiness, its challenges open and closed, its
+   *  finished battles seen from its side, its record per rival and format, and the rivals'
+   *  names. For members — a recruit sees no more of the battles than of the roster. */
+  async battles(who: CorpActor): Promise<AvaBattlesView | AvaFail> {
+    const membership = await this.corps.membershipOf(who.accountId);
+    if (!membership || membership.role === 'recruit') return { ok: false, code: 'E_FORBIDDEN' };
+    const { corpId } = membership;
+    const formats = await this.corps.readyFormatsOf(corpId);
+    const players = await this.corps.readyPlayersOf(corpId);
+    const challenges = await this.challenges.challengesOf(corpId);
+    const results = await this.results.resultsOf(corpId);
+    const tally = await this.results.tallyOf(corpId);
+    const rivals = new Set<string>();
+    for (const row of [...challenges, ...results]) {
+      rivals.add(row.challengerCorp === corpId ? row.targetCorp : row.challengerCorp);
+    }
+    const names: Record<string, string> = {};
+    for (const id of [...rivals].sort()) {
+      const corp = await this.corps.getCorp(id);
+      if (corp) names[id] = corp.name;
+    }
+    return {
+      corpId,
+      ready: {
+        corp: formats !== null,
+        formats: formats ?? [],
+        player: players.includes(who.accountId),
+        players,
+      },
+      challenges,
+      results: results.map((result) => battleResultOf(result, corpId)),
+      tally,
+      names,
+    };
   }
 
   // ---- AVA-9 · public feed -------------------------------------------------
@@ -639,6 +724,20 @@ export class AvaService {
     if (headCorp !== corpId) return { ok: false, code: 'E_FORBIDDEN' };
     return { ok: true, challenge };
   }
+}
+
+/** A finished battle as `corpId` sees it (CORP-9): its side, and the breakdown with the
+ *  rival accounts left out — a rival is known by login, as at war. */
+function battleResultOf(result: AvaResult & { format: number }, corpId: string): AvaBattleResult {
+  const side: AvaSide = result.challengerCorp === corpId ? 'challenger' : 'target';
+  const { report, ...rest } = result;
+  if (!report) return { ...rest, side };
+  const seats = report.seats.map(({ accountId, ...seat }): AvaBattleSeat => ({
+    ...seat,
+    bot: accountId === null,
+    ...(accountId !== null && seat.side === side ? { accountId } : {}),
+  }));
+  return { ...rest, side, report: { ...report, seats } };
 }
 
 /** Which side of a matchup a corp fights for, or null when it is not a party. */

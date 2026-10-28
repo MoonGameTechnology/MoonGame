@@ -16,6 +16,7 @@ import type {
   AccountStore,
   AnnouncementStore,
   ArsenalStore,
+  AvaBattleReport,
   AvaChallenge,
   AvaChallengeStatus,
   AvaChallengeStore,
@@ -27,6 +28,7 @@ import type {
   AvaSession,
   AvaSessionStore,
   AvaSide,
+  AvaTally,
   CommanderStore,
   CorpAuditEntry,
   CorpMembership,
@@ -261,6 +263,14 @@ const SCHEMA_SQL = `
       at              bigint NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ava_results_at_idx ON ava_results (at DESC);
+    -- CORP-9: the battle's format and breakdown, recorded with the result. An earlier
+    -- result takes its challenge's format; it has no breakdown.
+    ALTER TABLE ava_results ADD COLUMN IF NOT EXISTS format integer;
+    UPDATE ava_results r SET format = c.format FROM ava_challenges c
+      WHERE r.format IS NULL AND c.id = r.matchup_id;
+    ALTER TABLE ava_results ADD COLUMN IF NOT EXISTS report jsonb;
+    CREATE INDEX IF NOT EXISTS ava_results_challenger_idx ON ava_results (challenger_corp);
+    CREATE INDEX IF NOT EXISTS ava_results_target_idx ON ava_results (target_corp);
 
     -- AvA sessions (AVA-7): the live match a locked matchup was raised into. PK match_id +
     -- a UNIQUE matchup_id enforce one session per matchup and per instance (the orchestrator
@@ -1778,6 +1788,8 @@ interface ResultRow {
   target_corp: string;
   winner_corp: string | null;
   at: string;
+  format: number | null;
+  report: AvaBattleReport | null;
 }
 
 function resultOf(row: ResultRow): AvaResult {
@@ -1787,6 +1799,8 @@ function resultOf(row: ResultRow): AvaResult {
     targetCorp: row.target_corp,
     winnerCorp: row.winner_corp,
     at: Number(row.at),
+    ...(row.format === null ? {} : { format: Number(row.format) }),
+    ...(row.report === null ? {} : { report: row.report }),
   };
 }
 
@@ -1797,16 +1811,25 @@ export class PostgresAvaResultStore implements AvaResultStore {
 
   async record(result: AvaResult): Promise<void> {
     await this.pool.query(
-      `INSERT INTO ava_results (matchup_id, challenger_corp, target_corp, winner_corp, at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO ava_results
+         (matchup_id, challenger_corp, target_corp, winner_corp, at, format, report)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (matchup_id) DO NOTHING`,
-      [result.matchupId, result.challengerCorp, result.targetCorp, result.winnerCorp, result.at],
+      [
+        result.matchupId,
+        result.challengerCorp,
+        result.targetCorp,
+        result.winnerCorp,
+        result.at,
+        result.format ?? null,
+        result.report ? JSON.stringify(result.report) : null,
+      ],
     );
   }
 
   async get(matchupId: string): Promise<AvaResult | null> {
     const r = await this.pool.query<ResultRow>(
-      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at
+      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report
        FROM ava_results WHERE matchup_id = $1`,
       [matchupId],
     );
@@ -1815,11 +1838,57 @@ export class PostgresAvaResultStore implements AvaResultStore {
 
   async recent(limit = DEFAULT_RESULTS_LIMIT): Promise<AvaResult[]> {
     const r = await this.pool.query<ResultRow>(
-      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at
+      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report
        FROM ava_results ORDER BY at DESC, matchup_id LIMIT $1`,
       [limit],
     );
     return r.rows.map(resultOf);
+  }
+
+  async resultsOf(
+    corpId: string,
+    limit = DEFAULT_RESULTS_LIMIT,
+  ): Promise<Array<AvaResult & { format: number }>> {
+    const r = await this.pool.query<ResultRow>(
+      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report
+       FROM ava_results WHERE challenger_corp = $1 OR target_corp = $1
+       ORDER BY at DESC, matchup_id LIMIT $2`,
+      [corpId, limit],
+    );
+    return r.rows.map((row) => ({ ...resultOf(row), format: Number(row.format ?? 2) }));
+  }
+
+  async tallyOf(corpId: string): Promise<AvaTally[]> {
+    const r = await this.pool.query<{
+      opponent: string;
+      format: number;
+      wins: string;
+      losses: string;
+      draws: string;
+    }>(
+      `SELECT
+         CASE WHEN challenger_corp = $1 THEN target_corp ELSE challenger_corp END AS opponent,
+         COALESCE(format, 2) AS format,
+         count(*) FILTER (WHERE winner_corp = $1)::text AS wins,
+         count(*) FILTER (WHERE winner_corp IS NOT NULL AND winner_corp <> $1)::text AS losses,
+         count(*) FILTER (WHERE winner_corp IS NULL)::text AS draws
+       FROM ava_results
+       WHERE challenger_corp = $1 OR target_corp = $1
+       GROUP BY 1, 2`,
+      [corpId],
+    );
+    // Sorted here, not by the database collation: the same order as the memory store.
+    return r.rows
+      .map((row) => ({
+        opponent: row.opponent,
+        format: Number(row.format),
+        wins: Number(row.wins),
+        losses: Number(row.losses),
+        draws: Number(row.draws),
+      }))
+      .sort((x, y) =>
+        x.opponent < y.opponent ? -1 : x.opponent > y.opponent ? 1 : x.format - y.format,
+      );
   }
 
   async statsForCorp(corpId: string): Promise<{ matches: number; wins: number }> {
