@@ -48,6 +48,13 @@ import {
   type ServerRejectionMessage,
 } from './protocol';
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
+import {
+  emptyCareer,
+  careerOwners,
+  foldCareerEvents,
+  type CareerLedger,
+  type CareerOwners,
+} from './playerCareer';
 import { arsenalSnapshotOf } from './arsenal';
 import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
@@ -93,6 +100,8 @@ export interface MatchRoomOptions {
   initiallyStarted?: boolean;
   /** Durable anchor for a scaled/lobby clock; absent on legacy snapshots. */
   initialClock?: MatchSnapshot['clock'];
+  initialCareer?: CareerLedger;
+  careerAccounts?: Record<string, string>;
   /** Attach `hashState(view)` to snapshots so the client can detect desync: every full
    *  snapshot (welcome, resync) and one delta per player every `STATE_HASH_EVERY_MS`.
    *  Default: on when `NODE_ENV=production` (see the constructor). */
@@ -351,7 +360,14 @@ type ApplyPlan =
   /** Ядро отвергло действие, но догон УЖЕ посчитан: коммитится он один (SRV-1). */
   | { kind: 'rejected'; code: string; state: GameState; events: DomainEvent[]; steps: ReplayStep[] }
   /** Действие принято: коммитится итоговое состояние и события догона + применения. */
-  | { kind: 'applied'; state: GameState; events: DomainEvent[]; at: number; advanced: GameState; steps: ReplayStep[] };
+  | {
+      kind: 'applied';
+      state: GameState;
+      events: DomainEvent[];
+      at: number;
+      advanced: GameState;
+      steps: ReplayStep[];
+    };
 /** План, у которого есть что коммитить (всё, кроме несостоявшегося догона). */
 type CommittablePlan = Extract<ApplyPlan, { kind: 'rejected' | 'applied' }>;
 
@@ -557,6 +573,9 @@ export class MatchRoom {
   private readonly persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
   /** Server-side participation evidence, never part of the deterministic state or wire view. */
   private economyActivity: Record<string, string[]> = {};
+  private readonly careerTracking: boolean;
+  private career: CareerLedger;
+  private careerHumans: CareerOwners;
   /** Opt-in action-layer front-door (see options.gate). */
   private readonly gate?: ActionGate;
   /** Player-action deny-list (see options.denyPlayerActions). */
@@ -648,6 +667,14 @@ export class MatchRoom {
   constructor(options: MatchRoomOptions) {
     this.id = options.id;
     this.stateValue = options.initialState;
+    this.careerTracking = !!options.initialCareer || options.initialState.match.status !== 'ended';
+    this.career = structuredClone(
+      options.initialCareer ?? emptyCareer(options.now?.() ?? Date.now()),
+    );
+    this.careerHumans = {
+      ...this.career.owners,
+      ...careerOwners(options.initialState, options.careerAccounts ?? {}),
+    };
     this.kernel = options.kernel;
     this.data = options.data;
     this.serverOrders = options.serverOrders;
@@ -673,15 +700,31 @@ export class MatchRoom {
     this.manualStart = options.manualStart ?? false;
     const anchor = options.initialClock;
     this.clockAnchored = !!(anchor || options.initiallyStarted || this.manualStart || this.waitFor);
-    if (anchor && (!Number.isFinite(anchor.wallTime) || !Number.isFinite(anchor.gameTime) ||
-        anchor.gameTime < 0 || !Number.isFinite(anchor.timeScale) || anchor.timeScale <= 0 ||
-        typeof anchor.running !== 'boolean')) throw new Error('E_CLOCK_SNAPSHOT');
+    if (
+      anchor &&
+      (!Number.isFinite(anchor.wallTime) ||
+        !Number.isFinite(anchor.gameTime) ||
+        anchor.gameTime < 0 ||
+        !Number.isFinite(anchor.timeScale) ||
+        anchor.timeScale <= 0 ||
+        typeof anchor.running !== 'boolean')
+    )
+      throw new Error('E_CLOCK_SNAPSHOT');
     const transitions = anchor?.coalitionTransitions ?? [];
-    if (!Array.isArray(transitions) || transitions.some((segment, index) =>
-      !segment || !Number.isFinite(segment.wallTime) || !Number.isFinite(segment.gameTime) ||
-      segment.gameTime < 0 || !Number.isFinite(segment.timeScale) || segment.timeScale <= 0 ||
-      segment.gameTime > anchor!.gameTime ||
-      (index > 0 && segment.gameTime < transitions[index - 1]!.gameTime)))
+    if (
+      !Array.isArray(transitions) ||
+      transitions.some(
+        (segment, index) =>
+          !segment ||
+          !Number.isFinite(segment.wallTime) ||
+          !Number.isFinite(segment.gameTime) ||
+          segment.gameTime < 0 ||
+          !Number.isFinite(segment.timeScale) ||
+          segment.timeScale <= 0 ||
+          segment.gameTime > anchor!.gameTime ||
+          (index > 0 && segment.gameTime < transitions[index - 1]!.gameTime),
+      )
+    )
       throw new Error('E_CLOCK_SNAPSHOT');
     this.coalitionTransitions = options.initialState.coalitionClock
       ? transitions.map(({ wallTime, gameTime, timeScale }) => ({ wallTime, gameTime, timeScale }))
@@ -692,8 +735,10 @@ export class MatchRoom {
       // A wait-for-players room is paused while its peers are absent.
       const running = anchor.running && !this.waitFor;
       this.started = options.initiallyStarted === true || (this.manualStart && running);
-      this.lobbyAccrued = Math.max(options.initialState.time, anchor.gameTime +
-        (running ? Math.max(0, wall - anchor.wallTime) * anchor.timeScale : 0));
+      this.lobbyAccrued = Math.max(
+        options.initialState.time,
+        anchor.gameTime + (running ? Math.max(0, wall - anchor.wallTime) * anchor.timeScale : 0),
+      );
       this.lobbyRunningSince = running ? wall : null;
     } else if (options.initiallyStarted) {
       // Born running: anchor the clock at the initial game time (a fresh world's 0,
@@ -710,7 +755,7 @@ export class MatchRoom {
     // bit-exact-IEEE-754 `Math.sqrt` determinism claim — leaving it off by
     // default in prod defeated the claim. Tests and dev harnesses override
     // explicitly when they need deterministic-off (e.g. snapshot replay).
-    this.emitStateHash = options.emitStateHash ?? (process.env.NODE_ENV === 'production');
+    this.emitStateHash = options.emitStateHash ?? process.env.NODE_ENV === 'production';
     this.hostFog = options.hostFog;
     this.singlePeerPerPlayer = options.singlePeerPerPlayer ?? false;
     // Enforce the metrics invariant (docs/metrics-roadmap): an observer is PURE
@@ -741,7 +786,10 @@ export class MatchRoom {
     this.actionRateMax = options.actionRateMax ?? ACTION_RATE_MAX_DEFAULT;
     this.actionRateWindowMs = options.actionRateWindowMs ?? ACTION_RATE_WINDOW_MS_DEFAULT;
     this.actionWindow = new PerKeyWindow(this.actionRateMax, this.actionRateWindowMs);
-    this.timeScale = options.timeScale && Number.isFinite(options.timeScale) && options.timeScale > 0 ? options.timeScale : 1;
+    this.timeScale =
+      options.timeScale && Number.isFinite(options.timeScale) && options.timeScale > 0
+        ? options.timeScale
+        : 1;
     if (options.initialReceipts) {
       // Rehydration must respect the cap — seed only the most recent `maxReceipts`.
       for (const r of options.initialReceipts.slice(-this.maxReceipts)) {
@@ -827,7 +875,9 @@ export class MatchRoom {
   private clock(wall = this.now()): number {
     const raw = !this.clockAnchored
       ? wall
-      : this.lobbyAccrued + (this.lobbyRunningSince === null ? 0 : Math.max(0, wall - this.lobbyRunningSince)) * this.timeScale;
+      : this.lobbyAccrued +
+        (this.lobbyRunningSince === null ? 0 : Math.max(0, wall - this.lobbyRunningSince)) *
+          this.timeScale;
     const floor = Math.max(this.clockFloor, this.stateValue.time);
     if (this.clockAnchored && raw < floor) {
       // Rebase the live anchor too: saving (new wall, old floor) while the live
@@ -849,9 +899,19 @@ export class MatchRoom {
     const wallTime = this.now();
     const gameTime = this.clock(wallTime);
     const coalitionTransitions = this.pendingCoalitionClocks(state);
-    return { wallTime, gameTime, timeScale: this.timeScale,
+    return {
+      wallTime,
+      gameTime,
+      timeScale: this.timeScale,
       running: this.isClockRunning && state.match.status !== 'ended',
-      ...(coalitionTransitions.length > 0 ? { coalitionTransitions } : {}) };
+      ...(coalitionTransitions.length > 0 ? { coalitionTransitions } : {}),
+    };
+  }
+
+  get careerSnapshot(): CareerLedger | undefined {
+    return this.careerTracking
+      ? structuredClone({ ...this.career, owners: this.careerHumans })
+      : undefined;
   }
 
   get economyActivitySnapshot(): Record<string, string[]> {
@@ -942,7 +1002,10 @@ export class MatchRoom {
   }
 
   hasPlayer(playerId: PlayerId): boolean {
-    return Object.hasOwn(this.stateValue.players, playerId) && this.stateValue.players[playerId] !== undefined;
+    return (
+      Object.hasOwn(this.stateValue.players, playerId) &&
+      this.stateValue.players[playerId] !== undefined
+    );
   }
 
   get admissionRevision(): number {
@@ -1030,6 +1093,8 @@ export class MatchRoom {
     // Кто именно сидит на этом сокете. Отдельно от `playerAccountId`: та карта хранит
     // владельца до ЯВНОГО освобождения кресла, а для перехвата нужен тот, кто сидит сейчас.
     this.peerAccountId.set(peer, accountId);
+    if (verified && accountId)
+      Object.assign(this.careerHumans, careerOwners(this.stateValue, { [playerId]: accountId }));
     this.observe?.({ kind: 'join', playerId, ...(accountId ? { accountId } : {}) });
     if (this.manualStart && this.host === null) this.host = playerId; // first in hosts
     const flipped = this.syncLobbyClock(); // last player in? the match resumes
@@ -1224,10 +1289,11 @@ export class MatchRoom {
       // Serialize the lobby release through the mailbox in committed mode, so its
       // broadcast can't interleave with an in-flight action's persist await. (`start`
       // itself is synchronous and host-only; ignored otherwise.)
-      if (this.persist) await this.enqueue(
-        () => this.start(playerId),
-        () => this.send(peer, { type: 'error', matchId: this.id, code: 'E_RATE_LIMIT' }),
-      );
+      if (this.persist)
+        await this.enqueue(
+          () => this.start(playerId),
+          () => this.send(peer, { type: 'error', matchId: this.id, code: 'E_RATE_LIMIT' }),
+        );
       else this.start(playerId);
       return;
     }
@@ -1348,14 +1414,15 @@ export class MatchRoom {
     // whose persist is still in flight, making that earlier one's transient failure
     // un-retriable (E_REPLAY). The sync path can't interleave, so it needs no mailbox.
     if (this.persist) {
-      await this.enqueue(() =>
-        this.admitCommitted(playerId, peer, envelope, sessionId).catch(() => {
-          try {
-            this.sendReject(peer, playerId, envelopeActionId(envelope), 'E_INTERNAL');
-          } catch {
-            /* peer gone */
-          }
-        }),
+      await this.enqueue(
+        () =>
+          this.admitCommitted(playerId, peer, envelope, sessionId).catch(() => {
+            try {
+              this.sendReject(peer, playerId, envelopeActionId(envelope), 'E_INTERNAL');
+            } catch {
+              /* peer gone */
+            }
+          }),
         () => this.sendReject(peer, playerId, envelopeActionId(envelope), 'E_RATE_LIMIT'),
       );
       return;
@@ -1484,25 +1551,30 @@ export class MatchRoom {
       return { ok: r.ok, ...(r.code !== undefined ? { code: r.code } : {}) };
     }
     let out: { ok: boolean; code?: string } = { ok: false, code: 'E_INTERNAL' };
-    await this.enqueue(async () => {
-      if (isCurrent && !isCurrent()) {
-        // No receipt: a reconnect may reuse this action id with a live connection.
-        out = { ok: false, code: 'E_FORBIDDEN' };
-        return;
-      }
-      const front = this.frontGate(playerId, action.id, undefined, throttle); // без пира: у драйвера нет сокета
-      if (front.kind === 'cached') {
-        const { receipt } = front;
-        out = { ok: receipt.ok, ...(receipt.code !== undefined ? { code: receipt.code } : {}) };
-        return;
-      }
-      if (front.kind === 'rate-limited') {
-        out = { ok: false, code: 'E_RATE_LIMIT' }; // transient — the driver's next pass retries
-        return;
-      }
-      const verdict = await this.commitApply(playerId, action);
-      out = verdict.ok ? { ok: true } : { ok: false, code: verdict.code ?? 'E_INTERNAL' };
-    }, () => { out = { ok: false, code: 'E_RATE_LIMIT' }; }).catch(() => {
+    await this.enqueue(
+      async () => {
+        if (isCurrent && !isCurrent()) {
+          // No receipt: a reconnect may reuse this action id with a live connection.
+          out = { ok: false, code: 'E_FORBIDDEN' };
+          return;
+        }
+        const front = this.frontGate(playerId, action.id, undefined, throttle); // без пира: у драйвера нет сокета
+        if (front.kind === 'cached') {
+          const { receipt } = front;
+          out = { ok: receipt.ok, ...(receipt.code !== undefined ? { code: receipt.code } : {}) };
+          return;
+        }
+        if (front.kind === 'rate-limited') {
+          out = { ok: false, code: 'E_RATE_LIMIT' }; // transient — the driver's next pass retries
+          return;
+        }
+        const verdict = await this.commitApply(playerId, action);
+        out = verdict.ok ? { ok: true } : { ok: false, code: verdict.code ?? 'E_INTERNAL' };
+      },
+      () => {
+        out = { ok: false, code: 'E_RATE_LIMIT' };
+      },
+    ).catch(() => {
       out = { ok: false, code: 'E_INTERNAL' };
     });
     return out;
@@ -1555,20 +1627,33 @@ export class MatchRoom {
   private planApply(action: Action, serverNow: number): ApplyPlan {
     let advanced = this.computeAdvance(this.stateValue, serverNow);
     if (!advanced.ok) return { kind: 'advance-failed', code: advanced.code };
-    if (!advanced.state.coalitionClock &&
-        (action.type === 'coalition.leave' || action.type === 'coalition.kick') &&
-        this.kernel.manifest.modules.some((module) => module.id === 'diplomacy') &&
-        advanced.state.match.status !== 'ended') {
+    if (
+      !advanced.state.coalitionClock &&
+      (action.type === 'coalition.leave' || action.type === 'coalition.kick') &&
+      this.kernel.manifest.modules.some((module) => module.id === 'diplomacy') &&
+      advanced.state.match.status !== 'ended'
+    ) {
       const rebased = this.rebaseCoalitionClock(advanced.state, this.liveCoalitionClock());
       if (!rebased.ok) return { kind: 'advance-failed', code: rebased.code };
-      advanced = { ...advanced, state: rebased.state, events: [...advanced.events, ...rebased.events], steps: [...advanced.steps, rebased.step] };
+      advanced = {
+        ...advanced,
+        state: rebased.state,
+        events: [...advanced.events, ...rebased.events],
+        steps: [...advanced.steps, rebased.step],
+      };
     }
     const at = Math.max(serverNow, advanced.state.time);
     const result = this.reduceAction(advanced.state, action, at);
     if (!result.ok) {
       // SRV-1: действие отвергнуто, но догон уже посчитан и его события (прилёты, бои,
       // захваты) терять нельзя — коммитится и рассылается ОН, без результата действия.
-      return { kind: 'rejected', code: result.code, state: advanced.state, events: advanced.events, steps: advanced.steps };
+      return {
+        kind: 'rejected',
+        code: result.code,
+        state: advanced.state,
+        events: advanced.events,
+        steps: advanced.steps,
+      };
     }
     return {
       kind: 'applied',
@@ -1602,6 +1687,7 @@ export class MatchRoom {
       this.stateValue,
       order,
     );
+    this.career = foldCareerEvents(this.career, plan.events, this.stateValue, this.careerHumans);
     this.stateValue = plan.state;
     if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
     if (plan.events.length > 0 || plan.kind === 'applied') {
@@ -1807,7 +1893,12 @@ export class MatchRoom {
   private advance(now: number): { ok: true; events: DomainEvent[] } | { ok: false; code: string } {
     const r = this.computeAdvance(this.stateValue, now);
     if (!r.ok) return { ok: false, code: r.code };
-    this.economyActivity = captureMetaEconomyActivity(this.economyActivity, r.events, this.stateValue);
+    this.economyActivity = captureMetaEconomyActivity(
+      this.economyActivity,
+      r.events,
+      this.stateValue,
+    );
+    this.career = foldCareerEvents(this.career, r.events, this.stateValue, this.careerHumans);
     this.stateValue = r.state;
     // RPL-2: the boundary the world ACTUALLY reached (a throttled advance stops
     // short of `now`) — a no-op advance is not a boundary, keep the log compact.
@@ -1827,9 +1918,10 @@ export class MatchRoom {
   }
 
   private coalitionClockChanged(state: GameState, clock = this.liveCoalitionClock()): boolean {
-    return !!state.coalitionClock && (
-      state.coalitionClock.timeScale !== clock.timeScale ||
-      Math.abs(coalitionWallNow(state, clock.gameTime) - clock.wallTime) > 0.001
+    return (
+      !!state.coalitionClock &&
+      (state.coalitionClock.timeScale !== clock.timeScale ||
+        Math.abs(coalitionWallNow(state, clock.gameTime) - clock.wallTime) > 0.001)
     );
   }
 
@@ -1841,8 +1933,15 @@ export class MatchRoom {
     for (const clock of [...this.coalitionTransitions, this.liveCoalitionClock()]) {
       const previous = segments.at(-1);
       // Equivalent consecutive mappings need only their first boundary.
-      if (previous && previous.timeScale === clock.timeScale &&
-          Math.abs(previous.wallTime + (clock.gameTime - previous.gameTime) / previous.timeScale - clock.wallTime) <= 0.001)
+      if (
+        previous &&
+        previous.timeScale === clock.timeScale &&
+        Math.abs(
+          previous.wallTime +
+            (clock.gameTime - previous.gameTime) / previous.timeScale -
+            clock.wallTime,
+        ) <= 0.001
+      )
         continue;
       segments.push({ ...clock });
     }
@@ -1852,12 +1951,16 @@ export class MatchRoom {
     let applied = -1;
     for (let index = 0; index < segments.length; index++) {
       const clock = segments[index]!;
-      if (clock.gameTime <= state.time && !this.coalitionClockChanged(state, clock)) applied = index;
+      if (clock.gameTime <= state.time && !this.coalitionClockChanged(state, clock))
+        applied = index;
     }
     return segments.slice(applied + 1);
   }
 
-  private rebaseCoalitionClock(state: GameState, clock: CoalitionClock):
+  private rebaseCoalitionClock(
+    state: GameState,
+    clock: CoalitionClock,
+  ):
     | { ok: true; state: GameState; events: DomainEvent[]; step: ReplayStep }
     | { ok: false; code: string } {
     // Re-anchor at the reached instant, so the action never silently advances time.
@@ -1875,13 +1978,21 @@ export class MatchRoom {
     };
     const result = this.reduceAction(state, action, state.time);
     if (!result.ok) return result;
-    return { ok: true, state: result.state, events: result.events, step: { at: state.time, action } };
+    return {
+      ok: true,
+      state: result.state,
+      events: result.events,
+      step: { at: state.time, action },
+    };
   }
 
   /** Preserve the old clock's offline segment, then record the mapping change and
    * re-project future coalition events. Pure plans carry their replay steps until
    * the durable caller has acknowledged the resulting snapshot. */
-  private computeAdvance(from: GameState, now: number):
+  private computeAdvance(
+    from: GameState,
+    now: number,
+  ):
     | { ok: true; state: GameState; events: DomainEvent[]; steps: ReplayStep[] }
     | { ok: false; code: string } {
     const steps: ReplayStep[] = [];
@@ -2029,8 +2140,18 @@ export class MatchRoom {
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
       state,
-      economyActivity: captureMetaEconomyActivity(this.economyActivity, events, this.stateValue, order),
-      ...(clock ? { clock: { ...clock, running: clock.running && state.match.status !== 'ended' } } : {}),
+      ...(this.careerTracking
+        ? { career: foldCareerEvents(this.career, events, this.stateValue, this.careerHumans) }
+        : {}),
+      economyActivity: captureMetaEconomyActivity(
+        this.economyActivity,
+        events,
+        this.stateValue,
+        order,
+      ),
+      ...(clock
+        ? { clock: { ...clock, running: clock.running && state.match.status !== 'ended' } }
+        : {}),
     };
   }
 
@@ -2048,7 +2169,9 @@ export class MatchRoom {
       return Promise.resolve();
     }
     this.pendingCommits += 1;
-    const run = this.mailbox.then(task).finally(() => { this.pendingCommits -= 1; });
+    const run = this.mailbox.then(task).finally(() => {
+      this.pendingCommits -= 1;
+    });
     this.mailbox = run.catch(() => undefined);
     return run;
   }
@@ -2065,17 +2188,20 @@ export class MatchRoom {
     action: Action,
     peer?: RoomPeer,
   ): Promise<void> {
-    return this.enqueue(() =>
-      this.doCommittedSubmit(playerId, action, peer).catch(() => {
-        // Last-resort: report and swallow. The `send` itself must not throw (a dead
-        // socket would otherwise reject the task), so guard it too.
-        try {
-          if (peer) this.sendReject(peer, playerId, action.id, 'E_INTERNAL');
-        } catch {
-          /* peer gone */
-        }
-      }),
-      () => { if (peer) this.sendReject(peer, playerId, action.id, 'E_RATE_LIMIT'); },
+    return this.enqueue(
+      () =>
+        this.doCommittedSubmit(playerId, action, peer).catch(() => {
+          // Last-resort: report and swallow. The `send` itself must not throw (a dead
+          // socket would otherwise reject the task), so guard it too.
+          try {
+            if (peer) this.sendReject(peer, playerId, action.id, 'E_INTERNAL');
+          } catch {
+            /* peer gone */
+          }
+        }),
+      () => {
+        if (peer) this.sendReject(peer, playerId, action.id, 'E_RATE_LIMIT');
+      },
     );
   }
 
@@ -2101,7 +2227,11 @@ export class MatchRoom {
    *  `commitApply` — a REAL, persisted, broadcast, hash-consistent action, never a
    *  silent state patch) BEFORE the caller's `commitApply` for the original action,
    *  so the unchanged ARS-3 check in `construction.ts` sees current ownership. */
-  private async maybeSyncArsenal(playerId: PlayerId, action: Action, isCurrent: () => boolean): Promise<void> {
+  private async maybeSyncArsenal(
+    playerId: PlayerId,
+    action: Action,
+    isCurrent: () => boolean,
+  ): Promise<void> {
     if (!this.arsenalStore || action.type !== 'unit.build') return;
     const accountId = this.playerAccountId.get(playerId);
     if (!accountId) return;
@@ -2186,7 +2316,14 @@ export class MatchRoom {
         ? { actionId: action.id, playerId, seq, ok: true }
         : { actionId: action.id, playerId, seq, ok: false, code: plan.code };
       const order = this.ownOrder(plan, action, peer); // one wall reading for both writes
-      if (!(await this.persistGuarded(this.snapshot(plan.state, seq, plan.events, order), receipt, action.id, peer))) {
+      if (
+        !(await this.persistGuarded(
+          this.snapshot(plan.state, seq, plan.events, order),
+          receipt,
+          action.id,
+          peer,
+        ))
+      ) {
         return TRANSIENT_VERDICT;
       }
       this.seq = seq;
@@ -2318,11 +2455,23 @@ export class MatchRoom {
         const identify = view.identified;
         // Бои, которые игрок видит сейчас или видел кадром раньше: `battle.resolved`
         // приходит, когда боя в состоянии уже нет.
-        const battles = new Set([...Object.keys(baseline.battles), ...Object.keys(view.base.battles)]);
-        for (const [id, owners] of flash) if (inVisionBloc(this.stateValue, playerId, owners)) battles.add(id);
+        const battles = new Set([
+          ...Object.keys(baseline.battles),
+          ...Object.keys(view.base.battles),
+        ]);
+        for (const [id, owners] of flash)
+          if (inVisionBloc(this.stateValue, playerId, owners)) battles.add(id);
         const visibleEvents = events.filter((e) =>
           this.eventVisibleTo(e, playerId, identify, battles),
-        );
+        ).map((event) => {
+          if (event.type !== 'unit.died' || !event.payload || typeof event.payload !== 'object') return event;
+          // Career telemetry is server-only: even a visible casualty must not reveal
+          // an opponent's hidden loadout value or otherwise hidden contributors.
+          const payload = { ...event.payload } as Record<string, unknown>;
+          delete payload.lossCost;
+          delete payload.damageShares;
+          return { ...event, payload };
+        });
         if (
           cause &&
           playerId !== cause.actor &&
@@ -2400,6 +2549,7 @@ export class MatchRoom {
     identify: Set<string>,
     battles: ReadonlySet<string>,
   ): boolean {
+    if (event.type === 'career.casualty') return false;
     if (event.type === 'time.advanced' || event.type.startsWith('match.')) return true;
     const p = (event.payload ?? {}) as Record<string, unknown>;
     // Hero events are strictly owner-only: their payloads carry the hero's node
@@ -2559,7 +2709,11 @@ export class MatchRoom {
     this.relayToViewers(ping, { type: 'ping.added', matchId: this.id, ping });
   }
 
-  private async handlePingClear(playerId: PlayerId, peer: RoomPeer, pingId?: string): Promise<void> {
+  private async handlePingClear(
+    playerId: PlayerId,
+    peer: RoomPeer,
+    pingId?: string,
+  ): Promise<void> {
     const entries = await this.ephemeral.entries<Ping>(this.pingPrefix);
     if (pingId !== undefined && !entries.some(({ value }) => value.id === pingId)) {
       // A ping can expire between the client's last snapshot and this request.
@@ -2647,10 +2801,14 @@ export class MatchRoom {
   /** Host-only DM, using the ordinary privacy, sanitization, flood limit and
    *  bounded reconnect history. Does not create peers or emit human joins. */
   sendServerChat(from: PlayerId, to: PlayerId, rawText: string): boolean {
-    if (!this.serverChatAllowed?.(from) || from === to ||
-        this.state.match.status === 'ended' ||
-        this.state.players[from]?.status !== 'active' ||
-        this.state.players[to]?.status !== 'active') return false;
+    if (
+      !this.serverChatAllowed?.(from) ||
+      from === to ||
+      this.state.match.status === 'ended' ||
+      this.state.players[from]?.status !== 'active' ||
+      this.state.players[to]?.status !== 'active'
+    )
+      return false;
     const wall = this.now();
     if (this.chatWindow.limited(from, wall)) return false;
     const text = sanitizeChatText(rawText, CHAT_TEXT_MAX);
@@ -2658,7 +2816,11 @@ export class MatchRoom {
     this.chatWindow.record(from, wall);
     this.relayChat({
       id: `chat:${from}:${opaqueId()}`,
-      from, to, channel: 'dm', text, at: this.clock(),
+      from,
+      to,
+      channel: 'dm',
+      text,
+      at: this.clock(),
     });
     return true;
   }

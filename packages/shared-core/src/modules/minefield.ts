@@ -1,3 +1,4 @@
+import { captureCasualtyCost } from '../util/casualtyCost';
 /**
  * Минный заградитель (SM-3.4) и мина как неподвижный отряд (SM-3.6).
  *
@@ -193,13 +194,14 @@ function damageShips(h: HandlerContext, fleet: Fleet, hit: number, at: string, b
     const newHull = (1 - hit) * (stack.hp ?? stack.count * perHull);
     const newCount = Math.ceil(newHull / perHull);
     if (!(newCount > 0) || newCount > stack.count) continue; // fail-secure: ни гибели флота, ни роста
+    const value = captureCasualtyCost(h.state, [stack], data);
     const died = stack.count - newCount;
     stack.count = newCount;
     stack.hp = newHull;
     if (stack.shieldHp !== undefined) stack.shieldHp = Math.min(stack.shieldHp, newCount * (eff.shield ?? 0));
     if (died > 0) {
       lost += died;
-      h.emit('unit.died', { unit: stack.unit, count: died, at, owner: fleet.owner, fleetId: fleet.id, killedBy: by });
+      h.emit('unit.died', { unit: stack.unit, count: died, at, owner: fleet.owner, fleetId: fleet.id, killedBy: by, lossCost: value()[stack.unit] ?? {} });
     }
   }
   fleet.lastDamagedAt = h.ctx.now;

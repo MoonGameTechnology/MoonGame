@@ -12,6 +12,7 @@ import {
 import { createDevMatch, MODULE_MANIFEST_VERSION } from './scenario';
 import { startClockDriver, HEARTBEAT_MS, type ClockDriverHandle } from './clockDriver';
 import { snapshotOf, type Stores } from './persistence';
+import { nickSeatAccounts } from './commanderCredit';
 import type { LoadedMatch } from './roomRegistry';
 import type { MatchRoom, RoomObservation } from './matchRoom';
 import { warDeclarationsFor, type AvaSessionSpec } from './avaOrchestrator';
@@ -31,7 +32,9 @@ export interface MatchLoaderDeps {
   securityAudit?: SecurityAudit;
   /** Account cosmetics consume only committed terminal snapshots; also reconciles a restart. */
   onTerminalState?: (matchId: string, state: GameState) => Promise<void>;
-  stores: Pick<Stores, 'store' | 'receiptStore'>;
+  stores: Pick<Stores, 'store' | 'receiptStore'> &
+    Partial<Pick<Stores, 'profileStore' | 'accountStore' | 'userStore'>>;
+  careerAccounts?(matchId: string): Promise<Record<string, string>>;
   data: GameData;
   /** Present ⇒ every loaded room is gated (validated action.v1 envelopes). */
   gateFactory?: () => ActionGate;
@@ -82,7 +85,9 @@ export interface MatchExtras {
  * this on demand; `dispose` persists the final state and stops the driver when
  * the match hibernates or the server stops.
  */
-export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => Promise<LoadedMatch | null> {
+export function createMatchLoader(
+  deps: MatchLoaderDeps,
+): (matchId: string) => Promise<LoadedMatch | null> {
   const { stores, data } = deps;
   const now = deps.now ?? ((): number => Date.now());
   // MP-4: computed once (the bundle doesn't change while the process is up), not per load.
@@ -128,6 +133,11 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     // snapshot + receipt before committing state / broadcasting the delta.
     const persist = async (snapshot: MatchSnapshot, receipt: StoredReceipt): Promise<void> => {
       await commitMatch(stores.store, stores.receiptStore, snapshot, receipt);
+      if (snapshot.status === 'ended')
+        detach(
+          'career settlement',
+          stores.profileStore?.creditCareer?.(snapshot) ?? Promise.resolve(),
+        );
     };
     // The committed path already persists each action; `observe` re-arms the driver
     // (an action may have scheduled a new event the sleeping timer can't see) and
@@ -136,7 +146,8 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       if (event.kind === 'action') driver?.reschedule();
       if (event.kind === 'end') {
         extras?.onEnd?.(event.winner, event.rewards);
-        if (deps.onTerminalState) detach('profile progress', deps.onTerminalState(matchId, room.state));
+        if (deps.onTerminalState)
+          detach('profile progress', deps.onTerminalState(matchId, room.state));
       }
       if (event.kind === 'events') extras?.onEvents?.(event.events);
       deps.onObservation?.(matchId, event);
@@ -152,6 +163,12 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       initialState: snap.state,
       initialReceipts,
       initialSeq: snap.seq,
+      initialCareer: snap.career,
+      careerAccounts: deps.careerAccounts
+        ? await deps.careerAccounts(matchId)
+        : stores.accountStore && stores.userStore
+          ? await nickSeatAccounts(stores.accountStore, stores.userStore, matchId)()
+          : {},
       // The mode is persisted in the state (BRW-0): without this a restart would bring an
       // AvA battle back under every-seat-for-itself rules (CORP-4). So is the map, and a
       // match on a catalogued map plays its victory rules, the table the players' host and
@@ -170,6 +187,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       ...(deps.arsenalStore && !extras?.frozenArsenal ? { arsenalStore: deps.arsenalStore } : {}),
     });
 
+    if (snap.status === 'ended') await stores.profileStore?.creditCareer?.(snap);
     if (snap.state.match.status === 'ended' && deps.onTerminalState)
       await deps.onTerminalState(matchId, snap.state);
 
@@ -185,7 +203,17 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     // actions, the exact drift the prototype host already fixed with its inline driver.
     driver = startClockDriver(room, {
       onTick: ({ progressed }) => {
-        detach('сохранение снапшота на тике', stores.store.save(snapshotOf(room)));
+        const snapshot = snapshotOf(room);
+        detach(
+          'сохранение снапшота на тике',
+          stores.store
+            .save(snapshot)
+            .then(() =>
+              snapshot.status === 'ended'
+                ? stores.profileStore?.creditCareer?.(snapshot)
+                : undefined,
+            ),
+        );
         // Standing orders (CC-2 auto-storm / RETR-2 auto-retreat, standingOrderDriver.ts): the
         // missing "who decides, and when" half of `standingOrdersModule`. Skip on a
         // same-instant stall — submitting would emit `action` observations that
@@ -194,30 +222,30 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
         const stalled = !progressed && room.msUntilNextEvent() === 0;
         if (room.isStarted && !stalled && !standingOrdersBusy) {
           standingOrdersBusy = true;
-          detach('постоянные приказы', (async () => {
-            try {
-              for (const { playerId, action } of standingOrderTickActions(
-                room.state,
-                data,
-                (state: GameState, actions: readonly Action[]) =>
-                  room.canApplyAll(state, actions, room.state.time),
-              )) {
-                await room.submitServerAction(playerId, action);
+          detach(
+            'постоянные приказы',
+            (async () => {
+              try {
+                for (const { playerId, action } of standingOrderTickActions(
+                  room.state,
+                  data,
+                  (state: GameState, actions: readonly Action[]) =>
+                    room.canApplyAll(state, actions, room.state.time),
+                )) {
+                  await room.submitServerAction(playerId, action);
+                }
+                // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не
+                // подтверждённые дольше окна. Едет в той же пачке, что стоячие приказы —
+                // отдельный таймер тут не нужен, а `standingOrdersBusy` уже страхует от
+                // реэнтерабельности на durable-комнате.
+                for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+                  await room.submitServerAction(playerId, action);
+                }
+              } finally {
+                standingOrdersBusy = false;
               }
-              // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не
-              // подтверждённые дольше окна. Едет в той же пачке, что стоячие приказы —
-              // отдельный таймер тут не нужен, а `standingOrdersBusy` уже страхует от
-              // реэнтерабельности на durable-комнате.
-              for (const { playerId, action } of expiredSeatClaims(
-                room.state,
-                room.clockScale,
-              )) {
-                await room.submitServerAction(playerId, action);
-              }
-            } finally {
-              standingOrdersBusy = false;
-            }
-          })());
+            })(),
+          );
         }
       },
       onStall: () => deps.onStall?.(matchId),
@@ -226,7 +254,9 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
 
     const dispose = async (): Promise<void> => {
       driver?.stop();
-      await stores.store.save(snapshotOf(room));
+      const final = snapshotOf(room);
+      await stores.store.save(final);
+      if (final.status === 'ended') await stores.profileStore?.creditCareer?.(final);
     };
     return { room, dispose };
   };

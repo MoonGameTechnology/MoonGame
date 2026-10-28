@@ -14,7 +14,6 @@ import {
   captiveModule,
   autoMergeModule,
   captureOnArrivalModule,
-
   combatModule,
   constructionModule,
   createInitialState,
@@ -656,6 +655,8 @@ export interface DevMatchOptions {
   initiallyStarted?: boolean;
   /** The persisted anchor of such a clock (see `MatchRoom.initialClock`). */
   initialClock?: MatchSnapshot['clock'];
+  initialCareer?: MatchSnapshot['career'];
+  careerAccounts?: Record<string, string>;
   /** Strict commit-before-broadcast durable write (see `MatchRoom.persist`). */
   persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
   /** Opt-in `@void/action-layer` front-door (see `MatchRoom.gate`). */
@@ -719,7 +720,11 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
   const ids = options.players ?? ['green', 'red'];
   const base = createInitialState({
     seed: 'dev-match',
-    version: { data: data.version, manifest: MODULE_MANIFEST_VERSION, dataHash: hashGameDataBundle(data) },
+    version: {
+      data: data.version,
+      manifest: MODULE_MANIFEST_VERSION,
+      dataHash: hashGameDataBundle(data),
+    },
     time: options.time ?? 0,
   });
   const players: Record<string, Player> = {};
@@ -790,6 +795,8 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     record: options.record,
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,
+    initialCareer: options.initialCareer,
+    careerAccounts: options.careerAccounts,
     ...(options.initiallyStarted ? { initiallyStarted: true } : {}),
     ...(options.initialClock ? { initialClock: options.initialClock } : {}),
     persist: options.persist,
