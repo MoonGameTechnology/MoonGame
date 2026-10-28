@@ -740,6 +740,9 @@ const server = createMultiplayerServer({
                 }
                 return null;
               },
+              // FRIENDS-2: an invite is valid only into a match its sender plays.
+              holdsSeat: async (matchId, login) =>
+                (await stores.accountStore.seatOf(matchId, login)) !== null,
             },
           });
           // Leaderboards (RANK-1) — «Рейтинги» in the hub: commander XP + corp

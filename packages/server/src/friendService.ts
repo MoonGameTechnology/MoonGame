@@ -107,6 +107,22 @@ export class FriendService {
     return done.ok ? { ok: true } : { ok: false, code: 'E_NO_EDGE' };
   }
 
+  /** FRIENDS-2 · Are these two accounts ACCEPTED friends? A pending request is not a
+   *  friendship: it must not unlock invites or the friend's match. */
+  async areFriends(accountId: string, otherId: string): Promise<boolean> {
+    const edges = await this.friends.edgesOf(accountId);
+    return edges.some((e) => e.accountId === otherId && e.kind === 'friend');
+  }
+
+  /** FRIENDS-2 · «Скрывать мои партии от друзей». */
+  hidesMatches(accountId: string): Promise<boolean> {
+    return this.friends.hidesMatches(accountId);
+  }
+
+  setHidesMatches(accountId: string, hide: boolean): Promise<void> {
+    return this.friends.setHidesMatches(accountId, hide);
+  }
+
   /** Accepted friends only — pending edges cost nothing until they are accepted. */
   private async atLimit(accountId: string): Promise<boolean> {
     const edges = await this.friends.edgesOf(accountId);

@@ -809,6 +809,10 @@ export interface FriendStore {
     accountId: string,
     otherId: string,
   ): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
+  /** FRIENDS-2 · Does this account hide WHICH matches it plays from its friends?
+   *  Default (no row) is false: presence shows the match and offers «Войти». */
+  hidesMatches(accountId: string): Promise<boolean>;
+  setHidesMatches(accountId: string, hide: boolean): Promise<void>;
   close?(): Promise<void>;
 }
 

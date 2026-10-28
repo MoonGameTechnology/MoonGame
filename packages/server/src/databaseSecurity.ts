@@ -52,6 +52,7 @@ export const APP_TABLES = [
   'registration_rewards',
   'push_subscriptions',
   'friend_edges',
+  'friend_privacy',
 ] as const;
 const OWNER = 'vd_schema';
 const DML = 'vd_runtime';

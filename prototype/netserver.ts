@@ -1589,6 +1589,8 @@ const server = createMultiplayerServer({
             }
             return null;
           },
+          // FRIENDS-2: an invite is valid only into a match its sender plays.
+          holdsSeat: async (matchId, login) => (await accountStore.seatOf(matchId, login)) !== null,
         },
       });
       registerCorporateMaintenance(app, process.env.CORPORATIONS_MAINTENANCE === '1');

@@ -531,6 +531,12 @@ const SCHEMA_SQL = `
       PRIMARY KEY (lo_id, hi_id)
     );
     CREATE INDEX IF NOT EXISTS friend_edges_hi ON friend_edges (hi_id);
+    -- FRIENDS-2: «скрывать мои партии от друзей». A row exists only for an account
+    -- that changed the switch; no row reads as «не скрывать».
+    CREATE TABLE IF NOT EXISTS friend_privacy (
+      account_id   text PRIMARY KEY,
+      hide_matches boolean NOT NULL
+    );
 
     -- CORP-1: admin announcements in the news feed — the admin's own text in both
     -- languages (the feed's other rows are facts the client words itself). A removed one
@@ -2578,6 +2584,22 @@ export class PostgresFriendStore implements FriendStore {
       hi,
     ]);
     return (r.rowCount ?? 0) > 0 ? { ok: true } : { ok: false, code: 'E_NO_EDGE' };
+  }
+
+  async hidesMatches(accountId: string): Promise<boolean> {
+    const r = await this.pool.query<{ hide_matches: boolean }>(
+      `SELECT hide_matches FROM friend_privacy WHERE account_id = $1`,
+      [accountId],
+    );
+    return r.rows[0]?.hide_matches ?? false;
+  }
+
+  async setHidesMatches(accountId: string, hide: boolean): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO friend_privacy (account_id, hide_matches) VALUES ($1, $2)
+       ON CONFLICT (account_id) DO UPDATE SET hide_matches = EXCLUDED.hide_matches`,
+      [accountId, hide],
+    );
   }
 }
 
