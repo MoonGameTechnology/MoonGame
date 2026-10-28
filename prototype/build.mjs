@@ -3440,8 +3440,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .fitpane .hgradeline.g-legendary{color:var(--amber);}
 .fitpane .hgradeline.g-main{color:var(--grn);}
 
-#ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
-#ub-notes:empty{display:none;}
 #ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
 #ub-status:empty{display:none;}
 
@@ -3453,7 +3451,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   padding:12px 14px;border:1px solid var(--cyan);border-radius:10px;
   background:rgba(4,20,26,.94);box-shadow:0 6px 28px rgba(0,0,0,.55),0 0 22px rgba(53,214,230,.16);}
 #updbar .ub-t{font-size:var(--fs-body);color:var(--dim);line-height:1.5;}
-#updbar .ub-t b{color:var(--ink);}
 #updbar .ub-row{display:flex;gap:10px;margin-top:10px;}
 #updbar .ub-go{flex:1;text-align:center;padding:11px 10px;border-radius:8px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.18);color:var(--cyan);font-size:var(--fs-body);text-decoration:none;cursor:pointer;}
@@ -5445,8 +5442,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
      the returning-player path lands in the hub and never visits #connect, which is
      where this used to live (and why players never saw their updates). -->
 <div id="updbar" role="region" aria-live="polite">
-  <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
-  <p id="ub-notes"></p>
+  <div class="ub-t" data-i18n="upd.available"></div>
   <p id="ub-status"></p>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>

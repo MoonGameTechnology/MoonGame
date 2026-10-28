@@ -17,8 +17,9 @@ const ANDROID_UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (K
 const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const fulfilApk=async(page)=>{let requested='';await page.route(link,async route=>{requested=route.request().url();await route.fulfill({contentType:'application/vnd.android.package-archive',headers:{'Content-Disposition':'attachment; filename=probe.apk'},body:'APK download fixture'});});return ()=>requested;};
 const enterHub=async(page,nick,tap)=>{if(!(await page.locator('#cwnick').isVisible()))await page.locator('#clogin')[tap?'tap':'click']();await page.locator('#cwnick').fill(nick);await page.locator('#cwgo')[tap?'tap':'click']();await page.locator('#hub-play').waitFor({state:'visible'});};
-// Hostile release notes must render as text, never as markup.
-const hostileNotes='Changes <img src=x onerror="window.__xss=1">';
+// Even signed legacy manifests can carry internal commit/repository metadata.
+// None of it belongs in the update prompt, whether plain text or markup.
+const hostileNotes='Merge pull request #1864 from MoonGameTechnology/MoonGame/feat/player-card-stats\nhttps://github.com/MoonGameTechnology/MoonGame <img src=x onerror="window.__xss=1">';
 // The real key signs in CI only. The harness bakes its own public key into the served
 // build so the actual WebCrypto check runs; a file signed by any other key must fail.
 const testKey=generateKeyPairSync('ed25519'),strangerKey=generateKeyPairSync('ed25519');
@@ -80,7 +81,10 @@ try {
       assert.equal(await page.locator('#hub-android').count(),0,'APK must not advertise another installation');
       if(scenario==='newer') {
         await page.locator('#updbar').waitFor({state:'visible'});assert.notEqual(await page.locator('#ub-go').getAttribute('href'),apkUrl,'no unverified plain-link download');
-        assert.equal(await page.locator('#ub-notes').textContent(),hostileNotes);assert.equal(await page.locator('#ub-notes img').count(),0);assert.equal(await page.evaluate(()=>window.__xss),undefined);
+        const copy=(await page.locator('#updbar').innerText()).replace(/\s+/g,' ').trim();
+        assert.equal(copy,lane==='alpha'?'Доступно обновление Скачать обновление Позже':'An update is available Download update Later');
+        assert.equal(await page.locator('#updbar img').count(),0);assert.equal(await page.evaluate(()=>window.__xss),undefined);
+        await page.screenshot({path:`.playwright-mcp/android-update-prompt-${lane}.png`});
         await page.locator('#ub-go').click();assert.deepEqual(await page.evaluate(()=>window.__installs),[[apkUrl,apkSha256]]);
         assert.equal(await page.locator('#ub-status').textContent(),lane==='alpha'?'✗ файл не совпал с подписанной версией, установка отменена':"✗ the file doesn't match the signed version, install cancelled");
         await page.screenshot({path:`.playwright-mcp/android-update-${lane}.png`});
@@ -89,5 +93,5 @@ try {
       assert.equal(requests,1);await page.close();
     }
   }
-  assert.deepEqual(errors,[]);console.log('APK site: header download on desktop (hover QR decoded) and Android phones 390/360/320, none on iPhone (dev/player), APK newer/forged/equal/older/offline, signed manifest, verified native install handoff, safe notes: passed');
+  assert.deepEqual(errors,[]);console.log('APK site: header download on desktop (hover QR decoded) and Android phones 390/360/320, none on iPhone (dev/player), APK newer/forged/equal/older/offline, signed manifest, verified native install handoff, no release notes or build identity in prompt: passed');
 } finally {await browser.close();await pages.close();}
