@@ -873,6 +873,7 @@ export class MatchRoom {
    *  auto-started room (`initiallyStarted`, no lobby) accrues scaled time from
    *  its anchor at `initialState.time` (SES-2.1). */
   private clock(wall = this.now()): number {
+    if (this.stateValue.match.status === 'ended') return this.stateValue.time;
     const raw = !this.clockAnchored
       ? wall
       : this.lobbyAccrued +
@@ -897,7 +898,8 @@ export class MatchRoom {
   private captureClock(state: GameState): MatchSnapshot['clock'] {
     if (!this.clockAnchored) return undefined;
     const wallTime = this.now();
-    const gameTime = this.clock(wallTime);
+    // A planned durable snapshot may finish before stateValue is committed.
+    const gameTime = state.match.status === 'ended' ? state.time : this.clock(wallTime);
     const coalitionTransitions = this.pendingCoalitionClocks(state);
     return {
       wallTime,
@@ -983,14 +985,17 @@ export class MatchRoom {
     return this.started;
   }
 
-  /** Whether the world clock is currently ADVANCING (vs. frozen in a pre-start lobby).
+  /** Whether the world clock is currently ADVANCING (vs. a lobby or ended match).
    *  Mirrors the `clock()` gate exactly: a no-lobby room (auto-start SES-2.1, or the
    *  plain dev match) always runs; a waitForPlayers/manualStart lobby runs only once
    *  released (`lobbyRunningSince` set). The offline heartbeat beats only a running
    *  room — a frozen lobby has no live clock to keep on-screen, and its "due" events
    *  must not fire (which would also trip the driver's stall guard). */
   get isClockRunning(): boolean {
-    return !this.clockAnchored || this.lobbyRunningSince !== null;
+    return (
+      this.stateValue.match.status !== 'ended' &&
+      (!this.clockAnchored || this.lobbyRunningSince !== null)
+    );
   }
 
   /** Number of connected sockets across all seats — 0 means the match is unwatched
@@ -1765,7 +1770,7 @@ export class MatchRoom {
     // committed to `stateValue` (commit-before-broadcast), so advancing here would race
     // the submit's pending commit. `msUntilNextEvent` reports null while committing, so a
     // driver idles rather than firing skipped ticks; the submit re-arms it on commit.
-    if (this.waiting || this.committing) return false;
+    if (this.waiting || this.committing || this.stateValue.match.status === 'ended') return false;
     const before = this.stateValue.time;
     const startedAt = this.observe ? performance.now() : 0;
     const advanced = this.advance(this.clock());
@@ -1804,7 +1809,7 @@ export class MatchRoom {
    * bearing. It is swallowed the same way a throwing observer is.
    */
   private runServerOrders(): void {
-    if (!this.serverOrders || this.serverOrdersBusy) return;
+    if (!this.serverOrders || this.serverOrdersBusy || this.stateValue.match.status === 'ended') return;
     let orders: Action[];
     try {
       orders = this.serverOrders(this.stateValue, this.serverOrderSeq);
@@ -1817,6 +1822,7 @@ export class MatchRoom {
     this.serverOrdersWork = (async () => {
       try {
         for (const action of orders) {
+          if (this.stateValue.match.status === 'ended') break;
           await this.submitServerAction(action.playerId, action);
         }
       } catch {
@@ -1852,7 +1858,7 @@ export class MatchRoom {
     // `stateValue` yet, so the still-pending events read as overdue (ms 0). Report
     // "nothing to wake for" so a driver idles instead of spinning on skipped ticks and
     // tripping its stall guard — the submit re-arms the driver when it commits.
-    if (this.waiting || this.committing) return null;
+    if (this.waiting || this.committing || this.stateValue.match.status === 'ended') return null;
     if (this.pendingCoalitionClocks(this.stateValue).length > 0) return 0;
     const scheduled = this.stateValue.scheduled;
     if (scheduled.length === 0) return null;

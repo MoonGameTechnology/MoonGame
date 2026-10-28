@@ -1013,8 +1013,16 @@ async function createHostedMatch(
           // ждёт мейлбокс, за это время истекает делегирование Стюарда или возвращается
           // человек — и флот оставался вышедшим из боя без приказа куда идти. Планировщик
           // уже сверяет политику с той, под которую план строился (`aiScheduler.step`).
-          if (group.length && aiPolicy(group[0]!.playerId) !== null) {
-            for (const action of group) await room.submitServerAction(action.playerId, action);
+          // Validate the whole slice against the current authoritative world.
+          // Plans wait between slices; earlier orders may consume capacity/resources.
+          // Testing commands separately would discard a legal retreat+course pair.
+          if (
+            group.length && aiPolicy(group[0]!.playerId) !== null &&
+            room.canApplyAll(room.state, group, room.state.time) === null
+          ) {
+            for (const action of group) {
+              if (!(await room.submitServerAction(action.playerId, action)).ok) break;
+            }
           }
         } finally {
           driversBusy = false;
@@ -1042,7 +1050,7 @@ async function createHostedMatch(
   // Дежурного вылета (CC-4) больше нет: «Держать патруль» (SHU-6.6) поднимает эскадру
   // событием ядра, без драйвера.
   async function runServerStanding(): Promise<void> {
-    if (!room.isStarted) return;
+    if (!room.isStarted || room.state.match.status === 'ended') return;
     // RETR-2 идёт ПЕРВЫМ: смысл приказа — выйти из боя до следующего раунда, а не
     // после того, как флот отработает остальные намерения.
     for (const r of serverAutoRetreatActions(room.state)) {

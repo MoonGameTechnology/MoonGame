@@ -492,21 +492,6 @@ function groundCount(p: Planet): number {
   return p.garrison.reduce((n, s) => n + (data.units[s.unit]?.domain === 'ground' ? s.count : 0), 0);
 }
 
-/** Свободный трюм флота: Σ cargoCapacity кораблей − Σ cargoSize уже погруженного
- *  десанта. Та же формула, что у ядра (`army.ts`), иначе погрузка сыпала бы
- *  `E_NO_CAPACITY`. */
-function liftFree(f: Fleet): number {
-  const cap = f.units.reduce(
-    (n, s) => n + (data.units[s.unit]?.stats.cargoCapacity ?? 0) * s.count,
-    0,
-  );
-  const used = (f.landing ?? []).reduce(
-    (n, s) => n + (data.units[s.unit]?.stats.cargoSize ?? 1) * s.count,
-    0,
-  );
-  return cap - used;
-}
-
 /** What drives a seat this tick + the posture to hand `aiOrders`. */
 export interface SeatAiDecision {
   kind: SeatAiKind;
@@ -1007,7 +992,7 @@ function baseAiOrders(
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
       if (here0 && here0.id === base.id && (warFooting || neutralGuarded)) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
-        let free = liftFree(f);
+        let free = fleetHoldFree(state, f, data);
         let ordered = false;
         for (const st of spareGround(here0, data)) {
           if (free <= 0) break;
@@ -1073,7 +1058,7 @@ function baseAiOrders(
         (f.loading ?? []).length === 0 &&
         neediestWorld(here0.position) !== undefined
       ) {
-        let free = liftFree(f);
+        let free = fleetHoldFree(state, f, data);
         let ordered = false;
         for (const st of spareGround(here0, data)) {
           if (free <= 0) break;
@@ -1166,8 +1151,13 @@ function baseAiOrders(
       // не доктрина, а минимальный эскорт, и её кап остаётся как был.
       const spareMilitia = spareGround(base, data).find((s) => s.unit === militiaUnit);
       const hasLanding = (f.landing ?? []).some((s) => s.count > 0);
-      if (!hasLanding && spareMilitia) {
-        out.push(loadArmy(ai, f.id, militiaUnit, Math.min(2, spareMilitia.count)));
+      const lift = Math.min(
+        2,
+        spareMilitia?.count ?? 0,
+        Math.floor(fleetHoldFree(state, f, data) / (data.units[militiaUnit]?.stats.cargoSize ?? 1)),
+      );
+      if (!hasLanding && lift > 0) {
+        out.push(loadArmy(ai, f.id, militiaUnit, lift));
         continue; // час подъёма — вылет следующим тиком
       }
     }
@@ -1196,7 +1186,7 @@ function baseAiOrders(
     const hunting = skilled && warFooting && trailing;
     const weight = (p: Planet): number => (hunting ? huntWeight(p, f.landing ?? []) : 1);
     for (const p of Object.values(state.planets)) {
-      if (p.owner === ai || !capturable(p)) continue;
+      if (p.id === here.id || p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
       if (!inReach(p)) continue; // за угодьями клана пираты не ходят
       // Ничью планету с гарнизоном, которую этот десант наверняка не возьмёт, не
@@ -2727,11 +2717,18 @@ function baseAiOrders(
   }
   // Новая партия начинает только с разведчика: закрытые заказы ждут исследования.
   // Решение о доступности остаётся у ядра, включая войска десантного челнока и героев.
-  const available = swarmInhabitant
+  const unlocked = swarmInhabitant
     ? out.filter((a) => canOrder(state, a) === null)
     : state.techRules?.ruleset === 'main'
     ? out.filter((a) => canOrder(state, a) !== 'E_TECH_LOCKED')
     : out;
+  // Production orders are independent intents. Ask the reducer before ordering:
+  // bombardment, a full queue or a missing prerequisite can suppress this world.
+  // Fleet preparation/course pairs are checked together by the host instead.
+  const available = unlocked.filter(
+    (a) => !['unit.build', 'building.construct', 'building.upgrade'].includes(a.type) ||
+      canOrder(state, a) === null,
+  );
   // Копилка доктрины: войска, которые тратят то, на что место копит узел ветки, ждут.
   const held =
     saving.size === 0
