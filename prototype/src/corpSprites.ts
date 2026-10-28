@@ -11,7 +11,7 @@
  * SVG и в панораму не встаёт — карточка и лист у него всё равно есть.
  */
 import type { CorpLotState } from '../../decisions/corpBase';
-import { CORP_STYLE_STANDARD } from '../../packages/protocol/src/corpStyle';
+import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD } from '../../packages/protocol/src/corpStyle';
 import { corpArt, type CorpArt } from './corpArt';
 
 /** Участок здания на панораме и где у его подписи место — над участком или под ним. */
@@ -147,18 +147,118 @@ function seeded(seed: number): () => number {
   };
 }
 
-let stars = '';
-function starField(): string {
-  if (stars) return stars;
-  const r = seeded(7);
-  for (let i = 0; i < 150; i++)
-    stars += `<circle cx="${(r() * 1200).toFixed(1)}" cy="${(r() * 320).toFixed(1)}" r="${(0.4 + r() * 1.2).toFixed(2)}" fill="#dff8ff" opacity="${(0.25 + r() * 0.65).toFixed(2)}"/>`;
+/** Звёзды неба: зерно и цвет у каждого фона свои. */
+function starField(seed: number, color: string, count: number): string {
+  const r = seeded(seed);
+  let stars = '';
+  for (let i = 0; i < count; i++)
+    stars += `<circle cx="${(r() * 1200).toFixed(1)}" cy="${(r() * 320).toFixed(1)}" r="${(0.4 + r() * 1.2).toFixed(2)}" fill="${color}" opacity="${(0.25 + r() * 0.65).toFixed(2)}"/>`;
   return stars;
 }
 
-/** Фон панорамы: небо, планета, палуба с сеткой и площадки под участками. `built` —
- *  у здания есть уровень, тогда его площадка светится сплошной линией. */
-export function corpPanoramaBg(pads: ReadonlyArray<{ id: string; built: boolean }>): string {
+/** Фон базы (CORP-15): небо над горизонтом y=330, пейзаж и палуба под зданиями. Горизонт и
+ *  палуба у всех фонов на одном месте, поэтому участки зданий от фона не зависят. `accent` —
+ *  цвет сетки палубы, горизонта и площадок под участками. */
+interface Backdrop {
+  nameKey: string;
+  sky: readonly [string, string, string];
+  deck: readonly [string, string];
+  accent: string;
+  stars: { seed: number; color: string; count: number };
+  /** Пейзаж между небом и палубой; градиенты — в `defs`. */
+  defs: string;
+  scene: string;
+}
+
+const BACKDROPS: Readonly<Record<string, Backdrop>> = {
+  orbit: {
+    nameKey: 'corp.backdrop.orbit',
+    sky: ['#020b13', '#05192a', '#0a3044'],
+    deck: ['#0b2d3c', '#031019'],
+    accent: '#35d6e6',
+    stars: { seed: 7, color: '#dff8ff', count: 150 },
+    defs: `<radialGradient id="cbPlanet" cx=".62" cy=".08" r=".9"><stop offset="0" stop-color="#1b4a5e"/><stop offset=".45" stop-color="#0b2534"/><stop offset="1" stop-color="#030c14"/></radialGradient>`,
+    scene:
+      `<circle cx="724" cy="62" r="20" fill="#0c2a38" stroke="#1d6b70" stroke-width="1.5"/>` +
+      `<circle cx="250" cy="600" r="420" fill="url(#cbPlanet)"/><circle cx="250" cy="600" r="420" fill="none" stroke="#35d6e6" stroke-opacity=".35" stroke-width="2"/>` +
+      `<path d="M60 330Q250 260 520 330" fill="none" stroke="#35d6e6" stroke-opacity=".08" stroke-width="10"/>`,
+  },
+  nebula: {
+    nameKey: 'corp.backdrop.nebula',
+    sky: ['#0a0414', '#1a0b2e', '#2b1240'],
+    deck: ['#22102f', '#0a0510'],
+    accent: '#c48cff',
+    stars: { seed: 11, color: '#f3e6ff', count: 190 },
+    defs:
+      `<radialGradient id="cbNeb1" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ff5fb4" stop-opacity=".55"/><stop offset=".55" stop-color="#8a3cff" stop-opacity=".22"/><stop offset="1" stop-color="#8a3cff" stop-opacity="0"/></radialGradient>` +
+      `<radialGradient id="cbNeb2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#4fd8ff" stop-opacity=".4"/><stop offset="1" stop-color="#4fd8ff" stop-opacity="0"/></radialGradient>` +
+      `<radialGradient id="cbStar" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#ffd6f2" stop-opacity=".8"/><stop offset="1" stop-color="#ff7fd0" stop-opacity="0"/></radialGradient>`,
+    scene:
+      `<ellipse cx="860" cy="150" rx="420" ry="150" fill="url(#cbNeb1)" transform="rotate(-14 860 150)"/>` +
+      `<ellipse cx="300" cy="110" rx="330" ry="110" fill="url(#cbNeb1)" opacity=".7" transform="rotate(10 300 110)"/>` +
+      `<ellipse cx="640" cy="220" rx="300" ry="90" fill="url(#cbNeb2)"/>` +
+      `<circle cx="930" cy="128" r="46" fill="url(#cbStar)"/>` +
+      `<path d="M0 330L90 296L170 314L260 282L350 306L430 290L520 318L600 330Z" fill="#160a22"/>` +
+      `<path d="M700 330L780 300L880 318L960 288L1050 312L1130 296L1200 314V330Z" fill="#160a22"/>`,
+  },
+  ice_moon: {
+    nameKey: 'corp.backdrop.ice-moon',
+    sky: ['#03101e', '#0b2742', '#3f6f93'],
+    deck: ['#7fa9c4', '#1b3550'],
+    accent: '#bdf3ff',
+    stars: { seed: 23, color: '#ffffff', count: 120 },
+    defs:
+      `<radialGradient id="cbGiant" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#d9c8a8"/><stop offset=".5" stop-color="#9c7f5c"/><stop offset="1" stop-color="#3a2c22"/></radialGradient>` +
+      `<linearGradient id="cbIce" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f7ff"/><stop offset="1" stop-color="#8db6cf"/></linearGradient>`,
+    scene:
+      `<g transform="rotate(-12 330 150)"><ellipse cx="330" cy="150" rx="250" ry="34" fill="none" stroke="#e9dcc0" stroke-opacity=".35" stroke-width="10"/>` +
+      `<circle cx="330" cy="150" r="110" fill="url(#cbGiant)"/>` +
+      `<path d="M80 150A250 34 0 0 0 580 150" fill="none" stroke="#f4ead2" stroke-opacity=".55" stroke-width="10"/></g>` +
+      `<circle cx="980" cy="70" r="14" fill="#cfe8f5" opacity=".8"/>` +
+      `<path d="M0 330L70 284L120 300L190 252L250 290L320 270L400 330Z" fill="url(#cbIce)" opacity=".85"/>` +
+      `<path d="M760 330L840 262L900 296L980 240L1060 288L1130 268L1200 300V330Z" fill="url(#cbIce)" opacity=".85"/>` +
+      `<path d="M190 252L176 280L204 276ZM980 240L964 272L996 266Z" fill="#ffffff" opacity=".9"/>`,
+  },
+  gas_giant: {
+    nameKey: 'corp.backdrop.gas-giant',
+    sky: ['#120604', '#3a1408', '#a2441a'],
+    deck: ['#3b1a0c', '#0f0603'],
+    accent: '#ffb43a',
+    stars: { seed: 31, color: '#ffe7c4', count: 90 },
+    defs:
+      `<radialGradient id="cbJove" cx=".5" cy=".2" r=".8"><stop offset="0" stop-color="#ffcf7a"/><stop offset=".45" stop-color="#e2772e"/><stop offset="1" stop-color="#5a1f0c"/></radialGradient>` +
+      `<clipPath id="cbJoveClip"><circle cx="600" cy="560" r="430"/></clipPath>`,
+    scene:
+      `<circle cx="600" cy="560" r="450" fill="#ff9a3c" opacity=".12"/>` +
+      `<circle cx="600" cy="560" r="430" fill="url(#cbJove)"/>` +
+      `<g clip-path="url(#cbJoveClip)" fill="none" stroke-linecap="round">` +
+      `<path d="M150 210Q600 170 1050 210" stroke="#ffe0a3" stroke-opacity=".45" stroke-width="14"/>` +
+      `<path d="M170 250Q600 222 1030 252" stroke="#8a3412" stroke-opacity=".5" stroke-width="18"/>` +
+      `<path d="M190 296Q600 276 1010 298" stroke="#ffd08a" stroke-opacity=".35" stroke-width="10"/></g>` +
+      `<ellipse cx="760" cy="238" rx="38" ry="14" fill="#7a2a10" opacity=".7"/>` +
+      `<circle cx="180" cy="90" r="24" fill="#3a1408" stroke="#ffb43a" stroke-opacity=".5" stroke-width="1.5"/>`,
+  },
+};
+
+/** Фоны базы, бесплатный первым. Ключ — id фона из каталога магазина (`corpBackdrop`). */
+export const CORP_BACKDROPS: readonly string[] = /* @__PURE__ */ Object.keys(BACKDROPS);
+
+const backdropOf = (id: string): Backdrop => BACKDROPS[id] ?? BACKDROPS.orbit!;
+
+/** Ключ имени фона; незнакомый фон называется бесплатным, как и рисуется. */
+export function corpBackdropName(id: string): string {
+  return backdropOf(id).nameKey;
+}
+
+/** Фон панорамы: небо, пейзаж, палуба с сеткой и площадки под участками. `built` — у здания
+ *  есть уровень, тогда его площадка светится сплошной линией. `backdrop` — фон базы. */
+export function corpPanoramaBg(
+  pads: ReadonlyArray<{ id: string; built: boolean }>,
+  backdrop: string = CORP_BACKDROP_STANDARD,
+): string {
+  const b = backdropOf(backdrop);
+  // Общие градиенты — с id фона: превью разных фонов на одной странице не делят их.
+  const k = BACKDROPS[backdrop] ? backdrop : CORP_BACKDROP_STANDARD;
   let grid = '';
   for (let x = -1800; x <= 3000; x += 150) grid += `<line x1="600" y1="250" x2="${x}" y2="540"/>`;
   for (let i = 1; i <= 9; i++) {
@@ -173,20 +273,17 @@ export function corpPanoramaBg(pads: ReadonlyArray<{ id: string; built: boolean 
     })
     .join('');
   return (
-    `<svg class="bg" viewBox="0 0 1200 540" preserveAspectRatio="none" aria-hidden="true"><defs>` +
-    `<linearGradient id="cbSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#020b13"/><stop offset=".5" stop-color="#05192a"/><stop offset=".62" stop-color="#0a3044"/></linearGradient>` +
-    `<radialGradient id="cbPlanet" cx=".62" cy=".08" r=".9"><stop offset="0" stop-color="#1b4a5e"/><stop offset=".45" stop-color="#0b2534"/><stop offset="1" stop-color="#030c14"/></radialGradient>` +
-    `<linearGradient id="cbDeck" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b2d3c"/><stop offset="1" stop-color="#031019"/></linearGradient>` +
-    `<radialGradient id="cbHaze" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#35d6e6" stop-opacity=".22"/><stop offset="1" stop-color="#35d6e6" stop-opacity="0"/></radialGradient>` +
-    `<clipPath id="cbClip"><rect x="0" y="330" width="1200" height="210"/></clipPath></defs>` +
-    `<rect width="1200" height="540" fill="url(#cbSky)"/>${starField()}` +
-    `<circle cx="724" cy="62" r="20" fill="#0c2a38" stroke="#1d6b70" stroke-width="1.5"/>` +
-    `<circle cx="250" cy="600" r="420" fill="url(#cbPlanet)"/><circle cx="250" cy="600" r="420" fill="none" stroke="#35d6e6" stroke-opacity=".35" stroke-width="2"/>` +
-    `<path d="M60 330Q250 260 520 330" fill="none" stroke="#35d6e6" stroke-opacity=".08" stroke-width="10"/>` +
-    `<ellipse cx="600" cy="330" rx="760" ry="46" fill="url(#cbHaze)"/>` +
-    `<rect x="0" y="330" width="1200" height="210" fill="url(#cbDeck)"/>` +
-    `<g clip-path="url(#cbClip)" stroke="#35d6e6" stroke-opacity=".1" stroke-width="1">${grid}</g>` +
-    `<line x1="0" y1="330" x2="1200" y2="330" stroke="#35d6e6" stroke-opacity=".5" stroke-width="1.5"/>` +
+    `<svg class="bg" viewBox="0 0 1200 540" preserveAspectRatio="none" style="--pad:${b.accent}" aria-hidden="true"><defs>` +
+    `<linearGradient id="cbSky-${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${b.sky[0]}"/><stop offset=".5" stop-color="${b.sky[1]}"/><stop offset=".62" stop-color="${b.sky[2]}"/></linearGradient>` +
+    `<linearGradient id="cbDeck-${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${b.deck[0]}"/><stop offset="1" stop-color="${b.deck[1]}"/></linearGradient>` +
+    `<radialGradient id="cbHaze-${k}" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${b.accent}" stop-opacity=".22"/><stop offset="1" stop-color="${b.accent}" stop-opacity="0"/></radialGradient>` +
+    `<clipPath id="cbClip-${k}"><rect x="0" y="330" width="1200" height="210"/></clipPath>${b.defs}</defs>` +
+    `<rect width="1200" height="540" fill="url(#cbSky-${k})"/>${starField(b.stars.seed, b.stars.color, b.stars.count)}` +
+    b.scene +
+    `<ellipse cx="600" cy="330" rx="760" ry="46" fill="url(#cbHaze-${k})"/>` +
+    `<rect x="0" y="330" width="1200" height="210" fill="url(#cbDeck-${k})"/>` +
+    `<g clip-path="url(#cbClip-${k})" stroke="${b.accent}" stroke-opacity=".1" stroke-width="1">${grid}</g>` +
+    `<line x1="0" y1="330" x2="1200" y2="330" stroke="${b.accent}" stroke-opacity=".5" stroke-width="1.5"/>` +
     `${padsSvg}</svg>`
   );
 }

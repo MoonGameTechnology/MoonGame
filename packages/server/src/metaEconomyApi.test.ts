@@ -36,7 +36,7 @@ function setup(
     chooseSeasonReward: vi.fn(async () => ok),
     buyOffer: vi.fn(async () => ok),
     claimPremiumDaily: vi.fn(async () => ok),
-    corpStyle: vi.fn(async () => ({ active: 'high_tech', owned: ['high_tech'] })),
+    corpStyle: vi.fn(async () => ({ active: 'high_tech', backdrop: 'orbit', owned: ['high_tech'] })),
     buyCorpStyle: vi.fn(async () => ok),
     applyCorpStyle: vi.fn(async () => ok),
   };
@@ -240,7 +240,7 @@ describe('main economy HTTP boundary', () => {
       const response = await app.inject({ url: '/meta-economy/corp-style?corpId=other' });
       expect(response.headers['cache-control']).toBe('no-store');
       expect(response.json()).toEqual({
-        corp: { head, active: 'high_tech', owned: ['high_tech'] },
+        corp: { head, active: 'high_tech', backdrop: 'orbit', owned: ['high_tech'] },
       });
       expect(economy.corpStyle).toHaveBeenCalledWith('corp-1');
     }

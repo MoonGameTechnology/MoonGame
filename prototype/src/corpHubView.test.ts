@@ -255,7 +255,12 @@ describe('вкладка «Корпорация»: казна', () => {
   });
 });
 
-const styles = (head: boolean, active = 'standard', owned: string[] = ['high_tech']) => ({ head, active, owned });
+const styles = (head: boolean, active = 'standard', owned: string[] = ['high_tech'], backdrop = 'orbit') => ({
+  head,
+  active,
+  backdrop,
+  owned,
+});
 
 describe('вкладка «Корпорация»: стиль базы (CORP-14)', () => {
   it('шапка называет стиль, и здания рисуются в нём', () => {
@@ -288,6 +293,21 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
     expect(asMember).not.toMatch(/data-corp(style|shop)=/);
     expect(asMember).toContain(t('corp.style.owned'));
     expect(asMember).toContain(t('corp.style.locked'));
+  });
+
+  it('фон базы: панорама в применённом фоне, в шторке фоны рядом со стилями (CORP-15)', () => {
+    const view = styles(true, 'high_tech', ['high_tech', 'nebula'], 'nebula');
+    const html = corpHubHtml(paint({ style: view }));
+    expect(html).toContain('url(#cbSky-nebula)');
+    expect(html).not.toContain('url(#cbSky-orbit)');
+    const sheet = corpHubSheetHtml(paint({ style: view }), { kind: 'style' }, '');
+    expect(sheet).toContain(t('corp.backdrop.title'));
+    expect(sheet).toContain('data-corpstyle="orbit"');
+    expect(sheet).not.toContain('data-corpstyle="nebula"');
+    expect(sheet).toContain('data-corpshop="ice_moon"');
+    expect(sheet).toContain('data-corpshop="gas_giant"');
+    // Без прочитанного стиля панорама — в бесплатном фоне.
+    expect(corpHubHtml(paint())).toContain('url(#cbSky-orbit)');
   });
 });
 

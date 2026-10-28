@@ -98,6 +98,7 @@ const STORE: MetaStoreOfferView[] = [
     bought: 0,
   },
   { id: 'corp_style_high_tech', category: 'styles', price: 490, corpStyle: 'high_tech', bought: 0 },
+  { id: 'corp_backdrop_nebula', category: 'styles', price: 290, corpBackdrop: 'nebula', bought: 0 },
 ];
 
 function view(over: Partial<MetaEconomyView> = {}): MetaEconomyView {
@@ -160,6 +161,7 @@ function state(over: Partial<ShopState> = {}): ShopState {
 const corp = (head: boolean, owned: string[] = [], active = 'standard'): MetaCorpStyleView => ({
   head,
   active,
+  backdrop: 'orbit',
   owned,
 });
 
@@ -298,6 +300,21 @@ describe('магазин — «Стили»: стили базы корпора�
     const detail = shopDetailHtml(styles({ pick: 'high_tech' }));
     expect(detail).toContain('<h3 id="sh-dt-title">Хайтек</h3>');
     expect(detail).toContain('data-sh-buy="corp_style_high_tech"');
+  });
+
+  it('фон базы рядом со стилями: панорама без зданий, покупка и применение тем же путём (CORP-15)', () => {
+    const html = shopHtml(styles());
+    expect(html).toContain('Туманность');
+    expect(html).toContain('Фон базы корпорации');
+    expect(html).toMatch(/data-sh-pick="corp_backdrop_nebula"[^]*?sh-sov">290/);
+    expect(html).toContain('url(#cbSky-nebula)');
+    const detail = shopDetailHtml(styles({ pick: 'nebula' }));
+    expect(detail).toContain('data-sh-buy="corp_backdrop_nebula"');
+    expect(detail).toContain('Фон принадлежит корпорации');
+    const owned = shopDetailHtml(
+      styles({ corpStyle: corp(true, ['nebula']), pick: 'corp_backdrop_nebula' }),
+    );
+    expect(owned).toContain('data-sh-apply="nebula"');
   });
 });
 

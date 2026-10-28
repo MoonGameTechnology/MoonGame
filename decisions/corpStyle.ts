@@ -10,8 +10,15 @@
  *    остальные видят, какой стиль применён и что у корпорации есть.
  * 3. **Нет ответа о корпорации — кнопка погашена.** Без него клиент не знает, глава ли
  *    игрок и куплен ли стиль.
+ *
+ * Фон базы (CORP-15, заказ владельца 2026-10-28) покупается и применяется так же, как стиль,
+ * и стоит рядом с ним: применённый фон не снимает стиль. Правила те же.
  */
-import { CORP_STYLE_STANDARD, type MetaCorpStyleView } from '../packages/protocol/src/corpStyle';
+import {
+  CORP_BACKDROP_STANDARD,
+  CORP_STYLE_STANDARD,
+  type MetaCorpStyleView,
+} from '../packages/protocol/src/corpStyle';
 import type { MetaStoreOfferView } from '../packages/protocol/src/metaEconomyView';
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -27,29 +34,44 @@ export function parseCorpStyle(raw: unknown): MetaCorpStyleView | null | undefin
     !isObj(corp) ||
     typeof corp.head !== 'boolean' ||
     typeof corp.active !== 'string' ||
+    typeof corp.backdrop !== 'string' ||
     !Array.isArray(corp.owned) ||
     !corp.owned.every((style) => typeof style === 'string')
   )
     return undefined;
-  return { head: corp.head, active: corp.active, owned: [...(corp.owned as string[])] };
+  return {
+    head: corp.head,
+    active: corp.active,
+    backdrop: corp.backdrop,
+    owned: [...(corp.owned as string[])],
+  };
 }
 
-/** Стиль у корпорации есть: куплен или стандартный (правило 1). */
+/** Что продаёт товар корпорации: id стиля или фона; `undefined` — товар не для базы. */
+export function corpLook(
+  offer: Pick<MetaStoreOfferView, 'corpStyle' | 'corpBackdrop'>,
+): string | undefined {
+  return offer.corpStyle ?? offer.corpBackdrop;
+}
+
+/** Стиль или фон у корпорации есть: куплен или бесплатный (правило 1). */
 export function corpOwnsStyle(view: MetaCorpStyleView, style: string): boolean {
-  return style === CORP_STYLE_STANDARD || view.owned.includes(style);
+  return (
+    style === CORP_STYLE_STANDARD || style === CORP_BACKDROP_STANDARD || view.owned.includes(style)
+  );
 }
 
-/** Карточка стиля на вкладке «Корпорация»: применён; можно применить (глава); есть у
+/** Карточка стиля или фона на вкладке «Корпорация»: применён; можно применить (глава); есть у
  *  корпорации; купить в магазине (глава); не куплен. */
 export type CorpStyleCard = 'applied' | 'apply' | 'owned' | 'shop' | 'locked';
 
 export function corpStyleCard(view: MetaCorpStyleView, style: string): CorpStyleCard {
-  if (style === view.active) return 'applied';
+  if (style === view.active || style === view.backdrop) return 'applied';
   if (corpOwnsStyle(view, style)) return view.head ? 'apply' : 'owned';
   return view.head ? 'shop' : 'locked';
 }
 
-/** Кнопка стиля в магазине. `offline` — нет ответа о корпорации, `corp` — игрок не в
+/** Кнопка стиля или фона в магазине. `offline` — нет ответа о корпорации, `corp` — игрок не в
  *  корпорации, `head` — покупает глава, `owned` — стиль уже у корпорации, а игрок не глава. */
 export type StyleOfferState =
   | { kind: 'buy' }
@@ -63,7 +85,7 @@ export function styleOfferState(
   corp: MetaCorpStyleView | null | undefined,
   balance: number,
 ): StyleOfferState {
-  const style = offer.corpStyle ?? '';
+  const style = corpLook(offer) ?? '';
   if (corp === undefined) return { kind: 'blocked', reason: 'offline' };
   if (corp === null) return { kind: 'blocked', reason: 'corp' };
   const card = corpStyleCard(corp, style);

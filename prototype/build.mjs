@@ -3935,8 +3935,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pano-scroll{border-radius:14px;border:1px solid var(--sf-edge);overflow:hidden;}
 .cb-pano{position:relative;width:100%;aspect-ratio:1200 / 540;background:#020a12;}
 .cb-pano > svg.bg{position:absolute;inset:0;width:100%;height:100%;display:block;}
-.cb-pano .pad{fill:rgba(53,214,230,.05);stroke:rgba(53,214,230,.35);stroke-width:1.5;stroke-dasharray:7 6;}
-.cb-pano .pad.on{fill:rgba(53,214,230,.1);stroke:rgba(53,214,230,.55);stroke-dasharray:none;}
+.cb-pano .pad{fill:color-mix(in srgb,var(--pad,#35d6e6) 5%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 35%,transparent);stroke-width:1.5;stroke-dasharray:7 6;}
+.cb-pano .pad.on{fill:color-mix(in srgb,var(--pad,#35d6e6) 10%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 55%,transparent);stroke-dasharray:none;}
 .cb-lot{position:absolute;padding:0;margin:0;border:0;background:none;color:inherit;cursor:pointer;pointer-events:none;border-radius:8px;}
 .cb-lot .spr{width:100%;height:100%;pointer-events:none;}
 .cb-lot :is(.spr g,.cb-tagl,.cb-bdg,.cb-plus){pointer-events:auto;}
@@ -4185,6 +4185,10 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-sty{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0;}
 .cb-sty .cb-art{height:150px;padding:10px 10px 6px;border-radius:12px;border:1px solid var(--line);}
 .cb-sty.cur .cb-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-bd-art{aspect-ratio:1200 / 540;border-radius:12px;border:1px solid var(--line);overflow:hidden;}
+.cb-bd-art svg{display:block;width:100%;height:100%;}
+.cb-sty.cur .cb-bd-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-sty-h{margin:16px 0 8px;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
 .cb-sty figcaption{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
 .cb-sty figcaption b{font-weight:600;color:var(--sf-hi);}
 .cb-sty-st{min-height:28px;display:inline-flex;align-items:center;padding:0 10px;border-radius:999px;border:1px solid var(--sf-edge);
@@ -4599,6 +4603,10 @@ span.ar-fchip{cursor:default;}
 .sh-dt .sh-art-style{justify-content:center;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
   background:radial-gradient(120% 90% at 50% 100%,#0d3447,#04121c 70%);}
 .sh-dt .sh-art-style img{flex:1 1 0;min-width:0;height:auto;max-height:120px;}
+/* Фон базы (CORP-15): панорама без зданий. */
+.sh-art-bd{display:block;width:100%;max-width:150px;aspect-ratio:1200 / 540;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
+.sh-art-bd svg{display:block;width:100%;height:100%;}
+.sh-dt .sh-art-bd{max-width:none;border-radius:12px;}
 .sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
   background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
 .sh-mi.own{filter:grayscale(1);opacity:.5;}

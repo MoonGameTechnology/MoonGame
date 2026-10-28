@@ -212,20 +212,38 @@ try {
   await request(`/corps/${firstCorp}/apply`, { token: member.token, body: {} });
   await request(`/corps/${firstCorp}/accept`, { token: firstHead.token, body: { target: member.accountId } });
   const style = (who) => request('/meta-economy/corp-style', { token: who.token });
-  assert.deepEqual(await style(member), { corp: { head: false, active: 'standard', owned: ['imperial_gothic'] } });
+  assert.deepEqual(await style(member), { corp: { head: false, active: 'standard', backdrop: 'orbit', owned: ['imperial_gothic'] } });
   const refused = (who, path, body) => request(`/meta-economy/corp-style/${path}`, {
     token: who.token, body: { requestId: randomBytes(8).toString('hex'), ...body },
   }, 409);
   assert.equal((await refused(member, 'buy', { offerId: 'corp_style_high_tech' })).error, 'E_FORBIDDEN');
   assert.equal((await refused(member, 'apply', { styleId: 'imperial_gothic' })).error, 'E_FORBIDDEN');
   await request(`/corps/${firstCorp}/transfer`, { token: firstHead.token, body: { target: member.accountId } });
-  assert.deepEqual(await style(member), { corp: { head: true, active: 'standard', owned: ['imperial_gothic'] } });
+  assert.deepEqual(await style(member), { corp: { head: true, active: 'standard', backdrop: 'orbit', owned: ['imperial_gothic'] } });
   await request('/meta-economy/corp-style/apply', {
     token: member.token, body: { requestId: randomBytes(8).toString('hex'), styleId: 'imperial_gothic' },
   });
   assert.equal((await style(firstHead)).corp.active, 'imperial_gothic');
   assert.equal((await refused(firstHead, 'apply', { styleId: 'standard' })).error, 'E_FORBIDDEN');
   console.log('PASS http: a member is refused; the style stays with the corporation under a new head');
+
+  // CORP-15: a backdrop is bought and applied the same way and leaves the style in place. The
+  // first head gets the corporation back: their account already has a meta-economy record.
+  await request(`/corps/${firstCorp}/transfer`, { token: member.token, body: { target: firstHead.accountId } });
+  const topped = await db.query(
+    `UPDATE meta_economy_accounts SET state = jsonb_set(state, '{sovereigns}', '300') WHERE account_id = $1`,
+    [firstHead.accountId],
+  );
+  assert.equal(topped.rowCount, 1);
+  const send = (path, body) => request(`/meta-economy/corp-style/${path}`, {
+    token: firstHead.token, body: { requestId: randomBytes(8).toString('hex'), ...body },
+  });
+  await send('buy', { offerId: 'corp_backdrop_nebula' });
+  await send('apply', { styleId: 'nebula' });
+  assert.deepEqual(await style(firstHead), {
+    corp: { head: true, active: 'imperial_gothic', backdrop: 'nebula', owned: ['imperial_gothic', 'nebula'] },
+  });
+  console.log('PASS http: a backdrop is bought and applied next to the style');
 } catch (error) {
   let safeLog = log;
   for (const value of secrets) safeLog = safeLog.replaceAll(value, '[redacted]');

@@ -483,7 +483,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `metaEconomyScreen.ts`, `metaMarketScreen.ts`, общая сессия экономики — `metaEconomyClient.ts`.
   «Магазин» (`shopScreen.ts`, решения — `decisions/shopView.ts`): Суверены, Премиум, Модули,
   Материалы, Стили; покупка за ◆, пакеты ◆ ждут провайдера оплаты. Стиль базы корпорации
-  покупает и применяет глава (`decisions/corpStyle.ts`, CORP-14).
+  и фон базы покупает и применяет глава (`decisions/corpStyle.ts`, CORP-14, CORP-15).
   «Корпорация» (`corpHubView.ts`, решения — `decisions/corpHub.ts`, `corpBase.ts`,
   `corpMembers.ts`, `corpTreasury.ts`): База (картинки уровней зданий в стиле базы
   `corpSprites.ts` и `corpArt.ts`, лист здания и стиль базы шторкой), Битвы, Состав, Казна;

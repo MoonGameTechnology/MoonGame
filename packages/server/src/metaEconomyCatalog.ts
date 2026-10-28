@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { GameData } from '@void/shared-core';
-import { CORP_STYLE_STANDARD, PROFILE_MEDALS } from '@void/protocol';
+import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD, PROFILE_MEDALS } from '@void/protocol';
 
 const id = z
   .string()
@@ -32,6 +32,8 @@ const storeOffer = z
     materials: quantities.optional(),
     /** A corporation base style: the head buys it for the whole corporation (`buyCorpStyle`). */
     corpStyle: id.optional(),
+    /** A corporation backdrop (CORP-15): bought and applied like a base style. */
+    corpBackdrop: id.optional(),
     /** Lifetime purchases per account. */
     limit: z.number().int().min(1).max(100).optional(),
   })
@@ -268,6 +270,7 @@ export function parseMetaEconomyCatalog(
       offer.modules,
       offer.materials,
       offer.corpStyle,
+      offer.corpBackdrop,
     ].filter((kind) => kind !== undefined);
     if (kinds.length !== 1) throw new Error('E_META_STORE');
     if (offer.modules) {
@@ -284,19 +287,23 @@ export function parseMetaEconomyCatalog(
       ? 'modules'
       : offer.materials
         ? 'materials'
-        : offer.corpStyle
+        : offer.corpStyle || offer.corpBackdrop
           ? 'styles'
           : 'premium';
     if (offer.category !== category) throw new Error('E_META_STORE');
-    if (offer.corpStyle) {
-      // The free style is never sold; a style is owned once, so no purchase limit either.
+    const look = offer.corpStyle ?? offer.corpBackdrop;
+    if (look) {
+      // The free style and backdrop are never sold; a style or a backdrop is owned once, so
+      // no purchase limit either. Both share the corporation's list of bought looks, so an
+      // id names one of them only.
       if (
-        offer.corpStyle === CORP_STYLE_STANDARD ||
-        corpStyles.has(offer.corpStyle) ||
+        look === CORP_STYLE_STANDARD ||
+        look === CORP_BACKDROP_STANDARD ||
+        corpStyles.has(look) ||
         offer.limit !== undefined
       )
         throw new Error('E_META_STORE');
-      corpStyles.add(offer.corpStyle);
+      corpStyles.add(look);
     }
     checkMaterials(offer.materials);
     if (offer.premiumSeason && !seasonIds.has(offer.premiumSeason)) throw new Error('E_META_STORE');

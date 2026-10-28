@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { hashJson as gameDataHash, type ArsenalItem } from '@void/shared-core';
-import { CORP_STYLE_STANDARD } from '@void/protocol';
+import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD } from '@void/protocol';
 import type {
   EntitlementCommandV1,
   EntitlementReceipt,
@@ -588,6 +588,7 @@ export class MetaEconomy {
         : {}),
       ...(offer.materials ? { materials: { ...offer.materials } } : {}),
       ...(offer.corpStyle ? { corpStyle: offer.corpStyle } : {}),
+      ...(offer.corpBackdrop ? { corpBackdrop: offer.corpBackdrop } : {}),
       ...(offer.limit !== undefined ? { limit: offer.limit } : {}),
       bought: account.counters[`offer:${id}`] ?? 0,
       ...(terms.blocked ? { blocked: terms.blocked } : {}),
@@ -688,8 +689,8 @@ export class MetaEconomy {
         )
           reject('E_META_OFFER');
         const offer = this.deps.catalog.store.offers[command.offerId]!;
-        // A base style belongs to a corporation: it is bought through `buyCorpStyle`.
-        if (offer.corpStyle) reject('E_META_OFFER');
+        // A base style or backdrop belongs to a corporation: it is bought through `buyCorpStyle`.
+        if (offer.corpStyle || offer.corpBackdrop) reject('E_META_OFFER');
         const items = await tx.arsenal.listOf(accountId);
         const terms = this.storeTerms(command.offerId, offer, account, items, receipt.at);
         if (terms.blocked === 'limit') reject('E_OFFER_LIMIT');
@@ -749,17 +750,18 @@ export class MetaEconomy {
     );
   }
 
-  /** The corporation's base style: applied and bought (CORP-14). */
+  /** The corporation's base style and backdrop: applied and bought (CORP-14, CORP-15). */
   async corpStyle(corpId: string): Promise<Omit<MetaCorpStyleView, 'head'>> {
     const key = corpEconomyKey(corpId);
     const record = validKey(key) ? await this.deps.store.read(key) : undefined;
     return {
       active: record?.corpStyle ?? CORP_STYLE_STANDARD,
+      backdrop: record?.corpBackdrop ?? CORP_BACKDROP_STANDARD,
       owned: [...(record?.cosmetics ?? [])],
     };
   }
 
-  /** The head buys a base style for the whole corporation with personal Sovereigns. The
+  /** The head buys a base style or backdrop for the whole corporation with personal Sovereigns. The
    *  caller checks that `accountId` heads `corpId`; the corporation keeps the style when
    *  the head changes. */
   buyCorpStyle(
@@ -780,23 +782,25 @@ export class MetaEconomy {
         )
           reject('E_META_OFFER');
         const offer = this.deps.catalog.store.offers[command.offerId]!;
-        if (!offer.corpStyle) reject('E_META_OFFER');
+        const look = offer.corpStyle ?? offer.corpBackdrop;
+        if (!look) reject('E_META_OFFER');
         const record = tx.account(corp);
-        if (record.cosmetics.includes(offer.corpStyle)) reject('E_ALREADY_OWNED');
+        if (record.cosmetics.includes(look)) reject('E_ALREADY_OWNED');
         const price = offer.price!;
         const balance = account.sovereigns ?? 0;
         if (balance < price) reject('E_SOVEREIGNS');
         account.sovereigns = balance - price;
-        record.cosmetics.push(offer.corpStyle);
+        record.cosmetics.push(look);
         receipt.sovereignsSpent = price;
-        receipt.corpStyle = offer.corpStyle;
+        receipt.corpStyle = look;
       },
       [corp],
     );
   }
 
-  /** The head applies a bought style, or the free standard one, to the corporation's base.
-   *  The caller checks that the actor heads `corpId`. */
+  /** The head applies a bought style or backdrop, or a free one, to the corporation's base.
+   *  The catalog tells a backdrop from a style. The caller checks that the actor heads
+   *  `corpId`. */
   applyCorpStyle(corpId: string, command: MetaCorpStyleApplyCommand): Promise<MetaCommandResult> {
     return this.command(
       corpEconomyKey(corpId),
@@ -804,11 +808,20 @@ export class MetaEconomy {
       'corp-style-apply',
       command,
       async (_tx, record, receipt) => {
-        if (command.styleId === CORP_STYLE_STANDARD) delete record.corpStyle;
-        else if (record.cosmetics.includes(command.styleId)) record.corpStyle = command.styleId;
-        else reject('E_CORP_STYLE');
+        const look = command.styleId;
+        if (look === CORP_STYLE_STANDARD) delete record.corpStyle;
+        else if (look === CORP_BACKDROP_STANDARD) delete record.corpBackdrop;
+        else if (!record.cosmetics.includes(look)) reject('E_CORP_STYLE');
+        else if (this.isBackdrop(look)) record.corpBackdrop = look;
+        else record.corpStyle = look;
         receipt.corpStyle = command.styleId;
       },
+    );
+  }
+
+  private isBackdrop(look: string): boolean {
+    return Object.values(this.deps.catalog.store.offers).some(
+      (offer) => offer.corpBackdrop === look,
     );
   }
 
