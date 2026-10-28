@@ -88,8 +88,17 @@ describe('Frontier 50', () => {
 
 // CORP-5: битву корпораций сервер заводит на карте из пула AvA, и клиент обязан её знать —
 // иначе в списке партий вместо названия стоит id карты, а полоса очков считает до чужого порога.
-describe('corporation battle maps (CORP-5)', () => {
-  it('knows every map the server picks for a battle and plays it to the core threshold', () => {
+describe('corporation battle maps (CORP-5, CORP-8)', () => {
+  it('knows every map the server picks for a battle: a published map with its own threshold', () => {
+    const catalog = JSON.parse(
+      readFileSync(new URL('../../data/avaFormats.json', import.meta.url), 'utf8'),
+    ) as { formats: Array<{ maps: Array<{ id: string }> }> };
+    const picked = [...new Set(catalog.formats.flatMap((f) => f.maps.map((m) => m.id)))].sort();
+    expect(picked).toEqual(['ffa-20', 'team-2v2', 'team-3v3']);
+    for (const mapId of picked) expect(MAP_IDS).toContain(mapId);
+  });
+
+  it('still knows the authored AvA maps a battle raised before CORP-8 is played on', () => {
     const dir = new URL('../../data/maps/', import.meta.url);
     const picked = readdirSync(dir)
       .filter((name) => name.endsWith('.json'))

@@ -78,6 +78,8 @@ import { MatchRoom, type ActionReceipt, type RoomObservation } from './matchRoom
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { validateStarterArsenal, type StarterArsenalTemplate } from './arsenal';
 import { validateDropTables, type DropTables } from './dropRoller';
+import { AVA_FORMATS } from './avaFormats';
+import { buildAvaMapPool } from './avaMapPool';
 
 /**
  * A runnable dev match on the *real* simulation core — the smallest faithful
@@ -118,15 +120,19 @@ export function loadDropTables(data: GameData): DropTables {
   return tables;
 }
 
-/** The AvA-eligible map pool (AVA-5/7): every validated map in `data/maps` tagged
- *  `avaEligible`, the candidate set the orchestrator picks from by requested shape. */
-export function loadAvaMaps(): MatchMap[] {
+/** The AvA maps (CORP-8): `pool` — the maps every format of `data/avaFormats.json` plays,
+ *  built from `data/maps` and checked at boot (`buildAvaMapPool`), the candidate set the
+ *  orchestrator picks from; `retired` — the maps tagged `avaEligible` that no format plays
+ *  any more, kept so a battle raised on one before the switch still settles by it. */
+export function loadAvaMaps(data: GameData): { pool: MatchMap[]; retired: MatchMap[] } {
   const dir = new URL('../../../data/maps/', import.meta.url);
-  return readdirSync(dir)
+  const maps = readdirSync(dir)
     .filter((name) => name.endsWith('.json'))
     .sort()
-    .map((name) => parseMatchMap(JSON.parse(readFileSync(new URL(name, dir), 'utf8'))))
-    .filter((map) => map.avaEligible);
+    .map((name) => parseMatchMap(JSON.parse(readFileSync(new URL(name, dir), 'utf8'))));
+  const pool = buildAvaMapPool(AVA_FORMATS, maps, data);
+  const played = new Set(pool.map((map) => map.id));
+  return { pool, retired: maps.filter((map) => map.avaEligible && !played.has(map.id)) };
 }
 
 /** Full base-module manifest, in a fixed order (invariant #6: execution order =

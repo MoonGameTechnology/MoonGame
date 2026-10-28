@@ -415,6 +415,8 @@ export {
   type MapOperation,
   parseMatchMap,
   mapForDifficulty,
+  NEUTRAL_PLANET_MILITIA,
+  neutralSector,
   safeParseMatchMap,
   type MatchMap,
   type MapSector,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { mapForDifficulty, parseMatchMap, safeParseMatchMap } from './mapSchema';
+import { mapForDifficulty, NEUTRAL_PLANET_MILITIA, neutralSector, parseMatchMap, safeParseMatchMap } from './mapSchema';
 import { validateMatchMap } from '../state/buildFromMap';
 import { loadGameData } from './loadGameData';
 
@@ -251,5 +251,29 @@ describe('старт главы по сложности (PVR-6.32)', () => {
     expect(issues).toContain('E_START_UNKNOWN_FLEET:weak:p1_9');
     expect(issues).toContain('E_UNKNOWN_UNIT:cruser');
     expect(issues).toContain('E_MAP_LOADOUT:weak:cruiser:E_UNKNOWN_MODULE');
+  });
+});
+
+describe('neutralSector (CORP-8) — a start nobody plays stays on the map neutral', () => {
+  const map = parseMatchMap(readMap('team-2v2.json'));
+
+  it('drops the owner and the buildings; a planet keeps two militia, another kind nothing', () => {
+    const home = map.sectors.home_1!;
+    expect(home.owner).toBe('slot_1');
+    expect(home.buildings.length).toBeGreaterThan(0);
+    expect(neutralSector(home)).toEqual({
+      ...home,
+      owner: null,
+      buildings: [],
+      garrison: [{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }],
+    });
+    const open = Object.values(map.sectors).find((sector) => sector.kind !== 'planet')!;
+    expect(neutralSector(open).garrison).toEqual([]);
+  });
+
+  it('does not mutate the map', () => {
+    const before = JSON.stringify(map.sectors.home_1);
+    neutralSector(map.sectors.home_1!);
+    expect(JSON.stringify(map.sectors.home_1)).toBe(before);
   });
 });

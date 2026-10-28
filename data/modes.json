@@ -72,5 +72,25 @@
   "team_5v5": {
     "name": "Team 5v5",
     "teamFormat": "5v5"
+  },
+  "team_6v6": {
+    "name": "Team 6v6",
+    "teamFormat": "6v6"
+  },
+  "team_7v7": {
+    "name": "Team 7v7",
+    "teamFormat": "7v7"
+  },
+  "team_8v8": {
+    "name": "Team 8v8",
+    "teamFormat": "8v8"
+  },
+  "team_9v9": {
+    "name": "Team 9v9",
+    "teamFormat": "9v9"
+  },
+  "team_10v10": {
+    "name": "Team 10v10",
+    "teamFormat": "10v10"
   }
 }

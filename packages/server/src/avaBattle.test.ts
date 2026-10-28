@@ -24,6 +24,7 @@ import { MemoryArsenalStore, MemoryMatchStore, MemoryReceiptStore } from './stor
 // on its first tick, and the victory counted every seat for itself.
 
 const data = loadShippedData();
+const avaMaps = loadAvaMaps(data);
 const DAY = 24 * 60 * 60 * 1000;
 const A_HEAD: CorpActor = { accountId: 'a-head', login: 'ahead' };
 const A_MEMBER: CorpActor = { accountId: 'a-mem', login: 'amember' };
@@ -83,7 +84,9 @@ describe('AvA battle end to end (CORP-4)', () => {
       rosterStore: stores.rosterStore,
       sessionStore: stores.sessionStore,
       data,
-      maps: loadAvaMaps(),
+      // The chain, not the map, is under test: the small authored 2 на 2 the catalog no
+      // longer plays keeps the orders below short (CORP-8 plays 2 на 2 on `team-2v2`).
+      maps: avaMaps.retired,
       manifest: MODULE_MANIFEST_VERSION,
       createRoom: createAvaRoom({ stores, data, now }),
       cancel: (matchupId) => ava.cancelLocked(matchupId),
@@ -180,6 +183,63 @@ describe('AvA battle end to end (CORP-4)', () => {
     expect((await stores.resultStore.get(ch.id))?.winnerCorp).toBe(a.corpId);
     // 500 − 100 for the challenge + 150 for the win
     expect((await stores.corpStore.getCorp(a.corpId))?.influence).toBe(550);
+  });
+});
+
+// CORP-8 — a battle larger than 3 на 3 is played on the 20-start map cut in two; the host
+// loads it like any battle, under the format's fixed sides.
+describe('AvA battle on the 20-start map (CORP-8)', () => {
+  it('raises a 4 на 4 and loads it with its sides, the starts out of play neutral', async () => {
+    const wall = Date.UTC(2026, 9, 28);
+    const now = (): number => wall;
+    const stores = await createStores({});
+    await stores.challengeStore.createChallenge({
+      id: 'mu-4v4',
+      challengerCorp: 'cA',
+      targetCorp: 'cB',
+      format: 4,
+      cost: 200,
+      status: 'pending',
+      createdAt: 1,
+      expiresAt: 10,
+    });
+    await stores.challengeStore.closeChallenge('mu-4v4', 'accepted');
+    await stores.challengeStore.closeMatchup('mu-4v4', 'locked');
+    for (const [accountId, side] of [
+      ['a1', 'challenger'],
+      ['a2', 'challenger'],
+      ['a3', 'challenger'],
+      ['b1', 'target'],
+      ['b2', 'target'],
+      ['b3', 'target'],
+    ] as const) {
+      await stores.rosterStore.addEntry({ matchupId: 'mu-4v4', accountId, side, source: 'self', at: 1 }, 4);
+    }
+    const orch = new AvaOrchestrator({
+      challengeStore: stores.challengeStore,
+      rosterStore: stores.rosterStore,
+      sessionStore: stores.sessionStore,
+      data,
+      maps: avaMaps.pool,
+      retiredMaps: avaMaps.retired,
+      manifest: MODULE_MANIFEST_VERSION,
+      createRoom: createAvaRoom({ stores, data, now }),
+      now,
+    });
+    expect(await orch.sweep()).toEqual({ raised: 1, cancelled: 0 });
+    const session = await stores.sessionStore.byMatchup('mu-4v4');
+    expect(session?.mapId).toBe('ffa-20');
+
+    const live = await createMatchLoader({ stores, data, now })(session!.matchId);
+    const room = live!.room;
+    room.tick();
+    expect(room.modeId).toBe('team_4v4');
+    expect(room.state.match.status).toBe('ongoing');
+    const seats = Object.values(room.state.players).filter((p) => !p.npc);
+    expect(seats.map((p) => p.team).sort()).toEqual(['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B']);
+    const owned = Object.values(room.state.planets).filter((p) => p.owner !== null && !room.state.players[p.owner]?.npc);
+    expect(owned).toHaveLength(8); // a home a seat; the other twelve starts are neutral
+    await live!.dispose();
   });
 });
 

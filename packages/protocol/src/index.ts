@@ -1,3 +1,4 @@
+export * from './ava';
 export * from './corpInfrastructure';
 export * from './corpStyle';
 export * from './news';
