@@ -18,7 +18,7 @@
  * Кнопку стиля решает `decisions/corpStyle.ts` по ответу `/meta-economy/corp-style`.
  */
 import { CORP_HQ } from '../../decisions/corpBase';
-import { styleOfferState, type StyleOfferState } from '../../decisions/corpStyle';
+import { corpLook, styleOfferState, type StyleOfferState } from '../../decisions/corpStyle';
 import type { CommerceOffer } from '../../packages/protocol/src/commerce';
 import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import type {
@@ -42,6 +42,7 @@ import {
   type ShopTab,
 } from '../../decisions/shopView';
 import { CORP_ART_BUILDINGS, corpArt, corpStyleName } from './corpArt';
+import { corpBackdropName, corpPanoramaBg } from './corpSprites';
 import { data } from './gameData';
 import { esc, nfmt } from './format';
 import { SOV_SVG } from './icons';
@@ -153,7 +154,7 @@ function entries(s: ShopState): Entry[] {
 export function pickedEntry(s: ShopState): Entry | undefined {
   const list = entries(s);
   const asked = list.find(
-    (e) => e.id === s.pick || (e.kind === 'store' && !!s.pick && e.offer.corpStyle === s.pick),
+    (e) => e.id === s.pick || (e.kind === 'store' && !!s.pick && corpLook(e.offer) === s.pick),
   );
   const id =
     asked?.id ??
@@ -163,6 +164,7 @@ export function pickedEntry(s: ShopState): Entry | undefined {
 
 function storeTitle(view: MetaEconomyView, o: MetaStoreOfferView): string {
   if (o.corpStyle) return t(corpStyleName(o.corpStyle));
+  if (o.corpBackdrop) return t(corpBackdropName(o.corpBackdrop));
   if (o.premiumDays) return t('shop.premium.days', { n: o.premiumDays });
   if (o.premiumSeason) {
     const season = view.seasons.find((x) => x.id === o.premiumSeason);
@@ -197,8 +199,14 @@ function styleArtHtml(style: string, all: boolean): string {
   );
 }
 
+/** Фон базы — его панорамой без зданий. */
+function backdropArtHtml(backdrop: string): string {
+  return `<span class="sh-art sh-art-bd" aria-hidden="true">${corpPanoramaBg([], backdrop)}</span>`;
+}
+
 function artHtml(e: Entry, detail = false): string {
   if (e.kind === 'store' && e.offer.corpStyle) return styleArtHtml(e.offer.corpStyle, detail);
+  if (e.kind === 'store' && e.offer.corpBackdrop) return backdropArtHtml(e.offer.corpBackdrop);
   if (e.kind === 'pack') {
     const n = Math.min(5, 1 + Math.floor(Math.log2(packTotal(e.offer) / 100 + 1)));
     return `<span class="sh-art sh-art-sov" aria-hidden="true">${`<i>${SOV_SVG}</i>`.repeat(n)}</span>`;
@@ -264,10 +272,11 @@ function cardHtml(
       if (saving) sub = t('shop.premium.saving', { n: saving });
     } else if (o.premiumSeason) sub = t('shop.season.track');
     else if (o.corpStyle) sub = t('shop.style.sub');
+    else if (o.corpBackdrop) sub = t('shop.backdrop.sub');
     const discount = discountOf(o);
     if (discount) tag = t('shop.discount', { n: discount });
     price =
-      (o.corpStyle ? stylePill(s, view, o) : '') ||
+      (corpLook(o) ? stylePill(s, view, o) : '') ||
       (o.blocked
         ? `<span class="sh-pill">${t(BLOCKED_KEY[o.blocked])}</span>`
         : (o.fullPrice && o.fullPrice > o.price ? `<s>${nfmt(o.fullPrice)}</s>` : '') +
@@ -400,7 +409,7 @@ function styleHtml(
   if (state.kind === 'applied')
     return `<button type="button" class="btn-main" disabled>${t('corp.style.applied')}</button>`;
   if (state.kind === 'apply')
-    return `<button type="button" class="btn-main" data-sh-apply="${esc(o.corpStyle ?? '')}"${off(s.busy)}>${t('corp.style.apply')}</button>`;
+    return `<button type="button" class="btn-main" data-sh-apply="${esc(corpLook(o) ?? '')}"${off(s.busy)}>${t('corp.style.apply')}</button>`;
   return payHtml(s, o, title, state.kind === 'short' ? state.lack : 0);
 }
 
@@ -485,7 +494,8 @@ export function shopDetailHtml(s: ShopState): string {
           cover.map((c) => line(moduleName(c.defId), `${c.percent}%`)).join('');
       note = t('shop.materials.note');
     } else if (o.corpStyle) note = t('corp.style.note');
-    action = o.corpStyle ? styleHtml(s, view, o, title) : buyHtml(s, view, o, title);
+    else if (o.corpBackdrop) note = t('corp.backdrop.note');
+    action = corpLook(o) ? styleHtml(s, view, o, title) : buyHtml(s, view, o, title);
   }
   return (
     `<div class="sh-dt"><h3 id="sh-dt-title">${e.kind === 'pack' ? sov(packTotal(e.offer)) : esc(title)}</h3>` +
@@ -683,7 +693,7 @@ export function initShop(host: ShopHost): {
     if (client.busy() || !view) return;
     // Стиль базы покупает глава для корпорации — его кнопку решает не `buyState`.
     const canBuy = (o: MetaStoreOfferView): boolean =>
-      (o.corpStyle
+      (corpLook(o)
         ? styleOfferState(o, client.corpStyle(), view.sovereigns ?? 0)
         : buyState(o, view.sovereigns ?? 0)
       ).kind === 'buy';
@@ -704,7 +714,7 @@ export function initShop(host: ShopHost): {
     if (d.shBuyDo) {
       const o = view.store?.find((x) => x.id === d.shBuyDo);
       if (!o || !confirm || pick !== o.id || !canBuy(o)) return;
-      if (o.corpStyle)
+      if (corpLook(o))
         return act('/meta-economy/corp-style/buy', { offerId: o.id }, 'shop.done.style', 'detail');
       const done =
         o.premiumDays || o.premiumSeason
@@ -715,7 +725,7 @@ export function initShop(host: ShopHost): {
       return act('/meta-economy/store/buy', { offerId: o.id }, done, 'detail');
     }
     if (d.shApply) {
-      const o = view.store?.find((x) => x.corpStyle === d.shApply);
+      const o = view.store?.find((x) => corpLook(x) === d.shApply);
       if (!o || styleOfferState(o, client.corpStyle(), view.sovereigns ?? 0).kind !== 'apply')
         return;
       return act(

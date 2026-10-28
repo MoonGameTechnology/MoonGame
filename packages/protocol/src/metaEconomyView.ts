@@ -88,6 +88,8 @@ export interface MetaStoreOfferView {
    *  `/meta-economy/corp-style/buy`, so `blocked` never covers it: the caller's corporation
    *  is in `GET /meta-economy/corp-style`. */
   corpStyle?: string;
+  /** A corporation backdrop (CORP-15): bought and applied like a base style. */
+  corpBackdrop?: string;
   /** Lifetime purchases allowed per account; absent = unlimited. */
   limit?: number;
   bought: number;
@@ -134,7 +136,7 @@ export interface MetaCommandReceipt {
   premiumUntil?: number;
   /** Sovereigns credited by the premium daily claim or by medal rewards. */
   sovereignsGranted?: number;
-  /** The corporation base style bought or applied. */
+  /** The corporation base style or backdrop bought or applied. */
   corpStyle?: string;
   /** Medal degrees this command paid for, each once per account. */
   medals?: MedalRewardGrant[];

@@ -798,10 +798,15 @@ describe('MetaEconomy corporation base styles', () => {
     expect((await f.store.read('alice')).cosmetics).toEqual([]);
     expect(await f.service.corpStyle('corp-1')).toEqual({
       active: 'standard',
+      backdrop: 'orbit',
       owned: ['high_tech'],
     });
     // Another corporation does not get it; the same one cannot buy it twice.
-    expect(await f.service.corpStyle('corp-2')).toEqual({ active: 'standard', owned: [] });
+    expect(await f.service.corpStyle('corp-2')).toEqual({
+      active: 'standard',
+      backdrop: 'orbit',
+      owned: [],
+    });
     expect(await buy(f, 'style-2')).toEqual({ ok: false, code: 'E_ALREADY_OWNED' });
     expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 490);
     // The same request id for another corporation is a different request: refused.
@@ -814,7 +819,11 @@ describe('MetaEconomy corporation base styles', () => {
   it('refuses a purchase without the Sovereigns or of an offer that is not a style', async () => {
     const f = setup();
     expect(await buy(f, 'poor')).toEqual({ ok: false, code: 'E_SOVEREIGNS' });
-    expect(await f.service.corpStyle('corp-1')).toEqual({ active: 'standard', owned: [] });
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'standard',
+      backdrop: 'orbit',
+      owned: [],
+    });
     await buyPack(f);
     for (const offerId of ['premium_7', 'nope'])
       expect(
@@ -854,16 +863,51 @@ describe('MetaEconomy corporation base styles', () => {
     });
     expect(await f.service.corpStyle('corp-1')).toEqual({
       active: 'high_tech',
+      backdrop: 'orbit',
       owned: ['high_tech'],
     });
     expect(await apply('a3', 'imperial_gothic')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
     expect((await apply('a4', 'standard')).ok).toBe(true);
     expect(await f.service.corpStyle('corp-1')).toEqual({
       active: 'standard',
+      backdrop: 'orbit',
       owned: ['high_tech'],
     });
     // The record is the corporation's, apart from every player's.
     expect((await f.store.read(corpEconomyKey('corp-1'))).cosmetics).toEqual(['high_tech']);
+  });
+
+  it('sells and applies a backdrop next to the style, each in its own place', async () => {
+    const f = setup();
+    await buyPack(f);
+    const apply = (requestId: string, styleId: string) =>
+      f.service.applyCorpStyle('corp-1', { requestId, styleId });
+    expect(await apply('b0', 'nebula')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
+    expect(
+      await f.service.buyCorpStyle('alice', 'corp-1', {
+        requestId: 'bd-1',
+        offerId: 'corp_backdrop_nebula',
+      }),
+    ).toMatchObject({ ok: true, receipt: { sovereignsSpent: 290, corpStyle: 'nebula' } });
+    await buy(f, 'style-1');
+    expect((await apply('b1', 'nebula')).ok).toBe(true);
+    expect((await apply('b2', 'high_tech')).ok).toBe(true);
+    // A backdrop does not replace the style, nor the style the backdrop.
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'high_tech',
+      backdrop: 'nebula',
+      owned: ['nebula', 'high_tech'],
+    });
+    expect((await apply('b3', 'orbit')).ok).toBe(true);
+    expect(await f.service.corpStyle('corp-1')).toMatchObject({
+      active: 'high_tech',
+      backdrop: 'orbit',
+    });
+    // A backdrop is the corporation's too, never sold through the personal store.
+    expect(
+      await f.service.buyOffer('alice', { requestId: 'own', offerId: 'corp_backdrop_ice_moon' }),
+    ).toEqual({ ok: false, code: 'E_META_OFFER' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 290 - 490);
   });
 });
 

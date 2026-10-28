@@ -42,9 +42,11 @@ import { corpEmblem, corpEmblemPicker } from './corpEmblems';
 import type { CorpAuditEntry, CorpMembership, CorpRecord, CorpRole, CorpSummary } from './corp';
 import { CORP_STYLES, corpStyleName } from './corpArt';
 import {
+  CORP_BACKDROPS,
   CORP_DRAW_ORDER,
   CORP_LOTS,
   CORP_PANORAMA,
+  corpBackdropName,
   corpPanoramaBg,
   corpSprite,
   corpSpriteRoof,
@@ -428,7 +430,10 @@ function baseHtml(p: CorpHubPaint): string {
   const drawn = CORP_DRAW_ORDER.map((id) => view.buildings.find((b) => b.id === id)).filter(
     (b): b is CorpBuildingView => b !== undefined,
   );
-  const bg = corpPanoramaBg(drawn.map((b) => ({ id: b.id, built: b.level > 0 })));
+  const bg = corpPanoramaBg(
+    drawn.map((b) => ({ id: b.id, built: b.level > 0 })),
+    p.style?.backdrop,
+  );
   const style = styleOf(p);
   return (
     `<div class="cb-base">` +
@@ -755,17 +760,28 @@ function memberSheetHtml(p: CorpHubPaint, me: CorpMembership, m: CorpMembership)
   );
 }
 
-/** «Стиль базы»: каждый стиль штабом III уровня. Глава применяет купленный и идёт в магазин
- *  за остальными; участник видит, что есть у корпорации. */
+/** Кнопка или пометка под карточкой стиля и фона. */
+function lookActHtml(p: CorpHubPaint, card: CorpStyleCard, id: string): string {
+  return card === 'apply'
+    ? `<button type="button" class="btn-second" data-corpstyle="${esc(id)}"${off(p.busy)}>${esc(t('corp.style.apply'))}</button>`
+    : card === 'shop'
+      ? `<button type="button" class="btn-second" data-corpshop="${esc(id)}">${esc(t('corp.style.to-shop'))}</button>`
+      : `<span class="cb-sty-st ${card}">${esc(t(STYLE_STATE[card]))}</span>`;
+}
+
+/** «Стиль базы»: каждый стиль штабом III уровня, ниже фоны базы (CORP-15) панорамой. Глава
+ *  применяет купленное и идёт в магазин за остальным; участник видит, что есть у корпорации. */
 function styleSheetHtml(p: CorpHubPaint, view: MetaCorpStyleView): string {
+  const backdrops = CORP_BACKDROPS.map((id) => {
+    const card = corpStyleCard(view, id);
+    return (
+      `<figure class="cb-sty cb-bd${card === 'applied' ? ' cur' : ''}"><div class="cb-bd-art">${corpPanoramaBg([], id)}</div>` +
+      `<figcaption><b>${esc(t(corpBackdropName(id)))}</b>${lookActHtml(p, card, id)}</figcaption></figure>`
+    );
+  }).join('');
   const cards = CORP_STYLES.map((id) => {
     const card = corpStyleCard(view, id);
-    const act =
-      card === 'apply'
-        ? `<button type="button" class="btn-second" data-corpstyle="${esc(id)}"${off(p.busy)}>${esc(t('corp.style.apply'))}</button>`
-        : card === 'shop'
-          ? `<button type="button" class="btn-second" data-corpshop="${esc(id)}">${esc(t('corp.style.to-shop'))}</button>`
-          : `<span class="cb-sty-st ${card}">${esc(t(STYLE_STATE[card]))}</span>`;
+    const act = lookActHtml(p, card, id);
     return (
       `<figure class="cb-sty${card === 'applied' ? ' cur' : ''}"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built', id)}</div>` +
       `<figcaption><b>${esc(t(corpStyleName(id)))}</b>${act}</figcaption></figure>`
@@ -774,7 +790,9 @@ function styleSheetHtml(p: CorpHubPaint, view: MetaCorpStyleView): string {
   return (
     `<h3 id="cb-sheet-title">${esc(t('corp.style.title'))}</h3>` +
     `<p class="cb-note">${esc(t('corp.style.note'))}</p>` +
-    `<div class="cb-styles">${cards}</div>`
+    `<div class="cb-styles">${cards}</div>` +
+    `<h4 class="cb-sty-h">${esc(t('corp.backdrop.title'))}</h4>` +
+    `<div class="cb-styles">${backdrops}</div>`
   );
 }
 

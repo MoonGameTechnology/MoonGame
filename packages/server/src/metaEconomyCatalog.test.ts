@@ -100,6 +100,26 @@ describe('main-game meta content', () => {
     for (const catalog of [free, twice, limited, shelved, unpriced])
       expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_STORE');
   });
+
+  it('sells each backdrop once, never the free one, and never under a style id', () => {
+    const shipped = Object.values(loadMetaEconomyCatalog(data).store.offers).filter(
+      (offer) => offer.corpBackdrop,
+    );
+    expect(shipped.map((offer) => offer.corpBackdrop).sort()).toEqual([
+      'gas_giant',
+      'ice_moon',
+      'nebula',
+    ]);
+    expect(shipped.every((offer) => offer.category === 'styles' && offer.price === 290)).toBe(true);
+    const free = loadMetaEconomyCatalog(data);
+    free.store.offers.corp_backdrop_nebula!.corpBackdrop = 'orbit';
+    const asStyle = loadMetaEconomyCatalog(data);
+    asStyle.store.offers.corp_backdrop_nebula!.corpBackdrop = 'high_tech';
+    const both = loadMetaEconomyCatalog(data);
+    both.store.offers.corp_backdrop_nebula!.corpStyle = 'other';
+    for (const catalog of [free, asStyle, both])
+      expect(() => parseMetaEconomyCatalog(catalog, data)).toThrow('E_META_STORE');
+  });
 });
 
 describe('profile medal rewards', () => {

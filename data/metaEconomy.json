@@ -270,7 +270,10 @@
         "price": 490,
         "corpStyle": "imperial_gothic"
       },
-      "corp_style_high_tech": { "category": "styles", "price": 490, "corpStyle": "high_tech" }
+      "corp_style_high_tech": { "category": "styles", "price": 490, "corpStyle": "high_tech" },
+      "corp_backdrop_nebula": { "category": "styles", "price": 290, "corpBackdrop": "nebula" },
+      "corp_backdrop_ice_moon": { "category": "styles", "price": 290, "corpBackdrop": "ice_moon" },
+      "corp_backdrop_gas_giant": { "category": "styles", "price": 290, "corpBackdrop": "gas_giant" }
     },
     "premium": { "dailySovereigns": 5, "extraDailyAds": 1 }
   },

@@ -383,7 +383,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
       '/corps/c1/infrastructure': built.infrastructure,
       '/corps/c1/audit': { audit: [] },
       '/leaderboard': { corps: { me: { rank: 3 } } },
-      '/meta-economy/corp-style': { corp: { head: true, active: 'standard', owned: ['high_tech'] } },
+      '/meta-economy/corp-style': { corp: { head: true, active: 'standard', backdrop: 'orbit', owned: ['high_tech'] } },
     };
   }
 

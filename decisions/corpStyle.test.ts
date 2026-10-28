@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { MetaStoreOfferView } from '../packages/protocol/src/metaEconomyView';
 import { corpStyleCard, parseCorpStyle, styleOfferState } from './corpStyle';
 
-const view = (head: boolean, active = 'standard', owned: string[] = ['high_tech']) => ({
-  head,
-  active,
-  owned,
-});
+const view = (
+  head: boolean,
+  active = 'standard',
+  owned: string[] = ['high_tech'],
+  backdrop = 'orbit',
+) => ({ head, active, backdrop, owned });
 const offer = (corpStyle: string): MetaStoreOfferView => ({
   id: `corp_style_${corpStyle}`,
   category: 'styles',
@@ -25,6 +26,7 @@ describe('стиль базы корпорации (CORP-14)', () => {
       { corp: { head: 'yes', active: 'standard', owned: [] } },
       { corp: { head: true, active: 'standard', owned: [1] } },
       { corp: { head: true, owned: [] } },
+      { corp: { head: true, active: 'standard', owned: [] } },
     ])
       expect(parseCorpStyle(raw)).toBeUndefined();
   });
@@ -58,5 +60,25 @@ describe('стиль базы корпорации (CORP-14)', () => {
     expect(styleOfferState(tech, view(true), 0)).toEqual({ kind: 'apply' });
     expect(styleOfferState(tech, view(false), 0)).toEqual({ kind: 'blocked', reason: 'owned' });
     expect(styleOfferState(tech, view(false, 'high_tech'), 0)).toEqual({ kind: 'applied' });
+  });
+
+  it('фон стоит рядом со стилем: свой применённый, бесплатный есть у всех (CORP-15)', () => {
+    const head = view(true, 'high_tech', ['high_tech', 'nebula'], 'nebula');
+    expect(corpStyleCard(head, 'nebula')).toBe('applied');
+    expect(corpStyleCard(head, 'high_tech')).toBe('applied');
+    expect(corpStyleCard(head, 'orbit')).toBe('apply');
+    expect(corpStyleCard(head, 'ice_moon')).toBe('shop');
+    expect(corpStyleCard(view(false), 'orbit')).toBe('applied');
+    const ice: MetaStoreOfferView = {
+      id: 'corp_backdrop_ice_moon',
+      category: 'styles',
+      price: 290,
+      corpBackdrop: 'ice_moon',
+      bought: 0,
+    };
+    expect(styleOfferState(ice, head, 100)).toEqual({ kind: 'short', lack: 190 });
+    expect(styleOfferState(ice, view(true, 'standard', ['ice_moon']), 0)).toEqual({
+      kind: 'apply',
+    });
   });
 });
