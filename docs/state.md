@@ -59,6 +59,7 @@ Void Dominion (`@void/*`); название продукта — Averion или 
 | `localization/` | тексты игрока (`ru.ts`, `en.ts`) и единый рантайм `core.ts`; в коде ключи |
 | `data/` | контент в JSON, карты в `data/maps/`, версия бандла в `data/manifest.json` |
 | `mobile/` | Capacitor-обёртка: Android APK, подготовка к RuStore |
+| `desktop/` | Electron-обёртка ПК: архив Sector Zero в окне, без Яндекс SDK |
 | `deploy/` | Compose (сервер + Postgres), Caddy/TLS, preflight, бэкапы, автодеплой, мониторинг |
 | `docs/` | дизайн, роадмапы, бэклог, этот снимок |
 
@@ -162,6 +163,7 @@ data/                  контент *.json, manifest.json (версия), bund
 scripts/               docs-check.mjs (гейт доков), server.ts (вход сервера пакета), генераторы
 deploy/                Compose, Caddy, бэкап и восстановление, обновление, проверка образа
 mobile/                обёртка Capacitor: APK, выпуск в RuStore
+desktop/               обёртка Electron: архив Sector Zero как ПК-приложение (README.md)
 testclient/            минимальный браузерный клиент для pnpm dev:server
 docs/                  дизайн, роадмапы, бэклог; ADR — docs/explanations/
 .github/workflows/     ci.yml (гейт), security.yml, image.yml, android.yml, pages.yml и др.
@@ -633,7 +635,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   основная не заменяется. Его баланс не переносится в игру/облако. Облачный конверт
   запечатан целиком; из старого конверта принимается только подписанный профиль без забега.
 
-**Площадки: Яндекс Игры, APK, RuStore.**
+**Площадки: Яндекс Игры, APK, RuStore, ПК (Electron).**
 - Контракт `GamePlatform` (`src/platform/types.ts`), адаптеры `web.ts` и `yandex.ts`; `host.ts`
   берёт Яндекс, только если поднят лоадер SDK, иначе и при сбое SDK — веб.
 - Архив `dist/yandex/` (`platformBuild.mjs`, `__SECTOR_ZERO_ONLY__`) — только Sector Zero и один
@@ -644,6 +646,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (открытый ключ Ed25519 закреплён в `mobile/distribution.json` как `manifestPublicKey`)
   ([runbook](../deploy/apk/README.md)); RuStore — `rustore.yml`,
   выпуск закрыт до решений оператора ([rustore-preparation.md](security/rustore-preparation.md)).
+- ПК — Electron (`desktop/`, [README](../desktop/README.md)): тот же архив `dist/yandex/` со схемы
+  `app://game/`; на `/sdk.js` обёртка отдаёт заглушку, чей `YaGames.init()` даёт `null`, и `host.ts` сразу
+  выбирает веб-адаптер.
+  Пробная сборка: ни CI-ленты, ни Steam-интеграции нет.
 
 **Локализация, пульт, телеметрия.**
 - Рантайм `localization/core.ts`, прототип берёт `runtime.ts` (все языки), локали `ru` и `en`.
