@@ -24,13 +24,14 @@ function duration(ms: number): string {
 }
 
 function effects(
-  level: Pick<CorpBuildingLevel, 'influencePerDay' | 'constructionReduction'>,
+  level: Pick<CorpBuildingLevel, 'influencePerDay' | 'constructionReduction' | 'maxFormat'>,
 ): string {
   return [
     level.influencePerDay > 0 ? t('corp.buildings.income', { n: level.influencePerDay }) : '',
     level.constructionReduction > 0
       ? t('corp.buildings.speed', { n: level.constructionReduction })
       : '',
+    level.maxFormat ? t('corp.buildings.format', { n: level.maxFormat }) : '',
   ]
     .filter(Boolean)
     .map((text) => `<span>${esc(text)}</span>`)

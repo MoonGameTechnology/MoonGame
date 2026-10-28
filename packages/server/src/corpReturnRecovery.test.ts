@@ -165,6 +165,7 @@ describe.skipIf(!url)('durable corporate handoff', () => {
         id,
         challengerCorp: corpId,
         targetCorp: `other-${id}`,
+        format: 2,
         cost: 0,
         status: 'cancelled',
         createdAt: 0,

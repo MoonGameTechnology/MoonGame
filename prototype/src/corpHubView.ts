@@ -165,6 +165,7 @@ function effects(level: CorpBuildingLevel | undefined): string {
   return [
     level.influencePerDay > 0 ? t('corp.buildings.income', { n: level.influencePerDay }) : '',
     level.constructionReduction > 0 ? t('corp.buildings.speed', { n: level.constructionReduction }) : '',
+    level.maxFormat ? t('corp.buildings.format', { n: level.maxFormat }) : '',
   ]
     .filter(Boolean)
     .join(' · ');

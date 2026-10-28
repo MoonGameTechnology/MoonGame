@@ -21,7 +21,7 @@ import type { AvaChallengeStore, AvaRosterStore, AvaSessionStore, AvaSide } from
  * is built by the core's pure `buildStateFromMap`, so a session is reproducible from the
  * matchup id.
  *
- * Flow (`corporation-wars.md` §4): pick a symmetric AvA map big enough for the larger side
+ * Flow (`corporation-wars.md` §4): pick a symmetric AvA map of the challenge's format
  * (`pickAvaMap`), lay each side's roster onto that side's slots (allies grouped by
  * construction, empty slots filled by a server AI bot), build the state at a PEACEFUL
  * cross-team start (S5 — the war opens later on a timer, AVA-8), and raise the room. The
@@ -233,10 +233,12 @@ export class AvaOrchestrator {
     const bySide: Record<AvaSide, string[]> = { challenger: [], target: [] };
     for (const row of roster) bySide[row.side].push(row.accountId);
 
-    // Pick a symmetric 2-side map big enough for the larger roster side; the shorter side's
-    // spare slots become AI bots. Seeded by the matchup id → deterministic + re-derivable.
-    // A team format with no fixed-side mode has no map either (CORP-4, `avaModeId`).
-    const slotsPerSide = Math.max(1, bySide.challenger.length, bySide.target.length);
+    // Pick a symmetric 2-side map of the challenge's format (CORP-7: N on N); a side's spare
+    // slots become AI bots. A roster larger than its format (a side gathered under the old
+    // cap of 4) still gets a map that seats it. Seeded by the matchup id → deterministic +
+    // re-derivable. A team format with no fixed-side mode has no map either (CORP-4,
+    // `avaModeId`).
+    const slotsPerSide = Math.max(matchup.format, bySide.challenger.length, bySide.target.length);
     const modeId = avaModeId(slotsPerSide);
     if (modeId === null) return { ok: false, code: 'E_NO_MAP' };
     const rng = new Rng(seedRng(`ava:${matchupId}`));

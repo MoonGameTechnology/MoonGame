@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, t } from '../../localization/runtime';
 import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruction';
 import { corpBuildingsHtml } from './corpBuildingsView';
 function fixture() {
@@ -14,6 +14,7 @@ function fixture() {
       expect(html).toContain('data-corparg="headquarters">');
       expect(html).toContain('data-corparg="supply_center" disabled');
       expect(html).toContain('24');
+      expect(html).toContain(t('corp.buildings.format', { n: 5 })); // CORP-7: оперативный центр
       expect(html).not.toContain('corp.building.');
       expect(html).not.toContain('E_CORP');
       const member = fixture();

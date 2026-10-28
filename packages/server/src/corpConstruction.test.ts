@@ -295,7 +295,7 @@ describe.skipIf(!process.env.DATABASE_URL)('corporation infrastructure — postg
 });
 
 it('validates the meta catalog before it reaches either adapter', () => {
-  expect(CORP_BUILDINGS).toHaveLength(3);
+  expect(CORP_BUILDINGS).toHaveLength(4);
   for (const value of [null, {}, { buildings: [] }, { buildings: [null] }]) {
     expect(() => parseCorpBuildings(value)).toThrow('E_CORP_CATALOG');
   }
@@ -305,6 +305,12 @@ it('validates the meta catalog before it reaches either adapter', () => {
   for (const field of ['members', 'battles'] as const) {
     const bad = structuredClone(CORP_BUILDINGS);
     bad[0]!.levels[3]![field] = 1.5;
+    expect(() => parseCorpBuildings({ buildings: bad })).toThrow('E_CORP_CATALOG');
+  }
+  // CORP-7: a level opens a battle of at least two a side.
+  for (const maxFormat of [1, 4.5]) {
+    const bad = structuredClone(CORP_BUILDINGS);
+    bad.find((b) => b.id === 'operations_center')!.levels[0]!.maxFormat = maxFormat;
     expect(() => parseCorpBuildings({ buildings: bad })).toThrow('E_CORP_CATALOG');
   }
 });

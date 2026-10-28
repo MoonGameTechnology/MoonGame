@@ -44,10 +44,8 @@ async function harness(): Promise<Harness> {
     resultStore: new MemoryAvaResultStore(),
     feedStore: new MemoryAvaFeedStore(),
     now,
-    challengeCost: 100,
     expiryMs: 1000,
     pauseMs: 1000,
-    capPerSide: 2,
   });
 
   const a = await corp.create(actor('alice'), 'Alliance A');
@@ -197,6 +195,42 @@ describe('AVA · readiness + challenge API', () => {
       (await app.inject({ method: 'GET', url: `/ava/matchup/${id}`, headers: as('carol') }))
         .statusCode,
     ).toBe(403);
+    await app.close();
+  });
+
+  it('battle formats over HTTP (CORP-7): readiness formats, the challenge format', async () => {
+    const { app, corpB } = await harness();
+    const post = (url: string, who: string, payload?: object) =>
+      app.inject({ method: 'POST', url, headers: as(who), ...(payload ? { payload } : {}) });
+    // A malformed list → 400; a format above 3 на 3 without the operations center → 409.
+    const long = { formats: Array.from({ length: 17 }, () => 2) };
+    for (const payload of [{ formats: 'all' }, { formats: [2.5] }, { formats: [] }, long]) {
+      const res = await post('/ava/ready/corp', 'bob', payload);
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: 'E_FORMAT' });
+    }
+    const locked = await post('/ava/ready/corp', 'bob', { formats: [2, 5] });
+    expect(locked.statusCode).toBe(409);
+    expect(locked.json()).toEqual({ error: 'E_FORMAT_LOCKED' });
+    expect((await post('/ava/ready/corp', 'bob', { formats: [3] })).statusCode).toBe(200);
+    expect((await post('/ava/ready/corp', 'alice')).statusCode).toBe(200);
+    const pool = (
+      await app.inject({ method: 'GET', url: '/ava/pool', headers: as('alice') })
+    ).json() as { pool: Array<{ corpId: string; formats: number[] }> };
+    expect(pool.pool.find((c) => c.corpId === corpB)?.formats).toEqual([3]);
+
+    // The challenge: a malformed format → 400; one the target does not play → 409.
+    const bad = await post('/ava/challenge', 'alice', { target: corpB, format: 'big' });
+    expect(bad.statusCode).toBe(400);
+    const notCommon = await post('/ava/challenge', 'alice', { target: corpB, format: 2 });
+    expect(notCommon.statusCode).toBe(409);
+    expect(notCommon.json()).toEqual({ error: 'E_NO_COMMON_FORMAT' });
+    // No format → the smallest the target plays, at its price.
+    expect((await post('/ava/challenge', 'alice', { target: corpB })).statusCode).toBe(201);
+    const mine = (
+      await app.inject({ method: 'GET', url: '/ava/challenges', headers: as('alice') })
+    ).json() as { challenges: Array<{ format: number; cost: number }> };
+    expect(mine.challenges[0]).toMatchObject({ format: 3, cost: 150 });
     await app.close();
   });
 

@@ -43,6 +43,7 @@ async function harness(): Promise<{ app: ReturnType<typeof Fastify>; corpId: str
     id: matchupId,
     challengerCorp: a.corpId,
     targetCorp: b.corpId,
+    format: 2,
     cost: 0,
     status: 'accepted',
     createdAt: 0,

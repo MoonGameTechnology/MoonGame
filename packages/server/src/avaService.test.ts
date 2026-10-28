@@ -13,11 +13,15 @@ import {
 // AVA-2/3/4 — readiness + the S0→S2 challenge state machine — and AVA-6, the roster
 // window, enforced fail-secure. Every gate is exercised both ways; influence is
 // checked to balance exactly across spend / refund; expiry and the roster sweep run
-// with no client, on the injected clock.
+// with no client, on the injected clock. The battle formats (CORP-7) run on the shipped
+// catalog: a 2-on-2 costs 100, pays the winner 150 and needs two players a side.
 
 const A_HEAD: CorpActor = { accountId: 'a-head', login: 'ahead' };
 const A_MEMBER: CorpActor = { accountId: 'a-mem', login: 'amember' };
+const A_THIRD: CorpActor = { accountId: 'a-3rd', login: 'athird' };
 const B_HEAD: CorpActor = { accountId: 'b-head', login: 'bhead' };
+const B_MEMBER: CorpActor = { accountId: 'b-mem', login: 'bmember' };
+const B_THIRD: CorpActor = { accountId: 'b-3rd', login: 'bthird' };
 const OUTSIDER: CorpActor = { accountId: 'out', login: 'outsider' };
 
 interface Fixture {
@@ -29,16 +33,15 @@ interface Fixture {
   corpA: string;
   corpB: string;
   clock: () => number;
+  /** Move the services' clock forward (CORP-7: let a construction finish). */
+  advance: (ms: number) => void;
 }
 
-/** Two corps A (head + member) and B (head), each with `influence` credited. */
+/** Two corps A and B (head + two members each), each with `influence` credited. */
 async function fixture(
   opts: {
     influenceA?: number;
     influenceB?: number;
-    cost?: number;
-    capPerSide?: number;
-    winReward?: number;
     medals?: MedalCatalog;
   } = {},
 ): Promise<Fixture> {
@@ -56,34 +59,48 @@ async function fixture(
     feedStore: feed,
     ...(opts.medals ? { medals: opts.medals } : {}),
     now,
-    challengeCost: opts.cost ?? 100,
     expiryMs: 1_000,
     pauseMs: 1_000,
-    capPerSide: opts.capPerSide ?? 2,
-    minPerSide: 1,
-    winReward: opts.winReward ?? 150,
   });
 
   const a = await corp.create(A_HEAD, 'Alliance A');
   const b = await corp.create(B_HEAD, 'Alliance B');
   if (!a.ok || !b.ok) throw new Error('fixture: create failed');
-  await corp.apply(A_MEMBER, a.corpId);
-  await corp.accept(A_HEAD, a.corpId, A_MEMBER.accountId);
+  for (const [head, corpId, members] of [
+    [A_HEAD, a.corpId, [A_MEMBER, A_THIRD]],
+    [B_HEAD, b.corpId, [B_MEMBER, B_THIRD]],
+  ] as const) {
+    for (const member of members) {
+      await corp.apply(member, corpId);
+      await corp.accept(head, corpId, member.accountId);
+    }
+  }
   await store.addInfluence(a.corpId, opts.influenceA ?? 500);
   await store.addInfluence(b.corpId, opts.influenceB ?? 500);
-  return { ava, corp, store, feed, corpA: a.corpId, corpB: b.corpId, clock: (): number => t };
+  return {
+    ava,
+    corp,
+    store,
+    feed,
+    corpA: a.corpId,
+    corpB: b.corpId,
+    clock: (): number => t,
+    advance: (ms): void => {
+      t += ms;
+    },
+  };
 }
 
-/** Ready → challenge → accept → both sides join → sweep-lock: the LOCKED matchup id. */
+/** Ready → challenge → accept → two a side join → sweep-lock: the LOCKED matchup id. */
 async function lockedMatchup(f: Fixture): Promise<string> {
   await f.ava.setCorpReady(A_HEAD);
   await f.ava.setCorpReady(B_HEAD);
   const ch = await f.ava.challenge(A_HEAD, f.corpB);
   if (!ch.ok) throw new Error('challenge failed');
   if (!(await f.ava.accept(B_HEAD, ch.id)).ok) throw new Error('accept failed');
-  await f.ava.join(A_HEAD, ch.id);
-  await f.ava.join(B_HEAD, ch.id);
-  if ((await f.ava.sweepRosters(1_000_000)).locked !== 1) throw new Error('lock failed');
+  for (const who of [A_HEAD, A_MEMBER, B_HEAD, B_MEMBER]) await f.ava.join(who, ch.id);
+  if ((await f.ava.sweepRosters(f.clock() + 1_000_000)).locked !== 1)
+    throw new Error('lock failed');
   return ch.id;
 }
 
@@ -257,11 +274,12 @@ describe('AvaService — roster window S3 (AVA-6)', () => {
     expect(view.mine[0]).toMatchObject({ accountId: A_MEMBER.accountId, source: 'self' });
   });
 
-  it('join respects the per-side cap', async () => {
-    const f = await fixture({ capPerSide: 1 });
+  it('join respects the per-side cap: a 2-on-2 seats two', async () => {
+    const f = await fixture();
     const id = await matchup(f);
     expect(await f.ava.join(A_HEAD, id)).toEqual({ ok: true });
-    expect(await f.ava.join(A_MEMBER, id)).toEqual({ ok: false, code: 'E_ROSTER_FULL' });
+    expect(await f.ava.join(A_MEMBER, id)).toEqual({ ok: true });
+    expect(await f.ava.join(A_THIRD, id)).toEqual({ ok: false, code: 'E_ROSTER_FULL' });
     expect(await f.ava.join(B_HEAD, id)).toEqual({ ok: true }); // the OTHER side has its own cap
   });
 
@@ -281,13 +299,12 @@ describe('AvaService — roster window S3 (AVA-6)', () => {
   it('sweep locks a full roster exactly once; writes freeze after the lock', async () => {
     const f = await fixture();
     const id = await matchup(f);
-    await f.ava.join(A_HEAD, id);
-    await f.ava.join(B_HEAD, id);
+    for (const who of [A_HEAD, A_MEMBER, B_HEAD, B_MEMBER]) await f.ava.join(who, id);
     expect(await f.ava.sweepRosters(1)).toEqual({ locked: 0, cancelled: 0 }); // window still open
     expect(await f.ava.sweepRosters(1_000_000)).toEqual({ locked: 1, cancelled: 0 });
     expect(await f.ava.sweepRosters(1_000_000)).toEqual({ locked: 0, cancelled: 0 }); // exactly once
     expect((await f.ava.challengesFor(A_HEAD))[0]?.status).toBe('locked');
-    expect(await f.ava.join(A_MEMBER, id)).toEqual({ ok: false, code: 'E_ROSTER_LOCKED' });
+    expect(await f.ava.join(A_THIRD, id)).toEqual({ ok: false, code: 'E_ROSTER_LOCKED' });
     await f.ava.setPlayerReady(A_HEAD);
     expect(await f.ava.setRoster(A_HEAD, id, [A_HEAD.accountId])).toEqual({
       ok: false,
@@ -306,6 +323,14 @@ describe('AvaService — roster window S3 (AVA-6)', () => {
     expect(await f.ava.sweepRosters(1_000_000)).toEqual({ locked: 0, cancelled: 0 }); // no double refund
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(500);
     expect(await f.ava.join(A_MEMBER, id)).toEqual({ ok: false, code: 'E_WINDOW_CLOSED' });
+  });
+
+  it('a side one short of the 2-on-2 minimum cancels the battle (CORP-7)', async () => {
+    const f = await fixture();
+    const id = await matchup(f);
+    for (const who of [A_HEAD, A_MEMBER, B_HEAD]) await f.ava.join(who, id);
+    expect(await f.ava.sweepRosters(1_000_000)).toEqual({ locked: 0, cancelled: 1 });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // refunded
   });
 
   it('a pending (not yet accepted) challenge has no roster window', async () => {
@@ -422,8 +447,7 @@ describe('AvaService — public feed (AVA-9)', () => {
     });
     expect(feed[0]?.winnerCorp).toBeUndefined();
     // Drive to a lock, then settle → the S7 result is appended (newest first).
-    await f.ava.join(A_HEAD, ch.id);
-    await f.ava.join(B_HEAD, ch.id);
+    for (const who of [A_HEAD, A_MEMBER, B_HEAD, B_MEMBER]) await f.ava.join(who, ch.id);
     await f.ava.sweepRosters(1_000_000);
     expect((await f.ava.settleMatch(ch.id, 'challenger')).ok).toBe(true);
     feed = await f.ava.publicFeed();
@@ -483,5 +507,128 @@ describe('AvaService — medal news (CORP-1)', () => {
     const f = await fixture();
     expect((await f.ava.settleMatch(await lockedMatchup(f), 'challenger')).ok).toBe(true);
     expect(await medalNews(f)).toEqual([]);
+  });
+});
+
+describe('AvaService — battle formats (CORP-7)', () => {
+  /** Build a corp's operations center (HQ 1 → HQ 2 → operations center 1) on the store and
+   *  move the services' clock to the moment each stage finishes: the last one is left for
+   *  the service's own read to settle. */
+  async function openOperationsCenter(f: Fixture, corpId: string, head: CorpActor): Promise<void> {
+    for (const [buildingId, expectedLevel] of [
+      ['headquarters', 0],
+      ['headquarters', 1],
+      ['operations_center', 0],
+    ] as const) {
+      const at = f.clock();
+      const r = await f.store.infrastructure(corpId, head.accountId, at, {
+        buildingId,
+        expectedLevel,
+      });
+      if (!r.ok || !r.infrastructure.construction) throw new Error(`build ${buildingId} failed`);
+      f.advance(r.infrastructure.construction.completesAt - at);
+    }
+    // Settle the last construction (and the income it earned) so balances read after this are final.
+    await f.store.infrastructure(corpId, head.accountId, f.clock());
+  }
+  const poolOf = async (f: Fixture, corpId: string) =>
+    (await f.ava.pool()).find((c) => c.corpId === corpId);
+
+  it('readiness: no formats means 2 на 2; up to 3 на 3 without buildings', async () => {
+    const f = await fixture();
+    expect(await f.ava.setCorpReady(A_HEAD)).toEqual({ ok: true });
+    const since = (await poolOf(f, f.corpA))?.readySince;
+    expect(await poolOf(f, f.corpA)).toMatchObject({ formats: [2] });
+    // Repeats and order don't matter; the corp keeps its place in the pool.
+    expect(await f.ava.setCorpReady(A_HEAD, [3, 2, 3])).toEqual({ ok: true });
+    expect(await poolOf(f, f.corpA)).toMatchObject({ formats: [2, 3], readySince: since });
+    expect(await f.ava.setCorpReady(A_HEAD, [4])).toEqual({ ok: false, code: 'E_FORMAT_LOCKED' });
+    for (const formats of [[], [1], [11], [2, 12]]) {
+      expect(await f.ava.setCorpReady(A_HEAD, formats)).toEqual({ ok: false, code: 'E_FORMAT' });
+    }
+    expect(await f.ava.setCorpReady(A_MEMBER, [2])).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    expect(await poolOf(f, f.corpA)).toMatchObject({ formats: [2, 3] }); // nothing changed
+  });
+
+  it('the operations center opens 4 на 4 and 5 на 5 as soon as it is built', async () => {
+    const f = await fixture();
+    await openOperationsCenter(f, f.corpA, A_HEAD);
+    expect(await f.ava.setCorpReady(A_HEAD, [6])).toEqual({ ok: false, code: 'E_FORMAT_LOCKED' });
+    expect(await f.ava.setCorpReady(A_HEAD, [2, 4, 5])).toEqual({ ok: true });
+    expect(await poolOf(f, f.corpA)).toMatchObject({ formats: [2, 4, 5] });
+  });
+
+  it('a challenge goes in a format the target plays, the smallest by default, at 50 ⟡ a seat', async () => {
+    const f = await fixture();
+    await f.ava.setCorpReady(A_HEAD);
+    await f.ava.setCorpReady(B_HEAD, [3]);
+    expect(await f.ava.challenge(A_HEAD, f.corpB, 1)).toEqual({ ok: false, code: 'E_FORMAT' });
+    expect(await f.ava.challenge(A_HEAD, f.corpB, 4)).toEqual({
+      ok: false,
+      code: 'E_FORMAT_LOCKED',
+    });
+    expect(await f.ava.challenge(A_HEAD, f.corpB, 2)).toEqual({
+      ok: false,
+      code: 'E_NO_COMMON_FORMAT',
+    });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // nothing spent
+    const ch = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!ch.ok) throw new Error(ch.code);
+    expect((await f.ava.challengesFor(A_HEAD))[0]).toMatchObject({ format: 3, cost: 150 });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(350);
+    expect(await f.ava.decline(B_HEAD, ch.id)).toEqual({ ok: true });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // the format's price back
+    // An explicit format both play.
+    await f.ava.setCorpReady(B_HEAD, [2, 3]);
+    const two = await f.ava.challenge(A_HEAD, f.corpB, 2);
+    if (!two.ok) throw new Error(two.code);
+    expect((await f.ava.challengesFor(A_HEAD))[0]).toMatchObject({
+      id: two.id,
+      format: 2,
+      cost: 100,
+    });
+  });
+
+  it('no common format: the target plays only formats the challenger has not opened', async () => {
+    const f = await fixture();
+    await openOperationsCenter(f, f.corpB, B_HEAD);
+    await f.ava.setCorpReady(A_HEAD);
+    expect(await f.ava.setCorpReady(B_HEAD, [4, 5])).toEqual({ ok: true });
+    expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({
+      ok: false,
+      code: 'E_NO_COMMON_FORMAT',
+    });
+    // With its own operations center the challenger plays the target's smallest format.
+    await openOperationsCenter(f, f.corpA, A_HEAD);
+    const before = (await f.store.getCorp(f.corpA))!.influence;
+    const ch = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!ch.ok) throw new Error(ch.code);
+    expect((await f.ava.challengesFor(A_HEAD))[0]).toMatchObject({ format: 4, cost: 200 });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(before - 200);
+  });
+
+  it('a 3-on-3 needs three a side and pays the winner 75 ⟡ a seat', async () => {
+    const f = await fixture();
+    await f.ava.setCorpReady(A_HEAD);
+    await f.ava.setCorpReady(B_HEAD, [3]);
+    const play = async (b: readonly CorpActor[]): Promise<string> => {
+      const ch = await f.ava.challenge(A_HEAD, f.corpB);
+      if (!ch.ok) throw new Error(ch.code);
+      expect(await f.ava.accept(B_HEAD, ch.id)).toEqual({ ok: true });
+      for (const who of [A_HEAD, A_MEMBER, A_THIRD, ...b]) {
+        expect(await f.ava.join(who, ch.id)).toEqual({ ok: true });
+      }
+      return ch.id;
+    };
+    // Two of three on side B: short of the 3-on-3 minimum, the battle is cancelled.
+    await play([B_HEAD, B_MEMBER]);
+    expect(await f.ava.sweepRosters(f.clock() + 1_000_000)).toEqual({ locked: 0, cancelled: 1 });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500);
+    // Three a side lock; the winner gets 225.
+    const id = await play([B_HEAD, B_MEMBER, B_THIRD]);
+    expect(await f.ava.sweepRosters(f.clock() + 1_000_000)).toEqual({ locked: 1, cancelled: 0 });
+    expect(await f.ava.settleMatch(id, 'target')).toEqual({ ok: true, winnerCorp: f.corpB });
+    expect((await f.store.getCorp(f.corpB))?.influence).toBe(725);
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(350);
   });
 });

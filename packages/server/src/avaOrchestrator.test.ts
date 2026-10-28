@@ -57,17 +57,20 @@ function harness(): Harness {
   return { orch, challenges, roster, sessions, built };
 }
 
-/** Seed a LOCKED matchup with the given roster on each side (bypassing AvaService). */
+/** Seed a LOCKED matchup with the given roster on each side (bypassing AvaService). The
+ *  format defaults to the larger side — the size the roster alone used to pick (CORP-7). */
 async function lockedMatchup(
   h: Harness,
   id: string,
   challenger: string[],
   target: string[],
+  format = Math.max(challenger.length, target.length),
 ): Promise<void> {
   const row: AvaChallenge = {
     id,
     challengerCorp: 'cA',
     targetCorp: 'cB',
+    format,
     cost: 100,
     status: 'pending',
     createdAt: 1,
@@ -182,6 +185,26 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
     });
   });
 
+  it('the format sets the side size: bots take the seats the roster leaves (CORP-7)', async () => {
+    const h = harness();
+    await lockedMatchup(h, 'mu-f2', ['acc-a'], ['acc-b'], 2);
+    const res = await h.orch.orchestrate('mu-f2');
+    if (!res.ok) throw new Error(res.code);
+    expect(res.mapId).toBe('ava-2v2-1');
+    expect(res.seats).toEqual({ 'acc-a': 'slot_a1', 'acc-b': 'slot_b1' });
+    const state = h.built[0]!.state;
+    expect(state.modeId).toBe('team_2v2');
+    expect(
+      Object.values(state.players)
+        .filter((p) => p.ai)
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(['bot:slot_a2', 'bot:slot_b2']);
+    // A 3-on-3 has a fixed-side mode but no map in the pool yet (CORP-8).
+    await lockedMatchup(h, 'mu-f3', ['a1', 'a2'], ['b1', 'b2'], 3);
+    expect(await h.orch.orchestrate('mu-f3')).toEqual({ ok: false, code: 'E_NO_MAP' });
+  });
+
   it('is idempotent — a second orchestrate returns the same session without rebuilding', async () => {
     const h = harness();
     await lockedMatchup(h, 'mu3', ['acc-a'], ['acc-b']);
@@ -199,6 +222,7 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
       id: 'mu-open',
       challengerCorp: 'cA',
       targetCorp: 'cB',
+      format: 2,
       cost: 100,
       status: 'pending',
       createdAt: 1,

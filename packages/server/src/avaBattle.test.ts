@@ -28,6 +28,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const A_HEAD: CorpActor = { accountId: 'a-head', login: 'ahead' };
 const A_MEMBER: CorpActor = { accountId: 'a-mem', login: 'amember' };
 const B_HEAD: CorpActor = { accountId: 'b-head', login: 'bhead' };
+const B_MEMBER: CorpActor = { accountId: 'b-mem', login: 'bmember' };
 
 function move(playerId: string, fleetId: string, to: string): Action {
   return {
@@ -54,20 +55,22 @@ describe('AvA battle end to end (CORP-4)', () => {
       now,
     });
 
-    // Corp A (head + member) challenges corp B (head alone): two seats a side, so B's
-    // spare seat goes to a bot.
+    // Corp A (head + member) challenges corp B (head + member) to a 2-on-2, the format
+    // both play without buildings (CORP-7). B's member never gives an order.
     const a = await corp.create(A_HEAD, 'Alliance A');
     const b = await corp.create(B_HEAD, 'Alliance B');
     if (!a.ok || !b.ok) throw new Error('fixture: create failed');
     await corp.apply(A_MEMBER, a.corpId);
     await corp.accept(A_HEAD, a.corpId, A_MEMBER.accountId);
+    await corp.apply(B_MEMBER, b.corpId);
+    await corp.accept(B_HEAD, b.corpId, B_MEMBER.accountId);
     await stores.corpStore.addInfluence(a.corpId, 500);
     await ava.setCorpReady(A_HEAD);
     await ava.setCorpReady(B_HEAD);
     const ch = await ava.challenge(A_HEAD, b.corpId);
     if (!ch.ok) throw new Error('fixture: challenge failed');
     expect((await ava.accept(B_HEAD, ch.id)).ok).toBe(true);
-    for (const who of [A_HEAD, A_MEMBER, B_HEAD]) {
+    for (const who of [A_HEAD, A_MEMBER, B_HEAD, B_MEMBER]) {
       expect((await ava.join(who, ch.id)).ok).toBe(true);
     }
     wall += DAY; // the roster window closes
@@ -94,7 +97,12 @@ describe('AvA battle end to end (CORP-4)', () => {
     expect(await orch.sweep()).toEqual({ raised: 1, cancelled: 0 });
     const session = await stores.sessionStore.byMatchup(ch.id);
     expect(session?.mapId).toBe('ava-2v2-1');
-    expect(session?.seats).toEqual({ 'a-head': 'slot_a1', 'a-mem': 'slot_a2', 'b-head': 'slot_b1' });
+    expect(session?.seats).toEqual({
+      'a-head': 'slot_a1',
+      'a-mem': 'slot_a2',
+      'b-head': 'slot_b1',
+      'b-mem': 'slot_b2',
+    });
     const matchId = session!.matchId;
 
     // The loader raises the battle under fixed sides, on its own world clock: the world
@@ -109,7 +117,7 @@ describe('AvA battle end to end (CORP-4)', () => {
     const teams = Object.fromEntries(
       Object.entries(room.state.players).map(([id, p]) => [id, p.team]),
     );
-    expect(teams).toEqual({ slot_a1: 'A', slot_a2: 'A', slot_b1: 'B', 'bot:slot_b2': 'B' });
+    expect(teams).toEqual({ slot_a1: 'A', slot_a2: 'A', slot_b1: 'B', slot_b2: 'B' });
 
     // Orders during the peace: each human takes a free province.
     for (const [playerId, fleetId, to] of [
@@ -141,9 +149,9 @@ describe('AvA battle end to end (CORP-4)', () => {
     // The peace lapses: the war sweep opens the war between the two sides only.
     expect(await orch.sweepWar()).toEqual({ declared: 1 });
     expect(getStance(room.state, 'slot_a1', 'slot_b1')).toBe('war');
-    expect(getStance(room.state, 'slot_a2', 'bot:slot_b2')).toBe('war');
+    expect(getStance(room.state, 'slot_a2', 'slot_b2')).toBe('war');
     expect(getStance(room.state, 'slot_a1', 'slot_a2')).toBe('alliance');
-    expect(getStance(room.state, 'slot_b1', 'bot:slot_b2')).toBe('alliance');
+    expect(getStance(room.state, 'slot_b1', 'slot_b2')).toBe('alliance');
 
     // The session cap (100 world days) ends the battle by score. The best seat of each
     // side ties, so per-seat rules would call a draw; the side sum decides.
@@ -159,7 +167,7 @@ describe('AvA battle end to end (CORP-4)', () => {
     const total = (id: string): number => match.scores[id]?.total ?? 0;
     expect(total('slot_a1')).toBe(total('slot_b1'));
     expect(total('slot_a1') + total('slot_a2')).toBeGreaterThan(
-      total('slot_b1') + total('bot:slot_b2'),
+      total('slot_b1') + total('slot_b2'),
     );
     expect(match.winners).toEqual(['slot_a1', 'slot_a2']);
 

@@ -374,8 +374,9 @@ export class MemoryCorpStore implements CorpStore {
   /** `accountId → membership` — the map key IS the one-corp-per-account invariant. */
   private readonly members = new Map<string, CorpMembership>();
   private readonly audit: CorpAuditEntry[] = [];
-  /** AvA readiness (AVA-3): corp-flag `corpId → since`, player-flag `accountId → {corpId, since}`. */
-  private readonly corpReady = new Map<string, number>();
+  /** AvA readiness (AVA-3): corp-flag `corpId → {since, formats}` (formats: CORP-7),
+   *  player-flag `accountId → {corpId, since}`. */
+  private readonly corpReady = new Map<string, { since: number; formats: number[] }>();
   private readonly playerReady = new Map<string, { corpId: string; since: number }>();
 
   createCorp(
@@ -495,8 +496,11 @@ export class MemoryCorpStore implements CorpStore {
     return Promise.resolve({ ok: true });
   }
 
-  setCorpReady(corpId: string, since: number): Promise<void> {
-    if (this.corps.has(corpId) && !this.corpReady.has(corpId)) this.corpReady.set(corpId, since);
+  setCorpReady(corpId: string, since: number, formats: readonly number[]): Promise<void> {
+    if (this.corps.has(corpId)) {
+      const entry = this.corpReady.get(corpId);
+      this.corpReady.set(corpId, { since: entry?.since ?? since, formats: [...formats] });
+    }
     return Promise.resolve();
   }
 
@@ -505,15 +509,17 @@ export class MemoryCorpStore implements CorpStore {
     return Promise.resolve();
   }
 
-  async listReadyCorps(): Promise<Array<CorpSummary & { readySince: number }>> {
+  async listReadyCorps(): Promise<Array<CorpSummary & { readySince: number; formats: number[] }>> {
     const all = await this.listCorps();
-    return all
-      .filter((c) => this.corpReady.has(c.corpId))
-      .map((c) => ({ ...c, readySince: this.corpReady.get(c.corpId)! }));
+    return all.flatMap((c) => {
+      const entry = this.corpReady.get(c.corpId);
+      return entry ? [{ ...c, readySince: entry.since, formats: [...entry.formats] }] : [];
+    });
   }
 
-  isCorpReady(corpId: string): Promise<boolean> {
-    return Promise.resolve(this.corpReady.has(corpId));
+  readyFormatsOf(corpId: string): Promise<number[] | null> {
+    const entry = this.corpReady.get(corpId);
+    return Promise.resolve(entry ? [...entry.formats] : null);
   }
 
   setPlayerReady(accountId: string, corpId: string, since: number): Promise<void> {

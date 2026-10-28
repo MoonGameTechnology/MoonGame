@@ -20,7 +20,8 @@ const level = (v: unknown): v is CorpBuildingLevel =>
   integer(v.constructionReduction) &&
   v.constructionReduction <= 50 &&
   (v.members === undefined || integer(v.members)) &&
-  (v.battles === undefined || integer(v.battles));
+  (v.battles === undefined || integer(v.battles)) &&
+  (v.maxFormat === undefined || (integer(v.maxFormat) && v.maxFormat >= 2));
 const ERRORS = new Set([
   'E_FORBIDDEN',
   'E_CORP_BUILDING',
