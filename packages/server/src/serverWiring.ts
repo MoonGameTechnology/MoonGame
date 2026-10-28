@@ -2,6 +2,7 @@ import type { SecurityAudit } from './securityAudit';
 import type { ActionGate } from '@void/action-layer';
 import {
   hashGameDataBundle,
+  mapVictoryRules,
   type Action,
   type DomainEvent,
   type GameData,
@@ -141,6 +142,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       deps.onObservation?.(matchId, event);
     };
 
+    const victory = mapVictoryRules(snap.state.mapId);
     const room = createDevMatch(data, {
       id: matchId,
       now,
@@ -151,10 +153,15 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       initialReceipts,
       initialSeq: snap.seq,
       // The mode is persisted in the state (BRW-0): without this a restart would bring an
-      // AvA battle back under every-seat-for-itself rules (CORP-4).
-      ...(snap.state.modeId !== undefined
-        ? { config: { timeScale: 1, modeId: snap.state.modeId } }
-        : {}),
+      // AvA battle back under every-seat-for-itself rules (CORP-4). So is the map, and a
+      // match on a catalogued map plays its victory rules, the table the players' host and
+      // the HUD read: a corporations battle on a team map ends at that map's threshold,
+      // not the core's (CORP-8). The dev scenario names no map and keeps the core's.
+      config: {
+        timeScale: 1,
+        ...(snap.state.modeId !== undefined ? { modeId: snap.state.modeId } : {}),
+        ...(victory !== undefined ? { victory } : {}),
+      },
       // A room born on its own world clock resumes from the saved anchor; a room without
       // one keeps reading the wall clock as world time.
       ...(snap.clock ? { initiallyStarted: true, initialClock: snap.clock } : {}),

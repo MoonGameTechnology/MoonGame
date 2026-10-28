@@ -354,6 +354,7 @@ export {
   type ActionIdParts,
 } from './action/types';
 export { resolveMatchConfig, hasFixedSides, FIXED_SIDE_MODES, type ModeResolution } from './action/matchMode';
+export { MAP_SCORE_LIMITS, mapVictoryRules } from './action/mapVictory';
 // AUD-6: the schema map and the catalog of legal client action types are public now —
 // the boolean alone forced anyone writing a client to deep-import a test-only file.
 export {
@@ -415,6 +416,8 @@ export {
   type MapOperation,
   parseMatchMap,
   mapForDifficulty,
+  NEUTRAL_PLANET_MILITIA,
+  neutralSector,
   safeParseMatchMap,
   type MatchMap,
   type MapSector,

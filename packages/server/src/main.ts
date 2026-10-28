@@ -329,12 +329,14 @@ const corpArsenalService = new CorpArsenalService({
   rosterStore: stores.rosterStore,
 });
 
+const avaMaps = loadAvaMaps(data);
 const avaOrchestrator = new AvaOrchestrator({
   challengeStore: stores.challengeStore,
   rosterStore: stores.rosterStore,
   sessionStore: stores.sessionStore,
   data,
-  maps: loadAvaMaps(),
+  maps: avaMaps.pool,
+  retiredMaps: avaMaps.retired,
   manifest: MODULE_MANIFEST_VERSION, // the module graph `createMatchLoader` resumes under
   createRoom: createAvaRoom({ stores, data }),
   // CORP-4: no map fits the locked roster — cancel the battle and refund the challenge.

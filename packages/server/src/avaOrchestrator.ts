@@ -2,7 +2,6 @@ import {
   Rng,
   buildStateFromMap,
   getStance,
-  hasFixedSides,
   seedRng,
   type Action,
   type GameData,
@@ -11,7 +10,9 @@ import {
   type PlayerArsenal,
   type SlotAssignment,
 } from '@void/shared-core';
+import { avaMatchId } from '@void/protocol';
 import { pickAvaMap } from './avaMapPool';
+import { avaModeId } from './avaFormats';
 import { mergeArsenal } from './arsenal';
 import type { AvaChallengeStore, AvaRosterStore, AvaSessionStore, AvaSide } from './store';
 
@@ -51,8 +52,11 @@ export interface AvaOrchestratorDeps {
   rosterStore: AvaRosterStore;
   sessionStore: AvaSessionStore;
   data: GameData;
-  /** AvA-eligible map pool (loaded + validated at boot). */
+  /** AvA map pool: the maps the formats catalog plays (loaded + validated at boot). */
   maps: readonly MatchMap[];
+  /** Maps no format plays any more: a battle raised on one before the switch still
+   *  settles by it (`onMatchEnded`). Never picked for a new battle. */
+  retiredMaps?: readonly MatchMap[];
   /** The module manifest the host's rooms run (`MODULE_MANIFEST_VERSION` on this server),
    *  pinned into the built state. The loader refuses a match pinned to another module
    *  graph, so a session built under a default here could never load (CORP-4). */
@@ -97,11 +101,6 @@ const DEFAULT_PEACE_MS = 24 * 60 * 60 * 1000;
 
 /** The two sides of a matchup, in seating order (challenger → the first team of the map). */
 const SIDES: readonly AvaSide[] = ['challenger', 'target'];
-
-/** The id an AvA battle's match is hosted under — one per matchup, so a re-raise lands on
- *  the same room and snapshot. A host tells an AvA room from an ordinary one by it. */
-export const avaMatchId = (matchupId: string): string => `ava-${matchupId}`;
-export const isAvaMatchId = (matchId: string): boolean => matchId.startsWith('ava-');
 
 /**
  * Player intents a corporations battle refuses, on both hosts. The orchestrator alone moves
@@ -165,24 +164,13 @@ export function seatAvaRoster(
   return { slots, seats };
 }
 
-/** CORP-4 — the mode a battle of `slotsPerSide` seats a side plays under (pure, exported
- *  for tests). A team battle is a fixed-side match (`hasFixedSides`): the roster decides
- *  the sides, and every ending counts a side as one unit. One seat a side needs no mode —
- *  the base rules already pit the two seats against each other. `null`: the game has no
- *  fixed-side mode for this format, and a team battle is never played every seat for
- *  itself (fail-secure) — the orchestrator treats it like a battle no map fits. */
-export function avaModeId(slotsPerSide: number): string | undefined | null {
-  if (slotsPerSide <= 1) return undefined;
-  const modeId = `team_${slotsPerSide}v${slotsPerSide}`;
-  return hasFixedSides(modeId) ? modeId : null;
-}
-
 export class AvaOrchestrator {
   private readonly challenges: AvaChallengeStore;
   private readonly roster: AvaRosterStore;
   private readonly sessions: AvaSessionStore;
   private readonly data: GameData;
   private readonly maps: readonly MatchMap[];
+  private readonly retiredMaps: readonly MatchMap[];
   private readonly isMatchEnded?: (matchId: string) => Promise<boolean>;
   private readonly manifest: string;
   private readonly createRoom: (spec: AvaSessionSpec) => Promise<void>;
@@ -201,6 +189,7 @@ export class AvaOrchestrator {
     this.sessions = deps.sessionStore;
     this.data = deps.data;
     this.maps = deps.maps;
+    this.retiredMaps = deps.retiredMaps ?? [];
     this.manifest = deps.manifest;
     this.createRoom = deps.createRoom;
     if (deps.cancel) this.cancel = deps.cancel;
@@ -233,11 +222,11 @@ export class AvaOrchestrator {
     const bySide: Record<AvaSide, string[]> = { challenger: [], target: [] };
     for (const row of roster) bySide[row.side].push(row.accountId);
 
-    // Pick a symmetric 2-side map of the challenge's format (CORP-7: N on N); a side's spare
-    // slots become AI bots. A roster larger than its format (a side gathered under the old
-    // cap of 4) still gets a map that seats it. Seeded by the matchup id → deterministic +
-    // re-derivable. A team format with no fixed-side mode has no map either (CORP-4,
-    // `avaModeId`).
+    // Pick a symmetric 2-side map of the challenge's format (CORP-7: N on N, CORP-8: the
+    // format's maps in the catalog); a side's spare slots become AI bots. A roster larger
+    // than its format (a side gathered under the old cap of 4) still gets a map that seats
+    // it. Seeded by the matchup id → deterministic + re-derivable. A team format with no
+    // fixed-side mode has no map either (CORP-4, `avaModeId`).
     const slotsPerSide = Math.max(matchup.format, bySide.challenger.length, bySide.target.length);
     const modeId = avaModeId(slotsPerSide);
     if (modeId === null) return { ok: false, code: 'E_NO_MAP' };
@@ -365,9 +354,12 @@ export class AvaOrchestrator {
     if (!this.settle) return;
     const session = await this.sessions.byMatch(matchId);
     if (!session) return; // not an AvA session — nothing to settle
-    const map = this.maps.find((m) => m.id === session.mapId);
-    const side =
-      winnerPlayerId === null || !map ? null : winnerSideOf(map, winnerPlayerId);
+    // A split map plays a cut per format (CORP-8): any cut holding the winner's start names
+    // its side, the same in every format (`buildAvaMapPool`).
+    let side: AvaSide | null = null;
+    if (winnerPlayerId !== null)
+      for (const map of [...this.maps, ...this.retiredMaps])
+        if (map.id === session.mapId) side ??= winnerSideOf(map, winnerPlayerId);
     await this.settle(session.matchupId, side);
   }
 }

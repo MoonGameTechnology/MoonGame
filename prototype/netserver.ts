@@ -34,7 +34,8 @@ import { MedalService } from '../packages/server/src/medalService';
 import { loadMedalCatalog } from '../packages/server/src/medalCatalog';
 import { registerAvaApi, registerAvaFeed } from '../packages/server/src/avaApi';
 import { registerMedalApi } from '../packages/server/src/medalApi';
-import { AvaOrchestrator, avaBotOrders, avaDeniedAction, isAvaMatchId, type AvaSessionSpec } from '../packages/server/src/avaOrchestrator';
+import { AvaOrchestrator, avaBotOrders, avaDeniedAction, type AvaSessionSpec } from '../packages/server/src/avaOrchestrator';
+import { isAvaMatchId } from '../packages/protocol/src/ava';
 import { createAvaSweeps } from '../packages/server/src/avaSweeps';
 import { CorpArsenalService } from '../packages/server/src/corpArsenalService';
 import { registerCorpArsenalApi } from '../packages/server/src/corpArsenalApi';
@@ -584,12 +585,14 @@ const corpArsenalService = new CorpArsenalService({ corpStore, arsenalStore, ren
 // Манифест, который несут партии самого прототипа (`newGame`). Хост игроков по нему партию не
 // отвергает, но битва, собранная здесь, остаётся одной из них.
 const PROTOTYPE_MANIFEST = '1';
+const avaMaps = loadAvaMaps(data);
 const avaOrchestrator = new AvaOrchestrator({
   challengeStore,
   rosterStore,
   sessionStore,
   data,
-  maps: loadAvaMaps(),
+  maps: avaMaps.pool,
+  retiredMaps: avaMaps.retired,
   manifest: PROTOTYPE_MANIFEST,
   createRoom: (spec) => raiseAvaBattle(spec),
   // CORP-4: ни одна карта не подходит под запертый состав — битва отменяется, вызов возвращается.
@@ -960,7 +963,8 @@ async function createHostedMatch(
     if (avaBots.has(seat)) return 'ava:expand';
     // Место человека в битве не играет никакой ИИ — ни подмена после отсрочки, ни Хранитель
     // (corporation-wars.md §7): атакует только вошедший игрок, экономика и оборона идут сами.
-    if (ava) return null;
+    // Жители карты (пираты, рой, нейтралы) живут, как в обычной партии (CORP-8).
+    if (ava && !room.state.players[seat]?.npc) return null;
     // Offline population keeps its own empires active. The grace-based human
     // stand-in keeps the existing watched-room policy.
     if (connected === 0) return null;

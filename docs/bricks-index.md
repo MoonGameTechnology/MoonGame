@@ -58,7 +58,7 @@
 | CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
 | CORP-6 | ✅ | data srv proto | `docs/backlog.md` | Уровни корпорации 4 и 5. |
 | CORP-7 | ✅ | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
-| CORP-8 | ⏳ | data srv | `docs/backlog.md` | Карта под формат. |
+| CORP-8 | ✅ | core data srv proto | `docs/backlog.md` | Карта под формат. |
 | CORP-9 | ⏳ | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
 | CORP-10 | 🔒 | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
 | CORP-11 | ⏳ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |

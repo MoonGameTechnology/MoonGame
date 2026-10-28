@@ -197,7 +197,7 @@ try {
     const lists = await request('/matches', { token: alpha.token });
     return lists.active.find((row) => row.matchId === matchId) ?? false;
   }, 'the first AvA pass raises the battle', 100_000);
-  assert.equal(listed.mapId, 'ava-2v2-1');
+  assert.equal(listed.mapId, 'team-2v2'); // CORP-8: a 2-on-2 is played on the main-game team map
   assert.equal(listed.entryOpen, false, 'nobody queues into a battle: its roster holds every seat');
   for (const member of [charlie, bravo]) {
     const lists = await request('/matches', { token: member.token });
@@ -210,11 +210,11 @@ try {
   );
   const { rows: [session] } = await db.query('SELECT seats FROM ava_sessions WHERE match_id = $1', [matchId]);
   assert.deepEqual(Object.keys(session.seats).sort(), [alpha.accountId, bravo.accountId, charlie.accountId].sort());
-  assert.deepEqual(Object.values(session.seats).sort(), ['slot_a1', 'slot_a2', 'slot_b1']);
+  assert.deepEqual(Object.values(session.seats).sort(), ['slot_1', 'slot_2', 'slot_3']);
   const seat = session.seats[alpha.accountId];
   const { rows: [raised] } = await db.query('SELECT state FROM matches WHERE id = $1', [matchId]);
-  assert.equal(raised.state.mapId, 'ava-2v2-1');
-  assert.equal(raised.state.players['bot:slot_b2']?.ai, true);
+  assert.equal(raised.state.mapId, 'team-2v2');
+  assert.equal(raised.state.players['bot:slot_4']?.ai, true);
   assert.ok(raised.state.players[seat].arsenal.hulls.includes('evac_transport'), 'the handout rides into the battle deck');
   assert.ok(!raised.state.players[session.seats[charlie.accountId]].arsenal.hulls.includes('evac_transport'));
   report('battle-raised', { matchId, mapId: listed.mapId, sinceBootMs: Date.now() - start });
@@ -299,7 +299,7 @@ try {
   await enter((await request(`/matches/${matchId}/join`, { token: alpha.token })).token, true);
   const watchedUntil = Date.now() + AI_CYCLE_MS + 2000;
   const orders = await until(async () => {
-    const n = (await ordersOf(['bot:slot_b2'])).filter((row) => row.ok).length;
+    const n = (await ordersOf(['bot:slot_4'])).filter((row) => row.ok).length;
     return Date.now() >= watchedUntil && n;
   }, 'the side’s bot plays its seat for a whole AI cycle', 60_000);
   const members = [seat, session.seats[charlie.accountId]];
@@ -315,8 +315,8 @@ try {
     100_000,
   );
   const { rows: [atWar] } = await db.query('SELECT state FROM matches WHERE id = $1', [matchId]);
-  assert.equal(atWar.state.diplomacy[[seat, 'slot_b1'].sort().join('|')], 'war');
-  assert.equal(atWar.state.diplomacy[['slot_a1', 'slot_a2'].join('|')], 'alliance');
+  assert.equal(atWar.state.diplomacy[[seat, 'slot_3'].sort().join('|')], 'war');
+  assert.equal(atWar.state.diplomacy[['slot_1', 'slot_2'].join('|')], 'alliance');
   report('PASS', { durationMs: Date.now() - start });
 } catch (error) {
   let safeLog = log;

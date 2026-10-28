@@ -50,9 +50,20 @@ export function resolveMatchConfig(data: GameData, config: MatchConfig): ModeRes
 }
 
 /** Team modes whose sides are MATCH RULES fixed at the start (`Player.team`), not
- *  treaties: no cross-side peace, no teammate war, the score race counts sides. Only
- *  the formats an authored map seats today; other team formats keep their old rules. */
-export const FIXED_SIDE_MODES: readonly string[] = ['team_2v2', 'team_3v3'];
+ *  treaties: no cross-side peace, no teammate war, the score race counts sides. Every
+ *  N-on-N format from 2 to 10: the authored team maps seat 2v2 and 3v3, a corporations
+ *  battle any of them (CORP-8). */
+export const FIXED_SIDE_MODES: readonly string[] = [
+  'team_2v2',
+  'team_3v3',
+  'team_4v4',
+  'team_5v5',
+  'team_6v6',
+  'team_7v7',
+  'team_8v8',
+  'team_9v9',
+  'team_10v10',
+];
 
 /** Does this match play with fixed sides? Unset mode — no. */
 export function hasFixedSides(modeId: string | undefined): boolean {

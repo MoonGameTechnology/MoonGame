@@ -16,6 +16,7 @@
  * карточке «Сервер не отвечает» и видно только при сбое (`browserFallback.ts`, правило 4).
  */
 import { t, tData } from '../../localization/runtime';
+import { isAvaMatchId } from '../../packages/protocol/src/ava';
 import { fallbackFor, showServerRow, type Fallback } from '../../decisions/browserFallback';
 import { matchNumberText, parseMatchNumber } from '../../decisions/matchNumber';
 import { filterControls, seatPips, tabCounts, type FilterControls } from '../../decisions/matchesPage';
@@ -73,6 +74,10 @@ export interface MatchBrowserHost {
 
 let game: MatchBrowserHost;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
+/** Имя партии в строке. Битву корпораций называет её номер: с CORP-8 её играют на обычных
+ *  картах, и имя карты битву больше не выдаёт. */
+const matchName = (m: Pick<MatchRow, 'matchId' | 'mapId'>): string =>
+  isAvaMatchId(m.matchId) ? t('map.ava') : game.mapLabel(m.mapId);
 let srvInput: HTMLInputElement;
 
 export interface MatchRow {
@@ -334,7 +339,7 @@ function matchRow(m: MatchRow): HTMLElement {
   else if (win.kind === 'open')
     windowHtml = `<span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
   info.innerHTML =
-    `<div class="mname"><b>${esc(game.mapLabel(m.mapId))}</b>${modeHtml}${ended}</div>` +
+    `<div class="mname"><b>${esc(matchName(m))}</b>${modeHtml}${ended}</div>` +
     `<div class="mmeta"><span>${t('browser.day', { n: m.days })}</span>${seats}` +
     `<span>${esc(ruleSummary(m.rules, m.kind))}</span>${windowHtml}</div>`;
   row.appendChild(info);
@@ -368,7 +373,7 @@ function descriptionButton(match: MatchRow): HTMLButtonElement {
   button.type = 'button';
   button.className = 'mbtn btn-quiet mdescription';
   button.textContent = t('browser.description');
-  button.addEventListener('click', () => openMatchDescription(match, game.mapLabel(match.mapId)));
+  button.addEventListener('click', () => openMatchDescription(match, matchName(match)));
   return button;
 }
 
@@ -477,7 +482,7 @@ function renderMyMatches(): void {
       `<div class="hm-body">` +
       // Номер стоит ниже отдельной строкой: в заголовке он вытеснял бы то, ради чего
       // сюда смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(game.mapLabel(m.mapId))}</div>` +
+      `<div class="hc-t">${esc(matchName(m))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
