@@ -30,9 +30,10 @@ const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { hpOfLevel as __hpOfLevel } from './game';
 // Базы прицела — у прицелов (REFM-233); \`main.ts\` сам их не зовёт.
 import { relocateSpots as __relocateSpots } from './mapAim';
+import { unworld as __unworld } from './mapCamera';
 window.__relocateTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
-  // Эскадра из двух перехватчиков (перелёт 360) стоит в порту своего мира ('port') или в
+  // Эскадра из двух перехватчиков стоит в порту своего мира ('port') или в
   // трюме своего «Носителя» у него ('hold'). Вокруг три базы: подходящая — свой носитель
   // у ближнего мира (для 'port') или порт этого мира (для 'hold'); носитель с полным
   // трюмом у соседнего узла; свой порт за дальностью перелёта.
@@ -40,13 +41,19 @@ window.__relocateTest = {
     speed = 0;
     s = structuredClone(s);
     const home = Object.values(s.planets).find((p) => p.owner === ME);
+    if (!home) throw new Error('relocate fixture: missing home world');
     const gap = (a, b) => Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
     const nodes = Object.values(s.planets)
-      .filter((p) => p.id !== home.id && p.owner === null)
+      .filter((p) => p.kind === 'planet' && p.owner === null)
       .sort((a, b) => gap(a, home) - gap(b, home) || (a.id < b.id ? -1 : 1));
-    const near = nodes.find((p) => gap(p, home) >= 60 && gap(p, home) <= 200);
-    const side = nodes.find((p) => p !== near && gap(p, home) <= 200 && gap(p, near) >= 60);
-    const far = nodes.find((p) => gap(p, home) > 420);
+    const [near, blockedWorld] = nodes;
+    const far = nodes.at(-1);
+    if (nodes.length < 3 || gap(far, home) <= gap(blockedWorld, home))
+      throw new Error('relocate fixture: need two nearby worlds and a farther one');
+    // New maps have no pair of neutral worlds within 200 units. Both the kernel
+    // and UI read these fixture stats: put two bases inside ferry range and one
+    // outside it, without moving worlds away from the map's projected positions.
+    data.units.interceptor.stats.strikeRange = (gap(blockedWorld, home) + gap(far, home)) / 4;
     const port = (p) => {
       p.buildings = p.buildings.filter((b) => b.type !== 'spaceport');
       p.buildings.push({ type: 'spaceport', level: 1, hp: __hpOfLevel('spaceport', 1) });
@@ -63,7 +70,7 @@ window.__relocateTest = {
       hangar,
     });
     const deck = [{ id: 'sq:' + ME + ':' + kind, units: [{ unit: 'interceptor', count: 2 }] }];
-    const full = ship('relo-full', side, [{ id: 'sq:' + ME + ':full', units: [{ unit: 'interceptor', count: 16 }] }]);
+    const full = ship('relo-full', blockedWorld, [{ id: 'sq:' + ME + ':full', units: [{ unit: 'interceptor', count: 16 }] }]);
     s.fleets[full.id] = full;
     far.owner = ME;
     port(far);
@@ -91,11 +98,12 @@ window.__relocateTest = {
       dest = { kind: 'planet', id: near.id };
       setFleetSelection([carrier.id]);
     }
+    forgetVision();
     invalidatePanel();
     renderPanel();
     // Центруем ПОСЛЕ панели и между домом и соседями: открытая панель сужает поле карты,
     // а подходящая и полная база обязаны попасть на экран — не влезли, камера отходит.
-    const trio = [home, near, side];
+    const trio = [home, near, blockedWorld];
     const mid = {
       x: trio.reduce((n, p) => n + p.position.x, 0) / 3,
       y: trio.reduce((n, p) => n + p.position.y, 0) / 3,
@@ -122,6 +130,20 @@ window.__relocateTest = {
   at: (base) => {
     const p = relocateSpotPx(base);
     return p ? toScreen(p, canvas.getBoundingClientRect(), VW, VH) : null;
+  },
+  // Панорамируем к базе в свободное место карты: карточка флота может закрывать её.
+  show: (base) => {
+    const at = relocateSpotPx(base);
+    if (!at) return;
+    const r = canvas.getBoundingClientRect();
+    const free = [[0.5, 0.5], [0.75, 0.45], [0.25, 0.45], [0.5, 0.3], [0.5, 0.18], [0.25, 0.18], [0.75, 0.18]]
+      .map(([x, y]) => ({ x: r.left + r.width * x, y: r.top + r.height * y }))
+      .find((p) => document.elementFromPoint(p.x, p.y) === canvas);
+    if (!free) throw new Error('relocate fixture: no free canvas point');
+    const p = __unworld(at);
+    centerOn(p, cam.scale);
+    const under = __unworld({ x: ((free.x - r.left) * VW) / r.width, y: ((free.y - r.top) * VH) / r.height });
+    centerOn({ x: 2 * p.x - under.x, y: 2 * p.y - under.y }, cam.scale);
   },
   flights: () =>
     (s.strikes ?? [])
@@ -165,6 +187,11 @@ try {
               window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)),
             ),
         );
+      const reveal = async (base) => {
+        await page.evaluate((b) => window.__relocateTest.show(b), base);
+        await frame();
+        return page.evaluate((b) => window.__relocateTest.at(b), base);
+      };
       await withDiagnostics(page, `relocate-${kind}-${viewport.width}`, async () => {
         await page.goto(site.url + '/');
         await enterSkirmish(page, { tap: phone });
@@ -203,7 +230,7 @@ try {
         }
 
         // Тап по полному носителю приказа не даёт: прицел гаснет, перелёта нет.
-        const fullAt = await page.evaluate((b) => window.__relocateTest.at(b), bases.full);
+        const fullAt = await reveal(bases.full);
         assert.ok(fullAt, 'полный носитель на экране');
         assert.equal(
           await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName, fullAt),
@@ -216,7 +243,7 @@ try {
 
         // Снова кнопка — и тап по подходящей базе ставит перелёт.
         await arm();
-        const destAt = await page.evaluate((b) => window.__relocateTest.at(b), bases.dest);
+        const destAt = await reveal(bases.dest);
         assert.ok(destAt, 'подходящая база на экране');
         assert.equal(
           await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName, destAt),
