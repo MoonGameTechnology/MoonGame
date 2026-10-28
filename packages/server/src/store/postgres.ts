@@ -1,4 +1,5 @@
 import { reservedBotLogin } from '../botNicknames';
+import { isCorpEmblemId, type CorpEmblemId } from '@void/protocol';
 import type {
   CorpBuildOrder,
   CorpInfrastructureResult,
@@ -173,6 +174,7 @@ const SCHEMA_SQL = `
     -- ALTER … IF NOT EXISTS backfills pre-AVA-2 corps rows with the 0 default.
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS influence bigint NOT NULL DEFAULT 0;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS infrastructure jsonb;
+    ALTER TABLE corps ADD COLUMN IF NOT EXISTS emblem_id text;
 
     -- account_id as the PRIMARY KEY is the one-corp-per-account invariant: a member
     -- (recruit rows included — a recruit row IS the pending application) can't join
@@ -1184,6 +1186,7 @@ export class PostgresCorpStore implements CorpStore {
     headAccountId: string,
     headLogin: string,
     at: number = Date.now(),
+    emblemId?: CorpEmblemId,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
     // One transaction, two atomic claims: the corp_members PK is the one-corp-per-
     // account claim, the lower(name) unique index is the name claim. ON CONFLICT
@@ -1203,8 +1206,10 @@ export class PostgresCorpStore implements CorpStore {
         return { ok: false, code: 'E_IN_CORP' };
       }
       try {
-        await client.query(`INSERT INTO corps (id, name) VALUES ($1, $2)`, [corpId, name]);
-      } catch {
+        await client.query(`INSERT INTO corps (id, name, emblem_id) VALUES ($1, $2, $3)`, [corpId, name, emblemId ?? null]);
+      } catch (error) {
+        const conflict = error as { code?: unknown; constraint?: unknown };
+        if (conflict.code !== '23505' || conflict.constraint !== 'corps_name_idx') throw error;
         await client.query('ROLLBACK');
         return { ok: false, code: 'E_NAME_TAKEN' };
       }
@@ -1221,12 +1226,37 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async getCorp(corpId: string): Promise<CorpRecord | null> {
-    const r = await this.pool.query<{ id: string; name: string; influence: string }>(
-      `SELECT id, name, influence FROM corps WHERE id = $1`,
+    const r = await this.pool.query<{ id: string; name: string; influence: string; emblem_id: string | null }>(
+      `SELECT id, name, influence, emblem_id FROM corps WHERE id = $1`,
       [corpId],
     );
     const row = r.rows[0];
-    return row ? { corpId: row.id, name: row.name, influence: Number(row.influence) } : null;
+    return row ? { corpId: row.id, name: row.name, influence: Number(row.influence),
+      ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}) } : null;
+  }
+
+  async setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const allowed = await client.query<{ emblem_id: string | null }>(
+        `SELECT c.emblem_id FROM corps c JOIN corp_members m ON m.corp_id=c.id
+         WHERE c.id=$1 AND m.account_id=$2 AND m.role='head' FOR UPDATE OF c,m`, [corpId, actor]);
+      if (!allowed.rows[0]) {
+        await client.query('ROLLBACK');
+        return { ok: false, code: 'E_FORBIDDEN' };
+      }
+      if (allowed.rows[0].emblem_id !== emblemId) {
+        await client.query('UPDATE corps SET emblem_id=$2 WHERE id=$1', [corpId, emblemId]);
+        await client.query(`INSERT INTO corp_audit (corp_id,at,actor,action,detail) VALUES ($1,$2,$3,'emblem',$4)`,
+          [corpId, at, actor, emblemId]);
+      }
+      await client.query('COMMIT');
+      return { ok: true };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   async listCorps(): Promise<CorpSummary[]> {
@@ -1235,8 +1265,9 @@ export class PostgresCorpStore implements CorpStore {
       name: string;
       influence: string;
       members: string;
+      emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence,
+      `SELECT c.id, c.name, c.influence, c.emblem_id,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corps c
        LEFT JOIN corp_members m ON m.corp_id = c.id
@@ -1248,6 +1279,7 @@ export class PostgresCorpStore implements CorpStore {
       name: row.name,
       influence: Number(row.influence),
       members: Number(row.members),
+      ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
   }
 
@@ -1402,8 +1434,9 @@ export class PostgresCorpStore implements CorpStore {
       members: string;
       since: string;
       formats: number[];
+      emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence, r.since, r.formats,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, r.since, r.formats,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corp_ready r
        JOIN corps c ON c.id = r.corp_id
@@ -1418,6 +1451,7 @@ export class PostgresCorpStore implements CorpStore {
       members: Number(row.members),
       readySince: Number(row.since),
       formats: row.formats.map(Number),
+      ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
   }
 
