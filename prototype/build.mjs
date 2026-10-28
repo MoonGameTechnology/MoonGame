@@ -4221,7 +4221,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-pano-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
   .cb-pano{width:556px;height:250px;aspect-ratio:auto;}
   .cb-tagl,.cb-lot .cb-plus{display:none;}
-  .cb-bdg{position:absolute;right:6%;top:2%;display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
+  .cb-bdg{position:absolute;left:var(--bx,94%);top:var(--by,2%);transform:translate(-100%,-50%);display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
     background:rgba(3,12,20,.92);border:1px solid var(--cyan);color:var(--sf-hi);font-size:var(--fs-caption);font-weight:700;}
   .cb-lot.build .cb-bdg{border-color:var(--amber);color:var(--amber);}
   .cb-lot.open .cb-bdg{border-style:dashed;color:var(--cyan);}

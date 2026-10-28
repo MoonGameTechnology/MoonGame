@@ -26,9 +26,9 @@ export interface CorpLot {
 export const CORP_PANORAMA = { w: 1200, h: 540 };
 
 export const CORP_LOTS: Readonly<Record<string, CorpLot>> = {
-  headquarters: { x: 470, y: 100, w: 260, h: 330, tag: 'bottom' },
-  supply_center: { x: 236, y: 290, w: 210, h: 190, tag: 'bottom' },
-  engineering_complex: { x: 744, y: 294, w: 230, h: 190, tag: 'bottom' },
+  headquarters: { x: 410, y: 158, w: 380, h: 272, tag: 'bottom' },
+  supply_center: { x: 150, y: 283, w: 300, h: 197, tag: 'bottom' },
+  engineering_complex: { x: 740, y: 270, w: 320, h: 214, tag: 'bottom' },
 };
 
 /** Порядок рисования: дальние раньше ближних. */
@@ -60,40 +60,51 @@ const svg = (lot: CorpLot, body: string): string =>
 
 const n = (v: number): number => Math.round(v * 10) / 10;
 
-/** Картинки здания в участке: холст вписан в участок и стоит на его нижней кромке. */
-function artSprite(
-  id: string,
-  lot: CorpLot,
-  level: number,
-  mode: CorpLotState,
-  style: string,
-  top: CorpArt,
-  hit: boolean,
-): string {
+/** Нарисованное здание в участке: холст вписан в участок и стоит на его нижней кромке.
+ *  `drawn` — рамка всех показанных уровней в единицах участка: x0, y0, x1, y1. */
+interface Placed {
+  lot: CorpLot;
+  top: CorpArt;
+  current: CorpArt | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  drawn: readonly [number, number, number, number];
+}
+
+function place(id: string, level: number, mode: CorpLotState, style: string): Placed | null {
+  // Строится следующий уровень; закрытое и доступное к стройке здание показывает первый.
+  const top = corpArt(id, mode === 'built' ? level : mode === 'build' ? level + 1 : 1, style);
+  if (!top) return null;
+  const lot = CORP_LOTS[id] ?? PLAIN_LOT;
   const k = Math.min(lot.w / top.w, lot.h / top.h);
   const w = top.w * k;
   const h = top.h * k;
   const x = (lot.w - w) / 2;
   const y = lot.h - h;
+  const current = mode === 'build' && level > 0 ? corpArt(id, level, style) : null;
+  const boxes = current ? [top.box, current.box] : [top.box];
+  const lo = (i: number): number => Math.min(...boxes.map((b) => b[i] ?? 0));
+  const hi = (i: number): number => Math.max(...boxes.map((b) => b[i] ?? 1));
+  const drawn = [x + lo(0) * w, y + lo(1) * h, x + hi(2) * w, y + hi(3) * h] as const;
+  return { lot, top, current, x, y, w, h, drawn };
+}
+
+function artSprite({ lot, top, current, x, y, w, h, drawn }: Placed, mode: CorpLotState, hit: boolean): string {
   const image = (art: CorpArt, attrs = ''): string =>
     `<image href="${art.src}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${attrs}/>`;
-  const current = mode === 'build' && level > 0 ? corpArt(id, level, style) : null;
   const body =
     mode === 'built'
       ? image(top)
       : mode === 'build'
         ? image(top, ' class="scaf" filter="url(#corpScaf)"') + (current ? image(current) : '')
         : image(top, ' class="ghost" filter="url(#corpGhost)"');
-  let zone = '';
-  if (hit) {
-    // Нажимается нарисованное, а не пустое небо холста: рамка всех показанных уровней.
-    const boxes = current ? [top.box, current.box] : [top.box];
-    const lo = (i: number): number => Math.min(...boxes.map((b) => b[i] ?? 0));
-    const hi = (i: number): number => Math.max(...boxes.map((b) => b[i] ?? 1));
-    const x0 = x + lo(0) * w;
-    const y0 = y + lo(1) * h;
-    zone = `<g><rect class="hit" x="${n(x0)}" y="${n(y0)}" width="${n(x + hi(2) * w - x0)}" height="${n(y + hi(3) * h - y0)}"/></g>`;
-  }
+  // Нажимается нарисованное, а не пустое небо холста.
+  const [x0, y0, x1, y1] = drawn;
+  const zone = hit
+    ? `<g><rect class="hit" x="${n(x0)}" y="${n(y0)}" width="${n(x1 - x0)}" height="${n(y1 - y0)}"/></g>`
+    : '';
   return svg(lot, zone + body);
 }
 
@@ -106,12 +117,23 @@ export function corpSprite(
   style: string = CORP_STYLE_STANDARD,
   hit = false,
 ): string {
-  // Строится следующий уровень; закрытое и доступное к стройке здание показывает первый.
-  const top = corpArt(id, mode === 'built' ? level : mode === 'build' ? level + 1 : 1, style);
-  if (top) return artSprite(id, CORP_LOTS[id] ?? PLAIN_LOT, level, mode, style, top, hit);
+  const placed = place(id, level, mode, style);
+  if (placed) return artSprite(placed, mode, hit);
   const solid = mode === 'built' || (mode === 'build' && level > 0) ? PLAIN : '';
   const ghost = mode === 'built' ? '' : PLAIN;
   return svg(PLAIN_LOT, `<g class="solid">${solid}</g><g class="ghost${mode === 'build' ? ' scaf' : ''}">${ghost}</g>`);
+}
+
+/** Правый верхний угол нарисованного здания в долях участка — там на телефоне стоит значок
+ *  уровня, а не в пустом небе участка. У здания без рисунка — null. */
+export function corpSpriteRoof(
+  id: string,
+  level: number,
+  mode: CorpLotState,
+  style: string = CORP_STYLE_STANDARD,
+): { x: number; y: number } | null {
+  const placed = place(id, level, mode, style);
+  return placed && { x: placed.drawn[2] / placed.lot.w, y: placed.drawn[1] / placed.lot.h };
 }
 
 /** Генератор с зерном (mulberry32): звёзды неба одни и те же при каждой отрисовке. */

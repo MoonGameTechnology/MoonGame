@@ -47,6 +47,7 @@ import {
   CORP_PANORAMA,
   corpPanoramaBg,
   corpSprite,
+  corpSpriteRoof,
 } from './corpSprites';
 import { esc, nfmt } from './format';
 import { newsCalendar, newsTimeText } from './newsScreen';
@@ -298,13 +299,15 @@ function lotHtml(view: CorpInfrastructureView, b: CorpBuildingView, canBuild: bo
   const pos =
     `left:${pct(lot.x, CORP_PANORAMA.w)};top:${pct(lot.y, CORP_PANORAMA.h)};` +
     `width:${pct(lot.w, CORP_PANORAMA.w)};height:${pct(lot.h, CORP_PANORAMA.h)}`;
+  const roof = corpSpriteRoof(b.id, b.level, st, style);
+  const at = roof ? ` style="--bx:${pct(roof.x, 1)};--by:${pct(roof.y, 1)}"` : '';
   return (
     `<button type="button" class="cb-lot ${st} tag-${lot.tag}" style="${pos}" data-corpbld="${esc(b.id)}" ` +
     `aria-label="${esc(`${t(b.nameKey)}: ${lotLabel(view, b, st)}`)}">` +
     corpSprite(b.id, b.level, st, style, true) +
     (st === 'open' && canBuild ? `<span class="cb-plus" aria-hidden="true">+</span>` : '') +
     `<span class="cb-tagl" aria-hidden="true"><b>${esc(t(b.nameKey))}</b>${mark.tag ? `<i>${esc(mark.tag)}</i>` : ''}</span>` +
-    `<span class="cb-bdg" aria-hidden="true">${esc(mark.badge)}</span></button>`
+    `<span class="cb-bdg"${at} aria-hidden="true">${esc(mark.badge)}</span></button>`
   );
 }
 
