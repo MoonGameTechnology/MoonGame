@@ -688,7 +688,7 @@ describe('AvaService — the «Битвы» tab (CORP-9)', () => {
       [won, 'ended'],
     ]);
     expect(view.tally).toEqual([{ opponent: f.corpB, format: 2, wins: 1, losses: 0, draws: 0 }]);
-    expect(view.names).toEqual({ [f.corpB]: 'Alliance B' });
+    expect(view.names).toEqual({ [f.corpB]: generatedCorpName(1) });
     expect(view.results).toHaveLength(1);
     expect(view.results[0]).toMatchObject({ matchupId: won, side: 'challenger', format: 2, winnerCorp: f.corpA });
     // The corp's own seats name their accounts; a rival is known by login, a bot by nothing.
@@ -707,7 +707,7 @@ describe('AvaService — the «Битвы» tab (CORP-9)', () => {
     if ('ok' in view) throw new Error(view.code);
     expect(view.ready).toMatchObject({ corp: true, player: false, players: [] });
     expect(view.tally).toEqual([{ opponent: f.corpA, format: 2, wins: 0, losses: 1, draws: 0 }]);
-    expect(view.names).toEqual({ [f.corpA]: 'Alliance A' });
+    expect(view.names).toEqual({ [f.corpA]: generatedCorpName(0) });
     expect(view.results[0]?.side).toBe('target');
     expect(view.results[0]?.report?.seats.map((seat) => seat.accountId)).toEqual([
       undefined,

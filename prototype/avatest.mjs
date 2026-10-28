@@ -228,7 +228,7 @@ try {
     tab.challenges.map((row) => `${row.id}:${row.status}`).sort(),
     [`${battle}:locked`, `${cancelled}:cancelled`].sort(),
   );
-  assert.equal(tab.names[corpB], `Bravo ${suffix}`);
+  assert.equal(tab.names[corpB], (await request(`/corps/${corpB}`, { token: alpha.token })).corp.name);
   const peace = await request(`/ava-war/${battle}`, { token: alpha.token });
   assert.equal(peace.phase, 'peace');
   assert.equal(peace.side, 'challenger');

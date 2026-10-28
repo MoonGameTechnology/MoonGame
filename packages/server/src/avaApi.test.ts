@@ -291,7 +291,7 @@ describe('AVA · readiness + challenge API', () => {
       challenges: [{ id, status: 'declined' }],
       results: [],
       tally: [],
-      names: { [corpB]: 'Alliance B' },
+      names: { [corpB]: generatedCorpName(1) },
     });
     // carol belongs to no corp: no battles to show her
     const carol = await app.inject({ method: 'GET', url: '/ava/battles', headers: as('carol') });
