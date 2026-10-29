@@ -1580,11 +1580,14 @@ export const ru: Record<string, string> = {
   'corp.role.member': 'Участник',
   'corp.role.officer': 'Офицер',
   'corp.role.recruit': 'Заявка',
+  'corp.settings.appearance': 'Архитектура и фон',
+  'corp.settings.appearance-unavailable': 'Не удалось загрузить оформление.',
   'corp.settings.identity': 'Идентичность',
   'corp.settings.identity.hint':
     'Название назначается случайно. Эмблему меняет глава.',
   'corp.settings.name': 'Название',
   'corp.settings.soon': 'Скоро',
+  'corp.settings.title': 'Настройки корпорации',
   'corp.showcase': 'Витрина наград',
   'corp.showcase.empty': 'пусто',
   'corp.showcase.hint':

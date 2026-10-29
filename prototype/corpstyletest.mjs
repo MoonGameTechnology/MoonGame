@@ -147,9 +147,13 @@ try {
         await page.click('[data-hub="corp"]');
         if (await page.locator('#intro .in-ok').isVisible()) await page.click('#intro .in-ok');
       };
-      const pill = page.locator('#hp-corp [data-corphub="style"]');
+      const appearance = page.locator('#hp-corp [data-corphub="style"]');
+      const settings = async () => page.click('#hp-corp [data-corpsec="settings"]');
+      const baseTab = async () => page.click('#hp-corp [data-corpsec="base"]');
       await corpTab();
-      await pill.filter({ hasText: locale === 'ru' ? 'Стандарт' : 'Standard' }).waitFor();
+      await settings();
+      await appearance.filter({ hasText: locale === 'ru' ? 'Стандарт' : 'Standard' }).waitFor();
+      await baseTab();
       const standard = await panorama(page);
       assert.equal(standard.length, 3);
 
@@ -175,14 +179,17 @@ try {
 
       // The base is redrawn in the applied style.
       await corpTab();
-      await pill.filter({ hasText: locale === 'ru' ? 'Имперская готика' : 'Imperial Gothic' }).waitFor();
+      await settings();
+      await appearance.filter({ hasText: locale === 'ru' ? 'Имперская готика' : 'Imperial Gothic' }).waitFor();
+      await baseTab();
       const gothic = await panorama(page);
       assert.equal(gothic.length, 3);
       assert.ok(gothic.every((href, i) => href !== standard[i]), 'every building is drawn in the new style');
       await page.screenshot({ path: `.playwright-mcp/corp-style-${tag}-base.png` });
 
       // The style sheet sends an unbought style to the shop and applies a bought one.
-      await pill.click();
+      await settings();
+      await appearance.click();
       await page.locator('#corp-sheet [data-corpshop="high_tech"]').click();
       // The shop opens on that style; 110 ◆ are left, so its button names the shortfall.
       const shopDetail = page.locator(phone ? '#shop-sheet .ar-sheet-body' : '#hp-shop .sh-detail');
@@ -193,12 +200,16 @@ try {
         await page.locator('#shop-sheet.open').waitFor({ state: 'detached' });
       }
       await corpTab();
-      await pill.click();
+      await settings();
+      await appearance.click();
       await page.waitForFunction(() => document.querySelector('#corp-sheet .cb-sheet')
         .getAnimations().every((a) => a.playState !== 'running'));
       await page.screenshot({ path: `.playwright-mcp/corp-style-${tag}-sheet.png` });
       await page.click('#corp-sheet [data-corpstyle="standard"]');
-      await pill.filter({ hasText: locale === 'ru' ? 'Стандарт' : 'Standard' }).waitFor();
+      await appearance.filter({ hasText: locale === 'ru' ? 'Стандарт' : 'Standard' }).waitFor();
+      await page.keyboard.press('Escape');
+      await page.locator('#corp-sheet.open').waitFor({ state: 'detached' });
+      await baseTab();
       assert.deepEqual(await panorama(page), standard);
       assert.equal(await page.$eval('#hp-corp', (el) => el.scrollWidth > el.clientWidth + 1), false);
       assert.deepEqual(errors, []);

@@ -1572,11 +1572,14 @@ export const en: Record<string, string> = {
   'corp.role.member': 'Member',
   'corp.role.officer': 'Officer',
   'corp.role.recruit': 'Applicant',
+  'corp.settings.appearance': 'Architecture and backdrop',
+  'corp.settings.appearance-unavailable': 'Appearance could not be loaded.',
   'corp.settings.identity': 'Identity',
   'corp.settings.identity.hint':
     'A random name is assigned at creation. Only the head can change the emblem.',
   'corp.settings.name': 'Name',
   'corp.settings.soon': 'Coming soon',
+  'corp.settings.title': 'Corporation settings',
   'corp.showcase': 'Award showcase',
   'corp.showcase.empty': 'empty',
   'corp.showcase.hint':
