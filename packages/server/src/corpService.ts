@@ -2,6 +2,7 @@ import { CORP_EMBLEMS, isCorpEmblemId, blockedPublicName, type CorpBuildOrder, t
 import { randomInt } from 'node:crypto';
 import { CORP_NAME_COUNT, generatedCorpName } from './corpNames';
 import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } from './store';
+import type { CorpShowcaseResult } from '@void/protocol';
 
 /**
  * CORP-0 — the corporation service: membership + the fixed RBAC from
@@ -96,6 +97,9 @@ export class CorpService {
   async setEmblem(who: CorpActor, corpId: string, emblemId: unknown): Promise<{ ok: true } | CorpFail> {
     if (!isCorpEmblemId(emblemId)) return { ok: false, code: 'E_BAD_EMBLEM' };
     return this.store.setEmblem(corpId, who.accountId, emblemId, this.now());
+  }
+  setShowcase(who: CorpActor, corpId: string, medals: readonly string[]): Promise<CorpShowcaseResult> {
+    return this.store.setShowcase(corpId, who.accountId, medals, this.now());
   }
 
   /** applyToCorp — creates the recruit row (the pending application). */

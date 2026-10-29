@@ -11,6 +11,8 @@ import type {
 } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
+import { corpFacilities, publicCorpFacilities, validateShowcase } from '../corpFacilities';
+import type { CorpShowcaseResult } from '@void/protocol';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
@@ -202,6 +204,7 @@ const SCHEMA_SQL = `
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS influence bigint NOT NULL DEFAULT 0;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS infrastructure jsonb;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS emblem_id text;
+    ALTER TABLE corps ADD COLUMN IF NOT EXISTS showcase jsonb NOT NULL DEFAULT '[]'::jsonb;
 
     -- account_id as the PRIMARY KEY is the one-corp-per-account invariant: a member
     -- (recruit rows included — a recruit row IS the pending application) can't join
@@ -386,6 +389,8 @@ const SCHEMA_SQL = `
       event_id text PRIMARY KEY, matchup_id text NOT NULL, entry jsonb NOT NULL, delivered boolean NOT NULL DEFAULT false
     );
     CREATE INDEX IF NOT EXISTS corp_arsenal_rent_matchup_idx ON corp_arsenal_rent (matchup_id);
+    CREATE INDEX IF NOT EXISTS corp_arsenal_rent_corp_matchup_idx ON corp_arsenal_rent (corp_id, matchup_id);
+    ALTER TABLE corp_arsenal_rent ADD COLUMN IF NOT EXISTS unworn boolean NOT NULL DEFAULT false;
     CREATE INDEX IF NOT EXISTS corp_return_audit_pending_idx ON corp_return_audit (matchup_id) WHERE NOT delivered;
 
     -- MetaMarket (EC-3): кошелёк Варрантов, книга лотов и леджер сделок.
@@ -1178,7 +1183,14 @@ function memberOf(row: CorpMemberRow): CorpMembership {
   };
 }
 
+type CorpFacilityRow = { infrastructure: CorpInfrastructureState | null; showcase: string[] };
+
 export class PostgresCorpStore implements CorpStore {
+  async monumentsOf(ids: readonly string[]): Promise<string[]> {
+    if (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string')) return [];
+    const result = await this.pool.query<{ id: string; infrastructure: CorpInfrastructureState | null }>('SELECT id,infrastructure FROM corps WHERE id=ANY($1::text[])', [ids]);
+    return result.rows.filter((row) => publicCorpFacilities(row.infrastructure, Date.now()).monument).map((row) => row.id);
+  }
   async infrastructure(
     corpId: string,
     actor: string,
@@ -1297,12 +1309,13 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async getCorp(corpId: string): Promise<CorpRecord | null> {
-    const r = await this.pool.query<{ id: string; name: string; influence: string; emblem_id: string | null }>(
-      `SELECT id, name, influence, emblem_id FROM corps WHERE id = $1`,
+    const r = await this.pool.query<CorpFacilityRow & { id: string; name: string; influence: string; emblem_id: string | null }>(
+      `SELECT id, name, influence, emblem_id, infrastructure, showcase FROM corps WHERE id = $1`,
       [corpId],
     );
     const row = r.rows[0];
     return row ? { corpId: row.id, name: row.name, influence: Number(row.influence),
+      ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}) } : null;
   }
 
@@ -1331,14 +1344,14 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async listCorps(): Promise<CorpSummary[]> {
-    const r = await this.pool.query<{
+    const r = await this.pool.query<CorpFacilityRow & {
       id: string;
       name: string;
       influence: string;
       members: string;
       emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence, c.emblem_id,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corps c
        LEFT JOIN corp_members m ON m.corp_id = c.id
@@ -1350,8 +1363,34 @@ export class PostgresCorpStore implements CorpStore {
       name: row.name,
       influence: Number(row.influence),
       members: Number(row.members),
+      ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
+  }
+
+  async setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      const allowed = await db.query<CorpFacilityRow>(
+        `SELECT c.infrastructure,c.showcase FROM corps c JOIN corp_members m ON m.corp_id=c.id
+         WHERE c.id=$1 AND m.account_id=$2 AND m.role='head' FOR UPDATE OF c,m`, [corpId, actor]);
+      const row = allowed.rows[0];
+      if (!row) { await db.query('ROLLBACK'); return { ok: false, code: 'E_FORBIDDEN' }; }
+      const stats = await db.query<{ wins: string; matches: string }>(
+        `SELECT count(*) AS matches,count(*) FILTER(WHERE winner_corp=$1) AS wins FROM ava_results
+         WHERE challenger_corp=$1 OR target_corp=$1`, [corpId]);
+      const count = stats.rows[0]!;
+      const error = validateShowcase(medalIds, corpFacilities(row.infrastructure, at).showcaseSlots, { wins: Number(count.wins), matches: Number(count.matches) });
+      if (error) { await db.query('ROLLBACK'); return { ok: false, code: error }; }
+      if (JSON.stringify(row.showcase) !== JSON.stringify(medalIds)) {
+        await db.query('UPDATE corps SET showcase=$2::jsonb WHERE id=$1', [corpId, JSON.stringify(medalIds)]);
+        await db.query(`INSERT INTO corp_audit(corp_id,at,actor,action,detail) VALUES($1,$2,$3,'showcase',$4)`, [corpId, at, actor, JSON.stringify(medalIds)]);
+      }
+      await db.query('COMMIT');
+      return { ok: true };
+    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { db.release(); }
   }
 
   async membershipOf(accountId: string): Promise<CorpMembership | null> {
@@ -1498,7 +1537,7 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async listReadyCorps(): Promise<Array<CorpSummary & { readySince: number; formats: number[] }>> {
-    const r = await this.pool.query<{
+    const r = await this.pool.query<CorpFacilityRow & {
       id: string;
       name: string;
       influence: string;
@@ -1507,7 +1546,7 @@ export class PostgresCorpStore implements CorpStore {
       formats: number[];
       emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence, c.emblem_id, r.since, r.formats,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase, r.since, r.formats,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corp_ready r
        JOIN corps c ON c.id = r.corp_id
@@ -1522,6 +1561,7 @@ export class PostgresCorpStore implements CorpStore {
       members: Number(row.members),
       readySince: Number(row.since),
       formats: row.formats.map(Number),
+      ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
   }
@@ -2421,6 +2461,7 @@ interface CorpRentRow {
   matchup_id: string;
   account_id: string;
   rented_at: string;
+  unworn: boolean;
 }
 
 function corpRentOf(row: CorpRentRow): CorpRent {
@@ -2430,6 +2471,7 @@ function corpRentOf(row: CorpRentRow): CorpRent {
     matchupId: row.matchup_id,
     accountId: row.account_id,
     rentedAt: Number(row.rented_at),
+    ...(row.unworn ? { unworn: true as const } : {}),
   };
 }
 
@@ -2526,6 +2568,10 @@ export class PostgresArsenalStore implements ArsenalStore {
 }
 
 export class PostgresCorpRentStore implements CorpRentStore {
+  async activeForCorp(corpId: string): Promise<CorpRent[]> {
+    const result = await this.pool.query<CorpRentRow>('SELECT * FROM corp_arsenal_rent WHERE corp_id=$1 ORDER BY rented_at,item_id', [corpId]);
+    return result.rows.map(corpRentOf);
+  }
   async completeReturn(
     matchupId: string,
     itemId: string,
@@ -2546,7 +2592,7 @@ export class PostgresCorpRentStore implements CorpRentStore {
       }
       const updated = await db.query(
         'UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-$3) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id',
-        [itemId, row.corp_id, wear],
+        [itemId, row.corp_id, row.unworn ? 0 : wear],
       );
       if (updated.rowCount !== 1) throw Error('E_CORP_ITEM_MISSING');
       const eventId = JSON.stringify(['rent_return', matchupId, itemId]);
@@ -2605,9 +2651,28 @@ export class PostgresCorpRentStore implements CorpRentStore {
     return (r.rowCount ?? 0) > 0;
   }
 
+  async rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'> {
+    if (!Number.isSafeInteger(limit) || limit < 1) return 'limit';
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['warehouse', entry.corpId, entry.matchupId])]);
+      const held = await db.query('SELECT 1 FROM corp_arsenal_rent WHERE item_id=$1', [entry.itemId]);
+      if (held.rowCount) { await db.query('ROLLBACK'); return 'rented'; }
+      const used = await db.query<{ n: string }>('SELECT count(*) AS n FROM corp_arsenal_rent WHERE corp_id=$1 AND matchup_id=$2', [entry.corpId, entry.matchupId]);
+      if (Number(used.rows[0]!.n) >= limit) { await db.query('ROLLBACK'); return 'limit'; }
+      const inserted = await db.query(`INSERT INTO corp_arsenal_rent(item_id,corp_id,matchup_id,account_id,rented_at,unworn)
+        VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(item_id) DO NOTHING`,
+        [entry.itemId, entry.corpId, entry.matchupId, entry.accountId, entry.rentedAt, entry.unworn === true]);
+      await db.query('COMMIT');
+      return inserted.rowCount ? 'ok' : 'rented';
+    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { db.release(); }
+  }
+
   async activeForMatchup(matchupId: string): Promise<CorpRent[]> {
     const r = await this.pool.query<CorpRentRow>(
-      `SELECT item_id, corp_id, matchup_id, account_id, rented_at
+      `SELECT item_id, corp_id, matchup_id, account_id, rented_at, unworn
        FROM corp_arsenal_rent WHERE matchup_id = $1 ORDER BY item_id`,
       [matchupId],
     );
@@ -2616,7 +2681,7 @@ export class PostgresCorpRentStore implements CorpRentStore {
 
   async activeForAccount(matchupId: string, accountId: string): Promise<CorpRent[]> {
     const r = await this.pool.query<CorpRentRow>(
-      `SELECT item_id, corp_id, matchup_id, account_id, rented_at
+      `SELECT item_id, corp_id, matchup_id, account_id, rented_at, unworn
        FROM corp_arsenal_rent WHERE matchup_id = $1 AND account_id = $2 ORDER BY item_id`,
       [matchupId, accountId],
     );

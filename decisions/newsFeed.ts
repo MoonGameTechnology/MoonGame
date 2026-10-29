@@ -78,7 +78,7 @@ const idOf = (v: unknown): v is string =>
 function corpOf(v: unknown): NewsCorp | null {
   if (!record(v) || !idOf(v.id)) return null;
   if (typeof v.name !== 'string' || v.name.length === 0 || v.name.length > NAME_MAX) return null;
-  return { id: v.id, name: v.name };
+  return { id: v.id, name: v.name, ...(v.monument === true ? { monument: true } : {}) };
 }
 
 function textOf(v: unknown, max: number, required: boolean): NewsText | null {

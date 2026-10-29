@@ -260,7 +260,7 @@ function opponentsView(p: CorpBattlesPaint): string {
               action = `<button type="button" class="btn-second" data-battletab="${offer.kind === 'answer' ? 'challenges' : 'now'}">${esc(t(offer.kind === 'answer' ? 'corp.combat.answer' : 'corp.combat.to-current'))}</button>`;
             else action = hint(OFFER[offer.kind]);
             return (
-              `<article class="cb-card cb-battle-card"><header><div class="cb-battle-identity">${corpEmblem(r.corpId, r.emblemId, 40)}<h3>${esc(r.name)}</h3></div><b>${nfmt(r.influence)} ⟡</b></header>` +
+              `<article class="cb-card cb-battle-card${r.monument ? ' corp-monument' : ''}"><header><div class="cb-battle-identity">${corpEmblem(r.corpId, r.emblemId, 40)}<h3>${esc(r.name)}</h3></div><b>${nfmt(r.influence)} ⟡</b></header>` +
               `<p class="cb-battle-hint">${esc(t('corp.members.count', { n: r.members }))} · ${r.formats.map(fmt).join(' · ')}</p>` +
               (rematch
                 ? `<p class="cb-battle-hint">${esc(t('corp.combat.encounters', { wins: record.wins, losses: record.losses, draws: record.draws }))}</p>`

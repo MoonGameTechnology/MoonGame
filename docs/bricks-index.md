@@ -61,7 +61,7 @@
 | CORP-8 | ✅ | core data srv proto | `docs/backlog.md` | Карта под формат. |
 | CORP-9 | ✅ | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
 | CORP-10 | ✅ | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
-| CORP-11 | ⏳ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
+| CORP-11 | ✅ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
 | CORP-12 | ⏳ | srv | `docs/backlog.md` | Медали игроков в ленте. |
 | CORP-13 | 🔶 | proto | `docs/backlog.md` | Картинки базы. |
 | CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |

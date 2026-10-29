@@ -5,15 +5,11 @@ import {
   CORP_TABS,
   CORP_AUDIT_RU,
   CORP_ROLE_DOT,
-  SHOWCASE_SLOTS,
   corpBattles,
   corpRoleLabel,
   hqTile,
   initCorp,
   medalGalleryHtml,
-  readShowcase,
-  showcaseHtml,
-  writeShowcase,
   type CorpHost,
 } from './corpScreen';
 import type { CorpBattlesView } from '../../packages/protocol/src/corpBattles';
@@ -213,23 +209,6 @@ describe('корпорации — витрина наград', () => {
     { id: 'champ', name: 'Чемпион', description: 'пять побед' },
   ];
 
-  it('пустое/битое хранилище читается как пустые слоты, а не падает', () => {
-    expect(readShowcase(null)).toEqual(['', '', '']);
-    expect(readShowcase('first')).toEqual(['first', '', '']);
-    expect(readShowcase(readShowcase(null).join(','))).toHaveLength(SHOWCASE_SLOTS);
-  });
-
-  it('запись и чтение — обратимы', () => {
-    expect(readShowcase(writeShowcase(['a', 'b', 'c']))).toEqual(['a', 'b', 'c']);
-  });
-
-  it('в слоте показывается только ЗАРАБОТАННАЯ награда — протухший выбор гаснет', () => {
-    const html = showcaseHtml(['first', 'champ', ''], defs, ['first']);
-    expect(html).toContain('Первая кровь');
-    expect(html).not.toContain('Чемпион'); // не получена — слот пуст, а не «есть»
-    expect((html.match(/data-corpcup=/g) ?? []).length).toBe(SHOWCASE_SLOTS);
-  });
-
   it('в общей витрине неполученные видны, но не выбираются', () => {
     const html = medalGalleryHtml(defs, ['first']);
     expect(html).toContain('data-corppick="first"');
@@ -293,17 +272,14 @@ describe('корпорации — кабинет', () => {
     expect(body.html()).not.toBe(before);
   });
 
-  it('Back закрывает СНАЧАЛА витрину и только потом кабинет', () => {
-    const { api, root, shown } = wire();
+  it('Back закрывает кабинет: витрина встроена в карточку здания', () => {
+    const { api, shown } = wire();
     api.open();
-    root.fire({ closest: (s: string) => (s === '[data-corpcup]' ? { dataset: { corpcup: '1' } } : null) });
-    api.close();
-    expect(shown()).toBe('flex'); // ушла витрина — из корпорации игрока не выбросило
     api.close();
     expect(shown()).toBe('none');
   });
 
-  it('крестик закрывает кабинет целиком, даже из открытой витрины', () => {
+  it('крестик закрывает кабинет целиком', () => {
     const { api, root, shown } = wire();
     api.open();
     root.fire({ closest: (s: string) => (s === '[data-corpcup]' ? { dataset: { corpcup: '0' } } : null) });
@@ -597,6 +573,25 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     hubRoot.fire(press({ corpact: 'ava-ready-save' }));
     await tick();
     expect(sent).toEqual([{ formats: [3] }, { formats: [3] }]);
+  });
+
+  it('warehouse battle labels use the server name even when the rival left the ready pool', async () => {
+    const corp = { ...CORP, warehouseItems: 2 };
+    const matchup = { id: 'war', challengerCorp: 'c1', targetCorp: 'private-corp-id', format: 2, cost: 100, status: 'accepted', createdAt: 1, expiresAt: 9999999999999, pauseEndsAt: 9999999999999 };
+    server({ ...headCorp(),
+      '/corps/me': { corp, membership: HEAD, features: { ava: true, medals: false } },
+      '/corps/c1': { corp, members: [HEAD] },
+      '/ava/battles': { corpId: 'c1', ready: { corp: false, formats: [], player: false, players: [] }, challenges: [matchup], results: [], tally: [], names: { 'private-corp-id': 'Орден Ориона' } },
+      '/ava/pool': { pool: [] },
+      '/ava/matchup/war': { matchupId: 'war', side: 'challenger', status: 'accepted', mine: [], counts: { challenger: 0, target: 0 } },
+      '/corp-arsenal/c1?matchupId=war': { capacity: 2, used: 0, canLend: true, fighters: [], items: [] },
+    });
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corpbld: 'warehouse' }));
+    expect(hubSheet.html()).toContain('Орден Ориона');
+    expect(hubSheet.html()).not.toContain('private-corp-id');
   });
 
   it('CORP-10: reads private battles, sends selected formats, and opens the report sheet', async () => {

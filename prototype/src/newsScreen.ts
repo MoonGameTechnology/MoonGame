@@ -1,3 +1,4 @@
+import { corpShowcaseHtml } from './corpFacilitiesView';
 /**
  * Лента новостей на «Домой» (CORP-2). На ПК — колонка справа от «Моих партий», на
  * телефоне — превью (закреплённые и три свежие) и шторка со всей лентой. Что показать, в
@@ -17,6 +18,7 @@ import {
   appendNewsPage,
   newsApply,
   newsItems,
+  newsCorps,
   newsLine,
   newsPlaceholder,
   newsTeaser,
@@ -154,7 +156,7 @@ export function newsItemHtml(item: NewsItem, line: NewsLine, time: string, apply
     `nw-it k-${line.category}` +
     (line.tone ? ` s-${line.tone}` : '') +
     (line.pinned ? ' pin' : '') +
-    (line.own ? ' my' : '');
+    (line.own ? ' my' : '') + (newsCorps(item).some((c) => c.monument) ? ' corp-monument' : '');
   const label = (line.pinned ? `${t('news.pinned')} · ` : '') + t(line.labelKey);
   const card = line.card;
   const acts =
@@ -277,6 +279,7 @@ export function newsCardHtml(
           : '';
   return (
     title +
+    corpShowcaseHtml(card.corp) +
     `<ul class="nw-facts">${facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` +
     (act ? `<div class="nw-a">${act}</div>` : '')
   );

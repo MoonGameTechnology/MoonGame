@@ -23,6 +23,7 @@ import type { AnnouncementStore, AvaFeedStore, FeedEntry, FeedKind } from './sto
 export interface NewsApiDeps {
   feed: Pick<AvaFeedStore, 'recent'>;
   announcements: Pick<AnnouncementStore, 'active'>;
+  monumentsOf?(ids: readonly string[]): Promise<string[]>;
   now?: () => number;
 }
 
@@ -83,6 +84,9 @@ export function registerNewsApi(app: FastifyInstance, deps: NewsApiDeps): void {
       }),
       more,
     };
+    const corps = view.events.flatMap((e) => e.kind === 'matchup' || e.kind === 'result' ? [e.challenger, e.target] : e.corp ? [e.corp] : []);
+    const monuments = new Set(await deps.monumentsOf?.([...new Set(corps.map((c) => c.id))]).catch(() => []) ?? []);
+    for (const corp of corps) if (monuments.has(corp.id)) corp.monument = true;
     return reply.header('cache-control', 'no-store').send(view);
   });
 }

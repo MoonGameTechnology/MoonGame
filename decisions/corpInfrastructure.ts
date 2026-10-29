@@ -21,7 +21,10 @@ const level = (v: unknown): v is CorpBuildingLevel =>
   v.constructionReduction <= 50 &&
   (v.members === undefined || integer(v.members)) &&
   (v.battles === undefined || integer(v.battles)) &&
-  (v.maxFormat === undefined || (integer(v.maxFormat) && v.maxFormat >= 2));
+  (v.maxFormat === undefined || (integer(v.maxFormat) && v.maxFormat >= 2)) &&
+  (v.warehouseItems === undefined || (integer(v.warehouseItems) && v.warehouseItems >= 1 && v.warehouseItems <= 20)) &&
+  (v.showcaseSlots === undefined || (integer(v.showcaseSlots) && v.showcaseSlots >= 1 && v.showcaseSlots <= 20)) &&
+  (v.monument === undefined || typeof v.monument === 'boolean');
 const ERRORS = new Set([
   'E_FORBIDDEN',
   'E_CORP_BUILDING',

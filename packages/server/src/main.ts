@@ -614,7 +614,7 @@ const server = createMultiplayerServer({
     registerAvaFeed(app, { service: avaService });
     // The news feed (CORP-1) — the admin's announcements + corporation and battle facts,
     // public like the AvA feed it grew from.
-    registerNewsApi(app, { feed: stores.feedStore, announcements: stores.announcementStore });
+    registerNewsApi(app, { feed: stores.feedStore, announcements: stores.announcementStore, monumentsOf: (ids) => stores.corpStore.monumentsOf(ids) });
     // The account + match WRITE surface only when auth is on (it mints tokens); no auth ⇒
     // the insecure dev ?player= handshake only. It sits behind @fastify/rate-limit in an
     // ENCAPSULATED scope so the coarse per-IP backstop covers only these write routes —

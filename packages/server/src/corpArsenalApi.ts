@@ -23,6 +23,8 @@ const STATUS: Record<string, number> = {
   E_ROSTER_LOCKED: 409,
   E_NOT_ROSTERED: 409,
   E_ALREADY_RENTED: 409,
+  E_CORP_WAREHOUSE_REQUIRED: 409,
+  E_CORP_WAREHOUSE_LIMIT: 409,
   E_BAD_REQUEST: 400,
 };
 
@@ -36,7 +38,18 @@ export function registerCorpArsenalApi(app: FastifyInstance, deps: CorpArsenalAp
     return who;
   };
 
-  app.post('/corp-arsenal/rent', async (request, reply) => {
+  app.get('/corp-arsenal/:corpId', async (request, reply) => {
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' };
+    const { corpId } = request.params as { corpId: string };
+    const { matchupId } = request.query as { matchupId?: unknown };
+    if (corpId.length > 100 || (matchupId !== undefined && (typeof matchupId !== 'string' || !matchupId || matchupId.length > 100))) return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+    const result = await deps.service.warehouse(who, corpId, matchupId as string | undefined);
+    if (!result.ok) return reply.code(STATUS[result.code] ?? 400).send({ error: result.code });
+    return reply.header('cache-control', 'no-store').send(result.warehouse);
+  });
+
+  app.post('/corp-arsenal/rent', { bodyLimit: 2048 }, async (request, reply) => {
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
     const body = request.body as
@@ -46,7 +59,9 @@ export function registerCorpArsenalApi(app: FastifyInstance, deps: CorpArsenalAp
       typeof body?.corpId !== 'string' ||
       typeof body?.itemId !== 'string' ||
       typeof body?.matchupId !== 'string' ||
-      typeof body?.accountId !== 'string'
+      typeof body?.accountId !== 'string' ||
+      Object.keys(body).some((key) => !['corpId', 'itemId', 'matchupId', 'accountId'].includes(key)) ||
+      Object.values(body).some((value) => typeof value !== 'string' || !value || value.length > 100)
     ) {
       void reply.code(400);
       return { error: 'E_BAD_REQUEST' as const };
