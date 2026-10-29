@@ -161,6 +161,28 @@ describe('AvaService — challenge S0→S2 (AVA-4)', () => {
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // fully refunded
   });
 
+  it.each([{ format: 2, days: 5, remaining: 20 }, { format: 3, days: 7, remaining: 18 }])(
+    'settles building income before charging a base $format-on-$format challenge',
+    async ({ format, days, remaining }) => {
+      const f = await fixture({ influenceA: 0 });
+      await f.store.infrastructure(f.corpA, A_HEAD.accountId, f.clock(), {
+        buildingId: 'headquarters', expectedLevel: 0,
+      });
+      await f.ava.setCorpReady(A_HEAD, [format]);
+      await f.ava.setCorpReady(B_HEAD, [format]);
+      f.advance(3_600_000 + days * 86_400_000);
+      // No cabinet read has settled the completed HQ's 24 influence/day yet.
+      expect((await f.store.getCorp(f.corpA))?.influence).toBe(0);
+      expect(await f.ava.challenge(A_HEAD, f.corpB, format)).toMatchObject({ ok: true });
+      expect((await f.store.getCorp(f.corpA))?.influence).toBe(remaining);
+      // The same elapsed time cannot pay for a second challenge.
+      expect(await f.ava.challenge(A_HEAD, f.corpB, format)).toMatchObject({
+        ok: false, code: 'E_INSUFFICIENT',
+      });
+      expect((await f.store.getCorp(f.corpA))?.influence).toBe(remaining);
+    },
+  );
+
   it('expiry refunds without any client, on the injected clock', async () => {
     const f = await fixture();
     await ready(f);
@@ -179,7 +201,9 @@ describe('AvaService — challenge S0→S2 (AVA-4)', () => {
     expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({ ok: false, code: 'E_NOT_READY' });
     await ready(f);
     expect(await f.ava.challenge(A_HEAD, f.corpA)).toEqual({ ok: false, code: 'E_SELF_CHALLENGE' });
-    expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({ ok: false, code: 'E_INSUFFICIENT' }); // 50 < 100
+    expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({
+      ok: false, code: 'E_INSUFFICIENT', requiredInfluence: 100, influence: 50,
+    }); // 50 < 100
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(50); // nothing spent on the failed attempt
   });
 

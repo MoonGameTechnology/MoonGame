@@ -67,7 +67,13 @@ export type AvaErrorCode =
   | 'E_FORMAT_LOCKED'
   | 'E_NO_COMMON_FORMAT';
 
-export type AvaFail = { ok: false; code: AvaErrorCode };
+export type AvaFail = {
+  ok: false;
+  code: AvaErrorCode;
+  /** Own corporation's authoritative balance and the selected format's price. */
+  requiredInfluence?: number;
+  influence?: number;
+};
 
 /** What a party member sees of a matchup's roster (AVA-6). The OWN side's entries
  *  are listed; the opposing side is private — only its headcount shows. */
@@ -235,7 +241,10 @@ export class AvaService {
     // one await wide and the loss is bounded by `cost`; closing it needs a shared
     // store transaction (both Postgres adapters share one Pool) or a sweep-side audit.
     const spend = await this.corps.spendInfluence(challengerCorp, cost);
-    if (!spend.ok) return { ok: false, code: 'E_INSUFFICIENT' };
+    if (!spend.ok) return {
+      ok: false, code: 'E_INSUFFICIENT', requiredInfluence: cost,
+      influence: (await this.corps.getCorp(challengerCorp))?.influence ?? 0,
+    };
     const at = this.now();
     const challenge: AvaChallenge = {
       id: randomUUID(),
@@ -264,7 +273,7 @@ export class AvaService {
 
   /** CORP-7 — the format a challenge is played in: `wanted`, or (absent) the smallest one
    *  the target is ready for. Either must be a format the challenger plays; the buildings
-   *  are read only when the format is above the base. */
+   *  also settle the income earned before charging, including the base formats. */
   private async challengeFormat(
     who: CorpActor,
     challengerCorp: string,
@@ -274,9 +283,7 @@ export class AvaService {
     if (wanted !== undefined && !avaFormat(this.formats, wanted)) {
       return { ok: false, code: 'E_FORMAT' };
     }
-    const base = this.formats.baseMaxFormat;
-    const aboveBase = wanted === undefined ? !theirs.some((n) => n <= base) : wanted > base;
-    const max = aboveBase ? await this.maxFormatOf(challengerCorp, who) : base;
+    const max = await this.maxFormatOf(challengerCorp, who);
     if (max === null) return { ok: false, code: 'E_FORBIDDEN' };
     if (wanted !== undefined && wanted > max) return { ok: false, code: 'E_FORMAT_LOCKED' };
     const pick = wanted ?? theirs.find((n) => n <= max && avaFormat(this.formats, n));

@@ -371,6 +371,25 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     return { closest: (sel: string) => (names.includes(sel) ? button : null) };
   }
 
+  it('uses the server treasury and selected price when a challenge is underfunded', async () => {
+    server({ ...headCorp(),
+      '/corps/me': { corp: CORP, membership: HEAD, features: { ava: true, medals: false } },
+      '/ava/battles': { corpId: 'c1', ready: { corp: true, formats: [3], player: false, players: [] }, challenges: [], results: [], tally: [], names: {} },
+      '/ava/pool': { pool: [] },
+    });
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => url.endsWith('/ava/challenge')
+      ? Promise.resolve(new Response(JSON.stringify({ error: 'E_INSUFFICIENT', requiredInfluence: 150, influence: 82 }), { status: 402 }))
+      : inner(url, init));
+    const { api, hubRoot, hubNotes } = wire(session);
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corpact: 'ava-challenge', corparg: 'c2', corpformat: '3' }));
+    await tick();
+    expect(hubNotes).toContain('✖ ' + t('corp.combat.insufficient', { required: 150, available: 82 }));
+    expect(hubNotes.join(' ')).not.toContain('текст:E_INSUFFICIENT');
+  });
+
   it('без входа: сначала загрузка, потом приглашение — и в сеть вкладка не ходит', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);

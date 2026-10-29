@@ -1450,6 +1450,7 @@ export const ru: Record<string, string> = {
   'corp.combat.no-common': 'Нет общего доступного формата.',
   'corp.combat.no-history': 'Завершённых битв этого формата пока нет.',
   'corp.combat.no-influence': 'Недостаточно влияния для вызова.',
+  'corp.combat.insufficient': 'Для вызова нужно {required} ⟡ влияния корпорации; в казне {available} ⟡.',
   'corp.combat.no-opponents': 'Готовых соперников этого формата пока нет.',
   'corp.combat.no-report': 'Разбор этой битвы не сохранился.',
   'corp.combat.none-ready': 'Никто ещё не подтвердил готовность.',

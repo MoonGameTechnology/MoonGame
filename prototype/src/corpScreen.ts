@@ -329,8 +329,15 @@ export function initCorp(host: CorpHost): {
       });
       const body = (await res.json().catch(() => null)) as unknown;
       if (!res.ok) {
-        const code = (body as { error?: unknown } | null)?.error;
-        if (typeof code === 'string') surface('✖ ' + host.errText(code));
+        const failure = body as { error?: unknown; requiredInfluence?: unknown; influence?: unknown } | null;
+        const code = failure?.error;
+        if (path === '/ava/challenge' && code === 'E_INSUFFICIENT' &&
+            typeof failure?.requiredInfluence === 'number' && Number.isSafeInteger(failure.requiredInfluence) && failure.requiredInfluence > 0 &&
+            typeof failure.influence === 'number' && Number.isSafeInteger(failure.influence) && failure.influence >= 0) {
+          surface('✖ ' + t('corp.combat.insufficient', {
+            required: nfmt(failure.requiredInfluence), available: nfmt(failure.influence),
+          }));
+        } else if (typeof code === 'string') surface('✖ ' + host.errText(code));
         return null;
       }
       return body;

@@ -1441,6 +1441,7 @@ export const en: Record<string, string> = {
   'corp.combat.no-common': 'No shared available format.',
   'corp.combat.no-history': 'No finished battles in this format yet.',
   'corp.combat.no-influence': 'Not enough influence to challenge.',
+  'corp.combat.insufficient': 'This challenge requires {required} ⟡ corporation influence; the treasury has {available} ⟡.',
   'corp.combat.no-opponents': 'No opponents ready for this format yet.',
   'corp.combat.no-report': 'This battle has no saved report.',
   'corp.combat.none-ready': 'Nobody has confirmed readiness yet.',
