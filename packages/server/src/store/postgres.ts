@@ -1,4 +1,7 @@
+import { scopedPool } from '../corporateScopedPool';
 import { reservedBotLogin } from '../botNicknames';
+import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
+import { readArchiveMetadata } from '../matchArchiveCatalog';
 import { isCorpEmblemId, type CorpEmblemId } from '@void/protocol';
 import type {
   CorpBuildOrder,
@@ -7,8 +10,10 @@ import type {
   NewsAnnouncement,
   NewsAnnouncementKind,
 } from '@void/protocol';
-import { updateCorpInfrastructure } from '../corpConstruction';
+import { corpBuildPrice, updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
+import { corpFacilities, publicCorpFacilities, validateShowcase } from '../corpFacilities';
+import type { CorpShowcaseResult } from '@void/protocol';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
@@ -86,6 +91,28 @@ const SCHEMA_SQL = `
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS career jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS archive_meta jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS archive_state_bytes integer;
+    -- Legacy snapshots have only simulation time. Infer their finish once, anchored
+    -- at durable creation, rather than extending their archive on every restart.
+    UPDATE matches SET ended_at = LEAST(updated_at, GREATEST(created_at,
+      created_at + GREATEST(0,
+        COALESCE((state->'match'->>'endedAt')::double precision, (state->>'time')::double precision, 0)
+        - COALESCE((state->>'startedAt')::double precision, 0))
+        / GREATEST(COALESCE((clock->>'timeScale')::double precision, 1), 1)
+        * interval '1 millisecond'))
+    WHERE status = 'ended' AND ended_at IS NULL;
+    UPDATE matches SET archive_meta = jsonb_strip_nulls(jsonb_build_object(
+      'mapId', COALESCE(state->>'mapId', 'nexus'), 'modeId', state->>'modeId',
+      'gameTime', COALESCE((state->>'time')::double precision, 0),
+      'startedAt', COALESCE((state->>'startedAt')::double precision, 0),
+      'timeScale', COALESCE((clock->>'timeScale')::double precision, 1),
+      'capacity', (SELECT count(*) FROM jsonb_each(COALESCE(state->'players', '{}'::jsonb)) AS p
+        WHERE COALESCE(p.value->>'npc', '') IN ('', 'false')))),
+      archive_state_bytes = octet_length(state::text)
+    WHERE status='ended' AND (archive_meta IS NULL OR archive_state_bytes IS NULL);
+    CREATE INDEX IF NOT EXISTS matches_ended_at_idx ON matches (ended_at) WHERE status = 'ended';
     CREATE TABLE IF NOT EXISTS profile_career (account_id text PRIMARY KEY, career jsonb NOT NULL);
     CREATE TABLE IF NOT EXISTS profile_career_credits (match_id text NOT NULL, account_id text NOT NULL, PRIMARY KEY(match_id,account_id));
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
@@ -99,6 +126,7 @@ const SCHEMA_SQL = `
     );
     -- a side is held by at most one nick per room (so two nicks can't take p1)
     CREATE UNIQUE INDEX IF NOT EXISTS seats_room_player_idx ON seats (room, player_id);
+    CREATE INDEX IF NOT EXISTS seats_nick_room_idx ON seats (nick, room);
     -- seat lock (REL-5): sha256 of the seat ticket; NULL = seat claimed before the
     -- lock existed (adopted on the owner's next join). Plaintext never stored.
     ALTER TABLE seats ADD COLUMN IF NOT EXISTS ticket_hash text;
@@ -141,6 +169,9 @@ const SCHEMA_SQL = `
       visits integer NOT NULL DEFAULT 0 CHECK(visits>=0),
       PRIMARY KEY(account_id,day)
     );
+    ALTER TABLE player_activity_days ADD COLUMN IF NOT EXISTS sector_zero_entries integer NOT NULL DEFAULT 0 CHECK(sector_zero_entries>=0);
+    ALTER TABLE player_activity_days ADD COLUMN IF NOT EXISTS sector_zero_first_ms bigint;
+    ALTER TABLE player_activity_days ADD COLUMN IF NOT EXISTS sector_zero_last_ms bigint;
     CREATE INDEX IF NOT EXISTS player_activity_day_idx ON player_activity_days(day);
     CREATE TABLE IF NOT EXISTS player_activity_state (
       id integer PRIMARY KEY CHECK(id=1), since_ms bigint NOT NULL
@@ -177,6 +208,7 @@ const SCHEMA_SQL = `
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS influence bigint NOT NULL DEFAULT 0;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS infrastructure jsonb;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS emblem_id text;
+    ALTER TABLE corps ADD COLUMN IF NOT EXISTS showcase jsonb NOT NULL DEFAULT '[]'::jsonb;
 
     -- account_id as the PRIMARY KEY is the one-corp-per-account invariant: a member
     -- (recruit rows included — a recruit row IS the pending application) can't join
@@ -187,6 +219,17 @@ const SCHEMA_SQL = `
       login      text NOT NULL,
       role       text NOT NULL,
       joined_at  timestamptz NOT NULL DEFAULT now()
+    );
+    ALTER TABLE corp_members ADD COLUMN IF NOT EXISTS membership_nonce uuid NOT NULL DEFAULT gen_random_uuid();
+    CREATE UNIQUE INDEX IF NOT EXISTS corp_members_nonce_idx ON corp_members(membership_nonce);
+    CREATE TABLE IF NOT EXISTS corp_build_payments (
+      id text PRIMARY KEY,
+      corp_id text NOT NULL,
+      head_membership uuid REFERENCES corp_members(membership_nonce) ON DELETE SET NULL,
+      request_key text NOT NULL,
+      ticket jsonb NOT NULL,
+      result jsonb,
+      UNIQUE(corp_id,head_membership,request_key)
     );
     CREATE INDEX IF NOT EXISTS corp_members_corp_idx ON corp_members (corp_id);
 
@@ -361,6 +404,8 @@ const SCHEMA_SQL = `
       event_id text PRIMARY KEY, matchup_id text NOT NULL, entry jsonb NOT NULL, delivered boolean NOT NULL DEFAULT false
     );
     CREATE INDEX IF NOT EXISTS corp_arsenal_rent_matchup_idx ON corp_arsenal_rent (matchup_id);
+    CREATE INDEX IF NOT EXISTS corp_arsenal_rent_corp_matchup_idx ON corp_arsenal_rent (corp_id, matchup_id);
+    ALTER TABLE corp_arsenal_rent ADD COLUMN IF NOT EXISTS unworn boolean NOT NULL DEFAULT false;
     CREATE INDEX IF NOT EXISTS corp_return_audit_pending_idx ON corp_return_audit (matchup_id) WHERE NOT delivered;
 
     -- MetaMarket (EC-3): кошелёк Варрантов, книга лотов и леджер сделок.
@@ -391,11 +436,28 @@ const SCHEMA_SQL = `
     );
     CREATE INDEX IF NOT EXISTS meta_market_ledger_account_idx ON meta_market_ledger(account_id, at DESC);
 
+    -- Player medal announcements commit with their reward; restricted degrees are
+    -- filtered on the server before pagination, never sent through the public corp feed.
+    CREATE TABLE IF NOT EXISTS player_medal_news (
+      id text PRIMARY KEY,
+      account_id text,
+      medal_id text NOT NULL,
+      grade smallint NOT NULL CHECK(grade BETWEEN 1 AND 3),
+      at bigint NOT NULL,
+      login text,
+      corp jsonb,
+      UNIQUE(account_id,medal_id,grade)
+    );
+    CREATE INDEX IF NOT EXISTS player_medal_news_public_idx ON player_medal_news(at DESC,id DESC) WHERE grade=1;
+    CREATE INDEX IF NOT EXISTS player_medal_news_corp_idx ON player_medal_news((corp->>'id'),at DESC,id DESC);
+
     -- One local transaction owns material stock, crafting, seasons and trade receipts.
     CREATE TABLE IF NOT EXISTS meta_economy_accounts (
       account_id text PRIMARY KEY,
       state jsonb NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS meta_economy_corp_pending_idx ON meta_economy_accounts(account_id)
+      WHERE account_id LIKE 'corp:%' AND state->'corpMaterials'->'pending' IS NOT NULL;
     CREATE TABLE IF NOT EXISTS meta_economy_receipts (
       receipt_key text PRIMARY KEY,
       fingerprint text NOT NULL,
@@ -612,6 +674,8 @@ interface MatchRow {
   economy_observations: MatchSnapshot['economyObservations'] | null;
   economy_activity: MatchSnapshot['economyActivity'] | null;
   career: MatchSnapshot['career'] | null;
+  created_at: Date;
+  ended_at: Date | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
@@ -640,16 +704,35 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
+    return this.snapshotFromRow(row);
+  }
+
+  async loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
+    const r = await this.pool.query<MatchRow>(
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at
+       FROM matches WHERE id=$1 AND status='ended' AND ended_at>$2 AND archive_state_bytes<=$3`,
+      [matchId, new Date(since), maxBytes],
+    );
+    return this.snapshotFromRow(r.rows[0]);
+  }
+
+  archiveMetadata(ids: readonly string[], since: number): Promise<ArchiveSummaryMetadata[]> {
+    return readArchiveMetadata(this.pool, { ids, since });
+  }
+
+  private snapshotFromRow(row: MatchRow | undefined): MatchSnapshot | null {
     if (!row) return null;
     return {
       matchId: row.id,
       dataVersion: row.data_version,
       seq: row.seq,
       status: row.status === 'ended' ? 'ended' : 'ongoing',
+      ...(row.created_at ? { createdAt: row.created_at.getTime() } : {}),
+      ...(row.ended_at ? { endedAt: row.ended_at.getTime() } : {}),
       ...(row.career ? { career: row.career } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
@@ -688,8 +771,8 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, ended_at, created_at, archive_meta, archive_state_bytes, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), $13::jsonb, $14, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
@@ -697,6 +780,9 @@ export class PostgresMatchStore implements MatchStore {
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
          career       = EXCLUDED.career,
+         ended_at     = COALESCE(matches.ended_at, EXCLUDED.ended_at),
+         archive_meta = EXCLUDED.archive_meta,
+         archive_state_bytes = EXCLUDED.archive_state_bytes,
          economy_observations = CASE
            WHEN matches.economy_observations IS NULL AND EXCLUDED.economy_observations IS NULL THEN NULL
            ELSE COALESCE(EXCLUDED.economy_observations, '{}'::jsonb) || COALESCE(matches.economy_observations, '{}'::jsonb)
@@ -744,6 +830,10 @@ export class PostgresMatchStore implements MatchStore {
           : null,
         MAX_META_ACTIVITY_FACTS_PER_ROLE,
         snapshot.career ? JSON.stringify(snapshot.career) : null,
+        snapshot.status === 'ended' ? new Date(snapshot.endedAt ?? Date.now()) : null,
+        snapshot.createdAt !== undefined ? new Date(snapshot.createdAt) : null,
+        snapshot.status === 'ended' ? JSON.stringify(archiveMetadataOf(snapshot)) : null,
+        snapshot.status === 'ended' ? archiveStateBytes(snapshot.state) : null,
       ],
     );
     return result.rowCount === 1;
@@ -753,6 +843,14 @@ export class PostgresMatchStore implements MatchStore {
     // Uses matches_status_idx — never touches the JSONB `state`.
     const r = await this.pool.query<{ id: string }>(
       `SELECT id FROM matches WHERE status = 'ongoing'`,
+    );
+    return r.rows.map((row) => row.id);
+  }
+
+  async endedMatchIds(since: number): Promise<string[]> {
+    const r = await this.pool.query<{ id: string }>(
+      `SELECT id FROM matches WHERE status = 'ended' AND ended_at > $1 ORDER BY ended_at DESC, id`,
+      [new Date(since)],
     );
     return r.rows.map((row) => row.id);
   }
@@ -1117,7 +1215,64 @@ function memberOf(row: CorpMemberRow): CorpMembership {
   };
 }
 
+type CorpFacilityRow = { infrastructure: CorpInfrastructureState | null; showcase: string[] };
+
 export class PostgresCorpStore implements CorpStore {
+  async prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      const member = await db.query<{ membership_nonce: string; role: string }>('SELECT membership_nonce,role FROM corp_members WHERE account_id=$1 AND corp_id=$2 FOR UPDATE', [actor, corpId]);
+      const m = member.rows[0];
+      if (m?.role !== 'head') { await db.query('ROLLBACK'); return { ok: false, code: 'E_FORBIDDEN' }; }
+      const old = await db.query<{ ticket: import('@void/protocol').CorpBuildTicket }>('SELECT ticket FROM corp_build_payments WHERE corp_id=$1 AND head_membership=$2 AND request_key=$3', [corpId, m.membership_nonce, order.requestId]);
+      if (old.rows[0]) {
+        const t = old.rows[0].ticket;
+        await db.query('COMMIT');
+        return t.order.price === order.price && t.order.buildingId === order.buildingId && t.order.expectedLevel === order.expectedLevel
+          ? { ok: true, ticket: t } : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
+      }
+      const result = await new PostgresCorpStore(scopedPool(db)).infrastructure(corpId, actor, now);
+      const b = result.ok ? result.infrastructure.buildings.find((b) => b.id === order.buildingId) : undefined;
+      let code: import('@void/protocol').CorpBuildError | null = !b?.next || b.level !== order.expectedLevel ? 'E_CORP_BUILD_LEVEL' : b.blocked;
+      if (!order.requestId || !b?.next || order.price !== b.next.price) code = 'E_CORP_PRICE';
+      if (code) { await db.query('COMMIT'); return { ok: false, code }; }
+      const ticket = { id: randomUUID(), corpId, order: { ...order, requestId: undefined }, materials: { ...b!.next!.materials } };
+      await db.query('INSERT INTO corp_build_payments(id,corp_id,head_membership,request_key,ticket) VALUES($1,$2,$3,$4,$5::jsonb)', [ticket.id, corpId, m.membership_nonce, order.requestId, JSON.stringify(ticket)]);
+      await db.query('COMMIT');
+      return { ok: true, ticket };
+    } catch (e) { await db.query('ROLLBACK').catch(() => undefined); throw e; } finally { db.release(); }
+  }
+  async commitBuild(id: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      // Membership before receipt before corporation: same lock order as erase/disband.
+      const peek = await db.query<{ head_membership: string | null }>('SELECT head_membership FROM corp_build_payments WHERE id=$1', [id]);
+      const nonce = peek.rows[0]?.head_membership;
+      const members = nonce ? await db.query<{ account_id: string; role: string; corp_id: string }>('SELECT account_id,role,corp_id FROM corp_members WHERE membership_nonce=$1 FOR UPDATE', [nonce]) : null;
+      const row = (await db.query<{ ticket: import('@void/protocol').CorpBuildTicket; result: import('@void/protocol').CorpBuildSettlement | null; head_membership: string | null }>('SELECT ticket,result,head_membership FROM corp_build_payments WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      if (!row || row.result) { await db.query('COMMIT'); return row?.result ?? { state: 'unknown' }; }
+      const m = members?.rows[0];
+      let result: import('@void/protocol').CorpBuildSettlement;
+      if (!m || row.head_membership !== nonce || m.role !== 'head' || m.corp_id !== row.ticket.corpId)
+        result = { state: 'rejected', code: 'E_FORBIDDEN' };
+      else if (row.ticket.order.price !== corpBuildPrice(row.ticket.corpId, row.ticket.order)) result = { state: 'rejected', code: 'E_CORP_PRICE' };
+      else {
+        const applied = await new PostgresCorpStore(scopedPool(db)).infrastructure(row.ticket.corpId, m.account_id, now, row.ticket.order);
+        result = applied.ok ? { state: 'applied' } : { state: 'rejected', code: applied.code };
+      }
+      await db.query('UPDATE corp_build_payments SET result=$2::jsonb WHERE id=$1', [id, JSON.stringify(result)]);
+      await db.query('COMMIT');
+      return result;
+    } catch (e) { await db.query('ROLLBACK').catch(() => undefined); throw e; } finally { db.release(); }
+  }
+
+  async monumentsOf(ids: readonly string[]): Promise<string[]> {
+    if (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string')) return [];
+    const result = await this.pool.query<{ id: string; infrastructure: CorpInfrastructureState | null }>('SELECT id,infrastructure FROM corps WHERE id=ANY($1::text[])', [ids]);
+    return result.rows.filter((row) => publicCorpFacilities(row.infrastructure, Date.now()).monument).map((row) => row.id);
+  }
   async infrastructure(
     corpId: string,
     actor: string,
@@ -1236,12 +1391,13 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async getCorp(corpId: string): Promise<CorpRecord | null> {
-    const r = await this.pool.query<{ id: string; name: string; influence: string; emblem_id: string | null }>(
-      `SELECT id, name, influence, emblem_id FROM corps WHERE id = $1`,
+    const r = await this.pool.query<CorpFacilityRow & { id: string; name: string; influence: string; emblem_id: string | null }>(
+      `SELECT id, name, influence, emblem_id, infrastructure, showcase FROM corps WHERE id = $1`,
       [corpId],
     );
     const row = r.rows[0];
     return row ? { corpId: row.id, name: row.name, influence: Number(row.influence),
+      ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}) } : null;
   }
 
@@ -1270,14 +1426,14 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async listCorps(): Promise<CorpSummary[]> {
-    const r = await this.pool.query<{
+    const r = await this.pool.query<CorpFacilityRow & {
       id: string;
       name: string;
       influence: string;
       members: string;
       emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence, c.emblem_id,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corps c
        LEFT JOIN corp_members m ON m.corp_id = c.id
@@ -1289,8 +1445,34 @@ export class PostgresCorpStore implements CorpStore {
       name: row.name,
       influence: Number(row.influence),
       members: Number(row.members),
+      ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
+  }
+
+  async setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      const allowed = await db.query<CorpFacilityRow>(
+        `SELECT c.infrastructure,c.showcase FROM corps c JOIN corp_members m ON m.corp_id=c.id
+         WHERE c.id=$1 AND m.account_id=$2 AND m.role='head' FOR UPDATE OF c,m`, [corpId, actor]);
+      const row = allowed.rows[0];
+      if (!row) { await db.query('ROLLBACK'); return { ok: false, code: 'E_FORBIDDEN' }; }
+      const stats = await db.query<{ wins: string; matches: string }>(
+        `SELECT count(*) AS matches,count(*) FILTER(WHERE winner_corp=$1) AS wins FROM ava_results
+         WHERE challenger_corp=$1 OR target_corp=$1`, [corpId]);
+      const count = stats.rows[0]!;
+      const error = validateShowcase(medalIds, corpFacilities(row.infrastructure, at).showcaseSlots, { wins: Number(count.wins), matches: Number(count.matches) });
+      if (error) { await db.query('ROLLBACK'); return { ok: false, code: error }; }
+      if (JSON.stringify(row.showcase) !== JSON.stringify(medalIds)) {
+        await db.query('UPDATE corps SET showcase=$2::jsonb WHERE id=$1', [corpId, JSON.stringify(medalIds)]);
+        await db.query(`INSERT INTO corp_audit(corp_id,at,actor,action,detail) VALUES($1,$2,$3,'showcase',$4)`, [corpId, at, actor, JSON.stringify(medalIds)]);
+      }
+      await db.query('COMMIT');
+      return { ok: true };
+    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { db.release(); }
   }
 
   async membershipOf(accountId: string): Promise<CorpMembership | null> {
@@ -1437,7 +1619,7 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async listReadyCorps(): Promise<Array<CorpSummary & { readySince: number; formats: number[] }>> {
-    const r = await this.pool.query<{
+    const r = await this.pool.query<CorpFacilityRow & {
       id: string;
       name: string;
       influence: string;
@@ -1446,7 +1628,7 @@ export class PostgresCorpStore implements CorpStore {
       formats: number[];
       emblem_id: string | null;
     }>(
-      `SELECT c.id, c.name, c.influence, c.emblem_id, r.since, r.formats,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase, r.since, r.formats,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corp_ready r
        JOIN corps c ON c.id = r.corp_id
@@ -1461,6 +1643,7 @@ export class PostgresCorpStore implements CorpStore {
       members: Number(row.members),
       readySince: Number(row.since),
       formats: row.formats.map(Number),
+      ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
     }));
   }
@@ -2360,6 +2543,7 @@ interface CorpRentRow {
   matchup_id: string;
   account_id: string;
   rented_at: string;
+  unworn: boolean;
 }
 
 function corpRentOf(row: CorpRentRow): CorpRent {
@@ -2369,6 +2553,7 @@ function corpRentOf(row: CorpRentRow): CorpRent {
     matchupId: row.matchup_id,
     accountId: row.account_id,
     rentedAt: Number(row.rented_at),
+    ...(row.unworn ? { unworn: true as const } : {}),
   };
 }
 
@@ -2465,6 +2650,10 @@ export class PostgresArsenalStore implements ArsenalStore {
 }
 
 export class PostgresCorpRentStore implements CorpRentStore {
+  async activeForCorp(corpId: string): Promise<CorpRent[]> {
+    const result = await this.pool.query<CorpRentRow>('SELECT * FROM corp_arsenal_rent WHERE corp_id=$1 ORDER BY rented_at,item_id', [corpId]);
+    return result.rows.map(corpRentOf);
+  }
   async completeReturn(
     matchupId: string,
     itemId: string,
@@ -2485,7 +2674,7 @@ export class PostgresCorpRentStore implements CorpRentStore {
       }
       const updated = await db.query(
         'UPDATE arsenal SET durability=CASE WHEN durability IS NULL THEN NULL ELSE GREATEST(0,durability-$3) END WHERE item_id=$1 AND account_id=$2 RETURNING item_id',
-        [itemId, row.corp_id, wear],
+        [itemId, row.corp_id, row.unworn ? 0 : wear],
       );
       if (updated.rowCount !== 1) throw Error('E_CORP_ITEM_MISSING');
       const eventId = JSON.stringify(['rent_return', matchupId, itemId]);
@@ -2544,9 +2733,28 @@ export class PostgresCorpRentStore implements CorpRentStore {
     return (r.rowCount ?? 0) > 0;
   }
 
+  async rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'> {
+    if (!Number.isSafeInteger(limit) || limit < 1) return 'limit';
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['warehouse', entry.corpId, entry.matchupId])]);
+      const held = await db.query('SELECT 1 FROM corp_arsenal_rent WHERE item_id=$1', [entry.itemId]);
+      if (held.rowCount) { await db.query('ROLLBACK'); return 'rented'; }
+      const used = await db.query<{ n: string }>('SELECT count(*) AS n FROM corp_arsenal_rent WHERE corp_id=$1 AND matchup_id=$2', [entry.corpId, entry.matchupId]);
+      if (Number(used.rows[0]!.n) >= limit) { await db.query('ROLLBACK'); return 'limit'; }
+      const inserted = await db.query(`INSERT INTO corp_arsenal_rent(item_id,corp_id,matchup_id,account_id,rented_at,unworn)
+        VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(item_id) DO NOTHING`,
+        [entry.itemId, entry.corpId, entry.matchupId, entry.accountId, entry.rentedAt, entry.unworn === true]);
+      await db.query('COMMIT');
+      return inserted.rowCount ? 'ok' : 'rented';
+    } catch (error) { await db.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { db.release(); }
+  }
+
   async activeForMatchup(matchupId: string): Promise<CorpRent[]> {
     const r = await this.pool.query<CorpRentRow>(
-      `SELECT item_id, corp_id, matchup_id, account_id, rented_at
+      `SELECT item_id, corp_id, matchup_id, account_id, rented_at, unworn
        FROM corp_arsenal_rent WHERE matchup_id = $1 ORDER BY item_id`,
       [matchupId],
     );
@@ -2555,7 +2763,7 @@ export class PostgresCorpRentStore implements CorpRentStore {
 
   async activeForAccount(matchupId: string, accountId: string): Promise<CorpRent[]> {
     const r = await this.pool.query<CorpRentRow>(
-      `SELECT item_id, corp_id, matchup_id, account_id, rented_at
+      `SELECT item_id, corp_id, matchup_id, account_id, rented_at, unworn
        FROM corp_arsenal_rent WHERE matchup_id = $1 AND account_id = $2 ORDER BY item_id`,
       [matchupId, accountId],
     );

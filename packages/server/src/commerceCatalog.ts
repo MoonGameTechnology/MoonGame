@@ -1,6 +1,6 @@
 import type { CommerceOffer } from '@void/protocol';
 
-export const COMMERCE_CATALOG_VERSION = 'meta-v0.1';
+export const COMMERCE_CATALOG_VERSION = 'meta-v0.2';
 export const COMMERCE_PRODUCTS = [
   'supply_personal',
   'module_shield_booster',

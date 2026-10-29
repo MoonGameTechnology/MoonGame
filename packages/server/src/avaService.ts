@@ -1,3 +1,4 @@
+import type { CorpBattleSeat as AvaBattleSeat, CorpBattleResult as AvaBattleResult, CorpBattlesView as AvaBattlesView } from '@void/protocol';
 import { randomUUID } from 'node:crypto';
 import { AVA_FEED_KINDS, isAvaFeedEntry } from './store';
 import type {
@@ -10,9 +11,7 @@ import type {
   AvaResultStore,
   AvaRosterEntry,
   AvaRosterStore,
-  AvaSeatReport,
   AvaSide,
-  AvaTally,
   CorpMembership,
   CorpStore,
   CorpSummary,
@@ -68,7 +67,13 @@ export type AvaErrorCode =
   | 'E_FORMAT_LOCKED'
   | 'E_NO_COMMON_FORMAT';
 
-export type AvaFail = { ok: false; code: AvaErrorCode };
+export type AvaFail = {
+  ok: false;
+  code: AvaErrorCode;
+  /** Own corporation's authoritative balance and the selected format's price. */
+  requiredInfluence?: number;
+  influence?: number;
+};
 
 /** What a party member sees of a matchup's roster (AVA-6). The OWN side's entries
  *  are listed; the opposing side is private — only its headcount shows. */
@@ -83,41 +88,8 @@ export interface AvaRosterView {
   counts: Record<AvaSide, number>;
 }
 
-/** CORP-9: a seat of a finished battle as one of its corporations sees it. The account
- *  is named on the caller's own side only; a rival is known by login, a bot by nothing. */
-export interface AvaBattleSeat extends Omit<AvaSeatReport, 'accountId'> {
-  accountId?: string;
-  bot: boolean;
-}
-
-/** CORP-9: a finished battle as one of its corporations sees it — its side, the format,
- *  and the breakdown when the battle has one (results before CORP-9 have none). */
-export interface AvaBattleResult extends Omit<AvaResult, 'report'> {
-  format: number;
-  side: AvaSide;
-  report?: Omit<AvaBattleReport, 'seats'> & { seats: AvaBattleSeat[] };
-}
-
-/** CORP-9: the «Битвы» tab of a corporation, for its members. */
-export interface AvaBattlesView {
-  corpId: string;
-  ready: {
-    /** The corp is in the ready pool, for these formats. */
-    corp: boolean;
-    formats: number[];
-    /** The caller's own consent to deployment, and every member who gave it. */
-    player: boolean;
-    players: string[];
-  };
-  /** Open and closed challenges, newest first (`AvaChallengeStore.challengesOf`). */
-  challenges: AvaChallenge[];
-  /** Finished battles, newest first. */
-  results: AvaBattleResult[];
-  /** The whole record, per rival and format. */
-  tally: AvaTally[];
-  /** corpId → name of every rival above; a disbanded corp is absent. */
-  names: Record<string, string>;
-}
+// The hub and the authority consume one wire contract.
+export type { CorpBattleSeat as AvaBattleSeat, CorpBattleResult as AvaBattleResult, CorpBattlesView as AvaBattlesView } from '@void/protocol';
 
 /** Default challenge expiry (tunable via deps). Price, roster bounds and the win reward
  *  come from the challenge's format (CORP-7). */
@@ -269,7 +241,10 @@ export class AvaService {
     // one await wide and the loss is bounded by `cost`; closing it needs a shared
     // store transaction (both Postgres adapters share one Pool) or a sweep-side audit.
     const spend = await this.corps.spendInfluence(challengerCorp, cost);
-    if (!spend.ok) return { ok: false, code: 'E_INSUFFICIENT' };
+    if (!spend.ok) return {
+      ok: false, code: 'E_INSUFFICIENT', requiredInfluence: cost,
+      influence: (await this.corps.getCorp(challengerCorp))?.influence ?? 0,
+    };
     const at = this.now();
     const challenge: AvaChallenge = {
       id: randomUUID(),
@@ -298,7 +273,7 @@ export class AvaService {
 
   /** CORP-7 — the format a challenge is played in: `wanted`, or (absent) the smallest one
    *  the target is ready for. Either must be a format the challenger plays; the buildings
-   *  are read only when the format is above the base. */
+   *  also settle the income earned before charging, including the base formats. */
   private async challengeFormat(
     who: CorpActor,
     challengerCorp: string,
@@ -308,9 +283,7 @@ export class AvaService {
     if (wanted !== undefined && !avaFormat(this.formats, wanted)) {
       return { ok: false, code: 'E_FORMAT' };
     }
-    const base = this.formats.baseMaxFormat;
-    const aboveBase = wanted === undefined ? !theirs.some((n) => n <= base) : wanted > base;
-    const max = aboveBase ? await this.maxFormatOf(challengerCorp, who) : base;
+    const max = await this.maxFormatOf(challengerCorp, who);
     if (max === null) return { ok: false, code: 'E_FORBIDDEN' };
     if (wanted !== undefined && wanted > max) return { ok: false, code: 'E_FORMAT_LOCKED' };
     const pick = wanted ?? theirs.find((n) => n <= max && avaFormat(this.formats, n));

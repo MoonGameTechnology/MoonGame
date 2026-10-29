@@ -1,7 +1,9 @@
+import { CORP_BUILDINGS } from './corpConstruction';
 import { CORP_EMBLEMS, isCorpEmblemId, blockedPublicName, type CorpBuildOrder, type CorpInfrastructureResult } from '@void/protocol';
 import { randomInt } from 'node:crypto';
 import { CORP_NAME_COUNT, generatedCorpName } from './corpNames';
 import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } from './store';
+import type { CorpShowcaseResult } from '@void/protocol';
 
 /**
  * CORP-0 — the corporation service: membership + the fixed RBAC from
@@ -67,6 +69,10 @@ export class CorpService {
   }
 
   infrastructure(who: CorpActor, corpId: string, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+    // The public legacy endpoint never accepts a funded/paid flag. Material-priced
+    // orders go through the game's durable reservation coordinator.
+    const materials = order && CORP_BUILDINGS.find((b) => b.id === order.buildingId)?.levels[order.expectedLevel]?.materials;
+    if (materials && Object.keys(materials).length) return Promise.resolve({ ok: false, code: 'E_CORP_PRICE' });
     return this.store.infrastructure(corpId, who.accountId, this.now(), order);
   }
 
@@ -96,6 +102,9 @@ export class CorpService {
   async setEmblem(who: CorpActor, corpId: string, emblemId: unknown): Promise<{ ok: true } | CorpFail> {
     if (!isCorpEmblemId(emblemId)) return { ok: false, code: 'E_BAD_EMBLEM' };
     return this.store.setEmblem(corpId, who.accountId, emblemId, this.now());
+  }
+  setShowcase(who: CorpActor, corpId: string, medals: readonly string[]): Promise<CorpShowcaseResult> {
+    return this.store.setShowcase(corpId, who.accountId, medals, this.now());
   }
 
   /** applyToCorp — creates the recruit row (the pending application). */

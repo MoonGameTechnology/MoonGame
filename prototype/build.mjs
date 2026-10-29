@@ -33,7 +33,9 @@ const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
+const corpFacilitiesCss = readFileSync(new URL('./corp-facilities.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
+const corpBattlesCss = readFileSync(new URL('./corp-battles.css', import.meta.url), 'utf8');
 
 /** Отдельный поток расчёта соло-мира (`simWorker.ts`) — свой файл рядом со страницей: политика
  *  CSP сервера и сайта пускает только поток со своего origin (`decisions/simWorker.ts`). Имя
@@ -4049,6 +4051,15 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pips i.bld{background:repeating-linear-gradient(90deg,var(--amber) 0 2px,transparent 2px 4px);border-color:var(--amber);}
 /* Состав и казна: список слева, сбоку заявки, роли и баланс. */
 .cb-two{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start;}
+.cb-materials{margin-top:16px;}
+.cb-material-row{display:grid;grid-template-columns:minmax(0,1fr) 76px auto;gap:8px;align-items:center;border-bottom:1px solid var(--sf-edge);padding:10px 0;}
+.cb-material-row>div{min-width:0;overflow-wrap:anywhere;}
+.cb-material-row b,.cb-material-row small{display:block;}
+.cb-material-row small{font-size:var(--fs-caption);color:var(--sf-dim);margin-top:4px;line-height:1.5;}
+.cb-material-row input{width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;background:var(--sf-card);color:var(--sf-hi);border:1px solid var(--sf-edge);border-radius:8px;}
+.cb-materials .cb-lrow>b{font-size:var(--fs-caption);overflow-wrap:anywhere;}
+.cb-materials summary{cursor:pointer;padding:8px 0;}
+@media(max-width:540px){.cb-material-row{grid-template-columns:minmax(0,1fr) 92px;}.cb-material-row>div{grid-column:1/-1;}.cb-material-row button{min-height:42px;}}
 .cb-side{display:flex;flex-direction:column;gap:16px;min-width:0;}
 .cb-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px;border-radius:14px;border:1px solid var(--sf-edge);background:var(--sf-card);}
 .cb-card-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;}
@@ -4365,6 +4376,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
+${corpBattlesCss}
+${corpFacilitiesCss}
 /* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
    каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
    Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт
@@ -4612,12 +4625,12 @@ span.ar-fchip{cursor:default;}
 .sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
 .sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
 .sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
-/* Стиль базы (CORP-14): здания III уровня рисунками — в карточке штаб, в описании все. */
+/* Стиль базы: в карточке завершённый штаб, в описании все здания. */
 .sh-art-style{align-items:flex-end;}
-.sh-art-style img{display:block;height:64px;width:auto;max-width:100%;object-fit:contain;}
-.sh-dt .sh-art-style{justify-content:center;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
+.sh-art-style .spr{display:block;height:64px;width:auto;max-width:100%;}
+.sh-dt .sh-art-style{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
   background:radial-gradient(120% 90% at 50% 100%,#0d3447,#04121c 70%);}
-.sh-dt .sh-art-style img{flex:1 1 0;min-width:0;height:auto;max-height:120px;}
+.sh-dt .sh-art-style .spr{min-width:0;width:100%;height:96px;}
 /* Фон базы (CORP-15): панорама без зданий. */
 .sh-art-bd{display:block;width:100%;max-width:150px;aspect-ratio:1200 / 540;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
 .sh-art-bd svg{display:block;width:100%;height:100%;}
@@ -5189,7 +5202,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-market">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
     <!-- Торговец экспедиции («живой курс»): только в забеге с торговцем, видимость — кадр main.ts -->
     <button id="rail-trader" type="button" data-i18n-title="rail.trader.title" style="display:none">⚖<span class="rlbl" data-i18n="rail.trader.label"></span></button>
-    <button id="railcorp">⬢<span class="rlbl" data-i18n="rail.corp.title"></span></button>
     <button id="rail-chat" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
     <button id="rail-log">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
     <button id="rail-help">?<span class="rlbl" data-i18n="rail.help.title"></span></button>
@@ -5317,6 +5329,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             ${passwordToggle('cwpass')}
           </div>
         </form>
+        <button id="cwrecover" class="clink btn-quiet" type="button" style="display:none" data-i18n="welcome.recover.link"></button>
       </div>
       <div id="cregister" style="display:none">
         <button id="crback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
@@ -5347,7 +5360,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div class="crow">
           <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
         </div>
-        <button id="crrecover" class="clink btn-quiet" type="button" data-i18n="welcome.register.recover"></button>
       </div>
       <div id="crecover" style="display:none">
         <button id="crecback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>

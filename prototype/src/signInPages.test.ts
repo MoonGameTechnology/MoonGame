@@ -225,6 +225,7 @@ describe('REFM-218 — проба режима сервера', () => {
     await bootAccounts();
     expect(el('cwlogin').style.display).toBe('flex');
     expect(el('cwpassrow').style.display).toBe('flex');
+    expect(el('cwrecover').style.display).toBe('');
     expect(el('cwnick').value).toBe(`${t('callsign.rhino')}-1`);
   });
 
@@ -241,12 +242,14 @@ describe('REFM-218 — проба режима сервера', () => {
     cell.set('void.nick', 'Orion');
     await bootAccounts();
     expect(el('cwlogin').style.display).toBe('none');
+    expect(el('cwrecover').style.display).toBe('');
     cell.clear();
     const { pages } = await boot();
     server['/auth/status'] = () => reply(404);
     pages.startAuthProbe(BASE);
     await settle();
     expect(el('cwlogin').style.display).toBe('none');
+    expect(el('cwrecover').style.display).toBe('none');
   });
 
   it('пустой адрес — сервер не спрашивают', async () => {
@@ -691,7 +694,7 @@ describe('REFM-218 — восстановление доступа', () => {
   it('открывается с почтой, уже набранной на регистрации', async () => {
     await boot();
     el('crmail').value = ' me@mail.test ';
-    click('crrecover');
+    click('cwrecover');
     expect([stages(), el('crecmail').value, focused]).toEqual([
       ['crecover'],
       'me@mail.test',
@@ -731,12 +734,16 @@ describe('REFM-218 — восстановление доступа', () => {
     expect([calls, env.status]).toEqual([[], [t('net.need-address')]]);
   });
 
-  it('«Назад» возвращает к приветствию', async () => {
-    const { env } = await boot();
-    click('crrecover');
+  it('«Назад» возвращает к раскрытой форме входа с набранным позывным', async () => {
+    const { env } = await bootAccounts();
+    el('cwnick').value = 'Orion';
+    click('cwrecover');
     env.status.length = 0;
     click('crecback');
     expect([stages(), env.status]).toEqual([['cwelcome'], ['']]);
+    expect(el('cwlogin').style.display).toBe('flex');
+    expect(el('cwpassrow').style.display).toBe('flex');
+    expect(el('cwnick').value).toBe('Orion');
   });
 });
 
@@ -816,7 +823,7 @@ describe('REFM-218 — проводка в main.ts', () => {
     const ids = MAIN.match(/\$\('(c[a-z]+)'\)/g) ?? [];
     for (const id of ['cnew', 'clogin', 'cwgo', 'cgoogle', 'capple', 'crgo', 'crback'])
       expect(ids).not.toContain(`$('${id}')`);
-    for (const id of ['crrecover', 'crecgo', 'crecback', 'cresetgo', 'cwelcome', 'cregister'])
+    for (const id of ['cwrecover', 'crecgo', 'crecback', 'cresetgo', 'cwelcome', 'cregister'])
       expect(ids).not.toContain(`$('${id}')`);
   });
 

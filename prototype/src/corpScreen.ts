@@ -1,4 +1,10 @@
+import { canFundCorpBuilding, corpMaterialsHtml, parseCorpMaterials } from './corpMaterialsView';
+import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
+import { corpShowcaseHtml, parseWarehouse, warehouseHtml, type WarehouseView } from './corpFacilitiesView';
 import { corpHubBadges, corpHubState } from '../../decisions/corpHub';
+import { BATTLE_FORMATS, CORP_BATTLE_TABS, formatLimit, parseCorpBattles, parseCorpWar, type CorpBattleTab } from '../../decisions/corpBattles';
+import type { CorpBattlesView, CorpWarView } from '../../packages/protocol/src/corpBattles';
+import { corpBattleReportHtml, corpBattlesViewHtml } from './corpBattlesView';
 import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
 import { parseCorpStyle } from '../../decisions/corpStyle';
 import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
@@ -36,7 +42,6 @@ import { t } from '../../localization/runtime';
 import { corpEmblemId, isCorpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/corpIdentity';
 import { CORP_EMBLEM_LABEL, corpEmblem, corpEmblemPicker } from './corpEmblems';
 import { esc, nfmt } from './format';
-import { readRaw, writeRaw } from './prefs';
 import { detach } from './detach';
 import {
   canManage,
@@ -46,8 +51,6 @@ import {
   parseCorpRecord,
   parseCorpSummaries,
   parseFeed,
-  parseMedalDefs,
-  parseMedals,
   parseMembership,
   parseMemberships,
   parseReadyPool,
@@ -92,6 +95,7 @@ export const CORP_ROLE_DOT: Record<CorpRole, string> = {
 export const CORP_AUDIT_RU: Record<string, string> = {
   create: 'corp.audit.create',
   emblem: 'corp.audit.emblem',
+  showcase: 'corp.audit.showcase',
   accept: 'corp.audit.accept',
   decline: 'corp.audit.decline',
   kick: 'corp.audit.kick',
@@ -151,23 +155,6 @@ export function corpBattles(feed: readonly AvaFeedEntry[], myCorpId: string): Co
   return out;
 }
 
-/** Витрина: how many awards the Штаб pins. Three is what fits a phone row. */
-export const SHOWCASE_SLOTS = 3;
-/** Which awards are pinned is a LOCAL choice (the server has no showcase field), so it
- *  lives in prefs — and the screen never claims other players see it. */
-export const SHOWCASE_KEY = 'corp.showcase';
-
-/** Stored form is a comma-joined id list; a missing/short/garbled value degrades to
- *  empty slots rather than throwing. Always exactly `SHOWCASE_SLOTS` entries. */
-export function readShowcase(raw: string | null): string[] {
-  const parts = (raw ?? '').split(',');
-  return Array.from({ length: SHOWCASE_SLOTS }, (_, i) => parts[i] ?? '');
-}
-
-export function writeShowcase(slots: readonly string[]): string {
-  return Array.from({ length: SHOWCASE_SLOTS }, (_, i) => slots[i] ?? '').join(',');
-}
-
 /** Big number + caption — the Штаб's tile shape. `null` prints «—» (нет данных), which
  *  is honestly different from a zero. */
 export function hqTile(label: string, value: string | null): string {
@@ -175,25 +162,6 @@ export function hqTile(label: string, value: string | null): string {
     `<div class="chq-tile"><b>${value === null ? '—' : esc(value)}</b>` +
     `<span>${esc(label)}</span></div>`
   );
-}
-
-/** The three pinned slots. An id that is not in the catalog, or not earned, reads as an
- *  empty slot — a stale pref must never print a medal the player does not hold. */
-export function showcaseHtml(
-  slots: readonly string[],
-  defs: readonly MedalDef[],
-  owned: readonly string[],
-): string {
-  const cells = Array.from({ length: SHOWCASE_SLOTS }, (_, i) => {
-    const id = slots[i] ?? '';
-    const def = owned.includes(id) ? defs.find((d) => d.id === id) : undefined;
-    return (
-      `<button class="chq-cup${def ? ' on' : ''}" data-corpcup="${i}">` +
-      `<i>${def ? '🏆' : '＋'}</i>` +
-      `<span>${def ? esc(def.name) : t('corp.showcase.empty')}</span></button>`
-    );
-  }).join('');
-  return `<div class="chq-cups">${cells}</div>`;
 }
 
 /** The full award gallery — every medal of the catalog, earned ones tappable, the rest
@@ -251,6 +219,8 @@ export interface CorpHost {
     signIn(): void;
     /** CORP-14 — a base style the corporation lacks is bought in the shop; open it there. */
     openShop?(style: string): void;
+    openMarket?(): void;
+    openBattle?(matchupId: string): void;
   };
 }
 
@@ -274,6 +244,7 @@ export function initCorp(host: CorpHost): {
   closeHubSheet: () => void;
 } {
   let infrastructure: CorpInfrastructureView | null = null;
+  let corpMaterials: CorpMaterialsView | null = null;
   let infrastructureAt = 0;
   let infrastructureTimer: ReturnType<typeof setInterval> | undefined;
   // Стиль базы (CORP-14); null — не прочитан, здания рисуются стандартными.
@@ -284,7 +255,6 @@ export function initCorp(host: CorpHost): {
   let corpTab = 'hq'; // открытая вкладка кабинета
   // Открытая витрина наград (галерея). Не отдельный слой: она заменяет тело кабинета,
   // а Back закрывает СНАЧАЛА её — ступень `corp` в лестнице зовёт `close()` ниже.
-  let cupSlot: number | null = null;
 
   // --- live state (fetched via corpFetch — see refreshCorp) --------------------
   let corpMine: { corp: CorpRecord | null; membership: CorpMembership | null } = {
@@ -298,6 +268,13 @@ export function initCorp(host: CorpHost): {
   let avaPool: Array<CorpSummary & { readySince: number }> = [];
   let avaFeed: AvaFeedEntry[] = [];
   let avaRoster: AvaRosterView | null = null;
+  let battleView: CorpBattlesView | null = null;
+  let battleTab: CorpBattleTab = 'now';
+  let battleFormat = 0;
+  let battleDraft: number[] | null = null;
+  let battlePool: Array<CorpSummary & { formats: number[] }> | null = null;
+  let battleRosters: Record<string, AvaRosterView | null> = {};
+  let battleWars: Record<string, CorpWarView | null> = {};
   // AVA-6 setRoster eligibility — accountIds flagged ready in my corp (head/officer only,
   // fetched only while a roster window is open; empty otherwise).
   let avaReadyPlayers: string[] = [];
@@ -309,9 +286,12 @@ export function initCorp(host: CorpHost): {
   // Место корпорации в общей доске (RANK-1). Считает СЕРВЕР по всей популяции —
   // `null` значит «места нет» (доска пуста / не в рейтинге), а не «последнее».
   let corpRank: number | null = null;
-  let medalDefs: MedalDef[] = [];
-  let medalsOwned: string[] = [];
-  let showcase: string[] = readShowcase(readRaw(SHOWCASE_KEY));
+  let showcase: string[] = [];
+  let eligibleMedals: string[] = [];
+  let warehouse: WarehouseView | null = null;
+  let warehouseMatch = '';
+  let warehouseFighter = '';
+  let warehouseRead = 0;
   // Чтение в пути: приказ ждёт его, а не теряется (кнопки во время чтения не гаснут).
   let refreshing: Promise<void> | null = null;
   let refreshedAt = 0; // начало последнего чтения — тик базы не стучится чаще
@@ -353,8 +333,15 @@ export function initCorp(host: CorpHost): {
       });
       const body = (await res.json().catch(() => null)) as unknown;
       if (!res.ok) {
-        const code = (body as { error?: unknown } | null)?.error;
-        if (typeof code === 'string') surface('✖ ' + host.errText(code));
+        const failure = body as { error?: unknown; requiredInfluence?: unknown; influence?: unknown } | null;
+        const code = failure?.error;
+        if (path === '/ava/challenge' && code === 'E_INSUFFICIENT' &&
+            typeof failure?.requiredInfluence === 'number' && Number.isSafeInteger(failure.requiredInfluence) && failure.requiredInfluence > 0 &&
+            typeof failure.influence === 'number' && Number.isSafeInteger(failure.influence) && failure.influence >= 0) {
+          surface('✖ ' + t('corp.combat.insufficient', {
+            required: nfmt(failure.requiredInfluence), available: nfmt(failure.influence),
+          }));
+        } else if (typeof code === 'string') surface('✖ ' + host.errText(code));
         return null;
       }
       return body;
@@ -434,8 +421,11 @@ export function initCorp(host: CorpHost): {
         infrastructureAt = performance.now();
         if (infrastructure && corpMine.corp) corpMine.corp.influence = infrastructure.influence;
         corpStyle = parseCorpStyle(await corpFetch('/meta-economy/corp-style')) ?? null;
+        corpMaterials = parseCorpMaterials(await corpFetch('/meta-economy/corp-materials'));
+        if (corpMaterials?.corpId !== corpId) corpMaterials = null;
       } else {
         infrastructure = null;
+        corpMaterials = null;
         corpStyle = null;
       }
       if (canManage(corpMine.membership.role)) {
@@ -451,6 +441,7 @@ export function initCorp(host: CorpHost): {
       corpDetail = null;
       corpAudit = [];
       infrastructure = null;
+      corpMaterials = null;
       corpStyle = null;
       const listRaw = (await corpFetch('/corps')) as { corps?: unknown } | null;
       corpBrowseList = parseCorpSummaries(listRaw?.corps);
@@ -464,35 +455,66 @@ export function initCorp(host: CorpHost): {
       } | null;
       const rank = board?.corps?.me?.rank;
       corpRank = typeof rank === 'number' ? rank : null;
-      const catRaw = ((medalsAvailable ? await corpFetch('/medals') : null)) as { medals?: unknown } | null;
-      medalDefs = parseMedalDefs(catRaw?.medals);
-      const mineMedals = ((medalsAvailable ? await corpFetch('/medals/me') : null)) as { medals?: unknown } | null;
-      medalsOwned = parseMedals(mineMedals?.medals).map((m) => m.medalId);
+      const earned = medalsAvailable && corpMine.corp?.showcaseSlots && corpMine.membership.role === 'head' ? await corpFetch('/medals/eligible') as { eligible?: unknown } | null : null;
+      eligibleMedals = parseAccountIds(earned?.eligible);
+      showcase = corpMine.corp?.showcase ?? [];
     } else {
       corpRank = null;
-      medalDefs = [];
-      medalsOwned = [];
+      eligibleMedals = [];
+      showcase = [];
     }
 
-    const challengesRaw = ((avaAvailable ? await corpFetch('/ava/challenges') : null)) as { challenges?: unknown } | null;
-    avaChallenges = parseChallenges(challengesRaw?.challenges);
+    const myCorpId = corpMine.membership?.corpId;
+    const battleMember = avaAvailable && myCorpId && corpMine.membership?.role !== 'recruit';
+    const priorCorp = battleView?.corpId;
+    battleView = battleMember ? parseCorpBattles(await corpFetch('/ava/battles'), myCorpId) : null;
+    if (battleView) {
+      avaChallenges = battleView.challenges;
+      corpReadyOptimistic = battleView.ready.corp;
+      playerReadyOptimistic = battleView.ready.player;
+      if (battleDraft === null || priorCorp !== myCorpId) battleDraft = [...battleView.ready.formats];
+      battleDraft = battleDraft.filter((f) => f <= formatLimit(infrastructure));
+    } else {
+      battleDraft = null;
+      // The older match cabinet still handles hosts without the new read model.
+      const raw = !hubShown && avaAvailable ? await corpFetch('/ava/challenges') as { challenges?: unknown } | null : null;
+      avaChallenges = parseChallenges(raw?.challenges);
+    }
+    if (!warehouseBattles().some((b) => b.id === warehouseMatch)) {
+      warehouseMatch = warehouseBattles()[0]?.id ?? '';
+      warehouseFighter = '';
+    }
+    await loadWarehouse();
     const poolRaw = ((avaAvailable ? await corpFetch('/ava/pool') : null)) as { pool?: unknown } | null;
     avaPool = parseReadyPool(poolRaw?.pool);
-    // Лента ПУБЛИЧНАЯ и общая: вкладка «Битвы» отбирает из неё свои бои, поэтому окно
-    // берётся шире восьми записей — иначе чужие войны вытеснят мои из истории.
-    const feedRaw = ((avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
+    const rawPool = Array.isArray(poolRaw?.pool) ? poolRaw.pool as Array<{ corpId?: unknown; formats?: unknown }> : [];
+    battlePool = poolRaw && Array.isArray(poolRaw.pool) ? avaPool.map((p) => {
+      const formats = rawPool.find((r) => r?.corpId === p.corpId)?.formats;
+      return { ...p, formats: Array.isArray(formats) ? formats.filter((f): f is number => BATTLE_FORMATS.some((v) => v.format === f)) : [] };
+    }) : null;
+    // Only the legacy match cabinet uses the public feed; the hub has private history.
+    const feedRaw = ((!hubShown && avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
     avaFeed = parseFeed(feedRaw?.feed);
 
     // A locked-or-accepted matchup my corp is party to: show its roster window.
-    const myCorpId = corpMine.membership?.corpId;
     const activeMatchup = avaChallenges.find(
       (c) =>
         (c.status === 'accepted' || c.status === 'locked') &&
         (c.challengerCorp === myCorpId || c.targetCorp === myCorpId),
     );
-    avaRoster = activeMatchup
-      ? parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(activeMatchup.id)}`))
-      : null;
+    battleRosters = {};
+    battleWars = {};
+    const active = battleView?.challenges.filter((c) => c.status === 'accepted' || c.status === 'locked') ?? (activeMatchup ? [activeMatchup] : []);
+    for (const c of active) {
+      const roster = parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(c.id)}`));
+      battleRosters[c.id] = roster?.matchupId === c.id ? roster : null;
+      if (c.status === 'locked' && battleView) {
+        const war = parseCorpWar(await corpFetch(`/ava-war/${encodeURIComponent(c.id)}`), c.id);
+        const side = c.challengerCorp === myCorpId ? 'challenger' : 'target';
+        battleWars[c.id] = war?.side === side ? war : null;
+      }
+    }
+    avaRoster = activeMatchup ? battleRosters[activeMatchup.id] ?? null : null;
 
     // The setRoster eligibility set (AVA-6) — head/officer only, only while curating.
     avaReadyPlayers =
@@ -520,6 +542,7 @@ export function initCorp(host: CorpHost): {
     try {
       if (refreshing) await refreshing;
       await corpFetch(path, { method: 'POST', body: body ?? {} });
+      if (path === '/ava/ready/corp') battleDraft = null;
       // Refresh even on rejection/timeout: the server may have committed the order.
       await refreshCorp();
     } finally {
@@ -529,6 +552,7 @@ export function initCorp(host: CorpHost): {
   }
 
   function auditText(entry: CorpAuditEntry): string {
+    if (entry.action === 'showcase') return t('corp.audit.showcase');
     if (entry.action === 'emblem') return t('corp.audit.emblem') +
       (isCorpEmblemId(entry.detail) ? ` · ${t(CORP_EMBLEM_LABEL[entry.detail])}` : '');
     if (entry.action === 'building_income') return t('corp.buildings.income-earned', { n: entry.detail ?? '0' });
@@ -546,9 +570,10 @@ export function initCorp(host: CorpHost): {
   function corpNameOf(corpId: string): string {
     if (corpId === corpMine.membership?.corpId && corpMine.corp) return corpMine.corp.name;
     return (
+      battleView?.names[corpId] ??
       corpBrowseList.find((c) => c.corpId === corpId)?.name ??
       avaPool.find((c) => c.corpId === corpId)?.name ??
-      corpId
+      t('corp.combat.unknown-corp')
     );
   }
 
@@ -576,7 +601,6 @@ export function initCorp(host: CorpHost): {
 
   function corpHqHtml(): string {
     if (!corpMine.corp || !corpMine.membership) return corpNoneHtml();
-    if (cupSlot !== null) return medalGalleryHtml(medalDefs, medalsOwned);
     const c = corpMine.corp;
     const feed = corpAudit
       .slice(0, 6)
@@ -603,9 +627,7 @@ export function initCorp(host: CorpHost): {
       hqTile(t('corp.card.role'), corpRoleLabel(corpMine.membership.role)) +
       `</div>` +
       `<button class="cbtn2 wide btn-second" data-corpact="buildings">▥ ${t('corp.tab.buildings')}</button>` +
-      `<h4>${t('corp.showcase')}</h4>` +
-      showcaseHtml(showcase, medalDefs, medalsOwned) +
-      `<p class="chint">${t('corp.showcase.hint')}</p>` +
+      corpShowcaseHtml(c, eligibleMedals, corpMine.membership.role === 'head', intentBusy) +
       `<h4>${t('corp.log')}</h4>${feedHtml}`
     );
   }
@@ -775,7 +797,7 @@ export function initCorp(host: CorpHost): {
       .filter((p) => p.corpId !== myCorpId)
       .map(
         (p) =>
-          `<div class="crow2"><span class="cnm">${esc(p.name)}</span><span class="cinf">${nfmt(p.influence)} ⟡</span>` +
+          `<div class="crow2${p.monument ? ' corp-monument' : ''}"><span class="cnm">${esc(p.name)}</span><span class="cinf">${nfmt(p.influence)} ⟡</span>` +
           (iAmHead
             ? `<span class="cman"><button class="cbtn2 btn-second" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('corp.war.challenge')}</button></span>`
             : '') +
@@ -815,7 +837,7 @@ export function initCorp(host: CorpHost): {
     return (
       `<div class="cbig"><div><span>${t('corp.influence')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
       `<h4>${t('corp.history')}</h4><div class="cledger">${ledgerHtml}</div>` +
-      `<p class="chint">${t('corp.influence.hint')}</p>`
+      `<p class="chint">${t('corp.influence.hint')}</p>` + corpMaterialsHtml(corpMaterials, intentBusy)
     );
   }
 
@@ -843,7 +865,7 @@ export function initCorp(host: CorpHost): {
     ).join('');
     let body = '';
     if (corpTab === 'hq') body = corpHqHtml();
-    else if (corpTab === 'buildings') body = corpBuildingsHtml(infrastructure, performance.now() - infrastructureAt, intentBusy || corpFetchBusy);
+    else if (corpTab === 'buildings') body = corpBuildingsHtml(infrastructure, performance.now() - infrastructureAt, intentBusy || corpFetchBusy, corpMaterials);
     else if (corpTab === 'members') body = corpMembersHtml();
     else if (corpTab === 'wars') body = corpWarsHtml();
     else if (corpTab === 'battles') body = corpBattlesHtml();
@@ -855,7 +877,6 @@ export function initCorp(host: CorpHost): {
   function openCorp(tab?: string): void {
     if (tab !== undefined && CORP_TABS.some((ct) => ct.id === tab)) {
       corpTab = tab;
-      cupSlot = null; // витрина живёт только на «Штабе»
     }
     renderCorp(); // paint instantly from whatever's cached in memory…
     host.root().style.display = 'flex';
@@ -883,17 +904,11 @@ export function initCorp(host: CorpHost): {
   /** Ступень Back: сначала закрывается ВИТРИНА, и только потом сам кабинет — иначе
    *  аппаратная кнопка выбрасывала бы игрока из корпорации целиком с полпути выбора. */
   function closeCorp(): void {
-    if (cupSlot !== null) {
-      cupSlot = null;
-      renderCorp();
-      return;
-    }
     hideCorp();
   }
   function hideCorp(): void {
     if (infrastructureTimer !== undefined) clearInterval(infrastructureTimer);
     infrastructureTimer = undefined;
-    cupSlot = null;
     host.root().style.display = 'none';
   }
 
@@ -912,7 +927,6 @@ export function initCorp(host: CorpHost): {
     const b = (e.target as HTMLElement | null)?.closest('[data-corptab]') as HTMLElement | null;
     if (!b) return;
     corpTab = b.dataset.corptab ?? 'hq';
-    cupSlot = null; // витрина живёт только на «Штабе»
     renderCorp();
     if (corpTab === 'wars') host.onIntro('ava');
   });
@@ -922,29 +936,6 @@ export function initCorp(host: CorpHost): {
     if (pickDraft(tg)) return;
     if (tg.id === 'corpclose' || tg.id === 'corp') {
       hideCorp();
-      return;
-    }
-    // Витрина наград: тап по кубку открывает общий список, тап по награде — ставит её
-    // в ЭТОТ слот. Выбор локальный (у сервера поля витрины нет), поэтому и живёт в prefs.
-    const cup = tg.closest('[data-corpcup]') as HTMLElement | null;
-    if (cup) {
-      cupSlot = Number(cup.dataset.corpcup);
-      renderCorp();
-      return;
-    }
-    const pick = tg.closest('[data-corppick]') as HTMLElement | null;
-    if (pick) {
-      if (cupSlot !== null) {
-        showcase = showcase.map((id, i) => (i === cupSlot ? (pick.dataset.corppick ?? '') : id));
-        writeRaw(SHOWCASE_KEY, writeShowcase(showcase));
-      }
-      cupSlot = null;
-      renderCorp();
-      return;
-    }
-    if (tg.closest('[data-corpback]')) {
-      cupSlot = null;
-      renderCorp();
       return;
     }
     const btn = tg.closest('[data-corpact]') as HTMLElement | null;
@@ -959,6 +950,28 @@ export function initCorp(host: CorpHost): {
     const corpId = corpMine.membership?.corpId ?? '';
     const account = btn.dataset.corpaccount ?? '';
     switch (act) {
+      case 'ava-ready-save': {
+        if (!battleView || corpMine.membership?.role !== 'head' || !battleDraft?.length) break;
+        const formats = [...battleDraft];
+        corpSend(act, '/ava/ready/corp', { formats });
+        break;
+      }
+      case 'ava-play': {
+        const war = battleWars[arg];
+        if (war && war.phase !== 'ended' && battleRosters[arg]?.mine.some((s) => s.accountId === corpMine.membership?.accountId))
+          host.hub.openBattle?.(arg);
+        break;
+      }
+      case 'pin-medal': {
+        if (corpMine.membership?.role !== 'head') break;
+        const medals = showcase.includes(arg) ? showcase.filter((id) => id !== arg) : [...showcase, arg];
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/showcase`, { medals });
+        break;
+      }
+      case 'rent-item':
+        if (warehouse?.canLend && warehouseMatch && warehouseFighter)
+          corpSend(act, '/corp-arsenal/rent', { corpId, itemId: arg, matchupId: warehouseMatch, accountId: warehouseFighter });
+        break;
       case 'buildings':
         corpTab = 'buildings';
         renderCorp();
@@ -966,10 +979,23 @@ export function initCorp(host: CorpHost): {
       case 'refresh':
         detach('corporation refresh', refreshCorp());
         break;
+      case 'materials-market':
+        host.hub.openMarket?.();
+        break;
+      case 'contribute': {
+        const input = btn.closest('.cb-material-row')?.querySelector<HTMLInputElement>('input[data-corpmaterial]');
+        const quantity = Number(input?.value);
+        const personal = corpMaterials?.materials.find((r) => r.id === arg)?.personal ?? 0;
+        if (Number.isSafeInteger(quantity) && quantity > 0 && quantity <= personal)
+          corpSend(act, '/meta-economy/corp-materials/contribute', { requestId: crypto.randomUUID(), materialId: arg, quantity });
+        break;
+      }
       case 'build': {
         const building = infrastructure?.buildings.find((b) => b.id === arg);
-        if (building?.next && building.blocked === null && infrastructure?.canBuild) {
-          corpSend(act, `/corps/${encodeURIComponent(corpId)}/build`, { buildingId: arg, expectedLevel: building.level });
+        if (building?.next && building.blocked === null && infrastructure?.canBuild && canFundCorpBuilding(building.next, corpMaterials)) {
+          if (Object.keys(building.next.materials ?? {}).length)
+            corpSend(act, '/meta-economy/corp-materials/build', { requestId: crypto.randomUUID(), buildingId: arg, expectedLevel: building.level, price: building.next.price });
+          else corpSend(act, `/corps/${encodeURIComponent(corpId)}/build`, { buildingId: arg, expectedLevel: building.level });
         }
         break;
       }
@@ -1016,51 +1042,19 @@ export function initCorp(host: CorpHost): {
         corpSend(act, `/corps/${encodeURIComponent(corpId)}/disband`);
         break;
       case 'ready-corp':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/corp', { method: 'POST' }).then((r) => {
-            if (r) {
-              corpReadyOptimistic = true;
-              detach('корпорация: обновление кабинета', refreshCorp());
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/corp');
         break;
       case 'ready-corp-clear':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/corp/clear', { method: 'POST' }).then((r) => {
-            if (r) {
-              corpReadyOptimistic = false;
-              detach('корпорация: обновление кабинета', refreshCorp());
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/corp/clear');
         break;
       case 'ready-player':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/player', { method: 'POST' }).then((r) => {
-            if (r) {
-              playerReadyOptimistic = true;
-              paint();
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/player');
         break;
       case 'ready-player-clear':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/player/clear', { method: 'POST' }).then((r) => {
-            if (r) {
-              playerReadyOptimistic = false;
-              paint();
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/player/clear');
         break;
       case 'ava-challenge':
-        corpSend(act, '/ava/challenge', { target: arg });
+        corpSend(act, '/ava/challenge', { target: arg, ...(btn.dataset.corpformat ? { format: Number(btn.dataset.corpformat) } : {}) });
         break;
       case 'ava-accept':
         corpSend(act, `/ava/challenge/${encodeURIComponent(arg)}/accept`);
@@ -1074,8 +1068,9 @@ export function initCorp(host: CorpHost): {
       case 'ava-roster-toggle': {
         // arg = matchupId, account = the toggled accountId. Server is wholesale
         // (setRoster REPLACES the side), so send the full desired set every time.
-        if (!avaRoster || avaRoster.matchupId !== arg) break;
-        const current = avaRoster.mine.map((r) => r.accountId);
+        const roster = battleRosters[arg] ?? avaRoster;
+        if (!roster || roster.matchupId !== arg) break;
+        const current = roster.mine.map((r) => r.accountId);
         const next = current.includes(account)
           ? current.filter((id) => id !== account)
           : [...current, account];
@@ -1103,6 +1098,7 @@ export function initCorp(host: CorpHost): {
       me,
       members,
       view: infrastructure,
+      materials: corpMaterials,
       style: corpStyle,
       elapsedMs: performance.now() - infrastructureAt,
       rank: corpRank,
@@ -1112,11 +1108,43 @@ export function initCorp(host: CorpHost): {
       draftEmblem,
       armed: hubArmed,
       badges: corpHubBadges(me, members, avaChallenges),
-      // «Битвы» до CORP-10 — те же построители, что у окна в партии.
-      battles: hubSection === 'battles' ? corpWarsHtml() + (avaAvailable ? corpBattlesHtml() : '') : '',
+      battles: hubSection === 'battles' && corpMine.corp && me ? corpBattlesViewHtml({
+        view: battleView, available: avaAvailable, corp: corpMine.corp, me, members, pool: battlePool,
+        rosters: battleRosters, wars: battleWars, tab: battleTab, format: battleFormat,
+        maxFormat: formatLimit(infrastructure), draftFormats: battleDraft ?? [], busy: intentBusy,
+        now: Date.now(), canPlay: !!host.hub.openBattle,
+      }) : '',
+      battleReport: hubSheet?.kind === 'report' ? battleReport(hubSheet.matchupId) : '',
+      facilities: {
+        hall_of_fame: corpMine.corp ? corpShowcaseHtml(corpMine.corp, eligibleMedals, me?.role === 'head', intentBusy) : '',
+        warehouse: corpMine.corp?.warehouseItems ? warehouseHtml(warehouse, warehouseBattles(), warehouseMatch, warehouseFighter, intentBusy) : '',
+      },
       canSignIn: host.hub.canSignIn(),
       now: Date.now(),
     };
+  }
+
+  function battleReport(id: string): string {
+    const result = battleView?.results.find((r) => r.matchupId === id);
+    if (!result || !battleView) return '';
+    const rival = result.challengerCorp === battleView.corpId ? result.targetCorp : result.challengerCorp;
+    return corpBattleReportHtml(result, battleView.names[rival] ?? t('corp.combat.unknown-corp'));
+  }
+
+  function warehouseBattles(): Array<{ id: string; name: string }> {
+    const id = corpMine.corp?.corpId;
+    return avaChallenges.filter((c) => (c.status === 'accepted' || c.status === 'locked') && (c.challengerCorp === id || c.targetCorp === id)).map((c) => ({ id: c.id,
+      name: corpNameOf(c.challengerCorp === id ? c.targetCorp : c.challengerCorp) }));
+  }
+
+  async function loadWarehouse(): Promise<void> {
+    const seq = ++warehouseRead;
+    const id = corpMine.corp?.corpId;
+    const raw = id && corpMine.corp?.warehouseItems && corpMine.membership?.role !== 'recruit'
+      ? await corpFetch(`/corp-arsenal/${encodeURIComponent(id)}${warehouseMatch ? `?matchupId=${encodeURIComponent(warehouseMatch)}` : ''}`) : null;
+    if (seq !== warehouseRead) return;
+    warehouse = parseWarehouse(raw);
+    if (!warehouse?.fighters.some((f) => f.accountId === warehouseFighter)) warehouseFighter = '';
   }
 
   function renderHub(): void {
@@ -1124,11 +1152,26 @@ export function initCorp(host: CorpHost): {
     const root = host.hub.root();
     // Перерисовка сохраняет место на панораме; выбор эмблемы держит контроллер.
     const scroll = root.querySelector<HTMLElement>('.cb-pano-scroll')?.scrollLeft ?? null;
+    const tabsScroll = root.querySelector<HTMLElement>('.cb-battle-tabs')?.scrollLeft ?? 0;
+    const active = root.ownerDocument?.activeElement;
+    const focused = active && root.contains(active) ? active as HTMLElement : null;
+    const focusAttrs = focused ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-')).map((a) => [a.name, a.value] as const) : [];
     const p = hubPaint();
     root.innerHTML = corpHubHtml(p);
     // Панорама впервые на экране — штабом в середину: на телефоне она шире экрана.
     const pano = root.querySelector<HTMLElement>('.cb-pano-scroll');
     if (pano) pano.scrollLeft = scroll ?? (pano.scrollWidth - pano.clientWidth) / 2;
+    const tabs = root.querySelector<HTMLElement>('.cb-battle-tabs');
+    if (tabs) {
+      tabs.scrollLeft = tabsScroll;
+      const selected = tabs.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (selected) {
+        const box = selected.getBoundingClientRect(), frame = tabs.getBoundingClientRect();
+        if (box.left < frame.left) tabs.scrollLeft -= frame.left - box.left;
+        else if (box.right > frame.right) tabs.scrollLeft += box.right - frame.right;
+      }
+    }
+    if (focusAttrs.length) Array.from(root.querySelectorAll<HTMLElement>('button')).find((el) => focusAttrs.every(([attr, value]) => el.getAttribute(attr) === value))?.focus({ preventScroll: true });
     renderHubSheet(p);
   }
 
@@ -1183,6 +1226,38 @@ export function initCorp(host: CorpHost): {
     const tg = e.target as HTMLElement | null;
     if (!tg) return;
     if (pickDraft(tg)) return;
+    const tab = tg.closest<HTMLElement>('[data-battletab]')?.dataset.battletab;
+    if (tab && CORP_BATTLE_TABS.some((t) => t === tab)) {
+      battleTab = tab as CorpBattleTab;
+      renderHub();
+      host.hub.root().querySelector<HTMLElement>(`[data-battletab="${battleTab}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    const filter = tg.closest<HTMLElement>('[data-battle-format]');
+    if (filter) {
+      const value = Number(filter.dataset.battleFormat);
+      if (value === 0 || BATTLE_FORMATS.some((f) => f.format === value)) battleFormat = value;
+      renderHub();
+      host.hub.root().querySelector<HTMLElement>(`[data-battle-format="${battleFormat}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    const readyFormat = tg.closest<HTMLButtonElement>('[data-battle-ready-format]');
+    if (readyFormat) {
+      const value = Number(readyFormat.dataset.battleReadyFormat);
+      if (!readyFormat.disabled && !intentBusy && corpMine.membership?.role === 'head' && battleView && value <= formatLimit(infrastructure) && BATTLE_FORMATS.some((f) => f.format === value)) {
+        const draft = battleDraft ?? [];
+        battleDraft = draft.includes(value) ? draft.filter((f) => f !== value) : [...draft, value].sort((a, b) => a - b);
+        renderHub();
+        host.hub.root().querySelector<HTMLElement>(`[data-battle-ready-format="${value}"]`)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    const report = tg.closest<HTMLElement>('[data-battle-report]')?.dataset.battleReport;
+    if (report) {
+      if (battleView?.results.some((r) => r.matchupId === report && r.report))
+        openSheet({ kind: 'report', matchupId: report }, 'data-battle-report', report);
+      return;
+    }
     // Любое нажатие снимает взвод; второе нажатие по взведённой кнопке исполняет приказ.
     const armed = hubArmed;
     hubArmed = null;
@@ -1277,8 +1352,32 @@ export function initCorp(host: CorpHost): {
     renderHubSheet();
   }
 
+  host.hub.root().addEventListener('keydown', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[role="tab"][data-battletab]');
+    if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const index = CORP_BATTLE_TABS.indexOf(battleTab);
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? CORP_BATTLE_TABS.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : -1) + CORP_BATTLE_TABS.length) % CORP_BATTLE_TABS.length;
+    battleTab = CORP_BATTLE_TABS[next]!;
+    renderHub();
+    host.hub.root().querySelector<HTMLElement>(`[data-battletab="${battleTab}"]`)?.focus({ preventScroll: true });
+  });
   host.hub.root().addEventListener('click', onHubClick);
   host.hub.sheet().addEventListener('click', onHubClick);
+  host.hub.sheet().addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (target?.matches('[data-warehouse-match]')) {
+      warehouseMatch = target.value;
+      warehouseFighter = '';
+      warehouse = null;
+      renderHubSheet();
+      detach('corporation warehouse', loadWarehouse().then(() => renderHubSheet()));
+    } else if (target?.matches('[data-warehouse-fighter]')) {
+      warehouseFighter = target.value;
+      renderHubSheet();
+      host.hub.sheet().querySelector<HTMLElement>('[data-warehouse-fighter]')?.focus();
+    }
+  });
 
   return {
     open: openCorp,

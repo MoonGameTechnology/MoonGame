@@ -1,3 +1,4 @@
+import type { CorpPublicFacilities } from '../../packages/protocol/src/corpInfrastructure';
 /**
  * AVA-C1/C2 — corporation cabinet: pure types + fail-secure parsers for the CORP-0 /
  * AVA-2..9 / MED-1 HTTP responses (`packages/server/src/corpApi.ts`,
@@ -20,7 +21,7 @@ import { isCorpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/c
 
 export type CorpRole = 'head' | 'officer' | 'member' | 'recruit';
 
-export interface CorpRecord {
+export interface CorpRecord extends CorpPublicFacilities {
   corpId: string;
   name: string;
   influence: number;
@@ -109,9 +110,15 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 
 /** Fail-secure: a malformed/missing corp record parses to null rather than a crash
  *  (a network hiccup or an old cached response should never break the cabinet). */
+export function parseCorpFacilities(raw: Record<string, unknown>): CorpPublicFacilities {
+  const warehouseItems = [2, 4, 6].includes(Number(raw.warehouseItems)) ? Number(raw.warehouseItems) : 0;
+  const showcaseSlots = [5, 10, 20].includes(Number(raw.showcaseSlots)) ? Number(raw.showcaseSlots) : 0;
+  const showcase = Array.isArray(raw.showcase) && raw.showcase.every((id) => typeof id === 'string') ? [...new Set(raw.showcase)].slice(0, showcaseSlots) as string[] : [];
+  return { ...(warehouseItems ? { warehouseItems } : {}), ...(showcaseSlots ? { showcaseSlots, showcase } : {}), ...(raw.monument === true ? { monument: true } : {}) };
+}
 export function parseCorpRecord(raw: unknown): CorpRecord | null {
   if (!isObj(raw) || !isStr(raw.corpId) || !isStr(raw.name) || !isNum(raw.influence)) return null;
-  return { corpId: raw.corpId, name: raw.name, influence: raw.influence,
+  return { ...parseCorpFacilities(raw), corpId: raw.corpId, name: raw.name, influence: raw.influence,
     ...(isCorpEmblemId(raw.emblemId) ? { emblemId: raw.emblemId } : {}) };
 }
 
@@ -120,7 +127,7 @@ export function parseCorpSummaries(raw: unknown): CorpSummary[] {
   const out: CorpSummary[] = [];
   for (const r of raw) {
     if (isObj(r) && isStr(r.corpId) && isStr(r.name) && isNum(r.influence) && isNum(r.members)) {
-      out.push({ corpId: r.corpId, name: r.name, influence: r.influence, members: r.members,
+      out.push({ ...parseCorpFacilities(r), corpId: r.corpId, name: r.name, influence: r.influence, members: r.members,
         ...(isCorpEmblemId(r.emblemId) ? { emblemId: r.emblemId } : {}) });
     }
   }
@@ -205,7 +212,7 @@ export function parseReadyPool(raw: unknown): Array<CorpSummary & { readySince: 
       isNum(r.members) &&
       isNum(r.readySince)
     ) {
-      out.push({ corpId: r.corpId, name: r.name, influence: r.influence, members: r.members, readySince: r.readySince,
+      out.push({ ...parseCorpFacilities(r), corpId: r.corpId, name: r.name, influence: r.influence, members: r.members, readySince: r.readySince,
         ...(isCorpEmblemId(r.emblemId) ? { emblemId: r.emblemId } : {}) });
     }
   }

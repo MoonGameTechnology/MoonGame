@@ -64,6 +64,7 @@ import { COMIC_TRIGGERS } from './comicArt';
 import type { ComicPlayer } from './comicPlayer';
 import type { createComicQueue } from './comicQueue';
 import { detach } from './detach';
+import { recordSectorZeroEntry } from './connectScreen';
 import { displayUnit } from './format';
 import { abandonRun, data } from './game';
 import { playerOrder } from './orderPipeline';
@@ -451,6 +452,7 @@ export function launchSectorRun(): void {
  *  стартует новый — тем же путём, что кнопка «Новый забег». */
 export function openSectorZero(preparation = false, replay = false): void {
   claimSectorZero();
+  recordSectorZeroEntry();
   game.leaveWorld();
   // Close the map's layers before the new screen takes over. Do not route the
   // setup's Back button through the multiplayer hub on the way here.

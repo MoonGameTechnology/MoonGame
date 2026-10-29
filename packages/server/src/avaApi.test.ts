@@ -32,7 +32,7 @@ interface Harness {
 }
 
 /** Two ready corps (A: alice head, B: bob head), each with influence, over one store. */
-async function harness(): Promise<Harness> {
+async function harness(influenceA = 500): Promise<Harness> {
   const store = new MemoryCorpStore();
   const challenges = new MemoryAvaChallengeStore();
   let t = 0;
@@ -53,7 +53,7 @@ async function harness(): Promise<Harness> {
   const a = await corp.create(actor('alice'), 'Alliance A');
   const b = await corp.create(actor('bob'), 'Alliance B');
   if (!a.ok || !b.ok) throw new Error('harness: create failed');
-  await store.addInfluence(a.corpId, 500);
+  await store.addInfluence(a.corpId, influenceA);
   await store.addInfluence(b.corpId, 500);
 
   const app = Fastify();
@@ -63,6 +63,22 @@ async function harness(): Promise<Harness> {
 }
 
 describe('AVA · readiness + challenge API', () => {
+  it.each([{ format: 2, required: 100 }, { format: 3, required: 150 }])(
+    'reports the selected $format-on-$format price and own treasury on insufficient influence',
+    async ({ format, required }) => {
+      const { app, corpB } = await harness(82);
+      try {
+        for (const login of ['alice', 'bob']) await app.inject({
+          method: 'POST', url: '/ava/ready/corp', headers: as(login), payload: { formats: [format] },
+        });
+        const result = await app.inject({
+          method: 'POST', url: '/ava/challenge', headers: as('alice'), payload: { target: corpB, format },
+        });
+        expect(result.statusCode).toBe(402);
+        expect(result.json()).toEqual({ error: 'E_INSUFFICIENT', requiredInfluence: required, influence: 82 });
+      } finally { await app.close(); }
+    },
+  );
   it('every route is session-gated: anonymous → uniform 401', async () => {
     const { app } = await harness();
     const routes = [

@@ -134,6 +134,8 @@ describe('база корпорации (CORP-3)', () => {
       ['supply_center', 3],
       ['engineering_complex', 3],
       ['operations_center', 2],
+      ['warehouse', 2],
+      ['hall_of_fame', 1],
     ]);
     expect(corpOpensAt(v, 9)).toEqual([]);
   });

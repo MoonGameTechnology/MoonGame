@@ -4,8 +4,8 @@
 // Тест держит каждый из них на живом каталоге прототипа: если правило снова начнут
 // выводить вручную, любая из трёх проверок покажет это до плейтеста, а не на нём.
 //
-// Проверяется прямая функция ядра (`sensorCoverage`) — та самая, к которой клиент
-// теперь и обращается. Это не тавтология: до правки эти три случая карта НЕ учитывала,
+// Проверяется функция просмотра ядра (`viewCoverage`), которая в живом матче читает
+// sensorCoverage. Это не тавтология: до правки эти три случая карта НЕ учитывала,
 // и сторож фиксирует, что источник правды один.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -13,6 +13,7 @@ import {
   buildingLevel,
   createInitialState,
   sensorCoverage,
+  viewCoverage,
   setStance,
   type GameState,
   type Planet,
@@ -77,9 +78,17 @@ function base(patch: (st: GameState) => void = () => {}): GameState {
 const withRadar = (st: GameState): void => {
   st.planets.A!.buildings = [{ type: RADAR_BUILDING, level: 1, hp: 100 }];
 };
-const see = (st: GameState, who = 'p1'): Set<string> => sensorCoverage(st, who, data).identify;
+const see = (st: GameState, who = 'p1'): Set<string> => viewCoverage(st, who, data).identify;
 
 describe('RULES-5 — три правила, которых у клиентской копии не было', () => {
+  it('завершённая карта раскрыта для просмотра, а фактические сенсоры не расширяются', () => {
+    const state = base();
+    expect(sensorCoverage(state, 'p1', data).identify.has('E')).toBe(false);
+    state.match.status = 'ended';
+    expect(see(state).size).toBe(IDS.length);
+    expect(sensorCoverage(state, 'p1', data).identify.has('E')).toBe(false);
+    expect(state.fog).toBeUndefined();
+  });
   it('дальность радара растёт от исследованной технологии', () => {
     const plain = base(withRadar);
     const teched = base((st) => {
@@ -120,7 +129,7 @@ describe('RULES-5 — три правила, которых у клиентск�
 });
 
 describe('RULES-5 — карта спрашивает ядро, а не выводит правило заново', () => {
-  it('computeVision зовёт sensorCoverage и не пересчитывает кольца сам', () => {
+  it('computeVision зовёт viewCoverage и не пересчитывает кольца сам', () => {
     // Проверки выше держат САМО правило; эта — то, что клиент к нему подключён.
     // Без неё сторож остался бы тавтологией: ядро можно чинить сколько угодно, а карта
     // продолжала бы рисовать по своей копии — именно так расхождение и прожило до сих пор.
@@ -128,7 +137,7 @@ describe('RULES-5 — карта спрашивает ядро, а не выво
     const src = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
     const body = src.slice(src.indexOf('function computeVision('));
     const fn = body.slice(0, body.indexOf('\n}\n') + 3);
-    expect(fn).toContain('sensorCoverage(s, ME, data, planets)');
+    expect(fn).toContain('viewCoverage(s, ME, data, planets)');
     for (const reDerived of ['planetRadar(', 'fleetRadar(', 'withinRadius', 'floodHops(']) {
       expect(fn).not.toContain(reDerived);
     }

@@ -1,3 +1,4 @@
+import { COMMERCE_CATALOG_VERSION } from './commerceCatalog';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -59,7 +60,7 @@ describe('standalone Commerce HTTP boundary', () => {
       method: 'POST',
       url: '/commerce/orders',
       headers: { 'x-test-account': 'alice' },
-      payload: { requestId: 'r1', productId: 'supply_personal', catalogVersion: 'meta-v0.1' },
+      payload: { requestId: 'r1', productId: 'supply_personal', catalogVersion: COMMERCE_CATALOG_VERSION },
     });
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ error: 'E_COMMERCE_UNAVAILABLE' });
@@ -67,7 +68,7 @@ describe('standalone Commerce HTTP boundary', () => {
 
   it('rejects unauthenticated orders and does not accept an account from request data', async () => {
     const f = setup(true);
-    const payload = { requestId: 'r1', productId: 'supply_personal', catalogVersion: 'meta-v0.1' };
+    const payload = { requestId: 'r1', productId: 'supply_personal', catalogVersion: COMMERCE_CATALOG_VERSION };
     expect(
       (await f.app.inject({ method: 'POST', url: '/commerce/orders', payload })).statusCode,
     ).toBe(401);
@@ -102,7 +103,7 @@ describe('standalone Commerce HTTP boundary', () => {
 
   it('preserves exact provider body bytes, stores pending proof, and never grants in webhook handling', async () => {
     const f = setup(true);
-    const order = await f.service.createOrder('alice', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('alice', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     const payload = JSON.stringify(
       {
         provider: 'test-only',
@@ -111,7 +112,7 @@ describe('standalone Commerce HTTP boundary', () => {
         orderId: order.orderId,
         accountId: 'alice',
         productId: 'supply_personal',
-        catalogVersion: 'meta-v0.1',
+        catalogVersion: COMMERCE_CATALOG_VERSION,
         kind: 'payment',
         amountMinor: 100,
         currency: 'USD',
@@ -217,7 +218,7 @@ describe('Game identity assertion for Commerce', () => {
     apps.push(app);
     return app;
   }
-  const payload = { requestId: 'r1', productId: 'supply_personal', catalogVersion: 'meta-v0.1' };
+  const payload = { requestId: 'r1', productId: 'supply_personal', catalogVersion: COMMERCE_CATALOG_VERSION };
 
   it('accepts a body-bound assertion once and supports a fresh assertion for order replay', async () => {
     const app = gateway();

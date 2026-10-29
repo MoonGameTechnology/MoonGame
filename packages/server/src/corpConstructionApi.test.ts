@@ -23,7 +23,7 @@ async function setup(rateMax = 30) {
 }
 
 describe('corporation construction HTTP authority', () => {
-  it('requires a session, denies outsiders and ignores payload identity/price/time', async () => {
+  it('requires a session, denies outsiders and rejects payload identity/price/time', async () => {
     const { app, store, corpId, base } = await setup();
     try {
       for (const [method, url] of [
@@ -44,13 +44,23 @@ describe('corporation construction HTTP authority', () => {
         cost: -1000,
         completesAt: 0,
       };
+      for (const actor of ['member', 'head']) {
+        const forged = await app.inject({
+          method: 'POST',
+          url: `${base}/build`,
+          headers: { 'x-user': actor },
+          payload: body,
+        });
+        expect(forged.statusCode).toBe(400);
+        expect(forged.json()).toEqual({ error: 'E_BAD_MESSAGE' });
+      }
       expect(
         (
           await app.inject({
             method: 'POST',
             url: `${base}/build`,
             headers: { 'x-user': 'member' },
-            payload: body,
+            payload: { buildingId: 'headquarters', expectedLevel: 0 },
           })
         ).statusCode,
       ).toBe(403);
@@ -58,7 +68,7 @@ describe('corporation construction HTTP authority', () => {
         method: 'POST',
         url: `${base}/build`,
         headers: { 'x-user': 'head' },
-        payload: body,
+        payload: { buildingId: 'headquarters', expectedLevel: 0 },
       });
       expect(built.statusCode).toBe(200);
       expect(built.json().construction).toMatchObject({ cost: 0, completesAt: 3_600_000 });

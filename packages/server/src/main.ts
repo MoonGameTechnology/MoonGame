@@ -1,3 +1,5 @@
+import { CorpMaterials } from './corpMaterials';
+import { registerCorpMaterialsApi } from './corpMaterialsApi';
 import {
   corporateEndpoint,
   registerCorporateGateway,
@@ -22,7 +24,7 @@ import {
 import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { salvageFromEvents } from './dropRoller';
 import { MetaEconomy } from './metaEconomy';
-import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
+import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from './metaEconomyCatalog';
 import { registerMetaEconomyApi } from './metaEconomyApi';
 import { createMetaRewardDelivery } from './metaEconomyDelivery';
 import { commerceOffers } from './commerceCatalog';
@@ -147,7 +149,7 @@ const dropTables = loadDropTables(data);
 const stores = await createStores();
 const metaCatalog = loadMetaEconomyCatalog(data);
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
-const metaEconomy = new MetaEconomy({ store: stores.metaEconomy, catalog: metaCatalog, dropTables, now: Date.now,
+const metaEconomy = new MetaEconomy({ store: stores.metaEconomy, catalog: metaCatalog, catalogHistory: loadMetaEconomyCatalogHistory(data), dropTables, now: Date.now,
   onEvent: (event) => {
     process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
     void refreshGrantedArsenal(event.accountId).catch((error) => process.stderr.write(`meta live catalog refresh failed: ${String(error)}\n`));
@@ -614,7 +616,10 @@ const server = createMultiplayerServer({
     registerAvaFeed(app, { service: avaService });
     // The news feed (CORP-1) — the admin's announcements + corporation and battle facts,
     // public like the AvA feed it grew from.
-    registerNewsApi(app, { feed: stores.feedStore, announcements: stores.announcementStore });
+    registerNewsApi(app, { feed: stores.feedStore, announcements: stores.announcementStore,
+      monumentsOf: (ids) => stores.corpStore.monumentsOf(ids),
+      playerMedals: stores.metaEconomy, identify,
+      membershipOf: (id) => stores.corpStore.membershipOf(id) });
     // The account + match WRITE surface only when auth is on (it mints tokens); no auth ⇒
     // the insecure dev ?player= handshake only. It sits behind @fastify/rate-limit in an
     // ENCAPSULATED scope so the coarse per-IP backstop covers only these write routes —
@@ -689,6 +694,7 @@ const server = createMultiplayerServer({
             }
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
+          registerCorpMaterialsApi(scope, new CorpMaterials({ store: stores.metaEconomy, catalog: metaCatalog, corps: stores.corpStore }), identify, process.env.CORPORATIONS_MAINTENANCE !== '1');
           registerMetaEconomyApi(scope, {
             economy: metaEconomy,
             identify,
@@ -713,6 +719,7 @@ const server = createMultiplayerServer({
                     commanders: stores.commanderStore,
                     economy: metaEconomy,
                     table: metaCatalog.medals,
+                    news: { users: stores.userStore, corps: stores.corpStore },
                   },
                   accountId,
                 ),

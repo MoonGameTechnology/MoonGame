@@ -13,6 +13,7 @@ const key = (v: unknown): v is string =>
 const level = (v: unknown): v is CorpBuildingLevel =>
   object(v) &&
   integer(v.cost) &&
+  (v.materials === undefined || object(v.materials) && Object.entries(v.materials).every(([id, n]) => ['construction_blocks', 'engineering_kits', 'command_cores'].includes(id) && integer(n) && n > 0)) &&
   integer(v.durationMs) &&
   v.durationMs > 0 &&
   integer(v.headquarters) &&
@@ -21,7 +22,10 @@ const level = (v: unknown): v is CorpBuildingLevel =>
   v.constructionReduction <= 50 &&
   (v.members === undefined || integer(v.members)) &&
   (v.battles === undefined || integer(v.battles)) &&
-  (v.maxFormat === undefined || (integer(v.maxFormat) && v.maxFormat >= 2));
+  (v.maxFormat === undefined || (integer(v.maxFormat) && v.maxFormat >= 2)) &&
+  (v.warehouseItems === undefined || (integer(v.warehouseItems) && v.warehouseItems >= 1 && v.warehouseItems <= 20)) &&
+  (v.showcaseSlots === undefined || (integer(v.showcaseSlots) && v.showcaseSlots >= 1 && v.showcaseSlots <= 20)) &&
+  (v.monument === undefined || typeof v.monument === 'boolean');
 const ERRORS = new Set([
   'E_FORBIDDEN',
   'E_CORP_BUILDING',
@@ -73,6 +77,7 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
       b.next !== null &&
       (!level(b.next) ||
         !object(b.next) ||
+        (b.next.price !== undefined && (typeof b.next.price !== 'string' || !/^[a-f0-9]{64}$/.test(b.next.price))) ||
         !integer(b.next.actualDurationMs) ||
         b.next.actualDurationMs < 1)
     )

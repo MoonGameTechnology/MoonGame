@@ -12,6 +12,7 @@ import {
   MemoryCommanderStore,
   MemoryDropStore,
   MemoryUserStore,
+  MemoryCorpStore,
 } from './store';
 import { loadDropTables, loadShippedData } from './scenario';
 
@@ -32,10 +33,24 @@ function setup() {
   const profiles = new MemoryProfileStore();
   const commanders = new MemoryCommanderStore();
   const deps: MedalRewardDeps = { profiles, commanders, economy, table: catalog.medals };
-  return { catalog, economy, market, profiles, commanders, deps };
+  return { catalog, economy, market, profiles, commanders, deps, store };
 }
 
 describe('medal rewards', () => {
+  it('announces actual server-earned degrees once with the recipient identity', async () => {
+    const f = setup();
+    const users = new MemoryUserStore();
+    const made = await users.createUser('NewsPilot', 'hash');
+    if (!made.ok) throw Error('fixture');
+    f.deps.news = { users, corps: new MemoryCorpStore() };
+    await f.profiles.credit('medal-news-match', [{ accountId: made.userId, progress: { wins: 50 } }]);
+    await settleMedalRewards(f.deps, made.userId);
+    await settleMedalRewards(f.deps, made.userId);
+    const news = await f.store.recentPlayerMedals(50);
+    expect(news).toHaveLength(1);
+    expect(news[0]).toMatchObject({ medalId: 'first', grade: 1, login: 'NewsPilot', corp: null });
+    expect(JSON.stringify(news)).not.toContain(made.userId);
+  });
   it('pays every reached degree, lower classes included, once; medals earned without play pay Sovereigns only', async () => {
     const f = setup();
     // 10 wins reach «Первый рубеж» II, so class III pays too; registration and the

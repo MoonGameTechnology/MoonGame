@@ -36,6 +36,7 @@ const ROSTER = [HEAD, member('a2', 'Вега', 'officer'), member('a3', 'Лир�
 
 function paint(over: Partial<CorpHubPaint> = {}): CorpHubPaint {
   return {
+    materials: { corpId: 'c1', pending: false, history: [], materials: ['construction_blocks', 'engineering_kits', 'command_cores'].map((id) => ({ id, nameKey: 'meta.material.' + id, personal: 10, available: 500, reserved: 0 })) },
     state: 'corp',
     section: 'base',
     corp: { corpId: 'c1', name: 'Звёздный штиль', influence: 500 },
@@ -102,7 +103,7 @@ describe('вкладка «Корпорация»: база', () => {
   it('у каждого здания на панораме свой участок, а в списке — карточка', () => {
     const p = paint();
     const html = corpHubHtml(p);
-    for (const id of Object.keys(CORP_LOTS)) expect(html).toMatch(new RegExp(`class="cb-lot [^"]*" style="[^"]*" data-corpbld="${id}"`));
+    for (const { id } of p.view!.buildings.filter((b) => CORP_LOTS[b.id])) expect(html).toMatch(new RegExp(`class="cb-lot [^"]*" style="[^"]*" data-corpbld="${id}"`));
     const cards = [...html.matchAll(/class="cb-bc [^"]*" data-corpbld="([\w-]+)"/g)].map((m) => m[1]);
     expect(cards).toEqual(p.view!.buildings.map((b) => b.id));
   });

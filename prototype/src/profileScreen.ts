@@ -1,3 +1,4 @@
+import { corpShowcaseHtml } from './corpFacilitiesView';
 /**
  * «Профиль командира» — the career dossier (docs/main-menu.md §4.2, REFM-10).
  *
@@ -122,7 +123,7 @@ export function profileCorporationHtml(corp: CorpRecord, members: readonly CorpM
     `<header class="pf-corp-head">${corpEmblem(corp.corpId, corp.emblemId, 64)}<div>` +
     `<p class="pf-corp-kicker">${esc(t('profile.corporation'))}</p><h2>${esc(corp.name)}</h2></div></header>` +
     `<div class="pf-grid pf-corp-stats">${pfCell(t('profile.influence'), nfmt(corp.influence), true)}` +
-    `${pfCell(t('corp.tab.members'), nfmt(roster.length))}</div>` +
+    `${pfCell(t('corp.tab.members'), nfmt(roster.length))}</div>${corpShowcaseHtml(corp)}` +
     `<section class="pf-corp-roster" aria-label="${esc(t('profile.corporation.members', { n: roster.length }))}">` +
     `<h3>${esc(t('corp.hub.tab.members'))}</h3>` +
     (roster.length

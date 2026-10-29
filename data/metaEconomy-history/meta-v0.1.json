@@ -1,0 +1,311 @@
+{
+  "version": "meta-v0.1",
+  "materials": {
+    "ferroalloys": { "nameKey": "meta.material.ferroalloys" },
+    "technical_composites": { "nameKey": "meta.material.technical_composites" },
+    "control_circuits": { "nameKey": "meta.material.control_circuits" },
+    "energy_cells": { "nameKey": "meta.material.energy_cells" },
+    "technology_archives": { "nameKey": "meta.material.technology_archives" }
+  },
+  "recipes": {
+    "siege_platform": {
+      "defId": "siege_platform",
+      "ingredients": { "ferroalloys": 25, "technical_composites": 10, "energy_cells": 8 },
+      "salvage": { "ferroalloys": 6, "technical_composites": 2, "energy_cells": 2 }
+    },
+    "targeting_array": {
+      "defId": "targeting_array",
+      "ingredients": { "ferroalloys": 10, "control_circuits": 25, "energy_cells": 4 },
+      "salvage": { "ferroalloys": 2, "control_circuits": 6, "energy_cells": 1 }
+    },
+    "shield_booster": {
+      "defId": "shield_booster",
+      "ingredients": { "technical_composites": 15, "control_circuits": 20, "energy_cells": 12 },
+      "salvage": { "technical_composites": 3, "control_circuits": 5, "energy_cells": 3 }
+    },
+    "repair_tender": {
+      "defId": "repair_tender",
+      "ingredients": { "ferroalloys": 20, "technical_composites": 20, "control_circuits": 10 },
+      "salvage": { "ferroalloys": 5, "technical_composites": 5, "control_circuits": 2 }
+    },
+    "tractor_beam": {
+      "defId": "tractor_beam",
+      "ingredients": {
+        "ferroalloys": 15,
+        "control_circuits": 20,
+        "energy_cells": 12,
+        "technology_archives": 1
+      },
+      "salvage": { "ferroalloys": 3, "control_circuits": 5, "energy_cells": 3 }
+    },
+    "rocket_mine_layer": {
+      "defId": "rocket_mine_layer",
+      "ingredients": {
+        "ferroalloys": 30,
+        "control_circuits": 20,
+        "energy_cells": 16,
+        "technology_archives": 1
+      },
+      "salvage": { "ferroalloys": 7, "control_circuits": 5, "energy_cells": 4 }
+    }
+  },
+  "rewards": {
+    "materials": {
+      "ferroalloys": 20,
+      "technical_composites": 14,
+      "control_circuits": 14,
+      "energy_cells": 10,
+      "technology_archives": 1
+    },
+    "stageFractions": [0.25, 0.5],
+    "resultBonuses": [
+      { "maxPlace": 1, "percent": 30 },
+      { "maxPlace": 3, "percent": 15 }
+    ],
+    "seasonXp": 200,
+    "warrants": 20,
+    "dailyWarrants": 100,
+    "participation": {
+      "reconPerPoint": 3,
+      "logisticsPerPoint": 2,
+      "defensePerPoint": 1,
+      "objectivesPerPoint": 1,
+      "stagePoints": [1, 3],
+      "stageDays": [3, 7],
+      "finalPresence": 0.25
+    }
+  },
+  "market": { "minimumAccountXp": 100 },
+  "medals": {
+    "grades": {
+      "3": { "sovereigns": 10, "warrants": 20, "xp": 50 },
+      "2": { "sovereigns": 25, "warrants": 50, "xp": 150 },
+      "1": { "sovereigns": 60, "warrants": 120, "xp": 400 }
+    },
+    "sovereignsOnly": ["contribution", "tutorial"]
+  },
+  "seasons": [
+    {
+      "id": "frontier_fleet_2026",
+      "nameKey": "meta.season.frontier_fleet",
+      "startsAt": 1792022400000,
+      "durationDays": 56,
+      "levels": 50,
+      "xpPerLevel": 200,
+      "dailyXp": 100,
+      "milestones": [
+        {
+          "level": 1,
+          "free": {
+            "labelKey": "meta.reward.supply",
+            "materials": {
+              "ferroalloys": 5,
+              "technical_composites": 3,
+              "control_circuits": 3,
+              "energy_cells": 2
+            }
+          },
+          "premium": { "labelKey": "meta.reward.portrait", "cosmetic": "frontier_officer_portrait" }
+        },
+        {
+          "level": 10,
+          "free": {
+            "labelKey": "meta.reward.blueprint_choice",
+            "choices": ["mine_layer", "targeting_array", "shield_booster"]
+          },
+          "premium": { "labelKey": "meta.reward.ship_skin", "cosmetic": "frontier_cruiser_livery" }
+        },
+        {
+          "level": 20,
+          "free": {
+            "labelKey": "meta.reward.materials",
+            "materials": {
+              "ferroalloys": 15,
+              "technical_composites": 10,
+              "control_circuits": 10,
+              "energy_cells": 6,
+              "technology_archives": 1
+            }
+          },
+          "premium": { "labelKey": "meta.reward.banner", "cosmetic": "frontier_profile_banner" }
+        },
+        {
+          "level": 30,
+          "free": { "labelKey": "meta.reward.module", "module": "repair_tender" },
+          "premium": {
+            "labelKey": "meta.reward.engineering",
+            "materials": {
+              "ferroalloys": 20,
+              "technical_composites": 14,
+              "control_circuits": 14,
+              "energy_cells": 10,
+              "technology_archives": 1
+            }
+          }
+        },
+        {
+          "level": 40,
+          "free": { "labelKey": "meta.reward.goal_materials", "goalMaterials": true },
+          "premium": {
+            "labelKey": "meta.reward.guardian_skin",
+            "cosmetic": "frontier_guardian_report"
+          }
+        },
+        {
+          "level": 50,
+          "free": {
+            "labelKey": "meta.reward.final",
+            "module": "rocket_mine_layer",
+            "cosmetic": "frontier_completion_mark"
+          },
+          "premium": {
+            "labelKey": "meta.reward.visual_set",
+            "cosmetic": "frontier_admiral_visual_set"
+          }
+        }
+      ],
+      "contracts": [
+        { "id": "week_1_service", "week": 1, "metric": "matches", "target": 3, "xp": 400 },
+        { "id": "week_2_recon", "week": 2, "metric": "recon", "target": 12, "xp": 400 },
+        { "id": "week_3_logistics", "week": 3, "metric": "logistics", "target": 6, "xp": 400 },
+        { "id": "week_4_defense", "week": 4, "metric": "defense", "target": 6, "xp": 400 },
+        { "id": "week_5_objectives", "week": 5, "metric": "objectives", "target": 6, "xp": 400 },
+        { "id": "week_6_service", "week": 6, "metric": "matches", "target": 5, "xp": 400 },
+        { "id": "week_7_recon", "week": 7, "metric": "recon", "target": 20, "xp": 400 },
+        { "id": "week_8_logistics", "week": 8, "metric": "logistics", "target": 10, "xp": 400 }
+      ]
+    }
+  ],
+  "store": {
+    "modulePrices": {
+      "targeting_array": 180,
+      "shield_booster": 180,
+      "repair_tender": 180,
+      "mine_layer": 200,
+      "siege_platform": 220,
+      "tractor_beam": 220,
+      "rocket_mine_layer": 360
+    },
+    "offers": {
+      "premium_7": { "category": "premium", "price": 149, "premiumDays": 7 },
+      "premium_30": { "category": "premium", "price": 449, "premiumDays": 30 },
+      "premium_90": { "category": "premium", "price": 1090, "premiumDays": 90 },
+      "season_frontier_fleet": {
+        "category": "premium",
+        "price": 690,
+        "premiumSeason": "frontier_fleet_2026"
+      },
+      "pack_defense": {
+        "category": "modules",
+        "modules": ["shield_booster", "repair_tender"],
+        "discountPercent": 15
+      },
+      "pack_assault": {
+        "category": "modules",
+        "modules": ["targeting_array", "siege_platform"],
+        "discountPercent": 15
+      },
+      "pack_control": {
+        "category": "modules",
+        "modules": ["tractor_beam", "mine_layer"],
+        "discountPercent": 15
+      },
+      "pack_full": {
+        "category": "modules",
+        "modules": [
+          "targeting_array",
+          "shield_booster",
+          "repair_tender",
+          "mine_layer",
+          "siege_platform",
+          "tractor_beam",
+          "rocket_mine_layer"
+        ],
+        "discountPercent": 25
+      },
+      "module_targeting_array": { "category": "modules", "modules": ["targeting_array"] },
+      "module_shield_booster": { "category": "modules", "modules": ["shield_booster"] },
+      "module_repair_tender": { "category": "modules", "modules": ["repair_tender"] },
+      "module_mine_layer": { "category": "modules", "modules": ["mine_layer"] },
+      "module_siege_platform": { "category": "modules", "modules": ["siege_platform"] },
+      "module_tractor_beam": { "category": "modules", "modules": ["tractor_beam"] },
+      "module_rocket_mine_layer": { "category": "modules", "modules": ["rocket_mine_layer"] },
+      "materials_personal": {
+        "category": "materials",
+        "price": 60,
+        "materials": {
+          "ferroalloys": 5,
+          "technical_composites": 3,
+          "control_circuits": 3,
+          "energy_cells": 2
+        }
+      },
+      "materials_engineer": {
+        "category": "materials",
+        "price": 250,
+        "materials": {
+          "ferroalloys": 25,
+          "technical_composites": 15,
+          "control_circuits": 15,
+          "energy_cells": 10
+        }
+      },
+      "materials_ferroalloys": {
+        "category": "materials",
+        "price": 120,
+        "materials": { "ferroalloys": 30 }
+      },
+      "materials_circuits": {
+        "category": "materials",
+        "price": 150,
+        "materials": { "control_circuits": 25 }
+      },
+      "materials_archives": {
+        "category": "materials",
+        "price": 200,
+        "materials": { "technology_archives": 1 }
+      },
+      "corp_style_imperial_gothic": {
+        "category": "styles",
+        "price": 490,
+        "corpStyle": "imperial_gothic"
+      },
+      "corp_style_high_tech": { "category": "styles", "price": 490, "corpStyle": "high_tech" },
+      "corp_backdrop_nebula": { "category": "styles", "price": 290, "corpBackdrop": "nebula" },
+      "corp_backdrop_ice_moon": { "category": "styles", "price": 290, "corpBackdrop": "ice_moon" },
+      "corp_backdrop_gas_giant": { "category": "styles", "price": 290, "corpBackdrop": "gas_giant" }
+    },
+    "premium": { "dailySovereigns": 5, "extraDailyAds": 1 }
+  },
+  "commerce": {
+    "dailyAdLimit": 2,
+    "products": {
+      "supply_personal": {
+        "source": "payment",
+        "materials": {
+          "ferroalloys": 5,
+          "technical_composites": 3,
+          "control_circuits": 3,
+          "energy_cells": 2
+        }
+      },
+      "module_shield_booster": { "source": "payment", "module": "shield_booster" },
+      "frontier_fleet_premium": { "source": "payment", "premiumSeason": "frontier_fleet_2026" },
+      "sovereigns_100": { "source": "payment", "sovereigns": 100 },
+      "sovereigns_330": { "source": "payment", "sovereigns": 300, "bonusSovereigns": 30 },
+      "sovereigns_690": { "source": "payment", "sovereigns": 600, "bonusSovereigns": 90 },
+      "sovereigns_1440": { "source": "payment", "sovereigns": 1200, "bonusSovereigns": 240 },
+      "sovereigns_3125": { "source": "payment", "sovereigns": 2500, "bonusSovereigns": 625 },
+      "sovereigns_7800": { "source": "payment", "sovereigns": 6000, "bonusSovereigns": 1800 },
+      "rewarded_supply": {
+        "source": "rewarded_ad",
+        "materials": {
+          "ferroalloys": 2,
+          "technical_composites": 2,
+          "control_circuits": 1,
+          "energy_cells": 1
+        }
+      }
+    }
+  }
+}

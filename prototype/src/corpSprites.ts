@@ -30,16 +30,24 @@ export interface CorpLot {
 export const CORP_PANORAMA = { w: 1200, h: 540 };
 
 export const CORP_LOTS: Readonly<Record<string, CorpLot>> = {
-  headquarters: { x: 410, y: 158, w: 380, h: 272, tag: 'bottom' },
-  supply_center: { x: 150, y: 283, w: 300, h: 197, tag: 'bottom' },
-  engineering_complex: { x: 740, y: 270, w: 320, h: 214, tag: 'bottom' },
+  headquarters: { x: 440, y: 48, w: 320, h: 250, tag: 'bottom' },
+  operations_center: { x: 90, y: 100, w: 280, h: 195, tag: 'bottom' },
+  hall_of_fame: { x: 805, y: 90, w: 280, h: 210, tag: 'bottom' },
+  supply_center: { x: 85, y: 325, w: 245, h: 150, tag: 'bottom' },
+  warehouse: { x: 340, y: 305, w: 250, h: 170, tag: 'bottom' },
+  engineering_complex: { x: 610, y: 315, w: 265, h: 160, tag: 'bottom' },
+  monument: { x: 935, y: 310, w: 170, h: 180, tag: 'bottom' },
 };
 
 /** Порядок рисования: дальние раньше ближних. */
 export const CORP_DRAW_ORDER: readonly string[] = [
+  'operations_center',
   'headquarters',
+  'hall_of_fame',
   'supply_center',
+  'warehouse',
   'engineering_complex',
+  'monument',
 ];
 
 function bx(x: number, y: number, w: number, h: number, d: number): string {
@@ -113,8 +121,13 @@ function artSprite(
   mode: CorpLotState,
   hit: boolean,
 ): string {
-  const image = (art: CorpArt, attrs = ''): string =>
-    `<image href="${art.src}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${attrs}/>`;
+  const image = (art: CorpArt, attrs = ''): string => {
+    const f = art.frame;
+    if (!f) return `<image href="${art.src}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${attrs}/>`;
+    return `<svg x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${art.w} ${art.h}"${attrs}>` +
+      `<svg x="${n(f.dx)}" y="${n(f.dy)}" width="${n(f.dw)}" height="${n(f.dh)}" viewBox="${f.sx} ${f.sy} ${f.sw} ${f.sh}" overflow="hidden">` +
+      `<image href="${art.src}" width="${f.iw}" height="${f.ih}"/></svg></svg>`;
+  };
   const body =
     mode === 'built'
       ? image(top)

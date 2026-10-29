@@ -163,7 +163,14 @@ export function registerAvaApi(app: FastifyInstance, deps: AvaApiDeps): void {
     const format = body?.format;
     if (format !== undefined && !Number.isSafeInteger(format)) return failed(reply, 'E_FORMAT');
     const result = await service.challenge(who, target, format as number | undefined);
-    if (!result.ok) return failed(reply, result.code);
+    if (!result.ok) {
+      if (result.code === 'E_INSUFFICIENT') {
+        return reply.code(402).send({
+          error: result.code, requiredInfluence: result.requiredInfluence, influence: result.influence,
+        });
+      }
+      return failed(reply, result.code);
+    }
     void reply.code(201);
     return { id: result.id };
   });

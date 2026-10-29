@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { hashJson as gameDataHash, type ArsenalItem } from '@void/shared-core';
 import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD } from '@void/protocol';
 import type {
@@ -644,7 +644,7 @@ export class MetaEconomy {
   /** Pays reached medal degrees once per account: Sovereigns and Warrants here. XP lives in
    *  the commander store, so the caller credits it per degree BEFORE this call
    *  (`medalRewards.ts`); the receipt lists the full grant, XP included. */
-  claimMedals(accountId: string, earned: readonly MedalGradeRef[]): Promise<MetaCommandResult> {
+  claimMedals(accountId: string, earned: readonly MedalGradeRef[], news?: { login: string; corp: import('@void/protocol').NewsCorp | null }): Promise<MetaCommandResult> {
     const keys = earned.map(medalCounter).sort();
     return this.command(
       accountId,
@@ -666,6 +666,7 @@ export class MetaEconomy {
             warrants = safeAdd(warrants, grant.warrants);
           }
           medals.push(grant);
+          if (news) await tx.announcePlayerMedal({ id: randomUUID(), at: receipt.at, kind: 'player_medal', medalId: ref.medalId, grade: ref.grade, ...news }, accountId);
         }
         account.sovereigns = safeAdd(account.sovereigns ?? 0, sovereigns);
         receipt.sovereignsGranted = sovereigns;
@@ -1042,7 +1043,7 @@ export class MetaEconomy {
           seasonXp: 0,
           finalized: false,
           metrics: {},
-          budget: { ...policy.materials },
+          budget: { ...policy.materials, ...policy.corporationMaterials },
           policyVersion: this.deps.catalog.version,
           seasonXpBudget: policy.seasonXp,
         });

@@ -137,7 +137,7 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' };
     const body = request.body as { buildingId?: unknown; expectedLevel?: unknown } | null;
-    if (!body || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
+    if (!closedInput(body, ['buildingId', 'expectedLevel']) || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
         typeof body.expectedLevel !== 'number' || !Number.isSafeInteger(body.expectedLevel) || body.expectedLevel < 0) {
       return reply.code(400).send({ error: 'E_BAD_MESSAGE' });
     }
@@ -194,6 +194,19 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     const { id } = request.params as { id: string };
     const result = await service.setEmblem(who, id, request.body.emblemId);
     if (!result.ok) return failed(reply, result.code);
+    return result;
+  });
+
+  app.post('/corps/:id/showcase', { bodyLimit: 2048 }, async (request, reply) => {
+    if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' };
+    if (!closedInput(request.body, ['medals']) || !Array.isArray(request.body.medals) ||
+      request.body.medals.length > 20 || request.body.medals.some((id: unknown) => typeof id !== 'string' || id.length > 100))
+      return reply.code(400).send({ error: 'E_BAD_SHOWCASE' });
+    const { id } = request.params as { id: string };
+    const result = await service.setShowcase(who, id, request.body.medals as string[]);
+    if (!result.ok) return reply.code(result.code === 'E_FORBIDDEN' ? 403 : 409).send({ error: result.code });
     return result;
   });
 

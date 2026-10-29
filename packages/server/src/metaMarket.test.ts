@@ -284,7 +284,7 @@ describe('meta market receipts and material reservations', () => {
 });
 
 describe.skipIf(!databaseUrl)('meta market materials — PostgreSQL', () => {
-  it('serializes a material purchase against cancellation without losing escrow', async () => {
+  it.each(['ferroalloys', 'command_cores'])('serializes a %s purchase against cancellation without losing escrow', async (materialId) => {
     const pool = new pg.Pool({ connectionString: databaseUrl });
     await migrate(pool);
     const suffix = `cancel-${Date.now()}-${Math.random()}`;
@@ -295,12 +295,12 @@ describe.skipIf(!databaseUrl)('meta market materials — PostgreSQL', () => {
     market.setEconomy(economy);
     try {
       await economy.transaction([seller], async (tx) => {
-        tx.account(seller).materials.push(material('earned', 20));
+        tx.account(seller).materials.push({ ...material('earned', 20), materialId });
       });
       const listed = await market.listMaterials(
         seller,
         'Seller',
-        'ferroalloys',
+        materialId,
         20,
         100,
         'listing',

@@ -1,3 +1,4 @@
+import expansion from '../art/corp/expansion/manifest.json';
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import manifest from '../art/corp/manifest.json';
@@ -7,11 +8,12 @@ import { CORP_LOTS, corpSprite } from './corpSprites';
 const images = (svg: string): string[] => [...svg.matchAll(/<image [^>]*>/g)].map((m) => m[0]);
 
 describe('рисунки зданий корпорации (CORP-13)', () => {
-  it('каждое здание панорамы нарисовано на всех трёх уровнях', () => {
+  it('каждое здание панорамы нарисовано на всех уровнях каталога', () => {
     expect([...CORP_ART_BUILDINGS].sort()).toEqual(Object.keys(CORP_LOTS).sort());
     for (const id of CORP_ART_BUILDINGS) {
-      const srcs = [1, 2, 3].map((level) => corpArt(id, level)?.src);
-      expect(new Set(srcs).size, id).toBe(3);
+      const count = id === 'headquarters' ? 5 : id === 'monument' ? 1 : 3;
+      const frames = Array.from({ length: count }, (_, i) => JSON.stringify(corpArt(id, i + 1)));
+      expect(new Set(frames).size, id).toBe(count);
     }
   });
 
@@ -28,7 +30,8 @@ describe('рисунки зданий корпорации (CORP-13)', () => {
 
   it('уровень вне нарисованных берёт ближайший рисунок, чужое здание — без рисунка', () => {
     expect(corpArt('headquarters', 0)?.src).toBe(corpArt('headquarters', 1)?.src);
-    expect(corpArt('headquarters', 5)?.src).toBe(corpArt('headquarters', 3)?.src);
+    expect(corpArt('headquarters', 99)).toEqual(corpArt('headquarters', 5));
+    expect(corpArt('headquarters', 4)).not.toEqual(corpArt('headquarters', 5));
     expect(corpArt('orbital_dock', 1)).toBeNull();
   });
 });
@@ -43,11 +46,12 @@ describe('стили базы (CORP-14)', () => {
     const srcs = new Set<string>();
     for (const style of CORP_STYLES)
       for (const id of CORP_ART_BUILDINGS)
-        for (const level of [1, 2, 3]) srcs.add(corpArt(id, level, style)!.src);
-    expect(srcs.size).toBe(CORP_STYLES.length * CORP_ART_BUILDINGS.length * 3);
+        for (const level of Array.from({ length: id === 'headquarters' ? 5 : id === 'monument' ? 1 : 3 }, (_, i) => i + 1)) srcs.add(JSON.stringify(corpArt(id, level, style)));
+    expect(srcs.size).toBe(CORP_STYLES.length * 21);
   });
 
   it('стиль без рисунков в этой сборке рисуется и называется стандартным', () => {
+    expect(corpArt('headquarters', 2, '__proto__')).toEqual(corpArt('headquarters', 2));
     expect(corpArt('headquarters', 2, 'art_deco')).toEqual(corpArt('headquarters', 2));
     expect(corpStyleName('art_deco')).toBe(corpStyleName('standard'));
     expect(corpStyleName('high_tech')).toBe('corp.style.high-tech');
@@ -106,4 +110,16 @@ describe('здание на панораме (corpSprite)', () => {
     expect(images(svg)).toEqual([]);
     expect(svg).toContain('class="f"');
   });
+});
+
+it('atlas frames stay inside the source sheet and share a ground-aligned canvas', () => {
+  for (const buildings of Object.values(expansion)) for (const frames of Object.values(buildings)) {
+    expect(new Set(frames.map((f) => `${f.w}:${f.h}`)).size).toBe(1);
+    for (const { frame: f, box, h } of frames) {
+      expect(f.sx + f.sw).toBeLessThanOrEqual(f.iw);
+      expect(f.sy + f.sh).toBeLessThanOrEqual(f.ih);
+      expect(f.dy + f.dh).toBeCloseTo(h);
+      expect(box.every((n) => Number.isFinite(n) && n >= 0 && n <= 1)).toBe(true);
+    }
+  }
 });

@@ -45,6 +45,7 @@ export interface MetaEconomyAccount {
   cosmetics: string[];
   /** On a corporation's record: the applied base style; absent = `standard`. */
   corpStyle?: string;
+  corpMaterials?: import('./corpInfrastructure').CorpMaterialBank;
   /** On a corporation's record: the applied backdrop; absent = `orbit`. */
   corpBackdrop?: string;
   counters: Record<string, number>;

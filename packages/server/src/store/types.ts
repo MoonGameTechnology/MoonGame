@@ -1,4 +1,4 @@
-import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
+import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpPublicFacilities, CorpShowcaseResult, NewsAnnouncement } from '@void/protocol';
 import type { ArsenalItem, CoalitionClock, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
@@ -31,6 +31,10 @@ export interface MatchSnapshot {
   seq: number;
   status: 'ongoing' | 'ended';
   state: GameState;
+  /** Real UTC milliseconds, outside the deterministic world clock. */
+  createdAt?: number;
+  /** First committed finish, immutable across saves and server restarts. */
+  endedAt?: number;
   /** Absent on legacy snapshots and rooms using absolute wall time. */
   clock?: MatchClock;
   /** Immutable first observation per [playerId, claimedAt], outside GameState. */
@@ -42,6 +46,10 @@ export interface MatchSnapshot {
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
  *  All methods are async so the same interface fits a real database. */
 export interface MatchStore {
+  /** Enforce archive status, real-time retention and byte budget before loading JSON. */
+  loadArchive?(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null>;
+  /** Lightweight catalog metadata, without retaining/cloning full worlds. */
+  archiveMetadata?(ids: readonly string[], since: number): Promise<import('../matchArchiveMetadata').ArchiveSummaryMetadata[]>;
   /** Durable reward delivery scans committed matches in bounded, stable pages. */
   economyMatchIds?(after?: string, limit?: number): Promise<string[]>;
   load(matchId: string): Promise<MatchSnapshot | null>;
@@ -60,6 +68,8 @@ export interface MatchStore {
    *  feed can enumerate joinable matches without loading each snapshot. Restart-safe:
    *  it reflects what is durably in the store, not just the rooms live in memory. */
   ongoingMatchIds(): Promise<string[]>;
+  /** Finished snapshots still within a real-time archive window. */
+  endedMatchIds?(since: number): Promise<string[]>;
   /** Cheap reachability check for the `/ready` probe (SV-0.1): true if the backing
    *  store is reachable (a `SELECT 1` for Postgres). Absent ⇒ assumed reachable
    *  (in-memory has no dependency to be down). */
@@ -215,7 +225,7 @@ export interface UserStore {
  *  caps a player at one application at a time. */
 export type CorpRole = 'head' | 'officer' | 'member' | 'recruit';
 
-export interface CorpRecord {
+export interface CorpRecord extends CorpPublicFacilities {
   corpId: string;
   name: string;
   /** Absent on legacy records; clients derive a stable default from corpId. */
@@ -253,6 +263,7 @@ export interface CorpAuditEntry {
   action:
     | 'create'
     | 'emblem'
+    | 'showcase'
     | 'accept'
     | 'decline'
     | 'kick'
@@ -289,6 +300,9 @@ export const DEFAULT_FEED_LIMIT = 50;
 export const ACTIVE_ANNOUNCEMENTS_MAX = 50;
 
 export interface CorpStore {
+  prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation>;
+  commitBuild(ticketId: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement>;
+  monumentsOf(corpIds: readonly string[]): Promise<string[]>;
   /** Settle elapsed construction/income, optionally order a level. Membership,
    * debit, queue and audit commit together; only the head may spend influence. A settled
    * headquarters of level 2+ also goes to the public feed in that commit (CORP-1). */
@@ -310,6 +324,8 @@ export interface CorpStore {
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }>;
   /** Head authorization, appearance and audit commit atomically. */
   setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }>;
+  /** Head-only, with hall capacity and earned medals rechecked under the corp lock. */
+  setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult>;
   getCorp(corpId: string): Promise<CorpRecord | null>;
   /** Every corp with its accepted-member count, ordered by name (case-insensitive). */
   listCorps(): Promise<CorpSummary[]>;
@@ -734,6 +750,8 @@ export interface CorpRent {
   matchupId: string;
   accountId: string;
   rentedAt: number;
+  /** Warehouse benefit fixed when handed out; old rentals retain their old wear rule. */
+  unworn?: true;
 }
 
 /** Persistence for corp-arsenal rentals (ARS-6). Deliberately dumb like the other
@@ -756,6 +774,8 @@ export interface CorpRentStore {
    *  anywhere (including other matchups) — false = already on rent, nothing
    *  changed. */
   rent(entry: CorpRent): Promise<boolean>;
+  rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'>;
+  activeForCorp(corpId: string): Promise<CorpRent[]>;
   /** Every still-active rental for a matchup (war-end return-all sweep reads this). */
   activeForMatchup(matchupId: string): Promise<CorpRent[]>;
   /** This account's active rentals for a matchup (the ARS-3 snapshot merge point). */

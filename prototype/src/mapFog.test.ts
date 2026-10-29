@@ -101,6 +101,25 @@ async function boot(w: GameState = base()) {
 }
 
 describe('REFM-231 — зрение кадра', () => {
+  it('opens the frozen map and travelling fleets in both solo and network views after the match ends', async () => {
+    const world = base();
+    world.fleets.enemy = { ...fleet('enemy', 'p2', 'D'), location: null,
+      movement: { from: 'D', to: 'E', departedAt: 0, arrivesAt: 2000 } };
+    const { fog, env } = await boot(world);
+    fog.refreshVision();
+    expect(fog.known('E')).toBe(false);
+    expect(fog.fleetSeen(world.fleets.enemy!)).toBe(false);
+    env.world = { ...world, match: { ...world.match, status: 'ended', endedAt: world.time } };
+    fog.refreshVision();
+    expect(fog.known('E')).toBe(true);
+    expect(fog.fleetSeen(world.fleets.enemy!)).toBe(true);
+    env.net = true;
+    fog.refreshVision();
+    expect(fog.known('E')).toBe(true);
+    expect(fog.fleetSeen(world.fleets.enemy!)).toBe(true);
+    expect(fog.vision!.signatures).toEqual([]);
+  });
+
   it('до первого пересчёта тумана нет: видно всё', async () => {
     const { fog } = await boot();
     expect(fog.vision).toBeNull();

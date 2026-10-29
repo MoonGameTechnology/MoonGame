@@ -1,3 +1,4 @@
+import { connectToMatch } from './matchJoin';
 /**
  * Хозяин хаба (REFM-220): показ хаба и его вкладки, «Прокачка» с мета-хранилищем по
  * позывному, экраны вкладок (друзья, рейтинги, арсенал, аукцион, магазин, новости,
@@ -28,6 +29,7 @@ import { initFriends } from './friendsScreen';
 import { maybeIntro, openCodex } from './helpCenter';
 import { initHubWallet } from './hubWallet';
 import { inviteTargets, joinByNumber, refreshMyMatches } from './matchBrowser';
+import { avaMatchId } from '../../packages/protocol/src/ava';
 import { leaveMatch, startProvingGround } from './matchLifecycle';
 import {
   canUnlock,
@@ -687,9 +689,10 @@ export function initHubScreen(host: HubScreenHost): void {
           shop?.show('styles', style);
           hubTab('shop');
         },
+        openMarket: () => hubTab('auction'),
+        openBattle: (matchupId) => connectToMatch(avaMatchId(matchupId)),
       },
     });
-  $('railcorp').addEventListener('click', () => corp?.open());
   // hub interactions
   $('hub-play').addEventListener('click', () => hubTab('games'));
   // Single-player entry from the hub home — offline skirmish vs bots (both builds).
