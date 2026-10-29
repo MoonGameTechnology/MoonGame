@@ -191,6 +191,9 @@ describe('ended room lifecycle', () => {
     });
     expect(saved?.state.time).toBe(10);
     expect(saved?.clock).toMatchObject({ gameTime: 10, running: false });
+    expect(saved?.createdAt).toBe(0);
+    expect(saved?.endedAt).toBe(6);
+    expect(room.endedAt).toBe(6);
     if (!saved) throw new Error('missing snapshot');
     wall = 1000;
     const restored = new MatchRoom({
@@ -202,9 +205,31 @@ describe('ended room lifecycle', () => {
       initiallyStarted: true,
       timeScale: 2,
       initialClock: saved.clock,
+      initialCreatedAt: saved.createdAt,
+      initialEndedAt: saved.endedAt,
     });
     expect(restored.tick()).toBe(false);
     expect(restored.state).toEqual(saved.state);
     expect(restored.clockSnapshot).toMatchObject({ gameTime: 10, running: false });
+    expect(restored.endedAt).toBe(6);
+    expect(restored.createdAt).toBe(0);
+  });
+
+  it('does not start archive retention when the finishing durable write fails', async () => {
+    let wall = 0;
+    const persist = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
+    const room = new MatchRoom({
+      id: 'failed-finish', initialState: initial(), kernel: createKernel([module]), data,
+      now: () => wall, initiallyStarted: true, persist,
+    });
+    const action = { id: 'finish', type: 'finishAction', playerId: 'p1', issuedAt: 0, payload: {} };
+    wall = 1;
+    expect((await room.submitServerAction('p1', action)).ok).toBe(false);
+    expect(room.state.match.status).toBe('ongoing');
+    expect(room.endedAt).toBeUndefined();
+    wall = 2;
+    expect((await room.submitServerAction('p1', action)).ok).toBe(true);
+    expect(room.endedAt).toBe(2);
+    expect(persist.mock.calls[1]![0].endedAt).toBe(2);
   });
 });

@@ -1,4 +1,5 @@
 import { reservedBotLogin } from '../botNicknames';
+import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
@@ -75,6 +76,24 @@ export class MemoryMatchStore implements MatchStore {
     return Promise.resolve(snap ? clone(snap) : null);
   }
 
+  loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
+    const snapshot = this.snaps.get(matchId);
+    if (!snapshot || snapshot.status !== 'ended' || snapshot.endedAt === undefined ||
+      snapshot.endedAt <= since || archiveStateBytes(snapshot.state) > maxBytes) return Promise.resolve(null);
+    return Promise.resolve(clone(snapshot));
+  }
+
+  archiveMetadata(ids: readonly string[], since: number): Promise<ArchiveSummaryMetadata[]> {
+    const rows: ArchiveSummaryMetadata[] = [];
+    for (const id of ids) {
+      const snapshot = this.snaps.get(id);
+      if (!snapshot || snapshot.status !== 'ended' || snapshot.endedAt === undefined || snapshot.endedAt <= since) continue;
+      rows.push({ ...archiveMetadataOf(snapshot), matchId: id,
+        createdAt: snapshot.createdAt ?? snapshot.endedAt, endedAt: snapshot.endedAt, seated: 0 });
+    }
+    return Promise.resolve(rows);
+  }
+
   save(snapshot: MatchSnapshot): Promise<void> {
     const prepared = this.prepareSnapshot(snapshot);
     if (prepared) this.snaps.set(snapshot.matchId, prepared);
@@ -104,6 +123,10 @@ export class MemoryMatchStore implements MatchStore {
       }
       return clone({
         ...snapshot,
+        createdAt: prev?.createdAt ?? snapshot.createdAt ?? Date.now(),
+        ...(snapshot.status === 'ended'
+          ? { endedAt: prev?.endedAt ?? snapshot.endedAt ?? Date.now() }
+          : {}),
         ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
         ...(Object.keys(economyActivity).length ? { economyActivity } : {}),
       }); // optimistic: keep the newest while retaining committed reward evidence
@@ -115,6 +138,13 @@ export class MemoryMatchStore implements MatchStore {
     const ids: string[] = [];
     for (const snap of this.snaps.values()) if (snap.status !== 'ended') ids.push(snap.matchId);
     return Promise.resolve(ids);
+  }
+
+  endedMatchIds(since: number): Promise<string[]> {
+    return Promise.resolve([...this.snaps.values()]
+      .filter((s) => s.status === 'ended' && s.endedAt !== undefined && s.endedAt > since)
+      .sort((a, b) => b.endedAt! - a.endedAt! || a.matchId.localeCompare(b.matchId))
+      .map((s) => s.matchId));
   }
 
   ping(): Promise<boolean> {

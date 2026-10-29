@@ -1,5 +1,15 @@
 import type { MatchRoom } from './matchRoom';
 import { detach } from './detach';
+import { MATCH_ARCHIVE_MS } from './matchRegistry';
+
+function archiveExpired(room: MatchRoom, now: number): boolean {
+  return room.state.match.status === 'ended' && room.endedAt !== undefined &&
+    now >= room.endedAt + MATCH_ARCHIVE_MS;
+}
+
+function closeArchive(room: MatchRoom): void {
+  for (const player of room.connectedPlayers()) room.evict(player, 'E_ENTRY_CLOSED');
+}
 
 /**
  * A set of independent match-actors hosted in one process, addressed by match id
@@ -29,6 +39,8 @@ export interface RoomRegistry {
   release?(matchId: string): void;
   /** Persist + release every live match (graceful shutdown). */
   shutdown?(): Promise<void>;
+  /** Reap expired frozen viewers even while their sockets keep the room retained. */
+  pruneExpired?(): string[];
 }
 
 /**
@@ -53,7 +65,7 @@ export function revokeAccountConnections(
 export class InMemoryRoomRegistry implements RoomRegistry {
   private readonly rooms = new Map<string, MatchRoom>();
 
-  constructor(rooms: readonly MatchRoom[] = []) {
+  constructor(rooms: readonly MatchRoom[] = [], private readonly now: () => number = Date.now) {
     for (const room of rooms) this.add(room);
   }
 
@@ -63,11 +75,21 @@ export class InMemoryRoomRegistry implements RoomRegistry {
   }
 
   get(matchId: string): MatchRoom | undefined {
-    return this.rooms.get(matchId);
+    const room = this.rooms.get(matchId);
+    if (room && archiveExpired(room, this.now())) {
+      this.rooms.delete(matchId);
+      closeArchive(room);
+      return undefined;
+    }
+    return room;
   }
 
   ids(): string[] {
-    return [...this.rooms.keys()];
+    return [...this.rooms.keys()].filter((id) => this.get(id) !== undefined);
+  }
+
+  pruneExpired(): string[] {
+    return [...this.rooms.keys()].filter((id) => this.get(id) === undefined);
   }
 }
 
@@ -79,6 +101,7 @@ export interface LoadedMatch {
 }
 
 export interface LazyRoomRegistryOptions {
+  now?: () => number;
   /** Build + fully wire (persist, clock driver) a live room for `matchId` from the store,
    *  paired with its teardown, or null if no such match exists durably. */
   load: (matchId: string) => Promise<LoadedMatch | null>;
@@ -127,22 +150,40 @@ export class LazyRoomRegistry implements RoomRegistry {
   private readonly idleMs: number;
   private readonly schedule: (fn: () => void, ms: number) => unknown;
   private readonly cancel: (handle: unknown) => void;
+  private readonly now: () => number;
 
   constructor(private readonly options: LazyRoomRegistryOptions) {
     this.idleMs = options.idleMs ?? 5 * 60_000;
     this.schedule = options.schedule ?? ((fn, ms) => setTimeout(fn, ms));
     this.cancel = options.cancel ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
+    this.now = options.now ?? Date.now;
   }
 
   get(matchId: string): MatchRoom | undefined {
+    if (this.expire(matchId)) return undefined;
     return this.live.get(matchId)?.room;
   }
 
   ids(): string[] {
-    return [...this.live.keys()];
+    return [...this.live.keys()].filter((id) => this.get(id) !== undefined);
+  }
+
+  pruneExpired(): string[] {
+    return [...this.live.keys()].filter((id) => this.expire(id));
+  }
+
+  private expire(matchId: string): boolean {
+    const loaded = this.live.get(matchId);
+    if (!loaded || !archiveExpired(loaded.room, this.now())) return false;
+    this.disarmIdle(matchId);
+    this.disarmWake(matchId);
+    // Remove the entry before closing peers: a close handler may re-enter get/resolve.
+    detach(`archive expiry ${matchId}`, this.hibernate(matchId, true, true));
+    return true;
   }
 
   async resolve(matchId: string): Promise<MatchRoom | undefined> {
+    if (this.expire(matchId)) return undefined;
     const live = this.live.get(matchId);
     if (live) return live.room;
     // A reconnection landing WHILE this match is mid-hibernation must not read the
@@ -152,7 +193,7 @@ export class LazyRoomRegistry implements RoomRegistry {
     if (disposing) {
       await disposing;
       const relive = this.live.get(matchId);
-      if (relive) return relive.room; // a concurrent resolve already reloaded it
+      if (relive) return this.get(matchId); // a concurrent resolve already reloaded it
     }
     // De-dupe concurrent loads (two players joining an evicted match at once): the
     // second awaits the first's in-flight load instead of building a second room.
@@ -171,6 +212,7 @@ export class LazyRoomRegistry implements RoomRegistry {
     const loaded = await this.options.load(matchId);
     if (!loaded) return undefined;
     this.live.set(matchId, loaded);
+    if (this.expire(matchId)) return undefined;
     this.disarmWake(matchId); // now live — the loaded room's clock driver supersedes the wake
     return loaded.room;
   }
@@ -213,12 +255,12 @@ export class LazyRoomRegistry implements RoomRegistry {
     }
   }
 
-  private async hibernate(matchId: string, wakeProgressed = true): Promise<void> {
+  private async hibernate(matchId: string, wakeProgressed = true, expired = false): Promise<void> {
     this.idle.delete(matchId);
     const live = this.live.get(matchId);
-    if (!live || live.room.peerCount > 0) return; // a socket reconnected during the window
+    if (!live || (!expired && live.room.peerCount > 0)) return; // a socket reconnected during the window
     // Read the next scheduled event's wall-ms BEFORE teardown, to wake for it while asleep.
-    const nextEventMs = live.room.msUntilNextEvent();
+    const nextEventMs = expired ? null : live.room.msUntilNextEvent();
     this.live.delete(matchId);
     // `dispose` persists + tears down; it can REJECT on a store error. Contain it: a
     // failed idle-persist must never crash the process (this runs as `void hibernate`).
@@ -232,6 +274,7 @@ export class LazyRoomRegistry implements RoomRegistry {
         () => {},
       );
     this.disposing.set(matchId, persisted);
+    if (expired) closeArchive(live.room);
     try {
       await persisted;
     } finally {

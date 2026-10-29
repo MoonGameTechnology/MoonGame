@@ -21,6 +21,7 @@ import { standingOrderTickActions } from './standingOrderDriver';
 import { expiredSeatClaims } from './seatExpiry';
 import { detach } from './detach';
 import { commitMatch } from './matchCommit';
+import { archiveExpired } from './matchArchive';
 
 /**
  * The match-loading wiring `main.ts` hands to the LazyRoomRegistry, extracted
@@ -94,7 +95,7 @@ export function createMatchLoader(
   const expectedDataHash = hashGameDataBundle(data);
   return async (matchId: string): Promise<LoadedMatch | null> => {
     const snap = await stores.store.load(matchId);
-    if (!snap) return null;
+    if (!snap || archiveExpired(snap, now())) return null;
     // MP-4: the match pinned the game-data bundle's hash at creation — a mismatch means
     // data/*.json was swapped out from under a LIVE match (accidental drift or tampering,
     // "подмена бандла меняет правила"). Fail-secure: refuse to resume rather than run it
@@ -164,6 +165,8 @@ export function createMatchLoader(
       initialReceipts,
       initialSeq: snap.seq,
       initialCareer: snap.career,
+      initialCreatedAt: snap.createdAt,
+      initialEndedAt: snap.endedAt,
       careerAccounts: deps.careerAccounts
         ? await deps.careerAccounts(matchId)
         : stores.accountStore && stores.userStore

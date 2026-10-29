@@ -235,6 +235,8 @@ export function snapshotOf(room: MatchRoom): MatchSnapshot {
     dataVersion: state.version.data,
     seq: room.sequence,
     status: state.match.status,
+    createdAt: room.createdAt,
+    ...(room.endedAt !== undefined ? { endedAt: room.endedAt } : {}),
     state,
     economyActivity: room.economyActivitySnapshot,
     career: room.careerSnapshot,

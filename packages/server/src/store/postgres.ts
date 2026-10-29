@@ -1,4 +1,6 @@
 import { reservedBotLogin } from '../botNicknames';
+import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
+import { readArchiveMetadata } from '../matchArchiveCatalog';
 import { isCorpEmblemId, type CorpEmblemId } from '@void/protocol';
 import type {
   CorpBuildOrder,
@@ -86,6 +88,28 @@ const SCHEMA_SQL = `
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS career jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS archive_meta jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS archive_state_bytes integer;
+    -- Legacy snapshots have only simulation time. Infer their finish once, anchored
+    -- at durable creation, rather than extending their archive on every restart.
+    UPDATE matches SET ended_at = LEAST(updated_at, GREATEST(created_at,
+      created_at + GREATEST(0,
+        COALESCE((state->'match'->>'endedAt')::double precision, (state->>'time')::double precision, 0)
+        - COALESCE((state->>'startedAt')::double precision, 0))
+        / GREATEST(COALESCE((clock->>'timeScale')::double precision, 1), 1)
+        * interval '1 millisecond'))
+    WHERE status = 'ended' AND ended_at IS NULL;
+    UPDATE matches SET archive_meta = jsonb_strip_nulls(jsonb_build_object(
+      'mapId', COALESCE(state->>'mapId', 'nexus'), 'modeId', state->>'modeId',
+      'gameTime', COALESCE((state->>'time')::double precision, 0),
+      'startedAt', COALESCE((state->>'startedAt')::double precision, 0),
+      'timeScale', COALESCE((clock->>'timeScale')::double precision, 1),
+      'capacity', (SELECT count(*) FROM jsonb_each(COALESCE(state->'players', '{}'::jsonb)) AS p
+        WHERE COALESCE(p.value->>'npc', '') IN ('', 'false')))),
+      archive_state_bytes = octet_length(state::text)
+    WHERE status='ended' AND (archive_meta IS NULL OR archive_state_bytes IS NULL);
+    CREATE INDEX IF NOT EXISTS matches_ended_at_idx ON matches (ended_at) WHERE status = 'ended';
     CREATE TABLE IF NOT EXISTS profile_career (account_id text PRIMARY KEY, career jsonb NOT NULL);
     CREATE TABLE IF NOT EXISTS profile_career_credits (match_id text NOT NULL, account_id text NOT NULL, PRIMARY KEY(match_id,account_id));
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
@@ -99,6 +123,7 @@ const SCHEMA_SQL = `
     );
     -- a side is held by at most one nick per room (so two nicks can't take p1)
     CREATE UNIQUE INDEX IF NOT EXISTS seats_room_player_idx ON seats (room, player_id);
+    CREATE INDEX IF NOT EXISTS seats_nick_room_idx ON seats (nick, room);
     -- seat lock (REL-5): sha256 of the seat ticket; NULL = seat claimed before the
     -- lock existed (adopted on the owner's next join). Plaintext never stored.
     ALTER TABLE seats ADD COLUMN IF NOT EXISTS ticket_hash text;
@@ -612,6 +637,8 @@ interface MatchRow {
   economy_observations: MatchSnapshot['economyObservations'] | null;
   economy_activity: MatchSnapshot['economyActivity'] | null;
   career: MatchSnapshot['career'] | null;
+  created_at: Date;
+  ended_at: Date | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
@@ -640,16 +667,35 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
+    return this.snapshotFromRow(row);
+  }
+
+  async loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
+    const r = await this.pool.query<MatchRow>(
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at
+       FROM matches WHERE id=$1 AND status='ended' AND ended_at>$2 AND archive_state_bytes<=$3`,
+      [matchId, new Date(since), maxBytes],
+    );
+    return this.snapshotFromRow(r.rows[0]);
+  }
+
+  archiveMetadata(ids: readonly string[], since: number): Promise<ArchiveSummaryMetadata[]> {
+    return readArchiveMetadata(this.pool, { ids, since });
+  }
+
+  private snapshotFromRow(row: MatchRow | undefined): MatchSnapshot | null {
     if (!row) return null;
     return {
       matchId: row.id,
       dataVersion: row.data_version,
       seq: row.seq,
       status: row.status === 'ended' ? 'ended' : 'ongoing',
+      ...(row.created_at ? { createdAt: row.created_at.getTime() } : {}),
+      ...(row.ended_at ? { endedAt: row.ended_at.getTime() } : {}),
       ...(row.career ? { career: row.career } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
@@ -688,8 +734,8 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, ended_at, created_at, archive_meta, archive_state_bytes, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), $13::jsonb, $14, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
@@ -697,6 +743,9 @@ export class PostgresMatchStore implements MatchStore {
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
          career       = EXCLUDED.career,
+         ended_at     = COALESCE(matches.ended_at, EXCLUDED.ended_at),
+         archive_meta = EXCLUDED.archive_meta,
+         archive_state_bytes = EXCLUDED.archive_state_bytes,
          economy_observations = CASE
            WHEN matches.economy_observations IS NULL AND EXCLUDED.economy_observations IS NULL THEN NULL
            ELSE COALESCE(EXCLUDED.economy_observations, '{}'::jsonb) || COALESCE(matches.economy_observations, '{}'::jsonb)
@@ -744,6 +793,10 @@ export class PostgresMatchStore implements MatchStore {
           : null,
         MAX_META_ACTIVITY_FACTS_PER_ROLE,
         snapshot.career ? JSON.stringify(snapshot.career) : null,
+        snapshot.status === 'ended' ? new Date(snapshot.endedAt ?? Date.now()) : null,
+        snapshot.createdAt !== undefined ? new Date(snapshot.createdAt) : null,
+        snapshot.status === 'ended' ? JSON.stringify(archiveMetadataOf(snapshot)) : null,
+        snapshot.status === 'ended' ? archiveStateBytes(snapshot.state) : null,
       ],
     );
     return result.rowCount === 1;
@@ -753,6 +806,14 @@ export class PostgresMatchStore implements MatchStore {
     // Uses matches_status_idx — never touches the JSONB `state`.
     const r = await this.pool.query<{ id: string }>(
       `SELECT id FROM matches WHERE status = 'ongoing'`,
+    );
+    return r.rows.map((row) => row.id);
+  }
+
+  async endedMatchIds(since: number): Promise<string[]> {
+    const r = await this.pool.query<{ id: string }>(
+      `SELECT id FROM matches WHERE status = 'ended' AND ended_at > $1 ORDER BY ended_at DESC, id`,
+      [new Date(since)],
     );
     return r.rows.map((row) => row.id);
   }

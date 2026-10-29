@@ -31,6 +31,10 @@ export interface MatchSnapshot {
   seq: number;
   status: 'ongoing' | 'ended';
   state: GameState;
+  /** Real UTC milliseconds, outside the deterministic world clock. */
+  createdAt?: number;
+  /** First committed finish, immutable across saves and server restarts. */
+  endedAt?: number;
   /** Absent on legacy snapshots and rooms using absolute wall time. */
   clock?: MatchClock;
   /** Immutable first observation per [playerId, claimedAt], outside GameState. */
@@ -42,6 +46,10 @@ export interface MatchSnapshot {
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
  *  All methods are async so the same interface fits a real database. */
 export interface MatchStore {
+  /** Enforce archive status, real-time retention and byte budget before loading JSON. */
+  loadArchive?(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null>;
+  /** Lightweight catalog metadata, without retaining/cloning full worlds. */
+  archiveMetadata?(ids: readonly string[], since: number): Promise<import('../matchArchiveMetadata').ArchiveSummaryMetadata[]>;
   /** Durable reward delivery scans committed matches in bounded, stable pages. */
   economyMatchIds?(after?: string, limit?: number): Promise<string[]>;
   load(matchId: string): Promise<MatchSnapshot | null>;
@@ -60,6 +68,8 @@ export interface MatchStore {
    *  feed can enumerate joinable matches without loading each snapshot. Restart-safe:
    *  it reflects what is durably in the store, not just the rooms live in memory. */
   ongoingMatchIds(): Promise<string[]>;
+  /** Finished snapshots still within a real-time archive window. */
+  endedMatchIds?(since: number): Promise<string[]>;
   /** Cheap reachability check for the `/ready` probe (SV-0.1): true if the backing
    *  store is reachable (a `SELECT 1` for Postgres). Absent ⇒ assumed reachable
    *  (in-memory has no dependency to be down). */
