@@ -41,8 +41,8 @@ import {
   SHOP_TABS,
   type ShopTab,
 } from '../../decisions/shopView';
-import { CORP_ART_BUILDINGS, corpArt, corpStyleName } from './corpArt';
-import { corpBackdropName, corpPanoramaBg } from './corpSprites';
+import { CORP_ART_BUILDINGS, corpStyleName } from './corpArt';
+import { corpBackdropName, corpPanoramaBg, corpSprite } from './corpSprites';
 import { data } from './gameData';
 import { esc, nfmt } from './format';
 import { SOV_SVG } from './icons';
@@ -186,14 +186,13 @@ function materialsSub(view: MetaEconomyView, materials: Record<string, number>):
   return t('shop.materials.kinds', { n: rows.length });
 }
 
-/** Стиль базы — зданиями III уровня, самыми полными рисунками: в карточке штаб, в описании
+/** Стиль базы — завершёнными зданиями: в карточке штаб, в описании
  *  все здания. */
 function styleArtHtml(style: string, all: boolean): string {
   return (
     `<span class="sh-art sh-art-style" aria-hidden="true">` +
     (all ? CORP_ART_BUILDINGS : [CORP_HQ])
-      .map((id) => corpArt(id, 3, style))
-      .map((art) => (art ? `<img src="${art.src}" alt="">` : ''))
+      .map((id) => corpSprite(id, id === CORP_HQ ? 5 : 3, 'built', style))
       .join('') +
     '</span>'
   );
