@@ -8,7 +8,7 @@ import {
   type MatchRewardFacts,
   type MetaEconomyDeps,
 } from './metaEconomy';
-import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
+import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from './metaEconomyCatalog';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { MemoryMetaMarket } from './metaMarket';
 import { MemoryArsenalStore, MemoryDropStore } from './store';
@@ -28,7 +28,7 @@ function setup(onEvent?: MetaEconomyDeps['onEvent']) {
   const store = new MemoryMetaEconomyStore(arsenal, drops, market);
   market.setEconomy(store);
   const tables = loadDropTables(data);
-  const service = new MetaEconomy({ store, catalog, dropTables: tables, now: () => time, onEvent });
+  const service = new MetaEconomy({ store, catalog, catalogHistory: loadMetaEconomyCatalogHistory(data), dropTables: tables, now: () => time, onEvent });
   const final = (
     matchId = 'match_1',
     overrides: Partial<MatchRewardFacts> = {},
@@ -95,6 +95,53 @@ function setup(onEvent?: MetaEconomyDeps['onEvent']) {
 }
 
 describe('MetaEconomy settlement', () => {
+  it('grants tradable corporation resources once across stages and final, and sells them through the existing auction', async () => {
+    const f = setup();
+    const facts = f.final('corp-materials', { place: 5 });
+    const stage = { ...facts, kind: 'stage' as const, stage: 1, place: undefined };
+    expect((await f.service.settle(stage)).ok).toBe(true);
+    expect((await f.service.settle(stage)).ok).toBe(true);
+    expect((await f.service.settle({ ...stage, stage: 2 })).ok).toBe(true);
+    const result = await f.service.settle(facts);
+    expect(result.ok).toBe(true);
+    expect(await f.service.settle(facts)).toEqual(result);
+    const account = await f.store.read('alice');
+    for (const [id, quantity] of Object.entries(f.catalog.rewards.corporationMaterials)) {
+      const lots = account.materials.filter((lot) => lot.materialId === id);
+      expect(lots.reduce((sum, lot) => sum + lot.quantity, 0)).toBe(quantity);
+      expect(lots.every((lot) => !lot.soulbound && lot.source === 'match')).toBe(true);
+    }
+    expect((await f.service.settle(f.final('buyer', { accountId: 'bob', place: 5 }))).ok).toBe(true);
+    const listed = await f.market.listMaterials('alice', 'Alice', 'command_cores', 1, 10, 'list-core');
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) throw Error('fixture');
+    const before = await f.market.balance('bob');
+    const purchase = await f.market.buyMaterial('bob', listed.listing.id, 'buy-core');
+    expect(purchase.ok).toBe(true);
+    expect(await f.market.buyMaterial('bob', listed.listing.id, 'buy-core')).toEqual(purchase);
+    expect(await f.market.balance('bob')).toBe(before - 10);
+    expect((await f.store.read('bob')).materials.filter((lot) => lot.materialId === 'command_cores')
+      .reduce((sum, lot) => sum + lot.quantity, 0)).toBe(2);
+  });
+
+  it('does not extend an existing operation budget with newly introduced corporation resources', async () => {
+    const f = setup();
+    await f.store.transaction(['alice'], async (tx) => {
+      tx.account('alice').operations.legacy = { materials: {}, seasonXp: 0, metrics: {}, finalized: false,
+        budget: { ...f.catalog.rewards.materials }, policyVersion: 'meta-v0.1' };
+    });
+    expect((await f.service.settle(f.final('legacy', { place: 5 }))).ok).toBe(true);
+    expect((await f.store.read('alice')).materials.some((lot) =>
+      f.catalog.materials[lot.materialId]?.purpose === 'corporation')).toBe(false);
+  });
+
+  it('still fulfils an issued entitlement from the previous catalog edition', async () => {
+    const f = setup();
+    const command = f.entitlement('legacy-payment', 'supply_personal', { catalogVersion: 'meta-v0.1' });
+    const result = await f.service.applyEntitlement(command);
+    expect(result.ok).toBe(true);
+    expect(await f.service.applyEntitlement(command)).toEqual(result);
+  });
   it('does not announce a complete final while omitting stages committed during receipt reads', async () => {
     const f = setup();
     const stage = { ...f.final(), kind: 'stage' as const, stage: 1, place: undefined };
@@ -187,6 +234,9 @@ describe('MetaEconomy settlement', () => {
     expect(await f.service.settle(f.final())).toEqual(first);
     expect(await f.store.read('alice')).toEqual(before);
     expect(before.operations.match_1?.materials).toEqual({
+      construction_blocks: 15,
+      engineering_kits: 6,
+      command_cores: 1,
       ferroalloys: 26,
       technical_composites: 18,
       control_circuits: 18,

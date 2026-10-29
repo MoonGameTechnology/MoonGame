@@ -300,6 +300,8 @@ export const DEFAULT_FEED_LIMIT = 50;
 export const ACTIVE_ANNOUNCEMENTS_MAX = 50;
 
 export interface CorpStore {
+  prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation>;
+  commitBuild(ticketId: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement>;
   monumentsOf(corpIds: readonly string[]): Promise<string[]>;
   /** Settle elapsed construction/income, optionally order a level. Membership,
    * debit, queue and audit commit together; only the head may spend influence. A settled

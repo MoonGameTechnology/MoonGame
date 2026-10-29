@@ -1,3 +1,5 @@
+import { canFundCorpBuilding, corpMaterialsHtml, parseCorpMaterials } from './corpMaterialsView';
+import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
 import { corpShowcaseHtml, parseWarehouse, warehouseHtml, type WarehouseView } from './corpFacilitiesView';
 import { corpHubBadges, corpHubState } from '../../decisions/corpHub';
 import { BATTLE_FORMATS, CORP_BATTLE_TABS, formatLimit, parseCorpBattles, parseCorpWar, type CorpBattleTab } from '../../decisions/corpBattles';
@@ -217,6 +219,7 @@ export interface CorpHost {
     signIn(): void;
     /** CORP-14 — a base style the corporation lacks is bought in the shop; open it there. */
     openShop?(style: string): void;
+    openMarket?(): void;
     openBattle?(matchupId: string): void;
   };
 }
@@ -241,6 +244,7 @@ export function initCorp(host: CorpHost): {
   closeHubSheet: () => void;
 } {
   let infrastructure: CorpInfrastructureView | null = null;
+  let corpMaterials: CorpMaterialsView | null = null;
   let infrastructureAt = 0;
   let infrastructureTimer: ReturnType<typeof setInterval> | undefined;
   // Стиль базы (CORP-14); null — не прочитан, здания рисуются стандартными.
@@ -417,8 +421,11 @@ export function initCorp(host: CorpHost): {
         infrastructureAt = performance.now();
         if (infrastructure && corpMine.corp) corpMine.corp.influence = infrastructure.influence;
         corpStyle = parseCorpStyle(await corpFetch('/meta-economy/corp-style')) ?? null;
+        corpMaterials = parseCorpMaterials(await corpFetch('/meta-economy/corp-materials'));
+        if (corpMaterials?.corpId !== corpId) corpMaterials = null;
       } else {
         infrastructure = null;
+        corpMaterials = null;
         corpStyle = null;
       }
       if (canManage(corpMine.membership.role)) {
@@ -434,6 +441,7 @@ export function initCorp(host: CorpHost): {
       corpDetail = null;
       corpAudit = [];
       infrastructure = null;
+      corpMaterials = null;
       corpStyle = null;
       const listRaw = (await corpFetch('/corps')) as { corps?: unknown } | null;
       corpBrowseList = parseCorpSummaries(listRaw?.corps);
@@ -829,7 +837,7 @@ export function initCorp(host: CorpHost): {
     return (
       `<div class="cbig"><div><span>${t('corp.influence')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
       `<h4>${t('corp.history')}</h4><div class="cledger">${ledgerHtml}</div>` +
-      `<p class="chint">${t('corp.influence.hint')}</p>`
+      `<p class="chint">${t('corp.influence.hint')}</p>` + corpMaterialsHtml(corpMaterials, intentBusy)
     );
   }
 
@@ -857,7 +865,7 @@ export function initCorp(host: CorpHost): {
     ).join('');
     let body = '';
     if (corpTab === 'hq') body = corpHqHtml();
-    else if (corpTab === 'buildings') body = corpBuildingsHtml(infrastructure, performance.now() - infrastructureAt, intentBusy || corpFetchBusy);
+    else if (corpTab === 'buildings') body = corpBuildingsHtml(infrastructure, performance.now() - infrastructureAt, intentBusy || corpFetchBusy, corpMaterials);
     else if (corpTab === 'members') body = corpMembersHtml();
     else if (corpTab === 'wars') body = corpWarsHtml();
     else if (corpTab === 'battles') body = corpBattlesHtml();
@@ -971,10 +979,23 @@ export function initCorp(host: CorpHost): {
       case 'refresh':
         detach('corporation refresh', refreshCorp());
         break;
+      case 'materials-market':
+        host.hub.openMarket?.();
+        break;
+      case 'contribute': {
+        const input = btn.closest('.cb-material-row')?.querySelector<HTMLInputElement>('input[data-corpmaterial]');
+        const quantity = Number(input?.value);
+        const personal = corpMaterials?.materials.find((r) => r.id === arg)?.personal ?? 0;
+        if (Number.isSafeInteger(quantity) && quantity > 0 && quantity <= personal)
+          corpSend(act, '/meta-economy/corp-materials/contribute', { requestId: crypto.randomUUID(), materialId: arg, quantity });
+        break;
+      }
       case 'build': {
         const building = infrastructure?.buildings.find((b) => b.id === arg);
-        if (building?.next && building.blocked === null && infrastructure?.canBuild) {
-          corpSend(act, `/corps/${encodeURIComponent(corpId)}/build`, { buildingId: arg, expectedLevel: building.level });
+        if (building?.next && building.blocked === null && infrastructure?.canBuild && canFundCorpBuilding(building.next, corpMaterials)) {
+          if (Object.keys(building.next.materials ?? {}).length)
+            corpSend(act, '/meta-economy/corp-materials/build', { requestId: crypto.randomUUID(), buildingId: arg, expectedLevel: building.level, price: building.next.price });
+          else corpSend(act, `/corps/${encodeURIComponent(corpId)}/build`, { buildingId: arg, expectedLevel: building.level });
         }
         break;
       }
@@ -1077,6 +1098,7 @@ export function initCorp(host: CorpHost): {
       me,
       members,
       view: infrastructure,
+      materials: corpMaterials,
       style: corpStyle,
       elapsedMs: performance.now() - infrastructureAt,
       rank: corpRank,

@@ -1,3 +1,5 @@
+import { canFundCorpBuilding, corpMaterialsHtml, corpMaterialPriceHtml } from './corpMaterialsView';
+import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
 /**
  * Вкладка хаба «Корпорация» (CORP-3) — разметка по макету, одобренному владельцем
  * 2026-10-21: шапка корпорации, разделы «База», «Битвы», «Состав», «Казна» и шторка над
@@ -119,6 +121,7 @@ const STYLE_STATE: Readonly<Record<Exclude<CorpStyleCard, 'apply' | 'shop'>, str
 
 /** Всё, из чего рисуется вкладка. */
 export interface CorpHubPaint {
+  materials?: CorpMaterialsView | null;
   state: CorpHubState;
   section: CorpHubSection;
   corp: CorpRecord | null;
@@ -563,7 +566,7 @@ function treasuryHtml(p: CorpHubPaint, corp: CorpRecord): string {
         `</div>`
       : '') +
     `<ul class="cb-reqs"><li class="info">${esc(t('corp.hub.balance.in'))}</li><li class="info">${esc(t('corp.hub.balance.out'))}</li></ul>` +
-    `</section></div>`
+    `</section></div>` + corpMaterialsHtml(p.materials, p.busy)
   );
 }
 
@@ -690,10 +693,10 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
   else {
     const label = t(b.level > 0 ? 'corp.hub.act.upgrade' : 'corp.hub.act.build', { cost: price(next.cost) });
     action =
-      status.kind === 'can'
+      status.kind === 'can' && canFundCorpBuilding(next, p.materials)
         ? `<button type="button" class="btn-main" data-corpact="build" data-corparg="${esc(b.id)}"${off(p.busy)}>${esc(label)}</button>`
         : `<button type="button" class="btn-main" aria-disabled="true" disabled>${esc(label)}</button>` +
-          `<p class="cb-note warn">${statusHtml(view, b, p.elapsedMs).html}</p>`;
+          `<p class="cb-note warn">${status.kind === 'can' ? esc(t(!p.materials ? 'corp.materials.unavailable' : p.materials.pending ? 'corp.materials.pending' : 'corp.materials.insufficient')) : statusHtml(view, b, p.elapsedMs).html}</p>`;
   }
   const opens = b.id === CORP_HQ && next ? corpLevelPlan(view)?.next?.opens ?? [] : [];
   const style = styleOf(p);
@@ -720,6 +723,8 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
       : '') +
     (p.facilities?.[b.id] ?? '') +
     reqs +
+    (next && Object.keys(next.materials ?? {}).length ? `<div class="cb-sec"><h4>${esc(t('corp.materials.cost'))}</h4><ul class="cb-reqs">${corpMaterialPriceHtml(next.materials, p.materials)}</ul>` +
+      (p.materials?.pending ? `<p role="status" class="cb-note warn">${esc(t('corp.materials.pending'))}</p>` : '') + `</div>` : '') +
     `<div class="cb-acts">${action}</div>` +
     `<div class="cb-sec"><h4>${esc(t('corp.hub.levels.title'))}</h4><div class="cb-lvls">${thumbs}</div></div>`
   );
@@ -731,6 +736,7 @@ function levelsSheetHtml(view: CorpInfrastructureView): string {
       (r) =>
         `<tr class="${r.current ? 'cur' : ''}"><td>${r.level}${r.current ? ` · ${esc(t('corp.hub.levels.here'))}` : ''}</td>` +
         `<td>${esc(price(r.cost))} · ${esc(duration(r.durationMs))}` +
+        `<ul class="cb-reqs">${Object.entries(view.buildings.find((b) => b.id === CORP_HQ)?.levels[r.level - 1]?.materials ?? {}).map(([id, n]) => `<li>${n} ${esc(t('meta.material.' + id))}</li>`).join('')}</ul>` +
         (r.conditions.length
           ? `<span class="cb-lv-cond">${esc(r.conditions.map((c) => t(CONDITION_KEY[c.kind].need, { n: c.need })).join(' · '))}</span>`
           : '') +

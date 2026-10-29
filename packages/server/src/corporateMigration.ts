@@ -6,6 +6,7 @@ import { migrate } from './store';
 export const CORPORATE_TABLES = [
   'corps',
   'corp_members',
+  'corp_build_payments',
   'corp_audit',
   'corp_ready',
   'player_ready',
@@ -28,6 +29,10 @@ const COPY_SQL = {
     count: 'SELECT count(*) AS n FROM corp_members',
     write:
       'INSERT INTO corp_members SELECT * FROM json_populate_record(NULL::corp_members, $1::json)',
+  },
+  corp_build_payments: {
+    read: 'SELECT * FROM corp_build_payments', count: 'SELECT count(*) AS n FROM corp_build_payments',
+    write: 'INSERT INTO corp_build_payments SELECT * FROM json_populate_record(NULL::corp_build_payments, $1::json)',
   },
   corp_audit: {
     read: 'SELECT * FROM corp_audit',
@@ -91,7 +96,7 @@ export async function migrateCorporations(
     // Lock target tables against concurrent corporate writes during the import.
     if (apply)
       await to.query(
-        'LOCK TABLE corps,corp_members,corp_audit,corp_ready,player_ready,ava_challenges,ava_roster,ava_results,ava_feed,medals IN EXCLUSIVE MODE',
+        'LOCK TABLE corps,corp_members,corp_build_payments,corp_audit,corp_ready,player_ready,ava_challenges,ava_roster,ava_results,ava_feed,medals IN EXCLUSIVE MODE',
       );
     for (const table of CORPORATE_TABLES) {
       const sql = COPY_SQL[table];

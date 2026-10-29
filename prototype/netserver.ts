@@ -1,3 +1,5 @@
+import { CorpMaterials } from '../packages/server/src/corpMaterials';
+import { registerCorpMaterialsApi } from '../packages/server/src/corpMaterialsApi';
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
 import { ArchiveCapacityError, ArchiveRoomCache, HOST_ROOM_LIMIT } from '../packages/server/src/matchArchive';
 import { PostgresArchiveCatalog, StoreArchiveCatalog } from '../packages/server/src/matchArchiveCatalog';
@@ -5,7 +7,7 @@ import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type Re
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
 import { MemoryDropStore } from '../packages/server/src/store';
 import { MetaEconomy } from '../packages/server/src/metaEconomy';
-import { loadMetaEconomyCatalog } from '../packages/server/src/metaEconomyCatalog';
+import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from '../packages/server/src/metaEconomyCatalog';
 import { registerMetaEconomyApi } from '../packages/server/src/metaEconomyApi';
 import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from '../packages/server/src/metaEconomyStore';
 import { createMetaRewardDelivery } from '../packages/server/src/metaEconomyDelivery';
@@ -447,7 +449,7 @@ const arsenalRefreshes = new Set<Promise<void>>();
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
 // ARS-4: таблицы выпадения — и для доставки наград, и для осколков за бои битвы корпораций.
 const dropTables = loadDropTables(data);
-const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, dropTables, now: Date.now,
+const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, catalogHistory: loadMetaEconomyCatalogHistory(data), dropTables, now: Date.now,
   onEvent: (event) => {
     process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
     // Final snapshots can themselves issue durable rewards. During shutdown do
@@ -1706,6 +1708,7 @@ const server = createMultiplayerServer({
       const refreshAccountArsenal = async (who: { accountId: string; login: string }): Promise<void> => {
         await syncAccountArsenal({ ...who, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: (id) => !isAvaMatchId(id) });
       };
+      registerCorpMaterialsApi(app, new CorpMaterials({ store: metaEconomyStore, catalog: metaCatalog, corps: corpStore }), identifySession, process.env.CORPORATIONS_MAINTENANCE !== '1');
       registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal,
         corpOf: (accountId) => corpStore.membershipOf(accountId) });
       registerMetaCommerce(app, metaEconomy, metaEconomyStore);

@@ -360,6 +360,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
       '/corps/c1/infrastructure': built.infrastructure,
       '/corps/c1/audit': { audit: [] },
       '/leaderboard': { corps: { me: { rank: 3 } } },
+      '/meta-economy/corp-materials': { corp: { corpId: 'c1', pending: false, history: [], materials: ['construction_blocks', 'engineering_kits', 'command_cores'].map((id) => ({ id, nameKey: 'meta.material.' + id, personal: 10, available: 500, reserved: 0 })) } },
       '/meta-economy/corp-style': { corp: { head: true, active: 'standard', backdrop: 'orbit', owned: ['high_tech'] } },
     };
   }

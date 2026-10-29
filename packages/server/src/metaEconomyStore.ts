@@ -32,6 +32,7 @@ export interface MetaEconomyTransaction {
 }
 
 export interface MetaEconomyStore {
+  pendingCorpMaterials(limit: number, after?: string): Promise<string[]>;
   transaction<T>(
     accountIds: readonly string[],
     work: (tx: MetaEconomyTransaction) => Promise<T>,
@@ -67,6 +68,10 @@ function validAccount(account: MetaEconomyAccount): void {
     throw Error('E_ECONOMY_STATE');
   if (account.premiumUntil !== undefined && !Number.isSafeInteger(account.premiumUntil))
     throw Error('E_ECONOMY_STATE');
+  if (account.corpMaterials) {
+    for (const n of Object.values(account.corpMaterials.available)) if (!Number.isSafeInteger(n) || n < 0) throw Error('E_ECONOMY_STATE');
+    for (const n of Object.values(account.corpMaterials.pending?.materials ?? {})) if (!Number.isSafeInteger(n) || n <= 0) throw Error('E_ECONOMY_STATE');
+  }
   const ids = new Set<string>();
   for (const lot of account.materials) {
     if (
@@ -100,6 +105,9 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
     drops.bindEconomyLock(arsenal);
   }
 
+  pendingCorpMaterials(limit: number, after?: string): Promise<string[]> {
+    return this.lock.run(async () => [...this.accounts].filter(([id, a]) => id.startsWith('corp:') && a.corpMaterials?.pending && (!after || id > `corp:${after}`)).sort(([a], [b]) => a.localeCompare(b)).slice(0, limit).map(([id]) => id.slice(5)));
+  }
   read(accountId: string): Promise<MetaEconomyAccount> {
     return this.lock.run(async () =>
       structuredClone(this.accounts.get(accountId) ?? emptyMetaEconomyAccount()),
@@ -233,6 +241,10 @@ class TransactionDrops implements DropStore {
 }
 
 export class PostgresMetaEconomyStore implements MetaEconomyStore {
+  async pendingCorpMaterials(limit: number, after?: string): Promise<string[]> {
+    const rows = await this.pool.query<{ account_id: string }>("SELECT account_id FROM meta_economy_accounts WHERE account_id LIKE 'corp:%' AND state->'corpMaterials'->'pending' IS NOT NULL AND ($2::text IS NULL OR account_id>$2) ORDER BY account_id LIMIT $1", [limit, after ? `corp:${after}` : null]);
+    return rows.rows.map((r) => r.account_id.slice(5));
+  }
   constructor(private readonly pool: Pool) {}
 
   async recentPlayerMedals(limit: number, before?: number, corpId?: string | null): Promise<PlayerMedalNews[]> {

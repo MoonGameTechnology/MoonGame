@@ -1,3 +1,4 @@
+import { scopedPool } from '../corporateScopedPool';
 import { reservedBotLogin } from '../botNicknames';
 import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { readArchiveMetadata } from '../matchArchiveCatalog';
@@ -9,7 +10,7 @@ import type {
   NewsAnnouncement,
   NewsAnnouncementKind,
 } from '@void/protocol';
-import { updateCorpInfrastructure } from '../corpConstruction';
+import { corpBuildPrice, updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
 import { corpFacilities, publicCorpFacilities, validateShowcase } from '../corpFacilities';
 import type { CorpShowcaseResult } from '@void/protocol';
@@ -215,6 +216,17 @@ const SCHEMA_SQL = `
       login      text NOT NULL,
       role       text NOT NULL,
       joined_at  timestamptz NOT NULL DEFAULT now()
+    );
+    ALTER TABLE corp_members ADD COLUMN IF NOT EXISTS membership_nonce uuid NOT NULL DEFAULT gen_random_uuid();
+    CREATE UNIQUE INDEX IF NOT EXISTS corp_members_nonce_idx ON corp_members(membership_nonce);
+    CREATE TABLE IF NOT EXISTS corp_build_payments (
+      id text PRIMARY KEY,
+      corp_id text NOT NULL,
+      head_membership uuid REFERENCES corp_members(membership_nonce) ON DELETE SET NULL,
+      request_key text NOT NULL,
+      ticket jsonb NOT NULL,
+      result jsonb,
+      UNIQUE(corp_id,head_membership,request_key)
     );
     CREATE INDEX IF NOT EXISTS corp_members_corp_idx ON corp_members (corp_id);
 
@@ -441,6 +453,8 @@ const SCHEMA_SQL = `
       account_id text PRIMARY KEY,
       state jsonb NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS meta_economy_corp_pending_idx ON meta_economy_accounts(account_id)
+      WHERE account_id LIKE 'corp:%' AND state->'corpMaterials'->'pending' IS NOT NULL;
     CREATE TABLE IF NOT EXISTS meta_economy_receipts (
       receipt_key text PRIMARY KEY,
       fingerprint text NOT NULL,
@@ -1201,6 +1215,56 @@ function memberOf(row: CorpMemberRow): CorpMembership {
 type CorpFacilityRow = { infrastructure: CorpInfrastructureState | null; showcase: string[] };
 
 export class PostgresCorpStore implements CorpStore {
+  async prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      const member = await db.query<{ membership_nonce: string; role: string }>('SELECT membership_nonce,role FROM corp_members WHERE account_id=$1 AND corp_id=$2 FOR UPDATE', [actor, corpId]);
+      const m = member.rows[0];
+      if (m?.role !== 'head') { await db.query('ROLLBACK'); return { ok: false, code: 'E_FORBIDDEN' }; }
+      const old = await db.query<{ ticket: import('@void/protocol').CorpBuildTicket }>('SELECT ticket FROM corp_build_payments WHERE corp_id=$1 AND head_membership=$2 AND request_key=$3', [corpId, m.membership_nonce, order.requestId]);
+      if (old.rows[0]) {
+        const t = old.rows[0].ticket;
+        await db.query('COMMIT');
+        return t.order.price === order.price && t.order.buildingId === order.buildingId && t.order.expectedLevel === order.expectedLevel
+          ? { ok: true, ticket: t } : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
+      }
+      const result = await new PostgresCorpStore(scopedPool(db)).infrastructure(corpId, actor, now);
+      const b = result.ok ? result.infrastructure.buildings.find((b) => b.id === order.buildingId) : undefined;
+      let code: import('@void/protocol').CorpBuildError | null = !b?.next || b.level !== order.expectedLevel ? 'E_CORP_BUILD_LEVEL' : b.blocked;
+      if (!order.requestId || !b?.next || order.price !== b.next.price) code = 'E_CORP_PRICE';
+      if (code) { await db.query('COMMIT'); return { ok: false, code }; }
+      const ticket = { id: randomUUID(), corpId, order: { ...order, requestId: undefined }, materials: { ...b!.next!.materials } };
+      await db.query('INSERT INTO corp_build_payments(id,corp_id,head_membership,request_key,ticket) VALUES($1,$2,$3,$4,$5::jsonb)', [ticket.id, corpId, m.membership_nonce, order.requestId, JSON.stringify(ticket)]);
+      await db.query('COMMIT');
+      return { ok: true, ticket };
+    } catch (e) { await db.query('ROLLBACK').catch(() => undefined); throw e; } finally { db.release(); }
+  }
+  async commitBuild(id: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement> {
+    const db = await this.pool.connect();
+    try {
+      await db.query('BEGIN');
+      // Membership before receipt before corporation: same lock order as erase/disband.
+      const peek = await db.query<{ head_membership: string | null }>('SELECT head_membership FROM corp_build_payments WHERE id=$1', [id]);
+      const nonce = peek.rows[0]?.head_membership;
+      const members = nonce ? await db.query<{ account_id: string; role: string; corp_id: string }>('SELECT account_id,role,corp_id FROM corp_members WHERE membership_nonce=$1 FOR UPDATE', [nonce]) : null;
+      const row = (await db.query<{ ticket: import('@void/protocol').CorpBuildTicket; result: import('@void/protocol').CorpBuildSettlement | null; head_membership: string | null }>('SELECT ticket,result,head_membership FROM corp_build_payments WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      if (!row || row.result) { await db.query('COMMIT'); return row?.result ?? { state: 'unknown' }; }
+      const m = members?.rows[0];
+      let result: import('@void/protocol').CorpBuildSettlement;
+      if (!m || row.head_membership !== nonce || m.role !== 'head' || m.corp_id !== row.ticket.corpId)
+        result = { state: 'rejected', code: 'E_FORBIDDEN' };
+      else if (row.ticket.order.price !== corpBuildPrice(row.ticket.corpId, row.ticket.order)) result = { state: 'rejected', code: 'E_CORP_PRICE' };
+      else {
+        const applied = await new PostgresCorpStore(scopedPool(db)).infrastructure(row.ticket.corpId, m.account_id, now, row.ticket.order);
+        result = applied.ok ? { state: 'applied' } : { state: 'rejected', code: applied.code };
+      }
+      await db.query('UPDATE corp_build_payments SET result=$2::jsonb WHERE id=$1', [id, JSON.stringify(result)]);
+      await db.query('COMMIT');
+      return result;
+    } catch (e) { await db.query('ROLLBACK').catch(() => undefined); throw e; } finally { db.release(); }
+  }
+
   async monumentsOf(ids: readonly string[]): Promise<string[]> {
     if (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string')) return [];
     const result = await this.pool.query<{ id: string; infrastructure: CorpInfrastructureState | null }>('SELECT id,infrastructure FROM corps WHERE id=ANY($1::text[])', [ids]);

@@ -37,6 +37,7 @@
     "smoke:corporation-service": "node prototype/corporationservicetest.mjs",
     "smoke:corporation": "pnpm run prototype && node prototype/corptest.mjs",
     "smoke:ava": "pnpm run prototype && node prototype/avatest.mjs",
+    "smoke:corp-materials": "pnpm run prototype && node prototype/corpmaterialstest.mjs",
     "smoke:corp-style": "pnpm run prototype && node prototype/corpstyletest.mjs",
     "smoke:registration-reward": "pnpm run prototype && node prototype/registrationrewardtest.mjs",
     "smoke:bots": "node prototype/botpopulationtest.mjs",
