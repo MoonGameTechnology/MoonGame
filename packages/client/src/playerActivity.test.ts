@@ -33,6 +33,19 @@ describe('foreground reporter', () => {
     expect(JSON.parse(request.mock.calls.at(-2)![1]!.body as string).active).toBe(false);
     expect(request.mock.calls.at(-1)![0]).toBe('https://other.example/activity/pulse');
   });
+  it('marks an entry immediately without tagging later heartbeats or missing identities', async () => {
+    let target: ActivityTarget | null = { base: 'https://game.example', token: 'private' };
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
+    const report = createActivityReporter({ target: () => target, request, channel: 'a'.repeat(32) });
+    await report(true, true);
+    await report(true);
+    expect(JSON.parse(request.mock.calls[0]![1]!.body as string).sectorZero).toBe(true);
+    expect(JSON.parse(request.mock.calls[1]![1]!.body as string).sectorZero).toBeUndefined();
+    target = null;
+    await report(true, true);
+    expect(JSON.parse(request.mock.calls.at(-1)![1]!.body as string)).toMatchObject({ active: false });
+    expect(request).toHaveBeenCalledTimes(3);
+  });
   it('bounds offline requests and absorbs fetch/storage errors', async () => {
     vi.useFakeTimers();
     const request = vi.fn<typeof fetch>().mockImplementation(
