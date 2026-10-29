@@ -4052,6 +4052,15 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pips i.bld{background:repeating-linear-gradient(90deg,var(--amber) 0 2px,transparent 2px 4px);border-color:var(--amber);}
 /* Состав и казна: список слева, сбоку заявки, роли и баланс. */
 .cb-two{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start;}
+.cb-materials{margin-top:16px;}
+.cb-material-row{display:grid;grid-template-columns:minmax(0,1fr) 76px auto;gap:8px;align-items:center;border-bottom:1px solid var(--sf-edge);padding:10px 0;}
+.cb-material-row>div{min-width:0;overflow-wrap:anywhere;}
+.cb-material-row b,.cb-material-row small{display:block;}
+.cb-material-row small{font-size:var(--fs-caption);color:var(--sf-dim);margin-top:4px;line-height:1.5;}
+.cb-material-row input{width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;background:var(--sf-card);color:var(--sf-hi);border:1px solid var(--sf-edge);border-radius:8px;}
+.cb-materials .cb-lrow>b{font-size:var(--fs-caption);overflow-wrap:anywhere;}
+.cb-materials summary{cursor:pointer;padding:8px 0;}
+@media(max-width:540px){.cb-material-row{grid-template-columns:minmax(0,1fr) 92px;}.cb-material-row>div{grid-column:1/-1;}.cb-material-row button{min-height:42px;}}
 .cb-side{display:flex;flex-direction:column;gap:16px;min-width:0;}
 .cb-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px;border-radius:14px;border:1px solid var(--sf-edge);background:var(--sf-card);}
 .cb-card-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;}

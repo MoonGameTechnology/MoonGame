@@ -1,3 +1,5 @@
+import { CorpMaterials } from '../packages/server/src/corpMaterials';
+import { registerCorpMaterialsApi } from '../packages/server/src/corpMaterialsApi';
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
 import { ArchiveCapacityError, ArchiveRoomCache, HOST_ROOM_LIMIT } from '../packages/server/src/matchArchive';
 import { PostgresArchiveCatalog, StoreArchiveCatalog } from '../packages/server/src/matchArchiveCatalog';
@@ -1706,6 +1708,7 @@ const server = createMultiplayerServer({
       const refreshAccountArsenal = async (who: { accountId: string; login: string }): Promise<void> => {
         await syncAccountArsenal({ ...who, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: (id) => !isAvaMatchId(id) });
       };
+      registerCorpMaterialsApi(app, new CorpMaterials({ store: metaEconomyStore, catalog: metaCatalog, corps: corpStore }), identifySession, process.env.CORPORATIONS_MAINTENANCE !== '1');
       registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal,
         corpOf: (accountId) => corpStore.membershipOf(accountId) });
       registerMetaCommerce(app, metaEconomy, metaEconomyStore);

@@ -137,7 +137,7 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' };
     const body = request.body as { buildingId?: unknown; expectedLevel?: unknown } | null;
-    if (!body || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
+    if (!closedInput(body, ['buildingId', 'expectedLevel']) || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
         typeof body.expectedLevel !== 'number' || !Number.isSafeInteger(body.expectedLevel) || body.expectedLevel < 0) {
       return reply.code(400).send({ error: 'E_BAD_MESSAGE' });
     }

@@ -689,6 +689,7 @@ export function initHubScreen(host: HubScreenHost): void {
           shop?.show('styles', style);
           hubTab('shop');
         },
+        openMarket: () => hubTab('auction'),
         openBattle: (matchupId) => connectToMatch(avaMatchId(matchupId)),
       },
     });

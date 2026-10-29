@@ -3,7 +3,7 @@ import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } fro
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
-import { updateCorpInfrastructure } from '../corpConstruction';
+import { corpBuildPrice, updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
 import { corpFacilities, publicCorpFacilities, validateShowcase } from '../corpFacilities';
 import type { CorpShowcaseResult } from '@void/protocol';
@@ -368,6 +368,59 @@ export class MemoryUserStore implements UserStore {
 
 /** In-memory corp store — membership keyed by account (one corp per account). */
 export class MemoryCorpStore implements CorpStore {
+  private readonly memberNonces = new Map<string, string>();
+  private readonly buildTickets = new Map<string, {
+    ticket: import('@void/protocol').CorpBuildTicket; nonce: string | null; key: string;
+    result?: import('@void/protocol').CorpBuildSettlement;
+  }>();
+  async prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation> {
+    const view = await this.infrastructure(corpId, actor, now);
+    const member = this.members.get(actor);
+    if (!view.ok || member?.role !== 'head' || member.corpId !== corpId) return { ok: false, code: 'E_FORBIDDEN' };
+    let nonce = this.memberNonces.get(actor);
+    if (!nonce) this.memberNonces.set(actor, nonce = randomUUID());
+    const key = order.requestId!;
+    const old = [...this.buildTickets.values()].find((t) => t.ticket.corpId === corpId && t.nonce === nonce && t.key === key);
+    if (old) return old.ticket.order.price === order.price && old.ticket.order.buildingId === order.buildingId && old.ticket.order.expectedLevel === order.expectedLevel
+      ? { ok: true, ticket: structuredClone(old.ticket) } : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
+    const b = view.infrastructure.buildings.find((b) => b.id === order.buildingId);
+    if (!b?.next || b.level !== order.expectedLevel) return { ok: false, code: 'E_CORP_BUILD_LEVEL' };
+    if (!order.requestId || order.price !== b.next.price) return { ok: false, code: 'E_CORP_PRICE' };
+    if (b.blocked) return { ok: false, code: b.blocked };
+    const ticket = { id: randomUUID(), corpId, order: { ...order, requestId: undefined }, materials: { ...b.next.materials } };
+    this.buildTickets.set(ticket.id, { ticket, nonce, key });
+    return { ok: true, ticket: structuredClone(ticket) };
+  }
+  async commitBuild(id: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement> {
+    const row = this.buildTickets.get(id);
+    if (!row) return { state: 'unknown' };
+    if (row.result) return structuredClone(row.result);
+    const battles = (await this.results?.statsForCorp(row.ticket.corpId))?.matches ?? 0;
+    // Recheck after await. Authorize, mutate, and cache the terminal receipt without yielding.
+    if (row.result) return structuredClone(row.result);
+    const { corpId, order } = row.ticket;
+    const member = [...this.members.values()].find((m) => row.nonce !== null && this.memberNonces.get(m.accountId) === row.nonce);
+    const corp = this.corps.get(corpId);
+    if (!corp || !member || member.corpId !== corpId || member.role !== 'head')
+      return row.result = { state: 'rejected', code: 'E_FORBIDDEN' };
+    if (order.price !== corpBuildPrice(corpId, order)) return row.result = { state: 'rejected', code: 'E_CORP_PRICE' };
+    const updated = updateCorpInfrastructure(corpId, member.accountId, member.role, corp.influence,
+      this.infrastructureStates.get(corpId) ?? null, now, order,
+      { members: [...this.members.values()].filter((m) => m.corpId === corpId && m.role !== 'recruit').length, battles });
+    corp.influence = updated.influence;
+    this.infrastructureStates.set(corpId, updated.state);
+    this.audit.push(...updated.audit);
+    row.result = updated.result.ok ? { state: 'applied' } : { state: 'rejected', code: updated.result.code };
+    // Feed observation cannot undo an already committed payment receipt.
+    await this.publish(corpLevelNews(corpId, corp.name, updated.audit)).catch(() => undefined);
+    return structuredClone(row.result);
+  }
+  private revokeBuildMembership(accountId: string): void {
+    const nonce = this.memberNonces.get(accountId);
+    if (nonce) for (const ticket of this.buildTickets.values()) if (ticket.nonce === nonce) ticket.nonce = null;
+    this.memberNonces.delete(accountId);
+  }
+
   monumentsOf(ids: readonly string[]): Promise<string[]> {
     if (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string')) return Promise.resolve([]);
     return Promise.resolve(ids.filter((id) => this.corps.has(id) && publicCorpFacilities(this.infrastructureStates.get(id) ?? null, Date.now()).monument));
@@ -515,6 +568,7 @@ export class MemoryCorpStore implements CorpStore {
   removeMember(corpId: string, accountId: string): Promise<void> {
     const row = this.members.get(accountId);
     if (row && row.corpId === corpId) {
+      this.revokeBuildMembership(accountId);
       this.members.delete(accountId);
       this.playerReady.delete(accountId); // leaving the corp revokes the consent (AVA-3)
     }
@@ -538,7 +592,8 @@ export class MemoryCorpStore implements CorpStore {
     this.corpReady.delete(corpId);
     for (const [accountId, row] of this.members) {
       if (row.corpId === corpId) {
-        this.members.delete(accountId);
+        this.revokeBuildMembership(accountId);
+      this.members.delete(accountId);
         this.playerReady.delete(accountId);
       }
     }

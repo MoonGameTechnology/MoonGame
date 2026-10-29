@@ -13,6 +13,7 @@ const key = (v: unknown): v is string =>
 const level = (v: unknown): v is CorpBuildingLevel =>
   object(v) &&
   integer(v.cost) &&
+  (v.materials === undefined || object(v.materials) && Object.entries(v.materials).every(([id, n]) => ['construction_blocks', 'engineering_kits', 'command_cores'].includes(id) && integer(n) && n > 0)) &&
   integer(v.durationMs) &&
   v.durationMs > 0 &&
   integer(v.headquarters) &&
@@ -76,6 +77,7 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
       b.next !== null &&
       (!level(b.next) ||
         !object(b.next) ||
+        (b.next.price !== undefined && (typeof b.next.price !== 'string' || !/^[a-f0-9]{64}$/.test(b.next.price))) ||
         !integer(b.next.actualDurationMs) ||
         b.next.actualDurationMs < 1)
     )

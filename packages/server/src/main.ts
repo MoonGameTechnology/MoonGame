@@ -1,3 +1,5 @@
+import { CorpMaterials } from './corpMaterials';
+import { registerCorpMaterialsApi } from './corpMaterialsApi';
 import {
   corporateEndpoint,
   registerCorporateGateway,
@@ -692,6 +694,7 @@ const server = createMultiplayerServer({
             }
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
+          registerCorpMaterialsApi(scope, new CorpMaterials({ store: stores.metaEconomy, catalog: metaCatalog, corps: stores.corpStore }), identify, process.env.CORPORATIONS_MAINTENANCE !== '1');
           registerMetaEconomyApi(scope, {
             economy: metaEconomy,
             identify,

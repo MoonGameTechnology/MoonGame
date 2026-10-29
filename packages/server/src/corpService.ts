@@ -1,3 +1,4 @@
+import { CORP_BUILDINGS } from './corpConstruction';
 import { CORP_EMBLEMS, isCorpEmblemId, blockedPublicName, type CorpBuildOrder, type CorpInfrastructureResult } from '@void/protocol';
 import { randomInt } from 'node:crypto';
 import { CORP_NAME_COUNT, generatedCorpName } from './corpNames';
@@ -68,6 +69,10 @@ export class CorpService {
   }
 
   infrastructure(who: CorpActor, corpId: string, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+    // The public legacy endpoint never accepts a funded/paid flag. Material-priced
+    // orders go through the game's durable reservation coordinator.
+    const materials = order && CORP_BUILDINGS.find((b) => b.id === order.buildingId)?.levels[order.expectedLevel]?.materials;
+    if (materials && Object.keys(materials).length) return Promise.resolve({ ok: false, code: 'E_CORP_PRICE' });
     return this.store.infrastructure(corpId, who.accountId, this.now(), order);
   }
 

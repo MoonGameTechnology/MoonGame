@@ -15,7 +15,7 @@ export const APP_TABLES = [
   'account_erasure_guard',
   'corps',
   'corp_gateway_nonces',
-  'corp_members',
+  'corp_members', 'corp_build_payments',
   'corp_audit',
   'corp_ready',
   'player_ready',

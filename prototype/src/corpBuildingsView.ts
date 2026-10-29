@@ -1,3 +1,5 @@
+import { canFundCorpBuilding, corpMaterialPriceHtml } from './corpMaterialsView';
+import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
 import type {
   CorpInfrastructureView,
   CorpBuildingLevel,
@@ -7,6 +9,10 @@ import { t } from '../../localization/runtime';
 import { esc, nfmt } from './format';
 
 const errorKey = {
+  E_CORP_MATERIALS: 'corp.materials.insufficient',
+  E_CORP_PRICE: 'corp.materials.price-changed',
+  E_CORP_PAYMENT_PENDING: 'corp.materials.pending',
+  E_IDEMPOTENCY_CONFLICT: 'err.idempotency-conflict',
   E_FORBIDDEN: 'corp.buildings.lead-only',
   E_CORP_BUILDING: 'err.corp-building',
   E_CORP_BUILD_BUSY: 'err.corp-build-busy',
@@ -45,6 +51,7 @@ export function corpBuildingsHtml(
   view: CorpInfrastructureView | null,
   elapsedMs = 0,
   busy = false,
+  bank?: CorpMaterialsView | null,
 ): string {
   const refresh = `<button class="cbtn2 btn-second" data-corpact="refresh"${busy ? ' disabled' : ''}>${t('corp.buildings.refresh')}</button>`;
   if (!view) return `<p class="chint">${t('corp.buildings.unavailable')}</p>${refresh}`;
@@ -64,7 +71,7 @@ export function corpBuildingsHtml(
     .map((b) => {
       const current = b.levels[b.level - 1];
       const next = b.next;
-      const disabled = busy || !view.canBuild || b.blocked !== null || !next;
+      const disabled = busy || !view.canBuild || b.blocked !== null || !next || !canFundCorpBuilding(next, bank);
       const reason = b.blocked ? t(errorKey[b.blocked]) : '';
       return (
         `<article class="cbuild-card"><header><b>${esc(t(b.nameKey))}</b><span>${t('corp.buildings.level', { level: b.level, max: b.levels.length })}</span></header>` +
@@ -74,6 +81,7 @@ export function corpBuildingsHtml(
           : '') +
         (next
           ? `<div class="cbuild-effects"><small>${t('corp.buildings.next')}</small>${effects(next)}</div>` +
+            `<ul class="cb-reqs">${corpMaterialPriceHtml(next.materials, bank)}</ul>` +
             `<p>${next.cost ? t('corp.buildings.cost', { n: nfmt(next.cost) }) : t('corp.buildings.free')} · ${duration(next.actualDurationMs)}</p>` +
             (next.headquarters
               ? `<p class="chint">${t('corp.buildings.requirement', { n: next.headquarters })}</p>`
