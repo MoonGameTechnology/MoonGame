@@ -5304,6 +5304,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             ${passwordToggle('cwpass')}
           </div>
         </form>
+        <button id="cwrecover" class="clink btn-quiet" type="button" style="display:none" data-i18n="welcome.recover.link"></button>
       </div>
       <div id="cregister" style="display:none">
         <button id="crback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
@@ -5334,7 +5335,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div class="crow">
           <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
         </div>
-        <button id="crrecover" class="clink btn-quiet" type="button" data-i18n="welcome.register.recover"></button>
       </div>
       <div id="crecover" style="display:none">
         <button id="crecback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
