@@ -66,6 +66,7 @@
 | CORP-13 | ✅ | proto | `docs/backlog.md` | Картинки базы. |
 | CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
 | CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
+| CORP-16 | ⏳ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

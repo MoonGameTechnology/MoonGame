@@ -1043,7 +1043,7 @@ export class MetaEconomy {
           seasonXp: 0,
           finalized: false,
           metrics: {},
-          budget: { ...policy.materials },
+          budget: { ...policy.materials, ...policy.corporationMaterials },
           policyVersion: this.deps.catalog.version,
           seasonXpBudget: policy.seasonXp,
         });
