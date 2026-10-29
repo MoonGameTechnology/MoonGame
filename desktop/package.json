@@ -1,0 +1,17 @@
+{
+  "name": "void-dominion-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Electron wrapper that runs the Sector Zero platform build (prototype/dist/yandex) as a PC app. Standalone — not part of the pnpm workspace.",
+  "main": "main.mjs",
+  "scripts": {
+    "www": "node sync-www.mjs",
+    "start": "npm run www && electron .",
+    "pack:win": "npm run www && electron-packager . \"Sector Zero\" --platform=win32 --arch=x64 --out=out --overwrite --ignore=\"^/out\" --ignore=\"\\.test\\.mjs$\"",
+    "pack:linux": "npm run www && electron-packager . \"Sector Zero\" --platform=linux --arch=x64 --out=out --overwrite --ignore=\"^/out\" --ignore=\"\\.test\\.mjs$\""
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.7.1"
+  }
+}

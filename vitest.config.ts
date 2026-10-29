@@ -26,6 +26,8 @@ export default defineConfig({
       'deploy/**/*.test.mjs',
       // Отчёты по журналам плейтеста (PTM-0.1): чистые хелперы рядом со скриптом отчёта.
       'prototype/*.test.mjs',
+      // Маршруты схемы `app://` ПК-обёртки (Electron): чистая функция без Electron.
+      'desktop/*.test.mjs',
     ],
     coverage: {
       provider: 'v8',
