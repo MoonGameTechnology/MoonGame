@@ -45,6 +45,7 @@ import type {
   NewsEvent,
   NewsView,
 } from '../../packages/protocol/src/news';
+import { PROFILE_MEDALS } from '../../packages/protocol/src/playerProfile';
 import {
   parseCorpRecord,
   parseMedalDefs,
@@ -67,6 +68,7 @@ const EVENT_ICON: Record<NewsEvent['kind'], string> = {
   founded: '⬢',
   level: '▲',
   medal: '✪',
+  player_medal: '✪',
   matchup: '⚔',
   result: '⚑',
 };
@@ -378,7 +380,9 @@ export function initNews(host: NewsHost): {
   /** Поколение чтения: ответ, обогнанный новым обновлением, выбрасывается. */
   let seq = 0;
 
-  const reader = (): NewsReader => ({ signedIn, membership, medalNames, locale: LOCALE });
+  const reader = (): NewsReader => ({ signedIn, membership, medalNames, locale: LOCALE,
+    playerMedalNames: Object.fromEntries(PROFILE_MEDALS.map((m) => [m.id, t(`profile.medal.${m.id}`)])) });
+  let newsToken: string | undefined;
 
   function paint(): void {
     const r = reader();
@@ -500,6 +504,9 @@ export function initNews(host: NewsHost): {
 
   async function refresh(): Promise<void> {
     const my = ++seq;
+    // Private achievements must be authorized afresh, including after leaving a corp
+    // or signing out while the same hub instance remains mounted.
+    if (view) view = { ...view, events: view.events.filter((e) => e.kind !== 'player_medal' || e.grade === 1) };
     loadingMore = false;
     const base = host.publicBase();
     if (base !== viewBase) {
@@ -510,10 +517,10 @@ export function initNews(host: NewsHost): {
     }
     failed = false;
     paint();
-    const [feed, auth] = await Promise.all([
-      base ? call(`${base}/news`) : Promise.resolve(null),
-      host.authorizedBase(),
-    ]);
+    const auth = await host.authorizedBase();
+    if (my !== seq) return;
+    newsToken = auth?.base === base ? auth.token : undefined;
+    const feed = base ? await call(`${base}/news`, newsToken) : null;
     if (my !== seq) return;
     const next = feed?.ok ? parseNewsView(feed.body) : null;
     if (next) view = next;
@@ -547,7 +554,11 @@ export function initNews(host: NewsHost): {
     loadingMore = true;
     paint();
     const my = seq;
-    const res = await call(`${base}/news?before=${before}`);
+    const auth = await host.authorizedBase();
+    if (my !== seq) return;
+    const token = auth?.base === base ? auth.token : undefined;
+    if (token !== newsToken) { await refresh(); return; }
+    const res = await call(`${base}/news?before=${before}`, token);
     if (my !== seq || !view) return; // ленту за это время перечитали целиком
     loadingMore = false;
     const page = res?.ok ? parseNewsView(res.body) : null;

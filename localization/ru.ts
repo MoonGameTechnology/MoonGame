@@ -3506,6 +3506,8 @@ export const ru: Record<string, string> = {
   'news.loading': 'Загрузка новостей…',
   'news.matchup': 'Назначена битва: «{a}» против «{b}»',
   'news.medal': 'Корпорация «{corp}» получила медаль',
+  'news.player-medal': '{player} получает медаль «{medal}» {grade} степени',
+  'news.player-medal.anonymous': 'Игрок получил медаль «{medal}» {grade} степени',
   'news.medal.named': 'Корпорация «{corp}» получила медаль «{medal}»',
   'news.more': 'Показать ещё',
   'news.offline': 'Нет связи с сервером',

@@ -78,6 +78,12 @@ describe('parseNewsView — ответ сервера читается точн�
   it('целый ответ проходит без потерь', () => {
     expect(parseNewsView(raw)).toEqual(raw);
   });
+  it('разбирает степени медалей игрока и анонимную награду, отбрасывает неизвестные факты', () => {
+    const medal = { id: 'player-news', at: 20, kind: 'player_medal', medalId: 'first', grade: 2, login: '<Pilot>', corp: A };
+    const anonymous = { ...medal, id: 'anonymous', login: null, corp: null, grade: 1 };
+    const parsed = parseNewsView({ ...raw, events: [medal, anonymous, { ...medal, grade: 0 }, { ...medal, medalId: 'invented' }, { ...medal, corp: {} }] });
+    expect(parsed?.events).toEqual([medal, anonymous]);
+  });
 
   it('сломанная запись выпадает, соседи остаются', () => {
     const parsed = parseNewsView({

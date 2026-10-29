@@ -3497,6 +3497,8 @@ export const en: Record<string, string> = {
   'news.loading': 'Loading news…',
   'news.matchup': 'Battle set: “{a}” vs “{b}”',
   'news.medal': 'Corporation “{corp}” earned a medal',
+  'news.player-medal': '{player} earns the “{medal}” medal, class {grade}',
+  'news.player-medal.anonymous': 'A player earned the “{medal}” medal, class {grade}',
   'news.medal.named': 'Corporation “{corp}” earned the “{medal}” medal',
   'news.more': 'Show more',
   'news.offline': 'No connection to the server',
