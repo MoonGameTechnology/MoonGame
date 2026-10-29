@@ -71,6 +71,7 @@ export const CORP_HUB_SECTION_LABEL: Readonly<Record<CorpHubSection, string>> = 
 export type CorpHubSheet =
   | { kind: 'building'; id: string }
   | { kind: 'levels' }
+  | { kind: 'report'; matchupId: string }
   | { kind: 'member'; accountId: string }
   | { kind: 'emblem' }
   | { kind: 'style' };
@@ -140,8 +141,9 @@ export interface CorpHubPaint {
   /** Взведённая кнопка необратимого приказа. */
   armed: string | null;
   badges: { members: number; battles: number };
-  /** «Битвы» до CORP-10 — построители окна корпорации. */
+  /** Five battle subsections, built from the private battle read model. */
   battles: string;
+  battleReport?: string;
   canSignIn: boolean;
   /** Часы игрока — для «сегодня» и «вчера» в казне. */
   now: number;
@@ -636,7 +638,7 @@ export function corpHubHtml(p: CorpHubPaint): string {
     p.section === 'base'
       ? baseHtml(p)
       : p.section === 'battles'
-        ? `<div class="cb-legacy">${p.battles}</div>`
+        ? p.battles
         : p.section === 'members'
           ? membersHtml(p, me)
           : treasuryHtml(p, corp);
@@ -802,6 +804,8 @@ export function corpHubSheetHtml(p: CorpHubPaint, sheet: CorpHubSheet, notice: s
   if (sheet.kind === 'building') {
     const b = p.view?.buildings.find((x) => x.id === sheet.id);
     if (p.view && b) body = buildingSheetHtml(p, p.view, b);
+  } else if (sheet.kind === 'report') {
+    body = p.battleReport ?? '';
   } else if (sheet.kind === 'levels') {
     if (p.view) body = levelsSheetHtml(p.view);
   } else if (sheet.kind === 'style') {

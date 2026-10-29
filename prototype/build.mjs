@@ -34,6 +34,7 @@ const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
+const corpBattlesCss = readFileSync(new URL('./corp-battles.css', import.meta.url), 'utf8');
 
 /** Отдельный поток расчёта соло-мира (`simWorker.ts`) — свой файл рядом со страницей: политика
  *  CSP сервера и сайта пускает только поток со своего origin (`decisions/simWorker.ts`). Имя
@@ -4350,6 +4351,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
+${corpBattlesCss}
 /* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
    каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
    Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт

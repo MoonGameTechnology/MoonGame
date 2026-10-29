@@ -16,6 +16,7 @@ import {
   writeShowcase,
   type CorpHost,
 } from './corpScreen';
+import type { CorpBattlesView } from '../../packages/protocol/src/corpBattles';
 import type { AvaFeedEntry, CorpRole, MedalDef } from './corp';
 import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruction';
 
@@ -557,4 +558,47 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     hubSheet.fire(press({ corpshop: 'imperial_gothic' }));
     expect(shop).toEqual(['imperial_gothic']);
   });
+  it('CORP-10: reads private battles, sends selected formats, and opens the report sheet', async () => {
+    const battles: CorpBattlesView = { corpId: 'c1', ready: { corp: false, formats: [], player: false, players: [] },
+      challenges: [], results: [{ matchupId: 'ended', challengerCorp: 'c1', targetCorp: 'c2', winnerCorp: 'c1', at: 1, format: 2, side: 'challenger',
+        report: { reason: 'score', provinces: 10, sides: { challenger: { score: 100, provinces: 6 }, target: { score: 20, provinces: 4 } }, seats: [] } }],
+      tally: [], names: { c2: 'Вторая корпорация' } };
+    const routes = { ...headCorp(), '/corps/me': { corp: CORP, membership: HEAD, features: { ava: true, medals: false } }, '/ava/battles': battles, '/ava/pool': { pool: [] }, 'POST /ava/ready/corp': { ok: true } };
+    const calls = server(routes);
+    const sent: unknown[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: { method?: string; body?: string }) => {
+      if (url.endsWith('/ava/ready/corp') && init?.method === 'POST') {
+        sent.push(JSON.parse(init.body ?? '{}'));
+        battles.ready.corp = true;
+        battles.ready.formats = [3];
+      }
+      return inner(url, init);
+    });
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    api.showSection('battles');
+    expect(calls).toContain('GET /ava/battles');
+    expect(calls).not.toContain('GET /ava/feed?limit=40');
+    hubRoot.fire(press({ battletab: 'ready' }));
+    hubRoot.fire(press({ battleReadyFormat: '3' }));
+    hubRoot.fire(press({ corpact: 'ava-ready-save' }));
+    await tick();
+    expect(sent).toEqual([{ formats: [3] }]);
+    expect(hubRoot.html()).toContain('data-battle-ready-format="3" aria-pressed="true"');
+    hubRoot.fire(press({ battletab: 'history' }));
+    hubRoot.fire(press({ battleReport: 'ended' }));
+    expect(api.hubSheetOpen()).toBe(true);
+    expect(hubSheet.html()).toContain(t('corp.combat.report'));
+    expect(hubSheet.html()).toContain('Вторая корпорация');
+    api.closeHubSheet();
+    expect(hubRoot.html()).toContain('data-battletab="history" aria-selected="true"');
+    delete (routes as Record<string, unknown>)['/ava/battles'];
+    hubRoot.fire(press({ corphub: 'refresh' }));
+    await tick();
+    expect(hubRoot.html()).toContain(t('corp.combat.unavailable'));
+    expect(hubRoot.html()).not.toContain('data-battle-report=');
+  });
+
 });

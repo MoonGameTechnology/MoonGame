@@ -28,6 +28,7 @@ import { initFriends } from './friendsScreen';
 import { maybeIntro, openCodex } from './helpCenter';
 import { initHubWallet } from './hubWallet';
 import { inviteTargets, joinByNumber, refreshMyMatches } from './matchBrowser';
+import { avaMatchId } from '../../packages/protocol/src/ava';
 import { leaveMatch, startProvingGround } from './matchLifecycle';
 import {
   canUnlock,
@@ -687,6 +688,7 @@ export function initHubScreen(host: HubScreenHost): void {
           shop?.show('styles', style);
           hubTab('shop');
         },
+        openBattle: (matchupId) => joinByNumber(avaMatchId(matchupId)),
       },
     });
   $('railcorp').addEventListener('click', () => corp?.open());

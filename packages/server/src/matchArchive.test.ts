@@ -5,7 +5,7 @@ import { ArchiveCapacityError, ArchiveRoomCache } from './matchArchive';
 import { ARCHIVE_CATALOG_LIMIT, StoreArchiveCatalog } from './matchArchiveCatalog';
 import { MATCH_ARCHIVE_MS, MatchRegistry, sessionMeta } from './matchRegistry';
 import { MatchRoom } from './matchRoom';
-import { registerBrowserApi } from './matchApi';
+import { registerBrowserApi, registerSeatsApi } from './matchApi';
 import { MemoryAccountStore, MemoryMatchStore, type MatchSnapshot } from './store';
 
 const data = parseGameData({ version: 'archive', resources: ['metal'], units: {}, factions: {}, buildings: {}, events: {} });
@@ -141,6 +141,61 @@ describe('seven-day finished-match archive', () => {
 });
 
 describe('bounded archive residency', () => {
+  it('refuses anonymous/foreign seat browsing before loading or renewing archives, retaining public live entry', async () => {
+    const store = new MemoryMatchStore();
+    const accounts = new MemoryAccountStore();
+    let wall = finish + 1;
+    const now = () => wall;
+    const ids = Array.from({ length: 9 }, (_, i) => `private-${i}`);
+    for (const id of ids) {
+      await store.save(snapshot(id));
+      await accounts.resolveSeat(id, 'alice', ['p1']);
+    }
+    const load = vi.spyOn(store, 'loadArchive');
+    const { registry, cache } = catalogRegistry(store, accounts, now);
+    const live = snapshot('public-live');
+    live.status = live.state.match.status = 'ongoing';
+    delete live.endedAt;
+    const room = viewer(live, now);
+    registry.register(room, sessionMeta(room, { createdAt: created, timeScale: 24 }));
+    const app = Fastify();
+    registerSeatsApi(app, {
+      identify: async (req) => {
+        const login = req.headers.authorization === 'Bearer alice' ? 'alice'
+          : req.headers.authorization === 'Bearer mallory' ? 'mallory' : null;
+        return login ? { login, accountId: login } : null;
+      },
+      entryOpen: (id) => registry.entryOpen(id),
+      seatOf: (id, login) => accounts.seatOf(id, login),
+      seats: async (id, login) => {
+        const found = await registry.resolveForBrowser(id, login);
+        return found ? { ended: found.state.match.status === 'ended', seats: [
+          { playerId: 'p1', name: 'One', faction: 'x', start: null, taken: false },
+        ] } : null;
+      },
+    });
+    try {
+      expect((await app.inject('/matches/public-live/seats')).statusCode).toBe(200);
+      for (const id of ids) {
+        expect((await app.inject(`/matches/${id}/seats?nick=alice`)).statusCode).toBe(404);
+        expect((await app.inject({ url: `/matches/${id}/seats`,
+          headers: { authorization: 'Bearer mallory' } })).statusCode).toBe(404);
+      }
+      expect(load).not.toHaveBeenCalled();
+      expect(cache.size).toBe(0);
+      expect((await app.inject({ url: '/matches/private-0/seats',
+        headers: { authorization: 'Bearer alice' } })).statusCode).toBe(200);
+      expect(load).toHaveBeenCalledOnce();
+      wall += 59_999;
+      expect((await app.inject('/matches/private-0/seats?nick=alice')).statusCode).toBe(404);
+      expect(await registry.resolveForBrowser('private-0', 'mallory')).toBeUndefined();
+      wall++;
+      expect(cache.pruneExpired()).toContain('private-0');
+      expect(cache.size).toBe(0); // Refused probes never renewed the minute-long idle window.
+      expect(load).toHaveBeenCalledOnce();
+    } finally { await app.close(); await cache.shutdown(); }
+  });
+
   it('lists thousands of stored archives and restarts without loading any worlds', async () => {
     const store = new MemoryMatchStore();
     const accounts = new MemoryAccountStore();

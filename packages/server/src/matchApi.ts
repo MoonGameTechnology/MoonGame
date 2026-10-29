@@ -375,8 +375,9 @@ export interface SeatLayout {
 }
 
 export interface SeatsApiDeps {
-  /** The match's seat layout, or null when there is no such match. */
-  seats(matchId: string): Promise<SeatLayout | null>;
+  /** The match's seat layout, or null when absent/inaccessible. The verified login
+   * arrives before loading so a lazy archive cannot be warmed by a refused caller. */
+  seats(matchId: string, login: string | null): Promise<SeatLayout | null>;
   /** SES-2.3 entry window: may a NEWCOMER still claim a seat in this match? Unknown
    *  match ⇒ false (fail-secure), mirroring `MatchRegistry.entryOpen`. */
   entryOpen(matchId: string): boolean | Promise<boolean>;
@@ -422,7 +423,8 @@ export function registerSeatsApi(app: FastifyInstance, deps: SeatsApiDeps): void
 
   app.get('/matches/:id/seats', async (request: FastifyRequest, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
-    const layout = await deps.seats(id);
+    const login = deps.identify ? (await deps.identify(request))?.login ?? null : nickOf(request);
+    const layout = await deps.seats(id, login);
     if (!layout) {
       void reply.code(404);
       return { error: 'E_NO_MATCH' as const };

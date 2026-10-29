@@ -147,6 +147,15 @@ export class MatchRegistry {
     return this.archives?.rooms.resolve?.(id) ?? this.archives?.rooms.get(id);
   }
 
+  /** Pre-join browsing stays public for resident ongoing matches. An archive may
+   * load or remain in use only for its participant, before touching the lazy cache. */
+  async resolveForBrowser(id: string, nick: string | null): Promise<MatchRoom | undefined> {
+    const room = this.get(id);
+    if (room?.state.match.status === 'ongoing') return room;
+    if (!nick || !(await this.accounts.seatOf(id, nick))) return undefined;
+    return room ?? this.resolve(id);
+  }
+
   /** A durably saved, unwatched terminal host can retire to catalog-only storage. */
   unregister(id: string): boolean {
     const entry = this.entries.get(id);

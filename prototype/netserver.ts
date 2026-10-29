@@ -1574,9 +1574,9 @@ const server = createMultiplayerServer({
     // because `start` is the homeworld the fog hides in game. Same move as the join
     // handshake (NETA2-7): one authorization rule, both hosts.
     registerSeatsApi(app, {
-      seats: async (id) => {
-        // The shared bounded resolver opens a frozen archive only on demand.
-        const room = await registry.resolve(id);
+      seats: async (id, login) => {
+        // Verify participation BEFORE a cold archive allocates or touches a viewer.
+        const room = await registry.resolveForBrowser(id, login);
         if (!room) return null;
         // Кресло → ник: занятость и ник из одного ответа хранилища. Ник нужен клиенту в
         // дипломатии (строка игрока ведёт в его профиль); показывать его можно тем же,
@@ -1801,7 +1801,7 @@ const server = createMultiplayerServer({
           { nick: login, accountId, pwfp, preferredSlot, preferredFaction, preferredScientists },
         ) => {
           let room: MatchRoom | undefined;
-          try { room = await registry.resolve(id); }
+          try { room = await registry.resolveForBrowser(id, login); }
           catch (error) { if (error instanceof ArchiveCapacityError) return { error: 'E_UNAVAILABLE' as const }; throw error; }
           if (!room) return { error: 'E_NO_MATCH' as const };
           // CORP-5: в битву корпораций входит только её состав, каждый — на своё место.
