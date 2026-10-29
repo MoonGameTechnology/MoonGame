@@ -7,6 +7,14 @@ import { drawTerrainEnvironmentTile, type TerrainEnvironmentProjection } from '.
 import type { HoloRect } from './holographicLayout';
 import { drawTerrainArt } from './holographicTerrainArt';
 
+/** A box of the canvas's space, `x0..x1` × `y0..y1`: what a strip of the map's bake paints. */
+export interface PaintBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 export interface TerrainField {
   id: string;
   kind: string;
@@ -512,11 +520,15 @@ function rimPoint(shape: RimShape, fraction: number): typeof RIM_POINT {
  *
  * Over the halo the rim smoulders — «небольшое слабое горение», owner 2026-09-25: see
  * {@link rimHeat}. Same hologram clock as the rest of the rim, so pause and reduced
- * motion freeze it in place like the boil. */
+ * motion freeze it in place like the boil.
+ *
+ * With `box`, only where the rim can touch it: a strip of the map's bake far from the rim
+ * draws none. */
 export function drawGlassRim(
-  g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true,
+  g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true, box?: PaintBox,
 ): void {
   if (frame.width <= 0 || frame.height <= 0) return;
+  if (box && !rimMeets(frame, glow, box)) return;
   const time = Math.max(0, clock) / 1000;
   const scale = Math.min(frame.width, frame.height);
   const shape = rimShape(frame);
@@ -558,6 +570,19 @@ export function drawGlassRim(
   g.stroke();
   drawRimBurn(g, frame, scale, time);
   g.restore();
+}
+
+/** Could the rim touch `box`? Its strokes keep within the widest halo's half and the boil
+ * (`0.00035 + 0.0017` of the short side) of the frame's outline, and the corners round
+ * inward by their radius. */
+function rimMeets(frame: HoloRect, glow: boolean, box: PaintBox): boolean {
+  const scale = Math.min(frame.width, frame.height);
+  const reach = scale * ((glow ? RIM_HALO : RIM_HALO_LITE)[0]![0] / 2 + 0.00205) + 1;
+  const x1 = frame.x + frame.width;
+  const y1 = frame.y + frame.height;
+  if (box.x1 < frame.x - reach || box.x0 > x1 + reach || box.y1 < frame.y - reach || box.y0 > y1 + reach) return false;
+  const inset = scale * 0.026 + reach;
+  return !(box.x0 > frame.x + inset && box.x1 < x1 - inset && box.y0 > frame.y + inset && box.y1 < y1 - inset);
 }
 
 /** Halo passes as [width, alpha], widths relative to the frame's short side. */
@@ -624,7 +649,9 @@ function drawRimBurn(g: CanvasRenderingContext2D, frame: HoloRect, scale: number
 }
 
 /** Subtle interference on the world plane. Every point and stroke width is world-
- * relative: camera translation/zoom carries the reflection along with the map. */
+ * relative: camera translation/zoom carries the reflection along with the map.
+ *
+ * With `box`, only where the wave can touch it, as {@link drawGlassRim}. */
 export function drawGlassWave(
   g: CanvasRenderingContext2D,
   frame: HoloRect,
@@ -632,6 +659,7 @@ export function drawGlassWave(
   height: number,
   clock: number,
   glow = true,
+  box?: PaintBox,
 ): void {
   if (width <= 0 || height <= 0 || frame.width <= 0 || frame.height <= 0) return;
   const phase = ((Math.max(0, clock) + 8000) % 52000) / 52000;
@@ -640,6 +668,8 @@ export function drawGlassWave(
   const w = frame.width;
   const h = frame.height;
   const y = frame.y + h * (-0.15 + phase * 1.3);
+  // The curve keeps within its control points and the widest stroke of `y`, inside the glass.
+  if (box && (box.y1 < y - h * 0.07 - 1 || box.y0 > y + h * 0.08 + 1 || box.x1 < frame.x || box.x0 > frame.x + w)) return;
   const bend = Math.sin(clock / 11000) * h * 0.008;
   const shoulder = h * 0.018;
   g.save();

@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { MetaCommandResult } from '@void/protocol';
+import type { MetaCommandResult, MetaCorpStyleResponse } from '@void/protocol';
 import type { MetaEconomy } from './metaEconomy';
 import type { Identity } from './matchApi';
+import type { CorpMembership } from './store';
 import { slidingWindowIpLimiter } from './rateLimit';
 
 export interface MetaEconomyApiDeps {
@@ -16,8 +17,14 @@ export interface MetaEconomyApiDeps {
     | 'chooseSeasonReward'
     | 'buyOffer'
     | 'claimPremiumDaily'
+    | 'corpStyle'
+    | 'buyCorpStyle'
+    | 'applyCorpStyle'
   >;
   identify(request: FastifyRequest): Promise<Identity | null>;
+  /** The account's corporation (`CorpStore.membershipOf`). Without it the base style
+   *  routes are not mounted. */
+  corpOf?(accountId: string): Promise<CorpMembership | null>;
   now?: () => number;
   rateMax?: number;
   /** Best-effort refresh of live build catalogs after the value transaction. */
@@ -169,5 +176,54 @@ export function registerMetaEconomyApi(app: FastifyInstance, deps: MetaEconomyAp
     'premium/daily',
     (b) => fields(b, ['requestId']),
     (account, b) => deps.economy.claimPremiumDaily(account, { requestId: b.requestId as string }),
+  );
+
+  // CORP-14: the corporation's base style. The corporation comes from the session, never
+  // from the request; only its head spends on the style and applies it.
+  const corpOf = deps.corpOf;
+  if (!corpOf) return;
+  app.get('/meta-economy/corp-style', async (request, reply) =>
+    guard(reply, async (): Promise<unknown> => {
+      const who = await deps.identify(request);
+      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+      const membership = await corpOf(who.accountId);
+      if (!membership || membership.role === 'recruit') return { corp: null };
+      const style = await deps.economy.corpStyle(membership.corpId);
+      const response: MetaCorpStyleResponse = {
+        corp: { head: membership.role === 'head', ...style },
+      };
+      return response;
+    }),
+  );
+  const asHead = async (
+    accountId: string,
+    run: (corpId: string) => Promise<MetaCommandResult>,
+  ): Promise<MetaCommandResult> => {
+    const membership = await corpOf(accountId);
+    if (!membership || membership.role === 'recruit') return { ok: false, code: 'E_NOT_MEMBER' };
+    if (membership.role !== 'head') return { ok: false, code: 'E_FORBIDDEN' };
+    return run(membership.corpId);
+  };
+  post(
+    'corp-style/buy',
+    (b) => fields(b, ['requestId', 'offerId']) && id(b.offerId),
+    (account, b) =>
+      asHead(account, (corpId) =>
+        deps.economy.buyCorpStyle(account, corpId, {
+          requestId: b.requestId as string,
+          offerId: b.offerId as string,
+        }),
+      ),
+  );
+  post(
+    'corp-style/apply',
+    (b) => fields(b, ['requestId', 'styleId']) && id(b.styleId),
+    (account, b) =>
+      asHead(account, (corpId) =>
+        deps.economy.applyCorpStyle(corpId, {
+          requestId: b.requestId as string,
+          styleId: b.styleId as string,
+        }),
+      ),
   );
 }

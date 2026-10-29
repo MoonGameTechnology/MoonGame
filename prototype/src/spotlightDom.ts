@@ -356,6 +356,8 @@ export function startTour(
   steps: readonly SpotlightStep[],
   onEnd?: TourEnd,
   map?: TourMap,
+  /** Step to begin at: a resumed guide picks up where it was closed. */
+  from = 0,
 ): RunningTour {
   const o = ensureOverlay();
   current?.skip(); // one tour at a time
@@ -438,7 +440,7 @@ export function startTour(
       () => requestAnimationFrame(frame),
     );
   };
-  tour.start();
+  tour.start(from);
   if (running) requestAnimationFrame(frame);
 
   return {

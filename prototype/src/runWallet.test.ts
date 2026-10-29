@@ -175,7 +175,9 @@ describe('шапка забега — проводка в кадре', () => {
     expect(status).toContain('data-solo-save');
     expect(status).toContain('data-donate="1"');
     expect(status).not.toMatch(/dl-donate[^\n]*<b>/);
-    expect(main).toContain(
+    // Кошелёк хаба — у хаба (`hubScreen.ts`, REFM-220).
+    const hub = readFileSync(new URL('./hubScreen.ts', import.meta.url), 'utf8');
+    expect(hub).toContain(
       'wallet: () => ({ sovereigns: shop?.sovereigns() ?? null, warrants: metaMarket?.balance() ?? 0 }),',
     );
     // Отдельный настоящий баланс Sector Zero по-прежнему приходит из профиля.

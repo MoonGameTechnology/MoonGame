@@ -40,7 +40,14 @@ export interface MetaEconomyAccount {
   supplyGoal?: string;
   season: Record<string, MetaSeasonState>;
   activeSeasonId?: string;
+  /** Cosmetic unlocks; on a corporation's record (`corp:<id>`), the base styles and
+   *  backdrops it bought (CORP-14, CORP-15). */
   cosmetics: string[];
+  /** On a corporation's record: the applied base style; absent = `standard`. */
+  corpStyle?: string;
+  corpMaterials?: import('./corpInfrastructure').CorpMaterialBank;
+  /** On a corporation's record: the applied backdrop; absent = `orbit`. */
+  corpBackdrop?: string;
   counters: Record<string, number>;
   operations: Record<string, MetaOperationState>;
   itemSources: Record<string, { source: MaterialSource; sourceId: string }>;

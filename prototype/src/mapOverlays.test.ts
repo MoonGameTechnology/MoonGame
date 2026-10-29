@@ -87,7 +87,14 @@ async function boot(opts: { net?: boolean } = {}) {
   camera.frameMap(nodes);
   camera.setView({ scale: 1, x: 0, y: 0 });
   const fog = await import('./mapFog');
-  fog.initMapFog({ world: () => env.world, me: () => 'p1', net: () => opts.net ?? false, contacts: () => [], sight: () => [] });
+  fog.initMapFog({
+    world: () => env.world,
+    me: () => 'p1',
+    net: () => opts.net ?? false,
+    contacts: () => [],
+    sight: () => [],
+    planets: () => Object.values(env.world.planets),
+  });
   fog.refreshVision();
   const geo = await import('./fleetGeometry');
   geo.initFleetGeometry({
@@ -415,7 +422,7 @@ describe('REFM-233 — стык наложений с main.ts', () => {
       'me: () => ME,',
       'ctx: () => cx,',
       'now: () => mapNow(),',
-      "aa: () => perWorld('aa', () => aaRings(s, data, ME, known)),",
+      "aa: () => perWorld('aa', () => aaRings(s, data, ME, known, worldPlanets())),",
       'aimSquadron,',
     ])
       expect(init, hook).toContain(hook);

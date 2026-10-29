@@ -112,6 +112,25 @@ for (const backend of ['memory', 'postgres'] as const) {
         expect((await economy.read(account)).counters.grants).toBe(1);
       });
 
+      it('changes a player and a corporation record together or not at all', async () => {
+        // CORP-14: the head pays for a base style that the corporation then owns.
+        const { economy } = await fixture(backend);
+        const head = randomUUID(),
+          corp = `corp:${randomUUID()}`;
+        const buy = (fail: boolean) =>
+          economy.transaction([head, corp], async (tx) => {
+            tx.account(head).counters.spent = 1;
+            tx.account(corp).cosmetics.push('high_tech');
+            if (fail) throw Error('purchase failed');
+          });
+        await expect(buy(true)).rejects.toThrow('purchase failed');
+        expect((await economy.read(head)).counters).toEqual({});
+        expect((await economy.read(corp)).cosmetics).toEqual([]);
+        await buy(false);
+        expect((await economy.read(head)).counters).toEqual({ spent: 1 });
+        expect((await economy.read(corp)).cosmetics).toEqual(['high_tech']);
+      });
+
       it('returns detached state and prevents a paid lot from becoming tradable', async () => {
         const { economy } = await fixture(backend);
         const account = randomUUID();

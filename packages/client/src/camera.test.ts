@@ -15,6 +15,12 @@ import {
   clampCam,
   centerOn,
   inView,
+  panRange,
+  elasticCam,
+  elasticPull,
+  dragCam,
+  settleCam,
+  ELASTIC_REACH,
 } from './camera';
 
 // A portrait play area and a square map — the prototype's typical shape.
@@ -185,6 +191,84 @@ describe('camera — edge slack (панель поверх карты)', () => {
     const c = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 1000 }, 3, VP, B, { bottom: 300 });
     const noSlack = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 1000 }, 3, VP, B);
     expect(c.y).toBeLessThan(noSlack.y); // the bottom-edge target gets closer to centre
+  });
+});
+
+describe('camera — elastic edge (упругий край)', () => {
+  // Owner's ask 2026-10-25: at the map border the camera "hit a wall".
+  const reachX = 400 * ELASTIC_REACH;
+  const atLeftEdge = (): Cam => {
+    const r = panRange(3, VP, B);
+    return { scale: 3, x: r.maxX, y: (r.minY + r.maxY) / 2 };
+  };
+
+  it('inside the pan range the map follows the finger one to one', () => {
+    const r = panRange(3, VP, B);
+    const mid: Cam = { scale: 3, x: (r.minX + r.maxX) / 2, y: (r.minY + r.maxY) / 2 };
+    expect(dragCam(mid, 25, -40, VP, B)).toEqual({ scale: 3, x: mid.x + 25, y: mid.y - 40 });
+  });
+
+  it('past the range the map still moves, slower the further it is pulled, never past the reach', () => {
+    const edge = atLeftEdge();
+    const one = dragCam(edge, 60, 0, VP, B);
+    const two = dragCam(one, 60, 0, VP, B);
+    expect(one.x).toBeGreaterThan(edge.x); // no wall: the camera moves past the range
+    expect(one.x - edge.x).toBeLessThan(60); // ...but less than the finger
+    expect(two.x - one.x).toBeLessThan(one.x - edge.x); // resistance grows
+    const far = dragCam(edge, 100_000, 0, VP, B);
+    expect(far.x - edge.x).toBeLessThan(reachX);
+    expect(far.x - edge.x).toBeGreaterThan(reachX * 0.95);
+  });
+
+  it('pulling back the same way returns the camera exactly where it was', () => {
+    const r = panRange(3, VP, B);
+    const start: Cam = { scale: 3, x: r.maxX - 20, y: r.minY + 10 };
+    const out = dragCam(start, 300, -300, VP, B);
+    const back = dragCam(out, -300, 300, VP, B);
+    expect(back.x).toBeCloseTo(start.x, 6);
+    expect(back.y).toBeCloseTo(start.y, 6);
+  });
+
+  it('a gesture that grabs a stretched camera starts where it is, without a jump', () => {
+    const stretched = dragCam(atLeftEdge(), 200, 0, VP, B);
+    expect(dragCam(stretched, 0, 0, VP, B).x).toBeCloseTo(stretched.x, 6);
+    expect(elasticCam(elasticPull(stretched, VP, B), VP, B).x).toBeCloseTo(stretched.x, 6);
+    // A pinch that begins on it (zero movement) leaves it in place too.
+    const pair = { dist: 120, mid: { x: 200, y: 400 } };
+    const pinched = pinchAt(elasticPull(stretched, VP, B), pair, pair, VP, B, {}, elasticCam);
+    expect(pinched.x).toBeCloseTo(stretched.x, 6);
+  });
+
+  it('a pinch past the edge stretches with the elastic edge and stays hard by default', () => {
+    const edge = atLeftEdge();
+    const start = { dist: 120, mid: { x: 200, y: 400 } };
+    const moved = { dist: 120, mid: { x: 500, y: 400 } };
+    expect(pinchAt(edge, start, moved, VP, B).x).toBeCloseTo(edge.x, 6);
+    const soft = pinchAt(edge, start, moved, VP, B, {}, elasticCam);
+    expect(soft.x).toBeGreaterThan(edge.x);
+    expect(soft.x - edge.x).toBeLessThan(300);
+  });
+
+  it('released, the camera eases back into range and lands exactly on it', () => {
+    let cur = dragCam(atLeftEdge(), 400, 0, VP, B);
+    const target = clampCam(cur, VP, B);
+    let prev = Math.abs(cur.x - target.x);
+    let frames = 0;
+    for (let done = false; !done; frames++) {
+      const step = settleCam(cur, 16, VP, B);
+      cur = step.cam;
+      done = step.done;
+      const gap = Math.abs(cur.x - target.x);
+      expect(gap).toBeLessThanOrEqual(prev); // never overshoots back the other way
+      prev = gap;
+    }
+    expect(cur).toEqual(target);
+    expect(frames).toBeLessThan(30); // under half a second at 60 fps
+  });
+
+  it('a camera at rest inside the range is already settled', () => {
+    const cam = clampCam({ scale: 2, x: 0, y: 0 }, VP, B);
+    expect(settleCam(cam, 16, VP, B)).toEqual({ cam, done: true });
   });
 });
 

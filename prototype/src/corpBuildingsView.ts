@@ -1,3 +1,5 @@
+import { canFundCorpBuilding, corpMaterialPriceHtml } from './corpMaterialsView';
+import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
 import type {
   CorpInfrastructureView,
   CorpBuildingLevel,
@@ -7,12 +9,18 @@ import { t } from '../../localization/runtime';
 import { esc, nfmt } from './format';
 
 const errorKey = {
+  E_CORP_MATERIALS: 'corp.materials.insufficient',
+  E_CORP_PRICE: 'corp.materials.price-changed',
+  E_CORP_PAYMENT_PENDING: 'corp.materials.pending',
+  E_IDEMPOTENCY_CONFLICT: 'err.idempotency-conflict',
   E_FORBIDDEN: 'corp.buildings.lead-only',
   E_CORP_BUILDING: 'err.corp-building',
   E_CORP_BUILD_BUSY: 'err.corp-build-busy',
   E_CORP_BUILD_LEVEL: 'err.corp-build-level',
   E_CORP_BUILD_MAX: 'err.corp-build-max',
   E_CORP_BUILD_REQUIRES: 'err.corp-build-requires',
+  E_CORP_BUILD_MEMBERS: 'err.corp-build-members',
+  E_CORP_BUILD_BATTLES: 'err.corp-build-battles',
   E_INSUFFICIENT: 'err.insufficient',
 };
 
@@ -22,13 +30,17 @@ function duration(ms: number): string {
 }
 
 function effects(
-  level: Pick<CorpBuildingLevel, 'influencePerDay' | 'constructionReduction'>,
+  level: Pick<CorpBuildingLevel, 'influencePerDay' | 'constructionReduction' | 'maxFormat' | 'warehouseItems' | 'showcaseSlots' | 'monument'>,
 ): string {
   return [
     level.influencePerDay > 0 ? t('corp.buildings.income', { n: level.influencePerDay }) : '',
     level.constructionReduction > 0
       ? t('corp.buildings.speed', { n: level.constructionReduction })
       : '',
+    level.maxFormat ? t('corp.buildings.format', { n: level.maxFormat }) : '',
+    level.warehouseItems ? t('corp.buildings.warehouse.effect', { n: level.warehouseItems }) : '',
+    level.showcaseSlots ? t('corp.buildings.hall.effect', { n: level.showcaseSlots }) : '',
+    level.monument ? t('corp.buildings.monument.effect') : '',
   ]
     .filter(Boolean)
     .map((text) => `<span>${esc(text)}</span>`)
@@ -39,6 +51,7 @@ export function corpBuildingsHtml(
   view: CorpInfrastructureView | null,
   elapsedMs = 0,
   busy = false,
+  bank?: CorpMaterialsView | null,
 ): string {
   const refresh = `<button class="cbtn2 btn-second" data-corpact="refresh"${busy ? ' disabled' : ''}>${t('corp.buildings.refresh')}</button>`;
   if (!view) return `<p class="chint">${t('corp.buildings.unavailable')}</p>${refresh}`;
@@ -58,7 +71,7 @@ export function corpBuildingsHtml(
     .map((b) => {
       const current = b.levels[b.level - 1];
       const next = b.next;
-      const disabled = busy || !view.canBuild || b.blocked !== null || !next;
+      const disabled = busy || !view.canBuild || b.blocked !== null || !next || !canFundCorpBuilding(next, bank);
       const reason = b.blocked ? t(errorKey[b.blocked]) : '';
       return (
         `<article class="cbuild-card"><header><b>${esc(t(b.nameKey))}</b><span>${t('corp.buildings.level', { level: b.level, max: b.levels.length })}</span></header>` +
@@ -68,6 +81,7 @@ export function corpBuildingsHtml(
           : '') +
         (next
           ? `<div class="cbuild-effects"><small>${t('corp.buildings.next')}</small>${effects(next)}</div>` +
+            `<ul class="cb-reqs">${corpMaterialPriceHtml(next.materials, bank)}</ul>` +
             `<p>${next.cost ? t('corp.buildings.cost', { n: nfmt(next.cost) }) : t('corp.buildings.free')} · ${duration(next.actualDurationMs)}</p>` +
             (next.headquarters
               ? `<p class="chint">${t('corp.buildings.requirement', { n: next.headquarters })}</p>`

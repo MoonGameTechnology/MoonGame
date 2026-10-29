@@ -156,6 +156,7 @@ async function boot(opts: { fog?: boolean } = {}) {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.s.planets),
   });
   if (opts.fog !== false) fog.refreshVision();
   const geometry = await import('./fleetGeometry');
@@ -581,6 +582,8 @@ describe('REFM-230 — двери игры', () => {
 
 describe('REFM-230 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
 
   it('main.ts поднимает ленту всеми хуками и не держит её старых определений', () => {
@@ -602,7 +605,7 @@ describe('REFM-230 — стык с main.ts', () => {
       expect(body, hook).toMatch(new RegExp(`\\b${hook}\\b`));
     expect(body).toMatch(/allyPulseUntil = performance\.now\(\) \+ 12_000;/);
     // Смена матча забывает журнал и память боёв старого.
-    const install = /function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(MAIN)?.[1];
+    const install = /export function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(LIFE)?.[1];
     expect(install).toMatch(/\bresetEventFeed\(\);/);
     for (const old of [
       /function handleEvents\(/,

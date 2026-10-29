@@ -883,6 +883,7 @@ body.mobile-ui #battlewinbody .bw-orders {
    ещё нет: их правило — по сенсорному экрану. */
 @media (pointer: coarse) {
   .set-tabs button,
+  .set-rate .set-pal,
   .pc-close,
   #spotlight :is(.sl-skip, .sl-next, .sl-skip-stage, .sl-fold),
   #scipick .sp-cancel {

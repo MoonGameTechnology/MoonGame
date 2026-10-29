@@ -392,7 +392,7 @@ describe('bounded persistent bot DM responder', () => {
     await f.deliver();
     expect(getStance(f.room.state, 'human', 'bot')).toBe('war');
     expect(getOffer(f.room.state, 'human', 'bot')).toBeNull();
-    expect(next.texts()).toEqual(['make peace']);
+    expect(next.texts()).toEqual([]); // a replacement owner must not inherit private talk
     expect(f.observations.includes('action')).toBe(false);
   });
 

@@ -12,7 +12,7 @@ import { MatchRoom, type RoomObservation, type RoomPeer } from './matchRoom';
 import { MemoryArsenalStore, type ArsenalStore, type MatchSnapshot, type StoredReceipt } from './store';
 import type { ServerMessage } from './protocol';
 
-// Strict commit-before-broadcast (docs/engineering-risks.md risk14). When a `persist`
+// Strict commit-before-broadcast (docs/archive/engineering-risks.md risk14). When a `persist`
 // fn is configured, the action path awaits the durable write of the new snapshot +
 // receipt BEFORE committing state or broadcasting — serialized per room so the async
 // await can't let a second action race the reducer. These tests pin that contract.

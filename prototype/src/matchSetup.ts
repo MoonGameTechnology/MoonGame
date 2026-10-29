@@ -15,6 +15,8 @@ import {
   matchStart,
   deriveRoads,
   factionStart,
+  NEUTRAL_PLANET_MILITIA,
+  neutralSector,
   shareRoadNetwork,
   pairKey,
   type DiplomaticStance,
@@ -270,10 +272,6 @@ export function networkStartsOf(
   return starts;
 }
 
-/** Militia holding each neutral planet at match start (BAL-10: two break the snowball's
- *  free early grab, and more left ~half the planets neutral all match in self-play). */
-export const NEUTRAL_PLANET_MILITIA = 2;
-
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   const preset = mapPreset(setup.mapId);
   const seed = setup.seed ?? 'prototype-1';
@@ -288,12 +286,8 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
         slots: {},
         fleets: Object.fromEntries(Object.entries(preset.map.fleets)
           .filter(([, fleet]) => inhabitants.has(fleet.owner))),
-        sectors: Object.fromEntries(Object.entries(preset.map.sectors).map(([id, sector]) => [id, sector.owner && inhabitants.has(sector.owner) ? sector : {
-          ...sector,
-          owner: null,
-          buildings: [],
-          garrison: sector.kind === 'planet' ? [{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }] : [],
-        }])),
+        sectors: Object.fromEntries(Object.entries(preset.map.sectors).map(([id, sector]) =>
+          [id, sector.owner && inhabitants.has(sector.owner) ? sector : neutralSector(sector)])),
       }, data)
     : createInitialState({
         seed,

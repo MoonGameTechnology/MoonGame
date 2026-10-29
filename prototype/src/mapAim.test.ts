@@ -116,6 +116,7 @@ async function boot() {
     net: () => false,
     contacts: () => [],
     sight: () => sightCircles(env.world, 'p1', game.data),
+    planets: () => Object.values(env.world.planets),
   });
   fog.refreshVision();
   const geo = await import('./fleetGeometry');

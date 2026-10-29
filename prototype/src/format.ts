@@ -8,10 +8,20 @@
  * host dependencies explicitly; these are the ones that never need to be passed).
  *
  * Locale-aware and clock-aware, otherwise state-free: `t`/`tData` read the chosen locale,
- * and the time helpers ask {@link setRunClock} whether a Sector Zero run is on screen.
+ * the time helpers ask {@link setRunClock} whether a Sector Zero run is on screen, and the
+ * resource rates ask {@link setRateUnit} for the player's unit (per hour / per day).
  */
 import { t, tData } from '../../localization/runtime';
-import { runClockText, runPerMinute } from '../../decisions/runClock';
+import { runClockText } from '../../decisions/runClock';
+import {
+  DEFAULT_RATE_UNIT,
+  RATE_SUFFIX_KEY,
+  RATE_WORD_KEY,
+  rateIn,
+  shownRate,
+  type RateUnit,
+  type ShownRate,
+} from '../../decisions/rateUnit';
 import { RES_SVG } from './icons';
 import { DAY, HOUR } from './time';
 
@@ -29,6 +39,21 @@ export function setRunClock(on: () => boolean): void {
 /** Идут ли сейчас часы забега — для текста, который называет единицу словами. */
 export function runClockShown(): boolean {
   return runClockOn();
+}
+
+/**
+ * ДОХОД В ЧАС ИЛИ В СУТКИ (настройка игрока, заказ владельца 2026-10-25). Как и часы
+ * забега, хост отдаёт сюда вопрос, а не флаг: настройку читают все скорости ресурсов —
+ * бар, карточка ресурса, мир, стройка, досье, флот — и каждая берёт её в момент отрисовки.
+ * Правила пересчёта — `decisions/rateUnit.ts`; часы забега сильнее выбора игрока.
+ */
+let rateUnitOf: () => RateUnit = () => DEFAULT_RATE_UNIT;
+export function setRateUnit(get: () => RateUnit): void {
+  rateUnitOf = get;
+}
+/** В какой единице сейчас читается скорость ресурса. */
+function rateShown(): ShownRate {
+  return shownRate(rateUnitOf(), runClockOn());
 }
 
 /** HTML-escape for text AND attribute values (CWE-79). Covers both quote styles: the
@@ -111,17 +136,19 @@ export function cost(
  * игроку приходилось читать текст там, где бар и цены он узнаёт по цвету. Теперь
  * поверхность одна: выучил бар — читаешь всё.
  *
- * `sign` ставит явный «+»/«−» (поток, а не запас), `per` дописывает локализованный
- * суффикс скорости. Неизвестный ресурс не ломается: `curIc` отдаёт букву имени.
+ * `sign` ставит явный «+»/«−» (поток, а не запас). `per` говорит, в какой единице
+ * пришло ЧИСЛО: `'h'` — за час (выработка зданий), `'d'` — за сутки (содержание юнитов
+ * и зданий). Показ пересчитывает его в единицу игрока и дописывает её суффикс.
+ * Неизвестный ресурс не ломается: `curIc` отдаёт букву имени.
  */
 export function resChip(
   res: string,
   n: number | string,
   opts: { sign?: boolean; per?: 'h' | 'd' } = {},
 ): string {
-  // Скорость мира в забеге — в минуту (часы забега), суточный суффикс — не скорость мира.
-  const perMin = opts.per === 'h' && typeof n === 'number' && runClockOn();
-  if (perMin && typeof n === 'number') n = runPerMinute(n);
+  const shownPer = opts.per ? rateShown() : null;
+  if (opts.per && shownPer && typeof n === 'number')
+    n = rateIn(n, opts.per === 'd' ? 'day' : 'hour', shownPer);
   const num = typeof n === 'number' ? n : Number(n);
   // Минус — типографский «−» (U+2212), тот же знак, что у дефицита в ценнике:
   // дефисный «-» в моноширинном шрифте читается как перенос, а не как «минус».
@@ -129,9 +156,7 @@ export function resChip(
     typeof n === 'number'
       ? `${opts.sign && num > 0 ? '+' : ''}${String(round1(num)).replace('-', '−')}`
       : String(n);
-  const per = opts.per
-    ? `<i class="rc-per">${opts.per === 'd' ? t('res.per.day') : perMin ? t('res.per.minute') : t('res.per.hour')}</i>`
-    : '';
+  const per = shownPer ? `<i class="rc-per">${t(RATE_SUFFIX_KEY[shownPer])}</i>` : '';
   return `<span class="rcost rc-${res}">${curIc(res)}${shown}${per}</span>`;
 }
 
@@ -160,14 +185,20 @@ export function costText(bag: Record<string, number> | undefined): string {
 // продолжали импортировать отсюда.
 export { displayUnit, buildingName } from '../../decisions/dataNames';
 
-/** Приток за час мира — в той единице, в которой его читает игрок: в забеге за минуту. */
+/** Приток за час мира — в той единице, в которой его читает игрок: в час, в сутки, в
+ *  забеге за минуту. */
 export function flowRate(perHour: number): number {
-  return runClockOn() ? runPerMinute(perHour) : perHour;
+  return rateIn(perHour, 'hour', rateShown());
 }
 
-/** Подпись к {@link flowRate}: «/ч», в забеге «/мин». */
+/** Подпись к {@link flowRate}: «/ч», «/д», в забеге «/мин». */
 export function flowPer(): string {
-  return t(runClockOn() ? 'res.per.minute' : 'res.per.hour');
+  return t(RATE_SUFFIX_KEY[rateShown()]);
+}
+
+/** Та же единица словом — для прозы досье: «в час», «в сутки», «в минуту». */
+export function flowWord(): string {
+  return t(RATE_WORD_KEY[rateShown()]);
 }
 
 /** Срок в часах мира (стройка, исследование): «3ч», в забеге «1:12». */

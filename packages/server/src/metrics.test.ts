@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MetricsAggregator } from './metrics';
+import { MetricsAggregator, metricsReaderSummary } from './metrics';
 import type { RoomObservation } from './matchRoom';
 
 function feed(events: RoomObservation[]): MetricsAggregator {
@@ -9,6 +9,26 @@ function feed(events: RoomObservation[]): MetricsAggregator {
 }
 
 describe('MetricsAggregator (M1)', () => {
+  it('observer projection excludes player economics, winners and future fields at the server boundary', () => {
+    const summary = {
+      ...new MetricsAggregator().summary(),
+      joins: 3,
+      economy: { snapshots: 2, arrearsHours: { secretPlayer: 2 } },
+      end: { winner: 'secretPlayer', reason: 'secret reason' },
+      futureSensitiveField: 'secret payload',
+      submitMs: { count: 1, total: 2, max: 2, avg: 2, futureSensitiveField: 'secret timing owner' },
+    };
+    const limited = metricsReaderSummary(summary);
+    expect(limited.joins).toBe(3);
+    expect(limited.actions).toEqual(summary.actions);
+    expect(limited).not.toHaveProperty('economy');
+    expect(limited).not.toHaveProperty('end');
+    expect(limited).not.toHaveProperty('futureSensitiveField');
+    expect(limited.submitMs).toEqual({ count: 1, total: 2, max: 2, avg: 2 });
+    expect(JSON.stringify(limited)).not.toContain('secret');
+    expect(summary.economy.arrearsHours.secretPlayer).toBe(2);
+  });
+
   it('starts empty — zero counters, no end', () => {
     const s = new MetricsAggregator().summary();
     expect(s).toMatchObject({

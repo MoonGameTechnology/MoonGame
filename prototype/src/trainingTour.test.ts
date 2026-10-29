@@ -19,6 +19,17 @@ const steps = (mobile = false) =>
   });
 
 describe('пошаговый полигон Sector Zero', () => {
+  it('teaches upgrading the seeded mine instead of ordering a duplicate', () => {
+    const order = steps().find((s) => s.id === 'economy.mine-order')!;
+    expect(order.target).toBe('#buildwin [data-bw-up="mine"]');
+    const tour = new SpotlightTour([order], { locate: () => null, render: () => {} });
+    tour.start();
+    tour.notifyAction('building.construct');
+    expect(tour.active).toBe(true);
+    tour.notifyAction('building.upgrade');
+    expect(tour.active).toBe(false);
+  });
+
   it('сохраняет двенадцать этапов и проверку каждого действия', () => {
     const all = steps(true);
     expect([...new Set(all.map((s) => s.stage))]).toEqual([...TRAINING_STAGES]);

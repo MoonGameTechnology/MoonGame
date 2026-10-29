@@ -44,7 +44,7 @@ function creditsAfter(planetType?: string): number {
 
 describe('economy parity (FND-7) — mine payback', () => {
   it('mine L1 pays for itself in 3–8h (resource-economy.md §4 rule of thumb)', () => {
-    const def = data.buildings.mine_t1;
+    const def = data.buildings.mine;
     expect(def).toBeDefined();
     const cost = def!.cost.metal ?? 0;
     const rate = def!.produces?.metal ?? 0;

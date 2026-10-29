@@ -44,6 +44,15 @@ describe('buildGate — можно ли строить здесь (MIG-10)', () 
     expect(canBuildHere({ kind: 'void_station' }, 'mine', data, false)).toBe(false);
   });
 
+  it('retired buildings are not new construction choices, even on unrestricted planets', () => {
+    const retired = {
+      ...data,
+      buildings: { mine: { ...data.buildings.mine!, retired: true } },
+    };
+    expect(canBuildHere({ kind: 'planet' }, 'mine', retired, false)).toBe(false);
+    expect(buildsAnything({ kind: 'planet' }, retired, false)).toBe(false);
+  });
+
   it('`buildable: false` закрывает вид целиком — пустой ростер для этого не нужен', () => {
     expect(canBuildHere({ kind: 'nebula' }, 'mine', data, false)).toBe(false);
     expect(canBuildHere({ kind: 'nebula' }, 'shipyard', data, false)).toBe(false);

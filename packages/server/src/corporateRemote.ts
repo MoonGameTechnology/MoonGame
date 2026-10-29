@@ -5,7 +5,7 @@ import { corporateRequest, type CorporateEndpoint } from './corporateTransport';
 /** No arbitrary method/property dispatch: only the game's required corporate reads
  * and settlement operations are callable over the internal gateway. */
 export const CORPORATE_METHODS = {
-  corpStore: ['getCorp', 'listCorps', 'membershipOf', 'membersOf', 'readyPlayersOf', 'appendAudit'],
+  corpStore: ['prepareBuild', 'commitBuild', 'getCorp', 'listCorps', 'membershipOf', 'membersOf', 'readyPlayersOf', 'appendAudit', 'monumentsOf'],
   challengeStore: ['getChallenge', 'lockedMatchups'],
   rosterStore: ['rosterOf'],
   resultStore: ['get', 'recent', 'statsForCorp'],

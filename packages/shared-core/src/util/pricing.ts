@@ -1,4 +1,4 @@
-import type { ResourceBag } from '../data/schemas';
+import type { ResourceBag, UnitDef } from '../data/schemas';
 import type { GameState, MatchPricing } from '../state/gameState';
 
 /**
@@ -38,6 +38,41 @@ export function matchCost(
   for (const res of Object.keys(cost)) {
     const amount = cost[res] ?? 0;
     out[res] = amount > 0 ? Math.ceil(amount * factor(table, res)) : amount;
+  }
+  return out;
+}
+
+/** Price of a unit's hull, before modules/cargo and quantity. Only buildable ship
+ * hulls carry the ship premium: shuttles, ground troops, ordnance and issued/hero
+ * units keep their ordinary match price. Both factors are applied before rounding
+ * once, so UI, payment, cancellation and salvage use the same integer price.
+ * Older matches without `shipCost` retain their pinned prices. */
+export function matchUnitCost(state: Pick<GameState, 'pricing'>, unit: UnitDef): ResourceBag;
+export function matchUnitCost(
+  state: Pick<GameState, 'pricing'>,
+  unit: UnitDef | undefined,
+): ResourceBag | undefined;
+export function matchUnitCost(
+  state: Pick<GameState, 'pricing'>,
+  unit: UnitDef | undefined,
+): ResourceBag | undefined {
+  if (!unit) return undefined;
+  const premium = state.pricing?.shipCost;
+  if (
+    !premium ||
+    !unit.hullClass ||
+    unit.domain !== 'space' ||
+    unit.traits.includes('hero') ||
+    unit.traits.includes('issued')
+  )
+    return matchCost(state, unit.cost);
+  const out: ResourceBag = {};
+  for (const res of Object.keys(unit.cost)) {
+    const amount = unit.cost[res] ?? 0;
+    out[res] =
+      amount > 0
+        ? Math.ceil(amount * factor(state.pricing?.cost, res) * factor(premium, res))
+        : amount;
   }
   return out;
 }

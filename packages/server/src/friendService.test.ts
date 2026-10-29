@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FriendService } from './friendService';
 import { MemoryFriendStore, MemoryUserStore } from './store';
 
@@ -57,6 +57,18 @@ describe('FRIENDS-1 — заявка', () => {
     });
   });
 
+  it('rejects NUL and oversized callsigns before the database lookup', async () => {
+    const w = await world(['Vasya']);
+    const lookup = vi.spyOn(w.users, 'findUser');
+    for (const callsign of ['Petya\0', 'P'.repeat(65)]) {
+      expect(await w.service.request(w.who('Vasya'), callsign)).toEqual({
+        ok: false,
+        code: 'E_BAD_TARGET',
+      });
+    }
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it('ВСТРЕЧНАЯ заявка не создаёт второе ребро — пара всегда одна строка', async () => {
     const w = await world(['Vasya', 'Petya']);
     await w.service.request(w.who('Vasya'), 'Petya');
@@ -79,6 +91,15 @@ describe('FRIENDS-1 — заявка', () => {
 });
 
 describe('FRIENDS-1 — принятие', () => {
+  it('rejects NUL in an edge ID before a database write', async () => {
+    const w = await world(['Vasya']);
+    const accept = vi.spyOn(w.friends, 'accept');
+    expect(await w.service.accept(w.ids.Vasya!, 'other\0')).toEqual({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(accept).not.toHaveBeenCalled();
+  });
   it('принимает только ТА сторона, которую попросили', async () => {
     const w = await world(['Vasya', 'Petya']);
     await w.service.request(w.who('Vasya'), 'Petya');
@@ -108,6 +129,15 @@ describe('FRIENDS-1 — принятие', () => {
 });
 
 describe('FRIENDS-1 — одна операция на отклонить / отозвать / удалить', () => {
+  it('rejects NUL in an edge ID before a database write', async () => {
+    const w = await world(['Vasya']);
+    const drop = vi.spyOn(w.friends, 'drop');
+    expect(await w.service.drop(w.ids.Vasya!, 'other\0')).toEqual({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(drop).not.toHaveBeenCalled();
+  });
   it('отклонить входящую', async () => {
     const w = await world(['Vasya', 'Petya']);
     await w.service.request(w.who('Vasya'), 'Petya');

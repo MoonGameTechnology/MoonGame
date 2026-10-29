@@ -1,0 +1,856 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-25",
+  "sourceCommit": "e1325d98a15bb28f131fae19f57f87468a82b61b",
+  "generator": "image_gen (built-in)",
+  "deliveryStatus": "concept-triptychs",
+  "runtimeIntegrated": false,
+  "defaultStyleId": "standard",
+  "assetRoot": "art/corporations",
+  "pathsRelativeTo": "art/corporations",
+  "sheetCount": 25,
+  "depictedStageCount": 75,
+  "styles": [
+    {
+      "id": "standard",
+      "nameRu": "Стандартный",
+      "nameEn": "Standard",
+      "freeDefault": true
+    },
+    {
+      "id": "soviet-retrofuturism",
+      "nameRu": "Советский футуризм",
+      "nameEn": "Soviet futurism",
+      "freeDefault": false
+    },
+    {
+      "id": "imperial",
+      "nameRu": "Имперская космическая архитектура",
+      "nameEn": "Imperial space architecture",
+      "freeDefault": false
+    },
+    {
+      "id": "high-tech",
+      "nameRu": "Хайтек",
+      "nameEn": "High-tech",
+      "freeDefault": false
+    },
+    {
+      "id": "imperial-gothic",
+      "nameRu": "Имперская готика",
+      "nameEn": "Imperial Gothic",
+      "freeDefault": false
+    }
+  ],
+  "buildings": [
+    {
+      "id": "headquarters",
+      "nameRu": "Штаб корпорации",
+      "nameEn": "Corporation headquarters",
+      "status": "catalog-building",
+      "catalogNameKey": "corp.building.headquarters"
+    },
+    {
+      "id": "supply_center",
+      "nameRu": "Центр снабжения",
+      "nameEn": "Supply center",
+      "status": "catalog-building",
+      "catalogNameKey": "corp.building.supply-center"
+    },
+    {
+      "id": "engineering_complex",
+      "nameRu": "Инженерный комплекс",
+      "nameEn": "Engineering complex",
+      "status": "catalog-building",
+      "catalogNameKey": "corp.building.engineering-complex"
+    },
+    {
+      "id": "shipyard",
+      "nameRu": "Космоверфь",
+      "nameEn": "Space shipyard",
+      "status": "future-concept",
+      "catalogNameKey": null
+    },
+    {
+      "id": "research_center",
+      "nameRu": "Научный центр",
+      "nameEn": "Research center",
+      "status": "future-concept",
+      "catalogNameKey": null
+    }
+  ],
+  "assets": [
+    {
+      "styleId": "standard",
+      "buildingId": "headquarters",
+      "titleRu": "Штаб корпорации — Стандартный",
+      "titleEn": "Corporation headquarters — Standard",
+      "status": "catalog-building",
+      "path": "standard/headquarters.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Командный корпус с наклонным остеклением, входом и небольшими боковыми блоками.",
+        "На прежнем корпусе выросла башня связи; сзади добавлены антенна и служебный блок.",
+        "Добавлены две боковые башни, задняя галерея и инженерные модули; исходный вход сохранён."
+      ],
+      "width": 2046,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1662097,
+      "sha256": "4f22146014e41a4ef279fb7c5da3e86f3c072afeac40674611cd0851b19750e6",
+      "qaNotesRu": [
+        "Местами заметна цветная кайма по прозрачному контуру."
+      ]
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "supply_center",
+      "titleRu": "Центр снабжения — Стандартный",
+      "titleEn": "Supply center — Standard",
+      "status": "catalog-building",
+      "path": "standard/supply_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Низкий склад с двумя грузовыми воротами, диспетчерской и площадкой контейнеров.",
+        "За сохранённым складом добавлены второй корпус и портальный кран над грузовой площадкой.",
+        "Добавлен высокий крытый перегрузочный зал с фермами и мостовым краном; исходные ворота остаются доступны."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2412173,
+      "sha256": "d0f0567f26f947d452c19d375ace9605572746bff54dcf9e18a3943c6410d79a",
+      "qaNotesRu": [
+        "Концепт-триптих: уровни требуют отдельного экспорта и выравнивания.",
+        "У верхней кромки третьего уровня минимальный отступ; перед production-экспортом увеличить поле.",
+        "По отдельным краям заметны цветные остаточные пиксели; проверить альфа-край при подготовке спрайтов."
+      ]
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "engineering_complex",
+      "titleRu": "Инженерный комплекс — Стандартный",
+      "titleEn": "Engineering complex — Standard",
+      "status": "catalog-building",
+      "path": "standard/engineering_complex.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Мастерская с открытым станочным пролётом, служебной дверью и остеклённым постом управления.",
+        "К исходной мастерской добавлены второй производственный пролёт и опорный портальный кран для крупных деталей.",
+        "Добавлен высокий сборочный цех с фермами, мостовым краном и крышной системой охлаждения; исходная мастерская сохранена."
+      ],
+      "width": 2148,
+      "height": 732,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2099656,
+      "sha256": "15f4fc204fdc21a80dc22c8944a7f670d668b0faab87fe823785062121869937",
+      "qaNotesRu": [
+        "Концепт-триптих: уровни требуют отдельного экспорта и выравнивания.",
+        "По тонким краям местами видны цветные остаточные пиксели; перед использованием в игре очистить альфа-край.",
+        "На третьем уровне кран среднего этапа заменён внутренним краном сборочного цеха; базовая мастерская сохраняется."
+      ]
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "shipyard",
+      "titleRu": "Космоверфь — Стандартный",
+      "titleEn": "Space shipyard — Standard",
+      "status": "future-concept",
+      "path": "standard/shipyard.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Один стапель с кораблём, небольшим манипулятором и служебным зданием.",
+        "Добавлены второй стапель, тяжёлый кран и площадки деталей.",
+        "Над стапелями установлен портальный комплекс с манипуляторами и сервисной галереей."
+      ],
+      "width": 2048,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        254
+      ],
+      "bytes": 2510935,
+      "sha256": "a70b03c2e97217c0055bc9623e8d2ec37e236a20b1247967c897e5344ca96ca4",
+      "qaNotesRu": [
+        "Вокруг объектов есть светлый ореол; перед игровым экспортом нужна очистка альфа-канала."
+      ]
+    },
+    {
+      "styleId": "standard",
+      "buildingId": "research_center",
+      "titleRu": "Научный центр — Стандартный",
+      "titleEn": "Research center — Standard",
+      "status": "future-concept",
+      "path": "standard/research_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Круглый лабораторный корпус со стеклянным куполом и техническим модулем.",
+        "Добавлены боковые лаборатории, антенна и блок охлаждения.",
+        "Сзади появились полукольцевая галерея, радиотелескоп и вычислительные башни."
+      ],
+      "width": 2046,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1674044,
+      "sha256": "1b8c4684898d169b728fa74e3819940c6c5af81ca05a060d01d3f19041a11e60",
+      "qaNotesRu": [
+        "Три стадии не предназначены для попиксельного наложения без выравнивания."
+      ]
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "headquarters",
+      "titleRu": "Штаб корпорации — Советский футуризм",
+      "titleEn": "Corporation headquarters — Soviet futurism",
+      "status": "catalog-building",
+      "path": "soviet-retrofuturism/headquarters.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Низкий административный корпус и круглая диспетчерская на наклонных опорах.",
+        "Добавлены левое служебное крыло, закрытый переход и спутниковая антенна.",
+        "Сзади вырос координационный блок с охлаждением и мачтой связи."
+      ],
+      "width": 2079,
+      "height": 756,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2093904,
+      "sha256": "db62aa5bb17444e2600aa53146d6cfea304b49871bc6b0c6318fa211d948c01a",
+      "qaNotesRu": [
+        "На прозрачном крае местами заметны красные и жёлтые пиксели; нужна очистка перед интеграцией."
+      ]
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "supply_center",
+      "titleRu": "Центр снабжения — Советский футуризм",
+      "titleEn": "Supply center — Soviet futurism",
+      "status": "catalog-building",
+      "path": "soviet-retrofuturism/supply_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Низкий склад с двумя погрузочными воротами, контейнерами и диспетчерской пристройкой.",
+        "Добавлены второй склад и козловой кран над грузовым двором.",
+        "Добавлены высокий сортировочный ангар с фермами перекрытия и круглая диспетчерская на опорах."
+      ],
+      "width": 2079,
+      "height": 756,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2216922,
+      "sha256": "b71b54e2d67f508a1d2877bb0bed2210da8305c431960e540bb2281a144c6082",
+      "qaNotesRu": [
+        "По краям присутствуют цветные пиксели ореола; перед игровым экспортом нужна очистка alpha.",
+        "Края площадок близки к границам кадра; требуется единая безопасная область при экспорте."
+      ]
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "engineering_complex",
+      "titleRu": "Инженерный комплекс — Советский футуризм",
+      "titleEn": "Engineering complex — Soviet futurism",
+      "status": "catalog-building",
+      "path": "soviet-retrofuturism/engineering_complex.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Машинная мастерская с открытым рабочим пролётом и оборудованием для обработки деталей.",
+        "Добавлены второй рабочий пролёт и красный мостовой кран.",
+        "Добавлены высокий сборочный корпус с фермами крыши, тяжёлый кран и блок охлаждения."
+      ],
+      "width": 2079,
+      "height": 756,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2070882,
+      "sha256": "5371a85e9d3d82a054115f8516cdd9e1df40dfcc302626f295563a103adfd62a",
+      "qaNotesRu": [
+        "По краям заметны цветные пиксели ореола; нужна очистка alpha перед игровым экспортом.",
+        "Стадии сохраняют исходную мастерскую, но не являются выровненными слоями анимации."
+      ]
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "shipyard",
+      "titleRu": "Космоверфь — Советский футуризм",
+      "titleEn": "Space shipyard — Soviet futurism",
+      "status": "future-concept",
+      "path": "soviet-retrofuturism/shipyard.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Один стапель с гражданским грузовым аппаратом, ремонтная мастерская и сервисный манипулятор.",
+        "Добавлены второй стапель и кран для перемещения двигателей и узлов.",
+        "Добавлены общий сборочный портал, подвесные манипуляторы и задняя крытая галерея."
+      ],
+      "width": 2079,
+      "height": 756,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1851963,
+      "sha256": "1c103cefbc37c9c9044638ee31ad7263d367a59f48a2850c310a100b096b4d32",
+      "qaNotesRu": [
+        "Цветные пиксели ореола заметны по контуру; нужна очистка alpha перед игровым экспортом.",
+        "На третьем уровне форма подъёмного портала меняется; триптих показывает концепт, а не готовые совмещаемые слои."
+      ]
+    },
+    {
+      "styleId": "soviet-retrofuturism",
+      "buildingId": "research_center",
+      "titleRu": "Научный центр — Советский футуризм",
+      "titleEn": "Research center — Soviet futurism",
+      "status": "future-concept",
+      "path": "soviet-retrofuturism/research_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Низкая лаборатория с куполом обсерватории и открывающейся щелью для инструмента.",
+        "Добавлены боковые лабораторные корпуса, малая антенна и техническая пристройка.",
+        "Добавлены крупный радиотелескоп на массивном основании и вычислительный корпус с охлаждением."
+      ],
+      "width": 2079,
+      "height": 756,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1759196,
+      "sha256": "4b1327c310939f725531d2b9cc42d3824b65a0727d35b114248ccfa9735cb97e",
+      "qaNotesRu": [
+        "Цветные пиксели по контуру требуют очистки alpha перед игровым экспортом.",
+        "Малая антенна и боковые элементы смещаются между стадиями; для анимации нужно отдельное выравнивание."
+      ]
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "headquarters",
+      "titleRu": "Штаб корпорации — Имперская космическая архитектура",
+      "titleEn": "Corporation headquarters — Imperial space architecture",
+      "status": "catalog-building",
+      "path": "imperial/headquarters.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Компактный штаб с монументальным порталом и ступенчатой плоской кровлей.",
+        "Добавлены боковые административные крылья и верхний командный зал.",
+        "Сзади построены две башни связи с закрытым переходом; передний корпус сохранён."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1774204,
+      "sha256": "927ac59fd6375c37834833f6ad5dec99221bbdf09f574e83465b2a8b5b227f9a",
+      "qaNotesRu": [
+        "Местами видна цветная кайма по прозрачному контуру."
+      ]
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "supply_center",
+      "titleRu": "Центр снабжения — Имперская космическая архитектура",
+      "titleEn": "Supply center — Imperial space architecture",
+      "status": "catalog-building",
+      "path": "imperial/supply_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Склад с двумя погрузочными воротами, крытым навесом и контейнерами.",
+        "Добавлены боковой склад и открытый крановый двор.",
+        "Добавлен высокий перевалочный зал с мостовым краном; ранние складские корпуса сохранены."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1953394,
+      "sha256": "b46f1e4e0e28f6d6e93637ee680e08ad10a58ba7a060f06537ade4e10c0d025a",
+      "qaNotesRu": [
+        "Ракурс и основные корпуса сохраняются; точное пиксельное совмещение стадий не гарантировано.",
+        "По краям отдельных металлических деталей видна цветная кайма альфа-канала."
+      ]
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "engineering_complex",
+      "titleRu": "Инженерный комплекс — Имперская космическая архитектура",
+      "titleEn": "Engineering complex — Imperial space architecture",
+      "status": "catalog-building",
+      "path": "imperial/engineering_complex.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Машинный цех с открытым ремонтным боксом и вентиляцией.",
+        "Добавлены второй цех и площадка сборки под портальным краном.",
+        "Добавлен высокий сборочный зал с мостовым краном и наружным охлаждением."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2037078,
+      "sha256": "aaa16e7d648649734c50f1ebddb7dea12da300bc2a754cc08447759ea0f8c444",
+      "qaNotesRu": [
+        "Основные ранние корпуса сохранены, но стадии требуют выравнивания для послойной анимации.",
+        "По некоторым контурам заметна цветная кайма альфа-канала."
+      ]
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "shipyard",
+      "titleRu": "Космоверфь — Имперская космическая архитектура",
+      "titleEn": "Space shipyard — Imperial space architecture",
+      "status": "future-concept",
+      "path": "imperial/shipyard.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Один стапель с малым кораблём, ремонтным корпусом и монтажным манипулятором.",
+        "Добавлены второй стапель с собираемым корпусом и подъёмный кран.",
+        "Над двумя стапелями установлен сборочный портал с манипуляторами; добавлен задний производственный корпус."
+      ],
+      "width": 2168,
+      "height": 725,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1811209,
+      "sha256": "38bf456c8ac96499b3fad089f0a323c718e829cddbdb99536b0c3dc751e9d4b0",
+      "qaNotesRu": [
+        "Один проход коррекции кадрирования восстановил крайние цоколи; все три стадии видны целиком.",
+        "По отдельным контурам остаётся заметная цветная альфа-кайма.",
+        "Стадии не подготовлены для пиксельно точной послойной анимации."
+      ]
+    },
+    {
+      "styleId": "imperial",
+      "buildingId": "research_center",
+      "titleRu": "Научный центр — Имперская космическая архитектура",
+      "titleEn": "Research center — Imperial space architecture",
+      "status": "future-concept",
+      "path": "imperial/research_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Лабораторное ядро с приборным куполом, обзорным залом и техническими блоками.",
+        "Добавлены боковые лабораторные крылья с закрытыми переходами и вентиляцией.",
+        "Добавлены задний вычислительный корпус с охлаждением и радиотелескоп на сервисной платформе."
+      ],
+      "width": 2149,
+      "height": 732,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1871084,
+      "sha256": "acb3e680334d1983fe6f6de944ccb0c6580f47adcd9269c1bb4b62b93410bf8d",
+      "qaNotesRu": [
+        "Раннее лабораторное ядро сохраняется; точное пиксельное совмещение стадий не выполнено.",
+        "На отдельных контурах приборов и цоколей заметна цветная альфа-кайма."
+      ]
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "headquarters",
+      "titleRu": "Штаб корпорации — Хайтек",
+      "titleEn": "Corporation headquarters — High-tech",
+      "status": "catalog-building",
+      "path": "high-tech/headquarters.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Округлый белый корпус со стеклянной кровлей и открытым подъездом.",
+        "Добавлены два продольных крыла и оборудование во внутреннем дворе.",
+        "Над задней частью появился павильон на опорах с радиопрозрачным куполом и солнечным навесом."
+      ],
+      "width": 2048,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        254
+      ],
+      "bytes": 2371804,
+      "sha256": "2297fe61fe197878151c4b4aedf6dbf9f975d245ba23cd763d6f1b7832947683",
+      "qaNotesRu": [
+        "Вокруг зданий есть широкий светлый ореол; потребуется очистка альфа-канала."
+      ]
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "supply_center",
+      "titleRu": "Центр снабжения — Хайтек",
+      "titleEn": "Supply center — High-tech",
+      "status": "catalog-building",
+      "path": "high-tech/supply_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Склад с двумя погрузочными воротами, контейнерами и грузовой площадкой.",
+        "К основному складу добавлены боковой склад и рельсовый козловой кран.",
+        "Над задним участком возведён сортировочный корпус на опорах, соединённый с площадкой наклонными транспортёрами."
+      ],
+      "width": 2048,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        254
+      ],
+      "bytes": 2574384,
+      "sha256": "0e1f6636dcb0d39964c5282ed7d876ece54a08c9afd57b4c6d4bae6781436100",
+      "qaNotesRu": [
+        "Три концептуальных стадии: исходный передний объём сохранён; элементы требуют точного выравнивания перед нарезкой в игровые спрайты.",
+        "Вокруг объектов заметна мягкая светлая кайма; требуется проверка альфа-края на игровом фоне."
+      ]
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "engineering_complex",
+      "titleRu": "Инженерный комплекс — Хайтек",
+      "titleEn": "Engineering complex — High-tech",
+      "status": "catalog-building",
+      "path": "high-tech/engineering_complex.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Мастерская с открытым сборочным пролётом, направляющими и боковым блоком охлаждения.",
+        "За мастерской добавлены второй цех и площадка с мостовым краном.",
+        "Появился высокий задний сборочный зал с крупным краном и дополнительным охлаждением."
+      ],
+      "width": 2048,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        254
+      ],
+      "bytes": 2558774,
+      "sha256": "14927abd56738fed9f4baf180375c85b4c4dfc3af30541e658241c6eefa60f3f",
+      "qaNotesRu": [
+        "Основной передний цех узнаваем на всех стадиях; это концептуальные листы, а не точно совмещённые спрайты.",
+        "Мягкая светлая кайма требует очистки для тёмного игрового фона."
+      ]
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "shipyard",
+      "titleRu": "Космоверфь — Хайтек",
+      "titleEn": "Space shipyard — High-tech",
+      "status": "future-concept",
+      "path": "high-tech/shipyard.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Один стапель с кораблём, сервисным корпусом и манипулятором.",
+        "Добавлены второй стапель, задний корпус снабжения и козловой кран.",
+        "Над стапелями установлены крупный сборочный портал, подвесные механизмы и сервисная галерея."
+      ],
+      "width": 2048,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        254
+      ],
+      "bytes": 2620895,
+      "sha256": "cbb41859c3051280907a99176e349fa15ae14089605a9aa0b989928b84c53c8c",
+      "qaNotesRu": [
+        "Стапель и боковой сервисный корпус сохраняются по стадиям; механизмы ориентированы на обслуживание корабля.",
+        "Светлая кайма требует очистки; точная нарезка и совмещение игровых спрайтов не выполнены."
+      ]
+    },
+    {
+      "styleId": "high-tech",
+      "buildingId": "research_center",
+      "titleRu": "Научный центр — Хайтек",
+      "titleEn": "Research center — High-tech",
+      "status": "future-concept",
+      "path": "high-tech/research_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Низкий лабораторный корпус со стеклянным куполом и отдельным техническим модулем.",
+        "Добавлены два боковых лабораторных крыла, переходы и задний приборный блок с антенной.",
+        "За лабораториями установлены вычислительный блок с охлаждением и радиотелескоп на усиленном основании."
+      ],
+      "width": 2048,
+      "height": 768,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        254
+      ],
+      "bytes": 2550025,
+      "sha256": "359232d1e1fb889ad9b0b9b1deca8c6b157e78ca9d3c75597223335e79499f43",
+      "qaNotesRu": [
+        "Купольная лаборатория остаётся узнаваемой во всех стадиях; телескоп расположен на отдельной задней платформе.",
+        "Радиотелескоп почти достигает верхней границы листа; при нарезке нужен запас.",
+        "Светлая кайма требует очистки; стадии не выровнены попиксельно."
+      ]
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "headquarters",
+      "titleRu": "Штаб корпорации — Имперская готика",
+      "titleEn": "Corporation headquarters — Imperial Gothic",
+      "status": "catalog-building",
+      "path": "imperial-gothic/headquarters.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Штаб со стрельчатым входом, рёбрами фасада и высокой складчатой кровлей.",
+        "Добавлены боковые крылья и задний блок связи с антенной.",
+        "Появились две высокие башни с контрфорсами и закрытым переходом; исходный корпус остаётся узнаваемым."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1929242,
+      "sha256": "f0c132784acc25d4704bf59031dea95dce33ca290e70392ee1d33b092028ad8e",
+      "qaNotesRu": [
+        "Тонкие шпили и рёбра требуют проверки после уменьшения до размера игрового участка."
+      ]
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "supply_center",
+      "titleRu": "Центр снабжения — Имперская готика",
+      "titleEn": "Supply center — Imperial Gothic",
+      "status": "catalog-building",
+      "path": "imperial-gothic/supply_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Склад с двумя погрузочными воротами, свободной площадкой разгрузки и боковым диспетчерским блоком.",
+        "Добавлены второй склад, контейнерная полоса и портальный грузовой кран.",
+        "Добавлены высокий крытый сортировочный зал, верхняя перегрузочная галерея и блоки охлаждения."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2182895,
+      "sha256": "4d8764d39ca3303e9fdc4de1bcbbeeb2f68921ee2505b54c2ff80f930ae6e435",
+      "qaNotesRu": [
+        "Три стадии читаются слева направо; передний склад сохранён. Широкие ворота доступны с площадки.",
+        "Контур содержит мелкие цветные полупрозрачные пиксели; перед игровым экспортом требуется проверка альфа-края и единое выравнивание."
+      ]
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "engineering_complex",
+      "titleRu": "Инженерный комплекс — Имперская готика",
+      "titleEn": "Engineering complex — Imperial Gothic",
+      "status": "catalog-building",
+      "path": "imperial-gothic/engineering_complex.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Мастерская с широким сборочным проёмом, кран-балкой и боковым служебным блоком.",
+        "Добавлены второй производственный корпус, общая площадка и мостовой кран над крупными узлами.",
+        "Добавлены высокий сборочный зал с фермами и мощным мостовым краном, вытяжные трубы и охлаждение."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2166727,
+      "sha256": "8e743af3b677ee647e841faf950720f84ab6d76680b0b6e10a64e2a2cde9b9ef",
+      "qaNotesRu": [
+        "Производственная функция читается по открытым цехам, подъёмным кранам и деталям машин. Нижний цех сохраняется при развитии.",
+        "Концептные стадии не выровнены попиксельно; при экспорте отдельных спрайтов потребуется проверка краёв и якорей."
+      ]
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "shipyard",
+      "titleRu": "Космоверфь — Имперская готика",
+      "titleEn": "Space shipyard — Imperial Gothic",
+      "status": "future-concept",
+      "path": "imperial-gothic/shipyard.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Один корабль на стапеле, сервисный манипулятор и боковая ремонтная мастерская.",
+        "Добавлены второй стапель, поворотный грузовой кран и склад деталей.",
+        "Добавлены большой сборочный портал с подвесными механизмами и задняя служебная галерея."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 2373848,
+      "sha256": "35c4cfc8a0f1a58b7b12db8160466f6ed35d091736893c4a244d75882569303a",
+      "qaNotesRu": [
+        "Вокруг части контуров заметны цветные артефакты альфа-края; требуется очистка перед использованием спрайтов.",
+        "Готические фермы и контрфорсы несут элементы дока. Корабль и базовая мастерская сохранены во всех стадиях."
+      ]
+    },
+    {
+      "styleId": "imperial-gothic",
+      "buildingId": "research_center",
+      "titleRu": "Научный центр — Имперская готика",
+      "titleEn": "Research center — Imperial Gothic",
+      "status": "future-concept",
+      "path": "imperial-gothic/research_center.png",
+      "stageOrder": [
+        1,
+        2,
+        3
+      ],
+      "captionsRu": [
+        "Центральная лаборатория с небольшим приборным куполом и боковым блоком инженерных систем.",
+        "Добавлены два лабораторных крыла, соединительные переходы и антенна на крыше.",
+        "Добавлены наблюдательная платформа с радиотелескопом и вычислительный блок с охлаждением."
+      ],
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "bytes": 1761609,
+      "sha256": "45ef8c0957f5015e260d2249e4175ff43697a9ff0454d25fbeb29c3a86b18539",
+      "qaNotesRu": [
+        "Три стадии сохраняют лабораторное ядро; радиотелескоп стоит на отдельной опоре.",
+        "Доступ в передний корпус выполнен по лестнице. Мелкие цветные пиксели альфа-края и взаимное выравнивание нужно проверить перед игровым экспортом."
+      ]
+    }
+  ]
+}

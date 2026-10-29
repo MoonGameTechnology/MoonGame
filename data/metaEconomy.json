@@ -1,11 +1,14 @@
 {
-  "version": "meta-v0.1",
+  "version": "meta-v0.2",
   "materials": {
     "ferroalloys": { "nameKey": "meta.material.ferroalloys" },
     "technical_composites": { "nameKey": "meta.material.technical_composites" },
     "control_circuits": { "nameKey": "meta.material.control_circuits" },
     "energy_cells": { "nameKey": "meta.material.energy_cells" },
-    "technology_archives": { "nameKey": "meta.material.technology_archives" }
+    "technology_archives": { "nameKey": "meta.material.technology_archives" },
+    "construction_blocks": { "nameKey": "meta.material.construction_blocks", "purpose": "corporation" },
+    "engineering_kits": { "nameKey": "meta.material.engineering_kits", "purpose": "corporation" },
+    "command_cores": { "nameKey": "meta.material.command_cores", "purpose": "corporation" }
   },
   "recipes": {
     "siege_platform": {
@@ -50,6 +53,7 @@
     }
   },
   "rewards": {
+    "corporationMaterials": { "construction_blocks": 12, "engineering_kits": 5, "command_cores": 1 },
     "materials": {
       "ferroalloys": 20,
       "technical_composites": 14,
@@ -76,6 +80,14 @@
     }
   },
   "market": { "minimumAccountXp": 100 },
+  "medals": {
+    "grades": {
+      "3": { "sovereigns": 10, "warrants": 20, "xp": 50 },
+      "2": { "sovereigns": 25, "warrants": 50, "xp": 150 },
+      "1": { "sovereigns": 60, "warrants": 120, "xp": 400 }
+    },
+    "sovereignsOnly": ["contribution", "tutorial"]
+  },
   "seasons": [
     {
       "id": "frontier_fleet_2026",
@@ -256,7 +268,16 @@
         "category": "materials",
         "price": 200,
         "materials": { "technology_archives": 1 }
-      }
+      },
+      "corp_style_imperial_gothic": {
+        "category": "styles",
+        "price": 490,
+        "corpStyle": "imperial_gothic"
+      },
+      "corp_style_high_tech": { "category": "styles", "price": 490, "corpStyle": "high_tech" },
+      "corp_backdrop_nebula": { "category": "styles", "price": 290, "corpBackdrop": "nebula" },
+      "corp_backdrop_ice_moon": { "category": "styles", "price": 290, "corpBackdrop": "ice_moon" },
+      "corp_backdrop_gas_giant": { "category": "styles", "price": 290, "corpBackdrop": "gas_giant" }
     },
     "premium": { "dailySovereigns": 5, "extraDailyAds": 1 }
   },

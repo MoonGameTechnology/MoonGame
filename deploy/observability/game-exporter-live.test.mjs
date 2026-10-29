@@ -14,9 +14,10 @@ beforeAll(async () => {
 }, 50000);
 afterAll(async () => { if (game?.exitCode === null) { game.kill('SIGTERM'); await once(game, 'exit'); } });
 
-async function startGame(port = 0) {
+async function startGame(port = 0, overrides = {}) {
   const env = { ...process.env, HOST: '127.0.0.1', PORT: String(port), GATE: '1', SEAT_LOCK: '1', PROD: '0', MATCHES: '1', TIME_SCALE: '1' };
-  for (const key of ['DATABASE_URL', 'AUTH_JWT_SECRET', 'AUTH_JWT_PREVIOUS_SECRET', 'METRICS_TOKEN', 'ALLOWED_ORIGINS', 'TLS_KEY_FILE', 'TLS_CERT_FILE', 'CORPORATIONS_URL', 'CORPORATION_SERVICE_URL']) delete env[key];
+  for (const key of ['DATABASE_URL', 'AUTH_JWT_SECRET', 'AUTH_JWT_PREVIOUS_SECRET', 'METRICS_TOKEN', 'METRICS_READER_TOKEN', 'ALLOWED_ORIGINS', 'TLS_KEY_FILE', 'TLS_CERT_FILE', 'CORPORATIONS_URL', 'CORPORATION_SERVICE_URL']) delete env[key];
+  Object.assign(env, overrides);
   game = spawn(process.execPath, ['packages/server/dist/proto-server.mjs'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
   return new Promise((resolve, reject) => {
     let log = '';
@@ -56,4 +57,39 @@ it('reads the live production bundle and observes a Game counter reset without a
   text = await exporter.scrape();
   expect(text).toContain('moongame_joins_total 0');
   expect(text).toContain('moongame_connections 0');
+}, 45000);
+
+it('a stolen observer credential reads aggregate sources but cannot read raw events, use a session or borrow loopback authority', async () => {
+  if (game?.exitCode === null) { game.kill('SIGTERM'); await once(game, 'exit'); }
+  const reader = 'synthetic-aggregate-reader-credential-for-audit';
+  const operator = 'synthetic-full-operator-credential-for-audit';
+  const port = await startGame(0, {
+    METRICS_TOKEN: operator,
+    METRICS_READER_TOKEN: reader,
+    AUTH_JWT_SECRET: 'synthetic-session-signing-credential-for-audit',
+  });
+  const exporter = createExporter({ sourcePort: port, token: reader });
+  const text = await exporter.scrape();
+  for (const source of ['health', 'ready', 'metrics', 'summary', 'activity'])
+    expect(text).toContain(`moongame_source_up{source="${source}"} 1`);
+  const get = (path, token) => fetch(`http://127.0.0.1:${port}${path}`, {
+    headers: { authorization: `Bearer ${token}`, 'x-forwarded-for': '127.0.0.1' },
+  });
+  // Invalid n fails BEFORE reading a journal; 400 proves only that the full
+  // operator passed authorization. Reader and unknown credentials must get 404.
+  for (const path of ['/metrics/recent?n=invalid', '/metrics/health']) {
+    expect((await fetch(`http://127.0.0.1:${port}${path}`)).status).toBe(404);
+    expect((await get(path, reader)).status).toBe(404);
+    expect((await get(path, 'wrong')).status).toBe(404);
+  }
+  expect((await get('/metrics/recent?n=invalid', operator)).status).toBe(400);
+  expect((await get('/metrics/health', operator)).status).toBe(200);
+  const limited = await (await get('/metrics/summary', reader)).json();
+  expect(limited).not.toHaveProperty('economy');
+  expect(limited).not.toHaveProperty('end');
+  expect(limited).not.toHaveProperty('eventsByType');
+  expect(await (await get('/metrics/summary', operator)).json()).toHaveProperty('economy');
+  expect((await fetch(`http://127.0.0.1:${port}/auth/refresh`, {
+    method: 'POST', headers: { authorization: `Bearer ${reader}` },
+  })).status).toBe(401);
 }, 45000);

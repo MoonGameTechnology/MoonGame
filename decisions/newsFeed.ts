@@ -36,6 +36,7 @@ import {
   type NewsText,
   type NewsView,
 } from '../packages/protocol/src/news';
+import { PROFILE_MEDALS } from '../packages/protocol/src/playerProfile';
 
 /** Раздел ленты: объявления, корпорации, битвы, достижения. */
 export type NewsCategory = 'ann' | 'corp' | 'battle' | 'ach';
@@ -78,7 +79,7 @@ const idOf = (v: unknown): v is string =>
 function corpOf(v: unknown): NewsCorp | null {
   if (!record(v) || !idOf(v.id)) return null;
   if (typeof v.name !== 'string' || v.name.length === 0 || v.name.length > NAME_MAX) return null;
-  return { id: v.id, name: v.name };
+  return { id: v.id, name: v.name, ...(v.monument === true ? { monument: true } : {}) };
 }
 
 function textOf(v: unknown, max: number, required: boolean): NewsText | null {
@@ -104,6 +105,14 @@ export function parseNewsAnnouncement(v: unknown): NewsAnnouncement | null {
 function eventOf(v: unknown): NewsEvent | null {
   if (!record(v) || !idOf(v.id) || !moment(v.at)) return null;
   const { id, at } = v;
+  if (v.kind === 'player_medal') {
+    const medal = PROFILE_MEDALS.find((m) => m.id === v.medalId);
+    const corp = v.corp === null ? null : corpOf(v.corp);
+    if (!medal || (v.grade !== 1 && v.grade !== 2 && v.grade !== 3) ||
+      (v.login !== null && (typeof v.login !== 'string' || !v.login.trim() || v.login.length > 100)) ||
+      (v.corp !== null && !corp)) return null;
+    return { id, at, kind: 'player_medal', medalId: medal.id, grade: v.grade, login: v.login, corp };
+  }
   if (v.kind === 'founded' || v.kind === 'level' || v.kind === 'medal') {
     const corp = corpOf(v.corp);
     if (!corp) return null;
@@ -173,14 +182,14 @@ export function newsCategory(item: NewsItem): NewsCategory {
   if (item.type === 'announcement') return 'ann';
   const kind = item.event.kind;
   if (kind === 'founded' || kind === 'level') return 'corp';
-  return kind === 'medal' ? 'ach' : 'battle';
+  return kind === 'medal' || kind === 'player_medal' ? 'ach' : 'battle';
 }
 
 /** Корпорации, о которых новость. */
 export function newsCorps(item: NewsItem): NewsCorp[] {
   if (item.type === 'announcement') return [];
   const e = item.event;
-  return e.kind === 'matchup' || e.kind === 'result' ? [e.challenger, e.target] : [e.corp];
+  return e.kind === 'matchup' || e.kind === 'result' ? [e.challenger, e.target] : e.corp ? [e.corp] : [];
 }
 
 /** Своя корпорация — где игрок состоит; заявка и неизвестность не в счёт (правило 4). */
@@ -242,6 +251,7 @@ export interface NewsReader {
   membership: NewsMembership | null | undefined;
   /** Имена медалей из каталога, по id; пусто, пока каталог не прочитан. */
   medalNames: Readonly<Record<string, string>>;
+  playerMedalNames?: Readonly<Record<string, string>>;
   /** Язык игрока: объявление показывается на нём, если администратор его заполнил. */
   locale: string;
 }
@@ -303,6 +313,13 @@ export function newsLine(item: NewsItem, reader: NewsReader): NewsLine {
   const own = mine !== null && newsCorps(item).some((c) => c.id === mine);
   const line = { ...base, tone: null, labelKey: NEWS_FILTER_LABEL[category], own, body: null };
   const e = item.event;
+  if (e.kind === 'player_medal') return {
+    ...line,
+    card: reader.signedIn ? e.corp : null,
+    title: { key: e.login === null ? 'news.player-medal.anonymous' : 'news.player-medal', vars: {
+      player: e.login ?? '', medal: reader.playerMedalNames?.[e.medalId] ?? e.medalId, grade: ['I', 'II', 'III'][e.grade - 1]!,
+    } },
+  };
   if (e.kind === 'matchup' || e.kind === 'result') {
     const vs = { a: e.challenger.name, b: e.target.name };
     if (e.kind === 'matchup')

@@ -10,12 +10,19 @@
  */
 import {
   type GameState,
+  type Planet,
+  type ScheduledEvent,
   isBombarded,
+  bombardedPlanets,
+  isForkSite,
   buildingLevel,
   BROWNOUT,
   buildProgress,
   thresholdRamp,
   matchHours,
+  matchCost,
+  matchUnitCost,
+  loadoutCost,
   creditsBonusOf,
 } from '../../packages/shared-core/src/index';
 import {
@@ -27,7 +34,30 @@ import {
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 import { feedsOnBiomass, isInfected } from '../../packages/shared-core/src/util/infestation';
+import { recordValues } from '../../packages/shared-core/src/util/records';
 import { HOUR } from './time';
+
+/** Investment represented by a completed unit order, for the economy harness.
+ * The event carries the hull, modules, carried troop and quantity; quote the same
+ * separate parts as construction rather than treating catalogue hull cost as the
+ * money spent. This is completed-work accounting, not payment-time cash flow. */
+export function completedUnitSpend(
+  state: Pick<GameState, 'pricing'>,
+  payload: { unit: string; count?: number; modules?: readonly string[]; troop?: string },
+): Record<string, number> {
+  const hull = data.units[payload.unit];
+  if (!hull) return {};
+  const out: Record<string, number> = {};
+  const parts = [
+    matchUnitCost(state, hull),
+    matchCost(state, loadoutCost(payload.modules ?? [], data)),
+    payload.troop ? matchUnitCost(state, data.units[payload.troop]) : undefined,
+  ];
+  for (const part of parts)
+    for (const [resource, amount] of Object.entries(part ?? {}))
+      out[resource] = (out[resource] ?? 0) + amount * (payload.count ?? 1);
+  return out;
+}
 
 /** ECON-6: почасовой экономический срез для пайплайна наблюдений хоста — казна /
  *  чистый приток / arrears per player на мировом времени `state.time`. Чистая
@@ -56,11 +86,38 @@ export function economySnapshot(state: GameState): {
 
 /** Net per-hour income for a player: production from owned, un-bombarded worlds
  *  (brownout-dimmed like the core) minus unit/garrison AND building upkeep
- *  (daily ÷ 24). Drives the HUD's `+/h` deltas. */
-export function netIncome(state: GameState, playerId: string): Record<string, number> {
+ *  (daily ÷ 24). Drives the HUD's `+/h` deltas.
+ *
+ *  The map is walked ONCE: the HUD asks on every new world, and on 1675 provinces four
+ *  walks (two here, plus the province and inhabited-world counts) and a scan of the whole
+ *  schedule per owned world were ~5 ms of a weak phone's frame. The sums run in the same
+ *  order as before — world by world in map order, then fleets, then garrisons and
+ *  beachheads — so the numbers are bit-for-bit the same (the AI reads them too).
+ *  `planets` — the worlds of `state.planets` in record order when the caller already
+ *  holds them (the frame keeps the list), so the HUD does not walk the record itself. */
+export function netIncome(
+  state: GameState,
+  playerId: string,
+  planets: readonly Planet[] = recordValues(state.planets),
+): Record<string, number> {
   const out: Record<string, number> = {};
   const arrears = state.players[playerId]?.arrears ?? [];
-  const inhabited = inhabitedWorldCount(data, state, playerId); // for the diminishing civic tax
+  // My worlds in map order, the two counts the bonuses need (`ownedProvinceCount`,
+  // `inhabitedWorldCount`) and the garrison/beachhead stacks in the order they are charged.
+  const owned: Planet[] = [];
+  const stationed: Array<Array<{ unit: string; count: number }>> = [];
+  let provinces = 0;
+  let inhabited = 0; // for the diminishing civic tax
+  for (const p of planets) {
+    if (p.owner === playerId) {
+      owned.push(p);
+      if (!isForkSite(p)) provinces += 1;
+      if (isInhabited(data, p)) inhabited += 1;
+      stationed.push(p.garrison);
+    }
+    // Десант на плацдарме содержит его владелец — как ядро (`economy.upkeepByOwner`).
+    for (const b of p.beachheads ?? []) if (b.owner === playerId) stationed.push(b.units);
+  }
   // BF-35: mirror the faction + tech `economy.production` hooks (factionModule /
   // technologyModule) — the HUD `+/h` used to apply only the planetType bonus, so a
   // production-boosted player (e.g. a +12% faction) saw a low readout from minute one.
@@ -72,10 +129,22 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
   // BAL-10: налог на рост державы (sprawlModule) — тоже чистый множитель всего выхода мира.
-  const bonusMult =
-    (1 + factionBonus) * (1 + techBonus) * sprawlFactor(ownedProvinceCount(state, playerId));
-  for (const p of Object.values(state.planets)) {
-    if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
+  const bonusMult = (1 + factionBonus) * (1 + techBonus) * sprawlFactor(provinces);
+  const bombarded = owned.length > 0 ? bombardedPlanets(state, data) : new Set<string>();
+  // Constructions in progress by world, in schedule order — what the per-world scan of
+  // `state.scheduled` used to pick out.
+  const sites = new Map<string, ScheduledEvent[]>();
+  if (owned.length > 0)
+    for (const event of state.scheduled) {
+      if (event.type !== 'construction.complete') continue;
+      const at = (event.payload as { planetId?: string }).planetId;
+      if (at === undefined) continue;
+      const list = sites.get(at);
+      if (list) list.push(event);
+      else sites.set(at, [event]);
+    }
+  for (const p of owned) {
+    if (bombarded.has(p.id)) continue;
     const mult =
       (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) * bonusMult;
     // Credits are settled per-planet so the civic tax + Tax Office boost mirror the
@@ -114,15 +183,12 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
     // mirrors economy.ts's `pendingProduction` ramp rule. Point-evaluated (not
     // integrated) since this is a live HUD rate, not an accrual over a span; no
     // upkeep is charged on an unfinished building either, so no brownout applies here.
-    for (const event of state.scheduled) {
-      if (event.type !== 'construction.complete') continue;
+    for (const event of sites.get(p.id) ?? []) {
       const cp = event.payload as {
         kind?: 'building' | 'unit' | 'upgrade';
-        planetId?: string;
         building?: string;
         level?: number;
       };
-      if (cp.planetId !== p.id) continue;
       if (cp.kind === 'building' && typeof cp.building === 'string') {
         const def = data.buildings[cp.building];
         if (!def) continue;
@@ -214,16 +280,12 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
         out[res] = (out[res] ?? 0) - ((def.upkeep[res] ?? 0) * st.count) / 24;
     }
   };
-  for (const f of Object.values(state.fleets))
+  for (const f of recordValues(state.fleets))
     if (f.owner === playerId) {
       addUpkeep(f.units);
       if (f.landing) addUpkeep(f.landing);
     }
-  for (const p of Object.values(state.planets)) {
-    if (p.owner === playerId) addUpkeep(p.garrison);
-    // Десант на плацдарме содержит его владелец — как ядро (`economy.upkeepByOwner`).
-    for (const b of p.beachheads ?? []) if (b.owner === playerId) addUpkeep(b.units);
-  }
+  for (const stacks of stationed) addUpkeep(stacks);
   return out;
 }
 

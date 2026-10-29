@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { parseGameData, safeParseGameData, buildingLevel, buildingMaxLevel } from './schemas';
+import { parseGameData, safeParseGameData, buildingLevel, buildingMaxLevel, TEAM_FORMATS } from './schemas';
 import { composeGameDataBundle } from './loadGameData';
 import { canEquip, moduleAllowed } from '../util/loadout';
 import {
@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.66'); // юнит ракеты `missile` (SM-3.7b; корпус и сигнатура ракеты переехали из модуля) поверх 0.1.64: юнит ракетной мины `rocket_mine` (SM-3.7a) поверх 0.1.63: круг патруля шаттлов 60 → 90 (SHU-6.9) поверх 0.1.62: площадка крепости на развилке (FORT-6.1) поверх 0.1.61: ракетная мина — только корабль героя, мины — только фрегаты (утилитарный слот) поверх 0.1.60: защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
+    expect(data.version).toBe('0.1.68'); // режимы с постоянными сторонами `team_6v6`…`team_10v10` для битв корпораций (CORP-8) поверх 0.1.67: единая металлодобыча `mine`; ранее — юнит ракеты `missile` (SM-3.7b; корпус и сигнатура ракеты переехали из модуля) поверх 0.1.64: юнит ракетной мины `rocket_mine` (SM-3.7a) поверх 0.1.63: круг патруля шаттлов 60 → 90 (SHU-6.9) поверх 0.1.62: площадка крепости на развилке (FORT-6.1) поверх 0.1.61: ракетная мина — только корабль героя, мины — только фрегаты (утилитарный слот) поверх 0.1.60: защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -407,7 +407,6 @@ describe('game data schema (docs/architecture.md §2)', () => {
       'frigate_design → unit:frigate',
       'heavy_cruiser_design → unit:heavy_cruiser',
       'heavy_infantry_training → unit:heavy_infantry',
-      'industrial_automation → building:mine_t2',
       'interceptor_design → unit:interceptor',
       'landing_design → unit:landing_shuttle',
       'militia_training → unit:militia',
@@ -902,7 +901,7 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     // за стол на четверых, поэтому пару проверяем именно вместе.
     const data = parseGameData(loadShippedBundle());
     expect(data.modes.duel?.teamFormat).toBe('1v1');
-    for (const n of [2, 3, 4, 5]) {
+    for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
       const mode = data.modes[`team_${n}v${n}`];
       expect({ id: `team_${n}v${n}`, format: mode?.teamFormat }).toEqual({
         id: `team_${n}v${n}`,
@@ -915,7 +914,8 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     // Пустой `victory` значит «базовые правила»; вписать туда числа значило бы, что
     // дуэль и 5v5 незаметно играются по РАЗНЫМ условиям победы.
     const data = parseGameData(loadShippedBundle());
-    for (const id of ['duel', 'team_2v2', 'team_3v3', 'team_4v4', 'team_5v5']) {
+    const teams = [2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `team_${n}v${n}`);
+    for (const id of ['duel', ...teams]) {
       expect({ id, victory: data.modes[id]?.victory, modules: data.modes[id]?.modules }).toEqual({
         id,
         victory: {},
@@ -946,7 +946,7 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
   });
 
   it('accepts a PvE mode (waves + NPC faction) across every team format', () => {
-    for (const teamFormat of ['1v1', '2v2', '3v3', '4v4', '5v5', 'ffa']) {
+    for (const teamFormat of TEAM_FORMATS) {
       const parsed = withModes({
         waves: {
           name: 'Waves',
@@ -1024,7 +1024,7 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
   });
 
   it('rejects an unknown team format and a malformed PvE section (fail-closed)', () => {
-    expect(withModes({ m: { name: 'M', teamFormat: '6v6' } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', teamFormat: '11v11' } }).success).toBe(false);
     expect(withModes({ m: { name: 'M', pve: { waves: 0, npcFaction: 'swarm', waveIntervalHours: 6 } } }).success).toBe(
       false,
     );

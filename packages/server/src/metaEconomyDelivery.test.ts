@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialState, type GameState, type Planet } from '@void/shared-core';
-import { MemoryArsenalStore, MemoryDropStore, MemoryMatchStore, type MatchSnapshot } from './store';
+import { MemoryArsenalStore, MemoryDropStore, MemoryMatchStore, MemoryReceiptStore, type MatchSnapshot } from './store';
+import { commitMatch } from './matchCommit';
 import { MemoryMetaMarket } from './metaMarket';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { createMetaRewardDelivery, type MetaRewardDeliveryDeps } from './metaEconomyDelivery';
@@ -74,6 +75,23 @@ function fixture() {
 }
 
 describe('reward delivery from persisted match facts', () => {
+  it('preserves atomic command commits and observations through the production reward decorator', async () => {
+    const { create, matches } = fixture();
+    const delivery = create(); const receipts = new MemoryReceiptStore();
+    const initial = snapshot();
+    const receipt = { actionId: 'seat:p1:1', playerId: 'p1', seq: initial.seq, ok: true };
+    await commitMatch(delivery.matches, receipts, initial, receipt);
+    await delivery.stop();
+    expect(await receipts.loadAll(initial.matchId)).toEqual([receipt]);
+    expect((await matches.load(initial.matchId))?.economyObservations).toBeDefined();
+    const committed = await matches.load(initial.matchId);
+    receipts.prepareSave = () => { throw new Error('injected receipt preparation failure'); };
+    await expect(commitMatch(delivery.matches, receipts, explored(initial), { ...receipt, actionId: 'seat:p1:2', seq: 2 }))
+      .rejects.toThrow('injected receipt preparation failure');
+    expect(await matches.load(initial.matchId)).toEqual(committed);
+    expect(await receipts.loadAll(initial.matchId)).toHaveLength(1);
+    await delivery.stop();
+  });
   it('does not turn initial visibility, passive participation XP or a finished untouched seat into income', async () => {
     const { create, settle } = fixture();
     const delivery = create();
@@ -277,4 +295,21 @@ describe('rewards only for time in the match', () => {
     await delivery.deliver(later);
     expect(activeDay.mock.calls.map(([, day]) => day)).toEqual([20741, 20742, 20743, 20743]);
   });
+});
+
+
+it('retries a temporarily unavailable career projection from durable snapshots, independently of economy', async () => {
+  const { matches,create,onError } = fixture();
+  const final=ended(snapshot());
+  final.createdAt=1_800_000_000_000;
+  final.endedAt=final.createdAt+1000;
+  final.career={since:100,owners:{p1:{accountId:'account',claimedAt:1}},players:{}};
+  await matches.save(final);
+  const career=vi.fn().mockRejectedValueOnce(Error('career temporarily down')).mockResolvedValue(undefined);
+  await create(1000,{career}).deliver(final);
+  expect(onError).toHaveBeenCalled();
+  const restarted=create(2000,{career});
+  await restarted.sweep();
+  expect(career).toHaveBeenCalledTimes(2);
+  expect(career.mock.calls[1]![0]).toEqual(final);
 });

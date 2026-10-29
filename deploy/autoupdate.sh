@@ -206,6 +206,12 @@ extract_release() {
     log "E_RELEASE_TRANSPORT_SUPPORT: candidate predates the enabled transport profile"
     return 1
   fi
+  if [ -e "$STATE_DIR/resource-guard.version" ] && \
+     [ "$(cat "$dest.tmp/deploy/resources/version" 2>/dev/null || true)" != 1 ]; then
+    rm -rf "$dest.tmp"
+    log "E_RELEASE_RESOURCE_SUPPORT: candidate cannot preserve the disk-pressure stop"
+    return 1
+  fi
   # Сертификаты — состояние машины, а не версии: compose монтирует ./certs из каталога
   # версии, и он обязан смотреть в постоянный каталог.
   rm -rf "$dest.tmp/deploy/certs"

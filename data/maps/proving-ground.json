@@ -22,12 +22,8 @@
       "owner": "p1",
       "buildings": [
         {
-          "type": "mine_t1",
-          "level": 1
-        },
-        {
-          "type": "mine_t2",
-          "level": 1
+          "type": "mine",
+          "level": 3
         },
         {
           "type": "shipyard",
@@ -75,10 +71,6 @@
         },
         {
           "type": "farm",
-          "level": 3
-        },
-        {
-          "type": "mine",
           "level": 3
         },
         {
@@ -690,7 +682,8 @@
       "owner": "p2",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine",
+          "level": 1
         },
         {
           "type": "shipyard",
@@ -846,7 +839,8 @@
           "type": "swarm_synapse"
         },
         {
-          "type": "mine_t2"
+          "type": "mine",
+          "level": 3
         },
         {
           "type": "shipyard",

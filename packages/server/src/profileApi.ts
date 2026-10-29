@@ -5,10 +5,11 @@ import {
   defaultAppearance,
   medalGrade,
   parseAppearance,
+  type MedalRewardGrant,
   type PlayerProfile,
 } from '@void/protocol';
 import type { Identity } from './matchApi';
-import type { CommanderStore, UserStore } from './store';
+import type { CommanderStore, UserStore, CorpStore } from './store';
 import type { ProfileStore } from './profileStore';
 import type { RegistrationRewardStore } from './registrationRewardStore';
 import type { BotRosterStore } from './botRoster';
@@ -16,12 +17,15 @@ import { slidingWindowIpLimiter } from './rateLimit';
 
 export interface ProfileApiDeps {
   profiles: ProfileStore;
+  corporations?: Pick<CorpStore, 'membershipOf' | 'getCorp'>;
   users: Pick<UserStore, 'findUser' | 'findById'>;
   commanders: Pick<CommanderStore, 'xpOf'>;
   bots?: Pick<BotRosterStore, 'findByLogin' | 'recentMatches'>;
   registrationRewards?: RegistrationRewardStore;
   /** A running premium account (Meta): shown as the profile frame. */
   premium?(accountId: string): Promise<boolean>;
+  /** Pays reached medal degrees not paid yet (`medalRewards.ts`). */
+  medalRewards?(accountId: string): Promise<MedalRewardGrant[]>;
   identify(request: FastifyRequest): Promise<Identity | null>;
 }
 
@@ -36,14 +40,32 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
       // The frame is decoration: a failed read leaves it off, never the whole profile.
       deps.premium?.(id).catch(() => false) ?? false,
     ]);
-    const frame = premium ? { premium: true } : {};
+    const corporation = deps.corporations
+      ? await (async () => {
+          const member = await deps.corporations!.membershipOf(id);
+          if (!member || member.role === 'recruit') return null;
+          const corp = await deps.corporations!.getCorp(member.corpId);
+          return corp ? { id: corp.corpId, name: corp.name } : null;
+        })().catch(() => undefined)
+      : undefined;
+    const career = await deps.profiles.career?.(id);
+    const frame = {
+      ...(premium ? { premium: true as const } : {}),
+      statistics: { matches: progress.matches ?? 0, wins: progress.wins ?? 0 },
+      ...(career !== undefined ? { career } : {}),
+      ...(corporation !== undefined ? { corporation } : {}),
+    };
     if (owner) return { login, xp, progress, ...appearance, ...frame };
     const publicProgress: PlayerProfile['progress'] = {};
     for (const id of appearance.slots) {
       if (!id) continue;
       const grade = medalGrade(id, progress);
       const medal = PROFILE_MEDALS.find((m) => m.id === id)!;
-      if (grade) publicProgress[medal.metric] = Math.max(publicProgress[medal.metric] ?? 0, medal.goals[3 - grade]!);
+      if (grade)
+        publicProgress[medal.metric] = Math.max(
+          publicProgress[medal.metric] ?? 0,
+          medal.goals[3 - grade]!,
+        );
     }
     return { login, xp, progress: publicProgress, ...appearance, ...frame };
   };
@@ -51,8 +73,9 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
     const who = await deps.identify(request);
     if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+    reply.header('cache-control', 'no-store');
     const login = request.query.login;
-    if (login !== undefined && (typeof login !== 'string' || login.length > 64))
+    if (login !== undefined && (typeof login !== 'string' || login.length > 64 || login.includes('\0')))
       return reply.code(400).send({ error: 'E_BAD_REQUEST' });
     const user =
       login === undefined
@@ -60,8 +83,7 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
         : await deps.users.findUser(login);
     // Real accounts always retain their own profile, even if a roster has a colliding name.
     if (user) return view(user.userId, user.login, user.userId === who.accountId);
-    if (!login || !deps.bots)
-      return reply.code(404).send({ error: 'E_NO_PROFILE' });
+    if (!login || !deps.bots) return reply.code(404).send({ error: 'E_NO_PROFILE' });
     const bot = await deps.bots.findByLogin(login);
     if (!bot) return reply.code(404).send({ error: 'E_NO_PROFILE' });
     const [progress, history] = await Promise.all([
@@ -103,7 +125,8 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     return view(who.accountId, user.login);
   });
   // The tutorial is played on the device, out of the server's sight: the claim names no
-  // count, the credit is a fixed 1 once per account, and it grants no XP or currency.
+  // count and the credit is a fixed 1 once per account. Its medal pays Sovereigns only,
+  // through the medal rewards below, never XP or Warrants.
   app.post('/profiles/rewards/tutorial', { bodyLimit: 64 }, async (request, reply) => {
     if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
     const who = await deps.identify(request);
@@ -114,6 +137,18 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     reply.header('cache-control', 'no-store');
     return { medalId: 'tutorial' };
   });
+  // Medal rewards: the server reads the account's own progress, so the claim carries
+  // nothing and a repeat pays nothing twice.
+  if (deps.medalRewards) {
+    const settle = deps.medalRewards;
+    app.post('/profiles/rewards/medals', { bodyLimit: 64 }, async (request, reply) => {
+      if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      const who = await deps.identify(request);
+      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+      reply.header('cache-control', 'no-store');
+      return { granted: await settle(who.accountId) };
+    });
+  }
   if (deps.registrationRewards) {
     const rewards = deps.registrationRewards;
     app.get('/profiles/rewards/registration', async (request, reply) => {
@@ -123,17 +158,26 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
       reply.header('cache-control', 'no-store');
       return { reward: await rewards.ensure(who.accountId) };
     });
-    app.post('/profiles/rewards/registration/accept', { bodyLimit: 256 }, async (request, reply) => {
-      if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
-      const who = await deps.identify(request);
-      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
-      const body = request.body as { equip?: unknown } | null;
-      if (!body || typeof body.equip !== 'boolean' || Object.keys(body).some((key) => key !== 'equip'))
-        return reply.code(400).send({ error: 'E_BAD_REQUEST' });
-      const result = await rewards.accept(who.accountId, body.equip);
-      if (!result.ok) return reply.code(result.code === 'E_NO_REWARD' ? 404 : 409).send({ error: result.code });
-      reply.header('cache-control', 'no-store');
-      return { reward: result.reward };
-    });
+    app.post(
+      '/profiles/rewards/registration/accept',
+      { bodyLimit: 256 },
+      async (request, reply) => {
+        if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+        const who = await deps.identify(request);
+        if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+        const body = request.body as { equip?: unknown } | null;
+        if (
+          !body ||
+          typeof body.equip !== 'boolean' ||
+          Object.keys(body).some((key) => key !== 'equip')
+        )
+          return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+        const result = await rewards.accept(who.accountId, body.equip);
+        if (!result.ok)
+          return reply.code(result.code === 'E_NO_REWARD' ? 404 : 409).send({ error: result.code });
+        reply.header('cache-control', 'no-store');
+        return { reward: result.reward };
+      },
+    );
   }
 }

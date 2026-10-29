@@ -1,4 +1,5 @@
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
+import { scopedPool } from './corporateScopedPool';
 import { CorpService } from './corpService';
 import { AvaService } from './avaService';
 import { MedalService } from './medalService';
@@ -11,26 +12,6 @@ import {
   PostgresAvaFeedStore,
   PostgresMedalStore,
 } from './store';
-
-/** Existing stores sometimes open their own transaction. Inside a service operation
- * those boundaries become savepoints; they must never commit the outer operation. */
-function scopedPool(client: PoolClient): Pool {
-  const connection = {
-    query: async (sql: string, values?: unknown[]) => {
-      const command = sql.trim().toUpperCase();
-      if (command === 'BEGIN') return client.query('SAVEPOINT corporate_operation');
-      if (command === 'COMMIT') return client.query('RELEASE SAVEPOINT corporate_operation');
-      if (command === 'ROLLBACK') {
-        // PostgreSQL resolves the most recent savepoint with this fixed name.
-        await client.query('ROLLBACK TO SAVEPOINT corporate_operation');
-        return client.query('RELEASE SAVEPOINT corporate_operation');
-      }
-      return client.query(sql, values);
-    },
-    release: () => undefined,
-  };
-  return { query: client.query.bind(client), connect: async () => connection } as unknown as Pool;
-}
 
 /** Rights checks, mutations and audit share one serializable transaction. Only
  * aborted serialization/deadlock attempts retry; network/commit errors never do. */

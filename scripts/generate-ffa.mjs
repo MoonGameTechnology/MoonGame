@@ -286,7 +286,7 @@ function generate(seats, cfg) {
     add(`home_${i + 1}`, home, 'planet', 'empty_space', {
       planetType: 'terran',
       owner: slot,
-      buildings: [{ type: 'mine_t1' }, { type: 'shipyard', level: 2 }],
+      buildings: [{ type: 'mine' }, { type: 'shipyard', level: 2 }],
       garrison: [{ unit: 'militia', count: 3 }],
     });
     fleets[`fleet_${i + 1}`] = {
@@ -806,6 +806,7 @@ function finish(seats, cfg, g) {
     slots,
     fleets,
     techRules: { ruleset: 'main', starting: ['scout_design'], dayGates: true, exclude: [] },
+    pricing: JSON.parse(readFileSync(ROOT + 'data/maps/duel-1.json', 'utf8')).pricing,
   };
 
   // ── contracts (prototype/src/ffaMap.test.ts holds the same on the committed file) ──

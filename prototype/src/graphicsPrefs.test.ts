@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -20,6 +20,11 @@ import {
   setUiScale,
   uiScalePct,
   UI_SCALE_DEFAULT,
+  mapSharpChosen,
+  mapSharpOn,
+  mapSlowSeen,
+  markMapSlow,
+  setMapSharp,
 } from './graphicsPrefs';
 
 // REFM-21. Модуль читает окружающее хранилище на импорте, поэтому тесты работают с ЖИВЫМ
@@ -206,5 +211,47 @@ describe('движение слоёв', () => {
         expect(fxBreath(now, b)).toBe(b.base);
       }
     });
+  });
+});
+
+// Чёткая карта (`decisions/mapSharpness.ts`). Вердикт «слабое» назад не отменяется, поэтому
+// блок стоит последним в файле: после него устройство остаётся слабым.
+describe('графика — чёткая карта', () => {
+  it('без выбора и вердикта карта чёткая, слабое устройство её снимает', () => {
+    expect(mapSharpChosen()).toBeNull();
+    expect(mapSlowSeen()).toBe(false);
+    expect(mapSharpOn()).toBe(true);
+    markMapSlow();
+    expect(mapSlowSeen()).toBe(true);
+    expect(mapSharpOn()).toBe(false);
+  });
+
+  it('ВЫБОР ИГРОКА СИЛЬНЕЕ ВЕРДИКТА в обе стороны', () => {
+    markMapSlow();
+    setMapSharp(true);
+    expect(mapSharpChosen()).toBe(true);
+    expect(mapSharpOn()).toBe(true);
+    setMapSharp(false);
+    expect(mapSharpChosen()).toBe(false);
+    expect(mapSharpOn()).toBe(false);
+  });
+});
+
+// Движение на слабом устройстве (`decisions/mapSharpness.ts`, правило 5) — на свежей загрузке
+// модуля: блоки выше уже выбрали движение тумблером.
+describe('графика — слабое устройство останавливает слои', () => {
+  it('без выбора игрока вердикт «слабое» выключает движение, а выбор сильнее вердикта', async () => {
+    vi.resetModules();
+    const prefs = await import('./graphicsPrefs');
+    expect(prefs.motionChosen()).toBeNull();
+    expect(prefs.reducedMotionAsked()).toBe(false);
+    expect(prefs.motionOn()).toBe(true);
+    prefs.markMapSlow();
+    expect(prefs.motionOn()).toBe(false);
+    // Слой стоит в середине размаха — виден, но не качается.
+    expect(prefs.fxBreath(1234, { period: 200, base: 0.5, amp: 0.5 })).toBe(0.5);
+    prefs.setMotion(true);
+    expect(prefs.motionChosen()).toBe(true);
+    expect(prefs.motionOn()).toBe(true);
   });
 });

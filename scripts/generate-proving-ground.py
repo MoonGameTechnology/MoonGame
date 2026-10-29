@@ -209,16 +209,16 @@ planet_roster = DATA['sectorKinds']['planet'].get('allowedBuildings')
 capital_buildings = [
     {'type': bid, 'level': 1 + len(b.get('upgrades', []))}
     for bid, b in DATA['buildings'].items()
-    if 'infected' not in b.get('traits', [])
+    if not b.get('retired', False) and 'infected' not in b.get('traits', [])
     and (b.get('onlyOn') is None or 'planet' in b['onlyOn'])
     and (planet_roster is None or bid in planet_roster)
 ]
 
 BUILDINGS = {
     CAPITAL: capital_buildings,
-    RIVAL: [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'barracks'}],
+    RIVAL: [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'barracks'}],
     # Улей Роя — как в главе I (`pve-1`): с верфью, иначе первую матку не заложить.
-    HIVE: [{'type': 'biomass_pit'}, {'type': 'swarm_synapse'}, {'type': 'mine_t2'},
+    HIVE: [{'type': 'biomass_pit'}, {'type': 'swarm_synapse'}, {'type': 'mine', 'level': 3},
            {'type': 'shipyard', 'level': 2}, {'type': 'orbital_aa'}, {'type': 'barracks'},
            {'type': 'factory'}, {'type': 'swarm_datacenter'}],
     PIRATE: [{'type': 'shipyard'}, {'type': 'radar'}],

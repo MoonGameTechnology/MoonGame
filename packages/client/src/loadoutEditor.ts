@@ -26,6 +26,7 @@ import {
   loadoutBays,
   loadoutCost,
   matchCost,
+  matchUnitCost,
   moduleRarityBonus,
   moduleStarMultiplier,
   RARITIES,
@@ -293,7 +294,7 @@ function buildModel(
   }
 
   // Цена партии по частям, как у ядра (`orderSpec`): корпус и модули отдельно.
-  const hullCost = scaleBag(matchCost(match, def.cost), count);
+  const hullCost = scaleBag(matchUnitCost(match, def), count);
   const modulesCost = scaleBag(matchCost(match, loadoutCost(modules, data)), count);
   const totalCost = addBags(hullCost, modulesCost);
 

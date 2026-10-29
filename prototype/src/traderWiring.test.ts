@@ -9,17 +9,21 @@ import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+// Окна экспедиции — у своего владельца (`expeditionWindows.ts`, REFM-249).
+const WINDOWS = readFileSync(new URL('./expeditionWindows.ts', import.meta.url), 'utf8');
 
 describe('торговец экспедиции — проводка', () => {
   it('кнопка рельса открывает окно и по умолчанию спрятана', () => {
-    expect(MAIN).toMatch(/railTrader\.addEventListener\('click', \(\) => trader\.open\(\)\)/);
+    expect(WINDOWS).toMatch(/railTrader\.addEventListener\('click', \(\) => trader\.open\(\)\)/);
     expect(BUILD).toMatch(/<button id="rail-trader"[^>]*style="display:none"/);
   });
 
   it('кадр забега ведёт кнопку и окно, а торговец есть только у идущего забега', () => {
     expect(MAIN).toMatch(/tickAbandon\(\);\s*tickTrader\(\);/);
-    expect(MAIN).toMatch(/return runInProgress\(\) \? traderOf\(ctx\(s\.time, s\)\) : undefined;/);
-    expect(MAIN).toMatch(/cfg: runTrader,/);
+    expect(WINDOWS).toMatch(
+      /return runInProgress\(\) \? traderOf\(ctx\(s\.time, s\)\) : undefined;/,
+    );
+    expect(WINDOWS).toMatch(/cfg: runTrader,/);
   });
 
   it('карточка ресурса знает товары торговца и открывает его на ресурсе', () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ORBIT_R,
+  ORBIT_R_MAX,
   ORBIT_SPIN,
   ORBIT_ZOOM_IN,
   chevronAngle,
@@ -64,6 +65,15 @@ describe('орбита — радиус кольца', () => {
 
   it('ОДИНОКОМУ УЗЛУ ПОТОЛОК НЕ НУЖЕН: без связей кольцо живёт по зуму', () => {
     expect(orbitRadius(2.4, Infinity)).toBeCloseTo(ORBIT_R * 2.4, 12);
+  });
+
+  it('шире ORBIT_R_MAX кольцо не бывает ни на каком зуме и зазоре', () => {
+    for (const scale of [0, 1, ORBIT_ZOOM_IN, 2, 3, 9, 40]) {
+      for (const gap of [0, 20, 60, 200, 1e6, Infinity]) {
+        expect(orbitRadius(orbitBloom(scale), gap)).toBeLessThanOrEqual(ORBIT_R_MAX);
+      }
+    }
+    expect(orbitRadius(orbitBloom(40), Infinity)).toBe(ORBIT_R_MAX);
   });
 
   it('радиус не бывает шире 40% зазора ни при каком зуме', () => {

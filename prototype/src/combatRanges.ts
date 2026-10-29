@@ -30,8 +30,10 @@ import {
   type Fleet,
   type GameData,
   type GameState,
+  type Planet,
   type Squadron,
 } from '../../packages/shared-core/src/index';
+import { recordValues } from '../../packages/shared-core/src/util/records';
 
 /** Вид оружия — он же ключ цвета. Цвета живут в `main.ts` рядом с остальной палитрой;
  *  здесь только вид, чтобы модуль не знал про канву. */
@@ -123,18 +125,22 @@ export function combatRanges(
  *
  * Отдельно от `combatRanges`, потому что от выделения отметки не зависят — только от мира
  * и тумана. Кадр берёт их из памяти по миру (шаг 9 плавности): обход каждой провинции на
- * каждом кадре стоил на большой карте больше, чем рисование самих колец.
+ * каждом кадре стоил на большой карте больше, чем рисование самих колец. `planets` — миры
+ * `state.planets` в порядке записи, если они у вызывающего уже есть (кадр держит список).
  */
 export function aaRings(
   state: GameState,
   data: GameData,
   me: string,
   visible: (planetId: string) => boolean,
+  planets: readonly Planet[] = recordValues(state.planets),
 ): RangeRing[] {
   const rings: RangeRing[] = [];
-  for (const planet of Object.values(state.planets)) {
-    if (aaStrength(planet, data) <= 0) continue;
+  for (const planet of planets) {
+    // Сначала туман: проверка «опознан ли» дешевле подсчёта зубов, а под туманом почти вся
+    // большая карта.
     if (planet.owner !== me && !visible(planet.id)) continue;
+    if (aaStrength(planet, data) <= 0) continue;
     rings.push({
       kind: 'aa',
       x: planet.position.x,

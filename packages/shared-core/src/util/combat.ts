@@ -1,5 +1,13 @@
+import { captureCasualtyCost, partitionCasualtyCost } from './casualtyCost';
 import type { HandlerContext } from '../kernel/module';
-import type { CombatantRef, Fleet, GameState, PlanetId, PlayerId, UnitStack } from '../state/gameState';
+import type {
+  CombatantRef,
+  Fleet,
+  GameState,
+  PlanetId,
+  PlayerId,
+  UnitStack,
+} from '../state/gameState';
 import type { GameData, UnitDef } from '../data/schemas';
 import { cappedUnitBreakdown, type StackContribution } from './stacks';
 import { TARGET_CLASSES, targetClassOf, type ClassPools } from './groundTargets';
@@ -207,7 +215,8 @@ export function creditVolley(
     if (row.damage <= 0) continue;
     const stack = units[row.index];
     if (!stack || stack.count <= 0) continue;
-    stack.damageDealt = (stack.damageDealt ?? 0) + (row.damage / shot.total) * dealt / stack.count;
+    stack.damageDealt =
+      (stack.damageDealt ?? 0) + ((row.damage / shot.total) * dealt) / stack.count;
   }
 }
 
@@ -215,7 +224,11 @@ export function creditVolley(
  *  (`FactionDef.veterans: false` — Рой). Игрок без фракции или с неизвестной — растут,
  *  как и было до флага. Проверяют ВСЕ места начисления заслуги, иначе у запрещённой
  *  фракции копилась бы одна из двух линий медалей. */
-export function earnsMerit(state: GameState, owner: string | null | undefined, data: Pick<GameData, 'factions'>): boolean {
+export function earnsMerit(
+  state: GameState,
+  owner: string | null | undefined,
+  data: Pick<GameData, 'factions'>,
+): boolean {
   const faction = owner ? state.players[owner]?.faction : undefined;
   return faction === undefined || data.factions[faction]?.veterans !== false;
 }
@@ -463,6 +476,11 @@ export function damageByClass(
  * `count` юнитов получает `totalDamage × count / N` и тратит его на свой щит и запас
  * корпуса так же, как в {@link damageUnits}.
  *
+ * `weights` — вес рода войск цели (ROS-1.6b: стрелки бьют пехоту и технику разным уроном).
+ * Тогда N считается взвешенно, `Σ count × вес`, и юнит рода с весом `w` получает
+ * `totalDamage × w / Σ count × вес`. Род с весом 0 урона не получает. Не передан — у всех
+ * вес 1.
+ *
  * Стек, которому досталось больше, чем он держит, гибнет, а его остаток делится между
  * выжившими по той же формуле: урон не пропадает. Каждый проход либо тратит всё, либо
  * опустошает хотя бы один стек, поэтому проходов не больше, чем стеков. Мутирует стеки
@@ -472,13 +490,17 @@ export function damageEvenly(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
+  weights?: ClassPools,
 ): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
+  const weightOf = (s: UnitStack): number =>
+    weights ? Math.max(0, weights[targetClassOf(data.units[s.unit])]) : 1;
   const deaths: { unit: string; count: number }[] = [];
   let remaining = totalDamage;
   while (remaining > 0) {
-    const live = units.filter((s) => isTargetable(s, data));
-    const alive = live.reduce((n, s) => n + s.count, 0);
-    if (alive === 0) {
+    // `> 0` отсекает и вес NaN: такой род не бьётся вовсе, а не ломает деление.
+    const live = units.filter((s) => isTargetable(s, data) && weightOf(s) > 0);
+    const alive = live.reduce((n, s) => n + s.count * weightOf(s), 0);
+    if (!(alive > 0)) {
       break; // nothing left that can be hit
     }
     let allocated = 0;
@@ -487,7 +509,9 @@ export function damageEvenly(
       // Последний стек берёт точный остаток, как последняя линия в `damageUnits`:
       // деление на доли не теряет и не чеканит урон на округлении.
       const slice =
-        i === live.length - 1 ? remaining - allocated : (remaining * stack.count) / alive;
+        i === live.length - 1
+          ? remaining - allocated
+          : (remaining * stack.count * weightOf(stack)) / alive;
       allocated += slice;
       leftover += damageStack(stack, slice, data, deaths);
     }
@@ -496,7 +520,7 @@ export function damageEvenly(
     }
     remaining = leftover;
   }
-  // Стек, задетый в двух проходах, теряет юнитов дважды; наружу — одна строка на род юнита,
+  // Стек, задетый в двух проходах, теряет юнитов дважды; наружу — одна строка на юнит,
   // в порядке первой потери.
   const lost = new Map<string, number>();
   for (const d of deaths) lost.set(d.unit, (lost.get(d.unit) ?? 0) + d.count);
@@ -513,15 +537,17 @@ export function applyDamage(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
-  source: Record<string, string>,
+  source: Record<string, unknown>,
 ): UnitStack[] {
+  const value = captureCasualtyCost(h.state, units, data);
   const { survivors, deaths } = damageUnits(units, totalDamage, data);
-  for (const d of deaths) {
+  const costs = partitionCasualtyCost(deaths, value());
+  for (const [index,d] of deaths.entries()) {
     // A missile (SM-3.7b) does not die as a unit: shot down by shuttles it leaves spent,
     // exactly like a point-defense kill — otherwise the expedition tally, loot drops and
     // hero XP would score an interception as a kill.
     if (unitHasTrait(data, d.unit, MISSILE_TRAIT)) continue;
-    h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
+    h.emit('unit.died', { unit: d.unit, count: d.count, ...source, lossCost: costs[index] ?? {} });
   }
   return survivors;
 }
@@ -684,9 +710,10 @@ export function applyDamageToSide(
    *  burst names the world's owner; a shuttle strike names the strike's owner. Omitted
    *  when nobody owns the fire (a neutral garrison). */
   killedBy?: PlayerId | null,
-  /** `'even'` — урон поровну на каждого юнита стороны ({@link damageEvenly}): так огонь
-   *  сверху бьёт гарнизон (ROS-1.6a). Не передан — линиями, как в бою. */
-  spread?: 'even',
+  /** Урон поровну на каждого юнита стороны, с весом его рода войск ({@link damageEvenly}):
+   *  так огонь сверху бьёт гарнизон (ROS-1.6a/b). Не передан — линиями, как в бою. */
+  evenly?: ClassPools,
+  damageShares?: Record<string, number>,
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -694,10 +721,11 @@ export function applyDamageToSide(
   }
   // Плацдарм адресуется миром, как и гарнизон: флота у него нет (ROS-1.5).
   const onPlanet = ref.kind === 'garrison' || ref.kind === 'beachhead';
-  const source: Record<string, string> = onPlanet
+  const source: Record<string, unknown> = onPlanet
     ? { at: location, planetId: ref.planetId }
     : { at: location, fleetId: ref.fleetId };
   if (battleId !== undefined) source.battleId = battleId;
+  if (damageShares) source.damageShares = damageShares;
   if (killedBy != null) source.killedBy = killedBy;
   // Tag the casualty's owner NOW: a wiped fleet is deleted before the `unit.died`
   // event drains, so listeners (heroes / score) can't re-find it. У плацдарма
@@ -719,17 +747,25 @@ export function applyDamageToSide(
       f.lastDamagedAt = h.ctx.now;
     }
   }
-  const laid =
-    spread === 'even'
-      ? damageEvenly(units, dmg, data)
-      : byClass
-        ? damageByClass(units, byClass, data)
-        : null;
+  const value = captureCasualtyCost(h.state, units, data);
+  const laid = evenly
+    ? damageEvenly(units, dmg, data, evenly)
+    : byClass
+      ? damageByClass(units, byClass, data)
+      : null;
   if (!laid) {
     setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
     return;
   }
-  for (const d of laid.deaths) h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
+  const costs = partitionCasualtyCost(laid.deaths, value());
+  for (const [index,d] of laid.deaths.entries()) {
+    h.emit('unit.died', {
+      unit: d.unit,
+      count: d.count,
+      ...source,
+      ...(!unitHasTrait(data, d.unit, MISSILE_TRAIT) ? { lossCost: costs[index] ?? {} } : {}),
+    });
+  }
   setSideUnits(h.state, ref, laid.survivors);
 }
 

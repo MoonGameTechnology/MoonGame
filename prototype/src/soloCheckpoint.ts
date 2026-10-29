@@ -15,7 +15,8 @@
 import { t } from '../../localization/runtime';
 import { hashJson, type GameState } from '../../packages/shared-core/src/index';
 import { hubDoor } from '../../decisions/hubDoor';
-import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { parseCompatibleSoloSave } from '../../decisions/soloSaveMigration';
 import { gameDay } from './format';
 import { data } from './game';
 import { mapNodesFromState, mapPreset } from './mapCatalog';
@@ -34,6 +35,9 @@ export interface SoloCheckpointHost {
   inMatch(): boolean;
   /** Снимок партии вместе с политиками хоста. */
   snapshot(): SoloSave;
+  /** Собрать строку снимка в потоке расчёта, а не в кадре: строка придёт в `done`, `null` —
+   *  писать нечего. `false` — потока нет, снимок собирается здесь же. */
+  saveInBackground(rules: string, done: (raw: string | null) => void): boolean;
   /** Остановить мир: пауза на уходе со страницы. */
   halt(): void;
   /** Поставить партию из слота: выйти из сети, установить мир и политики, темп на паузе. */
@@ -59,6 +63,9 @@ const soloRules = hashJson({ data, modules: soloKernel.manifest });
 export let soloSaveActive = false;
 let soloSavedAtReal = 0;
 let soloSaveFailed = false;
+/** Номер последней записи слота. Строка из потока ложится в слот, только если после её заказа
+ *  слот не писали и не закрывали: иначе она затёрла бы запись свежее себя. */
+let saveSeq = 0;
 
 /** Поднять слот: хуки игры и кнопки окна замены. Зовётся из `main.ts` один раз. */
 export function initSoloCheckpoint(host: SoloCheckpointHost): void {
@@ -83,6 +90,7 @@ export function leaveSolo(): void {
 
 export function saveSolo(explicit = false): void {
   if (!soloSaveActive || game.net() || game.world().pve || game.practice()) return;
+  saveSeq++;
   const s = game.world();
   let ok = false;
   try {
@@ -111,7 +119,18 @@ export function tickSoloSave(now: number): void {
   }
   if (now - soloSavedAtReal < 15000) return;
   soloSavedAtReal = now;
+  // Строку снимка карты в 1675 провинций слабый телефон собирает сотни мс, и кадр стоял их
+  // каждые 15 с, даже на паузе. Её собирает поток расчёта, кадру остаётся положить её в слот.
+  const seq = ++saveSeq;
+  if (game.saveInBackground(soloRules, (raw) => settleBackground(seq, raw))) return;
   saveSolo();
+}
+/** Строка снимка пришла из потока: в слот, если она всё ещё последняя запись. */
+function settleBackground(seq: number, raw: string | null): void {
+  if (seq !== saveSeq || !soloSaveActive || game.net() || raw === null) return;
+  const ok = soloStore.save(raw);
+  if (!ok && !soloSaveFailed) game.note(t('solo.save.failed'));
+  soloSaveFailed = !ok;
 }
 /**
  * Главная дверь хаба (UIX-10.1): «Продолжить» с картой и днём сохранённой партии или, новичку
@@ -120,7 +139,7 @@ export function tickSoloSave(now: number): void {
  */
 export function refreshHubDoor(): void {
   const stored = soloStore.load();
-  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  const save = stored.ok ? parseCompatibleSoloSave(stored.raw, soloRules) : null;
   const door = hubDoor(
     // Сохранение без карты — «Нексус»: так его читает и `mapPreset` при загрузке.
     save
@@ -160,7 +179,7 @@ export function closeSoloReplace(): void {
 export function restoreSolo(): void {
   if (game.net()) return;
   const stored = soloStore.load();
-  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  const save = stored.ok ? parseCompatibleSoloSave(stored.raw, soloRules) : null;
   if (!save) {
     refreshHubDoor();
     return;

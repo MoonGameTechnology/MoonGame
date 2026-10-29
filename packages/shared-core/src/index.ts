@@ -10,7 +10,7 @@ export { playablePlayerIds } from './state/playableSeats';
 export { Rng, seedRng, type RngState } from './rng/rng';
 
 // Цены партии (основная игра дороже каталога, резолюция владельца 2026-10-18)
-export { matchCost, matchHours, matchStart } from './util/pricing';
+export { matchCost, matchUnitCost, matchHours, matchStart } from './util/pricing';
 
 // State model
 export {
@@ -208,6 +208,7 @@ export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {
   visibleState,
   visibleView,
+  viewCoverage,
   identifiedNodes,
   sensorCoverage,
   radarSignatures,
@@ -354,6 +355,7 @@ export {
   type ActionIdParts,
 } from './action/types';
 export { resolveMatchConfig, hasFixedSides, FIXED_SIDE_MODES, type ModeResolution } from './action/matchMode';
+export { MAP_SCORE_LIMITS, mapVictoryRules } from './action/mapVictory';
 // AUD-6: the schema map and the catalog of legal client action types are public now —
 // the boolean alone forced anyone writing a client to deep-import a test-only file.
 export {
@@ -415,6 +417,8 @@ export {
   type MapOperation,
   parseMatchMap,
   mapForDifficulty,
+  NEUTRAL_PLANET_MILITIA,
+  neutralSector,
   safeParseMatchMap,
   type MatchMap,
   type MapSector,

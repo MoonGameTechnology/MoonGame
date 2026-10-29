@@ -416,6 +416,15 @@ describe('SpotlightTour — этапы учебного полигона (TRN-2)
     expect(e.get()).toBeNull();
   });
 
+  it('возвращённое обучение начинает с заданного шага; лишний номер прижимается к концу', () => {
+    const h = fakeHost();
+    new SpotlightTour(staged, h.host).start(2);
+    expect(h.last()?.step.id).toBe('b1');
+    const far = fakeHost();
+    new SpotlightTour(staged, far.host).start(99);
+    expect(far.last()?.step.id).toBe('c1');
+  });
+
   it('пропуск последнего этапа — конец обучения как пройденного до конца', () => {
     const e = ender();
     const tour = new SpotlightTour(staged, fakeHost().host, e.onEnd);

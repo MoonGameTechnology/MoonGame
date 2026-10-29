@@ -123,7 +123,7 @@ bash deploy/launch.sh --build
 | Переменная | Описание | Значение по умолчанию (compose) |
 |-----------|---------|----------------------|
 | `PORT` | Порт сервера | `8788` |
-| `TIME_SCALE` | Ускорение времени (1 = реальное 24/7) | `24` — первая плейтест-сессия: 1 реальный час = 1 игровой день (SES-2.6) |
+| `TIME_SCALE` | Ускорение новых сессий по умолчанию (1 = реальное 24/7); при восстановлении используется скорость сохранённой сессии | `24` — 1 реальный час = 1 игровой день |
 | `GATE` | Валидация action.v1-конвертов | `1` (релиз-постура) |
 | `SEAT_LOCK` | Посадочные билеты (nick-режим) | `1` (релиз-постура) |
 | `AUTH_JWT_SECRET` | Аккаунты (SES-2.5): register/login → session-JWT → join-токен; nick/ticket отклоняются | пусто = nick+ticket режим. **Под `PROD=1` обязателен и должен быть ≥32 символов** — короткий HS256-секрет подбирается офлайн по одному перехваченному токену |
@@ -319,6 +319,21 @@ moongame update     # обновление (= deploy/update.sh, файл реп�
 moongame shell      # shell в директории проекта
 ```
 
+### Разовая миграция хоста, установленного до OPS-1
+
+Раньше установщик генерировал скрипт обновления в `/opt/moongame/update-dev.sh`, и хелпер
+`moongame` на таких машинах всё ещё зовёт эту старую копию: правки механизма обновления до
+них не доезжают. Один раз, руками:
+
+```bash
+cd /opt/moongame && moongame update          # старой копией — притащить свежий код
+sudo sed -i 's#\$INSTALL_DIR/update-dev.sh#$INSTALL_DIR/deploy/update.sh#' /usr/local/bin/moongame
+rm -f /opt/moongame/update-dev.sh            # копия больше не нужна
+```
+
+Дальше `moongame update` исполняет репозиторный `deploy/update.sh`, и следующие правки
+механизма приедут сами.
+
 ## 🔄 Отказоустойчивость
 
 - **Автоперезапуск**: systemd сервис `moongame` автоматически перезапускает контейнеры при краше
@@ -492,14 +507,6 @@ DOMAIN=play.example.com \
 Отладка без реального домена — см. комментарии в `deploy/Caddyfile` (`tls internal` /
 ACME-staging). Managed-край (Render/Cloudflare-туннель) уже даёт HTTPS без Caddy —
 см. `docs/https-roadmap.md`.
-
-## 📚 Документация
-
-| Файл | Для кого | Время |
-|------|----------|-------|
-| **[QUICK-START.md](QUICK-START.md)** | Я спешу | 5 мин |
-| **[INSTALLATION.md](INSTALLATION.md)** | Я хочу все понять | 15 мин |
-| **[README-UBUNTU.md](README-UBUNTU.md)** | Мне нужна справка | справочник |
 
 ## 🔍 Статус и логи
 
@@ -1111,10 +1118,7 @@ bash deploy/serve.sh
 
 ## 📞 Помощь и дальнейшее
 
-1. Прочитай **[QUICK-START.md](QUICK-START.md)** (5 мин)
-2. Полное руководство: **[INSTALLATION.md](INSTALLATION.md)** (15 мин)
-3. Все вопросы: **[README-UBUNTU.md](README-UBUNTU.md)** (справочник)
-4. Проблемы: `moongame logs` и `sudo journalctl -u moongame -n 100`
+Проблемы: `moongame logs` и `sudo journalctl -u moongame -n 100`.
 
 ---
 

@@ -1,11 +1,23 @@
-import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from './registrationRewardStore';
+import {
+  MemoryRegistrationRewardStore,
+  PostgresRegistrationRewardStore,
+  type RegistrationRewardStore,
+} from './registrationRewardStore';
 import { createCorporateServices } from './corporateTransactions';
-import { MemoryPlayerActivityStore, PostgresPlayerActivityStore, type PlayerActivityStore } from './playerActivity';
+import {
+  MemoryPlayerActivityStore,
+  PostgresPlayerActivityStore,
+  type PlayerActivityStore,
+} from './playerActivity';
 import type { MatchRoom } from './matchRoom';
 import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
 import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
-import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from './metaEconomyStore';
+import {
+  MemoryMetaEconomyStore,
+  PostgresMetaEconomyStore,
+  type MetaEconomyStore,
+} from './metaEconomyStore';
 import {
   MemoryAccountStore,
   MemoryAnnouncementStore,
@@ -144,6 +156,8 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     const commanders = new MemoryCommanderStore();
     // One feed for both writers: the corp store announces a corp's own facts into it.
     const feed = new MemoryAvaFeedStore();
+    // The corp store counts played battles for the level requirements (CORP-6).
+    const results = new MemoryAvaResultStore();
     return {
       playerActivity: new MemoryPlayerActivityStore(),
       profileStore: profiles,
@@ -152,11 +166,11 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       receiptStore: new MemoryReceiptStore(),
       accountStore: new MemoryAccountStore(),
       userStore: users,
-      corpStore: new MemoryCorpStore(feed),
+      corpStore: new MemoryCorpStore(feed, results),
       commanderStore: commanders,
       challengeStore: new MemoryAvaChallengeStore(),
       rosterStore: new MemoryAvaRosterStore(),
-      resultStore: new MemoryAvaResultStore(),
+      resultStore: results,
       feedStore: feed,
       announcementStore: new MemoryAnnouncementStore(),
       sessionStore: new MemoryAvaSessionStore(memoryMatches),
@@ -221,8 +235,11 @@ export function snapshotOf(room: MatchRoom): MatchSnapshot {
     dataVersion: state.version.data,
     seq: room.sequence,
     status: state.match.status,
+    createdAt: room.createdAt,
+    ...(room.endedAt !== undefined ? { endedAt: room.endedAt } : {}),
     state,
     economyActivity: room.economyActivitySnapshot,
+    career: room.careerSnapshot,
     ...(clock ? { clock } : {}),
   };
 }

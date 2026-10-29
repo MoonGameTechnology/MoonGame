@@ -1,3 +1,4 @@
+import { COMMERCE_CATALOG_VERSION } from './commerceCatalog';
 import { describe, expect, it, vi } from 'vitest';
 import type { EntitlementReceipt } from '@void/protocol';
 import { COMMERCE_PRODUCTS } from './commerceCatalog';
@@ -45,7 +46,7 @@ function fixture() {
     orderId,
     accountId: 'account-a',
     productId: 'supply_personal',
-    catalogVersion: 'meta-v0.1',
+    catalogVersion: COMMERCE_CATALOG_VERSION,
     kind: 'payment',
     amountMinor: 100,
     currency: 'USD',
@@ -75,7 +76,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
     expect(service.offers()).toHaveLength(COMMERCE_PRODUCTS.length);
     expect(service.offers().every((offer) => !offer.available && !offer.price)).toBe(true);
     await expect(
-      service.createOrder('a', 'request', 'supply_personal', 'meta-v0.1'),
+      service.createOrder('a', 'request', 'supply_personal', COMMERCE_CATALOG_VERSION),
     ).rejects.toThrow('E_COMMERCE_UNAVAILABLE');
     await expect(service.webhook('browser', {}, Buffer.from('{}'))).rejects.toThrow(
       'E_COMMERCE_UNAVAILABLE',
@@ -85,19 +86,19 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('pins the offer and returns the same order for an idempotent request', async () => {
     const f = fixture();
-    const first = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
-    expect(await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1')).toEqual(
+    const first = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
+    expect(await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION)).toEqual(
       first,
     );
     await expect(
-      f.service.createOrder('account-a', 'r1', 'rewarded_supply', 'meta-v0.1'),
+      f.service.createOrder('account-a', 'r1', 'rewarded_supply', COMMERCE_CATALOG_VERSION),
     ).rejects.toThrow('E_COMMERCE_CONFLICT');
     expect(await f.service.order('account-b', first.orderId)).toBeNull();
   });
 
   it('persists verified proof before delivery and deduplicates provider retries across restarts', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     expect((await f.service.order('account-a', order.orderId))?.state).toBe('pending');
     expect(f.meta.apply).not.toHaveBeenCalled();
@@ -112,7 +113,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('reconciles a lost response after grant commit instead of granting twice', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     vi.mocked(f.meta.apply).mockImplementationOnce(async (command) => {
       f.receipts.set(command.commandId, {
@@ -133,7 +134,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('does not accept browser success or provider proof for another account/product/price', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await expect(
       f.service.webhook('test-only', {}, Buffer.from(JSON.stringify(f.proof(order.orderId)))),
     ).rejects.toThrow('E_COMMERCE_PROOF');
@@ -151,8 +152,8 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('rejects a provider transaction reused under a different order/account', async () => {
     const f = fixture();
-    const a = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
-    const b = await f.service.createOrder('account-b', 'r2', 'supply_personal', 'meta-v0.1');
+    const a = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
+    const b = await f.service.createOrder('account-b', 'r2', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(a.orderId, { providerTransactionId: 'shared' }));
     await expect(
       f.webhook(f.proof(b.orderId, { providerTransactionId: 'shared', accountId: 'account-b' })),
@@ -163,7 +164,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('keeps verified orders pending while Meta is unavailable and ready stays local', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     vi.mocked(f.meta.status).mockRejectedValue(Error('offline'));
     await f.service.deliver();
@@ -174,7 +175,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('delivers refund as a separate idempotent command after the confirmed grant', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     const refund = f.proof(order.orderId, { eventId: 'refund:1', kind: 'refund' });
     await f.webhook(refund);
@@ -192,7 +193,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('holds further orders when a consumed entitlement requires refund review', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     await f.service.deliver();
     await f.webhook(f.proof(order.orderId, { eventId: 'chargeback:1', kind: 'chargeback' }));
@@ -208,13 +209,13 @@ describe('Commerce orders and durable entitlement delivery', () => {
     await f.service.deliver();
     expect((await f.service.order('account-a', order.orderId))?.state).toBe('review-required');
     await expect(
-      f.service.createOrder('account-a', 'r2', 'supply_personal', 'meta-v0.1'),
+      f.service.createOrder('account-a', 'r2', 'supply_personal', COMMERCE_CATALOG_VERSION),
     ).rejects.toThrow('E_COMMERCE_REVIEW_REQUIRED');
   });
 
   it('quarantines out-of-order refund instead of inventing its missing grant', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId, { eventId: 'refund:first', kind: 'refund' }));
     await f.webhook(f.proof(order.orderId));
     expect((await f.service.order('account-a', order.orderId))?.state).toBe('review-required');
@@ -223,7 +224,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('cannot mark an order fulfilled from a receipt with another payload hash', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     vi.mocked(f.meta.status).mockImplementation(async (commandIdValue) => ({
       commandId: commandIdValue,
@@ -237,7 +238,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('bounds repeated outage retries and preserves the original command for operator replay', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'r1', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.webhook(f.proof(order.orderId));
     vi.mocked(f.meta.apply).mockRejectedValue(Error('offline'));
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -253,7 +254,7 @@ describe('Commerce orders and durable entitlement delivery', () => {
 
   it('sends only a named rewarded product without currency or arbitrary value', async () => {
     const f = fixture();
-    const order = await f.service.createOrder('account-a', 'ad1', 'rewarded_supply', 'meta-v0.1');
+    const order = await f.service.createOrder('account-a', 'ad1', 'rewarded_supply', COMMERCE_CATALOG_VERSION);
     const proof = f.proof(order.orderId, { productId: 'rewarded_supply', kind: 'rewarded_ad' });
     delete proof.amountMinor;
     delete proof.currency;

@@ -3,8 +3,14 @@ import { MS_PER_DAY, type GameData, type MatchConfig } from '@void/shared-core';
 import type { MatchKind, MatchLists, MatchSummary } from '@void/protocol';
 import type { MatchRoom } from './matchRoom';
 import type { AccountStore } from './store';
+import type { RoomRegistry } from './roomRegistry';
+import type { MatchArchiveCatalog } from './matchArchiveCatalog';
+import type { ArchiveSummaryMetadata } from './matchArchiveMetadata';
 
 export type { MatchKind, MatchLists, MatchSummary };
+
+/** Real-time retention, independent of match speed. Rewards outlive this view. */
+export const MATCH_ARCHIVE_MS = 7 * MS_PER_DAY;
 
 /**
  * The multi-match registry behind the main-menu match browser.
@@ -30,6 +36,7 @@ export interface MatchMeta {
   modeId?: string;
   /** Wall-clock ms the match was created — for ordering and (later) honest age. */
   createdAt: number;
+  endedAt?: number;
   /** The world-time (`GameState.time`) the match's clock began at. "Days running" is
    *  elapsed game time = `(state.time - startedAt) / MS_PER_DAY`. Default 0 (matches
    *  that start at time 0); dev matches start at the boot instant, so without this the
@@ -71,7 +78,7 @@ export interface MatchMeta {
  */
 export function sessionMeta(
   room: {
-    state: { mapId?: string; time: number };
+    state: { mapId?: string; time: number; startedAt?: number };
     modeId?: string;
     victoryRules?: MatchConfig['victory'];
   },
@@ -84,7 +91,7 @@ export function sessionMeta(
     rules: { timeScale: opts.timeScale, ...(victory !== undefined ? { victory } : {}) },
     ...(room.modeId !== undefined ? { modeId: room.modeId } : {}),
     createdAt: opts.createdAt,
-    startedAt: room.state.time,
+    startedAt: room.state.startedAt ?? 0,
     ...(opts.entryWindowMs !== undefined ? { entryWindowMs: opts.entryWindowMs } : {}),
   };
 }
@@ -105,6 +112,11 @@ interface Entry {
   room: MatchRoom;
   meta: MatchMeta;
 }
+export interface MatchArchives {
+  catalog: MatchArchiveCatalog;
+  rooms: RoomRegistry;
+  rules?(metadata: ArchiveSummaryMetadata): MatchConfig;
+}
 
 export class MatchRegistry {
   private readonly entries = new Map<string, Entry>();
@@ -115,6 +127,8 @@ export class MatchRegistry {
   constructor(
     readonly accounts: AccountStore,
     private readonly data?: GameData,
+    private readonly now: () => number = Date.now,
+    private readonly archives?: MatchArchives,
   ) {}
 
   /** Add a match (room + its meta). Re-registering the same id replaces the entry. */
@@ -123,15 +137,66 @@ export class MatchRegistry {
   }
 
   get(id: string): MatchRoom | undefined {
-    return this.entries.get(id)?.room;
+    const entry = this.entries.get(id);
+    return entry && !this.expired(entry) ? entry.room : this.archives?.rooms.get(id);
   }
 
+  async resolve(id: string): Promise<MatchRoom | undefined> {
+    const entry = this.entries.get(id);
+    if (entry && !this.expired(entry)) return entry.room;
+    return this.archives?.rooms.resolve?.(id) ?? this.archives?.rooms.get(id);
+  }
+
+  /** Pre-join browsing stays public for resident ongoing matches. An archive may
+   * load or remain in use only for its participant, before touching the lazy cache. */
+  async resolveForBrowser(id: string, nick: string | null): Promise<MatchRoom | undefined> {
+    const room = this.get(id);
+    if (room?.state.match.status === 'ongoing') return room;
+    if (!nick || !(await this.accounts.seatOf(id, nick))) return undefined;
+    return room ?? this.resolve(id);
+  }
+
+  /** A durably saved, unwatched terminal host can retire to catalog-only storage. */
+  unregister(id: string): boolean {
+    const entry = this.entries.get(id);
+    if (!entry) return true;
+    if (entry.room.state.match.status !== 'ended' || entry.room.peerCount > 0) return false;
+    this.entries.delete(id);
+    return true;
+  }
+
+  retain(id: string): void { this.archives?.rooms.retain?.(id); }
+  release(id: string): void { this.archives?.rooms.release?.(id); }
+
   has(id: string): boolean {
-    return this.entries.has(id);
+    return this.entries.has(id) || this.archives?.rooms.get(id) !== undefined;
   }
 
   ids(): string[] {
-    return [...this.entries.keys()];
+    return [...new Set([...this.entries.keys(), ...(this.archives?.rooms.ids() ?? [])])]
+      .filter((id) => this.get(id) !== undefined);
+  }
+
+  private finishedAt(entry: Entry): number | undefined {
+    if (entry.room.state.match.status !== 'ended') return undefined;
+    return entry.room.endedAt ?? (entry.meta.endedAt ??= this.now());
+  }
+
+  private expired(entry: Entry): boolean {
+    const endedAt = this.finishedAt(entry);
+    return endedAt !== undefined && this.now() >= endedAt + MATCH_ARCHIVE_MS;
+  }
+
+  /** Drop only the playable archive view, never durable results or reward evidence. */
+  pruneExpired(): string[] {
+    const removed: string[] = [];
+    for (const [id, entry] of this.entries) {
+      if (!this.expired(entry)) continue;
+      for (const player of entry.room.connectedPlayers()) entry.room.evict(player, 'E_ENTRY_CLOSED');
+      this.entries.delete(id);
+      removed.push(id);
+    }
+    return [...removed, ...(this.archives?.rooms.pruneExpired?.() ?? [])];
   }
 
   /** Real ms the session has been running, from its game clock: `state.time` is game
@@ -153,7 +218,7 @@ export class MatchRegistry {
    *  caller (a nick already holding a seat) and never reaches this gate. */
   entryOpen(matchId: string): boolean {
     const entry = this.entries.get(matchId);
-    if (!entry) return false;
+    if (!entry || entry.room.state.match.status === 'ended') return false;
     if (entry.meta.entryWindowMs === undefined) return true;
     return this.realAgeMs(entry) < entry.meta.entryWindowMs;
   }
@@ -161,7 +226,8 @@ export class MatchRegistry {
   private async summary(entry: Entry): Promise<MatchSummary> {
     const st = entry.room.state;
     const window = entry.meta.entryWindowMs;
-    const open = window === undefined || this.realAgeMs(entry) < window;
+    const open = this.entryOpen(entry.room.id);
+    const endedAt = this.finishedAt(entry);
     const kind = matchKind(this.data, entry.meta.modeId);
     return {
       matchId: entry.room.id,
@@ -176,9 +242,10 @@ export class MatchRegistry {
       },
       status: st.match.status,
       createdAt: entry.meta.createdAt,
+      ...(endedAt !== undefined ? { endedAt, archiveExpiresAt: endedAt + MATCH_ARCHIVE_MS } : {}),
       entryOpen: open,
       entryClosesInMs:
-        window === undefined ? Number.MAX_SAFE_INTEGER : Math.max(0, window - this.realAgeMs(entry)),
+        !open ? 0 : window === undefined ? Number.MAX_SAFE_INTEGER : Math.max(0, window - this.realAgeMs(entry)),
     };
   }
 
@@ -193,12 +260,13 @@ export class MatchRegistry {
   async list(nick: string | null): Promise<MatchLists> {
     const out: MatchLists = { available: [], active: [], archived: [] };
     for (const entry of this.entries.values()) {
+      if (this.expired(entry)) continue;
       const sum = await this.summary(entry);
-      if (nick && entry.meta.archivedBy?.has(nick)) {
+      const seat = nick ? await this.accounts.seatOf(entry.room.id, nick) : null;
+      if (seat && (sum.status === 'ended' || entry.meta.archivedBy?.has(nick!))) {
         out.archived.push(sum);
         continue;
       }
-      const seat = nick ? await this.accounts.seatOf(entry.room.id, nick) : null;
       if (seat) {
         // A seated player keeps their match on Active regardless of the entry window —
         // the window only gates NEW claims, never a return to a seat you already hold.
@@ -211,6 +279,24 @@ export class MatchRegistry {
         // Joinable only while the entry window is still open (SES-2.3): a closed-window
         // match with free seats is no longer offered to newcomers.
         out.available.push(sum);
+      }
+    }
+    if (nick && this.archives) {
+      const seen = new Set([...out.available, ...out.active, ...out.archived].map((row) => row.matchId));
+      const rows = await this.archives.catalog.list(nick, this.now() - MATCH_ARCHIVE_MS);
+      for (const meta of rows) {
+        if (seen.has(meta.matchId) || this.now() >= meta.endedAt + MATCH_ARCHIVE_MS) continue;
+        const kind = matchKind(this.data, meta.modeId);
+        out.archived.push({
+          matchId: meta.matchId, mapId: meta.mapId,
+          rules: this.archives.rules?.(meta) ?? { timeScale: meta.timeScale },
+          ...(meta.modeId !== undefined ? { modeId: meta.modeId } : {}),
+          ...(kind !== undefined ? { kind } : {}),
+          days: Math.max(0, Math.floor((meta.gameTime - meta.startedAt) / MS_PER_DAY)),
+          players: { seated: meta.seated, capacity: meta.capacity }, status: 'ended',
+          createdAt: meta.createdAt, endedAt: meta.endedAt, archiveExpiresAt: meta.endedAt + MATCH_ARCHIVE_MS,
+          entryOpen: false, entryClosesInMs: 0,
+        });
       }
     }
     // Newest first, id as a deterministic tiebreak.
@@ -227,7 +313,7 @@ export class MatchRegistry {
    *  not strangers'). Per-player — it never affects anyone else's view. Idempotent. */
   async archive(matchId: string, nick: string): Promise<ArchiveResult> {
     const entry = this.entries.get(matchId);
-    if (!entry) return { ok: false, code: 'E_NO_MATCH' };
+    if (!entry || this.expired(entry)) return { ok: false, code: 'E_NO_MATCH' };
     if (!nick || !(await this.accounts.seatOf(matchId, nick))) return { ok: false, code: 'E_FORBIDDEN' };
     (entry.meta.archivedBy ??= new Set()).add(nick);
     return { ok: true };
@@ -236,8 +322,9 @@ export class MatchRegistry {
   /** Restore a match from a player's archive (the inverse of {@link archive}). */
   async unarchive(matchId: string, nick: string): Promise<ArchiveResult> {
     const entry = this.entries.get(matchId);
-    if (!entry) return { ok: false, code: 'E_NO_MATCH' };
+    if (!entry || this.expired(entry)) return { ok: false, code: 'E_NO_MATCH' };
     if (!nick || !(await this.accounts.seatOf(matchId, nick))) return { ok: false, code: 'E_FORBIDDEN' };
+    if (entry.room.state.match.status === 'ended') return { ok: false, code: 'E_FORBIDDEN' };
     entry.meta.archivedBy?.delete(nick);
     return { ok: true };
   }

@@ -1,3 +1,4 @@
+import { corpShowcaseHtml } from './corpFacilitiesView';
 /**
  * «Профиль командира» — the career dossier (docs/main-menu.md §4.2, REFM-10).
  *
@@ -5,8 +6,9 @@
  * Cosmetic edits persist on the account; nothing here touches the simulation.
  *
  * Where each number comes from, so nothing on this screen is invented:
- *   · matches / winrate / avg place / streak / season score — the local career
- *     counters folded at checkEnd (`meta.ts` `recordMatch`);
+ *   · authenticated matches / wins / XP — the server account projection;
+ *   · PvP counts / resource value / modes — completed authoritative career ledgers;
+ *   · guest career — local counters folded at checkEnd (`meta.ts` `recordMatch`);
  *   · league — a cosmetic band over the commander level (`leagueKey`);
  *   · influence + corporation — the live corp record, when a session has one;
  *   · corporation grants — the existing cached showcase;
@@ -19,11 +21,13 @@
  * finished `ProfileView`, so it needs neither storage nor a clock), and only
  * `initProfile(host)` touches the host, through explicit hooks.
  */
-import { LOCALE, t } from '../../localization/runtime';
+import { LOCALE, t, hasKey } from '../../localization/runtime';
 import { esc, kfmt, nfmt } from './format';
 import { SOV_SVG } from './icons';
-import { averagePlace, leagueKey, metaLevel, winRate, type MetaStats } from './meta';
-import { parseMedals } from './corp';
+import { averagePlace, leagueKey, winRate, type MetaStats } from './meta';
+import { parseMedals, parseCorpRecord } from './corp';
+import { corpEmblem } from './corpEmblems';
+import { accountLevel } from '../../decisions/playerCareer';
 import { detach } from './detach';
 import {
   defaultAppearance,
@@ -56,6 +60,8 @@ export interface ProfileView {
   /** Commander XP — the level and its cosmetic league band derive from it here. */
   xp: number;
   stats: MetaStats;
+  account?: PlayerProfile;
+  accountReady?: boolean;
   /** The live corp record, or null when this commander flies alone. */
   corp: { name: string; influence: number } | null;
   sovereigns: number | null;
@@ -129,16 +135,18 @@ export function profileCareerHtml(v: ProfileView, titled = true): string {
     : '';
   return (
     (titled ? `<div class="pf-h">${esc(t('profile.title'))}</div>` : '') +
-    `<div class="pf-grid">` +
-    pfCell(t('profile.matches'), String(stats.matches)) +
-    pfCell(t('profile.winrate'), played ? `${winRate(stats)}%` : null, true) +
-    pfCell(t('profile.place'), avg === null ? null : avg.toFixed(1)) +
-    // Influence is the corporation's ledger (metagame.md) — without one there is
-    // no number to show, and a bare 0 would read as «you earned nothing».
-    pfCell(t('profile.influence'), v.corp ? nfmt(v.corp.influence) : null, true) +
-    pfCell(t('profile.season'), nfmt(stats.score)) +
-    pfCell(t('profile.streak'), stats.streak > 0 ? `×${stats.streak}` : '—') +
-    `</div>` +
+    (v.account
+      ? accountCareerHtml(v.account, v.accountReady ?? true)
+      : `<div class="pf-grid">` +
+        pfCell(t('profile.matches'), String(stats.matches)) +
+        pfCell(t('profile.winrate'), played ? `${winRate(stats)}%` : null, true) +
+        pfCell(t('profile.place'), avg === null ? null : avg.toFixed(1)) +
+        // Influence is the corporation's ledger (metagame.md) — without one there is
+        // no number to show, and a bare 0 would read as «you earned nothing».
+        pfCell(t('profile.influence'), v.corp ? nfmt(v.corp.influence) : null, true) +
+        pfCell(t('profile.season'), nfmt(stats.score)) +
+        pfCell(t('profile.streak'), stats.streak > 0 ? `×${stats.streak}` : '—') +
+        `</div>`) +
     `<div class="pf-sec">${esc(t('profile.medals'))}</div>` +
     (medals
       ? `<div class="pf-medals">${medals}</div>`
@@ -149,7 +157,7 @@ export function profileCareerHtml(v: ProfileView, titled = true): string {
 /** The dossier — pure string building over an already-gathered view. */
 export function profileHtml(v: ProfileView): string {
   const nick = v.nick.trim() || t('auth.commander');
-  const league = t(leagueKey(metaLevel(v.xp)));
+  const league = t(leagueKey(accountLevel(v.xp).level));
   // Subtitle mirrors the mock: «<corp> · Лига: <band>», degrading to the league
   // alone when this commander flies without a corporation.
   const sub =
@@ -161,7 +169,9 @@ export function profileHtml(v: ProfileView): string {
       ? `<div class="pf-av face"><img src="${esc(v.face)}" alt=""></div>`
       : `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>`) +
     `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div>${premiumMark(v.premium)}</div>` +
-    (v.sovereigns === null ? '' : `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>`) +
+    (v.sovereigns === null
+      ? ''
+      : `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>`) +
     `</div>` +
     `<div class="pf-body">` +
     (v.studio ?? profileCareerHtml(v)) +
@@ -169,18 +179,10 @@ export function profileHtml(v: ProfileView): string {
   );
 }
 
-/** Bot careers come from the server's real, bounded match history. Human public
- *  profiles keep their existing projection: XP and equipped medals only. */
+/** Shared account career; bots additionally retain their bounded completed history. */
 function publicCareerHtml(profile: PlayerProfile, ready: boolean): string {
   const bot = ready && profile.kind === 'bot';
-  const grid =
-    `<div class="pf-grid">` +
-    pfCell(t('profile.xp'), ready ? String(profile.xp) : null) +
-    (bot
-      ? pfCell(t('profile.matches'), String(profile.progress.matches ?? 0)) +
-        pfCell(t('profile.metric.wins'), String(profile.progress.wins ?? 0))
-      : '') +
-    `</div>`;
+  const grid = accountCareerHtml(profile, ready);
   if (!bot) return grid;
   const history = profile.recentMatches ?? [];
   const title = `<h3>${esc(t('profile.history.title'))}</h3>`;
@@ -192,22 +194,92 @@ function publicCareerHtml(profile: PlayerProfile, ready: boolean): string {
     year: 'numeric',
   });
   return (
-    grid + title + `<ol class="pf-history">` +
-    history.map((match) => {
-      const date = new Date(match.endedAt);
-      const outcome = match.outcome === 'win'
-        ? t('profile.history.win')
-        : match.outcome === 'draw'
-          ? t('profile.history.draw')
-          : t('profile.history.loss');
-      const place = match.place === null
-        ? ''
-        : `<span>${esc(t('profile.history.place', { n: match.place }))}</span>`;
-      return (
-        `<li><div class="pf-history-main"><b>${esc(outcome)}</b><time datetime="${esc(date.toISOString())}">${esc(dateFormat.format(date))}</time></div>` +
-        `<div class="pf-history-details"><span class="pf-history-map">${esc(t('profile.history.map', { map: match.mapId }))}</span>${place}<span>${esc(t('profile.history.xp', { n: match.xp }))}</span></div></li>`
-      );
-    }).join('') + `</ol>`
+    grid +
+    title +
+    `<ol class="pf-history">` +
+    history
+      .map((match) => {
+        const date = new Date(match.endedAt);
+        const outcome =
+          match.outcome === 'win'
+            ? t('profile.history.win')
+            : match.outcome === 'draw'
+              ? t('profile.history.draw')
+              : t('profile.history.loss');
+        const place =
+          match.place === null
+            ? ''
+            : `<span>${esc(t('profile.history.place', { n: match.place }))}</span>`;
+        return (
+          `<li><div class="pf-history-main"><b>${esc(outcome)}</b><time datetime="${esc(date.toISOString())}">${esc(dateFormat.format(date))}</time></div>` +
+          `<div class="pf-history-details"><span class="pf-history-map">${esc(t('profile.history.map', { map: match.mapId }))}</span>${place}<span>${esc(t('profile.history.xp', { n: match.xp }))}</span></div></li>`
+        );
+      })
+      .join('') +
+    `</ol>`
+  );
+}
+
+/** No local career counters or invented zeroes enter a public account card. */
+export function accountCareerHtml(profile: PlayerProfile, ready: boolean): string {
+  const level = accountLevel(profile.xp);
+  const stats = ready
+    ? (profile.statistics ??
+      (profile.kind === 'bot'
+        ? { matches: profile.progress.matches ?? 0, wins: profile.progress.wins ?? 0 }
+        : undefined))
+    : undefined;
+  const career = ready ? profile.career : null;
+  const ratio = (destroyed: number, lost: number): string =>
+    lost > 0 ? (destroyed / lost).toFixed(2) : destroyed > 0 ? t('profile.career.no-losses') : '—';
+  const corporation =
+    !ready || profile.corporation === undefined
+      ? esc(t('profile.corporation.unknown'))
+      : profile.corporation === null
+        ? esc(t('profile.corporation.none'))
+        : `<button type="button" class="btn-second pf-corporation" data-profile-corp="${esc(profile.corporation.id)}">${esc(profile.corporation.name)}</button>`;
+  const combat = career?.pvp;
+  const resources = combat
+    ? [...new Set([...Object.keys(combat.destroyedCost), ...Object.keys(combat.lostCost)])].sort()
+    : [];
+  const detail = career
+    ? `<p class="pf-hint">${esc(t('profile.career.since', { date: new Intl.DateTimeFormat(LOCALE).format(new Date(career.since)) }))}</p>` +
+      `<h4>${esc(t('profile.career.resources'))}</h4><ul>` +
+      resources
+        .map(
+          (resource) =>
+            `<li>${esc(t('profile.career.resource', { resource: t('hud.resource.' + resource), destroyed: nfmt(combat!.destroyedCost[resource] ?? 0), lost: nfmt(combat!.lostCost[resource] ?? 0), ratio: ratio(combat!.destroyedCost[resource] ?? 0, combat!.lostCost[resource] ?? 0) }))}</li>`,
+        )
+        .join('') +
+      `</ul>` +
+      `<h4>${esc(t('profile.career.modes'))}</h4><ul>` +
+      Object.entries(career.modes)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(
+          ([mode, n]) =>
+            `<li>${esc(t('profile.career.mode', { mode: mode === 'versus-bots' ? t('profile.career.versus-bots') : hasKey('data.' + mode.replaceAll('_','-')) ? t('data.' + mode.replaceAll('_','-')) : t('profile.career.mode-other'), matches: n.matches, wins: n.wins }))}</li>`,
+        )
+        .join('') +
+      `</ul>`
+    : `<p class="pf-hint">${esc(t('profile.career.none'))}</p>`;
+  return (
+    `<div class="pf-account-level"><b>${ready ? esc(t('profile.account.level', { n: level.level })) : '—'}</b>` +
+    (ready
+      ? `<progress max="${level.needed}" value="${level.earned}" aria-label="${esc(t('profile.xp'))}"></progress><span>${esc(t('profile.account.progress', level))}</span>`
+      : '') +
+    `</div>` +
+    `<div class="pf-corp-line">${esc(t('profile.corporation'))}: ${corporation}</div><div class="pf-grid">` +
+    pfCell(t('profile.matches'), stats ? String(stats.matches) : null) +
+    pfCell(t('profile.metric.wins'), stats ? String(stats.wins) : null) +
+    pfCell(
+      t('profile.winrate'),
+      stats?.matches ? `${Math.round((stats.wins / stats.matches) * 100)}%` : null,
+    ) +
+    pfCell(t('profile.career.destroyed'), combat ? nfmt(combat.destroyed) : null) +
+    pfCell(t('profile.career.lost'), combat ? nfmt(combat.lost) : null) +
+    pfCell(t('profile.career.ratio'), combat ? ratio(combat.destroyed, combat.lost) : null) +
+    `</div>` +
+    `<details class="pf-career-details"><summary>${esc(t('profile.career.details'))}</summary>${detail}<p class="pf-hint">${esc(t('profile.career.rules'))}</p></details>`
   );
 }
 
@@ -241,6 +313,8 @@ export function initProfile(host: ProfileHost): {
   let owned: string[] = [];
   let catalog: MedalEntry[] = [];
   let generation = 0;
+  let corporationHtml: string | null = null;
+  let corporationRequest = 0;
   let target: string | undefined;
   let identity = '';
   let custom: PlayerProfile = { ...defaultAppearance(), login: '', xp: 0, progress: {} };
@@ -285,9 +359,14 @@ export function initProfile(host: ProfileHost): {
       notice,
       tab,
     };
+    if (corporationHtml !== null) {
+      root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-body"><button type="button" class="btn-second" data-profile-corp-back>${esc(t('profile.corporation.back'))}</button>${corporationHtml}</div>`;
+      return;
+    }
     if (target === undefined) {
       const view: ProfileView = {
         ...host.view(),
+        ...(auth ? { account: custom, accountReady: ready, xp: custom.xp, corp: null } : {}),
         owned,
         catalog,
         face: PORTRAITS[custom.portrait - 1],
@@ -429,12 +508,65 @@ export function initProfile(host: ProfileHost): {
   }
 
   const close = (): void => {
+    if (corporationHtml !== null) {
+      corporationRequest++;
+      corporationHtml = null;
+      paint();
+      return;
+    }
     generation++;
     host.root().classList.remove('show');
   };
 
   host.root().addEventListener('click', (ev) => {
     const tg = ev.target as HTMLElement;
+    if (tg.closest('[data-profile-corp-back]')) {
+      corporationRequest++;
+      corporationHtml = null;
+      paint();
+      return;
+    }
+    const corpButton = tg.closest<HTMLElement>('[data-profile-corp]');
+    if (
+      corpButton &&
+      auth &&
+      custom.corporation &&
+      corpButton.dataset.profileCorp === custom.corporation.id
+    ) {
+      const session = auth,
+        n = generation,
+        request = ++corporationRequest;
+      const corpId = custom.corporation.id;
+      corporationHtml = `<p class="pf-hint">${esc(t('profile.corporation.loading'))}</p>`;
+      paint();
+      detach(
+        'player corporation card',
+        (async () => {
+          try {
+            const response = await fetch(`${session.base}/corps/${encodeURIComponent(corpId)}`, {
+              headers: { authorization: `Bearer ${session.token}` },
+            });
+            const body = response.ok
+              ? ((await response.json()) as { corp?: unknown; members?: unknown })
+              : null;
+            const corp = parseCorpRecord(body?.corp);
+            if (!corp || corp.corpId !== corpId || !Array.isArray(body?.members))
+              throw new Error('E_NO_CORP');
+            const names = body.members.flatMap((m: unknown) => {
+              const v = m as { login?: unknown; role?: unknown } | null;
+              return v && v.role !== 'recruit' && typeof v.login === 'string' ? [v.login] : [];
+            });
+            if (!current(n) || request !== corporationRequest) return;
+            corporationHtml = `${corpEmblem(corp.corpId, corp.emblemId, 56)}<h2>${esc(corp.name)}</h2><div class="pf-grid">${pfCell(t('profile.influence'), nfmt(corp.influence))}</div>${corpShowcaseHtml(corp)}<h3>${esc(t('profile.corporation.members', { n: names.length }))}</h3><ul>${names.map((name) => `<li>${esc(name)}</li>`).join('')}</ul>`;
+          } catch {
+            if (!current(n) || request !== corporationRequest) return;
+            corporationHtml = `<p class="pf-hint">${esc(t('profile.corporation.error'))}</p>`;
+          }
+          paint();
+        })(),
+      );
+      return;
+    }
     // Close on the ✕ or on the backdrop itself, never on a tap inside the sheet.
     if (tg.closest('.pf-close') || tg === host.root()) {
       close();
@@ -522,6 +654,8 @@ export function initProfile(host: ProfileHost): {
     open: (login) => {
       generation++;
       identity = currentIdentity();
+      corporationRequest++;
+      corporationHtml = null;
       target = login;
       ready = false;
       saving = false;

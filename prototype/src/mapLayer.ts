@@ -3,8 +3,9 @@
  * провинций, местность, дороги, край доски и кольца обзора, — выпеченные под камерой в свой
  * холст с запасом за экраном. Модуль решает, когда выпекать, сдвигать окно выпечки или
  * дорисовывать её в фоне полосами (`decisions/mapLayerView.ts`), и кладёт небо с картой под
- * живой кадр (`blitStaticLayer`). Здесь же рецепт подготовки карты за заставкой входа
- * (`mapPreparationJobs`) и рисунок сети дорог.
+ * живой кадр (`blitStaticLayer`), а медленному устройству — ещё и подложку из всей карты на
+ * обзоре там, где отдаление открыло край выпечки (правило 9). Здесь же рецепт подготовки карты
+ * за заставкой входа (`mapPreparationJobs`) и рисунок сети дорог.
  *
  * Модуль — владелец холстов слоя, кэшей местности и геометрии провинций последней выпечки.
  * Снаружи их только читают: кадр — перенос из пространства выпечки на экран `mapView`,
@@ -35,7 +36,11 @@ import {
 import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
 import { borderTolerance } from '../../packages/client/src/territoryLod';
 import { t } from '../../localization/runtime';
+import { framedRect, intersectRect, uncoveredRects } from '../../decisions/livingBorderLayer';
 import {
+  GESTURE_BAKE_MS,
+  LIVE_RING_BUDGET,
+  MAX_BAKE_PIXELS,
   NO_SCROLL,
   SETTLE_MS,
   bakeBudgetMs,
@@ -46,6 +51,7 @@ import {
   exposedStrips,
   gridNudge,
   layerTransform,
+  liveRingsShown,
   mapLayerAction,
   onPixelGrid,
   overscanFor,
@@ -66,9 +72,9 @@ import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { SECTOR_TYPES, type MapNode } from './game';
 import { data } from './gameData';
 import { glowOn, starfieldOn } from './graphicsPrefs';
-import { clipGlassSurface, drawGlassScreen, type TerrainField } from './holographicSurface';
-import { cam, insets, mapBounds, panBy, world } from './mapCamera';
-import { known, memory, surveyed } from './mapFog';
+import { clipGlassSurface, drawGlassRim, drawGlassScreen, drawGlassWave, type TerrainField } from './holographicSurface';
+import { atOverview, cam, insets, mapBounds, panBy, world } from './mapCamera';
+import { known, memory, surveyed, vision, type Vision } from './mapFog';
 import { pinchStart } from './mapInput';
 import { GRID, ownerColor } from './mapPalette';
 import type { PreparationJob } from './mapPreparation';
@@ -111,6 +117,11 @@ export interface MapLayerHost {
   lod(): MapLod;
   /** Холсты карты потеряли пиксели: слой живых границ забывает свои тоже. */
   surfacesLost(): void;
+  /** Часы голограммы. */
+  clock(): number;
+  /** Часы голограммы стоят по выбору игрока — выключено движение: рамку и волну стекла держит
+   *  выпечка, а не кадр. */
+  still(): boolean;
 }
 
 let game: MapLayerHost;
@@ -147,7 +158,9 @@ const mapContextOptions = canvasCompatibilityOptions();
 // into a spare canvas over a few frames while the frame keeps showing the old one, and
 // the two canvases then trade places (rule 7). The SKY under it (backdrop art, grid, stars)
 // keeps its own bounded parallax, so moving frames paint it live — it is cheap. A settled
-// camera composes sky and map into `bg` once, and idle frames are one 1:1 blit.
+// camera composes sky and map into `bg` once, and idle frames are one 1:1 blit. A slow device
+// also keeps the whole map at the overview in an UNDERLAY, painted at rest in bands: a zoom out
+// shows it where it uncovers the bake, instead of baking the map mid-gesture (rule 9).
 const bg = document.createElement('canvas');
 export const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
 let mapLayer = document.createElement('canvas');
@@ -156,6 +169,10 @@ let mapLayerX = (mapContextOptions ? mapLayer.getContext('2d', mapContextOptions
  *  back once the camera has rested with nothing to bake ({@link SPARE_KEEP_MS}). */
 let mapSpare = document.createElement('canvas');
 let mapSpareX = (mapContextOptions ? mapSpare.getContext('2d', mapContextOptions) : mapSpare.getContext('2d')) as CanvasRenderingContext2D;
+/** Rule 9: a slow device's underlay — the whole board at the overview, without rings like its
+ *  bakes. It gets pixels only once the device proves slow. */
+const mapUnder = document.createElement('canvas');
+const mapUnderX = (mapContextOptions ? mapUnder.getContext('2d', mapContextOptions) : mapUnder.getContext('2d')) as CanvasRenderingContext2D;
 const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
 const terrainGeometry = new TerrainGeometryCache();
 const terrainEnvironment = new TerrainEnvironmentSceneCache();
@@ -212,6 +229,18 @@ interface BakeJob {
   pending: boolean;
 }
 let bakeJob: BakeJob | null = null;
+/** Rule 9: the underlay being painted, a band a frame at rest like the next bake. */
+let underJob: BakeJob | null = null;
+let underContent = ''; // content signature of the underlay ('' — none, stale or half-painted)
+let underAt: MapProjection = { a: 1, x: 0, y: 0 }; // projection it was painted at: the overview
+let underOffset = { x: 0, y: 0 }; // where its point (0, 0) lies on its canvas, device px
+let underBakes = 0; // bumps on every underlay painted, so the composite knows its underlay
+let underRefused = ''; // content whose underlay had no pixels: not measured again at rest
+/** The underlay holds the board this much wider than its glass and province clip, CSS px: the
+ *  board edge, the glass rim and the terrain's raster padding reach past them. */
+const UNDER_PAD = TERRAIN_PAD + 2;
+/** Rule 8: what the last whole bake cost this device, its raster included, ms. */
+let bakeCostMs = 0;
 let bgComposite = ''; // what `bg` holds: which map bake, at which offset, over which sky
 let camSeen = ''; // projection of the previous frame, to notice the camera moving
 let camMovedAt = -Infinity;
@@ -221,6 +250,15 @@ let camMovedAt = -Infinity;
 export let provinceGeometry: MapLayerGeometry | null = null;
 /** The camera has rested `SETTLE_MS` (as {@link blitStaticLayer} judged this frame). */
 export let mapSettled = false;
+/** The camera is moving at `now`: a pinch is open, or a frame saw it move less than `SETTLE_MS`
+ *  ago. Judged at the moment asked, so a camera that stopped while the map was not drawn is not
+ *  moving. */
+export function mapMoving(now: number): boolean {
+  return pinchStart !== null || now - camMovedAt < SETTLE_MS;
+}
+/** A whole bake costs this device more than `GESTURE_BAKE_MS`: a gesture does not wait for one
+ *  (rule 8, as {@link blitStaticLayer} judged this frame). */
+export let mapCostly = false;
 export let terrainFields: TerrainField[] = [];
 export let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -229,6 +267,7 @@ export function invalidateMapSurfaces(): void {
   cancelBakeJob();
   releaseMapSpare();
   mapLayerContent = '';
+  forgetUnderlay();
   bgComposite = '';
   game.surfacesLost();
   terrainRefine = -1;
@@ -251,6 +290,19 @@ for (const surface of [mapLayer, mapSpare])
       mapLayerContent = '';
       bgComposite = '';
     });
+for (const type of ['contextlost', 'contextrestored'] as const)
+  mapUnder.addEventListener?.(type, () => {
+    backgroundContextEvents[type === 'contextlost' ? 'lost' : 'restored']++;
+    forgetUnderlay();
+    bgComposite = '';
+  });
+
+/** Rule 9: the underlay no longer shows the map, and its painting starts over. */
+function forgetUnderlay(): void {
+  underContent = '';
+  underJob = null;
+  underRefused = '';
+}
 
 /**
  * ROADS-7: рисунок сети дорог — штрихи и отметки развилок — меняется только вместе с
@@ -294,6 +346,7 @@ export function forgetMapArt(): void {
   terrainEnvironment.clear();
   environmentMade = null;
   terrainRaster.clear();
+  forgetUnderlay(); // подложка — рисунок прежней карты
 }
 
 /** Подготовка карты упала: недопечённый слой не годится, кадр выпечет карту обычным путём. */
@@ -314,6 +367,40 @@ export function knownOwner(id: string): string | null {
 /** Знание игрока о мирах для подписи выпечки: сверяется каждым кадром без строки по всем
  *  мирам (`staticLayerCache.ts`, правило 2). */
 const knowledge = new KnowledgeRevision();
+/** С чем знание о мирах сверено в последний раз. Знание читает мир, зрение кадра, память
+ *  разведки, игрока и узлы карты. Мир не правят на месте, а заменяют целиком, зрение
+ *  меняется вместе с ним (договор `visionMemo` в `mapFog.ts`), память считает свои правки
+ *  (`version`). Пока всё это прежнее, прежний и номер, и обход всех миров карты (на большой
+ *  их больше тысячи) кадр пропускает. Без тумана зрения нет, а песочница правит мир на
+ *  месте: там сверка идёт каждым кадром, как раньше. */
+let knowledgeSeen: {
+  world: GameState;
+  vision: Vision;
+  scans: number;
+  me: string;
+  nodes: readonly MapNode[];
+  revision: number;
+} | null = null;
+/** Номер знания о мирах: сверка, только когда сменилось то, что она читает. */
+function knowledgeRevision(s: GameState, me: string): number {
+  const nodes = game.nodes();
+  const scans = memory.version();
+  const seen = knowledgeSeen;
+  if (
+    seen &&
+    seen.world === s &&
+    seen.vision === vision &&
+    seen.scans === scans &&
+    seen.me === me &&
+    seen.nodes === nodes
+  )
+    return seen.revision;
+  const revision = knowledge.check(nodes, knownOwner, (id) =>
+    knownEnvironment(s.planets[id], known(id), memory.get(id), surveyed(id)),
+  );
+  knowledgeSeen = vision ? { world: s, vision, scans, me, nodes, revision } : null;
+  return revision;
+}
 
 /** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
  *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
@@ -349,10 +436,11 @@ function mapLayerSignature(): string {
     me: ME,
     // Подпись читает ЗНАНИЕ игрока (`knownOwner`, `knownEnvironment`), а не правду — см.
     // `staticLayerCache.ts` (REFM-60): иначе скрытый захват выдал бы себя самим фактом перерисовки.
-    knowledge: knowledge.check(game.nodes(), knownOwner,
-      (id) => knownEnvironment(s.planets[id], known(id), memory.get(id), surveyed(id))),
+    knowledge: knowledgeRevision(s, ME),
     starfield: starfieldOn(),
   }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
+    // A standing hologram's glass is baked at the moment its clock stands at.
+    `|still:${holographicMapOn() && game.still() ? game.clock() : '-'}` +
     // The roads: a hero's corridor lays new lanes mid-match. A scroll paints its strips with
     // the roads of the moment, so a bake that missed them would end at the strip's edge.
     `|topo:${roadDrawingOf(s).topology}`;
@@ -428,6 +516,9 @@ export interface MapLayerGeometry {
   /** One permitted world-space scene, reused by the bake and all its exposed strips. */
   environment: TerrainEnvironment | null;
   readonly lod: MapLod;
+  /** The bake carries the overview's node rings. A slow device's leaves them to the frame
+   *  ({@link drawLiveRings}, rule 8): stretched with the bake, they would swell with the map. */
+  readonly rings: boolean;
   readonly seeds: ProvinceSeed[];
   /** The province of `seeds[i]`. */
   readonly nodes: readonly MapNode[];
@@ -505,6 +596,7 @@ function measureMapLayer(): MapLayerGeometry {
     at,
     environment: null,
     lod: currentMapLod(),
+    rings: !mapCostly,
     seeds,
     nodes,
     shape,
@@ -815,8 +907,9 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   }
   // The overview's node rings belong to the map, not to the moment: every province the same
   // neutral ring (`drawSchematicNode`), fading as the node art comes in. Baked on top of the
-  // roads they end, since a frame stroking 1675 of them spent half its raster on them.
-  if (lod.art < 1) {
+  // roads they end, since a frame stroking 1675 of them spent half its raster on them. A slow
+  // device's bake leaves them to the frame (`drawLiveRings`, rule 8).
+  if (geo.rings && lod.art < 1) {
     g.save();
     g.globalAlpha *= 1 - lod.art;
     const reach = lod.markerRadius + 1;
@@ -826,6 +919,13 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
       drawSchematicNode(g, c, lod.markerRadius);
     }
     g.restore();
+  }
+  // Motion off: the hologram stands, and the glass wave and rim the frame lays over the map
+  // (`mapSurface.ts`) are part of its picture. Baked over all of it, they cost a strip of the
+  // bake only where they pass.
+  if (holographicMapOn() && game.still()) {
+    drawGlassWave(g, geo.frame, game.vw(), game.vh(), game.clock(), glowOn(), view);
+    drawGlassRim(g, geo.frame, game.clock(), glowOn(), view);
   }
   return fields;
 }
@@ -849,6 +949,7 @@ function bakeMapLayer(content: string, zooming: boolean, preparing = false): voi
   const DPR = game.dpr();
   cancelBakeJob(); // this bake supersedes it
   if (mapLayerX.isContextLost?.()) return;
+  const at = performance.now();
   const { margin, ox, oy, width, height } = mapLayerSize();
   mapLayerContent = ''; // publish the signature only after a complete paint
   // Preserve the allocation when only the scene changed.
@@ -861,6 +962,12 @@ function bakeMapLayer(content: string, zooming: boolean, preparing = false): voi
   publishMapGeometry(geo);
   terrainFields = paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y },
     zooming, preparing, geo);
+  if (!preparing) {
+    // Rule 8: the raster is four fifths of a bake, and it would land in the frame that shows the
+    // bake anyway: made here, it is counted in the bake's cost.
+    flushRaster(mapLayer);
+    bakeCostMs = performance.now() - at;
+  }
   mapLayerGeometry = geo;
   mapLayerAt = geo.at;
   mapLayerMargin = margin;
@@ -993,11 +1100,12 @@ function startBakeJob(content: string, zooming: boolean, final: boolean): boolea
 }
 
 /**
- * Paint the next `rows` of the bake in the background. `flush` rasters them in this frame:
- * Chromium records a canvas's paint and rasters it only when the canvas is next drawn from,
- * so without it the raster of every band would land at once on the frame that shows the bake.
+ * Paint the next `rows` of the bake in the background (or of the underlay: `g` draws into
+ * `surface`). `flush` rasters them in this frame: Chromium records a canvas's paint and rasters
+ * it only when the canvas is next drawn from, so without it the raster of every band would land
+ * at once on the frame that shows the bake.
  */
-function paintBakeBand(job: BakeJob, rows: number, flush: boolean): void {
+function paintBakeBand(job: BakeJob, rows: number, flush: boolean, g = mapSpareX, surface = mapSpare): void {
   const at = performance.now();
   const owed = terrainRaster.pending;
   // A refinement's bake makes the last rasters the cache owes: never leave one owed again.
@@ -1005,10 +1113,10 @@ function paintBakeBand(job: BakeJob, rows: number, flush: boolean): void {
   // of the frame, and the refinement makes them after the bake, in a budget of its own.
   terrainRaster.beginFrame(job.final ? Infinity : 0);
   paintMapLayerRect({ x: 0, y: job.done, width: job.width, height: rows }, job.geo, job.zooming, job.fields,
-    job.met, mapSpareX, job.offset);
+    job.met, g, job.offset);
   job.pending ||= terrainRaster.pending;
   terrainRaster.pending = owed;
-  if (flush) flushRaster(mapSpare);
+  if (flush) flushRaster(surface);
   job.done += rows;
   job.lastRows = rows;
   job.lastMs = performance.now() - at;
@@ -1034,16 +1142,16 @@ const FLOOR_PROJECTION = { scale: 1, x: 0, y: 0 };
  * The frames at rest make the floors the known map still lacks (`terrainRasterCache.ts`): of the
  * tiles exploration revealed since the loading, a few per frame in the share of the frame a
  * bake in the background gets. Then a later zoom out finds every known tile at least soft,
- * never missing.
+ * never missing. `true` — they are all made, and this frame made none.
  */
-function prepareFloors(): void {
+function prepareFloors(): boolean {
   const scene = provinceGeometry?.environment;
-  if (!scene || mapLayerX.isContextLost?.()) return;
+  if (!scene || mapLayerX.isContextLost?.()) return false;
   if (scene !== floorScene) {
     floorScene = scene;
     floorNext = 0;
   }
-  if (floorNext >= scene.tiles.length) return;
+  if (floorNext >= scene.tiles.length) return true;
   const DPR = game.dpr();
   const at = performance.now();
   const budget = bakeBudgetMs(game.fps());
@@ -1062,6 +1170,7 @@ function prepareFloors(): void {
   // Rastered here, at rest, not by the first frame of the next gesture.
   const atlas = terrainRaster.floorAtlas;
   if (made && atlas) flushRaster(atlas);
+  return false;
 }
 
 /** Rule 7: the bake in the background is complete, and it becomes the map layer. */
@@ -1077,23 +1186,182 @@ function swapBakeJob(job: BakeJob): void {
   mapLayerScroll = NO_SCROLL;
   mapLayerBakes++;
   mapLayerContent = mapLayerX.isContextLost?.() ? '' : job.content;
+  // Rule 8: its bands were rastered as they were painted, so they add up to a whole bake.
+  bakeCostMs = job.startMs + job.paintedMs;
   // As after a bake: the terrain its bands could not afford is sharpened next.
   terrainRefine = job.pending ? 0 : -1;
   terrainOwed = terrainRefine < 0 ? [] : null;
 }
 
-/** Draw the map layer into `g` under `view` (bake space → screen). */
-function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform): void {
+/** Rule 9: start painting the underlay — the whole board at the overview, measured there — into
+ *  its canvas. `false` — it has no pixels to paint into. */
+function startUnderlay(content: string): boolean {
+  const DPR = game.dpr();
+  if (mapUnderX.isContextLost?.()) return false;
+  const at = performance.now();
+  const geo = atOverview(measureMapLayer);
+  // The board: its glass and the province clip, which holds the terrain, the roads and the edge.
+  let x0 = geo.frame.x;
+  let y0 = geo.frame.y;
+  let x1 = geo.frame.x + geo.frame.width;
+  let y1 = geo.frame.y + geo.frame.height;
+  for (const [x, y] of geo.clip) {
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  const offset = { x: -Math.floor((x0 - UNDER_PAD) * DPR), y: -Math.floor((y0 - UNDER_PAD) * DPR) };
+  const width = Math.ceil((x1 + UNDER_PAD) * DPR) + offset.x;
+  const height = Math.ceil((y1 + UNDER_PAD) * DPR) + offset.y;
+  if (!(width > 0 && height > 0) || width * height > MAX_BAKE_PIXELS) return false;
+  if (mapUnder.width !== width) mapUnder.width = width;
+  if (mapUnder.height !== height) mapUnder.height = height;
+  underContent = ''; // a half-painted underlay is no picture of the map
+  underJob = { content, geo, margin: { x: 0, y: 0 }, offset, width, height, zooming: true, final: false,
+    budget: bakeBudgetMs(game.fps()), startMs: performance.now() - at, fields: [], met: new Set(),
+    work: bakeWork(geo.boxes, width, height, DPR, offset), done: 0, paintedMs: 0, lastRows: 0, lastMs: 0,
+    pending: false };
+  return true;
+}
+
+/** Rule 9: the next band of the underlay of `content`; a content change starts it over, since a
+ *  stale underlay is never shown. Its terrain is the floors': rasters it makes none. */
+function paintUnderlay(content: string): void {
+  if (underContent === content || underRefused === content) return;
+  const going = underJob?.content === content;
+  if (!going && !startUnderlay(content)) {
+    underRefused = content;
+    return;
+  }
+  const job = underJob!;
+  const rows = bandRows({ work: job.work, done: job.done, paintedMs: job.paintedMs, lastRows: job.lastRows,
+    lastMs: job.lastMs, budgetMs: job.budget, spentMs: going ? 0 : job.startMs });
+  if (rows > 0) paintBakeBand(job, rows, true, mapUnderX, mapUnder);
+  if (job.done < job.height) return;
+  underJob = null;
+  if (mapUnderX.isContextLost?.()) return;
+  underContent = job.content;
+  underAt = job.geo.at;
+  underOffset = job.offset;
+  underBakes++;
+}
+
+/** Rule 9: what of the screen the bake leaves to the underlay. In device pixels. */
+interface UnderlayPlan {
+  /** From the underlay's space to the screen. */
+  readonly view: LayerTransform;
+  /** The bake's whole pixels on the screen; `null` — none. */
+  readonly bake: PixelRect | null;
+  /** The rest of the screen: at most four rects, apart from the bake and from each other. */
+  readonly strips: PixelRect[];
+}
+
+/** Rule 9: the plan for the bake shown under `view` over an underlay fresh for this frame; `null` —
+ *  the bake covers the screen. */
+function underlayPlan(view: LayerTransform, here: MapProjection): UnderlayPlan | null {
+  const DPR = game.dpr();
+  const screen = { x: 0, y: 0, width: Math.round(game.vw() * DPR), height: Math.round(game.vh() * DPR) };
+  const o = mapLayerOffset();
+  const framed = framedRect({ x: -o.x, y: -o.y, width: mapLayer.width, height: mapLayer.height }, view, DPR);
+  const bake = framed && intersectRect(framed, screen);
+  const strips = uncoveredRects(screen, bake);
+  return strips.length ? { view: onPixelGrid(layerTransform(underAt, here), DPR), bake, strips } : null;
+}
+
+/** Draw the device-pixel rect `r` of the screen from `source`, whose pixel `c` shows the point
+ *  `(c − o) / DPR` of a space the screen shows under `tr`: a source rect, not a clip — a clip
+ *  around a scaled image costs the software raster as much again. */
+function drawPixels(g: CanvasRenderingContext2D, source: HTMLCanvasElement, o: { x: number; y: number },
+  tr: LayerTransform, r: PixelRect): void {
+  const DPR = game.dpr();
+  const s = tr.k;
+  g.drawImage(source, (r.x - tr.tx * DPR) / s + o.x, (r.y - tr.ty * DPR) / s + o.y, r.width / s, r.height / s,
+    r.x, r.y, r.width, r.height);
+}
+
+/** Draw the map layer into `g` under `view` (bake space → screen), over the underlay where `plan`
+ *  says the bake leaves the screen (rule 9). */
+function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform, plan: UnderlayPlan | null): void {
   const DPR = game.dpr();
   const { x: ox, y: oy } = mapLayerOffset();
-  const exact = exactOffset(view, DPR);
   g.setTransform(1, 0, 0, 1, 0, 0);
+  if (plan) {
+    // The underlay where the bake leaves the screen, the bake in its own whole pixels: the two
+    // meet edge to edge, and neither translucent glass is drawn over the other.
+    const under = framedRect({ x: -underOffset.x, y: -underOffset.y, width: mapUnder.width, height: mapUnder.height },
+      plan.view, DPR);
+    for (const strip of plan.strips) {
+      const r = under && intersectRect(strip, under);
+      if (r) drawPixels(g, mapUnder, underOffset, plan.view, r);
+    }
+    if (plan.bake) drawPixels(g, mapLayer, { x: ox, y: oy }, view, plan.bake);
+    return;
+  }
+  const exact = exactOffset(view, DPR);
   // On its pixel grid the layer is a plain copy; otherwise it is resampled — for the
   // frames of a gesture only, since a settled camera gets an exact bake (rule 4).
   if (exact) g.drawImage(mapLayer, exact.x - ox, exact.y - oy);
   else
     g.drawImage(mapLayer, view.tx * DPR - view.k * ox, view.ty * DPR - view.k * oy,
       view.k * mapLayer.width, view.k * mapLayer.height);
+}
+
+/** One ring of the overview per radius and pixel density, drawn as a bake draws it. */
+const ringSprites = new Map<string, HTMLCanvasElement>();
+function ringSprite(radius: number, dpr: number): HTMLCanvasElement {
+  const key = `${radius}:${dpr}`;
+  let sprite = ringSprites.get(key);
+  if (!sprite) {
+    sprite = document.createElement('canvas');
+    sprite.width = sprite.height = Math.ceil((2 * radius + 2) * dpr);
+    const g = sprite.getContext('2d') as CanvasRenderingContext2D;
+    const c = sprite.width / dpr / 2;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawSchematicNode(g, { x: c, y: c }, radius);
+    ringSprites.set(key, sprite);
+  }
+  return sprite;
+}
+
+/**
+ * Rule 8: the overview's node rings that the bake shown under `view` does not carry, drawn into
+ * `g` at the current camera's size, so a stretched bake does not swell them. A sprite a ring on
+ * whole device pixels: a copy, not a resample. In motion only while few are on the screen
+ * ({@link liveRingsShown}).
+ */
+function drawLiveRings(g: CanvasRenderingContext2D, geo: MapLayerGeometry, view: LayerTransform,
+  settled: boolean): void {
+  if (geo.rings) return;
+  const lod = currentMapLod();
+  if (!(lod.art < 1)) return;
+  const VW = game.vw();
+  const VH = game.vh();
+  const DPR = game.dpr();
+  // A ring's size goes in tenths of a pixel: a zoom makes a few sprites, not one a frame.
+  const radius = Math.round(lod.markerRadius * 10) / 10;
+  const reach = radius + 1;
+  // Map point `p` lies on the screen at `a·p + (x0, y0)`: the bake's projection, then `view`.
+  const a = view.k * geo.at.a;
+  const x0 = view.k * geo.at.x + view.tx;
+  const y0 = view.k * geo.at.y + view.ty;
+  const shown = (x: number, y: number): boolean => x >= -reach && x <= VW + reach && y >= -reach && y <= VH + reach;
+  let onScreen = 0;
+  if (!settled)
+    for (const n of geo.nodes) if (shown(a * n.x + x0, a * n.y + y0) && ++onScreen > LIVE_RING_BUDGET) break;
+  if (!liveRingsShown(geo.rings, settled, onScreen)) return;
+  const sprite = ringSprite(radius, DPR);
+  const half = sprite.width / 2;
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalAlpha = 1 - lod.art;
+  g.globalCompositeOperation = 'source-over';
+  for (const n of geo.nodes) {
+    const x = a * n.x + x0;
+    const y = a * n.y + y0;
+    if (shown(x, y)) g.drawImage(sprite, Math.round(x * DPR - half), Math.round(y * DPR - half));
+  }
+  g.restore();
 }
 
 /** Province geometry for input and the transform from the screen into it. Bakes the map
@@ -1118,9 +1386,13 @@ export function blitStaticLayer(now: number): void {
     camMovedAt = now;
   }
   // A pinch stays open while its fingers pause: no bake at each intermediate scale.
-  const settled = pinchStart === null && now - camMovedAt >= SETTLE_MS;
+  const settled = !mapMoving(now);
   mapSettled = settled;
+  const costly = bakeCostMs > GESTURE_BAKE_MS;
+  mapCostly = costly;
   const content = mapLayerSignature();
+  // Rule 9: the underlay shows the map only as it is now.
+  const underlay = underContent === content && !mapUnderX.isContextLost?.();
   if (mapLayerX.isContextLost?.()) {
     // No offscreen map to reuse: paint it straight into the frame.
     mapSettled = false;
@@ -1130,6 +1402,7 @@ export function blitStaticLayer(now: number): void {
     const geo = measureMapLayer();
     publishMapGeometry(geo);
     terrainFields = paintMapLayer(cx, { x0: 0, y0: 0, x1: VW, y1: VH }, !settled, false, geo);
+    drawLiveRings(cx, geo, { k: 1, tx: 0, ty: 0 }, true);
     cx.restore();
     mapLayerAt = here;
     mapView = { k: 1, tx: 0, ty: 0 };
@@ -1145,6 +1418,8 @@ export function blitStaticLayer(now: number): void {
     margin: mapLayerMargin,
     scroll: mapLayerScroll,
     settled,
+    costly,
+    underlay,
   });
   const decide = (): MapLayerAction => mapLayerAction(frameNow());
   let action = decide();
@@ -1172,8 +1447,9 @@ export function blitStaticLayer(now: number): void {
     });
     if (fate === 'drop') cancelBakeJob();
     else if (fate === 'finish') {
-      // The screen cannot wait for it, and its rows left cost less than a whole bake.
-      paintBakeBand(job, job.height - job.done, false);
+      // The screen cannot wait for it, and its rows left cost less than a whole bake. Their
+      // raster lands in this frame anyway: made here, the bake's cost counts it (rule 8).
+      paintBakeBand(job, job.height - job.done, true);
       swapBakeJob(job);
       view = layerTransform(mapLayerAt, here);
       action = decide();
@@ -1235,7 +1511,8 @@ export function blitStaticLayer(now: number): void {
       }
     }
     const next = bakeJob;
-    if (next) {
+    // Rule 8: on a slow device the bands wait for the camera to rest.
+    if (next && (settled || !costly)) {
       // One band a frame; a bake started in this frame has already spent its start, and the
       // refinement that started it its rasters.
       const rows = bandRows({ work: next.work, done: next.done, paintedMs: next.paintedMs,
@@ -1248,16 +1525,19 @@ export function blitStaticLayer(now: number): void {
       }
     }
   }
-  if (settled && !bakeJob && terrainRefine < 0) prepareFloors();
+  // Rule 9: a slow device paints its underlay at rest, after the floors its far terrain is made of.
+  if (settled && !bakeJob && terrainRefine < 0 && prepareFloors() && costly) paintUnderlay(content);
   if (!bakeJob && terrainRefine < 0 && now - camMovedAt >= SPARE_KEEP_MS) releaseMapSpare();
   // In motion a pan moves the layer by whole device pixels — a copy, not a resample;
   // what is drawn from bake geometry follows the same rounded transform.
   mapView = onPixelGrid(view, DPR);
+  const plan = underlay ? underlayPlan(mapView, here) : null;
   if (settled && !bgx.isContextLost?.()) {
     // Settled: compose sky + map once, then every idle frame is one 1:1 blit — also while
     // the sharp bake paints in the background under the stretched one (rule 7).
     const key = `${mapLayerBakes}|${mapView.k},${mapView.tx},${mapView.ty}|${VW}x${VH}:${DPR}|` +
-      `${starfieldOn()}:${spaceBackdropReady(holographicMapOn())}:${holographicMapOn()}|${cam.x},${cam.y},${cam.scale}`;
+      `${starfieldOn()}:${spaceBackdropReady(holographicMapOn())}:${holographicMapOn()}|${cam.x},${cam.y},${cam.scale}|` +
+      `${plan ? underBakes : '-'}`;
     if (bgComposite !== key) {
       bgComposite = '';
       const width = Math.round(VW * DPR);
@@ -1265,7 +1545,8 @@ export function blitStaticLayer(now: number): void {
       if (bg.width !== width) bg.width = width;
       if (bg.height !== height) bg.height = height;
       paintSky(bgx);
-      showMapLayer(bgx, mapView);
+      showMapLayer(bgx, mapView, plan);
+      if (mapLayerGeometry) drawLiveRings(bgx, mapLayerGeometry, mapView, true);
       if (!bgx.isContextLost?.()) bgComposite = key;
     }
     cx.save();
@@ -1280,7 +1561,8 @@ export function blitStaticLayer(now: number): void {
   // In motion (or settling): the sky live, the baked map under the camera's transform.
   cx.save();
   paintSky(cx);
-  showMapLayer(cx, mapView);
+  showMapLayer(cx, mapView, plan);
+  if (mapLayerGeometry) drawLiveRings(cx, mapLayerGeometry, mapView, false);
   cx.restore();
 }
 

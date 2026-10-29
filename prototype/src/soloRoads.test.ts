@@ -121,9 +121,10 @@ describe('ROADS-7 — на nexus флот обходит планету по р�
 
 describe('ROADS-7 — состояние из сохранения снова делит сеть', () => {
   it('`installMatch` помечает сеть после JSON — иначе шаги после перезагрузки её копировали бы', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-    const body = /function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(src)?.[1];
+    // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+    const src = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
+    const body = /export function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(src)?.[1];
     expect(body, 'функция installMatch не найдена — сторож проверял бы пустоту').toBeTruthy();
-    expect(body).toContain('shareRoadNetwork(s.planets)');
+    expect(body).toContain('shareRoadNetwork(state.planets)');
   });
 });

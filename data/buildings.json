@@ -10,7 +10,8 @@
     },
     "hp": 15,
     "scoreValue": 8,
-    "traits": []
+    "traits": [],
+    "retired": true
   },
   "mine_t2": {
     "name": "Metal Extractor II",
@@ -24,7 +25,8 @@
     },
     "hp": 25,
     "scoreValue": 8,
-    "traits": []
+    "traits": [],
+    "retired": true
   },
   "shipyard": {
     "name": "Orbital Shipyard",

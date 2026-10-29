@@ -1,4 +1,13 @@
-import { writeFileSync, statSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  writeFileSync,
+  statSync,
+  symlinkSync,
+  linkSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,6 +34,97 @@ const readLines = (file: string): Array<Record<string, unknown>> =>
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 
 describe('DailyJsonl', () => {
+  it('caps queued UTF-8 bytes and releases the budget after flush', async () => {
+    const dir = tempDir();
+    const record = { t: DAY1, text: 'Я🚀' };
+    const bytes = Buffer.byteLength(JSON.stringify(record) + '\n');
+    const log = new DailyJsonl({
+      dir,
+      prefix: 'match',
+      now: () => DAY1,
+      maxQueuedBytes: bytes,
+      flushDelayMs: 60_000,
+    });
+    log.write(record);
+    log.write(record);
+    await log.flush();
+    log.write(record);
+    await log.flush();
+    expect(log.stats()).toEqual({ written: 2, dropped: 1, failed: 0 });
+  });
+
+  it('keeps complete records within the file budget across process restarts', async () => {
+    const dir = tempDir();
+    const record = { t: DAY1, text: 'Я🚀' };
+    const bytes = Buffer.byteLength(JSON.stringify(record) + '\n');
+    const options = {
+      dir,
+      prefix: 'match',
+      now: () => DAY1,
+      maxFileBytes: bytes * 2 + 1,
+      flushDelayMs: 60_000,
+    };
+    const first = new DailyJsonl(options);
+    first.write(record);
+    await first.flush();
+    const restarted = new DailyJsonl(options);
+    restarted.write(record);
+    restarted.write(record);
+    await restarted.flush();
+    expect(readLines(first.currentFile())).toEqual([record, record]);
+    expect(statSync(first.currentFile()).size).toBe(bytes * 2);
+    expect(restarted.stats()).toEqual({ written: 1, dropped: 1, failed: 0 });
+  });
+
+  it('preserves an already oversized file and resumes logging on the next UTC day', async () => {
+    const dir = tempDir();
+    let now = DAY1;
+    const log = new DailyJsonl({ dir, prefix: 'match', now: () => now, maxFileBytes: 128 });
+    const existing = 'existing evidence\n'.repeat(100);
+    const file = log.currentFile();
+    writeFileSync(file, existing);
+    log.write({ event: 'full' });
+    await log.flush();
+    expect(readFileSync(file, 'utf8')).toBe(existing);
+    now = DAY2;
+    log.write({ event: 'new-day' });
+    await log.flush();
+    expect(readLines(log.currentFile())[0]?.event).toBe('new-day');
+    expect(log.stats()).toEqual({ written: 1, dropped: 1, failed: 0 });
+  });
+
+  it('cannot create unbounded daily files using old, future or invalid timestamps', async () => {
+    const dir = tempDir();
+    const log = new DailyJsonl({ dir, prefix: 'match', now: () => DAY1 });
+    log.write({ t: DAY1 - 100 * 86_400_000 });
+    log.write({ t: DAY2 });
+    expect(() => log.write({ t: NaN })).not.toThrow();
+    await log.flush();
+    expect(readdirSync(dir)).toEqual([]);
+    expect(log.stats()).toEqual({ written: 0, dropped: 2, failed: 1 });
+  });
+
+  it('refuses symlinks and hardlinks without modifying their target', async () => {
+    for (const link of [symlinkSync, linkSync]) {
+      const dir = tempDir();
+      const log = new DailyJsonl({ dir, prefix: 'match', now: () => DAY1 });
+      const target = join(dir, 'evidence.txt');
+      writeFileSync(target, 'unchanged');
+      link(target, log.currentFile());
+      log.write({ event: 'must-not-append' });
+      await log.flush();
+      expect(readFileSync(target, 'utf8')).toBe('unchanged');
+      expect(log.stats().failed).toBe(1);
+    }
+  });
+
+  it('rejects invalid resource budgets at construction', () => {
+    for (const maxFileBytes of [0, -1, Infinity, 1.5]) {
+      expect(() => new DailyJsonl({ dir: tempDir(), prefix: 'match', maxFileBytes })).toThrow(
+        'E_JOURNAL_CONFIG',
+      );
+    }
+  });
   it('utcDay is the UTC calendar day', () => {
     expect(utcDay(DAY1)).toBe('2026-10-14');
     expect(utcDay(DAY2)).toBe('2026-10-15');
@@ -108,7 +208,10 @@ describe('DailyJsonl', () => {
     log.write({ kind: 'summary' });
     await log.flush(); // what shutdown awaits
     await inFlight;
-    expect(readLines(join(dir, 'match-2026-10-14.jsonl')).map((r) => r.kind)).toEqual(['a', 'summary']);
+    expect(readLines(join(dir, 'match-2026-10-14.jsonl')).map((r) => r.kind)).toEqual([
+      'a',
+      'summary',
+    ]);
   });
 
   it('concurrent flushes keep line order', async () => {
@@ -133,7 +236,12 @@ it('expires only its own old telemetry files and keeps new files private', async
   log.write({ kind: 'today' });
   log.write({ oversized: 'x'.repeat(64 * 1024) });
   await log.flush();
-  expect(readdirSync(dir).sort()).toEqual(['client-2026-09-01.jsonl', 'evidence.txt', 'match-2026-09-02.jsonl', 'match-2026-10-14.jsonl']);
+  expect(readdirSync(dir).sort()).toEqual([
+    'client-2026-09-01.jsonl',
+    'evidence.txt',
+    'match-2026-09-02.jsonl',
+    'match-2026-10-14.jsonl',
+  ]);
   expect(statSync(log.currentFile()).mode & 0o777).toBe(0o600);
   expect(log.stats().dropped).toBe(1);
 });

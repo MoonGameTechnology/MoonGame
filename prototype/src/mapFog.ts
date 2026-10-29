@@ -10,10 +10,10 @@
  * сохранения писали в память разведки. Теперь они зовут двери модуля
  * ({@link refreshVision}, {@link forgetVision}, {@link resetFogMemory}, {@link rememberScan},
  * {@link restoreFogMemory}), а снаружи зрение — живая привязка только для чтения, и память
- * разведки отдаёт только чтение (`get`/`has`/`ownerOf`/`dump`).
+ * разведки отдаёт только чтение (`get`/`has`/`ownerOf`/`dump`/`version`).
  *
- * Мир на экране, своё место, режим сети, контакты радара с сервера и круги обзора (они
- * считаются раз на мир в кэше кадра) живут в `main.ts`; модуль получает их хуками
+ * Мир на экране, своё место, режим сети, контакты радара с сервера, круги обзора и список
+ * миров (они считаются в кэше кадра) живут в `main.ts`; модуль получает их хуками
  * {@link initMapFog} — импорт оттуда был бы циклом.
  */
 import {
@@ -22,7 +22,7 @@ import {
   fleetsSeenByPosition,
   patrolsSeenBy,
   radarSignatures,
-  sensorCoverage,
+  viewCoverage,
   type Battle,
   type Engagement,
   type Fleet,
@@ -59,6 +59,10 @@ export interface MapFogHost {
   contacts(): SignatureContact[];
   /** Круги обзора этого мира — из кэша кадра (`perWorld`): ракете нужна позиция в круге. */
   sight(): SightCircle[];
+  /** Миры этого мира (`world().planets`) в порядке записи — из кэша кадра: запись обходится
+   *  раз, а не каждым читателем. Тот же мир — тот же список, поэтому в проверку
+   *  `visionMemo` он не входит. */
+  planets(): readonly Planet[];
 }
 
 let game: MapFogHost;
@@ -143,7 +147,8 @@ function computeVision(): Vision {
   const ME = game.me();
   const NET = game.net();
   const netSignatures = game.contacts();
-  const { identify, radar } = sensorCoverage(s, ME, data);
+  const planets = game.planets();
+  const { identify, radar } = viewCoverage(s, ME, data, planets);
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
   // is remembered after the window closes).
   grantVision({ identify, radar }, targetsOf(myIntel(), 'planet'), (id) => !!s.planets[id]);
@@ -151,7 +156,7 @@ function computeVision(): Vision {
   return {
     identify,
     radar,
-    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt),
+    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt, planets),
     engaged: engagementOf(s, ME),
     seenAt,
     seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),
@@ -220,9 +225,11 @@ export function refreshVision(): void {
 }
 
 /** Забыть запомненное зрение: мир правили на месте (песочница), тот же объект — уже
- *  другой мир. */
+ *  другой мир. По той же причине память разведки переснимет опознанные миры, а не
+ *  поверит снимку, снятому с того же объекта. */
 export function forgetVision(): void {
   visionMemo = null;
+  scans.retake();
 }
 
 /** Записать в память разведки миры, увиденные не радаром: захват, который игрок видел. */
@@ -245,6 +252,7 @@ export function restoreFogMemory(entries: Parameters<ScanMemory['restore']>[0]):
  *  window on a world identifies the fleets at it, SPY-8). */
 export function fleetSeen(f: Fleet): boolean {
   const s = game.world();
+  if (s.match.status === 'ended') return true;
   const ME = game.me();
   // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
   if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
@@ -279,6 +287,7 @@ export function fleetKnown(f: Fleet): boolean {
 /** Опознание по зрению, посчитанному клиентом, — единственное место, где узел флота
  *  спрашивается напрямую (сторож `engagedFog.test.ts`). */
 function fleetSeenHere(f: Fleet): boolean {
+  if (game.world().match.status === 'ended') return true;
   return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
 }
 
@@ -294,7 +303,7 @@ export function battleKnown(b: Battle): boolean {
 // мир, и память принадлежит матчу.
 const scans = createScanMemory();
 /** Память разведки для чтения: писать в неё можно только дверями модуля. */
-export const memory: Pick<ScanMemory, 'get' | 'has' | 'ownerOf' | 'dump'> = scans;
+export const memory: Pick<ScanMemory, 'get' | 'has' | 'ownerOf' | 'dump' | 'version'> = scans;
 /**
  * Записать в память разведки то, что видно СЕЙЧАС, и то, что помнит СЕРВЕР (FOG-10).
  *

@@ -114,6 +114,7 @@ async function boot() {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   const geo = await import('./fleetGeometry');
   geo.initFleetGeometry({
@@ -497,6 +498,19 @@ describe('REFM-226 — полоска «Приказ» на месте ряда'
     expect(ch.chainMode).toBeNull();
     expect(cmds()).not.toContain('chsend');
     expect(cmds()).toContain('move'); // тот же кадр собрал обычный ряд
+  });
+
+  it('пока взведён ручной отход, ряд уходит с карты: точку отхода ловит карта (PT-01)', async () => {
+    const { cb, inter, page, fleet, select } = await boot();
+    select(fleet.id);
+    cb.renderCmdBar();
+    expect(page.shown()).toBe(true);
+    inter.arm('retreatAim', fleet.id);
+    cb.renderCmdBar();
+    expect(page.shown()).toBe(false);
+    inter.drop('retreatAim');
+    cb.renderCmdBar();
+    expect(page.shown()).toBe(true);
   });
 
   it('пока каст целится, полоска уходит с экрана', async () => {

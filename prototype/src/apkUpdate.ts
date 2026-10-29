@@ -29,7 +29,7 @@ export const CHECK_GAP_MS = 15 * 60_000;
 export function updateMessage(r: UpdateCheck): string {
   switch (r.kind) {
     case 'update':
-      return t('upd.available', { v: r.info.versionCode });
+      return t('upd.available');
     case 'current':
       return t('upd.current', { l: r.local, r: r.remote });
     case 'offline':
@@ -102,10 +102,6 @@ export function initApkUpdater(): void {
   const showUpdate = (u: UpdateInfo): void => {
     offered = u;
     status('');
-    const ver = el('ub-ver');
-    if (ver) ver.textContent = buildLabel(u);
-    const notes = el('ub-notes');
-    if (notes) notes.textContent = u.notes;
     const bar = el('updbar');
     if (bar) bar.style.display = 'block'; // override the stylesheet's display:none
   };

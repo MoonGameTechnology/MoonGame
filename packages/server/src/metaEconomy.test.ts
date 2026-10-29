@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { EntitlementCommandV1 } from '@void/protocol';
 import {
+  corpEconomyKey,
   MetaEconomy,
   metaEconomyFingerprint,
   metaSettlementReceiptKey,
   type MatchRewardFacts,
   type MetaEconomyDeps,
 } from './metaEconomy';
-import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
+import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from './metaEconomyCatalog';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { MemoryMetaMarket } from './metaMarket';
 import { MemoryArsenalStore, MemoryDropStore } from './store';
@@ -27,7 +28,7 @@ function setup(onEvent?: MetaEconomyDeps['onEvent']) {
   const store = new MemoryMetaEconomyStore(arsenal, drops, market);
   market.setEconomy(store);
   const tables = loadDropTables(data);
-  const service = new MetaEconomy({ store, catalog, dropTables: tables, now: () => time, onEvent });
+  const service = new MetaEconomy({ store, catalog, catalogHistory: loadMetaEconomyCatalogHistory(data), dropTables: tables, now: () => time, onEvent });
   const final = (
     matchId = 'match_1',
     overrides: Partial<MatchRewardFacts> = {},
@@ -94,6 +95,53 @@ function setup(onEvent?: MetaEconomyDeps['onEvent']) {
 }
 
 describe('MetaEconomy settlement', () => {
+  it('grants tradable corporation resources once across stages and final, and sells them through the existing auction', async () => {
+    const f = setup();
+    const facts = f.final('corp-materials', { place: 5 });
+    const stage = { ...facts, kind: 'stage' as const, stage: 1, place: undefined };
+    expect((await f.service.settle(stage)).ok).toBe(true);
+    expect((await f.service.settle(stage)).ok).toBe(true);
+    expect((await f.service.settle({ ...stage, stage: 2 })).ok).toBe(true);
+    const result = await f.service.settle(facts);
+    expect(result.ok).toBe(true);
+    expect(await f.service.settle(facts)).toEqual(result);
+    const account = await f.store.read('alice');
+    for (const [id, quantity] of Object.entries(f.catalog.rewards.corporationMaterials)) {
+      const lots = account.materials.filter((lot) => lot.materialId === id);
+      expect(lots.reduce((sum, lot) => sum + lot.quantity, 0)).toBe(quantity);
+      expect(lots.every((lot) => !lot.soulbound && lot.source === 'match')).toBe(true);
+    }
+    expect((await f.service.settle(f.final('buyer', { accountId: 'bob', place: 5 }))).ok).toBe(true);
+    const listed = await f.market.listMaterials('alice', 'Alice', 'command_cores', 1, 10, 'list-core');
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) throw Error('fixture');
+    const before = await f.market.balance('bob');
+    const purchase = await f.market.buyMaterial('bob', listed.listing.id, 'buy-core');
+    expect(purchase.ok).toBe(true);
+    expect(await f.market.buyMaterial('bob', listed.listing.id, 'buy-core')).toEqual(purchase);
+    expect(await f.market.balance('bob')).toBe(before - 10);
+    expect((await f.store.read('bob')).materials.filter((lot) => lot.materialId === 'command_cores')
+      .reduce((sum, lot) => sum + lot.quantity, 0)).toBe(2);
+  });
+
+  it('does not extend an existing operation budget with newly introduced corporation resources', async () => {
+    const f = setup();
+    await f.store.transaction(['alice'], async (tx) => {
+      tx.account('alice').operations.legacy = { materials: {}, seasonXp: 0, metrics: {}, finalized: false,
+        budget: { ...f.catalog.rewards.materials }, policyVersion: 'meta-v0.1' };
+    });
+    expect((await f.service.settle(f.final('legacy', { place: 5 }))).ok).toBe(true);
+    expect((await f.store.read('alice')).materials.some((lot) =>
+      f.catalog.materials[lot.materialId]?.purpose === 'corporation')).toBe(false);
+  });
+
+  it('still fulfils an issued entitlement from the previous catalog edition', async () => {
+    const f = setup();
+    const command = f.entitlement('legacy-payment', 'supply_personal', { catalogVersion: 'meta-v0.1' });
+    const result = await f.service.applyEntitlement(command);
+    expect(result.ok).toBe(true);
+    expect(await f.service.applyEntitlement(command)).toEqual(result);
+  });
   it('does not announce a complete final while omitting stages committed during receipt reads', async () => {
     const f = setup();
     const stage = { ...f.final(), kind: 'stage' as const, stage: 1, place: undefined };
@@ -186,6 +234,9 @@ describe('MetaEconomy settlement', () => {
     expect(await f.service.settle(f.final())).toEqual(first);
     expect(await f.store.read('alice')).toEqual(before);
     expect(before.operations.match_1?.materials).toEqual({
+      construction_blocks: 15,
+      engineering_kits: 6,
+      command_cores: 1,
       ferroalloys: 26,
       technical_composites: 18,
       control_circuits: 18,
@@ -774,5 +825,191 @@ describe('MetaEconomy Sovereign store', () => {
       ),
     ).toEqual({ ok: false, code: 'E_ENTITLEMENT' });
     expect((await f.service.readModel('alice')).sovereigns).toBe(0);
+  });
+});
+
+describe('MetaEconomy corporation base styles', () => {
+  const buyPack = async (f: ReturnType<typeof setup>) =>
+    f.service.applyEntitlement(f.entitlement('pack', 'sovereigns_1440'));
+  const buy = (f: ReturnType<typeof setup>, requestId: string, corpId = 'corp-1') =>
+    f.service.buyCorpStyle('alice', corpId, { requestId, offerId: 'corp_style_high_tech' });
+
+  it('the head pays personal Sovereigns, the corporation owns the style', async () => {
+    const f = setup();
+    await buyPack(f);
+    const bought = await buy(f, 'style-1');
+    expect(bought).toMatchObject({
+      ok: true,
+      receipt: { sovereignsSpent: 490, corpStyle: 'high_tech' },
+    });
+    // A retry is the same receipt and charges once; the style is not the head's own.
+    expect(await buy(f, 'style-1')).toEqual(bought);
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 490);
+    expect((await f.store.read('alice')).cosmetics).toEqual([]);
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'standard',
+      backdrop: 'orbit',
+      owned: ['high_tech'],
+    });
+    // Another corporation does not get it; the same one cannot buy it twice.
+    expect(await f.service.corpStyle('corp-2')).toEqual({
+      active: 'standard',
+      backdrop: 'orbit',
+      owned: [],
+    });
+    expect(await buy(f, 'style-2')).toEqual({ ok: false, code: 'E_ALREADY_OWNED' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 490);
+    // The same request id for another corporation is a different request: refused.
+    expect(await buy(f, 'style-1', 'corp-2')).toEqual({
+      ok: false,
+      code: 'E_IDEMPOTENCY_CONFLICT',
+    });
+  });
+
+  it('refuses a purchase without the Sovereigns or of an offer that is not a style', async () => {
+    const f = setup();
+    expect(await buy(f, 'poor')).toEqual({ ok: false, code: 'E_SOVEREIGNS' });
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'standard',
+      backdrop: 'orbit',
+      owned: [],
+    });
+    await buyPack(f);
+    for (const offerId of ['premium_7', 'nope'])
+      expect(
+        await f.service.buyCorpStyle('alice', 'corp-1', { requestId: offerId, offerId }),
+      ).toEqual({ ok: false, code: 'E_META_OFFER' });
+    // A style is bought for a corporation, never through the personal store.
+    expect(
+      await f.service.buyOffer('alice', { requestId: 'own', offerId: 'corp_style_high_tech' }),
+    ).toEqual({ ok: false, code: 'E_META_OFFER' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440);
+  });
+
+  it('shows a style offer to everyone without deciding who can buy it', async () => {
+    const f = setup();
+    const offer = (await f.service.readModel('alice')).store!.find(
+      (o) => o.id === 'corp_style_imperial_gothic',
+    );
+    expect(offer).toEqual({
+      id: 'corp_style_imperial_gothic',
+      category: 'styles',
+      price: 490,
+      corpStyle: 'imperial_gothic',
+      bought: 0,
+    });
+  });
+
+  it('applies a bought style or the standard one, and nothing else', async () => {
+    const f = setup();
+    const apply = (requestId: string, styleId: string) =>
+      f.service.applyCorpStyle('corp-1', { requestId, styleId });
+    expect(await apply('a1', 'high_tech')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
+    await buyPack(f);
+    await buy(f, 'style-1');
+    expect(await apply('a2', 'high_tech')).toMatchObject({
+      ok: true,
+      receipt: { corpStyle: 'high_tech' },
+    });
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'high_tech',
+      backdrop: 'orbit',
+      owned: ['high_tech'],
+    });
+    expect(await apply('a3', 'imperial_gothic')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
+    expect((await apply('a4', 'standard')).ok).toBe(true);
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'standard',
+      backdrop: 'orbit',
+      owned: ['high_tech'],
+    });
+    // The record is the corporation's, apart from every player's.
+    expect((await f.store.read(corpEconomyKey('corp-1'))).cosmetics).toEqual(['high_tech']);
+  });
+
+  it('sells and applies a backdrop next to the style, each in its own place', async () => {
+    const f = setup();
+    await buyPack(f);
+    const apply = (requestId: string, styleId: string) =>
+      f.service.applyCorpStyle('corp-1', { requestId, styleId });
+    expect(await apply('b0', 'nebula')).toEqual({ ok: false, code: 'E_CORP_STYLE' });
+    expect(
+      await f.service.buyCorpStyle('alice', 'corp-1', {
+        requestId: 'bd-1',
+        offerId: 'corp_backdrop_nebula',
+      }),
+    ).toMatchObject({ ok: true, receipt: { sovereignsSpent: 290, corpStyle: 'nebula' } });
+    await buy(f, 'style-1');
+    expect((await apply('b1', 'nebula')).ok).toBe(true);
+    expect((await apply('b2', 'high_tech')).ok).toBe(true);
+    // A backdrop does not replace the style, nor the style the backdrop.
+    expect(await f.service.corpStyle('corp-1')).toEqual({
+      active: 'high_tech',
+      backdrop: 'nebula',
+      owned: ['nebula', 'high_tech'],
+    });
+    expect((await apply('b3', 'orbit')).ok).toBe(true);
+    expect(await f.service.corpStyle('corp-1')).toMatchObject({
+      active: 'high_tech',
+      backdrop: 'orbit',
+    });
+    // A backdrop is the corporation's too, never sold through the personal store.
+    expect(
+      await f.service.buyOffer('alice', { requestId: 'own', offerId: 'corp_backdrop_ice_moon' }),
+    ).toEqual({ ok: false, code: 'E_META_OFFER' });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(1440 - 290 - 490);
+  });
+});
+
+describe('MetaEconomy medal rewards', () => {
+  it('pays each reached degree once: Sovereigns and Warrants here, XP listed for the caller', async () => {
+    const f = setup();
+    const warrantsBefore = await f.market.balance('alice');
+    const earned = [
+      { medalId: 'first' as const, grade: 3 as const },
+      { medalId: 'first' as const, grade: 2 as const },
+      { medalId: 'tutorial' as const, grade: 3 as const },
+    ];
+    expect(await f.service.unpaidMedals('alice', earned)).toEqual(earned);
+    const paid = await f.service.claimMedals('alice', earned);
+    const { grades } = f.catalog.medals;
+    expect(paid).toMatchObject({
+      ok: true,
+      receipt: {
+        kind: 'medal-reward',
+        sovereignsGranted: grades[3].sovereigns + grades[2].sovereigns + grades[3].sovereigns,
+        warrants: grades[3].warrants + grades[2].warrants,
+        medals: [
+          { medalId: 'first', grade: 3, ...grades[3] },
+          { medalId: 'first', grade: 2, ...grades[2] },
+          // Earned without playing: Sovereigns only.
+          { medalId: 'tutorial', grade: 3, sovereigns: grades[3].sovereigns, warrants: 0, xp: 0 },
+        ],
+      },
+    });
+    expect((await f.service.readModel('alice')).sovereigns).toBe(
+      grades[3].sovereigns * 2 + grades[2].sovereigns,
+    );
+    expect((await f.market.balance('alice')) - warrantsBefore).toBe(
+      grades[3].warrants + grades[2].warrants,
+    );
+    expect(await f.service.unpaidMedals('alice', earned)).toEqual([]);
+    // A new degree beside paid ones pays only the new one.
+    const next = [...earned, { medalId: 'first' as const, grade: 1 as const }];
+    expect(await f.service.unpaidMedals('alice', next)).toEqual([{ medalId: 'first', grade: 1 }]);
+    const again = await f.service.claimMedals('alice', next);
+    expect(again.ok && again.receipt.medals).toEqual([
+      { medalId: 'first', grade: 1, ...grades[1] },
+    ]);
+  });
+
+  it('refuses a malformed account id without touching any wallet', async () => {
+    const f = setup();
+    const earned = [{ medalId: 'first' as const, grade: 3 as const }];
+    expect(await f.service.unpaidMedals('__proto__', earned)).toEqual([]);
+    expect(await f.service.claimMedals('__proto__', earned)).toEqual({
+      ok: false,
+      code: 'E_META_REQUEST',
+    });
   });
 });

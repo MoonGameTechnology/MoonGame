@@ -103,7 +103,7 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
       { id: 'p2', name: 'B', faction: 'crimson', start: game.START_CANDIDATES[1]!, ai: false },
     ],
   });
-  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900 };
+  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900, clock: 0, still: false };
   const nodes = (await import('./mapCatalog')).mapNodesFromState(world);
   const camera = await import('./mapCamera');
   camera.initMapCamera({
@@ -117,7 +117,14 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
   camera.frameMap(nodes);
   camera.setView({ scale: 1, x: 0, y: 0 });
   const fog = await import('./mapFog');
-  fog.initMapFog({ world: () => env.world, me: () => 'p1', net: () => false, contacts: () => [], sight: () => [] });
+  fog.initMapFog({
+    world: () => env.world,
+    me: () => 'p1',
+    net: () => false,
+    contacts: () => [],
+    sight: () => [],
+    planets: () => Object.values(env.world.planets),
+  });
   fog.refreshVision();
   (await import('./mapPalette')).initMapPalette({
     world: () => env.world,
@@ -145,12 +152,20 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
     },
     lod: () => mapLod(camera.worldDist(mapSpacing(nodes)), camera.cam.scale),
     surfacesLost: () => env.lost++,
+    clock: () => env.clock,
+    still: () => env.still,
   });
-  const [bg, layer, spare] = made as [FakeCanvas, FakeCanvas, FakeCanvas];
+  const [bg, layer, spare, under] = made as [FakeCanvas, FakeCanvas, FakeCanvas, FakeCanvas];
   /** Источники `drawImage` холста, с режимом наложения. */
   const drawn = (c: FakeCanvas) => c.calls.filter((x) => x.name === 'drawImage').map((x) => ({ src: x.args[0], op: x.op }));
   const home = (id: string) => Object.values(env.world.planets).find((p) => p.owner === id)!;
-  return { ml, fog, camera, env, nodes, page, frame, bg, layer, spare, drawn, home };
+  return { ml, fog, camera, env, nodes, page, frame, bg, layer, spare, under, drawn, home };
+}
+
+/** Кадру — новый мир. Соло и сеть заменяют мир целиком, а не правят прежний (договор
+ *  `visionMemo` в `mapFog.ts`): тест правит его на месте и отдаёт новый объект. */
+function newWorld(env: { world: GameState }): void {
+  env.world = { ...env.world };
 }
 
 describe('REFM-232 — статический слой карты', () => {
@@ -221,11 +236,13 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     env.world.planets[hidden.id]!.owner = 'p2';
+    newWorld(env);
     expect(ml.knownOwner(hidden.id)).toBeNull();
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).toBe(geo);
     // Своя провинция сменила владельца — это знание, и карта перепекается.
     env.world.planets[mine]!.owner = 'p2';
+    newWorld(env);
     expect(ml.knownOwner(mine)).toBe('p2');
     ml.blitStaticLayer(1032);
     expect(ml.provinceGeometry).not.toBe(geo);
@@ -237,20 +254,67 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     hidden.terrain = 'asteroid_field';
+    newWorld(env);
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).toBe(geo);
     // Своя провинция сменила местность — это знание, и карта перепекается.
     home('p1').terrain = 'asteroid_field';
+    newWorld(env);
     ml.blitStaticLayer(1032);
     expect(ml.provinceGeometry).not.toBe(geo);
   });
 
+  it('знание о мирах кадр сверяет, только когда сменилось то, что оно читает', async () => {
+    const { ml, fog, env, home } = await boot();
+    vi.stubGlobal('performance', { now: () => 0 }); // часы стоят: выпечка не дорогая (правило 8)
+    const { KnowledgeRevision } = await import('./staticLayerCache');
+    const check = vi.spyOn(KnowledgeRevision.prototype, 'check');
+    const hidden = Object.values(env.world.planets).find(
+      (p) => !fog.known(p.id) && !fog.memory.has(p.id) && !fog.surveyed(p.id),
+    )!;
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1016);
+    expect(check).toHaveBeenCalledTimes(1);
+    const geo = ml.provinceGeometry;
+    // Новый мир с прежним знанием: сверка есть, выпечки нет.
+    newWorld(env);
+    ml.blitStaticLayer(1032);
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(ml.provinceGeometry).toBe(geo);
+    // Мир и зрение прежние, а в память разведки лёг снимок мира за туманом (дверь
+    // `rememberScan`): его местность теперь известна, и карта перепекается.
+    fog.rememberScan([hidden.id]);
+    ml.blitStaticLayer(1048);
+    expect(check).toHaveBeenCalledTimes(3);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    // Без тумана зрения нет, а песочница правит мир на месте: сверка каждым кадром.
+    const { sandboxConfig } = await import('./sandbox');
+    sandboxConfig.enabled = true;
+    sandboxConfig.fog = false;
+    fog.refreshVision();
+    ml.blitStaticLayer(1064);
+    ml.blitStaticLayer(1080);
+    expect(check).toHaveBeenCalledTimes(5);
+    const open = ml.provinceGeometry;
+    home('p1').owner = 'p2';
+    ml.blitStaticLayer(1096);
+    expect(ml.provinceGeometry).not.toBe(open);
+  });
+
   it('кадр: в движении небо и карта рисуются живьём, на покое — одна копия готового кадра', async () => {
     const { ml, frame, bg, layer, drawn } = await boot();
+    // Часы стоят: загруженная машина гейта не сделает устройство медленным, а его покой — печью
+    // подложки (правило 9).
+    vi.stubGlobal('performance', { now: () => 0 });
     ml.blitStaticLayer(1000);
     expect(ml.mapSettled).toBe(false);
+    // Движется ли камера, судится по моменту вопроса: кадра, рисующего карту, для этого не ждут.
+    expect(ml.mapMoving(1000 + SETTLE_MS - 1)).toBe(true);
+    expect(ml.mapMoving(1000 + SETTLE_MS)).toBe(false);
     expect(ml.mapView).toEqual({ k: 1, tx: 0, ty: 0 });
-    expect(drawn(frame).map((d) => d.src)).toEqual([layer]);
+    // Первый кадр печёт карту: её растр делается пикселем в кадр, чтобы цена выпечки его
+    // учла (правило 8), потом выпечка ложится под камеру.
+    expect(drawn(frame).map((d) => d.src)).toEqual([layer, layer]);
     expect(drawn(bg)).toEqual([]);
     frame.calls.length = 0;
     ml.blitStaticLayer(1000 + SETTLE_MS);
@@ -327,8 +391,204 @@ describe('REFM-232 — статический слой карты', () => {
     expect(spare.width).toBeGreaterThan(0);
   });
 
+  it('медленное устройство: приближение в жесте не перепекает карту, полосы ждут покоя', async () => {
+    // Быстрое устройство: растянутую вчетверо выпечку жест перепекает сразу. Часы стоят:
+    // цена выпечки не зависит от того, чем ещё занята машина с тестами.
+    const fast = await boot();
+    vi.stubGlobal('performance', { now: () => 0 });
+    fast.ml.blitStaticLayer(1000);
+    fast.ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(fast.ml.mapCostly).toBe(false);
+    const fastGeo = fast.ml.provinceGeometry;
+    fast.camera.zoomAt(800, 450, 4);
+    fast.ml.blitStaticLayer(2000);
+    expect(fast.ml.provinceGeometry).not.toBe(fastGeo);
+    vi.resetModules();
+    const { ml, camera, spare } = await boot();
+    // Каждое чтение часов — 60 мс: целая выпечка дороже GESTURE_BAKE_MS.
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(ml.mapCostly).toBe(true);
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 4);
+    ml.blitStaticLayer(2000);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(ml.mapView.k).toBeCloseTo(4, 6);
+    expect(spare.width).toBe(0);
+    // Покой: чёткая выпечка печётся в фоне, на экране растянутая.
+    let now = 2000 + SETTLE_MS;
+    ml.blitStaticLayer(now);
+    expect(spare.width).toBeGreaterThan(0);
+    expect(ml.provinceGeometry).toBe(geo);
+    // Новый жест: полоса не рисуется, пока камера не встанет.
+    camera.zoomAt(800, 450, 1.1);
+    const painted = spare.calls.length;
+    ml.blitStaticLayer((now += 16));
+    ml.blitStaticLayer((now += 16));
+    expect(spare.calls.length).toBe(painted);
+    expect(ml.provinceGeometry).toBe(geo);
+    now += SETTLE_MS;
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    expect(ml.provinceGeometry).not.toBe(geo);
+  });
+
+  it('медленное устройство: кольца обзора рисует кадр, а не растянутая выпечка', async () => {
+    const arcs = (c: FakeCanvas) => c.calls.filter((x) => x.name === 'arc').length;
+    // Быстрое: кольца в выпечке, готовый кадр — одна её копия.
+    const fast = await boot();
+    vi.stubGlobal('performance', { now: () => 0 });
+    fast.ml.blitStaticLayer(1000);
+    fast.ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(fast.ml.provinceGeometry?.rings).toBe(true);
+    expect(arcs(fast.layer)).toBeGreaterThan(0);
+    expect(fast.drawn(fast.bg).map((d) => d.src)).toEqual([fast.layer]);
+    vi.resetModules();
+    const { ml, camera, nodes, bg, frame, spare, drawn } = await boot();
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    ml.blitStaticLayer(1000 + SETTLE_MS);
+    // Первую выпечку испекли, когда цена устройства ещё не была известна: кольца в ней.
+    expect(ml.mapCostly).toBe(true);
+    expect(ml.provinceGeometry?.rings).toBe(true);
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 1.1);
+    let now = 2000;
+    ml.blitStaticLayer(now);
+    now += SETTLE_MS;
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    // Выпечка медленного устройства колец не несёт: растянутая, она раздула бы их.
+    expect(ml.provinceGeometry?.rings).toBe(false);
+    expect(arcs(spare)).toBe(0);
+    // Их кладёт в готовый кадр сам кадр, картинкой на каждое кольцо на экране.
+    const lod = mapLod(camera.worldDist(mapSpacing(nodes)), camera.cam.scale);
+    expect(lod.art).toBeLessThan(1);
+    const reach = Math.round(lod.markerRadius * 10) / 10 + 1;
+    const onScreen = ml.provinceGeometry!.nodes.filter((n) => {
+      const c = camera.world(n);
+      return c.x >= -reach && c.x <= 1600 + reach && c.y >= -reach && c.y <= 900 + reach;
+    }).length;
+    expect(onScreen).toBeGreaterThan(0);
+    bg.calls.length = 0;
+    bg.fire('contextlost');
+    ml.blitStaticLayer((now += 16));
+    const [map, ...rings] = drawn(bg).map((d) => d.src);
+    expect(map).toBe(spare);
+    expect(rings).toHaveLength(onScreen);
+    expect(new Set(rings).size).toBe(1);
+    // В движении — тоже, их здесь немного (LIVE_RING_BUDGET).
+    camera.panBy(5, 0);
+    frame.calls.length = 0;
+    ml.blitStaticLayer(now + 16);
+    expect(ml.mapSettled).toBe(false);
+    expect(drawn(frame).filter((d) => d.src === rings[0]).length).toBeGreaterThan(0);
+  });
+
+  it('медленное устройство: отдаление в жесте открывает подложку, а не перепекает карту', async () => {
+    const { ml, camera, frame, bg, layer, under, drawn } = await boot();
+    camera.zoomAt(800, 450, 4);
+    // Каждое чтение часов — 60 мс: целая выпечка дороже GESTURE_BAKE_MS.
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    // Покой: подложка — вся карта на обзоре — печётся полосами, а выпечка на экране та же.
+    const geo = ml.provinceGeometry;
+    let now = 1000 + SETTLE_MS;
+    for (let i = 0; i < 200; i++) ml.blitStaticLayer((now += 16));
+    expect(ml.mapCostly).toBe(true);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(under.width).toBeGreaterThan(0);
+    expect(under.calls.some((c) => c.name === 'fill')).toBe(true);
+    // Подложку мерили на обзоре, а камеру вернули на место.
+    expect(camera.cam.scale).toBe(4);
+    // Отдаление втрое посреди жеста открыло край выпечки: его закрывает подложка, а выпечка —
+    // своими целыми пикселями, без перепечки.
+    camera.zoomAt(800, 450, 1 / 3);
+    frame.calls.length = 0;
+    ml.blitStaticLayer((now += 16));
+    expect(ml.mapSettled).toBe(false);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(ml.mapView.k).toBeCloseTo(1 / 3, 6);
+    const map = frame.calls.filter((c) => c.name === 'drawImage' && c.args[0] === layer);
+    expect(map).toHaveLength(1);
+    expect(map[0]!.args).toHaveLength(9);
+    expect(drawn(frame).filter((d) => d.src === under).length).toBeGreaterThan(0);
+    // Покой: новая выпечка печётся в фоне, а готовый кадр — сжатая выпечка на подложке.
+    now += SETTLE_MS;
+    ml.blitStaticLayer(now);
+    expect(drawn(bg).map((d) => d.src)).toContain(under);
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(ml.mapView.k).toBe(1);
+    bg.calls.length = 0;
+    bg.fire('contextlost');
+    ml.blitStaticLayer(now + 16);
+    expect(drawn(bg).length).toBeGreaterThan(0);
+    expect(drawn(bg).map((d) => d.src)).not.toContain(under);
+  });
+
+  it('устаревшую подложку кадр не показывает: отдаление перепекает карту, как раньше', async () => {
+    const { ml, camera, env, frame, under, drawn, home } = await boot();
+    camera.zoomAt(800, 450, 4);
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    ml.blitStaticLayer(1000);
+    let now = 1000 + SETTLE_MS;
+    for (let i = 0; i < 200; i++) ml.blitStaticLayer((now += 16));
+    expect(under.width).toBeGreaterThan(0);
+    // Своя провинция сменила владельца: выпечка перепекается сразу, подложка устарела.
+    home('p1').owner = 'p2';
+    newWorld(env);
+    ml.blitStaticLayer((now += 16));
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 1 / 3);
+    frame.calls.length = 0;
+    ml.blitStaticLayer(now + 16);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(drawn(frame).map((d) => d.src)).not.toContain(under);
+  });
+
+  it('быстрое устройство подложку не печёт', async () => {
+    const { ml, under } = await boot();
+    vi.stubGlobal('performance', { now: () => 0 });
+    ml.blitStaticLayer(1000);
+    for (let i = 0; i < 200; i++) ml.blitStaticLayer(1000 + SETTLE_MS + 16 * i);
+    expect(ml.mapCostly).toBe(false);
+    expect(under.width).toBe(0);
+    expect(under.calls).toEqual([]);
+  });
+
+  it('подложку, которой не хватило пикселей, покой не меряет каждый кадр, а отдаление перепекает', async () => {
+    const { ml, camera, env, under } = await boot();
+    // Экран больше бюджета выпечки: вся карта на обзоре в него не влезает.
+    env.width = 6000;
+    env.height = 4000;
+    camera.zoomAt(3000, 2000, 4);
+    let clock = 0;
+    vi.stubGlobal('performance', { now: () => (clock += 60) });
+    const overview = vi.spyOn(camera, 'atOverview');
+    ml.blitStaticLayer(1000);
+    let now = 1000 + SETTLE_MS;
+    for (let i = 0; i < 200; i++) ml.blitStaticLayer((now += 16));
+    expect(ml.mapCostly).toBe(true);
+    expect(under.width).toBe(0);
+    expect(overview).toHaveBeenCalledTimes(1);
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(3000, 2000, 1 / 3);
+    ml.blitStaticLayer(now + 16);
+    expect(ml.provinceGeometry).not.toBe(geo);
+  });
+
   it('потерянный контекст выпечки: карта рисуется прямо в кадр', async () => {
     const { ml, frame, layer, drawn } = await boot();
+    // Часы стоят: выпечка ничего не стоит, устройство быстрое. По настоящим часам загруженная
+    // машина гейта делала его медленным, и кольца обзора рисовал бы кадр (правило 8).
+    vi.stubGlobal('performance', { now: () => 0 });
     ml.blitStaticLayer(1000);
     const geo = ml.provinceGeometry;
     layer.lost = true;
@@ -357,6 +617,36 @@ describe('REFM-232 — статический слой карты', () => {
     expect(ml.livingBorders()).not.toBeNull();
     expect(ml.holographicFrame).toBe(ml.provinceGeometry!.frame);
     expect(ml.holographicFrame.width).toBeGreaterThan(0);
+  });
+
+  it('движение выключено: стоящие рамку и волну стекла печёт выпечка, движение отдаёт их кадру', async () => {
+    const { ml, env, layer } = await boot({ holo: true });
+    vi.stubGlobal('performance', { now: () => 0 });
+    // Рамку выдаёт её тление — единственный конический градиент выпечки; волну — её кривая,
+    // проведённая в режиме 'screen'.
+    const glass = () => {
+      const rims = layer.calls.filter((c) => c.name === 'createConicGradient').length;
+      const waves = layer.calls.filter((c) => c.name === 'bezierCurveTo' && c.op === 'screen').length;
+      layer.calls.length = 0;
+      return { rims, waves: waves > 0 };
+    };
+    ml.blitStaticLayer(1000);
+    expect(glass()).toEqual({ rims: 0, waves: false });
+    env.still = true;
+    let geo = ml.provinceGeometry;
+    ml.blitStaticLayer(1050);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(glass()).toEqual({ rims: 1, waves: true });
+    // Та же картинка: кадр её только кладёт.
+    geo = ml.provinceGeometry;
+    ml.blitStaticLayer(1100);
+    expect(ml.provinceGeometry).toBe(geo);
+    expect(glass()).toEqual({ rims: 0, waves: false });
+    // Движение включено: новая выпечка без стекла, его рисует кадр.
+    env.still = false;
+    ml.blitStaticLayer(1150);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(glass()).toEqual({ rims: 0, waves: false });
   });
 
   it('рецепт подготовки: фон, геометрия, местность каждой провинции, последняя выпечка', async () => {
@@ -410,6 +700,7 @@ describe('REFM-232 — статический слой карты', () => {
     expect(geometry.seeds[index]!.kind).toBe('nebula');
     hidden.kind = 'graveyard';
     hidden.terrain = 'graveyard';
+    newWorld(env);
     const authoritative = structuredClone(env.world);
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).toBe(geometry);
@@ -455,7 +746,7 @@ describe('REFM-232 — статический слой карты', () => {
   });
 
   it('захват меняет политическую заливку, сохраняя ту же мировую среду и её растры', async () => {
-    const { ml, home } = await boot({ holo: true });
+    const { ml, env, home } = await boot({ holo: true });
     const mine = home('p1');
     mine.terrain = 'asteroid_field';
     ml.blitStaticLayer(1000);
@@ -464,6 +755,7 @@ describe('REFM-232 — статический слой карты', () => {
     const fingerprints = environment.tiles.map(t => [t.id, t.fingerprint]);
     expect(fingerprints.length).toBeGreaterThan(0);
     mine.owner = 'p2';
+    newWorld(env);
     ml.blitStaticLayer(1016);
     expect(ml.provinceGeometry).not.toBe(geometry);
     expect(ml.knownOwner(mine.id)).toBe('p2');
@@ -544,6 +836,8 @@ describe('REFM-232 — стык с main.ts', () => {
       'sectorType: sectorTypeOf,',
       'wave: provinceWave,',
       'lod: currentMapLod,',
+      'clock: () => hologramTime,',
+      'still: hologramStill,',
     ])
       expect(init, hook).toContain(hook);
     // Слой живых границ забывает картинку своей дверью (`borderLayer.ts`, часть 2).

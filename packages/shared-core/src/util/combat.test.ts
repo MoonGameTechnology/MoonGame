@@ -28,7 +28,12 @@ const data: GameData = parseGameData({
       domain: 'ground',
       line: 'rear',
     },
-    walker: { faction: 'x', stats: { attack: 8, defense: 8, speed: 3, hp: 48 }, domain: 'ground' },
+    walker: {
+      faction: 'x',
+      stats: { attack: 8, defense: 8, speed: 3, hp: 48 },
+      domain: 'ground',
+      kind: 'vehicle',
+    },
     ghost: { faction: 'x', stats: { attack: 1, defense: 1, speed: 1, hp: 0 }, line: 'front' },
   },
   factions: {},
@@ -255,6 +260,25 @@ describe('damageEvenly — урон поровну на каждого юнит�
     damageEvenly(units, 40, data);
     expect(units[0]).toEqual({ unit: 'frigate', count: 2, shieldHp: 0 });
     expect(units[1]).toEqual({ unit: 'cruiser', count: 2, hp: 60 });
+  });
+
+  it('с весом рода юнит получает урон × вес / Σ число × вес (ROS-1.6b)', () => {
+    // Пехота весит 2, техника 1: Σ = 3 × 2 + 1 × 1 = 7, 35 урона — по 10 на солдата, 5 шагоходу.
+    const units = [stack('trooper', 3), stack('walker', 1)];
+    damageEvenly(units, 35, data, { infantry: 2, vehicle: 1, other: 1 });
+    expect(units).toEqual([
+      { unit: 'trooper', count: 2, hp: 42 },
+      { unit: 'walker', count: 1, hp: 43 },
+    ]);
+  });
+
+  it('род с весом 0 урона не получает', () => {
+    const units = [stack('trooper', 3), stack('walker', 1)];
+    damageEvenly(units, 30, data, { infantry: 1, vehicle: 0, other: 1 });
+    expect(units).toEqual([
+      { unit: 'trooper', count: 2, hp: 42 },
+      { unit: 'walker', count: 1 },
+    ]);
   });
 
   it('стек без описания в данных не задет и не входит в N', () => {

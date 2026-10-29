@@ -92,10 +92,13 @@ window.__szTest = {
       .sort((a, b) => Math.hypot(b.position.x - home.position.x, b.position.y - home.position.y) - Math.hypot(a.position.x - home.position.x, a.position.y - home.position.y))[0];
     return far?.id ?? null;
   },
-  give: (id) => { s.planets[id].owner = ME; },
+  // Робот правит мир на месте, как песочница, и потому, как она, забывает зрение: иначе
+  // память разведки поверит снимку, снятому с того же объекта мира до правки.
+  give: (id) => { s.planets[id].owner = ME; forgetVision(); },
   capture: (id) => {
     const owner = s.pve.npcPlayerId;
     s.planets[id].owner = owner;
+    forgetVision();
     handleEvents([{ type: 'planet.captured', payload: { planetId: id, owner } }]);
     return owner;
   },

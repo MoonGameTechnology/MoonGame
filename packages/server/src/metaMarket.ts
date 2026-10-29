@@ -1,3 +1,4 @@
+import { reserveMaterials } from './materialStock';
 import { randomUUID } from 'node:crypto';
 import type { ArsenalItem } from '@void/shared-core';
 import type { Pool, PoolClient } from 'pg';
@@ -46,33 +47,6 @@ export interface MemoryMetaMarketState {
   materialLots: [string, ReservedMaterialListing][];
   journal: MetaMarketLedgerEntry[];
   receipts: [string, MarketReceipt][];
-}
-
-/** Reserve only earned, unbound stock. Provenance survives every split and transfer. */
-function reserveMaterials(
-  materials: MaterialLot[],
-  materialId: string,
-  quantity: number,
-  listingId: string,
-): MaterialLot[] | undefined {
-  const eligible = materials.filter(
-    (lot) =>
-      lot.materialId === materialId &&
-      !lot.soulbound &&
-      lot.source !== 'commerce' &&
-      lot.source !== 'ad',
-  );
-  if (eligible.reduce((sum, lot) => sum + lot.quantity, 0) < quantity) return undefined;
-  const reserved: MaterialLot[] = [];
-  let remaining = quantity;
-  for (const lot of eligible) {
-    if (!remaining) break;
-    const taken = Math.min(lot.quantity, remaining);
-    reserved.push({ ...lot, lotId: `${listingId}:${reserved.length}`, quantity: taken });
-    lot.quantity -= taken;
-    remaining -= taken;
-  }
-  return reserved;
 }
 
 function publicMaterialListing(lot: ReservedMaterialListing): MetaMaterialListing {
@@ -537,17 +511,24 @@ export class PostgresMetaMarket implements MetaMarket {
         if (!tx.sql) throw new Error('E_STORAGE_MISMATCH');
         return work(tx.sql, tx);
       });
-    const c = await this.pool.connect();
-    try {
-      await c.query('BEGIN');
-      const result = await work(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (error) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      c.release();
+    for (let attempt = 0; ; attempt++) {
+      const c = await this.pool.connect();
+      try {
+        await c.query('BEGIN');
+        const result = await work(c);
+        await c.query('COMMIT');
+        return result;
+      } catch (error) {
+        await c.query('ROLLBACK').catch(() => undefined);
+        // Сериализация или deadlock сняли попытку — Postgres просит её повторить. Работа трогает
+        // только базу, а откат вернул базу как было, поэтому повтор безопасен (тот же приём, что
+        // в `corporateTransactions.ts`). Любая другая ошибка и третий отказ уходят наверх.
+        const code = (error as { code?: unknown }).code;
+        if (attempt < 2 && (code === '40001' || code === '40P01')) continue;
+        throw error;
+      } finally {
+        c.release();
+      }
     }
   }
 

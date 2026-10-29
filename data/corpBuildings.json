@@ -10,21 +10,59 @@
           "durationMs": 3600000,
           "headquarters": 0,
           "influencePerDay": 24,
-          "constructionReduction": 0
+          "constructionReduction": 0,
+          "materials": {}
         },
         {
           "cost": 120,
           "durationMs": 21600000,
           "headquarters": 1,
           "influencePerDay": 48,
-          "constructionReduction": 0
+          "constructionReduction": 0,
+          "materials": {
+            "construction_blocks": 12,
+            "engineering_kits": 4
+          }
         },
         {
           "cost": 360,
           "durationMs": 43200000,
           "headquarters": 2,
           "influencePerDay": 72,
-          "constructionReduction": 0
+          "constructionReduction": 0,
+          "materials": {
+            "construction_blocks": 35,
+            "engineering_kits": 12,
+            "command_cores": 2
+          }
+        },
+        {
+          "cost": 800,
+          "durationMs": 86400000,
+          "headquarters": 3,
+          "influencePerDay": 96,
+          "constructionReduction": 0,
+          "members": 15,
+          "battles": 10,
+          "materials": {
+            "construction_blocks": 80,
+            "engineering_kits": 30,
+            "command_cores": 8
+          }
+        },
+        {
+          "cost": 1500,
+          "durationMs": 172800000,
+          "headquarters": 4,
+          "influencePerDay": 120,
+          "constructionReduction": 0,
+          "members": 20,
+          "battles": 25,
+          "materials": {
+            "construction_blocks": 160,
+            "engineering_kits": 65,
+            "command_cores": 20
+          }
         }
       ]
     },
@@ -38,21 +76,35 @@
           "durationMs": 10800000,
           "headquarters": 1,
           "influencePerDay": 48,
-          "constructionReduction": 0
+          "constructionReduction": 0,
+          "materials": {
+            "construction_blocks": 8,
+            "engineering_kits": 3
+          }
         },
         {
           "cost": 180,
           "durationMs": 21600000,
           "headquarters": 2,
           "influencePerDay": 96,
-          "constructionReduction": 0
+          "constructionReduction": 0,
+          "materials": {
+            "construction_blocks": 24,
+            "engineering_kits": 8,
+            "command_cores": 1
+          }
         },
         {
           "cost": 420,
           "durationMs": 43200000,
           "headquarters": 3,
           "influencePerDay": 144,
-          "constructionReduction": 0
+          "constructionReduction": 0,
+          "materials": {
+            "construction_blocks": 55,
+            "engineering_kits": 20,
+            "command_cores": 4
+          }
         }
       ]
     },
@@ -66,21 +118,192 @@
           "durationMs": 14400000,
           "headquarters": 1,
           "influencePerDay": 0,
-          "constructionReduction": 10
+          "constructionReduction": 10,
+          "materials": {
+            "construction_blocks": 10,
+            "engineering_kits": 5
+          }
         },
         {
           "cost": 240,
           "durationMs": 28800000,
           "headquarters": 2,
           "influencePerDay": 0,
-          "constructionReduction": 20
+          "constructionReduction": 20,
+          "materials": {
+            "construction_blocks": 30,
+            "engineering_kits": 15,
+            "command_cores": 2
+          }
         },
         {
           "cost": 560,
           "durationMs": 57600000,
           "headquarters": 3,
           "influencePerDay": 0,
-          "constructionReduction": 30
+          "constructionReduction": 30,
+          "materials": {
+            "construction_blocks": 70,
+            "engineering_kits": 35,
+            "command_cores": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "operations_center",
+      "nameKey": "corp.building.operations-center",
+      "descriptionKey": "corp.building.operations-center.desc",
+      "levels": [
+        {
+          "cost": 150,
+          "durationMs": 21600000,
+          "headquarters": 2,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "maxFormat": 5,
+          "materials": {
+            "construction_blocks": 18,
+            "engineering_kits": 8,
+            "command_cores": 1
+          }
+        },
+        {
+          "cost": 400,
+          "durationMs": 43200000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "maxFormat": 7,
+          "materials": {
+            "construction_blocks": 48,
+            "engineering_kits": 20,
+            "command_cores": 4
+          }
+        },
+        {
+          "cost": 900,
+          "durationMs": 86400000,
+          "headquarters": 4,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "maxFormat": 10,
+          "materials": {
+            "construction_blocks": 110,
+            "engineering_kits": 45,
+            "command_cores": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "warehouse",
+      "nameKey": "corp.building.warehouse",
+      "descriptionKey": "corp.building.warehouse.desc",
+      "levels": [
+        {
+          "cost": 100,
+          "durationMs": 14400000,
+          "headquarters": 2,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "warehouseItems": 2,
+          "materials": {
+            "construction_blocks": 14,
+            "engineering_kits": 6
+          }
+        },
+        {
+          "cost": 300,
+          "durationMs": 28800000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "warehouseItems": 4,
+          "materials": {
+            "construction_blocks": 40,
+            "engineering_kits": 16,
+            "command_cores": 3
+          }
+        },
+        {
+          "cost": 700,
+          "durationMs": 57600000,
+          "headquarters": 4,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "warehouseItems": 6,
+          "materials": {
+            "construction_blocks": 90,
+            "engineering_kits": 38,
+            "command_cores": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "hall_of_fame",
+      "nameKey": "corp.building.hall-of-fame",
+      "descriptionKey": "corp.building.hall-of-fame.desc",
+      "levels": [
+        {
+          "cost": 200,
+          "durationMs": 21600000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "showcaseSlots": 5,
+          "materials": {
+            "construction_blocks": 25,
+            "engineering_kits": 12,
+            "command_cores": 2
+          }
+        },
+        {
+          "cost": 500,
+          "durationMs": 43200000,
+          "headquarters": 4,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "showcaseSlots": 10,
+          "materials": {
+            "construction_blocks": 60,
+            "engineering_kits": 30,
+            "command_cores": 7
+          }
+        },
+        {
+          "cost": 1000,
+          "durationMs": 86400000,
+          "headquarters": 5,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "showcaseSlots": 20,
+          "materials": {
+            "construction_blocks": 130,
+            "engineering_kits": 75,
+            "command_cores": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "monument",
+      "nameKey": "corp.building.monument",
+      "descriptionKey": "corp.building.monument.desc",
+      "levels": [
+        {
+          "cost": 2000,
+          "durationMs": 259200000,
+          "headquarters": 5,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "monument": true,
+          "materials": {
+            "construction_blocks": 200,
+            "engineering_kits": 100,
+            "command_cores": 30
+          }
         }
       ]
     }

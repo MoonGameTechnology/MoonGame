@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   CorpBuildError,
   CorpBuildOrder,
@@ -5,6 +6,7 @@ import type {
   CorpInfrastructureState,
   CorpInfrastructureResult,
   CorpInfrastructureView,
+  CorpStanding,
 } from '@void/protocol';
 import rawCatalog from '../../../data/corpBuildings.json';
 import type { CorpAuditEntry, CorpRole } from './store/types';
@@ -37,12 +39,20 @@ export function parseCorpBuildings(raw: unknown): CorpBuildingDef[] {
       if (
         !level ||
         !integer(level.cost) ||
+        (level.materials !== undefined && (typeof level.materials !== 'object' || level.materials === null || Array.isArray(level.materials) ||
+          Object.entries(level.materials).some(([id, n]) => !['construction_blocks', 'engineering_kits', 'command_cores'].includes(id) || !integer(n) || n === 0))) ||
         !integer(level.durationMs) ||
         level.durationMs < 1 ||
         !integer(level.headquarters) ||
         !integer(level.influencePerDay) ||
         !integer(level.constructionReduction) ||
-        level.constructionReduction > 50
+        level.constructionReduction > 50 ||
+        (level.members !== undefined && !integer(level.members)) ||
+        (level.battles !== undefined && !integer(level.battles)) ||
+        (level.maxFormat !== undefined && (!integer(level.maxFormat) || level.maxFormat < 2)) ||
+        (level.warehouseItems !== undefined && (!integer(level.warehouseItems) || level.warehouseItems < 1 || level.warehouseItems > 20)) ||
+        (level.showcaseSlots !== undefined && (!integer(level.showcaseSlots) || level.showcaseSlots < 1 || level.showcaseSlots > 20)) ||
+        (level.monument !== undefined && typeof level.monument !== 'boolean')
       ) {
         throw new Error('E_CORP_CATALOG');
       }
@@ -54,6 +64,13 @@ export function parseCorpBuildings(raw: unknown): CorpBuildingDef[] {
     throw new Error('E_CORP_CATALOG');
   }
   return buildings;
+}
+
+export function corpBuildPrice(corpId: string, order: CorpBuildOrder): string {
+  const level = CORP_BUILDINGS.find((b) => b.id === order.buildingId)?.levels[order.expectedLevel];
+  return createHash('sha256').update(JSON.stringify([corpId, order.buildingId, order.expectedLevel,
+    level?.cost, Object.entries(level?.materials ?? {}).sort(), level?.durationMs, level?.headquarters,
+    level?.members, level?.battles])).digest('hex');
 }
 
 export const CORP_BUILDINGS = parseCorpBuildings(rawCatalog);
@@ -77,6 +94,7 @@ function blocked(
   influence: number,
   role: CorpRole,
   order: CorpBuildOrder,
+  standing: CorpStanding,
 ): CorpBuildError | null {
   if (role !== 'head') return 'E_FORBIDDEN';
   const def = CORP_BUILDINGS.find((b) => b.id === order.buildingId);
@@ -87,13 +105,17 @@ function blocked(
   const next = def.levels[level];
   if (!next) return 'E_CORP_BUILD_MAX';
   if ((state.levels.headquarters ?? 0) < next.headquarters) return 'E_CORP_BUILD_REQUIRES';
+  if (standing.members < (next.members ?? 0)) return 'E_CORP_BUILD_MEMBERS';
+  if (standing.battles < (next.battles ?? 0)) return 'E_CORP_BUILD_BATTLES';
   if (influence < next.cost) return 'E_INSUFFICIENT';
   return null;
 }
 
 /** One atomic store operation. No I/O: memory and SQL execute identical rules.
  *  Absolute timestamps settle construction/income after downtime without a timer.
- *  Rejecting an order still settles already-earned income, but never charges it. */
+ *  Rejecting an order still settles already-earned income, but never charges it.
+ *  `standing` — members and played battles, counted by the store in the same operation;
+ *  without it no level that asks for them can be ordered. */
 export function updateCorpInfrastructure(
   corpId: string,
   actor: string,
@@ -102,13 +124,20 @@ export function updateCorpInfrastructure(
   saved: CorpInfrastructureState | null,
   now: number,
   order?: CorpBuildOrder,
+  standing: CorpStanding = { members: 0, battles: 0 },
 ): {
   state: CorpInfrastructureState;
   influence: number;
   audit: CorpAuditEntry[];
   result: CorpInfrastructureResult;
 } {
-  if (!integer(now) || !integer(balance)) throw new Error('E_CORP_STATE');
+  if (
+    !integer(now) ||
+    !integer(balance) ||
+    !integer(standing.members) ||
+    !integer(standing.battles)
+  )
+    throw new Error('E_CORP_STATE');
   const state = saved
     ? structuredClone(saved)
     : { levels: {}, construction: null, accruedAt: now, remainder: 0 };
@@ -149,7 +178,7 @@ export function updateCorpInfrastructure(
   }
   accrue(at);
   if (order) {
-    const code = blocked(state, influence, role, order);
+    const code = blocked(state, influence, role, order, standing);
     if (code) return { state, influence, audit, result: { ok: false, code } };
     const def = CORP_BUILDINGS.find((b) => b.id === order.buildingId)!;
     const level = state.levels[def.id] ?? 0;
@@ -180,6 +209,8 @@ export function updateCorpInfrastructure(
     serverNow: at,
     influence,
     ...bonuses,
+    members: standing.members,
+    battles: standing.battles,
     canBuild: role === 'head',
     construction: state.construction,
     buildings: CORP_BUILDINGS.map((def) => {
@@ -191,12 +222,19 @@ export function updateCorpInfrastructure(
         next: next
           ? {
               ...next,
+              price: corpBuildPrice(corpId, { buildingId: def.id, expectedLevel: level }),
               actualDurationMs: Math.ceil(
                 (next.durationMs * (100 - bonuses.constructionReduction)) / 100,
               ),
             }
           : null,
-        blocked: blocked(state, influence, role, { buildingId: def.id, expectedLevel: level }),
+        blocked: blocked(
+          state,
+          influence,
+          role,
+          { buildingId: def.id, expectedLevel: level },
+          standing,
+        ),
       };
     }),
   };

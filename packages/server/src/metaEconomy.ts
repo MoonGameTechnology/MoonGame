@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { hashJson as gameDataHash, type ArsenalItem } from '@void/shared-core';
+import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD } from '@void/protocol';
 import type {
   EntitlementCommandV1,
   EntitlementReceipt,
@@ -7,10 +8,14 @@ import type {
   MaterialSource,
   MetaCommandReceipt,
   MetaCommandResult,
+  MetaCorpStyleApplyCommand,
+  MetaCorpStyleView,
   MetaCraftCommand,
   MetaEconomyAccount,
   MetaEconomyView,
   MetaMatchRewardsView,
+  MedalGradeRef,
+  MedalRewardGrant,
   MetaPremiumDailyCommand,
   MetaRecipeView,
   MetaSalvageCommand,
@@ -84,6 +89,25 @@ export function metaEconomyFingerprint(value: unknown): string {
   return createHash('sha256')
     .update(JSON.stringify(canonical(value)))
     .digest('hex');
+}
+
+/** Account counter that records one paid medal degree. */
+export const medalCounter = (ref: MedalGradeRef): string => `medal:${ref.medalId}:${ref.grade}`;
+
+/** A corporation's record in the economy store: its base styles live here (CORP-14). The
+ *  prefix keeps it apart from every player's record. */
+export const corpEconomyKey = (corpId: string): string => `corp:${corpId}`;
+
+/** What one medal degree pays under the catalog (`medals`): medals earned without playing
+ *  pay their Sovereigns only. */
+export function medalReward(
+  table: MetaEconomyCatalog['medals'],
+  ref: MedalGradeRef,
+): MedalRewardGrant {
+  const pay = table.grades[ref.grade];
+  return table.sovereignsOnly.includes(ref.medalId)
+    ? { ...ref, sovereigns: pay.sovereigns, warrants: 0, xp: 0 }
+    : { ...ref, ...pay };
 }
 
 class MetaRejection extends Error {
@@ -160,6 +184,7 @@ export class MetaEconomy {
     }
   }
 
+  /** `also` — further records the command changes, locked in the same transaction. */
   private async command(
     accountId: string,
     requestId: string,
@@ -170,13 +195,15 @@ export class MetaEconomy {
       account: MetaEconomyAccount,
       receipt: MetaCommandReceipt,
     ) => Promise<void>,
+    also: readonly string[] = [],
   ): Promise<MetaCommandResult> {
-    if (!validKey(accountId) || !validKey(requestId)) return { ok: false, code: 'E_META_REQUEST' };
+    if (!validKey(accountId) || !validKey(requestId) || !also.every(validKey))
+      return { ok: false, code: 'E_META_REQUEST' };
     const key = receiptKey(kind, accountId, requestId);
     const fingerprint = metaEconomyFingerprint(payload);
     let applied = false;
     try {
-      const result = await this.deps.store.transaction([accountId], async (tx) => {
+      const result = await this.deps.store.transaction([accountId, ...also], async (tx) => {
         const previous = await tx.receipt(key);
         if (previous) {
           if (previous.fingerprint !== fingerprint) reject('E_IDEMPOTENCY_CONFLICT');
@@ -560,6 +587,8 @@ export class MetaEconomy {
           }
         : {}),
       ...(offer.materials ? { materials: { ...offer.materials } } : {}),
+      ...(offer.corpStyle ? { corpStyle: offer.corpStyle } : {}),
+      ...(offer.corpBackdrop ? { corpBackdrop: offer.corpBackdrop } : {}),
       ...(offer.limit !== undefined ? { limit: offer.limit } : {}),
       bought: account.counters[`offer:${id}`] ?? 0,
       ...(terms.blocked ? { blocked: terms.blocked } : {}),
@@ -602,6 +631,51 @@ export class MetaEconomy {
     );
   }
 
+  /** Medal degrees the account has reached but not been paid for yet. */
+  async unpaidMedals(
+    accountId: string,
+    earned: readonly MedalGradeRef[],
+  ): Promise<MedalGradeRef[]> {
+    if (!validKey(accountId)) return [];
+    const account = await this.deps.store.read(accountId);
+    return earned.filter((ref) => !account.counters[medalCounter(ref)]);
+  }
+
+  /** Pays reached medal degrees once per account: Sovereigns and Warrants here. XP lives in
+   *  the commander store, so the caller credits it per degree BEFORE this call
+   *  (`medalRewards.ts`); the receipt lists the full grant, XP included. */
+  claimMedals(accountId: string, earned: readonly MedalGradeRef[], news?: { login: string; corp: import('@void/protocol').NewsCorp | null }): Promise<MetaCommandResult> {
+    const keys = earned.map(medalCounter).sort();
+    return this.command(
+      accountId,
+      metaEconomyFingerprint(['medals', keys]),
+      'medal-reward',
+      { medals: keys },
+      async (tx, account, receipt) => {
+        const medals: MedalRewardGrant[] = [];
+        let sovereigns = 0;
+        let warrants = 0;
+        for (const ref of earned) {
+          const counter = medalCounter(ref);
+          if (account.counters[counter]) continue;
+          const grant = medalReward(this.deps.catalog.medals, ref);
+          account.counters[counter] = 1;
+          sovereigns = safeAdd(sovereigns, grant.sovereigns);
+          if (grant.warrants > 0) {
+            await tx.creditWarrants(accountId, grant.warrants, 'medal_reward', counter, receipt.at);
+            warrants = safeAdd(warrants, grant.warrants);
+          }
+          medals.push(grant);
+          if (news) await tx.announcePlayerMedal({ id: randomUUID(), at: receipt.at, kind: 'player_medal', medalId: ref.medalId, grade: ref.grade, ...news }, accountId);
+        }
+        account.sovereigns = safeAdd(account.sovereigns ?? 0, sovereigns);
+        receipt.sovereignsGranted = sovereigns;
+        receipt.warrants = warrants;
+        receipt.medals = medals;
+      },
+    );
+  }
+
   /** Spend Sovereigns on a store offer. Bought goods are personal (soulbound), like paid ones. */
   buyOffer(accountId: string, command: MetaStoreBuyCommand): Promise<MetaCommandResult> {
     return this.command(
@@ -616,6 +690,8 @@ export class MetaEconomy {
         )
           reject('E_META_OFFER');
         const offer = this.deps.catalog.store.offers[command.offerId]!;
+        // A base style or backdrop belongs to a corporation: it is bought through `buyCorpStyle`.
+        if (offer.corpStyle || offer.corpBackdrop) reject('E_META_OFFER');
         const items = await tx.arsenal.listOf(accountId);
         const terms = this.storeTerms(command.offerId, offer, account, items, receipt.at);
         if (terms.blocked === 'limit') reject('E_OFFER_LIMIT');
@@ -672,6 +748,81 @@ export class MetaEconomy {
         }
         receipt.soulbound = true;
       },
+    );
+  }
+
+  /** The corporation's base style and backdrop: applied and bought (CORP-14, CORP-15). */
+  async corpStyle(corpId: string): Promise<Omit<MetaCorpStyleView, 'head'>> {
+    const key = corpEconomyKey(corpId);
+    const record = validKey(key) ? await this.deps.store.read(key) : undefined;
+    return {
+      active: record?.corpStyle ?? CORP_STYLE_STANDARD,
+      backdrop: record?.corpBackdrop ?? CORP_BACKDROP_STANDARD,
+      owned: [...(record?.cosmetics ?? [])],
+    };
+  }
+
+  /** The head buys a base style or backdrop for the whole corporation with personal Sovereigns. The
+   *  caller checks that `accountId` heads `corpId`; the corporation keeps the style when
+   *  the head changes. */
+  buyCorpStyle(
+    accountId: string,
+    corpId: string,
+    command: MetaStoreBuyCommand,
+  ): Promise<MetaCommandResult> {
+    const corp = corpEconomyKey(corpId);
+    return this.command(
+      accountId,
+      command.requestId,
+      'corp-style-buy',
+      { ...command, corpId },
+      async (tx, account, receipt) => {
+        if (
+          !validKey(command.offerId) ||
+          !Object.hasOwn(this.deps.catalog.store.offers, command.offerId)
+        )
+          reject('E_META_OFFER');
+        const offer = this.deps.catalog.store.offers[command.offerId]!;
+        const look = offer.corpStyle ?? offer.corpBackdrop;
+        if (!look) reject('E_META_OFFER');
+        const record = tx.account(corp);
+        if (record.cosmetics.includes(look)) reject('E_ALREADY_OWNED');
+        const price = offer.price!;
+        const balance = account.sovereigns ?? 0;
+        if (balance < price) reject('E_SOVEREIGNS');
+        account.sovereigns = balance - price;
+        record.cosmetics.push(look);
+        receipt.sovereignsSpent = price;
+        receipt.corpStyle = look;
+      },
+      [corp],
+    );
+  }
+
+  /** The head applies a bought style or backdrop, or a free one, to the corporation's base.
+   *  The catalog tells a backdrop from a style. The caller checks that the actor heads
+   *  `corpId`. */
+  applyCorpStyle(corpId: string, command: MetaCorpStyleApplyCommand): Promise<MetaCommandResult> {
+    return this.command(
+      corpEconomyKey(corpId),
+      command.requestId,
+      'corp-style-apply',
+      command,
+      async (_tx, record, receipt) => {
+        const look = command.styleId;
+        if (look === CORP_STYLE_STANDARD) delete record.corpStyle;
+        else if (look === CORP_BACKDROP_STANDARD) delete record.corpBackdrop;
+        else if (!record.cosmetics.includes(look)) reject('E_CORP_STYLE');
+        else if (this.isBackdrop(look)) record.corpBackdrop = look;
+        else record.corpStyle = look;
+        receipt.corpStyle = command.styleId;
+      },
+    );
+  }
+
+  private isBackdrop(look: string): boolean {
+    return Object.values(this.deps.catalog.store.offers).some(
+      (offer) => offer.corpBackdrop === look,
     );
   }
 
@@ -892,7 +1043,7 @@ export class MetaEconomy {
           seasonXp: 0,
           finalized: false,
           metrics: {},
-          budget: { ...policy.materials },
+          budget: { ...policy.materials, ...policy.corporationMaterials },
           policyVersion: this.deps.catalog.version,
           seasonXpBudget: policy.seasonXp,
         });

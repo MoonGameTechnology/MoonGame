@@ -1,4 +1,4 @@
-import { matchCost } from '../packages/shared-core/src/index';
+import { matchUnitCost } from '../packages/shared-core/src/index';
 import type { GameData, GameState, UnitDef } from '../packages/shared-core/src/index';
 
 /**
@@ -56,8 +56,8 @@ export function landerCost(
   troop: string,
   match: Pick<GameState, 'pricing'> = {},
 ): Record<string, number> {
-  const out: Record<string, number> = { ...(matchCost(match, data.units[unit]?.cost) ?? {}) };
-  for (const [r, n] of Object.entries(matchCost(match, data.units[troop]?.cost) ?? {}))
+  const out: Record<string, number> = { ...(matchUnitCost(match, data.units[unit]) ?? {}) };
+  for (const [r, n] of Object.entries(matchUnitCost(match, data.units[troop]) ?? {}))
     out[r] = (out[r] ?? 0) + n;
   return out;
 }

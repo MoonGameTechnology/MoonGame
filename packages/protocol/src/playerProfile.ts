@@ -17,7 +17,8 @@ export const PROFILE_MEDALS = [
   { id: 'explorer', metric: 'explored', goals: [100, 250, 500] },
   { id: 'contribution', metric: 'registered', goals: [1] },
   // The guided first match runs on the device: the claim carries no counter, only a fixed
-  // 1 per account, and grants no XP or currency (POST /profiles/rewards/tutorial).
+  // 1 per account (POST /profiles/rewards/tutorial). Like registration, its medal reward is
+  // Sovereigns only (`medals.sovereignsOnly` in data/metaEconomy.json).
   { id: 'tutorial', metric: 'tutorial', goals: [1] },
 ] as const;
 export type ProfileMedalId = (typeof PROFILE_MEDALS)[number]['id'];
@@ -48,7 +49,24 @@ export interface BotProfileMatch {
   xp: number;
   place: number | null;
 }
+/** Server-confirmed career only. Missing statistics mean not recorded, never zero. */
+export interface PlayerCareer {
+  matches: number;
+  wins: number;
+  since: number;
+  pvp: {
+    destroyed: number;
+    lost: number;
+    destroyedCost: Record<string, number>;
+    lostCost: Record<string, number>;
+  };
+  modes: Record<string, { matches: number; wins: number }>;
+}
 export interface PlayerProfile extends ProfileAppearance {
+  career?: PlayerCareer | null;
+  statistics?: { matches: number; wins: number };
+  corporation?: { id: string; name: string } | null;
+
   login: string;
   xp: number;
   progress: ProfileProgress;
@@ -72,6 +90,27 @@ export function medalGrade(id: ProfileMedalId, progress: ProfileProgress): Medal
       : value >= medal.goals[0]
         ? 3
         : null;
+}
+/** One reached degree of one medal; grade 3 is class III, the first goal. */
+export interface MedalGradeRef {
+  medalId: ProfileMedalId;
+  grade: MedalGrade;
+}
+/** What one medal degree paid, once per account (`POST /profiles/rewards/medals`). */
+export interface MedalRewardGrant extends MedalGradeRef {
+  sovereigns: number;
+  warrants: number;
+  xp: number;
+}
+/** Every degree the progress has reached, lower classes included: a counter that jumps
+ *  straight past class III still pays class III. */
+export function earnedMedalGrades(progress: ProfileProgress): MedalGradeRef[] {
+  return PROFILE_MEDALS.flatMap((medal) => {
+    const value = progress[medal.metric] ?? 0;
+    return (medal.goals as readonly number[]).flatMap((goal, i) =>
+      value >= goal ? [{ medalId: medal.id, grade: (3 - i) as MedalGrade }] : [],
+    );
+  });
 }
 /** Exact write shape, bounded slots and no duplicate medals. Ownership is checked by the server. */
 export function parseAppearance(raw: unknown): ProfileAppearance | null {

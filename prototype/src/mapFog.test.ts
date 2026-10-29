@@ -81,7 +81,13 @@ function base(patch: (st: GameState) => void = () => {}): GameState {
 }
 
 async function boot(w: GameState = base()) {
-  const env = { world: w, me: 'p1', net: false, contacts: [] as SignatureContact[] };
+  const env = {
+    world: w,
+    me: 'p1',
+    net: false,
+    contacts: [] as SignatureContact[],
+    planets: null as Planet[] | null,
+  };
   const fog = await import('./mapFog');
   fog.initMapFog({
     world: () => env.world,
@@ -89,11 +95,31 @@ async function boot(w: GameState = base()) {
     net: () => env.net,
     contacts: () => env.contacts,
     sight: () => [],
+    planets: () => env.planets ?? Object.values(env.world.planets),
   });
   return { fog, env };
 }
 
 describe('REFM-231 — зрение кадра', () => {
+  it('opens the frozen map and travelling fleets in both solo and network views after the match ends', async () => {
+    const world = base();
+    world.fleets.enemy = { ...fleet('enemy', 'p2', 'D'), location: null,
+      movement: { from: 'D', to: 'E', departedAt: 0, arrivesAt: 2000 } };
+    const { fog, env } = await boot(world);
+    fog.refreshVision();
+    expect(fog.known('E')).toBe(false);
+    expect(fog.fleetSeen(world.fleets.enemy!)).toBe(false);
+    env.world = { ...world, match: { ...world.match, status: 'ended', endedAt: world.time } };
+    fog.refreshVision();
+    expect(fog.known('E')).toBe(true);
+    expect(fog.fleetSeen(world.fleets.enemy!)).toBe(true);
+    env.net = true;
+    fog.refreshVision();
+    expect(fog.known('E')).toBe(true);
+    expect(fog.fleetSeen(world.fleets.enemy!)).toBe(true);
+    expect(fog.vision!.signatures).toEqual([]);
+  });
+
   it('до первого пересчёта тумана нет: видно всё', async () => {
     const { fog } = await boot();
     expect(fog.vision).toBeNull();
@@ -126,6 +152,14 @@ describe('REFM-231 — зрение кадра', () => {
     fog.refreshVision();
     expect(fog.vision).not.toBe(third);
     expect(fog.memory.has('A')).toBe(true);
+  });
+
+  it('пересчёт берёт миры списком из кэша кадра (W7), а не обходом записи', async () => {
+    const { fog, env } = await boot();
+    // A — свой мир и единственные глаза: без него в списке опознавать нечего и нечем.
+    env.planets = Object.values(env.world.planets).filter((p) => p.id !== 'A');
+    fog.refreshVision();
+    expect(fog.known('A')).toBe(false);
   });
 
   it('смена своего места — тоже пересчёт', async () => {
@@ -272,25 +306,48 @@ describe('REFM-231 — память разведки', () => {
     fog.refreshVision();
     expect([fog.known('D'), fog.memory.has('D')]).toEqual([false, true]);
   });
+
+  it('новый мир с прежними мирами память не переснимает, забвение песочницы — переснимает (W8)', async () => {
+    const { fog, env } = await boot();
+    fog.refreshVision();
+    const first = fog.memory.get('A');
+    env.world = { ...env.world };
+    fog.refreshVision();
+    expect(fog.memory.get('A')).toBe(first);
+    // Песочница правит мир на месте и потому забывает зрение каждым кадром.
+    env.world.planets.A!.garrison.push({ unit: 'militia', count: 4 });
+    fog.forgetVision();
+    fog.refreshVision();
+    expect(fog.memory.get('A')?.garrison).toBe(4);
+  });
 });
 
 describe('REFM-231 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const FOG = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
   // Захват, который игрок видел, пишет в память разведки разбор событий (`eventFeed.ts`).
   const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
   const init = /initMapFog\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
-  it('хуки тумана — мир, своё место, сеть, контакты радара и круги обзора кадра', () => {
+  it('хуки тумана — мир, своё место, сеть, контакты радара, круги обзора и миры кадра', () => {
     for (const hook of [
       'world: () => s,',
       'me: () => ME,',
       'net: () => NET,',
       'contacts: () => netSignatures,',
-      "sight: () => perWorld('sight', () => sightCircles(s, ME, data)),",
+      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+      'planets: worldPlanets,',
     ]) {
       expect(init, hook).toContain(hook);
     }
+  });
+
+  it('список миров кадра — один на запись миров, песочница его сбрасывает (W7)', () => {
+    const body = MAIN.slice(MAIN.indexOf('function worldPlanets('));
+    expect(body.slice(0, body.indexOf('\n}\n'))).toContain('planetList?.record !== s.planets');
+    expect(MAIN).toMatch(/forgetVision\(\);\n\s*worldMemo = null;\n\s*planetList = null;/);
   });
 
   it('зрение и память разведки меняют только двери владельца', () => {
@@ -302,7 +359,7 @@ describe('REFM-231 — стык с main.ts', () => {
       /\bfunction (computeVision|currentVision|fogVision|myIntel|fleetNode|fleetSeen|fleetKnown|fleetSeenHere|battleKnown|updateMemory|known|admits|seesDetails)\(/,
     );
     // Смена матча чистит память вместе с запомненным зрением, песочница — только зрение.
-    expect(MAIN).toMatch(/resetEventFeed\(\);[^\n]*\n\s*resetFogMemory\(\);/);
+    expect(LIFE).toMatch(/resetEventFeed\(\);[^\n]*\n\s*resetFogMemory\(\);/);
     expect(MAIN).toMatch(/enforceSandbox\(s, ME, sandboxHomeId\);\n\s*forgetVision\(\);/);
     expect(FEED).toContain('rememberScan([p.planetId as string]);');
     expect(MAIN).toContain('restoreFogMemory(save.memory);');

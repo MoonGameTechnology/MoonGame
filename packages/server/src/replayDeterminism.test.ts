@@ -6,6 +6,7 @@ import {
   runReplay,
   type Action,
   type GameState,
+  type MatchConfig,
   type ReplayLog,
   type ReplayStep,
 } from '@void/shared-core';
@@ -26,6 +27,8 @@ import { createDevMatch, loadShippedData, DEV_MODULES } from './scenario';
 
 const HOUR = 3_600_000;
 const data = loadShippedData();
+// Exercise two full days of accrual and replay independently of a quick dev-map win.
+const config: MatchConfig = { timeScale: 1, victory: { scripted: true } };
 
 async function playRecordedMatch(): Promise<{
   log: ReplayLog;
@@ -39,6 +42,7 @@ async function playRecordedMatch(): Promise<{
     now: () => wallNow,
     time: 0,
     record: (step) => steps.push(step),
+    config,
   });
   const initial = deepClone(room.state);
 
@@ -68,7 +72,7 @@ async function playRecordedMatch(): Promise<{
   const final = room.state;
   expect(final.time).toBe(48 * HOUR);
   return {
-    log: { dataVersion: data.version, initial, steps },
+    log: { dataVersion: data.version, config, initial, steps },
     final,
     hash: hashState(final),
   };

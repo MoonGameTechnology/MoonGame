@@ -13,12 +13,19 @@ const key = (v: unknown): v is string =>
 const level = (v: unknown): v is CorpBuildingLevel =>
   object(v) &&
   integer(v.cost) &&
+  (v.materials === undefined || object(v.materials) && Object.entries(v.materials).every(([id, n]) => ['construction_blocks', 'engineering_kits', 'command_cores'].includes(id) && integer(n) && n > 0)) &&
   integer(v.durationMs) &&
   v.durationMs > 0 &&
   integer(v.headquarters) &&
   integer(v.influencePerDay) &&
   integer(v.constructionReduction) &&
-  v.constructionReduction <= 50;
+  v.constructionReduction <= 50 &&
+  (v.members === undefined || integer(v.members)) &&
+  (v.battles === undefined || integer(v.battles)) &&
+  (v.maxFormat === undefined || (integer(v.maxFormat) && v.maxFormat >= 2)) &&
+  (v.warehouseItems === undefined || (integer(v.warehouseItems) && v.warehouseItems >= 1 && v.warehouseItems <= 20)) &&
+  (v.showcaseSlots === undefined || (integer(v.showcaseSlots) && v.showcaseSlots >= 1 && v.showcaseSlots <= 20)) &&
+  (v.monument === undefined || typeof v.monument === 'boolean');
 const ERRORS = new Set([
   'E_FORBIDDEN',
   'E_CORP_BUILDING',
@@ -26,6 +33,8 @@ const ERRORS = new Set([
   'E_CORP_BUILD_LEVEL',
   'E_CORP_BUILD_MAX',
   'E_CORP_BUILD_REQUIRES',
+  'E_CORP_BUILD_MEMBERS',
+  'E_CORP_BUILD_BATTLES',
   'E_INSUFFICIENT',
 ]);
 
@@ -39,6 +48,8 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
     !integer(raw.influencePerDay) ||
     !integer(raw.constructionReduction) ||
     raw.constructionReduction > 50 ||
+    (raw.members !== undefined && !integer(raw.members)) ||
+    (raw.battles !== undefined && !integer(raw.battles)) ||
     typeof raw.canBuild !== 'boolean' ||
     !Array.isArray(raw.buildings) ||
     raw.buildings.length === 0 ||
@@ -66,6 +77,7 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
       b.next !== null &&
       (!level(b.next) ||
         !object(b.next) ||
+        (b.next.price !== undefined && (typeof b.next.price !== 'string' || !/^[a-f0-9]{64}$/.test(b.next.price))) ||
         !integer(b.next.actualDurationMs) ||
         b.next.actualDurationMs < 1)
     )
@@ -87,7 +99,12 @@ export function parseCorpInfrastructure(raw: unknown): CorpInfrastructureView | 
     )
       return null;
   }
-  return raw as unknown as CorpInfrastructureView;
+  // A server before CORP-6 sends no counts and no level asks for them.
+  return {
+    ...(raw as unknown as CorpInfrastructureView),
+    members: integer(raw.members) ? raw.members : 0,
+    battles: integer(raw.battles) ? raw.battles : 0,
+  };
 }
 
 /** Server time + elapsed local display time; changing the device clock cannot complete a job. */

@@ -294,6 +294,23 @@ export function avaShape(map: MatchMap): { sides: number; slotsPerSide: number }
   return { sides: counts.size, slotsPerSide: per };
 }
 
+/** Militia holding each neutral planet at match start (BAL-10: two break the snowball's
+ *  free early grab, and more left ~half the planets neutral all match in self-play). */
+export const NEUTRAL_PLANET_MILITIA = 2;
+
+/** A start nobody plays, left on the map neutral: no owner, no buildings, a planet held by
+ *  {@link NEUTRAL_PLANET_MILITIA} militia and any other kind open. One rule for a game with
+ *  fewer players than starts and for the unused starts of a corporations battle (CORP-8).
+ *  Does not mutate the input. */
+export function neutralSector(sector: MapSector): MapSector {
+  return {
+    ...sector,
+    owner: null,
+    buildings: [],
+    garrison: sector.kind === 'planet' ? [{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }] : [],
+  };
+}
+
 /** Strict parse — throws on a malformed map (use at trusted boot). */
 export function parseMatchMap(raw: unknown): MatchMap {
   return MatchMapSchema.parse(raw);

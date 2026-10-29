@@ -35,8 +35,9 @@ const SHEETS: Record<string, string> = {
   'packages/client/index.html': CLIENT,
 };
 
-/** Цифра на плашке медали — часть рисунка медали 34 px, а не надпись для чтения. */
-const ART = ['#profile .ps-medal i', '#profile .ps-pin .ps-medal i'];
+/** Цифра на плашке медали — часть рисунка медали 34 px, а не надпись для чтения. Тот же
+ *  рисунок стоит в окне наград за медали (`#medal-rewards`). */
+const ART = [':is(#profile, #medal-rewards) .ps-medal i', '#profile .ps-pin .ps-medal i'];
 
 /** Размеры мельче 12 px в листе: `font-size` (в том числе нижняя граница `clamp`) и размер
  *  в сокращении `font:` (до `/` высоты строки). Возвращает «селектор: размер». */
@@ -92,7 +93,7 @@ describe('мельче 12 px текста нет (UIX-1.2)', () => {
   });
 
   it('исключения — только цифра на медали; уйдёт рисунок — уйдёт и строка', () => {
-    const profile = tinySizes(SHEETS['profile.css']!).map((x) => x.split(':')[0]);
+    const profile = tinySizes(SHEETS['profile.css']!).map((x) => x.slice(0, x.lastIndexOf(': ')));
     expect(profile).toEqual(ART);
   });
 });

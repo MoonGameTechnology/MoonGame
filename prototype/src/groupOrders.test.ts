@@ -70,6 +70,7 @@ async function boot() {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   const note = (text: string, at?: string) => env.notes.push([text, at]);
   const pipe = await import('./orderPipeline');
@@ -389,6 +390,8 @@ describe('REFM-228 — погрузка десанта', () => {
 
 describe('REFM-228 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const GO = readFileSync(new URL('./groupOrders.ts', import.meta.url), 'utf8');
   const init = /initGroupOrders\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
@@ -405,7 +408,7 @@ describe('REFM-228 — стык с main.ts', () => {
   });
 
   it('чужие зоны пишут стойку и окно только дверями', () => {
-    expect(MAIN).toContain('forgetAutoAssault();');
+    expect(LIFE).toContain('forgetAutoAssault();');
     expect(MAIN).toContain('restoreAutoAssault(save.autoAssault);');
     expect(MAIN).toContain('autoAssault: [...soloAutoAssault]');
     expect(MAIN).toContain('autoAssault: (id) => soloAutoAssault.has(id),');

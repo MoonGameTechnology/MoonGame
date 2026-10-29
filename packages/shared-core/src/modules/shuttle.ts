@@ -1,3 +1,4 @@
+import { captureCasualtyCost } from '../util/casualtyCost';
 import { fleetPointDefense, planetPointDefense, fleetPDRange, PD_COOLDOWN_MINUTES } from '../util/pointDefense';
 /**
  * ЧЕЛНОКИ (shuttles-roadmap, заказ владельца 2026-09-08) — второй класс космических
@@ -87,7 +88,7 @@ import {
   type HookedDamage,
 } from '../util/combat';
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
-import { fireOnGarrison, shuttleGroundDamage } from '../util/groundFire';
+import { fireOnGarrison, groundVolley, shuttleGroundDamage, type GroundVolley } from '../util/groundFire';
 import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -359,13 +360,20 @@ function shootDownStrike(strike: ShuttleStrike, amount: number): number {
  * трассе, перехват, ответка в момент удара) обязаны считать ОДИНАКОВО — счёт живёт здесь
  * в одном экземпляре, а не тремя копиями по месту.
  */
-function absorbIntoStrike(strike: ShuttleStrike, damage: HookedDamage, data: GameData): number {
+function absorbIntoStrike(strike: ShuttleStrike, damage: HookedDamage, data: GameData, h: HandlerContext, by: string | null): number {
   const first = strike.units[0];
   if (!first) return 0;
   const hull = Math.max(1, data.units[first.unit]?.stats.hp ?? 1);
+  const value = captureCasualtyCost(h.state, strike.units, data);
+  const before = strike.units.map(stack => ({ stack, count: stack.count }));
   strike.damage = (strike.damage ?? 0) + damage;
   const downed = shootDownStrike(strike, Math.floor(strike.damage / hull));
   strike.damage -= downed * hull;
+  const costs = value();
+  const losses: Record<string, number> = {};
+  for (const { stack, count } of before) losses[stack.unit] = (losses[stack.unit] ?? 0) + count - stack.count;
+  for (const [unit, count] of Object.entries(losses)) if (count > 0)
+    h.emit('career.casualty', { unit, count, owner: strike.owner, killedBy: by, lossCost: costs[unit] ?? {} });
   return downed;
 }
 
@@ -620,10 +628,9 @@ function strikeAirPower(strike: ShuttleStrike, data: GameData): number {
 
 /** Огонь вылета по ВОЙСКАМ мира за удар (ROS-1.6): той же линией огня и в той же доле
  *  живого корпуса, что и удар по постройкам. */
-function strikeGroundPower(strike: ShuttleStrike, data: GameData): number {
-  return (
-    cappedUnitStat(strike.units, data, shuttleGroundDamage) * hullShare(strike.units, strike.damage, data)
-  );
+function strikeGroundPower(strike: ShuttleStrike, target: Planet, data: GameData): GroundVolley {
+  const volley = groundVolley(strike.units, target.garrison, data, shuttleGroundDamage);
+  return { ...volley, total: volley.total * hullShare(strike.units, strike.damage, data) };
 }
 
 /** Носитель, пустивший этот вылет, для `DamageHookArgs.attackerFleet` (CORE-DMG-3).
@@ -655,7 +662,7 @@ function repelStrike(
     // CORE-DMG-3: огрызается ЦЕЛЬ — флот своими орудиями, мир своим ПВО.
     ...(target.kind === 'fleet' ? { attackerFleet: target.id } : {}),
   });
-  const downed = absorbIntoStrike(strike, dealt, h.ctx.data);
+  const downed = absorbIntoStrike(strike, dealt, h.ctx.data, h, target.owner);
   h.emit('shuttle.repelled', {
     strikeId: strike.id,
     owner: strike.owner,
@@ -1501,7 +1508,7 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
     defender: target.owner,
     ...strikeAttackerFleet(strike),
   });
-  const downed = absorbIntoStrike(target, dealt, data);
+  const downed = absorbIntoStrike(target, dealt, data, h, strike.owner);
   h.emit('shuttle.intercepted', {
     baseId: strike.base.id,
     baseKind: strike.base.kind,
@@ -1666,16 +1673,16 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
           // ROS-1.6: удар задевает и войска мира — сильнее обстрела с орбиты, но без
           // последнего бойца (`util/groundFire.ts`). Только у врага или ничейного мира:
           // по чужим, но не враждебным войскам огонь не идёт.
-          const troops = strikeGroundPower(strike, h.ctx.data);
-          if (troops > 0 && (target.owner === null || isHostile(h, strike.owner, target.owner))) {
-            const toTroops = hookedDamage(h, troops, {
+          const troops = strikeGroundPower(strike, target, h.ctx.data);
+          if (troops.total > 0 && (target.owner === null || isHostile(h, strike.owner, target.owner))) {
+            const toTroops = hookedDamage(h, troops.total, {
               phase: 'shuttle',
               location: target.id,
               attacker: strike.owner,
               defender: target.owner ?? '',
               ...strikeAttackerFleet(strike),
             });
-            fireOnGarrison(h, target, toTroops, strike.owner);
+            fireOnGarrison(h, target, toTroops, strike.owner, troops.weights);
           }
           repelStrike(h, strike, answer, {
             kind: 'planet',
@@ -1927,7 +1934,8 @@ export const shuttleModule: GameModule = {
   //         `missile.flew`, и по последнему отрезку до цели — замечание Codex на #1644).
   // 1.17.0: урон удара по войскам мира делится поровну на каждого юнита, а не фокусом
   //         (ROS-1.6a, то же правило, что у обстрела с орбиты).
-  version: '1.17.0',
+  // 1.18.0: удар по миру бьёт технику и пехоту разной долей атаки (ROS-1.6b).
+  version: '1.18.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -2707,7 +2715,7 @@ export const shuttleModule: GameModule = {
           });
           // Урон переводится в СБИТЫЕ МАШИНЫ по корпусу челнока — счёт один на все
           // каналы, см. `absorbIntoStrike`.
-          const downed = absorbIntoStrike(target, dealt, data);
+          const downed = absorbIntoStrike(target, dealt, data, h, fleet.owner);
           h.emit('pd.fired', {
             fleetId: fleet.id,
             owner: fleet.owner,
@@ -2806,7 +2814,7 @@ export const shuttleModule: GameModule = {
           ...(base.ref.kind === 'fleet' ? { attackerFleet: base.ref.id } : {}),
         });
         // Тот же перевод урона в сбитые машины, что у зонального ПВО (`absorbIntoStrike`).
-        const downed = absorbIntoStrike(target, dealt, data);
+        const downed = absorbIntoStrike(target, dealt, data, h, base.owner);
         base.setSortie(spendSortie(sortie, spec.rearmRounds));
         h.emit('shuttle.intercepted', {
           baseId: base.ref.id,

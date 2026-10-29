@@ -9,11 +9,6 @@
       "metal": 80
     },
     "researchTimeHours": 4,
-    "unlocks": {
-      "buildings": [
-        "mine_t2"
-      ]
-    },
     "effects": {
       "productionBonus": 0.1
     }

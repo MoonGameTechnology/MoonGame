@@ -15,7 +15,8 @@
  * значения приходят со входа и читаются через `resolveServer`. Поле адреса стоит в
  * карточке «Сервер не отвечает» и видно только при сбое (`browserFallback.ts`, правило 4).
  */
-import { t, tData } from '../../localization/runtime';
+import { LOCALE, t, tData } from '../../localization/runtime';
+import { isAvaMatchId } from '../../packages/protocol/src/ava';
 import { fallbackFor, showServerRow, type Fallback } from '../../decisions/browserFallback';
 import { matchNumberText, parseMatchNumber } from '../../decisions/matchNumber';
 import { filterControls, seatPips, tabCounts, type FilterControls } from '../../decisions/matchesPage';
@@ -39,6 +40,8 @@ import {
   type FilterState,
 } from './matchFilter';
 import { openSessionTab } from './matchJoin';
+import { inviteMatches } from '../../decisions/friendInvite';
+import type { InviteMatch } from './friendsScreen';
 import { isMatchDescriptionOpen, openMatchDescription } from './matchDescription';
 import {
   fmtJoinWindow,
@@ -73,6 +76,10 @@ export interface MatchBrowserHost {
 
 let game: MatchBrowserHost;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
+/** Имя партии в строке. Битву корпораций называет её номер: с CORP-8 её играют на обычных
+ *  картах, и имя карты битву больше не выдаёт. */
+const matchName = (m: Pick<MatchRow, 'matchId' | 'mapId'>): string =>
+  isAvaMatchId(m.matchId) ? t('map.ava') : game.mapLabel(m.mapId);
 let srvInput: HTMLInputElement;
 
 export interface MatchRow {
@@ -82,6 +89,7 @@ export interface MatchRow {
   days: number;
   players: { seated: number; capacity: number };
   status: string;
+  archiveExpiresAt?: number;
   /** Entry window (SES-2.3/2.4): can a NEW player still take a free seat here, and how
    *  long is left. Absent on an older server ⇒ treat as always open. */
   entryOpen?: boolean;
@@ -182,7 +190,11 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
     else game.status(t(effect.key));
   };
   try {
-    const res = await fetch(archiveUrl(srv.base, id, srv.nick, restore), { method: 'POST' });
+    const pass = tokenFor(localStorage, srv.base, srv.nick);
+    const res = await fetch(archiveUrl(srv.base, id, srv.nick, restore), {
+      method: 'POST',
+      ...(pass ? { headers: { authorization: `Bearer ${pass}` } } : {}),
+    });
     await apply(archiveEffect(op, queryOutcome(res) === 'refused' ? 'refused' : 'ok'));
   } catch {
     await apply(archiveEffect(op, 'unreachable'));
@@ -292,7 +304,7 @@ function renderEmpty(el: HTMLElement, plan: Extract<Fallback, { kind: 'empty' }>
 function matchRow(m: MatchRow): HTMLElement {
   // «В архив» / «Восстановить» — только на своих вкладках. «Описание» доступно везде;
   // кнопкам на телефоне нужен свой ряд, чтобы они не сжимали название карты.
-  const action = rowAction(activeTab);
+  const action = rowAction(activeTab, m.status);
   const row = document.createElement('div');
   row.className = 'mrow mrow-2';
   // Номер партии в строке не печатается — как в «Моих партиях» хаба: `m-<uuid>` вытеснял
@@ -333,8 +345,14 @@ function matchRow(m: MatchRow): HTMLElement {
   if (win.kind === 'closed') windowHtml = `<span class="mwin shut">${t('acc.join-closed')}</span>`;
   else if (win.kind === 'open')
     windowHtml = `<span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
+  if (m.status === 'ended' && m.archiveExpiresAt !== undefined) {
+    const date = new Date(m.archiveExpiresAt).toLocaleString(LOCALE, {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    });
+    windowHtml += `<span class="mwin">${esc(t('browser.archive-until', { date }))}</span>`;
+  }
   info.innerHTML =
-    `<div class="mname"><b>${esc(game.mapLabel(m.mapId))}</b>${modeHtml}${ended}</div>` +
+    `<div class="mname"><b>${esc(matchName(m))}</b>${modeHtml}${ended}</div>` +
     `<div class="mmeta"><span>${t('browser.day', { n: m.days })}</span>${seats}` +
     `<span>${esc(ruleSummary(m.rules, m.kind))}</span>${windowHtml}</div>`;
   row.appendChild(info);
@@ -344,8 +362,8 @@ function matchRow(m: MatchRow): HTMLElement {
   join.className = 'mbtn btn-second';
   // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
   // о возвращении, а не о вступлении.
-  const seated = activeTab === 'active';
-  join.textContent = t(seated ? 'browser.resume' : 'browser.join');
+  const seated = activeTab !== 'available';
+  join.textContent = t(m.status === 'ended' ? 'browser.view-map' : seated ? 'browser.resume' : 'browser.join');
   join.addEventListener('click', () => openSessionTab(m.matchId, seated));
   btns.appendChild(join);
   if (action) {
@@ -368,7 +386,7 @@ function descriptionButton(match: MatchRow): HTMLButtonElement {
   button.type = 'button';
   button.className = 'mbtn btn-quiet mdescription';
   button.textContent = t('browser.description');
-  button.addEventListener('click', () => openMatchDescription(match, game.mapLabel(match.mapId)));
+  button.addEventListener('click', () => openMatchDescription(match, matchName(match)));
   return button;
 }
 
@@ -477,7 +495,7 @@ function renderMyMatches(): void {
       `<div class="hm-body">` +
       // Номер стоит ниже отдельной строкой: в заголовке он вытеснял бы то, ради чего
       // сюда смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(game.mapLabel(m.mapId))}</div>` +
+      `<div class="hc-t">${esc(matchName(m))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
@@ -537,6 +555,22 @@ export async function refreshMyMatches(): Promise<void> {
   renderMyMatches();
 }
 
+/** Войти в партию по номеру: своя — возвращение, чужая — выбор места, как у строки. Этой
+ *  же дверью входят к другу и по приглашению (FRIENDS-2). */
+export function joinByNumber(id: string): void {
+  const seated = [...(matchLists?.active ?? []), ...(matchLists?.archived ?? [])]
+    .some((m) => m.matchId === id);
+  openSessionTab(id, seated);
+}
+
+/** Свои идущие партии, куда можно позвать друга (FRIENDS-2, `decisions/friendInvite.ts`). */
+export function inviteTargets(): InviteMatch[] {
+  return inviteMatches(matchLists?.active ?? []).map((m) => ({
+    matchId: m.matchId,
+    label: `${game.mapLabel(m.mapId)} · ${matchNumberText(m.matchId)}`,
+  }));
+}
+
 /** Положить готовую ленту и показать «Доступные», без похода на сервер. Ею харнес размеров
  *  (`sizetest.mjs`) мерит обозреватель: сервера там нет. */
 export function showLists(lists: Record<MatchTab, MatchRow[]>): void {
@@ -586,8 +620,7 @@ export function initMatchBrowser(host: MatchBrowserHost): void {
       game.status(t('browser.number.bad'));
       return;
     }
-    const seated = (matchLists?.active ?? []).some((m) => m.matchId === id);
-    openSessionTab(id, seated);
+    joinByNumber(id);
   });
 
   for (const btn of Array.from(document.querySelectorAll('.mtab')))

@@ -91,6 +91,7 @@ async function boot() {
     net: () => false,
     contacts: () => [],
     sight: () => [],
+    planets: () => Object.values(env.world.planets),
   });
   const geo = await import('./fleetGeometry');
   geo.initFleetGeometry({
@@ -468,6 +469,8 @@ describe('REFM-229 — двери и запросы', () => {
 
 describe('REFM-229 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Установка партии — у жизненного цикла матча (`matchLifecycle.ts`, REFM-219).
+  const LIFE = readFileSync(new URL('./matchLifecycle.ts', import.meta.url), 'utf8');
   const CHAIN = readFileSync(new URL('./chainComposer.ts', import.meta.url), 'utf8');
   const init = /initChainComposer\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
@@ -491,7 +494,8 @@ describe('REFM-229 — стык с main.ts', () => {
     expect(MAIN).not.toMatch(/\bchainMode\.(fleetIds|steps|gestures|menu) =/);
     expect(MAIN).not.toMatch(/\bchainMode = /);
     expect(MAIN).not.toMatch(/\bchainRouteCache\b/);
-    expect(MAIN.match(/forgetChainRoutes\(\);/g)).toHaveLength(2); // смена матча и впуск в сеть
+    expect(MAIN.match(/forgetChainRoutes\(\);/g)).toHaveLength(1); // впуск в сеть
+    expect(LIFE.match(/forgetChainRoutes\(\);/g)).toHaveLength(1); // смена матча
   });
 
   it('композер живёт у владельца, `main.ts` только зовёт его', () => {

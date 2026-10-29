@@ -123,7 +123,7 @@ export function securityHeaders(options: SecurityHeaderOptions = {}): Record<str
     `style-src ${styles.join(' ') || "'none'"}`,
     // Правило 8: атрибуты `style` — да, блоки `<style>` — только по хешу строкой выше.
     "style-src-attr 'unsafe-inline'",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     // Правило 3: свой origin плюс любой wss — ссылка `?join=` ведёт на чужой сервер.
     "connect-src 'self' wss:",

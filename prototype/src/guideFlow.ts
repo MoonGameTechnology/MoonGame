@@ -132,7 +132,11 @@ export let activeTour: RunningTour | null = null;
 const ORIENTATION_TOUR = __PLAYER_BUILD__
   ? HUD_ORIENTATION_TOUR.filter((step) => step.id !== 'clock')
   : HUD_ORIENTATION_TOUR;
-export function launchTour(steps = ORIENTATION_TOUR, onEnd?: (r: TourResult) => void): void {
+export function launchTour(
+  steps = ORIENTATION_TOUR,
+  onEnd?: (r: TourResult) => void,
+  from = 0,
+): void {
   activeTour = startTour(
     steps,
     (r) => {
@@ -140,6 +144,7 @@ export function launchTour(steps = ORIENTATION_TOUR, onEnd?: (r: TourResult) => 
       onEnd?.(r);
     },
     { keepClear: keepMarkClear },
+    from,
   );
 }
 

@@ -106,6 +106,8 @@ services:
       # the host a curl arrives via the Docker bridge, not loopback, so prod needs the
       # token (≥32 chars, e.g. `openssl rand -hex 32`). Unset ⇒ the routes 404 for everyone.
       METRICS_TOKEN: ${METRICS_TOKEN:-}
+      # Aggregate-only credential for the host observer; never use METRICS_TOKEN there.
+      METRICS_READER_TOKEN: ${METRICS_READER_TOKEN:-}
       # PTM-0.2: salt of the analytics pseudonym in the match journal (≥32 chars). Unset ⇒
       # the journal carries no `actor`, so players can't be linked across matches and days.
       ANALYTICS_SALT: ${ANALYTICS_SALT:-}
@@ -182,6 +184,7 @@ services:
     cap_drop:
       - ALL
     mem_limit: 1g
+    cpus: 1.0
     pids_limit: 512
     logging:
       driver: json-file
@@ -216,6 +219,7 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 1g
+    cpus: 1.0
     pids_limit: 256
     logging:
       driver: json-file

@@ -40,7 +40,7 @@ P = collections.OrderedDict([
     # СЕВЕРО-ЗАПАД — сюда входит игрок, это ещё край сектора.
     ('landing',   (-437, -415, 'planet', 'empty_space', 'p1',
                    [{'unit': 'militia', 'count': 2}],
-                   [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'}])),
+                   [{'type': 'mine'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'}])),
     ('rim_veil',  (-397, -600, 'nebula', 'nebula', None, [], [])),
     ('cold_shoal',(-218, -145, 'asteroid', 'asteroid_field', None, [], [])),
 

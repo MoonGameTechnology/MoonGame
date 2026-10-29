@@ -665,9 +665,10 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
   }
 
   if (map.pricing) {
-    const { cost, hours, start } = map.pricing;
+    const { cost, shipCost, hours, start } = map.pricing;
     base.pricing = {
       ...(cost ? { cost: { ...cost } } : {}),
+      ...(shipCost ? { shipCost: { ...shipCost } } : {}),
       ...(hours !== undefined ? { hours } : {}),
       ...(start ? { start: { ...start } } : {}),
     };

@@ -385,7 +385,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
         'cwgo:btn-second',
         'crback:btn-quiet',
         'crgo:btn-main',
-        'crrecover:btn-quiet',
+        'cwrecover:btn-quiet',
         'crecback:btn-quiet',
         'crecgo:btn-main',
         'cresetgo:btn-main',

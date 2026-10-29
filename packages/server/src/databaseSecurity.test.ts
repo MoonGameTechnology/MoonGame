@@ -190,7 +190,7 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       // The pre-cutover match, clock, sequence and seat survive provisioning,
       // backup/restore and a fresh runtime connection; subsequent saves still work.
       const matches = new PostgresMatchStore(runtime);
-      expect(await matches.load(snapshot.matchId)).toEqual(snapshot);
+      expect(await matches.load(snapshot.matchId)).toEqual({ ...snapshot, createdAt: expect.any(Number) });
       expect(await new PostgresAccountStore(runtime).seatOf(snapshot.matchId, 'existing')).toBe('p1');
       await matches.save({ ...snapshot, seq: 18 });
       expect((await matches.load(snapshot.matchId))?.seq).toBe(18);

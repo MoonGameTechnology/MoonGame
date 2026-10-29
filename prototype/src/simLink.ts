@@ -3,24 +3,32 @@
  * приказы и собирать его разности в мир на экране.
  *
  * Мир ведёт поток; у экрана две копии. `base` — мир потока, каким его сделала последняя
- * пришедшая разность. Мир на экране — `base` плюс приказы игрока, которые поток ещё не
- * подтвердил: экран применяет приказ сам, сразу (отказ слышен в момент нажатия, флот
+ * разность, которую забрал кадр. Мир на экране — `base` плюс приказы игрока, которые поток ещё
+ * не подтвердил: экран применяет приказ сам, сразу (отказ слышен в момент нажатия, флот
  * трогается без ожидания) и отсылает его потоку. С каждой разностью неподтверждённые
  * приказы накладываются на свежий `base` заново тем же ядром, поэтому мир на экране
  * совпадает с миром потока, как только поток их применит. Приказ, который экран принял, а
  * поток отверг (мир успел измениться за шаг), возвращается отказом с опозданием.
  *
- * Чего у копии нет — памяти тумана и разведки Роя чужих мест (`screenView`). Для
- * сохранения поток раз в {@link FULL_EVERY_MS} присылает их целиком, и {@link SimLink.saved}
- * подкладывает их под мир на экране.
+ * Присланное экран забирает не в каждом кадре (правило 7 в `decisions/simClock.ts`), и мир на
+ * экране отстаёт от мира потока на шаги, которых он ещё не взял. Поэтому следующий шаг
+ * отсчитывается от {@link SimLink.time}, а не от мира на экране, а часы картинки получают
+ * время мира потока с приходом каждого шага ({@link SimLink.frame}), а не со взятием мира.
+ *
+ * Чего у копии нет — памяти тумана и разведки Роя чужих мест и мнений ботов о чужих местах
+ * (`screenView`). Для сохранения на уходе со страницы поток раз в {@link FULL_EVERY_MS}
+ * присылает их целиком, и {@link SimLink.saved} подкладывает их под мир на экране. Строку
+ * сохранения по такту собирает сам поток ({@link SimLink.save}) из своего полного мира.
  */
 import type { SimWorkerScript } from '../../decisions/simWorker';
+import type { SoloSave } from '../../decisions/soloSave';
 import type { Action, DomainEvent, GameState } from '../../packages/shared-core/src/index';
 import { applyDelta } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
+import { approvalLedger, fullApproval } from './botFavour';
 import { order } from './protoKernel';
 import type { DriverOrder } from './soloSim';
-import type { SimReply, SimRequest } from './simProtocol';
+import { screenView, type SimReply, type SimRequest } from './simProtocol';
 
 /** Как часто экран просит у потока память тумана всех мест для сохранения. */
 export const FULL_EVERY_MS = 10_000;
@@ -42,8 +50,6 @@ export interface SimSync {
   driverOrders: DriverOrder[];
   /** Приказы игрока, которые экран принял, а поток отверг. */
   refused: DriverOrder[];
-  /** Был ли среди них шаг мира (часы картинки меряют ход по шагам). */
-  stepped: boolean;
 }
 
 export interface SimLink {
@@ -51,6 +57,8 @@ export interface SimLink {
   readonly busy: boolean;
   /** Почему поток сломался; `null` — работает. */
   readonly failed: string | null;
+  /** Время мира потока после всех отосланных шагов: цель последнего из них. */
+  readonly time: number;
   step(
     target: number,
     drivers: boolean,
@@ -60,10 +68,18 @@ export interface SimLink {
   ): void;
   /** Приказ игрока, который экран уже применил к своему миру. */
   forward(action: Action): void;
+  /** Начался кадр: время мира потока после последнего шага, пришедшего с прошлого кадра, —
+   *  часам картинки; `null` — шагов не приходило. Зовётся каждый кадр, и когда мир кадр не
+   *  берёт: иначе часы картинки отсчитывали бы ход от взятия, а не от прихода. */
+  frame(): number | null;
   /** Собрать пришедшее; `null` — разностей не было. */
   take(): SimSync | null;
-  /** Мир на экране с памятью тумана всех мест — для сохранения. */
+  /** Мир на экране с тем, чего у копии нет (память тумана всех мест, весь стол симпатий), —
+   *  для сохранения и для мира, который кадр ведёт сам, когда поток сломался. */
   saved(state: GameState): GameState;
+  /** Собрать строку сохранения в потоке; `done` получит её, `null` — писать нечего. Поток
+   *  остановлен или сломался — `done` не позовут. */
+  save(host: Omit<SoloSave, 'state'>, rules: string, done: (raw: string | null) => void): void;
   stop(): void;
 }
 
@@ -101,16 +117,31 @@ export function startSimLink(
   me: string,
   modeId: string | undefined,
 ): SimLink {
-  let base = state;
+  // Копия с самого начала такая, какой её держит поток (`shown` в `simHost.ts`): его разности
+  // считаются от неё, и стол симпатий, который в первых шагах не менялся, не остался бы полным.
+  let base = screenView(state, me);
   const pending: Array<{ id: number; action: Action }> = [];
   let nextId = 1;
-  let stepsOut = 0;
+  /** Цели отосланных шагов, разность которых ещё не пришла, по порядку. */
+  const targets: number[] = [];
+  let time = state.time;
+  /** Время мира потока после последнего пришедшего шага, которого кадр ещё не видел. */
+  let arrived: number | null = null;
   let failed: string | null = null;
   let fullAt = -Infinity;
-  let extras = { fog: state.fog, swarmIntel: state.swarmIntel };
+  let extras = { fog: state.fog, swarmIntel: state.swarmIntel, approval: approvalLedger(state) };
   const inbox: SimReply[] = [];
+  const saves = new Map<number, (raw: string | null) => void>();
+  let nextSave = 1;
   port.listen((reply) => {
-    if (reply.kind === 'sync' && reply.stepped) stepsOut -= 1;
+    // Строка слота идёт в слот сразу, между кадрами, а не ждёт кадр в очереди разностей.
+    if (reply.kind === 'saved') {
+      const done = saves.get(reply.id);
+      saves.delete(reply.id);
+      done?.(reply.raw);
+      return;
+    }
+    if (reply.kind === 'sync' && reply.stepped) arrived = targets.shift() ?? arrived;
     if (reply.kind === 'fail') failed = reply.message;
     inbox.push(reply);
   });
@@ -120,13 +151,17 @@ export function startSimLink(
 
   return {
     get busy() {
-      return stepsOut > 0;
+      return targets.length > 0;
     },
     get failed() {
       return failed;
     },
+    get time() {
+      return time;
+    },
     step(target, drivers, ai, autoAssault, now) {
-      stepsOut += 1;
+      targets.push(target);
+      time = target;
       port.post({ kind: 'step', target, drivers, ai: [...ai], autoAssault: [...autoAssault] });
       if (now - fullAt >= FULL_EVERY_MS) {
         fullAt = now;
@@ -138,21 +173,25 @@ export function startSimLink(
       pending.push({ id, action });
       port.post({ kind: 'order', id, action });
     },
+    frame() {
+      const t = arrived;
+      arrived = null;
+      return t;
+    },
     take() {
       if (inbox.length === 0) return null;
       const events: DomainEvent[] = [];
       const driverOrders: DriverOrder[] = [];
       const refused: DriverOrder[] = [];
-      let stepped = false;
       let synced = false;
       for (const reply of inbox.splice(0)) {
-        if (reply.kind === 'full') extras = { fog: reply.fog, swarmIntel: reply.swarmIntel };
+        if (reply.kind === 'full')
+          extras = { fog: reply.fog, swarmIntel: reply.swarmIntel, approval: reply.approval };
         if (reply.kind !== 'sync') continue;
         synced = true;
         base = applyDelta(base, reply.delta);
         events.push(...reply.events);
         driverOrders.push(...reply.driverOrders);
-        stepped ||= reply.stepped;
         for (const outcome of reply.orders) {
           const at = pending.findIndex((p) => p.id === outcome.id);
           if (at < 0) continue;
@@ -163,13 +202,25 @@ export function startSimLink(
       if (!synced) return null;
       let shown = base;
       for (const p of pending) shown = order(shown, p.action, shown.time).state;
-      return { state: shown, events, driverOrders, refused, stepped };
+      return { state: shown, events, driverOrders, refused };
     },
-    saved: (shown) => ({
-      ...shown,
-      fog: merge(extras.fog, shown.fog),
-      swarmIntel: merge(extras.swarmIntel, shown.swarmIntel),
-    }),
-    stop: () => port.close(),
+    saved: (shown) =>
+      fullApproval(
+        {
+          ...shown,
+          fog: merge(extras.fog, shown.fog),
+          swarmIntel: merge(extras.swarmIntel, shown.swarmIntel),
+        },
+        extras.approval,
+      ),
+    save(host, rules, done) {
+      const id = nextSave++;
+      saves.set(id, done);
+      port.post({ kind: 'save', id, rules, host });
+    },
+    stop: () => {
+      saves.clear();
+      port.close();
+    },
   };
 }

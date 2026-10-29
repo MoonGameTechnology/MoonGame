@@ -104,8 +104,8 @@ function fakeWin() {
           return nodes.get(key) as never;
         });
       }
-      // Места и окна нижней панели (UIX-3.3) — тоже из разметки.
-      const bar = /data-(barslot|baritem)/.exec(sel)?.[1];
+      // Места и окна нижней панели (UIX-3.3) и единица дохода — тоже из разметки.
+      const bar = /data-(barslot|baritem|rate)/.exec(sel)?.[1];
       if (bar) {
         return [...el.innerHTML.matchAll(new RegExp(`data-${bar}="([a-z0-9]+)"`, 'g'))].map(([, id]) => {
           const key = `${bar}:${id}`;
@@ -140,6 +140,8 @@ function fakeWin() {
     /** Нажать место нижней панели или окно для него. */
     barSlot: (i: number) => nodes.get(`barslot:${i}`)?.on.click?.(),
     barItem: (id: string) => nodes.get(`baritem:${id}`)?.on.click?.(),
+    /** Нажать кнопку единицы дохода. */
+    rate: (id: string) => nodes.get(`rate:${id}`)?.on.click?.(),
     /** Нажать вкладку. Узлы строятся при отрисовке — тут их только находим. */
     tab: (id: string) => nodes.get(`tab:${id}`)?.on.click?.(),
     /** Клавиша на кнопке вкладки. */
@@ -243,13 +245,13 @@ describe('настройки — разметка', () => {
 
   const HOME: Record<string, readonly string[]> = {
     sound: ['set-snd', 'set-snd-vol'],
-    graphics: ['set-ui-scale', 'set-window-opacity', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
+    graphics: ['set-ui-scale', 'set-window-opacity', 'set-map-sharp', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
     map: ['set-sweep', 'set-ownpings', 'set-colyou', 'set-colneutral', 'set-colreset'],
     controls: [],
   };
 
   it('каждая настройка живёт ровно в одной вкладке, «Готово» — во всех', () => {
-    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9, uiScale: 1 });
+    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9, uiScale: 1, mapSharp: true });
     const all = Object.values(HOME).flat();
     for (const { id: tab } of SETTINGS_TABS) {
       const html = settingsBoxHtml(view, false, tab);
@@ -344,6 +346,16 @@ describe('настройки — разметка', () => {
     expect(html).toContain('value="#abcdef"');
   });
 
+  it('чёткая карта — только там, где экрану есть что понижать, и с её состоянием', () => {
+    expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-map-sharp"');
+    const on = settingsBoxHtml(viewOf({ mapSharp: true }), false, 'graphics');
+    const off = settingsBoxHtml(viewOf({ mapSharp: false }), false, 'graphics');
+    expect(on).toMatch(/id="set-map-sharp" type="checkbox" checked/);
+    expect(off).toContain('id="set-map-sharp" type="checkbox"');
+    expect(off).not.toMatch(/id="set-map-sharp" type="checkbox" checked/);
+    expect(on).toContain(t('settings.gfx.map-sharp.hint'));
+  });
+
   it('ползунок непрозрачности окон — только там, где есть стеклянные окна', () => {
     expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-window-opacity"');
     const html = settingsBoxHtml(viewOf({ windowOpacity: 0.9 }), false, 'graphics');
@@ -395,6 +407,18 @@ describe('настройки — окно и обработчики', () => {
       w.win.fire(`set-${id}`);
     }
     expect(w.calls.map(([k]) => k)).toEqual(['ownpings', 'glow', 'starfield', 'fps']);
+  });
+
+  it('тумблер чёткой карты зовёт свой сеттер', () => {
+    const sharp: boolean[] = [];
+    const w = wired({ setMapSharp: (v) => sharp.push(v) }, viewOf({ mapSharp: false }));
+    w.api.open();
+    w.win.tab('graphics');
+    w.win.node('set-map-sharp')!.checked = true;
+    w.win.fire('set-map-sharp');
+    expect(sharp).toEqual([true]);
+    expect(w.calls).toEqual([]);
+    expect(w.win.node('set-map-sharp-val')?.textContent).toBe(t('settings.on'));
   });
 
   it('движение можно отключить без переключения на старый интерфейс', () => {
@@ -641,6 +665,66 @@ describe('настройки — окно и обработчики', () => {
     w.api.open();
     w.win.fire('set-close', 'click');
     expect(w.win.shown()).toBe(false);
+  });
+});
+
+describe('настройки — номер партии (FRIENDS-2)', () => {
+  it('в сетевой партии во «Игре» есть номер и «Скопировать номер»', () => {
+    const html = settingsBoxHtml(viewOf({ matchId: '48219370' }), false, 'game');
+    expect(html).toContain('data-settab="game"');
+    expect(html).toContain('№ 48219370');
+    expect(html).toContain('id="set-copy-match"');
+  });
+
+  it('вне сетевой партии строки нет', () => {
+    expect(settingsBoxHtml(viewOf({ rateUnit: 'hour' }), false, 'game')).not.toContain(
+      'set-copy-match',
+    );
+  });
+});
+
+describe('настройки — доход в час или в сутки', () => {
+  it('вкладка «Игра» есть там, где есть единица дохода, и стоит перед «Уведомлениями»', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('data-settab="game"');
+    const html = settingsBoxHtml(
+      viewOf({ rateUnit: 'hour', push: { state: 'off', kinds: [], failed: false } }),
+    );
+    expect(html).toContain(`>${t('settings.tab.game')}</button>`);
+    expect(html.indexOf('data-settab="controls"')).toBeLessThan(html.indexOf('data-settab="game"'));
+    expect(html.indexOf('data-settab="game"')).toBeLessThan(html.indexOf('data-settab="push"'));
+  });
+
+  it('две кнопки — «в час» и «в сутки», выбранная подсвечена и нажата', () => {
+    const html = settingsBoxHtml(viewOf({ rateUnit: 'day' }), false, 'game');
+    expect(html).toContain(t('settings.rate'));
+    expect(html).toContain('data-rate="hour" aria-pressed="false">в час</button>');
+    expect(html).toContain('class="set-pal on" data-rate="day" aria-pressed="true">в сутки</button>');
+    // Единица живёт только во «Игре».
+    for (const { id } of SETTINGS_TABS)
+      expect(settingsBoxHtml(viewOf({ rateUnit: 'day' }), false, id)).not.toContain('data-rate=');
+  });
+
+  it('нажатая единица уходит в сеттер, окно перерисовывается и остаётся на «Игре»', () => {
+    const view = viewOf({ rateUnit: 'hour' });
+    const set: string[] = [];
+    const w = wired(
+      {
+        setRateUnit: (u) => {
+          set.push(u);
+          view.rateUnit = u;
+        },
+      },
+      view,
+    );
+    w.api.open();
+    w.win.tab('game');
+    expect(w.win.selected()).toBe('game');
+    const renders = w.win.renderCount();
+    w.win.rate('day');
+    expect(set).toEqual(['day']);
+    expect(w.win.renderCount()).toBe(renders + 1);
+    expect(w.win.selected()).toBe('game');
+    expect(w.win.html()).toContain('class="set-pal on" data-rate="day"');
   });
 });
 

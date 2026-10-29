@@ -26,7 +26,11 @@ import type {
 } from '../../packages/shared-core/src/index';
 import { isMissileFleet, isOrdnanceFleet } from '../../packages/shared-core/src/state/ordnance';
 import { t } from '../../localization/runtime';
-import { pinchAt as camPinchAt } from '../../packages/client/src/camera';
+import {
+  elasticCam as camElasticCam,
+  elasticPull as camElasticPull,
+  pinchAt as camPinchAt,
+} from '../../packages/client/src/camera';
 import {
   allyOrder,
   patrolShuttle,
@@ -135,12 +139,13 @@ import {
 } from './interaction';
 import {
   cam,
-  clampCam,
   defaultView,
+  dragBy,
+  holdCam,
   insets,
   mapBounds,
-  panBy,
   panelSlack,
+  releaseCam,
   setView,
   unworld,
   world,
@@ -903,7 +908,12 @@ export let pinchStart: { cam: typeof cam; at: ReturnType<typeof pinchOf> } | nul
 let pinchPending = false;
 function rebasePinch(): void {
   const [a, b] = [...pointers.values()];
-  pinchStart = a && b ? { cam: { ...cam }, at: pinchOf(a, b) } : null;
+  // Щипок, начатый на растянутой за край камере, ведёт её от того места, куда её тянули, —
+  // иначе упругий край сжал бы растяжку ещё раз, и карта прыгнула бы при втором пальце.
+  pinchStart =
+    a && b
+      ? { cam: camElasticPull(cam, insets(), mapBounds(), panelSlack()), at: pinchOf(a, b) }
+      : null;
   pinchPending = false;
 }
 export function flushPinch(): void {
@@ -912,7 +922,15 @@ export function flushPinch(): void {
   const [a, b] = [...pointers.values()];
   if (a && b)
     setView(
-      camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()),
+      camPinchAt(
+        pinchStart.cam,
+        pinchStart.at,
+        pinchOf(a, b),
+        insets(),
+        mapBounds(),
+        panelSlack(),
+        camElasticCam,
+      ),
     );
 }
 // Был ли в этом жесте второй палец. После щипка нельзя ни выбирать объект,
@@ -936,6 +954,7 @@ function pointerDown(ev: PointerEvent): void {
   const ME = game.me();
   const MOBILE = game.mobile();
   flushPinch();
+  holdCam(); // карта под пальцем: возврат от края встаёт, жест ведёт камеру дальше
   canvas.setPointerCapture?.(ev.pointerId);
   const p = ptXY(ev);
   pointers.set(ev.pointerId, p);
@@ -1035,8 +1054,7 @@ function pointerMove(ev: PointerEvent): void {
   } else if (intent === 'box' && dragStart) {
     selectionBox = { x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y };
   } else if (cameraFollows(intent)) {
-    panBy(p.x - prev.x, p.y - prev.y);
-    clampCam(); // keep the map from being dragged entirely off-screen
+    dragBy(p.x - prev.x, p.y - prev.y); // past the edge the map gives, not stops dead
   }
   if (marksDragged(intent, moved)) dragged = true;
 }
@@ -1071,6 +1089,7 @@ function endPointer(ev: PointerEvent) {
   }
   pointers.delete(ev.pointerId);
   rebasePinch();
+  if (!pointers.size) releaseCam(); // растянутая за край камера плывёт обратно
   cancelLongPress();
   // Созревшее удержание СЪЕДАЕТ это отпускание (правила 4–5): оно уже сделало своё дело,
   // и пропусти мы его дальше — за один жест игрок получил бы ещё и выбор/приказ.
@@ -1097,6 +1116,7 @@ function cancelPointer(ev: PointerEvent): void {
   mapHold = IDLE; // жест отменён системой — отпускания не будет, и съедать нечего
   pointers.delete(ev.pointerId);
   rebasePinch();
+  if (!pointers.size) releaseCam();
   dragged = true;
   selectionBox = null;
   boxSelecting = false;

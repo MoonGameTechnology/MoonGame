@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { stewardGuardOrders, aiOrders, order, advance, HOUR } from './game';
+import { data } from './gameData';
 import {
   createInitialState,
   type Fleet,
@@ -7,6 +8,30 @@ import {
   type Planet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
+
+it('keeps defensive orders for a bot without writing a non-delegated Steward report', () => {
+  const s = guardState({
+    fleets: [raider(inboundToH(10)), fl('F1', 'p1', { location: 'H', units: stacks([['cruiser', 1]]) })],
+    hGarrison: stacks([['militia', 4]]),
+  });
+  delete s.players.p1!.steward;
+  const orders = stewardGuardOrders(s, 'p1');
+  expect(orders.some((a) => a.type === 'army.load')).toBe(true);
+  expect(orders.some((a) => a.type === 'steward.report')).toBe(false);
+});
+
+it('does not evacuate ground troops into a shuttle-filled hold', () => {
+  const capacity = 2 * data.units.cruiser!.stats.cargoCapacity;
+  const size = data.units.landing_shuttle!.stats.cargoSize;
+  const s = guardState({
+    fleets: [raider(inboundToH(10)), fl('F1', 'p1', {
+      location: 'H', units: stacks([['cruiser', 2]]),
+      hangar: [{ id: 'sq', units: stacks([['landing_shuttle', capacity / size]]) }],
+    })],
+    hGarrison: stacks([['militia', 4]]),
+  });
+  expect(stewardGuardOrders(s, 'p1').some((a) => a.type === 'army.load')).toBe(false);
+});
 
 // Hand-built geometry (the threat.test.ts pattern): chain E—H—S, 100 units per
 // lane. p1 owns H (home) and S (the safe rear); p2 is the hostile. p1's owned

@@ -67,6 +67,15 @@ describe('время строки — по часам игрока', () => {
   });
 });
 
+describe('медали игроков в ленте', () => {
+  it('локализует награду и экранирует логин', () => {
+    const html = newsFeedHtml(paint({ view: view([{ id: 'player-medal', at: NOW, kind: 'player_medal', medalId: 'first', grade: 2, login: '<img src=x>', corp: A }]), reader: { ...guest, playerMedalNames: { first: 'Первый рубеж' } } }));
+    expect(html).toContain('&lt;img src=x&gt;');
+    expect(html).toContain('Первый рубеж');
+    expect(html).not.toContain('<img src=x>');
+  });
+});
+
 describe('разметка ленты', () => {
   it('имя корпорации — данные игрока: в разметку оно попадает экранированным', () => {
     const evil = { id: 'x', name: '<img src=x onerror=alert(1)>' };
@@ -232,6 +241,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('экран ленты', () => {
+  it('передаёт сессию для закрытых наград и забывает их при выходе даже если лента недоступна', async () => {
+    routes['GET /news'] = () => ({ status: 200, body: view([{ id: 'secret-medal', at: NOW, kind: 'player_medal', medalId: 'first', grade: 2, login: 'PrivatePilot', corp: A }]) });
+    const news = screen();
+    await news.refresh();
+    expect(calls.find((c) => c.url === `${BASE}/news`)?.authorization).toBe('Bearer tok');
+    expect(column.innerHTML).toContain('PrivatePilot');
+    signedIn = false;
+    routes['GET /news'] = () => ({ status: 503, body: {} });
+    await news.refresh();
+    expect(column.innerHTML).not.toContain('PrivatePilot');
+    expect(teaser.innerHTML).not.toContain('PrivatePilot');
+  });
   it('гость читает ленту без сессии и без запросов о членстве', async () => {
     signedIn = false;
     await screen().refresh();

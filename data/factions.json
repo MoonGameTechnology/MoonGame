@@ -29,7 +29,7 @@
         }
       ],
       "homeBuildings": [
-        "mine_t1"
+        "mine"
       ]
     },
     "passives": {
@@ -66,7 +66,7 @@
         }
       ],
       "homeBuildings": [
-        "mine_t1"
+        "mine"
       ]
     },
     "passives": {
@@ -103,7 +103,7 @@
         }
       ],
       "homeBuildings": [
-        "mine_t1"
+        "mine"
       ]
     },
     "passives": {
@@ -140,7 +140,7 @@
         }
       ],
       "homeBuildings": [
-        "mine_t1"
+        "mine"
       ]
     },
     "passives": {
@@ -178,7 +178,7 @@
         }
       ],
       "homeBuildings": [
-        "mine_t1"
+        "mine"
       ]
     },
     "passives": {
@@ -223,7 +223,7 @@
       ],
       "homeBuildings": [
         "biomass_pit",
-        "mine_t1",
+        "mine",
         "swarm_synapse",
         "swarm_hive"
       ]

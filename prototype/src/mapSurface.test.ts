@@ -72,6 +72,7 @@ function makeEnv() {
   return {
     holographic: true,
     clock: 777,
+    still: false,
     borders: { kind: 'borders' } as object | null,
     layered: false,
     geometry: { place: PLACE } as object | null,
@@ -126,6 +127,7 @@ async function boot() {
     vh: () => VH,
     dpr: () => DPR,
     clock: () => env.clock,
+    still: () => env.still,
     holographic: () => env.holographic,
   });
   const interaction = await import('./interaction');
@@ -170,6 +172,18 @@ describe('REFM-235 — поверхность карты', () => {
     expect(find('drawGlassWave')!.args[5]).toBe(false);
     expect(find('drawGlassRim')!.args[3]).toBe(false);
     expect(find('drawProvinceSelection')!.args[2]).toEqual({ ms: 0, motion: false });
+  });
+
+  it('движение выключено: стоящие волну и рамку стекла держит выпечка карты, кадр их не рисует', async () => {
+    const { surface, env, names } = await boot();
+    env.still = true;
+    surface.drawMapSurface(0, LOD());
+    expect(names()).toEqual([
+      'save', 'setTransform', 'blitBorderLayer',
+      'save', 'clipGlassSurface', 'drawLivingBorders',
+      'save', 'restore',
+      'drawCaptureFlashes', 'restore', 'restore',
+    ]);
   });
 
   it('слой границ готов — живые границы не рисуются второй раз; без границ и без геометрии — тоже', async () => {
@@ -261,7 +275,7 @@ describe('REFM-235 — стык поверхности с main.ts', () => {
 
   it('хуки — кадр, экран, плотность, часы и вид голограммы', () => {
     const init = MAIN.slice(MAIN.indexOf('initMapSurface({'), MAIN.indexOf('});', MAIN.indexOf('initMapSurface({')));
-    for (const hook of ['ctx: () => cx', 'vw: () => VW', 'vh: () => VH', 'dpr: () => DPR', 'clock: () => hologramTime', 'holographic: holographicMapOn'])
+    for (const hook of ['ctx: () => cx', 'vw: () => VW', 'vh: () => VH', 'dpr: () => DPR', 'clock: () => hologramTime', 'still: hologramStill', 'holographic: holographicMapOn'])
       expect(init, hook).toContain(hook);
   });
 

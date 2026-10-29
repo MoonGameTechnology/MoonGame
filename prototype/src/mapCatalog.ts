@@ -1,4 +1,6 @@
 import {
+  MAP_SCORE_LIMITS,
+  mapVictoryRules,
   matchMapEdges,
   parseMatchMap,
   validateMatchMap,
@@ -24,26 +26,16 @@ export type MapId = (typeof MAP_IDS)[number] | 'nexus' | 'frontier-50' | 'fronti
 export const isCurrentMap = (id: string | undefined): boolean => MAP_IDS.some((map) => map === id);
 export const isFrontier = (id: string | undefined): boolean =>
   id === 'frontier-50' || id === 'frontier-100';
-/** Порог победы по карте — ОДНА таблица. Раньше те же числа стояли двумя наборами
- *  литералов: в пресете и в `scoreLimitFor`. Их читают разные потребители (HUD берёт
- *  предел через `scoreLimitFor`, победа в матче — из пресета), так что правка одного
- *  места молча разводила полосу прогресса с настоящим порогом конца партии. */
-const SCORE_LIMITS: Record<MapId, number> = {
-  // BAL-16 (резолюция владельца 2026-10-15): порог — очки всей застроенной карты. Половина
-  // карты, взятая без боя, даёт 55–59% порога, остальное добирают выигранные бои (замер
-  // 2026-10-14: 120 партий ботов по 30 дней).
-  'duel-1': 560,
-  'ffa-4': 790,
-  'team-2v2': 2200,
-  'team-3v3': 3300,
-  // Большие FFA — та же доля очков карты, что у фронтира (~0,47 базы): одному из двадцати
-  // или пятидесяти не нужно держать полкарты, чтобы победить по очкам.
-  'ffa-20': 3800,
-  'ffa-50': 9400,
-  nexus: 1100,
-  'frontier-50': 7500,
-  'frontier-100': 15000,
-};
+/** Карты битв корпораций (CORP-5). Партию на них заводит только сервер по запертому составу,
+ *  поэтому среди карт новой партии их нет: клиенту нужны лишь их подпись и порог победы. */
+export const AVA_MAP_IDS = ['ava-duel-1', 'ava-2v2-1'] as const;
+type AvaMapId = (typeof AVA_MAP_IDS)[number];
+export const isAvaMap = (id: string | undefined): boolean => AVA_MAP_IDS.some((map) => map === id);
+/** Порог победы по карте — ОДНА таблица на все хосты, `MAP_SCORE_LIMITS` в ядре
+ *  (`mapVictory.ts`): по ней судит и канонический сервер. Раньше те же числа стояли двумя
+ *  наборами литералов, и правка одного места молча разводила полосу прогресса с настоящим
+ *  порогом конца партии. Тип требует порог у каждой карты каталога. */
+const SCORE_LIMITS: Record<MapId | AvaMapId, number> = MAP_SCORE_LIMITS;
 export interface MapPreset {
   id: MapId;
   nodes: MapNode[];
@@ -181,24 +173,16 @@ export function teamForStart(mapId: MapId, start: string): string | undefined {
 
 export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
   const id = state.mapId;
-  return (id !== undefined && SCORE_LIMITS[id as MapId]) || SCORE_LIMITS.nexus;
+  return (id !== undefined && SCORE_LIMITS[id as MapId | AvaMapId]) || SCORE_LIMITS.nexus;
 }
-/** Доля захваченных провинций, которая побеждает сразу (BAL-16, та же резолюция): 80%
- *  вместо умолчания ядра 60%, иначе на дуэли захват кончал партию на 4-й день, до боёв.
- *  Карта вне таблицы берёт умолчание режима или ядра. */
-const DOMINATION_PERCENT: Partial<Record<MapId, number>> = { 'duel-1': 0.8, 'ffa-4': 0.8 };
 /** Условия победы карты для конфига матча — один источник для локальной симуляции
- *  (`protoKernel.ctx`) и сетевого хоста (`netserver.ts`). */
+ *  (`protoKernel.ctx`) и сетевого хоста (`netserver.ts`); доля захвата у дуэли и FFA на
+ *  четверых своя (BAL-16). Карта вне таблицы играет до порога `nexus`. */
 export function victoryFor(state: Pick<GameState, 'mapId'>): {
   scoreLimit: number;
   dominationPercent?: number;
 } {
-  const domination =
-    state.mapId === undefined ? undefined : DOMINATION_PERCENT[state.mapId as MapId];
-  return {
-    scoreLimit: scoreLimitFor(state),
-    ...(domination !== undefined ? { dominationPercent: domination } : {}),
-  };
+  return mapVictoryRules(state.mapId) ?? { scoreLimit: SCORE_LIMITS.nexus };
 }
 /** Geometry comes from the authoritative snapshot, including custom scenarios. */
 export function mapNodesFromState(state: GameState): MapNode[] {

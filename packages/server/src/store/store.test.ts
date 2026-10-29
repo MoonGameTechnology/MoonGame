@@ -41,6 +41,8 @@ import {
 } from './postgres';
 import { AVA_FEED_KINDS, isAvaFeedEntry } from './types';
 import { SYSTEM_BOT_NICKNAMES } from '../botNicknames';
+import { PostgresArchiveCatalog } from '../matchArchiveCatalog';
+import { archiveMetadataOf, archiveStateBytes } from '../matchArchiveMetadata';
 import type {
   AccountStore,
   AnnouncementStore,
@@ -50,6 +52,7 @@ import type {
   DropStore,
   OwnedArsenalItem,
   UserStore,
+  AvaBattleReport,
   AvaChallenge,
   AvaChallengeStore,
   AvaFeedEntry,
@@ -95,6 +98,23 @@ function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: stri
       expect(await make().load(uniq('nope'))).toBeNull();
     });
 
+    it('retains first real finish across repeated/stale saves and catalogs only recent archives', async () => {
+      const store = make();
+      const id = uniq('archive-dates');
+      const createdAt = 1_800_000_000_000;
+      const endedAt = createdAt + 1000;
+      const s = state();
+      s.match.status = 'ended';
+      const ended: MatchSnapshot = { ...snap(id, 2, s), status: 'ended', createdAt, endedAt };
+      await store.save(ended);
+      await store.save({ ...ended, seq: 3, createdAt: createdAt + 99999, endedAt: endedAt + 99999 });
+      await store.save({ ...ended, seq: 1, createdAt: 0, endedAt: 0 });
+      expect(await store.load(id)).toMatchObject({ seq: 3, createdAt, endedAt });
+      expect(await store.endedMatchIds!(endedAt - 1)).toContain(id);
+      expect(await store.endedMatchIds!(endedAt)).not.toContain(id);
+      expect(await store.ongoingMatchIds()).not.toContain(id);
+    });
+
     it('is optimistic by seq — an older save never clobbers a newer one', async () => {
       const store = make();
       await store.save(snap(uniq('m2'), 10, withTime(state(), 1000)));
@@ -102,6 +122,27 @@ function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: stri
       const loaded = await store.load(uniq('m2'));
       expect(loaded?.seq).toBe(10);
       expect(loaded?.state.time).toBe(1000);
+    });
+
+    it('loads only recent ended worlds within the byte budget and catalogs metadata separately', async () => {
+      const store = make();
+      const id = uniq('bounded-archive');
+      const s = state();
+      s.match.status = 'ended';
+      const endedAt = 1_800_000_001_000;
+      const snapshot: MatchSnapshot = { ...snap(id, 1, s), status: 'ended', createdAt: endedAt - 1000, endedAt };
+      await store.save(snapshot);
+      const bytes = archiveStateBytes(s);
+      expect(await store.loadArchive!(id, endedAt - 1, bytes)).toMatchObject(snapshot);
+      expect(await store.loadArchive!(id, endedAt - 1, bytes - 1)).toBeNull();
+      expect(await store.loadArchive!(id, endedAt, bytes)).toBeNull();
+      const live = uniq('bounded-live');
+      await store.save(snap(live, 1, state()));
+      expect(await store.loadArchive!(live, endedAt - 1, bytes)).toBeNull();
+      expect(await store.archiveMetadata!([id, live], endedAt - 1)).toEqual([
+        { ...archiveMetadataOf(snapshot), matchId: id, createdAt: endedAt - 1000, endedAt, seated: 0 },
+      ]);
+      expect(await store.archiveMetadata!([id], endedAt)).toEqual([]);
     });
 
     it('lists ONGOING matches only (the open-matches feed read)', async () => {
@@ -415,6 +456,29 @@ function userStoreContract(name: string, make: () => UserStore, uniq: (p: string
  *  runs on the shared Postgres tables (names/accounts must not collide across tests). */
 function corpStoreContract(name: string, make: () => CorpStore, uniq: (p: string) => string): void {
   describe(`CorpStore — ${name}`, () => {
+    it('persists insignia in detail, browse and readiness; only the current head may change it', async () => {
+      const store = make(), head = uniq('identity-head'), officer = uniq('identity-officer');
+      const created = await store.createCorp(uniq('Insignia'), head, 'head', 1, 'falcon');
+      if (!created.ok) throw Error('fixture');
+      const id = created.corpId;
+      await store.addMember(id, officer, 'officer', 'officer');
+      expect(await store.setEmblem(id, officer, 'wolf', 2)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(await store.setEmblem(id, uniq('outsider'), 'wolf', 2)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(await store.getCorp(id)).toMatchObject({ emblemId: 'falcon' });
+      expect(await store.setEmblem(id, head, 'phoenix', 3)).toEqual({ ok: true });
+      expect(await store.setEmblem(id, head, 'phoenix', 4)).toEqual({ ok: true });
+      expect(await store.getCorp(id)).toMatchObject({ emblemId: 'phoenix' });
+      expect((await store.listCorps()).find(c => c.corpId === id)).toMatchObject({ emblemId: 'phoenix' });
+      await store.setCorpReady(id, 5, [2]);
+      expect((await store.listReadyCorps()).find(c => c.corpId === id)).toMatchObject({ emblemId: 'phoenix' });
+      expect((await store.auditOf(id)).filter(e => e.action === 'emblem')).toEqual([
+        expect.objectContaining({ actor: head, detail: 'phoenix', at: 3 }),
+      ]);
+      await store.swapHead(id, head, officer);
+      expect(await store.setEmblem(id, head, 'dragon', 6)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+      expect(await store.setEmblem(id, officer, 'dragon', 7)).toEqual({ ok: true });
+    });
+
     it('creates a corp with the founder as head; the name is taken case-insensitively', async () => {
       const store = make();
       const corpName = uniq('Void Miners');
@@ -560,11 +624,16 @@ function corpStoreContract(name: string, make: () => CorpStore, uniq: (p: string
       const created = await store.createCorp(uniq('Ready'), uniq('acc-rdyh'), 'head');
       if (!created.ok) throw new Error('expected ok');
       await store.addMember(created.corpId, uniq('acc-rdyp'), 'pat', 'member');
-      expect(await store.isCorpReady(created.corpId)).toBe(false);
-      await store.setCorpReady(created.corpId, 111);
-      expect(await store.isCorpReady(created.corpId)).toBe(true);
+      expect(await store.readyFormatsOf(created.corpId)).toBeNull();
+      await store.setCorpReady(created.corpId, 111, [2]);
+      expect(await store.readyFormatsOf(created.corpId)).toEqual([2]);
       const pool = (await store.listReadyCorps()).find((c) => c.corpId === created.corpId);
-      expect(pool).toMatchObject({ name: uniq('Ready'), readySince: 111 });
+      expect(pool).toMatchObject({ name: uniq('Ready'), readySince: 111, formats: [2] });
+      // CORP-7: readying again changes the formats only — the corp keeps its place in the pool.
+      await store.setCorpReady(created.corpId, 999, [2, 3, 5]);
+      expect(await store.readyFormatsOf(created.corpId)).toEqual([2, 3, 5]);
+      const again = (await store.listReadyCorps()).find((c) => c.corpId === created.corpId);
+      expect(again).toMatchObject({ readySince: 111, formats: [2, 3, 5] });
 
       await store.setPlayerReady(uniq('acc-rdyp'), created.corpId, 222);
       await store.setPlayerReady(uniq('acc-rdyh'), created.corpId, 223);
@@ -574,7 +643,7 @@ function corpStoreContract(name: string, make: () => CorpStore, uniq: (p: string
       expect(await store.readyPlayersOf(created.corpId)).toEqual([uniq('acc-rdyh')]);
       // disband clears the corp flag AND remaining consents
       await store.removeCorp(created.corpId);
-      expect(await store.isCorpReady(created.corpId)).toBe(false);
+      expect(await store.readyFormatsOf(created.corpId)).toBeNull();
       expect(await store.readyPlayersOf(created.corpId)).toHaveLength(0);
     });
   });
@@ -591,6 +660,7 @@ function challenge(
     id,
     challengerCorp: challenger,
     targetCorp: target,
+    format: 2,
     cost: 100,
     status: 'pending',
     createdAt: 0,
@@ -615,6 +685,18 @@ function avaChallengeStoreContract(
       });
       expect(await store.challengesOf(a)).toHaveLength(1);
       expect(await store.challengesOf(b)).toHaveLength(1); // visible to the target too
+    });
+
+    it('CORP-7: a challenge keeps its format', async () => {
+      const store = make();
+      const [a, b] = [uniq('c-a7'), uniq('c-b7')];
+      await store.createChallenge({
+        ...challenge(uniq('ch-5v5'), a, b, 500),
+        format: 5,
+        cost: 250,
+      });
+      expect(await store.getChallenge(uniq('ch-5v5'))).toMatchObject({ format: 5, cost: 250 });
+      expect((await store.challengesOf(b))[0]).toMatchObject({ format: 5 });
     });
 
     it('rejects a second PENDING challenge for the same pair', async () => {
@@ -746,6 +828,62 @@ function resultStoreContract(
       expect(await store.statsForCorp(a)).toEqual({ matches: 3, wins: 1 }); // 3 matches, 1 win
       expect(await store.statsForCorp(b)).toEqual({ matches: 2, wins: 1 });
       expect(await store.statsForCorp(uniq('none'))).toEqual({ matches: 0, wins: 0 });
+    });
+
+    it('keeps the battle’s format and breakdown (CORP-9)', async () => {
+      const store = make();
+      const [mu, a, b] = [uniq('f-mu'), uniq('f-a'), uniq('f-b')];
+      const report: AvaBattleReport = {
+        reason: 'domination',
+        warAt: 7,
+        provinces: 9,
+        sides: { challenger: { score: 420, provinces: 6 }, target: { score: 90, provinces: 1 } },
+        seats: [
+          { side: 'challenger', accountId: 'acc-1', login: 'one', score: 420, provinces: 6, out: false },
+          { side: 'target', accountId: null, login: null, score: 90, provinces: 1, out: true },
+        ],
+      };
+      await store.record({ matchupId: mu, challengerCorp: a, targetCorp: b, winnerCorp: a, at: 3, format: 4, report });
+      expect(await store.get(mu)).toEqual({
+        matchupId: mu,
+        challengerCorp: a,
+        targetCorp: b,
+        winnerCorp: a,
+        at: 3,
+        format: 4,
+        report: structuredClone(report),
+      });
+      report.seats[0]!.score = 0; // the stored breakdown is not the caller's object
+      expect((await store.get(mu))?.report?.seats[0]?.score).toBe(420);
+    });
+
+    it('resultsOf: a corp’s battles on either side, newest first, 2 на 2 without a format (CORP-9)', async () => {
+      const store = make();
+      const [a, b, c] = [uniq('o-a'), uniq('o-b'), uniq('o-c')];
+      await store.record({ matchupId: uniq('o1'), challengerCorp: a, targetCorp: b, winnerCorp: a, at: 1 });
+      await store.record({ matchupId: uniq('o2'), challengerCorp: c, targetCorp: a, winnerCorp: c, at: 2, format: 5 });
+      await store.record({ matchupId: uniq('o3'), challengerCorp: b, targetCorp: c, winnerCorp: b, at: 3, format: 3 });
+      expect((await store.resultsOf(a)).map((r) => [r.matchupId, r.format])).toEqual([
+        [uniq('o2'), 5],
+        [uniq('o1'), 2],
+      ]);
+      expect(await store.resultsOf(a, 1)).toHaveLength(1);
+      expect(await store.resultsOf(uniq('o-none'))).toEqual([]);
+    });
+
+    it('tallyOf: the record per rival and format (CORP-9)', async () => {
+      const store = make();
+      const [a, b, c] = [uniq('t-a'), uniq('t-b'), uniq('t-c')];
+      await store.record({ matchupId: uniq('t1'), challengerCorp: a, targetCorp: b, winnerCorp: a, at: 1, format: 2 });
+      await store.record({ matchupId: uniq('t2'), challengerCorp: b, targetCorp: a, winnerCorp: b, at: 2, format: 2 });
+      await store.record({ matchupId: uniq('t3'), challengerCorp: a, targetCorp: b, winnerCorp: null, at: 3, format: 3 });
+      await store.record({ matchupId: uniq('t4'), challengerCorp: c, targetCorp: a, winnerCorp: a, at: 4 });
+      expect(await store.tallyOf(a)).toEqual([
+        { opponent: b, format: 2, wins: 1, losses: 1, draws: 0 },
+        { opponent: b, format: 3, wins: 0, losses: 0, draws: 1 },
+        { opponent: c, format: 2, wins: 1, losses: 0, draws: 0 },
+      ]);
+      expect(await store.tallyOf(uniq('t-none'))).toEqual([]);
     });
   });
 }
@@ -959,6 +1097,17 @@ function corpRentStoreContract(
       expect(await store.activeForMatchup(mu)).toHaveLength(0);
       // the item is free again — a NEW war can rent it
       expect(await store.rent({ itemId: item, corpId: corp, matchupId: uniq('mu2'), accountId: acc, rentedAt: 2 })).toBe(true);
+    });
+
+    it('pendingMatchups lists each matchup holding a rental once, until it is returned', async () => {
+      const store = make();
+      const [itemA, itemB, corp, mu, acc] = [uniq('it-p1'), uniq('it-p2'), uniq('corp'), uniq('mu-p'), uniq('acc')];
+      await store.rent({ itemId: itemA, corpId: corp, matchupId: mu, accountId: acc, rentedAt: 1 });
+      await store.rent({ itemId: itemB, corpId: corp, matchupId: mu, accountId: acc, rentedAt: 1 });
+      expect((await store.pendingMatchups()).filter((id) => id === mu)).toEqual([mu]);
+      await store.closeRent(mu, itemA);
+      await store.closeRent(mu, itemB);
+      expect(await store.pendingMatchups()).not.toContain(mu);
     });
   });
 }
@@ -1242,6 +1391,47 @@ describe.skipIf(!DB)('Postgres adapters', () => {
     await pool.end();
   });
 
+  it('backfills legacy finish once from original creation and scaled game duration, preserving the frozen state', async () => {
+    const store = new PostgresMatchStore(pool);
+    const id = `legacy-archive-${process.pid}-${Date.now()}`;
+    const createdAt = 1_790_000_000_000;
+    const s = state();
+    s.startedAt = 0;
+    s.time = 2000; // Old snapshots could keep ticking after their actual finish.
+    s.match.status = 'ended';
+    s.match.endedAt = 1000;
+    await store.save({ ...snap(id, 1, s), status: 'ended', createdAt,
+      clock: { gameTime: 2000, wallTime: createdAt + 90000, timeScale: 2, running: false } });
+    await pool.query(`UPDATE matches SET ended_at = NULL, archive_meta = NULL, archive_state_bytes = NULL, updated_at = $2 WHERE id = $1`, [id, new Date(createdAt + 90000)]);
+    await migrate(pool);
+    expect(await store.load(id)).toMatchObject({ state: s, createdAt, endedAt: createdAt + 500 });
+    expect(await store.archiveMetadata([id], createdAt)).toMatchObject([
+      { matchId: id, createdAt, endedAt: createdAt + 500, gameTime: 2000, timeScale: 2 },
+    ]);
+    expect(await store.loadArchive(id, createdAt, 2 * 1024 * 1024)).toMatchObject({ state: s });
+    expect(await store.loadArchive(id, createdAt, 1)).toBeNull();
+    await pool.query(`UPDATE matches SET updated_at = now() WHERE id = $1`, [id]);
+    await migrate(pool);
+    expect(await store.load(id)).toMatchObject({ state: s, createdAt, endedAt: createdAt + 500 });
+  });
+
+  it('joins archive ownership in PostgreSQL and excludes expired or foreign worlds', async () => {
+    const store = new PostgresMatchStore(pool);
+    const accounts = new PostgresAccountStore(pool);
+    const catalog = new PostgresArchiveCatalog(pool);
+    const tag = `archive-owner-${process.pid}-${Date.now()}`;
+    const endedAt = 1_800_000_001_000;
+    const s = state(); s.match.status = 'ended';
+    for (const suffix of ['mine', 'foreign', 'expired']) {
+      const id = `${tag}-${suffix}`;
+      await store.save({ ...snap(id, 1, s), status: 'ended', createdAt: endedAt - 2000,
+        endedAt: suffix === 'expired' ? endedAt - 1000 : endedAt });
+      await accounts.resolveSeat(id, suffix === 'foreign' ? `${tag}-other` : tag, ['p1']);
+    }
+    expect((await catalog.list(tag, endedAt - 1)).map((row) => row.matchId)).toEqual([`${tag}-mine`]);
+    expect(await catalog.list(`${tag}' OR true --`, endedAt - 1)).toEqual([]);
+  });
+
   // The corp contract from above, against the real tables. The stamp keeps names and
   // account ids unique across runs (shared tables) while STABLE within one run — the
   // contract asks for the same key several times and must get the same id back.
@@ -1287,5 +1477,56 @@ describe.skipIf(!DB)('Postgres adapters', () => {
   it('migrates idempotently', async () => {
     await migrate(pool);
     await migrate(pool); // twice → no error (IF NOT EXISTS)
+  });
+
+  it('CORP-7: a challenge and a ready corp from before the formats read as 2 на 2', async () => {
+    const id = `legacy_${stamp}`;
+    // Rows written by the pre-CORP-7 INSERTs, without the columns the formats added.
+    await pool.query(
+      `INSERT INTO ava_challenges (id, challenger_corp, target_corp, cost, status, created_at, expires_at)
+       VALUES ($1, $2, $3, 100, 'declined', 0, 0)`,
+      [id, `${id}_a`, `${id}_b`],
+    );
+    await pool.query(`INSERT INTO corp_ready (corp_id, since) VALUES ($1, 0)`, [`${id}_a`]);
+    try {
+      expect((await new PostgresAvaChallengeStore(pool).getChallenge(id))?.format).toBe(2);
+      expect(await new PostgresCorpStore(pool).readyFormatsOf(`${id}_a`)).toEqual([2]);
+    } finally {
+      await pool.query(`DELETE FROM ava_challenges WHERE id = $1`, [id]);
+      await pool.query(`DELETE FROM corp_ready WHERE corp_id = $1`, [`${id}_a`]);
+    }
+  });
+
+  it('CORP-9: a result from before the breakdowns takes its challenge’s format', async () => {
+    const id = `legacy9_${stamp}`;
+    const [a, b] = [`${id}_a`, `${id}_b`];
+    await pool.query(
+      `INSERT INTO ava_challenges (id, challenger_corp, target_corp, format, cost, status, created_at, expires_at)
+       VALUES ($1, $2, $3, 4, 200, 'ended', 0, 0)`,
+      [id, a, b],
+    );
+    // Written by the pre-CORP-9 INSERT: no format, no breakdown.
+    await pool.query(
+      `INSERT INTO ava_results (matchup_id, challenger_corp, target_corp, winner_corp, at)
+       VALUES ($1, $2, $3, $2, 0)`,
+      [id, a, b],
+    );
+    try {
+      const store = new PostgresAvaResultStore(pool);
+      expect((await store.get(id))?.format).toBeUndefined();
+      await migrate(pool);
+      expect(await store.get(id)).toEqual({
+        matchupId: id,
+        challengerCorp: a,
+        targetCorp: b,
+        winnerCorp: a,
+        at: 0,
+        format: 4,
+      });
+      expect(await store.tallyOf(a)).toEqual([{ opponent: b, format: 4, wins: 1, losses: 0, draws: 0 }]);
+    } finally {
+      await pool.query(`DELETE FROM ava_results WHERE matchup_id = $1`, [id]);
+      await pool.query(`DELETE FROM ava_challenges WHERE id = $1`, [id]);
+    }
   });
 });

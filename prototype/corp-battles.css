@@ -1,0 +1,44 @@
+/* The corporation hub's existing surfaces, type scale and action buttons. */
+.cb-battles,.cb-battle-body,.cb-battle-group{display:flex;flex-direction:column;gap:14px;min-width:0;}
+.cb-battle-tabs{display:flex;gap:4px;padding:4px;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);}
+.cb-battle-tabs button{display:flex;align-items:center;justify-content:center;gap:6px;flex:1 0 auto;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--sf-dim);font:600 var(--fs-caption) var(--sf-font);white-space:nowrap;}
+.cb-battle-tabs button.on{border-color:var(--sf-edge-hi);color:var(--cyan);background:var(--sf-card);}
+.cb-battle-tabs small{font-size:var(--fs-caption);color:var(--sf-hi);}
+.cb-battle-body .cb-card h3,.cb-battle-group>h3{margin:0;color:var(--sf-hi);font-size:var(--fs-heading);font-weight:600;}
+.cb-battle-card>header,.cb-battle-identity{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;}
+.cb-battle-identity{justify-content:flex-start;}
+.cb-battle-card>header h3,.cb-battle-card>header h4{margin:0;min-width:0;overflow-wrap:anywhere;color:var(--sf-hi);}
+.cb-battle-card>header>b{flex:none;color:var(--cyan);font-size:var(--fs-caption);}
+.cb-battle-hint{margin:0;color:var(--sf-dim);font-size:var(--fs-caption);line-height:1.5;overflow-wrap:anywhere;}
+.cb-battle-tag{display:inline-flex;align-items:center;flex:none;max-width:100%;padding:4px 8px;border:1px solid var(--sf-edge);border-radius:7px;color:var(--sf-dim);font-size:var(--fs-caption);}
+.cb-battle-tag.war,.cb-battle-tag.loss{color:var(--red);border-color:var(--red);}
+.cb-battle-tag.peace,.cb-battle-tag.win{color:var(--cyan);border-color:var(--sf-edge-hi);}
+.cb-battle-tag.roster{color:var(--amber);}
+.cb-battle-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.cb-battle-stats.four{grid-template-columns:repeat(4,minmax(0,1fr));}
+.cb-battle-stat{display:flex;flex-direction:column;gap:5px;min-width:0;padding:14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);}
+.cb-battle-stat b{font-size:var(--fs-heading);color:var(--sf-hi);overflow-wrap:anywhere;}
+.cb-battle-stat span{font-size:var(--fs-caption);color:var(--sf-dim);}
+.cb-battle-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.cb-battle-actions small{font-size:var(--fs-caption);color:var(--sf-dim);}
+.cb-battle-body .btn-second,.cb-battle-roster .btn-second{min-height:44px;padding:8px 14px;white-space:normal;}
+.cb-battle-filter{display:flex;flex-wrap:wrap;gap:6px;}
+.cb-battle-filter button{min-height:44px;min-width:44px;padding:8px 12px;border:1px solid var(--sf-edge);border-radius:9px;background:var(--sf-inset);color:var(--sf-dim);font:600 var(--fs-caption) var(--sf-font);}
+.cb-battle-filter button.on{color:var(--cyan);border-color:var(--sf-edge-hi);background:var(--sf-card);}
+.cb-battle-formats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.cb-battle-formats button{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:44px;min-width:0;padding:12px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);color:var(--sf-dim);text-align:left;font-family:var(--sf-font);}
+.cb-battle-formats button[aria-pressed="true"]{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--sf-edge-hi);}
+.cb-battle-formats b{font-size:var(--fs-heading);color:var(--sf-hi);}
+.cb-battle-formats :is(span,small){font-size:var(--fs-caption);line-height:1.4;overflow-wrap:anywhere;}
+.cb-battle-formats button:disabled{opacity:.55;}
+.cb-battle-roster h4{margin:0;color:var(--sf-hi);font-size:var(--fs-caption);}
+.cb-battle-roster h4>span,.cb-battle-group>h3>span{color:var(--sf-dim);font-size:var(--fs-caption);}
+.cb-battle-roster ul{list-style:none;margin:6px 0 0;padding:0;}
+.cb-battle-roster li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--sf-edge);font-size:var(--fs-caption);color:var(--sf-hi);}
+.cb-battle-roster li:last-child{border-bottom:0;}
+.cb-battle-roster li>span:first-child,.cb-battle-roster li>div{min-width:0;overflow-wrap:anywhere;}
+.cb-battle-roster li>div small{display:block;margin-top:3px;font-size:var(--fs-caption);color:var(--sf-dim);}
+.cb-battle-best{margin:0;padding-left:24px;}
+.cb-battle-best li{padding:6px 0;color:var(--sf-hi);overflow-wrap:anywhere;}
+.cb-battle-best span{display:block;margin-top:4px;color:var(--sf-dim);font-size:var(--fs-caption);}
+@media(max-width:599px){.cb-battle-stats.four{grid-template-columns:repeat(2,minmax(0,1fr));}.cb-battle-formats{grid-template-columns:repeat(2,minmax(0,1fr));}.cb-battle-card>header{flex-wrap:wrap;}}

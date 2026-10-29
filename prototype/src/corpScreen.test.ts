@@ -5,17 +5,14 @@ import {
   CORP_TABS,
   CORP_AUDIT_RU,
   CORP_ROLE_DOT,
-  SHOWCASE_SLOTS,
   corpBattles,
   corpRoleLabel,
   hqTile,
   initCorp,
   medalGalleryHtml,
-  readShowcase,
-  showcaseHtml,
-  writeShowcase,
   type CorpHost,
 } from './corpScreen';
+import type { CorpBattlesView } from '../../packages/protocol/src/corpBattles';
 import type { AvaFeedEntry, CorpRole, MedalDef } from './corp';
 import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruction';
 
@@ -212,23 +209,6 @@ describe('корпорации — витрина наград', () => {
     { id: 'champ', name: 'Чемпион', description: 'пять побед' },
   ];
 
-  it('пустое/битое хранилище читается как пустые слоты, а не падает', () => {
-    expect(readShowcase(null)).toEqual(['', '', '']);
-    expect(readShowcase('first')).toEqual(['first', '', '']);
-    expect(readShowcase(readShowcase(null).join(','))).toHaveLength(SHOWCASE_SLOTS);
-  });
-
-  it('запись и чтение — обратимы', () => {
-    expect(readShowcase(writeShowcase(['a', 'b', 'c']))).toEqual(['a', 'b', 'c']);
-  });
-
-  it('в слоте показывается только ЗАРАБОТАННАЯ награда — протухший выбор гаснет', () => {
-    const html = showcaseHtml(['first', 'champ', ''], defs, ['first']);
-    expect(html).toContain('Первая кровь');
-    expect(html).not.toContain('Чемпион'); // не получена — слот пуст, а не «есть»
-    expect((html.match(/data-corpcup=/g) ?? []).length).toBe(SHOWCASE_SLOTS);
-  });
-
   it('в общей витрине неполученные видны, но не выбираются', () => {
     const html = medalGalleryHtml(defs, ['first']);
     expect(html).toContain('data-corppick="first"');
@@ -292,17 +272,14 @@ describe('корпорации — кабинет', () => {
     expect(body.html()).not.toBe(before);
   });
 
-  it('Back закрывает СНАЧАЛА витрину и только потом кабинет', () => {
-    const { api, root, shown } = wire();
+  it('Back закрывает кабинет: витрина встроена в карточку здания', () => {
+    const { api, shown } = wire();
     api.open();
-    root.fire({ closest: (s: string) => (s === '[data-corpcup]' ? { dataset: { corpcup: '1' } } : null) });
-    api.close();
-    expect(shown()).toBe('flex'); // ушла витрина — из корпорации игрока не выбросило
     api.close();
     expect(shown()).toBe('none');
   });
 
-  it('крестик закрывает кабинет целиком, даже из открытой витрины', () => {
+  it('крестик закрывает кабинет целиком', () => {
     const { api, root, shown } = wire();
     api.open();
     root.fire({ closest: (s: string) => (s === '[data-corpcup]' ? { dataset: { corpcup: '0' } } : null) });
@@ -383,6 +360,8 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
       '/corps/c1/infrastructure': built.infrastructure,
       '/corps/c1/audit': { audit: [] },
       '/leaderboard': { corps: { me: { rank: 3 } } },
+      '/meta-economy/corp-materials': { corp: { corpId: 'c1', pending: false, history: [], materials: ['construction_blocks', 'engineering_kits', 'command_cores'].map((id) => ({ id, nameKey: 'meta.material.' + id, personal: 10, available: 500, reserved: 0 })) } },
+      '/meta-economy/corp-style': { corp: { head: true, active: 'standard', backdrop: 'orbit', owned: ['high_tech'] } },
     };
   }
 
@@ -392,6 +371,25 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     const names = Object.keys(attrs).map((k) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}]`);
     return { closest: (sel: string) => (names.includes(sel) ? button : null) };
   }
+
+  it('uses the server treasury and selected price when a challenge is underfunded', async () => {
+    server({ ...headCorp(),
+      '/corps/me': { corp: CORP, membership: HEAD, features: { ava: true, medals: false } },
+      '/ava/battles': { corpId: 'c1', ready: { corp: true, formats: [3], player: false, players: [] }, challenges: [], results: [], tally: [], names: {} },
+      '/ava/pool': { pool: [] },
+    });
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => url.endsWith('/ava/challenge')
+      ? Promise.resolve(new Response(JSON.stringify({ error: 'E_INSUFFICIENT', requiredInfluence: 150, influence: 82 }), { status: 402 }))
+      : inner(url, init));
+    const { api, hubRoot, hubNotes } = wire(session);
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corpact: 'ava-challenge', corparg: 'c2', corpformat: '3' }));
+    await tick();
+    expect(hubNotes).toContain('✖ ' + t('corp.combat.insufficient', { required: 150, available: 82 }));
+    expect(hubNotes.join(' ')).not.toContain('текст:E_INSUFFICIENT');
+  });
 
   it('без входа: сначала загрузка, потом приглашение — и в сеть вкладка не ходит', async () => {
     const fetchSpy = vi.fn();
@@ -511,4 +509,152 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     expect(api.hubSheetOpen()).toBe(false);
     expect(hubSheet.open()).toBe(false);
   });
+
+  it('стиль базы (CORP-14): плашка в шапке открывает шторку, глава применяет купленный', async () => {
+    const calls = server({ ...headCorp(), 'POST /meta-economy/corp-style/apply': { ok: true } });
+    const sent: unknown[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: { method?: string; body?: string }) => {
+      if (init?.body) sent.push(JSON.parse(init.body));
+      return inner(url, init);
+    });
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    expect(hubRoot.html()).toContain(t('corp.style.current', { name: t('corp.style.standard') }));
+    hubRoot.fire(press({ corphub: 'style' }));
+    expect(api.hubSheetOpen()).toBe(true);
+    expect(hubSheet.html()).toContain('data-corpstyle="high_tech"');
+    hubSheet.fire(press({ corpstyle: 'high_tech' }));
+    await tick();
+    expect(calls).toContain('POST /meta-economy/corp-style/apply');
+    expect(sent).toEqual([{ requestId: expect.any(String), styleId: 'high_tech' }]);
+  });
+
+  it('стиль базы (CORP-14): некупленный ведёт в магазин, на этот стиль', async () => {
+    server(headCorp());
+    const hubRoot = fakeHubEl();
+    const hubSheet = fakeHubEl();
+    const shop: string[] = [];
+    const { api } = wire({
+      ...session,
+      hub: {
+        root: () => hubRoot,
+        sheet: () => hubSheet,
+        note: () => undefined,
+        canSignIn: () => false,
+        signIn: () => undefined,
+        openShop: (style) => shop.push(style),
+      },
+    });
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corphub: 'style' }));
+    expect(hubSheet.html()).toContain('data-corpshop="imperial_gothic"');
+    hubSheet.fire(press({ corpshop: 'imperial_gothic' }));
+    expect(shop).toEqual(['imperial_gothic']);
+  });
+  it('a delayed old refresh cannot restore the old ready formats after saving', async () => {
+    const battles: CorpBattlesView = { corpId: 'c1', ready: { corp: true, formats: [2], player: false, players: [] }, challenges: [], results: [], tally: [], names: {} };
+    const routes = { ...headCorp(), '/corps/me': { corp: CORP, membership: HEAD, features: { ava: true, medals: false } }, '/ava/battles': battles, '/ava/pool': { pool: [] }, 'POST /ava/ready/corp': { ok: true } };
+    server(routes);
+    const inner = globalThis.fetch;
+    let delay = false;
+    let release: (() => void) | undefined;
+    const sent: unknown[] = [];
+    vi.stubGlobal('fetch', (url: string, init?: { method?: string; body?: string }) => {
+      if (url.endsWith('/ava/battles') && delay) {
+        delay = false;
+        const old = JSON.stringify(battles);
+        return new Promise<Response>((resolve) => { release = () => resolve(new Response(old)); });
+      }
+      if (url.endsWith('/ava/ready/corp') && init?.method === 'POST') {
+        sent.push(JSON.parse(init.body ?? '{}'));
+        battles.ready.formats = [3];
+      }
+      return inner(url, init);
+    });
+    const { api, hubRoot } = wire(session);
+    api.showHub();
+    await tick();
+    api.showSection('battles');
+    hubRoot.fire(press({ battletab: 'ready' }));
+    hubRoot.fire(press({ battleReadyFormat: '2' }));
+    hubRoot.fire(press({ battleReadyFormat: '3' }));
+    delay = true;
+    hubRoot.fire(press({ corphub: 'refresh' }));
+    await tick();
+    expect(release).toBeDefined();
+    hubRoot.fire(press({ corpact: 'ava-ready-save' }));
+    release!();
+    await tick();
+    expect(hubRoot.html()).toContain('data-battle-ready-format="3" aria-pressed="true"');
+    expect(hubRoot.html()).toContain('data-battle-ready-format="2" aria-pressed="false"');
+    hubRoot.fire(press({ corpact: 'ava-ready-save' }));
+    await tick();
+    expect(sent).toEqual([{ formats: [3] }, { formats: [3] }]);
+  });
+
+  it('warehouse battle labels use the server name even when the rival left the ready pool', async () => {
+    const corp = { ...CORP, warehouseItems: 2 };
+    const matchup = { id: 'war', challengerCorp: 'c1', targetCorp: 'private-corp-id', format: 2, cost: 100, status: 'accepted', createdAt: 1, expiresAt: 9999999999999, pauseEndsAt: 9999999999999 };
+    server({ ...headCorp(),
+      '/corps/me': { corp, membership: HEAD, features: { ava: true, medals: false } },
+      '/corps/c1': { corp, members: [HEAD] },
+      '/ava/battles': { corpId: 'c1', ready: { corp: false, formats: [], player: false, players: [] }, challenges: [matchup], results: [], tally: [], names: { 'private-corp-id': 'Орден Ориона' } },
+      '/ava/pool': { pool: [] },
+      '/ava/matchup/war': { matchupId: 'war', side: 'challenger', status: 'accepted', mine: [], counts: { challenger: 0, target: 0 } },
+      '/corp-arsenal/c1?matchupId=war': { capacity: 2, used: 0, canLend: true, fighters: [], items: [] },
+    });
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    hubRoot.fire(press({ corpbld: 'warehouse' }));
+    expect(hubSheet.html()).toContain('Орден Ориона');
+    expect(hubSheet.html()).not.toContain('private-corp-id');
+  });
+
+  it('CORP-10: reads private battles, sends selected formats, and opens the report sheet', async () => {
+    const battles: CorpBattlesView = { corpId: 'c1', ready: { corp: false, formats: [], player: false, players: [] },
+      challenges: [], results: [{ matchupId: 'ended', challengerCorp: 'c1', targetCorp: 'c2', winnerCorp: 'c1', at: 1, format: 2, side: 'challenger',
+        report: { reason: 'score', provinces: 10, sides: { challenger: { score: 100, provinces: 6 }, target: { score: 20, provinces: 4 } }, seats: [] } }],
+      tally: [], names: { c2: 'Вторая корпорация' } };
+    const routes = { ...headCorp(), '/corps/me': { corp: CORP, membership: HEAD, features: { ava: true, medals: false } }, '/ava/battles': battles, '/ava/pool': { pool: [] }, 'POST /ava/ready/corp': { ok: true } };
+    const calls = server(routes);
+    const sent: unknown[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: { method?: string; body?: string }) => {
+      if (url.endsWith('/ava/ready/corp') && init?.method === 'POST') {
+        sent.push(JSON.parse(init.body ?? '{}'));
+        battles.ready.corp = true;
+        battles.ready.formats = [3];
+      }
+      return inner(url, init);
+    });
+    const { api, hubRoot, hubSheet } = wire(session);
+    api.showHub();
+    await tick();
+    api.showSection('battles');
+    expect(calls).toContain('GET /ava/battles');
+    expect(calls).not.toContain('GET /ava/feed?limit=40');
+    hubRoot.fire(press({ battletab: 'ready' }));
+    hubRoot.fire(press({ battleReadyFormat: '3' }));
+    hubRoot.fire(press({ corpact: 'ava-ready-save' }));
+    await tick();
+    expect(sent).toEqual([{ formats: [3] }]);
+    expect(hubRoot.html()).toContain('data-battle-ready-format="3" aria-pressed="true"');
+    hubRoot.fire(press({ battletab: 'history' }));
+    hubRoot.fire(press({ battleReport: 'ended' }));
+    expect(api.hubSheetOpen()).toBe(true);
+    expect(hubSheet.html()).toContain(t('corp.combat.report'));
+    expect(hubSheet.html()).toContain('Вторая корпорация');
+    api.closeHubSheet();
+    expect(hubRoot.html()).toContain('data-battletab="history" aria-selected="true"');
+    delete (routes as Record<string, unknown>)['/ava/battles'];
+    hubRoot.fire(press({ corphub: 'refresh' }));
+    await tick();
+    expect(hubRoot.html()).toContain(t('corp.combat.unavailable'));
+    expect(hubRoot.html()).not.toContain('data-battle-report=');
+  });
+
 });

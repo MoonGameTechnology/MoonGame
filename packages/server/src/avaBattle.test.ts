@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { getStance, type Action } from '@void/shared-core';
+import { getStance, mapVictoryRules, type Action } from '@void/shared-core';
 import { AvaOrchestrator } from './avaOrchestrator';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
-import { createStores } from './persistence';
+import type { RoomPeer } from './matchRoom';
+import { createStores, snapshotOf } from './persistence';
 import type { LoadedMatch } from './roomRegistry';
-import { loadAvaMaps, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
-import { createAvaRoom, createMatchLoader, declareAvaWar } from './serverWiring';
+import { createDevMatch, loadAvaMaps, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
+import {
+  createAvaRoom,
+  createMatchLoader,
+  declareAvaWar,
+  type MatchExtras,
+} from './serverWiring';
+import { MemoryArsenalStore, MemoryMatchStore, MemoryReceiptStore } from './store';
 
 // CORP-4 — one corporation battle from the lock to the settlement, on the host's own
 // composition: the roster sweep locks the matchup, the orchestrator raises the session
@@ -17,10 +24,12 @@ import { createAvaRoom, createMatchLoader, declareAvaWar } from './serverWiring'
 // on its first tick, and the victory counted every seat for itself.
 
 const data = loadShippedData();
+const avaMaps = loadAvaMaps(data);
 const DAY = 24 * 60 * 60 * 1000;
 const A_HEAD: CorpActor = { accountId: 'a-head', login: 'ahead' };
 const A_MEMBER: CorpActor = { accountId: 'a-mem', login: 'amember' };
 const B_HEAD: CorpActor = { accountId: 'b-head', login: 'bhead' };
+const B_MEMBER: CorpActor = { accountId: 'b-mem', login: 'bmember' };
 
 function move(playerId: string, fleetId: string, to: string): Action {
   return {
@@ -47,20 +56,22 @@ describe('AvA battle end to end (CORP-4)', () => {
       now,
     });
 
-    // Corp A (head + member) challenges corp B (head alone): two seats a side, so B's
-    // spare seat goes to a bot.
+    // Corp A (head + member) challenges corp B (head + member) to a 2-on-2, the format
+    // both play without buildings (CORP-7). B's member never gives an order.
     const a = await corp.create(A_HEAD, 'Alliance A');
     const b = await corp.create(B_HEAD, 'Alliance B');
     if (!a.ok || !b.ok) throw new Error('fixture: create failed');
     await corp.apply(A_MEMBER, a.corpId);
     await corp.accept(A_HEAD, a.corpId, A_MEMBER.accountId);
+    await corp.apply(B_MEMBER, b.corpId);
+    await corp.accept(B_HEAD, b.corpId, B_MEMBER.accountId);
     await stores.corpStore.addInfluence(a.corpId, 500);
     await ava.setCorpReady(A_HEAD);
     await ava.setCorpReady(B_HEAD);
     const ch = await ava.challenge(A_HEAD, b.corpId);
     if (!ch.ok) throw new Error('fixture: challenge failed');
     expect((await ava.accept(B_HEAD, ch.id)).ok).toBe(true);
-    for (const who of [A_HEAD, A_MEMBER, B_HEAD]) {
+    for (const who of [A_HEAD, A_MEMBER, B_HEAD, B_MEMBER]) {
       expect((await ava.join(who, ch.id)).ok).toBe(true);
     }
     wall += DAY; // the roster window closes
@@ -73,7 +84,9 @@ describe('AvA battle end to end (CORP-4)', () => {
       rosterStore: stores.rosterStore,
       sessionStore: stores.sessionStore,
       data,
-      maps: loadAvaMaps(),
+      // The chain, not the map, is under test: the small authored 2 на 2 the catalog no
+      // longer plays keeps the orders below short (CORP-8 plays 2 на 2 on `team-2v2`).
+      maps: avaMaps.retired,
       manifest: MODULE_MANIFEST_VERSION,
       createRoom: createAvaRoom({ stores, data, now }),
       cancel: (matchupId) => ava.cancelLocked(matchupId),
@@ -87,7 +100,12 @@ describe('AvA battle end to end (CORP-4)', () => {
     expect(await orch.sweep()).toEqual({ raised: 1, cancelled: 0 });
     const session = await stores.sessionStore.byMatchup(ch.id);
     expect(session?.mapId).toBe('ava-2v2-1');
-    expect(session?.seats).toEqual({ 'a-head': 'slot_a1', 'a-mem': 'slot_a2', 'b-head': 'slot_b1' });
+    expect(session?.seats).toEqual({
+      'a-head': 'slot_a1',
+      'a-mem': 'slot_a2',
+      'b-head': 'slot_b1',
+      'b-mem': 'slot_b2',
+    });
     const matchId = session!.matchId;
 
     // The loader raises the battle under fixed sides, on its own world clock: the world
@@ -102,7 +120,7 @@ describe('AvA battle end to end (CORP-4)', () => {
     const teams = Object.fromEntries(
       Object.entries(room.state.players).map(([id, p]) => [id, p.team]),
     );
-    expect(teams).toEqual({ slot_a1: 'A', slot_a2: 'A', slot_b1: 'B', 'bot:slot_b2': 'B' });
+    expect(teams).toEqual({ slot_a1: 'A', slot_a2: 'A', slot_b1: 'B', slot_b2: 'B' });
 
     // Orders during the peace: each human takes a free province.
     for (const [playerId, fleetId, to] of [
@@ -134,9 +152,9 @@ describe('AvA battle end to end (CORP-4)', () => {
     // The peace lapses: the war sweep opens the war between the two sides only.
     expect(await orch.sweepWar()).toEqual({ declared: 1 });
     expect(getStance(room.state, 'slot_a1', 'slot_b1')).toBe('war');
-    expect(getStance(room.state, 'slot_a2', 'bot:slot_b2')).toBe('war');
+    expect(getStance(room.state, 'slot_a2', 'slot_b2')).toBe('war');
     expect(getStance(room.state, 'slot_a1', 'slot_a2')).toBe('alliance');
-    expect(getStance(room.state, 'slot_b1', 'bot:slot_b2')).toBe('alliance');
+    expect(getStance(room.state, 'slot_b1', 'slot_b2')).toBe('alliance');
 
     // The session cap (100 world days) ends the battle by score. The best seat of each
     // side ties, so per-seat rules would call a draw; the side sum decides.
@@ -152,7 +170,7 @@ describe('AvA battle end to end (CORP-4)', () => {
     const total = (id: string): number => match.scores[id]?.total ?? 0;
     expect(total('slot_a1')).toBe(total('slot_b1'));
     expect(total('slot_a1') + total('slot_a2')).toBeGreaterThan(
-      total('slot_b1') + total('bot:slot_b2'),
+      total('slot_b1') + total('slot_b2'),
     );
     expect(match.winners).toEqual(['slot_a1', 'slot_a2']);
 
@@ -165,5 +183,137 @@ describe('AvA battle end to end (CORP-4)', () => {
     expect((await stores.resultStore.get(ch.id))?.winnerCorp).toBe(a.corpId);
     // 500 − 100 for the challenge + 150 for the win
     expect((await stores.corpStore.getCorp(a.corpId))?.influence).toBe(550);
+  });
+});
+
+// CORP-8 — a battle larger than 3 на 3 is played on the 20-start map cut in two; the host
+// loads it like any battle, under the format's fixed sides.
+describe('AvA battle on the 20-start map (CORP-8)', () => {
+  it('raises a 4 на 4 and loads it with its sides, the starts out of play neutral', async () => {
+    const wall = Date.UTC(2026, 9, 28);
+    const now = (): number => wall;
+    const stores = await createStores({});
+    await stores.challengeStore.createChallenge({
+      id: 'mu-4v4',
+      challengerCorp: 'cA',
+      targetCorp: 'cB',
+      format: 4,
+      cost: 200,
+      status: 'pending',
+      createdAt: 1,
+      expiresAt: 10,
+    });
+    await stores.challengeStore.closeChallenge('mu-4v4', 'accepted');
+    await stores.challengeStore.closeMatchup('mu-4v4', 'locked');
+    for (const [accountId, side] of [
+      ['a1', 'challenger'],
+      ['a2', 'challenger'],
+      ['a3', 'challenger'],
+      ['b1', 'target'],
+      ['b2', 'target'],
+      ['b3', 'target'],
+    ] as const) {
+      await stores.rosterStore.addEntry({ matchupId: 'mu-4v4', accountId, side, source: 'self', at: 1 }, 4);
+    }
+    const orch = new AvaOrchestrator({
+      challengeStore: stores.challengeStore,
+      rosterStore: stores.rosterStore,
+      sessionStore: stores.sessionStore,
+      data,
+      maps: avaMaps.pool,
+      retiredMaps: avaMaps.retired,
+      manifest: MODULE_MANIFEST_VERSION,
+      createRoom: createAvaRoom({ stores, data, now }),
+      now,
+    });
+    expect(await orch.sweep()).toEqual({ raised: 1, cancelled: 0 });
+    const session = await stores.sessionStore.byMatchup('mu-4v4');
+    expect(session?.mapId).toBe('ffa-20');
+
+    const live = await createMatchLoader({ stores, data, now })(session!.matchId);
+    const room = live!.room;
+    room.tick();
+    expect(room.modeId).toBe('team_4v4');
+    // Judged by the map's threshold, the one the players' host and the HUD use, not the core's.
+    expect(room.victoryRules.scoreLimit).toBe(mapVictoryRules('ffa-20')?.scoreLimit);
+    expect(room.state.match.status).toBe('ongoing');
+    const seats = Object.values(room.state.players).filter((p) => !p.npc);
+    expect(seats.map((p) => p.team).sort()).toEqual(['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B']);
+    const owned = Object.values(room.state.planets).filter((p) => p.owner !== null && !room.state.players[p.owner]?.npc);
+    expect(owned).toHaveLength(8); // a home a seat; the other twelve starts are neutral
+    await live!.dispose();
+  });
+});
+
+// CORP-5 — a battle deck is locked with the roster (ARS-3), corporation handouts included
+// (ARS-6). The live re-read of the personal arsenal before a build (LARS-1) would replace
+// that deck, so a battle room is built without the arsenal store.
+describe('AvA battle deck stays frozen (CORP-5)', () => {
+  class CountingArsenal extends MemoryArsenalStore {
+    reads = 0;
+    override listOf(accountId: string): ReturnType<MemoryArsenalStore['listOf']> {
+      this.reads++;
+      return super.listOf(accountId);
+    }
+  }
+
+  /** Builds a cruiser with a module the seat's frozen deck lacks but the account owns. */
+  async function buildPastTheDeck(extras: MatchExtras | null) {
+    const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
+    const green = seed.state.players.green!;
+    // The cruiser also costs microelectronics (CONV-12): the test is about ownership.
+    green.resources = { ...green.resources, microelectronics: 10 };
+    green.arsenal = { hulls: ['cruiser'], modules: [] };
+    const store = new MemoryMatchStore();
+    await store.save(snapshotOf(seed));
+    const arsenal = new CountingArsenal();
+    for (const [itemId, kind, defId] of [
+      ['hull', 'hull', 'cruiser'],
+      ['module', 'module', 'targeting_array'],
+    ] as const) {
+      await arsenal.grant({ itemId, accountId: 'acc-1', kind, defId, form: 'blueprint',
+        soulbound: false, origin: 'craft', acquiredAt: 0 });
+    }
+    const load = createMatchLoader({
+      stores: { store, receiptStore: new MemoryReceiptStore() },
+      data,
+      now: () => 1000,
+      arsenalStore: arsenal,
+      matchExtras: async () => extras,
+    });
+    const { room, dispose } = (await load('dev'))!;
+    const refused: string[] = [];
+    const peer: RoomPeer = {
+      send: (raw) => {
+        const message = JSON.parse(raw) as { type: string; code?: string };
+        if (message.type === 'rejection') refused.push(message.code ?? '');
+      },
+    };
+    room.addPeer('green', peer, undefined, undefined, 'acc-1');
+    const build: Action = {
+      id: 't:green:1',
+      type: 'unit.build',
+      playerId: 'green',
+      payload: { planetId: 'home_green', unit: 'cruiser', modules: ['targeting_array'] },
+      issuedAt: 0,
+    };
+    await room.receive('green', peer, JSON.stringify({ type: 'action', action: build }));
+    const modules = room.state.players.green?.arsenal?.modules;
+    await dispose();
+    return { refused, reads: arsenal.reads, modules };
+  }
+
+  it('a battle room never re-reads the personal arsenal', async () => {
+    const { refused, reads, modules } = await buildPastTheDeck({ frozenArsenal: true });
+    expect(reads).toBe(0);
+    expect(refused).toEqual(['E_NOT_OWNED']);
+    expect(modules).toEqual([]);
+  });
+
+  it('an ordinary room still picks up a module bought mid-match', async () => {
+    const { refused, reads, modules } = await buildPastTheDeck(null);
+    expect(reads).toBe(1);
+    expect(refused).toEqual([]);
+    expect(modules).toEqual(['targeting_array']);
   });
 });

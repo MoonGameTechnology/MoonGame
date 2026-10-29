@@ -16,6 +16,15 @@ This is the server-authoritative multiplayer slice (Stage 3; the critical path t
 - Broadcasts are **deltas**, not full snapshots: only the entities/fields that changed since the room's last broadcast (a full `state` is sent only on join and idempotent resync). The codec lives in `shared-core` (`diffState`/`applyDelta`), so the client reconstructs state from `welcome` + deltas; `applyDelta(prev, diffState(prev,next))` deep-equals `next`.
 - Retried action IDs are idempotent: the same action ID is not applied twice (the retry gets a full `state` resync).
 - Cross-player spoofing is rejected with `E_FORBIDDEN`.
+- Durable commands commit their snapshot and receipt together through `commitMatch`:
+  one PostgreSQL transaction, or one synchronous publication of prepared memory values.
+  A receipt-write failure rolls back the snapshot; unsupported or mismatched adapter
+  pairs fail closed. Tick-only snapshot saves retain their ordinary optimistic path.
+- An awaited arsenal read rechecks its connection before syncing ownership or applying
+  the original command. A transient read failure releases the reserved sequence number
+  and returns `E_UNAVAILABLE`, allowing the same command to be retried.
+- Explicit seat release clears that seat's buffered direct messages before another
+  account can inherit its backlog. Ordinary disconnect/logout keeps the seat and history.
 - `@void/client` exposes `MultiplayerClient`, a small transport adapter that sends actions and consumes `welcome`/`state`/`delta`/`rejection` messages (applying deltas onto its last snapshot).
 
 ## Running a two-player test

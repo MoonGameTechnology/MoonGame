@@ -66,7 +66,10 @@ function sandbox({
   chmodSync(join(deploy, 'update.sh'), 0o755);
   // Настоящий, не заглушка: добор ключей — часть проверяемого поведения.
   writeFileSync(join(deploy, 'env-keys.sh'), readFileSync(ENV_KEYS_SH));
-  writeFileSync(join(deploy, 'production-preflight.sh'), readFileSync(join(DEPLOY_DIR, 'production-preflight.sh')));
+  // Relocate the default host state as well as explicit deployment state: tests
+  // must not inherit a running VPS's disk/erasure maintenance flags.
+  writeFileSync(join(deploy, 'production-preflight.sh'),
+    readFileSync(join(DEPLOY_DIR, 'production-preflight.sh'), 'utf8').replaceAll('/var/lib/moongame', root));
   writeFileSync(join(deploy, 'release-state.sh'), readFileSync(join(DEPLOY_DIR, 'release-state.sh')));
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml']) {
     writeFileSync(join(deploy, f), '# stub\n');
@@ -114,6 +117,7 @@ exit 0`,
 
   const env = {
     ...process.env,
+    STATE_DIR: '', // These fixtures exercise legacy mode; release tests override it.
     PROD: '0', // Do not inherit Vite's PROD build-mode variable into shell fixtures.
     PATH: `${bin}:${process.env.PATH}`,
     LOG: log,

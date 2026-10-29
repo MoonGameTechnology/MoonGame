@@ -134,7 +134,7 @@ export const GLOSSARY: GlossaryArticle[] = [
 
 interface CodexData {
   units: Record<string, { domain?: string; line?: string; traits?: string[] }>;
-  buildings: Record<string, { name: string; produces?: Record<string, number> }>;
+  buildings: Record<string, { name: string; produces?: Record<string, number>; retired?: boolean }>;
 }
 
 /** A stable English label for a unit id ('strike_carrier' → 'strike carrier'). */
@@ -163,6 +163,7 @@ export function buildCodexIndex(
     });
   }
   for (const [id, def] of Object.entries(data.buildings)) {
+    if (def.retired) continue;
     entries.push({
       key: 'b:' + id,
       title: def.name,

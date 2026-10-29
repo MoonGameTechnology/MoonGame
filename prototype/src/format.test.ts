@@ -17,12 +17,14 @@ import {
   fmtHrs,
   flowPer,
   flowRate,
+  flowWord,
   gameDay,
   gameStamp,
   hl,
   kfmt,
   nfmt,
   resChip,
+  setRateUnit,
   setRunClock,
   resLine,
   round1,
@@ -55,7 +57,6 @@ describe('чипы ресурса — одно правило на все пов
 
   it('суффикс скорости приходит из локали, а не зашит в код', () => {
     expect(resChip('metal', 12, { per: 'h' })).toContain('/ч');
-    expect(resChip('credits', 6, { per: 'd' })).toContain('/д');
     expect(resChip('metal', 12)).not.toContain('rc-per');
   });
 
@@ -322,8 +323,13 @@ describe('часы забега Sector Zero (решение владельца 2
     const chip = resChip('metal', 12, { sign: true, per: 'h' });
     expect(chip).toContain('+30');
     expect(chip).toContain('/мин');
-    // Суточный суффикс — не скорость мира, его часы забега не трогают.
-    expect(resChip('metal', 12, { per: 'd' })).toContain('12');
+    // Суточное содержание — тоже скорость: в забеге и оно за минуту (48 в сутки = 2 в час).
+    expect(resChip('credits', -48, { sign: true, per: 'd' })).toContain('−5');
+    // Выбор «в сутки» забег не трогает: там всё за реальную минуту.
+    setRateUnit(() => 'day');
+    expect(flowPer()).toBe('/мин');
+    expect(flowRate(12)).toBe(30);
+    setRateUnit(() => 'hour');
   });
 
   it('вне забега — игровые часы, как было', () => {
@@ -334,5 +340,36 @@ describe('часы забега Sector Zero (решение владельца 2
     expect(flowRate(12)).toBe(12);
     expect(flowPer()).toBe('/ч');
     expect(resChip('metal', 12, { sign: true, per: 'h' })).toContain('+12');
+  });
+});
+
+describe('доход в час или в сутки (настройка игрока, 2026-10-25)', () => {
+  afterEach(() => setRateUnit(() => 'hour'));
+
+  it('по умолчанию — в час; суточное содержание пересчитано в час, а не подписано «/ч»', () => {
+    expect(flowRate(12)).toBe(12);
+    expect(flowPer()).toBe('/ч');
+    expect(flowWord()).toBe('в час');
+    // Здание платит 48 в сутки: это −2 в час, а не «−48/ч», как печатали стройка и досье.
+    const keep = resChip('credits', -48, { sign: true, per: 'd' });
+    expect(keep).toContain('−2<');
+    expect(keep).toContain('/ч');
+  });
+
+  it('«в сутки»: выработка ×24, содержание как есть, подпись и слово — суточные', () => {
+    setRateUnit(() => 'day');
+    expect(flowRate(12)).toBe(288);
+    expect(flowPer()).toBe('/д');
+    expect(flowWord()).toBe('в сутки');
+    const prod = resChip('metal', 12, { sign: true, per: 'h' });
+    expect(prod).toContain('+288');
+    expect(prod).toContain('/д');
+    expect(resChip('credits', -48, { sign: true, per: 'd' })).toContain('−48<');
+  });
+
+  it('ценник и запас не скорость — настройка их не трогает', () => {
+    setRateUnit(() => 'day');
+    expect(resChip('metal', 12)).toContain('12<');
+    expect(resChip('metal', 12)).not.toContain('rc-per');
   });
 });

@@ -1,0 +1,167 @@
+{
+  "baseMaxFormat": 3,
+  "formats": [
+    {
+      "format": 2,
+      "cost": 100,
+      "reward": 150,
+      "minPlayers": 2,
+      "maps": [
+        {
+          "id": "team-2v2"
+        }
+      ]
+    },
+    {
+      "format": 3,
+      "cost": 150,
+      "reward": 225,
+      "minPlayers": 3,
+      "maps": [
+        {
+          "id": "team-3v3"
+        }
+      ]
+    },
+    {
+      "format": 4,
+      "cost": 200,
+      "reward": 300,
+      "minPlayers": 3,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_14", "slot_20"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"]
+          ]
+        }
+      ]
+    },
+    {
+      "format": 5,
+      "cost": 250,
+      "reward": 375,
+      "minPlayers": 4,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_15", "slot_19"],
+            ["slot_16", "slot_18"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"]
+          ]
+        }
+      ]
+    },
+    {
+      "format": 6,
+      "cost": 300,
+      "reward": 450,
+      "minPlayers": 5,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_15", "slot_19"],
+            ["slot_16", "slot_18"],
+            ["slot_3", "slot_10"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"]
+          ]
+        }
+      ]
+    },
+    {
+      "format": 7,
+      "cost": 350,
+      "reward": 525,
+      "minPlayers": 6,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_15", "slot_19"],
+            ["slot_16", "slot_18"],
+            ["slot_3", "slot_10"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"],
+            ["slot_6", "slot_7"]
+          ]
+        }
+      ]
+    },
+    {
+      "format": 8,
+      "cost": 400,
+      "reward": 600,
+      "minPlayers": 6,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_16", "slot_18"],
+            ["slot_14", "slot_20"],
+            ["slot_3", "slot_10"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"],
+            ["slot_6", "slot_7"],
+            ["slot_1", "slot_12"]
+          ]
+        }
+      ]
+    },
+    {
+      "format": 9,
+      "cost": 450,
+      "reward": 675,
+      "minPlayers": 7,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_15", "slot_19"],
+            ["slot_16", "slot_18"],
+            ["slot_14", "slot_20"],
+            ["slot_3", "slot_10"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"],
+            ["slot_6", "slot_7"],
+            ["slot_1", "slot_12"]
+          ]
+        }
+      ]
+    },
+    {
+      "format": 10,
+      "cost": 500,
+      "reward": 750,
+      "minPlayers": 8,
+      "maps": [
+        {
+          "id": "ffa-20",
+          "pairs": [
+            ["slot_15", "slot_19"],
+            ["slot_16", "slot_18"],
+            ["slot_14", "slot_20"],
+            ["slot_3", "slot_10"],
+            ["slot_2", "slot_11"],
+            ["slot_4", "slot_9"],
+            ["slot_5", "slot_8"],
+            ["slot_6", "slot_7"],
+            ["slot_1", "slot_12"],
+            ["slot_17", "slot_13"]
+          ]
+        }
+      ]
+    }
+  ]
+}

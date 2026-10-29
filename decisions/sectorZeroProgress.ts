@@ -117,6 +117,9 @@ export interface SectorZeroProgress {
   objectivesDone: Record<string, string[]>;
   /** Главы, выигранные хоть раз (id карты): отметка «пройдена» на маршруте глав. */
   chaptersWon: string[];
+  /** Стартовый пакет учебного полигона уже выдан (§14.7): пакет платится один раз на
+   *  профиль, повтор обучения его не повторяет. Нет поля — ещё не выдан. */
+  trainingRewarded?: true;
   /** Комиксы глав, уже показанные этому профилю (`pve-1:intro`, `pve-1:outro`) — каждый
    *  один раз (`decisions/chapterComics.ts`). В профиле, а не в браузере: отметка едет с
    *  профилем через облако, и на новом устройстве комикс второй раз не всплывёт. */
@@ -257,6 +260,10 @@ export const WARRANTS_PER_REWARD = 5;
  * победу: победный забег платит те же `10 + 4 = 14`, проигранный — ровно пришедшие волны.
  */
 export const RUN_WIN_BONUS = 4;
+/** Стартовый пакет учебного полигона (§14.7, заказ владельца 2026-10-25): за первую победу
+ *  на полигоне, один раз на профиль. Данных — ровно на одно открытие модуля, Варрантов — на
+ *  первую звезду: «одно осмысленное открытие или улучшение», но не арсенал. **v0**. */
+export const TRAINING_REWARD = { research: MODULE_UNLOCK_COST, warrants: 20 } as const;
 /** Варранты за каждого уничтоженного врага (решение владельца 2026-09-25: «проигрывать —
  *  нормально, каждая экспедиция должна что-то приносить»). Платит и поражение: счёт
  *  уничтоженных ведёт ядро (`PveState.tally`, PVR-6.20). **v0** — калибруется телеметрией. */
@@ -636,6 +643,8 @@ export type SectorProgressAction =
   | { kind: 'refresh-shop' }
   | { kind: 'ad-sovereigns' }
   | { kind: 'double-reward' }
+  /** Стартовый пакет за первую победу на учебном полигоне ({@link TRAINING_REWARD}). */
+  | { kind: 'training-reward' }
   /** Ремонт флота в забеге: списать цену за `hull` недостающего корпуса. Сам ремонт
    *  делает ядро (`fleet.premiumRepair`) — хост зовёт его, только если списание прошло. */
   | { kind: 'premium-repair'; hull: number }
@@ -733,6 +742,13 @@ export function changeSectorZeroProgress(
       // Все Варранты забега, с уничтоженными врагами: удваивается награда целиком.
       next.warrants += lastRunWarrants(next);
       next.doubledThrough = next.settledThrough;
+      break;
+    case 'training-reward':
+      // Один раз на профиль: повтор полигона пакет не повторяет (§14.7).
+      if (next.trainingRewarded) return null;
+      next.research += TRAINING_REWARD.research;
+      next.warrants += TRAINING_REWARD.warrants;
+      next.trainingRewarded = true;
       break;
     case 'premium-repair': {
       const price = sovereignRepairCost(action.hull);
@@ -1038,6 +1054,7 @@ export function parseSectorZeroProgress(
       if (list.length > 0 && chapter !== '__proto__') fresh.objectivesDone[chapter] = list;
     }
     fresh.chaptersWon = strings(p.chaptersWon);
+    if (p.trainingRewarded === true) fresh.trainingRewarded = true;
     fresh.comicsSeen = strings(p.comicsSeen).filter((id) => COMIC_ID.test(id));
     for (const [chapter, ids] of Object.entries(p.chapterScouted ?? {})) {
       const list = strings(ids);

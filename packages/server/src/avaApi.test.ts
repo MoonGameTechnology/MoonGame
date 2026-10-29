@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { registerAvaApi, registerAvaFeed } from './avaApi';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
+import { generatedCorpName } from './corpNames';
 import {
   MemoryAvaChallengeStore,
   MemoryAvaFeedStore,
@@ -31,12 +32,13 @@ interface Harness {
 }
 
 /** Two ready corps (A: alice head, B: bob head), each with influence, over one store. */
-async function harness(): Promise<Harness> {
+async function harness(influenceA = 500): Promise<Harness> {
   const store = new MemoryCorpStore();
   const challenges = new MemoryAvaChallengeStore();
   let t = 0;
   const now = (): number => ++t;
-  const corp = new CorpService({ store, now });
+  let catalogueIndex = 0;
+  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ });
   const service = new AvaService({
     corpStore: store,
     challengeStore: challenges,
@@ -44,16 +46,14 @@ async function harness(): Promise<Harness> {
     resultStore: new MemoryAvaResultStore(),
     feedStore: new MemoryAvaFeedStore(),
     now,
-    challengeCost: 100,
     expiryMs: 1000,
     pauseMs: 1000,
-    capPerSide: 2,
   });
 
   const a = await corp.create(actor('alice'), 'Alliance A');
   const b = await corp.create(actor('bob'), 'Alliance B');
   if (!a.ok || !b.ok) throw new Error('harness: create failed');
-  await store.addInfluence(a.corpId, 500);
+  await store.addInfluence(a.corpId, influenceA);
   await store.addInfluence(b.corpId, 500);
 
   const app = Fastify();
@@ -63,11 +63,28 @@ async function harness(): Promise<Harness> {
 }
 
 describe('AVA · readiness + challenge API', () => {
+  it.each([{ format: 2, required: 100 }, { format: 3, required: 150 }])(
+    'reports the selected $format-on-$format price and own treasury on insufficient influence',
+    async ({ format, required }) => {
+      const { app, corpB } = await harness(82);
+      try {
+        for (const login of ['alice', 'bob']) await app.inject({
+          method: 'POST', url: '/ava/ready/corp', headers: as(login), payload: { formats: [format] },
+        });
+        const result = await app.inject({
+          method: 'POST', url: '/ava/challenge', headers: as('alice'), payload: { target: corpB, format },
+        });
+        expect(result.statusCode).toBe(402);
+        expect(result.json()).toEqual({ error: 'E_INSUFFICIENT', requiredInfluence: required, influence: 82 });
+      } finally { await app.close(); }
+    },
+  );
   it('every route is session-gated: anonymous → uniform 401', async () => {
     const { app } = await harness();
     const routes = [
       { method: 'GET' as const, url: '/ava/pool' },
       { method: 'GET' as const, url: '/ava/challenges' },
+      { method: 'GET' as const, url: '/ava/battles' },
       { method: 'POST' as const, url: '/ava/ready/corp' },
       { method: 'POST' as const, url: '/ava/ready/player' },
       { method: 'POST' as const, url: '/ava/challenge', payload: { target: 'x' } },
@@ -130,8 +147,8 @@ describe('AVA · readiness + challenge API', () => {
     expect(feed.feed).toHaveLength(1);
     expect(feed.feed[0]).toMatchObject({
       kind: 'matchup',
-      challengerName: 'Alliance A',
-      targetName: 'Alliance B',
+      challengerName: generatedCorpName(0),
+      targetName: generatedCorpName(1),
     });
     await app.close();
   });
@@ -200,6 +217,42 @@ describe('AVA · readiness + challenge API', () => {
     await app.close();
   });
 
+  it('battle formats over HTTP (CORP-7): readiness formats, the challenge format', async () => {
+    const { app, corpB } = await harness();
+    const post = (url: string, who: string, payload?: object) =>
+      app.inject({ method: 'POST', url, headers: as(who), ...(payload ? { payload } : {}) });
+    // A malformed list → 400; a format above 3 на 3 without the operations center → 409.
+    const long = { formats: Array.from({ length: 17 }, () => 2) };
+    for (const payload of [{ formats: 'all' }, { formats: [2.5] }, { formats: [] }, long]) {
+      const res = await post('/ava/ready/corp', 'bob', payload);
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: 'E_FORMAT' });
+    }
+    const locked = await post('/ava/ready/corp', 'bob', { formats: [2, 5] });
+    expect(locked.statusCode).toBe(409);
+    expect(locked.json()).toEqual({ error: 'E_FORMAT_LOCKED' });
+    expect((await post('/ava/ready/corp', 'bob', { formats: [3] })).statusCode).toBe(200);
+    expect((await post('/ava/ready/corp', 'alice')).statusCode).toBe(200);
+    const pool = (
+      await app.inject({ method: 'GET', url: '/ava/pool', headers: as('alice') })
+    ).json() as { pool: Array<{ corpId: string; formats: number[] }> };
+    expect(pool.pool.find((c) => c.corpId === corpB)?.formats).toEqual([3]);
+
+    // The challenge: a malformed format → 400; one the target does not play → 409.
+    const bad = await post('/ava/challenge', 'alice', { target: corpB, format: 'big' });
+    expect(bad.statusCode).toBe(400);
+    const notCommon = await post('/ava/challenge', 'alice', { target: corpB, format: 2 });
+    expect(notCommon.statusCode).toBe(409);
+    expect(notCommon.json()).toEqual({ error: 'E_NO_COMMON_FORMAT' });
+    // No format → the smallest the target plays, at its price.
+    expect((await post('/ava/challenge', 'alice', { target: corpB })).statusCode).toBe(201);
+    const mine = (
+      await app.inject({ method: 'GET', url: '/ava/challenges', headers: as('alice') })
+    ).json() as { challenges: Array<{ format: number; cost: number }> };
+    expect(mine.challenges[0]).toMatchObject({ format: 3, cost: 150 });
+    await app.close();
+  });
+
   it('maps stable codes to statuses: not-ready 409, self 400, forbidden 403', async () => {
     const { app, corpA, corpB } = await harness();
     // challenge before anyone is ready → 409 E_NOT_READY
@@ -231,6 +284,35 @@ describe('AVA · readiness + challenge API', () => {
       headers: as('carol'),
     });
     expect(carol.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('the battles tab over HTTP (CORP-9): a closed challenge stays listed, members only', async () => {
+    const { app, corpB } = await harness();
+    await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('alice') });
+    await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('bob') });
+    const challenge = await app.inject({
+      method: 'POST',
+      url: '/ava/challenge',
+      headers: as('alice'),
+      payload: { target: corpB },
+    });
+    const { id } = challenge.json() as { id: string };
+    await app.inject({ method: 'POST', url: `/ava/challenge/${id}/decline`, headers: as('bob') });
+
+    const tab = await app.inject({ method: 'GET', url: '/ava/battles', headers: as('alice') });
+    expect(tab.statusCode).toBe(200);
+    expect(tab.json()).toMatchObject({
+      ready: { corp: true, formats: [2], player: false, players: [] },
+      challenges: [{ id, status: 'declined' }],
+      results: [],
+      tally: [],
+      names: { [corpB]: generatedCorpName(1) },
+    });
+    // carol belongs to no corp: no battles to show her
+    const carol = await app.inject({ method: 'GET', url: '/ava/battles', headers: as('carol') });
+    expect(carol.statusCode).toBe(403);
+    expect(carol.json()).toEqual({ error: 'E_FORBIDDEN' });
     await app.close();
   });
 });

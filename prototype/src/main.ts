@@ -1,8 +1,4 @@
-import {
-  attackBattle,
-} from '../../decisions/actions';
-import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
-import { startPlayerActivity } from '../../packages/client/src/playerActivity';
+import { connectEl, connectShown, enterBrowse, initConnectScreen, nickInput, refreshActivity, resolveServer, showConnect, srvInput, startActivity, statusEl } from './connectScreen';
 import { isEmplacementFleet } from '../../decisions/emplacement';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
@@ -10,13 +6,9 @@ import { rocketMinesUi } from './rocketMinesUi';
 import type { SoloSave } from '../../decisions/soloSave';
 import {
   closeSoloReplace,
-  enterSolo,
   initSoloCheckpoint,
   leaveSolo,
-  refreshHubDoor,
-  restoreSolo,
   saveSolo,
-  soloSaveActive,
   suspendSolo,
   tickSoloSave,
 } from './soloCheckpoint';
@@ -27,7 +19,6 @@ import {
   probeAuthMode,
   resumeSession,
   sessionRecord,
-  sessionToken,
 } from './accountSession';
 import {
   dispatchChat,
@@ -67,7 +58,6 @@ import {
   openReset,
   showStage,
   startAuthProbe,
-  suggestCallsign,
   welcomePassword,
 } from './signInPages';
 import {
@@ -85,19 +75,16 @@ import {
   rttEma,
   serverMatchId,
 } from './netSession';
-import { clearSeatNicks, refreshSeatNicks, seatNick } from './seatNicks';
+import { refreshSeatNicks, seatNick } from './seatNicks';
 import {
   closeSeatPicker,
   connectToMatch,
   initMatchJoin,
-  openSeatPicker,
   stopNetSetupPoll,
 } from './matchJoin';
-import { initMatchBrowser, refreshMatches, refreshMyMatches } from './matchBrowser';
+import { initMatchBrowser } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
-import { shareRoadNetwork } from '../../packages/shared-core/src/index';
-import { kernel as soloKernel } from './protoKernel';
-import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, type MapId } from './mapCatalog';
+import { isAvaMap, isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -111,19 +98,15 @@ import {
   order,
   canOrder,
   ctx,
-  setMatchMode,
   matchMode,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
-  // SHU-3.1 — челноки: перегрузка порт ⇄ носитель и сам вылет.
-  mergeFleet,
   buildBuilding,
   netIncome,
   capitalOf,
-  type SetupConfig,
   buySupply,
   type AiProfile,
 } from './game';
@@ -154,7 +137,6 @@ import {
   initStatPop,
   statPopOpen,
   strikeTitle,
-  unitTileHtml,
 } from './fleetCard';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
@@ -174,28 +156,26 @@ import {
 } from './backGesture';
 import {
   sightCircles,
+  type Planet,
   type SightCircle,
   type Squadron,
   type ShuttleStrike,
-  traderOf,
-  type ModeTrader,
 } from '../../packages/shared-core/src/index';
-import { createBattleModel } from '../../packages/client/src/index';
-import { pveModeId, pveChapter, trainingState, trainingModeId, provingGroundState, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { pveChapter } from '../../packages/client/src/gameData';
 import { fitTransform as camFitTransform } from '../../packages/client/src/camera';
-import { bakedServer, buildLabel, currentBuild } from './updater';
+import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
 import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
-import { clearFlak, drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
+import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { backgroundContextEvents, bgx, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
@@ -221,15 +201,11 @@ import {
 } from './worldCard';
 import { buildRoster } from './planetTabs';
 import { tileLock, type TileLock } from './catalogTile';
-import { tokenFor } from '../../decisions/sessionStore';
-import { signOutEverywhere } from './accountSession';
 import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
-import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { initMissionPanel } from './missionPanel';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
-import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
-import { initPirateIntro } from './pirateIntro';
+import { allyScreen, initExpeditionWindows, pirateIntro, runTrader, tickAlly, tickTrader, trader } from './expeditionWindows';
 import { initComicPlayer } from './comicPlayer';
 import { createComicQueue } from './comicQueue';
 import { CHAPTER_COMICS } from './comicArt';
@@ -240,7 +216,6 @@ import {
 } from '../../decisions/sectorZeroTools';
 import {
   changeSectorProgress,
-  chapterWorld,
   initSectorProfile,
   pushCloud,
   saveSectorProgress,
@@ -248,16 +223,12 @@ import {
 } from './sectorProfile';
 import {
   awardSectorRun,
-  beginAttempt,
-  enterRun,
   fleetLabelOf,
   forgetSavedRun,
   initSectorRun,
   isSectorZeroRun,
   isTraining,
-  leaveRun,
   markGameplay,
-  pveDifficulty,
   runChain,
   runInProgress,
   runMissionRows,
@@ -290,23 +261,18 @@ import {
 import {
   buildSetupConfig,
   initSetupScreen,
-  netSetup,
   openSetup,
-  sciWin,
   setupEl,
-  setupMapId,
-  setupSlots,
-  setupSpeed,
 } from './setupScreen';
 import { getPlatform, type PlatformHost } from './platform/host';
 import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
 import {
   changeSectorZeroProgress,
-  prepareSectorZeroRun,
+  TRAINING_REWARD,
 } from '../../decisions/sectorZeroProgress';
+import { resumeStep } from '../../decisions/tourResume';
+import { initTrainingResume } from './trainingResume';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
-import { syncCommanderXp } from './commanderSync';
-import { cardCovers } from './panelSlack';
 import { frontierOutline } from './frontierOutline';
 import { initMobileHud, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
@@ -316,7 +282,7 @@ import { initPcHotkeys } from './pcHotkeys';
 import { HOTKEY_SILENT_LAYERS, cycledFleets, homeTarget, nextFleet } from '../../decisions/hotkeys';
 import { toScreen } from './screenAnchor';
 import { pickHome } from './openingView';
-import { houseDisplayName, seatAiProfile } from './setupSeats';
+import { houseDisplayName } from './setupSeats';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -329,8 +295,10 @@ import {
 // REFM-2: the pure presentation formatters live in `format.ts` now (no state, no DOM)
 import {
   esc,
+  setRateUnit,
   setRunClock,
 } from './format';
+import { parseRateUnit } from '../../decisions/rateUnit';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
   RES_SVG,
@@ -338,18 +306,6 @@ import {
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
 import { buildingDossier, createDossiers } from './dossiers';
-import {
-  META_TREE,
-  META_BRANCH_RU,
-  metaLevel,
-  metaLevelProgress,
-  metaPoints,
-  canUnlock,
-  unlockNode,
-  parseMetaState,
-  type MetaState,
-  type MetaBranch,
-} from './meta';
 // ARS-5 — arsenal witryna: the hub tab itself (`arsenalScreen.ts`, REFM-5 —
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
@@ -358,40 +314,54 @@ import { initTechTree } from './techTree';
 import { initBuildScreen } from './buildScreen';
 import type { MetaMatchRewardsView } from '../../packages/protocol/src/metaEconomyView';
 import { initEndScreen, type MatchEnd } from './endScreen';
+// Хаб, его вкладки, прокачка и профиль (REFM-220).
+import {
+  arsenal,
+  corp,
+  hubAuthorizedBase,
+  hubEl,
+  hubNote,
+  hubTab,
+  initHubScreen,
+  loadMeta,
+  news,
+  openHub,
+  premiumRunning,
+  profile,
+  saveMeta,
+  shop,
+  showHub,
+  tutorialMedal,
+} from './hubScreen';
+// Жизненный цикл матча (REFM-219): установка, запуски, уход и выходы.
+import {
+  initMatchLifecycle,
+  installMatch,
+  leaveFromEnd,
+  leaveMatch,
+  leavesToSectorZero,
+  startMatch,
+  startPvEMatch,
+  startTraining,
+} from './matchLifecycle';
 import {
   pcUi,
-  glowOn,
-  setGlowFx,
-  starfieldOn,
-  setStarfield,
   showFpsOn,
-  setShowFps,
+  motionChosen,
   motionOn,
-  setMotion,
-  setWindowOpacity,
-  windowAlpha,
-  windowOpacityPct,
-  setUiScale,
-  uiScalePct,
+  reducedMotionAsked,
+  mapSharpChosen,
+  mapSharpOn,
+  mapSlowSeen,
+  markMapSlow,
 } from './graphicsPrefs';
-import { initSettings } from './settingsOverlay';
-import { initPush } from './pushSetup';
-import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
+import { initSettingsView, openSettings, push } from './settingsView';
+import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { initHolographicUi } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
-// «Профиль командира» — карьерное досье (REFM-10).
-import { initProfile } from './profileScreen';
-import { initRegistrationReward } from './registrationReward';
-import { initTutorialMedal } from './tutorialMedal';
-import { PORTRAITS } from './profileArt';
-import { parseAppearance } from '../../packages/protocol/src/playerProfile';
-// AVA-C1/C2 — корпоративный кабинет (REFM-11).
-import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
-import { initTrader } from './traderScreen';
-import { initAllyScreen } from './allyScreen';
 import { linkedAlly } from '../../decisions/allyPanel';
 import { extractionCandidates } from '../../decisions/chapterChain';
 import { captiveLoad, extractionStart } from '../../decisions/actions';
@@ -414,28 +384,25 @@ import { COLOR, paletteOf } from './sideColors';
 // REFM-237 — цвета сторон, места матча и константы карты: у владельца, `mapPalette.ts`.
 import {
   initMapPalette,
-  neutralColor,
   ownerColor,
   rivalPaletteId,
   SEAT_META,
-  setSideColors,
   stanceCol,
   youColor,
 } from './mapPalette';
-import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, pirateIntroRect, setView, world, worldDist } from './mapCamera';
-import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, resetFogMemory, restoreFogMemory, vision, type Vision } from './mapFog';
+import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
+import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, forgetRadarContacts, initMapRadar, netSignatures, ownRadarSources, setSweepOpacity, sweepOpacity, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
-import { apply, initOrderPipeline, playerOrder, settleOrder } from './orderPipeline';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
   hideTrainingBoard,
-  resetTrainingScenario,
   tickTrainingScenario,
   type TrainingScenarioHost,
 } from './trainingScenario';
-import { startSimLink, workerPort, type SimLink } from './simLink';
-import { autoRetreatAt, cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, forgetAutoAssault, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
+import { forwardToSim, initSimDriver, saveSimInBackground, settleSimClock, simOn, simSaved, simShownTime, stepSim, stopSim, syncSim } from './simDriver';
+import { cancelWarPrompt, confirmLoadPrompt, confirmWarPrompt, initGroupOrders, orderPromptOpen, restoreAutoAssault, soloAutoAssault } from './groupOrders';
 import {
   cancelMobileOrder,
   initCmdActions,
@@ -444,37 +411,29 @@ import {
   mobileTargetLabel,
 } from './cmdActions';
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
-import { flushPinch, forgetAdditive, initMapInput, selectionBox, tapByTouch } from './mapInput';
+import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
-import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct, timeLeft } from './worldQueries';
-import { handleEvents, initEventFeed, killStats, logLines, note, resetEventFeed, toast } from './eventFeed';
+import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct } from './worldQueries';
+import { handleEvents, initEventFeed, killStats, logLines, note, toast } from './eventFeed';
 import {
   PLAY_BASE,
   applyTimeSpeed,
   closeSwarmDossier,
   forgetStatusLine,
-  hideSwarmDossier,
   initTopBar,
   renderSpeedbar,
   renderSwarmDossier,
   renderTopBar,
-  resetThreatAlerts,
   swarmDossierPinned,
   updateThreatAlerts,
 } from './matchTopBar';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; its read-only helpers are shared with
 // the threat alert (`stewFmtDur`, `matchTopBar.ts`), the side panel (`stewardTechDone`)
 // and the morning report (`stewMetrics`).
-import { battleRetreats, initBattleWindow } from './battleScreen';
+import { armRetreat, battleRetreatAim, battleWindow, clearBattleRetreatAim, initBattleView } from './battleView';
 import {
   initSteward,
 } from './stewardScreen';
-import { initArsenal } from './arsenalScreen';
-import { initMetaMarket } from './metaMarketScreen';
-import { initMetaEconomy } from './metaEconomyScreen';
-import { initShop } from './shopScreen';
-import { initNews } from './newsScreen';
-import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -486,35 +445,28 @@ import { pullNextDevWave } from './sectorZeroDev';
 // snapshot, initSandbox call) + the #sandbox HTML/CSS to cut it cleanly.
 import {
   sandboxConfig,
-  resetSandboxConfig,
-  resetSandboxRuntime,
   enforceSandbox,
   initSandbox,
-  setSandboxButton,
 } from './sandbox';
 // Обучение (ONB-0/1/2/7) — у владельца `guideFlow.ts` (REFM-221): тур по HUD, флаг
 // пройденного обучения, ведомый первый матч, цели первой сессии.
 import {
   activeTour,
-  forgetLesson,
   initGuideFlow,
   launchTour,
   lessonRunning,
   loadOnboard,
   maybeStartPendingTour,
   setPendingGuide,
-  stopFirstGoals,
   updateGoals,
 } from './guideFlow';
 // TRN-2 — тур полигона: собирается здесь, запускается лаунчером `guideFlow.ts`.
 import { buildTrainingTour } from './trainingTour';
 import { trainingTourUi } from './trainingTourDom';
-import { trainingFlagshipMerge } from '../../decisions/trainingGuide';
-import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
 // Справка (ONB-3/4/5) — у владельца `helpCenter.ts` (REFM-221): справочник и его поиск,
 // карточка корабля, вводные к механикам, сводка «пока вас не было».
-import { forgetAway, initHelpCenter, maybeIntro, openCodex, openShipCard } from './helpCenter';
+import { initHelpCenter, maybeIntro, openCodex, openShipCard } from './helpCenter';
 import { HOLD_TIP_MS, holdTipPos, movedTooFar } from './tipPlacement';
 import {
   IDLE,
@@ -532,7 +484,6 @@ import {
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
 import {
-  allyAim,
   anyArmed,
   arm,
   cmdMore,
@@ -563,33 +514,30 @@ import {
   saneGap,
   simRuns,
   spinRuns,
-  stepBacklog,
 } from '../../decisions/simClock';
-import { simWorkerScript } from '../../decisions/simWorker';
 import {
-  NET_VIEW_IDLE,
-  netViewAt,
+  JUDGE_WARMUP_MS,
+  judgingFrames,
+  mapDpr,
+  slowFrames,
+  slowVerdictReach,
+} from '../../decisions/mapSharpness';
+import {
   netViewFollow,
   netViewSettled,
-  netViewSnapshot,
   type NetViewShown,
 } from '../../decisions/netViewClock';
 import { mountLocaleMenu } from './localeMenu';
 import { mapLod, mapSpacing, type MapLod } from '../../packages/client/src/mapLod';
-import { authorizedBase } from '../../decisions/hubAuth';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
 import { claimIntent, matchIdFrom } from '../../decisions/matchAddress';
-import { httpBase } from '../../decisions/matchQuery';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
-import { defaultServerField, resolveAddress, resolveBase } from '../../decisions/serverAddress';
+import { apkOfferShown } from '../../decisions/apkOffer';
 import { radarContacts } from './snapshotIngest';
 import { GOTO_MIN_ZOOM } from './mapJump';
-// FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
-import { initFriends } from './friendsScreen';
-import { initRank } from './rankScreen';
 import { aaRings, type RangeRing } from './combatRanges';
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
 // ONB-0 — какой хаб показать новичку (флаг обучения хранит `guideFlow.ts`).
@@ -598,6 +546,7 @@ import type {
   GameState,
   Fleet,
 } from '../../packages/shared-core/src/index';
+import { recordValues } from '../../packages/shared-core/src/util/records';
 
 // --- constants ---------------------------------------------------------------
 
@@ -866,8 +815,8 @@ initNetSession({
   pingProvince: (target) => provinceForPing(target, MAP),
   closePingPop: () => pings?.closePop(),
   fps: () => fpsEma,
-  showConnect: (show) => showConnect(show),
-  connectShown: () => connectShown(),
+  showConnect,
+  connectShown,
   openHub,
   cameFromLink: () => cameFromLink,
 });
@@ -883,50 +832,22 @@ let netShown: NetViewShown | null = null;
 function mapNow(): number {
   // Серверный мир рисуется по часам картинки и на обрыве (`netWorld`): иначе флоты на миг
   // отъезжали бы ко времени последнего снимка и прыгали обратно на переподключении.
-  return netWorld ? netShownTime : simLink ? simShownTime : s.time;
+  return netWorld ? netShownTime : simOn() ? simShownTime() : s.time;
 }
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
 // «сильный» = the full-heuristics one). Default solo = p2 on weak.
 let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
-// Отдельный поток расчёта соло-мира (`simLink.ts`): мир обычной схватки считает он, а кадр
-// только рисует. Файл потока (и для дев-сборки с диска — исходник строкой) кладёт сборка
-// (`build.mjs`); откуда поднимать — `decisions/simWorker.ts`. Не поднялся — мир идёт в кадре.
-declare const __SIM_WORKER_URL__: string | undefined;
-declare const __SIM_WORKER_SRC__: string | undefined;
-const SIM_WORKER = simWorkerScript({
-  protocol: location.protocol,
-  query: new URLSearchParams(location.search).get('sim'),
-  url: typeof __SIM_WORKER_URL__ === 'string' ? __SIM_WORKER_URL__ : '',
-  source: typeof __SIM_WORKER_SRC__ === 'string' ? __SIM_WORKER_SRC__ : '',
+// Поток расчёта соло-мира — у владельца, `simDriver.ts` (REFM-245): связь с потоком, его
+// часы картинки и решение, ведёт ли он мир. Отсюда — мир, своё место, экран матча, места ИИ
+// и очередь комиксов.
+initSimDriver({
+  world: () => s,
+  me: () => ME,
+  inMatch: () => inMatch(),
+  aiPlayers: () => AI_PLAYERS,
+  comicBusy: () => comicQueue.isBusy(),
 });
-let simLink: SimLink | null = null;
-/** Поток не поднялся или сломался — до перезагрузки мир идёт в кадре. */
-let simBroken = false;
-/** Игровое время, накопленное кадрами к следующему шагу потока (`stepBacklog`). */
-let simBacklog = 0;
-/** Часы картинки между шагами потока — те же, что у сети между снимками сервера. */
-let simView = NET_VIEW_IDLE;
-let simShownTime = 0;
-/** Поток считает только обычную схватку: забег, обучение, полигон, песочница и сеть ведут
- *  мир в кадре — там экран сам правит мир и ждёт итог приказа сразу. */
-function simEligible(): boolean {
-  return (
-    SIM_WORKER !== null &&
-    !simBroken &&
-    !netWorld &&
-    soloSaveActive &&
-    !s.pve &&
-    inMatch() &&
-    !(!__PLAYER_BUILD__ && sandboxConfig.enabled)
-  );
-}
-function stopSim(): void {
-  simLink?.stop();
-  simLink = null;
-  simBacklog = 0;
-  simView = NET_VIEW_IDLE;
-}
 // SANDBOX — the home world of the local player (immortal-home target), captured at
 // launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
 let sandboxHomeId: string | null = null;
@@ -968,7 +889,6 @@ const cmdbar = $('cmdbar');
 const railEl = $('rail');
 const railToggle = $('railtoggle');
 const railGlyph = $('railglyph');
-const crestMark = $('crestmark');
 const holoCoarsePointer = window.matchMedia?.('(pointer: coarse)');
 const holographic = initHolographicUi({
   commands: cmdbar,
@@ -1045,32 +965,12 @@ function cardTabs() {
   return tabsForSelection(sel, pairFacts(s, ME));
 }
 
-// Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
-// wears in the in-match top-bar corner. Client-side only (localStorage) — never match
-// state, never sent to the server. Falls back to the first glyph if unset/unknown.
-const EMBLEMS = ['◆', '◇', '⬡', '⬢', '✦', '✧', '★', '⚛', '◉', '⌖', '❖', '⟡'];
-function playerEmblem(): string {
-  const e = readRaw('void.emblem') ?? '';
-  return EMBLEMS.includes(e) ? e : EMBLEMS[0]!;
-}
-function applyEmblem(): void {
-  const g = playerEmblem();
-  const hubAv = document.getElementById('hubav');
-  if (hubAv) { hubAv.textContent = g; hubAv.classList.remove('portrait'); }
-  if (!__SECTOR_ZERO_ONLY__) applyProfilePortrait();
-  crestMark.textContent = g;
-}
-function setPlayerEmblem(g: string): void {
-  if (!EMBLEMS.includes(g)) return;
-  writeRaw('void.emblem', g);
-  applyEmblem();
-}
-
 // --- viewport, galaxy backdrop & map projection ------------------------------
 
 let VW = 1280; // viewport size in CSS pixels (drives layout + projection)
 let VH = 720;
-let DPR = 1;
+let SCREEN_DPR = 1; // the screen's pixel density, capped
+let DPR = 1; // the map canvas's: the screen's, or one pixel a point (`decisions/mapSharpness.ts`)
 let MOBILE = false;
 function resize() {
   // The two decisions under this — the DPR cap and what counts as a phone — live in
@@ -1078,7 +978,8 @@ function resize() {
   const v = measureViewport();
   VW = v.w;
   VH = v.h;
-  DPR = v.dpr;
+  SCREEN_DPR = v.dpr;
+  DPR = mapDpr(v.dpr, mapSharpOn());
   MOBILE = v.mobile;
   // WebView can repeat resize notifications without changing the viewport.
   // Assigning even the SAME canvas size erases its bitmap and resets the context;
@@ -1102,6 +1003,11 @@ function setShowOwnPings(v: boolean): void {
   showOwnPings = v;
   writeBool('void.showOwnPings', v);
 }
+// Доход ресурсов в час или в сутки (client-only, localStorage): единица всех скоростей
+// ресурсов на экране. Форматтеры спрашивают её сами (`format.ts`), поэтому смена видна на
+// следующем кадре — бар и панели перерисуются по изменившейся разметке.
+let rateUnit = parseRateUnit(readRaw('void.rateUnit'));
+setRateUnit(() => rateUnit);
 // --- graphics preferences (client-only, localStorage) ------------------------
 // Тумблеры косметики и режима вёрстки живут в `graphicsPrefs.ts` (REFM-21): свечение,
 // звёздное поле, счётчик кадров и ПК-гейт. Здесь остаётся только то, что завязано на
@@ -1129,7 +1035,8 @@ initMapRadar({
   vw: () => VW,
   vh: () => VH,
   sources: () => perWorld('radar', ownRadarSources),
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
+  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  planets: worldPlanets,
   note,
   placeName,
   ping: () => snd.play('radar'),
@@ -1218,11 +1125,6 @@ initWorldQueries({
 // Само правило живёт в `planetSummary.ts` (REFM-38) — одно место, где «крыло»
 // отделено от корабля линии, иначе один и тот же корпус считается дважды.
 const isShuttle = (u: string) => isWingUnit(u, data);
-/** Compact number like Iron Order's bar: 15.7k, 728, … */
-
-// Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
-/** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
- *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
 // Геометрия флотов — у владельца, `fleetGeometry.ts` (REFM-238). Отсюда — то, что
 // принадлежит игре: мир, своё место, часы картинки, детализация и кэши дорог и кадра.
 initFleetGeometry({
@@ -1243,11 +1145,10 @@ function fleetTitleOf(id: string): string {
 }
 
 
-/** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
- *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
- *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
-
 let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
+// Motion off: the hologram's clock stands until the player turns it on again, so its borders,
+// glass rim and wave are a picture, drawn once (`borderLayer.ts`, `mapLayer.ts`).
+const hologramStill = (): boolean => !motionOn();
 
 // Реакция на события мира и лента — у владельца, `eventFeed.ts` (REFM-230). Отсюда — то, что
 // принадлежит игре: мир, своё место, имена, выбор флота, окна и пульс союзника.
@@ -1298,7 +1199,8 @@ initMapFog({
   me: () => ME,
   net: () => NET,
   contacts: () => netSignatures,
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
+  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  planets: worldPlanets,
 });
 
 /** Производные мира для кадра (шаг 9 плавности) — по тому же договору, что `visionMemo`.
@@ -1337,6 +1239,20 @@ function perWorld<K extends keyof WorldDerived>(
   return memo.got[key] as WorldDerived[K];
 }
 
+/** Миры мира на экране в порядке записи (`recordValues`) — один список на запись миров
+ *  (W7). Запись в 1675 миров — словарь движка, и обход её по ключам на слабом телефоне
+ *  стоит ~0,7 мс; зрение кадра (дважды), круги обзора, радар, ПКО и доход обходили её
+ *  каждый сам, шесть раз на новый мир. Мир не правят на месте, а заменяют, и запись миров
+ *  тоже: та же запись — те же миры, и прежний список верен. Нетронутую запись `applyDelta`
+ *  оставляет прежней, а в идущей партии миры меняются редко, поэтому список переживает
+ *  смену мира. Песочница правит мир на месте и сбрасывает список вместе с `worldMemo`. */
+let planetList: { record: GameState['planets']; list: Planet[] } | null = null;
+function worldPlanets(): readonly Planet[] {
+  if (planetList?.record !== s.planets)
+    planetList = { record: s.planets, list: recordValues(s.planets) };
+  return planetList.list;
+}
+
 /** Имя места для игрока — одно на подписи, журнал, окно боя и метки (`planetName.ts`):
  *  раньше подпись и журнал на картах без имён показывали координату («бой · C0R2»), а окно
  *  того же боя — авто-имя («Бой: STYX-3»), UIX-5.2. */
@@ -1361,7 +1277,7 @@ initOrderPipeline({
   tour: () => activeTour,
   intro: maybeIntro,
   steward: () => steward,
-  forward: (action) => simLink?.forward(action),
+  forward: forwardToSim,
 });
 
 // Обучение — у владельца, `guideFlow.ts` (REFM-221): лаунчер туров, флаг «обучение
@@ -1377,7 +1293,7 @@ initGuideFlow({
   loadMeta,
   saveMeta,
   showHub,
-  showConnect: (show) => showConnect(show), // объявлен ниже, у экрана входа
+  showConnect,
   startMatch,
   sheetExpanded: (key) => mobileHud.expanded(key),
   collapseSheet: () => mobileHud.collapse(),
@@ -1474,6 +1390,9 @@ const matchEnd = initMatchEnd({
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
   training: isTraining,
+  // Стартовый пакет полигона (§14.7) — один раз на профиль; dev-полигон не платит.
+  trainingAward: () =>
+    !sectorDevActive && changeSectorProgress({ kind: 'training-reward' }) ? TRAINING_REWARD : null,
   // Dev-забег не засчитывается — его разбивки нет, и чужую (прошлого забега) не показываем.
   runSummary: () =>
     sectorDevActive || sectorProgress.lastRun?.attempt !== sectorAttempt ? null : sectorProgress.lastRun,
@@ -1489,7 +1408,7 @@ initMapOverlays({
   me: () => ME,
   ctx: () => cx,
   now: () => mapNow(),
-  aa: () => perWorld('aa', () => aaRings(s, data, ME, known)),
+  aa: () => perWorld('aa', () => aaRings(s, data, ME, known, worldPlanets())),
   aimSquadron,
 });
 
@@ -1571,6 +1490,8 @@ initMapLayer({
   wave: provinceWave,
   lod: currentMapLod,
   surfacesLost: forgetBorderLayer,
+  clock: () => hologramTime,
+  still: hologramStill,
 });
 
 // Слой живых границ — `borderLayer.ts` (REFM-232, часть 2). Контекст кадра, экран и часы
@@ -1581,6 +1502,7 @@ initBorderLayer({
   vh: () => VH,
   dpr: () => DPR,
   clock: () => hologramTime,
+  still: hologramStill,
 });
 
 // Поверхность карты — живые границы, стекло, блики, выделение провинции и волна захвата —
@@ -1592,6 +1514,7 @@ initMapSurface({
   vh: () => VH,
   dpr: () => DPR,
   clock: () => hologramTime,
+  still: hologramStill,
   holographic: holographicMapOn,
 });
 
@@ -1605,6 +1528,7 @@ function mapLabel(mapId: string | undefined): string {
   if (mapId === 'team-3v3') return t('setup.map.team-3v3');
   if (mapId === 'ffa-20') return t('setup.map.ffa-20');
   if (mapId === 'ffa-50') return t('setup.map.ffa-50');
+  if (isAvaMap(mapId)) return t('map.ava');
   return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 
@@ -1869,12 +1793,6 @@ function repaintFeeds(): void {
   chatWin?.refreshIfVisible();
 }
 
-/** A compact codex tile (icon + a one-line label) that opens the full info panel on
- *  tap. `label` is the build cost for buildables, or ×count for a fleet's ships. The
- *  tiles live in context — building tiles in the build menu, ship tiles in the fleet
- *  panel — not in a global HUD strip. Identification is the game tooltip only: the
- *  PC cursor dossier (#objtip, via data-desc) and the mobile long-press bubble
- *  (data-name). No native `title` — it duplicated #objtip as a second, uglier popup. */
 /** A building is one-per-planet BY DEFAULT — since RULES-2 the number is the catalogue's
  *  `maxPerPlanet`, and the core (not this helper) enforces it; the whole shipped catalogue
  *  is still on the default 1.
@@ -1897,8 +1815,6 @@ function buildingLocked(planetId: string, id: string): TileLock {
     coreQueue(planetId, 'buildings').some((q) => q.building === id),
   );
 }
-/** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
- *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
 let mineViewState: typeof s | undefined;
 let mineViewOwner = '';
 let mineViewCache: ReturnType<typeof visibleOrdnance>;
@@ -2166,10 +2082,8 @@ initMapInput({
   closePingPop: () => pings?.closePop(),
   openPingPop: (loc) => pings?.openPop(loc),
   openBattle: (id) => battleWindow.open(id),
-  battleRetreatAim: () => battleRetreatAim,
-  clearBattleRetreatAim: () => {
-    battleRetreatAim = null;
-  },
+  battleRetreatAim,
+  clearBattleRetreatAim,
   markSelection: () => {
     markSelection(lastReal);
   },
@@ -2210,7 +2124,7 @@ initTopBar({
   toolsHidden: sectorZeroToolsHidden,
   scoreLimit: () => SCORE_LIMIT,
   nick: () => nickInput.value,
-  income: () => perWorld('income', () => netIncome(s, ME)),
+  income: () => perWorld('income', () => netIncome(s, ME, worldPlanets())),
   mobile: () => MOBILE,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,
@@ -2281,85 +2195,90 @@ const endScreenPanel = initEndScreen({
     watchAd,
     apply: () => changeSectorProgress({ kind: 'double-reward' }),
   },
-  onLeave: (which, wasNet) => {
-    // Уход — через дверь `leaveMatch` (REFM-205): из сетевого матча без дозвона, гайд и
-    // первые цели гаснут (матч мог закончиться посреди гайда, ONB-2).
-    leaveMatch();
-    // «Повторить обучение» — сразу новый полигон; «В меню» — в меню Sector Zero.
-    if (!wasNet && isTraining()) {
-      if (which === 'again') startTraining();
-      else openSectorZero();
-      return;
-    }
-    if (!wasNet && isSectorZeroRun()) {
-      openSectorZero(which === 'again', which === 'replay');
-      return;
-    }
-    if (which === 'again') {
-      // Соло — сразу в настройку схватки; сеть — в браузер матчей (пересадить тот же
-      // стол клиент не может, это отдельный серверный кирпич).
-      if (wasNet) {
-        openHub();
-        hubTab('games');
-      } else {
-        openSetup('hub');
-      }
-    } else {
-      openHub(); // «В меню»
-    }
-  },
+  onLeave: leaveFromEnd,
 });
 const renderEndScreen = (): void => endScreenPanel.render();
 
-/**
- * Выход из партии — одна дверь (REFM-205). Её зовут ⌂ (а через него ‹, рельс и аппаратный
- * Back), итоговый экран, вход в Sector Zero, «Одиночная игра» в хабе и в обзоре партий и
- * кнопка тестов. Куда вести игрока дальше, решает вызывающий. Пока выход был копиями, они
- * разошлись: итоговый экран не гасил первые цели, три копии не закрывали сокет, и ни одна
- * не гасила дозвон (см. `leaveNetwork`).
- *
- * - Забег Sector Zero сохраняется, и «Продолжить» поднимет его с этой минуты. Вне забега и
- *   после его засчёта `saveRun` ничего не пишет.
- * - Мир под меню встаёт. В соло иначе ИИ доигрывал бы партию, и «Победа!» ложилась поверх
- *   хаба (BF-29). Сетевому миру после выхода снимков больше не будет, а локальный ход
- *   сочинял бы его сам.
- * - Гайд гаснет (ONB-2): его #spotlight — синглтон на document.body, и незакрытый тур
- *   рисовал свой последний шаг поверх хаба и следующего матча (z-50, выше всего).
- * - Первые цели гаснут (ONB-7): список первой сессии живёт ровно одну партию.
- */
-function leaveMatch(): void {
-  saveRun();
-  stopSim();
-  speed = 0;
-  leaveNetwork();
-  clearSeatNicks();
-  stopFirstGoals();
-  activeTour?.stop();
-}
-
-// Speedbar "⌂ В меню": leave the current match from anywhere in-game — through the one
-// door `leaveMatch`; a run or the training ground leads to the Sector Zero menu, the rest
-// to the hub.
-$('tomenu').addEventListener('click', (ev) => {
-  // ⌂ в идущей экспедиции спрашивает (решение владельца 2026-09-26): в меню с сохранением
-  // или завершить и забрать награду. Спрашивает только живой тап — программные выходы
-  // (аппаратный Back, отмена загрузки карты, «В меню» самой карточки) уходят сразу.
-  if (ev.isTrusted && runInProgress()) {
-    openAbandon('exit', $('tomenu'));
-    return;
-  }
-  const toSectorZero = leavesToSectorZero();
-  leaveMatch();
-  if (toSectorZero) openSectorZero();
-  else openHub();
+// «Вернуть обучение» полигона: кнопку держит `trainingResume.ts`, тур — `startTraining`.
+let trainingResumeRun: ((from: number) => void) | null = null;
+const trainingResume = initTrainingResume((from) => trainingResumeRun?.(from));
+// Жизненный цикл матча — у владельца, `matchLifecycle.ts` (REFM-219): установка партии,
+// запуск схватки, забега, полигонов и сетевой партии, уход одной дверью и выходы ⌂,
+// «Покинуть сессию» и итогового экрана. Отсюда — то, что принадлежит игре: мир, своё
+// место, места ИИ, кеш мира, итог и баннер, темп, поток симуляции и экраны хаба.
+initMatchLifecycle({
+  world: () => s,
+  me: () => ME,
+  adopt: (state, ai) => {
+    s = state;
+    installMapGeometry(s);
+    syncPlayerNames(s);
+    ME = 'p1';
+    AI_PLAYERS = new Map(ai);
+    for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
+  },
+  resetScreen: () => {
+    pirateIntro.reset();
+    solo.reset();
+    worldMemo = null;
+    banner = null; // clear any end-banner left by the menu-background match (else it sticks)
+    endScreen = null; // a fresh match must not open into the previous result
+    matchEnd.reset(); // новый матч зарабатывает свою награду
+  },
+  stopSim,
+  halt: () => {
+    speed = 0;
+  },
+  mobile: () => MOBILE,
+  scoreLimit: () => SCORE_LIMIT,
+  devSpeedControl: setDevSpeedControl,
+  sound: (name) => snd.play(name),
+  setSandboxHome: (id) => {
+    sandboxHomeId = id;
+  },
+  pulseAlly: () => {
+    allyPulseUntil = performance.now() + 12_000;
+  },
+  // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
+  // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
+  armTrainingTour: () =>
+    setPendingGuide(() => {
+      const baseline = trainingBaseline(s, ME, data);
+      const steps = buildTrainingTour({
+        world: () => s,
+        me: ME,
+        data,
+        baseline,
+        ui: trainingTourUi({
+          world: () => s, me: () => ME, mobile: MOBILE,
+          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
+          ships: () => { setPlanetTab('ships'); },
+          // Synchronize the phone selection before Show expands its sheet.
+          render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
+        }),
+        introduced: forceIntroduced,
+      });
+      // «Пропустить обучение» оставляет кнопку «Вернуть обучение» (заказ владельца
+      // 2026-10-25): подсказки вернутся с начала этапа, на котором их закрыли.
+      const run = (from: number): void =>
+        launchTour(
+          steps,
+          (r) => {
+            if (r.skipped && isTraining() && s.match.status !== 'ended')
+              trainingResume.offer(resumeStep(steps.map((step) => step.stage), r.reachedStep));
+          },
+          from,
+        );
+      trainingResumeRun = run;
+      run(0);
+    }),
+  hideTrainingResume: () => trainingResume.hide(),
+  showConnect,
+  showHub: (show) => showHub(show),
+  openHub: () => openHub(),
+  hubTab: (tab) => hubTab(tab),
+  resolveServer,
 });
-// Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too. На ПК ⌂
-// в полосе скорости спрятан и выход живёт здесь, поэтому в экспедиции спрашивает и он.
-document.getElementById('rail-exit')?.addEventListener('click', (ev) => {
-  if (runInProgress()) openAbandon('exit', ev.currentTarget as HTMLElement);
-  else $('tomenu').click();
-});
-
 // Event-log window: the rail's ≡ opens it; ✕ or the backdrop closes it. The feed
 // (#log) updates in place each frame whether the window is open or not.
 const logWin = document.getElementById('logwin');
@@ -2457,97 +2376,22 @@ const steward = __SECTOR_ZERO_ONLY__
     });
 document.getElementById('rail-steward')?.addEventListener('click', () => steward?.open());
 
-// --- окно боя (заказ владельца 2026-09-15) -----------------------------------
-// Значок боя на карте и так показывал фазу и отсчёт до раунда; теперь он ОТКРЫВАЕТСЯ.
-// До этого расклад можно было увидеть единственным путём — выделив свой флот в этом
-// бою, — то есть про чужую схватку рядом узнать было нечем.
-const battleWin = $('battlewin');
-/** Взвести «Отступить» для флота: остальные прицелы гаснут, окно боя уступает карту. */
-let battleRetreatAim: string | null = null;
-function armRetreat(fleetId: string): void {
-  battleRetreatAim = null;
-  arm('retreatAim', fleetId);
-  battleWin.classList.remove('show');
-  note(t('hint.pick-retreat'));
-  invalidatePanel();
-}
-let battleReadoutCache: ReturnType<typeof inspectBattle> = {};
-let battleReadoutId = '';
-let battleReadoutAt = -Infinity;
-const battleWindow = initBattleWindow({
-  root: () => battleWin,
-  body: () => $('battlewinbody'),
-  head: () => $('battlewinhead'),
-  state: () => s,
+// Окно боя — у владельца проводки, `battleView.ts` (REFM-246): кэш разбора боя, прицел
+// «Отступить всем» и нажатия по плиткам. Отсюда — мир, своё место и имена мест и сторон.
+initBattleView({
+  world: () => s,
   me: () => ME,
-  model: (id) => {
-    // VET-6: тот же конфиг матча, на котором считает редьюсер, — иначе окно показало бы
-    // надбавку ветерана там, где хост её не дал.
-    const m = createBattleModel(s, id, ME, data, ctx(s.time, s).config);
-    if (!m.ok) return null;
-    const now = performance.now();
-    if (id !== battleReadoutId || now - battleReadoutAt >= 250) {
-      battleReadoutCache = inspectBattle(soloKernel, s, ctx(s.time, s), id);
-      battleReadoutAt = now;
-      battleReadoutId = id;
-    }
-    for (const side of m.sides) side.readout = side.key ? battleReadoutCache[side.key] : undefined;
-    return m;
-  },
-  attack: (id, side) => playerOrder(attackBattle(ME, id, side)),
-  retreatAll: (id) => {
-    const first = battleRetreats(s, id, ME)[0];
-    if (!first) return;
-    armRetreat(first);
-    battleRetreatAim = id;
-  },
-  // Отступление из окна боя — тот же прицел, что и кнопкой боковой панели.
-  retreat: (fleetId) => armRetreat(fleetId),
-  view: {
-    color: ownerColor,
-    ownerName: (owner) => owner ? NAME[owner] ?? owner : t('side.neutral'),
-    tiles: (side, limit, color) => (side.stacks ?? side.units).map((u, index) => ({ u, index }))
-      .filter(({ u }) => u.count > 0).slice(0, limit).map(({ u, index }) => {
-        const open = side.ref?.kind === 'fleet' && side.mine
-          ? `data-shipcard="${esc(side.ref.fleetId)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
-        return unitTileHtml(u, side.owner, open, true, color);
-      }).join(''),
-    fleetName: fleetCallsign,
-    placeName,
-    autoRetreatAt,
-    timeLeft,
-    // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
-    forecast: (sides) => battleForecast(sides, data, battleHostility(s)),
-  },
+  seatName: (owner) => NAME[owner],
+  placeName,
 });
-battleWin.addEventListener('click', (event) => {
-  const tile = (event.target as HTMLElement).closest<HTMLButtonElement>('button.ptile');
-  if (!tile) return;
-  if (tile.dataset.shipcard) {
-    const at = tile.dataset.shipcard.lastIndexOf('|');
-    openShipCard(tile.dataset.shipcard.slice(0, at), Number(tile.dataset.shipcard.slice(at + 1)));
-  } else if (tile.dataset.codex) openCodex(tile.dataset.codex);
-});
-/** Сколько экрана вокруг дома занимают его значки — стек флотов, гарнизон, подписи (YAG-7.2). */
-const HOME_CLEARANCE_PX = 80;
-const pirateIntro = initPirateIntro({
-  root: $('pirate-intro'),
-  copy: $('pirate-copy'),
-  action: $('pirate-action'),
-  close: $('pirate-close'),
-  focus: focusWorld,
-  openBattle: (id) => battleWindow.open(id),
-  // Воронка обучения (`YAG-5.1`): первый бой с пиратами — это и есть обучение забега.
-  onStage: (step) => {
-    if (isSectorZeroRun())
-      getPlatform().analytics.emit('onboarding_step', { guide: 'pirates', step, attempt: sectorAttempt });
-  },
-  // YAG-7.2: подсказка встаёт после первого хода часов, когда стартовый вид уже выбран. Если
-  // она легла на дом (и его флоты рядом), вид пересчитывается — теперь с припуском под ней.
-  onFirstShow: () => {
-    const home = pickHome(Object.values(s.planets), ME);
-    if (home && cardCovers(pirateIntroRect(), world(home.position), HOME_CLEARANCE_PX)) defaultView();
-  },
+// Окна экспедиции — у владельца, `expeditionWindows.ts` (REFM-249): подсказка первого боя с
+// пиратами, торговец с кнопкой рельса и связь с союзником, их кадровые такты. Отсюда — мир, своё
+// место, имя места и связь с союзником по кэшу мира.
+initExpeditionWindows({
+  world: () => s,
+  me: () => ME,
+  placeName,
+  allyLinked: () => !!perWorld('ally', () => linkedAlly(s, ME)),
 });
 // Комиксы глав (решение владельца 2026-09-24): арт рисует владелец, реестр — `comicArt.ts`.
 // Реестр читается через держатель, чтобы робот мог подложить свой комикс.
@@ -2593,77 +2437,6 @@ const market = __SECTOR_ZERO_ONLY__
       onOpen: () => maybeIntro('market'),
     });
 document.getElementById('rail-market')?.addEventListener('click', () => market?.open());
-
-// --- торговец экспедиции («живой курс», решение владельца 2026-09-26) -------------------
-// Рынок основной игры — книга заявок живых игроков, и в забеге его нет; здесь торгуют с самим
-// рынком (`modules/trader.ts`). Окно — `traderScreen.ts`; открыт торговец, пока идёт забег
-// режима с разделом `trader`: кнопка рельса и карточка ресурса спрашивают `runTrader()`.
-const traderWin = $('trader');
-/** Раздел торговца, если он у текущего забега есть. */
-function runTrader(): ModeTrader | undefined {
-  return runInProgress() ? traderOf(ctx(s.time, s)) : undefined;
-}
-const trader = initTrader({
-  root: () => traderWin,
-  state: () => s,
-  me: () => ME,
-  ctx: () => ctx(s.time, s),
-  cfg: runTrader,
-  order: playerOrder,
-});
-const railTrader = $('rail-trader');
-railTrader.addEventListener('click', () => trader.open());
-/** Кадровый такт торговца: кнопка рельса — пока он есть, окно следит за курсом (он плывёт к
- *  базе) и закрывается само, когда забег кончился. */
-function tickTrader(): void {
-  const live = runTrader() !== undefined;
-  const shown = live ? '' : 'none';
-  if (railTrader.style.display !== shown) railTrader.style.display = shown;
-  if (!live) {
-    if (trader.isOpen()) trader.close();
-    return;
-  }
-  trader.refresh();
-}
-
-// --- связь с союзником (глава IV, PVR-7.5) ---------------------------------------------
-// Окно — `allyScreen.ts`, статус операции — тот же план, по которому ходит бот союзника
-// (`decisions/allyPanel.ts`). Вход — чип «⬡ Союзник» в строке статуса: он есть и на ПК, и на
-// телефоне, и появляется только после встречи.
-const allyWin = $('ally');
-const allyScreen = initAllyScreen({
-  root: () => allyWin,
-  state: () => s,
-  me: () => ME,
-  data: () => data,
-  targetName: (planet, fleet) => {
-    if (planet) return placeName(planet);
-    const f = fleet ? s.fleets[fleet] : undefined;
-    const at = f ? (f.location ?? f.movement?.to) : undefined;
-    return at ? placeName(at) : '—';
-  },
-  arm: (kind) => {
-    arm('allyAim', kind);
-    note(t('ally.pick', { order: t(`ally.kind.${kind}`) }));
-  },
-  armed: () => allyAim,
-  findFleet: (fleetId) => {
-    const f = s.fleets[fleetId];
-    const at = f ? (f.location ?? f.movement?.to) : undefined;
-    if (at) jumpTo(at, 'goto');
-  },
-  order: playerOrder,
-  sees: fleetSeen,
-});
-/** Кадровый такт окна союзника: связи нет — окно закрыто и прицел снят. */
-function tickAlly(): void {
-  if (!perWorld('ally', () => linkedAlly(s, ME))) {
-    if (allyScreen.isOpen()) allyScreen.close();
-    drop('allyAim');
-    return;
-  }
-  allyScreen.refresh();
-}
 
 // --- resource card (RC-1): tap a resource chip → popup with stats + market button -
 const resCardEl = $('rescard');
@@ -2739,28 +2512,9 @@ const shipyard = initShipyard({
 });
 document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
 
-// --- connect overlay (single-player vs join a live session) ------------------
-// Entry screen: pick a faction, then run a local skirmish or connect to a server
-// (`pnpm dev:proto-server`, or a tunnel URL a friend shared). The last-used URL
-// is remembered so the APK reconnects with one tap.
-const connectEl = $('connect');
-const srvInput = $('csrv') as HTMLInputElement;
-const nickInput = $('cnick') as HTMLInputElement;
-const statusEl = $('cstatus');
-const showConnect = (show: boolean): void => {
-  connectEl.style.display = show ? 'flex' : 'none';
-};
-/** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли
- *  игрок написанное в его строку статуса. Пришёл ли он по ссылке — отдельный вопрос и
- *  отдельный признак (`cameFromLink`): оверлей держится до впуска в обоих случаях. */
-const connectShown = (): boolean => connectEl.style.display !== 'none';
-// Remembered server, then the one baked into the APK, then the page's own origin
-// (`serverAddress.ts`, rule 8).
-srvInput.value = defaultServerField(localStorage.getItem('void.server'), bakedServer(), location);
-// Remember the side you last commanded, so reopening the link drops you back onto
-// your own seat — the server maps nick→side, so a returning name resumes its own
-// faction (nick-login; full accounts in docs/persistence-accounts-roadmap.md).
-nickInput.value = localStorage.getItem('void.nick') ?? '';
+// Экран подключения — у владельца, `connectScreen.ts` (REFM-247): узлы экрана, показ, адрес и
+// позывной по умолчанию, разбор адреса, вход в обозреватель и такт активности игрока.
+initConnectScreen();
 
 // The dev test mode is a DEV-CLIENT feature: the player build compiles it out (and
 // build.mjs strips its button/markup), so a regular player's client has no test overlay
@@ -2818,472 +2572,26 @@ if (!__PLAYER_BUILD__) {
   });
 }
 
-// --- welcome stage → match browser ------------------------------------------------
-// Страницы входа и переключатель стадий `#connect` живут в `signInPages.ts` (REFM-218);
-// отсюда обозреватель партий открывается своей стадией.
-function enterBrowse(): void {
-  if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
-  showStage('browse');
-  detach('обозреватель: список партий', refreshMatches());
-}
-// --- meta-shell hub: post-login home + bottom nav (docs/main-menu.md) -------
-// After identity you land on the hub (home + PLAY + bottom nav), not the raw match
-// list. The nav routes into the existing flow: "Игры"/"ИГРАТЬ" → the match browser
-// (стадия 2 of #connect, untouched), «Корпорация» → вкладка `corpScreen.ts` (CORP-3), Ещё →
-// настройки. Social sign-in is a guest stub (accounts AC-1.1) with a "скоро" note.
-const hubEl = $('hub');
-const hubNote = $('hub-note');
-let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
-function showHub(show: boolean): void {
-  if (!show) registrationReward?.close();
-  if (!show) arsenal?.close();
-  if (!show) shop?.close();
-  if (!show) corp?.hideHub();
-  // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
-  if (show) document.getElementById('codex')?.classList.remove('show');
-  hubEl.style.display = show ? 'flex' : 'none';
-  // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
-  // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
-  document.body.classList.toggle('hub-open', show);
-}
-const HUB_PANELS: Record<string, string> = {
-  home: 'hp-home',
-  rank: 'hp-rank',
-  meta: 'hp-meta',
-  friends: 'hp-friends',
-  arsenal: 'hp-arsenal',
-  auction: 'hp-auction',
-  supply: 'hp-supply',
-  shop: 'hp-shop',
-  corp: 'hp-corp',
-  community: 'hp-community',
-  more: 'hp-more',
-};
-let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
-/** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community']);
-function hubTab(tab: string): void {
-  hubNote.textContent = '';
-  hubWallet?.render();
-  if (tab === 'games') {
-    showHub(false);
-    showConnect(true);
-    enterBrowse(); // hand off to the existing match browser
-    return;
-  }
-  currentHubTab = tab;
-  // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
-  // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
-  if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
-  // Кошелёк Варрантов в шапке (UIX-10.2) — тихо: гостю и при сбое сервера остаётся прежнее число.
-  if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
-  // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
-  if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
-  if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());
-  if (tab !== 'home') news?.close(); // the feed sheet lives over the home panel
-  if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
-  if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
-  if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
-  if (tab !== 'arsenal') arsenal?.close(); // the phone sheet lives over the hub, not in the tab
-  if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
-  if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
-  if (tab === 'shop' && shop) detach('хаб: магазин', shop.refresh());
-  if (tab !== 'shop') shop?.close(); // the phone sheet lives over the hub, like the arsenal's
-  for (const [k, pid] of Object.entries(HUB_PANELS))
-    $(pid).style.display = k === tab ? 'flex' : 'none';
-  // CORP-3: the corporation tab paints after its panel is visible — the panorama centres by width.
-  if (tab === 'corp') corp?.showHub();
-  else corp?.hideHub();
-  const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
-  for (const b of Array.from(document.querySelectorAll('.hub-tab')))
-    b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
-}
-
-// --- «Прокачка» — the commander's meta-progression trees (hub tab) -----------------
-// Three straight tracks (командование/экономика/наука); XP comes ONLY from finished
-// matches, a node costs its tier in points. Effects are session-start snapshots
-// (hidden techs / council level / starting treasury) — see prototype/src/meta.ts.
-function renderMetaPanel(): void {
-  const el = $('hp-meta');
-  const st = loadMeta();
-  const lvl = metaLevel(st.xp);
-  const [got, need] = metaLevelProgress(st.xp);
-  const pts = metaPoints(st);
-  let h =
-    `<div class="mp-head"><b>${t('meta.level', { n: lvl })}</b>` +
-    `<span class="mp-xp">${t('meta.xp', { got, need })}</span>` +
-    `<span class="mp-pts">${t('meta.points', { n: pts })}</span></div>`;
-  h += `<div class="mp-track"><div class="mp-fill" style="width:${Math.round((got / need) * 100)}%"></div></div>`;
-  for (const branch of ['command', 'economy', 'science'] as MetaBranch[]) {
-    h += `<div class="mp-branch"><div class="mp-bt">${t(META_BRANCH_RU[branch])}</div>`;
-    for (const node of META_TREE.filter((x) => x.branch === branch)) {
-      const owned = st.spent.includes(node.id);
-      const can = canUnlock(st, node.id);
-      h +=
-        `<div class="mp-node ${owned ? 'own' : can ? 'can' : 'lock'}">` +
-        `<div class="mp-nm">${owned ? '✓ ' : ''}${esc(t(node.name))} <em>· ${t('meta.cost', { n: node.tier })}</em></div>` +
-        `<div class="mp-ds">${esc(t(node.desc))}</div>` +
-        (owned
-          ? ''
-          : `<button class="mp-buy" data-meta="${node.id}" ${can ? '' : 'disabled'}>${can ? t('hero.tree.unlock') : t('meta.locked')}</button>`) +
-        `</div>`;
-    }
-    h += `</div>`;
-  }
-  h += `<p class="mp-note">${t('meta.note')}</p>`;
-  el.innerHTML = h;
-}
-$('hp-meta').addEventListener('click', (ev) => {
-  const b = (ev.target as HTMLElement).closest('[data-meta]') as HTMLElement | null;
-  if (!b || (b as HTMLButtonElement).disabled) return;
-  const next = unlockNode(loadMeta(), b.dataset.meta!);
-  if (next) {
-    saveMeta(next);
-    renderMetaPanel();
-  }
+// Хаб — у владельца, `hubScreen.ts` (REFM-220): вкладки и их экраны, прокачка, профиль,
+// портрет, сверка опыта, вход в хаб, его кнопки и корпорация. Отсюда — поля экрана входа,
+// его строка статуса и показ, обозреватель партий, темп и проверка удаления аккаунта.
+initHubScreen({
+  nick: () => nickInput.value,
+  setNick: (nick) => {
+    nickInput.value = nick;
+  },
+  serverField: () => srvInput.value,
+  resolveServer,
+  status: (text) => {
+    statusEl.textContent = text;
+  },
+  showConnect,
+  enterBrowse,
+  halt: () => {
+    speed = 0;
+  },
+  refreshAccountDeletion: () => refreshAccountDeletion(), // объявлен ниже, у страниц входа
 });
-
-// --- «Друзья» — the account's roster (hub tab, FRIENDS-1) --------------------
-// Экран живёт в `friendsScreen.ts`; здесь только доступ к серверу. Политика та же,
-// что у «Арсенала»: вкладка ПЕРЕИСПОЛЬЗУЕТ сессию, которую уже добыл вход, но никогда
-// не спрашивает пароль ради того, чтобы просто посмотреть — нет сервера, нет режима
-// аккаунтов или нет сохранённой сессии читаются одинаково (гостевое состояние).
-/**
- * Авторизованный адрес для вкладок хаба — ОДИН на все пять (`hubAuth.ts`, REFM-138).
- * Там же причины: три условия обязательны, режим аккаунтов пробуется у сервера, а ради
- * просмотра пароль не спрашивают — любой отказ это гостевое состояние.
- */
-async function hubAuthorizedBase(): Promise<{ base: string; token: string } | null> {
-  const srv = resolveServer();
-  if (srv) await probeAuthMode(srv.base); // проба режима — только когда есть у кого
-  return authorizedBase(
-    {
-      server: srv,
-      accountsMode: authMode === 'accounts',
-      token: srv ? sessionToken(srv.base) : null,
-    },
-    httpBase,
-  );
-}
-
-const friends = __SECTOR_ZERO_ONLY__
-  ? null
-  : initFriends({
-      root: () => $('hp-friends'),
-      authorizedBase: hubAuthorizedBase,
-      openPlayer: (login) => profile?.open(login),
-    });
-
-// --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
-// Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по
-// присланной странице, поэтому клиент его вывести и не смог бы. Доступ — та же
-// политика, что у «Друзей»: переиспользуем добытую входом сессию, пароль ради
-// просмотра не спрашиваем; нет сессии — гостевое состояние с причиной.
-const rank = __SECTOR_ZERO_ONLY__
-  ? null
-  : initRank({
-      root: () => $('hp-rank'),
-      authorizedBase: hubAuthorizedBase,
-      openPlayer: (login) => profile?.open(login),
-    });
-
-// --- «Арсенал» — the account's persistent collection and its workshop (hub tab, ARS-5) ----
-// The tab itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks. Cache key is
-// per callsign, like the meta store. `authorizedBase` encodes the tab's policy: it may reuse
-// a session token a prior join already stashed, but must never prompt for a password just to
-// LOOK at the collection — no server, no accounts or no stashed session all read the same way
-// (the starter kit and a sign-in). Narrow = the tab is too narrow for the detail beside the
-// list (the `@container arsenal` rule in build.mjs uses the same width), and then the detail
-// opens as a sheet over the hub.
-const ARSENAL_WIDE_MIN = 700;
-const arsenal = __SECTOR_ZERO_ONLY__
-  ? null
-  : initArsenal({
-      root: () => $('hp-arsenal'),
-      sheet: () => $('arsenal-sheet'),
-      narrow: () => $('hp-arsenal').clientWidth < ARSENAL_WIDE_MIN,
-      readCache: () => {
-        try {
-          return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
-        } catch {
-          return null;
-        }
-      },
-      writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
-      openCodex,
-      authorizedBase: hubAuthorizedBase,
-      canSignIn: () => !!resolveServer() && authMode === 'accounts',
-      signIn: () => {
-        showHub(false);
-        showConnect(true);
-        showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
-      },
-      openAuction: () => hubTab('auction'),
-      sell: (itemId) => {
-        metaMarket?.focusSell(itemId);
-        hubTab('auction');
-      },
-      openSeason: () => hubTab('supply'),
-      openStore: (offerId) => {
-        shop?.show('modules', offerId);
-        hubTab('shop');
-      },
-      changed: async () => {
-        await metaMarket?.sync();
-      },
-    });
-if (arsenal && typeof ResizeObserver !== 'undefined')
-  new ResizeObserver(() => arsenal.relayout()).observe($('hp-arsenal'));
-// EC-3 «Аукцион»: витрина торговли мета-предметами. Лоты и кошелёк живут на сервере,
-// поэтому кэша, как у арсенала, здесь нет — экран всегда спрашивает свежее.
-const metaMarket = __SECTOR_ZERO_ONLY__
-  ? null
-  : initMetaMarket({
-      root: () => $('hp-auction'),
-      arsenal: () => arsenal?.items() ?? [],
-      authorizedBase: hubAuthorizedBase,
-      note: (message) => {
-        hubNote.textContent = message;
-      },
-      changed: () => hubWallet?.render(),
-      inventoryChanged: async () => { await arsenal?.refresh(); },
-    });
-// «Магазин» (заказ владельца 2026-10-20): Суверены, премиум, модули и материалы за ◆.
-// Единственное место покупок — Снабжение и Арсенал ведут сюда. Баланс ◆ и срок премиума
-// приходят с ответом аккаунта: плашка хаба показывает число, чат помнит премиум по позывному
-// (цвет шрифта — его бонус; сам срок проверяется по часам при каждом открытии настроек).
-const SHOP_WIDE_MIN = 700;
-const premiumKey = (): string => 'vd.premium.' + (nickInput.value.trim() || 'guest');
-const shop = __SECTOR_ZERO_ONLY__
-  ? null
-  : initShop({
-      root: () => $('hp-shop'),
-      sheet: () => $('shop-sheet'),
-      narrow: () => $('hp-shop').clientWidth < SHOP_WIDE_MIN,
-      authorizedBase: hubAuthorizedBase,
-      canSignIn: () => !!resolveServer() && authMode === 'accounts',
-      signIn: () => {
-        showHub(false);
-        showConnect(true);
-        showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
-      },
-      warrants: () => metaMarket?.balance() ?? 0,
-      now: () => Date.now(),
-      accountChanged: (view) => {
-        if (view) writeRaw(premiumKey(), String(view.premiumUntil ?? 0));
-        hubWallet?.render();
-      },
-      changed: async () => {
-        await arsenal?.refresh();
-        await metaMarket?.sync();
-      },
-    });
-if (shop && typeof ResizeObserver !== 'undefined')
-  new ResizeObserver(() => shop.relayout()).observe($('hp-shop'));
-// CORP-2 «Домой»: лента новостей. Экран — `newsScreen.ts`, решения — `decisions/newsFeed.ts`.
-// Ленту сервер отдаёт без входа, поэтому ей нужен только адрес; сессия хаба — для «Моей
-// корпорации», карточки корпорации и заявки.
-const news = __SECTOR_ZERO_ONLY__
-  ? null
-  : initNews({
-      column: () => $('news-col'),
-      teaser: () => $('news-teaser'),
-      sheet: () => $('news-sheet'),
-      publicBase: () => {
-        const step = resolveBase(srvInput.value, location.protocol === 'https:');
-        return step.kind === 'ok' ? httpBase(step.base) : null;
-      },
-      authorizedBase: hubAuthorizedBase,
-      note: (text) => {
-        hubNote.textContent = text;
-      },
-      errText,
-      openCorp: (tab) => {
-        corp?.showSection(tab === 'hq' ? 'base' : 'battles');
-        hubTab('corp');
-      },
-      now: () => Date.now(),
-    });
-/** Premium is running for this callsign, by the last account read on this device. */
-function premiumRunning(): boolean {
-  return Number(readRaw(premiumKey()) ?? 0) > Date.now();
-}
-// Main-game supply has its own server-owned state; Sector Zero remains independent.
-const metaEconomy = __SECTOR_ZERO_ONLY__
-  ? null
-  : initMetaEconomy({
-      root: () => $('hp-supply'),
-      authorizedBase: hubAuthorizedBase,
-      changed: async () => {
-        await arsenal?.refresh();
-        await metaMarket?.sync();
-      },
-    });
-// Кошелёк главного экрана (UIX-10.2, заказ владельца 2026-10-01): Суверены — та же плашка с
-// «+», что в строке статуса партии; Варранты аукциона — плашкой, которая и есть дверь в аукцион.
-const hubWallet = __SECTOR_ZERO_ONLY__
-  ? null
-  : initHubWallet({
-      root: $('hubwallet'),
-      wallet: () => ({ sovereigns: shop?.sovereigns() ?? null, warrants: metaMarket?.balance() ?? 0 }),
-      donate: () => {
-        shop?.show('sovereigns');
-        hubTab('shop');
-      },
-      auction: () => hubTab('auction'),
-    });
-
-function arsenalKey(): string {
-  return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
-}
-
-
-// --- Профиль командира — the career dossier (docs/main-menu.md §4.2) ------------
-// Само досье живёт в `profileScreen.ts` (REFM-10); здесь только его хуки. Ключ кэша
-// медалей — по позывному, рядом с остальными ключами. `authorizedBase` кодирует ту же
-// политику, что у «Арсенала»: за паролем ради ПОСМОТРЕТЬ витрину не ходим.
-const profile = __SECTOR_ZERO_ONLY__
-  ? null
-  : initProfile({
-      root: () => $('profile'),
-      identity: () => profileKey(),
-      readAppearance: readProfileAppearance,
-      writeAppearance: (value) => writeRaw(profileKey(), JSON.stringify(value)),
-      appearanceChanged: applyProfilePortrait,
-      view: () => {
-        const st = loadMeta();
-        return {
-          nick: nickInput.value,
-          xp: st.xp,
-          stats: st.stats,
-          corp: (() => {
-            const c = corp?.mine().corp;
-            return c ? { name: c.name, influence: c.influence } : null;
-          })(),
-          sovereigns: shop?.sovereigns() ?? null,
-        };
-      },
-      readCache: () => {
-        try {
-          return JSON.parse(localStorage.getItem(medalsKey()) ?? 'null');
-        } catch {
-          return null;
-        }
-      },
-      writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
-      authorizedBase: async () => {
-        const srv = resolveServer();
-        if (!srv) return null;
-        const session = await hubAuthorizedBase();
-        return session && tokenFor(localStorage, srv.base, nickInput.value.trim()) === session.token ? session : null;
-      },
-    });
-const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
-if (!__SECTOR_ZERO_ONLY__) registrationReward = initRegistrationReward({
-  identity: profileKey,
-  visible: () => hubEl.style.display !== 'none',
-  authorizedBase: hubAuthorizedBase,
-  changed: async () => { await Promise.all([syncProfileAppearance(), syncCommanderFromServer()]); },
-});
-// The tutorial medal: earned on this device per callsign, carried into the account profile.
-const tutorialMedal = __SECTOR_ZERO_ONLY__
-  ? null
-  : initTutorialMedal({
-      key: () => 'vd.medal.tutorial.' + (nickInput.value.trim() || 'guest'),
-      authorizedBase: hubAuthorizedBase,
-    });
-function profileKey(): string {
-  return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
-}
-function readProfileAppearance(): unknown {
-  try { return JSON.parse(readRaw(profileKey()) ?? 'null'); } catch { return null; }
-}
-function applyProfilePortrait(portrait?: number): void {
-  if (__SECTOR_ZERO_ONLY__) return;
-  const id = portrait ?? parseAppearance(readProfileAppearance())?.portrait;
-  const src = id ? PORTRAITS[id - 1] : undefined;
-  const avatar = document.getElementById('hubav');
-  if (!avatar) return;
-  if (!src) { avatar.textContent = playerEmblem(); avatar.classList.remove('portrait'); return; }
-  const img = document.createElement('img');
-  img.src = src;
-  img.alt = t('profile.title');
-  avatar.replaceChildren(img);
-  avatar.classList.add('portrait');
-}
-
-async function syncProfileAppearance(): Promise<void> {
-  if (__SECTOR_ZERO_ONLY__) return;
-  const key = profileKey();
-  const srv = resolveServer();
-  if (!srv) return;
-  const session = await hubAuthorizedBase();
-  if (!session || tokenFor(localStorage, srv.base, nickInput.value.trim()) !== session.token) return;
-  try {
-    const response = await fetch(`${session.base}/profiles`, { headers: { authorization: `Bearer ${session.token}` } });
-    if (!response.ok) return;
-    const raw = await response.json() as { portrait?: unknown; slots?: unknown };
-    const appearance = parseAppearance({ portrait: raw.portrait, slots: raw.slots });
-    if (!appearance || key !== profileKey()) return;
-    writeRaw(key, JSON.stringify(appearance));
-    applyProfilePortrait(appearance.portrait);
-  } catch { /* Keep the previously saved portrait while offline. */ }
-}
-
-// --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
-
-/** Accounts mode (EC-*): pull the DURABLE account XP into the local meta mirror, so
- *  the commander level/progress a player sees is account-backed and follows them to a
- *  new device — not the per-callsign localStorage that only lived in one browser. The
- *  server total is authoritative (it sums every credited match across devices); the
- *  per-match award still lands optimistically at checkEnd (same formula as the core's
- *  `data.rewards`, so they agree). Guest/nick mode has no account → keeps localStorage. */
-async function syncCommanderFromServer(): Promise<void> {
-  const srv = resolveServer();
-  if (!srv) return;
-  await probeAuthMode(srv.base);
-  if (authMode !== 'accounts') return;
-  const session = sessionToken(srv.base);
-  if (!session) return;
-  try {
-    const res = await fetch(`${httpBase(srv.base)}/commander/me`, {
-      headers: { authorization: `Bearer ${session}` },
-    });
-    if (!res.ok) return;
-    const cur = loadMeta();
-    // Merging the two totals is `commanderSync.ts` (REFM-53): XP only ever grows, an
-    // unreadable answer leaves the local figure alone, and only a real change repaints.
-    const sync = syncCommanderXp(cur.xp, await res.json().catch(() => null));
-    if (sync.changed) {
-      saveMeta({ ...cur, xp: sync.xp }); // local `spent` tree is kept
-      // repaint the open hub panel so the new level/points show without a manual switch
-      if (hubEl.style.display !== 'none' && (currentHubTab === 'home' || currentHubTab === 'meta'))
-        hubTab(currentHubTab);
-    }
-  } catch {
-    // offline — the last mirrored total stays; a later login reconciles
-  }
-}
-function openHub(note = ''): void {
-  if (soloSaveActive) { saveSolo(); speed = 0; }
-  if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
-  const nick = nickInput.value.trim();
-  $('hub-name').textContent = nick || t('auth.commander');
-  applyProfilePortrait();
-  showConnect(false);
-  showHub(true);
-  hubTab('home');
-  hubNote.textContent = note;
-  refreshHubDoor(); // после позывного: пройденное обучение помнится по нику (`onboardKey`)
-  detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
-  detach('хаб: портрет аккаунта', syncProfileAppearance());
-  detach('account deletion capability', refreshAccountDeletion());
-  if (registrationReward) detach('registration reward', registrationReward.show());
-  if (tutorialMedal) detach('tutorial medal claim', tutorialMedal.claim());
-}
 
 // Страницы входа — у своего владельца (`signInPages.ts`, REFM-218): приветствие и вход
 // по позывному, регистрация, восстановление и сброс пароля. Строку статуса, поле позывного
@@ -3352,168 +2660,32 @@ const refreshAccountDeletion = mountAccountDeletion(() => resolveServer()?.base 
   statusEl.textContent = t('account.delete.pending');
 }, () => !__SECTOR_ZERO_ONLY__ && authMode === 'accounts');
 
-// hub interactions
-$('hub-play').addEventListener('click', () => hubTab('games'));
-// Single-player entry from the hub home — offline skirmish vs bots (both builds).
-$('hub-solo').addEventListener('click', () => {
-  leaveMatch();
-  showHub(false);
-  openSetup('hub');
-});
-$('hub-solo-continue').addEventListener('click', restoreSolo);
-$('hub-sector-zero').addEventListener('click', () => openSectorZero());
-$('hub-proving-ground').addEventListener('click', () => startProvingGround());
-$('hub-msg').addEventListener('click', () => {
-  hubNote.textContent = t('hub.messages.soon');
-});
-$('hub-logout').addEventListener('click', async () => {
-  // «Сменить командира» must really switch identity: drop this server's session so
-  // the next sign-in authenticates the NEW callsign instead of replaying the old JWT.
-  const srv = resolveServer();
-  if (srv && !(await signOutEverywhere(srv.base))) {
-    hubNote.textContent = t('auth.logout.failed');
-    return;
-  }
-  leaveMatch();
-  statusEl.textContent = '';
-  showHub(false);
-  showConnect(true);
-  showStage('welcome');
-});
-for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
-  b.addEventListener('click', () => hubTab((b as HTMLElement).dataset.hub ?? 'home'));
-}
-// «Прокачка», а с UIX-10.1 и «Рейтинг» с «Друзьями» уехали из нижней навигации (вкладок в ней
-// пять) в «Ещё»: плитка открывает ТУ ЖЕ панель, а не свою копию экрана.
-document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
-document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
-document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
-document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
-document.getElementById('hub-supply')?.addEventListener('click', () => hubTab('supply'));
-document.getElementById('hub-shop')?.addEventListener('click', () => hubTab('shop'));
-document.getElementById('hub-community')?.addEventListener('click', () => hubTab('community'));
-for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
-  tile.addEventListener('click', () => {
-    // The tile's own label span is already localized (localizeStaticDom ran at boot);
-    // read IT, not the Russian-only data-more attribute, so the toast matches the UI language.
-    const label =
-      tile.querySelector('[data-i18n]')?.textContent ?? (tile as HTMLElement).dataset.more ?? '';
-    hubNote.textContent = t('soon.generic', { what: label });
-  });
-}
-
-// --- settings overlay (hub → «Ещё» → Настройки) -----------------------------
-// Окно живёт в `settingsOverlay.ts` (REFM-22); здесь проводка. Модуль настройками не
-// владеет — каждая живёт там, где её читают (графика, цвета сторон, звук, развёртка), а
-// оверлей только показывает снимок и отдаёт изменение обратно.
-const settingsEl = $('settings');
-/** On-demand diagnostics: no pixel readbacks (those alter canvas heuristics),
- * no match/account state, and no automatic upload. Attributes are requests, not
- * proof of which raster backend WebView actually selected.
- */
-function mapRenderingReport(): string {
-  const rect = canvas.getBoundingClientRect();
-  const active = canvasCompatibilityActive();
-  const requested = canvasCompatibilityRequested();
-  return JSON.stringify({
-    schema: 1,
-    build: currentBuild(),
-    userAgent: navigator.userAgent,
-    compatibility: { active, requested, restartPending: active !== requested },
-    viewport: { width: VW, height: VH, devicePixelRatio: window.devicePixelRatio,
-      renderDpr: DPR, visualScale: window.visualViewport?.scale ?? null },
-    canvas: { width: canvas.width, height: canvas.height, cssWidth: rect.width, cssHeight: rect.height,
-      attributes: cx.getContextAttributes?.() ?? null, contextLost: cx.isContextLost?.() ?? null,
-      events: { ...mapContextEvents } },
-    background: { attributes: bgx.getContextAttributes?.() ?? null,
-      contextLost: bgx.isContextLost?.() ?? null, events: { ...backgroundContextEvents } },
-    frameErrors: frameErrs,
-    estimatedFps: Math.round(fpsEma),
-    cameraScale: cam.scale,
-  }, null, 2);
-}
-/** Стекло окон ПК и планшета берёт альфу из переменной на `body` (`holographic.css`). */
-function applyWindowOpacity(): void {
-  document.body.style.setProperty('--holo-window-alpha', String(windowAlpha(windowOpacityPct())));
-}
-applyWindowOpacity();
-const settings = initSettings({
-  root: () => settingsEl,
-  view: () => ({
-    sweepOpacity,
-    ownPings: showOwnPings,
-    glow: glowOn(),
-    starfield: starfieldOn(),
-    motion: motionOn(),
-    renderCompatibility: canvasCompatibilityRequested(),
-    renderCompatibilityActive: canvasCompatibilityActive(),
-    renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
-    fps: showFpsOn(),
-    soundOn: snd.enabled(),
-    volume: snd.volume(),
-    youColor,
-    neutralColor,
-    palette: rivalPaletteId,
-    touchOnly: !pcUi(),
-    speedKeys: devSpeedControl,
-    ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
-    // Размер интерфейса — множитель зума ПК (`holographicUi.ts`), у телефона его нет.
-    ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
-    // Нижняя панель есть там, где телефонная раскладка (UIX-3.3); настраивают её и с хаба.
-    ...(MOBILE ? { phoneBar: phoneNav.bar() } : {}),
-    // Push (UIX-4.4): вкладка есть там, где браузер умеет уведомления.
-    ...(push?.view() ? { push: push.view()! } : {}),
-  }),
-  setSweepOpacity,
-  setWindowOpacity: (v) => {
-    setWindowOpacity(Math.round(v * 100));
-    applyWindowOpacity();
-  },
-  // Новый зум подхватит `holographic.sync` на ближайшем кадре.
-  setUiScale: (v) => setUiScale(Math.round(v * 100)),
+// Окно настроек — у владельца проводки, `settingsView.ts` (REFM-248): снимок для окна и двери
+// обратно, прозрачность окон, диагностика рендера и окно согласия на push. Отсюда — свои пинги,
+// звук, темп, экран, нижняя панель телефона, единица дохода, канвас и счётчик кадров.
+initSettingsView({
+  ownPings: () => showOwnPings,
   setOwnPings: setShowOwnPings,
-  setGlow: setGlowFx,
-  setStarfield: setStarfield,
-  setMotion: setMotion,
-  setRenderCompatibility: setCanvasCompatibility,
-  renderingReport: mapRenderingReport,
-  setFps: setShowFps,
-  setSound: (v) => snd.setEnabled(v),
-  setVolume: (v) => snd.setVolume(v),
-  previewSound: () => snd.play('tap'),
-  setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
-  resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
+  sound: snd,
+  speedKeys: () => devSpeedControl,
+  screenDpr: () => SCREEN_DPR,
+  mobile: () => MOBILE,
+  phoneBar: () => phoneNav.bar(),
   setPhoneBar: (bar) => phoneNav.setBar(bar),
-  setPush: async (on) => push?.setEnabled(on),
-  setPushKind: async (kind, on) => push?.setKind(kind, on),
+  rateUnit: () => rateUnit,
+  setRateUnit: (unit) => {
+    rateUnit = unit;
+    writeRaw('void.rateUnit', unit);
+  },
+  resize,
+  probe: () => ({ canvas, cx, vw: VW, vh: VH, dpr: DPR, frameErrors: frameErrs, fps: fpsEma }),
 });
-// Push-уведомления (UIX-4.4) — у владельца, `pushSetup.ts`: вопрос о согласии, worker,
-// подписка и виды. Стоит ПОСЛЕ окна настроек: `changed` перерисовывает его.
-const push = __SECTOR_ZERO_ONLY__
-  ? null
-  : initPush({
-      authorizedBase: hubAuthorizedBase,
-      askRoot: () => $('pushask'),
-      changed: () => {
-        if (settingsEl.classList.contains('show')) settings.render();
-      },
-    });
-/** Окно настроек; вход и подписка перечитываются — вкладка «Уведомления» покажет их свежими. */
-function openSettings(): void {
-  settings.open();
-  push?.refresh().catch(() => undefined); // не вышло перечитать — вкладка покажет прошлое
-}
-$('hub-settings').addEventListener('click', openSettings);
-$('hub-gear').addEventListener('click', openSettings);
-// Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
-document.getElementById('rail-settings')?.addEventListener('click', openSettings);
 
 // Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
 // загрузочного блока: его ветка по ссылке может попросить войти.
-let activity: ReturnType<typeof startPlayerActivity> | undefined;
 initAccountSession({
   sessionChanged: () => {
-    activity?.refresh();
+    refreshActivity();
     arsenal?.forget();
   },
   status: (text) => {
@@ -3683,319 +2855,8 @@ initSetupScreen({
   sideColors: () => ({ you: youColor, rival: paletteOf(rivalPaletteId).war }),
 });
 
-// --- meta-progression (прокачка командующего) --------------------------------
-// Per-callsign account state; v1 lives in localStorage next to the guest identity —
-// the server account (SE-1.x) takes this over when the meta-layer lands there.
-function metaKey(): string {
-  return 'vd.meta.' + (nickInput.value.trim() || 'guest');
-}
-function loadMeta(): MetaState {
-  return parseMetaState(localStorage.getItem(metaKey()));
-}
-function saveMeta(st: MetaState): void {
-  localStorage.setItem(metaKey(), JSON.stringify(st));
-}
-
-// Install a ready GameState as the live match: reset all interaction state, queues,
-// camera and log, then hide the setup overlay. `aiPlayers` are the seats the local
-// sim drives. Shared by the normal skirmish and (via a hook) the dev test mode.
-function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
-  leaveNetwork(); // свой мир — уже не сетевая партия: гаснут и дозвон, и признак серверного мира
-  leaveSolo();
-  forgetLesson(); // startGuidedMatch raises it again after its own install
-  stopSim(); // поток считал мир прошлого матча
-  forgetAutoAssault();
-  leaveRun();
-  needMapPreparation();
-  // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
-  // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
-  // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.
-  setMatchMode(modeId);
-  s = state;
-  // ROADS-7: состояние из сохранения прошло через JSON и потеряло метку разделяемой сети
-  // дорог — без неё каждый шаг мира копировал бы всю сеть заново.
-  shareRoadNetwork(s.planets);
-  installMapGeometry(s);
-  syncPlayerNames(s);
-  ME = 'p1';
-  AI_PLAYERS = new Map(aiPlayers);
-  for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
-  pirateIntro.reset();
-  hideSwarmDossier();
-  solo.reset();
-  // ONB-2 (found live): a leftover guide from whatever was on screen before (a
-  // tutorial the player exited without finishing/skipping, a stale reconnect) must
-  // never survive into this match — #spotlight is a document.body singleton, so an
-  // un-stopped tour keeps painting its last step over the NEW match too. Runs before
-  // `maybeStartPendingTour()` (below) arms this match's own guide, if any.
-  activeTour?.stop();
-  // Reset interaction + queues + camera to the framed whole-map view.
-  disarm('match', MOBILE); // выбор, прицелы и окна старого матча указывают на то, чего здесь нет
-  forgetAdditive();
-  if (chainMode) exitChainMode(); // режим «Приказ» не переживает смену матча
-  forgetChainRoutes(); // маршруты принадлежат карте СТАРОГО матча
-  resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
-  resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
-  worldMemo = null;
-  forgetRadarContacts();
-  resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
-  clearFlak();
-  forgetAway(); // reset the away-window baseline for the new match
-  banner = null; // clear any end-banner left by the menu-background match (else it sticks)
-  endScreen = null; // a fresh match must not open into the previous result
-  matchEnd.reset(); // новый матч зарабатывает свою награду
-  // The match goal, written AFTER the wipe so it is the first line a player can read.
-  // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
-  // elimination, or on domination — no "capital capture" victory exists.
-  const waves = data.modes[modeId ?? '']?.pve?.waves;
-  note(
-    modeId !== undefined && modeId === trainingModeId()
-      ? t('training.goal') // полигон кончается взятием миров противника, а не очками
-      : waves ? t('hud.goal.pve', { n: waves }) : t('hud.goal', { n: SCORE_LIMIT }),
-  );
-  defaultView(); // phone / flagship console: home; simple desktop: whole-map fit
-  setupEl.style.display = 'none';
-  // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
-  // practice tools off; startMatch() re-arms them if the setup checkbox was ticked.
-  if (!__PLAYER_BUILD__) {
-    resetSandboxRuntime();
-    sandboxConfig.enabled = false;
-    setSandboxButton(false);
-  }
-  // FOG-13: зрение ЭТОЙ партии — до засевающего шага мира, который вызывающий делает
-  // сразу следом, ещё до первого кадра. `s` и `ME` уже новые, а песочница прошлой
-  // партии уже снята: её выключенный туман не должен стать «видно всё» новой
-  // (замечание Codex на #1490).
-  refreshVision();
-  // Start the queued tour after the prepared HUD is actually visible.
-  snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
-}
-function startMatch(
-  setup: SetupConfig,
-  persist = true,
-  scenario: (st: GameState) => GameState = (st) => st,
-): void {
-  const st = scenario(newGame(setup));
-  // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
-  // Политика локального хоста хранится рядом с миром в одиночном сохранении.
-  const profiles = new Map<string, AiProfile>();
-  for (const seat of setup.seats) {
-    if (!seat.ai) continue;
-    const i = SEAT_META.findIndex((m) => m.id === seat.id);
-    profiles.set(seat.id, (i >= 0 ? seatAiProfile(setupSlots[i]) : null) ?? 'weak');
-  }
-  installMatch(st, profiles, st.modeId);
-  applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
-  // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
-  // checkbox; remember the home world for the immortal-home toggle and show the opener.
-  if (!__PLAYER_BUILD__) {
-    sandboxConfig.enabled = ($('setupsandbox') as HTMLInputElement | null)?.checked ?? false;
-    sandboxHomeId = setup.seats[0]?.start ?? null;
-    setSandboxButton(sandboxConfig.enabled);
-  }
-  enterSolo(persist);
-}
-
-/** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
-function startPvEMatch(dev = false): void {
-  const testing = !__PLAYER_BUILD__ && dev;
-  saveRun(); // preserve a paused normal attempt before replacing the in-memory world
-  beginAttempt(testing);
-  // Новая попытка (`YAG-5.1`); «Продолжить» — та же попытка, её исход придёт своим событием.
-  if (!testing)
-    getPlatform().analytics.emit('pve_started', {
-      chapter: pveChapter(sectorMission).id,
-      difficulty: pveDifficulty,
-      attempt: sectorAttempt,
-    });
-  const st = prepareSectorZeroRun(chapterWorld(sectorMission, pveDifficulty), sectorProgress, data);
-  // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
-  const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
-  // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
-  // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
-  // `pve` он не видел, потому что конфиг ехал без `modeId`.
-  installMatch(st, aiSeats, pveModeId(sectorMission));
-  enterRun(testing ? 'dev' : 'run');
-  if (!__PLAYER_BUILD__ && testing) {
-    resetSandboxConfig();
-    sandboxConfig.enabled = true;
-    sandboxHomeId = Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null;
-    setSandboxButton(true);
-    setDevSpeedControl(true);
-  }
-  // Seed the PvE section through the kernel before the first save. A page can
-  // close before its first animation frame; that must not lose a fresh attempt.
-  apply(advance(s, s.time + 1));
-  // Стартовые флоты главы — одним флотом вокруг корабля героя (решение владельца
-  // 2026-09-26, `decisions/startFleets.ts`). Сливает ядро, приказом: его правила в силе.
-  for (const m of startFleetMerges(s, ME)) {
-    const merged = order(s, mergeFleet(ME, m.from, m.into), s.time);
-    if (!merged.error) apply(merged);
-  }
-  // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
-  // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
-  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
-  showConnect(false);
-  showHub(false);
-  setupEl.style.display = 'none';
-  sciWin.classList.remove('show');
-  saveRun();
-  note(t('setup.pve.started'));
-  // Союзник на связи с первой минуты (`contactAtStart`, главы V и VI): встречи, которая
-  // зажигает чип «⬡ Союзник» в главе IV, не будет — та же заметка и мигание со старта.
-  if (linkedAlly(s, ME)) {
-    note(t('ally.contact.note'));
-    allyPulseUntil = performance.now() + 12_000;
-  }
-}
-
-/**
- * УЧЕБНЫЙ ПОЛИГОН «Протокол допуска» (`docs/sector-zero-map-concepts.md` §14). Не глава и не
- * забег: у мира нет секции `pve`, поэтому ни волн, ни досье Роя (§14.6), ни снимка забега,
- * ни засчёта в профиль. Темп и инструменты — забега (`setRunActive`), чтобы полигон учил
- * тому же управлению, что ждёт в главе I.
- */
-function startTraining(): void {
-  saveRun(); // пауза обычной экспедиции переживает полигон — «Продолжить» её поднимет
-  // Учебный противник сам не ходит (§14.2: соединения вводятся по этапам) — ИИ-мест нет.
-  // Герой, арсенал и оснащение — те же, что поедут в главу I (`prepareSectorZeroRun`):
-  // полигон учит тем кораблям, с которыми игрок пойдёт дальше.
-  // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
-  // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
-  setPendingGuide(() => {
-    const baseline = trainingBaseline(s, ME, data);
-    launchTour(
-      buildTrainingTour({
-        world: () => s,
-        me: ME,
-        data,
-        baseline,
-        ui: trainingTourUi({
-          world: () => s, me: () => ME, mobile: MOBILE,
-          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
-          ships: () => { setPlanetTab('ships'); },
-          // Synchronize the phone selection before Show expands its sheet.
-          render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
-        }),
-        introduced: forceIntroduced,
-      }),
-    );
-  });
-  installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
-  enterRun('training');
-  apply(advance(s, s.time + 1));
-  const merge = trainingFlagshipMerge(s, ME);
-  if (merge) {
-    const prepared = order(s, mergeFleet(ME, merge.from, merge.into), s.time);
-    if (!prepared.error) apply(prepared);
-  }
-  // TRN-3: силы противника, контратака и исход — у сценария; на входе он начинается заново.
-  resetTrainingScenario(s.time);
-  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
-  showConnect(false);
-  showHub(false);
-  setupEl.style.display = 'none';
-  sciWin.classList.remove('show');
-  note(t('training.started'));
-}
-
-/**
- * ПОЛИГОН ОСНОВНОЙ ИГРЫ (M2.15, заказ владельца 2026-09-29): все области и весь каталог,
- * старт песочницей (`provingGroundState`). Обычная партия основной игры — без режима, волн
- * и наград; соперник и Рой ходят местами ИИ, как в главах (`runAiSeats`). В одиночное
- * сохранение полигон не пишется: «Продолжить» в хабе остаётся за обычной партией.
- */
-function startProvingGround(): void {
-  leaveMatch();
-  const st = provingGroundState(data);
-  installMatch(st, runAiSeats(st, PROVING_GROUND_PLAYER, 'weak'));
-  applyTimeSpeed(setupSpeed);
-  showConnect(false);
-  showHub(false);
-  note(t('proving-ground.started'));
-}
-
-let creatingMatch = false;
-function createOnlineMatch(mapId: MapId): void {
-  if (creatingMatch) return;
-  const srv = resolveServer();
-  if (!srv) { note(t('acc.server-down')); return; }
-  // Подписи у двух кнопок свои: «Создать сетевую игру» в настройке схватки, «Создать» на
-  // странице «Матчи» (UIX-17.1). После запроса каждая возвращает свою.
-  const buttons = [
-    { button: $('setup-network-create') as HTMLButtonElement, label: t('setup.network.create') },
-    { button: $('match-create-go') as HTMLButtonElement, label: t('browser.create.go') },
-  ];
-  creatingMatch = true;
-  for (const { button } of buttons) { button.disabled = true; button.textContent = t('setup.network.creating'); }
-  detach('create match', (async () => {
-    try {
-      const pass = tokenFor(localStorage, srv.base, srv.nick);
-      const res = await fetch(`${httpBase(srv.base)}/matches`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(pass ? { authorization: `Bearer ${pass}` } : {}) },
-        body: JSON.stringify({ mapId }),
-      });
-      if (!res.ok) {
-        const refusal = await res.json().catch(() => null) as { error?: string } | null;
-        throw new Error(refusal?.error ?? 'E_CREATE_MATCH');
-      }
-      const body = await res.json() as { matchId: string };
-      await openSeatPicker(body.matchId);
-    } catch (err) {
-      note(t(err instanceof Error && err.message === 'E_MATCH_QUOTA' ? 'setup.network.quota' : 'setup.network.failed'));
-    }
-    finally {
-      creatingMatch = false;
-      for (const { button, label } of buttons) { button.disabled = false; button.textContent = label; }
-    }
-  })());
-}
-$('setup-network-create').addEventListener('click', () => {
-  if (!netSetup) createOnlineMatch(setupMapId);
-});
-$('match-create-go').addEventListener('click', () => {
-  createOnlineMatch(mapPreset(($('match-create-map') as HTMLSelectElement).value).id);
-});
-
-// --- match browser (the meta-shell "Play" tab) -------------------------------
-// The list itself — tabs, filter, archive and the hub's «Мои партии» — lives in
-// `matchBrowser.ts` (REFM-217); the server box it reads stays here.
-
-/** Normalize the pasted server box to a ws(s):// ORIGIN + read the nick. Returns
- *  null (and sets the status line) when either is missing/invalid. Shared by the
- *  match browser and `connect()`. */
-function resolveServer(): { base: string; nick: string } | null {
-  // Разбор набранного — `serverAddress.ts` (REFM-162): схема правится (скопированный из
-  // браузера `https://` → `wss://`, голый хост дополняется схемой страницы, а на
-  // HTTPS-странице `ws://` поднимается до `wss://` — иначе браузер молча режет сокет),
-  // путь отбрасывается, а пустой ПОЗЫВНОЙ не пускает дальше МОЛЧА: пробу режима
-  // аккаунтов зовут из загрузочного блока, до того как игрок что-то напечатал.
-  const step = resolveAddress({
-    server: srvInput.value,
-    nick: nickInput.value,
-    pageHttps: location.protocol === 'https:',
-  });
-  if (step.kind === 'ok') return { base: step.base, nick: step.nick };
-  if (step.kind !== 'need-nick') statusEl.textContent = t(step.key);
-  return null;
-}
-
-if (!__SECTOR_ZERO_ONLY__) activity = startPlayerActivity(() => {
-  const step=resolveBase(srvInput.value,location.protocol==='https:');
-  const base=step.kind==='ok' ? step.base : null;
-  const token=base ? sessionToken(base) : null;
-  return base && token ? {base:httpBase(base),token} : null;
-});
-
-// MUST stay a hoisted function declaration — NOT a `const` arrow. The boot block
-// (~900 lines above) does `await probeAuthMode(...)` during module evaluation, and an
-// async body runs synchronously up to its first `await` — so httpBase is CALLED long
-// before a `const` on this line would be initialized. esbuild's minifier lowers a
-// top-level `const` to `var`, so instead of a loud TDZ error this surfaced in the
-// deployed bundle as `TypeError: Kn is not a function`, which rejected the whole boot
-// chain: the welcome card never revealed its password field and a `?join=<id>` deep-link
-// never reached connectToMatch (the seat was never claimed).
+// Такт активности игрока — у экрана подключения (`connectScreen.ts`): он читает поле сервера.
+startActivity();
 
 // --- accounts (SES-2.5) -------------------------------------------------------
 // The account flow itself — the server's identity mode, the stored session, login-or-
@@ -4335,7 +3196,6 @@ const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, str
   pings: 'pingpanel',
   market: 'market',
   trader: 'trader',
-  corporation: 'corp',
   steward: 'steward',
   dossier: 'swarm-dossier',
   codex: 'codexhub',
@@ -4434,8 +3294,12 @@ window.addEventListener('keydown', (e) => {
 // `soloCheckpoint.ts` (REFM-213). Здесь только снимок политик хоста и проводка к миру, темпу
 // и экранам.
 function currentSoloSave(): SoloSave {
+  return { state: simSaved(s), ...soloSaveHost() };
+}
+/** Политики хоста в сохранении — всё, кроме мира. */
+function soloSaveHost(): Omit<SoloSave, 'state'> {
   return {
-    state: simLink ? simLink.saved(s) : s, ai: [...AI_PLAYERS],
+    ai: [...AI_PLAYERS],
     normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
     fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
     autoAssault: [...soloAutoAssault], memory: memory.dump(),
@@ -4447,6 +3311,7 @@ initSoloCheckpoint({
   practice: () => !__PLAYER_BUILD__ && sandboxConfig.enabled,
   inMatch,
   snapshot: currentSoloSave,
+  saveInBackground: (rules, done) => saveSimInBackground(soloSaveHost(), rules, done),
   halt: () => {
     speed = 0;
     // Мир стоит, пока игрок не нажмёт ▶, — ряд скорости показывает паузу, а не прежний темп.
@@ -4504,7 +3369,10 @@ initSectorRun({
   cameFromLink: () => cameFromLink,
   inMatch,
   note,
-  trainingWon: () => playChapterComic('training-1', 'outro', () => {}),
+  trainingWon: () => {
+    trainingResume.hide();
+    playChapterComic('training-1', 'outro', () => {});
+  },
   finalScenes: () => playTaskComic(runMissionRows(), runChain()),
   chapterWon: () => playChapterComic(pveChapter(sectorMission).id, 'outro', () => {}),
   playing: () => speed > 0 && !comicQueue.isBusy(),
@@ -4517,10 +3385,6 @@ initSectorRun({
   playSpeed: () => Number($('spd-play').dataset.speed),
 });
 
-/** Уход из матча ведёт в меню Sector Zero — из забега и из полигона, а не в хаб. */
-function leavesToSectorZero(): boolean {
-  return isSectorZeroRun() || isTraining();
-}
 
 // Профиль Sector Zero, его облачная копия и вкладка-хозяйка — `sectorProfile.ts` (REFM-209).
 // Здесь только проводка к забегу и экрану. Хуки зовутся позже, по событию или после
@@ -4638,6 +3502,41 @@ const trainingScenarioHost: TrainingScenarioHost = {
   },
 };
 
+// Слабое устройство (`decisions/mapSharpness.ts`): кадры матча судят его, пока вердикту есть что
+// поменять — чёткость или движение, которых игрок не выбирал, — а вердикта нет. Слабое — карта
+// сразу переходит на пиксель на точку, голограмма замирает, и это запоминается.
+const sharpGaps: number[] = []; // the frame gaps judged so far
+let sharpFrom = -1; // when the gaps start counting, after the warm-up; -1 — the map is not shown
+let sharpJudged = false; // this session's frames found the device fine
+function judgeMapSharpness(nowReal: number, dt: number): void {
+  const reach = slowVerdictReach(
+    SCREEN_DPR,
+    mapSharpChosen(),
+    motionChosen(),
+    reducedMotionAsked(),
+  );
+  if (!judgingFrames(reach, mapSlowSeen(), sharpJudged)) return;
+  if (!inMatch() || mapPreparation.active) {
+    sharpFrom = -1;
+    sharpGaps.length = 0;
+    return;
+  }
+  if (sharpFrom < 0) sharpFrom = nowReal + JUDGE_WARMUP_MS;
+  if (nowReal < sharpFrom || !saneGap(dt)) return;
+  sharpGaps.push(dt);
+  const slow = slowFrames(sharpGaps);
+  if (slow === null) return;
+  sharpGaps.length = 0;
+  if (!slow) {
+    sharpJudged = true;
+    return;
+  }
+  markMapSlow();
+  if (reach.sharp) resize();
+  if (!reach.motion) toast(t('settings.gfx.map-sharp.auto'));
+  else toast(reach.sharp ? t('settings.gfx.slow.auto') : t('settings.gfx.motion.auto'));
+}
+
 function frame(nowReal: number) {
   flushPinch();
   const wasHolographic = holographic.active();
@@ -4658,44 +3557,21 @@ function frame(nowReal: number) {
   if (selfHealArm(backArmed, topLayerOpen(), inMatch(), performance.now(), backHintAt)) armBack();
   const dt = nowReal - lastReal;
   lastReal = nowReal;
+  easeCam(dt); // камера, отпущенная растянутой за край карты, плывёт обратно
   // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
   // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
   if (saneGap(dt)) {
     fpsEma = fpsNext(fpsEma, dt);
     countNetFrame(dt);
   }
-  // Отдельный поток расчёта: сначала то, что он прислал, — мир, события и исходы своих
-  // приказов, — потом следующий шаг, уже от пришедшего мира.
-  if (simLink && !simEligible()) stopSim();
-  if (!simLink && simEligible()) {
-    const port = SIM_WORKER && workerPort(SIM_WORKER);
-    if (port) simLink = startSimLink(port, s, ME, matchMode());
-    else simBroken = true;
-  }
-  if (simLink) {
-    const sync = simLink.take();
-    if (sync) {
-      apply({ state: sync.state, events: sync.events });
-      for (const o of [...sync.driverOrders, ...sync.refused]) settleOrder(o.type, o.error);
-      if (sync.stepped) simView = netViewSnapshot(simView, s.time, nowReal);
-    }
-    if (simLink.failed !== null) {
-      // Мир на экране цел (последняя разность и неподтверждённые приказы) — кадр ведёт его дальше.
-      console.warn('sim worker failed:', simLink.failed);
-      stopSim();
-      simBroken = true;
-    }
-  }
+  judgeMapSharpness(nowReal, dt);
+  // Отдельный поток расчёта: сначала то, что он прислал (мир, события и исходы своих
+  // приказов), потом следующий шаг (`simDriver.ts`).
+  syncSim(nowReal);
   // `netWorld`, а не `NET`: на обрыве мир на экране всё ещё серверный, под туманом, и
   // локальный ход по нему выбил бы «безземельных» соперников и объявил ложную победу.
   const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy() || !!activeTour?.holdsClock, !!endScreen);
-  if (simRunning && simLink) {
-    simBacklog = stepBacklog(simBacklog, dt, speed, HOUR);
-    if (!simLink.busy && simBacklog > 0) {
-      simLink.step(s.time + simBacklog, !comicQueue.isBusy(), AI_PLAYERS, soloAutoAssault, nowReal);
-      simBacklog = 0;
-    }
-  } else if (simRunning) {
+  if (simRunning && !stepSim(dt, speed, nowReal)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for
     // an empty seat — so we only render its snapshots (no local AI runs here).
@@ -4724,12 +3600,7 @@ function frame(nowReal: number) {
   if (netView.t === null || netView.bornAt > (netShown?.at ?? -Infinity)) netShown = null;
   netShown = netViewFollow(netShown, netView, nowReal, s.time);
   netShownTime = netShown.time;
-  // На паузе картинка стоит на мире: досчитывать вперёд нечего.
-  if (!simRunning) {
-    simBacklog = 0;
-    simView = NET_VIEW_IDLE;
-  }
-  simShownTime = netViewAt(simView, nowReal, s.time);
+  settleSimClock(nowReal, simRunning);
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
@@ -4742,11 +3613,13 @@ function frame(nowReal: number) {
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
   // The sandbox edits the world in place (here and from its panel), so the same world
-  // object no longer means the same world: a sandboxed match keeps no vision or world memo.
+  // object no longer means the same world: a sandboxed match keeps no vision, world memo
+  // or planet list.
   if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) {
     enforceSandbox(s, ME, sandboxHomeId);
     forgetVision();
     worldMemo = null;
+    planetList = null;
   }
   refreshVision(); // fog projection for this frame; recomputed only when the world changes
   const preparingMap = prepareEnteringMap();
@@ -4948,9 +3821,6 @@ $('topback').addEventListener('click', () => {
   else history.back();
 });
 
-// mirror the chosen emblem into the top-left corner + the hub avatar
-applyEmblem();
-
 // collapsible rail — the hamburger toggles the tool panel; picking a tool closes it.
 function setRailOpen(open: boolean): void {
   railEl.classList.toggle('open', open);
@@ -4961,27 +3831,6 @@ railToggle.addEventListener('click', () => setRailOpen(!railEl.classList.contain
 document.getElementById('railtools')?.addEventListener('click', () => setRailOpen(false));
 document.getElementById('holo-tech')?.addEventListener('click', () => $('rail-tech').click());
 document.getElementById('holo-constructor')?.addEventListener('click', () => $('rail-constructor').click());
-
-// The hub avatar now opens the account portrait and medal editor.
-const emblemPick = document.getElementById('emblempick');
-document.getElementById('hubav')?.addEventListener('click', () => profile?.open());
-// Both the portrait and identity strip open the same saved profile.
-document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile?.open());
-document
-  .getElementById('ep-close')
-  ?.addEventListener('click', () => emblemPick?.classList.remove('show'));
-emblemPick?.addEventListener('click', (e) => {
-  const t = e.target as HTMLElement;
-  if (t.id === 'emblempick') {
-    emblemPick.classList.remove('show'); // backdrop tap closes
-    return;
-  }
-  const cell = t.closest('.ep-cell') as HTMLElement | null;
-  if (cell?.dataset.emblem) {
-    setPlayerEmblem(cell.dataset.emblem);
-    emblemPick.classList.remove('show');
-  }
-});
 
 // War prompt: a move routed through a player you're at peace with asks for
 // confirmation — DECLARE WAR dispatches it (after declaring war), CANCEL/backdrop drops it.
@@ -5111,37 +3960,8 @@ if (!bootJoinId && !bootReset && document.body.dataset.entry === 'sector-zero')
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
 // в `apkUpdate.ts`. Вне APK вызов тихо ничего не делает.
-if (currentBuild()) document.getElementById('hub-android')?.remove();
+// «Скачать APK» в шапке хаба: не внутри самого APK и не на iPhone/iPad (`decisions/apkOffer.ts`).
+if (!apkOfferShown({ insideApk: currentBuild() !== null, userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints ?? 0 }))
+  document.getElementById('hub-android')?.remove();
 if (!__SECTOR_ZERO_ONLY__) initApkUpdater();
 
-// --- corporation cabinet (AVA-C1/C2) -----------------------------------------
-// Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки: окно в партии
-// открывает рельса матча, а в хабе корпорация — своя вкладка (CORP-3, `hubTab('corp')`).
-// `authorizedBase` — та же политика, что у «Арсенала» и профиля; кэша сознательно нет.
-const corp = __SECTOR_ZERO_ONLY__
-  ? null
-  : initCorp({
-      root: () => $('corp'),
-      head: () => $('corphd'),
-      tabs: () => $('corptabs'),
-      body: () => $('corpbody'),
-      note,
-      errText,
-      onIntro: maybeIntro,
-      authorizedBase: hubAuthorizedBase,
-      hub: {
-        root: () => $('hp-corp'),
-        sheet: () => $('corp-sheet'),
-        note: (text) => {
-          hubNote.textContent = text;
-        },
-        canSignIn: () => !!resolveServer() && authMode === 'accounts',
-        signIn: () => {
-          showHub(false);
-          showConnect(true);
-          showStage('welcome');
-          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
-        },
-      },
-    });
-$('railcorp').addEventListener('click', () => corp?.open());

@@ -381,6 +381,10 @@ export const BuildingLevelSchema = z.object({
 
 export const BuildingDefSchema = z.object({
   name: z.string(),
+  /** Retained for existing worlds and accepted construction orders, but no longer
+   *  available for new construction. Omitted on active catalogue entries so old
+   *  parsed bundles keep their original shape and content hash. */
+  retired: z.boolean().optional(),
   cost: ResourceBagSchema.default({}),
   buildTimeHours: z.number().nonnegative().default(0),
   produces: ResourceBagSchema.default({}),
@@ -1319,8 +1323,21 @@ export const ResearchBoostDefSchema = z.object({
 });
 
 /** How a match is seated: N against N in two teams, or every player for themselves.
- *  A mode names the format; the lobby turns it into concrete seats (PVE-1.1). */
-export const TEAM_FORMATS = ['1v1', '2v2', '3v3', '4v4', '5v5', 'ffa'] as const;
+ *  A mode names the format; the lobby turns it into concrete seats (PVE-1.1). A
+ *  corporations battle goes up to 10 on 10 (CORP-8). */
+export const TEAM_FORMATS = [
+  '1v1',
+  '2v2',
+  '3v3',
+  '4v4',
+  '5v5',
+  '6v6',
+  '7v7',
+  '8v8',
+  '9v9',
+  '10v10',
+  'ffa',
+] as const;
 export const TeamFormatSchema = z.enum(TEAM_FORMATS);
 
 /**
@@ -1491,6 +1508,8 @@ export const TechnologyRulesSchema = z
 export const MatchPricingSchema = z
   .object({
     cost: z.record(z.string(), z.number().positive()).optional(),
+    /** Additional resource multipliers for ship hulls; other orders retain `cost`. */
+    shipCost: z.record(z.string(), z.number().positive()).optional(),
     hours: z.number().positive().optional(),
     start: z.record(z.string(), z.number().positive()).optional(),
   })

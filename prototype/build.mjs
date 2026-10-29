@@ -13,7 +13,7 @@ import { basename } from 'node:path';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 import { cursorCss, heatPointers } from './cursors.mjs';
 
-// One persistent site link for the desktop button and its offline-rendered QR.
+// One persistent site link for the hub's download button and its offline-rendered QR.
 const androidDistribution = JSON.parse(readFileSync(new URL('../mobile/distribution.json', import.meta.url), 'utf8'));
 const androidDownloadUrl = `${androidDistribution.origin}${androidDistribution.basePath}/player/latest.apk`;
 const androidQr = (await QRCode.toString(androidDownloadUrl, { type: 'svg', errorCorrectionLevel: 'M', margin: 4 }))
@@ -33,7 +33,9 @@ const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
+const corpFacilitiesCss = readFileSync(new URL('./corp-facilities.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
+const corpBattlesCss = readFileSync(new URL('./corp-battles.css', import.meta.url), 'utf8');
 
 /** Отдельный поток расчёта соло-мира (`simWorker.ts`) — свой файл рядом со страницей: политика
  *  CSP сервера и сайта пускает только поток со своего origin (`decisions/simWorker.ts`). Имя
@@ -703,6 +705,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .set-pal{padding:5px 10px;font-size:var(--fs-caption);cursor:pointer;color:var(--dim);
   background:rgba(53,214,230,.05);border:1px solid var(--line-hi);border-radius:4px;}
 .set-pal.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.14);}
+/* «Доход ресурсов: в час / в сутки» — выбор из двух значений, кнопки крупнее пресетов палитры. */
+.set-rate .set-pal{min-width:96px;min-height:36px;font-size:var(--fs-body);}
 .set-ctl input[type=color]{width:42px;height:26px;padding:0;border:1px solid var(--line-hi);
   border-radius:4px;background:none;cursor:pointer;}
 /* mini tile (ground garrison): a nameless icon·count chip — hover/tap dossier names it */
@@ -829,10 +833,10 @@ body:has(#spotlight.sl-map) #toasts .toast{visibility:hidden;}
 #spotlight .sl-skip-stage,#spotlight .sl-fold,#spotlight .sl-reveal{background:none;border:1px solid var(--line);color:var(--ink);
   font-size:var(--fs-body);cursor:pointer;padding:5px 9px;border-radius:6px;}
 #spotlight .sl-skip-stage:hover,#spotlight .sl-fold:hover,#spotlight .sl-reveal:hover{border-color:var(--cyan);}
-#spotlight-chip{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
+#spotlight-chip,#training-resume{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
   border:1px solid var(--cyan);color:var(--cyan);font-weight:700;font-size:var(--fs-body);
   padding:7px 12px;border-radius:16px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);}
-#spotlight-chip:hover{filter:brightness(1.1);}
+#spotlight-chip:hover,#training-resume:hover{filter:brightness(1.1);}
 /* codex popup — full stats + description on tile click */
 #codex{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
@@ -1043,9 +1047,10 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-body);color:var(--ink);}
 .set-lbl .set-sub{font-size:var(--fs-caption);color:var(--dim);}
 /* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
-/* UX-SET-1: четыре вкладки (Звук · Графика · Карта · Управление). Ширина — по подписи, а не
-   поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на телефоне. */
-.set-tabs{display:flex;gap:6px;margin:0 0 12px;}
+/* UX-SET-1: вкладки (Звук · Графика · Карта · Управление · Игра · Уведомления). Ширина — по
+   подписи, а не поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на
+   телефоне. Не влезли в строку — переносятся второй строкой, а не наезжают подписями. */
+.set-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
 .set-tabs button{flex:1 1 auto;min-height:36px;padding:0 8px;white-space:nowrap;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 @media (max-width:360px){.set-tabs{gap:4px;}.set-tabs button{padding:0 5px;font-size:var(--fs-caption);letter-spacing:0;}}
 .set-tabs button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
@@ -1307,6 +1312,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .fr-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fr-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
 .fr-wait{font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 12px 4px 31px;font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick > span{flex:1 0 100%;}
+.fr-priv{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;}
+.fr-priv input{margin-top:3px;accent-color:var(--cyan);}
+.fr-priv b{display:block;font-size:var(--fs-body);color:var(--ink);font-weight:600;}
+.fr-priv span span{display:block;font-size:var(--fs-caption);color:var(--dim);}
 @media(max-width:640px){
   /* кнопки строки — под палец, как в окне меток */
   .fr-b{padding:11px 12px;}
@@ -3431,22 +3442,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .fitpane .hgradeline.g-legendary{color:var(--amber);}
 .fitpane .hgradeline.g-main{color:var(--grn);}
 
-/* APK promotion belongs to the desktop hub; the QR is generated locally at build time. */
-.hub-android{display:none;align-items:center;gap:24px;margin:20px 0;padding:20px;
-  border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.045);}
-.hub-android-copy{flex:1;min-width:0;}
-.hub-android h2{margin:0 0 14px;font-size:var(--fs-title,18px);color:var(--ink);font-weight:600;}
-.hub-android .ha-download{display:inline-flex;min-height:44px;align-items:center;padding:10px 20px;
-  border:1px solid var(--cyan);border-radius:7px;color:var(--cyan);background:rgba(53,214,230,.12);
-  text-decoration:none;font-size:var(--fs-body);}
-.hub-android .ha-download:hover{background:rgba(53,214,230,.22);}
-.hub-android .ha-qr{flex:none;width:132px;text-align:center;text-decoration:none;color:var(--dim);font-size:var(--fs-caption);}
-.hub-android .ha-qr svg{display:block;width:132px;height:132px;background:#fff;margin-bottom:8px;}
-#ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
-#ub-notes:empty{display:none;}
 #ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
 #ub-status:empty{display:none;}
-@media (min-width:801px) and (pointer:fine){.hub-android{display:flex;}}
 
 /* in-app APK update banner + manual check (APK only; updater.ts toggles visibility).
    GLOBAL fixed banner — floats over ANY screen (welcome / hub / match), z above the
@@ -3456,7 +3453,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   padding:12px 14px;border:1px solid var(--cyan);border-radius:10px;
   background:rgba(4,20,26,.94);box-shadow:0 6px 28px rgba(0,0,0,.55),0 0 22px rgba(53,214,230,.16);}
 #updbar .ub-t{font-size:var(--fs-body);color:var(--dim);line-height:1.5;}
-#updbar .ub-t b{color:var(--ink);}
 #updbar .ub-row{display:flex;gap:10px;margin-top:10px;}
 #updbar .ub-go{flex:1;text-align:center;padding:11px 10px;border-radius:8px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.18);color:var(--cyan);font-size:var(--fs-body);text-decoration:none;cursor:pointer;}
@@ -3627,6 +3623,56 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   #hub .hub-crest{width:20px;height:20px;flex:0 0 20px;}
   #hub .hub-crest .dia{width:12px;height:12px;border-width:1.5px;}
   #hub .hub-bt{font-size:14px;line-height:1.2;letter-spacing:3px;}
+}
+/* «Скачать APK» — в шапке хаба рядом со знаком игры, в любом браузере, кроме iPhone/iPad и
+   самого APK (decisions/apkOffer.ts). Зелёный Android выделяет кнопку из бирюзы интерфейса;
+   раз в пять секунд по ней проходит блик и стрелка кивает вниз — движение редкое, а не сплошное.
+   QR для телефона генерируется при сборке и открывается наведением мыши на ПК. */
+#hub .hub-apk{position:relative;flex:0 0 auto;display:flex;margin-left:6px;}
+#hub .hub-apk-btn{position:relative;display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 16px;
+  overflow:hidden;border:1px solid rgba(61,220,132,.8);border-radius:999px;color:#d4ffe6;text-decoration:none;
+  background:linear-gradient(135deg,rgba(61,220,132,.26),rgba(53,214,230,.14));
+  box-shadow:0 0 14px rgba(61,220,132,.3),inset 0 0 10px rgba(61,220,132,.16);
+  font:600 var(--fs-body) var(--sf-font);white-space:nowrap;transition:background .2s,box-shadow .2s,color .2s;}
+#hub .hub-apk-btn::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.42) 50%,transparent 62%) 160% 0/250% 100% no-repeat;}
+#hub .hub-apk-ic{flex:none;width:18px;height:18px;}
+#hub .hub-apk-btn:hover{color:#fff;background:linear-gradient(135deg,rgba(61,220,132,.4),rgba(53,214,230,.22));
+  box-shadow:0 0 22px rgba(61,220,132,.5),inset 0 0 12px rgba(61,220,132,.24);}
+#hub .hub-apk-btn:active{transform:translateY(1px);}
+#hub .hub-apk-btn:focus-visible{outline:2px solid #d4ffe6;outline-offset:3px;}
+#hub .hub-apk-qr{display:none;}
+@media (prefers-reduced-motion:no-preference){
+  body:not(.holo-still) #hub .hub-apk-btn{animation:hub-apk-glow 5s ease-in-out infinite;}
+  body:not(.holo-still) #hub .hub-apk-btn::after{animation:hub-apk-shine 5s ease-in-out infinite;}
+  body:not(.holo-still) #hub .hub-apk-ic{animation:hub-apk-nod 5s ease-in-out infinite;}
+}
+@keyframes hub-apk-glow{0%,100%{box-shadow:0 0 14px rgba(61,220,132,.3),inset 0 0 10px rgba(61,220,132,.16);}
+  12%{box-shadow:0 0 26px rgba(61,220,132,.62),inset 0 0 14px rgba(61,220,132,.3);}}
+@keyframes hub-apk-shine{0%{background-position:160% 0;}22%,100%{background-position:-60% 0;}}
+@keyframes hub-apk-nod{0%,24%,100%{transform:none;}8%{transform:translateY(3px);}16%{transform:translateY(-1px);}}
+/* Телефон: шапка — одна тонкая строка, кнопка ниже и плотнее. Совсем узкий экран оставляет
+   только стрелку: имя кнопки остаётся подсказкой и для экранного диктора (aria-label). */
+@media (max-width:719px), ((pointer:coarse) and (max-height:519px)){
+  #hub .hub-apk{margin-left:2px;}
+  #hub .hub-apk-btn{height:30px;padding:0 11px;gap:5px;font-size:13px;}
+  #hub .hub-apk-ic{width:15px;height:15px;}
+  #hub .hub-bt{white-space:nowrap;}
+}
+@media (max-width:379px){#hub .hub-banner{gap:8px;}#hub .hub-apk-btn{padding:0 9px;gap:4px;font-size:12px;}}
+@media (max-width:349px){#hub .hub-apk-lbl{display:none;}#hub .hub-apk-btn{padding:0 8px;}}
+/* QR — ПК с мышью: файл нужен телефону, а не компьютеру. Наведение или фокус с клавиатуры
+   раскрывают карточку под кнопкой; невидимый мостик сверху держит её, пока мышь идёт вниз. */
+@media (hover:hover) and (pointer:fine){
+  #hub .hub-banner{overflow:visible;z-index:3;}
+  #hub .hub-apk-qr{position:absolute;top:100%;left:50%;z-index:5;width:204px;margin-top:12px;padding:14px 14px 12px;
+    transform:translateX(-50%);border:1px solid rgba(61,220,132,.55);border-radius:12px;background:rgba(4,20,26,.97);
+    box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 18px rgba(61,220,132,.18);text-align:center;text-decoration:none;
+    color:var(--dim);font-size:var(--fs-caption);}
+  #hub .hub-apk-qr::before{content:"";position:absolute;left:0;right:0;top:-14px;height:14px;}
+  #hub .hub-apk:is(:hover,:focus-within) .hub-apk-qr{display:block;}
+  #hub .hub-apk-qr b{display:block;color:var(--ink);font-size:var(--fs-body);font-weight:600;}
+  #hub .hub-apk-qr svg{display:block;width:132px;height:132px;margin:10px auto 8px;background:#fff;border-radius:4px;}
 }
 #hub .hub-id{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
 #hub .hub-av{width:44px;height:44px;border-radius:50%;border:1px solid var(--line-hi);background:rgba(3,12,16,.8);
@@ -3856,8 +3902,16 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb{display:flex;flex-direction:column;gap:14px;}
 .cb-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;}
 .cb-emb{flex:0 0 auto;display:block;overflow:visible;}
-.cb-emb path{fill:color-mix(in srgb,var(--cyan) 20%,transparent);stroke:var(--cyan);stroke-width:1.6;}
-.cb-emb text{fill:var(--sf-hi);font-weight:700;font-family:var(--sf-font);}
+.cb-emb-frame{fill:color-mix(in srgb,var(--cyan) 12%,transparent);stroke:var(--cyan);stroke-width:1.2;}
+.cb-emb-mark{fill:none;stroke:var(--cyan);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.cb-emblem-edit{display:grid;place-items:center;flex:none;min-width:56px;min-height:60px;padding:2px;border:1px solid transparent;border-radius:10px;background:transparent;cursor:pointer;}
+.cb-emblem-edit:hover{background:color-mix(in srgb,var(--cyan) 8%,transparent);border-color:var(--cyan);}
+.cb-emblems{display:grid;grid-template-columns:repeat(5,minmax(44px,1fr));gap:8px;max-width:380px;margin:10px 0 14px;}
+.cb-emblem-choice{display:grid;place-items:center;min-width:44px;min-height:50px;padding:5px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(5,23,30,.6);cursor:pointer;}
+.cb-emblem-choice:hover{border-color:var(--cyan);}
+.cb-emblem-choice[aria-pressed="true"]{border-color:var(--cyan);background:rgba(53,214,230,.16);box-shadow:inset 0 0 0 1px var(--cyan);}
+.cb-emblem-choice:focus-visible,.cb-emblem-edit:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
+.cb-emblem-choice:disabled,.cb-emblem-edit:disabled{opacity:.5;cursor:default;}
 .cb-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .cb-id h2{margin:0;font-size:var(--fs-title);font-weight:700;line-height:1.2;color:var(--sf-hi);overflow-wrap:anywhere;}
 .cb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:var(--fs-caption);color:var(--sf-dim);}
@@ -3883,8 +3937,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pano-scroll{border-radius:14px;border:1px solid var(--sf-edge);overflow:hidden;}
 .cb-pano{position:relative;width:100%;aspect-ratio:1200 / 540;background:#020a12;}
 .cb-pano > svg.bg{position:absolute;inset:0;width:100%;height:100%;display:block;}
-.cb-pano .pad{fill:rgba(53,214,230,.05);stroke:rgba(53,214,230,.35);stroke-width:1.5;stroke-dasharray:7 6;}
-.cb-pano .pad.on{fill:rgba(53,214,230,.1);stroke:rgba(53,214,230,.55);stroke-dasharray:none;}
+.cb-pano .pad{fill:color-mix(in srgb,var(--pad,#35d6e6) 5%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 35%,transparent);stroke-width:1.5;stroke-dasharray:7 6;}
+.cb-pano .pad.on{fill:color-mix(in srgb,var(--pad,#35d6e6) 10%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 55%,transparent);stroke-dasharray:none;}
 .cb-lot{position:absolute;padding:0;margin:0;border:0;background:none;color:inherit;cursor:pointer;pointer-events:none;border-radius:8px;}
 .cb-lot .spr{width:100%;height:100%;pointer-events:none;}
 .cb-lot :is(.spr g,.cb-tagl,.cb-bdg,.cb-plus){pointer-events:auto;}
@@ -3907,22 +3961,18 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-lot.open .cb-tagl{border-style:dashed;}
 .cb-lot.locked .cb-tagl,.cb-lot.locked .cb-tagl :is(b,i){color:var(--sf-dim);}
 .cb-bdg{display:none;}
-/* Голограммы: корпус, крыша, бок, окна, линии. Закрытое здание — пунктир первой части,
-   строящийся уровень — штриховка лесов (узор #corpHatch лежит в разметке хаба). */
+/* Нарисованные здания — картинки; голограммы их уровней красят фильтры #corpGhost и
+   #corpScaf из разметки хаба. Здание без рисунка — корпус: крыша, бок, окна; закрытое —
+   пунктир, строящееся — штриховка лесов (узор #corpHatch там же). */
 :is(#hp-corp,#corp-sheet) .spr{display:block;overflow:visible;}
 :is(#hp-corp,#corp-sheet) .spr .f{fill:rgba(53,214,230,.14);stroke:#35d6e6;stroke-width:1.4;stroke-linejoin:round;}
 :is(#hp-corp,#corp-sheet) .spr .t{fill:rgba(120,236,246,.3);stroke:#35d6e6;stroke-width:1.2;stroke-linejoin:round;}
 :is(#hp-corp,#corp-sheet) .spr .s{fill:rgba(20,90,110,.38);stroke:#35d6e6;stroke-width:1.2;stroke-linejoin:round;}
 :is(#hp-corp,#corp-sheet) .spr .w{fill:#a8f6fc;}
 :is(#hp-corp,#corp-sheet) .spr .wd{fill:rgba(168,246,252,.2);}
-:is(#hp-corp,#corp-sheet) .spr .ln{fill:none;stroke:#35d6e6;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-:is(#hp-corp,#corp-sheet) .spr .acc{fill:#ffb43a;}
-:is(#hp-corp,#corp-sheet) .spr .vi{fill:#b48cff;}
 :is(#hp-corp,#corp-sheet) .spr .ghost :is(.f,.t,.s){fill:none;stroke:rgba(140,233,242,.6);stroke-dasharray:4 4;}
-:is(#hp-corp,#corp-sheet) .spr .ghost .ln{stroke:rgba(140,233,242,.6);stroke-dasharray:4 4;}
-:is(#hp-corp,#corp-sheet) .spr .ghost :is(.w,.wd,.acc,.vi){opacity:.18;}
+:is(#hp-corp,#corp-sheet) .spr .ghost :is(.w,.wd){opacity:.18;}
 :is(#hp-corp,#corp-sheet) .spr .ghost.scaf :is(.f,.t,.s){fill:url(#corpHatch);stroke:#ffb43a;stroke-opacity:.85;}
-:is(#hp-corp,#corp-sheet) .spr .ghost.scaf .ln{stroke:#ffb43a;stroke-opacity:.85;}
 .cb-hud{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:12px;max-width:360px;padding:10px 14px;
   border-radius:12px;background:rgba(3,12,20,.86);border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);}
 .cb-hud.idle{border-color:var(--sf-edge);}
@@ -4002,6 +4052,15 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pips i.bld{background:repeating-linear-gradient(90deg,var(--amber) 0 2px,transparent 2px 4px);border-color:var(--amber);}
 /* Состав и казна: список слева, сбоку заявки, роли и баланс. */
 .cb-two{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start;}
+.cb-materials{margin-top:16px;}
+.cb-material-row{display:grid;grid-template-columns:minmax(0,1fr) 76px auto;gap:8px;align-items:center;border-bottom:1px solid var(--sf-edge);padding:10px 0;}
+.cb-material-row>div{min-width:0;overflow-wrap:anywhere;}
+.cb-material-row b,.cb-material-row small{display:block;}
+.cb-material-row small{font-size:var(--fs-caption);color:var(--sf-dim);margin-top:4px;line-height:1.5;}
+.cb-material-row input{width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;background:var(--sf-card);color:var(--sf-hi);border:1px solid var(--sf-edge);border-radius:8px;}
+.cb-materials .cb-lrow>b{font-size:var(--fs-caption);overflow-wrap:anywhere;}
+.cb-materials summary{cursor:pointer;padding:8px 0;}
+@media(max-width:540px){.cb-material-row{grid-template-columns:minmax(0,1fr) 92px;}.cb-material-row>div{grid-column:1/-1;}.cb-material-row button{min-height:42px;}}
 .cb-side{display:flex;flex-direction:column;gap:16px;min-width:0;}
 .cb-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px;border-radius:14px;border:1px solid var(--sf-edge);background:var(--sf-card);}
 .cb-card-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;}
@@ -4050,9 +4109,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-nc-hero h2{margin:0 0 6px;font-size:var(--fs-title);color:var(--sf-hi);}
 .cb-nc-hero p{margin:0 0 12px;max-width:56ch;}
 .cb-create{display:flex;flex-wrap:wrap;gap:8px;}
-.cb-create input{flex:1 1 200px;min-width:0;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--sf-edge);
-  background:var(--sf-inset);color:var(--sf-hi);font:500 15px var(--sf-font);}
-.cb-create input:focus{outline:2px solid var(--sf-accent);outline-offset:1px;border-color:var(--sf-accent);}
 .cb-rlist{display:flex;flex-direction:column;}
 .cb-rrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);}
 .cb-rrow:last-child{border-bottom:0;}
@@ -4135,12 +4191,29 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-lt.fut .cb-art .spr{opacity:.5;}
 .cb-lt figcaption{font-size:var(--fs-caption);line-height:1.35;color:var(--sf-dim);}
 .cb-lt figcaption b{margin-right:4px;color:var(--sf-hi);}
+/* Стили базы (CORP-14): штаб III уровня в каждом стиле, применённый обведён. */
+.cb-styles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.cb-sty{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0;}
+.cb-sty .cb-art{height:150px;padding:10px 10px 6px;border-radius:12px;border:1px solid var(--line);}
+.cb-sty.cur .cb-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-bd-art{aspect-ratio:1200 / 540;border-radius:12px;border:1px solid var(--line);overflow:hidden;}
+.cb-bd-art svg{display:block;width:100%;height:100%;}
+.cb-sty.cur .cb-bd-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-sty-h{margin:16px 0 8px;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
+.cb-sty figcaption{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+.cb-sty figcaption b{font-weight:600;color:var(--sf-hi);}
+.cb-sty-st{min-height:28px;display:inline-flex;align-items:center;padding:0 10px;border-radius:999px;border:1px solid var(--sf-edge);
+  font-size:var(--fs-caption);font-weight:600;color:var(--sf-dim);}
+.cb-sty-st.applied{color:var(--grn);border-color:color-mix(in srgb,var(--grn) 50%,transparent);}
+.cb-sty-st.owned{color:var(--cyan);border-color:var(--cyan-dim);}
 .cb-tablewrap{overflow-x:auto;}
 .cb-lvtable{width:100%;border-collapse:collapse;font-size:var(--fs-caption);}
 .cb-lvtable :is(th,td){padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
 .cb-lvtable th{font-weight:600;color:var(--sf-dim);}
 .cb-lvtable tr.cur td{background:var(--sf-sel);}
 .cb-lvtable td:first-child{font-weight:700;color:var(--sf-hi);white-space:nowrap;}
+/* CORP-6: участники и битвы, без которых штаб этого уровня не заказать */
+.cb-lvtable .cb-lv-cond{display:block;margin-top:2px;color:var(--sf-dim);}
 .cb-ms-h{display:flex;align-items:center;gap:14px;}
 .cb-ms-h small{display:block;margin-top:2px;font-size:var(--fs-caption);color:var(--sf-dim);}
 .cb-ms-acts{display:flex;flex-wrap:wrap;gap:8px;}
@@ -4163,7 +4236,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-pano-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
   .cb-pano{width:556px;height:250px;aspect-ratio:auto;}
   .cb-tagl,.cb-lot .cb-plus{display:none;}
-  .cb-bdg{position:absolute;right:6%;top:2%;display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
+  .cb-bdg{position:absolute;left:var(--bx,94%);top:var(--by,2%);transform:translate(-100%,-50%);display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
     background:rgba(3,12,20,.92);border:1px solid var(--cyan);color:var(--sf-hi);font-size:var(--fs-caption);font-weight:700;}
   .cb-lot.build .cb-bdg{border-color:var(--amber);color:var(--amber);}
   .cb-lot.open .cb-bdg{border-style:dashed;color:var(--cyan);}
@@ -4288,6 +4361,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
+${corpBattlesCss}
+${corpFacilitiesCss}
 /* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
    каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
    Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт
@@ -4535,6 +4610,16 @@ span.ar-fchip{cursor:default;}
 .sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
 .sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
 .sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
+/* Стиль базы: в карточке завершённый штаб, в описании все здания. */
+.sh-art-style{align-items:flex-end;}
+.sh-art-style .spr{display:block;height:64px;width:auto;max-width:100%;}
+.sh-dt .sh-art-style{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
+  background:radial-gradient(120% 90% at 50% 100%,#0d3447,#04121c 70%);}
+.sh-dt .sh-art-style .spr{min-width:0;width:100%;height:96px;}
+/* Фон базы (CORP-15): панорама без зданий. */
+.sh-art-bd{display:block;width:100%;max-width:150px;aspect-ratio:1200 / 540;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
+.sh-art-bd svg{display:block;width:100%;height:100%;}
+.sh-dt .sh-art-bd{max-width:none;border-radius:12px;}
 .sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
   background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
 .sh-mi.own{filter:grayscale(1);opacity:.5;}
@@ -4600,9 +4685,16 @@ span.ar-fchip{cursor:default;}
   .sh-tab{flex:0 0 auto;justify-content:flex-start;}
 }
 @container shop (max-width:520px){
-  /* four tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen */
-  .sh-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+  /* all tabs side by side, icon over label: the narrow strip used to hide «Материалы» off-screen.
+     A column is never narrower than its label: equal when the strip has room, otherwise each
+     label keeps its own width instead of being cut. */
+  .sh-tabs{display:grid;grid-template-columns:repeat(5,minmax(min-content,1fr));}
   .sh-tab{flex-direction:column;gap:2px;min-height:52px;padding:6px 2px;font-size:var(--fs-caption);}
+}
+@container shop (max-width:320px){
+  /* the smallest phones (320 px): the five labels fit only without gaps */
+  .sh-tabs{gap:0;padding:2px;}
+  .sh-tab{padding:6px 0;}
 }
 @container shop (max-width:699px){
   .sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
@@ -5095,7 +5187,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-market">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
     <!-- Торговец экспедиции («живой курс»): только в забеге с торговцем, видимость — кадр main.ts -->
     <button id="rail-trader" type="button" data-i18n-title="rail.trader.title" style="display:none">⚖<span class="rlbl" data-i18n="rail.trader.label"></span></button>
-    <button id="railcorp">⬢<span class="rlbl" data-i18n="rail.corp.title"></span></button>
     <button id="rail-chat" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
     <button id="rail-log">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
     <button id="rail-help">?<span class="rlbl" data-i18n="rail.help.title"></span></button>
@@ -5223,6 +5314,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             ${passwordToggle('cwpass')}
           </div>
         </form>
+        <button id="cwrecover" class="clink btn-quiet" type="button" style="display:none" data-i18n="welcome.recover.link"></button>
       </div>
       <div id="cregister" style="display:none">
         <button id="crback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
@@ -5253,7 +5345,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div class="crow">
           <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
         </div>
-        <button id="crrecover" class="clink btn-quiet" type="button" data-i18n="welcome.register.recover"></button>
       </div>
       <div id="crecover" style="display:none">
         <button id="crecback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
@@ -5376,8 +5467,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
      the returning-player path lands in the hub and never visits #connect, which is
      where this used to live (and why players never saw their updates). -->
 <div id="updbar" role="region" aria-live="polite">
-  <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
-  <p id="ub-notes"></p>
+  <div class="ub-t" data-i18n="upd.available"></div>
   <p id="ub-status"></p>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>
@@ -5480,6 +5570,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div class="hub-banner">
     <div class="hub-crest"><span class="dia"></span></div>
     <div class="hub-bt">VOID DOMINION</div>
+    ${external ? '' : `<div class="hub-apk" id="hub-android">
+      <a id="hub-android-download" class="hub-apk-btn" href="${androidDownloadUrl}" data-i18n-aria="hub.android.download">
+        <svg class="hub-apk-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+        <span class="hub-apk-lbl" data-i18n="hub.android.download"></span>
+      </a>
+      <a id="hub-android-qr" class="hub-apk-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr"><b data-i18n="hub.android.title"></b>${androidQr}<span data-i18n="hub.android.scan"></span></a>
+    </div>`}
   </div>
   <div class="hub-id">
     <button type="button" class="hub-av" id="hubav" data-i18n-title="hub.avatar.title" data-i18n-aria="hub.avatar.title">◆</button>
@@ -5514,14 +5611,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
-      ${external ? '' : `
-      <section class="hub-android" id="hub-android" aria-labelledby="hub-android-title">
-        <div class="hub-android-copy"><h2 id="hub-android-title" data-i18n="hub.android.title"></h2>
-          <a id="hub-android-download" class="ha-download" href="${androidDownloadUrl}" data-i18n="hub.android.download"></a>
-        </div>
-        <a id="hub-android-qr" class="ha-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr">${androidQr}<span data-i18n="hub.android.scan"></span></a>
-      </section>
-      `}
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
@@ -5582,7 +5671,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div id="news-sheet"></div>
   <div id="corp-sheet"></div>
   <!-- Штриховка «идёт стройка» для голограмм зданий корпорации: одна на документ, спрайты ссылаются по id -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><pattern id="corpHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(255,180,58,.07)"/><rect width="2.2" height="7" fill="rgba(255,180,58,.5)"/></pattern></defs></svg>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><pattern id="corpHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(255,180,58,.07)"/><rect width="2.2" height="7" fill="rgba(255,180,58,.5)"/></pattern><filter id="corpGhost" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".09 .3 .03 0 .08 .2 .66 .07 0 .3 .2 .69 .07 0 .34 0 0 0 .6 0"/></filter><filter id="corpScaf" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".19 .64 .07 0 .35 .13 .44 .05 0 .22 .04 .14 .01 0 .05 0 0 0 .7 0"/></filter></defs></svg>
 </div>
 <div id="emblempick">
   <div class="ep-box">

@@ -25,6 +25,7 @@ import {
   buildingLevel,
   buildingMaxLevel,
   matchCost,
+  matchUnitCost,
   matchHours,
 } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
@@ -92,9 +93,11 @@ export function buildFx(def: BuildingDef, level: number): string {
   // было вовсе: строку «строит корабли» здание делило с верфью, а про челноки не
   // говорило ничего.
   if ((lv.shuttleBay ?? 0) > 0) fx.push(t('build.fx.hangar', { n: lv.shuttleBay ?? 0 }));
+  // Содержание здания в данных — за СУТКИ (как у юнитов): `per: 'd'` пересчитывает его в
+  // единицу игрока, а не подписывает суточное число часовым суффиксом.
   const keep = resLine(
     Object.fromEntries(Object.entries(lv.upkeep ?? {}).map(([r, n]) => [r, -(n ?? 0)])),
-    { sign: true, per: 'h' },
+    { sign: true, per: 'd' },
   );
   if (keep) fx.push(keep);
   return fx.join(' · ');
@@ -144,6 +147,20 @@ export function buildRowState(
   // и строка горела «строится» с первым уровнем. Его состояние — проба улучшения ниже.
   if (mine.length === 0 && localQueued(planetId, id))
     return { st: 'queued', waiting: waiting('building') };
+  // Retired definitions still describe saved buildings and paid orders. Only a
+  // fresh choice disappears; restoring an old match must not hide its work.
+  if (mine.length === 0 && data.buildings[id]?.retired) {
+    const paused = node?.pausedConstruction?.some(
+      (q) => q.kind === 'building' && q.building === id,
+    );
+    if (waiting('building') || paused) return { st: 'queued', waiting: true };
+    const active = state.scheduled.some((e) => {
+      if (e.type !== 'construction.complete') return false;
+      const q = e.payload as { kind?: string; planetId?: string; building?: string };
+      return q.kind === 'building' && q.planetId === planetId && q.building === id;
+    });
+    return active ? { st: 'queued', waiting: false } : { st: 'hidden' };
+  }
   // Вид провинции этого здания не пускает — строки нет вовсе, а не замок с причиной
   // (решение владельца 2026-09-26: «если в провинции по её типу нельзя что-то строить,
   // этого просто нет в выборе»). Спрашиваем воротами вида, а не кодом отказа: ядро
@@ -331,7 +348,8 @@ export function unitScreenHtml(
     .map((id) => {
       const def = data.units[id];
       if (!def) return '';
-      if (isLander(def)) return landerRowHtml(state, me, planetId, id, res, probe, lockText, unitArt(state, me, id));
+      if (isLander(def))
+        return landerRowHtml(state, me, planetId, id, res, probe, lockText, unitArt(state, me, id));
       const code = probe(buildUnit(me, planetId, id, 1));
       if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
       const locked = code !== null && code !== 'E_INSUFFICIENT';
@@ -342,7 +360,7 @@ export function unitScreenHtml(
       return (
         `<div class="bw-item st-${locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
-        `<div class="bw-foot"><span>${cost(matchCost(state, def.cost), res)}</span><span class="bw-dur">${fmtDur(matchHours(state, def.buildTimeHours))}</span></div></div>`
+        `<div class="bw-foot"><span>${cost(matchUnitCost(state, def), res)}</span><span class="bw-dur">${fmtDur(matchHours(state, def.buildTimeHours))}</span></div></div>`
       );
     })
     .join('');

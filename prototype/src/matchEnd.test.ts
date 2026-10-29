@@ -170,6 +170,20 @@ describe('конец матча — награда выдаётся один р�
     expect(w.meta()).toEqual(meta());
   });
 
+  it('победа на полигоне просит стартовый пакет один раз, поражение — нет', () => {
+    let asked = 0;
+    const pack = { research: 3, warrants: 20 };
+    const won = wired({ training: () => true, trainingAward: () => (asked++, pack) });
+    expect(won.api.check()).toMatchObject({ training: true, trainingReward: pack });
+    expect(won.api.check()).toBeNull();
+    expect(asked).toBe(1);
+    const taken = wired({ training: () => true, trainingAward: () => null });
+    expect(taken.api.check()).not.toHaveProperty('trainingReward');
+    const lost = wired({ training: () => true, trainingAward: () => (asked++, pack) }, ended({ winner: 'p2' }));
+    expect(lost.api.check()).not.toHaveProperty('trainingReward');
+    expect(asked).toBe(1);
+  });
+
   it('Sector Zero отдаёт экрану разбивку засчёта (PVR-5.4)', () => {
     const summary = { attempt: 1, chapter: 'pve-1', won: false, waves: 4, totalWaves: 10, base: 5, objectives: [], bonus: 0, total: 5, warrants: 25, unlocked: 0 };
     const w = wired({ runAward: () => 5, runSummary: () => summary });

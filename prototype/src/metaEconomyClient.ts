@@ -15,8 +15,10 @@
  * - a response the screen cannot draw never replaces a valid view (`accept` throws).
  */
 import type { CommerceOffer } from '../../packages/protocol/src/commerce';
+import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import type { MetaEconomyView } from '../../packages/protocol/src/metaEconomyView';
 import { hasKey } from '../../localization/runtime';
+import { parseCorpStyle } from '../../decisions/corpStyle';
 import { refusalKeyOf } from '../../decisions/refusalText';
 
 export interface MetaSession {
@@ -47,11 +49,15 @@ export interface MetaEconomyClientHost {
   /** After a confirmed write and its re-read (refresh what depends on the account). */
   changed?(): Promise<void>;
   requestId?(): string;
+  /** Also read the corporation's base styles with every view (CORP-14, the shop). */
+  corpStyle?: boolean;
 }
 
 export interface MetaEconomyClient {
   view(): MetaEconomyView | null;
   offers(): readonly CommerceOffer[];
+  /** The caller's corporation styles: null outside a corporation, undefined when unread. */
+  corpStyle(): MetaCorpStyleView | null | undefined;
   busy(): boolean;
   status(): MetaEconomyStatus;
   refresh(): Promise<void>;
@@ -64,6 +70,7 @@ const sameSession = (a: MetaSession | null, b: MetaSession | null): boolean =>
 export function createMetaEconomyClient(host: MetaEconomyClientHost): MetaEconomyClient {
   let view: MetaEconomyView | null = null;
   let offers: CommerceOffer[] = [];
+  let corpStyle: MetaCorpStyleView | null | undefined;
   let session: MetaSession | null = null;
   let generation = 0;
   let busy = false;
@@ -89,9 +96,14 @@ export function createMetaEconomyClient(host: MetaEconomyClientHost): MetaEconom
   };
 
   const load = async (auth: MetaSession, current: number): Promise<void> => {
-    const [raw, commerce] = await Promise.all([
+    const [raw, commerce, style] = await Promise.all([
       json(auth, '/meta-economy/me'),
       json(auth, '/commerce/offers').catch(() => ({ offers: [] })),
+      // The corporation service is another dependency: its failure only greys the style
+      // buttons, it never hides the account.
+      host.corpStyle
+        ? json(auth, '/meta-economy/corp-style').then(parseCorpStyle, () => undefined)
+        : undefined,
     ]);
     if (current !== generation) return;
     if (!sameSession(auth, await host.authorizedBase())) {
@@ -114,6 +126,7 @@ export function createMetaEconomyClient(host: MetaEconomyClientHost): MetaEconom
     host.accept?.(next, safeOffers);
     view = next;
     offers = safeOffers;
+    corpStyle = style;
   };
 
   const refresh = async (): Promise<void> => {
@@ -182,6 +195,7 @@ export function createMetaEconomyClient(host: MetaEconomyClientHost): MetaEconom
   return {
     view: () => view,
     offers: () => offers,
+    corpStyle: () => corpStyle,
     busy: () => busy,
     status: () => status,
     refresh,

@@ -19,6 +19,7 @@ import {
   sectorModulesFor,
   sectorSkillOpenTo,
   sovereignRepairCost,
+  TRAINING_REWARD,
   WARRANTS_PER_KILL,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
@@ -292,6 +293,21 @@ describe('Sector Zero persistent preparation', () => {
     const doubled = change(settled, { kind: 'double-reward' });
     expect(doubled.warrants - settled.warrants).toBe(settled.lastRun!.warrants);
     expect(doubled.research - settled.research).toBe(settled.lastReward);
+  });
+
+  it('стартовый пакет полигона платится один раз на профиль и переживает сохранение', () => {
+    const before = fresh();
+    const paid = change(before, { kind: 'training-reward' });
+    expect(paid.research - before.research).toBe(TRAINING_REWARD.research);
+    expect(paid.warrants - before.warrants).toBe(TRAINING_REWARD.warrants);
+    expect(paid.trainingRewarded).toBe(true);
+    expect(changeSectorZeroProgress(paid, { kind: 'training-reward' }, data)).toBeNull();
+    const saved = parseSectorZeroProgress(JSON.stringify(paid), data);
+    expect(saved.trainingRewarded).toBe(true);
+    expect(changeSectorZeroProgress(saved, { kind: 'training-reward' }, data)).toBeNull();
+    // Правленое значение не закрывает пакет: отметку ставит только `true`.
+    const forged = parseSectorZeroProgress(JSON.stringify({ ...before, trainingRewarded: 'yes' }), data);
+    expect(forged.trainingRewarded).toBeUndefined();
   });
 
   it('мусорный счёт в состоянии не платит: отрицательное и дробное — ноль', () => {

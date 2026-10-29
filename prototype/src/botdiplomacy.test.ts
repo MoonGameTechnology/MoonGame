@@ -21,6 +21,7 @@ import {
   getOffer,
   type GameState,
 } from '../../packages/shared-core/src/index';
+import { approvalLedger, fullApproval } from './botFavour';
 
 // In the default setup p1 is the human, p2 the AI (a tracked bot).
 describe('bot diplomacy — favour meter', () => {
@@ -195,5 +196,29 @@ describe('approvalView — the favour a viewer is sent', () => {
     expect(
       diffState(approvalView(st, 'p1'), approvalView(next, 'p1')).meta?.approval,
     ).toBeUndefined();
+  });
+
+  it('fullApproval puts the rest of the table back under the view, its slice fresh', () => {
+    let st = order(threeSeats(), declareWar('p2', 'p3'), 0).state;
+    const full = approvalLedger(st); // an earlier full copy…
+    st = order(st, declareWar('p1', 'p2'), 0).state; // …and since then p2's opinion of p1: 60 → 30
+    const view = approvalView(st, 'p1');
+    const before = JSON.stringify(view);
+    expect(approvalLedger(fullApproval(view, full))).toEqual(approvalLedger(st));
+    expect(JSON.stringify(view)).toBe(before);
+    expect(fullApproval(view, undefined)).toBe(view); // no full ledger: nothing to put back
+  });
+
+  it('a seat eliminated after the full copy leaves the table both ways (BF-33)', () => {
+    const full = approvalLedger(threeSeats());
+    let st = structuredClone(threeSeats());
+    for (const planet of Object.values(st.planets)) {
+      if (planet.owner === 'p3') planet.owner = 'p1';
+    }
+    st = advance(st, st.time + HOUR).state;
+    expect(st.players.p3!.status).toBe('defeated');
+    const back = approvalLedger(fullApproval(approvalView(st, 'p1'), full));
+    expect(back).toEqual(approvalLedger(st));
+    expect(back).toEqual({ p2: { p1: FAVOUR_BASE } });
   });
 });

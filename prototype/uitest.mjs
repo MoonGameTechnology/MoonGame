@@ -205,6 +205,8 @@ import { startGuidedMatch as __startGuidedMatch } from './guideFlow';
 import { battleBadgePoint as __battleBadgePoint } from '../../decisions/battleTap';
 // Узел флота — у тумана (\`mapFog.ts\`): с REFM-224 \`main.ts\` его не импортирует.
 import { fleetNode as __fleetNode } from './mapFog';
+// Флаг слота схватки — у владельца (\`soloCheckpoint.ts\`): с REFM-245 \`main.ts\` его не читает.
+import { soloSaveActive as __soloSaveActive } from './soloCheckpoint';
 module.exports = {
   battleFixture: () => {
     const before = s;
@@ -222,7 +224,7 @@ module.exports = {
     clearSelection();
     const badge = __battleBadgePoint(world(__battleAnchor(s.battles['ui-battle'])));
     __selectAt(badge.x, badge.y);
-    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
+    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; document.getElementById('battlewin').classList.remove('show'); clearSelection(); } };
   },
   links: (id) => [...(s.planets[id].links ?? [])],
   tapWorld: (id) => { const p = world(s.planets[id].position); __selectAt(p.x, p.y); },
@@ -252,7 +254,7 @@ module.exports = {
   backLabel: () => t('side.summary.back'),
   dev: () => ({ active: sectorDevActive, fog: sandboxConfig.fog, reveal: vision === null }),
   finishDev: () => { s.match = { ...s.match, status: 'ended', winner: ME }; awardSectorRun(); tickRunSave(performance.now()); },
-  solo: () => ({ active: soloSaveActive, speed, mode: matchMode(), save: currentSoloSave() }),
+  solo: () => ({ active: __soloSaveActive, speed, mode: matchMode(), save: currentSoloSave() }),
   breakTeam: () => {
     const partner = Object.values(s.players).find(p => p.id !== ME && !p.npc && p.team === s.players[ME].team);
     return order(s, { id: 'resume-team-guard', type: 'diplomacy.declare', playerId: ME,

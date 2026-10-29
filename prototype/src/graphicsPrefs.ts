@@ -14,8 +14,15 @@
  * Форма REFM: имена функций сохранены (`fxBlur`, `pcUi`), поэтому их вызовы в рендере не
  * изменились — переехало только объявление.
  */
+import { mapSharp, motionLive } from '../../decisions/mapSharpness';
 import { readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
 import { breath, type Breath } from './pulseFx';
+
+/** Выбор игрока из хранилища: `null` — ключа нет, не выбирал. */
+const readChoice = (key: string): boolean | null => {
+  const raw = readRaw(key);
+  return raw === '1' ? true : raw === '0' ? false : null;
+};
 
 /**
  * Свечение и ореолы: мягкие диски вокруг миров, флотов и границ, широкие полосы рамки и
@@ -56,8 +63,9 @@ export function fxBlur(n: number): number {
  *
  * ПО УМОЛЧАНИЮ БЕРЁТСЯ ИЗ СИСТЕМЫ. `prefers-reduced-motion: reduce` — это заявленная
  * потребность человека (вестибулярные расстройства, укачивание), а не предпочтение
- * оформления, поэтому она уважается ДО того, как игрок откроет настройки. Явный тумблер
- * потом перекрывает системный ответ в обе стороны.
+ * оформления, поэтому она уважается ДО того, как игрок откроет настройки. Слабое устройство
+ * слои тоже останавливает: стоящую голограмму кадр не перерисовывает
+ * (`decisions/mapSharpness.ts`, правило 5). Явный тумблер перекрывает оба ответа в обе стороны.
  *
  * Выключенное движение НЕ убирает слой, а замораживает его в СЕРЕДИНЕ размаха
  * (`Breath.base`): информация остаётся на экране, уходит только колебание. Убрать слой
@@ -75,17 +83,22 @@ function systemPrefersReducedMotion(): boolean {
     return false;
   }
 }
-let motion = readBool('void.motion', !systemPrefersReducedMotion());
-export const motionOn = (): boolean => motion;
+let motionChoice = readChoice('void.motion');
+const reducedMotion = systemPrefersReducedMotion();
+/** Выбор игрока; `null` — не выбирал, решают система и кадры. */
+export const motionChosen = (): boolean | null => motionChoice;
+/** Система просит меньше движения. */
+export const reducedMotionAsked = (): boolean => reducedMotion;
+export const motionOn = (): boolean => motionLive(motionChoice, reducedMotion, mapSlow);
 export function setMotion(v: boolean): void {
-  motion = v;
+  motionChoice = v;
   writeBool('void.motion', v);
 }
 
 /** Единственный кран для дыхания слоёв — аналог {@link fxBlur} для движения.
  *  Выключено → середина размаха, то есть слой виден и неподвижен. */
 export function fxBreath(now: number, b: Breath): number {
-  return motion ? breath(now, b) : b.base;
+  return motionOn() ? breath(now, b) : b.base;
 }
 
 /** Глубокий космос: дрейфующие туманности и звёздные точки, запечённые в статический
@@ -96,6 +109,28 @@ export const starfieldOn = (): boolean => starfield;
 export function setStarfield(v: boolean): void {
   starfield = v;
   writeBool('void.starfield', v);
+}
+
+/**
+ * Чёткая карта (`decisions/mapSharpness.ts`): холст карты в полную плотность экрана или в
+ * пиксель на точку. По умолчанию — по вердикту кадров: слабое устройство снимает чёткость само
+ * и помнит это. Явный тумблер игрока перекрывает вердикт в обе стороны — как у свечения.
+ */
+let mapSharpChoice = readChoice('void.mapSharp');
+let mapSlow = readBool('void.mapSlow', false);
+/** Выбор игрока; `null` — не выбирал, решают кадры. */
+export const mapSharpChosen = (): boolean | null => mapSharpChoice;
+/** Кадры однажды сказали, что устройство слабое (правило 2). */
+export const mapSlowSeen = (): boolean => mapSlow;
+export const mapSharpOn = (): boolean => mapSharp(mapSharpChoice, mapSlow);
+export function setMapSharp(v: boolean): void {
+  mapSharpChoice = v;
+  writeBool('void.mapSharp', v);
+}
+/** Запомнить вердикт кадров «устройство слабое». */
+export function markMapSlow(): void {
+  mapSlow = true;
+  writeBool('void.mapSlow', true);
 }
 
 /** Счётчик кадров в углу. По умолчанию ВЫКЛ (dev-режим и рассинхрон включают его сами). */

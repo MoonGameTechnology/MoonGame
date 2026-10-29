@@ -1,16 +1,20 @@
+import { CorpMaterials } from '../packages/server/src/corpMaterials';
+import { registerCorpMaterialsApi } from '../packages/server/src/corpMaterialsApi';
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
+import { ArchiveCapacityError, ArchiveRoomCache, HOST_ROOM_LIMIT } from '../packages/server/src/matchArchive';
+import { PostgresArchiveCatalog, StoreArchiveCatalog } from '../packages/server/src/matchArchiveCatalog';
 import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from '../packages/server/src/registrationRewardStore';
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
 import { MemoryDropStore } from '../packages/server/src/store';
 import { MetaEconomy } from '../packages/server/src/metaEconomy';
-import { loadMetaEconomyCatalog } from '../packages/server/src/metaEconomyCatalog';
+import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from '../packages/server/src/metaEconomyCatalog';
 import { registerMetaEconomyApi } from '../packages/server/src/metaEconomyApi';
 import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from '../packages/server/src/metaEconomyStore';
 import { createMetaRewardDelivery } from '../packages/server/src/metaEconomyDelivery';
 import { commerceOffers } from '../packages/server/src/commerceCatalog';
 import { registerMetaCommerce } from '../packages/server/src/metaCommerce';
-import { loadDropTables, loadStarterArsenal } from '../packages/server/src/scenario';
-import { grantStarterArsenal } from '../packages/server/src/arsenal';
+import { loadAvaMaps, loadDropTables, loadStarterArsenal } from '../packages/server/src/scenario';
+import { arsenalSnapshotOf, grantStarterArsenal } from '../packages/server/src/arsenal';
 import { initializeOrdinaryArsenal, syncAccountArsenal } from '../packages/server/src/mainGameArsenal';
 import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/store';
 import { corporateEndpoint, registerCorporateGateway, registerCorporateMaintenance } from '../packages/server/src/corporateTransport';
@@ -25,8 +29,27 @@ import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
 import { MemoryAnnouncementStore, MemoryAvaFeedStore, PostgresAnnouncementStore, PostgresAvaFeedStore, type AnnouncementStore, type AvaFeedStore } from '../packages/server/src/store';
 import { registerNewsApi } from '../packages/server/src/newsApi';
+// CORP-5: corporation battles on the players' host — the same AvA slice as the production
+// entry (`packages/server/src/main.ts`): challenges, the roster, the battle room, its result,
+// medals and the corp-warehouse handouts.
+import { MemoryAvaChallengeStore, MemoryAvaResultStore, MemoryAvaRosterStore, MemoryAvaSessionStore, MemoryCorpRentStore, MemoryMedalStore, PostgresAvaChallengeStore, PostgresAvaResultStore, PostgresAvaRosterStore, PostgresAvaSessionStore, PostgresCorpRentStore, PostgresDropStore, PostgresMedalStore, type AvaChallengeStore, type AvaResultStore, type AvaRosterStore, type AvaSessionStore, type CorpRentStore, type DropStore, type MedalStore } from '../packages/server/src/store';
+import { AvaService } from '../packages/server/src/avaService';
+import { MedalService } from '../packages/server/src/medalService';
+import { loadMedalCatalog } from '../packages/server/src/medalCatalog';
+import { registerAvaApi, registerAvaFeed } from '../packages/server/src/avaApi';
+import { registerMedalApi } from '../packages/server/src/medalApi';
+import { AvaOrchestrator, avaBotOrders, avaDeniedAction, type AvaSessionSpec } from '../packages/server/src/avaOrchestrator';
+import { isAvaMatchId } from '../packages/protocol/src/ava';
+import { createAvaSweeps } from '../packages/server/src/avaSweeps';
+import { CorpArsenalService } from '../packages/server/src/corpArsenalService';
+import { registerCorpArsenalApi } from '../packages/server/src/corpArsenalApi';
+import { registerAvaWarApi } from '../packages/server/src/avaWarApi';
+import { createCorporateServices } from '../packages/server/src/corporateTransactions';
+import { declareAvaWar } from '../packages/server/src/serverWiring';
+import { salvageFromEvents } from '../packages/server/src/dropRoller';
 import { DEFAULT_MAP_ID, MAP_IDS, mapPreset, victoryFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
+import { settleMedalRewards } from '../packages/server/src/medalRewards';
 // UIX-4.4 (часть 1): push до игроков — тот же приёмник подписки и та же рассылка «своё и
 // срочное», что у канонического хоста; без VAPID в окружении не монтируется ничего.
 import { registerPushApi } from '../packages/server/src/pushApi';
@@ -44,7 +67,7 @@ import { aiOrderSlices } from './src/aiOrderSlices';
 import { botAcceptsOffer, botBehaviorOrders, botStyle } from './src/botBehavior';
 import { botSocialAvailable, createBotSocial } from '../packages/server/src/botSocial';
 import { botChatText } from '../scripts/botChatText';
-import type { Action } from '../packages/shared-core/src/index';
+import type { Action, DomainEvent } from '../packages/shared-core/src/index';
 import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
 // Serves the prototype's OWN world over WebSocket so two browsers — or two phones
 // running the APK — can play the same session against one authoritative core.
@@ -116,6 +139,8 @@ import {
   revokeAccountConnections,
   configFromEnv,
   type AccountStore,
+  type JoinFailure,
+  type JoinResult,
   type FriendStore,
   type CommanderStore,
   type MatchStore,
@@ -156,10 +181,14 @@ import {
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
 import { createSnapshotWriter } from '../packages/server/src/snapshotWriter';
+import { commitMatch } from '../packages/server/src/matchCommit';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
-import { isOperatorRequest, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
+import { isMetricsReaderRequest, isOperatorRequest, metricsReaderTokenFromEnv, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
+import { registerOperatorMatchApi } from '../packages/server/src/operatorMatchApi';
+import { sessionSpeed } from '../packages/server/src/sessionSpeed';
+import { metricsReaderSummary } from '../packages/server/src/metrics';
 const { Pool } = pgPkg;
 
 // RESIL-3 — ДО всего остального. Этот хост важнее близнеца: именно он собирается в
@@ -247,6 +276,7 @@ const SEAT_LOCK = process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'tr
 // Operator access to /metrics/* from beyond loopback (prod behind Docker). Unset or
 // shorter than 32 chars = loopback only. See `operatorAccess.ts`.
 const METRICS_TOKEN = operatorTokenFromEnv(process.env);
+const METRICS_READER_TOKEN = metricsReaderTokenFromEnv(process.env);
 const TIME_SCALE = Math.max(1, Number(process.env.TIME_SCALE ?? 1) || 1);
 
 // Serve the built prototype HTML so a peer just opens `http://host:port/` (no file
@@ -321,6 +351,16 @@ let corpStore: CorpStore;
 // admin's announcements in the game database.
 let feedStore: AvaFeedStore;
 let announcementStore: AnnouncementStore;
+// CORP-5: the AvA stores. Challenges, rosters and results belong to the corporations
+// (remote when `CORPORATIONS_URL` is set); the battle sessions, medals, the warehouse
+// handouts and the battle salvage stay in the game database.
+let challengeStore: AvaChallengeStore;
+let rosterStore: AvaRosterStore;
+let resultStore: AvaResultStore;
+let sessionStore: AvaSessionStore;
+let medalStore: MedalStore;
+let corpRentStore: CorpRentStore;
+let dropStore: DropStore;
 // EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
 // из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
 // на аккаунт превращает регистрацию в монетный двор (ARS-0 anti-RMT).
@@ -345,12 +385,21 @@ if (DATABASE_URL) {
   corpStore = new PostgresCorpStore(pool);
   feedStore = new PostgresAvaFeedStore(pool);
   announcementStore = new PostgresAnnouncementStore(pool);
+  challengeStore = new PostgresAvaChallengeStore(pool);
+  rosterStore = new PostgresAvaRosterStore(pool);
+  resultStore = new PostgresAvaResultStore(pool);
+  sessionStore = new PostgresAvaSessionStore(pool);
+  medalStore = new PostgresMedalStore(pool);
+  corpRentStore = new PostgresCorpRentStore(pool);
+  dropStore = new PostgresDropStore(pool);
   arsenalStore = new PostgresArsenalStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
   metaEconomyStore = new PostgresMetaEconomyStore(pool);
   pushStore = new PostgresPushStore(pool);
 } else {
-  matchStore = new MemoryMatchStore();
+  // The session store reads an ended battle's result from the raw match store.
+  const memoryMatches = new MemoryMatchStore();
+  matchStore = memoryMatches;
   accountStore = new MemoryAccountStore();
   receiptStore = new MemoryReceiptStore();
   userStore = new MemoryUserStore();
@@ -362,13 +411,23 @@ if (DATABASE_URL) {
   // One feed for both writers: the corp store announces a corp's own facts into it.
   const memoryFeed = new MemoryAvaFeedStore();
   feedStore = memoryFeed;
-  corpStore = new MemoryCorpStore(memoryFeed);
+  // The corp store counts played battles for the level requirements (CORP-6).
+  const memoryResults = new MemoryAvaResultStore();
+  resultStore = memoryResults;
+  corpStore = new MemoryCorpStore(memoryFeed, memoryResults);
   announcementStore = new MemoryAnnouncementStore();
+  challengeStore = new MemoryAvaChallengeStore();
+  rosterStore = new MemoryAvaRosterStore();
+  sessionStore = new MemoryAvaSessionStore(memoryMatches);
+  medalStore = new MemoryMedalStore();
+  corpRentStore = new MemoryCorpRentStore();
   const memoryArsenal = new MemoryArsenalStore();
   const memoryMarket = new MemoryMetaMarket(memoryArsenal, undefined, metaFaucet);
+  const memoryDrops = new MemoryDropStore();
+  dropStore = memoryDrops;
   arsenalStore = memoryArsenal;
   metaMarket = memoryMarket;
-  metaEconomyStore = new MemoryMetaEconomyStore(memoryArsenal, new MemoryDropStore(), memoryMarket);
+  metaEconomyStore = new MemoryMetaEconomyStore(memoryArsenal, memoryDrops, memoryMarket);
   pushStore = new MemoryPushStore();
 }
 metaMarket.setEconomy(metaEconomyStore);
@@ -388,7 +447,9 @@ const starterArsenal = loadStarterArsenal(data);
 let shuttingDown = false;
 const arsenalRefreshes = new Set<Promise<void>>();
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
-const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, dropTables: loadDropTables(data), now: Date.now,
+// ARS-4: таблицы выпадения — и для доставки наград, и для осколков за бои битвы корпораций.
+const dropTables = loadDropTables(data);
+const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCatalog, catalogHistory: loadMetaEconomyCatalogHistory(data), dropTables, now: Date.now,
   onEvent: (event) => {
     process.stdout.write(`${JSON.stringify({ t: 'meta-economy', ...event })}\n`);
     // Final snapshots can themselves issue durable rewards. During shutdown do
@@ -404,6 +465,9 @@ const metaEconomy = new MetaEconomy({ store: metaEconomyStore, catalog: metaCata
 if (corporationsEndpoint) {
   corpStore = corporateRemote(corporationsEndpoint, 'corpStore');
   feedStore = corporateRemote(corporationsEndpoint, 'feedStore');
+  challengeStore = corporateRemote(corporationsEndpoint, 'challengeStore');
+  rosterStore = corporateRemote(corporationsEndpoint, 'rosterStore');
+  resultStore = corporateRemote(corporationsEndpoint, 'resultStore');
 }
 
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
@@ -437,6 +501,7 @@ const authCfg = configFromEnv(process.env);
 const securityAudit = securityAuditFromEnv(process.env);
 const AUTH = authCfg.auth !== undefined;
 const rewardDelivery = createMetaRewardDelivery({
+  career: (snapshot) => profileStore.creditCareer?.(snapshot) ?? Promise.resolve(),
   store: metaEconomyStore,
   matches: matchStore,
   seats: (id) => AUTH ? nickSeatAccounts(accountStore, userStore, id) : async () => ({}),
@@ -507,6 +572,64 @@ const NET_SEATS = networkSeats(NETWORK_MODE, DEFAULT_MAP_ID);
 // обновление; остальные получают настоящие идентификаторы, а не порядковые номера.
 const MATCHES = Math.max(1, Math.min(MAX_HOSTED_MATCHES, Number(process.env.MATCHES ?? 1) || 1));
 
+// CORP-5 — битвы корпораций на хосте игроков: те же службы и тот же фоновый обход, что у
+// боевого входа (`packages/server/src/main.ts`), а не своя копия. Вызовы, составы, итоги и
+// лента принадлежат корпорациям (за `CORPORATIONS_URL`, если он задан); сама битва — комната
+// ЭТОГО хоста, и пустые места сторон играет его ИИ. Битва сажает УЧЁТКИ из состава, поэтому
+// без AUTH обход не запускается и комнаты битв не поднимаются: у ник-хоста нет корпораций.
+const medalCatalog = loadMedalCatalog();
+// На Postgres каждое намерение — своя транзакция: машина состояний вызова и расчёт итога
+// битвы держатся на собственных воротах «ровно один раз», которым она нужна.
+const corporateServices = pool && !corporationsEndpoint ? createCorporateServices(pool) : undefined;
+const avaService: AvaService = corporationsEndpoint
+  ? corporateRemote<AvaService>(corporationsEndpoint, 'ava')
+  : (corporateServices?.ava ??
+    new AvaService({ corpStore, challengeStore, rosterStore, resultStore, feedStore, medals: medalCatalog }));
+const medalService =
+  corporateServices?.medals ?? new MedalService({ corpStore, resultStore, medalStore, catalog: medalCatalog });
+const corpArsenalService = new CorpArsenalService({ corpStore, arsenalStore, rentStore: corpRentStore, challengeStore, rosterStore });
+// Манифест, который несут партии самого прототипа (`newGame`). Хост игроков по нему партию не
+// отвергает, но битва, собранная здесь, остаётся одной из них.
+const PROTOTYPE_MANIFEST = '1';
+const avaMaps = loadAvaMaps(data);
+const avaOrchestrator = new AvaOrchestrator({
+  challengeStore,
+  rosterStore,
+  sessionStore,
+  data,
+  maps: avaMaps.pool,
+  retiredMaps: avaMaps.retired,
+  manifest: PROTOTYPE_MANIFEST,
+  createRoom: (spec) => raiseAvaBattle(spec),
+  // CORP-4: ни одна карта не подходит под запертый состав — битва отменяется, вызов возвращается.
+  cancel: (matchupId) => avaService.cancelLocked(matchupId),
+  // Сутки мира (`corporation-wars.md` §10) по часам ЭТОГО хоста: TIME_SCALE переводит их в
+  // реальное время. AVA_PEACE_MS переопределяет срок для плейтеста, как у боевого входа.
+  peaceMs: Number(process.env.AVA_PEACE_MS ?? '') || MS_PER_DAY / TIME_SCALE,
+  isMatchEnded: async (matchId) => (await matchStore.load(matchId))?.status === 'ended',
+  // Войну объявляет живая комната серверными действиями — мимо запрета для игроков.
+  escalateWar: async (matchId) => {
+    const room = registry.get(matchId);
+    return room ? declareAvaWar(room, matchId) : false;
+  },
+  // CORP-9: итог уходит с разбором битвы, посчитанным по её снимку на конец.
+  settle: (matchupId, winnerSide, report) => avaService.settleMatch(matchupId, winnerSide, report),
+  endedState: async (matchId) => (await matchStore.load(matchId))?.state ?? null,
+  loginsOf: (accountIds) => userStore.loginsOf(accountIds),
+  // ARS-3: арсенал учётки на момент блокировки состава; ARS-6: плюс выданное со склада.
+  arsenalOf: async (accountId) => arsenalSnapshotOf(await arsenalStore.listOf(accountId)),
+  corpRentalOf: (accountId, matchupId) => corpArsenalService.rentedArsenalOf(accountId, matchupId),
+});
+const avaSweeps = createAvaSweeps({
+  sessionStore,
+  resultStore,
+  ava: avaService,
+  orchestrator: avaOrchestrator,
+  corpArsenal: corpArsenalService,
+  maintenance: () => process.env.CORPORATIONS_MAINTENANCE === '1',
+  log: (message) => process.stderr.write(`${message}\n`),
+});
+
 // Wakeup-driver tuning. NETA2-6: the arm/fire/stall loop + the live-player HEARTBEAT_MS
 // beat now live in the shared `startClockDriver` (packages/server) — one scheduler for
 // both hosts. This host only pins a tighter 1h timer cap (setTimeout overflow +
@@ -530,8 +653,11 @@ async function createHostedMatch(
   id: string,
   mapId: MapId = DEFAULT_MAP_ID,
   modeId?: string,
+  requestedTimeScale?: number,
 ): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates the empty-seat AI)
+  // CORP-5: битва корпораций. Её мир собирает оркестратор (`raiseAvaBattle`), а не `newGame`.
+  const ava = isAvaMatchId(id);
   // The shared offline scheduler (assigned after `room` below). `observe` re-arms it,
   // so it is declared here — before `observe` — and read with `?.` until it exists.
   let driver: ClockDriverHandle | null = null;
@@ -564,6 +690,9 @@ async function createHostedMatch(
   }
 
   const restoredSnap = await matchStore.load(id);
+  const matchTimeScale = sessionSpeed(restoredSnap?.clock, TIME_SCALE, requestedTimeScale);
+  // Битва рождается только из снимка оркестратора: свежий мир под её номером был бы чужой партией.
+  if (ava && !restoredSnap) throw new Error('E_NO_MATCH');
   let initialState =
     restoredSnap?.state ??
     newGame({
@@ -581,9 +710,34 @@ async function createHostedMatch(
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
   // Strip the static `ai` branding newGame took from the seat config, or two humans
   // on DEFAULT_SETUP seats could never ally (E_BOT_ALLIANCE against seat p2 forever).
-  for (const seat of Object.values(initialState.players)) if (!seat.npc) delete seat.ai;
+  // В битве корпораций пустые места сторон — боты оркестратора (`bot:<место>`): человеку
+  // их не занять, и метка остаётся.
+  if (!ava) for (const seat of Object.values(initialState.players)) if (!seat.npc) delete seat.ai;
+  // CORP-5: эти места всю битву играет ИИ хоста — есть кто-то в партии или нет.
+  const avaBots = new Set(
+    ava ? Object.values(initialState.players).filter((p) => p.ai && !p.npc).map((p) => p.id) : [],
+  );
   // Rehydrate idempotency receipts so a retried action stays deduped across a restart.
   const initialReceipts = await receiptStore.loadAll(id);
+
+  // ARS-4, как у боевого входа: осколки победителю каждого боя битвы корпораций по павшему
+  // составу врага. Место → учётка — из состава сессии: у бота учётки нет, ему не достаётся ничего.
+  let avaSeatAccounts: Record<string, string> | null = null;
+  async function creditAvaSalvage(events: readonly DomainEvent[]): Promise<void> {
+    const salvage = salvageFromEvents(events, dropTables);
+    if (salvage.size === 0) return;
+    if (!avaSeatAccounts) {
+      const session = await sessionStore.byMatch(id);
+      if (!session) return; // связи битвы с составом ещё нет — начислять некому
+      avaSeatAccounts = Object.fromEntries(
+        Object.entries(session.seats).map(([accountId, slot]) => [slot, accountId]),
+      );
+    }
+    for (const [winner, shards] of salvage) {
+      const accountId = avaSeatAccounts[winner];
+      if (accountId) await dropStore.addShards(accountId, shards);
+    }
+  }
 
   // ECON-6: игровое время последнего экономического среза (первый — через час).
   let lastEconAt = initialState.time;
@@ -618,6 +772,8 @@ async function createHostedMatch(
       // Bank each seated commander's match XP onto their account (idempotent).
       runBackground('начисление опыта за матч', creditMatchXp(id, ev.rewards));
       runBackground('профиль: итоги матча', creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, room.state));
+    } else if (ev.kind === 'events' && ava) {
+      runBackground('осколки за бой битвы корпораций', creditAvaSalvage(ev.events));
     }
     // Persist after anything that changes the world (debounced below), and re-arm
     // the offline wakeup: an action may schedule or consume events — both move the
@@ -662,13 +818,17 @@ async function createHostedMatch(
     // now; restored snapshot: its durable anchor) and TIME_SCALE applies from here.
     initiallyStarted: true,
     initialClock: restoredSnap?.clock,
+    initialCreatedAt: restoredSnap?.createdAt,
+    initialEndedAt: restoredSnap?.endedAt,
     singlePeerPerPlayer: true, // one live connection per chair — no two people command one empire
     emitStateHash: true, // attach hashState(view) so the client overlay can flag desync
     // Bot favour (`approval`) is a prototype key the core fog passes through whole:
     // each player gets only the bots' opinion of THEM, not every bot's of every seat.
     hostFog: approvalView,
     securityAudit,
-    arsenalStore,
+    // Колода битвы заморожена при закрытии ростера (ARS-3) вместе с выдачей корпорации
+    // (ARS-6): живое перечитывание личного арсенала (LARS-1) заменило бы её целиком.
+    ...(ava ? {} : { arsenalStore }),
     observe, // M0: log every room event to JSONL + count for the on-exit summary
     initialReceipts, // rehydrated idempotency (deduped action stays deduped after restart)
     // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
@@ -686,6 +846,8 @@ async function createHostedMatch(
       ...(sessionModeId !== undefined ? { modeId: sessionModeId } : {}),
       victory: victoryFor(initialState),
     },
+    initialCareer: restoredSnap?.career,
+    careerAccounts: AUTH ? await nickSeatAccounts(accountStore, userStore, id)() : {},
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value
     // Strict commit-before-broadcast: await the durable write of the new snapshot +
@@ -693,10 +855,13 @@ async function createHostedMatch(
     // `observe` above becomes a harmless coalesced extra for actions (still needed for
     // tick-driven advances, which are recomputable and persist after the fact).
     persist: async (snapshot, receipt) => {
-      await matchStore.save(snapshot);
-      await receiptStore.save(id, receipt);
+      await commitMatch(matchStore, receiptStore, snapshot, receipt);
+      if (snapshot.status === 'ended') detach('career settlement', profileStore.creditCareer?.(snapshot) ?? Promise.resolve());
     },
-    timeScale: TIME_SCALE, // playtest fast-forward (1 = real-time)
+    timeScale: matchTimeScale, // persisted per-session wall/game rate
+    // CORP-5: стороны битвы от мира к войне переводит оркестратор, а не игроки; Хранителя
+    // битва не принимает — список отказов общий с каноническим сервером.
+    ...(ava ? { denyPlayerActions: avaDeniedAction } : {}),
     // REL-4: the action-layer front-door — envelope validate→authorize→sequence→dedup
     // with per-type payload schemas BEFORE the reducer. Server-internal drivers
     // (AI / standing orders) submit via room.submitAction and are unaffected.
@@ -718,6 +883,7 @@ async function createHostedMatch(
     onError: (code) => process.stderr.write(`${code}\n`),
   });
 
+  if (AUTH && restoredSnap?.status === 'ended') await profileStore.creditCareer?.(restoredSnap);
   if (AUTH && initialState.match.status === 'ended')
     await creditProfileMatch(profileStore, nickSeatAccounts(accountStore, userStore, id), id, initialState);
 
@@ -738,14 +904,20 @@ async function createHostedMatch(
         seq: room.sequence,
         status: room.state.match.status === 'ended' ? 'ended' as const : 'ongoing' as const,
         state: room.state,
+        createdAt: room.createdAt,
+        endedAt: room.endedAt,
         clock: room.clockSnapshot,
         economyActivity: room.economyActivitySnapshot,
+        career: room.careerSnapshot,
       };
       await matchStore.save(snapshot);
+      if (snapshot.status === 'ended') await profileStore.creditCareer?.(snapshot);
       // Admission may cross the terminal deadline before it can update botSeats.
       // The durable roster, not the successfully seated in-memory cache, owns settlement.
       if (snapshot.status === 'ended')
         await settleBotMatch({ snapshot, bots: botStore, profiles: profileStore, accounts: accountStore, now: Date.now() });
+      // CORP-5: итог битвы — сразу в расчёт (склад, влияние, лента). Не вышло — повторит обход.
+      if (snapshot.status === 'ended' && ava) detach('итог битвы корпораций', avaSweeps.deliverResults());
     },
     onError(e) {
       process.stderr.write(`snapshot save failed (${id}): ${(e as Error)?.message ?? String(e)}\n`);
@@ -756,7 +928,8 @@ async function createHostedMatch(
   });
   function scheduleSave(delay = 500): void { snapshots.schedule(delay); }
 
-  if (AUTH) {
+  // Население ботов-учёток — для обычных партий: места битвы корпораций раздаёт её состав.
+  if (AUTH && !ava) {
     try {
       await rememberBots(await prepareBotPopulation({ matchId: id, room, bots: botStore,
         accounts: accountStore, data, config: BOT_POPULATION, restored: true, now: Date.now() }));
@@ -805,6 +978,12 @@ async function createHostedMatch(
   const aiPolicy = (seat: string): string | null => {
     if (room.state.players[seat]?.status !== 'active') return null;
     if (botSeats.has(seat)) return `bot:${botStyle(botIdentities.get(seat)!.seed)}`;
+    // CORP-5: бот стороны играет за свою сторону всю битву — смотрит на неё кто-то или нет.
+    if (avaBots.has(seat)) return 'ava:expand';
+    // Место человека в битве не играет никакой ИИ — ни подмена после отсрочки, ни Хранитель
+    // (corporation-wars.md §7): атакует только вошедший игрок, экономика и оборона идут сами.
+    // Жители карты (пираты, рой, нейтралы) живут, как в обычной партии (CORP-8).
+    if (ava && !room.state.players[seat]?.npc) return null;
     // Offline population keeps its own empires active. The grace-based human
     // stand-in keeps the existing watched-room policy.
     if (connected === 0) return null;
@@ -818,7 +997,7 @@ async function createHostedMatch(
     if (aiBusy || aiStopped) return;
     aiBusy = true;
     try {
-      while (!aiStopped && !aiClockStalled && room.isStarted && (connected > 0 || botSeats.size > 0) && room.state.match.status !== 'ended') {
+      while (!aiStopped && !aiClockStalled && room.isStarted && (connected > 0 || botSeats.size > 0 || avaBots.size > 0) && room.state.match.status !== 'ended') {
         if (driversBusy) {
           await new Promise<void>((resolve) => setTimeout(resolve, 16));
           continue;
@@ -828,9 +1007,13 @@ async function createHostedMatch(
         driversBusy = true;
         try {
           const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
-            (seat, policy) => botSeats.has(seat)
-              ? botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed)
-              : aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
+            (seat, policy) => {
+              if (botSeats.has(seat)) return botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed);
+              const plan = aiOrders(room.state, seat, postureOf(policy));
+              // CORP-5: бот стороны подчиняется запретам битвы, как игрок, — войну между
+              // сторонами открывает оркестратор, а не план ИИ.
+              return aiOrderSlices(ava ? avaBotOrders(plan) : plan);
+            });
           if (!step.worked) return;
           const group = step.action ?? [];
           // Политику спрашиваем ОДИН раз на порцию. Перепроверка перед каждым приказом
@@ -838,8 +1021,16 @@ async function createHostedMatch(
           // ждёт мейлбокс, за это время истекает делегирование Стюарда или возвращается
           // человек — и флот оставался вышедшим из боя без приказа куда идти. Планировщик
           // уже сверяет политику с той, под которую план строился (`aiScheduler.step`).
-          if (group.length && aiPolicy(group[0]!.playerId) !== null) {
-            for (const action of group) await room.submitServerAction(action.playerId, action);
+          // Validate the whole slice against the current authoritative world.
+          // Plans wait between slices; earlier orders may consume capacity/resources.
+          // Testing commands separately would discard a legal retreat+course pair.
+          if (
+            group.length && aiPolicy(group[0]!.playerId) !== null &&
+            room.canApplyAll(room.state, group, room.state.time) === null
+          ) {
+            for (const action of group) {
+              if (!(await room.submitServerAction(action.playerId, action)).ok) break;
+            }
           }
         } finally {
           driversBusy = false;
@@ -867,7 +1058,7 @@ async function createHostedMatch(
   // Дежурного вылета (CC-4) больше нет: «Держать патруль» (SHU-6.6) поднимает эскадру
   // событием ядра, без драйвера.
   async function runServerStanding(): Promise<void> {
-    if (!room.isStarted) return;
+    if (!room.isStarted || room.state.match.status === 'ended') return;
     // RETR-2 идёт ПЕРВЫМ: смысл приказа — выйти из боя до следующего раунда, а не
     // после того, как флот отработает остальные намерения.
     for (const r of serverAutoRetreatActions(room.state)) {
@@ -917,7 +1108,7 @@ async function createHostedMatch(
     // One room timer, paced to the existing staggered two-game-hour AI cycle.
     // It does not add sockets or affect the real online-player count.
     backgroundHeartbeatMs: () => {
-      if (!botSeats.size || !room.isStarted || room.state.match.status === 'ended') return null;
+      if ((!botSeats.size && !avaBots.size) || !room.isStarted || room.state.match.status === 'ended') return null;
       const delay = aiSchedule.nextDelay(room.state.time, Object.keys(room.state.players), aiPolicy);
       return delay === null ? null : Math.max(HEARTBEAT_MS, delay / room.clockScale);
     },
@@ -959,7 +1150,7 @@ async function createHostedMatch(
       ),
   });
 
-  const botArrivals = AUTH ? startBotArrivals({
+  const botArrivals = AUTH && !ava ? startBotArrivals({
     config: BOT_POPULATION,
     canJoin: () => !aiStopped && room.state.match.status !== 'ended' && registry.entryOpen(id) &&
       botSeats.size < botMatchLimit(room.state, BOT_POPULATION.fillPercent),
@@ -1011,10 +1202,44 @@ const hosted: HostedMatch[] = [];
 // «у пресета есть секция `pve`»). Без него лента честно молчала бы про вид даже у
 // сессии с режимом: поймано живым прогоном при BRW-0 — `modeId` в строке уже стоял,
 // а `kind` у всех трёх партий приезжал `undefined`.
-const registry = new MatchRegistry(accountStore, data);
+const archiveViews = new ArchiveRoomCache({
+  store: matchStore, otherResidents: () => hosted.length, totalRoomLimit: HOST_ROOM_LIMIT,
+  viewer: (snapshot) => new MatchRoom({
+    id: snapshot.matchId, initialState: snapshot.state, initialSeq: snapshot.seq,
+    initialCareer: snapshot.career, initialCreatedAt: snapshot.createdAt, initialEndedAt: snapshot.endedAt,
+    initialClock: snapshot.clock, initiallyStarted: true, kernel, data,
+    timeScale: snapshot.clock?.timeScale ?? 1,
+    config: { timeScale: snapshot.clock?.timeScale ?? 1,
+      ...(snapshot.state.modeId !== undefined ? { modeId: snapshot.state.modeId } : {}),
+      victory: victoryFor(snapshot.state) },
+    hostFog: approvalView, singlePeerPerPlayer: true, emitStateHash: true,
+  }),
+});
+const registry = new MatchRegistry(accountStore, data, Date.now, {
+  rooms: archiveViews,
+  catalog: pool ? new PostgresArchiveCatalog(pool) : new StoreArchiveCatalog(matchStore, accountStore),
+  rules: (meta) => ({ timeScale: meta.timeScale, victory: victoryFor({ mapId: meta.mapId }) }),
+});
+
+let retiring: Promise<void> | null = null;
+function retireFinishedHosts(): Promise<void> {
+  if (retiring) return retiring;
+  retiring = (async () => {
+    for (let i = hosted.length - 1; i >= 0; i--) {
+      const h = hosted[i]!;
+      if (h.room.state.match.status !== 'ended' || h.room.peerCount > 0) continue;
+      h.clearTimers();
+      await h.flush();
+      if (h.room.peerCount === 0 && registry.unregister(h.id)) hosted.splice(i, 1);
+    }
+  })().finally(() => { retiring = null; });
+  return retiring;
+}
 refreshGrantedArsenal = async (accountId) => {
   const user = await userStore.findById(accountId);
-  if (user) await syncAccountArsenal({ accountId, login: user.login, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: () => true });
+  // Колода битвы корпораций законсервирована на момент блокировки состава (ARS-3): живой
+  // каталог учётки обновляет только обычные партии.
+  if (user) await syncAccountArsenal({ accountId, login: user.login, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: (id) => !isAvaMatchId(id) });
 };
 /** Метаданные браузера: карта и режим берутся из САМОЙ сессии (`sessionMeta`, BRW-0) —
  *  карта из сохранённого состояния, режим из резолвнутого конфига комнаты. Сборка живёт
@@ -1023,8 +1248,8 @@ refreshGrantedArsenal = async (accountId) => {
  *  реального окна от создания сессии. */
 const browserMeta = (room: MatchRoom): MatchMeta =>
   sessionMeta(room, {
-    timeScale: TIME_SCALE,
-    createdAt: Date.now(),
+    timeScale: room.clockScale,
+    createdAt: room.createdAt,
     entryWindowMs: ENTRY_WINDOW_MS,
   });
 
@@ -1032,13 +1257,32 @@ const browserMeta = (room: MatchRoom): MatchMeta =>
 // всё, что стор считает живым, и засевает только пустой стор (иначе каждый рестарт
 // добавлял бы ещё N комнат). Без этого партия, созданная через `POST /matches`, жила бы
 // лишь до перезапуска процесса — id уникален, но поднять её было бы некому.
-const roster = bootRoster({ stored: await matchStore.ongoingMatchIds(), seedCount: MATCHES });
+// Битвы корпораций в этот список не входят: их поднимает не `bootRoster`, а свой путь ниже
+// (CORP-5) — иначе рестарт поднял бы битву обычной партией, с чужими правилами мест.
+const storedMatchIds = await matchStore.ongoingMatchIds();
+const roster = bootRoster({ stored: storedMatchIds.filter((id) => !isAvaMatchId(id)), seedCount: MATCHES });
 for (const id of roster.raise) {
   const h = await createHostedMatch(id);
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   if (!h.restored) await h.flush(); // засеянная партия тоже durable сразу, а не после хода
 }
+// Идущие битвы корпораций возвращаются битвами. Без учёток их некому играть — они ждут в
+// сторе запуска с AUTH.
+if (AUTH) for (const id of storedMatchIds.filter(isAvaMatchId)) await hostAvaMatch(id);
+// Unopened archives stay in the metadata catalog. Retire unwatched terminal hosts
+// only after their final durable write; every remaining room still consumes capacity.
+let archiveSweeping = false;
+const archiveSweep = setInterval(() => {
+  if (archiveSweeping || shuttingDown) return;
+  archiveSweeping = true;
+  void (async () => {
+    registry.pruneExpired();
+    await retireFinishedHosts();
+  })().catch((error) => process.stderr.write(`archive cleanup failed: ${String(error)}\n`))
+    .finally(() => { archiveSweeping = false; });
+}, 60_000);
+archiveSweep.unref();
 const matchIds = roster.raise;
 const restoredCount = hosted.filter((h) => h.restored).length;
 /**
@@ -1051,24 +1295,105 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  * хоста), а `hosted` пополняется, иначе её таймеры не остановит и состояние не сбросит на
  * диск выход по SIGINT (см. конец файла).
  */
-const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
-// а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
-async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string, timeScale?: number): Promise<HostedMatch> {
   if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
-  if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
-  // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
-  const id = await freeMatchId(async (candidate) =>
-    registry.has(candidate) || (await matchStore.load(candidate)) !== null,
-  );
-  const h = await createHostedMatch(id, mapId, modeId);
-  hosted.push(h);
-  registry.register(h.room, browserMeta(h.room));
-  // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
-  // `ongoingMatchIds()` — а именно оттуда следующий старт берёт список (см. `bootRoster`
-  // выше), — и рестарт до первого хода стёр бы партию вместе с уже розданным адресом.
-  // Восстановленную трогать незачем: она в сторе по определению.
-  if (!h.restored) await h.flush();
-  return h;
+  await retireFinishedHosts();
+  const release = archiveViews.reserveHostRoom();
+  try {
+    // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
+    const id = await freeMatchId(async (candidate) =>
+      registry.has(candidate) || (await matchStore.load(candidate)) !== null,
+    );
+    const h = await createHostedMatch(id, mapId, modeId, timeScale);
+    hosted.push(h);
+    release();
+    registry.register(h.room, browserMeta(h.room));
+    // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
+    // `ongoingMatchIds()` — а именно оттуда следующий старт берёт список (см. `bootRoster`
+    // выше), — и рестарт до первого хода стёр бы партию вместе с уже розданным адресом.
+    // Восстановленную трогать незачем: она в сторе по определению.
+    if (!h.restored) await h.flush();
+    return h;
+  } finally { release(); }
+}
+
+/** CORP-5: поднять комнату битвы корпораций — на старте хоста и при запуске битвы. Вход
+ *  закрыт для всех с первой секунды (`entryWindowMs: 0`): места раздаёт состав, а не
+ *  очередь, поэтому в «Доступных» битвы нет, а её участники видят её в своих партиях. */
+async function hostAvaMatch(id: string): Promise<HostedMatch> {
+  const release = archiveViews.reserveHostRoom();
+  try {
+    const h = await createHostedMatch(id);
+    hosted.push(h);
+    release();
+    registry.register(
+      h.room,
+      sessionMeta(h.room, { timeScale: h.room.clockScale, createdAt: h.room.createdAt, entryWindowMs: 0 }),
+    );
+    return h;
+  } finally { release(); }
+}
+
+/**
+ * CORP-5: приёмник оркестратора — запустить битву, собранную из запертого состава.
+ *
+ * 1. **Первый снимок пишется, только если его нет.** Повтор после потерянной связи битвы с
+ *    составом поднимает уже идущую битву, а не начинает её заново.
+ * 2. **Комната сразу durable** вместе с якорем своих часов: рестарт до первого хода не
+ *    теряет ни битву, ни время, прошедшее с её начала.
+ * 3. **Места состава записываются за логинами.** Это зеркало состава, а не его замена (место
+ *    решает `resolveAvaSeat`), и нужно оно затем, чтобы участник нашёл битву в своих партиях
+ *    хаба и вошёл в неё оттуда. Повтор безвреден: привязка уже есть.
+ */
+async function raiseAvaBattle(spec: AvaSessionSpec): Promise<void> {
+  if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
+  if (!registry.has(spec.matchId)) {
+    if (!(await matchStore.load(spec.matchId))) {
+      await matchStore.save({
+        matchId: spec.matchId,
+        dataVersion: spec.state.version.data,
+        seq: 0,
+        status: 'ongoing',
+        state: spec.state,
+      });
+    }
+    await (await hostAvaMatch(spec.matchId)).flush();
+  }
+  for (const [accountId, slot] of Object.entries(spec.seats)) {
+    const user = await userStore.findById(accountId);
+    if (user) await accountStore.resolveSeat(spec.matchId, user.login, [slot], slot);
+  }
+}
+
+/** CORP-5: вход в битву корпораций. Место — из состава (`resolveAvaSeat`), заявка — та же,
+ *  что у обычного входа (`joinSeat.ts`, правило 1). Окна входа у битвы нет: место у участника
+ *  есть с её первой секунды. Стартовый арсенал не выдаётся и живой каталог не подмешивается —
+ *  колода битвы законсервирована на момент блокировки состава (ARS-3). */
+async function joinAvaBattle(
+  id: string,
+  room: MatchRoom,
+  who: { login: string; accountId?: string | undefined; pwfp?: string | undefined },
+): Promise<JoinResult | JoinFailure> {
+  const ava = who.accountId ? await avaOrchestrator.resolveAvaSeat(id, who.accountId) : null;
+  if (!ava?.ok) return { error: 'E_NOT_ROSTERED' };
+  if (room.state.match.status === 'ended') {
+    return { playerId: ava.playerId, token: await authCfg.signToken!(id, ava.playerId, who.accountId, who.pwfp) };
+  }
+  // Зеркало состава в посадочных записях: оно ведёт участника в битву из хаба (`raiseAvaBattle`).
+  await accountStore.resolveSeat(id, who.login, [ava.playerId], ava.playerId);
+  const seat = await admitSeat({
+    matchId: id,
+    claim: seatClaim({
+      avaPlayerId: ava.playerId,
+      claimed: room.state.players[ava.playerId]?.claimedAt !== undefined,
+      knownFactions: [],
+    }),
+    reserved: false, // место дал состав, а не этот вход: отпускать нечего
+    release: async () => undefined,
+    room,
+  });
+  if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
+  return { playerId: seat.playerId, token: await authCfg.signToken!(id, seat.playerId, who.accountId, who.pwfp) };
 }
 
 // UIX-4.4 (часть 2): service worker push-уведомлений (`build.mjs` → `dist/sw.js`). Только там,
@@ -1097,6 +1422,10 @@ const server = createMultiplayerServer({
         auth: authCfg.auth,
         accountPwfp: (accountId: string) => currentPwfp(userStore, accountId),
         accountSeat: async (matchId: string, accountId: string) => {
+          // CORP-5: место в битве корпораций решает её состав, как у боевого входа.
+          const ava = isAvaMatchId(matchId) ? await avaOrchestrator.resolveAvaSeat(matchId, accountId) : null;
+          if (ava) return ava.ok ? ava.playerId : null;
+          if (isAvaMatchId(matchId)) return null; // связи битвы с составом нет — места нет ни у кого
           const user = await userStore.findById(accountId);
           return user ? accountStore.seatOf(matchId, user.login) : null;
         },
@@ -1117,8 +1446,9 @@ const server = createMultiplayerServer({
   // This host is what the image runs, so it is the one that has to report it.
   version: buildVersion(process.env.GIT_SHA),
   ready: () => matchStore.ping?.() ?? Promise.resolve(true),
-  // `GET /metrics` is operator-only, like the `/metrics/*` routes below (same token).
+  // Aggregate metrics accept a separate observer credential; raw routes do not.
   ...(METRICS_TOKEN ? { operatorToken: METRICS_TOKEN } : {}),
+  ...(METRICS_READER_TOKEN ? { metricsReaderToken: METRICS_READER_TOKEN } : {}),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
@@ -1133,26 +1463,36 @@ const server = createMultiplayerServer({
     // колбэк выполняется внутри `createMultiplayerServer` выше по файлу, а сам хук
     // объявлен ниже — прямая ссылка упала бы в TDZ ещё на старте.
     registerBrowserApi(app, registry, AUTH ? (request) => identifySession(request) : undefined);
-    // The /metrics/* family is OPERATOR-ONLY (`operatorAccess.ts`): a direct loopback
-    // peer, or `Authorization: Bearer $METRICS_TOKEN`. The JSONL tail carries pre-fog
+    // Raw /metrics/* routes are OPERATOR-ONLY (`operatorAccess.ts`): the configured
+    // bearer is required even on loopback; tokenless loopback is for dev only. The JSONL tail carries pre-fog
     // domain events (fleet routes, captures) and every player's economy — served to the
     // internet it was a map hack for every match on the host. Anyone else gets the
     // ordinary 404, as if the route did not exist.
     const operator = (req: { socket: { remoteAddress?: string }; headers: Record<string, unknown> }): boolean =>
       isOperatorRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN);
+    const metricsReader = (req: { socket: { remoteAddress?: string }; headers: Record<string, unknown> }): boolean =>
+      isMetricsReaderRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN, METRICS_READER_TOKEN);
+    registerOperatorMatchApi(app, {
+      token: METRICS_TOKEN,
+      mapIds: MAP_IDS,
+      createMatch: async ({ mapId, timeScale }) => {
+        const h = await hostNewMatch(mapPreset(mapId).id, undefined, timeScale);
+        return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
+      },
+    });
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary, one `curl` from the host.
     // PTM-2.3: plus the telemetry pipeline itself — is it flowing during a test? Aggregates only.
-    app.get('/metrics/summary', async (req, reply) =>
-      operator(req)
-        ? {
-            ...metrics.summary(),
-            journal: { match: matchLog.stats(), client: clientLog.stats() },
-            ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
-          }
-        : reply.callNotFound(),
-    );
+    app.get('/metrics/summary', async (req, reply) => {
+      if (!metricsReader(req)) return reply.callNotFound();
+      const summary = metrics.summary();
+      return {
+        ...(operator(req) ? summary : metricsReaderSummary(summary)),
+        journal: { match: matchLog.stats(), client: clientLog.stats() },
+        ...(telemetryStats ? { telemetry: telemetryStats() } : {}),
+      };
+    });
     // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
     // derived from the live MetricsAggregator. Returns a compact status with
     // thresholds so a playtest host can `curl /metrics/health` and read a single
@@ -1219,7 +1559,7 @@ const server = createMultiplayerServer({
     if (AUTH) registerPlayerActivityApi(app, {
       store: pool ? new PostgresPlayerActivityStore(pool) : new MemoryPlayerActivityStore(),
       identify: identifySession,
-      operator,
+      operator: metricsReader,
       ...(authCfg.allowedOrigins ? { allowedOrigins: authCfg.allowedOrigins } : {}),
     });
     telemetryStats = registerTelemetryApi(app, {
@@ -1236,14 +1576,9 @@ const server = createMultiplayerServer({
     // because `start` is the homeworld the fog hides in game. Same move as the join
     // handshake (NETA2-7): one authorization rule, both hosts.
     registerSeatsApi(app, {
-      seats: async (id) => {
-        // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
-        // evicted match here; this eager MatchRegistry has no `resolve`, so the
-        // optional call is a typed no-op (kept so a lazy registry can slot in).
-        const lazyRegistry = registry as {
-          resolve?: (id: string) => Promise<MatchRoom | undefined>;
-        };
-        const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
+      seats: async (id, login) => {
+        // Verify participation BEFORE a cold archive allocates or touches a viewer.
+        const room = await registry.resolveForBrowser(id, login);
         if (!room) return null;
         // Кресло → ник: занятость и ник из одного ответа хранилища. Ник нужен клиенту в
         // дипломатии (строка игрока ведёт в его профиль); показывать его можно тем же,
@@ -1274,7 +1609,12 @@ const server = createMultiplayerServer({
       ...(AUTH ? { identify: identifySession } : {}),
     });
     // The news feed (CORP-1) — public, the same module as the production entry.
-    registerNewsApi(app, { feed: feedStore, announcements: announcementStore });
+    registerNewsApi(app, { feed: feedStore, announcements: announcementStore,
+      monumentsOf: (ids) => corpStore.monumentsOf(ids),
+      playerMedals: metaEconomyStore, ...(AUTH ? { identify: identifySession } : {}),
+      membershipOf: (id) => corpStore.membershipOf(id) });
+    // The public AvA feed (AVA-9) — confirmed matchups and results, read-only, no session.
+    registerAvaFeed(app, { service: avaService });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
     app.get('/auth/status', async () => ({ enabled: AUTH, accountDeletion: AUTH && !!pool && process.env.ACCOUNT_DELETION_ENABLED === '1' }));
@@ -1323,32 +1663,54 @@ const server = createMultiplayerServer({
             for (const id of registry.ids()) {
               if (!(await accountStore.seatOf(id, login))) continue;
               const room = registry.get(id);
-              if (!room) continue;
+              if (!room || room.state.match.status === 'ended') continue;
               return { matchId: id, days: Math.floor(room.state.time / MS_PER_DAY) };
             }
             return null;
           },
+          // FRIENDS-2: an invite is valid only into a match its sender plays.
+          holdsSeat: async (matchId, login) => registry.get(matchId)?.state.match.status === 'ongoing'
+            && (await accountStore.seatOf(matchId, login)) !== null,
         },
       });
       registerCorporateMaintenance(app, process.env.CORPORATIONS_MAINTENANCE === '1');
-      // The playable host shares the same corporation authority and durable storage.
-      // AvA orchestration/medals are not mounted here; the cabinet reads capabilities.
+      // The playable host shares the same corporation authority and durable storage, and
+      // since CORP-5 the whole slice: challenges, rosters and medals beside the corps.
       if (corporationsEndpoint) {
-        registerCorporateGateway(app, corporationsEndpoint, identifySession, { ava: false, medals: false });
+        registerCorporateGateway(app, corporationsEndpoint, identifySession);
       } else {
         registerCorpApi(app, {
-          service: new CorpService({ store: corpStore }),
+          service: corporateServices?.corp ?? new CorpService({ store: corpStore }),
           identify: identifySession,
-          features: { ava: false, medals: false },
         });
+        registerAvaApi(app, { service: avaService, identify: identifySession });
+        registerMedalApi(app, { service: medalService, identify: identifySession });
       }
+      // Corp-warehouse handouts (ARS-6): a head/officer lends a corp item to a rostered fighter.
+      registerCorpArsenalApi(app, { service: corpArsenalService, identify: identifySession });
+      // CORP-9: ход войны своей стороны для «Битв» хаба отдаёт хост, где идёт битва, а не
+      // корпорации: только у него её комната.
+      registerAvaWarApi(app, {
+        identify: identifySession,
+        corps: corpStore,
+        challenges: challengeStore,
+        sessions: sessionStore,
+        users: userStore,
+        battle: async (matchId) => {
+          const room = registry.get(matchId);
+          return room ? { state: room.state, victoryRules: room.victoryRules } : undefined;
+        },
+        data,
+      });
       // MetaMarket (EC-3) — тот же слайс аукциона, что в проде: прото-хост не заводит
       // свою торговлю. Фаусет — из окружения, по умолчанию выключен.
       registerArsenalApi(app, { store: arsenalStore, identify: identifySession });
       const refreshAccountArsenal = async (who: { accountId: string; login: string }): Promise<void> => {
-        await syncAccountArsenal({ ...who, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: () => true });
+        await syncAccountArsenal({ ...who, arsenal: arsenalStore, accounts: accountStore, registry, isOrdinary: (id) => !isAvaMatchId(id) });
       };
-      registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal });
+      registerCorpMaterialsApi(app, new CorpMaterials({ store: metaEconomyStore, catalog: metaCatalog, corps: corpStore }), identifySession, process.env.CORPORATIONS_MAINTENANCE !== '1');
+      registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal,
+        corpOf: (accountId) => corpStore.membershipOf(accountId) });
       registerMetaCommerce(app, metaEconomy, metaEconomyStore);
       app.get('/commerce/offers', async (_request, reply) => {
         reply.header('cache-control', 'no-store');
@@ -1357,7 +1719,9 @@ const server = createMultiplayerServer({
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
-      registerProfileApi(app, { registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId), identify: identifySession });
+      registerProfileApi(app, { corporations: corpStore, registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId),
+        medalRewards: (accountId) => settleMedalRewards({ profiles: profileStore, commanders: commanderStore, economy: metaEconomy, table: metaCatalog.medals, news: { users: userStore, corps: corpStore } }, accountId),
+        identify: identifySession });
       // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа
       // монтируется только при заданных VAPID.
       registerPushApi(app, {
@@ -1442,9 +1806,17 @@ const server = createMultiplayerServer({
           id,
           { nick: login, accountId, pwfp, preferredSlot, preferredFaction, preferredScientists },
         ) => {
-          const room = registry.get(id);
+          let room: MatchRoom | undefined;
+          try { room = await registry.resolveForBrowser(id, login); }
+          catch (error) { if (error instanceof ArchiveCapacityError) return { error: 'E_UNAVAILABLE' as const }; throw error; }
           if (!room) return { error: 'E_NO_MATCH' as const };
+          // CORP-5: в битву корпораций входит только её состав, каждый — на своё место.
+          if (isAvaMatchId(id)) return joinAvaBattle(id, room, { login, accountId, pwfp });
           const held = await accountStore.seatOf(id, login);
+          if (room.state.match.status === 'ended') {
+            if (!held) return { error: 'E_ENTRY_CLOSED' as const };
+            return { playerId: held, token: await authCfg.signToken!(id, held, accountId, pwfp) };
+          }
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
           // Что достаётся игроку и переписывать ли дом — ОБЩЕЕ решение с боевым сервером
           // (`packages/server/src/joinSeat.ts`). Паритет двух хостов держится одним
@@ -1544,6 +1916,9 @@ try {
   process.exit(1);
 }
 const httpUrl = wsUrl.replace(/^ws/, 'http').replace(/\/matches.*$/, '');
+// CORP-5: фоновый обход битв корпораций — раз в минуту, как у боевого входа, и только с
+// учётками (см. блок служб выше). Запускается, когда хост уже принимает игроков.
+const stopAvaSweeps = AUTH ? avaSweeps.start(60_000) : (): void => {};
 
 // Pick the address a friend actually dials: a real LAN/public IPv4, never a
 // VM-NAT/link-local one. `pnpm doctor` prints the full reachability breakdown.
@@ -1663,6 +2038,8 @@ const printSummary = (): void => {
 const shutdown = (): void => {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(archiveSweep);
+  stopAvaSweeps();
   printSummary();
   // M3: land the aggregated summary as the LAST JSONL line — the per-line log keeps
   // only anomalous broadcast/timing entries, so without this the report script would

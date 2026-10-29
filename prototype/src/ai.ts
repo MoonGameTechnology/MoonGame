@@ -11,6 +11,7 @@ import {
   buildingLevel,
   buildingMaxLevel,
   matchCost,
+  matchUnitCost,
   HERO_ACTIVE_CAP,
   abilityRange,
   getStance,
@@ -124,6 +125,12 @@ import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
 import { planAllyOperation } from '../../decisions/allyOperation';
 import { allyCaptiveOrders } from '../../decisions/captive';
+import {
+  isPirateClan,
+  pirateRaidZone,
+  pirateShipCap,
+  pirateShipCount,
+} from '../../decisions/pirateReach';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
  *  (SES-2.2). `steward` — «Хранитель»: the player's OWN autopilot, a defensive
@@ -485,21 +492,6 @@ function groundCount(p: Planet): number {
   return p.garrison.reduce((n, s) => n + (data.units[s.unit]?.domain === 'ground' ? s.count : 0), 0);
 }
 
-/** Свободный трюм флота: Σ cargoCapacity кораблей − Σ cargoSize уже погруженного
- *  десанта. Та же формула, что у ядра (`army.ts`), иначе погрузка сыпала бы
- *  `E_NO_CAPACITY`. */
-function liftFree(f: Fleet): number {
-  const cap = f.units.reduce(
-    (n, s) => n + (data.units[s.unit]?.stats.cargoCapacity ?? 0) * s.count,
-    0,
-  );
-  const used = (f.landing ?? []).reduce(
-    (n, s) => n + (data.units[s.unit]?.stats.cargoSize ?? 1) * s.count,
-    0,
-  );
-  return cap - used;
-}
-
 /** What drives a seat this tick + the posture to hand `aiOrders`. */
 export interface SeatAiDecision {
   kind: SeatAiKind;
@@ -556,6 +548,8 @@ export function aiOrders(
 ): Action[] {
   const state = provincesOnly(full);
   if (state.players[ai]?.npc === 'neutral') return allySeatOrders(state, ai, posture, profile);
+  if (isPirateClan(state, ai) && !state.pve)
+    return capPirateFleet(state, ai, baseAiOrders(state, ai, posture, profile, new Set()));
   if (state.pve?.npcPlayerId !== ai) return baseAiOrders(state, ai, posture, profile, new Set());
   // Сеть Роя (`docs/swarm-behavior.md`): посты-ретрансляторы стоят там, куда их ставит
   // сеть, — общий бот их не двигает и не сливает (`swarmNetPlan`, то же правило на сервере).
@@ -623,6 +617,23 @@ export function aiOrders(
   ];
 }
 
+/** Потолок флота пиратского клана (`decisions/pirateReach.ts`): заказы кораблей сверх
+ *  него снимаются, остальные приказы идут как есть. Снимаем на выходе, а не в каждой из
+ *  веток постройки: веток у бота несколько, а потолок один. */
+function capPirateFleet(state: GameState, ai: string, orders: Action[]): Action[] {
+  const isShip = (u: string): boolean => !!data.units[u] && !data.units[u]!.traits.includes('ground');
+  let room = pirateShipCap(state) - pirateShipCount(state, ai, isShip);
+  return orders.filter((a) => {
+    if (a.type !== 'unit.build') return true;
+    const p = a.payload as { unit?: string; count?: number };
+    if (!p.unit || !isShip(p.unit)) return true;
+    const n = p.count ?? 1;
+    if (n > room) return false;
+    room -= n;
+    return true;
+  });
+}
+
 /**
  * Житель-союзник главы IV (PVR-7.4): операция — приказ игрока или своя задача — ведётся по
  * плану `planAllyOperation` (то же решение показывает игроку карточка операции), а его
@@ -681,6 +692,10 @@ function baseAiOrders(
   if (state.players[ai]!.npc === 'pirate') posture = 'expand';
   // NPC pirates replenish their own roster; ordinary and legacy seats retain theirs.
   const pirate = state.players[ai]!.faction === 'pirates';
+  // Угодья клана (`decisions/pirateReach.ts`): набег только в пределах двух переходов от
+  // логова. Sector Zero и прочий PvE держат свой сценарий и сюда не попадают.
+  const raidZone = isPirateClan(state, ai) && !state.pve ? pirateRaidZone(state, ai) : null;
+  const inReach = (p: Planet): boolean => raidZone === null || raidZone.has(p.id);
   const swarmInhabitant = state.players[ai]!.npc === 'swarm';
   // ОДИН РЕПЕРТУАР, РАЗНАЯ РУКА (заказ владельца 2026-09-28: «слабый бот тоже умный, но
   // менее шустрый и чаще ошибается»). Эвристики блока AI-BAL достаются ОБОИМ профилям
@@ -731,7 +746,7 @@ function baseAiOrders(
     const at = fl.location ? state.planets[fl.location] : undefined;
     if (!at) return undefined;
     return Object.values(state.planets)
-      .filter((p) => p.owner !== ai && capturable(p) && canTraverse(state, ai, p.owner))
+      .filter((p) => p.owner !== ai && capturable(p) && canTraverse(state, ai, p.owner) && inReach(p))
       .sort(
         (a, b) =>
           d(at.position, a.position) - d(at.position, b.position) ||
@@ -977,7 +992,7 @@ function baseAiOrders(
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
       if (here0 && here0.id === base.id && (warFooting || neutralGuarded)) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
-        let free = liftFree(f);
+        let free = fleetHoldFree(state, f, data);
         let ordered = false;
         for (const st of spareGround(here0, data)) {
           if (free <= 0) break;
@@ -1043,7 +1058,7 @@ function baseAiOrders(
         (f.loading ?? []).length === 0 &&
         neediestWorld(here0.position) !== undefined
       ) {
-        let free = liftFree(f);
+        let free = fleetHoldFree(state, f, data);
         let ordered = false;
         for (const st of spareGround(here0, data)) {
           if (free <= 0) break;
@@ -1073,6 +1088,7 @@ function baseAiOrders(
         here0.owner !== ai &&
         capturable(here0) &&
         canTraverse(state, ai, here0.owner) &&
+        inReach(here0) &&
         !reconBare(f) &&
         (!here0.garrison.some((st) => st.count > 0) ||
           // ПРАВИЛО ВЛАДЕЛЬЦА №2 (2026-09-16): штурмовать, только будучи УВЕРЕННЫМ, что
@@ -1135,8 +1151,13 @@ function baseAiOrders(
       // не доктрина, а минимальный эскорт, и её кап остаётся как был.
       const spareMilitia = spareGround(base, data).find((s) => s.unit === militiaUnit);
       const hasLanding = (f.landing ?? []).some((s) => s.count > 0);
-      if (!hasLanding && spareMilitia) {
-        out.push(loadArmy(ai, f.id, militiaUnit, Math.min(2, spareMilitia.count)));
+      const lift = Math.min(
+        2,
+        spareMilitia?.count ?? 0,
+        Math.floor(fleetHoldFree(state, f, data) / (data.units[militiaUnit]?.stats.cargoSize ?? 1)),
+      );
+      if (!hasLanding && lift > 0) {
+        out.push(loadArmy(ai, f.id, militiaUnit, lift));
         continue; // час подъёма — вылет следующим тиком
       }
     }
@@ -1165,8 +1186,9 @@ function baseAiOrders(
     const hunting = skilled && warFooting && trailing;
     const weight = (p: Planet): number => (hunting ? huntWeight(p, f.landing ?? []) : 1);
     for (const p of Object.values(state.planets)) {
-      if (p.owner === ai || !capturable(p)) continue;
+      if (p.id === here.id || p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
+      if (!inReach(p)) continue; // за угодьями клана пираты не ходят
       // Ничью планету с гарнизоном, которую этот десант наверняка не возьмёт, не
       // выбирают, иначе флот повиснет на её орбите до конца матча.
       if (
@@ -1258,6 +1280,8 @@ function baseAiOrders(
     // Взять нечего тем, что в трюме, — домой, за десантом.
     if (!best && neutralGuarded && base && f.location !== base.id && skilled)
       best = base;
+    // Пиратский флот за пределами угодий (застрял там до потолка, отступил) идёт к логову.
+    if (!best && raidZone && base && !raidZone.has(f.location)) best = base;
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
   // War when the race is being LOST (self-play M4 finding): a passive bot loses the
@@ -1404,6 +1428,68 @@ function baseAiOrders(
       if (!affordable('mine')) break;
       out.push(buildBuilding(ai, p.id, 'mine'));
       break; // spread the economy one world per tick
+    }
+    // Invest while metal is tight, keeping one usable line hull and the normal
+    // order reserve. A rich treasury does not need another source of stockpiles.
+    // Only one mining investment may be pending anywhere in the empire.
+    const minePending =
+      out.some(
+        (a) =>
+          (a.type === 'building.construct' || a.type === 'building.upgrade') &&
+          (a.payload as { building?: string }).building === 'mine',
+      ) ||
+      Object.values(state.planets).some(
+        (p) =>
+          p.owner === ai &&
+          [...(p.buildQueue ?? []), ...(p.pausedConstruction ?? [])].some(
+            (q) => (q.kind === 'building' || q.kind === 'upgrade') && q.building === 'mine',
+          ),
+      ) ||
+      state.scheduled.some((e) => {
+        if (e.type !== 'construction.complete') return false;
+        const q = e.payload as { kind?: string; planetId?: string; building?: string };
+        return (
+          (q.kind === 'building' || q.kind === 'upgrade') &&
+          q.building === 'mine' &&
+          state.planets[q.planetId ?? '']?.owner === ai
+        );
+      });
+    if (skilled && !minePending && data.buildings.mine) {
+      const hull = matchUnitCost(state, data.units[lineUnit]) ?? {};
+      const reserve = (r: string): number => (hull[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0);
+      for (const p of [
+        base,
+        ...worldsInOrder(state, ai, 'mine-upgrade', skilled).filter((p) => p.id !== base.id),
+      ]) {
+        if (p.owner !== ai || p.kind !== 'planet') continue;
+        const mine = p.buildings.find((b) => b.type === 'mine' && b.hp > 0);
+        if (!mine || mine.level >= buildingMaxLevel(data.buildings.mine)) continue;
+        if (p.buildQueue?.length || p.pausedConstruction?.length) continue;
+        if (
+          out.some(
+            (a) =>
+              (a.type === 'building.construct' || a.type === 'building.upgrade') &&
+              (a.payload as { planetId?: string }).planetId === p.id,
+          )
+        )
+          continue;
+        const cost = matchCost(state, buildingLevel(data.buildings.mine, mine.level + 1).cost);
+        if (
+          (pl.resources.metal ?? 0) >=
+          (cost.metal ?? 0) + 2 * (hull.metal ?? 0) + pad('metal', ORDER_RESERVE.metal ?? 0)
+        )
+          continue;
+        if (
+          !Object.keys({ ...cost, ...hull, ...ORDER_RESERVE }).every(
+            (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + reserve(r),
+          )
+        )
+          continue;
+        const order = upgradeBuilding(ai, p.id, 'mine');
+        if (canOrder(state, order) !== null) continue;
+        out.push(order);
+        break;
+      }
     }
     // МЁРТВЫЙ МИР — тоже экономика (AI-BAL-8). До аннигиляции ни одного `dead_world` на
     // карте прототипа не существовало, поэтому `metal_station` числилась мёртвым
@@ -1593,7 +1679,10 @@ function baseAiOrders(
             (!data.units[u]?.traits.includes('shuttle') || owned(u) < strikeCap) &&
             canOrder(state, buildUnit(ai, base.id, u, 1)) === null,
         ) ?? lineUnit;
-      out.push(buildUnit(ai, base.id, hull, 1));
+      const order = buildUnit(ai, base.id, hull, 1);
+      // Resource floors are a strategy reserve, not an affordability check: the
+      // pinned ship premium can raise any component above those old floors.
+      if (canOrder(state, order) === null) out.push(order);
     }
     // Wartime posture (self-play M4: wars were free walk-in raids — the leader had no
     // garrisons, so whoever attacked always came back and won): at war the bot
@@ -1619,7 +1708,30 @@ function baseAiOrders(
         out.push(buildUnit(ai, base.id, militiaUnit, 2));
       }
       if (ownFleets < 8 && (pl.resources.metal ?? 0) > pad('metal', 140)) {
-        out.push(buildUnit(ai, base.id, scoutUnit, 1));
+        // Scouts use spare money after the next line hull. Otherwise a 75-metal
+        // scout bought every two hours drains more than the opening mine earns,
+        // keeping the treasury below the line-production floor indefinitely.
+        // NPC rosters and Sector Zero keep their existing scenario behaviour.
+        const lineBlock = canOrder(state, buildUnit(ai, base.id, lineUnit, 1));
+        const saveForLine =
+          scoutUnit === 'scout' &&
+          !pl.npc &&
+          !state.pve &&
+          (lineBlock === null || lineBlock === 'E_INSUFFICIENT');
+        const scoutCost = matchUnitCost(state, data.units[scoutUnit]) ?? {};
+        const lineCost = matchUnitCost(state, data.units[lineUnit]) ?? {};
+        const afterScout = (r: string): number =>
+          (pl.resources[r] ?? 0) - (scoutCost[r] ?? 0);
+        const keepsLineBudget =
+          afterScout('metal') > pad('metal', 220) &&
+          afterScout('credits') > pad('credits', 120) &&
+          afterScout('microelectronics') >= pad('microelectronics', 3) &&
+          Object.keys({ ...lineCost, ...ORDER_RESERVE }).every(
+            (r) => afterScout(r) >= (lineCost[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0),
+          );
+        // A technology or facility gate is not something hoarding can fix: keep
+        // scouting while the ordinary research/building policy opens that gate.
+        if (!saveForLine || keepsLineBudget) out.push(buildUnit(ai, base.id, scoutUnit, 1));
       }
     }
     // ═══ СИЛЬНЫЙ БОТ (AI-BAL-3): наземная кампания ═══
@@ -1649,8 +1761,8 @@ function baseAiOrders(
         });
       // `troop` — боец десантного челнока (SHU-5.2): платится вместе с машиной.
       const affordableUnit = (unit: string, count: number, troop?: string): boolean => {
-        const hull = matchCost(state, data.units[unit]?.cost) ?? {};
-        const extra = troop !== undefined ? (matchCost(state, data.units[troop]?.cost) ?? {}) : {};
+        const hull = matchUnitCost(state, data.units[unit]) ?? {};
+        const extra = troop !== undefined ? (matchUnitCost(state, data.units[troop]) ?? {}) : {};
         return Object.keys({ ...hull, ...extra }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
@@ -1824,7 +1936,7 @@ function baseAiOrders(
       // Бот держит пару таких крейсеров на войне: без них миры он рушил бы только
       // `attack × BOMBARD_FRACTION` линейных корпусов. Заднюю линию теперь держит
       // шаттл-носитель выше.
-      const lineCost = matchCost(state, data.units[lineUnit]?.cost) ?? {};
+      const lineCost = matchUnitCost(state, data.units[lineUnit]) ?? {};
       const siegeCost = matchCost(state, data.modules[SIEGE_MODULE]?.cost) ?? {};
       if (
         warFooting &&
@@ -2221,7 +2333,9 @@ function baseAiOrders(
         };
         const patrolWing = (sq: Squadron): boolean => {
           const machines = sq.units.filter((st) => st.count > 0);
-          return machines.length > 0 && machines.every((st) => PATROL_WING.includes(st.unit as never));
+          return (
+            machines.length > 0 && machines.every((st) => PATROL_WING.includes(st.unit as never))
+          );
         };
         const issue = (order: Action): boolean => {
           if (canOrder(state, order) !== null) return false;
@@ -2603,11 +2717,18 @@ function baseAiOrders(
   }
   // Новая партия начинает только с разведчика: закрытые заказы ждут исследования.
   // Решение о доступности остаётся у ядра, включая войска десантного челнока и героев.
-  const available = swarmInhabitant
+  const unlocked = swarmInhabitant
     ? out.filter((a) => canOrder(state, a) === null)
     : state.techRules?.ruleset === 'main'
     ? out.filter((a) => canOrder(state, a) !== 'E_TECH_LOCKED')
     : out;
+  // Production orders are independent intents. Ask the reducer before ordering:
+  // bombardment, a full queue or a missing prerequisite can suppress this world.
+  // Fleet preparation/course pairs are checked together by the host instead.
+  const available = unlocked.filter(
+    (a) => !['unit.build', 'building.construct', 'building.upgrade'].includes(a.type) ||
+      canOrder(state, a) === null,
+  );
   // Копилка доктрины: войска, которые тратят то, на что место копит узел ветки, ждут.
   const held =
     saving.size === 0

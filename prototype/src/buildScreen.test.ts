@@ -72,7 +72,9 @@ describe('окно построек — категории из данных', (
 describe('окно построек — строка эффекта', () => {
   it('производство и содержание читаются с одного взгляда', () => {
     expect(buildFx(data.buildings.mine!, 1)).toContain('+12');
-    expect(buildFx(data.buildings.refinery!, 1)).toContain('−40'); // upkeep — со знаком минус (BAL-3)
+    // Upkeep — со знаком минус (BAL-3). В данных он за СУТКИ: 40 в сутки — это −1.7 в час,
+    // а не «−40/ч», которые строка печатала до настройки «доход в час / в сутки».
+    expect(buildFx(data.buildings.refinery!, 1)).toContain('−1.7<');
     // Доля защиты мира (решение владельца 2026-09-26): у форта своя, по уровню.
     expect(buildFx(data.buildings.fort!, 1)).toContain('−15% урона по миру');
     expect(buildFx(data.buildings.fort!, 3)).toContain('−45% урона по миру');
@@ -105,6 +107,55 @@ describe('окно построек — строка эффекта', () => {
 });
 
 describe('окно построек — состояние строки от пробы ядра', () => {
+  it('hides retired choices but preserves standing and pending legacy buildings', () => {
+    const s = newGame();
+    const pid = home(s);
+    for (const id of ['mine_t1', 'mine_t2']) {
+      expect(buildRowState(s, 'p1', pid, id, probe(s), noQueue)).toEqual({ st: 'hidden' });
+    }
+    s.planets[pid]!.buildings.push({ type: 'mine_t1', level: 1, hp: 15 });
+    expect(buildRowState(s, 'p1', pid, 'mine_t1', probe(s), noQueue)).toMatchObject({
+      st: 'built',
+      level: 1,
+    });
+    expect(html(s, pid)).toContain('data-bw="mine_t1"');
+    s.planets[pid]!.buildQueue = [
+      { id: 999, kind: 'building', playerId: 'p1', building: 'mine_t2' },
+    ];
+    expect(buildRowState(s, 'p1', pid, 'mine_t2', probe(s), noQueue)).toEqual({
+      st: 'queued',
+      waiting: true,
+    });
+    s.planets[pid]!.buildQueue = [];
+    s.scheduled.push({
+      id: 'legacy:mine',
+      at: s.time + 1000,
+      type: 'construction.complete',
+      payload: { kind: 'building', planetId: pid, building: 'mine_t2', playerId: 'p1' },
+      seq: 999,
+    });
+    expect(buildRowState(s, 'p1', pid, 'mine_t2', probe(s), noQueue)).toEqual({
+      st: 'queued',
+      waiting: false,
+    });
+    s.scheduled = s.scheduled.filter((e) => e.id !== 'legacy:mine');
+    s.planets[pid]!.pausedConstruction = [
+      {
+        id: 999,
+        kind: 'building',
+        playerId: 'p1',
+        building: 'mine_t2',
+        progress: 0.5,
+        remainingHours: 9,
+        remainingCost: { metal: 150, credits: 60 },
+      },
+    ];
+    expect(buildRowState(s, 'p1', pid, 'mine_t2', probe(s), noQueue)).toEqual({
+      st: 'queued',
+      waiting: true,
+    });
+  });
+
   it('построенное — built с уровнем, доступное — avail, без казны — не оплачиваемое', () => {
     const s = newGame();
     const pid = home(s);

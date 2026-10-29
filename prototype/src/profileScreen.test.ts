@@ -4,6 +4,7 @@ import { EMPTY_STATS, type MetaStats } from './meta';
 import { defaultAppearance } from '../../packages/protocol/src/playerProfile';
 import { PORTRAITS } from './profileArt';
 import {
+  accountCareerHtml,
   parseMedalCache,
   parseMedalCatalog,
   pfCell,
@@ -73,24 +74,52 @@ it('досье скрывает неподтверждённый баланс С
 });
 
 describe('публичный профиль и устаревшие ответы', () => {
-  const publicData = (login: string) => ({ ...defaultAppearance(), login, xp: 70, progress: { matches: 2, wins: 1 } });
+  const publicData = (login: string) => ({
+    ...defaultAppearance(),
+    login,
+    xp: 70,
+    progress: { matches: 2, wins: 1 },
+  });
   const tick = () => new Promise((r) => setTimeout(r, 0));
   function host(root: HTMLElement): ProfileHost {
-    return { root: () => root, view: () => ({ nick: 'Owner', xp: 0, stats: stats(), corp: null, sovereigns: 9999 }), readCache: () => null, writeCache: () => {}, authorizedBase: async () => ({ base: 'https://server', token: 'session' }) };
+    return {
+      root: () => root,
+      view: () => ({ nick: 'Owner', xp: 0, stats: stats(), corp: null, sovereigns: 9999 }),
+      readCache: () => null,
+      writeCache: () => {},
+      authorizedBase: async () => ({ base: 'https://server', token: 'session' }),
+    };
   }
   it('чужая карточка читает именно чужой профиль и не показывает валюту владельца', async () => {
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => publicData('Other') }));
     vi.stubGlobal('fetch', fetcher);
-    const root = fakeOverlay(); const api = initProfile(host(root)); api.open('Other'); await tick();
+    const root = fakeOverlay();
+    const api = initProfile(host(root));
+    api.open('Other');
+    await tick();
     expect(fetcher).toHaveBeenCalledWith('https://server/profiles?login=Other', expect.anything());
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(root.html()).toContain('Other');
     expect(root.html()).not.toMatch(/pf-cur|data-portrait=|data-ps="save"|9999|Owner/);
-    expect(root.html()).not.toMatch(/pf-bot-badge|pf-history|Последние матчи|>Матчей<|>Победы в матчах</);
+    expect(root.html()).not.toMatch(/pf-bot-badge|pf-history|Последние матчи/);
   });
   it.each([
-    { locale: 'ru' as const, matches: 'Матчей', wins: 'Победы в матчах', xp: 'Опыт командира', history: 'Последние матчи', results: ['Победа', 'Ничья', 'Поражение'] },
-    { locale: 'en' as const, matches: 'Matches', wins: 'Match victories', xp: 'Commander XP', history: 'Recent matches', results: ['Victory', 'Draw', 'Defeat'] },
+    {
+      locale: 'ru' as const,
+      matches: 'Матчей',
+      wins: 'Победы в матчах',
+      xp: 'Опыт командира',
+      history: 'Последние матчи',
+      results: ['Победа', 'Ничья', 'Поражение'],
+    },
+    {
+      locale: 'en' as const,
+      matches: 'Matches',
+      wins: 'Match victories',
+      xp: 'Commander XP',
+      history: 'Recent matches',
+      results: ['Victory', 'Draw', 'Defeat'],
+    },
   ])('бот показывает серверную карьеру и историю без редактора ($locale)', async (copy) => {
     setLocale(copy.locale);
     const recentMatches = ['win', 'draw', 'loss'].map((outcome, index) => ({
@@ -103,7 +132,12 @@ describe('публичный профиль и устаревшие ответы
     }));
     const fetcher = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ ...publicData('~Orion'), kind: 'bot', progress: { matches: 3, wins: 1 }, recentMatches }),
+      json: async () => ({
+        ...publicData('~Orion'),
+        kind: 'bot',
+        progress: { matches: 3, wins: 1 },
+        recentMatches,
+      }),
     }));
     vi.stubGlobal('fetch', fetcher);
     const root = fakeOverlay();
@@ -113,8 +147,10 @@ describe('публичный профиль и устаревшие ответы
     await tick();
     const html = root.html();
     expect(fetcher).toHaveBeenCalledWith('https://server/profiles?login=~Orion', expect.anything());
-    expect(html).not.toMatch(/pf-bot-badge|Командир под управлением ИИ|AI-controlled commander|>ИИ<|>AI</);
-    expect(html).toContain(pfCell(copy.xp, '70'));
+    expect(html).not.toMatch(
+      /pf-bot-badge|Командир под управлением ИИ|AI-controlled commander|>ИИ<|>AI</,
+    );
+    expect(html).toContain('value="70"');
     expect(html).toContain(pfCell(copy.matches, '3'));
     expect(html).toContain(pfCell(copy.wins, '1'));
     expect(html).toContain(copy.history);
@@ -122,13 +158,18 @@ describe('публичный профиль и устаревшие ответы
     for (const result of copy.results) expect(html).toContain(`<b>${result}</b>`);
     expect(html).toContain('datetime="2026-10-19T12:00:00.000Z"');
     expect(html).toContain('sector-0');
-    expect(html).not.toMatch(/pf-cur|data-portrait=|data-pstab=|data-ps=|9999|Owner|>null<|NaN|href=/);
+    expect(html).not.toMatch(
+      /pf-cur|data-portrait=|data-pstab=|data-ps=|9999|Owner|>null<|NaN|href=/,
+    );
   });
   it('у нового бота нулевые счётчики и пустая история появляются только после ответа', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ...publicData('~New'), kind: 'bot', xp: 0, progress: {} }),
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ ...publicData('~New'), kind: 'bot', xp: 0, progress: {} }),
+      })),
+    );
     const root = fakeOverlay();
     const api = initProfile(host(root));
     api.open('~New');
@@ -136,15 +177,18 @@ describe('публичный профиль и устаревшие ответы
     await tick();
     expect(root.html()).toContain(pfCell('Матчей', '0'));
     expect(root.html()).toContain(pfCell('Победы в матчах', '0'));
-    expect(root.html()).toContain(pfCell('Опыт командира', '0'));
+    expect(root.html()).toContain('value="0"');
     expect(root.html()).toContain('История матчей пока пуста.');
     expect(root.html()).not.toContain('class="pf-history"');
   });
   it('позывной бота из сетевого профиля экранируется (CWE-79)', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ...publicData('<img src=x onerror=alert(1)>'), kind: 'bot' }),
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ ...publicData('<img src=x onerror=alert(1)>'), kind: 'bot' }),
+      })),
+    );
     const root = fakeOverlay();
     initProfile(host(root)).open('~Orion');
     await tick();
@@ -153,15 +197,29 @@ describe('публичный профиль и устаревшие ответы
   });
   it('запоздалый ответ предыдущей карточки не подменяет новую', async () => {
     let resolveOld!: (value: unknown) => void;
-    vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('Old')
-      ? new Promise((resolve) => { resolveOld = resolve; })
-      : Promise.resolve({ ok: true, json: async () => publicData('New') })));
-    const root = fakeOverlay(); const api = initProfile(host(root));
-    api.open('Old'); await tick(); api.open('New'); await tick();
-    resolveOld({ ok: true, json: async () => ({ ...publicData('Old'), kind: 'bot' }) }); await tick();
-    expect(root.html()).toContain('New'); expect(root.html()).not.toContain('Old');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        url.includes('Old')
+          ? new Promise((resolve) => {
+              resolveOld = resolve;
+            })
+          : Promise.resolve({ ok: true, json: async () => publicData('New') }),
+      ),
+    );
+    const root = fakeOverlay();
+    const api = initProfile(host(root));
+    api.open('Old');
+    await tick();
+    api.open('New');
+    await tick();
+    resolveOld({ ok: true, json: async () => ({ ...publicData('Old'), kind: 'bot' }) });
+    await tick();
+    expect(root.html()).toContain('New');
+    expect(root.html()).not.toContain('Old');
     expect(root.html()).not.toContain('pf-bot-badge');
-    api.close(); expect(root.shown()).toBe(false);
+    api.close();
+    expect(root.shown()).toBe(false);
   });
 });
 
@@ -192,7 +250,9 @@ describe('профиль — «—» вместо правдоподобного
 
   it('сыгранные матчи дают живые числа', () => {
     const html = profileHtml(
-      view({ stats: stats({ matches: 10, wins: 6, placeSum: 15, placed: 10, score: 4200, streak: 3 }) }),
+      view({
+        stats: stats({ matches: 10, wins: 6, placeSum: 15, placed: 10, score: 4200, streak: 3 }),
+      }),
     );
     expect(html).toContain('60%'); // 6 из 10
     expect(html).toContain('1.5'); // среднее место
@@ -449,4 +509,81 @@ describe('профиль — вкладки и панель сохранения
     expect(root.html()).not.toContain('ps-savebar');
     expect(root.html()).toContain(`<div class="pf-av face"><img src="${PORTRAITS[0]}"`);
   });
+});
+
+it('renders account career instead of local counters, escapes corporation names and avoids infinite ratios', () => {
+  const profile = {
+    ...defaultAppearance(),
+    login: 'A',
+    xp: 250,
+    progress: {},
+    statistics: { matches: 7, wins: 3 },
+    corporation: { id: 'corp-1', name: '<Example>' },
+    career: {
+      matches: 1,
+      wins: 1,
+      since: 100,
+      pvp: { destroyed: 4, lost: 0, destroyedCost: { metal: 80 }, lostCost: {} },
+      modes: { duel: { matches: 1, wins: 1 } },
+    },
+  };
+  const html = accountCareerHtml(profile, true);
+  expect(html).toContain('Уровень 3');
+  expect(html).toContain('data-profile-corp="corp-1"');
+  expect(html).toContain('&lt;Example&gt;');
+  expect(html).not.toContain('<Example>');
+  expect(html).toContain(pfCell('Матчей', '7'));
+  expect(html).toContain('Потерь нет');
+  expect(html).not.toContain('Infinity');
+  expect(accountCareerHtml({ ...profile, corporation: null, career: null }, true)).toContain(
+    'Без корпорации',
+  );
+  expect(accountCareerHtml({ ...profile, career: undefined }, true)).toContain('Нет данных');
+});
+
+it('opens the selected corporation and returns to the same player without applying for membership', async () => {
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const profile = {
+    ...defaultAppearance(),
+    login: 'Other',
+    xp: 25,
+    progress: {},
+    statistics: { matches: 1, wins: 0 },
+    corporation: { id: 'corp-1', name: 'Example' },
+  };
+  const fetcher = vi.fn(async (url: string) => ({
+    ok: true,
+    json: async () =>
+      url.includes('/corps/')
+        ? {
+            corp: { corpId: 'corp-1', name: 'Example', influence: 17 },
+            members: [{ login: 'Member', role: 'member' }],
+          }
+        : profile,
+  }));
+  vi.stubGlobal('fetch', fetcher);
+  const root = fakeOverlay();
+  const api = initProfile({
+    root: () => root,
+    view: () => view(),
+    readCache: () => null,
+    writeCache: () => {},
+    authorizedBase: async () => ({ base: 'https://server', token: 'session' }),
+  });
+  api.open('Other');
+  await tick();
+  root.fire({
+    closest: (selector: string) =>
+      selector === '[data-profile-corp]' ? { dataset: { profileCorp: 'corp-1' } } : null,
+  });
+  await tick();
+  expect(fetcher).toHaveBeenLastCalledWith('https://server/corps/corp-1', expect.anything());
+  expect(root.html()).toContain('Member');
+  expect(root.html()).toContain('Назад к игроку');
+  root.fire({
+    closest: (selector: string) => (selector === '[data-profile-corp-back]' ? {} : null),
+  });
+  expect(root.html()).toContain('Other');
+  expect(root.html()).toContain('data-profile-corp="corp-1"');
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

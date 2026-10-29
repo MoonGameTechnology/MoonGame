@@ -25,7 +25,7 @@
       "owner": "p1",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -65,7 +65,7 @@
       "owner": "covenant",
       "buildings": [
         {
-          "type": "mine_t1"
+          "type": "mine"
         },
         {
           "type": "shipyard",
@@ -160,7 +160,8 @@
           "type": "swarm_synapse"
         },
         {
-          "type": "mine_t2"
+          "type": "mine",
+          "level": 3
         },
         {
           "type": "shipyard",

@@ -1,0 +1,121 @@
+diff --git a/coraza.go b/coraza.go
+index 441be60..fd5c5ba 100644
+--- a/coraza.go
++++ b/coraza.go
+@@ -227,16 +227,19 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
+ 	// ProcessRequestHeaders and ProcessRequestBody.
+ 	// It fails if any of these functions returns an error and it stops on interruption.
+ 	if it, err := processRequest(tx, r); err != nil {
++		status := http.StatusInternalServerError
++		var oversized *http.MaxBytesError
++		if errors.As(err, &oversized) {
++			status = http.StatusRequestEntityTooLarge
++		}
+ 		return caddyhttp.HandlerError{
+-			StatusCode: http.StatusInternalServerError,
++			StatusCode: status,
+ 			ID:         tx.ID(),
+-			Err:        err,
++			Err:        errors.New("E_WAF_REQUEST"),
+ 		}
+ 	} else if it != nil {
+ 		client, _ := getClientAddress(r)
+ 		m.logger.Error("WAF rule violation detected",
+-			zap.String("hostname", r.Host),
+-			zap.String("uri", r.RequestURI),
+ 			zap.String("client_ip", client),
+ 			zap.String("unique_id", tx.ID()),
+ 		)
+@@ -317,25 +320,33 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
+ 	return m, err
+ }
+ 
++// Never log matched values, free-form messages, URIs, headers, or request bodies.
++// Coraza ErrorLog() contains all of these even with SecAuditEngine Off.
+ func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
+ 	return func(mr types.MatchedRule) {
+-		logMsg := mr.ErrorLog()
++		logMsg := "waf.rule"
++		fields := []zap.Field{
++			zap.Int("rule_id", mr.Rule().ID()),
++			zap.Int("severity", int(mr.Rule().Severity())),
++			zap.String("transaction_id", mr.TransactionID()),
++			zap.Bool("disruptive", mr.Disruptive()),
++		}
+ 		switch mr.Rule().Severity() {
+ 		case types.RuleSeverityEmergency,
+ 			types.RuleSeverityAlert,
+ 			types.RuleSeverityCritical,
+ 			types.RuleSeverityError:
+-			logger.Error(logMsg)
++			logger.Error(logMsg, fields...)
+ 		case types.RuleSeverityWarning:
+-			logger.Warn(logMsg)
++			logger.Warn(logMsg, fields...)
+ 		case types.RuleSeverityNotice:
+-			logger.Info(logMsg)
++			logger.Info(logMsg, fields...)
+ 		case types.RuleSeverityInfo:
+-			logger.Info(logMsg)
++			logger.Info(logMsg, fields...)
+ 		case types.RuleSeverityDebug:
+-			logger.Debug(logMsg)
++			logger.Debug(logMsg, fields...)
+ 		default:
+-			logger.Warn(logMsg)
++			logger.Warn(logMsg, fields...)
+ 		}
+ 	}
+ }
+diff --git a/coraza_test.go b/coraza_test.go
+index f340bc2..e0c7929 100644
+--- a/coraza_test.go
++++ b/coraza_test.go
+@@ -472,13 +472,16 @@ func TestNewErrorCb(t *testing.T) {
+ 			require.NoError(t, err)
+ 
+ 			tx := waf.NewTransaction()
+-			tx.ProcessURI("/trigger", "GET", "HTTP/1.1")
++			tx.ProcessURI("/trigger?token=synthetic-secret-canary", "GET", "HTTP/1.1")
+ 			tx.ProcessRequestHeaders()
+ 			tx.ProcessLogging()
+ 			tx.Close()
+ 
+ 			require.GreaterOrEqual(t, logs.Len(), 1)
+ 			require.Equal(t, tt.expectedLevel, logs.All()[0].Level)
++			require.Equal(t, "waf.rule", logs.All()[0].Message)
++			require.NotContains(t, fmt.Sprint(logs.All()), "synthetic-secret-canary")
++			require.Equal(t, int64(1), logs.All()[0].ContextMap()["rule_id"])
+ 		})
+ 	}
+ 
+@@ -498,7 +501,7 @@ func TestNewErrorCb(t *testing.T) {
+ 		require.NoError(t, err)
+ 
+ 		tx := waf.NewTransaction()
+-		tx.ProcessURI("/trigger", "GET", "HTTP/1.1")
++		tx.ProcessURI("/trigger?token=synthetic-secret-canary", "GET", "HTTP/1.1")
+ 		tx.ProcessRequestHeaders()
+ 		tx.ProcessLogging()
+ 		tx.Close()
+@@ -967,5 +970,6 @@ func TestViolationLogClientIPFromXFF(t *testing.T) {
+ 
+ 	require.Equal(t, forwardedIP, entry["client_ip"],
+ 		"violation log must carry the XFF-resolved client IP, not the proxy RemoteAddr")
+-	require.Equal(t, "/denyme", entry["uri"])
++	require.NotContains(t, entry, "uri", "request targets may contain credentials")
++	require.NotContains(t, entry, "hostname")
+ }
+diff --git a/http.go b/http.go
+index 92e036e..11448d5 100644
+--- a/http.go
++++ b/http.go
+@@ -57,7 +57,7 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
+ 		if req.Body != nil && req.Body != http.NoBody {
+ 			it, _, err := tx.ReadRequestBodyFrom(req.Body)
+ 			if err != nil {
+-				return nil, fmt.Errorf("failed to append request body: %s", err.Error())
++				return nil, fmt.Errorf("failed to append request body: %w", err)
+ 			}
+ 
+ 			if it != nil {

@@ -12,8 +12,15 @@
  * Раскладка как у Арсенала: на ПК карточка товара рядом со списком, на узкой вкладке
  * (телефон) — шторкой поверх хаба. Покупка — в два нажатия: «Купить» показывает
  * подтверждение с суммой, списание идёт только после него.
+ *
+ * Пятая полка, «Стили» (CORP-14), — стили базы корпорации: покупает глава за свои ◆
+ * для всей корпорации, и он же применяет купленный стиль здесь или на вкладке «Корпорация».
+ * Кнопку стиля решает `decisions/corpStyle.ts` по ответу `/meta-economy/corp-style`.
  */
+import { CORP_HQ } from '../../decisions/corpBase';
+import { corpLook, styleOfferState, type StyleOfferState } from '../../decisions/corpStyle';
 import type { CommerceOffer } from '../../packages/protocol/src/commerce';
+import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import type {
   MetaEconomyView,
   MetaStoreOfferView,
@@ -34,6 +41,8 @@ import {
   SHOP_TABS,
   type ShopTab,
 } from '../../decisions/shopView';
+import { CORP_ART_BUILDINGS, corpStyleName } from './corpArt';
+import { corpBackdropName, corpPanoramaBg, corpSprite } from './corpSprites';
 import { data } from './gameData';
 import { esc, nfmt } from './format';
 import { SOV_SVG } from './icons';
@@ -50,12 +59,21 @@ const TAB_KEY: Record<ShopTab, string> = {
   premium: 'shop.tab.premium',
   modules: 'shop.tab.modules',
   materials: 'shop.tab.materials',
+  styles: 'shop.tab.styles',
 };
 const TAB_ICON: Record<ShopTab, string> = {
   sovereigns: `<i class="sh-sv">${SOV_SVG}</i>`,
   premium: '★',
   modules: '⬡',
   materials: '⬢',
+  styles: '◈',
+};
+/** Кнопка стиля, которую нельзя нажать: почему. */
+const STYLE_BLOCKED_KEY: Record<Extract<StyleOfferState, { kind: 'blocked' }>['reason'], string> = {
+  offline: 'shop.style.offline',
+  corp: 'shop.style.no-corp',
+  head: 'shop.style.head',
+  owned: 'corp.style.owned',
 };
 /** Подсказка под вкладкой — только то, что карточки не говорят сами. */
 const TAB_HINT: Partial<Record<ShopTab, string>> = {
@@ -109,6 +127,8 @@ export interface ShopState {
   wide: boolean;
   warrants: number;
   now: number;
+  /** Стили корпорации игрока: null — он не в корпорации, undefined — ответа нет. */
+  corpStyle: MetaCorpStyleView | null | undefined;
 }
 
 function entries(s: ShopState): Entry[] {
@@ -129,17 +149,22 @@ function entries(s: ShopState): Entry[] {
   return list;
 }
 
-/** Открытый товар: выбранный игроком, иначе первый, который можно купить. */
+/** Открытый товар: выбранный игроком, иначе первый, который можно купить. Вкладка
+ *  «Корпорация» выбирает стиль по его id, а не по id товара. */
 export function pickedEntry(s: ShopState): Entry | undefined {
   const list = entries(s);
+  const asked = list.find(
+    (e) => e.id === s.pick || (e.kind === 'store' && !!s.pick && corpLook(e.offer) === s.pick),
+  );
   const id =
-    s.pick && list.some((e) => e.id === s.pick)
-      ? s.pick
-      : defaultPick(list.map((e) => ({ id: e.id, open: e.kind === 'store' && !e.offer.blocked })));
+    asked?.id ??
+    defaultPick(list.map((e) => ({ id: e.id, open: e.kind === 'store' && !e.offer.blocked })));
   return list.find((e) => e.id === id);
 }
 
 function storeTitle(view: MetaEconomyView, o: MetaStoreOfferView): string {
+  if (o.corpStyle) return t(corpStyleName(o.corpStyle));
+  if (o.corpBackdrop) return t(corpBackdropName(o.corpBackdrop));
   if (o.premiumDays) return t('shop.premium.days', { n: o.premiumDays });
   if (o.premiumSeason) {
     const season = view.seasons.find((x) => x.id === o.premiumSeason);
@@ -161,7 +186,26 @@ function materialsSub(view: MetaEconomyView, materials: Record<string, number>):
   return t('shop.materials.kinds', { n: rows.length });
 }
 
-function artHtml(e: Entry): string {
+/** Стиль базы — завершёнными зданиями: в карточке штаб, в описании
+ *  все здания. */
+function styleArtHtml(style: string, all: boolean): string {
+  return (
+    `<span class="sh-art sh-art-style" aria-hidden="true">` +
+    (all ? CORP_ART_BUILDINGS : [CORP_HQ])
+      .map((id) => corpSprite(id, id === CORP_HQ ? 5 : 3, 'built', style))
+      .join('') +
+    '</span>'
+  );
+}
+
+/** Фон базы — его панорамой без зданий. */
+function backdropArtHtml(backdrop: string): string {
+  return `<span class="sh-art sh-art-bd" aria-hidden="true">${corpPanoramaBg([], backdrop)}</span>`;
+}
+
+function artHtml(e: Entry, detail = false): string {
+  if (e.kind === 'store' && e.offer.corpStyle) return styleArtHtml(e.offer.corpStyle, detail);
+  if (e.kind === 'store' && e.offer.corpBackdrop) return backdropArtHtml(e.offer.corpBackdrop);
   if (e.kind === 'pack') {
     const n = Math.min(5, 1 + Math.floor(Math.log2(packTotal(e.offer) / 100 + 1)));
     return `<span class="sh-art sh-art-sov" aria-hidden="true">${`<i>${SOV_SVG}</i>`.repeat(n)}</span>`;
@@ -186,6 +230,15 @@ function artHtml(e: Entry): string {
     );
   }
   return `<span class="sh-art sh-art-prem" aria-hidden="true">★</span>`;
+}
+
+/** Стиль уже у корпорации — вместо цены сказано, применён он или куплен. */
+function stylePill(s: ShopState, view: MetaEconomyView, o: MetaStoreOfferView): string {
+  const st = styleOfferState(o, s.corpStyle, view.sovereigns ?? 0);
+  if (st.kind === 'applied') return `<span class="sh-pill on">${t('corp.style.applied')}</span>`;
+  if (st.kind === 'apply' || (st.kind === 'blocked' && st.reason === 'owned'))
+    return `<span class="sh-pill on">${t('corp.style.owned')}</span>`;
+  return '';
 }
 
 function cardHtml(
@@ -217,11 +270,16 @@ function cardHtml(
       const saving = premiumSavings(shelf(view.store ?? [], 'premium'))[o.id];
       if (saving) sub = t('shop.premium.saving', { n: saving });
     } else if (o.premiumSeason) sub = t('shop.season.track');
+    else if (o.corpStyle) sub = t('shop.style.sub');
+    else if (o.corpBackdrop) sub = t('shop.backdrop.sub');
     const discount = discountOf(o);
     if (discount) tag = t('shop.discount', { n: discount });
-    price = o.blocked
-      ? `<span class="sh-pill">${t(BLOCKED_KEY[o.blocked])}</span>`
-      : (o.fullPrice && o.fullPrice > o.price ? `<s>${nfmt(o.fullPrice)}</s>` : '') + sov(o.price);
+    price =
+      (corpLook(o) ? stylePill(s, view, o) : '') ||
+      (o.blocked
+        ? `<span class="sh-pill">${t(BLOCKED_KEY[o.blocked])}</span>`
+        : (o.fullPrice && o.fullPrice > o.price ? `<s>${nfmt(o.fullPrice)}</s>` : '') +
+          sov(o.price));
   }
   const title =
     e.kind === 'pack'
@@ -334,9 +392,31 @@ function buyHtml(
   const state = buyState(o, view.sovereigns ?? 0);
   if (state.kind === 'blocked')
     return `<button type="button" class="btn-main" disabled>${t(BLOCKED_KEY[state.reason])}</button>`;
-  if (state.kind === 'short')
+  return payHtml(s, o, title, state.kind === 'short' ? state.lack : 0);
+}
+
+/** Кнопка стиля базы: купить (глава), применить купленный или почему нельзя. */
+function styleHtml(
+  s: ShopState,
+  view: MetaEconomyView,
+  o: MetaStoreOfferView,
+  title: string,
+): string {
+  const state = styleOfferState(o, s.corpStyle, view.sovereigns ?? 0);
+  if (state.kind === 'blocked')
+    return `<button type="button" class="btn-main" disabled>${t(STYLE_BLOCKED_KEY[state.reason])}</button>`;
+  if (state.kind === 'applied')
+    return `<button type="button" class="btn-main" disabled>${t('corp.style.applied')}</button>`;
+  if (state.kind === 'apply')
+    return `<button type="button" class="btn-main" data-sh-apply="${esc(corpLook(o) ?? '')}"${off(s.busy)}>${t('corp.style.apply')}</button>`;
+  return payHtml(s, o, title, state.kind === 'short' ? state.lack : 0);
+}
+
+/** Оплата ◆: недостача с дорогой к Суверенам, подтверждение или «Купить». */
+function payHtml(s: ShopState, o: MetaStoreOfferView, title: string, lack: number): string {
+  if (lack > 0)
     return (
-      `<button type="button" class="btn-main" disabled>${t('shop.short')} ${sov(state.lack)}</button>` +
+      `<button type="button" class="btn-main" disabled>${t('shop.short')} ${sov(lack)}</button>` +
       `<button type="button" class="btn-second" data-sh-tab="sovereigns">${t('shop.topup')}</button>`
     );
   if (s.confirm)
@@ -412,13 +492,14 @@ export function shopDetailHtml(s: ShopState): string {
           `<h4 class="sh-sec">${t('shop.coverage')}</h4>` +
           cover.map((c) => line(moduleName(c.defId), `${c.percent}%`)).join('');
       note = t('shop.materials.note');
-    }
-    action = buyHtml(s, view, o, title);
+    } else if (o.corpStyle) note = t('corp.style.note');
+    else if (o.corpBackdrop) note = t('corp.backdrop.note');
+    action = corpLook(o) ? styleHtml(s, view, o, title) : buyHtml(s, view, o, title);
   }
   return (
     `<div class="sh-dt"><h3 id="sh-dt-title">${e.kind === 'pack' ? sov(packTotal(e.offer)) : esc(title)}</h3>` +
     statusHtml(s.notice) +
-    artHtml(e) +
+    artHtml(e, true) +
     `<div class="sh-lines">${lines}</div>` +
     (note ? `<p class="sh-note">${esc(note)}</p>` : '') +
     `<div class="sh-acts">${action}</div></div>`
@@ -481,6 +562,7 @@ export function initShop(host: ShopHost): {
     },
     ...(host.changed ? { changed: () => host.changed!() } : {}),
     ...(host.requestId ? { requestId: () => host.requestId!() } : {}),
+    corpStyle: true,
   });
 
   const readStatus = (st: MetaEconomyStatus): ShopState['status'] => {
@@ -517,6 +599,7 @@ export function initShop(host: ShopHost): {
       wide,
       warrants: host.warrants(),
       now: host.now(),
+      corpStyle: client.corpStyle(),
     };
   }
 
@@ -607,13 +690,19 @@ export function initShop(host: ShopHost): {
     }
     const view = client.view();
     if (client.busy() || !view) return;
+    // Стиль базы покупает глава для корпорации — его кнопку решает не `buyState`.
+    const canBuy = (o: MetaStoreOfferView): boolean =>
+      (corpLook(o)
+        ? styleOfferState(o, client.corpStyle(), view.sovereigns ?? 0)
+        : buyState(o, view.sovereigns ?? 0)
+      ).kind === 'buy';
     if (d.shDaily !== undefined) {
       if (!view.premiumDaily || view.premiumDaily.claimed) return;
       return act('/meta-economy/premium/daily', {}, 'shop.premium.daily-done', 'daily');
     }
     if (d.shBuy) {
       const o = view.store?.find((x) => x.id === d.shBuy);
-      if (!o || buyState(o, view.sovereigns ?? 0).kind !== 'buy') return;
+      if (!o || !canBuy(o)) return;
       pick = o.id;
       confirm = true;
       acting = false;
@@ -623,8 +712,9 @@ export function initShop(host: ShopHost): {
     }
     if (d.shBuyDo) {
       const o = view.store?.find((x) => x.id === d.shBuyDo);
-      if (!o || !confirm || pick !== o.id || buyState(o, view.sovereigns ?? 0).kind !== 'buy')
-        return;
+      if (!o || !confirm || pick !== o.id || !canBuy(o)) return;
+      if (corpLook(o))
+        return act('/meta-economy/corp-style/buy', { offerId: o.id }, 'shop.done.style', 'detail');
       const done =
         o.premiumDays || o.premiumSeason
           ? 'shop.done.premium'
@@ -632,6 +722,17 @@ export function initShop(host: ShopHost): {
             ? 'shop.done.modules'
             : 'shop.done.materials';
       return act('/meta-economy/store/buy', { offerId: o.id }, done, 'detail');
+    }
+    if (d.shApply) {
+      const o = view.store?.find((x) => corpLook(x) === d.shApply);
+      if (!o || styleOfferState(o, client.corpStyle(), view.sovereigns ?? 0).kind !== 'apply')
+        return;
+      return act(
+        '/meta-economy/corp-style/apply',
+        { styleId: d.shApply },
+        'shop.done.style-applied',
+        'detail',
+      );
     }
   }
 

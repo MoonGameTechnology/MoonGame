@@ -21,7 +21,10 @@ import {
   zoomAt as camZoomAt,
   clampCam as camClampCam,
   centerOn as camCenterOn,
+  dragCam as camDragCam,
+  settleCam as camSettleCam,
   fitTransform as camFitTransform,
+  MIN_SCALE,
 } from '../../packages/client/src/camera';
 import { data } from './gameData';
 import { isFrontier } from './mapCatalog';
@@ -118,6 +121,25 @@ export function world(p: { x: number; y: number }): { x: number; y: number } {
 export function unworld(p: { x: number; y: number }): { x: number; y: number } {
   return camScreenToWorld(p, cam, insets(), mapBounds());
 }
+/** Экран с запасом `pad` px — в координатах КАРТЫ. Проекция — равномерный масштаб со сдвигом,
+ *  поэтому точка карты внутри этой рамки — та, чья экранная точка внутри экрана с тем же
+ *  запасом ({@link visible}), с точностью до округления. Так с экраном сверяют много точек
+ *  карты, не переводя каждую. */
+export function visibleOnMap(pad: number): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  const a = unworld({ x: -pad, y: -pad });
+  const b = unworld({ x: game.vw() + pad, y: game.vh() + pad });
+  return {
+    minX: Math.min(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxX: Math.max(a.x, b.x),
+    maxY: Math.max(a.y, b.y),
+  };
+}
 /** Дальность карты в пикселях — ЕДИНСТВЕННЫЙ перевод на весь рендер (`mapRadius.ts`,
  *  REFM-132). Там же причина, почему множитель — подгон карты под экран × зум камеры:
  *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
@@ -208,17 +230,56 @@ export function defaultView(): void {
   camera.y = 0;
   clampCam();
 }
-/** Сдвинуть камеру на (dx, dy) экранных пикселей без зажима: зажимает тот, кто тянет
- *  (палец, лист выбора), а выпечка карты так подтягивает камеру на сетку пикселей. */
+/** Сдвинуть камеру на (dx, dy) экранных пикселей без зажима: зажимает тот, кто двигает
+ *  (лист выбора), а выпечка карты так подтягивает камеру на сетку пикселей. Палец и мышь
+ *  тянут карту через {@link dragBy}. */
 export function panBy(dx: number, dy: number): void {
   camera.x += dx;
   camera.y += dy;
+}
+/** Тянуть камеру пальцем или мышью на (dx, dy) экранных пикселей. У края карта не встаёт
+ *  стеной (просьба владельца 2026-10-25): за пределом она идёт за пальцем с растущим
+ *  сопротивлением, а после отпускания возвращается сама ({@link releaseCam}). */
+export function dragBy(dx: number, dy: number): void {
+  const n = camDragCam(cam, dx, dy, insets(), mapBounds(), panelSlack());
+  camera.x = n.x;
+  camera.y = n.y;
+}
+// Камера отпущена растянутой за край и плывёт обратно в предел — шаг за кадр.
+let easing = false;
+/** Последний палец отпустил карту: растянутую камеру вернуть в предел плавно, кадрами. */
+export function releaseCam(): void {
+  easing = true;
+}
+/** Палец снова взял карту: возврат встаёт там, где камера сейчас, и жест ведёт её дальше. */
+export function holdCam(): void {
+  easing = false;
+}
+/** Кадр возврата после отпускания: зовёт кадр игры, `dtMs` — время с прошлого кадра. */
+export function easeCam(dtMs: number): void {
+  if (!easing) return;
+  const n = camSettleCam(cam, dtMs, insets(), mapBounds(), panelSlack());
+  camera.x = n.cam.x;
+  camera.y = n.cam.y;
+  if (n.done) easing = false;
 }
 /** Поставить камеру целиком: щипок и подгонка вида под новый размер окна считают её сами. */
 export function setView(v: { scale: number; x: number; y: number }): void {
   camera.scale = v.scale;
   camera.x = v.x;
   camera.y = v.y;
+}
+/** Сделать `fn` при камере на виде всей карты и вернуть камеру, как стояла, что бы `fn` ни
+ *  бросила. Так слой карты меряет подложку на обзоре, не сдвинув экрана
+ *  (`decisions/mapLayerView.ts`, правило 9). */
+export function atOverview<T>(fn: () => T): T {
+  const was = { scale: camera.scale, x: camera.x, y: camera.y };
+  setView({ scale: MIN_SCALE, x: 0, y: 0 });
+  try {
+    return fn();
+  } finally {
+    setView(was);
+  }
 }
 
 /** Обе дороги к точке карты. Чем прыжок из текста отличается от перехода по ссылке из

@@ -28,14 +28,20 @@
 | BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
 | BAL-16 | 🔶 | core proto | `docs/backlog.md` | Бои за планеты дают очки, порог считается от карты. |
+| BAL-17 | ✅ | proto | `docs/backlog.md` | Пираты — местная угроза, а не завоеватель карты. |
 | BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
-| REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
-| REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
-| REFM-244 | 🔒 | proto | `docs/backlog.md` | Точка сборки |
+| REFM-219 | ✅ | proto | `docs/backlog.md` | Жизненный цикл матча |
+| REFM-220 | ✅ | proto | `docs/backlog.md` | Хаб и настройки |
+| REFM-244 | ✅ | proto | `docs/backlog.md` | Точка сборки |
+| REFM-245 | ✅ | proto | `docs/backlog.md` | Поток расчёта соло-мира |
+| REFM-246 | ✅ | proto | `docs/backlog.md` | Проводка окна боя |
+| REFM-247 | ✅ | proto | `docs/backlog.md` | Экран подключения |
+| REFM-248 | ✅ | proto | `docs/backlog.md` | Проводка настроек |
+| REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | TXT-8 | 🔒 | proto docs | `docs/backlog.md` | (LORE-1) Досье кораблей и зданий: описание о роли, числа в |
@@ -43,21 +49,24 @@
 | LORE-1 | ⏳ | docs | `docs/backlog.md` | Документ сеттинга: опора для лорных строк. |
 | UX-SEL-1 | 🗑 | proto | `docs/backlog.md` | На ПК выделять рамкой обычным ЛКМ — снято решением |
 | AUDM-3 | ⏳ | data | `docs/backlog.md` | Дальность удара шаттлов против длины проходов. |
-| AUDM-5 | ⏳ | docs | `docs/backlog.md` | Карта механик устарела. |
-| TRN-4 | ⏳ | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
+| AUDM-5 | 🗑 | docs | `docs/backlog.md` | Карта механик устарела. |
+| TRN-4 | 🔶 | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
 | UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
-| CORP-5 | ⏳ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
-| CORP-6 | ⏳ | data srv | `docs/backlog.md` | Уровни корпорации 4 и 5. |
-| CORP-7 | 🔒 | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
-| CORP-8 | 🔒 | data srv | `docs/backlog.md` | Карта под формат. |
-| CORP-9 | 🔒 | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
-| CORP-10 | 🔒 | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
-| CORP-11 | 🔒 | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
-| CORP-12 | ⏳ | srv | `docs/backlog.md` | Медали игроков в ленте. |
-| CORP-13 | 🔒 | proto | `docs/backlog.md` | Картинки базы. |
+| CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
+| CORP-6 | ✅ | data srv proto | `docs/backlog.md` | Уровни корпорации 4 и 5. |
+| CORP-7 | ✅ | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
+| CORP-8 | ✅ | core data srv proto | `docs/backlog.md` | Карта под формат. |
+| CORP-9 | ✅ | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
+| CORP-10 | ✅ | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
+| CORP-11 | ✅ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
+| CORP-12 | ✅ | srv proto | `docs/backlog.md` | Медали игроков в ленте. |
+| CORP-13 | ✅ | proto | `docs/backlog.md` | Картинки базы. |
+| CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
+| CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
+| CORP-16 | ✅ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
@@ -342,6 +351,7 @@
 | UI-STD | ✅ | proto | `docs/backlog-archive.md` | Кнопки окна меток — стандартные; дерево технологий — |
 | CMD-VIS | ✅ | core proto | `docs/backlog-archive.md` | Стоп в коридоре запрещён; «нет приказа — нет |
 | FRIENDS-1 | ✅ | srv proto | `docs/backlog-archive.md` | Вкладка «Друзья» в хабе — с настоящим сервером. |
+| FRIENDS-2 | ✅ | srv proto | `docs/backlog-archive.md` | Войти к другу, позвать друга, скрыть свои партии. |
 | BUILD-1 | ✅ | proto | `docs/backlog-archive.md` | Окно построек мира + карточка здания с уровнями. |
 | ABIL-RING | ✅ | proto | `docs/backlog-archive.md` | Радиусы способностей — фиолетовым пунктиром, и не только |
 | SENSOR-1 | ✅ | data core proto | `docs/backlog-archive.md` | Сенсорный фрегат: носитель радара — и сам радар |
@@ -1112,6 +1122,7 @@
 | ONB-13 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Операция урока и медаль за обучение [proto/srv] |
 | ONB-14 | ✅ | proto | `docs/onboarding-roadmap.md` | Отмеченный мир не прячется под окном |
 | ONB-15 | ✅ | proto | `docs/onboarding-roadmap.md` | Цель первой сессии на каждую главу урока |
+| ONB-16 | ✅ | srv proto data | `docs/onboarding-roadmap.md` | Награды за медали профиля |
 | TRN-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговый полигон Sector Zero |
 | ONB-3 | ✅ | proto | `docs/onboarding-roadmap.md` | Just-in-time интро механик (прогрессивное раскрытие) |
 | ONB-4 | ✅ | proto | `docs/onboarding-roadmap.md` | Help/кодекс-хаб («?» везде) |
@@ -1226,6 +1237,7 @@
 | ROS-1.5 | ✅ | core data proto | `docs/roster-roadmap.md` | Десантный челнок: высадка вместо удара 2026-09-09 |
 | ROS-1.6 | ✅ | core proto | `docs/roster-roadmap.md` | Корабли и шаттлы бьют наземные войска 2026-10-12 |
 | ROS-1.6a | ✅ | core | `docs/roster-roadmap.md` | Огонь сверху делит урон по войскам поровну 2026-10-24 |
+| ROS-1.6b | ✅ | core proto | `docs/roster-roadmap.md` | Огонь сверху бьёт пехоту и технику разной долей 2026-10-24 |
 | ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
 | ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
