@@ -1,3 +1,4 @@
+import { buildFixtureFacility } from './corpFacilityFixture';
 import { describe, expect, it } from 'vitest';
 import { CorpArsenalService, type CorpArsenalActor } from './corpArsenalService';
 import { CorpService, type CorpActor } from './corpService';
@@ -45,6 +46,7 @@ async function fixture(status: AvaChallenge['status'] = 'accepted'): Promise<Fix
   const a = await corp.create(HEAD, 'Alliance A');
   const b = await corp.create(ENEMY_FIGHTER, 'Alliance B');
   if (!a.ok || !b.ok) throw new Error('fixture');
+  await buildFixtureFacility(corps, a.corpId, HEAD.accountId, 'warehouse');
   for (const who of [OFFICER, MEMBER, FIGHTER]) await corp.apply(who, a.corpId);
   await corp.accept(HEAD, a.corpId, OFFICER.accountId);
   await corp.accept(HEAD, a.corpId, MEMBER.accountId);
@@ -95,6 +97,25 @@ async function fixture(status: AvaChallenge['status'] = 'accepted'): Promise<Fix
 const asActor = (who: CorpActor): CorpArsenalActor => who;
 
 describe('CorpArsenalService — RBAC and handout', () => {
+  it('shows stock only to accepted members and never exposes an enemy roster', async () => {
+    const f = await fixture();
+    const view = await f.service.warehouse(HEAD, f.corpA, f.matchupId);
+    expect(view).toMatchObject({ ok: true, warehouse: { capacity: 2, used: 0, canLend: true, fighters: [{ accountId: FIGHTER.accountId, login: FIGHTER.login }] } });
+    expect(await f.service.warehouse(ENEMY_FIGHTER, f.corpA)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    expect(await f.service.warehouse(HEAD, f.corpB, f.matchupId)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    await f.corps.addMember(f.corpA, 'candidate', 'Candidate', 'recruit');
+    expect(await f.service.warehouse({ accountId: 'candidate', login: 'Candidate' }, f.corpA)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    expect(await f.service.warehouse(MEMBER, f.corpA, f.matchupId)).toMatchObject({ ok: true, warehouse: { canLend: false } });
+  });
+
+  it('denies a late request even before the sweeper changes the accepted status', async () => {
+    const f = await fixture();
+    const old = await f.challenges.getChallenge(f.matchupId);
+    if (!old) throw Error('fixture');
+    await f.challenges.createChallenge({ ...old, id: 'past-deadline', pauseEndsAt: 0 });
+    expect(await f.service.rentOut(HEAD, f.corpA, f.itemId, 'past-deadline', FIGHTER.accountId)).toEqual({ ok: false, code: 'E_ROSTER_LOCKED' });
+    expect(await f.rentals.activeForCorp(f.corpA)).toEqual([]);
+  });
   it('head or officer can hand out; a plain member or an outsider cannot', async () => {
     const f = await fixture();
     const byMember = await f.service.rentOut(asActor(MEMBER), f.corpA, f.itemId, f.matchupId, FIGHTER.accountId);
@@ -165,12 +186,12 @@ describe('CorpArsenalService — ARS-3 snapshot merge', () => {
 });
 
 describe('CorpArsenalService — war end (ARS-0.3: always returns, win or lose)', () => {
-  it('returnWar closes every active rental, ticks durability, and audits — exactly once on replay', async () => {
+  it('returnWar closes every active rental, preserves durability, and audits — exactly once on replay', async () => {
     const f = await fixture();
     await f.service.rentOut(asActor(HEAD), f.corpA, f.itemId, f.matchupId, FIGHTER.accountId);
     const first = await f.service.returnWar(f.matchupId);
     expect(first).toBe(1);
-    expect((await f.arsenal.get(f.itemId))?.durability).toBe(4); // 5 - 1
+    expect((await f.arsenal.get(f.itemId))?.durability).toBe(5); // protected warehouse loan
     expect(await f.rentals.activeForMatchup(f.matchupId)).toHaveLength(0);
     const audit = await f.corps.auditOf(f.corpA);
     expect(audit).toContainEqual(
@@ -180,7 +201,7 @@ describe('CorpArsenalService — war end (ARS-0.3: always returns, win or lose)'
     // Replay (e.g. a re-delivered match.ended) — nothing doubles.
     const replay = await f.service.returnWar(f.matchupId);
     expect(replay).toBe(0);
-    expect((await f.arsenal.get(f.itemId))?.durability).toBe(4); // unchanged
+    expect((await f.arsenal.get(f.itemId))?.durability).toBe(5); // unchanged
 
     // The item is free again — a NEW war can rent it.
     const rerent = await f.service.rentOut(asActor(HEAD), f.corpA, f.itemId, 'mu-2', FIGHTER.accountId);

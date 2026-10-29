@@ -144,6 +144,7 @@ export interface CorpHubPaint {
   /** Five battle subsections, built from the private battle read model. */
   battles: string;
   battleReport?: string;
+  facilities?: Readonly<Record<string, string>>;
   canSignIn: boolean;
   /** Часы игрока — для «сегодня» и «вчера» в казне. */
   now: number;
@@ -174,6 +175,9 @@ function effects(level: CorpBuildingLevel | undefined): string {
     level.influencePerDay > 0 ? t('corp.buildings.income', { n: level.influencePerDay }) : '',
     level.constructionReduction > 0 ? t('corp.buildings.speed', { n: level.constructionReduction }) : '',
     level.maxFormat ? t('corp.buildings.format', { n: level.maxFormat }) : '',
+    level.warehouseItems ? t('corp.buildings.warehouse.effect', { n: level.warehouseItems }) : '',
+    level.showcaseSlots ? t('corp.buildings.hall.effect', { n: level.showcaseSlots }) : '',
+    level.monument ? t('corp.buildings.monument.effect') : '',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -714,6 +718,7 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
     (opens.length
       ? `<div class="cb-sec"><h4>${esc(t('corp.hub.level.opens'))}</h4><div class="cb-opens">${opensHtml(opens)}</div></div>`
       : '') +
+    (p.facilities?.[b.id] ?? '') +
     reqs +
     `<div class="cb-acts">${action}</div>` +
     `<div class="cb-sec"><h4>${esc(t('corp.hub.levels.title'))}</h4><div class="cb-lvls">${thumbs}</div></div>`

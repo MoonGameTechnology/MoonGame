@@ -11,7 +11,21 @@ export interface CorpBuildingLevel {
   battles?: number;
   /** The largest AvA battle this level opens, players per side (CORP-7, operations center). */
   maxFormat?: number;
+  /** Protected equipment loans per corporation and battle. */
+  warehouseItems?: number;
+  /** Number of corporation medals in the shared public showcase. */
+  showcaseSlots?: number;
+  monument?: boolean;
 }
+
+export interface CorpPublicFacilities {
+  warehouseItems?: number;
+  showcaseSlots?: number;
+  showcase?: string[];
+  monument?: boolean;
+}
+export type CorpShowcaseError = 'E_FORBIDDEN' | 'E_CORP_HALL_REQUIRED' | 'E_CORP_MEDAL_NOT_EARNED' | 'E_BAD_SHOWCASE';
+export type CorpShowcaseResult = { ok: true } | { ok: false; code: CorpShowcaseError };
 
 /** What the level requirements are checked against (CORP-6). */
 export interface CorpStanding {

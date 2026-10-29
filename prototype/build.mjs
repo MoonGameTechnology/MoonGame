@@ -33,6 +33,7 @@ const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
+const corpFacilitiesCss = readFileSync(new URL('./corp-facilities.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
 const corpBattlesCss = readFileSync(new URL('./corp-battles.css', import.meta.url), 'utf8');
 
@@ -4352,6 +4353,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 
 ${profileCss}
 ${corpBattlesCss}
+${corpFacilitiesCss}
 /* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
    каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
    Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт

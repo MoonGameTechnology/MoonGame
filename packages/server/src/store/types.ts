@@ -1,4 +1,4 @@
-import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
+import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpPublicFacilities, CorpShowcaseResult, NewsAnnouncement } from '@void/protocol';
 import type { ArsenalItem, CoalitionClock, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
@@ -225,7 +225,7 @@ export interface UserStore {
  *  caps a player at one application at a time. */
 export type CorpRole = 'head' | 'officer' | 'member' | 'recruit';
 
-export interface CorpRecord {
+export interface CorpRecord extends CorpPublicFacilities {
   corpId: string;
   name: string;
   /** Absent on legacy records; clients derive a stable default from corpId. */
@@ -263,6 +263,7 @@ export interface CorpAuditEntry {
   action:
     | 'create'
     | 'emblem'
+    | 'showcase'
     | 'accept'
     | 'decline'
     | 'kick'
@@ -299,6 +300,7 @@ export const DEFAULT_FEED_LIMIT = 50;
 export const ACTIVE_ANNOUNCEMENTS_MAX = 50;
 
 export interface CorpStore {
+  monumentsOf(corpIds: readonly string[]): Promise<string[]>;
   /** Settle elapsed construction/income, optionally order a level. Membership,
    * debit, queue and audit commit together; only the head may spend influence. A settled
    * headquarters of level 2+ also goes to the public feed in that commit (CORP-1). */
@@ -320,6 +322,8 @@ export interface CorpStore {
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }>;
   /** Head authorization, appearance and audit commit atomically. */
   setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }>;
+  /** Head-only, with hall capacity and earned medals rechecked under the corp lock. */
+  setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult>;
   getCorp(corpId: string): Promise<CorpRecord | null>;
   /** Every corp with its accepted-member count, ordered by name (case-insensitive). */
   listCorps(): Promise<CorpSummary[]>;
@@ -744,6 +748,8 @@ export interface CorpRent {
   matchupId: string;
   accountId: string;
   rentedAt: number;
+  /** Warehouse benefit fixed when handed out; old rentals retain their old wear rule. */
+  unworn?: true;
 }
 
 /** Persistence for corp-arsenal rentals (ARS-6). Deliberately dumb like the other
@@ -766,6 +772,8 @@ export interface CorpRentStore {
    *  anywhere (including other matchups) — false = already on rent, nothing
    *  changed. */
   rent(entry: CorpRent): Promise<boolean>;
+  rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'>;
+  activeForCorp(corpId: string): Promise<CorpRent[]>;
   /** Every still-active rental for a matchup (war-end return-all sweep reads this). */
   activeForMatchup(matchupId: string): Promise<CorpRent[]>;
   /** This account's active rentals for a matchup (the ARS-3 snapshot merge point). */

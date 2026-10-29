@@ -24,7 +24,7 @@ function duration(ms: number): string {
 }
 
 function effects(
-  level: Pick<CorpBuildingLevel, 'influencePerDay' | 'constructionReduction' | 'maxFormat'>,
+  level: Pick<CorpBuildingLevel, 'influencePerDay' | 'constructionReduction' | 'maxFormat' | 'warehouseItems' | 'showcaseSlots' | 'monument'>,
 ): string {
   return [
     level.influencePerDay > 0 ? t('corp.buildings.income', { n: level.influencePerDay }) : '',
@@ -32,6 +32,9 @@ function effects(
       ? t('corp.buildings.speed', { n: level.constructionReduction })
       : '',
     level.maxFormat ? t('corp.buildings.format', { n: level.maxFormat }) : '',
+    level.warehouseItems ? t('corp.buildings.warehouse.effect', { n: level.warehouseItems }) : '',
+    level.showcaseSlots ? t('corp.buildings.hall.effect', { n: level.showcaseSlots }) : '',
+    level.monument ? t('corp.buildings.monument.effect') : '',
   ]
     .filter(Boolean)
     .map((text) => `<span>${esc(text)}</span>`)

@@ -1,3 +1,4 @@
+import { buildFixtureFacility } from './corpFacilityFixture';
 import { describe, expect, it } from 'vitest';
 import Fastify, { type FastifyRequest } from 'fastify';
 import { registerCorpArsenalApi } from './corpArsenalApi';
@@ -35,6 +36,7 @@ async function harness(): Promise<{ app: ReturnType<typeof Fastify>; corpId: str
   const a = await corp.create(HEAD, 'Alliance A');
   const b = await corp.create({ accountId: 'other', login: 'other' }, 'Alliance B');
   if (!a.ok || !b.ok) throw new Error('harness');
+  await buildFixtureFacility(corps, a.corpId, HEAD.accountId, 'warehouse');
   await corp.apply(FIGHTER, a.corpId);
   await corp.accept(HEAD, a.corpId, FIGHTER.accountId);
 
@@ -48,7 +50,7 @@ async function harness(): Promise<{ app: ReturnType<typeof Fastify>; corpId: str
     status: 'accepted',
     createdAt: 0,
     expiresAt: 0,
-    pauseEndsAt: 100,
+    pauseEndsAt: Date.now() + 60_000,
   });
   await roster.addEntry({ matchupId, accountId: FIGHTER.accountId, side: 'challenger', source: 'flagged', at: 1 }, 10);
 

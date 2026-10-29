@@ -5,6 +5,8 @@ import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
+import { corpFacilities, publicCorpFacilities, validateShowcase } from '../corpFacilities';
+import type { CorpShowcaseResult } from '@void/protocol';
 import { randomUUID } from 'node:crypto';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
@@ -366,7 +368,12 @@ export class MemoryUserStore implements UserStore {
 
 /** In-memory corp store — membership keyed by account (one corp per account). */
 export class MemoryCorpStore implements CorpStore {
+  monumentsOf(ids: readonly string[]): Promise<string[]> {
+    if (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string')) return Promise.resolve([]);
+    return Promise.resolve(ids.filter((id) => this.corps.has(id) && publicCorpFacilities(this.infrastructureStates.get(id) ?? null, Date.now()).monument));
+  }
   private readonly infrastructureStates = new Map<string, CorpInfrastructureState>();
+  private readonly showcases = new Map<string, string[]>();
 
   /** CORP-1: the public feed the corporation's own facts go to (founded, reached a level)
    *  — the memory twin of the Postgres store writing them in the same transaction.
@@ -447,12 +454,28 @@ export class MemoryCorpStore implements CorpStore {
 
   getCorp(corpId: string): Promise<CorpRecord | null> {
     const corp = this.corps.get(corpId);
-    return Promise.resolve(corp ? { ...corp } : null);
+    return Promise.resolve(corp ? { ...corp, ...publicCorpFacilities(this.infrastructureStates.get(corpId) ?? null, Date.now(), this.showcases.get(corpId)) } : null);
+  }
+
+  async setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult> {
+    const stats = await this.results?.statsForCorp(corpId) ?? { wins: 0, matches: 0 };
+    // No awaits between checking the current head, validating, and committing the list.
+    const member = this.members.get(actor);
+    if (!this.corps.has(corpId) || member?.corpId !== corpId || member.role !== 'head') return { ok: false, code: 'E_FORBIDDEN' };
+    const capacity = corpFacilities(this.infrastructureStates.get(corpId) ?? null, at).showcaseSlots;
+    const error = validateShowcase(medalIds, capacity, stats);
+    if (error) return { ok: false, code: error };
+    if (JSON.stringify(this.showcases.get(corpId) ?? []) !== JSON.stringify(medalIds)) {
+      this.showcases.set(corpId, [...medalIds]);
+      await this.appendAudit({ corpId, actor, at, action: 'showcase', detail: JSON.stringify(medalIds) });
+    }
+    return { ok: true };
   }
 
   listCorps(): Promise<CorpSummary[]> {
     const list = [...this.corps.values()].map((corp) => ({
       ...corp,
+      ...publicCorpFacilities(this.infrastructureStates.get(corp.corpId) ?? null, Date.now(), this.showcases.get(corp.corpId)),
       members: [...this.members.values()].filter(
         (m) => m.corpId === corp.corpId && m.role !== 'recruit',
       ).length,
@@ -511,6 +534,7 @@ export class MemoryCorpStore implements CorpStore {
   removeCorp(corpId: string): Promise<void> {
     this.corps.delete(corpId);
     this.infrastructureStates.delete(corpId);
+    this.showcases.delete(corpId);
     this.corpReady.delete(corpId);
     for (const [accountId, row] of this.members) {
       if (row.corpId === corpId) {
@@ -1046,10 +1070,20 @@ export class MemoryArsenalStore implements ArsenalStore {
 export class MemoryCorpRentStore implements CorpRentStore {
   private readonly active = new Map<string, CorpRent>(); // itemId -> row
 
+  activeForCorp(corpId: string): Promise<CorpRent[]> {
+    return Promise.resolve([...this.active.values()].filter((r) => r.corpId === corpId).map((r) => ({ ...r })));
+  }
+
   rent(entry: CorpRent): Promise<boolean> {
     if (this.active.has(entry.itemId)) return Promise.resolve(false);
     this.active.set(entry.itemId, { ...entry });
     return Promise.resolve(true);
+  }
+  rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'> {
+    if (this.active.has(entry.itemId)) return Promise.resolve('rented');
+    if (!Number.isSafeInteger(limit) || limit < 1 || [...this.active.values()].filter((r) => r.corpId === entry.corpId && r.matchupId === entry.matchupId).length >= limit) return Promise.resolve('limit');
+    this.active.set(entry.itemId, { ...entry });
+    return Promise.resolve('ok');
   }
 
   activeForMatchup(matchupId: string): Promise<CorpRent[]> {

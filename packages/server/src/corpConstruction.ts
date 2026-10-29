@@ -46,7 +46,10 @@ export function parseCorpBuildings(raw: unknown): CorpBuildingDef[] {
         level.constructionReduction > 50 ||
         (level.members !== undefined && !integer(level.members)) ||
         (level.battles !== undefined && !integer(level.battles)) ||
-        (level.maxFormat !== undefined && (!integer(level.maxFormat) || level.maxFormat < 2))
+        (level.maxFormat !== undefined && (!integer(level.maxFormat) || level.maxFormat < 2)) ||
+        (level.warehouseItems !== undefined && (!integer(level.warehouseItems) || level.warehouseItems < 1 || level.warehouseItems > 20)) ||
+        (level.showcaseSlots !== undefined && (!integer(level.showcaseSlots) || level.showcaseSlots < 1 || level.showcaseSlots > 20)) ||
+        (level.monument !== undefined && typeof level.monument !== 'boolean')
       ) {
         throw new Error('E_CORP_CATALOG');
       }

@@ -132,6 +132,83 @@
           "maxFormat": 10
         }
       ]
+    },
+    {
+      "id": "warehouse",
+      "nameKey": "corp.building.warehouse",
+      "descriptionKey": "corp.building.warehouse.desc",
+      "levels": [
+        {
+          "cost": 100,
+          "durationMs": 14400000,
+          "headquarters": 2,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "warehouseItems": 2
+        },
+        {
+          "cost": 300,
+          "durationMs": 28800000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "warehouseItems": 4
+        },
+        {
+          "cost": 700,
+          "durationMs": 57600000,
+          "headquarters": 4,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "warehouseItems": 6
+        }
+      ]
+    },
+    {
+      "id": "hall_of_fame",
+      "nameKey": "corp.building.hall-of-fame",
+      "descriptionKey": "corp.building.hall-of-fame.desc",
+      "levels": [
+        {
+          "cost": 200,
+          "durationMs": 21600000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "showcaseSlots": 5
+        },
+        {
+          "cost": 500,
+          "durationMs": 43200000,
+          "headquarters": 4,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "showcaseSlots": 10
+        },
+        {
+          "cost": 1000,
+          "durationMs": 86400000,
+          "headquarters": 5,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "showcaseSlots": 20
+        }
+      ]
+    },
+    {
+      "id": "monument",
+      "nameKey": "corp.building.monument",
+      "descriptionKey": "corp.building.monument.desc",
+      "levels": [
+        {
+          "cost": 2000,
+          "durationMs": 259200000,
+          "headquarters": 5,
+          "influencePerDay": 0,
+          "constructionReduction": 0,
+          "monument": true
+        }
+      ]
     }
   ]
 }

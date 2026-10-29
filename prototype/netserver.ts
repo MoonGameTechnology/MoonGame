@@ -1607,7 +1607,7 @@ const server = createMultiplayerServer({
       ...(AUTH ? { identify: identifySession } : {}),
     });
     // The news feed (CORP-1) — public, the same module as the production entry.
-    registerNewsApi(app, { feed: feedStore, announcements: announcementStore });
+    registerNewsApi(app, { feed: feedStore, announcements: announcementStore, monumentsOf: (ids) => corpStore.monumentsOf(ids) });
     // The public AvA feed (AVA-9) — confirmed matchups and results, read-only, no session.
     registerAvaFeed(app, { service: avaService });
     // The client self-configures: accounts mode shows the password field + goes

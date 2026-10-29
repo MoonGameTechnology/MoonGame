@@ -33,6 +33,7 @@ export interface NewsAnnouncement {
 export interface NewsCorp {
   id: string;
   name: string;
+  monument?: boolean;
 }
 
 export type NewsEvent =

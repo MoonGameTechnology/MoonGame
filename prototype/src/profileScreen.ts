@@ -1,3 +1,4 @@
+import { corpShowcaseHtml } from './corpFacilitiesView';
 /**
  * «Профиль командира» — the career dossier (docs/main-menu.md §4.2, REFM-10).
  *
@@ -556,7 +557,7 @@ export function initProfile(host: ProfileHost): {
               return v && v.role !== 'recruit' && typeof v.login === 'string' ? [v.login] : [];
             });
             if (!current(n) || request !== corporationRequest) return;
-            corporationHtml = `${corpEmblem(corp.corpId, corp.emblemId, 56)}<h2>${esc(corp.name)}</h2><div class="pf-grid">${pfCell(t('profile.influence'), nfmt(corp.influence))}</div><h3>${esc(t('profile.corporation.members', { n: names.length }))}</h3><ul>${names.map((name) => `<li>${esc(name)}</li>`).join('')}</ul>`;
+            corporationHtml = `${corpEmblem(corp.corpId, corp.emblemId, 56)}<h2>${esc(corp.name)}</h2><div class="pf-grid">${pfCell(t('profile.influence'), nfmt(corp.influence))}</div>${corpShowcaseHtml(corp)}<h3>${esc(t('profile.corporation.members', { n: names.length }))}</h3><ul>${names.map((name) => `<li>${esc(name)}</li>`).join('')}</ul>`;
           } catch {
             if (!current(n) || request !== corporationRequest) return;
             corporationHtml = `<p class="pf-hint">${esc(t('profile.corporation.error'))}</p>`;
