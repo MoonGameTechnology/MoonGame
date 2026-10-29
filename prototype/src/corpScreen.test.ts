@@ -470,7 +470,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
   it('«Расформировать»: первое нажатие спрашивает, второе отправляет', async () => {
     const calls = server({ ...headCorp(), 'POST /corps/c1/disband': {} });
     const { api, hubRoot } = wire(session);
-    api.showSection('members');
+    api.showSection('settings');
     api.showHub();
     await tick();
     const disband = press({ corpconfirm: 'disband', corpact: 'disband' });
@@ -485,13 +485,13 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
   it('любое другое нажатие снимает взвод — приказ не уходит', async () => {
     const calls = server({ ...headCorp(), 'POST /corps/c1/disband': {} });
     const { api, hubRoot } = wire(session);
-    api.showSection('members');
+    api.showSection('settings');
     api.showHub();
     await tick();
     const disband = press({ corpconfirm: 'disband', corpact: 'disband' });
     hubRoot.fire(disband);
     hubRoot.fire(press({ corpsec: 'treasury' }));
-    api.showSection('members');
+    api.showSection('settings');
     expect(hubRoot.html()).not.toContain(t('corp.hub.disband.confirm'));
     hubRoot.fire(disband);
     await tick();
@@ -510,7 +510,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     expect(hubSheet.open()).toBe(false);
   });
 
-  it('стиль базы (CORP-14): плашка в шапке открывает шторку, глава применяет купленный', async () => {
+  it('настройки корпорации открывают стиль базы, глава применяет купленный', async () => {
     const calls = server({ ...headCorp(), 'POST /meta-economy/corp-style/apply': { ok: true } });
     const sent: unknown[] = [];
     const inner = globalThis.fetch;
@@ -521,7 +521,10 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     const { api, hubRoot, hubSheet } = wire(session);
     api.showHub();
     await tick();
-    expect(hubRoot.html()).toContain(t('corp.style.current', { name: t('corp.style.standard') }));
+    expect(hubRoot.html()).not.toContain('data-corphub="style"');
+    hubRoot.fire(press({ corpsec: 'settings' }));
+    expect(hubRoot.html()).toContain(t('corp.settings.appearance'));
+    expect(hubRoot.html()).toContain('data-corphub="style"');
     hubRoot.fire(press({ corphub: 'style' }));
     expect(api.hubSheetOpen()).toBe(true);
     expect(hubSheet.html()).toContain('data-corpstyle="high_tech"');
@@ -549,6 +552,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     });
     api.showHub();
     await tick();
+    hubRoot.fire(press({ corpsec: 'settings' }));
     hubRoot.fire(press({ corphub: 'style' }));
     expect(hubSheet.html()).toContain('data-corpshop="imperial_gothic"');
     hubSheet.fire(press({ corpshop: 'imperial_gothic' }));

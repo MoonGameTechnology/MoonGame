@@ -25,7 +25,7 @@ import { LOCALE, t, hasKey } from '../../localization/runtime';
 import { esc, kfmt, nfmt } from './format';
 import { SOV_SVG } from './icons';
 import { averagePlace, leagueKey, winRate, type MetaStats } from './meta';
-import { parseMedals, parseCorpRecord } from './corp';
+import { parseMedals, parseCorpRecord, parseMemberships, sortMembers, type CorpRecord, type CorpMembership, type CorpRole } from './corp';
 import { corpEmblem } from './corpEmblems';
 import { accountLevel } from '../../decisions/playerCareer';
 import { detach } from './detach';
@@ -110,6 +110,28 @@ export function pfCell(label: string, value: string | null, accent = false): str
   return (
     `<div class="pf-cell"><span class="pf-k">${esc(label)}</span>` +
     `<span class="pf-v${accent ? ' accent' : ''}">${value === null ? '—' : esc(value)}</span></div>`
+  );
+}
+
+/** The public corporation card uses the same verified record and roster as the cabinet. */
+export function profileCorporationHtml(corp: CorpRecord, members: readonly CorpMembership[]): string {
+  const roster = sortMembers(members.filter((m) => m.role !== 'recruit'));
+  const roles: Record<CorpRole, string> = {
+    head: 'corp.role.head', officer: 'corp.role.officer', member: 'corp.role.member', recruit: 'corp.role.recruit',
+  };
+  return (
+    `<header class="pf-corp-head">${corpEmblem(corp.corpId, corp.emblemId, 64)}<div>` +
+    `<p class="pf-corp-kicker">${esc(t('profile.corporation'))}</p><h2>${esc(corp.name)}</h2></div></header>` +
+    `<div class="pf-grid pf-corp-stats">${pfCell(t('profile.influence'), nfmt(corp.influence), true)}` +
+    `${pfCell(t('corp.tab.members'), nfmt(roster.length))}</div>${corpShowcaseHtml(corp)}` +
+    `<section class="pf-corp-roster" aria-label="${esc(t('profile.corporation.members', { n: roster.length }))}">` +
+    `<h3>${esc(t('corp.hub.tab.members'))}</h3>` +
+    (roster.length
+      ? `<ul class="pf-corp-members">` + roster.map((m) =>
+        `<li class="${m.role}"><span class="pf-corp-avatar" aria-hidden="true">${esc((Array.from(m.login.trim())[0] ?? '?').toUpperCase())}</span>` +
+        `<div><b>${esc(m.login)}</b><small>${esc(t(roles[m.role]))}</small></div></li>`,
+      ).join('') + `</ul>`
+      : `<p class="pf-hint">${esc(t('corp.empty'))}</p>`) + `</section>`
   );
 }
 
@@ -315,6 +337,7 @@ export function initProfile(host: ProfileHost): {
   let generation = 0;
   let corporationHtml: string | null = null;
   let corporationRequest = 0;
+  let playerScroll = 0;
   let target: string | undefined;
   let identity = '';
   let custom: PlayerProfile = { ...defaultAppearance(), login: '', xp: 0, progress: {} };
@@ -360,7 +383,14 @@ export function initProfile(host: ProfileHost): {
       tab,
     };
     if (corporationHtml !== null) {
-      root.innerHTML = `<button class="pf-close btn-x" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-body"><button type="button" class="btn-second" data-profile-corp-back>${esc(t('profile.corporation.back'))}</button>${corporationHtml}</div>`;
+      const scroll = root.querySelector?.('.pf-corp-body')?.scrollTop ?? 0;
+      root.innerHTML = `<div class="pf-corp-view"><nav class="pf-corp-nav">` +
+        `<button type="button" class="btn-quiet" data-profile-corp-back><span aria-hidden="true">←</span>${esc(t('profile.corporation.back'))}</button>` +
+        `</nav><div class="pf-body pf-corp-body"><article class="pf-corp-card">${corporationHtml}</article></div></div>`;
+      const body = root.querySelector?.('.pf-corp-body');
+      if (body) body.scrollTop = scroll;
+      if (active?.hasAttribute('data-profile-corp-back'))
+        root.querySelector<HTMLElement>('[data-profile-corp-back]')?.focus({ preventScroll: true });
       return;
     }
     if (target === undefined) {
@@ -512,6 +542,10 @@ export function initProfile(host: ProfileHost): {
       corporationRequest++;
       corporationHtml = null;
       paint();
+      const root = host.root();
+      const body = root.querySelector?.('.pf-body');
+      if (body) body.scrollTop = playerScroll;
+      root.querySelector?.<HTMLElement>('[data-profile-corp]')?.focus({ preventScroll: true });
       return;
     }
     generation++;
@@ -521,9 +555,7 @@ export function initProfile(host: ProfileHost): {
   host.root().addEventListener('click', (ev) => {
     const tg = ev.target as HTMLElement;
     if (tg.closest('[data-profile-corp-back]')) {
-      corporationRequest++;
-      corporationHtml = null;
-      paint();
+      close();
       return;
     }
     const corpButton = tg.closest<HTMLElement>('[data-profile-corp]');
@@ -537,8 +569,10 @@ export function initProfile(host: ProfileHost): {
         n = generation,
         request = ++corporationRequest;
       const corpId = custom.corporation.id;
-      corporationHtml = `<p class="pf-hint">${esc(t('profile.corporation.loading'))}</p>`;
+      playerScroll = host.root().querySelector?.('.pf-body')?.scrollTop ?? 0;
+      corporationHtml = `<p class="pf-hint" role="status">${esc(t('profile.corporation.loading'))}</p>`;
       paint();
+      host.root().querySelector?.<HTMLElement>('[data-profile-corp-back]')?.focus();
       detach(
         'player corporation card',
         (async () => {
@@ -552,12 +586,8 @@ export function initProfile(host: ProfileHost): {
             const corp = parseCorpRecord(body?.corp);
             if (!corp || corp.corpId !== corpId || !Array.isArray(body?.members))
               throw new Error('E_NO_CORP');
-            const names = body.members.flatMap((m: unknown) => {
-              const v = m as { login?: unknown; role?: unknown } | null;
-              return v && v.role !== 'recruit' && typeof v.login === 'string' ? [v.login] : [];
-            });
             if (!current(n) || request !== corporationRequest) return;
-            corporationHtml = `${corpEmblem(corp.corpId, corp.emblemId, 56)}<h2>${esc(corp.name)}</h2><div class="pf-grid">${pfCell(t('profile.influence'), nfmt(corp.influence))}</div>${corpShowcaseHtml(corp)}<h3>${esc(t('profile.corporation.members', { n: names.length }))}</h3><ul>${names.map((name) => `<li>${esc(name)}</li>`).join('')}</ul>`;
+            corporationHtml = profileCorporationHtml(corp, parseMemberships(body.members));
           } catch {
             if (!current(n) || request !== corporationRequest) return;
             corporationHtml = `<p class="pf-hint">${esc(t('profile.corporation.error'))}</p>`;

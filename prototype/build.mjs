@@ -3889,7 +3889,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 @media (prefers-reduced-motion:reduce){.nw-sheet{animation:none;}}
 @media (pointer:coarse){.nw-chip,.nw-btn{min-height:44px;}}
 /* Вкладка «Корпорация» (CORP-3, макет одобрен владельцем 2026-10-21): шапка, разделы «База»,
-   «Битвы», «Состав», «Казна» и шторка здания, уровней и участника. Раскладку решает ширина
+   «Битвы», «Состав», «Казна», «Настройки» и шторка здания, уровней и участника. Раскладку решает ширина
    самой вкладки (контейнер corp), а не окна: на ПК хаб идёт колонкой под зумом. Здания —
    голограммы-заглушки до картинок (CORP-13). Разметка — corpHubView.ts. */
 #hp-corp{height:100%;overflow-y:auto;overscroll-behavior:contain;container:corp / inline-size;}
@@ -3904,14 +3904,12 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-emb{flex:0 0 auto;display:block;overflow:visible;}
 .cb-emb-frame{fill:color-mix(in srgb,var(--cyan) 12%,transparent);stroke:var(--cyan);stroke-width:1.2;}
 .cb-emb-mark{fill:none;stroke:var(--cyan);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
-.cb-emblem-edit{display:grid;place-items:center;flex:none;min-width:56px;min-height:60px;padding:2px;border:1px solid transparent;border-radius:10px;background:transparent;cursor:pointer;}
-.cb-emblem-edit:hover{background:color-mix(in srgb,var(--cyan) 8%,transparent);border-color:var(--cyan);}
 .cb-emblems{display:grid;grid-template-columns:repeat(5,minmax(44px,1fr));gap:8px;max-width:380px;margin:10px 0 14px;}
 .cb-emblem-choice{display:grid;place-items:center;min-width:44px;min-height:50px;padding:5px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(5,23,30,.6);cursor:pointer;}
 .cb-emblem-choice:hover{border-color:var(--cyan);}
 .cb-emblem-choice[aria-pressed="true"]{border-color:var(--cyan);background:rgba(53,214,230,.16);box-shadow:inset 0 0 0 1px var(--cyan);}
-.cb-emblem-choice:focus-visible,.cb-emblem-edit:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
-.cb-emblem-choice:disabled,.cb-emblem-edit:disabled{opacity:.5;cursor:default;}
+.cb-emblem-choice:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
+.cb-emblem-choice:disabled{opacity:.5;cursor:default;}
 .cb-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .cb-id h2{margin:0;font-size:var(--fs-title);font-weight:700;line-height:1.2;color:var(--sf-hi);overflow-wrap:anywhere;}
 .cb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:var(--fs-caption);color:var(--sf-dim);}
@@ -3926,6 +3924,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-tab{min-height:44px;padding:0 18px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 var(--fs-body) var(--sf-font);white-space:nowrap;}
 .cb-tab:hover{color:var(--sf-text);}
+.cb-settings-icon{font-size:22px;line-height:1;}
 .cb-tab small{min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:grid;place-items:center;
   font-size:var(--fs-caption);font-weight:700;background:var(--amber);color:#1c1200;}
 .cb-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
@@ -4083,7 +4082,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   font-weight:700;color:var(--sf-dim);white-space:nowrap;}
 .cb-role.head{border-color:var(--cur-sovereigns);color:var(--cur-sovereigns);}
 .cb-role.officer{border-color:var(--cyan-dim);color:var(--cyan);}
-.cb-exit{display:flex;padding-top:4px;}
+.cb-settings{width:100%;max-width:680px;}
+.cb-settings-options{display:flex;flex-direction:column;gap:10px;}
+:is(#hp-corp,#corp-sheet) .cb-setting{justify-content:space-between;text-align:left;padding:10px 14px;}
+.cb-setting > span:first-child{min-width:0;overflow-wrap:anywhere;}
+.cb-setting b,.cb-setting small{display:block;}
+.cb-setting small{margin-top:4px;font-size:var(--fs-caption);font-weight:400;color:var(--sf-dim);}
+.cb-exit{display:flex;padding-top:16px;margin-top:8px;border-top:1px solid var(--sf-edge);}
 .cb-app{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px 10px;align-items:center;padding:10px;border-radius:12px;
   background:var(--sf-inset);border:1px solid color-mix(in srgb,var(--amber) 45%,transparent);}
 .cb-app .cb-mav{color:var(--amber);}
@@ -4233,6 +4238,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-infl{flex:1 1 100%;flex-direction:row;align-items:baseline;justify-content:space-between;}
   .cb-tabs{width:100%;align-self:stretch;}
   .cb-tab{flex:1;padding:0 4px;gap:5px;}
+  .cb-tab-settings{flex:0 0 44px;padding:0;}
+  .cb-settings-label{display:none;}
   .cb-pano-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
   .cb-pano{width:556px;height:250px;aspect-ratio:auto;}
   .cb-tagl,.cb-lot .cb-plus{display:none;}
@@ -4251,6 +4258,14 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-apps{order:-1;}
   .cb-roles{order:1;}
   .cb-nc-hero .cb-art{height:170px;}
+}
+/* Keep the settings button visible even with battle/application counts on a small phone. */
+@container corp (max-width:399px){
+  .cb-tabs{gap:2px;}
+  .cb-tab{position:relative;flex:1 0 auto;min-width:44px;padding:0 2px;font-size:var(--fs-caption);}
+  .cb-tab-settings{flex:0 0 44px;}
+  .cb-tabs:has(small) .cb-tab:not(.cb-tab-settings){padding-top:14px;}
+  .cb-tab small{position:absolute;top:2px;right:4px;min-width:16px;height:16px;padding:0 3px;font-size:var(--fs-caption);}
 }
 /* Палец: цели от 44 px (UIX-1.3). */
 @media (pointer:coarse){.cb-lvl{min-height:44px;}}
