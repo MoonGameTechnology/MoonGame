@@ -6,7 +6,7 @@ import type {
   MetaEconomyView,
   MetaStoreOfferView,
 } from '../../packages/protocol/src/metaEconomyView';
-import { corpArt } from './corpArt';
+import { CORP_ART_BUILDINGS, corpArt } from './corpArt';
 import { initShop, shopDetailHtml, shopHtml, type ShopHost, type ShopState } from './shopScreen';
 
 beforeAll(() => setLocale('ru'));
@@ -244,7 +244,7 @@ describe('магазин — «Стили»: стили базы корпора�
   const styles = (over: Partial<ShopState> = {}): ShopState =>
     state({ tab: 'styles', view: view({ sovereigns: 600 }), corpStyle: corp(true), ...over });
 
-  it('полка: стиль с ценой и штабом III уровня в этом стиле, вкладка подписана', () => {
+  it('полка: стиль с ценой и завершённым штабом, вкладка подписана', () => {
     const html = shopHtml(styles());
     expect(html).toContain('data-sh-tab="styles"');
     expect(html).toContain('Стили');
@@ -252,7 +252,8 @@ describe('магазин — «Стили»: стили базы корпора�
     expect(html).toContain('Хайтек');
     expect(html).toContain('Стиль базы корпорации');
     expect(html).toMatch(/data-sh-pick="corp_style_high_tech"[^]*?sh-sov">490/);
-    expect(html).toContain(`<img src="${corpArt('headquarters', 3, 'high_tech')!.src}" alt="">`);
+    expect(html).toContain(`href="${corpArt('headquarters', 5, 'high_tech')!.src}"`);
+    expect(html).not.toContain(`<img src="${corpArt('headquarters', 5, 'high_tech')!.src}"`);
     // Чужие полки стили не показывают.
     expect(shopHtml(styles({ tab: 'modules' }))).not.toContain('corp_style_');
   });
@@ -262,8 +263,16 @@ describe('магазин — «Стили»: стили базы корпора�
     expect(detail).toContain('data-sh-buy="corp_style_high_tech"');
     expect(detail).toContain('Стиль принадлежит корпорации и остаётся при смене главы.');
     // В описании — все здания базы в этом стиле.
-    for (const id of ['headquarters', 'supply_center', 'engineering_complex'])
-      expect(detail).toContain(corpArt(id, 3, 'high_tech')!.src);
+    expect(detail.match(/class="spr"/g)).toHaveLength(7);
+    for (const id of CORP_ART_BUILDINGS) {
+      const art = corpArt(id, id === 'headquarters' ? 5 : 3, 'high_tech')!;
+      expect(detail).toContain(`href="${art.src}"`);
+      if (art.frame) {
+        const f = art.frame;
+        expect(detail).toContain(`viewBox="${f.sx} ${f.sy} ${f.sw} ${f.sh}"`);
+        expect(detail).not.toContain(`<img src="${art.src}"`);
+      }
+    }
     const poor = shopDetailHtml(styles({ view: view(), pick: 'corp_style_high_tech' }));
     expect(poor).toMatch(/<button[^>]*disabled>Не хватает <b class="sh-sov">190/);
     expect(poor).not.toContain('data-sh-buy=');

@@ -63,7 +63,7 @@
 | CORP-10 | ✅ | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
 | CORP-11 | ✅ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
 | CORP-12 | ✅ | srv proto | `docs/backlog.md` | Медали игроков в ленте. |
-| CORP-13 | 🔶 | proto | `docs/backlog.md` | Картинки базы. |
+| CORP-13 | ✅ | proto | `docs/backlog.md` | Картинки базы. |
 | CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
 | CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |

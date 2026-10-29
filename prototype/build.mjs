@@ -4601,12 +4601,12 @@ span.ar-fchip{cursor:default;}
 .sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
 .sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
 .sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
-/* Стиль базы (CORP-14): здания III уровня рисунками — в карточке штаб, в описании все. */
+/* Стиль базы: в карточке завершённый штаб, в описании все здания. */
 .sh-art-style{align-items:flex-end;}
-.sh-art-style img{display:block;height:64px;width:auto;max-width:100%;object-fit:contain;}
-.sh-dt .sh-art-style{justify-content:center;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
+.sh-art-style .spr{display:block;height:64px;width:auto;max-width:100%;}
+.sh-dt .sh-art-style{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
   background:radial-gradient(120% 90% at 50% 100%,#0d3447,#04121c 70%);}
-.sh-dt .sh-art-style img{flex:1 1 0;min-width:0;height:auto;max-height:120px;}
+.sh-dt .sh-art-style .spr{min-width:0;width:100%;height:96px;}
 /* Фон базы (CORP-15): панорама без зданий. */
 .sh-art-bd{display:block;width:100%;max-width:150px;aspect-ratio:1200 / 540;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
 .sh-art-bd svg{display:block;width:100%;height:100%;}
