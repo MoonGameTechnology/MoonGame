@@ -265,6 +265,15 @@ try {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    // A corporation can assign a battle while the match browser is closed.
+    // Keep its match-list cache empty; the confirmed corporate seat must suffice.
+    await page.route(/\/matches(?:\?|$)/, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      if (Array.isArray(body.matches)) body.matches = body.matches.filter((match) => match.matchId !== matchId);
+      if (Array.isArray(body.active)) body.active = body.active.filter((match) => match.matchId !== matchId);
+      await route.fulfill({ response, json: body });
+    });
     page.setDefaultTimeout(20_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
