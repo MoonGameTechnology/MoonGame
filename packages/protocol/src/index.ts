@@ -1,4 +1,5 @@
 export * from './ava';
+export type * from './corpBattles';
 export * from './corpInfrastructure';
 export * from './corpStyle';
 export * from './corpIdentity';

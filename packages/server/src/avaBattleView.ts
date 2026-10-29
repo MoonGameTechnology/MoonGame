@@ -1,3 +1,4 @@
+import type { CorpWarView } from '@void/protocol';
 import { z } from 'zod';
 import {
   getStance,
@@ -181,46 +182,9 @@ export function parseAvaBattleReport(raw: unknown): AvaBattleReport | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** An own-side seat in the war view: everything the breakdown will show. */
-export interface AvaWarSeat {
-  /** null: a bot plays the seat. */
-  accountId: string | null;
-  login: string | null;
-  score: number;
-  provinces: number;
-  out: boolean;
-}
-
-/** A rival seat at war: who plays it and whether it is still in. Its score and land stay
- *  hidden — the match shows them to nobody but their owner. */
-export interface AvaRivalSeat {
-  bot: boolean;
-  login: string | null;
-  out: boolean;
-}
-
-/** CORP-9: the battle as one side sees it from the hub while it runs. */
-export interface AvaWarView {
-  matchupId: string;
-  side: AvaSide;
-  /** peace: the war is scheduled; war: it is on; ended: the match is over and its result
-   *  is on its way to the corporations (`/ava/battles` carries the breakdown). */
-  phase: 'peace' | 'war' | 'ended';
-  /** When the war opens (peace) or opened (war, ended), wall clock. Absent on a session
-   *  without a war schedule and on a battle that ended before its war. */
-  warAt?: number;
-  /** The side's score and the score that wins the battle. */
-  score: number;
-  scoreGoal: number;
-  /** The provinces the side holds, of the map's capturable ones; holding the
-   *  `dominationPercent` share of them (a fraction, as in the match rules) wins too. */
-  provinces: number;
-  capturable: number;
-  dominationPercent: number;
-  mine: AvaWarSeat[];
-  /** How many rival players signed up; at war and after, also every rival seat. */
-  rivals: { count: number; seats?: AvaRivalSeat[] };
-}
+export type AvaWarView = CorpWarView;
+export type AvaWarSeat = CorpWarView['mine'][number];
+export type AvaRivalSeat = NonNullable<CorpWarView['rivals']['seats']>[number];
 
 /**
  * The war view of one side (pure): its score against the side's goal, its provinces against

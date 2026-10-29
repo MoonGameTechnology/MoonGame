@@ -285,11 +285,20 @@ try {
       await page.locator('#medal-rewards[open]').waitFor();
       await page.click('#medal-rewards [data-mreward="ok"]');
       await page.locator('#medal-rewards').waitFor({ state: 'hidden' });
-      await page.click('#hub-play');
-      await page.click('.mtab[data-tab="active"]');
-      const row = page.locator(`#mlist .mrow[data-match="${matchId}"]`);
-      assert.equal(await row.locator('.mname b').textContent(), 'Битва корпораций');
-      await row.locator('.mbtn.btn-second').click();
+      await page.click('[data-hub="corp"]');
+      if (await page.locator('#intro').isVisible()) await page.click('#intro .in-ok');
+      await page.click('[data-corpsec="battles"]');
+      if (await page.locator('#intro').isVisible()) await page.click('#intro .in-ok');
+      await page.locator('[data-battletab="now"]').waitFor();
+      for (const width of [390, 1280]) {
+        await page.setViewportSize({ width, height: 844 });
+        for (const tab of ['challenges', 'opponents', 'history', 'ready', 'now']) {
+          await page.locator(`[data-battletab="${tab}"]`).click();
+          assert.equal(await page.locator(`[data-battletab="${tab}"]`).getAttribute('aria-selected'), 'true');
+          assert.equal(await page.locator('#hp-corp').evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true);
+        }
+      }
+      await page.locator('[data-corpact="ava-play"]').click();
       await page.waitForURL(new RegExp(`/game/${matchId}`));
       await page.waitForFunction(() => getComputedStyle(document.getElementById('connect')).display === 'none');
       await page.waitForTimeout(1500); // a few deltas on top of the welcome snapshot
