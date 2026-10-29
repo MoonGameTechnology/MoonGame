@@ -584,14 +584,6 @@ export function sensorCoverageOf(
   data: GameData,
   planets: readonly Planet[] = recordValues(state.planets),
 ): Map<PlayerId, Coverage> {
-  // A decided match is a frozen map for its participants to study. This only
-  // changes spatial visibility; project() still removes private/server fields.
-  if (state.match.status === 'ended') {
-    return new Map(viewerIds.map((id) => [id, {
-      identify: new Set(planets.map((p) => p.id)),
-      radar: new Set(planets.map((p) => p.id)),
-    }]));
-  }
   const { xs, ys, cells } = planetGrid(planets);
   const blocs = viewerIds.map((viewerId) => visionBloc(state, viewerId));
   const byOwner = circlesByOwner(
@@ -950,7 +942,8 @@ export function visibleState(state: GameState, viewerId: PlayerId, data: GameDat
 /** A player's projection plus the identify set it was computed from. */
 export interface VisibleView {
   view: VisibleState;
-  /** Nodes the viewer currently identifies — the same set `identifiedNodes` returns. */
+  /** Nodes visible in this projection, including the display-only post-match reveal.
+   * Actual exploration facts use sensorCoverage / identifiedNodes instead. */
   identified: Set<PlanetId>;
 }
 
@@ -1000,8 +993,23 @@ function hideRivalCorridors(state: GameState, view: VisibleState, viewerId: Play
  * events); computing them together halves the per-player coverage work.
  */
 export function visibleView(state: GameState, viewerId: PlayerId, data: GameData): VisibleView {
-  const coverage = sensorCoverage(state, viewerId, data);
+  const coverage = viewCoverage(state, viewerId, data);
   return { view: project(state, viewerId, data, coverage), identified: coverage.identify };
+}
+
+/** Display-only coverage. Actual sensors must never gain post-match knowledge:
+ * visibilityModule records them as exploration facts for rewards and career. */
+export function viewCoverage(
+  state: GameState,
+  viewerId: PlayerId,
+  data: GameData,
+  planets: readonly Planet[] = recordValues(state.planets),
+): Coverage {
+  if (state.match.status !== 'ended') return sensorCoverage(state, viewerId, data, planets);
+  return {
+    identify: new Set(planets.map((p) => p.id)),
+    radar: new Set(planets.map((p) => p.id)),
+  };
 }
 
 /** One visibility boundary reused by networking and the local map/UI. */

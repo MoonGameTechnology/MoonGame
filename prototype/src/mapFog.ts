@@ -22,7 +22,7 @@ import {
   fleetsSeenByPosition,
   patrolsSeenBy,
   radarSignatures,
-  sensorCoverage,
+  viewCoverage,
   type Battle,
   type Engagement,
   type Fleet,
@@ -148,7 +148,7 @@ function computeVision(): Vision {
   const NET = game.net();
   const netSignatures = game.contacts();
   const planets = game.planets();
-  const { identify, radar } = sensorCoverage(s, ME, data, planets);
+  const { identify, radar } = viewCoverage(s, ME, data, planets);
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
   // is remembered after the window closes).
   grantVision({ identify, radar }, targetsOf(myIntel(), 'planet'), (id) => !!s.planets[id]);

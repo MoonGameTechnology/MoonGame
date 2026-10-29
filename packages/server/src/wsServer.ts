@@ -869,6 +869,12 @@ export function createMultiplayerServer(
           refuseUpgrade(429);
           return;
         }
+        // Identity/store lookups above await: expiry can evict a frozen room in
+        // that gap. Never attach a new peer to the already-disposed viewer.
+        if (room.state.match.status === 'ended' && registry.get(matchId) !== room) {
+          refuseUpgrade(404);
+          return;
+        }
         wss.handleUpgrade(request, socket, head, (ws) => {
           openPerIp.set(clientIp, (openPerIp.get(clientIp) ?? 0) + 1);
           ws.once('close', () => {
@@ -1030,6 +1036,7 @@ export function createMultiplayerServer(
   // the rest. Reap window is one interval, so a slot frees within ~2×HEARTBEAT.
   const HEARTBEAT_MS = 15_000;
   const heartbeat = setInterval(() => {
+    registry.pruneExpired?.();
     for (const ws of sockets) {
       if (alive.get(ws) === false) {
         ws.terminate();

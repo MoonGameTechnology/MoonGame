@@ -208,6 +208,7 @@ export { diffState, applyDelta, type StateDelta } from './state/delta';
 export {
   visibleState,
   visibleView,
+  viewCoverage,
   identifiedNodes,
   sensorCoverage,
   radarSignatures,

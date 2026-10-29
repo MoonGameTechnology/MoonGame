@@ -25,6 +25,7 @@ import {
   stackRadarRange,
   visibleState,
   visibleView,
+  viewCoverage,
   worldSightOf,
 } from './visibility';
 import type { VisibleState } from './visibility';
@@ -168,7 +169,8 @@ describe('finished-match map inspection', () => {
     state.match.endedAt = state.time;
     const original = structuredClone(state);
     const view = visibleState(state, 'p1', special);
-    expect(sensorCoverage(state, 'p1', special).identify.size).toBe(5);
+    expect(viewCoverage(state, 'p1', special).identify.size).toBe(5);
+    expect(sensorCoverage(state, 'p1', special).identify.has('D')).toBe(false);
     expect(view.planets.D!.owner).toBe('p2');
     expect(view.planets.D!.garrison).toEqual(state.planets.D!.garrison);
     expect(Object.keys(view.fleets).sort()).toEqual(Object.keys(state.fleets).sort());

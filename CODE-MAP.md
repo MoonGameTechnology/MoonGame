@@ -451,7 +451,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
 | `matchRegistry.ts` | `MatchRegistry`, `sessionMeta`, `MATCH_ARCHIVE_MS` | лента матчей, автоматический архив участников и срок просмотра |
 | `matchArchive.ts` | `restoreMatchArchives`, `archiveExpired` | восстановление замерших карт из стора без драйверов и проверка срока |
-| `roomRegistry.ts` | `LazyRoomRegistry`, `InMemoryRoomRegistry` | маршрутизация комнат + hibernation канонического хоста |
+| `roomRegistry.ts` | `LazyRoomRegistry`, `InMemoryRoomRegistry` | маршрутизация, hibernation и истечение срока уже загруженных архивов |
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |
 | `operatorMatchApi.ts` | `POST /metrics/matches` | создание сессии с картой и скоростью; полный операторский ключ |
