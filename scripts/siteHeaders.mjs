@@ -38,7 +38,7 @@ export function pagePolicy(html) {
     `script-src ${scripts.join(' ') || "'none'"}`,
     `style-src ${styles.join(' ') || "'none'"}`,
     "style-src-attr 'unsafe-inline'",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https: wss:",
     "base-uri 'none'",

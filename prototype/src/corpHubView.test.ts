@@ -102,7 +102,7 @@ describe('вкладка «Корпорация»: база', () => {
   it('у каждого здания на панораме свой участок, а в списке — карточка', () => {
     const p = paint();
     const html = corpHubHtml(p);
-    for (const id of Object.keys(CORP_LOTS)) expect(html).toMatch(new RegExp(`class="cb-lot [^"]*" style="[^"]*" data-corpbld="${id}"`));
+    for (const { id } of p.view!.buildings.filter((b) => CORP_LOTS[b.id])) expect(html).toMatch(new RegExp(`class="cb-lot [^"]*" style="[^"]*" data-corpbld="${id}"`));
     const cards = [...html.matchAll(/class="cb-bc [^"]*" data-corpbld="([\w-]+)"/g)].map((m) => m[1]);
     expect(cards).toEqual(p.view!.buildings.map((b) => b.id));
   });

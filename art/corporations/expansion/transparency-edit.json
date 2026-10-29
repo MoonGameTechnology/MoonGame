@@ -1,0 +1,31 @@
+{
+  "generator": "Built-in image_gen",
+  "date": "2026-10-29",
+  "edits": [
+    {
+      "name": "headquarters",
+      "path": "/root/.codex/generated_images/01a144d9-cfe8-7561-ba50-451bdec5fcf8/exec-4a909369-2e71-4478-b70f-1950e420b33e.png",
+      "prompt": "Edit this production game sprite atlas ONLY to clean its transparency. Preserve every building exactly: architecture, colours, details, number, arrangement, size, positions, resolution, and level progression. Remove ALL gray haze/gradient outside buildings, ALL white or multicoloured fringe/speckles/halos along silhouettes, ALL shadows and backgrounds between and behind buildings. Outside actual building silhouettes must be fully transparent alpha=0, including spaces between antennas and towers. Use clean antialiased edges without light matte contamination. Preserve blue/amber lights INSIDE the buildings, but no wide external glow. Keep every building separate, fully visible, no cropping. No text, no new objects, no background. Output a clean transparent sprite sheet."
+    },
+    {
+      "name": "monument",
+      "path": "/root/.codex/generated_images/01a144d9-cfe8-7561-ba50-451bdec5fcf8/exec-76975f51-b1c6-4d44-9a86-ee7bc9fbf9e2.png",
+      "prompt": "Edit this production game sprite atlas ONLY to clean its transparency. Preserve every building exactly: architecture, colours, details, number, arrangement, size, positions, resolution, and level progression. Remove ALL gray haze/gradient outside buildings, ALL white or multicoloured fringe/speckles/halos along silhouettes, ALL shadows and backgrounds between and behind buildings. Outside actual building silhouettes must be fully transparent alpha=0, including spaces between antennas and towers. Use clean antialiased edges without light matte contamination. Preserve blue/amber lights INSIDE the buildings, but no wide external glow. Keep every building separate, fully visible, no cropping. No text, no new objects, no background. Output a clean transparent sprite sheet."
+    },
+    {
+      "name": "warehouse",
+      "path": "/root/.codex/generated_images/01a144d9-cfe8-7561-ba50-451bdec5fcf8/exec-684e7ab8-e218-4fe8-933f-9181f7033521.png",
+      "prompt": "Edit this production game sprite atlas ONLY to clean its transparency. Preserve every building exactly: architecture, colours, details, number, arrangement, size, positions, resolution, and level progression. Remove ALL gray haze/gradient outside buildings, ALL white or multicoloured fringe/speckles/halos along silhouettes, ALL shadows and backgrounds between and behind buildings. Outside actual building silhouettes must be fully transparent alpha=0, including spaces between antennas and towers. Use clean antialiased edges without light matte contamination. Preserve blue/amber lights INSIDE the buildings, but no wide external glow. Keep every building separate, fully visible, no cropping. No text, no new objects, no background. Output a clean transparent sprite sheet."
+    },
+    {
+      "name": "hall_of_fame",
+      "path": "/root/.codex/generated_images/01a144d9-cfe8-7561-ba50-451bdec5fcf8/exec-8d9603f6-2182-433b-aee7-944fde64deaa.png",
+      "prompt": "Edit this production game sprite atlas ONLY to clean its transparency. Preserve every building exactly: architecture, colours, details, number, arrangement, size, positions, resolution, and level progression. Remove ALL gray haze/gradient outside buildings, ALL white or multicoloured fringe/speckles/halos along silhouettes, ALL shadows and backgrounds between and behind buildings. Outside actual building silhouettes must be fully transparent alpha=0, including spaces between antennas and towers. Use clean antialiased edges without light matte contamination. Preserve blue/amber lights INSIDE the buildings, but no wide external glow. Keep every building separate, fully visible, no cropping. No text, no new objects, no background. Output a clean transparent sprite sheet."
+    },
+    {
+      "name": "operations_center",
+      "path": "/root/.codex/generated_images/01a144d9-cfe8-7561-ba50-451bdec5fcf8/exec-97f71844-a76e-47e5-8163-90bc231eda16.png",
+      "prompt": "Edit this production game sprite atlas ONLY to clean its transparency. Preserve every building exactly: architecture, colours, details, number, arrangement, size, positions, resolution, and level progression. Remove ALL gray haze/gradient outside buildings, ALL white or multicoloured fringe/speckles/halos along silhouettes, ALL shadows and backgrounds between and behind buildings. Outside actual building silhouettes must be fully transparent alpha=0, including spaces between antennas and towers. Use clean antialiased edges without light matte contamination. Preserve blue/amber lights INSIDE the buildings, but no wide external glow. Keep every building separate, fully visible, no cropping. No text, no new objects, no background. Output a clean transparent sprite sheet."
+    }
+  ]
+}
