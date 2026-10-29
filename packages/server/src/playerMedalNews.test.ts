@@ -37,6 +37,30 @@ function setup() {
   return { store, economy };
 }
 describe('player medal news', () => {
+  it('does not advance the shared cursor when either source is unavailable', async () => {
+    for (const failed of ['corps', 'medals']) {
+      let down = true;
+      const app = Fastify(); apps.push(app);
+      registerNewsApi(app, {
+        announcements: new MemoryAnnouncementStore(),
+        feed: { recent: async () => {
+          if (down && failed === 'corps') throw Error('outage');
+          return [{ id: 'c300', at: 300, kind: 'founded', corpId: 'c', corpName: 'Corp' }, { id: 'c200', at: 200, kind: 'founded', corpId: 'c', corpName: 'Corp' }];
+        } },
+        playerMedals: { recentPlayerMedals: async () => {
+          if (down && failed === 'medals') throw Error('outage');
+          return [{ id: 'm250', at: 250, kind: 'player_medal', medalId: 'first', grade: 1, login: 'Pilot', corp: null }];
+        } },
+      });
+      const refused = await app.inject('/news?limit=2');
+      expect(refused.statusCode).toBe(503);
+      expect(refused.json()).toEqual({ error: 'E_NEWS_UNAVAILABLE' });
+      down = false;
+      const recovered = await app.inject('/news?limit=2');
+      expect(recovered.statusCode).toBe(200);
+      expect(recovered.json().events.map((e: { id: string }) => e.id)).toEqual(['c300', 'm250']);
+    }
+  });
   it.skipIf(!process.env.DATABASE_URL)(
     'persists scoped news across adapters and cannot resurrect an erased login',
     async () => {

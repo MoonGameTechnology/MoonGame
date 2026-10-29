@@ -5101,4 +5101,5 @@ export const ru: Record<string, string> = {
   "err.corp-hall-required": "Сначала постройте зал славы",
   "err.corp-medal-not-earned": "Корпорация ещё не заслужила эту награду",
   "err.bad-showcase": "Не удалось сохранить этот набор наград",
+  'err.news-unavailable': 'Новости временно недоступны. Повторите попытку.',
 };

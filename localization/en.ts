@@ -5096,4 +5096,5 @@ export const en: Record<string, string> = {
   "err.corp-hall-required": "Build a hall of fame first",
   "err.corp-medal-not-earned": "The corporation has not earned this medal yet",
   "err.bad-showcase": "Could not save this medal selection",
+  'err.news-unavailable': 'News is temporarily unavailable. Try again.',
 };

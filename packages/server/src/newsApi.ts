@@ -64,17 +64,21 @@ export function registerNewsApi(app: FastifyInstance, deps: NewsApiDeps): void {
       // No verified current membership: public events only, including during an outage.
     }
     const corpKinds = kinds?.filter((k) => k !== 'player_medal') as FeedKind[] | undefined;
-    const read = async (count: number): Promise<NewsEvent[]> => {
+    const read = async (count: number): Promise<NewsEvent[] | null> => {
       const [corp, medals] = await Promise.all([
-        corpKinds?.length === 0 ? [] : deps.feed.recent(count, before, corpKinds).catch(() => []),
+        corpKinds?.length === 0 ? [] : deps.feed.recent(count, before, corpKinds).catch(() => deps.playerMedals ? null : []),
         deps.playerMedals && (!kinds || kinds.includes('player_medal'))
-          ? deps.playerMedals.recentPlayerMedals(count, before, corpId).catch(() => []) : [],
+          ? deps.playerMedals.recentPlayerMedals(count, before, corpId).catch(() => null) : [],
       ]);
+      // A shared cursor cannot advance past an unread source. The client keeps
+      // its previous page on failure and can retry the same request.
+      if (corp === null || medals === null) return null;
       return [...corp.flatMap((row) => { const e = newsEventOf(row); return e ? [e] : []; }), ...medals]
         .sort((a, b) => b.at - a.at || b.id.localeCompare(a.id)).slice(0, count);
     };
     // One row past the page says whether older events follow.
-    const rows = (await read(limit + 1)) ?? [];
+    const rows = await read(limit + 1);
+    if (rows === null) return reply.code(503).send({ error: 'E_NEWS_UNAVAILABLE' });
     let page = rows.slice(0, limit);
     let more = rows.length > limit;
     // The next page asks for strictly older events, so a page that ends inside one moment
@@ -87,6 +91,7 @@ export function registerNewsApi(app: FastifyInstance, deps: NewsApiDeps): void {
         // The whole page is one moment (one settlement writes a result and its medals at
         // once): serve the moment whole, past the limit, up to the page bound.
         const whole = await read(NEWS_PAGE_MAX + 1);
+        if (whole === null) return reply.code(503).send({ error: 'E_NEWS_UNAVAILABLE' });
         if (whole) {
           page = whole.filter((row) => row.at === cut).slice(0, NEWS_PAGE_MAX);
           more = whole.length > page.length;
