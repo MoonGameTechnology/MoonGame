@@ -1,4 +1,7 @@
 import { corpHubBadges, corpHubState } from '../../decisions/corpHub';
+import { BATTLE_FORMATS, CORP_BATTLE_TABS, formatLimit, parseCorpBattles, parseCorpWar, type CorpBattleTab } from '../../decisions/corpBattles';
+import type { CorpBattlesView, CorpWarView } from '../../packages/protocol/src/corpBattles';
+import { corpBattleReportHtml, corpBattlesViewHtml } from './corpBattlesView';
 import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
 import { parseCorpStyle } from '../../decisions/corpStyle';
 import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
@@ -251,6 +254,7 @@ export interface CorpHost {
     signIn(): void;
     /** CORP-14 — a base style the corporation lacks is bought in the shop; open it there. */
     openShop?(style: string): void;
+    openBattle?(matchupId: string): void;
   };
 }
 
@@ -298,6 +302,13 @@ export function initCorp(host: CorpHost): {
   let avaPool: Array<CorpSummary & { readySince: number }> = [];
   let avaFeed: AvaFeedEntry[] = [];
   let avaRoster: AvaRosterView | null = null;
+  let battleView: CorpBattlesView | null = null;
+  let battleTab: CorpBattleTab = 'now';
+  let battleFormat = 0;
+  let battleDraft: number[] | null = null;
+  let battlePool: Array<CorpSummary & { formats: number[] }> | null = null;
+  let battleRosters: Record<string, AvaRosterView | null> = {};
+  let battleWars: Record<string, CorpWarView | null> = {};
   // AVA-6 setRoster eligibility — accountIds flagged ready in my corp (head/officer only,
   // fetched only while a roster window is open; empty otherwise).
   let avaReadyPlayers: string[] = [];
@@ -474,25 +485,52 @@ export function initCorp(host: CorpHost): {
       medalsOwned = [];
     }
 
-    const challengesRaw = ((avaAvailable ? await corpFetch('/ava/challenges') : null)) as { challenges?: unknown } | null;
-    avaChallenges = parseChallenges(challengesRaw?.challenges);
+    const myCorpId = corpMine.membership?.corpId;
+    const battleMember = avaAvailable && myCorpId && corpMine.membership?.role !== 'recruit';
+    const priorCorp = battleView?.corpId;
+    battleView = battleMember ? parseCorpBattles(await corpFetch('/ava/battles'), myCorpId) : null;
+    if (battleView) {
+      avaChallenges = battleView.challenges;
+      corpReadyOptimistic = battleView.ready.corp;
+      playerReadyOptimistic = battleView.ready.player;
+      if (battleDraft === null || priorCorp !== myCorpId) battleDraft = [...battleView.ready.formats];
+      battleDraft = battleDraft.filter((f) => f <= formatLimit(infrastructure));
+    } else {
+      battleDraft = null;
+      // The older match cabinet still handles hosts without the new read model.
+      const raw = !hubShown && avaAvailable ? await corpFetch('/ava/challenges') as { challenges?: unknown } | null : null;
+      avaChallenges = parseChallenges(raw?.challenges);
+    }
     const poolRaw = ((avaAvailable ? await corpFetch('/ava/pool') : null)) as { pool?: unknown } | null;
     avaPool = parseReadyPool(poolRaw?.pool);
-    // Лента ПУБЛИЧНАЯ и общая: вкладка «Битвы» отбирает из неё свои бои, поэтому окно
-    // берётся шире восьми записей — иначе чужие войны вытеснят мои из истории.
-    const feedRaw = ((avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
+    const rawPool = Array.isArray(poolRaw?.pool) ? poolRaw.pool as Array<{ corpId?: unknown; formats?: unknown }> : [];
+    battlePool = poolRaw && Array.isArray(poolRaw.pool) ? avaPool.map((p) => {
+      const formats = rawPool.find((r) => r?.corpId === p.corpId)?.formats;
+      return { ...p, formats: Array.isArray(formats) ? formats.filter((f): f is number => BATTLE_FORMATS.some((v) => v.format === f)) : [] };
+    }) : null;
+    // Only the legacy match cabinet uses the public feed; the hub has private history.
+    const feedRaw = ((!hubShown && avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
     avaFeed = parseFeed(feedRaw?.feed);
 
     // A locked-or-accepted matchup my corp is party to: show its roster window.
-    const myCorpId = corpMine.membership?.corpId;
     const activeMatchup = avaChallenges.find(
       (c) =>
         (c.status === 'accepted' || c.status === 'locked') &&
         (c.challengerCorp === myCorpId || c.targetCorp === myCorpId),
     );
-    avaRoster = activeMatchup
-      ? parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(activeMatchup.id)}`))
-      : null;
+    battleRosters = {};
+    battleWars = {};
+    const active = battleView?.challenges.filter((c) => c.status === 'accepted' || c.status === 'locked') ?? (activeMatchup ? [activeMatchup] : []);
+    for (const c of active) {
+      const roster = parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(c.id)}`));
+      battleRosters[c.id] = roster?.matchupId === c.id ? roster : null;
+      if (c.status === 'locked' && battleView) {
+        const war = parseCorpWar(await corpFetch(`/ava-war/${encodeURIComponent(c.id)}`), c.id);
+        const side = c.challengerCorp === myCorpId ? 'challenger' : 'target';
+        battleWars[c.id] = war?.side === side ? war : null;
+      }
+    }
+    avaRoster = activeMatchup ? battleRosters[activeMatchup.id] ?? null : null;
 
     // The setRoster eligibility set (AVA-6) — head/officer only, only while curating.
     avaReadyPlayers =
@@ -959,6 +997,19 @@ export function initCorp(host: CorpHost): {
     const corpId = corpMine.membership?.corpId ?? '';
     const account = btn.dataset.corpaccount ?? '';
     switch (act) {
+      case 'ava-ready-save': {
+        if (!battleView || corpMine.membership?.role !== 'head' || !battleDraft?.length) break;
+        const formats = [...battleDraft];
+        battleDraft = null;
+        corpSend(act, '/ava/ready/corp', { formats });
+        break;
+      }
+      case 'ava-play': {
+        const war = battleWars[arg];
+        if (war && war.phase !== 'ended' && battleRosters[arg]?.mine.some((s) => s.accountId === corpMine.membership?.accountId))
+          host.hub.openBattle?.(arg);
+        break;
+      }
       case 'buildings':
         corpTab = 'buildings';
         renderCorp();
@@ -1016,51 +1067,19 @@ export function initCorp(host: CorpHost): {
         corpSend(act, `/corps/${encodeURIComponent(corpId)}/disband`);
         break;
       case 'ready-corp':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/corp', { method: 'POST' }).then((r) => {
-            if (r) {
-              corpReadyOptimistic = true;
-              detach('корпорация: обновление кабинета', refreshCorp());
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/corp');
         break;
       case 'ready-corp-clear':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/corp/clear', { method: 'POST' }).then((r) => {
-            if (r) {
-              corpReadyOptimistic = false;
-              detach('корпорация: обновление кабинета', refreshCorp());
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/corp/clear');
         break;
       case 'ready-player':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/player', { method: 'POST' }).then((r) => {
-            if (r) {
-              playerReadyOptimistic = true;
-              paint();
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/player');
         break;
       case 'ready-player-clear':
-        detach(
-          `корпорация: ${act}`,
-          corpFetch('/ava/ready/player/clear', { method: 'POST' }).then((r) => {
-            if (r) {
-              playerReadyOptimistic = false;
-              paint();
-            }
-          }),
-        );
+        corpSend(act, '/ava/ready/player/clear');
         break;
       case 'ava-challenge':
-        corpSend(act, '/ava/challenge', { target: arg });
+        corpSend(act, '/ava/challenge', { target: arg, ...(btn.dataset.corpformat ? { format: Number(btn.dataset.corpformat) } : {}) });
         break;
       case 'ava-accept':
         corpSend(act, `/ava/challenge/${encodeURIComponent(arg)}/accept`);
@@ -1074,8 +1093,9 @@ export function initCorp(host: CorpHost): {
       case 'ava-roster-toggle': {
         // arg = matchupId, account = the toggled accountId. Server is wholesale
         // (setRoster REPLACES the side), so send the full desired set every time.
-        if (!avaRoster || avaRoster.matchupId !== arg) break;
-        const current = avaRoster.mine.map((r) => r.accountId);
+        const roster = battleRosters[arg] ?? avaRoster;
+        if (!roster || roster.matchupId !== arg) break;
+        const current = roster.mine.map((r) => r.accountId);
         const next = current.includes(account)
           ? current.filter((id) => id !== account)
           : [...current, account];
@@ -1112,11 +1132,23 @@ export function initCorp(host: CorpHost): {
       draftEmblem,
       armed: hubArmed,
       badges: corpHubBadges(me, members, avaChallenges),
-      // «Битвы» до CORP-10 — те же построители, что у окна в партии.
-      battles: hubSection === 'battles' ? corpWarsHtml() + (avaAvailable ? corpBattlesHtml() : '') : '',
+      battles: hubSection === 'battles' && corpMine.corp && me ? corpBattlesViewHtml({
+        view: battleView, available: avaAvailable, corp: corpMine.corp, me, members, pool: battlePool,
+        rosters: battleRosters, wars: battleWars, tab: battleTab, format: battleFormat,
+        maxFormat: formatLimit(infrastructure), draftFormats: battleDraft ?? [], busy: intentBusy,
+        now: Date.now(), canPlay: !!host.hub.openBattle,
+      }) : '',
+      battleReport: hubSheet?.kind === 'report' ? battleReport(hubSheet.matchupId) : '',
       canSignIn: host.hub.canSignIn(),
       now: Date.now(),
     };
+  }
+
+  function battleReport(id: string): string {
+    const result = battleView?.results.find((r) => r.matchupId === id);
+    if (!result || !battleView) return '';
+    const rival = result.challengerCorp === battleView.corpId ? result.targetCorp : result.challengerCorp;
+    return corpBattleReportHtml(result, battleView.names[rival] ?? t('corp.combat.unknown-corp'));
   }
 
   function renderHub(): void {
@@ -1124,11 +1156,26 @@ export function initCorp(host: CorpHost): {
     const root = host.hub.root();
     // Перерисовка сохраняет место на панораме; выбор эмблемы держит контроллер.
     const scroll = root.querySelector<HTMLElement>('.cb-pano-scroll')?.scrollLeft ?? null;
+    const tabsScroll = root.querySelector<HTMLElement>('.cb-battle-tabs')?.scrollLeft ?? 0;
+    const active = root.ownerDocument?.activeElement;
+    const focused = active && root.contains(active) ? active as HTMLElement : null;
+    const focusAttrs = focused ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-')).map((a) => [a.name, a.value] as const) : [];
     const p = hubPaint();
     root.innerHTML = corpHubHtml(p);
     // Панорама впервые на экране — штабом в середину: на телефоне она шире экрана.
     const pano = root.querySelector<HTMLElement>('.cb-pano-scroll');
     if (pano) pano.scrollLeft = scroll ?? (pano.scrollWidth - pano.clientWidth) / 2;
+    const tabs = root.querySelector<HTMLElement>('.cb-battle-tabs');
+    if (tabs) {
+      tabs.scrollLeft = tabsScroll;
+      const selected = tabs.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (selected) {
+        const box = selected.getBoundingClientRect(), frame = tabs.getBoundingClientRect();
+        if (box.left < frame.left) tabs.scrollLeft -= frame.left - box.left;
+        else if (box.right > frame.right) tabs.scrollLeft += box.right - frame.right;
+      }
+    }
+    if (focusAttrs.length) Array.from(root.querySelectorAll<HTMLElement>('button')).find((el) => focusAttrs.every(([attr, value]) => el.getAttribute(attr) === value))?.focus({ preventScroll: true });
     renderHubSheet(p);
   }
 
@@ -1183,6 +1230,38 @@ export function initCorp(host: CorpHost): {
     const tg = e.target as HTMLElement | null;
     if (!tg) return;
     if (pickDraft(tg)) return;
+    const tab = tg.closest<HTMLElement>('[data-battletab]')?.dataset.battletab;
+    if (tab && CORP_BATTLE_TABS.some((t) => t === tab)) {
+      battleTab = tab as CorpBattleTab;
+      renderHub();
+      host.hub.root().querySelector<HTMLElement>(`[data-battletab="${battleTab}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    const filter = tg.closest<HTMLElement>('[data-battle-format]');
+    if (filter) {
+      const value = Number(filter.dataset.battleFormat);
+      if (value === 0 || BATTLE_FORMATS.some((f) => f.format === value)) battleFormat = value;
+      renderHub();
+      host.hub.root().querySelector<HTMLElement>(`[data-battle-format="${battleFormat}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    const readyFormat = tg.closest<HTMLButtonElement>('[data-battle-ready-format]');
+    if (readyFormat) {
+      const value = Number(readyFormat.dataset.battleReadyFormat);
+      if (!readyFormat.disabled && !intentBusy && corpMine.membership?.role === 'head' && battleView && value <= formatLimit(infrastructure) && BATTLE_FORMATS.some((f) => f.format === value)) {
+        const draft = battleDraft ?? [];
+        battleDraft = draft.includes(value) ? draft.filter((f) => f !== value) : [...draft, value].sort((a, b) => a - b);
+        renderHub();
+        host.hub.root().querySelector<HTMLElement>(`[data-battle-ready-format="${value}"]`)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    const report = tg.closest<HTMLElement>('[data-battle-report]')?.dataset.battleReport;
+    if (report) {
+      if (battleView?.results.some((r) => r.matchupId === report && r.report))
+        openSheet({ kind: 'report', matchupId: report }, 'data-battle-report', report);
+      return;
+    }
     // Любое нажатие снимает взвод; второе нажатие по взведённой кнопке исполняет приказ.
     const armed = hubArmed;
     hubArmed = null;
@@ -1277,6 +1356,16 @@ export function initCorp(host: CorpHost): {
     renderHubSheet();
   }
 
+  host.hub.root().addEventListener('keydown', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[role="tab"][data-battletab]');
+    if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const index = CORP_BATTLE_TABS.indexOf(battleTab);
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? CORP_BATTLE_TABS.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : -1) + CORP_BATTLE_TABS.length) % CORP_BATTLE_TABS.length;
+    battleTab = CORP_BATTLE_TABS[next]!;
+    renderHub();
+    host.hub.root().querySelector<HTMLElement>(`[data-battletab="${battleTab}"]`)?.focus({ preventScroll: true });
+  });
   host.hub.root().addEventListener('click', onHubClick);
   host.hub.sheet().addEventListener('click', onHubClick);
 

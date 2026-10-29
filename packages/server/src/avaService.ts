@@ -1,3 +1,4 @@
+import type { CorpBattleSeat as AvaBattleSeat, CorpBattleResult as AvaBattleResult, CorpBattlesView as AvaBattlesView } from '@void/protocol';
 import { randomUUID } from 'node:crypto';
 import { AVA_FEED_KINDS, isAvaFeedEntry } from './store';
 import type {
@@ -10,9 +11,7 @@ import type {
   AvaResultStore,
   AvaRosterEntry,
   AvaRosterStore,
-  AvaSeatReport,
   AvaSide,
-  AvaTally,
   CorpMembership,
   CorpStore,
   CorpSummary,
@@ -83,41 +82,8 @@ export interface AvaRosterView {
   counts: Record<AvaSide, number>;
 }
 
-/** CORP-9: a seat of a finished battle as one of its corporations sees it. The account
- *  is named on the caller's own side only; a rival is known by login, a bot by nothing. */
-export interface AvaBattleSeat extends Omit<AvaSeatReport, 'accountId'> {
-  accountId?: string;
-  bot: boolean;
-}
-
-/** CORP-9: a finished battle as one of its corporations sees it — its side, the format,
- *  and the breakdown when the battle has one (results before CORP-9 have none). */
-export interface AvaBattleResult extends Omit<AvaResult, 'report'> {
-  format: number;
-  side: AvaSide;
-  report?: Omit<AvaBattleReport, 'seats'> & { seats: AvaBattleSeat[] };
-}
-
-/** CORP-9: the «Битвы» tab of a corporation, for its members. */
-export interface AvaBattlesView {
-  corpId: string;
-  ready: {
-    /** The corp is in the ready pool, for these formats. */
-    corp: boolean;
-    formats: number[];
-    /** The caller's own consent to deployment, and every member who gave it. */
-    player: boolean;
-    players: string[];
-  };
-  /** Open and closed challenges, newest first (`AvaChallengeStore.challengesOf`). */
-  challenges: AvaChallenge[];
-  /** Finished battles, newest first. */
-  results: AvaBattleResult[];
-  /** The whole record, per rival and format. */
-  tally: AvaTally[];
-  /** corpId → name of every rival above; a disbanded corp is absent. */
-  names: Record<string, string>;
-}
+// The hub and the authority consume one wire contract.
+export type { CorpBattleSeat as AvaBattleSeat, CorpBattleResult as AvaBattleResult, CorpBattlesView as AvaBattlesView } from '@void/protocol';
 
 /** Default challenge expiry (tunable via deps). Price, roster bounds and the win reward
  *  come from the challenge's format (CORP-7). */
