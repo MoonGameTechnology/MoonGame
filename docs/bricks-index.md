@@ -58,13 +58,15 @@
 | CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
 | CORP-6 | ✅ | data srv proto | `docs/backlog.md` | Уровни корпорации 4 и 5. |
 | CORP-7 | ✅ | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
-| CORP-8 | ⏳ | data srv | `docs/backlog.md` | Карта под формат. |
-| CORP-9 | ⏳ | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
-| CORP-10 | 🔒 | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
-| CORP-11 | ⏳ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
-| CORP-12 | ⏳ | srv | `docs/backlog.md` | Медали игроков в ленте. |
-| CORP-13 | 🔶 | proto | `docs/backlog.md` | Картинки базы. |
+| CORP-8 | ✅ | core data srv proto | `docs/backlog.md` | Карта под формат. |
+| CORP-9 | ✅ | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
+| CORP-10 | ✅ | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
+| CORP-11 | ✅ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
+| CORP-12 | ✅ | srv proto | `docs/backlog.md` | Медали игроков в ленте. |
+| CORP-13 | ✅ | proto | `docs/backlog.md` | Картинки базы. |
 | CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
+| CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
+| CORP-16 | ✅ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
@@ -349,6 +351,7 @@
 | UI-STD | ✅ | proto | `docs/backlog-archive.md` | Кнопки окна меток — стандартные; дерево технологий — |
 | CMD-VIS | ✅ | core proto | `docs/backlog-archive.md` | Стоп в коридоре запрещён; «нет приказа — нет |
 | FRIENDS-1 | ✅ | srv proto | `docs/backlog-archive.md` | Вкладка «Друзья» в хабе — с настоящим сервером. |
+| FRIENDS-2 | ✅ | srv proto | `docs/backlog-archive.md` | Войти к другу, позвать друга, скрыть свои партии. |
 | BUILD-1 | ✅ | proto | `docs/backlog-archive.md` | Окно построек мира + карточка здания с уровнями. |
 | ABIL-RING | ✅ | proto | `docs/backlog-archive.md` | Радиусы способностей — фиолетовым пунктиром, и не только |
 | SENSOR-1 | ✅ | data core proto | `docs/backlog-archive.md` | Сенсорный фрегат: носитель радара — и сам радар |

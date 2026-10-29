@@ -9,6 +9,7 @@ import {
   type DropStore,
 } from './store';
 import type { MemoryMetaMarket } from './metaMarket';
+import type { PlayerMedalNews } from '@void/protocol';
 import { memoryEconomyLock } from './memoryEconomyLock';
 
 export interface MetaEconomyTransaction {
@@ -25,11 +26,13 @@ export interface MetaEconomyTransaction {
     at: number,
   ): Promise<number>;
   isItemListed(itemId: string): Promise<boolean>;
+  announcePlayerMedal(event: PlayerMedalNews, accountId: string): Promise<void>;
   /** Internal auction adapter only: participates in this exact local transaction. */
   sql?: PoolClient;
 }
 
 export interface MetaEconomyStore {
+  pendingCorpMaterials(limit: number, after?: string): Promise<string[]>;
   transaction<T>(
     accountIds: readonly string[],
     work: (tx: MetaEconomyTransaction) => Promise<T>,
@@ -37,6 +40,7 @@ export interface MetaEconomyStore {
   read(accountId: string): Promise<MetaEconomyAccount>;
   receipt(key: string): Promise<MetaEconomyReceipt | null>;
   claimNonce(nonce: string, expiresAt: number): Promise<boolean>;
+  recentPlayerMedals(limit: number, before?: number, corpId?: string | null): Promise<PlayerMedalNews[]>;
 }
 
 export function emptyMetaEconomyAccount(): MetaEconomyAccount {
@@ -64,6 +68,10 @@ function validAccount(account: MetaEconomyAccount): void {
     throw Error('E_ECONOMY_STATE');
   if (account.premiumUntil !== undefined && !Number.isSafeInteger(account.premiumUntil))
     throw Error('E_ECONOMY_STATE');
+  if (account.corpMaterials) {
+    for (const n of Object.values(account.corpMaterials.available)) if (!Number.isSafeInteger(n) || n < 0) throw Error('E_ECONOMY_STATE');
+    for (const n of Object.values(account.corpMaterials.pending?.materials ?? {})) if (!Number.isSafeInteger(n) || n <= 0) throw Error('E_ECONOMY_STATE');
+  }
   const ids = new Set<string>();
   for (const lot of account.materials) {
     if (
@@ -85,6 +93,7 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
   private readonly accounts = new Map<string, MetaEconomyAccount>();
   private readonly receipts = new Map<string, MetaEconomyReceipt>();
   private readonly nonces = new Map<string, number>();
+  private readonly playerMedals = new Map<string, PlayerMedalNews>();
   private readonly lock;
 
   constructor(
@@ -96,10 +105,18 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
     drops.bindEconomyLock(arsenal);
   }
 
+  pendingCorpMaterials(limit: number, after?: string): Promise<string[]> {
+    return this.lock.run(async () => [...this.accounts].filter(([id, a]) => id.startsWith('corp:') && a.corpMaterials?.pending && (!after || id > `corp:${after}`)).sort(([a], [b]) => a.localeCompare(b)).slice(0, limit).map(([id]) => id.slice(5)));
+  }
   read(accountId: string): Promise<MetaEconomyAccount> {
     return this.lock.run(async () =>
       structuredClone(this.accounts.get(accountId) ?? emptyMetaEconomyAccount()),
     );
+  }
+  recentPlayerMedals(limit: number, before?: number, corpId?: string | null): Promise<PlayerMedalNews[]> {
+    return this.lock.run(async () => structuredClone([...this.playerMedals.values()]
+      .filter((e) => (before === undefined || e.at < before) && (e.grade === 1 || (corpId != null && e.corp?.id === corpId)))
+      .sort((a, b) => b.at - a.at || b.id.localeCompare(a.id)).slice(0, limit)));
   }
   claimNonce(nonce: string, expiresAt: number): Promise<boolean> {
     return this.lock.run(async () => {
@@ -126,12 +143,18 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
         ]),
       );
       const receipts = new Map<string, MetaEconomyReceipt>();
+      const news = new Map<string, PlayerMedalNews>();
       const arsenal = this.arsenal.snapshotState();
       const drops = this.drops.snapshotState();
       const market = this.market.snapshotState();
       try {
         const result = await work({
           account: (id) => accountFrom(staged, id),
+          announcePlayerMedal: async (event, id) => {
+            accountFrom(staged, id);
+            const key = JSON.stringify([id, event.medalId, event.grade]);
+            if (!this.playerMedals.has(key) && !news.has(key)) news.set(key, structuredClone(event));
+          },
           arsenal: this.arsenal,
           drops: this.drops,
           receipt: async (key) =>
@@ -152,6 +175,7 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
         for (const account of staged.values()) validAccount(account);
         for (const [id, account] of staged) this.accounts.set(id, structuredClone(account));
         for (const [key, receipt] of receipts) this.receipts.set(key, structuredClone(receipt));
+        for (const [key, event] of news) this.playerMedals.set(key, event);
         return output;
       } catch (error) {
         this.arsenal.restoreState(arsenal);
@@ -217,7 +241,19 @@ class TransactionDrops implements DropStore {
 }
 
 export class PostgresMetaEconomyStore implements MetaEconomyStore {
+  async pendingCorpMaterials(limit: number, after?: string): Promise<string[]> {
+    const rows = await this.pool.query<{ account_id: string }>("SELECT account_id FROM meta_economy_accounts WHERE account_id LIKE 'corp:%' AND state->'corpMaterials'->'pending' IS NOT NULL AND ($2::text IS NULL OR account_id>$2) ORDER BY account_id LIMIT $1", [limit, after ? `corp:${after}` : null]);
+    return rows.rows.map((r) => r.account_id.slice(5));
+  }
   constructor(private readonly pool: Pool) {}
+
+  async recentPlayerMedals(limit: number, before?: number, corpId?: string | null): Promise<PlayerMedalNews[]> {
+    const result = await this.pool.query<{ id: string; at: string; medal_id: PlayerMedalNews['medalId']; grade: PlayerMedalNews['grade']; login: string | null; corp: PlayerMedalNews['corp'] }>(
+      `SELECT id,at,medal_id,grade,login,corp FROM player_medal_news
+       WHERE ($1::bigint IS NULL OR at<$1) AND (grade=1 OR ($2::text IS NOT NULL AND corp->>'id'=$2))
+       ORDER BY at DESC,id DESC LIMIT $3`, [before ?? null, corpId ?? null, limit]);
+    return result.rows.map((r) => ({ id: r.id, at: Number(r.at), kind: 'player_medal', medalId: r.medal_id, grade: r.grade, login: r.login, corp: r.corp }));
+  }
 
   async claimNonce(nonce: string, expiresAt: number): Promise<boolean> {
     await this.pool.query('DELETE FROM meta_entitlement_nonces WHERE expires_at<=$1', [Date.now()]);
@@ -264,6 +300,16 @@ export class PostgresMetaEconomyStore implements MetaEconomyStore {
       }
       const result = await work({
         account: (id) => accountFrom(accounts, id),
+        announcePlayerMedal: async (event, id) => {
+          accountFrom(accounts, id);
+          // A deletion request takes an UPDATE lock on this row before erasure.
+          // A delayed reward must not recreate the erased recipient's identity.
+          const live = await db.query<{ login: string }>('SELECT login FROM users WHERE id=$1 AND deletion_requested_at IS NULL FOR SHARE', [id]);
+          if (!live.rows[0]) return;
+          await db.query(`INSERT INTO player_medal_news(id,account_id,medal_id,grade,at,login,corp)
+            VALUES($1,$2,$3,$4,$5,$6,$7::jsonb) ON CONFLICT(account_id,medal_id,grade) DO NOTHING`,
+          [event.id, id, event.medalId, event.grade, event.at, live.rows[0].login, JSON.stringify(event.corp)]);
+        },
         arsenal: new PostgresArsenalStore(db),
         drops: new TransactionDrops(db),
         sql: db,

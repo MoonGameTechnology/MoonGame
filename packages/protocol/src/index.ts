@@ -1,5 +1,8 @@
+export * from './ava';
+export type * from './corpBattles';
 export * from './corpInfrastructure';
 export * from './corpStyle';
+export * from './corpIdentity';
 export * from './news';
 export type * from './metaEconomy';
 export type * from './metaEconomyView';
@@ -162,6 +165,9 @@ export interface MatchSummary {
   /** Simulation status (NOT the archive flag, which is per-viewer). */
   status: 'ongoing' | 'ended';
   createdAt: number;
+  /** Real UTC milliseconds, independent of the world's simulation clock. */
+  endedAt?: number;
+  archiveExpiresAt?: number;
   /** Entry window (SES-2.3): can a NEW player still claim a free seat here? True when
    *  no window is configured. A closed window keeps the match out of `available` even
    *  if it has free seats (you cannot join it any more — only the seated may return). */

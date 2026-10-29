@@ -9,7 +9,6 @@ import {
   CORP_HQ,
   corpBuildingStatus,
   corpCanOrder,
-  corpInitials,
   corpLevel,
   corpLevelPlan,
   corpLevelTable,
@@ -135,6 +134,8 @@ describe('база корпорации (CORP-3)', () => {
       ['supply_center', 3],
       ['engineering_complex', 3],
       ['operations_center', 2],
+      ['warehouse', 2],
+      ['hall_of_fame', 1],
     ]);
     expect(corpOpensAt(v, 9)).toEqual([]);
   });
@@ -224,11 +225,4 @@ describe('база корпорации (CORP-3)', () => {
     expect(corpLevelPlan(low)!.next!.conditions).toEqual([]);
   });
 
-  it('знак на гербе: первые буквы двух слов или две буквы одного слова', () => {
-    expect(corpInitials('Северный щит')).toBe('СЩ');
-    expect(corpInitials('Орден Вектора Третьего')).toBe('ОВ');
-    expect(corpInitials('Тайга-7')).toBe('Т7');
-    expect(corpInitials('альфа')).toBe('АЛ');
-    expect(corpInitials('  ')).toBe('?');
-  });
 });

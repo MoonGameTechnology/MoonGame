@@ -33,6 +33,9 @@ export default tseslint.config(
       '**/node_modules/**',
       'testclient/**',
       'mobile/**',
+      // Staged game build and packaged app of the desktop (Electron) wrapper.
+      'desktop/www/**',
+      'desktop/out/**',
       // Semgrep rule fixtures (SEC-2) are intentionally-broken snippets for the
       // `// ruleid:` / `// ok:` unit-test convention, not real source.
       '.semgrep/**',
@@ -121,6 +124,8 @@ export default tseslint.config(
       'prototype/**/*.{mjs,js}',
       // `deploy/*.mjs` — тесты скриптов эксплуатации (OPS-1), та же Node-глюкода.
       'deploy/**/*.{mjs,js}',
+      // `desktop/*.mjs` — Electron main process and its staging script (Node glue).
+      'desktop/**/*.{mjs,js}',
     ],
     languageOptions: {
       globals: {
@@ -134,5 +139,10 @@ export default tseslint.config(
         performance: 'readonly',
       },
     },
+  },
+  {
+    // The Electron main process answers its `app://` scheme with fetch `Response`s.
+    files: ['desktop/main.mjs'],
+    languageOptions: { globals: { Response: 'readonly' } },
   },
 );

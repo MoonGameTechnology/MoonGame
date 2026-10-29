@@ -143,6 +143,16 @@ describe('GET /news', () => {
     }
   });
 
+  it.each(['kinds=founded&kinds=level', 'kinds=founded&kinds=founded'])(
+    'rejects repeated kind filters without a server error: %s',
+    async (query) => {
+      const s = await server([founded('a', 1)]);
+      const res = await s.inject({ method: 'GET', url: `/news?${query}` });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: 'E_BAD_REQUEST' });
+    },
+  );
+
   it('clamps the page size and ignores a cursor that is not a moment', async () => {
     const rows = Array.from({ length: 60 }, (_, i) => founded(`e${i}`, i + 1));
     const s = await server(rows);

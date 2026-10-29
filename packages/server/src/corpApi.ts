@@ -17,7 +17,8 @@ import { closedInput } from '@void/protocol';
  *   GET  /corps/:id/audit          audit trail (head/officer only)
  *   GET  /corps/:id/ready-players   accountIds flagged ready — AVA-6 setRoster
  *        {accountIds}              eligibility set (head/officer only)
- *   POST /corps        {name}      create — the founder becomes the head
+ *   POST /corps        {emblemId?} create with a server-generated name
+ *   POST /corps/:id/emblem         change insignia — head only
  *   POST /corps/:id/:intent        apply·cancel·accept·decline·kick·role·transfer·
  *        {target?, role?}          leave·disband (see corpService.ts)
  */
@@ -36,6 +37,7 @@ export interface CorpApiDeps {
 
 const STATUS: Record<CorpErrorCode, number> = {
   E_BAD_NAME: 400,
+  E_BAD_EMBLEM: 400,
   E_BAD_ROLE: 400,
   E_BAD_TARGET: 400,
   E_NO_CORP: 404,
@@ -135,7 +137,7 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' };
     const body = request.body as { buildingId?: unknown; expectedLevel?: unknown } | null;
-    if (!body || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
+    if (!closedInput(body, ['buildingId', 'expectedLevel']) || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
         typeof body.expectedLevel !== 'number' || !Number.isSafeInteger(body.expectedLevel) || body.expectedLevel < 0) {
       return reply.code(400).send({ error: 'E_BAD_MESSAGE' });
     }
@@ -175,12 +177,37 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     }
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
-    const name = closedInput(request.body, ['name']) ? request.body.name : undefined;
-    if (typeof name !== 'string') return failed(reply, 'E_BAD_NAME');
-    const result = await service.create(who, name);
+    const body = request.body === undefined ? {} : request.body;
+    if (!closedInput(body, ['name', 'emblemId']) ||
+        (body.name !== undefined && typeof body.name !== 'string')) return failed(reply, 'E_BAD_NAME');
+    const result = await service.create(who, body.name as string | undefined, body.emblemId);
     if (!result.ok) return failed(reply, result.code);
     void reply.code(201);
     return { corpId: result.corpId };
+  });
+
+  app.post('/corps/:id/emblem', { bodyLimit: 1024 }, async (request, reply) => {
+    if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' as const };
+    if (!closedInput(request.body, ['emblemId'])) return failed(reply, 'E_BAD_EMBLEM');
+    const { id } = request.params as { id: string };
+    const result = await service.setEmblem(who, id, request.body.emblemId);
+    if (!result.ok) return failed(reply, result.code);
+    return result;
+  });
+
+  app.post('/corps/:id/showcase', { bodyLimit: 2048 }, async (request, reply) => {
+    if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' };
+    if (!closedInput(request.body, ['medals']) || !Array.isArray(request.body.medals) ||
+      request.body.medals.length > 20 || request.body.medals.some((id: unknown) => typeof id !== 'string' || id.length > 100))
+      return reply.code(400).send({ error: 'E_BAD_SHOWCASE' });
+    const { id } = request.params as { id: string };
+    const result = await service.setShowcase(who, id, request.body.medals as string[]);
+    if (!result.ok) return reply.code(result.code === 'E_FORBIDDEN' ? 403 : 409).send({ error: result.code });
+    return result;
   });
 
   app.post(`/corps/:id/:intent(${INTENTS.join('|')})`, async (request, reply) => {

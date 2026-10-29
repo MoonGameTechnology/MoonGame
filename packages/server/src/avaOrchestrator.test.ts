@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buildStateFromMap, getStance, pairKey, parseMatchMap } from '@void/shared-core';
+import { avaShape, buildStateFromMap, getStance, pairKey, parseMatchMap, setStance, type MatchMap } from '@void/shared-core';
 import {
   AvaOrchestrator,
   avaBotOrders,
   avaDeniedAction,
-  avaModeId,
   seatAvaRoster,
   warDeclarationsFor,
   winnerSideOf,
@@ -16,6 +15,7 @@ import {
   MemoryAvaChallengeStore,
   MemoryAvaRosterStore,
   MemoryAvaSessionStore,
+  type AvaBattleReport,
   type AvaChallenge,
   type AvaSide,
 } from './store';
@@ -26,7 +26,10 @@ import {
 // reads. The map/data are the real shipped content.
 
 const data = loadShippedData();
-const maps = loadAvaMaps();
+const { pool, retired } = loadAvaMaps(data);
+// The mechanics run on the two small AvA maps the catalog no longer plays (a duel and a
+// 2 на 2): every slot is named for its side. The shipped pool has its own tests (CORP-8).
+const maps = retired;
 
 interface Harness {
   orch: AvaOrchestrator;
@@ -200,7 +203,7 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
         .map((p) => p.id)
         .sort(),
     ).toEqual(['bot:slot_a2', 'bot:slot_b2']);
-    // A 3-on-3 has a fixed-side mode but no map in the pool yet (CORP-8).
+    // A format with a fixed-side mode but no map in the pool is refused.
     await lockedMatchup(h, 'mu-f3', ['a1', 'a2'], ['b1', 'b2'], 3);
     expect(await h.orch.orchestrate('mu-f3')).toEqual({ ok: false, code: 'E_NO_MAP' });
   });
@@ -230,7 +233,7 @@ describe('AvaOrchestrator.orchestrate (AVA-7) — raise a session from a locked 
     });
     await h.challenges.closeChallenge('mu-open', 'accepted');
     expect(await h.orch.orchestrate('mu-open')).toEqual({ ok: false, code: 'E_NOT_LOCKED' });
-    // no shipped map is a 2×3 — the pick fails, fail-secure
+    // no map in this pool is a 2×3 — the pick fails, fail-secure
     await lockedMatchup(h, 'mu-big', ['a1', 'a2', 'a3'], ['b1', 'b2', 'b3']);
     expect(await h.orch.orchestrate('mu-big')).toEqual({ ok: false, code: 'E_NO_MAP' });
     expect(h.built).toHaveLength(0);
@@ -334,17 +337,6 @@ describe('AvaOrchestrator × corp rentals (ARS-6)', () => {
   });
 });
 
-describe('avaModeId (CORP-4) — the mode a battle format plays under', () => {
-  it('a team format is a fixed-side mode; a 1-on-1 needs none; an unknown format has none', () => {
-    expect(avaModeId(1)).toBeUndefined();
-    expect(avaModeId(2)).toBe('team_2v2');
-    expect(avaModeId(3)).toBe('team_3v3');
-    // No fixed-side mode for 4-on-4 yet: such a battle is cancelled, never played
-    // every seat for itself.
-    expect(avaModeId(4)).toBeNull();
-  });
-});
-
 describe('avaDeniedAction (CORP-5) — what a battle refuses its players', () => {
   it('keeps the war with the orchestrator and the Steward off every seat; orders pass', () => {
     expect(avaDeniedAction('diplomacy.declare')).toBe('E_AVA_DIPLOMACY');
@@ -395,12 +387,12 @@ describe('AvaOrchestrator.sweep (AVA-7) — no client needed', () => {
       },
     });
     const h = { orch, challenges, roster, sessions, built: [] } as unknown as Harness;
-    // No shipped map is a 3-on-3, and the game has no fixed-side 4-on-4 mode.
+    // No map in this pool is a 3-on-3, and the game has no fixed-side 11-on-11 mode.
     await lockedMatchup(h, 'mu-3v3', ['a1', 'a2', 'a3'], ['b1', 'b2', 'b3']);
-    await lockedMatchup(h, 'mu-4v4', ['c1', 'c2', 'c3', 'c4'], ['d1']);
+    await lockedMatchup(h, 'mu-11v11', ['c1'], ['d1'], 11);
     await lockedMatchup(h, 'mu-duel', ['e1'], ['f1']);
     expect(await orch.sweep()).toEqual({ raised: 1, cancelled: 2 });
-    expect(cancelled.sort()).toEqual(['mu-3v3', 'mu-4v4']);
+    expect(cancelled.sort()).toEqual(['mu-11v11', 'mu-3v3']);
     expect(await orch.sweep()).toEqual({ raised: 0, cancelled: 0 }); // no longer locked
   });
 });
@@ -414,7 +406,10 @@ interface WarHarness extends Harness {
   escalateOk: { value: boolean };
 }
 
-function warHarness(peaceMs = 1_000): WarHarness {
+function warHarness(
+  peaceMs = 1_000,
+  pools: { maps: readonly MatchMap[]; retiredMaps?: readonly MatchMap[] } = { maps },
+): WarHarness {
   const challenges = new MemoryAvaChallengeStore();
   const roster = new MemoryAvaRosterStore();
   const sessions = new MemoryAvaSessionStore();
@@ -427,7 +422,7 @@ function warHarness(peaceMs = 1_000): WarHarness {
     rosterStore: roster,
     sessionStore: sessions,
     data,
-    maps,
+    ...pools,
     manifest: MODULE_MANIFEST_VERSION,
     createRoom: (spec) => {
       built.push(spec);
@@ -559,6 +554,57 @@ describe('AvaOrchestrator.onMatchEnded (AVA-8, S7) — the settlement hook', () 
     expect(h.settled).toHaveLength(1);
   });
 
+  it('sends the ended battle’s breakdown along (CORP-9)', async () => {
+    const h = harness();
+    await lockedMatchup(h, 'mu-r', ['acc-a1', 'acc-a2'], ['acc-b1']);
+    await h.orch.orchestrate('mu-r');
+    await h.sessions.markWarDeclared('ava-mu-r', 77);
+    const ended = structuredClone(h.built[0]!.state);
+    ended.match.status = 'ended';
+    ended.match.reason = 'domination';
+    const seats = Object.keys(ended.players).filter((id) => ended.players[id]!.team !== undefined);
+    for (const a of seats)
+      for (const b of seats)
+        if (ended.players[a]!.team !== ended.players[b]!.team) setStance(ended, a, b, 'war');
+    const reports: Array<AvaBattleReport | null> = [];
+    const settles = (endedState: (matchId: string) => Promise<typeof ended | null>) =>
+      new AvaOrchestrator({
+        challengeStore: h.challenges,
+        rosterStore: h.roster,
+        sessionStore: h.sessions,
+        data,
+        maps,
+        manifest: MODULE_MANIFEST_VERSION,
+        createRoom: () => Promise.resolve(),
+        settle: (_matchupId, _side, report) => {
+          reports.push(report);
+          return Promise.resolve();
+        },
+        endedState,
+        loginsOf: (ids) => Promise.resolve(Object.fromEntries(ids.map((id) => [id, id.toUpperCase()]))),
+      });
+    await settles((matchId) => Promise.resolve(matchId === 'ava-mu-r' ? ended : null)).onMatchEnded(
+      'ava-mu-r',
+      'slot_a1',
+    );
+    expect(reports[0]).toMatchObject({ reason: 'domination', warAt: 77, provinces: 9 });
+    expect(reports[0]?.seats.map((seat) => [seat.side, seat.accountId, seat.login])).toEqual([
+      ['target', null, null], // the bot on the target's empty seat
+      ['challenger', 'acc-a1', 'ACC-A1'],
+      ['challenger', 'acc-a2', 'ACC-A2'],
+      ['target', 'acc-b1', 'ACC-B1'],
+    ]);
+    // A host that keeps no ended snapshot settles without one.
+    await settles(() => Promise.resolve(null)).onMatchEnded('ava-mu-r', 'slot_a1');
+    expect(reports[1]).toBeNull();
+    // A battle that ended in peace: the war sweep stamped it only to drop it from its queue.
+    const peaceful = structuredClone(h.built[0]!.state);
+    peaceful.match.status = 'ended';
+    await settles(() => Promise.resolve(peaceful)).onMatchEnded('ava-mu-r', 'slot_a1');
+    expect(reports[2]).toMatchObject({ provinces: 9 });
+    expect(reports[2]).not.toHaveProperty('warAt');
+  });
+
   it('winnerSideOf: unknown slots yield null (no influence on a broken mapping)', () => {
     const duel = maps.find((m) => m.id === 'ava-duel-1')!;
     expect(winnerSideOf(duel, 'slot_a')).toBe('challenger');
@@ -580,4 +626,74 @@ it('keeps the game war clock and fixed seating independent of corporate availabi
   expect(await game.resolveAvaSeat('ava-independent', 'outsider')).toEqual({ ok: false, code: 'E_NOT_ROSTERED' });
   expect(await game.sweepWar(Number.MAX_SAFE_INTEGER)).toEqual({ declared: 1 });
   expect(opened).toBe(1);
+});
+
+describe('AvaOrchestrator × the shipped pool (CORP-8) — a map for every format', () => {
+  const shipped = { maps: pool, retiredMaps: retired };
+
+  it('raises every format on its map, with the sides its mode fixes', async () => {
+    const h = warHarness(1_000, shipped);
+    for (let n = 2; n <= 10; n++) {
+      await lockedMatchup(h, `mu-n${n}`, ['acc-a'], ['acc-b'], n);
+      const res = await h.orch.orchestrate(`mu-n${n}`);
+      if (!res.ok) throw new Error(res.code);
+      expect(res.mapId).toBe(n === 2 ? 'team-2v2' : n === 3 ? 'team-3v3' : 'ffa-20');
+      const state = h.built.at(-1)!.state;
+      expect(state.modeId).toBe(`team_${n}v${n}`);
+      const seats = Object.values(state.players).filter((p) => !p.npc);
+      expect(seats.filter((p) => p.team === 'A')).toHaveLength(n);
+      expect(seats.filter((p) => p.team === 'B')).toHaveLength(n);
+    }
+  });
+
+  it('a 4 на 4 on the 20-start map: starts out of play are neutral, inhabitants stay out of the war', async () => {
+    const h = warHarness(1_000, shipped);
+    await lockedMatchup(h, 'mu-cut', ['a1', 'a2', 'a3'], ['b1', 'b2', 'b3'], 4);
+    const res = await h.orch.orchestrate('mu-cut');
+    if (!res.ok) throw new Error(res.code);
+    const state = h.built[0]!.state;
+    const cut = pool.find((m) => m.id === 'ffa-20' && avaShape(m)?.slotsPerSide === 4)!;
+    for (let i = 1; i <= 20; i++) {
+      const home = state.planets[`home_${i}`]!;
+      if (Object.hasOwn(cut.slots, `slot_${i}`)) {
+        expect(home.owner).not.toBeNull();
+        continue;
+      }
+      expect([home.owner, home.buildings, home.garrison]).toEqual([
+        null,
+        [],
+        [{ unit: 'militia', count: 2 }],
+      ]);
+    }
+    // One scout a seat, bots included; the starts out of play bring none.
+    expect(Object.values(state.fleets).filter((f) => !state.players[f.owner]?.npc)).toHaveLength(8);
+    const inhabitants = Object.values(state.players).filter((p) => p.npc);
+    expect(inhabitants).toHaveLength(9);
+    for (const p of inhabitants) expect(p.team).toBeUndefined();
+    // The war is declared between the two sides only: 4 × 4 seats.
+    expect(warDeclarationsFor(state, 'ava-mu-cut')).toHaveLength(16);
+  });
+
+  it('settles a battle by its start on a cut map, and one raised on a retired map', async () => {
+    const h = warHarness(1_000, shipped);
+    await lockedMatchup(h, 'mu-cut', ['acc-a'], ['acc-b'], 6);
+    await h.orch.orchestrate('mu-cut');
+    await h.orch.onMatchEnded('ava-mu-cut', 'slot_15'); // a top start → the challenger
+    await h.orch.onMatchEnded('ava-mu-cut', 'bot:slot_19'); // its bottom pair → the target
+    // A battle raised before the catalog stopped playing its map still settles by it.
+    await h.sessions.create({
+      matchId: 'ava-mu-old',
+      matchupId: 'mu-old',
+      mapId: 'ava-2v2-1',
+      seats: {},
+      at: 1,
+      warAt: 2,
+    });
+    await h.orch.onMatchEnded('ava-mu-old', 'slot_b2');
+    expect(h.settled).toEqual([
+      { matchupId: 'mu-cut', side: 'challenger' },
+      { matchupId: 'mu-cut', side: 'target' },
+      { matchupId: 'mu-old', side: 'target' },
+    ]);
+  });
 });

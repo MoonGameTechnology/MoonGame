@@ -89,7 +89,8 @@ export function joinWindow(row: EntryFields, tab: MatchTab): JoinWindow {
 export type RowAction = 'archive' | 'restore' | null;
 
 /** «Доступные» — чужие матчи, их не архивируют; свои активные прячут, архивные возвращают. */
-export function rowAction(tab: MatchTab): RowAction {
+export function rowAction(tab: MatchTab, status?: string): RowAction {
+  if (status === 'ended') return null;
   if (tab === 'archived') return 'restore';
   return tab === 'active' ? 'archive' : null;
 }

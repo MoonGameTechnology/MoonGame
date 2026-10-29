@@ -1,0 +1,19 @@
+{
+  "generator": "built-in image_gen",
+  "date": "2026-10-29",
+  "references": [
+    "prototype/art/corp/standard/headquarters-3.webp",
+    "prototype/art/corp/high-tech/headquarters-3.webp",
+    "prototype/art/corp/imperial-gothic/headquarters-3.webp"
+  ],
+  "sheets": [
+    {
+      "file": "headquarters.png",
+      "prompt": "Create one production companion sprite-sheet for the Void Dominion corporation headquarters, extending the THREE provided reference sprites. These inputs are STYLE AND ARCHITECTURE REFERENCES, not an image to reproduce unchanged. Transparent alpha background. Front orthographic elevation, same eye level as references, full building visible including foundation, painterly detailed sci-fi game architecture, realistic materials, crisp silhouette at small UI sizes. EXACT grid: 2 columns and 3 rows, SIX isolated buildings. Row 1 STANDARD: pragmatic white-grey metal panels, rectangular blue glass, communications tower; row 2 HIGH TECH: white streamlined circular glass, broad thin canopies, cyan lighting; row 3 IMPERIAL GOTHIC: dark metal buttresses, tall pointed windows with warm amber light, spires. Column 1 is headquarters level IV, a visibly larger developed extension of reference level III; column 2 is headquarters level V, same recognizable building with expanded side wings and stronger central command tower. Level progression by added architecture, NOT different camera or unrelated designs. Keep styles clearly distinct; sci-fi rather than medieval stone. All six have generous transparent gutters (at least 10% of each cell), no overlap and no cropping, each foundation at the bottom of its cell. Match reference frontality, proportions, muted materials and soft even neutral illumination. No people, landscape, sky, text, labels, numbers, icons, frames, grid lines, watermark or ground beyond the compact building foundation. Sheet aspect 2:3 portrait, highest practical resolution."
+    },
+    {
+      "file": "monument.png",
+      "prompt": "Generate one game-art sprite sheet: three architectural variants of a CORPORATION MONUMENT for the sci-fi strategy game Void Dominion. Inputs are style references only. EXACTLY one horizontal row of THREE isolated monumental structures, all front orthographic elevation on their own compact plinths. Left STANDARD: pragmatic pale metal, dark steel panel joints, angular commemorative central tower holding an abstract orbital ring and star, restrained blue illumination. Middle HIGH TECH: sleek white curved supports, suspended luminous cyan orbital ring around a faceted star, advanced clean glass-and-metal plinth. Right IMPERIAL GOTHIC: monumental dark metal, strong buttresses and pointed arches, warm amber light, central ceremonial star within a pointed frame; clearly sci-fi, no religious figures or crosses. The same memorial function in all three distinct existing architecture styles. No humans, written inscriptions, badges, labels or words. Fully isolated with actual transparent alpha around each structure, generous empty gutters between cells and outer margins. Complete bases and highest tips visible, nothing cropped. Detailed painted sci-fi game sprites, crisp metal edges, realistic subdued materials and soft neutral illumination matching supplied reference buildings. Not logos or simple icons; actual substantial monuments built on an architectural base. All three grounded on a common baseline, similar overall scale. No sky, environment, backdrop, visible grid or ground plane. Landscape 3:2 canvas, highest practical resolution."
+    }
+  ]
+}

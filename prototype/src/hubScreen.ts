@@ -1,3 +1,4 @@
+import { connectToMatch } from './matchJoin';
 /**
  * Хозяин хаба (REFM-220): показ хаба и его вкладки, «Прокачка» с мета-хранилищем по
  * позывному, экраны вкладок (друзья, рейтинги, арсенал, аукцион, магазин, новости,
@@ -27,7 +28,8 @@ import { esc } from './format';
 import { initFriends } from './friendsScreen';
 import { maybeIntro, openCodex } from './helpCenter';
 import { initHubWallet } from './hubWallet';
-import { refreshMyMatches } from './matchBrowser';
+import { inviteTargets, joinByNumber, refreshMyMatches } from './matchBrowser';
+import { avaMatchId } from '../../packages/protocol/src/ava';
 import { leaveMatch, startProvingGround } from './matchLifecycle';
 import {
   canUnlock,
@@ -449,6 +451,8 @@ export function initHubScreen(host: HubScreenHost): void {
       root: () => $('hp-friends'),
       authorizedBase: hubAuthorizedBase,
       openPlayer: (login) => profile?.open(login),
+      myMatches: inviteTargets,
+      joinMatch: joinByNumber,
     });
   // --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
   // Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по
@@ -685,9 +689,10 @@ export function initHubScreen(host: HubScreenHost): void {
           shop?.show('styles', style);
           hubTab('shop');
         },
+        openMarket: () => hubTab('auction'),
+        openBattle: (matchupId) => connectToMatch(avaMatchId(matchupId)),
       },
     });
-  $('railcorp').addEventListener('click', () => corp?.open());
   // hub interactions
   $('hub-play').addEventListener('click', () => hubTab('games'));
   // Single-player entry from the hub home — offline skirmish vs bots (both builds).
@@ -706,9 +711,13 @@ export function initHubScreen(host: HubScreenHost): void {
     // «Сменить командира» must really switch identity: drop this server's session so
     // the next sign-in authenticates the NEW callsign instead of replaying the old JWT.
     const srv = game.resolveServer();
-    if (srv && !(await signOutEverywhere(srv.base))) {
-      hubNote.textContent = t('auth.logout.failed');
-      return;
+    if (srv) {
+      const result = await signOutEverywhere(srv.base);
+      if (result === null) return;
+      if (!result) {
+        hubNote.textContent = t('auth.logout.failed');
+        return;
+      }
     }
     leaveMatch();
     game.status('');

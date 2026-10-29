@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import {
   createInitialState,
@@ -12,9 +12,10 @@ import {
 } from '@void/shared-core';
 import { MatchRoom, type RoomPeer } from './matchRoom';
 import { InMemoryRoomRegistry, LazyRoomRegistry } from './roomRegistry';
-import { MemoryMatchStore } from './store';
+import { MemoryAccountStore, MemoryMatchStore } from './store';
 import { snapshotOf } from './persistence';
 import { createMultiplayerServer } from './wsServer';
+import { MATCH_ARCHIVE_MS } from './matchRegistry';
 import type { ServerMessage } from './protocol';
 
 /** A deterministic stand-in for the idle timer: captures the scheduled callback so a
@@ -62,8 +63,9 @@ function player(id: string): Player {
   return { id, name: id, faction: id, status: 'active', resources: {} };
 }
 
-function makeRoom(id: string): MatchRoom {
+function makeRoom(id: string, endedAt?: number): MatchRoom {
   const base = createInitialState({ seed: id, version: { data: 'test', manifest: 'test' } });
+  if (endedAt !== undefined) base.match.status = 'ended';
   return new MatchRoom({
     id,
     clientActionTypes: ['marker.set'],
@@ -80,6 +82,7 @@ function makeRoom(id: string): MatchRoom {
       planetTypes: {},
     }),
     now: () => 10,
+    initialEndedAt: endedAt,
   });
 }
 
@@ -90,6 +93,110 @@ function nextMessage(ws: WebSocket): Promise<ServerMessage> {
 function markerAction(id: string) {
   return { type: 'action', action: { id, type: 'marker.set', playerId: 'p1', payload: {}, issuedAt: 1 } };
 }
+
+describe('archive expiry for already loaded rooms', () => {
+  const finish = 1_800_000_000_000;
+  it.each(['get', 'resolve', 'prune'] as const)('expires a retained lazy viewer on %s without reloading or waking it', async (intent) => {
+    let wall = finish + MATCH_ARCHIVE_MS - 1;
+    const room = makeRoom('archive', finish);
+    const dispose = vi.fn();
+    const load = vi.fn().mockResolvedValueOnce({ room, dispose }).mockResolvedValue(null);
+    const registry = new LazyRoomRegistry({ load, now: () => wall });
+    expect(await registry.resolve('archive')).toBe(room);
+    const close = vi.fn(() => expect(registry.get('archive')).toBeUndefined());
+    room.addPeer('p1', { send() {}, close });
+    registry.retain('archive');
+    wall++;
+    if (intent === 'get') expect(registry.get('archive')).toBeUndefined();
+    else if (intent === 'resolve') expect(await registry.resolve('archive')).toBeUndefined();
+    else expect(registry.pruneExpired()).toEqual(['archive']);
+    expect(close).toHaveBeenCalledOnce();
+    expect(room.peerCount).toBe(0);
+    expect(registry.ids()).toEqual([]);
+    await flush();
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(await registry.resolve('archive')).toBeUndefined();
+    await registry.shutdown();
+  });
+
+  it('expires a retained in-memory viewer while leaving ongoing rooms accessible', () => {
+    let wall = finish + MATCH_ARCHIVE_MS - 1;
+    const archive = makeRoom('archive', finish);
+    const ongoing = makeRoom('live');
+    const registry = new InMemoryRoomRegistry([archive, ongoing], () => wall);
+    const close = vi.fn();
+    archive.addPeer('p1', { send() {}, close });
+    wall++;
+    expect(registry.pruneExpired()).toEqual(['archive']);
+    expect(close).toHaveBeenCalledOnce();
+    expect(registry.get('archive')).toBeUndefined();
+    expect(registry.get('live')).toBe(ongoing);
+  });
+
+  it('closes a connected canonical viewer at expiry from the transport heartbeat', async () => {
+    let wall = finish + MATCH_ARCHIVE_MS - 1;
+    const room = makeRoom('archive', finish);
+    const dispose = vi.fn();
+    const registry = new LazyRoomRegistry({
+      load: vi.fn().mockResolvedValueOnce({ room, dispose }).mockResolvedValue(null), now: () => wall,
+    });
+    await registry.resolve('archive');
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const server = createMultiplayerServer({ registry });
+    let socket: WebSocket | undefined;
+    try {
+      const url = await server.listen();
+      socket = new WebSocket(url + '?player=p1');
+      expect((await nextMessage(socket)).type).toBe('welcome');
+      expect(room.peerCount).toBe(1);
+      const closed = once(socket, 'close');
+      wall++;
+      vi.advanceTimersByTime(15_000);
+      expect((await closed)[0]).toBe(1000);
+      expect(registry.get('archive')).toBeUndefined();
+      await flush();
+      expect(dispose).toHaveBeenCalledOnce();
+    } finally {
+      socket?.terminate();
+      await server.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses a handshake when its account lookup crosses the archive deadline', async () => {
+    let wall = finish + MATCH_ARCHIVE_MS - 1;
+    const room = makeRoom('archive', finish);
+    const dispose = vi.fn();
+    const registry = new LazyRoomRegistry({ load: async () => ({ room, dispose }), now: () => wall });
+    await registry.resolve('archive');
+    const accounts = new MemoryAccountStore();
+    vi.spyOn(accounts, 'resolveSeat').mockImplementation(async () => {
+      wall++;
+      return { playerId: 'p1', isNew: false };
+    });
+    const server = createMultiplayerServer({ registry, accountStore: accounts, seatLock: false });
+    let socket: WebSocket | undefined;
+    try {
+      const url = await server.listen();
+      socket = new WebSocket(url + '?nick=ArchivePlayer');
+      socket.on('error', () => {});
+      const status = await new Promise<number | undefined>((resolve) => {
+        socket!.once('unexpected-response', (_req, response) => {
+          response.resume();
+          resolve(response.statusCode);
+        });
+      });
+      expect(status).toBe(404);
+      expect(room.peerCount).toBe(0);
+      expect(registry.get('archive')).toBeUndefined();
+      await flush();
+      expect(dispose).toHaveBeenCalledOnce();
+    } finally {
+      socket?.terminate();
+      await server.close();
+    }
+  });
+});
 
 describe('InMemoryRoomRegistry', () => {
   it('registers and resolves matches by id, and reports unknown as undefined', () => {

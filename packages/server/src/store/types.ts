@@ -1,4 +1,4 @@
-import type { CorpBuildOrder, CorpInfrastructureResult, NewsAnnouncement } from '@void/protocol';
+import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpPublicFacilities, CorpShowcaseResult, NewsAnnouncement } from '@void/protocol';
 import type { ArsenalItem, CoalitionClock, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
@@ -25,11 +25,16 @@ export interface EconomyObservation {
 }
 
 export interface MatchSnapshot {
+  career?: import('../playerCareer').CareerLedger;
   matchId: string;
   dataVersion: string;
   seq: number;
   status: 'ongoing' | 'ended';
   state: GameState;
+  /** Real UTC milliseconds, outside the deterministic world clock. */
+  createdAt?: number;
+  /** First committed finish, immutable across saves and server restarts. */
+  endedAt?: number;
   /** Absent on legacy snapshots and rooms using absolute wall time. */
   clock?: MatchClock;
   /** Immutable first observation per [playerId, claimedAt], outside GameState. */
@@ -41,6 +46,10 @@ export interface MatchSnapshot {
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
  *  All methods are async so the same interface fits a real database. */
 export interface MatchStore {
+  /** Enforce archive status, real-time retention and byte budget before loading JSON. */
+  loadArchive?(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null>;
+  /** Lightweight catalog metadata, without retaining/cloning full worlds. */
+  archiveMetadata?(ids: readonly string[], since: number): Promise<import('../matchArchiveMetadata').ArchiveSummaryMetadata[]>;
   /** Durable reward delivery scans committed matches in bounded, stable pages. */
   economyMatchIds?(after?: string, limit?: number): Promise<string[]>;
   load(matchId: string): Promise<MatchSnapshot | null>;
@@ -49,12 +58,18 @@ export interface MatchStore {
   save(snapshot: MatchSnapshot): Promise<void>;
   /** Atomically commit a command's state and receipt. Both adapters must belong to
    * the same backend; unsupported custom stores fail closed at the host boundary. */
-  saveWithReceipt?(snapshot: MatchSnapshot, receipt: StoredReceipt, receipts: ReceiptStore): Promise<void>;
+  saveWithReceipt?(
+    snapshot: MatchSnapshot,
+    receipt: StoredReceipt,
+    receipts: ReceiptStore,
+  ): Promise<void>;
   /** Ids of every match still `ongoing` (not ended). Cheap — reads the normalized
    *  `status` column (never the JSONB blob), so the match factory and the open-matches
    *  feed can enumerate joinable matches without loading each snapshot. Restart-safe:
    *  it reflects what is durably in the store, not just the rooms live in memory. */
   ongoingMatchIds(): Promise<string[]>;
+  /** Finished snapshots still within a real-time archive window. */
+  endedMatchIds?(since: number): Promise<string[]>;
   /** Cheap reachability check for the `/ready` probe (SV-0.1): true if the backing
    *  store is reachable (a `SELECT 1` for Postgres). Absent ⇒ assumed reachable
    *  (in-memory has no dependency to be down). */
@@ -210,9 +225,11 @@ export interface UserStore {
  *  caps a player at one application at a time. */
 export type CorpRole = 'head' | 'officer' | 'member' | 'recruit';
 
-export interface CorpRecord {
+export interface CorpRecord extends CorpPublicFacilities {
   corpId: string;
   name: string;
+  /** Absent on legacy records; clients derive a stable default from corpId. */
+  emblemId?: CorpEmblemId;
   /** AvA influence points (AVA-2) — the corp's inter-match currency: spent on a
    *  challenge, earned by a war victory. Never negative (spend is atomic+guarded). */
   influence: number;
@@ -245,6 +262,8 @@ export interface CorpAuditEntry {
   actor: string;
   action:
     | 'create'
+    | 'emblem'
+    | 'showcase'
     | 'accept'
     | 'decline'
     | 'kick'
@@ -281,6 +300,9 @@ export const DEFAULT_FEED_LIMIT = 50;
 export const ACTIVE_ANNOUNCEMENTS_MAX = 50;
 
 export interface CorpStore {
+  prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation>;
+  commitBuild(ticketId: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement>;
+  monumentsOf(corpIds: readonly string[]): Promise<string[]>;
   /** Settle elapsed construction/income, optionally order a level. Membership,
    * debit, queue and audit commit together; only the head may spend influence. A settled
    * headquarters of level 2+ also goes to the public feed in that commit (CORP-1). */
@@ -298,7 +320,12 @@ export interface CorpStore {
     headAccountId: string,
     headLogin: string,
     at?: number,
+    emblemId?: CorpEmblemId,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }>;
+  /** Head authorization, appearance and audit commit atomically. */
+  setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }>;
+  /** Head-only, with hall capacity and earned medals rechecked under the corp lock. */
+  setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult>;
   getCorp(corpId: string): Promise<CorpRecord | null>;
   /** Every corp with its accepted-member count, ordered by name (case-insensitive). */
   listCorps(): Promise<CorpSummary[]>;
@@ -440,6 +467,46 @@ export interface AvaResult {
   targetCorp: string;
   winnerCorp: string | null;
   at: number;
+  /** Players per side (CORP-9 records it; an earlier result takes its challenge's format). */
+  format?: number;
+  /** CORP-9: how the battle went; absent on results recorded before it. */
+  report?: AvaBattleReport;
+}
+
+/** CORP-9: one seat of a corporations battle in its breakdown. The login is taken at the
+ *  end, like the corp names in the feed, so the breakdown reads on its own later. */
+export interface AvaSeatReport {
+  side: AvaSide;
+  /** null: a bot played the seat. */
+  accountId: string | null;
+  login: string | null;
+  score: number;
+  /** Capturable provinces the seat held at the end. */
+  provinces: number;
+  /** The seat lost its last province. */
+  out: boolean;
+}
+
+/** CORP-9: the breakdown of a corporations battle, recorded with its result by the host
+ *  that ran it: how it ended, both sides' score and provinces, every seat's score. */
+export interface AvaBattleReport {
+  /** The match's end reason; null when the state names none of the four. */
+  reason: 'domination' | 'elimination' | 'score' | 'timeout' | null;
+  /** When the war opened (wall clock); absent when the battle ended before it. */
+  warAt?: number;
+  /** Capturable provinces of the map: the share a domination win counts against. */
+  provinces: number;
+  sides: Record<AvaSide, { score: number; provinces: number }>;
+  seats: AvaSeatReport[];
+}
+
+/** CORP-9: a corp's record against one opponent in one format. */
+export interface AvaTally {
+  opponent: string;
+  format: number;
+  wins: number;
+  losses: number;
+  draws: number;
 }
 
 /** Persistence for AvA results (AVA-8). One row per matchup — the matchup's exactly-once
@@ -454,6 +521,11 @@ export interface AvaResultStore {
    *  side) and matches it won. The objective source medal conditions (corporations.md §3)
    *  are checked against — server-side, never in the deterministic core. */
   statsForCorp(corpId: string): Promise<{ matches: number; wins: number }>;
+  /** CORP-9: the corp's battles (either side), newest first, each with its format: 2 на 2
+   *  when no format is known, like a challenge written before the formats. */
+  resultsOf(corpId: string, limit?: number): Promise<Array<AvaResult & { format: number }>>;
+  /** CORP-9: the corp's whole record, per opponent and format. */
+  tallyOf(corpId: string): Promise<AvaTally[]>;
   close?(): Promise<void>;
 }
 
@@ -678,6 +750,8 @@ export interface CorpRent {
   matchupId: string;
   accountId: string;
   rentedAt: number;
+  /** Warehouse benefit fixed when handed out; old rentals retain their old wear rule. */
+  unworn?: true;
 }
 
 /** Persistence for corp-arsenal rentals (ARS-6). Deliberately dumb like the other
@@ -700,6 +774,8 @@ export interface CorpRentStore {
    *  anywhere (including other matchups) — false = already on rent, nothing
    *  changed. */
   rent(entry: CorpRent): Promise<boolean>;
+  rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'>;
+  activeForCorp(corpId: string): Promise<CorpRent[]>;
   /** Every still-active rental for a matchup (war-end return-all sweep reads this). */
   activeForMatchup(matchupId: string): Promise<CorpRent[]>;
   /** This account's active rentals for a matchup (the ARS-3 snapshot merge point). */
@@ -809,6 +885,10 @@ export interface FriendStore {
     accountId: string,
     otherId: string,
   ): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
+  /** FRIENDS-2 · Does this account hide WHICH matches it plays from its friends?
+   *  Default (no row) is false: presence shows the match and offers «Войти». */
+  hidesMatches(accountId: string): Promise<boolean>;
+  setHidesMatches(accountId: string, hide: boolean): Promise<void>;
   close?(): Promise<void>;
 }
 

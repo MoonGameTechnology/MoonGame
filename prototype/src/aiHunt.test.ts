@@ -3,11 +3,10 @@
 // идёт к ближайшему, как раньше. Замер и довод — у `huntWeight` в `ai.ts`.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
-import { NEUTRAL_PLANET_MILITIA } from './matchSetup';
 import { data } from './gameData';
 import { huntWeight } from './ai';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
-import type { Fleet, GameState, Planet } from '../../packages/shared-core/src/index';
+import { NEUTRAL_PLANET_MILITIA, type Fleet, type GameState, type Planet } from '../../packages/shared-core/src/index';
 import { atWeakTurn } from './weakTurnFixture';
 
 const capturable = (p: Planet): boolean => data.sectorKinds[p.kind ?? '']?.capturable ?? false;

@@ -55,13 +55,17 @@ const PERSONAL_ROWS = [
   'DELETE FROM player_activity_channels WHERE account_id=$1',
   'DELETE FROM player_activity_days WHERE account_id=$1',
   'DELETE FROM friend_edges WHERE lo_id=$1 OR hi_id=$1',
+  'DELETE FROM friend_privacy WHERE account_id=$1',
   'DELETE FROM push_subscriptions WHERE account_id=$1',
   'DELETE FROM player_profiles WHERE account_id=$1',
   'DELETE FROM profile_progress WHERE account_id=$1',
+  'DELETE FROM profile_career WHERE account_id=$1',
+  'DELETE FROM profile_career_credits WHERE account_id=$1',
   'DELETE FROM profile_credits WHERE account_id=$1',
   'DELETE FROM registration_rewards WHERE account_id=$1',
   'DELETE FROM commander_xp WHERE account_id=$1',
   'DELETE FROM medals WHERE account_id=$1',
+  'UPDATE player_medal_news SET account_id=NULL,login=NULL WHERE account_id=$1',
   'DELETE FROM player_ready WHERE account_id=$1',
   'DELETE FROM ava_roster WHERE account_id=$1',
   'DELETE FROM corp_arsenal_rent WHERE account_id=$1',
@@ -82,8 +86,8 @@ const PERSONAL_ROWS = [
 // ids, balances, sequence numbers and third-party receipts intact.
 const JSON_RECORDS = [
   [
-    "SELECT id AS key, jsonb_build_object('state',state,'clock',clock,'economy_observations',economy_observations,'economy_activity',economy_activity) AS value FROM matches WHERE id>$1 ORDER BY id LIMIT 100",
-    "UPDATE matches SET state=$2::jsonb->'state',clock=NULLIF($2::jsonb->'clock','null'::jsonb),economy_observations=NULLIF($2::jsonb->'economy_observations','null'::jsonb),economy_activity=NULLIF($2::jsonb->'economy_activity','null'::jsonb) WHERE id=$1",
+    "SELECT id AS key, jsonb_build_object('state',state,'clock',clock,'economy_observations',economy_observations,'economy_activity',economy_activity,'career',career) AS value FROM matches WHERE id>$1 ORDER BY id LIMIT 100",
+    "UPDATE matches SET state=$2::jsonb->'state',clock=NULLIF($2::jsonb->'clock','null'::jsonb),economy_observations=NULLIF($2::jsonb->'economy_observations','null'::jsonb),economy_activity=NULLIF($2::jsonb->'economy_activity','null'::jsonb),career=NULLIF($2::jsonb->'career','null'::jsonb) WHERE id=$1",
   ],
   [
     'SELECT id AS key,infrastructure AS value FROM corps WHERE id>$1 ORDER BY id LIMIT 100',
@@ -92,6 +96,10 @@ const JSON_RECORDS = [
   [
     'SELECT match_id AS key,seats AS value FROM ava_sessions WHERE match_id>$1 ORDER BY match_id LIMIT 100',
     'UPDATE ava_sessions SET seats=$2::jsonb WHERE match_id=$1',
+  ],
+  [
+    'SELECT matchup_id AS key,report AS value FROM ava_results WHERE matchup_id>$1 AND report IS NOT NULL ORDER BY matchup_id LIMIT 100',
+    'UPDATE ava_results SET report=$2::jsonb WHERE matchup_id=$1',
   ],
   [
     'SELECT event_id AS key,entry AS value FROM corp_return_audit WHERE event_id>$1 ORDER BY event_id LIMIT 100',
@@ -129,7 +137,9 @@ export async function eraseAccountDatabase(pool: Pool, subject: ErasureSubject):
   const db = await pool.connect();
   try {
     await requireOfflineDatabase(db);
-    const legacy = await db.query('SELECT 1 FROM meta_economy_receipts WHERE account_ids IS NULL LIMIT 1');
+    const legacy = await db.query(
+      'SELECT 1 FROM meta_economy_receipts WHERE account_ids IS NULL LIMIT 1',
+    );
     if (legacy.rowCount) throw Error('E_ERASURE_LEGACY_RECEIPTS');
     await db.query('BEGIN');
     await db.query("SET LOCAL lock_timeout='5s'");
@@ -189,16 +199,21 @@ export async function eraseAccountDatabase(pool: Pool, subject: ErasureSubject):
       }
     }
     // Compound PK: process other players' trade receipts separately.
-    let afterAccount = '', afterTrade = '';
+    let afterAccount = '',
+      afterTrade = '';
     for (;;) {
       const receipts = await db.query<{ account_id: string; trade_id: string; result: unknown }>(
         'SELECT account_id,trade_id,result FROM meta_market_receipts WHERE position($1 in result::text)>0 AND (account_id,trade_id)>($2,$3) ORDER BY account_id,trade_id LIMIT 100',
-        [subject.accountId, afterAccount, afterTrade]);
+        [subject.accountId, afterAccount, afterTrade],
+      );
       if (!receipts.rows.length) break;
       for (const row of receipts.rows) {
-        await db.query('UPDATE meta_market_receipts SET result=$3::jsonb WHERE account_id=$1 AND trade_id=$2',
-          [row.account_id, row.trade_id, JSON.stringify(scrubPersonalJson(row.result, subject))]);
-        afterAccount = row.account_id; afterTrade = row.trade_id;
+        await db.query(
+          'UPDATE meta_market_receipts SET result=$3::jsonb WHERE account_id=$1 AND trade_id=$2',
+          [row.account_id, row.trade_id, JSON.stringify(scrubPersonalJson(row.result, subject))],
+        );
+        afterAccount = row.account_id;
+        afterTrade = row.trade_id;
       }
     }
     await db.query('DELETE FROM users WHERE id=$1', [subject.accountId]);

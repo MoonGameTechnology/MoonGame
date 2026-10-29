@@ -1,0 +1,42 @@
+{
+  "orbit": {
+    "file": "orbit.webp",
+    "width": 1800,
+    "height": 810,
+    "bytes": 186082,
+    "sha256": "b1d563c9de59022d4398d01faf6352b58c297f4fef0a67f63b7f702707a8ab70",
+    "sourceWidth": 1870,
+    "sourceHeight": 841,
+    "sourceSha256": "c46be8b5e9a789603d040837764608071755ae9a33597018a9deebcbfe18ed6c"
+  },
+  "nebula": {
+    "file": "nebula.webp",
+    "width": 1800,
+    "height": 810,
+    "bytes": 135154,
+    "sha256": "d38760d00c0e57d99ad8bb766c50c0671e6b18fb75fe3a658274c6aaa8b2e3ea",
+    "sourceWidth": 1870,
+    "sourceHeight": 841,
+    "sourceSha256": "3c89984e8f933ac64c3d1a1cfdc714031f98939544bc0f0c4174277f4c7140d5"
+  },
+  "ice_moon": {
+    "file": "ice_moon.webp",
+    "width": 1800,
+    "height": 810,
+    "bytes": 144772,
+    "sha256": "849fd21b285b66e8f943d113a73d0295f2b83da88b0601d593fe839abe1b71fa",
+    "sourceWidth": 1870,
+    "sourceHeight": 841,
+    "sourceSha256": "c966f996f5b237e981d3d4562936ecb5ec11dda38e8805fd56ac0e9a7f799fac"
+  },
+  "gas_giant": {
+    "file": "gas_giant.webp",
+    "width": 1800,
+    "height": 810,
+    "bytes": 150712,
+    "sha256": "7450112bcdebebeb794c40ae48d2d9e2e2af5604495255b72335665d7f175764",
+    "sourceWidth": 1870,
+    "sourceHeight": 841,
+    "sourceSha256": "585de9fbcdaaadbc20bfb8846a1ce6e7975f5d916ffd860f5a6a320bb59ce1ad"
+  }
+}

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../packages/shared-core/src/index';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from './soloSave';
-import { MINING_SOLO_MIGRATION as migration, parseCompatibleSoloSave } from './soloSaveMigration';
+import {
+  CORP_FORMATS_SOLO_MIGRATION as corpFormats,
+  MINING_SOLO_MIGRATION as migration,
+  SOLO_MIGRATIONS,
+  parseCompatibleSoloSave,
+} from './soloSaveMigration';
 
 function oldSave(): SoloSave {
   const state = createInitialState({
@@ -132,5 +137,62 @@ describe('explicit 0.1.66 mining save migration', () => {
     expect(
       parseCompatibleSoloSave(serializeSoloSave(save, migration.toRules), migration.toRules),
     ).toEqual(save);
+  });
+});
+
+describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
+  const at = (release: { data: string; dataHash?: string }): SoloSave => {
+    const save = oldSave();
+    save.state.version = { ...release, manifest: '1' };
+    return save;
+  };
+  const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
+
+  it('starts every pair where the one before it ends', () => {
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats]);
+    SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
+      const before = SOLO_MIGRATIONS[i]!;
+      expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
+        before.toRules,
+        before.toData,
+        before.toDataHash,
+      ]);
+    });
+  });
+
+  it('reads a 0.1.67 save under 0.1.68 with only its version pin moved', () => {
+    const before = at({ data: corpFormats.fromData, dataHash: corpFormats.fromDataHash });
+    const raw = serializeSoloSave(before, corpFormats.fromRules);
+    expect(parseCompatibleSoloSave(raw, corpFormats.toRules)).toEqual({
+      ...before,
+      state: { ...before.state, version: shipped },
+    });
+    expect(parseSoloSave(raw, corpFormats.fromRules)).toEqual(before); // original slot is intact
+  });
+
+  it('carries a 0.1.66 save through both pairs', () => {
+    const before = oldSave();
+    expect(
+      parseCompatibleSoloSave(serializeSoloSave(before, migration.fromRules), corpFormats.toRules),
+    ).toEqual({ ...before, state: { ...before.state, version: shipped } });
+  });
+
+  it('reads a 0.1.67 generated map, which pins only its outer rules', () => {
+    const before = at({ data: '0.1.0' });
+    before.state.mapId = 'nexus';
+    expect(
+      parseCompatibleSoloSave(serializeSoloSave(before, corpFormats.fromRules), corpFormats.toRules)
+        ?.state.version,
+    ).toEqual(shipped);
+  });
+
+  it('refuses a 0.1.67 envelope whose world names another catalogue', () => {
+    for (const release of [
+      { data: migration.fromData, dataHash: migration.fromDataHash },
+      { data: corpFormats.fromData, dataHash: 'foreign-data' },
+    ]) {
+      const raw = serializeSoloSave(at(release), corpFormats.fromRules);
+      expect(parseCompatibleSoloSave(raw, corpFormats.toRules)).toBeNull();
+    }
   });
 });

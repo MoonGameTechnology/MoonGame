@@ -33,7 +33,9 @@ const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
+const corpFacilitiesCss = readFileSync(new URL('./corp-facilities.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
+const corpBattlesCss = readFileSync(new URL('./corp-battles.css', import.meta.url), 'utf8');
 
 /** Отдельный поток расчёта соло-мира (`simWorker.ts`) — свой файл рядом со страницей: политика
  *  CSP сервера и сайта пускает только поток со своего origin (`decisions/simWorker.ts`). Имя
@@ -1310,6 +1312,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .fr-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fr-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
 .fr-wait{font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 12px 4px 31px;font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick > span{flex:1 0 100%;}
+.fr-priv{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;}
+.fr-priv input{margin-top:3px;accent-color:var(--cyan);}
+.fr-priv b{display:block;font-size:var(--fs-body);color:var(--ink);font-weight:600;}
+.fr-priv span span{display:block;font-size:var(--fs-caption);color:var(--dim);}
 @media(max-width:640px){
   /* кнопки строки — под палец, как в окне меток */
   .fr-b{padding:11px 12px;}
@@ -3434,8 +3442,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .fitpane .hgradeline.g-legendary{color:var(--amber);}
 .fitpane .hgradeline.g-main{color:var(--grn);}
 
-#ub-notes{font-size:var(--fs-caption);color:var(--dim);white-space:pre-wrap;max-height:100px;overflow:auto;margin:8px 0 0;}
-#ub-notes:empty{display:none;}
 #ub-status{font-size:var(--fs-caption);color:var(--amber);margin:8px 0 0;}
 #ub-status:empty{display:none;}
 
@@ -3447,7 +3453,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   padding:12px 14px;border:1px solid var(--cyan);border-radius:10px;
   background:rgba(4,20,26,.94);box-shadow:0 6px 28px rgba(0,0,0,.55),0 0 22px rgba(53,214,230,.16);}
 #updbar .ub-t{font-size:var(--fs-body);color:var(--dim);line-height:1.5;}
-#updbar .ub-t b{color:var(--ink);}
 #updbar .ub-row{display:flex;gap:10px;margin-top:10px;}
 #updbar .ub-go{flex:1;text-align:center;padding:11px 10px;border-radius:8px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.18);color:var(--cyan);font-size:var(--fs-body);text-decoration:none;cursor:pointer;}
@@ -3884,7 +3889,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 @media (prefers-reduced-motion:reduce){.nw-sheet{animation:none;}}
 @media (pointer:coarse){.nw-chip,.nw-btn{min-height:44px;}}
 /* Вкладка «Корпорация» (CORP-3, макет одобрен владельцем 2026-10-21): шапка, разделы «База»,
-   «Битвы», «Состав», «Казна» и шторка здания, уровней и участника. Раскладку решает ширина
+   «Битвы», «Состав», «Казна», «Настройки» и шторка здания, уровней и участника. Раскладку решает ширина
    самой вкладки (контейнер corp), а не окна: на ПК хаб идёт колонкой под зумом. Здания —
    голограммы-заглушки до картинок (CORP-13). Разметка — corpHubView.ts. */
 #hp-corp{height:100%;overflow-y:auto;overscroll-behavior:contain;container:corp / inline-size;}
@@ -3897,8 +3902,14 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb{display:flex;flex-direction:column;gap:14px;}
 .cb-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;}
 .cb-emb{flex:0 0 auto;display:block;overflow:visible;}
-.cb-emb path{fill:color-mix(in srgb,var(--cyan) 20%,transparent);stroke:var(--cyan);stroke-width:1.6;}
-.cb-emb text{fill:var(--sf-hi);font-weight:700;font-family:var(--sf-font);}
+.cb-emb-frame{fill:color-mix(in srgb,var(--cyan) 12%,transparent);stroke:var(--cyan);stroke-width:1.2;}
+.cb-emb-mark{fill:none;stroke:var(--cyan);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.cb-emblems{display:grid;grid-template-columns:repeat(5,minmax(44px,1fr));gap:8px;max-width:380px;margin:10px 0 14px;}
+.cb-emblem-choice{display:grid;place-items:center;min-width:44px;min-height:50px;padding:5px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(5,23,30,.6);cursor:pointer;}
+.cb-emblem-choice:hover{border-color:var(--cyan);}
+.cb-emblem-choice[aria-pressed="true"]{border-color:var(--cyan);background:rgba(53,214,230,.16);box-shadow:inset 0 0 0 1px var(--cyan);}
+.cb-emblem-choice:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
+.cb-emblem-choice:disabled{opacity:.5;cursor:default;}
 .cb-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .cb-id h2{margin:0;font-size:var(--fs-title);font-weight:700;line-height:1.2;color:var(--sf-hi);overflow-wrap:anywhere;}
 .cb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:var(--fs-caption);color:var(--sf-dim);}
@@ -3913,6 +3924,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-tab{min-height:44px;padding:0 18px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 var(--fs-body) var(--sf-font);white-space:nowrap;}
 .cb-tab:hover{color:var(--sf-text);}
+.cb-settings-icon{font-size:22px;line-height:1;}
 .cb-tab small{min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:grid;place-items:center;
   font-size:var(--fs-caption);font-weight:700;background:var(--amber);color:#1c1200;}
 .cb-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
@@ -3924,8 +3936,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pano-scroll{border-radius:14px;border:1px solid var(--sf-edge);overflow:hidden;}
 .cb-pano{position:relative;width:100%;aspect-ratio:1200 / 540;background:#020a12;}
 .cb-pano > svg.bg{position:absolute;inset:0;width:100%;height:100%;display:block;}
-.cb-pano .pad{fill:rgba(53,214,230,.05);stroke:rgba(53,214,230,.35);stroke-width:1.5;stroke-dasharray:7 6;}
-.cb-pano .pad.on{fill:rgba(53,214,230,.1);stroke:rgba(53,214,230,.55);stroke-dasharray:none;}
+.cb-pano .pad{fill:color-mix(in srgb,var(--pad,#35d6e6) 5%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 35%,transparent);stroke-width:1.5;stroke-dasharray:7 6;}
+.cb-pano .pad.on{fill:color-mix(in srgb,var(--pad,#35d6e6) 10%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 55%,transparent);stroke-dasharray:none;}
 .cb-lot{position:absolute;padding:0;margin:0;border:0;background:none;color:inherit;cursor:pointer;pointer-events:none;border-radius:8px;}
 .cb-lot .spr{width:100%;height:100%;pointer-events:none;}
 .cb-lot :is(.spr g,.cb-tagl,.cb-bdg,.cb-plus){pointer-events:auto;}
@@ -4039,6 +4051,15 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-pips i.bld{background:repeating-linear-gradient(90deg,var(--amber) 0 2px,transparent 2px 4px);border-color:var(--amber);}
 /* Состав и казна: список слева, сбоку заявки, роли и баланс. */
 .cb-two{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start;}
+.cb-materials{margin-top:16px;}
+.cb-material-row{display:grid;grid-template-columns:minmax(0,1fr) 76px auto;gap:8px;align-items:center;border-bottom:1px solid var(--sf-edge);padding:10px 0;}
+.cb-material-row>div{min-width:0;overflow-wrap:anywhere;}
+.cb-material-row b,.cb-material-row small{display:block;}
+.cb-material-row small{font-size:var(--fs-caption);color:var(--sf-dim);margin-top:4px;line-height:1.5;}
+.cb-material-row input{width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;background:var(--sf-card);color:var(--sf-hi);border:1px solid var(--sf-edge);border-radius:8px;}
+.cb-materials .cb-lrow>b{font-size:var(--fs-caption);overflow-wrap:anywhere;}
+.cb-materials summary{cursor:pointer;padding:8px 0;}
+@media(max-width:540px){.cb-material-row{grid-template-columns:minmax(0,1fr) 92px;}.cb-material-row>div{grid-column:1/-1;}.cb-material-row button{min-height:42px;}}
 .cb-side{display:flex;flex-direction:column;gap:16px;min-width:0;}
 .cb-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px;border-radius:14px;border:1px solid var(--sf-edge);background:var(--sf-card);}
 .cb-card-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;}
@@ -4061,7 +4082,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   font-weight:700;color:var(--sf-dim);white-space:nowrap;}
 .cb-role.head{border-color:var(--cur-sovereigns);color:var(--cur-sovereigns);}
 .cb-role.officer{border-color:var(--cyan-dim);color:var(--cyan);}
-.cb-exit{display:flex;padding-top:4px;}
+.cb-settings{width:100%;max-width:680px;}
+.cb-settings-options{display:flex;flex-direction:column;gap:10px;}
+:is(#hp-corp,#corp-sheet) .cb-setting{justify-content:space-between;text-align:left;padding:10px 14px;}
+.cb-setting > span:first-child{min-width:0;overflow-wrap:anywhere;}
+.cb-setting b,.cb-setting small{display:block;}
+.cb-setting small{margin-top:4px;font-size:var(--fs-caption);font-weight:400;color:var(--sf-dim);}
+.cb-exit{display:flex;padding-top:16px;margin-top:8px;border-top:1px solid var(--sf-edge);}
 .cb-app{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px 10px;align-items:center;padding:10px;border-radius:12px;
   background:var(--sf-inset);border:1px solid color-mix(in srgb,var(--amber) 45%,transparent);}
 .cb-app .cb-mav{color:var(--amber);}
@@ -4087,9 +4114,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-nc-hero h2{margin:0 0 6px;font-size:var(--fs-title);color:var(--sf-hi);}
 .cb-nc-hero p{margin:0 0 12px;max-width:56ch;}
 .cb-create{display:flex;flex-wrap:wrap;gap:8px;}
-.cb-create input{flex:1 1 200px;min-width:0;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--sf-edge);
-  background:var(--sf-inset);color:var(--sf-hi);font:500 15px var(--sf-font);}
-.cb-create input:focus{outline:2px solid var(--sf-accent);outline-offset:1px;border-color:var(--sf-accent);}
 .cb-rlist{display:flex;flex-direction:column;}
 .cb-rrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);}
 .cb-rrow:last-child{border-bottom:0;}
@@ -4177,6 +4201,10 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cb-sty{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0;}
 .cb-sty .cb-art{height:150px;padding:10px 10px 6px;border-radius:12px;border:1px solid var(--line);}
 .cb-sty.cur .cb-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-bd-art{aspect-ratio:1200 / 540;border-radius:12px;border:1px solid var(--line);overflow:hidden;}
+.cb-bd-art svg{display:block;width:100%;height:100%;}
+.cb-sty.cur .cb-bd-art{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);}
+.cb-sty-h{margin:16px 0 8px;font-size:var(--fs-body);font-weight:600;color:var(--sf-head);}
 .cb-sty figcaption{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
 .cb-sty figcaption b{font-weight:600;color:var(--sf-hi);}
 .cb-sty-st{min-height:28px;display:inline-flex;align-items:center;padding:0 10px;border-radius:999px;border:1px solid var(--sf-edge);
@@ -4210,10 +4238,12 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-infl{flex:1 1 100%;flex-direction:row;align-items:baseline;justify-content:space-between;}
   .cb-tabs{width:100%;align-self:stretch;}
   .cb-tab{flex:1;padding:0 4px;gap:5px;}
+  .cb-tab-settings{flex:0 0 44px;padding:0;}
+  .cb-settings-label{display:none;}
   .cb-pano-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
   .cb-pano{width:556px;height:250px;aspect-ratio:auto;}
   .cb-tagl,.cb-lot .cb-plus{display:none;}
-  .cb-bdg{position:absolute;right:6%;top:2%;display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
+  .cb-bdg{position:absolute;left:var(--bx,94%);top:var(--by,2%);transform:translate(-100%,-50%);display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
     background:rgba(3,12,20,.92);border:1px solid var(--cyan);color:var(--sf-hi);font-size:var(--fs-caption);font-weight:700;}
   .cb-lot.build .cb-bdg{border-color:var(--amber);color:var(--amber);}
   .cb-lot.open .cb-bdg{border-style:dashed;color:var(--cyan);}
@@ -4228,6 +4258,14 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-apps{order:-1;}
   .cb-roles{order:1;}
   .cb-nc-hero .cb-art{height:170px;}
+}
+/* Keep the settings button visible even with battle/application counts on a small phone. */
+@container corp (max-width:399px){
+  .cb-tabs{gap:2px;}
+  .cb-tab{position:relative;flex:1 0 auto;min-width:44px;padding:0 2px;font-size:var(--fs-caption);}
+  .cb-tab-settings{flex:0 0 44px;}
+  .cb-tabs:has(small) .cb-tab:not(.cb-tab-settings){padding-top:14px;}
+  .cb-tab small{position:absolute;top:2px;right:4px;min-width:16px;height:16px;padding:0 3px;font-size:var(--fs-caption);}
 }
 /* Палец: цели от 44 px (UIX-1.3). */
 @media (pointer:coarse){.cb-lvl{min-height:44px;}}
@@ -4338,6 +4376,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
 ${profileCss}
+${corpBattlesCss}
+${corpFacilitiesCss}
 /* «Арсенал» хаба (ARS-5, переделан по макету 2026-10-20): правило верфи, цель мастерской,
    каталог модулей и кораблей и карточка выбранного рядом с ним, на телефоне шторкой снизу.
    Раскладку решает ширина самой вкладки (контейнер arsenal), а не окна: на ПК хаб идёт
@@ -4585,12 +4625,16 @@ span.ar-fchip{cursor:default;}
 .sh-art-sov i{display:inline-flex;width:22px;height:22px;color:var(--cur-sovereigns);}
 .sh-art-prem{font-size:28px;color:var(--cur-sovereigns);}
 .sh-art small{font-size:var(--fs-caption);color:var(--sf-dim);}
-/* Стиль базы (CORP-14): здания III уровня рисунками — в карточке штаб, в описании все. */
+/* Стиль базы: в карточке завершённый штаб, в описании все здания. */
 .sh-art-style{align-items:flex-end;}
-.sh-art-style img{display:block;height:64px;width:auto;max-width:100%;object-fit:contain;}
-.sh-dt .sh-art-style{justify-content:center;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
+.sh-art-style .spr{display:block;height:64px;width:auto;max-width:100%;}
+.sh-dt .sh-art-style{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:6px;padding:12px 10px 8px;border-radius:12px;border:1px solid var(--line);
   background:radial-gradient(120% 90% at 50% 100%,#0d3447,#04121c 70%);}
-.sh-dt .sh-art-style img{flex:1 1 0;min-width:0;height:auto;max-height:120px;}
+.sh-dt .sh-art-style .spr{min-width:0;width:100%;height:96px;}
+/* Фон базы (CORP-15): панорама без зданий. */
+.sh-art-bd{display:block;width:100%;max-width:150px;aspect-ratio:1200 / 540;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
+.sh-art-bd svg{display:block;width:100%;height:100%;}
+.sh-dt .sh-art-bd{max-width:none;border-radius:12px;}
 .sh-mi{width:34px;height:34px;border-radius:9px;display:inline-grid;place-items:center;font-size:17px;font-style:normal;
   background:color-mix(in srgb,var(--rar) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rar) 60%,transparent);}
 .sh-mi.own{filter:grayscale(1);opacity:.5;}
@@ -5158,7 +5202,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-market">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
     <!-- Торговец экспедиции («живой курс»): только в забеге с торговцем, видимость — кадр main.ts -->
     <button id="rail-trader" type="button" data-i18n-title="rail.trader.title" style="display:none">⚖<span class="rlbl" data-i18n="rail.trader.label"></span></button>
-    <button id="railcorp">⬢<span class="rlbl" data-i18n="rail.corp.title"></span></button>
     <button id="rail-chat" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
     <button id="rail-log">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
     <button id="rail-help">?<span class="rlbl" data-i18n="rail.help.title"></span></button>
@@ -5286,6 +5329,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             ${passwordToggle('cwpass')}
           </div>
         </form>
+        <button id="cwrecover" class="clink btn-quiet" type="button" style="display:none" data-i18n="welcome.recover.link"></button>
       </div>
       <div id="cregister" style="display:none">
         <button id="crback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
@@ -5316,7 +5360,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div class="crow">
           <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
         </div>
-        <button id="crrecover" class="clink btn-quiet" type="button" data-i18n="welcome.register.recover"></button>
       </div>
       <div id="crecover" style="display:none">
         <button id="crecback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
@@ -5439,8 +5482,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
      the returning-player path lands in the hub and never visits #connect, which is
      where this used to live (and why players never saw their updates). -->
 <div id="updbar" role="region" aria-live="polite">
-  <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
-  <p id="ub-notes"></p>
+  <div class="ub-t" data-i18n="upd.available"></div>
   <p id="ub-status"></p>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>

@@ -14,6 +14,8 @@ export interface ActivityDay {
   players: number;
   visits: number;
   seconds: number;
+  /** Menu entries reported by authenticated clients; not proof of playing a chapter. */
+  sectorZeroEntries?: number;
 }
 export interface ActivitySnapshot {
   schema: 1;
@@ -29,6 +31,7 @@ export interface PlayerActivityStore {
     active: boolean,
     at: number,
     sequence: number,
+    sectorZero?: boolean,
   ): Promise<void>;
   snapshot(at: number): Promise<ActivitySnapshot>;
 }
@@ -79,7 +82,7 @@ export class MemoryPlayerActivityStore implements PlayerActivityStore {
   >();
   private readonly rows = new Map<
     string,
-    { day: string; account: string; visits: number; spans: [number, number][] }
+    { day: string; account: string; visits: number; sectorZeroEntries?: number; spans: [number, number][] }
   >();
   constructor(private readonly since = Date.now()) {}
   private prune(at: number): void {
@@ -96,6 +99,7 @@ export class MemoryPlayerActivityStore implements PlayerActivityStore {
     active: boolean,
     at: number,
     sequence: number,
+    sectorZero?: boolean,
   ): Promise<void> {
     this.prune(at);
     const channels =
@@ -121,6 +125,8 @@ export class MemoryPlayerActivityStore implements PlayerActivityStore {
         key,
         {
           ...old,
+          ...(sectorZero && active && day === dayAt(at)
+            ? { sectorZeroEntries: (old.sectorZeroEntries ?? 0) + 1 } : {}),
           spans: unionActivity(old.spans, lo, hi),
           visits: old.visits + Number(active && !continuous && day === dayAt(at)),
         },
@@ -140,6 +146,7 @@ export class MemoryPlayerActivityStore implements PlayerActivityStore {
       const day = days.get(row.day) ?? { day: row.day, players: 0, visits: 0, seconds: 0 };
       day.players++;
       day.visits += row.visits;
+      if (row.sectorZeroEntries) day.sectorZeroEntries = (day.sectorZeroEntries ?? 0) + row.sectorZeroEntries;
       day.seconds += row.spans.reduce((sum, [a, b]) => sum + b - a, 0) / 1000;
       days.set(row.day, day);
     }
@@ -182,6 +189,7 @@ export class PostgresPlayerActivityStore implements PlayerActivityStore {
     active: boolean,
     at: number,
     sequence: number,
+    sectorZero?: boolean,
   ): Promise<void> {
     await this.prune(at);
     const db = await this.pool.connect();
@@ -225,12 +233,16 @@ export class PostgresPlayerActivityStore implements PlayerActivityStore {
         : []) {
         const visits = Number(active && !continuous && day === dayAt(at));
         const written = await db.query(
-          `INSERT INTO player_activity_days(account_id,day,spans,visits)
-          VALUES($1,$2::date,int8multirange(int8range($3::bigint,$4::bigint,'[)')),$5)
+          `INSERT INTO player_activity_days(account_id,day,spans,visits,sector_zero_entries,sector_zero_first_ms,sector_zero_last_ms)
+          VALUES($1,$2::date,int8multirange(int8range($3::bigint,$4::bigint,'[)')),$5,$6,$7,$7)
           ON CONFLICT(account_id,day) DO UPDATE SET spans=player_activity_days.spans+excluded.spans,
-          visits=player_activity_days.visits+excluded.visits
+          visits=player_activity_days.visits+excluded.visits,
+          sector_zero_entries=player_activity_days.sector_zero_entries+excluded.sector_zero_entries,
+          sector_zero_first_ms=least(player_activity_days.sector_zero_first_ms,excluded.sector_zero_first_ms),
+          sector_zero_last_ms=greatest(excluded.sector_zero_last_ms,player_activity_days.sector_zero_last_ms)
           WHERE (SELECT count(*) FROM unnest(player_activity_days.spans+excluded.spans))<=1024 RETURNING account_id`,
-          [account, day, lo, hi, visits],
+          [account, day, lo, hi, visits, Number(!!sectorZero && active && day === dayAt(at)),
+            sectorZero && active && day === dayAt(at) ? at : null],
         );
         if (!written.rowCount) throw Error('E_ACTIVITY_CAP');
       }
@@ -262,9 +274,10 @@ export class PostgresPlayerActivityStore implements PlayerActivityStore {
       players: string;
       visits: string;
       seconds: string;
+      sector_zero_entries: string;
     }>(
       `SELECT to_char(day,'YYYY-MM-DD') AS day,
-      count(*) players, sum(visits) visits,
+      count(*) players, sum(visits) visits, sum(sector_zero_entries) sector_zero_entries,
       sum((SELECT coalesce(sum(upper(span)-lower(span)),0) FROM unnest(spans) span))/1000.0 seconds
       FROM player_activity_days WHERE day BETWEEN $1::date AND $2::date GROUP BY day ORDER BY day`,
       [dayAt(at - (ACTIVITY_DAYS - 1) * DAY), dayAt(at)],
@@ -277,6 +290,7 @@ export class PostgresPlayerActivityStore implements PlayerActivityStore {
           players: Number(r.players),
           visits: Number(r.visits),
           seconds: Number(r.seconds),
+          ...(Number(r.sector_zero_entries) > 0 ? { sectorZeroEntries: Number(r.sector_zero_entries) } : {}),
         },
       ]),
     );

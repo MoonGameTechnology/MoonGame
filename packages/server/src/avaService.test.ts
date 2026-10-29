@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AvaService } from './avaService';
 import { CorpService, type CorpActor } from './corpService';
+import { generatedCorpName } from './corpNames';
 import { parseMedalCatalog, type MedalCatalog } from './medalCatalog';
 import {
   MemoryAvaChallengeStore,
@@ -8,6 +9,8 @@ import {
   MemoryAvaResultStore,
   MemoryAvaRosterStore,
   MemoryCorpStore,
+  type AvaBattleReport,
+  type AvaResult,
 } from './store';
 
 // AVA-2/3/4 — readiness + the S0→S2 challenge state machine — and AVA-6, the roster
@@ -43,6 +46,7 @@ async function fixture(
     influenceA?: number;
     influenceB?: number;
     medals?: MedalCatalog;
+    results?: MemoryAvaResultStore;
   } = {},
 ): Promise<Fixture> {
   const feed = new MemoryAvaFeedStore();
@@ -50,12 +54,13 @@ async function fixture(
   const challenges = new MemoryAvaChallengeStore();
   let t = 0;
   const now = (): number => ++t;
-  const corp = new CorpService({ store, now });
+  let catalogueIndex = 0;
+  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ });
   const ava = new AvaService({
     corpStore: store,
     challengeStore: challenges,
     rosterStore: new MemoryAvaRosterStore(),
-    resultStore: new MemoryAvaResultStore(),
+    resultStore: opts.results ?? new MemoryAvaResultStore(),
     feedStore: feed,
     ...(opts.medals ? { medals: opts.medals } : {}),
     now,
@@ -156,6 +161,28 @@ describe('AvaService — challenge S0→S2 (AVA-4)', () => {
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // fully refunded
   });
 
+  it.each([{ format: 2, days: 5, remaining: 20 }, { format: 3, days: 7, remaining: 18 }])(
+    'settles building income before charging a base $format-on-$format challenge',
+    async ({ format, days, remaining }) => {
+      const f = await fixture({ influenceA: 0 });
+      await f.store.infrastructure(f.corpA, A_HEAD.accountId, f.clock(), {
+        buildingId: 'headquarters', expectedLevel: 0,
+      });
+      await f.ava.setCorpReady(A_HEAD, [format]);
+      await f.ava.setCorpReady(B_HEAD, [format]);
+      f.advance(3_600_000 + days * 86_400_000);
+      // No cabinet read has settled the completed HQ's 24 influence/day yet.
+      expect((await f.store.getCorp(f.corpA))?.influence).toBe(0);
+      expect(await f.ava.challenge(A_HEAD, f.corpB, format)).toMatchObject({ ok: true });
+      expect((await f.store.getCorp(f.corpA))?.influence).toBe(remaining);
+      // The same elapsed time cannot pay for a second challenge.
+      expect(await f.ava.challenge(A_HEAD, f.corpB, format)).toMatchObject({
+        ok: false, code: 'E_INSUFFICIENT',
+      });
+      expect((await f.store.getCorp(f.corpA))?.influence).toBe(remaining);
+    },
+  );
+
   it('expiry refunds without any client, on the injected clock', async () => {
     const f = await fixture();
     await ready(f);
@@ -174,7 +201,9 @@ describe('AvaService — challenge S0→S2 (AVA-4)', () => {
     expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({ ok: false, code: 'E_NOT_READY' });
     await ready(f);
     expect(await f.ava.challenge(A_HEAD, f.corpA)).toEqual({ ok: false, code: 'E_SELF_CHALLENGE' });
-    expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({ ok: false, code: 'E_INSUFFICIENT' }); // 50 < 100
+    expect(await f.ava.challenge(A_HEAD, f.corpB)).toEqual({
+      ok: false, code: 'E_INSUFFICIENT', requiredInfluence: 100, influence: 50,
+    }); // 50 < 100
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(50); // nothing spent on the failed attempt
   });
 
@@ -441,9 +470,9 @@ describe('AvaService — public feed (AVA-9)', () => {
     expect(feed[0]).toMatchObject({
       kind: 'matchup',
       challengerCorp: f.corpA,
-      challengerName: 'Alliance A',
+      challengerName: generatedCorpName(0),
       targetCorp: f.corpB,
-      targetName: 'Alliance B',
+      targetName: generatedCorpName(1),
     });
     expect(feed[0]?.winnerCorp).toBeUndefined();
     // Drive to a lock, then settle → the S7 result is appended (newest first).
@@ -500,7 +529,7 @@ describe('AvaService — medal news (CORP-1)', () => {
     const [entry] = (await f.feed.recent(50, undefined, ['medal'])).filter(
       (e) => e.id === `medal:${f.corpB}:two`,
     );
-    expect(entry).toMatchObject({ kind: 'medal', corpId: f.corpB, corpName: 'Alliance B', medalId: 'two' });
+    expect(entry).toMatchObject({ kind: 'medal', corpId: f.corpB, corpName: generatedCorpName(1), medalId: 'two' });
   });
 
   it('without the catalog a settlement is no medal news', async () => {
@@ -630,5 +659,118 @@ describe('AvaService — battle formats (CORP-7)', () => {
     expect(await f.ava.settleMatch(id, 'target')).toEqual({ ok: true, winnerCorp: f.corpB });
     expect((await f.store.getCorp(f.corpB))?.influence).toBe(725);
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(350);
+  });
+});
+
+describe('AvaService — the «Битвы» tab (CORP-9)', () => {
+  /** The breakdown the host sends with a settlement: two challengers, the target's head
+   *  and a bot. */
+  const report = (): AvaBattleReport => ({
+    reason: 'score',
+    warAt: 5,
+    provinces: 9,
+    sides: { challenger: { score: 900, provinces: 5 }, target: { score: 300, provinces: 2 } },
+    seats: [
+      { side: 'challenger', accountId: A_HEAD.accountId, login: 'ahead', score: 600, provinces: 3, out: false },
+      { side: 'challenger', accountId: A_MEMBER.accountId, login: 'amember', score: 300, provinces: 2, out: false },
+      { side: 'target', accountId: B_HEAD.accountId, login: 'bhead', score: 300, provinces: 2, out: false },
+      { side: 'target', accountId: null, login: null, score: 0, provinces: 0, out: true },
+    ],
+  });
+
+  it('records the battle’s format and breakdown with its result', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f);
+    expect(await f.ava.settleMatch(id, 'challenger', report())).toEqual({ ok: true, winnerCorp: f.corpA });
+    expect((await f.ava.matchHistory())[0]).toMatchObject({ matchupId: id, format: 2, report: report() });
+  });
+
+  it('drops a malformed breakdown and settles all the same', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f);
+    const bad = { ...report(), seats: 'everyone' } as unknown as AvaBattleReport;
+    expect(await f.ava.settleMatch(id, 'challenger', bad)).toEqual({ ok: true, winnerCorp: f.corpA });
+    const [result] = await f.ava.matchHistory();
+    expect(result).toMatchObject({ matchupId: id, format: 2 });
+    expect(result).not.toHaveProperty('report');
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(550); // the win still paid
+  });
+
+  it('shows a member the readiness, every challenge, the battles and the record', async () => {
+    const f = await fixture();
+    const won = await lockedMatchup(f);
+    await f.ava.settleMatch(won, 'challenger', report());
+    const again = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!again.ok) throw new Error('challenge failed');
+    await f.ava.decline(B_HEAD, again.id); // closed, and still listed
+    await f.ava.setPlayerReady(A_MEMBER);
+
+    const view = await f.ava.battles(A_MEMBER);
+    if ('ok' in view) throw new Error(view.code);
+    expect(view.corpId).toBe(f.corpA);
+    expect(view.ready).toEqual({ corp: true, formats: [2], player: true, players: [A_MEMBER.accountId] });
+    expect(view.challenges.map((c) => [c.id, c.status])).toEqual([
+      [again.id, 'declined'],
+      [won, 'ended'],
+    ]);
+    expect(view.tally).toEqual([{ opponent: f.corpB, format: 2, wins: 1, losses: 0, draws: 0 }]);
+    expect(view.names).toEqual({ [f.corpB]: generatedCorpName(1) });
+    expect(view.results).toHaveLength(1);
+    expect(view.results[0]).toMatchObject({ matchupId: won, side: 'challenger', format: 2, winnerCorp: f.corpA });
+    // The corp's own seats name their accounts; a rival is known by login, a bot by nothing.
+    expect(view.results[0]?.report?.seats).toEqual([
+      { side: 'challenger', accountId: A_HEAD.accountId, bot: false, login: 'ahead', score: 600, provinces: 3, out: false },
+      { side: 'challenger', accountId: A_MEMBER.accountId, bot: false, login: 'amember', score: 300, provinces: 2, out: false },
+      { side: 'target', bot: false, login: 'bhead', score: 300, provinces: 2, out: false },
+      { side: 'target', bot: true, login: null, score: 0, provinces: 0, out: true },
+    ]);
+  });
+
+  it('the rival sees the same battle from its own side', async () => {
+    const f = await fixture();
+    await f.ava.settleMatch(await lockedMatchup(f), 'challenger', report());
+    const view = await f.ava.battles(B_MEMBER);
+    if ('ok' in view) throw new Error(view.code);
+    expect(view.ready).toMatchObject({ corp: true, player: false, players: [] });
+    expect(view.tally).toEqual([{ opponent: f.corpA, format: 2, wins: 0, losses: 1, draws: 0 }]);
+    expect(view.names).toEqual({ [f.corpA]: generatedCorpName(0) });
+    expect(view.results[0]?.side).toBe('target');
+    expect(view.results[0]?.report?.seats.map((seat) => seat.accountId)).toEqual([
+      undefined,
+      undefined,
+      B_HEAD.accountId,
+      undefined,
+    ]);
+  });
+
+  it('names every rival of the record, past the battles it lists', async () => {
+    // The lists keep the latest battles only; the record keeps a rival met long before.
+    class LatestOnly extends MemoryAvaResultStore {
+      override resultsOf(): Promise<Array<AvaResult & { format: number }>> {
+        return Promise.resolve([]);
+      }
+    }
+    const results = new LatestOnly();
+    const f = await fixture({ results });
+    await results.record({
+      matchupId: 'long-ago',
+      challengerCorp: f.corpA,
+      targetCorp: f.corpB,
+      winnerCorp: f.corpB,
+      at: 1,
+      format: 2,
+    });
+    const view = await f.ava.battles(A_MEMBER);
+    if ('ok' in view) throw new Error(view.code);
+    expect([view.challenges, view.results]).toEqual([[], []]);
+    expect(view.tally).toEqual([{ opponent: f.corpB, format: 2, wins: 0, losses: 1, draws: 0 }]);
+    expect(view.names).toEqual({ [f.corpB]: generatedCorpName(1) });
+  });
+
+  it('is for members: an outsider and a recruit are refused', async () => {
+    const f = await fixture();
+    expect(await f.ava.battles(OUTSIDER)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    await f.corp.apply(OUTSIDER, f.corpA); // an application makes a recruit
+    expect(await f.ava.battles(OUTSIDER)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
   });
 });

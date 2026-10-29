@@ -3196,7 +3196,6 @@ const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, str
   pings: 'pingpanel',
   market: 'market',
   trader: 'trader',
-  corporation: 'corp',
   steward: 'steward',
   dossier: 'swarm-dossier',
   codex: 'codexhub',

@@ -74,7 +74,8 @@ export class FriendService {
    *  resolved to an account first, so an edge can only ever point at a real one. */
   async request(who: FriendParty, callsign: string): Promise<{ ok: true } | FriendFail> {
     const typed = callsign.trim();
-    if (!typed) return { ok: false, code: 'E_BAD_TARGET' };
+    if (!typed || typed.length > 64 || typed.includes('\0'))
+      return { ok: false, code: 'E_BAD_TARGET' };
     const target = await this.users.findUser(typed);
     if (!target) return { ok: false, code: 'E_NO_ACCOUNT' };
     if (target.userId === who.accountId) return { ok: false, code: 'E_SELF' };
@@ -93,7 +94,7 @@ export class FriendService {
    *  (no such edge, already accepted, or it is your own outgoing one) — one opaque
    *  code, because distinguishing them tells a caller about rows it cannot see. */
   async accept(accountId: string, otherId: string): Promise<{ ok: true } | FriendFail> {
-    if (!otherId) return { ok: false, code: 'E_BAD_TARGET' };
+    if (!otherId || otherId.includes('\0')) return { ok: false, code: 'E_BAD_TARGET' };
     if (await this.atLimit(accountId)) return { ok: false, code: 'E_LIMIT' };
     const done = await this.friends.accept(accountId, otherId, this.now());
     return done.ok ? { ok: true } : { ok: false, code: 'E_NO_EDGE' };
@@ -102,9 +103,25 @@ export class FriendService {
   /** Decline, withdraw, or unfriend — one operation, because all three mean «no edge
    *  between us». Either side may drop; there is nothing to gate. */
   async drop(accountId: string, otherId: string): Promise<{ ok: true } | FriendFail> {
-    if (!otherId) return { ok: false, code: 'E_BAD_TARGET' };
+    if (!otherId || otherId.includes('\0')) return { ok: false, code: 'E_BAD_TARGET' };
     const done = await this.friends.drop(accountId, otherId);
     return done.ok ? { ok: true } : { ok: false, code: 'E_NO_EDGE' };
+  }
+
+  /** FRIENDS-2 · Are these two accounts ACCEPTED friends? A pending request is not a
+   *  friendship: it must not unlock invites or the friend's match. */
+  async areFriends(accountId: string, otherId: string): Promise<boolean> {
+    const edges = await this.friends.edgesOf(accountId);
+    return edges.some((e) => e.accountId === otherId && e.kind === 'friend');
+  }
+
+  /** FRIENDS-2 · «Скрывать мои партии от друзей». */
+  hidesMatches(accountId: string): Promise<boolean> {
+    return this.friends.hidesMatches(accountId);
+  }
+
+  setHidesMatches(accountId: string, hide: boolean): Promise<void> {
+    return this.friends.setHidesMatches(accountId, hide);
   }
 
   /** Accepted friends only — pending edges cost nothing until they are accepted. */

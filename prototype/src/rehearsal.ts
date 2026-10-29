@@ -567,6 +567,9 @@ export async function runRehearsal(
       players: playerIds,
       now: () => clock.now,
       time: 1_000,
+      // This fixture measures hours of transport/persistence, including after
+      // restart. A quick score/domination win must not end its load phase early.
+      config: { timeScale: 1, victory: { scripted: true } },
       gate: new ActionGate({ payloadValidator: isValidActionPayload }),
       persist,
       observe: (e) => observations.push(e),

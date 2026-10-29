@@ -1,6 +1,7 @@
 /** Persistent corporation infrastructure, outside the match simulation. */
 export interface CorpBuildingLevel {
   cost: number;
+  materials?: Record<string, number>;
   durationMs: number;
   headquarters: number;
   influencePerDay: number;
@@ -11,7 +12,21 @@ export interface CorpBuildingLevel {
   battles?: number;
   /** The largest AvA battle this level opens, players per side (CORP-7, operations center). */
   maxFormat?: number;
+  /** Protected equipment loans per corporation and battle. */
+  warehouseItems?: number;
+  /** Number of corporation medals in the shared public showcase. */
+  showcaseSlots?: number;
+  monument?: boolean;
 }
+
+export interface CorpPublicFacilities {
+  warehouseItems?: number;
+  showcaseSlots?: number;
+  showcase?: string[];
+  monument?: boolean;
+}
+export type CorpShowcaseError = 'E_FORBIDDEN' | 'E_CORP_HALL_REQUIRED' | 'E_CORP_MEDAL_NOT_EARNED' | 'E_BAD_SHOWCASE';
+export type CorpShowcaseResult = { ok: true } | { ok: false; code: CorpShowcaseError };
 
 /** What the level requirements are checked against (CORP-6). */
 export interface CorpStanding {
@@ -30,6 +45,8 @@ export interface CorpBuildOrder {
   buildingId: string;
   /** Compare-and-swap guard: a retried request cannot buy the following level. */
   expectedLevel: number;
+  price?: string;
+  requestId?: string;
 }
 
 export interface CorpConstruction {
@@ -57,11 +74,15 @@ export type CorpBuildError =
   | 'E_CORP_BUILD_REQUIRES'
   | 'E_CORP_BUILD_MEMBERS'
   | 'E_CORP_BUILD_BATTLES'
+  | 'E_CORP_MATERIALS'
+  | 'E_CORP_PRICE'
+  | 'E_CORP_PAYMENT_PENDING'
+  | 'E_IDEMPOTENCY_CONFLICT'
   | 'E_INSUFFICIENT';
 
 export interface CorpBuildingView extends CorpBuildingDef {
   level: number;
-  next: (CorpBuildingLevel & { actualDurationMs: number }) | null;
+  next: (CorpBuildingLevel & { actualDurationMs: number; price?: string }) | null;
   blocked: CorpBuildError | null;
 }
 
@@ -78,3 +99,31 @@ export interface CorpInfrastructureView extends CorpStanding {
 
 export type CorpInfrastructureResult =
   { ok: true; infrastructure: CorpInfrastructureView } | { ok: false; code: CorpBuildError };
+
+/** Private server-to-server construction ticket. No player identity is retained. */
+export interface CorpBuildTicket {
+  id: string;
+  corpId: string;
+  order: CorpBuildOrder;
+  materials: Record<string, number>;
+}
+export type CorpBuildPreparation = { ok: true; ticket: CorpBuildTicket } | { ok: false; code: CorpBuildError };
+export type CorpBuildSettlement = { state: 'unknown' } | { state: 'applied' } | { state: 'rejected'; code: CorpBuildError };
+export interface CorpMaterialMovement {
+  id: string;
+  at: number;
+  kind: 'contribution' | 'construction' | 'refund';
+  amounts: Record<string, number>;
+  status: 'pending' | 'spent' | 'refunded' | 'complete';
+}
+export interface CorpMaterialBank {
+  available: Record<string, number>;
+  pending?: CorpBuildTicket;
+  history: CorpMaterialMovement[];
+}
+export interface CorpMaterialsView {
+  corpId: string;
+  pending: boolean;
+  materials: { id: string; nameKey: string; personal: number; available: number; reserved: number }[];
+  history: CorpMaterialMovement[];
+}

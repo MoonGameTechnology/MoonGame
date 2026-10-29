@@ -6,7 +6,7 @@ import type {
   MetaEconomyView,
   MetaStoreOfferView,
 } from '../../packages/protocol/src/metaEconomyView';
-import { corpArt } from './corpArt';
+import { CORP_ART_BUILDINGS, corpArt } from './corpArt';
 import { initShop, shopDetailHtml, shopHtml, type ShopHost, type ShopState } from './shopScreen';
 
 beforeAll(() => setLocale('ru'));
@@ -98,6 +98,7 @@ const STORE: MetaStoreOfferView[] = [
     bought: 0,
   },
   { id: 'corp_style_high_tech', category: 'styles', price: 490, corpStyle: 'high_tech', bought: 0 },
+  { id: 'corp_backdrop_nebula', category: 'styles', price: 290, corpBackdrop: 'nebula', bought: 0 },
 ];
 
 function view(over: Partial<MetaEconomyView> = {}): MetaEconomyView {
@@ -160,6 +161,7 @@ function state(over: Partial<ShopState> = {}): ShopState {
 const corp = (head: boolean, owned: string[] = [], active = 'standard'): MetaCorpStyleView => ({
   head,
   active,
+  backdrop: 'orbit',
   owned,
 });
 
@@ -242,7 +244,7 @@ describe('магазин — «Стили»: стили базы корпора�
   const styles = (over: Partial<ShopState> = {}): ShopState =>
     state({ tab: 'styles', view: view({ sovereigns: 600 }), corpStyle: corp(true), ...over });
 
-  it('полка: стиль с ценой и штабом III уровня в этом стиле, вкладка подписана', () => {
+  it('полка: стиль с ценой и завершённым штабом, вкладка подписана', () => {
     const html = shopHtml(styles());
     expect(html).toContain('data-sh-tab="styles"');
     expect(html).toContain('Стили');
@@ -250,7 +252,8 @@ describe('магазин — «Стили»: стили базы корпора�
     expect(html).toContain('Хайтек');
     expect(html).toContain('Стиль базы корпорации');
     expect(html).toMatch(/data-sh-pick="corp_style_high_tech"[^]*?sh-sov">490/);
-    expect(html).toContain(`<img src="${corpArt('headquarters', 3, 'high_tech')!.src}" alt="">`);
+    expect(html).toContain(`href="${corpArt('headquarters', 5, 'high_tech')!.src}"`);
+    expect(html).not.toContain(`<img src="${corpArt('headquarters', 5, 'high_tech')!.src}"`);
     // Чужие полки стили не показывают.
     expect(shopHtml(styles({ tab: 'modules' }))).not.toContain('corp_style_');
   });
@@ -260,8 +263,16 @@ describe('магазин — «Стили»: стили базы корпора�
     expect(detail).toContain('data-sh-buy="corp_style_high_tech"');
     expect(detail).toContain('Стиль принадлежит корпорации и остаётся при смене главы.');
     // В описании — все здания базы в этом стиле.
-    for (const id of ['headquarters', 'supply_center', 'engineering_complex'])
-      expect(detail).toContain(corpArt(id, 3, 'high_tech')!.src);
+    expect(detail.match(/class="spr"/g)).toHaveLength(7);
+    for (const id of CORP_ART_BUILDINGS) {
+      const art = corpArt(id, id === 'headquarters' ? 5 : 3, 'high_tech')!;
+      expect(detail).toContain(`href="${art.src}"`);
+      if (art.frame) {
+        const f = art.frame;
+        expect(detail).toContain(`viewBox="${f.sx} ${f.sy} ${f.sw} ${f.sh}"`);
+        expect(detail).not.toContain(`<img src="${art.src}"`);
+      }
+    }
     const poor = shopDetailHtml(styles({ view: view(), pick: 'corp_style_high_tech' }));
     expect(poor).toMatch(/<button[^>]*disabled>Не хватает <b class="sh-sov">190/);
     expect(poor).not.toContain('data-sh-buy=');
@@ -298,6 +309,21 @@ describe('магазин — «Стили»: стили базы корпора�
     const detail = shopDetailHtml(styles({ pick: 'high_tech' }));
     expect(detail).toContain('<h3 id="sh-dt-title">Хайтек</h3>');
     expect(detail).toContain('data-sh-buy="corp_style_high_tech"');
+  });
+
+  it('фон базы рядом со стилями: панорама без зданий, покупка и применение тем же путём (CORP-15)', () => {
+    const html = shopHtml(styles());
+    expect(html).toContain('Туманность');
+    expect(html).toContain('Фон базы корпорации');
+    expect(html).toMatch(/data-sh-pick="corp_backdrop_nebula"[^]*?sh-sov">290/);
+    expect(html).toContain('<image data-corp-backdrop="nebula"');
+    const detail = shopDetailHtml(styles({ pick: 'nebula' }));
+    expect(detail).toContain('data-sh-buy="corp_backdrop_nebula"');
+    expect(detail).toContain('Фон принадлежит корпорации');
+    const owned = shopDetailHtml(
+      styles({ corpStyle: corp(true, ['nebula']), pick: 'corp_backdrop_nebula' }),
+    );
+    expect(owned).toContain('data-sh-apply="nebula"');
   });
 });
 

@@ -668,6 +668,21 @@ describe('настройки — окно и обработчики', () => {
   });
 });
 
+describe('настройки — номер партии (FRIENDS-2)', () => {
+  it('в сетевой партии во «Игре» есть номер и «Скопировать номер»', () => {
+    const html = settingsBoxHtml(viewOf({ matchId: '48219370' }), false, 'game');
+    expect(html).toContain('data-settab="game"');
+    expect(html).toContain('№ 48219370');
+    expect(html).toContain('id="set-copy-match"');
+  });
+
+  it('вне сетевой партии строки нет', () => {
+    expect(settingsBoxHtml(viewOf({ rateUnit: 'hour' }), false, 'game')).not.toContain(
+      'set-copy-match',
+    );
+  });
+});
+
 describe('настройки — доход в час или в сутки', () => {
   it('вкладка «Игра» есть там, где есть единица дохода, и стоит перед «Уведомлениями»', () => {
     expect(settingsBoxHtml(viewOf())).not.toContain('data-settab="game"');

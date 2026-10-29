@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   CorpBuildError,
   CorpBuildOrder,
@@ -38,6 +39,8 @@ export function parseCorpBuildings(raw: unknown): CorpBuildingDef[] {
       if (
         !level ||
         !integer(level.cost) ||
+        (level.materials !== undefined && (typeof level.materials !== 'object' || level.materials === null || Array.isArray(level.materials) ||
+          Object.entries(level.materials).some(([id, n]) => !['construction_blocks', 'engineering_kits', 'command_cores'].includes(id) || !integer(n) || n === 0))) ||
         !integer(level.durationMs) ||
         level.durationMs < 1 ||
         !integer(level.headquarters) ||
@@ -46,7 +49,10 @@ export function parseCorpBuildings(raw: unknown): CorpBuildingDef[] {
         level.constructionReduction > 50 ||
         (level.members !== undefined && !integer(level.members)) ||
         (level.battles !== undefined && !integer(level.battles)) ||
-        (level.maxFormat !== undefined && (!integer(level.maxFormat) || level.maxFormat < 2))
+        (level.maxFormat !== undefined && (!integer(level.maxFormat) || level.maxFormat < 2)) ||
+        (level.warehouseItems !== undefined && (!integer(level.warehouseItems) || level.warehouseItems < 1 || level.warehouseItems > 20)) ||
+        (level.showcaseSlots !== undefined && (!integer(level.showcaseSlots) || level.showcaseSlots < 1 || level.showcaseSlots > 20)) ||
+        (level.monument !== undefined && typeof level.monument !== 'boolean')
       ) {
         throw new Error('E_CORP_CATALOG');
       }
@@ -58,6 +64,13 @@ export function parseCorpBuildings(raw: unknown): CorpBuildingDef[] {
     throw new Error('E_CORP_CATALOG');
   }
   return buildings;
+}
+
+export function corpBuildPrice(corpId: string, order: CorpBuildOrder): string {
+  const level = CORP_BUILDINGS.find((b) => b.id === order.buildingId)?.levels[order.expectedLevel];
+  return createHash('sha256').update(JSON.stringify([corpId, order.buildingId, order.expectedLevel,
+    level?.cost, Object.entries(level?.materials ?? {}).sort(), level?.durationMs, level?.headquarters,
+    level?.members, level?.battles])).digest('hex');
 }
 
 export const CORP_BUILDINGS = parseCorpBuildings(rawCatalog);
@@ -209,6 +222,7 @@ export function updateCorpInfrastructure(
         next: next
           ? {
               ...next,
+              price: corpBuildPrice(corpId, { buildingId: def.id, expectedLevel: level }),
               actualDurationMs: Math.ceil(
                 (next.durationMs * (100 - bonuses.constructionReduction)) / 100,
               ),

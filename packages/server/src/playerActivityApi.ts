@@ -32,7 +32,8 @@ export function registerPlayerActivityApi(
       !body ||
       typeof body !== 'object' ||
       Array.isArray(body) ||
-      Object.keys(body).length !== 3 ||
+      Object.keys(body).some((key) => !['channel', 'sequence', 'active', 'sectorZero'].includes(key)) ||
+      (body.sectorZero !== undefined && body.sectorZero !== true) ||
       typeof body.channel !== 'string' ||
       !/^[a-f0-9]{32}$/.test(body.channel) ||
       typeof body.active !== 'boolean' ||
@@ -51,6 +52,7 @@ export function registerPlayerActivityApi(
         body.active,
         now(),
         Number(body.sequence),
+        body.sectorZero === true,
       );
       return reply.code(204).send();
     } catch {

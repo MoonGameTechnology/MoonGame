@@ -1,9 +1,12 @@
 import { reservedBotLogin } from '../botNicknames';
+import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
-import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
-import { updateCorpInfrastructure } from '../corpConstruction';
+import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
+import { corpBuildPrice, updateCorpInfrastructure } from '../corpConstruction';
 import { corpFoundedNews, corpLevelNews } from '../corpNews';
+import { corpFacilities, publicCorpFacilities, validateShowcase } from '../corpFacilities';
+import type { CorpShowcaseResult } from '@void/protocol';
 import { randomUUID } from 'node:crypto';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
@@ -20,6 +23,7 @@ import type {
   AvaSession,
   AvaSessionStore,
   AvaSide,
+  AvaTally,
   CommanderStore,
   CorpAuditEntry,
   CorpFeedEntry,
@@ -74,6 +78,24 @@ export class MemoryMatchStore implements MatchStore {
     return Promise.resolve(snap ? clone(snap) : null);
   }
 
+  loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
+    const snapshot = this.snaps.get(matchId);
+    if (!snapshot || snapshot.status !== 'ended' || snapshot.endedAt === undefined ||
+      snapshot.endedAt <= since || archiveStateBytes(snapshot.state) > maxBytes) return Promise.resolve(null);
+    return Promise.resolve(clone(snapshot));
+  }
+
+  archiveMetadata(ids: readonly string[], since: number): Promise<ArchiveSummaryMetadata[]> {
+    const rows: ArchiveSummaryMetadata[] = [];
+    for (const id of ids) {
+      const snapshot = this.snaps.get(id);
+      if (!snapshot || snapshot.status !== 'ended' || snapshot.endedAt === undefined || snapshot.endedAt <= since) continue;
+      rows.push({ ...archiveMetadataOf(snapshot), matchId: id,
+        createdAt: snapshot.createdAt ?? snapshot.endedAt, endedAt: snapshot.endedAt, seated: 0 });
+    }
+    return Promise.resolve(rows);
+  }
+
   save(snapshot: MatchSnapshot): Promise<void> {
     const prepared = this.prepareSnapshot(snapshot);
     if (prepared) this.snaps.set(snapshot.matchId, prepared);
@@ -103,6 +125,10 @@ export class MemoryMatchStore implements MatchStore {
       }
       return clone({
         ...snapshot,
+        createdAt: prev?.createdAt ?? snapshot.createdAt ?? Date.now(),
+        ...(snapshot.status === 'ended'
+          ? { endedAt: prev?.endedAt ?? snapshot.endedAt ?? Date.now() }
+          : {}),
         ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
         ...(Object.keys(economyActivity).length ? { economyActivity } : {}),
       }); // optimistic: keep the newest while retaining committed reward evidence
@@ -114,6 +140,13 @@ export class MemoryMatchStore implements MatchStore {
     const ids: string[] = [];
     for (const snap of this.snaps.values()) if (snap.status !== 'ended') ids.push(snap.matchId);
     return Promise.resolve(ids);
+  }
+
+  endedMatchIds(since: number): Promise<string[]> {
+    return Promise.resolve([...this.snaps.values()]
+      .filter((s) => s.status === 'ended' && s.endedAt !== undefined && s.endedAt > since)
+      .sort((a, b) => b.endedAt! - a.endedAt! || a.matchId.localeCompare(b.matchId))
+      .map((s) => s.matchId));
   }
 
   ping(): Promise<boolean> {
@@ -335,7 +368,65 @@ export class MemoryUserStore implements UserStore {
 
 /** In-memory corp store — membership keyed by account (one corp per account). */
 export class MemoryCorpStore implements CorpStore {
+  private readonly memberNonces = new Map<string, string>();
+  private readonly buildTickets = new Map<string, {
+    ticket: import('@void/protocol').CorpBuildTicket; nonce: string | null; key: string;
+    result?: import('@void/protocol').CorpBuildSettlement;
+  }>();
+  async prepareBuild(corpId: string, actor: string, now: number, order: CorpBuildOrder): Promise<import('@void/protocol').CorpBuildPreparation> {
+    const view = await this.infrastructure(corpId, actor, now);
+    const member = this.members.get(actor);
+    if (!view.ok || member?.role !== 'head' || member.corpId !== corpId) return { ok: false, code: 'E_FORBIDDEN' };
+    let nonce = this.memberNonces.get(actor);
+    if (!nonce) this.memberNonces.set(actor, nonce = randomUUID());
+    const key = order.requestId!;
+    const old = [...this.buildTickets.values()].find((t) => t.ticket.corpId === corpId && t.nonce === nonce && t.key === key);
+    if (old) return old.ticket.order.price === order.price && old.ticket.order.buildingId === order.buildingId && old.ticket.order.expectedLevel === order.expectedLevel
+      ? { ok: true, ticket: structuredClone(old.ticket) } : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
+    const b = view.infrastructure.buildings.find((b) => b.id === order.buildingId);
+    if (!b?.next || b.level !== order.expectedLevel) return { ok: false, code: 'E_CORP_BUILD_LEVEL' };
+    if (!order.requestId || order.price !== b.next.price) return { ok: false, code: 'E_CORP_PRICE' };
+    if (b.blocked) return { ok: false, code: b.blocked };
+    const ticket = { id: randomUUID(), corpId, order: { ...order, requestId: undefined }, materials: { ...b.next.materials } };
+    this.buildTickets.set(ticket.id, { ticket, nonce, key });
+    return { ok: true, ticket: structuredClone(ticket) };
+  }
+  async commitBuild(id: string, now: number): Promise<import('@void/protocol').CorpBuildSettlement> {
+    const row = this.buildTickets.get(id);
+    if (!row) return { state: 'unknown' };
+    if (row.result) return structuredClone(row.result);
+    const battles = (await this.results?.statsForCorp(row.ticket.corpId))?.matches ?? 0;
+    // Recheck after await. Authorize, mutate, and cache the terminal receipt without yielding.
+    if (row.result) return structuredClone(row.result);
+    const { corpId, order } = row.ticket;
+    const member = [...this.members.values()].find((m) => row.nonce !== null && this.memberNonces.get(m.accountId) === row.nonce);
+    const corp = this.corps.get(corpId);
+    if (!corp || !member || member.corpId !== corpId || member.role !== 'head')
+      return row.result = { state: 'rejected', code: 'E_FORBIDDEN' };
+    if (order.price !== corpBuildPrice(corpId, order)) return row.result = { state: 'rejected', code: 'E_CORP_PRICE' };
+    const updated = updateCorpInfrastructure(corpId, member.accountId, member.role, corp.influence,
+      this.infrastructureStates.get(corpId) ?? null, now, order,
+      { members: [...this.members.values()].filter((m) => m.corpId === corpId && m.role !== 'recruit').length, battles });
+    corp.influence = updated.influence;
+    this.infrastructureStates.set(corpId, updated.state);
+    this.audit.push(...updated.audit);
+    row.result = updated.result.ok ? { state: 'applied' } : { state: 'rejected', code: updated.result.code };
+    // Feed observation cannot undo an already committed payment receipt.
+    await this.publish(corpLevelNews(corpId, corp.name, updated.audit)).catch(() => undefined);
+    return structuredClone(row.result);
+  }
+  private revokeBuildMembership(accountId: string): void {
+    const nonce = this.memberNonces.get(accountId);
+    if (nonce) for (const ticket of this.buildTickets.values()) if (ticket.nonce === nonce) ticket.nonce = null;
+    this.memberNonces.delete(accountId);
+  }
+
+  monumentsOf(ids: readonly string[]): Promise<string[]> {
+    if (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string')) return Promise.resolve([]);
+    return Promise.resolve(ids.filter((id) => this.corps.has(id) && publicCorpFacilities(this.infrastructureStates.get(id) ?? null, Date.now()).monument));
+  }
   private readonly infrastructureStates = new Map<string, CorpInfrastructureState>();
+  private readonly showcases = new Map<string, string[]>();
 
   /** CORP-1: the public feed the corporation's own facts go to (founded, reached a level)
    *  — the memory twin of the Postgres store writing them in the same transaction.
@@ -384,15 +475,16 @@ export class MemoryCorpStore implements CorpStore {
     headAccountId: string,
     headLogin: string,
     at: number = Date.now(),
+    emblemId?: CorpEmblemId,
   ): Promise<{ ok: true; corpId: string } | { ok: false; code: 'E_NAME_TAKEN' | 'E_IN_CORP' }> {
+    if (this.members.has(headAccountId)) return Promise.resolve({ ok: false, code: 'E_IN_CORP' });
     const key = name.toLowerCase();
     for (const corp of this.corps.values()) {
       if (corp.name.toLowerCase() === key)
         return Promise.resolve({ ok: false, code: 'E_NAME_TAKEN' });
     }
-    if (this.members.has(headAccountId)) return Promise.resolve({ ok: false, code: 'E_IN_CORP' });
     const corpId = randomUUID();
-    this.corps.set(corpId, { corpId, name, influence: 0 });
+    this.corps.set(corpId, { corpId, name, influence: 0, ...(emblemId ? { emblemId } : {}) });
     this.members.set(headAccountId, {
       corpId,
       accountId: headAccountId,
@@ -402,14 +494,41 @@ export class MemoryCorpStore implements CorpStore {
     return this.publish([corpFoundedNews(corpId, name, at)]).then(() => ({ ok: true as const, corpId }));
   }
 
+  setEmblem(corpId: string, actor: string, emblemId: CorpEmblemId, at: number): Promise<{ ok: true } | { ok: false; code: 'E_FORBIDDEN' }> {
+    const corp = this.corps.get(corpId), member = this.members.get(actor);
+    if (!corp || member?.corpId !== corpId || member.role !== 'head')
+      return Promise.resolve({ ok: false, code: 'E_FORBIDDEN' });
+    if (corp.emblemId !== emblemId) {
+      this.corps.set(corpId, { ...corp, emblemId });
+      this.audit.push({ corpId, actor, at, action: 'emblem', detail: emblemId });
+    }
+    return Promise.resolve({ ok: true });
+  }
+
   getCorp(corpId: string): Promise<CorpRecord | null> {
     const corp = this.corps.get(corpId);
-    return Promise.resolve(corp ? { ...corp } : null);
+    return Promise.resolve(corp ? { ...corp, ...publicCorpFacilities(this.infrastructureStates.get(corpId) ?? null, Date.now(), this.showcases.get(corpId)) } : null);
+  }
+
+  async setShowcase(corpId: string, actor: string, medalIds: readonly string[], at: number): Promise<CorpShowcaseResult> {
+    const stats = await this.results?.statsForCorp(corpId) ?? { wins: 0, matches: 0 };
+    // No awaits between checking the current head, validating, and committing the list.
+    const member = this.members.get(actor);
+    if (!this.corps.has(corpId) || member?.corpId !== corpId || member.role !== 'head') return { ok: false, code: 'E_FORBIDDEN' };
+    const capacity = corpFacilities(this.infrastructureStates.get(corpId) ?? null, at).showcaseSlots;
+    const error = validateShowcase(medalIds, capacity, stats);
+    if (error) return { ok: false, code: error };
+    if (JSON.stringify(this.showcases.get(corpId) ?? []) !== JSON.stringify(medalIds)) {
+      this.showcases.set(corpId, [...medalIds]);
+      await this.appendAudit({ corpId, actor, at, action: 'showcase', detail: JSON.stringify(medalIds) });
+    }
+    return { ok: true };
   }
 
   listCorps(): Promise<CorpSummary[]> {
     const list = [...this.corps.values()].map((corp) => ({
       ...corp,
+      ...publicCorpFacilities(this.infrastructureStates.get(corp.corpId) ?? null, Date.now(), this.showcases.get(corp.corpId)),
       members: [...this.members.values()].filter(
         (m) => m.corpId === corp.corpId && m.role !== 'recruit',
       ).length,
@@ -449,6 +568,7 @@ export class MemoryCorpStore implements CorpStore {
   removeMember(corpId: string, accountId: string): Promise<void> {
     const row = this.members.get(accountId);
     if (row && row.corpId === corpId) {
+      this.revokeBuildMembership(accountId);
       this.members.delete(accountId);
       this.playerReady.delete(accountId); // leaving the corp revokes the consent (AVA-3)
     }
@@ -468,10 +588,12 @@ export class MemoryCorpStore implements CorpStore {
   removeCorp(corpId: string): Promise<void> {
     this.corps.delete(corpId);
     this.infrastructureStates.delete(corpId);
+    this.showcases.delete(corpId);
     this.corpReady.delete(corpId);
     for (const [accountId, row] of this.members) {
       if (row.corpId === corpId) {
-        this.members.delete(accountId);
+        this.revokeBuildMembership(accountId);
+      this.members.delete(accountId);
         this.playerReady.delete(accountId);
       }
     }
@@ -654,21 +776,54 @@ export class MemoryAvaResultStore implements AvaResultStore {
   record(result: AvaResult): Promise<void> {
     // The locked→ended transition guarantees one call per matchup; keep the first
     // write should it ever be called twice (idempotent by matchupId).
-    if (!this.rows.has(result.matchupId)) this.rows.set(result.matchupId, { ...result });
+    if (!this.rows.has(result.matchupId)) this.rows.set(result.matchupId, structuredClone(result));
     return Promise.resolve();
   }
 
   get(matchupId: string): Promise<AvaResult | null> {
     const row = this.rows.get(matchupId);
-    return Promise.resolve(row ? { ...row } : null);
+    return Promise.resolve(row ? structuredClone(row) : null);
   }
 
   recent(limit = DEFAULT_RESULTS_LIMIT): Promise<AvaResult[]> {
+    return Promise.resolve(this.newest().slice(0, limit).map((r) => structuredClone(r)));
+  }
+
+  resultsOf(
+    corpId: string,
+    limit = DEFAULT_RESULTS_LIMIT,
+  ): Promise<Array<AvaResult & { format: number }>> {
     return Promise.resolve(
-      [...this.rows.values()]
-        .sort((a, b) => b.at - a.at || (a.matchupId < b.matchupId ? -1 : 1))
+      this.newest()
+        .filter((r) => r.challengerCorp === corpId || r.targetCorp === corpId)
         .slice(0, limit)
-        .map((r) => ({ ...r })),
+        .map((r) => ({ ...structuredClone(r), format: r.format ?? 2 })),
+    );
+  }
+
+  tallyOf(corpId: string): Promise<AvaTally[]> {
+    const byKey = new Map<string, AvaTally>();
+    for (const r of this.rows.values()) {
+      if (r.challengerCorp !== corpId && r.targetCorp !== corpId) continue;
+      const opponent = r.challengerCorp === corpId ? r.targetCorp : r.challengerCorp;
+      const format = r.format ?? 2;
+      const key = `${opponent}\u0000${format}`;
+      const row = byKey.get(key) ?? { opponent, format, wins: 0, losses: 0, draws: 0 };
+      if (r.winnerCorp === null) row.draws += 1;
+      else if (r.winnerCorp === corpId) row.wins += 1;
+      else row.losses += 1;
+      byKey.set(key, row);
+    }
+    return Promise.resolve(
+      [...byKey.values()].sort((a, b) =>
+        a.opponent < b.opponent ? -1 : a.opponent > b.opponent ? 1 : a.format - b.format,
+      ),
+    );
+  }
+
+  private newest(): AvaResult[] {
+    return [...this.rows.values()].sort(
+      (a, b) => b.at - a.at || (a.matchupId < b.matchupId ? -1 : 1),
     );
   }
 
@@ -970,10 +1125,20 @@ export class MemoryArsenalStore implements ArsenalStore {
 export class MemoryCorpRentStore implements CorpRentStore {
   private readonly active = new Map<string, CorpRent>(); // itemId -> row
 
+  activeForCorp(corpId: string): Promise<CorpRent[]> {
+    return Promise.resolve([...this.active.values()].filter((r) => r.corpId === corpId).map((r) => ({ ...r })));
+  }
+
   rent(entry: CorpRent): Promise<boolean> {
     if (this.active.has(entry.itemId)) return Promise.resolve(false);
     this.active.set(entry.itemId, { ...entry });
     return Promise.resolve(true);
+  }
+  rentWithLimit(entry: CorpRent, limit: number): Promise<'ok' | 'limit' | 'rented'> {
+    if (this.active.has(entry.itemId)) return Promise.resolve('rented');
+    if (!Number.isSafeInteger(limit) || limit < 1 || [...this.active.values()].filter((r) => r.corpId === entry.corpId && r.matchupId === entry.matchupId).length >= limit) return Promise.resolve('limit');
+    this.active.set(entry.itemId, { ...entry });
+    return Promise.resolve('ok');
   }
 
   activeForMatchup(matchupId: string): Promise<CorpRent[]> {
@@ -1111,6 +1276,19 @@ export class MemoryFriendStore implements FriendStore {
     const key = MemoryFriendStore.key(accountId, otherId);
     if (!this.rows.delete(key)) return Promise.resolve({ ok: false, code: 'E_NO_EDGE' as const });
     return Promise.resolve({ ok: true as const });
+  }
+
+  /** FRIENDS-2 · accounts that hide their matches from friends. */
+  private readonly hiding = new Set<string>();
+
+  hidesMatches(accountId: string): Promise<boolean> {
+    return Promise.resolve(this.hiding.has(accountId));
+  }
+
+  setHidesMatches(accountId: string, hide: boolean): Promise<void> {
+    if (hide) this.hiding.add(accountId);
+    else this.hiding.delete(accountId);
+    return Promise.resolve();
   }
 }
 

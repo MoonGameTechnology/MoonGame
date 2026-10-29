@@ -25,6 +25,10 @@ describe.skipIf(!url)('corporate database cutover', () => {
       const created = await corps.createCorp(name, 'head', 'Pilot');
       if (!created.ok) throw Error('fixture');
       await corps.appendAudit({ corpId: created.corpId, at: 10, actor: 'head', action: 'create' });
+      const initial = await corps.infrastructure(created.corpId, 'head', 0);
+      if (!initial.ok) throw Error('fixture');
+      const prepared = await corps.prepareBuild(created.corpId, 'head', 0, { requestId: randomUUID(), buildingId: 'headquarters', expectedLevel: 0, price: initial.infrastructure.buildings[0]!.next!.price });
+      if (!prepared.ok) throw Error('fixture');
       await source.query(
         "INSERT INTO matches(id,data_version,seq,status,state) VALUES('game-only','test',1,'ongoing','{}')",
       );
@@ -39,6 +43,8 @@ describe.skipIf(!url)('corporate database cutover', () => {
       );
       expect(await new PostgresCorpStore(target).auditOf(created.corpId)).toHaveLength(1);
       expect((await new PostgresCorpStore(target).getCorp(created.corpId))?.name).toBe(name);
+      expect(await new PostgresCorpStore(target).commitBuild(prepared.ticket.id, 0)).toEqual({ state: 'applied' });
+      expect(await new PostgresCorpStore(target).commitBuild(prepared.ticket.id, 0)).toEqual({ state: 'applied' });
       expect((await target.query('SELECT count(*) AS n FROM matches')).rows[0].n).toBe('0');
       await expect(migrateCorporations(source, target, true)).rejects.toThrow(
         'E_CORPORATIONS_TARGET_NOT_EMPTY',

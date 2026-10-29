@@ -1,3 +1,4 @@
+import { COMMERCE_CATALOG_VERSION, commerceOffers } from './commerceCatalog';
 import Fastify from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CommerceService, type CommerceProvider } from './commerceService';
@@ -7,7 +8,7 @@ import {
   registerCommerceEntitlementApi,
 } from './commerceTransport';
 import { MetaEconomy } from './metaEconomy';
-import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
+import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from './metaEconomyCatalog';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { MemoryMetaMarket } from './metaMarket';
 import { MemoryArsenalStore, MemoryDropStore } from './store';
@@ -30,6 +31,7 @@ async function setup() {
   const economy = new MetaEconomy({
     store: metaStore,
     catalog,
+    catalogHistory: loadMetaEconomyCatalogHistory(data),
     dropTables: loadDropTables(data),
     now: () => now,
   });
@@ -78,10 +80,27 @@ async function setup() {
   });
   const send = (value: CommerceVerification) =>
     commerce.webhook(provider.id, {}, Buffer.from(JSON.stringify(value)));
-  return { commerce, economy, metaStore, market, proof, send, now };
+  return { commerce, economy, metaStore, market, proof, send, now, orders };
 }
 
 describe('Commerce to real Meta/Economy over signed HTTP', () => {
+  it('delivers an already issued old-catalog order after the catalog update, once', async () => {
+    const f = await setup();
+    const orderId = 'paid-before-catalog-update';
+    await f.orders.create({
+      orderId, accountId: 'alice', requestId: 'legacy-checkout', provider: 'test-only',
+      offer: { ...commerceOffers().find((offer) => offer.productId === 'supply_personal')!,
+        catalogVersion: 'meta-v0.1', available: true, price: { amountMinor: 100, currency: 'USD' } },
+      state: 'pending', createdAt: f.now - 1,
+    });
+    await f.send({ ...f.proof(orderId), catalogVersion: 'meta-v0.1' });
+    await f.commerce.deliver();
+    expect((await f.commerce.order('alice', orderId))?.state).toBe('fulfilled');
+    expect(await f.commerce.deliver()).toBe(0);
+    const lots = (await f.metaStore.read('alice')).materials;
+    expect(lots.map((lot) => lot.quantity).sort((a, b) => a - b)).toEqual([2, 3, 3, 5]);
+    expect(lots.every((lot) => lot.soulbound)).toBe(true);
+  });
   it('grants one bound pack, records its receipt and reverses only its materials', async () => {
     const f = await setup();
     await f.economy.settle({
@@ -94,7 +113,7 @@ describe('Commerce to real Meta/Economy over signed HTTP', () => {
     });
     const earned = (await f.metaStore.read('alice')).materials;
     const warrants = await f.market.balance('alice');
-    const order = await f.commerce.createOrder('alice', 'purchase', 'supply_personal', 'meta-v0.1');
+    const order = await f.commerce.createOrder('alice', 'purchase', 'supply_personal', COMMERCE_CATALOG_VERSION);
     await f.send(f.proof(order.orderId));
     await f.commerce.deliver();
     expect((await f.commerce.order('alice', order.orderId))?.state).toBe('fulfilled');
@@ -120,7 +139,7 @@ describe('Commerce to real Meta/Economy over signed HTTP', () => {
         'alice',
         `ad-${i}`,
         'rewarded_supply',
-        'meta-v0.1',
+        COMMERCE_CATALOG_VERSION,
       );
       orders.push(order);
       await f.send(f.proof(order.orderId, 'rewarded_supply', 'rewarded_ad'));

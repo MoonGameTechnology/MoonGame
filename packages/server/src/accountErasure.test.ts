@@ -162,6 +162,7 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
     if (!record) throw Error('fixture');
     const id = made.userId;
     await game.query('INSERT INTO registration_rewards (account_id, xp) VALUES ($1, 25)', [id]);
+    await game.query("INSERT INTO player_medal_news(id,account_id,medal_id,grade,at,login,corp) VALUES('erasure-medal',$1,'first',1,100,'active',NULL)", [id]);
     for (const pool of [game, corporations]) {
       await pool.query('INSERT INTO player_profiles VALUES($1,$2)', [id, { portrait: 'test' }]);
       await pool.query('INSERT INTO meta_wallets VALUES($1,42)', [id]);
@@ -180,6 +181,22 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
         [id],
       );
     }
+    // CORP-9: a battle's breakdown names its seats by account and login.
+    const seat = { side: 'challenger', score: 1, provinces: 1, out: false };
+    await corporations.query(
+      "INSERT INTO ava_results(matchup_id,challenger_corp,target_corp,winner_corp,at,format,report) VALUES('mu','c1','c2','c1',1,2,$1)",
+      [
+        {
+          reason: 'score',
+          provinces: 9,
+          sides: { challenger: { score: 1, provinces: 2 }, target: { score: 0, provinces: 0 } },
+          seats: [
+            { ...seat, accountId: id, login: 'active' },
+            { ...seat, accountId: 'other', login: 'other' },
+          ],
+        },
+      ],
+    );
     await new PostgresMetaEconomyStore(game).transaction([id], tx => tx.saveReceipt('meta:hashed-opaque-key', 'opaque-fingerprint', { ok: true }));
     await new PostgresMetaEconomyStore(game).transaction([id, 'other'], tx => tx.saveReceipt('meta:shared-opaque-key', 'shared-fingerprint', { accountId: id, other: 'other' }));
     const request = await store.requestDeletion(record);
@@ -215,7 +232,14 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
         ticket_hash: null,
       });
     }
+    const report = (await corporations.query('SELECT report FROM ava_results')).rows[0].report;
+    expect(JSON.stringify(report)).not.toContain(id);
+    expect(report.seats).toEqual([
+      { ...seat, accountId: expect.stringMatching(/^deleted:/), login: '[deleted]' },
+      { ...seat, accountId: 'other', login: 'other' },
+    ]);
     expect((await game.query('SELECT * FROM registration_rewards WHERE account_id=$1', [id])).rowCount).toBe(0);
+    expect((await game.query("SELECT account_id,login FROM player_medal_news WHERE id='erasure-medal'")).rows).toEqual([{ account_id: null, login: null }]);
     expect(
       (await game.query('SELECT completed_at FROM account_deletions')).rows[0].completed_at,
     ).toBeTruthy();

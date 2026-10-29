@@ -237,22 +237,3 @@ export function corpRequirements(
   out.push({ kind: 'time', durationMs: next.actualDurationMs, reduction: view.constructionReduction });
   return out;
 }
-
-/** Знак на гербе корпорации. Тега сервер не хранит, поэтому знак — первые буквы двух
- *  первых слов названия, а у названия из одного слова — его первые две буквы. */
-export function corpInitials(name: string): string {
-  const words = name
-    .trim()
-    .split(/[\s\-–—_.]+/u)
-    .filter(Boolean);
-  const letters =
-    words.length > 1
-      ? words
-          .slice(0, 2)
-          .map((w) => Array.from(w)[0] ?? '')
-          .join('')
-      : Array.from(words[0] ?? '')
-          .slice(0, 2)
-          .join('');
-  return (letters || '?').toUpperCase();
-}

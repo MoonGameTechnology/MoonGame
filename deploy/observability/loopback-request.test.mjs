@@ -155,6 +155,7 @@ describe.skipIf(!tools)('verified local operator transport', () => {
       execFileSync('python3', ['-c', script, transport, deploy, root], {
         encoding: 'utf8',
         stdio: 'pipe',
+        env: { ...process.env, STATE_DIR: root },
       });
     writeFileSync(file, base + 'BACKUP_POLICY=deferred-playtest\n');
     expect(JSON.parse(run())).toEqual({

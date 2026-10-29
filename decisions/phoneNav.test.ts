@@ -71,7 +71,6 @@ describe('нижняя панель телефона (UIX-3.1)', () => {
       'coalitions',
       'pings',
       'market',
-      'corporation',
       'steward',
       'codex',
       'settings',
@@ -80,10 +79,9 @@ describe('нижняя панель телефона (UIX-3.1)', () => {
   });
 
   it('подписи «Ещё» — полными словами, без «Дипло», «Корп» и «Сон» (правило 3)', () => {
-    const label = (id: 'diplomacy' | 'corporation' | 'steward') => ru[phoneItem(id).label];
-    expect([label('diplomacy'), label('corporation'), label('steward')]).toEqual([
+    const label = (id: 'diplomacy' | 'steward') => ru[phoneItem(id).label];
+    expect([label('diplomacy'), label('steward')]).toEqual([
       'Дипломатия',
-      'Корпорация',
       'Хранитель',
     ]);
     for (const item of PHONE_ITEMS)
@@ -167,7 +165,7 @@ describe('своя раскладка панели (UIX-3.3)', () => {
 
   it('незнакомое, повторное и лишнее отбрасывается, пустое занимает раскладка по умолчанию (правило 9)', () => {
     expect(parsePhoneBar('')).toEqual(DEFAULT_PHONE_BAR);
-    expect(parsePhoneBar('mail,mail,exit,nonsense')).toEqual(['mail', 'production', 'science']);
+    expect(parsePhoneBar('mail,mail,exit,corporation,nonsense')).toEqual(['mail', 'production', 'science']);
     expect(parsePhoneBar(' science , mail ,codex,steward')).toEqual(['science', 'mail', 'codex']);
     expect(parsePhoneBar('events')).toEqual(['events', 'production', 'science']);
   });

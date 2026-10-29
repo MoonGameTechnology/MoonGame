@@ -361,8 +361,7 @@ export class Kernel {
     // Terminal gate (BF-34): once the match is decided, the world is frozen — a
     // player intent must not keep mutating (and persisting) a finished game. A
     // future victory-lap grace window would relax THIS check; the fail-secure
-    // default is to reject. Scheduled events (advanceTo) still settle any battle
-    // that was already in flight — this bars only new player-driven change.
+    // default is to reject. advanceTo freezes scheduled work at the same boundary.
     if (state.match.status === 'ended') {
       return { ok: false, code: 'E_MATCH_ENDED' };
     }
@@ -482,7 +481,8 @@ export class Kernel {
    * Between consecutive event instants the kernel emits a `time.advanced`
    * { from, to } event covering that exact span, so modules accrue continuous
    * quantities (resource production) by formula rather than by ticking. The
-   * spans are contiguous and cover [state.time, now] exactly.
+   * spans are contiguous and cover [state.time, now], stopping after the atomic
+   * step that ends the match. No later scheduled step may change a decided world.
    *
    * A scheduled event whose handler throws is dropped into `failures` (dead-
    * lettered) and the timeline keeps moving — the world never gets stuck.
@@ -494,6 +494,9 @@ export class Kernel {
   advanceTo(state: GameState, ctx: Context): AdvanceResult {
     if (ctx.now < state.time) {
       return { ok: false, code: 'E_TIME_BACKWARDS' };
+    }
+    if (state.match.status === 'ended') {
+      return { ok: true, state, events: [], failures: [] };
     }
     return this.advanceInPlace(state, ctx) ?? this.advanceStepwise(state, ctx);
   }
@@ -523,7 +526,7 @@ export class Kernel {
     // Остановка, чей шаг ещё впереди: он идёт после событий, назначенных на тот же миг.
     let halt: number | null = null;
     let guard = 0;
-    for (;;) {
+    while (draft.match.status !== 'ended') {
       if (++guard > MAX_ADVANCE_STEPS) {
         return { ok: true, state: draft, events, failures: [], partial: true };
       }
@@ -580,7 +583,7 @@ export class Kernel {
     let halt: number | null = null;
     let guard = 0;
 
-    for (;;) {
+    while (committed.match.status !== 'ended') {
       if (++guard > MAX_ADVANCE_STEPS) {
         // Hit the per-call work bound before reaching `now`. Rather than discard the
         // (fully deterministic) progress made so far and wedge the room on every

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { GameData } from '@void/shared-core';
-import { CORP_STYLE_STANDARD, PROFILE_MEDALS } from '@void/protocol';
+import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD, PROFILE_MEDALS } from '@void/protocol';
 
 const id = z
   .string()
@@ -32,6 +32,8 @@ const storeOffer = z
     materials: quantities.optional(),
     /** A corporation base style: the head buys it for the whole corporation (`buyCorpStyle`). */
     corpStyle: id.optional(),
+    /** A corporation backdrop (CORP-15): bought and applied like a base style. */
+    corpBackdrop: id.optional(),
     /** Lifetime purchases per account. */
     limit: z.number().int().min(1).max(100).optional(),
   })
@@ -49,7 +51,7 @@ const medalPay = z
 const schema = z
   .object({
     version: z.string().min(1),
-    materials: z.record(id, z.object({ nameKey: z.string().min(1) }).strict()),
+    materials: z.record(id, z.object({ nameKey: z.string().min(1), purpose: z.literal('corporation').optional() }).strict()),
     recipes: z.record(
       id,
       z
@@ -63,6 +65,7 @@ const schema = z
     rewards: z
       .object({
         materials: quantities,
+        corporationMaterials: z.record(id, amount).default({}),
         stageFractions: z.array(z.number().gt(0).lt(1)).min(1).max(10),
         resultBonuses: z.array(
           z.object({ maxPlace: amount, percent: z.number().int().min(0).max(50) }).strict(),
@@ -169,10 +172,16 @@ export function parseMetaEconomyCatalog(
 ): MetaEconomyCatalog {
   const catalog = schema.parse(raw);
   const materialIds = Object.keys(catalog.materials);
-  if (materialIds.length !== 5) throw new Error('E_META_MATERIALS');
-  const checkMaterials = (values: Record<string, number> | undefined): void => {
+  const equipmentIds = materialIds.filter((key) => catalog.materials[key]!.purpose !== 'corporation');
+  const corporationIds = materialIds.filter((key) => catalog.materials[key]!.purpose === 'corporation');
+  if (equipmentIds.length !== 5) throw new Error('E_META_MATERIALS');
+  const checkMaterials = (values: Record<string, number> | undefined, corporation = false): void => {
     if (values && Object.keys(values).some((key) => !Object.hasOwn(catalog.materials, key))) {
       throw new Error('E_META_MATERIAL');
+    }
+    if (values && Object.keys(values).some((key) =>
+      (catalog.materials[key]!.purpose === 'corporation') !== corporation)) {
+      throw new Error('E_META_MATERIAL_PURPOSE');
     }
   };
   const checkModule = (defId: string | undefined): void => {
@@ -191,8 +200,12 @@ export function parseMetaEconomyCatalog(
     }
     for (const key of Object.keys(recipe.ingredients)) uses[key] = (uses[key] ?? 0) + 1;
   }
-  if (materialIds.some((key) => (uses[key] ?? 0) < 2)) throw new Error('E_META_UNUSED_MATERIAL');
+  if (equipmentIds.some((key) => (uses[key] ?? 0) < 2)) throw new Error('E_META_UNUSED_MATERIAL');
   checkMaterials(catalog.rewards.materials);
+  checkMaterials(catalog.rewards.corporationMaterials, true);
+  if (corporationIds.some((key) => !catalog.rewards.corporationMaterials[key])) {
+    throw new Error('E_META_UNUSED_MATERIAL');
+  }
   if (catalog.rewards.dailyWarrants < catalog.rewards.warrants)
     throw new Error('E_META_WARRANT_CAP');
   if (catalog.medals.sovereignsOnly.some((medal) => !PROFILE_MEDALS.some((m) => m.id === medal)))
@@ -268,6 +281,7 @@ export function parseMetaEconomyCatalog(
       offer.modules,
       offer.materials,
       offer.corpStyle,
+      offer.corpBackdrop,
     ].filter((kind) => kind !== undefined);
     if (kinds.length !== 1) throw new Error('E_META_STORE');
     if (offer.modules) {
@@ -284,19 +298,23 @@ export function parseMetaEconomyCatalog(
       ? 'modules'
       : offer.materials
         ? 'materials'
-        : offer.corpStyle
+        : offer.corpStyle || offer.corpBackdrop
           ? 'styles'
           : 'premium';
     if (offer.category !== category) throw new Error('E_META_STORE');
-    if (offer.corpStyle) {
-      // The free style is never sold; a style is owned once, so no purchase limit either.
+    const look = offer.corpStyle ?? offer.corpBackdrop;
+    if (look) {
+      // The free style and backdrop are never sold; a style or a backdrop is owned once, so
+      // no purchase limit either. Both share the corporation's list of bought looks, so an
+      // id names one of them only.
       if (
-        offer.corpStyle === CORP_STYLE_STANDARD ||
-        corpStyles.has(offer.corpStyle) ||
+        look === CORP_STYLE_STANDARD ||
+        look === CORP_BACKDROP_STANDARD ||
+        corpStyles.has(look) ||
         offer.limit !== undefined
       )
         throw new Error('E_META_STORE');
-      corpStyles.add(offer.corpStyle);
+      corpStyles.add(look);
     }
     checkMaterials(offer.materials);
     if (offer.premiumSeason && !seasonIds.has(offer.premiumSeason)) throw new Error('E_META_STORE');
@@ -309,4 +327,9 @@ export function loadMetaEconomyCatalog(
   path = 'data/metaEconomy.json',
 ): MetaEconomyCatalog {
   return parseMetaEconomyCatalog(JSON.parse(readFileSync(path, 'utf8')) as unknown, data);
+}
+
+/** Retain issued payment editions when the current match reward catalog advances. */
+export function loadMetaEconomyCatalogHistory(data: Pick<GameData, 'modules'>): MetaEconomyCatalog[] {
+  return [loadMetaEconomyCatalog(data, 'data/metaEconomy-history/meta-v0.1.json')];
 }

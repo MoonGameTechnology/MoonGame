@@ -1,6 +1,8 @@
+import { canFundCorpBuilding, corpMaterialsHtml, corpMaterialPriceHtml } from './corpMaterialsView';
+import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
 /**
  * Вкладка хаба «Корпорация» (CORP-3) — разметка по макету, одобренному владельцем
- * 2026-10-21: шапка корпорации, разделы «База», «Битвы», «Состав», «Казна» и шторка над
+ * 2026-10-21: шапка корпорации, разделы «База», «Битвы», «Состав», «Казна», «Настройки» и шторка над
  * хабом (лист здания, уровни корпорации, участник). Что показать, решают
  * `decisions/corpHub.ts`, `corpBase.ts`, `corpTreasury.ts` и `corpMembers.ts`; данные,
  * запросы и нажатия держит `corpScreen.ts`. Здесь — только сборка разметки из картины.
@@ -10,13 +12,12 @@
  * исключить, передать главенство), просит второго нажатия: `data-corpconfirm` — ключ
  * кнопки, и взведённая кнопка вместо названия задаёт вопрос.
  *
- * Здания рисуются в стиле базы (CORP-14): его применяет глава в шторке «Стиль базы»
+ * Здания рисуются в стиле базы (CORP-14): его применяет глава из «Настроек» в шторке «Стиль базы»
  * (`data-corpstyle`), а за некупленным ведёт в магазин (`data-corpshop`).
  */
 import {
   CORP_HQ,
   corpBuildingStatus,
-  corpInitials,
   corpLevel,
   corpLevelPlan,
   corpLevelTable,
@@ -38,36 +39,44 @@ import type {
 } from '../../packages/protocol/src/corpInfrastructure';
 import { CORP_STYLE_STANDARD, type MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import { t } from '../../localization/runtime';
+import { corpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/corpIdentity';
+import { corpEmblem, corpEmblemPicker } from './corpEmblems';
 import type { CorpAuditEntry, CorpMembership, CorpRecord, CorpRole, CorpSummary } from './corp';
 import { CORP_STYLES, corpStyleName } from './corpArt';
 import {
+  CORP_BACKDROPS,
   CORP_DRAW_ORDER,
   CORP_LOTS,
   CORP_PANORAMA,
+  corpBackdropName,
   corpPanoramaBg,
   corpSprite,
+  corpSpriteRoof,
 } from './corpSprites';
 import { esc, nfmt } from './format';
 import { newsCalendar, newsTimeText } from './newsScreen';
 
 // --- таблицы ---------------------------------------------------------------------------
 
-export type CorpHubSection = 'base' | 'battles' | 'members' | 'treasury';
+export type CorpHubSection = 'base' | 'battles' | 'members' | 'treasury' | 'settings';
 
-export const CORP_HUB_SECTIONS: readonly CorpHubSection[] = ['base', 'battles', 'members', 'treasury'];
+export const CORP_HUB_SECTIONS: readonly CorpHubSection[] = ['base', 'battles', 'members', 'treasury', 'settings'];
 
 export const CORP_HUB_SECTION_LABEL: Readonly<Record<CorpHubSection, string>> = {
   base: 'corp.hub.tab.base',
   battles: 'corp.tab.battles',
   members: 'corp.hub.tab.members',
   treasury: 'corp.tab.treasury',
+  settings: 'corp.tab.settings',
 };
 
 /** Что открыто в шторке над хабом. */
 export type CorpHubSheet =
   | { kind: 'building'; id: string }
   | { kind: 'levels' }
+  | { kind: 'report'; matchupId: string }
   | { kind: 'member'; accountId: string }
+  | { kind: 'emblem' }
   | { kind: 'style' };
 
 const ROLE_LABEL: Readonly<Record<CorpRole, string>> = {
@@ -113,6 +122,7 @@ const STYLE_STATE: Readonly<Record<Exclude<CorpStyleCard, 'apply' | 'shop'>, str
 
 /** Всё, из чего рисуется вкладка. */
 export interface CorpHubPaint {
+  materials?: CorpMaterialsView | null;
   state: CorpHubState;
   section: CorpHubSection;
   corp: CorpRecord | null;
@@ -131,11 +141,14 @@ export interface CorpHubPaint {
   browse: readonly CorpSummary[];
   /** Приказ ушёл и ждёт ответа: кнопки приказов погашены. */
   busy: boolean;
+  draftEmblem?: CorpEmblemId;
   /** Взведённая кнопка необратимого приказа. */
   armed: string | null;
   badges: { members: number; battles: number };
-  /** «Битвы» до CORP-10 — построители окна корпорации. */
+  /** Five battle subsections, built from the private battle read model. */
   battles: string;
+  battleReport?: string;
+  facilities?: Readonly<Record<string, string>>;
   canSignIn: boolean;
   /** Часы игрока — для «сегодня» и «вчера» в казне. */
   now: number;
@@ -166,22 +179,15 @@ function effects(level: CorpBuildingLevel | undefined): string {
     level.influencePerDay > 0 ? t('corp.buildings.income', { n: level.influencePerDay }) : '',
     level.constructionReduction > 0 ? t('corp.buildings.speed', { n: level.constructionReduction }) : '',
     level.maxFormat ? t('corp.buildings.format', { n: level.maxFormat }) : '',
+    level.warehouseItems ? t('corp.buildings.warehouse.effect', { n: level.warehouseItems }) : '',
+    level.showcaseSlots ? t('corp.buildings.hall.effect', { n: level.showcaseSlots }) : '',
+    level.monument ? t('corp.buildings.monument.effect') : '',
   ]
     .filter(Boolean)
     .join(' · ');
 }
 
 const initial = (s: string): string => (Array.from(s.trim())[0] ?? '?').toUpperCase();
-
-/** Герб: шестигранник со знаком корпорации. */
-export function corpEmblem(name: string, size = 40): string {
-  const tag = corpInitials(name);
-  return (
-    `<svg class="cb-emb" width="${size}" height="${Math.round(size * 1.1)}" viewBox="0 0 40 44" aria-hidden="true">` +
-    `<path d="M20 1.5L37.5 11.5V32.5L20 42.5L2.5 32.5V11.5Z"/>` +
-    `<text x="20" y="26.5" text-anchor="middle" font-size="${tag.length > 2 ? 10 : 13}">${esc(tag)}</text></svg>`
-  );
-}
 
 function hexNum(n: number): string {
   return (
@@ -240,16 +246,11 @@ function levelPill(view: CorpInfrastructureView): string {
 
 function headHtml(p: CorpHubPaint, corp: CorpRecord): string {
   const count = p.members.filter((m) => m.role !== 'recruit').length;
-  const style = p.style
-    ? `<button type="button" class="cb-lvl" data-corphub="style">${esc(
-        t('corp.style.current', { name: t(corpStyleName(p.style.active)) }),
-      )}</button>`
-    : '';
   return (
-    `<header class="cb-head">${corpEmblem(corp.name, 50)}` +
+    `<header class="cb-head">` +
+    corpEmblem(corp.corpId, corp.emblemId, 50) +
     `<div class="cb-id"><h2>${esc(corp.name)}</h2><div class="cb-meta">` +
     (p.view ? levelPill(p.view) : '') +
-    style +
     (count ? `<span>${esc(t('corp.members.count', { n: count }))}</span>` : '') +
     `<span>${esc(p.rank === null ? t('corp.head.rank.none') : t('corp.head.rank', { n: p.rank }))}</span>` +
     `</div></div>` +
@@ -268,9 +269,12 @@ function tabsHtml(p: CorpHubPaint): string {
     `<div class="cb-tabs" role="tablist" aria-label="${esc(t('corp.hub.tabs'))}">` +
     CORP_HUB_SECTIONS.map((s) => {
       const n = badge[s] ?? 0;
+      const settings = s === 'settings';
       return (
-        `<button type="button" role="tab" class="cb-tab" data-corpsec="${s}" aria-selected="${s === p.section}">` +
-        `${esc(t(CORP_HUB_SECTION_LABEL[s]))}${n ? `<small>${n}</small>` : ''}</button>`
+        `<button type="button" role="tab" class="cb-tab${settings ? ' cb-tab-settings' : ''}" data-corpsec="${s}" aria-selected="${s === p.section}"` +
+        (settings ? ` aria-label="${esc(t('corp.settings.title'))}" title="${esc(t('corp.settings.title'))}"` : '') + `>` +
+        (settings ? `<span class="cb-settings-icon" aria-hidden="true">⚙</span><span class="cb-settings-label">${esc(t(CORP_HUB_SECTION_LABEL[s]))}</span>` : esc(t(CORP_HUB_SECTION_LABEL[s]))) +
+        `${n ? `<small>${n}</small>` : ''}</button>`
       );
     }).join('') +
     `</div>`
@@ -302,13 +306,15 @@ function lotHtml(view: CorpInfrastructureView, b: CorpBuildingView, canBuild: bo
   const pos =
     `left:${pct(lot.x, CORP_PANORAMA.w)};top:${pct(lot.y, CORP_PANORAMA.h)};` +
     `width:${pct(lot.w, CORP_PANORAMA.w)};height:${pct(lot.h, CORP_PANORAMA.h)}`;
+  const roof = corpSpriteRoof(b.id, b.level, st, style);
+  const at = roof ? ` style="--bx:${pct(roof.x, 1)};--by:${pct(roof.y, 1)}"` : '';
   return (
     `<button type="button" class="cb-lot ${st} tag-${lot.tag}" style="${pos}" data-corpbld="${esc(b.id)}" ` +
     `aria-label="${esc(`${t(b.nameKey)}: ${lotLabel(view, b, st)}`)}">` +
     corpSprite(b.id, b.level, st, style, true) +
     (st === 'open' && canBuild ? `<span class="cb-plus" aria-hidden="true">+</span>` : '') +
     `<span class="cb-tagl" aria-hidden="true"><b>${esc(t(b.nameKey))}</b>${mark.tag ? `<i>${esc(mark.tag)}</i>` : ''}</span>` +
-    `<span class="cb-bdg" aria-hidden="true">${esc(mark.badge)}</span></button>`
+    `<span class="cb-bdg"${at} aria-hidden="true">${esc(mark.badge)}</span></button>`
   );
 }
 
@@ -429,7 +435,10 @@ function baseHtml(p: CorpHubPaint): string {
   const drawn = CORP_DRAW_ORDER.map((id) => view.buildings.find((b) => b.id === id)).filter(
     (b): b is CorpBuildingView => b !== undefined,
   );
-  const bg = corpPanoramaBg(drawn.map((b) => ({ id: b.id, built: b.level > 0 })));
+  const bg = corpPanoramaBg(
+    drawn.map((b) => ({ id: b.id, built: b.level > 0 })),
+    p.style?.backdrop,
+  );
   const style = styleOf(p);
   return (
     `<div class="cb-base">` +
@@ -501,15 +510,36 @@ function membersHtml(p: CorpHubPaint, me: CorpMembership): string {
     `<section class="cb-card cb-roles"><div class="cb-card-h"><h3>${esc(t('corp.hub.roles'))}</h3></div><ul class="cb-reqs">` +
     `<li class="info">${esc(t('corp.hub.roles.head'))}</li><li class="info">${esc(t('corp.hub.roles.officer'))}</li>` +
     `<li class="info">${esc(t('corp.hub.roles.member'))}</li></ul></section>`;
-  const exit =
-    me.role === 'head'
-      ? confirmable(p, 'disband', t('corp.disband'), t('corp.hub.disband.confirm'), 'data-corpact="disband"', 'btn-second danger')
-      : confirmable(p, 'leave', t('corp.leave'), t('corp.hub.leave.confirm'), 'data-corpact="leave"', 'btn-second danger');
   return (
     `<div class="cb-two"><section class="cb-card"><div class="cb-card-h"><h3>${esc(t('corp.tab.members'))}</h3>` +
     `<small>${esc(t('corp.members.count', { n: roster.length }))}</small></div><div class="cb-mlist">${rows}</div>` +
-    `<div class="cb-exit">${exit}</div></section>` +
+    `</section>` +
     `<div class="cb-side">${apps}${roles}</div></div>`
+  );
+}
+
+// --- настройки -------------------------------------------------------------------------
+
+function settingsHtml(p: CorpHubPaint, corp: CorpRecord, me: CorpMembership): string {
+  const appearance = p.style
+    ? `<button type="button" class="btn-second cb-setting" data-corphub="style"><span>` +
+      `<b>${esc(t('corp.settings.appearance'))}</b>` +
+      `<small>${esc(t('corp.style.current', { name: t(corpStyleName(p.style.active)) }))} · ${esc(t(corpBackdropName(p.style.backdrop)))}</small>` +
+      `</span><span aria-hidden="true">›</span></button>`
+    : `<p class="cb-note">${esc(t('corp.settings.appearance-unavailable'))}</p>` +
+      `<button type="button" class="btn-second" data-corphub="refresh"${off(p.busy)}>${esc(t('corp.buildings.refresh'))}</button>`;
+  const emblem = me.role === 'head'
+    ? `<button type="button" class="btn-second cb-setting" data-corphub="emblem"${off(p.busy)}>` +
+      `<span>${esc(t('corp.emblem.change'))}</span>${corpEmblem(corp.corpId, corp.emblemId, 36)}</button>`
+    : '';
+  const exit = me.role === 'head'
+    ? confirmable(p, 'disband', t('corp.disband'), t('corp.hub.disband.confirm'), 'data-corpact="disband"', 'btn-second danger')
+    : confirmable(p, 'leave', t('corp.leave'), t('corp.hub.leave.confirm'), 'data-corpact="leave"', 'btn-second danger');
+  return (
+    `<section class="cb-card cb-settings"><div class="cb-card-h"><h3>${esc(t('corp.settings.title'))}</h3></div>` +
+    `<p class="cb-note">${esc(t('corp.my-role'))}: ${esc(t(ROLE_LABEL[me.role]))}</p>` +
+    `<div class="cb-settings-options">${appearance}${emblem}</div>` +
+    `<div class="cb-exit">${exit}</div></section>`
   );
 }
 
@@ -553,7 +583,7 @@ function treasuryHtml(p: CorpHubPaint, corp: CorpRecord): string {
         `</div>`
       : '') +
     `<ul class="cb-reqs"><li class="info">${esc(t('corp.hub.balance.in'))}</li><li class="info">${esc(t('corp.hub.balance.out'))}</li></ul>` +
-    `</section></div>`
+    `</section></div>` + corpMaterialsHtml(p.materials, p.busy)
   );
 }
 
@@ -563,7 +593,7 @@ function noneHtml(p: CorpHubPaint): string {
   const rows = p.browse
     .map(
       (c) =>
-        `<div class="cb-rrow">${corpEmblem(c.name, 36)}<span><b>${esc(c.name)}</b>` +
+        `<div class="cb-rrow">${corpEmblem(c.corpId, c.emblemId, 36)}<span><b>${esc(c.name)}</b>` +
         `<small>${esc(t('corp.members.count', { n: c.members }))} · ${nfmt(c.influence)} ⟡</small></span>` +
         `<button type="button" class="btn-second" data-corpact="apply" data-corparg="${esc(c.corpId)}"${off(p.busy)}>${esc(t('corp.apply'))}</button></div>`,
     )
@@ -571,9 +601,9 @@ function noneHtml(p: CorpHubPaint): string {
   return (
     `<div class="cb-nc"><section class="cb-nc-hero"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built')}</div>` +
     `<div class="cb-nc-b"><h2>${esc(t('corp.hub.none.title'))}</h2><p>${esc(t('corp.hub.none.text'))}</p>` +
-    `<div class="cb-create"><input id="corp-hub-name" maxlength="24" autocomplete="off" ` +
-    `placeholder="${esc(t('corp.create.name-ph'))}" aria-label="${esc(t('corp.create.name-ph'))}">` +
-    `<button type="button" class="btn-main" data-corpact="create" data-corpinput="corp-hub-name"${off(p.busy)}>${esc(t('corp.create.title'))}</button></div>` +
+    `<p class="cb-note">${esc(t('corp.create.generated'))}</p>` +
+    corpEmblemPicker(p.draftEmblem ?? 'falcon', p.busy, true) +
+    `<div class="cb-create"><button type="button" class="btn-main" data-corpact="create"${off(p.busy)}>${esc(t('corp.create.title'))}</button></div>` +
     `</div></section>` +
     `<section class="cb-card"><div class="cb-card-h"><h3>${esc(t('corp.browse.title'))}</h3></div>` +
     (rows ? `<div class="cb-rlist">${rows}</div>` : `<p class="cb-note">${esc(t('corp.browse.empty'))}</p>`) +
@@ -584,7 +614,7 @@ function noneHtml(p: CorpHubPaint): string {
 function pendingHtml(p: CorpHubPaint): string {
   const name = p.corp?.name ?? '';
   return (
-    `<section class="cb-card cb-pending">${corpEmblem(name || '?', 50)}` +
+    `<section class="cb-card cb-pending">${corpEmblem(p.corp?.corpId ?? '', p.corp?.emblemId, 50)}` +
     `<div><h3>${esc(t('corp.hub.pending.title', { name }))}</h3><p class="cb-note">${esc(t('corp.hub.pending.text'))}</p></div>` +
     `<button type="button" class="btn-second" data-corpact="cancel"${off(p.busy)}>${esc(t('corp.hub.pending.cancel'))}</button></section>`
   );
@@ -632,10 +662,12 @@ export function corpHubHtml(p: CorpHubPaint): string {
     p.section === 'base'
       ? baseHtml(p)
       : p.section === 'battles'
-        ? `<div class="cb-legacy">${p.battles}</div>`
+        ? p.battles
         : p.section === 'members'
           ? membersHtml(p, me)
-          : treasuryHtml(p, corp);
+          : p.section === 'settings'
+            ? settingsHtml(p, corp, me)
+            : treasuryHtml(p, corp);
   return `<div class="cb">${headHtml(p, corp)}${tabsHtml(p)}${section}</div>`;
 }
 
@@ -680,10 +712,10 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
   else {
     const label = t(b.level > 0 ? 'corp.hub.act.upgrade' : 'corp.hub.act.build', { cost: price(next.cost) });
     action =
-      status.kind === 'can'
+      status.kind === 'can' && canFundCorpBuilding(next, p.materials)
         ? `<button type="button" class="btn-main" data-corpact="build" data-corparg="${esc(b.id)}"${off(p.busy)}>${esc(label)}</button>`
         : `<button type="button" class="btn-main" aria-disabled="true" disabled>${esc(label)}</button>` +
-          `<p class="cb-note warn">${statusHtml(view, b, p.elapsedMs).html}</p>`;
+          `<p class="cb-note warn">${status.kind === 'can' ? esc(t(!p.materials ? 'corp.materials.unavailable' : p.materials.pending ? 'corp.materials.pending' : 'corp.materials.insufficient')) : statusHtml(view, b, p.elapsedMs).html}</p>`;
   }
   const opens = b.id === CORP_HQ && next ? corpLevelPlan(view)?.next?.opens ?? [] : [];
   const style = styleOf(p);
@@ -708,7 +740,10 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
     (opens.length
       ? `<div class="cb-sec"><h4>${esc(t('corp.hub.level.opens'))}</h4><div class="cb-opens">${opensHtml(opens)}</div></div>`
       : '') +
+    (p.facilities?.[b.id] ?? '') +
     reqs +
+    (next && Object.keys(next.materials ?? {}).length ? `<div class="cb-sec"><h4>${esc(t('corp.materials.cost'))}</h4><ul class="cb-reqs">${corpMaterialPriceHtml(next.materials, p.materials)}</ul>` +
+      (p.materials?.pending ? `<p role="status" class="cb-note warn">${esc(t('corp.materials.pending'))}</p>` : '') + `</div>` : '') +
     `<div class="cb-acts">${action}</div>` +
     `<div class="cb-sec"><h4>${esc(t('corp.hub.levels.title'))}</h4><div class="cb-lvls">${thumbs}</div></div>`
   );
@@ -720,6 +755,7 @@ function levelsSheetHtml(view: CorpInfrastructureView): string {
       (r) =>
         `<tr class="${r.current ? 'cur' : ''}"><td>${r.level}${r.current ? ` · ${esc(t('corp.hub.levels.here'))}` : ''}</td>` +
         `<td>${esc(price(r.cost))} · ${esc(duration(r.durationMs))}` +
+        `<ul class="cb-reqs">${Object.entries(view.buildings.find((b) => b.id === CORP_HQ)?.levels[r.level - 1]?.materials ?? {}).map(([id, n]) => `<li>${n} ${esc(t('meta.material.' + id))}</li>`).join('')}</ul>` +
         (r.conditions.length
           ? `<span class="cb-lv-cond">${esc(r.conditions.map((c) => t(CONDITION_KEY[c.kind].need, { n: c.need })).join(' · '))}</span>`
           : '') +
@@ -756,17 +792,28 @@ function memberSheetHtml(p: CorpHubPaint, me: CorpMembership, m: CorpMembership)
   );
 }
 
-/** «Стиль базы»: каждый стиль штабом III уровня. Глава применяет купленный и идёт в магазин
- *  за остальными; участник видит, что есть у корпорации. */
+/** Кнопка или пометка под карточкой стиля и фона. */
+function lookActHtml(p: CorpHubPaint, card: CorpStyleCard, id: string): string {
+  return card === 'apply'
+    ? `<button type="button" class="btn-second" data-corpstyle="${esc(id)}"${off(p.busy)}>${esc(t('corp.style.apply'))}</button>`
+    : card === 'shop'
+      ? `<button type="button" class="btn-second" data-corpshop="${esc(id)}">${esc(t('corp.style.to-shop'))}</button>`
+      : `<span class="cb-sty-st ${card}">${esc(t(STYLE_STATE[card]))}</span>`;
+}
+
+/** «Стиль базы»: каждый стиль штабом III уровня, ниже фоны базы (CORP-15) панорамой. Глава
+ *  применяет купленное и идёт в магазин за остальным; участник видит, что есть у корпорации. */
 function styleSheetHtml(p: CorpHubPaint, view: MetaCorpStyleView): string {
+  const backdrops = CORP_BACKDROPS.map((id) => {
+    const card = corpStyleCard(view, id);
+    return (
+      `<figure class="cb-sty cb-bd${card === 'applied' ? ' cur' : ''}"><div class="cb-bd-art">${corpPanoramaBg([], id)}</div>` +
+      `<figcaption><b>${esc(t(corpBackdropName(id)))}</b>${lookActHtml(p, card, id)}</figcaption></figure>`
+    );
+  }).join('');
   const cards = CORP_STYLES.map((id) => {
     const card = corpStyleCard(view, id);
-    const act =
-      card === 'apply'
-        ? `<button type="button" class="btn-second" data-corpstyle="${esc(id)}"${off(p.busy)}>${esc(t('corp.style.apply'))}</button>`
-        : card === 'shop'
-          ? `<button type="button" class="btn-second" data-corpshop="${esc(id)}">${esc(t('corp.style.to-shop'))}</button>`
-          : `<span class="cb-sty-st ${card}">${esc(t(STYLE_STATE[card]))}</span>`;
+    const act = lookActHtml(p, card, id);
     return (
       `<figure class="cb-sty${card === 'applied' ? ' cur' : ''}"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built', id)}</div>` +
       `<figcaption><b>${esc(t(corpStyleName(id)))}</b>${act}</figcaption></figure>`
@@ -775,7 +822,9 @@ function styleSheetHtml(p: CorpHubPaint, view: MetaCorpStyleView): string {
   return (
     `<h3 id="cb-sheet-title">${esc(t('corp.style.title'))}</h3>` +
     `<p class="cb-note">${esc(t('corp.style.note'))}</p>` +
-    `<div class="cb-styles">${cards}</div>`
+    `<div class="cb-styles">${cards}</div>` +
+    `<h4 class="cb-sty-h">${esc(t('corp.backdrop.title'))}</h4>` +
+    `<div class="cb-styles">${backdrops}</div>`
   );
 }
 
@@ -785,10 +834,16 @@ export function corpHubSheetHtml(p: CorpHubPaint, sheet: CorpHubSheet, notice: s
   if (sheet.kind === 'building') {
     const b = p.view?.buildings.find((x) => x.id === sheet.id);
     if (p.view && b) body = buildingSheetHtml(p, p.view, b);
+  } else if (sheet.kind === 'report') {
+    body = p.battleReport ?? '';
   } else if (sheet.kind === 'levels') {
     if (p.view) body = levelsSheetHtml(p.view);
   } else if (sheet.kind === 'style') {
     if (p.style) body = styleSheetHtml(p, p.style);
+  } else if (sheet.kind === 'emblem') {
+    if (p.corp && p.me?.role === 'head')
+      body = `<h3 id="cb-sheet-title">${esc(t('corp.emblem.title'))}</h3>` +
+        corpEmblemPicker(corpEmblemId(p.corp.corpId, p.corp.emblemId), p.busy);
   } else {
     const m = p.members.find((x) => x.accountId === sheet.accountId && x.role !== 'recruit');
     if (p.me && m) body = memberSheetHtml(p, p.me, m);

@@ -295,7 +295,7 @@ describe.skipIf(!process.env.DATABASE_URL)('corporation infrastructure — postg
 });
 
 it('validates the meta catalog before it reaches either adapter', () => {
-  expect(CORP_BUILDINGS).toHaveLength(4);
+  expect(CORP_BUILDINGS).toHaveLength(7);
   for (const value of [null, {}, { buildings: [] }, { buildings: [null] }]) {
     expect(() => parseCorpBuildings(value)).toThrow('E_CORP_CATALOG');
   }

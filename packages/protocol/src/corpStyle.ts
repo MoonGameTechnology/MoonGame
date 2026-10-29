@@ -7,13 +7,21 @@
 /** The free style every corporation has. */
 export const CORP_STYLE_STANDARD = 'standard';
 
+/** The free backdrop every corporation has: the sky and deck behind the base. Backdrops are
+ *  bought and applied like styles, by the head, and are kept apart from them: a backdrop and
+ *  a style are applied together. */
+export const CORP_BACKDROP_STANDARD = 'orbit';
+
 /** The caller's corporation as `GET /meta-economy/corp-style` reports it. */
 export interface MetaCorpStyleView {
   /** The caller heads the corporation: only the head buys and applies styles. */
   head: boolean;
   /** Applied style: `standard` until the head applies another one. */
   active: string;
-  /** Styles the corporation bought. `standard` is not listed: every corporation has it. */
+  /** Applied backdrop: `orbit` until the head applies another one. */
+  backdrop: string;
+  /** Styles and backdrops the corporation bought. The free ones are not listed: every
+   *  corporation has them. */
   owned: string[];
 }
 
@@ -24,5 +32,6 @@ export interface MetaCorpStyleResponse {
 
 export interface MetaCorpStyleApplyCommand {
   requestId: string;
+  /** A style or a backdrop: the server knows which from the catalog. */
   styleId: string;
 }

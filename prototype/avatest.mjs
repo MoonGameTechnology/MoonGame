@@ -8,7 +8,8 @@
  * that is the host's own doing: its first AvA pass (a minute after boot) raises the battle
  * and hands a cancelled battle's warehouse item back unworn, a member enters it from the
  * hub, the side's bot plays its empty seat while no AI touches a member's, present or
- * not, and the next pass opens the war. Takes about two and a half minutes. */
+ * not, and the next pass opens the war. The hub reads the battle from both sides meanwhile
+ * (CORP-9). Takes about two and a half minutes. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -197,7 +198,7 @@ try {
     const lists = await request('/matches', { token: alpha.token });
     return lists.active.find((row) => row.matchId === matchId) ?? false;
   }, 'the first AvA pass raises the battle', 100_000);
-  assert.equal(listed.mapId, 'ava-2v2-1');
+  assert.equal(listed.mapId, 'team-2v2'); // CORP-8: a 2-on-2 is played on the main-game team map
   assert.equal(listed.entryOpen, false, 'nobody queues into a battle: its roster holds every seat');
   for (const member of [charlie, bravo]) {
     const lists = await request('/matches', { token: member.token });
@@ -210,14 +211,32 @@ try {
   );
   const { rows: [session] } = await db.query('SELECT seats FROM ava_sessions WHERE match_id = $1', [matchId]);
   assert.deepEqual(Object.keys(session.seats).sort(), [alpha.accountId, bravo.accountId, charlie.accountId].sort());
-  assert.deepEqual(Object.values(session.seats).sort(), ['slot_a1', 'slot_a2', 'slot_b1']);
+  assert.deepEqual(Object.values(session.seats).sort(), ['slot_1', 'slot_2', 'slot_3']);
   const seat = session.seats[alpha.accountId];
   const { rows: [raised] } = await db.query('SELECT state FROM matches WHERE id = $1', [matchId]);
-  assert.equal(raised.state.mapId, 'ava-2v2-1');
-  assert.equal(raised.state.players['bot:slot_b2']?.ai, true);
+  assert.equal(raised.state.mapId, 'team-2v2');
+  assert.equal(raised.state.players['bot:slot_4']?.ai, true);
   assert.ok(raised.state.players[seat].arsenal.hulls.includes('evac_transport'), 'the handout rides into the battle deck');
   assert.ok(!raised.state.players[session.seats[charlie.accountId]].arsenal.hulls.includes('evac_transport'));
   report('battle-raised', { matchId, mapId: listed.mapId, sinceBootMs: Date.now() - start });
+
+  // CORP-9: the «Битвы» tab. The corporations list the battle among the challenges, and the
+  // host running it shows a side its war: at peace the rival is a headcount, and a
+  // corporation outside the matchup sees nothing.
+  const tab = await request('/ava/battles', { token: alpha.token });
+  assert.deepEqual(
+    tab.challenges.map((row) => `${row.id}:${row.status}`).sort(),
+    [`${battle}:locked`, `${cancelled}:cancelled`].sort(),
+  );
+  assert.equal(tab.names[corpB], (await request(`/corps/${corpB}`, { token: alpha.token })).corp.name);
+  const peace = await request(`/ava-war/${battle}`, { token: alpha.token });
+  assert.equal(peace.phase, 'peace');
+  assert.equal(peace.side, 'challenger');
+  assert.equal(peace.scoreGoal, 3080); // team-2v2: 2 200 × 2 seats × 0.7
+  assert.deepEqual(peace.mine.map((row) => row.login).sort(), [alpha.login, charlie.login].sort());
+  assert.deepEqual(peace.rivals, { count: 1 });
+  assert.equal((await request(`/ava-war/${battle}`, { token: outsider.token }, 403)).error, 'E_FORBIDDEN');
+  report('war-view-peace', { rivals: peace.rivals.count });
 
   // 2. The same pass hands the cancelled battle's item back unworn; the war's stays out.
   await until(
@@ -246,6 +265,15 @@ try {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    // A corporation can assign a battle while the match browser is closed.
+    // Keep its match-list cache empty; the confirmed corporate seat must suffice.
+    await page.route(/\/matches(?:\?|$)/, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      if (Array.isArray(body.matches)) body.matches = body.matches.filter((match) => match.matchId !== matchId);
+      if (Array.isArray(body.active)) body.active = body.active.filter((match) => match.matchId !== matchId);
+      await route.fulfill({ response, json: body });
+    });
     page.setDefaultTimeout(20_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -266,11 +294,20 @@ try {
       await page.locator('#medal-rewards[open]').waitFor();
       await page.click('#medal-rewards [data-mreward="ok"]');
       await page.locator('#medal-rewards').waitFor({ state: 'hidden' });
-      await page.click('#hub-play');
-      await page.click('.mtab[data-tab="active"]');
-      const row = page.locator(`#mlist .mrow[data-match="${matchId}"]`);
-      assert.equal(await row.locator('.mname b').textContent(), 'Битва корпораций');
-      await row.locator('.mbtn.btn-second').click();
+      await page.click('[data-hub="corp"]');
+      if (await page.locator('#intro').isVisible()) await page.click('#intro .in-ok');
+      await page.click('[data-corpsec="battles"]');
+      if (await page.locator('#intro').isVisible()) await page.click('#intro .in-ok');
+      await page.locator('[data-battletab="now"]').waitFor();
+      for (const width of [390, 1280]) {
+        await page.setViewportSize({ width, height: 844 });
+        for (const tab of ['challenges', 'opponents', 'history', 'ready', 'now']) {
+          await page.locator(`[data-battletab="${tab}"]`).click();
+          assert.equal(await page.locator(`[data-battletab="${tab}"]`).getAttribute('aria-selected'), 'true');
+          assert.equal(await page.locator('#hp-corp').evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true);
+        }
+      }
+      await page.locator('[data-corpact="ava-play"]').click();
       await page.waitForURL(new RegExp(`/game/${matchId}`));
       await page.waitForFunction(() => getComputedStyle(document.getElementById('connect')).display === 'none');
       await page.waitForTimeout(1500); // a few deltas on top of the welcome snapshot
@@ -299,7 +336,7 @@ try {
   await enter((await request(`/matches/${matchId}/join`, { token: alpha.token })).token, true);
   const watchedUntil = Date.now() + AI_CYCLE_MS + 2000;
   const orders = await until(async () => {
-    const n = (await ordersOf(['bot:slot_b2'])).filter((row) => row.ok).length;
+    const n = (await ordersOf(['bot:slot_4'])).filter((row) => row.ok).length;
     return Date.now() >= watchedUntil && n;
   }, 'the side’s bot plays its seat for a whole AI cycle', 60_000);
   const members = [seat, session.seats[charlie.accountId]];
@@ -315,8 +352,18 @@ try {
     100_000,
   );
   const { rows: [atWar] } = await db.query('SELECT state FROM matches WHERE id = $1', [matchId]);
-  assert.equal(atWar.state.diplomacy[[seat, 'slot_b1'].sort().join('|')], 'war');
-  assert.equal(atWar.state.diplomacy[['slot_a1', 'slot_a2'].join('|')], 'alliance');
+  assert.equal(atWar.state.diplomacy[[seat, 'slot_3'].sort().join('|')], 'war');
+  assert.equal(atWar.state.diplomacy[['slot_1', 'slot_2'].join('|')], 'alliance');
+  // At war the other side learns who it fights and who is out, never their score or land.
+  const war = await request(`/ava-war/${battle}`, { token: bravo.token });
+  assert.equal(war.phase, 'war');
+  assert.equal(war.side, 'target');
+  assert.deepEqual(war.rivals.seats.map((row) => row.login).sort(), [alpha.login, charlie.login].sort());
+  assert.ok(
+    war.rivals.seats.every((row) => Object.keys(row).sort().join() === 'bot,login,out'),
+    'a rival seat carries no score, land or account',
+  );
+  report('war-view-war', { rivals: war.rivals.seats.length });
   report('PASS', { durationMs: Date.now() - start });
 } catch (error) {
   let safeLog = log;

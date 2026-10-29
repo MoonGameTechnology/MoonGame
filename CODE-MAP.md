@@ -51,6 +51,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 `botPopulation.ts` — посадка, реальные
 итоги и восстановление. Подключение — `prototype/netserver.ts`, публичная карточка —
 `profileApi.ts` → `decisions/playerProfile.ts` → `prototype/src/profileScreen.ts`.
+Серверная карьера: `playerCareer.ts` — private ledger снимка, `profileStore.ts` —
+однократное начисление после durable завершения; `decisions/playerCareer.ts` —
+проверка публичного контракта и уровень аккаунта.
 `prototype/src/botBehavior.ts` выбирает стратегию и политику переговоров по постоянному seed;
 `packages/server/src/botSocial.ts` отвечает на принятые личные сообщения, а
 `scripts/botChatText.ts` форматирует английские реплики без изменения протокола.
@@ -446,9 +449,15 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `main.ts` | `startServer({sendRecoveryMail})` | запуск сервера: Fastify + WS + persist + clockDriver; адаптеры и fatal handlers подключает внешний `scripts/server.ts` |
 | `matchRoom.ts` | `MatchRoom` | advance → applyAction → per-player fog deltas; durable persist |
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
-| `matchRegistry.ts` | `LazyRoomRegistry` | multi-match registry + hibernation |
+| `matchRegistry.ts` | `MatchRegistry`, `sessionMeta`, `MATCH_ARCHIVE_MS` | лента матчей, автоматический архив участников и срок просмотра |
+| `matchArchive.ts` | `ArchiveRoomCache`, `archiveExpired` | ограниченные загрузки замерших карт по запросу, общий лимит комнат и проверка срока |
+| `matchArchiveCatalog.ts` | `PostgresArchiveCatalog`, `StoreArchiveCatalog` | список архива участника по кратким метаданным без загрузки миров |
+| `matchArchiveMetadata.ts` | `archiveMetadataOf`, `archiveStateBytes` | компактные метаданные и размер состояния для ограниченного просмотра |
+| `roomRegistry.ts` | `LazyRoomRegistry`, `InMemoryRoomRegistry` | маршрутизация, hibernation и истечение срока уже загруженных архивов |
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |
+| `operatorMatchApi.ts` | `POST /metrics/matches` | создание сессии с картой и скоростью; полный операторский ключ |
+| `sessionSpeed.ts` | `sessionSpeed` | скорость из сохранённых часов либо настройка новой сессии |
 | `clockDriver.ts` | `clockDriver` | v1 offline scheduler (`msUntilNextEvent` → tick) |
 | `standingOrderDriver.ts` | `standingOrderDriver` | драйвер постоянных приказов |
 | `pveOrchestrator.ts` | `pveOrders(state, data, {session, seq})` | PVE-5: тактика волн Роя — ЧИСТАЯ функция → `Action[]`, подаётся через `serverOrders` (ADR `docs/explanations/05-pve-ai-placement.md`: тактика NPC не входит в контракт реплея, поэтому живёт на сервере, а не в модуле ядра) |
@@ -478,11 +487,13 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `avaMapPool.ts` | `pickAvaMap` | AvA-карты |
 | `avaApi.ts` / `avaService.ts` | AvA API/service | AvA-логика |
 | `corpApi.ts` / `corpService.ts` | corp API/service | корпорации и инфраструктура; оба серверных входа |
+| `corpMaterials.ts` / `corpMaterialsApi.ts` | казна и оплата стройки | Game: взносы, устойчивый резерв, сверка; private Corp ticket/receipt в обоих сторах |
+| `corpNames.ts` | разрешённые имена корпораций | серверный подбор из `data/corpNames.json`, ограниченный повтор только при коллизии |
 | `corporationMain.ts` / `corporationServer.ts` | самостоятельный corporate entrypoint | бандл `corporation-server.mjs`, отдельная PostgreSQL; [карта](docs/corporation-service.md) |
 | `corporateTransport.ts` / `corporateRemote.ts` | signed gateway / RPC | оба игровых входа, проверка личности в Game, подпись ответов и durable nonce |
 | `dependencyGuard.ts` | ограничение нагрузки / circuit breaker | общий исходящий предохранитель; применяется к Corp HTTP/RPC, без очереди и автоповтора; [роадмап](docs/service-resilience-roadmap.md) |
 | `corporateTransactions.ts` | `createCorporateServices` | SERIALIZABLE операция: права, изменение, аудит; savepoints стора |
-| `corporateMigration.ts` / `corporateMigrationMain.ts` | `CORPORATE_TABLES`, dry run / apply | перенос десяти корпоративных таблиц без игровых данных |
+| `corporateMigration.ts` / `corporateMigrationMain.ts` | `CORPORATE_TABLES`, dry run / apply | перенос одиннадцати корпоративных таблиц без игровых данных |
 | `corpConstruction.ts` | каталог и атомарный переход инфраструктуры | `data/corpBuildings.json`, очередь, влияние, аудит; Memory/Postgres |
 | `corpArsenalApi.ts` / `corpArsenalService.ts` | corp arsenal | арсенал корпораций |
 | `friendApi.ts` / `friendService.ts` | friend API/service | друзья |
@@ -548,6 +559,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `veteran.json` · `promotion.json` | надбавка ветерана и бросок «отмеченной» партии |
 | `sectorZeroShop.json` · `sectorZeroStars.json` | Sector Zero: витрина магазина, ступени звёзд |
 | `corpBuildings.json` | постройки базы корпорации; серверный каталог вне `GameData` |
+| `corpNames.json` | белый список для случайных названий корпораций, вне `GameData` |
 | `events.json` | тёмные события |
 | `dropTables.json` | таблицы дропа (ARS-4) |
 | `metaEconomy.json` | серверный каталог v0: материалы, рецепты, сезон, лимиты; вне `GameData` |

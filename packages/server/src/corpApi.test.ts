@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance, type FastifyRequest, type InjectOptions } from 'fastify';
 import { registerCorpApi, type CorpApiDeps } from './corpApi';
 import { CorpService } from './corpService';
+import { generatedCorpName } from './corpNames';
 import { MemoryCorpStore } from './store';
 import type { Identity } from './matchApi';
 
@@ -23,7 +24,7 @@ function appWith(
 ): FastifyInstance {
   const app = Fastify();
   registerCorpApi(app, {
-    service: new CorpService({ store, now: () => 7 }),
+    service: new CorpService({ store, now: () => 7, nameIndex: () => 0 }),
     identify: identifyByHeader,
     ...overrides,
   });
@@ -44,6 +45,32 @@ async function createCorp(app: FastifyInstance, login: string, name: string): Pr
 }
 
 describe('CORP-0 · corp API', () => {
+  it('chooses names on the server and accepts only catalogue emblems from the authenticated head', async () => {
+    const store = new MemoryCorpStore(), app = appWith({}, store);
+    try {
+      const made = await app.inject({ method: 'POST', url: '/corps', headers: as('alice'), payload: { emblemId: 'falcon' } });
+      expect(made.statusCode).toBe(201);
+      const id = (made.json() as { corpId: string }).corpId;
+      expect(await store.getCorp(id)).toMatchObject({ name: generatedCorpName(0), emblemId: 'falcon' });
+      const url = `/corps/${id}/emblem`;
+      for (const [login, status] of [['', 401], ['bob', 403]] as const) {
+        const denied = await app.inject({ method: 'POST', url, headers: as(login), payload: { emblemId: 'wolf' } });
+        expect(denied.statusCode).toBe(status);
+      }
+      for (const payload of [{ emblemId: '<svg>' }, { emblemId: 'https://evil.test/x.svg' },
+        { emblemId: 'wolf', accountId: 'acc-alice' }, { emblemId: null }, {}]) {
+        const bad = await app.inject({ method: 'POST', url, headers: as('alice'), payload });
+        expect(bad.statusCode).toBe(400);
+        expect(bad.json()).toEqual({ error: 'E_BAD_EMBLEM' });
+      }
+      expect(await store.getCorp(id)).toMatchObject({ emblemId: 'falcon' });
+      expect((await app.inject({ method: 'POST', url, headers: as('alice'), payload: { emblemId: 'phoenix' } })).statusCode).toBe(200);
+      expect(await store.getCorp(id)).toMatchObject({ emblemId: 'phoenix' });
+      expect((await app.inject({ method: 'POST', url: '/corps', headers: as('carol'), payload: { emblemId: 'unknown' } })).statusCode).toBe(400);
+      expect(await store.membershipOf('acc-carol')).toBeNull();
+    } finally { await app.close(); }
+  });
+
   it('every route is session-gated: anonymous → uniform 401 E_AUTH', async () => {
     const app = appWith();
     const routes = [
@@ -69,12 +96,12 @@ describe('CORP-0 · corp API', () => {
 
     const list = await app.inject({ method: 'GET', url: '/corps', headers: as('bob') });
     expect(list.json()).toEqual({
-      corps: [{ corpId, name: 'Void Miners', members: 1, influence: 0 }],
+      corps: [{ corpId, name: generatedCorpName(0), members: 1, influence: 0, emblemId: expect.any(String) }],
     });
 
     const detail = await app.inject({ method: 'GET', url: `/corps/${corpId}`, headers: as('bob') });
     expect(detail.json()).toEqual({
-      corp: { corpId, name: 'Void Miners', influence: 0 },
+      corp: { corpId, name: generatedCorpName(0), influence: 0, emblemId: expect.any(String) },
       members: [{ corpId, accountId: 'acc-alice', login: 'alice', role: 'head' }],
     });
 
@@ -162,12 +189,10 @@ describe('CORP-0 · corp API', () => {
       404,
       'E_NO_CORP',
     );
-    // 409 — duplicate name (case-insensitive) / double membership
-    await expectFail(
-      { method: 'POST', url: '/corps', headers: as('dave'), payload: { name: 'VOID MINERS' } },
-      409,
-      'E_NAME_TAKEN',
-    );
+    // A legacy requested name cannot claim arbitrary text or cause a collision.
+    const generated = await app.inject({ method: 'POST', url: '/corps', headers: as('dave'), payload: { name: 'VOID MINERS' } });
+    expect(generated.statusCode).toBe(201);
+    // 409 — double membership
     await expectFail(
       { method: 'POST', url: '/corps', headers: as('alice'), payload: { name: 'Another' } },
       409,

@@ -36,6 +36,7 @@ const ROSTER = [HEAD, member('a2', 'Вега', 'officer'), member('a3', 'Лир�
 
 function paint(over: Partial<CorpHubPaint> = {}): CorpHubPaint {
   return {
+    materials: { corpId: 'c1', pending: false, history: [], materials: ['construction_blocks', 'engineering_kits', 'command_cores'].map((id) => ({ id, nameKey: 'meta.material.' + id, personal: 10, available: 500, reserved: 0 })) },
     state: 'corp',
     section: 'base',
     corp: { corpId: 'c1', name: 'Звёздный штиль', influence: 500 },
@@ -75,12 +76,14 @@ describe('вкладка «Корпорация»: что стоит вмест�
     expect(offline).not.toContain('corp-hub-name');
   });
 
-  it('без корпорации: поле названия с кнопкой и корпорации, куда подать заявку', () => {
+  it('без корпорации: выбор эмблемы, случайное название и список для заявок', () => {
     const html = corpHubHtml(
       paint({ state: 'none', me: null, corp: null, browse: [{ corpId: 'c9', name: 'Рой', influence: 40, members: 3 }] }),
     );
-    expect(html).toContain('id="corp-hub-name"');
-    expect(html).toContain('data-corpact="create" data-corpinput="corp-hub-name"');
+    expect(html).not.toContain('<input');
+    expect(html.match(/data-corpdraft=/g)).toHaveLength(20);
+    expect(html).toContain(t('corp.create.generated'));
+    expect(html).toContain('data-corpact="create"');
     expect(html).toContain('data-corpact="apply" data-corparg="c9"');
   });
 
@@ -100,7 +103,7 @@ describe('вкладка «Корпорация»: база', () => {
   it('у каждого здания на панораме свой участок, а в списке — карточка', () => {
     const p = paint();
     const html = corpHubHtml(p);
-    for (const id of Object.keys(CORP_LOTS)) expect(html).toMatch(new RegExp(`class="cb-lot [^"]*" style="[^"]*" data-corpbld="${id}"`));
+    for (const { id } of p.view!.buildings.filter((b) => CORP_LOTS[b.id])) expect(html).toMatch(new RegExp(`class="cb-lot [^"]*" style="[^"]*" data-corpbld="${id}"`));
     const cards = [...html.matchAll(/class="cb-bc [^"]*" data-corpbld="([\w-]+)"/g)].map((m) => m[1]);
     expect(cards).toEqual(p.view!.buildings.map((b) => b.id));
   });
@@ -196,21 +199,21 @@ describe('вкладка «Корпорация»: состав', () => {
     expect(manage).toEqual(['a2', 'a3']);
     expect(html).toContain('data-corpact="accept" data-corparg="a4"');
     expect(html).toContain('data-corpact="decline" data-corparg="a4"');
-    expect(html).toContain('data-corpconfirm="disband"');
+    expect(html).not.toContain('data-corpconfirm="disband"');
   });
 
-  it('участник управлять не может и заявок не видит, а уйти — может', () => {
+  it('участник управлять не может и заявок не видит', () => {
     const html = corpHubHtml(paint({ section: 'members', me: member('a3', 'Лира', 'member') }));
     expect(html).not.toContain('data-corphub="member"');
     expect(html).not.toContain('data-corpact="accept"');
     expect(html).toContain(t('corp.hub.apps.lead'));
-    expect(html).toContain('data-corpconfirm="leave"');
+    expect(html).not.toContain('data-corpconfirm="leave"');
   });
 
   it('необратимый приказ просит второго нажатия: взведённая кнопка задаёт вопрос', () => {
-    const calm = corpHubHtml(paint({ section: 'members' }));
+    const calm = corpHubHtml(paint({ section: 'settings' }));
     expect(calm).toContain(`>${t('corp.disband')}</button>`);
-    const armed = corpHubHtml(paint({ section: 'members', armed: 'disband' }));
+    const armed = corpHubHtml(paint({ section: 'settings', armed: 'disband' }));
     expect(armed).toMatch(/class="btn-second danger armed" data-corpact="disband"/);
     expect(armed).toContain(t('corp.hub.disband.confirm'));
   });
@@ -253,14 +256,30 @@ describe('вкладка «Корпорация»: казна', () => {
   });
 });
 
-const styles = (head: boolean, active = 'standard', owned: string[] = ['high_tech']) => ({ head, active, owned });
+const styles = (head: boolean, active = 'standard', owned: string[] = ['high_tech'], backdrop = 'orbit') => ({
+  head,
+  active,
+  backdrop,
+  owned,
+});
 
 describe('вкладка «Корпорация»: стиль базы (CORP-14)', () => {
-  it('шапка называет стиль, и здания рисуются в нём', () => {
+  it('настройки следуют за казной, оформление убрано из шапки, здания сохраняют свой стиль', () => {
     const html = corpHubHtml(paint({ style: styles(true, 'high_tech') }));
-    expect(html).toContain(
-      `data-corphub="style">${t('corp.style.current', { name: t('corp.style.high-tech') })}</button>`,
-    );
+    expect(html).not.toContain('data-corphub="style"');
+    expect(html).not.toContain('data-corphub="emblem"');
+    expect([...html.matchAll(/data-corpsec="([a-z]+)"/g)].map((m) => m[1]))
+      .toEqual(['base', 'battles', 'members', 'treasury', 'settings']);
+    const settings = corpHubHtml(paint({ section: 'settings', style: styles(true, 'high_tech') }));
+    expect(settings).toContain('data-corphub="style"');
+    expect(settings).toContain('data-corphub="emblem"');
+    expect(settings).toContain(t('corp.style.high-tech'));
+    expect(settings).toContain(t('corp.backdrop.orbit'));
+    expect(settings).toContain('data-corpconfirm="disband"');
+    const ordinary = corpHubHtml(paint({ section: 'settings', me: ROSTER[2], style: styles(false) }));
+    expect(ordinary).not.toContain('data-corphub="emblem"');
+    expect(ordinary).not.toContain('data-corpact="disband"');
+    expect(ordinary).toContain('data-corpconfirm="leave"');
     expect(html).toContain(`href="${corpArt('headquarters', 1, 'high_tech')!.src}"`);
     expect(html).not.toContain(`href="${corpArt('headquarters', 1)!.src}"`);
   });
@@ -270,6 +289,9 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
     expect(html).not.toContain('data-corphub="style"');
     expect(html).toContain(`href="${corpArt('headquarters', 1)!.src}"`);
     expect(corpHubSheetHtml(paint(), { kind: 'style' }, '')).toBe('');
+    const settings = corpHubHtml(paint({ section: 'settings' }));
+    expect(settings).toContain('data-corphub="refresh"');
+    expect(settings).toContain('data-corphub="emblem"');
   });
 
   it('шторка: глава применяет купленный и идёт в магазин за остальными, участник смотрит', () => {
@@ -287,11 +309,26 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
     expect(asMember).toContain(t('corp.style.owned'));
     expect(asMember).toContain(t('corp.style.locked'));
   });
+
+  it('фон базы: панорама в применённом фоне, в шторке фоны рядом со стилями (CORP-15)', () => {
+    const view = styles(true, 'high_tech', ['high_tech', 'nebula'], 'nebula');
+    const html = corpHubHtml(paint({ style: view }));
+    expect(html).toContain('<image data-corp-backdrop="nebula"');
+    expect(html).not.toContain('<image data-corp-backdrop="orbit"');
+    const sheet = corpHubSheetHtml(paint({ style: view }), { kind: 'style' }, '');
+    expect(sheet).toContain(t('corp.backdrop.title'));
+    expect(sheet).toContain('data-corpstyle="orbit"');
+    expect(sheet).not.toContain('data-corpstyle="nebula"');
+    expect(sheet).toContain('data-corpshop="ice_moon"');
+    expect(sheet).toContain('data-corpshop="gas_giant"');
+    // Без прочитанного стиля панорама — в бесплатном фоне.
+    expect(corpHubHtml(paint())).toContain('<image data-corp-backdrop="orbit"');
+  });
 });
 
 describe('вкладка «Корпорация»: текст и кнопки', () => {
   const all = (): string[] => {
-    const sections = (['base', 'battles', 'members', 'treasury'] as const).map((section) =>
+    const sections = (['base', 'battles', 'members', 'treasury', 'settings'] as const).map((section) =>
       corpHubHtml(paint({ section, battles: '<p class="chint">—</p>', style: styles(true) })),
     );
     const states = (['guest', 'loading', 'offline', 'none', 'pending'] as const).map((state) =>
@@ -300,6 +337,7 @@ describe('вкладка «Корпорация»: текст и кнопки', 
     const sheets = [
       corpHubSheetHtml(paint(), { kind: 'building', id: 'headquarters' }, ''),
       corpHubSheetHtml(paint(), { kind: 'levels' }, ''),
+      corpHubSheetHtml(paint(), { kind: 'emblem' }, ''),
       corpHubSheetHtml(paint(), { kind: 'member', accountId: 'a2' }, ''),
       corpHubSheetHtml(paint({ style: styles(true, 'high_tech') }), { kind: 'style' }, ''),
       corpHubSheetHtml(paint({ style: styles(false) }), { kind: 'style' }, ''),
@@ -317,7 +355,7 @@ describe('вкладка «Корпорация»: текст и кнопки', 
   });
 
   it('у каждой кнопки приказа — один из трёх стилей или крестик', () => {
-    const own = /class="(cb-tab|cb-lvl|cb-lot|cb-bc)\b/;
+    const own = /class="(cb-tab|cb-lvl|cb-lot|cb-bc|cb-emblem-choice)\b/;
     const bare = all()
       .flatMap(buttons)
       .filter((tag) => !own.test(tag) && !/class="[^"]*\b(btn-main|btn-second|btn-quiet|btn-x)\b/.test(tag));

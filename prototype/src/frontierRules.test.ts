@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getStance, playablePlayerIds, visibleState } from '../../packages/shared-core/src/index';
 import { newGame, networkSeats } from './matchSetup';
 import { aiOrders } from './ai';
-import { advance, ctx, kernel, order } from './protoKernel';
+import { advance, canOrder, ctx, kernel, order } from './protoKernel';
 import { data } from './gameData';
 import { mapNodesFromState } from './mapCatalog';
 
@@ -23,7 +23,7 @@ describe('Frontier inhabitants', () => {
     }
   });
 
-  it('sends pirates out while neutral bases hold and develop', () => {
+  it('sends pirates out while neutral bases hold and trade through legal orders', () => {
     const s = world();
     const pirate = Object.values(s.players).find((p) => p.npc === 'pirate')!.id;
     const neutral = Object.values(s.players).find((p) => p.npc === 'neutral')!.id;
@@ -33,9 +33,10 @@ describe('Frontier inhabitants', () => {
     expect(defense.some((a) => a.type === 'fleet.move' || a.type === 'diplomacy.declare')).toBe(
       false,
     );
-    expect(defense.some((a) => a.type === 'building.construct' || a.type === 'unit.build')).toBe(
-      true,
-    );
+    // A neutral_base cannot build a refinery or ships without a yard. Those old
+    // intents were rejected with E_WRONG_SECTOR/E_NO_SHIPYARD, not development.
+    expect(defense.some((a) => a.type === 'market.list')).toBe(true);
+    expect(defense.map((a) => canOrder(s, a))).toEqual(defense.map(() => null));
   });
 
   it('does not give inhabitants victories/rewards and eliminates a conquered base', () => {

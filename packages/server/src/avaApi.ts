@@ -11,6 +11,8 @@ import { slidingWindowIpLimiter } from './rateLimit';
  *
  *   GET  /ava/pool                     ready-corp pool (name + influence + members + formats)
  *   GET  /ava/challenges               my incoming + outgoing challenges
+ *   GET  /ava/battles                  my corp's battles: readiness, challenges, results
+ *                                      with their breakdown, record per rival (CORP-9)
  *   POST /ava/ready/corp    (+clear)   corp readiness flag (head only), {formats?} (CORP-7)
  *   POST /ava/ready/player  (+clear)   player readiness flag (own corp member)
  *   POST /ava/challenge     {target, format?}  challenge a ready corp (head; spends influence)
@@ -103,6 +105,14 @@ export function registerAvaApi(app: FastifyInstance, deps: AvaApiDeps): void {
     return { challenges: await service.challengesFor(who) };
   });
 
+  app.get('/ava/battles', async (request, reply) => {
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' as const };
+    const view = await service.battles(who);
+    if ('ok' in view && !view.ok) return failed(reply, view.code);
+    return view;
+  });
+
   app.post('/ava/ready/corp', async (request, reply) => {
     const who = await guardedWrite(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
@@ -153,7 +163,14 @@ export function registerAvaApi(app: FastifyInstance, deps: AvaApiDeps): void {
     const format = body?.format;
     if (format !== undefined && !Number.isSafeInteger(format)) return failed(reply, 'E_FORMAT');
     const result = await service.challenge(who, target, format as number | undefined);
-    if (!result.ok) return failed(reply, result.code);
+    if (!result.ok) {
+      if (result.code === 'E_INSUFFICIENT') {
+        return reply.code(402).send({
+          error: result.code, requiredInfluence: result.requiredInfluence, influence: result.influence,
+        });
+      }
+      return failed(reply, result.code);
+    }
     void reply.code(201);
     return { id: result.id };
   });

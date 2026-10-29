@@ -21,7 +21,6 @@ describe('PVR-6.1 — инструменты мультиплеера не ед�
     expect(TOOLS.sort()).toEqual([
       'chat',
       'coalitions',
-      'corp',
       'mail',
       'market',
       'pings',

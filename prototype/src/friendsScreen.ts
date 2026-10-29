@@ -14,10 +14,18 @@
  * только живой сервер. Клиент лишь превращает его в слово — и в этом переводе есть
  * одно честное «не знаю»: `unknown` (сервер перезапускался и метки не помнит) — это
  * НЕ «офлайн», и говорить «был(а) давно» здесь было бы выдумкой.
+ *
+ * FRIENDS-2 — «Войти к другу», «Позвать» и «Скрывать мои партии». Номер партии друга
+ * приходит в присутствии `match` только тогда, когда друг его не скрыл: прячет СЕРВЕР, а
+ * экран просто не получает, что прятать. «Войти» ведёт обычной дверью входа по номеру
+ * (`joinMatch`), со всеми проверками сервера; «Позвать» — в свою идущую партию
+ * (`decisions/friendInvite.ts`), и сервер ещё раз проверит, что место в ней у вас есть.
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { detach } from './detach';
+import { inviteStep } from '../../decisions/friendInvite';
+import { matchNumberText } from '../../decisions/matchNumber';
 
 /** Присутствие ровно в тех формах, которые сервер умеет доказать. */
 export interface FriendPresence {
@@ -26,6 +34,27 @@ export interface FriendPresence {
   day?: number;
   /** Сколько миллисекунд назад видели (только `seen`). */
   agoMs?: number;
+  /** Партия друга (только `match`, и только если он её не скрыл) — куда ведёт «Войти». */
+  matchId?: string;
+}
+
+/** Приглашение в партию, пришедшее от друга (FRIENDS-2). */
+export interface FriendInvite {
+  fromId: string;
+  fromLogin: string;
+  matchId: string;
+}
+
+/** Своя идущая партия, в которую можно позвать: номер и подпись для выбора. */
+export interface InviteMatch {
+  matchId: string;
+  label: string;
+}
+
+/** Выбор партии для приглашения: кого зовём и куда можно. */
+export interface InvitePick {
+  accountId: string;
+  matches: readonly InviteMatch[];
 }
 
 export interface FriendRow {
@@ -76,7 +105,16 @@ export function sortRows(rows: readonly FriendRow[]): FriendRow[] {
 }
 
 /** Одна строка списка. Кнопки — только те, что имеют смысл для этого вида ребра. */
-function rowHtml(r: FriendRow): string {
+function rowHtml(r: FriendRow, pick: InvitePick | null): string {
+  const id = esc(r.accountId);
+  const join =
+    r.kind === 'friend' && r.presence.kind === 'match' && r.presence.matchId
+      ? `<button class="fr-b ok" data-fr-act="join" data-fr-match="${esc(r.presence.matchId)}">${t('friends.act.join')}</button>`
+      : '';
+  const invite =
+    r.kind === 'friend'
+      ? `<button class="fr-b" data-fr-act="invite" data-fr-id="${id}">${t('friends.act.invite')}</button>`
+      : '';
   const acts =
     r.kind === 'incoming'
       ? `<button class="fr-b ok" data-fr-act="accept" data-fr-id="${esc(r.accountId)}">${t('friends.act.accept')}</button>` +
@@ -84,14 +122,56 @@ function rowHtml(r: FriendRow): string {
       : r.kind === 'outgoing'
         ? `<span class="fr-wait">${t('friends.sent')}</span>` +
           `<button class="fr-b btn-x" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.cancel')}">✕</button>`
-        : `<button class="fr-b btn-x" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.remove')}">✕</button>`;
-  const sub = r.kind === 'incoming' ? t('friends.incoming') : presenceText(r.presence);
+        : join +
+          invite +
+          `<button class="fr-b btn-x" data-fr-act="drop" data-fr-id="${esc(r.accountId)}" title="${t('friends.act.remove')}">✕</button>`;
+  // Присутствие видно только у друзей: сервер не говорит, где играет тот, кто ещё не
+  // принял заявку, поэтому у исходящей строки подписи нет — «заявка отправлена» уже рядом.
+  const sub =
+    r.kind === 'incoming'
+      ? t('friends.incoming')
+      : r.kind === 'outgoing'
+        ? ''
+        : presenceText(r.presence);
+  const picker =
+    pick && pick.accountId === r.accountId
+      ? `<div class="fr-pick"><span>${t('friends.invite.pick', { who: esc(r.login) })}</span>` +
+        pick.matches
+          .map(
+            (m) =>
+              `<button class="fr-b" data-fr-act="invite-to" data-fr-id="${id}" data-fr-match="${esc(m.matchId)}">${esc(m.label)}</button>`,
+          )
+          .join('') +
+        `</div>`
+      : '';
   return (
     `<div class="fr-row${r.kind === 'incoming' ? ' req' : ''}">` +
     `<i class="fr-dot ${r.kind === 'incoming' ? 'am' : DOT[r.presence.kind]}"></i>` +
     `<button type="button" class="fr-txt pf-player-link" data-profile="${esc(r.login)}"><b>${esc(r.login)}</b><span>${sub}</span></button>` +
     `<span class="fr-acts">${acts}</span>` +
-    `</div>`
+    `</div>` +
+    picker
+  );
+}
+
+/** Приглашение от друга: кто, в какую партию, «Войти» и «✕». */
+function inviteHtml(i: FriendInvite): string {
+  return (
+    `<div class="fr-row req">` +
+    `<i class="fr-dot am"></i>` +
+    `<span class="fr-txt"><b>${esc(i.fromLogin)}</b><span>${t('friends.invite.from', { n: esc(matchNumberText(i.matchId)) })}</span></span>` +
+    `<span class="fr-acts">` +
+    `<button class="fr-b ok" data-fr-act="join" data-fr-match="${esc(i.matchId)}">${t('friends.act.join')}</button>` +
+    `<button class="fr-b btn-x" data-fr-act="dismiss" data-fr-id="${esc(i.fromId)}" title="${t('friends.act.dismiss')}">✕</button>` +
+    `</span></div>`
+  );
+}
+
+/** «Скрывать мои партии от друзей» — настройка аккаунта, её хранит сервер. */
+function privacyHtml(hide: boolean): string {
+  return (
+    `<label class="fr-priv"><input type="checkbox" id="fr-hide"${hide ? ' checked' : ''}>` +
+    `<span><b>${t('friends.privacy.hide')}</b><span>${t('friends.privacy.hide.hint')}</span></span></label>`
   );
 }
 
@@ -102,7 +182,13 @@ function rowHtml(r: FriendRow): string {
  */
 export function friendsPanelHtml(
   rows: readonly FriendRow[],
-  opts: { signedIn: boolean; note?: string } = { signedIn: true },
+  opts: {
+    signedIn: boolean;
+    note?: string;
+    invites?: readonly FriendInvite[];
+    hideMatches?: boolean;
+    pick?: InvitePick | null;
+  } = { signedIn: true },
 ): string {
   if (!opts.signedIn) {
     return (
@@ -116,11 +202,20 @@ export function friendsPanelHtml(
     `<button class="fr-b ok" type="submit">${t('friends.act.add')}</button>` +
     `</form>`;
   const note = opts.note ? `<div class="fr-note">${esc(opts.note)}</div>` : '';
+  const pick = opts.pick ?? null;
+  const invites = (opts.invites ?? []).map(inviteHtml).join('');
   const list = rows.length
-    ? sortRows(rows).map(rowHtml).join('')
+    ? sortRows(rows)
+        .map((r) => rowHtml(r, pick))
+        .join('')
     : `<div class="hub-empty"><span class="he-ic">☍</span>${t('friends.empty.title')}<br>` +
       `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('friends.empty.sub')}</span></div>`;
-  return search + note + `<div class="fr-list">${list}</div>`;
+  return (
+    search +
+    note +
+    `<div class="fr-list">${invites}${list}</div>` +
+    privacyHtml(opts.hideMatches ?? false)
+  );
 }
 
 /** Что вкладке нужно от хаба. */
@@ -130,6 +225,10 @@ export interface FriendsHost {
   root(): HTMLElement;
   /** База + токен сессии, или `null` — гость (друзья привязаны к аккаунту). */
   authorizedBase(): Promise<{ base: string; token: string } | null>;
+  /** Свои идущие партии — куда можно позвать друга (FRIENDS-2). */
+  myMatches?(): readonly InviteMatch[];
+  /** Войти в партию по номеру — той же дверью, что поле «Номер партии». */
+  joinMatch?(matchId: string): void;
 }
 
 /** Человекочитаемая причина отказа сервера — по СТАБИЛЬНОМУ коду, а не по тексту. */
@@ -145,6 +244,8 @@ function failText(code: string): string {
       return t('friends.err.limit');
     case 'E_RATE_LIMITED':
       return t('friends.err.too-fast');
+    case 'E_NOT_SEATED':
+      return t('friends.err.not-seated');
     default:
       return t('friends.err.generic');
   }
@@ -152,11 +253,14 @@ function failText(code: string): string {
 
 export function initFriends(host: FriendsHost): { refresh: () => Promise<void> } {
   let rows: FriendRow[] = [];
+  let invites: FriendInvite[] = [];
+  let hideMatches = false;
+  let pick: InvitePick | null = null;
   let note = '';
   let signedIn = true;
 
   function paint(): void {
-    host.root().innerHTML = friendsPanelHtml(rows, { signedIn, note });
+    host.root().innerHTML = friendsPanelHtml(rows, { signedIn, note, invites, hideMatches, pick });
   }
 
   /** Одно место, где экран говорит с сервером. Любой сбой — тихий: список остаётся
@@ -179,10 +283,14 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
       });
       const parsed = (await res.json().catch(() => null)) as {
         rows?: unknown;
+        invites?: unknown;
+        hideMatches?: unknown;
         error?: unknown;
       } | null;
       if (!res.ok) return typeof parsed?.error === 'string' ? parsed.error : 'E_HTTP';
       if (Array.isArray(parsed?.rows)) rows = parsed.rows as FriendRow[];
+      if (Array.isArray(parsed?.invites)) invites = parsed.invites as FriendInvite[];
+      if (typeof parsed?.hideMatches === 'boolean') hideMatches = parsed.hideMatches;
       return null;
     } catch {
       return 'E_OFFLINE';
@@ -211,6 +319,35 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
     );
   });
 
+  /** Отправить приглашение: ответ сервера — в строку заметки. */
+  function sendInvite(accountId: string, matchId: string): void {
+    pick = null;
+    const who = rows.find((r) => r.accountId === accountId)?.login ?? '';
+    detach(
+      'друзья: приглашение в партию',
+      (async () => {
+        const err = await call(`/friends/${encodeURIComponent(accountId)}/invite`, { matchId });
+        note = err ? failText(err) : t('friends.invite.sent', { who });
+        paint();
+      })(),
+    );
+  }
+
+  host.root().addEventListener('change', (ev) => {
+    const box = ev.target as HTMLInputElement;
+    if (box.id !== 'fr-hide') return;
+    const hide = box.checked;
+    detach(
+      'друзья: скрывать мои партии',
+      (async () => {
+        const err = await call('/friends/privacy', { hideMatches: hide });
+        if (err) note = failText(err);
+        else hideMatches = hide;
+        paint(); // при отказе галочка вернётся к тому, что знает сервер
+      })(),
+    );
+  });
+
   host.root().addEventListener('click', (ev) => {
     const player = (ev.target as HTMLElement).closest('[data-profile]') as HTMLElement | null;
     if (player?.dataset.profile) { host.openPlayer?.(player.dataset.profile); return; }
@@ -218,6 +355,34 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
     if (!btn) return;
     const id = btn.dataset.frId;
     const act = btn.dataset.frAct;
+    const matchId = btn.dataset.frMatch;
+    if (act === 'join' && matchId) {
+      host.joinMatch?.(matchId);
+      return;
+    }
+    if (act === 'invite' && id) {
+      const step = inviteStep(host.myMatches?.() ?? []);
+      if (step.kind === 'send') sendInvite(id, step.match.matchId);
+      else {
+        note = step.kind === 'none' ? t('friends.invite.none') : '';
+        pick = step.kind === 'pick' && pick?.accountId !== id ? { accountId: id, matches: step.matches } : null;
+        paint();
+      }
+      return;
+    }
+    if (act === 'invite-to' && id && matchId) {
+      sendInvite(id, matchId);
+      return;
+    }
+    if (act === 'dismiss' && id) {
+      invites = invites.filter((i) => i.fromId !== id);
+      paint();
+      detach(
+        'друзья: отклонить приглашение',
+        call(`/friends/invites/${encodeURIComponent(id)}/dismiss`, {}).then(() => undefined),
+      );
+      return;
+    }
     if (!id || (act !== 'accept' && act !== 'drop')) return;
     detach(
       'друзья: ответ на заявку',
