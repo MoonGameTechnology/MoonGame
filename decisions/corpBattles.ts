@@ -318,7 +318,6 @@ export function opponentOffer(p: {
     (f) =>
       (!p.format || f.format === p.format) &&
       f.format <= p.maxFormat &&
-      p.mine.includes(f.format) &&
       p.theirs.includes(f.format),
   );
   if (!f) return { kind: 'format' };

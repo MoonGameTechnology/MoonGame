@@ -1,3 +1,4 @@
+import { connectToMatch } from './matchJoin';
 /**
  * Хозяин хаба (REFM-220): показ хаба и его вкладки, «Прокачка» с мета-хранилищем по
  * позывному, экраны вкладок (друзья, рейтинги, арсенал, аукцион, магазин, новости,
@@ -688,7 +689,7 @@ export function initHubScreen(host: HubScreenHost): void {
           shop?.show('styles', style);
           hubTab('shop');
         },
-        openBattle: (matchupId) => joinByNumber(avaMatchId(matchupId)),
+        openBattle: (matchupId) => connectToMatch(avaMatchId(matchupId)),
       },
     });
   $('railcorp').addEventListener('click', () => corp?.open());

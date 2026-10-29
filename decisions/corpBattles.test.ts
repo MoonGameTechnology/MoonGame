@@ -99,6 +99,8 @@ describe('corporation battle decisions', () => {
         ...over,
       });
     expect(offer()).toEqual({ kind: 'challenge', format: 3, cost: 150 });
+    // Incoming preferences do not constrain an outgoing challenge accepted by the server.
+    expect(offer({ mine: [2], theirs: [3] })).toEqual({ kind: 'challenge', format: 3, cost: 150 });
     expect(offer({ head: false }).kind).toBe('head');
     expect(offer({ ready: false }).kind).toBe('ready');
     expect(offer({ theirs: [4] }).kind).toBe('format');

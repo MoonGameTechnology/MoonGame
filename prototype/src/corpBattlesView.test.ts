@@ -69,7 +69,7 @@ describe('corporation battle views', () => {
       for (const tab of CORP_BATTLE_TABS) {
         const html = corpBattlesViewHtml(paint({ tab }));
         expect(html.match(/role="tab"/g)).toHaveLength(5);
-        expect(html).not.toMatch(/corp\.combat\.|<script>|<img src=x>|undefined|NaN/);
+        expect(html).not.toMatch(/corp\.combat\.|<script>|<img src=x>|undefined|NaN/i);
       }
     }
   });
@@ -113,7 +113,7 @@ describe('corporation battle views', () => {
     expect(html).toContain('&lt;img src=x&gt;');
     expect(html).toContain('&lt;script&gt;rival&lt;/script&gt;');
     expect(html).toContain(t('corp.combat.bot'));
-    expect(html).not.toMatch(/private-account-id|<script>|<img src=x>/);
+    expect(html).not.toMatch(/private-account-id|<script>|<img src=x>/i);
   });
   it('allows enrollment only during the roster window and preserves the roster limit', () => {
     const p = paint();

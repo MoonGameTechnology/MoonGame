@@ -558,6 +558,7 @@ export function initCorp(host: CorpHost): {
     try {
       if (refreshing) await refreshing;
       await corpFetch(path, { method: 'POST', body: body ?? {} });
+      if (path === '/ava/ready/corp') battleDraft = null;
       // Refresh even on rejection/timeout: the server may have committed the order.
       await refreshCorp();
     } finally {
@@ -1000,7 +1001,6 @@ export function initCorp(host: CorpHost): {
       case 'ava-ready-save': {
         if (!battleView || corpMine.membership?.role !== 'head' || !battleDraft?.length) break;
         const formats = [...battleDraft];
-        battleDraft = null;
         corpSend(act, '/ava/ready/corp', { formats });
         break;
       }
