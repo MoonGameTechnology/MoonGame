@@ -97,6 +97,16 @@ async function fixture(status: AvaChallenge['status'] = 'accepted'): Promise<Fix
 const asActor = (who: CorpActor): CorpArsenalActor => who;
 
 describe('CorpArsenalService — RBAC and handout', () => {
+  it('normalizes blueprint wear in the JSON warehouse response without hiding other items', async () => {
+    const f = await fixture();
+    await f.arsenal.grant({ itemId: 'blueprint', accountId: f.corpA, kind: 'hull', form: 'blueprint', defId: 'frigate', soulbound: true, origin: 'starter', acquiredAt: 0 });
+    const result = await f.service.warehouse(HEAD, f.corpA, f.matchupId);
+    if (!result.ok) throw Error(result.code);
+    const wire = JSON.parse(JSON.stringify(result.warehouse));
+    expect(wire.items).toHaveLength(2);
+    expect(wire.items.find((item: { itemId: string }) => item.itemId === 'blueprint').durability).toBeNull();
+    expect(wire.items.find((item: { itemId: string }) => item.itemId === f.itemId).durability).toBe(5);
+  });
   it('shows stock only to accepted members and never exposes an enemy roster', async () => {
     const f = await fixture();
     const view = await f.service.warehouse(HEAD, f.corpA, f.matchupId);

@@ -81,7 +81,7 @@ export class CorpArsenalService {
     }
     const rentals = await this.rentals.activeForCorp(corpId);
     const items = (await this.arsenal.listOf(corpId)).map((item) => ({
-      itemId: item.itemId, kind: item.kind, defId: item.defId, durability: item.durability,
+      itemId: item.itemId, kind: item.kind, defId: item.defId, durability: item.durability ?? null,
       busy: rentals.some((r) => r.itemId === item.itemId),
       borrower: rentals.find((r) => r.itemId === item.itemId && r.matchupId === matchupId)?.accountId ?? null,
     }));
