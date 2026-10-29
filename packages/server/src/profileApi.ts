@@ -75,7 +75,7 @@ export function registerProfileApi(app: FastifyInstance, deps: ProfileApiDeps): 
     if (!who) return reply.code(401).send({ error: 'E_AUTH' });
     reply.header('cache-control', 'no-store');
     const login = request.query.login;
-    if (login !== undefined && (typeof login !== 'string' || login.length > 64))
+    if (login !== undefined && (typeof login !== 'string' || login.length > 64 || login.includes('\0')))
       return reply.code(400).send({ error: 'E_BAD_REQUEST' });
     const user =
       login === undefined
