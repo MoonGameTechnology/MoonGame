@@ -541,7 +541,7 @@ it('renders account career instead of local counters, escapes corporation names 
   expect(accountCareerHtml({ ...profile, career: undefined }, true)).toContain('Нет данных');
 });
 
-it('opens the selected corporation and returns to the same player without applying for membership', async () => {
+it.each(['button', 'close'] as const)('corporation card has one back action and returns to the same player via %s', async (back) => {
   const tick = () => new Promise((r) => setTimeout(r, 0));
   const profile = {
     ...defaultAppearance(),
@@ -556,8 +556,12 @@ it('opens the selected corporation and returns to the same player without applyi
     json: async () =>
       url.includes('/corps/')
         ? {
-            corp: { corpId: 'corp-1', name: 'Example', influence: 17 },
-            members: [{ login: 'Member', role: 'member' }],
+            corp: { corpId: 'corp-1', name: '<Example>', influence: 17, emblemId: 'falcon' },
+            members: [
+              { corpId: 'corp-1', accountId: 'm1', login: '<Member>', role: 'member' },
+              { corpId: 'corp-1', accountId: 'h1', login: 'Leader', role: 'head' },
+              { corpId: 'corp-1', accountId: 'r1', login: 'Pending', role: 'recruit' },
+            ],
           }
         : profile,
   }));
@@ -576,14 +580,24 @@ it('opens the selected corporation and returns to the same player without applyi
     closest: (selector: string) =>
       selector === '[data-profile-corp]' ? { dataset: { profileCorp: 'corp-1' } } : null,
   });
+  expect(root.html()).not.toContain('pf-close');
+  expect(root.html()).toContain('data-profile-corp-back');
   await tick();
   expect(fetcher).toHaveBeenLastCalledWith('https://server/corps/corp-1', expect.anything());
-  expect(root.html()).toContain('Member');
+  expect(root.html()).toContain('&lt;Member&gt;');
+  expect(root.html()).toContain('&lt;Example&gt;');
+  expect(root.html()).not.toMatch(/<Member>|<Example>|Pending|pf-close/);
+  expect(root.html()).toContain('data-corp-emblem="falcon"');
+  expect(root.html()).toContain('Участники: 2');
+  expect(root.html().indexOf('Leader')).toBeLessThan(root.html().indexOf('&lt;Member&gt;'));
   expect(root.html()).toContain('Назад к игроку');
-  root.fire({
-    closest: (selector: string) => (selector === '[data-profile-corp-back]' ? {} : null),
-  });
+  expect(root.html().match(/data-profile-corp-back/g)).toHaveLength(1);
+  if (back === 'button')
+    root.fire({ closest: (selector: string) => (selector === '[data-profile-corp-back]' ? {} : null) });
+  else api.close();
   expect(root.html()).toContain('Other');
   expect(root.html()).toContain('data-profile-corp="corp-1"');
+  expect(root.html()).toContain('pf-close');
+  expect(root.shown()).toBe(true);
   expect(fetcher).toHaveBeenCalledTimes(2);
 });

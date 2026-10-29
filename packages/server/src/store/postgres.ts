@@ -169,6 +169,9 @@ const SCHEMA_SQL = `
       visits integer NOT NULL DEFAULT 0 CHECK(visits>=0),
       PRIMARY KEY(account_id,day)
     );
+    ALTER TABLE player_activity_days ADD COLUMN IF NOT EXISTS sector_zero_entries integer NOT NULL DEFAULT 0 CHECK(sector_zero_entries>=0);
+    ALTER TABLE player_activity_days ADD COLUMN IF NOT EXISTS sector_zero_first_ms bigint;
+    ALTER TABLE player_activity_days ADD COLUMN IF NOT EXISTS sector_zero_last_ms bigint;
     CREATE INDEX IF NOT EXISTS player_activity_day_idx ON player_activity_days(day);
     CREATE TABLE IF NOT EXISTS player_activity_state (
       id integer PRIMARY KEY CHECK(id=1), since_ms bigint NOT NULL

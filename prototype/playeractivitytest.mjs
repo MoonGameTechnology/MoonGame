@@ -51,6 +51,13 @@ try {
     const channel = packets[0].body.channel;
     assert.match(channel, /^[a-f0-9]{32}$/);
     assert(packets.every((p) => p.body.channel === channel));
+    const sectorEntry = page.waitForResponse(
+      (r) => r.url() === site.url + '/activity/pulse' && r.request().postDataJSON().sectorZero === true,
+      { timeout: 10_000 },
+    );
+    await page.locator('#hub-sector-zero').click();
+    await sectorEntry;
+    assert.equal(packets.filter((p) => p.body.sectorZero).length, 1);
     // A loaded CI runner can take over a second to deliver a pulse to the route, so the
     // visibility steps wait for the packet itself instead of a fixed pause.
     const lastPulse = async (active) => {
@@ -78,13 +85,14 @@ try {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await lastPulse(true);
+    assert.equal(packets.at(-1).body.sectorZero, undefined, 'heartbeat is not another campaign entry');
     await page.unroute('**/activity/pulse');
     await page.route('**/activity/pulse', (route) => route.abort('failed'));
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.deepEqual(errors, []);
     await page.close();
     console.log(
-      `PASS ${phone ? 'phone player' : 'desktop alpha'}: immediate login, padded address, foreground/background, stable channel, offline observation`,
+      `PASS ${phone ? 'phone player' : 'desktop alpha'}: immediate login and Sector Zero entry, padded address, foreground/background, stable channel, offline observation`,
     );
   }
 } finally {

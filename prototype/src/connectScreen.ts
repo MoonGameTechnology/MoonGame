@@ -95,3 +95,8 @@ export function startActivity(): void {
 export function refreshActivity(): void {
   activity?.refresh();
 }
+
+/** Record an authenticated entry; analytics must never block the campaign. */
+export function recordSectorZeroEntry(): void {
+  activity?.enterSectorZero();
+}

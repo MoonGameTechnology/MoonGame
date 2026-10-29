@@ -47,6 +47,15 @@ async function lostClose(store: PlayerActivityStore) {
   });
 }
 describe('player activity semantics', () => {
+  it('counts entry signals once, ignores replay and hidden signals', async () => {
+    const store = new MemoryPlayerActivityStore(t);
+    await store.pulse('alice', a, true, t, 1, true);
+    await store.pulse('alice', a, true, t, 1, true);
+    await store.pulse('alice', a, false, t + 1000, 2, true);
+    await store.pulse('alice', a, true, t + 2000, 3);
+    await store.pulse('alice', a, true, t + 3000, 4, true);
+    expect((await store.snapshot(t + 3000)).days.at(-1)?.sectorZeroEntries).toBe(2);
+  });
   it('does not charge hidden time across a lost sequence', async () => {
     await lostClose(new MemoryPlayerActivityStore(t));
   });
@@ -135,7 +144,10 @@ describe('player activity semantics', () => {
       expect(
         (await post({ channel: a, sequence: 1, active: true, accountId: 'bob' })).statusCode,
       ).toBe(400);
-      expect((await post({ channel: a, sequence: 1, active: true })).statusCode).toBe(204);
+      expect((await post({ channel: a, sequence: 1, active: true, sectorZero: 'true' })).statusCode).toBe(400);
+      expect((await post({ channel: a, sequence: 1, active: true, sectorZero: true, accountId: 'bob' })).statusCode).toBe(400);
+      expect((await post({ channel: a, sequence: 1, active: true, sectorZero: true })).statusCode).toBe(204);
+      expect((await store.snapshot(t)).days.at(-1)?.sectorZeroEntries).toBe(1);
       expect((await app.inject('/metrics/activity')).statusCode).toBe(404);
       const out = await app.inject({
         url: '/metrics/activity',
@@ -178,6 +190,19 @@ describe.skipIf(!url)('durable activity on real PostgreSQL', () => {
     await pool?.end();
     await admin?.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
     await admin?.end();
+  });
+  it('persists entry timestamps once and erases them with the account', async () => {
+    await pool.query("INSERT INTO users(id,login,pass_hash) VALUES('sector-entry','sector-entry','synthetic')");
+    const store = new PostgresPlayerActivityStore(pool);
+    await store.pulse('sector-entry', a, true, t, 1, true);
+    await store.pulse('sector-entry', a, true, t, 1, true);
+    await store.pulse('sector-entry', a, true, t + 1000, 2);
+    await store.pulse('sector-entry', a, true, t + 2000, 3, true);
+    const row = (await pool.query("SELECT sector_zero_entries,sector_zero_first_ms,sector_zero_last_ms FROM player_activity_days WHERE account_id='sector-entry'")).rows[0];
+    expect(row).toEqual({ sector_zero_entries: 2, sector_zero_first_ms: String(t), sector_zero_last_ms: String(t + 2000) });
+    expect((await new PostgresPlayerActivityStore(pool).snapshot(t + 2000)).days.at(-1)?.sectorZeroEntries).toBe(2);
+    await pool.query("DELETE FROM users WHERE id='sector-entry'");
+    expect((await pool.query("SELECT * FROM player_activity_days WHERE account_id='sector-entry'")).rowCount).toBe(0);
   });
   it('does not charge an unconfirmed gap on PostgreSQL', async () => {
     await lostClose(new PostgresPlayerActivityStore(pool));

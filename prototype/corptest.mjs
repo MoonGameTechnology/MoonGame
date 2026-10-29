@@ -91,6 +91,9 @@ try {
       const corporationName = (await page.locator('#hp-corp .cb-id h2').textContent()).trim();
       assert.ok(allowedNames.has(corporationName), 'name comes from the server catalogue');
       await page.locator('#hp-corp .cb-head [data-corp-emblem="wolf"]').waitFor();
+      await page.click('#hp-corp [data-corpsec="settings"]');
+      await page.locator('#hp-corp .cb-settings').waitFor();
+      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-settings.png` });
       await page.click('#hp-corp [data-corphub="emblem"]');
       await page.locator('#corp-sheet.open').waitFor();
       assert.equal(await page.locator('#corp-sheet [data-corpact="emblem"]').count(), 20);
@@ -104,6 +107,26 @@ try {
       await page.waitForFunction(() => document.activeElement?.getAttribute('data-corparg') === 'phoenix');
       await page.keyboard.press('Escape');
       await page.locator('#corp-sheet.open').waitFor({ state: 'detached' });
+      // Public corporation card reached from a player has one back action, with focus restored.
+      await page.click('#hubav');
+      await page.locator('#profile.show').waitFor();
+      await page.click('#profile [data-pstab="career"]');
+      const corporation = page.locator('#profile [data-profile-corp]');
+      await corporation.click();
+      await page.locator('#profile .pf-corp-members li.head').waitFor();
+      assert.equal(await page.locator('#profile .pf-close').count(), 0);
+      assert.equal(await page.locator('#profile [data-profile-corp-back]').count(), 1);
+      assert.equal(await page.locator('#profile .pf-corp-stats .pf-cell').count(), 2);
+      assert.equal(await page.$eval('#profile .pf-corp-card', el => el.scrollWidth > el.clientWidth + 1), false);
+      await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-public-card.png` });
+      await page.click('#profile [data-profile-corp-back]');
+      await page.waitForFunction(() => document.activeElement?.hasAttribute('data-profile-corp'));
+      await corporation.click();
+      await page.locator('#profile .pf-corp-members li.head').waitFor();
+      await page.keyboard.press('Escape');
+      await corporation.waitFor();
+      await page.keyboard.press('Escape');
+      await page.locator('#profile.show').waitFor({ state: 'detached' });
       if (identityOnly) {
         await page.reload();
         await waitForApp(page);
@@ -117,6 +140,7 @@ try {
         console.log(`PASS identity ${locale} ${width}x${height}: 20 emblems → generated name → head selection → reload, no overflow/errors`);
         return;
       }
+      await page.click('#hp-corp [data-corpsec="base"]');
       assert.equal(await page.locator('#hp-corp .cb-bc').count(), buildingCount);
       assert.equal(await page.locator('#hp-corp .cb-lot').count(), 3);
       await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-base.png` });
@@ -141,7 +165,7 @@ try {
       const overflow = await page.$eval('#hp-corp', (el) => el.scrollWidth > el.clientWidth + 1);
       assert.equal(overflow, false, 'the corporation tab must not overflow horizontally');
       await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-queue.png` });
-      for (const section of ['members', 'treasury', 'battles']) {
+      for (const section of ['members', 'treasury', 'battles', 'settings']) {
         await page.click(`#hp-corp [data-corpsec="${section}"]`);
         await page.locator(`#hp-corp [data-corpsec="${section}"][aria-selected="true"]`).waitFor();
         await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-${section}.png` });
