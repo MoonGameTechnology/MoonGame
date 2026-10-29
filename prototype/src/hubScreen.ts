@@ -692,7 +692,6 @@ export function initHubScreen(host: HubScreenHost): void {
         openBattle: (matchupId) => connectToMatch(avaMatchId(matchupId)),
       },
     });
-  $('railcorp').addEventListener('click', () => corp?.open());
   // hub interactions
   $('hub-play').addEventListener('click', () => hubTab('games'));
   // Single-player entry from the hub home — offline skirmish vs bots (both builds).

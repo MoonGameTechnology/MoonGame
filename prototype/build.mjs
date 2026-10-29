@@ -5178,7 +5178,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-market">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
     <!-- Торговец экспедиции («живой курс»): только в забеге с торговцем, видимость — кадр main.ts -->
     <button id="rail-trader" type="button" data-i18n-title="rail.trader.title" style="display:none">⚖<span class="rlbl" data-i18n="rail.trader.label"></span></button>
-    <button id="railcorp">⬢<span class="rlbl" data-i18n="rail.corp.title"></span></button>
     <button id="rail-chat" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
     <button id="rail-log">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
     <button id="rail-help">?<span class="rlbl" data-i18n="rail.help.title"></span></button>

@@ -26,8 +26,6 @@ const PATHS: Record<PhoneSection | PhoneMoreId, string> = {
   trader:
     '<path d="M12 4v16M8 20h8M5 7h14"/>' +
     '<path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0L5 7ZM19 7l-2.5 6a2.5 2.5 0 0 0 5 0L19 7Z"/>',
-  corporation:
-    '<path d="M5 20V5.5L12 3v17M12 9l7 2v9M3 20h18"/><path d="M8 8h1M8 12h1M8 16h1M15 14h1M15 17h1"/>',
   steward: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5Z"/>',
   dossier: '<path d="M6 3.5h8l4 4v13H6Z"/><path d="M14 3.5V8h4M9 13h6M9 16.5h4"/>',
   codex:
