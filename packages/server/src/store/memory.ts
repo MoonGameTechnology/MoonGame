@@ -1,4 +1,5 @@
 import { reservedBotLogin } from '../botNicknames';
+import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import type { CorpBuildOrder, CorpEmblemId, CorpInfrastructureResult, CorpInfrastructureState, NewsAnnouncement } from '@void/protocol';
@@ -73,6 +74,24 @@ export class MemoryMatchStore implements MatchStore {
   load(matchId: string): Promise<MatchSnapshot | null> {
     const snap = this.snaps.get(matchId);
     return Promise.resolve(snap ? clone(snap) : null);
+  }
+
+  loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
+    const snapshot = this.snaps.get(matchId);
+    if (!snapshot || snapshot.status !== 'ended' || snapshot.endedAt === undefined ||
+      snapshot.endedAt <= since || archiveStateBytes(snapshot.state) > maxBytes) return Promise.resolve(null);
+    return Promise.resolve(clone(snapshot));
+  }
+
+  archiveMetadata(ids: readonly string[], since: number): Promise<ArchiveSummaryMetadata[]> {
+    const rows: ArchiveSummaryMetadata[] = [];
+    for (const id of ids) {
+      const snapshot = this.snaps.get(id);
+      if (!snapshot || snapshot.status !== 'ended' || snapshot.endedAt === undefined || snapshot.endedAt <= since) continue;
+      rows.push({ ...archiveMetadataOf(snapshot), matchId: id,
+        createdAt: snapshot.createdAt ?? snapshot.endedAt, endedAt: snapshot.endedAt, seated: 0 });
+    }
+    return Promise.resolve(rows);
   }
 
   save(snapshot: MatchSnapshot): Promise<void> {

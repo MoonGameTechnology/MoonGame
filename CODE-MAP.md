@@ -450,7 +450,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `matchRoom.ts` | `MatchRoom` | advance → applyAction → per-player fog deltas; durable persist |
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
 | `matchRegistry.ts` | `MatchRegistry`, `sessionMeta`, `MATCH_ARCHIVE_MS` | лента матчей, автоматический архив участников и срок просмотра |
-| `matchArchive.ts` | `restoreMatchArchives`, `archiveExpired` | восстановление замерших карт из стора без драйверов и проверка срока |
+| `matchArchive.ts` | `ArchiveRoomCache`, `archiveExpired` | ограниченные загрузки замерших карт по запросу, общий лимит комнат и проверка срока |
+| `matchArchiveCatalog.ts` | `PostgresArchiveCatalog`, `StoreArchiveCatalog` | список архива участника по кратким метаданным без загрузки миров |
+| `matchArchiveMetadata.ts` | `archiveMetadataOf`, `archiveStateBytes` | компактные метаданные и размер состояния для ограниченного просмотра |
 | `roomRegistry.ts` | `LazyRoomRegistry`, `InMemoryRoomRegistry` | маршрутизация, hibernation и истечение срока уже загруженных архивов |
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |

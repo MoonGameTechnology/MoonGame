@@ -46,6 +46,10 @@ export interface MatchSnapshot {
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
  *  All methods are async so the same interface fits a real database. */
 export interface MatchStore {
+  /** Enforce archive status, real-time retention and byte budget before loading JSON. */
+  loadArchive?(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null>;
+  /** Lightweight catalog metadata, without retaining/cloning full worlds. */
+  archiveMetadata?(ids: readonly string[], since: number): Promise<import('../matchArchiveMetadata').ArchiveSummaryMetadata[]>;
   /** Durable reward delivery scans committed matches in bounded, stable pages. */
   economyMatchIds?(after?: string, limit?: number): Promise<string[]>;
   load(matchId: string): Promise<MatchSnapshot | null>;

@@ -41,6 +41,8 @@ import {
 } from './postgres';
 import { AVA_FEED_KINDS, isAvaFeedEntry } from './types';
 import { SYSTEM_BOT_NICKNAMES } from '../botNicknames';
+import { PostgresArchiveCatalog } from '../matchArchiveCatalog';
+import { archiveMetadataOf, archiveStateBytes } from '../matchArchiveMetadata';
 import type {
   AccountStore,
   AnnouncementStore,
@@ -120,6 +122,27 @@ function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: stri
       const loaded = await store.load(uniq('m2'));
       expect(loaded?.seq).toBe(10);
       expect(loaded?.state.time).toBe(1000);
+    });
+
+    it('loads only recent ended worlds within the byte budget and catalogs metadata separately', async () => {
+      const store = make();
+      const id = uniq('bounded-archive');
+      const s = state();
+      s.match.status = 'ended';
+      const endedAt = 1_800_000_001_000;
+      const snapshot: MatchSnapshot = { ...snap(id, 1, s), status: 'ended', createdAt: endedAt - 1000, endedAt };
+      await store.save(snapshot);
+      const bytes = archiveStateBytes(s);
+      expect(await store.loadArchive!(id, endedAt - 1, bytes)).toMatchObject(snapshot);
+      expect(await store.loadArchive!(id, endedAt - 1, bytes - 1)).toBeNull();
+      expect(await store.loadArchive!(id, endedAt, bytes)).toBeNull();
+      const live = uniq('bounded-live');
+      await store.save(snap(live, 1, state()));
+      expect(await store.loadArchive!(live, endedAt - 1, bytes)).toBeNull();
+      expect(await store.archiveMetadata!([id, live], endedAt - 1)).toEqual([
+        { ...archiveMetadataOf(snapshot), matchId: id, createdAt: endedAt - 1000, endedAt, seated: 0 },
+      ]);
+      expect(await store.archiveMetadata!([id], endedAt)).toEqual([]);
     });
 
     it('lists ONGOING matches only (the open-matches feed read)', async () => {
@@ -1379,12 +1402,34 @@ describe.skipIf(!DB)('Postgres adapters', () => {
     s.match.endedAt = 1000;
     await store.save({ ...snap(id, 1, s), status: 'ended', createdAt,
       clock: { gameTime: 2000, wallTime: createdAt + 90000, timeScale: 2, running: false } });
-    await pool.query(`UPDATE matches SET ended_at = NULL, updated_at = $2 WHERE id = $1`, [id, new Date(createdAt + 90000)]);
+    await pool.query(`UPDATE matches SET ended_at = NULL, archive_meta = NULL, archive_state_bytes = NULL, updated_at = $2 WHERE id = $1`, [id, new Date(createdAt + 90000)]);
     await migrate(pool);
     expect(await store.load(id)).toMatchObject({ state: s, createdAt, endedAt: createdAt + 500 });
+    expect(await store.archiveMetadata([id], createdAt)).toMatchObject([
+      { matchId: id, createdAt, endedAt: createdAt + 500, gameTime: 2000, timeScale: 2 },
+    ]);
+    expect(await store.loadArchive(id, createdAt, 2 * 1024 * 1024)).toMatchObject({ state: s });
+    expect(await store.loadArchive(id, createdAt, 1)).toBeNull();
     await pool.query(`UPDATE matches SET updated_at = now() WHERE id = $1`, [id]);
     await migrate(pool);
     expect(await store.load(id)).toMatchObject({ state: s, createdAt, endedAt: createdAt + 500 });
+  });
+
+  it('joins archive ownership in PostgreSQL and excludes expired or foreign worlds', async () => {
+    const store = new PostgresMatchStore(pool);
+    const accounts = new PostgresAccountStore(pool);
+    const catalog = new PostgresArchiveCatalog(pool);
+    const tag = `archive-owner-${process.pid}-${Date.now()}`;
+    const endedAt = 1_800_000_001_000;
+    const s = state(); s.match.status = 'ended';
+    for (const suffix of ['mine', 'foreign', 'expired']) {
+      const id = `${tag}-${suffix}`;
+      await store.save({ ...snap(id, 1, s), status: 'ended', createdAt: endedAt - 2000,
+        endedAt: suffix === 'expired' ? endedAt - 1000 : endedAt });
+      await accounts.resolveSeat(id, suffix === 'foreign' ? `${tag}-other` : tag, ['p1']);
+    }
+    expect((await catalog.list(tag, endedAt - 1)).map((row) => row.matchId)).toEqual([`${tag}-mine`]);
+    expect(await catalog.list(`${tag}' OR true --`, endedAt - 1)).toEqual([]);
   });
 
   // The corp contract from above, against the real tables. The stamp keeps names and

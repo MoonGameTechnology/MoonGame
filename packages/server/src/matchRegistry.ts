@@ -3,6 +3,9 @@ import { MS_PER_DAY, type GameData, type MatchConfig } from '@void/shared-core';
 import type { MatchKind, MatchLists, MatchSummary } from '@void/protocol';
 import type { MatchRoom } from './matchRoom';
 import type { AccountStore } from './store';
+import type { RoomRegistry } from './roomRegistry';
+import type { MatchArchiveCatalog } from './matchArchiveCatalog';
+import type { ArchiveSummaryMetadata } from './matchArchiveMetadata';
 
 export type { MatchKind, MatchLists, MatchSummary };
 
@@ -109,6 +112,11 @@ interface Entry {
   room: MatchRoom;
   meta: MatchMeta;
 }
+export interface MatchArchives {
+  catalog: MatchArchiveCatalog;
+  rooms: RoomRegistry;
+  rules?(metadata: ArchiveSummaryMetadata): MatchConfig;
+}
 
 export class MatchRegistry {
   private readonly entries = new Map<string, Entry>();
@@ -120,6 +128,7 @@ export class MatchRegistry {
     readonly accounts: AccountStore,
     private readonly data?: GameData,
     private readonly now: () => number = Date.now,
+    private readonly archives?: MatchArchives,
   ) {}
 
   /** Add a match (room + its meta). Re-registering the same id replaces the entry. */
@@ -129,15 +138,34 @@ export class MatchRegistry {
 
   get(id: string): MatchRoom | undefined {
     const entry = this.entries.get(id);
-    return entry && !this.expired(entry) ? entry.room : undefined;
+    return entry && !this.expired(entry) ? entry.room : this.archives?.rooms.get(id);
   }
 
+  async resolve(id: string): Promise<MatchRoom | undefined> {
+    const entry = this.entries.get(id);
+    if (entry && !this.expired(entry)) return entry.room;
+    return this.archives?.rooms.resolve?.(id) ?? this.archives?.rooms.get(id);
+  }
+
+  /** A durably saved, unwatched terminal host can retire to catalog-only storage. */
+  unregister(id: string): boolean {
+    const entry = this.entries.get(id);
+    if (!entry) return true;
+    if (entry.room.state.match.status !== 'ended' || entry.room.peerCount > 0) return false;
+    this.entries.delete(id);
+    return true;
+  }
+
+  retain(id: string): void { this.archives?.rooms.retain?.(id); }
+  release(id: string): void { this.archives?.rooms.release?.(id); }
+
   has(id: string): boolean {
-    return this.entries.has(id);
+    return this.entries.has(id) || this.archives?.rooms.get(id) !== undefined;
   }
 
   ids(): string[] {
-    return [...this.entries.keys()].filter((id) => this.get(id) !== undefined);
+    return [...new Set([...this.entries.keys(), ...(this.archives?.rooms.ids() ?? [])])]
+      .filter((id) => this.get(id) !== undefined);
   }
 
   private finishedAt(entry: Entry): number | undefined {
@@ -159,7 +187,7 @@ export class MatchRegistry {
       this.entries.delete(id);
       removed.push(id);
     }
-    return removed;
+    return [...removed, ...(this.archives?.rooms.pruneExpired?.() ?? [])];
   }
 
   /** Real ms the session has been running, from its game clock: `state.time` is game
@@ -242,6 +270,24 @@ export class MatchRegistry {
         // Joinable only while the entry window is still open (SES-2.3): a closed-window
         // match with free seats is no longer offered to newcomers.
         out.available.push(sum);
+      }
+    }
+    if (nick && this.archives) {
+      const seen = new Set([...out.available, ...out.active, ...out.archived].map((row) => row.matchId));
+      const rows = await this.archives.catalog.list(nick, this.now() - MATCH_ARCHIVE_MS);
+      for (const meta of rows) {
+        if (seen.has(meta.matchId) || this.now() >= meta.endedAt + MATCH_ARCHIVE_MS) continue;
+        const kind = matchKind(this.data, meta.modeId);
+        out.archived.push({
+          matchId: meta.matchId, mapId: meta.mapId,
+          rules: this.archives.rules?.(meta) ?? { timeScale: meta.timeScale },
+          ...(meta.modeId !== undefined ? { modeId: meta.modeId } : {}),
+          ...(kind !== undefined ? { kind } : {}),
+          days: Math.max(0, Math.floor((meta.gameTime - meta.startedAt) / MS_PER_DAY)),
+          players: { seated: meta.seated, capacity: meta.capacity }, status: 'ended',
+          createdAt: meta.createdAt, endedAt: meta.endedAt, archiveExpiresAt: meta.endedAt + MATCH_ARCHIVE_MS,
+          entryOpen: false, entryClosesInMs: 0,
+        });
       }
     }
     // Newest first, id as a deterministic tiebreak.

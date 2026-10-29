@@ -42,6 +42,7 @@ export interface JoinResult {
 export type JoinFailure = {
   error:
     | 'E_NO_MATCH'
+    | 'E_UNAVAILABLE'
     | 'E_MATCH_FULL'
     | 'E_AUTH_DISABLED'
     | 'E_NOT_ROSTERED'
@@ -119,6 +120,7 @@ export interface MatchApiDeps {
 
 const STATUS: Record<JoinFailure['error'], number> = {
   E_NO_MATCH: 404,
+  E_UNAVAILABLE: 503,
   E_MATCH_FULL: 409,
   E_NOT_ROSTERED: 403,
   E_ENTRY_CLOSED: 403,
