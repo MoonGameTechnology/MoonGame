@@ -106,6 +106,7 @@ let wLoginEl: HTMLElement;
 let wNickInput: HTMLInputElement;
 let wPassRowEl: HTMLElement;
 let wPassInput: HTMLInputElement;
+let wRecoverEl: HTMLElement;
 let welcomeFeedback: ReturnType<typeof initFormFeedback<'nick' | 'pass'>>;
 function signInByCallsign(): void {
   const nick = wNickInput.value.trim();
@@ -190,13 +191,13 @@ export function fillWelcome(nick: string, password: 'show' | 'hide'): void {
   wNickInput.value = nick || suggestCallsign();
   welcomeFeedback.clear();
   wPassRowEl.style.display = password === 'hide' ? 'none' : 'flex';
+  wRecoverEl.style.display = password === 'hide' ? 'none' : '';
 }
 
 // --- «Новый командир» → dedicated registration page (its own #connect stage) -------
 // Callsign + password + repeat, on a page of its own (no live game behind it). Registration
 // IS the first login (ensureSession: login → 401 → register), so a fresh callsign creates
-// the account. «Восстановить доступ» is a stub until the accounts backend grows a real reset
-// (no email on file yet — docs/accounts-roadmap.md).
+// the account. Password recovery has its own entry on the welcome/sign-in card.
 let crNickInput: HTMLInputElement;
 let crMailInput: HTMLInputElement;
 let crPassInput: HTMLInputElement;
@@ -352,6 +353,9 @@ export function startAuthProbe(base: string): void {
   authProbe = (async () => {
     if (!base) return;
     await probeAuthMode(base);
+    // Recovery belongs beside sign-in, including a returning player's collapsed
+    // login form. Nick-only servers do not have account passwords to recover.
+    wRecoverEl.style.display = authMode === 'accounts' ? '' : 'none';
     // Кому раскрывать форму — `identityProbe.ts` (REFM-154, правило 4): только новичку.
     // Запомненный позывной значит, что карточку пропустили: форму никто не увидит, а
     // `suggestCallsign()` затёр бы уже введённое имя. Режим передаётся как есть: прежнее
@@ -379,6 +383,7 @@ export function initSignInPages(host: SignInPagesHost): void {
   wNickInput = $('cwnick') as HTMLInputElement;
   wPassRowEl = $('cwpassrow');
   wPassInput = $('cwpass') as HTMLInputElement;
+  wRecoverEl = $('cwrecover');
   crNickInput = $('crnick') as HTMLInputElement;
   crMailInput = $('crmail') as HTMLInputElement;
   crPassInput = $('crpass') as HTMLInputElement;
@@ -520,10 +525,9 @@ export function initSignInPages(host: SignInPagesHost): void {
     game.status('');
   });
 
-  $('crrecover').addEventListener('click', () => {
+  wRecoverEl.addEventListener('click', () => {
     showStage('recover');
-    // Адрес переносим с экрана регистрации (`recoverForm.ts`, правило 3): он его уже
-    // вводил строкой выше, а печатать второй раз ровно сейчас — повод бросить.
+    // Если почту уже набирали при регистрации, не заставляем вводить её повторно.
     crecMailInput.value = carryEmail(crMailInput.value);
     game.status('');
   });
@@ -535,6 +539,9 @@ export function initSignInPages(host: SignInPagesHost): void {
   });
   $('crecback').addEventListener('click', () => {
     showStage('welcome');
+    wLoginEl.style.display = 'flex';
+    wPassRowEl.style.display = authMode === 'accounts' ? 'flex' : 'none';
+    if (!wNickInput.value.trim()) wNickInput.value = (localStorage.getItem('void.nick') ?? '').trim();
     game.status('');
   });
 
