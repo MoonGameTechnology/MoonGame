@@ -13,14 +13,17 @@ export function createActivityReporter(options: {
   let generation = 0;
   let last: ActivityTarget | null = null;
   const request = options.request ?? fetch;
-  const send = async (target: ActivityTarget, active: boolean): Promise<void> => {
+  const send = async (target: ActivityTarget, active: boolean, sectorZero = false): Promise<void> => {
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), 5000);
     try {
       await request(target.base.replace(/\/$/, '') + '/activity/pulse', {
         method: 'POST',
         headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: options.channel, sequence: ++sequence, active }),
+        body: JSON.stringify({
+          channel: options.channel, sequence: ++sequence, active,
+          ...(sectorZero ? { sectorZero: true } : {}),
+        }),
         credentials: 'omit',
         redirect: 'error',
         cache: 'no-store',
@@ -33,7 +36,7 @@ export function createActivityReporter(options: {
       clearTimeout(timer);
     }
   };
-  return async (active: boolean): Promise<void> => {
+  return async (active: boolean, sectorZero = false): Promise<void> => {
     const call = ++generation;
     let target: ActivityTarget | null;
     try {
@@ -51,12 +54,12 @@ export function createActivityReporter(options: {
     }
     if (active && target && call === generation) {
       last = target;
-      await send(target, true);
+      await send(target, true, sectorZero);
     }
   };
 }
 
-export function startPlayerActivity(target: () => ActivityTarget | null): { refresh(): void; stop(): void } {
+export function startPlayerActivity(target: () => ActivityTarget | null): { refresh(): void; enterSectorZero(): void; stop(): void } {
   // A missing crypto primitive disables observation, never the game.
   try {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -77,7 +80,11 @@ export function startPlayerActivity(target: () => ActivityTarget | null): { refr
     window.addEventListener('online', pulse);
     window.addEventListener('offline', leave);
     pulse();
-    return { refresh: pulse, stop: () => {
+    return { refresh: pulse,
+      enterSectorZero: () => {
+        if (!stopped && visible()) void report(true, true);
+      },
+      stop: () => {
       stopped = true;
       window.clearInterval(timer);
       leave();
@@ -88,6 +95,6 @@ export function startPlayerActivity(target: () => ActivityTarget | null): { refr
       window.removeEventListener('offline', leave);
     } };
   } catch {
-    return { refresh: () => {}, stop: () => {} };
+    return { refresh: () => {}, enterSectorZero: () => {}, stop: () => {} };
   }
 }

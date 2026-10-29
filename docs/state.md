@@ -704,6 +704,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (`playtest-logs/client-*.jsonl`); сводка — `pnpm run analytics`.
 - Авторизованный foreground pulse и union интервалов дают уникальные аккаунты/время по
   суткам UTC; источник `/metrics/activity`, экран Grafana `/d/moongame-player-activity`.
+  Переход в Sector Zero дополнительно сохраняет число входов, первое и последнее
+  серверное время за сутки в `player_activity_days`; повтор sequence не дублирует отметку.
+  Старая история, анонимные входы и отдельная сборка без сессии не восстанавливаются.
   30-дневное хранение, erasure и точность — [runbook](../deploy/observability/PLAYER-ACTIVITY.md).
 
 **Харнесы и проверки.**
