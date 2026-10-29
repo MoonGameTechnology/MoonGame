@@ -475,6 +475,8 @@ export const ru: Record<string, string> = {
   'acc.server-down': 'сервер недоступен',
   'acc.session-expired': 'Сессия истекла — введите пароль ещё раз',
   'browser.archive': 'В архив',
+  'browser.archive-until': 'Карта доступна до {date}',
+  'browser.view-map': 'Посмотреть карту',
   'browser.archive-error': 'ошибка архива',
   'browser.archive-failed': 'не удалось в архив',
   'browser.create': 'Новый матч',

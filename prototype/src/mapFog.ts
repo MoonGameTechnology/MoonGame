@@ -252,6 +252,7 @@ export function restoreFogMemory(entries: Parameters<ScanMemory['restore']>[0]):
  *  window on a world identifies the fleets at it, SPY-8). */
 export function fleetSeen(f: Fleet): boolean {
   const s = game.world();
+  if (s.match.status === 'ended') return true;
   const ME = game.me();
   // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
   if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
@@ -286,6 +287,7 @@ export function fleetKnown(f: Fleet): boolean {
 /** Опознание по зрению, посчитанному клиентом, — единственное место, где узел флота
  *  спрашивается напрямую (сторож `engagedFog.test.ts`). */
 function fleetSeenHere(f: Fleet): boolean {
+  if (game.world().match.status === 'ended') return true;
   return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
 }
 

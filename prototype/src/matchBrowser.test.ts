@@ -541,15 +541,30 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(status).toBe(t('browser.number.bad'));
   });
 
-  it('«Архив»: рядом с «Войти» — «Восстановить»', async () => {
+  it('«Архив»: вручную скрытый живой матч можно продолжить или восстановить', async () => {
     await browsing();
     tab('archived').click();
     expect(ids()).toEqual(['z1']);
     expect(rows()[0]!.buttons.map((b) => b.textContent)).toEqual([
-      t('browser.join'),
+      t('browser.resume'),
       t('browser.restore'),
       t('browser.description'),
     ]);
+  });
+
+  it('завершённый архив открывает карту на своём месте без выбора фракции и без восстановления', async () => {
+    lists.archived = [row('finished', { status: 'ended', archiveExpiresAt: 1_800_000_000_000 })];
+    await browsing();
+    tab('archived').click();
+    expect(rows()[0]!.buttons.map((b) => b.textContent)).toEqual([
+      t('browser.view-map'), t('browser.description'),
+    ]);
+    rows()[0]!.buttons[0]!.click();
+    expect(of('openSessionTab')).toEqual([['openSessionTab', 'finished', true]]);
+    $('mnum-in').value = 'finished';
+    $('mnum').fire('submit');
+    expect(of('openSessionTab').at(-1)).toEqual(['openSessionTab', 'finished', true]);
+    expect(rows()[0]!.row.innerHTML).not.toContain(t('browser.restore'));
   });
 
   it('описание доступно во всех вкладках и в хабе без входа в матч', async () => {
@@ -652,7 +667,7 @@ describe('REFM-217 — архив', () => {
     await browsing();
     server = (url) => (url.includes('archive') ? reply(403) : reply(404));
     tab('active').click();
-    rows()[0]!.buttons[1]!.click();
+    rows()[1]!.buttons[1]!.click();
     await settle();
     expect(status).toBe(t('browser.archive-failed'));
     tab('archived').click();
@@ -680,7 +695,7 @@ describe('REFM-217 — архив', () => {
       throw new Error('offline');
     };
     tab('active').click();
-    rows()[0]!.buttons[1]!.click();
+    rows()[1]!.buttons[1]!.click();
     await settle();
     expect(status).toBe(t('browser.archive-error'));
   });

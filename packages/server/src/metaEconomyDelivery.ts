@@ -262,6 +262,9 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
       schedule(snapshot.matchId);
     },
     ongoingMatchIds: () => deps.matches.ongoingMatchIds(),
+    ...(deps.matches.endedMatchIds
+      ? { endedMatchIds: (since: number) => deps.matches.endedMatchIds!(since) }
+      : {}),
     ...(deps.matches.economyMatchIds
       ? {
           economyMatchIds: (after?: string, limit?: number) =>

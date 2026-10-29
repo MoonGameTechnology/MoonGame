@@ -482,7 +482,7 @@ export function patrolsSeenBy(state: GameState, viewerId: PlayerId, data: GameDa
     const seen =
       eyes.some((c) => inRadius(st.to, c, c.identify)) || // правило 2
       guarded.some((at) => inRadius(at, st.to, radius)); // правило 3
-    if (!seen) continue;
+    if (!seen && state.match.status !== 'ended') continue;
     out.push({
       owner: st.owner,
       at: { x: st.to.x, y: st.to.y },
@@ -584,6 +584,14 @@ export function sensorCoverageOf(
   data: GameData,
   planets: readonly Planet[] = recordValues(state.planets),
 ): Map<PlayerId, Coverage> {
+  // A decided match is a frozen map for its participants to study. This only
+  // changes spatial visibility; project() still removes private/server fields.
+  if (state.match.status === 'ended') {
+    return new Map(viewerIds.map((id) => [id, {
+      identify: new Set(planets.map((p) => p.id)),
+      radar: new Set(planets.map((p) => p.id)),
+    }]));
+  }
   const { xs, ys, cells } = planetGrid(planets);
   const blocs = viewerIds.map((viewerId) => visionBloc(state, viewerId));
   const byOwner = circlesByOwner(
@@ -749,6 +757,7 @@ export function radarSignatures(
   seenAt: ReadonlySet<FleetId> = fleetsSeenByPosition(state, viewerId, data),
   planets?: readonly Planet[],
 ): SignatureContact[] {
+  if (state.match.status === 'ended') return [];
   const sources = radarSources(state, viewerId, data, planets);
   if (!sources.length) return [];
   // A fleet in the viewer's own battle is shown in full (`engagementOf`) — no blip on top.
@@ -906,11 +915,13 @@ export function isVisibleTo(
   if ('planetId' in target) {
     const planet = state.planets[target.planetId];
     if (!planet) return false;
+    if (state.match.status === 'ended') return true;
     if (planet.owner === viewerId) return true;
     return (identified ?? identifiedNodes(state, viewerId, data)).has(target.planetId);
   }
   const fleet = state.fleets[target.fleetId];
   if (!fleet) return false;
+  if (state.match.status === 'ended') return true;
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
@@ -1120,14 +1131,14 @@ function project(
   // Scoreboard: each player's live planet/fleet/unit totals aggregate territory
   // the viewer can't see, so an enemy's `scores` line is fog-sensitive intel
   // (its `total`/`fleets` tick reveals a build-up or a capture behind the fog).
-  // Keep only the viewer's own line — the client renders just `scores[ME]`.
-  // `status`/`winner` stay: the match's end result is public to everyone.
-  if (view.match?.scores) {
+  // While ongoing, keep only the viewer's own line. Final scores are public
+  // alongside the finished map; status/winner always stay.
+  if (view.match?.scores && state.match.status !== 'ended') {
     const own = view.match.scores[viewerId];
     view.match.scores = own ? { [viewerId]: own } : {};
   }
   // Боевые очки (BAL-16) — та же разведка: их рост у соперника выдаёт бой за туманом.
-  if (view.match?.battlePoints) {
+  if (view.match?.battlePoints && state.match.status !== 'ended') {
     const own = view.match.battlePoints[viewerId];
     if (own !== undefined) view.match.battlePoints = { [viewerId]: own };
     else delete view.match.battlePoints;
@@ -1376,7 +1387,7 @@ function project(
   let eyes: SightCircle[] | undefined;
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
-    if (!fleet || fleet.owner === viewerId) continue;
+    if (!fleet || fleet.owner === viewerId || state.match.status === 'ended') continue;
     // Чужая мина — только вблизи; шпионаж, бой и опознанный узел её не раскрывают (SM-3.6).
     if (isMineFleet(fleet, data)) {
       const original = state.fleets[id];

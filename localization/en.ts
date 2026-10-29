@@ -471,6 +471,8 @@ export const en: Record<string, string> = {
   'acc.server-down': 'server unreachable',
   'acc.session-expired': 'Session expired — enter the password again',
   'browser.archive': 'Archive',
+  'browser.archive-until': 'Map available until {date}',
+  'browser.view-map': 'View map',
   'browser.archive-error': 'archive error',
   'browser.archive-failed': 'archiving failed',
   'browser.create': 'New match',

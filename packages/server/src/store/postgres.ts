@@ -86,6 +86,17 @@ const SCHEMA_SQL = `
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS career jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+    -- Legacy snapshots have only simulation time. Infer their finish once, anchored
+    -- at durable creation, rather than extending their archive on every restart.
+    UPDATE matches SET ended_at = LEAST(updated_at, GREATEST(created_at,
+      created_at + GREATEST(0,
+        COALESCE((state->'match'->>'endedAt')::double precision, (state->>'time')::double precision, 0)
+        - COALESCE((state->>'startedAt')::double precision, 0))
+        / GREATEST(COALESCE((clock->>'timeScale')::double precision, 1), 1)
+        * interval '1 millisecond'))
+    WHERE status = 'ended' AND ended_at IS NULL;
+    CREATE INDEX IF NOT EXISTS matches_ended_at_idx ON matches (ended_at) WHERE status = 'ended';
     CREATE TABLE IF NOT EXISTS profile_career (account_id text PRIMARY KEY, career jsonb NOT NULL);
     CREATE TABLE IF NOT EXISTS profile_career_credits (match_id text NOT NULL, account_id text NOT NULL, PRIMARY KEY(match_id,account_id));
     CREATE INDEX IF NOT EXISTS matches_status_idx ON matches (status);
@@ -612,6 +623,8 @@ interface MatchRow {
   economy_observations: MatchSnapshot['economyObservations'] | null;
   economy_activity: MatchSnapshot['economyActivity'] | null;
   career: MatchSnapshot['career'] | null;
+  created_at: Date;
+  ended_at: Date | null;
 }
 
 export class PostgresMatchStore implements MatchStore {
@@ -640,7 +653,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -650,6 +663,8 @@ export class PostgresMatchStore implements MatchStore {
       dataVersion: row.data_version,
       seq: row.seq,
       status: row.status === 'ended' ? 'ended' : 'ongoing',
+      ...(row.created_at ? { createdAt: row.created_at.getTime() } : {}),
+      ...(row.ended_at ? { endedAt: row.ended_at.getTime() } : {}),
       ...(row.career ? { career: row.career } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
@@ -688,8 +703,8 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, ended_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
@@ -697,6 +712,7 @@ export class PostgresMatchStore implements MatchStore {
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
          career       = EXCLUDED.career,
+         ended_at     = COALESCE(matches.ended_at, EXCLUDED.ended_at),
          economy_observations = CASE
            WHEN matches.economy_observations IS NULL AND EXCLUDED.economy_observations IS NULL THEN NULL
            ELSE COALESCE(EXCLUDED.economy_observations, '{}'::jsonb) || COALESCE(matches.economy_observations, '{}'::jsonb)
@@ -744,6 +760,8 @@ export class PostgresMatchStore implements MatchStore {
           : null,
         MAX_META_ACTIVITY_FACTS_PER_ROLE,
         snapshot.career ? JSON.stringify(snapshot.career) : null,
+        snapshot.status === 'ended' ? new Date(snapshot.endedAt ?? Date.now()) : null,
+        snapshot.createdAt !== undefined ? new Date(snapshot.createdAt) : null,
       ],
     );
     return result.rowCount === 1;
@@ -753,6 +771,14 @@ export class PostgresMatchStore implements MatchStore {
     // Uses matches_status_idx — never touches the JSONB `state`.
     const r = await this.pool.query<{ id: string }>(
       `SELECT id FROM matches WHERE status = 'ongoing'`,
+    );
+    return r.rows.map((row) => row.id);
+  }
+
+  async endedMatchIds(since: number): Promise<string[]> {
+    const r = await this.pool.query<{ id: string }>(
+      `SELECT id FROM matches WHERE status = 'ended' AND ended_at > $1 ORDER BY ended_at DESC, id`,
+      [new Date(since)],
     );
     return r.rows.map((row) => row.id);
   }

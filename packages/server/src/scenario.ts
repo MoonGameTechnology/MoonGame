@@ -655,6 +655,8 @@ export interface DevMatchOptions {
   initiallyStarted?: boolean;
   /** The persisted anchor of such a clock (see `MatchRoom.initialClock`). */
   initialClock?: MatchSnapshot['clock'];
+  initialCreatedAt?: number;
+  initialEndedAt?: number;
   initialCareer?: MatchSnapshot['career'];
   careerAccounts?: Record<string, string>;
   /** Strict commit-before-broadcast durable write (see `MatchRoom.persist`). */
@@ -796,6 +798,8 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,
     initialCareer: options.initialCareer,
+    initialCreatedAt: options.initialCreatedAt,
+    initialEndedAt: options.initialEndedAt,
     careerAccounts: options.careerAccounts,
     ...(options.initiallyStarted ? { initiallyStarted: true } : {}),
     ...(options.initialClock ? { initialClock: options.initialClock } : {}),

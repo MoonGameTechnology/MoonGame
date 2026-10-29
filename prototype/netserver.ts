@@ -1,4 +1,5 @@
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
+import { restoreMatchArchives } from '../packages/server/src/matchArchive';
 import { MemoryRegistrationRewardStore, PostgresRegistrationRewardStore, type RegistrationRewardStore } from '../packages/server/src/registrationRewardStore';
 import { registerArsenalApi } from '../packages/server/src/arsenalApi';
 import { MemoryDropStore } from '../packages/server/src/store';
@@ -814,6 +815,8 @@ async function createHostedMatch(
     // now; restored snapshot: its durable anchor) and TIME_SCALE applies from here.
     initiallyStarted: true,
     initialClock: restoredSnap?.clock,
+    initialCreatedAt: restoredSnap?.createdAt,
+    initialEndedAt: restoredSnap?.endedAt,
     singlePeerPerPlayer: true, // one live connection per chair — no two people command one empire
     emitStateHash: true, // attach hashState(view) so the client overlay can flag desync
     // Bot favour (`approval`) is a prototype key the core fog passes through whole:
@@ -898,6 +901,8 @@ async function createHostedMatch(
         seq: room.sequence,
         status: room.state.match.status === 'ended' ? 'ended' as const : 'ongoing' as const,
         state: room.state,
+        createdAt: room.createdAt,
+        endedAt: room.endedAt,
         clock: room.clockSnapshot,
         economyActivity: room.economyActivitySnapshot,
         career: room.careerSnapshot,
@@ -1209,7 +1214,7 @@ refreshGrantedArsenal = async (accountId) => {
 const browserMeta = (room: MatchRoom): MatchMeta =>
   sessionMeta(room, {
     timeScale: room.clockScale,
-    createdAt: Date.now(),
+    createdAt: room.createdAt,
     entryWindowMs: ENTRY_WINDOW_MS,
   });
 
@@ -1230,6 +1235,47 @@ for (const id of roster.raise) {
 // Идущие битвы корпораций возвращаются битвами. Без учёток их некому играть — они ждут в
 // сторе запуска с AUTH.
 if (AUTH) for (const id of storedMatchIds.filter(isAvaMatchId)) await hostAvaMatch(id);
+await restoreMatchArchives(registry, matchStore, (snapshot) => new MatchRoom({
+  id: snapshot.matchId,
+  initialState: snapshot.state,
+  initialSeq: snapshot.seq,
+  initialCareer: snapshot.career,
+  initialCreatedAt: snapshot.createdAt,
+  initialEndedAt: snapshot.endedAt,
+  initialClock: snapshot.clock,
+  initiallyStarted: true,
+  kernel,
+  data,
+  timeScale: snapshot.clock?.timeScale ?? 1,
+  config: {
+    timeScale: snapshot.clock?.timeScale ?? 1,
+    ...(snapshot.state.modeId !== undefined ? { modeId: snapshot.state.modeId } : {}),
+    victory: victoryFor(snapshot.state),
+  },
+  hostFog: approvalView,
+  singlePeerPerPlayer: true,
+  emitStateHash: true,
+}));
+
+// Expired maps stop accepting connections immediately in registry.get(). Reclaim
+// their viewers/drivers too, without deleting durable results or reward evidence.
+let archiveSweeping = false;
+const archiveSweep = setInterval(() => {
+  if (archiveSweeping || shuttingDown) return;
+  archiveSweeping = true;
+  void (async () => {
+    registry.pruneExpired();
+    for (let i = hosted.length - 1; i >= 0; i--) {
+      const h = hosted[i]!;
+      if (h.room.state.match.status !== 'ended' || registry.get(h.id)) continue;
+      h.clearTimers();
+      await h.flush();
+      hosted.splice(i, 1);
+    }
+  })().catch((error) => process.stderr.write(`archive cleanup failed: ${String(error)}\n`))
+    .finally(() => { archiveSweeping = false; });
+}, 60_000);
+archiveSweep.unref();
 const matchIds = roster.raise;
 const restoredCount = hosted.filter((h) => h.restored).length;
 /**
@@ -1246,7 +1292,8 @@ const MAX_HOSTED = 64; // потолок сессий в одном процес
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
 async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string, timeScale?: number): Promise<HostedMatch> {
   if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
-  if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
+  if (hosted.filter((h) => h.room.state.match.status !== 'ended').length >= MAX_HOSTED)
+    throw new Error('match capacity reached'); // → 500, bounded active worlds
   // Номер свободен и у живых комнат, и в сторе: законченная партия тоже держит свой номер.
   const id = await freeMatchId(async (candidate) =>
     registry.has(candidate) || (await matchStore.load(candidate)) !== null,
@@ -1270,7 +1317,7 @@ async function hostAvaMatch(id: string): Promise<HostedMatch> {
   hosted.push(h);
   registry.register(
     h.room,
-    sessionMeta(h.room, { timeScale: h.room.clockScale, createdAt: Date.now(), entryWindowMs: 0 }),
+    sessionMeta(h.room, { timeScale: h.room.clockScale, createdAt: h.room.createdAt, entryWindowMs: 0 }),
   );
   return h;
 }
@@ -1317,6 +1364,9 @@ async function joinAvaBattle(
 ): Promise<JoinResult | JoinFailure> {
   const ava = who.accountId ? await avaOrchestrator.resolveAvaSeat(id, who.accountId) : null;
   if (!ava?.ok) return { error: 'E_NOT_ROSTERED' };
+  if (room.state.match.status === 'ended') {
+    return { playerId: ava.playerId, token: await authCfg.signToken!(id, ava.playerId, who.accountId, who.pwfp) };
+  }
   // Зеркало состава в посадочных записях: оно ведёт участника в битву из хаба (`raiseAvaBattle`).
   await accountStore.resolveSeat(id, who.login, [ava.playerId], ava.playerId);
   const seat = await admitSeat({
@@ -1603,13 +1653,14 @@ const server = createMultiplayerServer({
             for (const id of registry.ids()) {
               if (!(await accountStore.seatOf(id, login))) continue;
               const room = registry.get(id);
-              if (!room) continue;
+              if (!room || room.state.match.status === 'ended') continue;
               return { matchId: id, days: Math.floor(room.state.time / MS_PER_DAY) };
             }
             return null;
           },
           // FRIENDS-2: an invite is valid only into a match its sender plays.
-          holdsSeat: async (matchId, login) => (await accountStore.seatOf(matchId, login)) !== null,
+          holdsSeat: async (matchId, login) => registry.get(matchId)?.state.match.status === 'ongoing'
+            && (await accountStore.seatOf(matchId, login)) !== null,
         },
       });
       registerCorporateMaintenance(app, process.env.CORPORATIONS_MAINTENANCE === '1');
@@ -1749,6 +1800,10 @@ const server = createMultiplayerServer({
           // CORP-5: в битву корпораций входит только её состав, каждый — на своё место.
           if (isAvaMatchId(id)) return joinAvaBattle(id, room, { login, accountId, pwfp });
           const held = await accountStore.seatOf(id, login);
+          if (room.state.match.status === 'ended') {
+            if (!held) return { error: 'E_ENTRY_CLOSED' as const };
+            return { playerId: held, token: await authCfg.signToken!(id, held, accountId, pwfp) };
+          }
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
           // Что достаётся игроку и переписывать ли дом — ОБЩЕЕ решение с боевым сервером
           // (`packages/server/src/joinSeat.ts`). Паритет двух хостов держится одним
@@ -1970,6 +2025,7 @@ const printSummary = (): void => {
 const shutdown = (): void => {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(archiveSweep);
   stopAvaSweeps();
   printSummary();
   // M3: land the aggregated summary as the LAST JSONL line — the per-line log keeps

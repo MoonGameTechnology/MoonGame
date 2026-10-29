@@ -104,6 +104,10 @@ export class MemoryMatchStore implements MatchStore {
       }
       return clone({
         ...snapshot,
+        createdAt: prev?.createdAt ?? snapshot.createdAt ?? Date.now(),
+        ...(snapshot.status === 'ended'
+          ? { endedAt: prev?.endedAt ?? snapshot.endedAt ?? Date.now() }
+          : {}),
         ...(Object.keys(economyObservations).length ? { economyObservations } : {}),
         ...(Object.keys(economyActivity).length ? { economyActivity } : {}),
       }); // optimistic: keep the newest while retaining committed reward evidence
@@ -115,6 +119,13 @@ export class MemoryMatchStore implements MatchStore {
     const ids: string[] = [];
     for (const snap of this.snaps.values()) if (snap.status !== 'ended') ids.push(snap.matchId);
     return Promise.resolve(ids);
+  }
+
+  endedMatchIds(since: number): Promise<string[]> {
+    return Promise.resolve([...this.snaps.values()]
+      .filter((s) => s.status === 'ended' && s.endedAt !== undefined && s.endedAt > since)
+      .sort((a, b) => b.endedAt! - a.endedAt! || a.matchId.localeCompare(b.matchId))
+      .map((s) => s.matchId));
   }
 
   ping(): Promise<boolean> {

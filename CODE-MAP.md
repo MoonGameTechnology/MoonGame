@@ -449,7 +449,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `main.ts` | `startServer({sendRecoveryMail})` | запуск сервера: Fastify + WS + persist + clockDriver; адаптеры и fatal handlers подключает внешний `scripts/server.ts` |
 | `matchRoom.ts` | `MatchRoom` | advance → applyAction → per-player fog deltas; durable persist |
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
-| `matchRegistry.ts` | `LazyRoomRegistry` | multi-match registry + hibernation |
+| `matchRegistry.ts` | `MatchRegistry`, `sessionMeta`, `MATCH_ARCHIVE_MS` | лента матчей, автоматический архив участников и срок просмотра |
+| `matchArchive.ts` | `restoreMatchArchives`, `archiveExpired` | восстановление замерших карт из стора без драйверов и проверка срока |
+| `roomRegistry.ts` | `LazyRoomRegistry`, `InMemoryRoomRegistry` | маршрутизация комнат + hibernation канонического хоста |
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |
 | `operatorMatchApi.ts` | `POST /metrics/matches` | создание сессии с картой и скоростью; полный операторский ключ |

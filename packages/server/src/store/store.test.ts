@@ -96,6 +96,23 @@ function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: stri
       expect(await make().load(uniq('nope'))).toBeNull();
     });
 
+    it('retains first real finish across repeated/stale saves and catalogs only recent archives', async () => {
+      const store = make();
+      const id = uniq('archive-dates');
+      const createdAt = 1_800_000_000_000;
+      const endedAt = createdAt + 1000;
+      const s = state();
+      s.match.status = 'ended';
+      const ended: MatchSnapshot = { ...snap(id, 2, s), status: 'ended', createdAt, endedAt };
+      await store.save(ended);
+      await store.save({ ...ended, seq: 3, createdAt: createdAt + 99999, endedAt: endedAt + 99999 });
+      await store.save({ ...ended, seq: 1, createdAt: 0, endedAt: 0 });
+      expect(await store.load(id)).toMatchObject({ seq: 3, createdAt, endedAt });
+      expect(await store.endedMatchIds!(endedAt - 1)).toContain(id);
+      expect(await store.endedMatchIds!(endedAt)).not.toContain(id);
+      expect(await store.ongoingMatchIds()).not.toContain(id);
+    });
+
     it('is optimistic by seq — an older save never clobbers a newer one', async () => {
       const store = make();
       await store.save(snap(uniq('m2'), 10, withTime(state(), 1000)));
@@ -1349,6 +1366,25 @@ describe.skipIf(!DB)('Postgres adapters', () => {
 
   afterAll(async () => {
     await pool.end();
+  });
+
+  it('backfills legacy finish once from original creation and scaled game duration, preserving the frozen state', async () => {
+    const store = new PostgresMatchStore(pool);
+    const id = `legacy-archive-${process.pid}-${Date.now()}`;
+    const createdAt = 1_790_000_000_000;
+    const s = state();
+    s.startedAt = 0;
+    s.time = 2000; // Old snapshots could keep ticking after their actual finish.
+    s.match.status = 'ended';
+    s.match.endedAt = 1000;
+    await store.save({ ...snap(id, 1, s), status: 'ended', createdAt,
+      clock: { gameTime: 2000, wallTime: createdAt + 90000, timeScale: 2, running: false } });
+    await pool.query(`UPDATE matches SET ended_at = NULL, updated_at = $2 WHERE id = $1`, [id, new Date(createdAt + 90000)]);
+    await migrate(pool);
+    expect(await store.load(id)).toMatchObject({ state: s, createdAt, endedAt: createdAt + 500 });
+    await pool.query(`UPDATE matches SET updated_at = now() WHERE id = $1`, [id]);
+    await migrate(pool);
+    expect(await store.load(id)).toMatchObject({ state: s, createdAt, endedAt: createdAt + 500 });
   });
 
   // The corp contract from above, against the real tables. The stamp keeps names and

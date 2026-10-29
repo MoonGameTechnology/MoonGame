@@ -142,6 +142,52 @@ function scenario(): GameState {
   };
 }
 
+describe('finished-match map inspection', () => {
+  it('reveals every node and fleet only after the server decides the match, retaining private boundaries', () => {
+    const state = scenario();
+    state.fleets.travelling = {
+      ...fleet('travelling', 'p2', 'D', [['cruiser', 1]]), location: null,
+      movement: { from: 'D', to: 'E', departedAt: 0, arrivesAt: 1000 },
+    };
+    const special = { ...data, units: {
+      ...data.units,
+      mine: { ...data.units.cruiser!, traits: ['mine'] },
+      missile: { ...data.units.cruiser!, traits: ['missile'] },
+    } };
+    state.fleets.mine = fleet('mine', 'p2', 'D', [['mine', 1]]);
+    state.fleets.missile = fleet('missile', 'p2', 'D', [['missile', 1]]);
+    state.fog = { p1: {}, p2: {} };
+    state.planets.D!.buildQueue = [];
+    const live = visibleState(state, 'p1', special);
+    expect(live.planets.D!.owner).toBeNull();
+    expect(live.fleets['enemy-hidden']).toBeUndefined();
+    expect(live.fleets.mine).toBeUndefined();
+    expect(live.fleets.missile).toBeUndefined();
+    expect(isVisibleTo(state, 'p1', { planetId: 'D' }, special)).toBe(false);
+    state.match.status = 'ended';
+    state.match.endedAt = state.time;
+    const original = structuredClone(state);
+    const view = visibleState(state, 'p1', special);
+    expect(sensorCoverage(state, 'p1', special).identify.size).toBe(5);
+    expect(view.planets.D!.owner).toBe('p2');
+    expect(view.planets.D!.garrison).toEqual(state.planets.D!.garrison);
+    expect(Object.keys(view.fleets).sort()).toEqual(Object.keys(state.fleets).sort());
+    expect(view.remembered).toEqual([]);
+    expect(view.signatures).toEqual([]);
+    expect(isVisibleTo(state, 'p1', { planetId: 'D' }, special)).toBe(true);
+    expect(isVisibleTo(state, 'p1', { fleetId: 'mine' }, special)).toBe(true);
+    expect(isVisibleTo(state, 'p1', { fleetId: 'absent' }, special)).toBe(false);
+    expect(view.rng).toBeUndefined();
+    expect(view.fog).toBeUndefined();
+    expect(view.scheduleSeq).toBeUndefined();
+    expect(view.players.p2!.resources).toEqual({});
+    expect(view.players.p2!.technologies).toBeUndefined();
+    expect(view.planets.D!.buildQueue).toBeUndefined();
+    expect(view.scheduled).toEqual([]);
+    expect(state).toEqual(original);
+  });
+});
+
 describe('visibleState — diplomatic offers are private to the two parties', () => {
   it('keeps the viewer’s sent/received offers, strips everyone else’s negotiations', () => {
     const state = scenario();

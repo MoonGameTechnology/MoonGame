@@ -301,6 +301,8 @@ describe('rewards only for time in the match', () => {
 it('retries a temporarily unavailable career projection from durable snapshots, independently of economy', async () => {
   const { matches,create,onError } = fixture();
   const final=ended(snapshot());
+  final.createdAt=1_800_000_000_000;
+  final.endedAt=final.createdAt+1000;
   final.career={since:100,owners:{p1:{accountId:'account',claimedAt:1}},players:{}};
   await matches.save(final);
   const career=vi.fn().mockRejectedValueOnce(Error('career temporarily down')).mockResolvedValue(undefined);

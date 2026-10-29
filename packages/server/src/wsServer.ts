@@ -955,7 +955,7 @@ export function createMultiplayerServer(
         // HTTP-джойна) заявки нет вовсе, и слать подтверждение значило бы сыпать
         // отказами на каждом коннекте.
         const claimedAt = room.state.players[playerId]?.claimedAt;
-        if (claimedAt !== undefined) {
+        if (claimedAt !== undefined && room.state.match.status !== 'ended') {
           // `claimedAt` уходит в идентификатор действия: после смены владельца кресла
           // подтверждение нового игрока иначе дедуплится квитанцией предыдущего, и
           // место не закрепляется никогда (см. `seatConfirmAction`).

@@ -100,6 +100,8 @@ export interface MatchRoomOptions {
   initiallyStarted?: boolean;
   /** Durable anchor for a scaled/lobby clock; absent on legacy snapshots. */
   initialClock?: MatchSnapshot['clock'];
+  initialCreatedAt?: number;
+  initialEndedAt?: number;
   initialCareer?: CareerLedger;
   careerAccounts?: Record<string, string>;
   /** Attach `hashState(view)` to snapshots so the client can detect desync: every full
@@ -540,6 +542,13 @@ export class MatchRoom {
   private readonly data: GameData;
   private readonly config: Context['config'];
   private readonly now: () => number;
+  readonly createdAt: number;
+  private endedAtValue?: number;
+
+  /** Stable real finish instant; never derived from a scaled or paused clock. */
+  get endedAt(): number | undefined {
+    return this.endedAtValue;
+  }
   private readonly maxPayloadBytes: number;
   /** Lobby gate (null = run freely). The world clock only accrues while all these
    *  players are connected. */
@@ -693,6 +702,10 @@ export class MatchRoom {
     }
     this.config = resolved.config;
     this.now = options.now ?? (() => Date.now());
+    this.createdAt = options.initialCreatedAt ?? this.now();
+    this.endedAtValue = options.initialState.match.status === 'ended'
+      ? options.initialEndedAt ?? this.now()
+      : undefined;
     this.maxPayloadBytes = options.maxPayloadBytes ?? 32_768;
     this.waitFor =
       options.waitForPlayers && options.waitForPlayers.length > 0
@@ -1683,6 +1696,7 @@ export class MatchRoom {
     receipt: ActionReceipt,
     peer?: RoomPeer,
     order = this.ownOrder(plan, action, peer),
+    endedAt?: number,
   ): void {
     // RPL-2: граница, которой мир ДЕЙСТВИТЕЛЬНО достиг (throttled-догон не доходит до
     // `now`) — пустой догон границей не считается, чтобы журнал не пух.
@@ -1695,6 +1709,7 @@ export class MatchRoom {
     );
     this.career = foldCareerEvents(this.career, plan.events, this.stateValue, this.careerHumans);
     this.stateValue = plan.state;
+    if (plan.state.match.status === 'ended') this.endedAtValue ??= endedAt ?? this.now();
     if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
     if (plan.events.length > 0 || plan.kind === 'applied') {
       // A rejected plan commits only the catch-up, so «the world without this action» is
@@ -1907,6 +1922,7 @@ export class MatchRoom {
     );
     this.career = foldCareerEvents(this.career, r.events, this.stateValue, this.careerHumans);
     this.stateValue = r.state;
+    if (r.state.match.status === 'ended') this.endedAtValue ??= this.now();
     // RPL-2: actual boundaries, or the request horizon for a same-instant finish.
     // A no-op advance is not a boundary; a terminal event still needs replaying.
     for (const step of r.steps) this.record?.(step);
@@ -2157,6 +2173,8 @@ export class MatchRoom {
       dataVersion: state.version.data,
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
+      createdAt: this.createdAt,
+      ...(state.match.status === 'ended' ? { endedAt: this.endedAtValue ?? this.now() } : {}),
       state,
       ...(this.careerTracking
         ? { career: foldCareerEvents(this.career, events, this.stateValue, this.careerHumans) }
@@ -2334,9 +2352,10 @@ export class MatchRoom {
         ? { actionId: action.id, playerId, seq, ok: true }
         : { actionId: action.id, playerId, seq, ok: false, code: plan.code };
       const order = this.ownOrder(plan, action, peer); // one wall reading for both writes
+      const snapshot = this.snapshot(plan.state, seq, plan.events, order);
       if (
         !(await this.persistGuarded(
-          this.snapshot(plan.state, seq, plan.events, order),
+          snapshot,
           receipt,
           action.id,
           peer,
@@ -2347,7 +2366,7 @@ export class MatchRoom {
       this.seq = seq;
       this.retainReceipt(receipt);
       observeCommitted = () => this.observeAction(receipt, action.type, true); // durable: persist already wrote the receipt
-      this.commitPlan(plan, action, receipt, peer, order);
+      this.commitPlan(plan, action, receipt, peer, order, snapshot.endedAt);
       return ok ? { ok: true } : { ok: false, code: plan.code, durable: true };
     } finally {
       this.committing = false;
