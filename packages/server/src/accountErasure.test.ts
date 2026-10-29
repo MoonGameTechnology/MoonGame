@@ -162,6 +162,7 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
     if (!record) throw Error('fixture');
     const id = made.userId;
     await game.query('INSERT INTO registration_rewards (account_id, xp) VALUES ($1, 25)', [id]);
+    await game.query("INSERT INTO player_medal_news(id,account_id,medal_id,grade,at,login,corp) VALUES('erasure-medal',$1,'first',1,100,'active',NULL)", [id]);
     for (const pool of [game, corporations]) {
       await pool.query('INSERT INTO player_profiles VALUES($1,$2)', [id, { portrait: 'test' }]);
       await pool.query('INSERT INTO meta_wallets VALUES($1,42)', [id]);
@@ -238,6 +239,7 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
       { ...seat, accountId: 'other', login: 'other' },
     ]);
     expect((await game.query('SELECT * FROM registration_rewards WHERE account_id=$1', [id])).rowCount).toBe(0);
+    expect((await game.query("SELECT account_id,login FROM player_medal_news WHERE id='erasure-medal'")).rows).toEqual([{ account_id: null, login: null }]);
     expect(
       (await game.query('SELECT completed_at FROM account_deletions')).rows[0].completed_at,
     ).toBeTruthy();

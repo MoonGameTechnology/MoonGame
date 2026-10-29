@@ -2,13 +2,14 @@ import { earnedMedalGrades, type MedalRewardGrant } from '@void/protocol';
 import { medalReward, type MetaEconomy } from './metaEconomy';
 import type { MetaEconomyCatalog } from './metaEconomyCatalog';
 import type { ProfileStore } from './profileStore';
-import type { CommanderStore } from './store';
+import type { CommanderStore, CorpStore, UserStore } from './store';
 
 export interface MedalRewardDeps {
   profiles: Pick<ProfileStore, 'progress'>;
   commanders: Pick<CommanderStore, 'creditMatch'>;
   economy: Pick<MetaEconomy, 'unpaidMedals' | 'claimMedals'>;
   table: MetaEconomyCatalog['medals'];
+  news?: { users: Pick<UserStore, 'findById'>; corps: Pick<CorpStore, 'membershipOf' | 'getCorp'> };
 }
 
 /**
@@ -29,6 +30,13 @@ export async function settleMedalRewards(
   const earned = earnedMedalGrades(await deps.profiles.progress(accountId));
   const unpaid = await deps.economy.unpaidMedals(accountId, earned);
   if (unpaid.length === 0) return [];
+  // Resolve server-owned identity before any reward writes. A failed lookup leaves the
+  // degrees unpaid, so the next request retries without losing or duplicating the news.
+  const user = deps.news ? await deps.news.users.findById(accountId) : null;
+  const membership = user && deps.news ? await deps.news.corps.membershipOf(accountId) : null;
+  const corporation = membership && membership.role !== 'recruit' && deps.news
+    ? await deps.news.corps.getCorp(membership.corpId) : null;
+  const news = user ? { login: user.login, corp: corporation ? { id: corporation.corpId, name: corporation.name } : null } : undefined;
   for (const ref of unpaid) {
     const { xp } = medalReward(deps.table, ref);
     if (xp > 0)
@@ -36,7 +44,7 @@ export async function settleMedalRewards(
         { accountId, xp },
       ]);
   }
-  const result = await deps.economy.claimMedals(accountId, unpaid);
+  const result = await deps.economy.claimMedals(accountId, unpaid, news);
   if (!result.ok) throw new Error(result.code);
   return result.receipt.medals ?? [];
 }

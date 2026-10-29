@@ -1607,7 +1607,10 @@ const server = createMultiplayerServer({
       ...(AUTH ? { identify: identifySession } : {}),
     });
     // The news feed (CORP-1) — public, the same module as the production entry.
-    registerNewsApi(app, { feed: feedStore, announcements: announcementStore, monumentsOf: (ids) => corpStore.monumentsOf(ids) });
+    registerNewsApi(app, { feed: feedStore, announcements: announcementStore,
+      monumentsOf: (ids) => corpStore.monumentsOf(ids),
+      playerMedals: metaEconomyStore, ...(AUTH ? { identify: identifySession } : {}),
+      membershipOf: (id) => corpStore.membershipOf(id) });
     // The public AvA feed (AVA-9) — confirmed matchups and results, read-only, no session.
     registerAvaFeed(app, { service: avaService });
     // The client self-configures: accounts mode shows the password field + goes
@@ -1714,7 +1717,7 @@ const server = createMultiplayerServer({
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
       registerProfileApi(app, { corporations: corpStore, registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId),
-        medalRewards: (accountId) => settleMedalRewards({ profiles: profileStore, commanders: commanderStore, economy: metaEconomy, table: metaCatalog.medals }, accountId),
+        medalRewards: (accountId) => settleMedalRewards({ profiles: profileStore, commanders: commanderStore, economy: metaEconomy, table: metaCatalog.medals, news: { users: userStore, corps: corpStore } }, accountId),
         identify: identifySession });
       // Web Push (ONB-5, UIX-4.4): подписка привязана к аккаунту сессии; маршрут ключа
       // монтируется только при заданных VAPID.

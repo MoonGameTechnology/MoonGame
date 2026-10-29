@@ -3497,6 +3497,8 @@ export const en: Record<string, string> = {
   'news.loading': 'Loading news…',
   'news.matchup': 'Battle set: “{a}” vs “{b}”',
   'news.medal': 'Corporation “{corp}” earned a medal',
+  'news.player-medal': '{player} earns the “{medal}” medal, class {grade}',
+  'news.player-medal.anonymous': 'A player earned the “{medal}” medal, class {grade}',
   'news.medal.named': 'Corporation “{corp}” earned the “{medal}” medal',
   'news.more': 'Show more',
   'news.offline': 'No connection to the server',
@@ -5094,4 +5096,5 @@ export const en: Record<string, string> = {
   "err.corp-hall-required": "Build a hall of fame first",
   "err.corp-medal-not-earned": "The corporation has not earned this medal yet",
   "err.bad-showcase": "Could not save this medal selection",
+  'err.news-unavailable': 'News is temporarily unavailable. Try again.',
 };

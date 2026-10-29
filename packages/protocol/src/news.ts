@@ -36,7 +36,19 @@ export interface NewsCorp {
   monument?: boolean;
 }
 
+export interface PlayerMedalNews {
+  id: string;
+  at: number;
+  kind: 'player_medal';
+  medalId: import('./playerProfile').ProfileMedalId;
+  grade: import('./playerProfile').MedalGrade;
+  /** Erased accounts retain an anonymous achievement, without their former login. */
+  login: string | null;
+  corp: NewsCorp | null;
+}
+
 export type NewsEvent =
+  | PlayerMedalNews
   | { id: string; at: number; kind: 'founded'; corp: NewsCorp }
   /** The corporation reached this level (= its headquarters level, 2 and up). */
   | { id: string; at: number; kind: 'level'; corp: NewsCorp; level: number }

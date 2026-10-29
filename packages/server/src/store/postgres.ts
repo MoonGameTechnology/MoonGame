@@ -421,6 +421,21 @@ const SCHEMA_SQL = `
     );
     CREATE INDEX IF NOT EXISTS meta_market_ledger_account_idx ON meta_market_ledger(account_id, at DESC);
 
+    -- Player medal announcements commit with their reward; restricted degrees are
+    -- filtered on the server before pagination, never sent through the public corp feed.
+    CREATE TABLE IF NOT EXISTS player_medal_news (
+      id text PRIMARY KEY,
+      account_id text,
+      medal_id text NOT NULL,
+      grade smallint NOT NULL CHECK(grade BETWEEN 1 AND 3),
+      at bigint NOT NULL,
+      login text,
+      corp jsonb,
+      UNIQUE(account_id,medal_id,grade)
+    );
+    CREATE INDEX IF NOT EXISTS player_medal_news_public_idx ON player_medal_news(at DESC,id DESC) WHERE grade=1;
+    CREATE INDEX IF NOT EXISTS player_medal_news_corp_idx ON player_medal_news((corp->>'id'),at DESC,id DESC);
+
     -- One local transaction owns material stock, crafting, seasons and trade receipts.
     CREATE TABLE IF NOT EXISTS meta_economy_accounts (
       account_id text PRIMARY KEY,

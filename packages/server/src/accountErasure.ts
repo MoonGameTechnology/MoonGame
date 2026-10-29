@@ -65,6 +65,7 @@ const PERSONAL_ROWS = [
   'DELETE FROM registration_rewards WHERE account_id=$1',
   'DELETE FROM commander_xp WHERE account_id=$1',
   'DELETE FROM medals WHERE account_id=$1',
+  'UPDATE player_medal_news SET account_id=NULL,login=NULL WHERE account_id=$1',
   'DELETE FROM player_ready WHERE account_id=$1',
   'DELETE FROM ava_roster WHERE account_id=$1',
   'DELETE FROM corp_arsenal_rent WHERE account_id=$1',

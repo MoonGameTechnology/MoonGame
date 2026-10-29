@@ -43,6 +43,7 @@ export const APP_TABLES = [
   'commander_xp',
   'commander_credits',
   'player_profiles',
+  'player_medal_news',
   'profile_progress',
   'profile_career',
   'profile_career_credits',
