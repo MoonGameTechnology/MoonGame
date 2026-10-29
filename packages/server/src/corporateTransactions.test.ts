@@ -35,6 +35,33 @@ afterAll(async () => {
   }
 });
 describe.skipIf(!url)('corporate service transactions', () => {
+  it.each([{ format: 2, balance: 82 }, { format: 3, balance: 132 }])(
+    'settles income and charges a base $format-on-$format challenge in the corporate transaction',
+    async ({ format, balance }) => {
+      const pool = new Pool({ connectionString: url });
+      try {
+        const services = createCorporateServices(pool);
+        const suffix = crypto.randomUUID();
+        const actor = { accountId: `income-a-${suffix}`, login: 'A' };
+        const target = { accountId: `income-b-${suffix}`, login: 'B' };
+        const a = await services.corp.create(actor);
+        const b = await services.corp.create(target);
+        if (!a.ok || !b.ok) throw Error('fixture');
+        await pool.query('UPDATE corps SET influence=$2, infrastructure=$3::jsonb WHERE id=$1', [
+          a.corpId, balance, JSON.stringify({ levels: { headquarters: 1 }, construction: null,
+            accruedAt: Date.now() - 86_400_000, remainder: 0 }),
+        ]);
+        await services.ava.setCorpReady(actor, [format]);
+        await services.ava.setCorpReady(target, [format]);
+        expect((await services.ava.challenge(actor, b.corpId, format)).ok).toBe(true);
+        const corp = await new PostgresCorpStore(pool).getCorp(a.corpId);
+        expect(corp?.influence).toBe(6);
+        expect(await services.ava.challenge(actor, b.corpId, format)).toMatchObject({
+          ok: false, code: 'E_INSUFFICIENT', influence: 6,
+        });
+      } finally { await pool.end(); }
+    },
+  );
   it('concurrent founders get distinct allowed names, while SQL failures are not retried as collisions', async () => {
     const pool = new Pool({ connectionString: url });
     try {
