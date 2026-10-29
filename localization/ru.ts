@@ -4155,7 +4155,6 @@ export const ru: Record<string, string> = {
   'rail.chat.label': 'Чат',
   'rail.constructor.label': 'Производство',
   'rail.constructor.title': 'Конструктор — оснащение кораблей, шаттлов, армии и героев',
-  'rail.corp.title': 'Корпорация',
   'rail.diplo.title': 'Дипломатия',
   'rail.exit.title': 'Покинуть сессию',
   'rail.abandon.title': 'Завершить экспедицию',

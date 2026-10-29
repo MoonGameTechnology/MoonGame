@@ -13,7 +13,7 @@
  * 2. **Раздела без кнопки нет и внизу.** В забеге Sector Zero «Производства» нет
  *    (`sectorZeroTools.ts`): пункт, который ничего не открывает, хуже отсутствующего.
  * 3. **В «Ещё» — остальные окна полными словами, затем Настройки и выходы.** «Дипломатия»,
- *    «Корпорация», «Хранитель», а не «Дипло», «Корп», «Сон». Пункт есть, пока есть его
+ *    «Хранитель», а не «Дипло» и «Сон». Пункт есть, пока есть его
  *    кнопка: в забеге нет почты и рынка, а торговец и досье Роя появляются по ходу партии.
  * 4. **Нажатие сначала убирает окна над картой**, иначе новое окно легло бы под старое.
  *    Нажатие на уже открытый раздел ведёт к карте, как у вкладок.
@@ -45,7 +45,6 @@ export type PhoneItemId =
   | 'pings'
   | 'market'
   | 'trader'
-  | 'corporation'
   | 'steward'
   | 'dossier'
   | 'codex'
@@ -77,7 +76,6 @@ export const PHONE_ITEMS: readonly PhoneItem[] = [
   { id: 'pings', label: 'rail.pings.label', opens: '#rail-pings' },
   { id: 'market', label: 'rail.market.label', opens: '#rail-market' },
   { id: 'trader', label: 'rail.trader.label', opens: '#rail-trader' },
-  { id: 'corporation', label: 'rail.corp.title', opens: '#railcorp' },
   { id: 'steward', label: 'steward.name', opens: '#rail-steward' },
   { id: 'dossier', label: 'swarm.intel.title', opens: '#rail-dossier' },
   { id: 'codex', label: 'rail.help.title', opens: '#rail-help' },
@@ -101,7 +99,6 @@ export const PHONE_PINNABLE: readonly PhoneItemId[] = [
   'pings',
   'market',
   'trader',
-  'corporation',
   'steward',
   'dossier',
   'codex',

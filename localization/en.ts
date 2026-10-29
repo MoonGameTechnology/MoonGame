@@ -4148,7 +4148,6 @@ export const en: Record<string, string> = {
   'rail.chat.label': 'Chat',
   'rail.constructor.label': 'Production',
   'rail.constructor.title': 'Constructor — outfit ships, shuttles, army and heroes',
-  'rail.corp.title': 'Corporation',
   'rail.diplo.title': 'Diplomacy',
   'rail.exit.title': 'Leave session',
   'rail.abandon.title': 'End the expedition',
