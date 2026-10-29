@@ -136,6 +136,20 @@
 | `docs/explanations/06-pve-wave-spawn-via-schedule.md` | 06. Спавн волн через schedule(), тактика NPC — нет | Дата: 2026-08-18 |
 | `docs/explanations/README.md` | docs/explanations/ — библиотека решений (ADR) | Architecture Decision Records: почему так, а не иначе. Не что делает код (это в |
 
+## docs/legal/
+
+| Документ | Заголовок | Про что |
+| --- | --- | --- |
+| `docs/legal/README.md` | Документы MoonGame для игроков — проект комплекта | Редакция проекта: 2026-10-27, 1.0-draft. НЕ ПУБЛИКОВАТЬ как действующие |
+| `docs/legal/account-deletion.md` | Удаление аккаунта и обращения по данным MoonGame | Проект 1.0-draft от 2026-10-27. НЕ ПУБЛИКОВАТЬ как действующую инструкцию |
+| `docs/legal/analytics-consent.md` | Отдельное согласие на необязательную аналитику MoonGame | Проект 1.0-draft от 2026-10-27. НЕ ПУБЛИКОВАТЬ и не использовать для сбора |
+| `docs/legal/community-rules.md` | Правила сообщества и честной игры MoonGame | Проект 1.0-draft, 27.10.2026. НЕ ПУБЛИКОВАТЬ до утверждения. |
+| `docs/legal/cookies.md` | Хранение на устройстве, cookies и аналитика MoonGame | Проект 1.0-draft от 2026-10-27. НЕ ПУБЛИКОВАТЬ как действующий документ. |
+| `docs/legal/implementation-review.md` | Сверка документов MoonGame с реализацией и план выпуска | Срез исходников: 39e6e7565e7283ee7547b058d8be1b903388fa69, 2026-10-27. |
+| `docs/legal/operator-details.md` | Сведения об операторе и выпуске MoonGame | НЕ ПУБЛИКОВАТЬ. Общая карточка проекта 1.0-draft, 2026-10-27. |
+| `docs/legal/purchases.md` | Игровые ценности, покупки и возвраты MoonGame | Проект 1.0-draft, 27.10.2026. НЕ ПУБЛИКОВАТЬ как оферту на оплату. |
+| `docs/legal/terms.md` | Пользовательское соглашение MoonGame | Проект 1.0-draft от 27.10.2026. НЕ ПУБЛИКОВАТЬ до заполнения реквизитов, |
+
 ## docs/mockups/player-profile/
 
 | Документ | Заголовок | Про что |
@@ -189,7 +203,7 @@
 | `docs/security/image-pinning.md` | Image Pinning и обновление sha256-дайджестов | Все образы должны быть пинены по sha256-дайджесту, а не по тегу. |
 | `docs/security/pipeline-architecture-2026-07-26.md` | Отчёт: архитектура CI/CD-пайплайна — 2026-07-26 | Оценка того, как построен пайплайн (не «что сканирует» — это |
 | `docs/security/pipeline.md` | DevSecOps-пайплайн — зачем эти сканеры и как с ними жить | Учебно-боевой слой безопасности в CI (GitHub Actions, .github/workflows/security.yml; |
-| `docs/security/privacy-policy-template.md` | Политика конфиденциальности игры Void Dominion — шаблон | НЕ ПУБЛИКОВАТЬ до заполнения и утверждения оператором. Метки [ЗАПОЛНИТЬ] |
+| `docs/security/privacy-policy-template.md` | Политика обработки персональных данных MoonGame | Проект 1.0-draft от 2026-10-27. НЕ ПУБЛИКОВАТЬ как действующую политику. |
 | `docs/security/rf-personal-data-readiness.md` | Персональные данные игры: защита и подготовка к запуску в РФ | Рабочий реестр обработки и критерии допуска Galactic War / Sector Zero к публичному релизу. Технические меры, решения оператора и доказательства проверяются ра… |
 | `docs/security/rustore-preparation.md` | Подготовка сетевой игры к RuStore | Обновлено: 2026-10-18. Это подготовка существующего player-клиента Void Dominion; |
 | `docs/security/scanner-coverage-2026-07-26.md` | Отчёт: охват сканеров безопасности — 2026-07-26 | Глубокий анализ DevSecOps-пайплайна Void Dominion: инвентаризация сканеров, |
