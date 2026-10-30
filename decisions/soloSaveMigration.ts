@@ -48,12 +48,25 @@ export const COMMANDER_CAREER_SOLO_MIGRATION = {
   toDataHash: '0acb4059848b47',
 } as const;
 
+/** Rules-only pair: movement 1.6.0 / visibility 2.4.0 halt a fleet at a closed border only
+ *  after discovering it. The catalogue is unchanged and saved orders keep their shape, so a
+ *  saved world reads as is. */
+export const RECON_HALT_SOLO_MIGRATION = {
+  fromRules: COMMANDER_CAREER_SOLO_MIGRATION.toRules,
+  fromData: COMMANDER_CAREER_SOLO_MIGRATION.toData,
+  fromDataHash: COMMANDER_CAREER_SOLO_MIGRATION.toDataHash,
+  toRules: '1b5d17a2f208b4',
+  toData: COMMANDER_CAREER_SOLO_MIGRATION.toData,
+  toDataHash: COMMANDER_CAREER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   MINING_SOLO_MIGRATION,
   CORP_FORMATS_SOLO_MIGRATION,
   COMMANDER_CAREER_SOLO_MIGRATION,
+  RECON_HALT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
