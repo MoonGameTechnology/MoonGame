@@ -18,6 +18,7 @@ import {
 import {
   blitGlow as hdBlitGlow,
   blitSphere as hdBlitSphere,
+  prepareSphere as hdPrepareSphere,
 } from '../../packages/client/src/holoDraw';
 import { glowOn } from './graphicsPrefs';
 import { readRaw, writeRaw } from './prefs';
@@ -149,6 +150,10 @@ export function blitSphere(
   clockMs = 0,
 ): void {
   hdBlitSphere(game.ctx(), game.dpr(), color, x, y, r, a, clockMs);
+}
+/** The sphere of `color` made before a frame needs it (`holoDraw.ts`). */
+export function prepareSphere(color: string): void {
+  hdPrepareSphere(game.ctx(), game.dpr(), color);
 }
 
 // Map-marker geometry / palette, shared so every blip reads the same way.
