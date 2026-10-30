@@ -87,7 +87,8 @@ export function initPhoneNav(host: PhoneNavHost) {
       `</div></div>`;
   };
   const closeMore = (): void => {
-    more.hidden = true;
+    // Кадр вне партии зовёт это каждый раз: закрытый лист не трогаем.
+    if (!more.hidden) more.hidden = true;
   };
   const press = (selector: string | null | undefined): void => {
     if (selector) document.querySelector<HTMLElement>(selector)?.click();

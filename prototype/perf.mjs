@@ -177,6 +177,13 @@ globalThis.window = {
 globalThis.addEventListener = globalThis.window.addEventListener;
 globalThis.history = { pushState() {}, back() {} };
 globalThis.location = { protocol: 'file:', host: '', hostname: '', href: 'file:///', search: '' };
+// The frame loop watches the menu screens' style at import time (rule 9 of
+// decisions/simClock.ts). The harness hides every menu before the first frame, so
+// the frames run back to back and the watcher never has to report anything.
+globalThis.MutationObserver = class MutationObserver {
+  observe() {}
+  disconnect() {}
+};
 const rafCbs = [];
 globalThis.requestAnimationFrame = (cb) => {
   rafCbs.push(cb);
