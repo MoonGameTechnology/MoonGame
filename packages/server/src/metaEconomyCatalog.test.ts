@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { loadShippedData } from './scenario';
 import { loadMetaEconomyCatalog, parseMetaEconomyCatalog } from './metaEconomyCatalog';
+import { PROFILE_MEDALS, REGISTRATION_REWARD } from '@void/protocol';
 
 const data = loadShippedData();
 const raw = (): Record<string, unknown> =>
@@ -135,7 +136,7 @@ describe('main-game meta content', () => {
 });
 
 describe('profile medal rewards', () => {
-  it('pays more for each higher degree and only Sovereigns for medals earned without play', () => {
+  it('pays more for each higher degree', () => {
     const { medals } = loadMetaEconomyCatalog(data);
     const { 1: top, 2: middle, 3: first } = medals.grades;
     for (const key of ['sovereigns', 'warrants', 'xp'] as const) {
@@ -143,7 +144,19 @@ describe('profile medal rewards', () => {
       expect(middle[key]).toBeGreaterThan(first[key]);
       expect(top[key]).toBeGreaterThan(middle[key]);
     }
-    expect(medals.sovereignsOnly).toEqual(['contribution', 'tutorial']);
+  });
+
+  // Medals earned without a match pay in full since 2026-10-30 (owner): the market gate,
+  // not a Sovereigns-only rule, keeps a fresh account from trading on that XP alone.
+  it('keeps everything an account earns without a match below the market gate', () => {
+    const { medals, market } = loadMetaEconomyCatalog(data);
+    const free = PROFILE_MEDALS.filter((m) => m.id === 'contribution' || m.id === 'tutorial');
+    expect(free).toHaveLength(2);
+    const xp = free.reduce<number>(
+      (sum, m) => sum + (medals.sovereignsOnly.includes(m.id) ? 0 : medals.grades[3].xp),
+      REGISTRATION_REWARD.xp,
+    );
+    expect(xp).toBeLessThan(market.minimumAccountXp);
   });
 
   it('rejects an unknown medal and a missing degree', () => {

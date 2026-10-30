@@ -4,6 +4,7 @@ import type { MetaMaterialView } from '../../packages/protocol/src/metaEconomyVi
 import { hasKey, t } from '../../localization/runtime';
 import { refusalKeyOf } from '../../decisions/refusalText';
 import { canSell } from '../../decisions/arsenalView';
+import { accountLevel } from '../../decisions/playerCareer';
 import { esc, nfmt } from './format';
 import { arsenalItemName } from './arsenalScreen';
 import { detach } from './detach';
@@ -23,6 +24,7 @@ interface MarketView {
   listings: Listing[];
   materialListings?: Array<MetaMaterialListing & { mine?: boolean }>;
   canTrade?: boolean;
+  minimumAccountXp?: number;
   materials?: MetaMaterialView[];
 }
 export interface MetaMarketHost {
@@ -71,7 +73,7 @@ export function metaMarketHtml(
         `<article class="mm-card"><b>${esc(t(m.nameKey))}</b><span>${t('auction.available', { n: nfmt(m.tradable) })}</span><label>${t('auction.quantity')} <input data-mm-quantity="${esc(m.id)}" type="number" min="1" max="${m.tradable}" step="1" value="1"></label><label>${t('auction.price')} <input data-mm-material-price="${esc(m.id)}" type="number" min="1" step="1" value="100"></label><button type="button" data-mm-material-list="${esc(m.id)}"${tradeDisabled}>${t('auction.list')}</button></article>`,
     )
     .join('');
-  return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.subtitle')}</small></div><b>⌖ ${nfmt(view.balance)}</b></header><p class="mm-fee">${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</p>${view.canTrade === false ? `<p class="mm-fee">${t('err.level-required')}</p>` : ''}<h3>${t('auction.browse')}</h3><div class="mm-grid">${lots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.materials')}</h3><div class="mm-grid">${materialLots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.sell')}</h3><div class="mm-grid">${sell || `<p class="hub-empty">${t('auction.no-items')}</p>`}${materialSell || `<p class="hub-empty">${t('auction.no-materials')}</p>`}</div>`;
+  return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.subtitle')}</small></div><b>⌖ ${nfmt(view.balance)}</b></header><p class="mm-fee">${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</p>${view.canTrade === false ? `<p class="mm-fee">${view.minimumAccountXp === undefined ? t('err.level-required') : t('auction.level-required', { n: accountLevel(view.minimumAccountXp).level })}</p>` : ''}<h3>${t('auction.browse')}</h3><div class="mm-grid">${lots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.materials')}</h3><div class="mm-grid">${materialLots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.sell')}</h3><div class="mm-grid">${sell || `<p class="hub-empty">${t('auction.no-items')}</p>`}${materialSell || `<p class="hub-empty">${t('auction.no-materials')}</p>`}</div>`;
 }
 
 export function initMetaMarket(host: MetaMarketHost): {
