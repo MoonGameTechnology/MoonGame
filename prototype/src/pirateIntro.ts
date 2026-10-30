@@ -36,7 +36,9 @@ export function initPirateIntro(host: {
   return {
     reset() { dismissed = false; shown = false; model = null; openedBattle = undefined; host.root.hidden = true; },
     update(next) {
-      host.root.hidden = dismissed || !next;
+      // Кадр зовёт это каждый раз: узел трогается, только когда видимость меняется.
+      const hidden = dismissed || !next;
+      if (host.root.hidden !== hidden) host.root.hidden = hidden;
       const firstShow = !host.root.hidden && !shown;
       if (firstShow) shown = true;
       if (!dismissed && next?.battleId && openedBattle !== next.battleId) {

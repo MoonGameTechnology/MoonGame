@@ -8,7 +8,7 @@ describe('кошелёк главного экрана (UIX-10.2)', () => {
   it('Суверены — золотая плашка с «+», как фишка в строке статуса партии', () => {
     const html = hubWalletHtml({ sovereigns: 500, warrants: 0 });
     expect(html).toMatch(
-      /class="dl-donate" data-hub-wallet="donate"[^>]*>.*<svg.*<\/svg><\/i><b>500<\/b><em aria-hidden="true">\+<\/em><\/button>/,
+      /class="dl-donate" data-hub-wallet="donate"[^>]*>.*<svg.*<\/svg><\/i><b>500<\/b><em aria-hidden="true">\+<\/em><span class="dl-glint" aria-hidden="true"><\/span><\/button>/,
     );
     expect(html).toContain('aria-label="Суверены: 500. Пополнить"');
   });
@@ -18,7 +18,7 @@ describe('кошелёк главного экрана (UIX-10.2)', () => {
   it('без баланса Суверенов плашка — знак и «+» без числа, Варранты остаются', () => {
     const html = hubWalletHtml({ sovereigns: null, warrants: 12 });
     expect(html).toMatch(
-      /class="dl-donate" data-hub-wallet="donate"[^>]*>.*<svg.*<\/svg><\/i><em aria-hidden="true">\+<\/em><\/button>/,
+      /class="dl-donate" data-hub-wallet="donate"[^>]*>.*<svg.*<\/svg><\/i><em aria-hidden="true">\+<\/em><span class="dl-glint" aria-hidden="true"><\/span><\/button>/,
     );
     expect(html).not.toContain('<b>');
     expect(html).toContain('aria-label="Магазин Суверенов"');

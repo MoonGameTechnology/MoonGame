@@ -131,6 +131,7 @@ let lastClockHead = '';
 let lastTopText = ''; // row-1 dirty check (nick / standing / score / day / countdown)
 let lastHudHtml = '';
 let lastAlertText = '';
+let lastMsgText = '';
 let lastRailAlert = '';
 
 /** Строка статуса забыла себя: следующий кадр перерисует её целиком. */
@@ -385,7 +386,7 @@ export function renderTopBar(missions: MissionRow[]): void {
     // авторитетного кошелька; в забеге Sector Zero Суверены — в шапке забега (`runWallet`).
     (game.toolsHidden()
       ? ''
-      : `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.open')}"><i>${SOV_SVG}</i><em aria-hidden="true">+</em></button>`);
+      : `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.open')}"><i>${SOV_SVG}</i><em aria-hidden="true">+</em><span class="dl-glint" aria-hidden="true"></span></button>`);
   if (statusHtml !== lastClockText) {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
@@ -474,10 +475,12 @@ export function renderTopBar(missions: MissionRow[]): void {
   // Кого зовут значки внимания и куда ложится цифра — `attentionBadges.ts` (REFM-189):
   // ноль ПРЯЧЕТ значок (значок с «0» гонит игрока в пустоту), бой считается моим и когда
   // я его лишь ВИЖУ, а зеркало на гамбургере молчит при открытой панели — там свои значки.
-  const msgBadge = document.getElementById('msgbadge');
+  const msgText = String(unreadMsgs);
+  const msgBadge = msgText !== lastMsgText ? document.getElementById('msgbadge') : null;
   if (msgBadge) {
     msgBadge.style.display = countShown(unreadMsgs) ? '' : 'none';
-    msgBadge.textContent = String(unreadMsgs);
+    msgBadge.textContent = msgText;
+    lastMsgText = msgText;
   }
   const battles = myBattleCount(
     Object.values(s.battles),

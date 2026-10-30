@@ -176,6 +176,23 @@ globalThis.window = {
 globalThis.addEventListener = globalThis.window.addEventListener;
 globalThis.history = { pushState() {}, back() {} };
 globalThis.location = { protocol: 'file:', host: '', hostname: '', href: 'file:///', search: '' };
+// Behind a full-screen menu the frame loop waits on a timer, and a change of screen wakes
+// it through a MutationObserver on the screens' style (rule 9 of decisions/simClock.ts).
+// The harness never runs timers between frames, so the fake DOM reports style writes on
+// observed elements as a browser does: otherwise no frame would follow login or Start.
+globalThis.MutationObserver = class MutationObserver {
+  constructor(callback) {
+    this.callback = callback;
+  }
+  observe(el) {
+    const report = () => Promise.resolve().then(() => this.callback([], this));
+    el.style = new Proxy(el.style, {
+      set: (style, name, value) => { style[name] = value; report(); return true; },
+      deleteProperty: (style, name) => { delete style[name]; report(); return true; },
+    });
+  }
+  disconnect() {}
+};
 const rafCbs = [];
 globalThis.requestAnimationFrame = (cb) => {
   rafCbs.push(cb);
