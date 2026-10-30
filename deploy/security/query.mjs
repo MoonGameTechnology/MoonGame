@@ -3,7 +3,7 @@
 import { constants } from 'node:fs';
 import { open, opendir, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMainModule } from '../observability/main-module.mjs';
 import { readRecords, privateDirectory, RULES, DAY, RETENTION_DAYS } from './records.mjs';
 
 export function parseQuery(args, now = Date.now()) {
@@ -143,7 +143,7 @@ async function main() {
   );
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
+if (isMainModule(import.meta.url))
   main().catch(() => {
     process.stderr.write('E_SECURITY_QUERY\n');
     process.exitCode = 1;

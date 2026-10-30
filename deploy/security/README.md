@@ -41,6 +41,10 @@ systemctl status moongame-security-monitor.timer --no-pager
 moongame security status
 ```
 
+CLI используют общий realpath-aware guard: ссылка `current` распознаётся как точка
+входа, а import не запускает установку/сбор. Subprocess-регрессия проверяет появление
+метрик при вызове через symlink, а не только exit status.
+
 Installer работает под deployment/erasure lock. Он сверяет revision пары Game/Caddy,
 проверяет конфигурацию Caddy, добавляет import из подписанного Caddy image, проверяет
 public health/ready и закрытый `/metrics`. При сбое edge-проверки возвращает прежний

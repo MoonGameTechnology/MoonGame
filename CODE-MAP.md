@@ -68,6 +68,8 @@ Recovery-письма обоих хостов форматирует `scripts/re
 `monitor.mjs` — passive detector/incident journal → numeric textfile,
 `query.mjs`/`control.mjs` — root поиск/статус и аудит чтений (`moongame security`).
 `install.mjs`/systemd units устанавливают ограниченный worker и signed observer bind.
+`deploy/observability/main-module.mjs` сопоставляет realpath точки входа: запуск через
+`current` исполняет CLI, обычный import сохраняет отсутствие побочных действий.
 `deploy/caddy/edge.caddy` едет в подписанном Caddy image, `edge-logging.mjs` применяет import.
 `deploy/observability/security.rules.yml` и dashboard `moongame-security` — panel-only
 представление, `check-alerts.mjs` запускает pinned promtool в CI.

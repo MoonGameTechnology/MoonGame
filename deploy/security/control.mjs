@@ -2,7 +2,8 @@ import { open, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { isMainModule } from '../observability/main-module.mjs';
 import { RULES } from './records.mjs';
 
 const KEYS = new Set([
@@ -104,7 +105,7 @@ async function main() {
   );
   process.exitCode = child.status ?? 1;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
+if (isMainModule(import.meta.url))
   main().catch(() => {
     process.stderr.write('E_SECURITY_CONTROL\n');
     process.exitCode = 1;

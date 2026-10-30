@@ -3,8 +3,8 @@
 import { constants } from 'node:fs';
 import { readFile, writeFile, open, mkdir, lstat, statfs, access, chmod } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { isMainModule } from '../observability/main-module.mjs';
 import { withEdgeImport } from './edge-logging.mjs';
 
 const STATE = '/var/lib/moongame',
@@ -259,7 +259,7 @@ async function install() {
     }) + '\n',
   );
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
+if (isMainModule(import.meta.url))
   install().catch((error) => {
     process.stderr.write(
       /^E_SECURITY_[A-Z_]+$/.test(error.message) ? error.message + '\n' : 'E_SECURITY_INSTALL\n',

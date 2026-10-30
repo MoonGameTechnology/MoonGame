@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { isMainModule } from '../observability/main-module.mjs';
 export function prometheusImage(text) {
   const section = /^ {2}obs-prometheus:\n([\s\S]*?)(?=^ {2}[a-z][a-z0-9-]*:|^networks:)/m.exec(
     text,
@@ -51,7 +52,7 @@ export function checkAlerts() {
   );
   if (result.status !== 0) throw Error('E_SECURITY_PROMTOOL');
 }
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMainModule(import.meta.url)) {
   try {
     checkAlerts();
   } catch {
