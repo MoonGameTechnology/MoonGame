@@ -9,6 +9,20 @@ import { withEdgeImport } from './edge-logging.mjs';
 
 const STATE = '/var/lib/moongame',
   CONFIG = '/etc/moongame/security-monitor.env';
+/** Existing named volumes can inherit 0755 from the image. Tighten access through
+ * a no-follow directory handle, preserving the Game process's UID/GID. */
+export async function protectLogDirectory(path) {
+  const directory = await open(
+    path,
+    constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+  );
+  try {
+    if (!(await directory.stat()).isDirectory()) throw Error('E_SECURITY_INSTALL_LOG_DIRECTORY');
+    await directory.chmod(0o700);
+  } finally {
+    await directory.close();
+  }
+}
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: 'utf8',
@@ -106,6 +120,7 @@ async function install() {
   for (const path of [logDir, dataDir])
     if (!/^\/var\/lib\/docker\/volumes\/[A-Za-z0-9_-]+\/_data$/.test(path))
       throw Error('E_SECURITY_INSTALL_VOLUME');
+  await protectLogDirectory(logDir);
   const edgeDir = dataDir + '/moongame-security';
   await mkdir(edgeDir, { recursive: true, mode: 0o700 });
   const edgeInfo = await lstat(edgeDir);

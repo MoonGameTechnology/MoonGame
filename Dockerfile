@@ -96,7 +96,7 @@ RUN CI=true pnpm --filter '!@void/backup-repository' install --prod --frozen-loc
 # Pre-create the dir the server writes at runtime so it exists (and, after the
 # COPY --chown below, is owned by the non-root user): playtest-logs/ (event JSONL).
 # packages/server/dist/ already exists — the bundle above lives there.
-RUN mkdir -p playtest-logs
+RUN mkdir -p playtest-logs && chmod 0700 playtest-logs
 
 # ---- Stage 2: runtime (distroless, no shell, non-root by default) ----
 # The :nonroot tag runs as uid 65532. Base is nodejs22-**debian13** (trixie): upstream

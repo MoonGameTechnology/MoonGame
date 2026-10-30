@@ -13,7 +13,7 @@ it.skipIf(!process.env.CADDY_BIN)(
     const upstream = createServer((_req, res) => {
       res.writeHead(401, {
         'Content-Type': 'text/plain',
-        'Set-Cookie': 'RESPONSE_COOKIE_SECRET',
+        'Set-Cookie': 'RESPONSE_COOKIE_SECRET=fixture; HttpOnly; Secure; SameSite=Strict',
         'X-Private': 'RESPONSE_HEADER_SECRET',
       });
       res.end('RESPONSE_BODY_SECRET');

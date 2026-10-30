@@ -9,7 +9,9 @@ import {
   rm,
   mkdir,
   utimes,
+  stat,
 } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detect, sample } from './monitor.mjs';
@@ -18,6 +20,7 @@ import { parseQuery, query } from './query.mjs';
 import { parseConfig } from './control.mjs';
 import { projectEdge } from './edge-records.mjs';
 import { withEdgeLogging } from './edge-logging.mjs';
+import { protectLogDirectory } from './install.mjs';
 
 const now = Date.parse('2026-10-30T05:00:00Z'),
   run = '11111111-2222-4333-8444-555555555555';
@@ -238,6 +241,7 @@ describe('durable bounded incidents and investigation', () => {
     const marker = join(root, 'pending'),
       success = join(root, 'success');
     await writeFile(marker, '', { mode: 0o600 });
+    await utimes(marker, new Date(now - 400000), new Date(now - 400000));
     await writeFile(success, '', { mode: 0o600 });
     await utimes(success, new Date(now - 400000), new Date(now - 400000));
     await put(logs, 'security-status', [status()]);
@@ -253,6 +257,77 @@ describe('durable bounded incidents and investigation', () => {
     await writeFile(secret, 'SECRET', { mode: 0o600 });
     await symlink(secret, join(logs, `security-${day}.jsonl`));
     expect((await sample({ directory: logs, metricsDirectory: metrics, now })).stats.up).toBe(0);
+  });
+  it('detects a stuck first erasure without a previous success and tolerates a fresh barrier', async () => {
+    const { root, logs, metrics } = await fixture();
+    const marker = join(root, 'pending'),
+      success = join(root, 'never-succeeded');
+    await writeFile(marker, '', { mode: 0o600 });
+    await put(logs, 'security-status', [status()]);
+    const options = {
+      directory: logs,
+      metricsDirectory: metrics,
+      maintenanceMarker: marker,
+      maintenanceSuccess: success,
+      now,
+    };
+    await utimes(marker, new Date(now - 1000), new Date(now - 1000));
+    expect((await sample(options)).incidents.map((r) => r.rule)).not.toContain('maintenance-stuck');
+    await utimes(marker, new Date(now - 400000), new Date(now - 400000));
+    expect((await sample(options)).incidents.map((r) => r.rule)).toContain('maintenance-stuck');
+  });
+  it('keeps the first barrier age across repeated erasure touches', async () => {
+    const { root, logs, metrics } = await fixture();
+    const marker = join(root, 'pending'),
+      success = join(root, 'never-succeeded');
+    await writeFile(marker, '', { mode: 0o600 });
+    const later = Date.now() + 400000;
+    await utimes(marker, new Date(later), new Date(later));
+    await put(logs, 'security-status', [status({ at: later - 1000 })]);
+    expect(
+      (
+        await sample({
+          directory: logs,
+          metricsDirectory: metrics,
+          maintenanceMarker: marker,
+          maintenanceSuccess: success,
+          now: later,
+        })
+      ).incidents.map((r) => r.rule),
+    ).toContain('maintenance-stuck');
+  });
+  it('makes only aggregate metrics readable under the production umask', async () => {
+    const { logs, metrics } = await fixture();
+    await put(logs, 'security-status', [status()]);
+    const module = new URL('./monitor.mjs', import.meta.url).href;
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { sample } from ${JSON.stringify(module)}; process.umask(0o077); await sample(JSON.parse(process.argv[1]));`,
+        JSON.stringify({ directory: logs, metricsDirectory: metrics, now }),
+      ],
+      { timeout: 10000 },
+    );
+    expect(child.status, child.stderr?.toString()).toBe(0);
+    expect((await stat(join(metrics, 'security.prom'))).mode & 0o777).toBe(0o644);
+    expect((await stat(join(logs, `security-status-${day}.jsonl`))).mode & 0o777).toBe(0o600);
+    expect((await stat(logs)).mode & 0o777).toBe(0o700);
+  });
+  it('normalizes a fresh image log volume without changing its owner or following links', async () => {
+    const { root, logs, metrics } = await fixture();
+    await chmod(logs, 0o755);
+    await put(logs, 'security-status', [status()]);
+    const owner = await stat(logs);
+    expect((await sample({ directory: logs, metricsDirectory: metrics, now })).stats.up).toBe(0);
+    await protectLogDirectory(logs);
+    const secured = await stat(logs);
+    expect([secured.uid, secured.gid, secured.mode & 0o777]).toEqual([owner.uid, owner.gid, 0o700]);
+    expect((await sample({ directory: logs, metricsDirectory: metrics, now })).stats.up).toBe(1);
+    const link = join(root, 'linked-logs');
+    await symlink(logs, link);
+    await expect(protectLogDirectory(link)).rejects.toThrow();
   });
   it('expires only its own incident files and keeps source journals untouched', async () => {
     const { logs, metrics } = await fixture();

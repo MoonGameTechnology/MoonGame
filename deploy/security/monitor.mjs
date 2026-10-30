@@ -165,6 +165,9 @@ async function publish(path, content, mode = 0o644) {
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
       mode,
     );
+    // open(mode) is still filtered by the service's private umask. This file
+    // contains only numeric aggregates and must be readable by Alloy UID473.
+    await file.chmod(mode);
     await file.writeFile(content);
     await file.datasync();
     await file.close();
@@ -301,16 +304,23 @@ export async function sample({
     );
   if (maintenanceMarker && maintenanceSuccess) {
     try {
-      const marker = await lstat(maintenanceMarker),
+      const marker = await lstat(maintenanceMarker);
+      if (!marker.isFile() || marker.isSymbolicLink()) throw Error('E_SECURITY_MAINTENANCE_FILE');
+      let success;
+      try {
         success = await lstat(maintenanceSuccess);
-      if (
-        marker.isFile() &&
-        !marker.isSymbolicLink() &&
-        success.isFile() &&
-        !success.isSymbolicLink() &&
-        now - success.mtimeMs > 300000
-      )
-        candidates.push(operational('maintenance-stuck', now, String(Math.floor(success.mtimeMs))));
+      } catch (e) {
+        if (e.code !== 'ENOENT') throw e;
+      }
+      if (success && (!success.isFile() || success.isSymbolicLink()))
+        throw Error('E_SECURITY_MAINTENANCE_FILE');
+      // Retrying erasure touches the marker again. Birth time preserves the start
+      // of that barrier; mtime is the fallback on filesystems without birth time.
+      const started =
+        marker.birthtimeMs > 0 ? Math.min(marker.birthtimeMs, marker.mtimeMs) : marker.mtimeMs;
+      const since = Math.max(started, success?.mtimeMs ?? 0);
+      if (now - since > 300000)
+        candidates.push(operational('maintenance-stuck', now, String(Math.floor(since))));
     } catch (e) {
       if (e.code !== 'ENOENT') {
         stats.up = 0;

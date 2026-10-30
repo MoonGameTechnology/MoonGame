@@ -47,6 +47,8 @@ public health/ready и закрытый `/metrics`. При сбое edge-про�
 Caddyfile. Остальные host-шаги повторяемы; при ошибке проверять результат, а не считать
 активный timer доказательством полной установки. Секреты не выводятся.
 
+Installer также приводит существующий named volume журналов к 0700 через no-follow
+handle, сохраняя UID/GID Game; новый image создаёт каталог с 0700.
 Создаются root0600 `/etc/moongame/security-monitor.env` с несекретными путями,
 root0700 `/var/lib/moongame-security` и service/timer. Код observer открывается его
 прежнему UID через read-only bind из signed release; права `/var/lib/moongame` не
@@ -99,7 +101,11 @@ peak33.4MiB в настоящем systemd96MiB/15%CPU. Это не длител�
 | `edge-probes` | 5 отказов на operator routes/min; без атрибуции посетителя |
 | `restart-burst` | 4 разных run одной версии/10min; разные версии релизов разделены |
 | `audit-loss`, `audit-stale`, `correlation-missing` | Потери/семплирование; heartbeat старше 180s; нет постоянного ключа |
-| `detector-capacity`, `maintenance-stuck` | Неполный вход/лимиты; erasure barrier и последний успех старше 5min |
+| `detector-capacity`, `maintenance-stuck` | Неполный вход/лимиты; erasure barrier дольше 5min, включая первый сбой без success |
+
+Возраст barrier использует начало файла (birthtime при наличии, иначе mtime),
+чтобы повторные touch при retry не скрывали длительный сбой; свежий barrier имеет
+пятиминутный запас.
 
 Это подозрения, а не доказанные атаки. NAT, повторные ошибки пользователя,
 разрешённый пентест и плановое обслуживание могут давать похожие последовательности.
@@ -108,7 +114,10 @@ Incidents содержат evidence references и время обнаружен�
 не непрерывно обновляемый счётчик всех попыток. История и активные случаи разделены.
 Автоматических банов, рестартов и финансовых действий нет.
 
-`security.prom` содержит только числа и фиксированные rule labels. Host observer
+`security.prom` содержит только числа и фиксированные rule labels. Mode0644 задаётся
+явно перед atomic rename независимо от UMask0077; приватные журналы остаются 0600.
+Чтение проверено отдельным процессом UID473, доступ к журналам ему отказан.
+ Host observer
 проецирует процессные счётчики из закрытого `/metrics`; identities не становятся labels.
 Grafana экран `moongame-security` связан с обзором, Prometheus загружает 8 rules из Git.
 Отсутствие данных и устаревание имеют отдельные проверки. Внешних receivers нет:
