@@ -1,0 +1,84 @@
+groups:
+  - name: moongame-security
+    interval: 15s
+    rules:
+      - alert: MoonGameSecurityDetectorUnavailable
+        expr: |
+          (up{job="observer"} == 0)
+          or (up{job="observer"} == 1 unless on (instance, environment) moongame_security_detector_up)
+          or (moongame_security_detector_up == 0)
+          or (time() - moongame_security_detector_sample_timestamp_seconds > 60)
+          or absent(up{job="observer"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Недоступен контур обнаружения инцидентов'
+          description: 'Проверьте timer/service security-monitor, свежесть security.prom и ошибки чтения. Отсутствие данных не означает отсутствие атак.'
+      - alert: MoonGameSecurityAuditStale
+        expr: |
+          (time() - moongame_security_detector_heartbeat_timestamp_seconds > 180)
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Нет свежего heartbeat журнала безопасности'
+          description: 'Проверьте Game, постоянный том и записи security-status. Возраст heartbeat измеряется независимо от посещений игроков.'
+      - alert: MoonGameSecurityAuditLoss
+        expr: |
+          (moongame_security_incidents_active{rule="audit-loss"} > 0)
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Журнал безопасности неполон'
+          description: 'Зафиксированы семплирование, потеря записей или ошибка записи. Сверьте счётчики процесса и суточные файлы; вывод об отсутствии атак недостоверен.'
+      - alert: MoonGameSecurityCapacity
+        expr: |
+          ((moongame_security_detector_storage_limited > 0)
+          or (moongame_security_detector_capacity_limited > 0)
+          or (moongame_security_detector_invalid_records > 0))
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Достигнут бюджет аудита или повреждён входной поток'
+          description: 'Сохраните доступные доказательства и проверьте объём/формат журналов. Повышать лимиты без проверки свободного диска нельзя.'
+      - alert: MoonGameSecuritySuspiciousActivity
+        expr: |
+          (moongame_security_incidents_active{rule=~"auth-burst|auth-slow|input-probes|mixed-script-probes|success-after-failures|action-boundary|server-errors|rate-limit|edge-probes|restart-burst"} > 0)
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Подозрительная последовательность: {{ $labels.rule }}'
+          description: 'Это основание для расследования, не доказательство атаки. Используйте moongame security incidents/events; автоматические санкции не выполняются.'
+      - alert: MoonGameSecurityMaintenanceStuck
+        expr: |
+          (moongame_security_incidents_active{rule="maintenance-stuck"} > 0)
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Обслуживание удаления аккаунтов не завершилось'
+          description: 'Проверьте account-erasure.service и проверку HTTPS. Сохраните maintenance barrier до успешного штатного завершения.'
+      - alert: MoonGameSecurityCorrelationMissing
+        expr: |
+          (moongame_security_incidents_active{rule="correlation-missing"} > 0)
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Нет постоянного ключа корреляции'
+          description: 'Проверьте защищённый ANALYTICS_SALT и историю ключей erasure. Значения ключей не печатать в логах или переписке.'
+      - alert: MoonGameSecurityEdgeUnavailable
+        expr: |
+          (moongame_security_edge_up == 0)
+          and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Недоступен безопасный журнал Caddy'
+          description: 'Проверьте logger Game site и каталог security access. Эта проверка подтверждает чтение файла, а не полноту всех HTTP-пакетов.'

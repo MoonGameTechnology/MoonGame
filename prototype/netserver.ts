@@ -1554,7 +1554,9 @@ const server = createMultiplayerServer({
           ? header.slice('Bearer '.length).trim()
           : null;
       const who = bearer ? await authCfg.verifySession!(bearer) : null;
-      return who?.ok ? liveSession(who.claim, userStore) : null;
+      const identity = who?.ok ? await liveSession(who.claim, userStore) : null;
+      if (identity) securityAudit?.identify(request, identity.accountId);
+      return identity;
     };
     if (AUTH) registerPlayerActivityApi(app, {
       store: pool ? new PostgresPlayerActivityStore(pool) : new MemoryPlayerActivityStore(),
@@ -1623,6 +1625,7 @@ const server = createMultiplayerServer({
       // hashes, uniform-401 + decoy timing, per-IP rate limit — hands out the
       // session JWT the join route below authenticates.
       registerAuthApi(app, {
+        securityAudit,
         users: userStore,
         onRegistered: async (accountId) => {
           try { await registrationRewards.ensure(accountId); }
@@ -2072,7 +2075,7 @@ const shutdown = (): void => {
     // The journals last: drain them, THEN write a fresh summary (its counters now match
     // the files; the one above stays as a fallback, the report keeps a run's LAST one)
     // and drain that. `flush()` waits for an append already in flight, so nothing is cut.
-    await Promise.all([matchLog.flush(), clientLog.flush()]);
+    await Promise.all([matchLog.flush(), clientLog.flush(), securityAudit?.flush()]);
     writeSummary();
     await matchLog.flush();
     if (pool) await pool.end();

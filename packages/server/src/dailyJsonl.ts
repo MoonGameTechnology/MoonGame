@@ -31,6 +31,8 @@ export interface DailyJsonlOptions {
   now?: () => number;
   /** Operational telemetry only, never statutory audit evidence. Default: 30 UTC days. */
   retentionDays?: number;
+  /** Operational security journals request fdatasync after each bounded batch. */
+  durable?: boolean;
 }
 
 /** `2026-10-14` for a UTC instant. */
@@ -190,7 +192,10 @@ export class DailyJsonl {
                 ? 0
                 : bytes.lastIndexOf(10, remaining - 1) + 1;
           const accepted = bytes.subarray(0, end);
-          if (accepted.length) await file.writeFile(accepted);
+          if (accepted.length) {
+            await file.writeFile(accepted);
+            if (this.options.durable) await file.datasync();
+          }
           const written = countLines(accepted.toString('utf8'));
           this.stats_.written += written;
           this.stats_.dropped += countLines(text) - written;

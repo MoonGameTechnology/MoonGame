@@ -156,21 +156,28 @@ Restore использует существующие `deploy/backup.sh` / `rest
 ## Журнал и алерты
 
 Под `PROD=1/true` аудит включён; для LAN/stage есть `SECURITY_AUDIT=1`.
-Compose передаёт этот flag по умолчанию. Поток идёт в stderr и попадает в существующий
-Docker `json-file` с ротацией `10m × 3`. Отдельного бесконечного security-файла нет.
+SecurityAudit v2 пишет приватные дневные JSONL в постоянный игровой том, отдельно
+приоритетный auth/lifecycle и heartbeat. Ограничены очередь/частота/дневной объём,
+срок —14 UTC-дат, принятые batches проходят datasync. Счётчики показывают потери.
+Docker stderr больше не является единственным хранилищем этого security stream.
 
-События: успешные login/register/reset, HTTP 401/403/429, WS-отказы 401/403,
-игровые отказы, пересекающие границу (`E_FORBIDDEN`, `E_BAD_PAYLOAD`, `E_BAD_ACTION_ID`,
-`E_BAD_MESSAGE`, `E_REPLAY`, `E_PAYLOAD_TOO_LARGE`; обычные отказы правил игры — нет),
-room rate-limit и raw-flood. Метаданные ограничены типом, временем, кодом и
-псевдонимом матча; нет login/IP/JWT/URL/тела запроса. По категориям auth/actions/rate
-поток выдаёт `security.alert` при всплеске отказов; пороги заданы в
-`packages/server/src/securityAudit.ts`. Алерт сигнализирует о необходимости расследования,
-а не доказывает чит/атаку.
+HTTP4xx/5xx, успешные auth/mutation, WS admission, raw-flood и нарушения границы
+команд несут server requestId, HMAC actor/target/дневной source и шаблон маршрута.
+Actor берётся после проверки аккаунта, клиентский ID/заголовки не считаются доверенными.
+Пароли, JWT, email, исходные login/accountId/IP/URL/payload не сохраняются.
+Обычные игровые отказы не считаются нарушениями безопасности.
 
-Для внешней доставки настройте сборщик этого потока и получателя `security.alert`.
-Проверка: всплеск отказов даёт alert, collector его принимает, оператор получает
-уведомление; журнал имеет согласованные сроки хранения и доступ.
+Host parser повторно проецирует данные, detector сохраняет объяснимые подозрения;
+CLI читает только разрешённую проекцию и аудирует root-чтения. Offline erasure
+учитывает actor/target и производные incidents. Чтение/детект/deployment/erasure
+сериализованы общим lock. Caddy пишет фиксированные классы без request/headers/IP.
+Aggregate metrics, Grafana экран и Prometheus rules не содержат персональных labels;
+канал уведомлений пока только панель. Installer не запускает тяжёлый стек автоматически.
+
+Это локальная история, изменяемая Game/root, без атомарности с игровым эффектом.
+Независимые delivery/append-only store/SIEM/response остаются планом.
+[Установка, лимиты и расследование](../../deploy/security/README.md),
+[направление роста](../security-operations-roadmap.md).
 
 ## Проверка эффективной конфигурации хоста
 

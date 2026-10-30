@@ -2885,7 +2885,7 @@ export class MatchRoom {
   private send(peer: RoomPeer, message: ServerMessage): void {
     if (message.type === 'rejection' || message.type === 'error') {
       const event = roomRejectionEvent(message.code);
-      if (event) this.securityAudit?.record(event, message.code, this.id);
+      if (event) this.securityAudit?.record(event, message.code, this.id, this.securityAudit.context(peer));
     }
     if (!canSend(peer)) return;
     // Backpressure: a peer whose buffer is backing up isn't draining — keep queuing

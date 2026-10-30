@@ -6,6 +6,9 @@ global:
     environment: playtest
     instance: game-1
 
+rule_files:
+  - /etc/prometheus/security.rules.yml
+
 # The observer target is empty until the optional host-side bridge is enabled.
 # Dashboards gate its samples on an explicit <=45s producer timestamp.
 scrape_configs:

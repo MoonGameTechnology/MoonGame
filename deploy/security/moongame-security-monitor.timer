@@ -1,0 +1,11 @@
+[Unit]
+Description=Evaluate MoonGame security records every 15 seconds
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=moongame-security-monitor.service
+
+[Install]
+WantedBy=timers.target

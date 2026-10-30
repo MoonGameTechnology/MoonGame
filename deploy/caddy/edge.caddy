@@ -1,0 +1,54 @@
+# BEGIN MOONGAME SECURITY ACCESS
+# Fixed categories only. The request, response headers, URL and IP never reach disk.
+map {method} {security_method} {
+    GET GET
+    POST POST
+    PUT PUT
+    PATCH PATCH
+    DELETE DELETE
+    HEAD HEAD
+    OPTIONS OPTIONS
+    default OTHER
+}
+map {path} {security_route} {
+    /auth/register auth.register
+    /auth/login auth.login
+    /auth/logout auth.logout
+    /auth/delete-account auth.delete
+    /auth/reset auth.reset
+    /auth/recover auth.recover
+    ~^/metrics(?:/|$) operator
+    ~^/admin(?:/|$) operator
+    ~^/matches(?:/|$) matches
+    ~^/corps(?:/|$) corporations
+    ~^/meta(?:/|$) economy
+    default other
+}
+log_append security_method {security_method}
+log_append security_route {security_route}
+@security_health path /health /ready
+log_skip @security_health
+log moongame_security {
+    output file /data/moongame-security/access.log {
+        mode 0600
+        roll_size 1MiB
+        roll_keep 4
+        roll_keep_for 336h
+        roll_interval 24h
+        roll_uncompressed
+    }
+    format filter {
+        wrap json
+        fields {
+            request delete
+            resp_headers delete
+            headers delete
+            uri delete
+            error delete
+            user_id delete
+            remote_ip delete
+            client_ip delete
+        }
+    }
+}
+# END MOONGAME SECURITY ACCESS

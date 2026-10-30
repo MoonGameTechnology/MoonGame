@@ -1,7 +1,8 @@
 # Независимые контуры бэкапов, логов, SIEM и реагирования
 
 Решение владельца: 2026-10-12. **План с частично реализованным фундаментом**
-(backup bundle v1 — 2026-10-13); живые площадки не проверены.
+(backup bundle v1 — 2026-10-13; локальный аудит/детект — 2026-10-30).
+Независимость площадок и полный SIEM/response не приняты.
 Владельцы задач — [SE-3.4/3.5, SE-8.1/8.4/8.5, SE-9.2](secure-environment-roadmap.md);
 связанные [OPS-0/1](operations-roadmap.md), [MSVC-7/8/9](service-resilience-roadmap.md),
 [служебные дела](staff-case-roadmap.md) и [карта сервисов](service-architecture-map.md).
@@ -24,14 +25,39 @@
   ещё не развёрнуты/не проверены.
   [Настройка и ограничения](../deploy/README.md#подписанный-комплект-v1).
   [S3 transport и приёмка провайдера](../deploy/backup-repository/README.md).
-- Типизированный security JSONL и локальный `security.alert`; центральный сбор,
-  внешний получатель, SIEM и runtime-response пока не построены.
+- Локальный аудит v2: постоянный приватный JSONL, server requestId, HMAC actor/target/
+  дневной source, HTTP/WS/auth/mutation/lifecycle, раздельные дневные бюджеты/heartbeat,
+  batch datasync и счётчики потерь. Offline erasure удаляет связанные события и incidents.
+- Bounded host detector, дедупликация, поиск по корреляции с аудитом root-чтений,
+  aggregate-only метрики, Grafana security экран и 8 Prometheus rules. Уведомления
+  сейчас только в панели; detector не исполняет response. Полный стек запускается
+  отдельно при прохождении действующего VPS guard, без снижения резервов.
+  [Установка, пороги, расследование и ограничения](../deploy/security/README.md),
+  [исследование первоисточников](research/2026-10-30-security-logging.md).
+  Это не независимый append-only store: Game/root могут изменить локальные файлы;
+  critical audit/outbox не атомарен с игровым эффектом. Центральная доставка,
+  off-host история, SIEM и runtime-response остаются планом.
 - CI SAST/SCA/DAST/image scans проверяют выпуск. Они не являются SIEM наблюдения
   за работающей игрой и не подтверждают runtime реагирование.
 
 [Защита ПДн и подготовка к релизу в РФ](security/rf-personal-data-readiness.md):
 реестр обработки, регламенты обращений/инцидентов, сроки и privacy evidence gate.
 Оператор и размещение хранилищ пока не подтверждены; правовой допуск не выдан.
+
+## Ресурсные этапы
+
+1. **Текущий VPS:** bounded постоянные журналы, lightweight detector/CLI и числовой
+   bridge. Grafana/Prometheus provisioning включать только при штатном guard и запасе
+   RAM/диска; при нехватке ресурсов оставить локальный сбор. Никаких новых внешних
+   receivers без отдельного выбора владельца.
+2. **Отдельная площадка:** collector/spool/WAL, authenticated TLS identity, ack/dedup/
+   replay, protected retention и внешний heartbeat. Проверить потерю игрового хоста,
+   переполнение, spoof/clock skew, erasure и повторную доставку; только после этого
+   заявлять независимую историю.
+3. **Полный целевой контур:** транзакционный доменный audit/outbox, персональный
+   RBAC/MFA/аудит чтений, SIEM/false-positive/suppression policy и scoped responder
+   с собственным incident admission. Долгое индексное хранение, off-host immutability
+   и HA не добавляются на игровой VPS ради формального закрытия этапа.
 
 ## Отдельные среды и владельцы
 
