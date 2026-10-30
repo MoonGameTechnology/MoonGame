@@ -36,24 +36,11 @@ export const CORP_FORMATS_SOLO_MIGRATION = {
   toDataHash: '1a42ba1318c5a5',
 } as const;
 
-/** Rules-only pair: movement 1.6.0 / visibility 2.4.0 halt a fleet at a closed border only
- *  after discovering it. The catalogue is unchanged and saved orders keep their shape, so a
- *  saved world reads as is. */
-export const RECON_HALT_SOLO_MIGRATION = {
-  fromRules: CORP_FORMATS_SOLO_MIGRATION.toRules,
-  fromData: CORP_FORMATS_SOLO_MIGRATION.toData,
-  fromDataHash: CORP_FORMATS_SOLO_MIGRATION.toDataHash,
-  toRules: '0dac76a591e626',
-  toData: CORP_FORMATS_SOLO_MIGRATION.toData,
-  toDataHash: CORP_FORMATS_SOLO_MIGRATION.toDataHash,
-} as const;
-
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   MINING_SOLO_MIGRATION,
   CORP_FORMATS_SOLO_MIGRATION,
-  RECON_HALT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
