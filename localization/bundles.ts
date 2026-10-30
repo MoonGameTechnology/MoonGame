@@ -10,11 +10,14 @@
 // нужны все языки сразу (прототип собирается в один HTML, тесты).
 import { ru } from './ru';
 import { en } from './en';
+import { de } from './de';
+import { pl } from './pl';
+import { es } from './es';
 import { DEFAULT_LOCALE } from './index';
 import type { LocaleId, Messages } from './index';
 
 /** Сырые тексты локалей, как они лежат в файлах: без фолбэка, ключа может не быть. */
-export const LOCALE_SOURCES: Record<LocaleId, Messages> = { ru, en };
+export const LOCALE_SOURCES: Record<LocaleId, Messages> = { ru, en, de, pl, es };
 
 /** Локаль поверх фолбэка. Результат самодостаточен: промаха, за которым пришлось бы
  *  идти в другой язык, в нём нет. */

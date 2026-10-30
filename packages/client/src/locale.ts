@@ -20,6 +20,9 @@ import type { LocaleId, Messages } from '../../../localization/core';
 export const LOCALE_CHUNKS: Record<LocaleId, () => Promise<{ default: Messages }>> = {
   ru: () => import('virtual:void-locale/ru'),
   en: () => import('virtual:void-locale/en'),
+  de: () => import('virtual:void-locale/de'),
+  pl: () => import('virtual:void-locale/pl'),
+  es: () => import('virtual:void-locale/es'),
 };
 
 /** Fetch the active locale's chunk and hand its texts to the shared runtime. Must be
