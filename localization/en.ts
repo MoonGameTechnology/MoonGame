@@ -623,6 +623,7 @@ export const en: Record<string, string> = {
   'auction.no-materials': 'No tradable materials.',
   'auction.invalid-amount': 'Quantity and price must be positive whole numbers.',
   'err.level-required': 'Trading unlocks after earning account experience.',
+  'auction.level-required': 'The auction unlocks at account level {n}.',
   'auction.title': 'Auction',
   'auction.subtitle': 'Trade earned equipment between matches',
   'auction.browse': 'Open listings',

@@ -1721,7 +1721,8 @@ const server = createMultiplayerServer({
       });
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
-        canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
+        canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp,
+        minimumAccountXp: metaCatalog.market.minimumAccountXp });
       registerProfileApi(app, { corporations: corpStore, registrationRewards, profiles: profileStore, bots: botStore, users: userStore, commanders: commanderStore, premium: (accountId) => metaEconomy.isPremium(accountId),
         medalRewards: (accountId) => settleMedalRewards({ profiles: profileStore, commanders: commanderStore, economy: metaEconomy, table: metaCatalog.medals, news: { users: userStore, corps: corpStore } }, accountId),
         identify: identifySession });

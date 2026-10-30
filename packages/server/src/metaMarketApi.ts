@@ -14,6 +14,8 @@ export interface MetaMarketApiDeps {
   market: MetaMarket;
   identify(request: FastifyRequest): Promise<Identity | null>;
   canTrade?(accountId: string): Promise<boolean>;
+  /** The account XP `canTrade` asks for, shown to a player who is not there yet. */
+  minimumAccountXp?: number;
   onChanged?(identity: Identity): Promise<void>;
   /** Инъекция часов и лимитов для детерминированных тестов (как в `corpApi`). */
   now?: () => number;
@@ -120,6 +122,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         })),
         history,
         canTrade,
+        ...(deps.minimumAccountXp === undefined ? {} : { minimumAccountXp: deps.minimumAccountXp }),
         materialListings: materialListings.map((listing) => ({
           ...listing,
           mine: listing.sellerId === identity.accountId,
