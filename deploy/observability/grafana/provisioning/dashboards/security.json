@@ -1,0 +1,396 @@
+{
+  "uid": "moongame-security",
+  "title": "MoonGame — безопасность и инциденты",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "timezone": "utc",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "tags": ["moongame", "security"],
+  "links": [
+    {
+      "title": "Обзор",
+      "type": "link",
+      "url": "/d/moongame-overview"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Как читать этот экран",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Подозрение требует расследования и не доказывает атаку. Нет данных при просроченном источнике. Счётчики событий относятся к текущему процессу; журнал инцидентов сохраняется между обновлениями. Подробности: `moongame security incidents` и `moongame security events --request ID`. Внешние уведомления и автоматические санкции не включены."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Работоспособность детектора",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_security_detector_up and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Возраст heartbeat аудита",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(time() - moongame_security_detector_heartbeat_timestamp_seconds) and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Лимит журнала инцидентов",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_security_detector_storage_limited and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Неполный входной поток",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 11,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_security_detector_invalid_records + moongame_security_detector_capacity_limited) and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Активные подозрения по правилам",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_security_incidents_active > 0 and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "История детектов за срок хранения",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_security_incidents_retained and on (instance, environment) (time() - moongame_security_detector_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "События безопасности в секунду",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(moongame_security_events_total[5m]) and on (instance, environment) (time() - moongame_security_sample_timestamp_seconds < 45)",
+          "instant": false,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Потери и семплирование текущего процесса",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(moongame_security_sampled_total + moongame_security_failed_total + moongame_security_journal_dropped_total + moongame_security_journal_failed_total) and on (instance, environment) (time() - moongame_security_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 10,
+      "title": "Начало текущего процесса Game",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "moongame_security_process_started_timestamp_seconds * 1000 and on (instance, environment) (time() - moongame_security_sample_timestamp_seconds < 45)",
+          "instant": true,
+          "format": "time_series",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 11,
+      "title": "Правила Prometheus в состоянии firing",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moongame-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ALERTS{alertname=~\"MoonGameSecurity.*\",alertstate=\"firing\"}",
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{rule}} {{event}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "нет данных"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

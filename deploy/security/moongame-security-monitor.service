@@ -1,0 +1,29 @@
+[Unit]
+Description=MoonGame bounded security detections and incident journal
+After=moongame-observer.service
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/moongame/security-monitor.env
+Environment=NODE_OPTIONS=--max-old-space-size=48
+ExecStart=/usr/bin/flock -n -E 0 /var/lib/moongame/autoupdate.lock /usr/bin/node /var/lib/moongame/current/deploy/security/monitor.mjs sample
+UMask=0077
+TimeoutStartSec=20
+MemoryMax=96M
+CPUQuota=15%
+TasksMax=32
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_CHOWN
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+InaccessiblePaths=/run -/etc/moongame -/etc/moongame-observability -/etc/shadow -/etc/gshadow -/etc/ssh -/var/lib/moongame/server.env -/var/lib/moongame/docker -/var/lib/moongame/db-cutover -/var/lib/moongame/account-erasure -/var/lib/docker/containers -/var/lib/docker/volumes/deploy_void-pgdata
+ReadWritePaths=/var/lib/moongame/autoupdate.lock /var/lib/moongame-metrics /var/lib/docker/volumes/deploy_void-logs/_data

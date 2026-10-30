@@ -595,6 +595,11 @@
       "title": "Контейнеры",
       "type": "link",
       "url": "/d/moongame-containers"
+    },
+    {
+      "title": "Безопасность и инциденты",
+      "type": "link",
+      "url": "/d/moongame-security"
     }
   ]
 }

@@ -105,6 +105,11 @@ services:
         target: /etc/prometheus/prometheus.yml
         read_only: true
         bind: { create_host_path: false }
+      - type: bind
+        source: ./observability/security.rules.yml
+        target: /etc/prometheus/security.rules.yml
+        read_only: true
+        bind: { create_host_path: false }
     healthcheck:
       test:
         [

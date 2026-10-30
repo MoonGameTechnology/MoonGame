@@ -225,6 +225,14 @@ extract_release() {
 make_current() {
   ln -sfn "$1" "$CURRENT.tmp"
   mv -Tf "$CURRENT.tmp" "$CURRENT"
+  # The unprivileged host bridge binds code from the signed release into its own
+  # mount namespace. Refresh that binding after an adopted/updated release. Tests
+  # and custom STATE_DIRs must never touch a real host service.
+  if [ "$STATE_DIR" = /var/lib/moongame ] && [ -f "$STATE_DIR/security-monitor.version" ]; then
+    if ! systemctl try-restart --no-block moongame-observer.service; then
+      log E_HOST_OBSERVER_REFRESH # Game stays healthy; missing telemetry is separately alerted.
+    fi
+  fi
 }
 
 write_prepared() {

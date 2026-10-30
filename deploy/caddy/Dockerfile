@@ -78,6 +78,7 @@ FROM caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19
 # переедет на пакет, наш бинарь всё равно ляжет последним.
 RUN apk upgrade --no-cache
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+COPY edge.caddy /etc/caddy/security/edge.caddy
 
 # Проба живости (Trivy DS026). Та же, что уже стояла у сервиса в `docker-compose.tls.yml`
 # (SEC-20): admin-API Caddy на 127.0.0.1:2019 наружу не публикуется, а `/config/` отвечает

@@ -37,7 +37,7 @@ Alloy. Пустой bootstrap-каталог не содержит `*.prom` и �
    со старой установки его также ротируют ([проверка](GAME-EXPORTER.md)).
    Не копировать туда весь env и не передавать значение в argv/stdout.
 3. Установить `moongame-observer.service`. `LoadCredential` передаёт ключ юниту;
-   приватная копия в RuntimeDirectory имеет0600 (systemd credential может иметь
+   приватная копия в RuntimeDirectory имеет 0600 (systemd credential может иметь
    0440, который строгий reader OBS-1.1 обоснованно отвергает). StateDirectory
    `/var/lib/moongame-metrics`0755 содержит только разрешённый numeric stream.
 4. Выполнить `stack.mjs init --admin-user PERSONAL_ADMIN`, установить guard
@@ -49,9 +49,18 @@ Alloy. Пустой bootstrap-каталог не содержит `*.prom` и �
    `OBS_GRAFANA_COOKIE_SECURE=true`. Запустить `stack.mjs up` и закрепить
    oneshot systemd unit с `RemainAfterExit`, `ExecStop=… stack.mjs stop`.
 
-Observer ограничен64MiB/0.1CPU/32tasks, доступом только к localhost и записью
+Observer ограничен 64MiB/0.1CPU/32tasks, доступом только к localhost и записью
 в собственные runtime/state dirs. Стек сохраняет отдельные caps/guard OBS-0.2.
 При ротации Game bearer заменить root-файл и перезапустить только observer.
+
+## Журнал безопасности
+
+[Security runbook](../security/README.md) описывает 96MiB/15%CPU worker, постоянный
+audit, CLI расследования и panel-only rules. Он пишет только числовой `security.prom`
+в существующий metrics directory; raw журналы не монтируются в Alloy/Grafana.
+Installer сохраняет UID/credentials observer и открывает его код read-only bind из
+signed release; успешная автодоставка обновляет привязку. Установка worker не
+запускает полный стек и не меняет 12GiB reserve.
 
 ## Контейнеры: фиксированный host timer
 
@@ -86,25 +95,25 @@ systemctl start moongame-container-observer.service
 ```
 
 Код и ops-каталог должны принадлежать root; `/var/lib/moongame-metrics` создаёт
-существующий host observer. Job имеет96MiB/0.2CPU/64tasks, timeout30s и только
-AF_UNIX. Каждый Docker вызов ограничен1500ms/64KiB, вызовы последовательны,
+существующий host observer. Job имеет 96MiB/0.2CPU/64tasks, timeout30s и только
+AF_UNIX. Каждый Docker вызов ограничен 1500ms/64KiB, вызовы последовательны,
 сборы не перекрываются. `containers.prom` ≤64KiB заменяется атомарно, Alloy читает
 его через существующий readonly mount. Новых портов и контейнеров нет.
 
-Dashboard `moongame-containers` (ссылка из `moongame-overview`) содержит17 панелей.
+Dashboard `moongame-containers` (ссылка из `moongame-overview`) содержит 17 панелей.
 Есть отдельные source_up, present и resources_up: отказ Docker не равен отсутствию
 контейнера; отсутствие healthcheck не зелёный health; остановленный контейнер не
 получает выдуманное нулевое потребление. Timestamp независим от host observer;
 при возрасте≥45s текущие значения скрываются, возраст остаётся виден.
 RestartCount — автоматические рестарты Docker за жизнь текущего контейнера,
 не журнал всех ручных рестартов. StartedAt дополняет его; пересоздание обнуляет
-cgroup counters, `rate()` учитывает resets. История событий между15s выборками
+cgroup counters, `rate()` учитывает resets. История событий между 15s выборками
 и долговременный аудит пересозданий не реализованы.
 
 Проверено на VPS2026-10-18: семь источников/ресурсов доступны,17 PromQL queries
 успешны; пауза producer46.8s скрыла состояния, возобновление вернуло семь строк,
-Game ready оставался200. Один успешный job: peak около26MiB, CPU около0.64s;
-это точечный замер, не24h/on-off soak. Fixture tests проверяют missing/ошибку
+Game ready оставался 200. Один успешный job: peak около 26MiB, CPU около 0.64s;
+это точечный замер, не 24h/on-off soak. Fixture tests проверяют missing/ошибку
 Docker, cgroup failure, остановку/пересоздание/reset и numeric/label allowlists.
 Графический Android/browser smoke отдельно не выполнен.
 
@@ -140,7 +149,7 @@ strict SNI/Host при client auth; проверить отдельно SNI иг
 Никаких proxy routes к Prometheus/Loki/Alloy/Game metrics не добавлять.
 
 Через локальный Grafana admin API создать отдельного персонального Viewer,
-проверить403 на admin API, provisioned dashboard и Prometheus datasource.
+проверить 403 на admin API, provisioned dashboard и Prometheus datasource.
 Bootstrap Admin хранить отдельно; не передавать его для обычного наблюдения.
 Успешный HTTPS handshake с сертификатом **не заменяет** вход в Grafana.
 
@@ -151,7 +160,7 @@ Bootstrap Admin хранить отдельно; не передавать ег�
 
 Отзыв в этом первом профиле — замена CA и клиентского сертификата с validate +
 reload и отрицательной проверкой старого сертификата. Не считать удаление
-локального `.p12` отзывом. До истечения90дней выпустить новый комплект.
+локального `.p12` отзывом. До истечения 90дней выпустить новый комплект.
 
 ## Проверка и границы
 
@@ -165,7 +174,7 @@ Stop/restart только OBS сохраняет Grafana dashboard/users/TSDB; `
 
 Это первый обзор, не завершение OBS-1.2/1.3/4.1: нет отдельной DB monitoring
 роли, backup/restore markers, оконных алертов/внешнего
-dead-man, histogram p95, карточек партий и24h/on-off soak. Host RAM/CPU не
+dead-man, histogram p95, карточек партий и 24h/on-off soak. Host RAM/CPU не
 выдаются за расход конкретной комнаты. Отчёт реального запуска хранить отдельно.
 
 Официальная конфигурация: [Caddy client auth](https://caddyserver.com/docs/caddyfile/directives/tls),

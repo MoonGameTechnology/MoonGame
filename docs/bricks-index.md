@@ -1128,7 +1128,7 @@
 | ONB-4 | ✅ | proto | `docs/onboarding-roadmap.md` | Help/кодекс-хаб («?» везде) |
 | ONB-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Цели первой сессии / чек-лист успеха |
 | ONB-8 | ✅ | proto | `docs/onboarding-roadmap.md` | Онбординг в соц/мета-слой |
-| OPS-0.1 | ⏳ | srv sec | `docs/operations-roadmap.md` | Структурные логи + трейсинг |
+| OPS-0.1 | 🔶 | srv sec | `docs/operations-roadmap.md` | Структурные логи + трейсинг |
 | OPS-0.2 | 🔒 | srv sec | `docs/operations-roadmap.md` | Метрики и трекинг ошибок |
 | OPS-0.3 | 🔒 | srv | `docs/operations-roadmap.md` | Игровая телеметрия/аналитика |
 | OPS-1.1 | ⏳ | srv sec | `docs/operations-roadmap.md` | Деплой при долгих WS-соединениях |
@@ -1173,10 +1173,10 @@
 | OBS-0.1 | ✅ | docs ops | `docs/playtest-observability-roadmap.md` | Контракты и baseline |
 | OBS-0.2 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Закрытый стек и provisioning |
 | OBS-0.4 | ✅ | ops sec | `docs/playtest-observability-roadmap.md` | Первый VPS и защищённый браузерный вход |
-| OBS-0.3 | ⏳ | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
+| OBS-0.3 | 🔶 | srv ops | `docs/playtest-observability-roadmap.md` | Lifecycle журналов и redaction |
 | OBS-1.1 | ✅ | srv ops | `docs/playtest-observability-roadmap.md` | Game exporter и процессные метрики |
 | OBS-1.2 | 🔶 | ops | `docs/playtest-observability-roadmap.md` | Хост, БД и backup health |
-| OBS-1.3 | 🔒 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
+| OBS-1.3 | 🔶 | ops docs | `docs/playtest-observability-roadmap.md` | Grafana и алерты первого выпуска |
 | OBS-2.1 | 🔒 | ops sec | `docs/playtest-observability-roadmap.md` | Alloy → Loki |
 | OBS-2.2 | 🔒 | srv ops | `docs/playtest-observability-roadmap.md` | Поведение в Grafana |
 | OBS-2.3 | ⏳ | srv | `docs/playtest-observability-roadmap.md` | Честные гистограммы и backlog |
@@ -1381,7 +1381,7 @@
 | SE-7.1 | 🔶 | cli sec | `docs/secure-environment-roadmap.md` | CSP + Trusted Types + HSTS 2026-09-21 |
 | SE-7.2 | ⏳ | cli sec | `docs/secure-environment-roadmap.md` | SRI и безопасные куки |
 | SE-8.1 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Структурное аудит-логирование |
-| SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md` | Алерты на аномалии |
+| SE-8.2 | 🔶 | sec | `docs/secure-environment-roadmap.md` | Алерты на аномалии |
 | SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | Метрики и трекинг ошибок |
 | SE-8.4 | 🔒 | sec ops | `docs/secure-environment-roadmap.md` | SIEM в отдельном security-контуре |
 | SE-8.5 | ⏳ | sec ops | `docs/secure-environment-roadmap.md` | Независимое incident admission и scoped-реагирование |

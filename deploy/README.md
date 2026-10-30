@@ -1,5 +1,9 @@
 # 🚀 Void Dominion — Развертывание на Ubuntu Server
 
+[Журнал безопасности, алерты и расследование](security/README.md): постоянный audit,
+ресурсоограниченный host worker, CLI и panel-only provisioning. Отдельное хранилище/
+SIEM — по [security roadmap](../docs/security-operations-roadmap.md).
+
 Полный пакет скриптов и документации для однокликовой установки игрового сервера на Ubuntu.
 
 Закрытый opt-in Grafana/Prometheus/Loki/Alloy для плейтестов:

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WebSocket, type ClientOptions } from 'ws';
 import { createInitialState, createKernel, parseGameData, type Player } from '@void/shared-core';
 import { MatchRoom } from './matchRoom';
-import type { SecurityAudit } from './securityAudit';
+import { SecurityAudit } from './securityAudit';
 import {
   createMultiplayerServer,
   upgradeClientAddress,
@@ -74,17 +74,19 @@ const viaProxy = (forwardedFor: string): ClientOptions => ({
 
 describe('лимит частоты WS-рукопожатий на адрес', () => {
   it('сверх бюджета за окно — 429 и запись в аудит, другой адрес не задет', async () => {
-    const record = vi.fn();
+    const audit = new SecurityAudit(() => {});
+    const record = vi.spyOn(audit, 'record');
     const server = createMultiplayerServer({
       room: makeRoom(),
       wsHandshakeRate: { max: 3, windowMs: 60_000 },
-      securityAudit: { record } as unknown as SecurityAudit,
+      securityAudit: audit,
     });
     const url = unknownMatch(await server.listen());
     try {
       for (let i = 0; i < 3; i += 1) expect(await rejectStatus(url)).toBe(404);
       expect(await rejectStatus(url)).toBe(429);
-      expect(record).toHaveBeenCalledWith('rate.limit', 'E_RATE_LIMIT');
+      expect(record).toHaveBeenCalledWith('rate.limit', 'E_RATE_LIMIT', undefined,
+        expect.objectContaining({ method: 'WS', status: 429 }));
       // Второй адрес на той же машине: на Linux вся 127.0.0.0/8 — петля.
       if (process.platform === 'linux') {
         expect(await rejectStatus(url, { localAddress: '127.0.0.2' })).toBe(404);

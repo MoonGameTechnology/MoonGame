@@ -75,6 +75,7 @@ export async function currentPwfp(
 }
 
 export interface AuthApiDeps {
+  securityAudit?: { identify(request: object, accountId: string): void };
   users: UserStore;
   verifySession?(token: string): Promise<SessionTokenResult>;
   onSessionsRevoked?(accountId: string): void | Promise<void>;
@@ -270,6 +271,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     }
     // Auto-login: registration IS the first login — hand the session token right away.
     const token = await deps.signSession(created.userId, creds.login, pwFingerprint(passHash));
+    deps.securityAudit?.identify(request, created.userId);
     void reply.code(201);
     return { accountId: created.userId, login: creds.login, token };
   }));
@@ -319,6 +321,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     if (!current || current.passHash !== verifiedHash || current.sessionNonce !== user.sessionNonce)
       return reply.code(401).send({ error: 'E_AUTH' });
     const token = await deps.signSession(current.userId, current.login, sessionFingerprint(current));
+    deps.securityAudit?.identify(request, current.userId);
     return { accountId: current.userId, login: current.login, token };
   }));
 
@@ -350,6 +353,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
         return reply.code(401).send({ error: 'E_AUTH' });
       const requestId = await deps.users.requestDeletion(user, body.requestId as string | undefined);
       if (!requestId) return reply.code(409).send({ error: 'E_SESSION_CHANGED' });
+      deps.securityAudit?.identify(request, user.userId);
       await deps.onSessionsRevoked?.(user.userId);
       // Accepted means queued, never a claim that all copies are already erased.
       return reply.code(202).send({ requestId, status: 'pending' });
@@ -364,6 +368,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       const who = verified?.ok ? await liveSession(verified.claim, deps.users) : null;
       if (!who) return reply.code(401).send({ error: 'E_AUTH' });
       // Commit before closing sockets/acknowledging. Store failures must never claim success.
+      deps.securityAudit?.identify(request, who.accountId);
       await deps.users.revokeSessions(who.accountId);
       await deps.onSessionsRevoked?.(who.accountId);
       return reply.code(204).send();
@@ -385,6 +390,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       if (!who || authTime === undefined || Math.floor(now() / 1000) - authTime >= SESSION_REAUTH_SEC)
         return reply.code(401).send({ error: 'E_AUTH' });
       const token = await deps.signSession(who.accountId, who.login, who.pwfp, authTime);
+      deps.securityAudit?.identify(request, who.accountId);
       return { accountId: who.accountId, login: who.login, token };
     });
   }
@@ -520,6 +526,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
       // Reset IS a login: hand back a fresh session (stamped with the NEW password's
       // fingerprint, so it survives while every pre-reset session is now revoked).
       const sessionToken = await deps.signSession(user.userId, user.login, sessionFingerprint({ ...user, passHash }));
+      deps.securityAudit?.identify(request, user.userId);
       return { accountId: user.userId, login: user.login, token: sessionToken };
     }));
   }

@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { withEdgeLogging } from './security/edge-logging.mjs';
 
 it.skipIf(!process.env.CADDY_BIN)('removes request credentials from a real reverse-proxy error log', async () => {
   const slot = createServer();
@@ -15,7 +16,7 @@ it.skipIf(!process.env.CADDY_BIN)('removes request credentials from a real rever
   const dir = mkdtempSync(join(tmpdir(), 'caddy-privacy-'));
   const file = join(dir, 'Caddyfile');
   const source = readFileSync(new URL('./Caddyfile', import.meta.url), 'utf8');
-  writeFileSync(file, source.replace('reverse_proxy server:8788', 'reverse_proxy 127.0.0.1:1').replace('log default {', 'admin off\n\tlog default {'));
+  writeFileSync(file, withEdgeLogging(source.replace('reverse_proxy server:8788', 'reverse_proxy 127.0.0.1:1').replace('log default {', 'admin off\n\tlog default {'), join(dir, 'access.log')));
   const child = spawn(process.env.CADDY_BIN, ['run', '--config', file], {
     env: { ...process.env, DOMAIN: `http://127.0.0.1:${port}` }, stdio: ['ignore', 'pipe', 'pipe'],
   });

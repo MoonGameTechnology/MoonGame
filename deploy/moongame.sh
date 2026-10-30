@@ -51,6 +51,10 @@ case "${1:-}" in
     # Последние выкатки и откаты (ZTP-1.3). Полный файл — $STATE_DIR/deploy-history.
     as_service tail -n "${2:-20}" "$STATE_DIR/deploy-history"
     ;;
+  security)
+    shift
+    as_service /usr/bin/node "$HERE/security/control.mjs" "$@"
+    ;;
   version)
     # Что запущено: дайджест из точки отката и то, что сервер сам говорит о сборке.
     if pair="$(as_service cat "$STATE_DIR/last-good-release" 2>/dev/null)"; then
@@ -72,6 +76,7 @@ case "${1:-}" in
     echo "  update      — выкатить свежую подписанную сборку сейчас, мимо окна"
     echo "  cleanup-images [--dry-run] — очистить старые образы или показать план"
     echo "  history [N] — последние выкатки и откаты"
+    echo "  security status | incidents | events — аудит и расследование (оператор)"
     echo "  version     — что сейчас запущено"
     echo ""
     echo "Выключить автообновление: AUTODEPLOY=0 в $STATE_DIR/server.env."
