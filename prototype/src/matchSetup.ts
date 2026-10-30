@@ -108,11 +108,6 @@ export interface SetupConfig {
   /** The player's ship blueprints — a module loadout per hull class (the "Верфь"
    *  designer). Frozen at session start (GDD §2). Absent → DEFAULT_SHIP_LOADOUTS. */
   ships?: ShipLoadout[];
-  /** Meta-progression grant for the HUMAN seat (prototype/src/meta.ts metaGrant),
-   *  snapshotted at match start like scientists: hidden techs land as
-   *  `completed`, the council starts higher, the treasury opens fatter. Earned by
-   *  play only — never sold (main-menu.md §5). Absent = a fresh commander. */
-  meta?: { tech: string[]; scientistLevel: number; resourceMult: number };
 }
 
 /** Default solo skirmish: you (p1) vs one AI (p2), at two of the start candidates. */
@@ -398,25 +393,12 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     // line stays reachable when unset; the has_scientist + day-15 gates still apply.
     if (!seat.ai) {
       const ids = setup.scientists?.length ? setup.scientists.slice(0, 2) : ['overseer'];
-      // Meta-progression raises the whole council's level (snapshot at match start).
-      const lvl = 1 + Math.max(0, setup.meta?.scientistLevel ?? 0);
-      players[seat.id]!.scientists = ids.map((id) => ({ id, level: lvl }));
-      // …opens the treasury fatter…
-      const mult = 1 + Math.max(0, setup.meta?.resourceMult ?? 0);
-      if (mult > 1) {
-        const bag = players[seat.id]!.resources;
-        for (const r of Object.keys(bag)) bag[r] = Math.round((bag[r] ?? 0) * mult);
-      }
-      // …and lands the unlocked hidden techs as completed (bonuses ride the normal
-      // technology hooks from the first second — the C3 pre-match seam, reused).
-      const grant = (setup.meta?.tech ?? []).filter((id) => data.technologies[id]?.grantOnly);
-      if (grant.length) players[seat.id]!.technologies = { completed: [...new Set(grant)] };
+      players[seat.id]!.scientists = ids.map((id) => ({ id, level: 1 }));
     } else {
       // BAL-12: бот тоже посвящает совет. Без этого `state.players.*.scientists` у
       // ботового места оставался `undefined`, и `technologyLock` отбивал КАЖДЫЙ
       // `has_scientist`-узел — в self-play, где ботовые оба места, целый слой дерева не
-      // измерялся ни разу. Уровень первый: рост совета даёт мета-прокачка, а она
-      // принадлежит аккаунту игрока, не боту.
+      // измерялся ни разу. Как и у человека, совет начинает с первого уровня.
       players[seat.id]!.scientists = botCouncil(seed, seat.id, Object.keys(data.scientists)).map(
         (id) => ({ id, level: 1 }),
       );

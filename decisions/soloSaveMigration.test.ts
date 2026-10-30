@@ -3,6 +3,7 @@ import { createInitialState } from '../packages/shared-core/src/index';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from './soloSave';
 import {
   CORP_FORMATS_SOLO_MIGRATION as corpFormats,
+  COMMANDER_CAREER_SOLO_MIGRATION as career,
   MINING_SOLO_MIGRATION as migration,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
@@ -149,7 +150,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -194,5 +195,38 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
       const raw = serializeSoloSave(at(release), corpFormats.fromRules);
       expect(parseCompatibleSoloSave(raw, corpFormats.toRules)).toBeNull();
     }
+  });
+});
+
+describe('commander power retirement save migration (0.1.68 → 0.1.69)', () => {
+  const shipped = { data: career.toData, dataHash: career.toDataHash, manifest: '1' };
+
+  it('keeps an existing world and accepted work while advancing its exact catalog pin', () => {
+    const before = oldSave();
+    before.state.version = { data: career.fromData, dataHash: career.fromDataHash, manifest: '1' };
+    before.state.players.p1!.technologies = { completed: ['meta_drill_speed', 'signal_corps'] };
+    before.state.players.p1!.scientists = [{ id: 'overseer', level: 2 }];
+    const raw = serializeSoloSave(before, career.fromRules);
+    const result = parseCompatibleSoloSave(raw, career.toRules);
+    expect(result).toEqual({ ...before, state: { ...before.state, version: shipped } });
+    expect(parseSoloSave(raw, career.fromRules)).toEqual(before);
+    expect(parseSoloSave(serializeSoloSave(result!, career.toRules), career.toRules)).toEqual(
+      result,
+    );
+  });
+
+  it('carries an older save through all three audited pairs', () => {
+    const before = oldSave();
+    expect(
+      parseCompatibleSoloSave(serializeSoloSave(before, migration.fromRules), career.toRules),
+    ).toEqual({ ...before, state: { ...before.state, version: shipped } });
+  });
+
+  it('refuses a mismatched catalog hash even with the expected envelope fingerprint', () => {
+    const before = oldSave();
+    before.state.version = { data: career.fromData, dataHash: 'foreign-data', manifest: '1' };
+    expect(
+      parseCompatibleSoloSave(serializeSoloSave(before, career.fromRules), career.toRules),
+    ).toBeNull();
   });
 });

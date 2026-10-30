@@ -36,7 +36,6 @@ import {
 } from './game';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_MAP_ID, fixedSideMode, isCurrentMap, isFrontier, mapPreset, seatsByCount, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
-import { metaGrant, type MetaState } from './meta';
 import { mapWorldName } from './planetName';
 import { resetSandboxConfig } from './sandbox';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
@@ -63,8 +62,6 @@ export interface SetupScreenHost {
   seats: ReadonlyArray<{ id: string; name: string; faction: string; color: string }>;
   /** Позывной из поля входа — имя главного героя. */
   nick(): string;
-  /** Прокачка командующего: её грант едет в матч снимком. */
-  meta(): MetaState;
   /** Идёт сетевая партия: её часы ведёт сервер. */
   net(): boolean;
   /** Остановить локальный мир под экраном. */
@@ -518,11 +515,9 @@ export function buildSetupConfig(): SetupConfig {
         : setupTeams && setupMapId !== 'ffa-4' ? { team: setupSeatTeam[i] } : {}),
     };
   });
-  // Carry the player's division templates + hero roster into the match (deep-cloned),
-  // plus the meta-progression grant (snapshot — no live account reads mid-match).
+  // Carry the player's division templates + hero roster into the match (deep-cloned).
   return {
     mapId: setupMapId,
-    meta: metaGrant(game.meta()),
     seats,
     ...(setupScientists.length ? { scientists: [...setupScientists] } : {}),
     heroes: setupHeroes.map((h) => ({

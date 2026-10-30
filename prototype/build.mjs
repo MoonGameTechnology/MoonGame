@@ -4293,26 +4293,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hub-note{flex:0 0 auto;min-height:0;text-align:center;color:var(--amber);font-size:var(--fs-body);
   padding:0 16px;}
 #hub .hub-note:not(:empty){padding:8px 16px;}
-/* «Прокачка» — meta-progression trees (hub tab) */
-#hp-meta{overflow-y:auto;gap:10px;}
-.mp-head{display:flex;align-items:baseline;gap:12px;color:#eafffb;}
-.mp-head b{font-size:16px;}
-.mp-xp{color:var(--dim);font-size:var(--fs-caption);}
-.mp-pts{margin-left:auto;color:var(--amber);font-weight:700;font-size:var(--fs-body);}
-.mp-track{height:5px;border-radius:3px;background:rgba(53,214,230,.12);overflow:hidden;}
-.mp-fill{height:100%;background:var(--cyan);box-shadow:0 0 8px rgba(53,214,230,.5);}
-.mp-branch{border:1px solid var(--line-hi);border-radius:10px;padding:10px 12px;}
-.mp-bt{font-size:var(--fs-caption);color:var(--dim);margin-bottom:8px;}
-.mp-node{padding:7px 0;border-top:1px dashed var(--line);}
-.mp-node:first-of-type{border-top:none;}
-.mp-nm{color:#eafffb;font-weight:700;font-size:var(--fs-body);}
-.mp-nm em{color:var(--dim);font-style:normal;font-weight:400;}
-.mp-ds{color:#74b0aa;font-size:var(--fs-caption);margin:2px 0 5px;}
-.mp-node.lock{opacity:.5;}
-.mp-node.own .mp-nm{color:var(--grn,#5ff0a8);}
-.mp-buy{padding:5px 12px;border:1px solid var(--cyan-dim);border-radius:7px;background:transparent;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.mp-buy:disabled{border-color:var(--line);color:var(--dim);cursor:default;}
-.mp-note{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 0;}
 /* --- Профиль командира: the career dossier (main-menu.md §4.2). One overlay, two
    entry points: the hub identity strip and the in-match player card, so the mount
    below is a full-screen sheet rather than a hub panel. In the hub palette (UIX-15.3):
@@ -5633,7 +5613,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <aside class="nw-col" id="news-col" data-i18n-aria="news.title"></aside>
       </div>
     </div>
-    <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
     <div class="hub-panel" id="hp-shop" style="display:none"></div>
@@ -5648,7 +5627,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-shop" type="button"><span class="ht-ic">◈</span><span data-i18n="hub.tile.shop"></span></button>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
-        <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
         <button class="hub-tile" id="hub-supply" type="button"><span class="ht-ic">⚒</span><span data-i18n="hub.tile.supply"></span></button>
         <button class="hub-tile" id="hub-auction" type="button"><span class="ht-ic">⌖</span><span data-i18n="hub.tile.auction"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>

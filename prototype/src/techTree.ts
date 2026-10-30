@@ -163,7 +163,7 @@ export function techTreeHtml(
   modalId: string | null,
 ): string {
   const seat = state.players[me];
-  // Meta-progression grants are account perks, not researchable session techs — the tree
+  // Run boons are grants, not researchable session techs — the tree
   // shows only the real nodes. The rule itself lives in `techCoverage.ts` (BAL-12): the
   // self-play report needs the same split for its denominator, and a second hand-written
   // prefix check is exactly how the two would drift apart.

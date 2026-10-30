@@ -20,7 +20,6 @@ beforeAll(() => setLocale('ru'));
 
 const meta = (over: Partial<MetaState> = {}): MetaState => ({
   xp: 0,
-  spent: [],
   stats: { ...EMPTY_STATS },
   ...over,
 });
