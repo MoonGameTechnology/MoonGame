@@ -38,6 +38,8 @@ import { borderTolerance } from '../../packages/client/src/territoryLod';
 import { t } from '../../localization/runtime';
 import { framedRect, intersectRect, uncoveredRects } from '../../decisions/livingBorderLayer';
 import {
+  DRAFT_DENSITY,
+  DRAFT_OVERSCAN_SHARE,
   GESTURE_BAKE_MS,
   LIVE_RING_BUDGET,
   MAX_BAKE_PIXELS,
@@ -183,6 +185,8 @@ let mapLayerAt: MapProjection = { a: 1, x: 0, y: 0 }; // projection the map laye
 let mapLayerMargin: Overscan = { x: 0, y: 0 }; // its margin beyond the screen, CSS px
 let mapLayerScroll: LayerScroll = NO_SCROLL; // how far its window moved since (rule 3), CSS px
 let mapLayerBakes = 0; // bumps on every bake and move, so the composite knows its map is current
+let mapLayerDensity = 1; // its canvas pixels per CSS px: the DPR, or a draft's (rule 8)
+let mapLayerDraft = false; // it is a draft, baked mid-gesture on a slow device (rule 8)
 /** This frame's transform from the map layer's bake space to the screen. The province
  *  geometry below (polygons, borders, terrain fields, glass frame) lives in bake space. */
 export let mapView: LayerTransform = { k: 1, tx: 0, ty: 0 };
@@ -930,81 +934,86 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   return fields;
 }
 
-/** A bake's size at the current screen: its margin beyond the screen, where the bake's point
- *  (0, 0) lies on its canvas, and the canvas, all but the margin in device pixels. */
-function mapLayerSize(): { margin: Overscan; ox: number; oy: number; width: number; height: number } {
+/** A bake's size at the current screen and `density` canvas pixels per CSS px: its margin beyond
+ *  the screen (a draft's is narrower, rule 8), where the bake's point (0, 0) lies on its canvas,
+ *  and the canvas, all but the margin in its pixels. */
+function mapLayerSize(density = game.dpr(), draft = false): { margin: Overscan; ox: number; oy: number; width: number; height: number } {
   const VW = game.vw();
   const VH = game.vh();
-  const DPR = game.dpr();
-  const margin = overscanFor(VW, VH, DPR);
-  const ox = Math.round(margin.x * DPR);
-  const oy = Math.round(margin.y * DPR);
-  return { margin, ox, oy, width: Math.round(VW * DPR) + 2 * ox, height: Math.round(VH * DPR) + 2 * oy };
+  const margin = draft ? overscanFor(VW, VH, density, MAX_BAKE_PIXELS, DRAFT_OVERSCAN_SHARE) : overscanFor(VW, VH, density);
+  const ox = Math.round(margin.x * density);
+  const oy = Math.round(margin.y * density);
+  return { margin, ox, oy, width: Math.round(VW * density) + 2 * ox, height: Math.round(VH * density) + 2 * oy };
 }
 
-/** Bake the map layer at the current camera, with its margin beyond the screen. */
-function bakeMapLayer(content: string, zooming: boolean, preparing = false): void {
+/** Bake the map layer at the current camera, with its margin beyond the screen. A `draft` (rule 8)
+ *  is baked at {@link DRAFT_DENSITY}, with the terrain rasters at hand, and is never left at rest. */
+function bakeMapLayer(content: string, zooming: boolean, preparing = false, draft = false): void {
   const VW = game.vw();
   const VH = game.vh();
   const DPR = game.dpr();
   cancelBakeJob(); // this bake supersedes it
   if (mapLayerX.isContextLost?.()) return;
   const at = performance.now();
-  const { margin, ox, oy, width, height } = mapLayerSize();
+  const density = draft ? Math.min(DPR, DRAFT_DENSITY) : DPR;
+  const { margin, ox, oy, width, height } = mapLayerSize(density, draft);
   mapLayerContent = ''; // publish the signature only after a complete paint
   // Preserve the allocation when only the scene changed.
   if (mapLayer.width !== width) mapLayer.width = width;
   if (mapLayer.height !== height) mapLayer.height = height;
   mapLayerX.setTransform(1, 0, 0, 1, 0, 0);
   mapLayerX.clearRect(0, 0, width, height);
-  mapLayerX.setTransform(DPR, 0, 0, DPR, ox, oy);
+  mapLayerX.setTransform(density, 0, 0, density, ox, oy);
   const geo = measureMapLayer();
   publishMapGeometry(geo);
+  if (draft) terrainRaster.beginFrame(0);
   terrainFields = paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y },
     zooming, preparing, geo);
   if (!preparing) {
     // Rule 8: the raster is four fifths of a bake, and it would land in the frame that shows the
-    // bake anyway: made here, it is counted in the bake's cost.
+    // bake anyway: made here, it is counted in the bake's cost. A draft's cost is not the bake's.
     flushRaster(mapLayer);
-    bakeCostMs = performance.now() - at;
+    if (!draft) bakeCostMs = performance.now() - at;
   }
   mapLayerGeometry = geo;
   mapLayerAt = geo.at;
   mapLayerMargin = margin;
   mapLayerScroll = NO_SCROLL;
+  mapLayerDensity = density;
+  mapLayerDraft = draft;
   mapLayerBakes++;
   // A loading bake is geometry only; the finished one follows it (`prepareEnteringMap`).
   if (!preparing && !mapLayerX.isContextLost?.()) mapLayerContent = content;
   // Sharp terrain the frame budget could not afford is refined a few rasters per frame
-  // and baked once at the end — the map is not re-baked every frame meanwhile.
-  terrainRefine = !preparing && terrainRaster.pending ? 0 : -1;
+  // and baked once at the end — the map is not re-baked every frame meanwhile. A draft owes
+  // nothing: the bake that replaces it at rest makes its own.
+  terrainRefine = !preparing && !draft && terrainRaster.pending ? 0 : -1;
   terrainOwed = terrainRefine < 0 ? [] : null;
 }
 
-/** Canvas pixel `c` of the map layer shows the bake's point `(c − offset) / DPR`: the bake
- *  sits past the screen by its margin, and its window moved by its scroll. */
+/** Canvas pixel `c` of the map layer shows the bake's point `(c − offset) / mapLayerDensity`: the
+ *  bake sits past the screen by its margin, and its window moved by its scroll. */
 function mapLayerOffset(): { x: number; y: number } {
-  const DPR = game.dpr();
+  const d = mapLayerDensity;
   return {
-    x: Math.round(mapLayerMargin.x * DPR) - Math.round(mapLayerScroll.x * DPR),
-    y: Math.round(mapLayerMargin.y * DPR) - Math.round(mapLayerScroll.y * DPR),
+    x: Math.round(mapLayerMargin.x * d) - Math.round(mapLayerScroll.x * d),
+    y: Math.round(mapLayerMargin.y * d) - Math.round(mapLayerScroll.y * d),
   };
 }
 
 /** Paint the canvas rect `r` of the map layer (or of `g`, where the bake's point (0, 0) lies at
- *  `o`) afresh from the bake's geometry; the terrain fields it meets join `fields` (once: `met`
- *  holds their ids). */
+ *  `o` and a CSS px is `d` of its pixels) afresh from the bake's geometry; the terrain fields it
+ *  meets join `fields` (once: `met` holds their ids). */
 function paintMapLayerRect(r: PixelRect, geo: MapLayerGeometry, zooming: boolean, fields: TerrainField[],
-  met: Set<string>, g = mapLayerX, o = mapLayerOffset()): void {
-  const DPR = game.dpr();
+  met: Set<string>, g = mapLayerX, o = mapLayerOffset(), d = mapLayerDensity): void {
   g.save();
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(r.x, r.y, r.width, r.height);
   g.beginPath();
   g.rect(r.x, r.y, r.width, r.height);
   g.clip();
-  g.setTransform(DPR, 0, 0, DPR, o.x, o.y);
-  const view = { x0: (r.x - o.x) / DPR, y0: (r.y - o.y) / DPR, x1: (r.x + r.width - o.x) / DPR, y1: (r.y + r.height - o.y) / DPR };
+  g.setTransform(d, 0, 0, d, o.x, o.y);
+  const view = { x0: (r.x - o.x) / d, y0: (r.y - o.y) / d, x1: (r.x + r.width - o.x) / d, y1: (r.y + r.height - o.y) / d };
   for (const field of paintMapLayer(g, view, zooming, false, geo))
     if (!met.has(field.id)) {
       met.add(field.id);
@@ -1020,13 +1029,13 @@ function paintMapLayerRect(r: PixelRect, geo: MapLayerGeometry, zooming: boolean
  * does not move, so the geometry the frame and input read stays valid as it is.
  */
 function scrollMapLayer(to: LayerScroll, zooming: boolean): void {
-  const DPR = game.dpr();
+  const d = mapLayerDensity;
   const geo = mapLayerGeometry;
   const content = mapLayerContent;
   mapLayerContent = ''; // a half-moved picture is no picture of the map
   if (!geo || mapLayerX.isContextLost?.()) return;
-  const dx = Math.round(to.x * DPR) - Math.round(mapLayerScroll.x * DPR);
-  const dy = Math.round(to.y * DPR) - Math.round(mapLayerScroll.y * DPR);
+  const dx = Math.round(to.x * d) - Math.round(mapLayerScroll.x * d);
+  const dy = Math.round(to.y * d) - Math.round(mapLayerScroll.y * d);
   const g = mapLayerX;
   g.save();
   g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1036,8 +1045,8 @@ function scrollMapLayer(to: LayerScroll, zooming: boolean): void {
   mapLayerScroll = to;
   const o = mapLayerOffset();
   // The frame's glints need the fields of the window, not of every place it has been.
-  const fields = terrainFields.filter((f) => f.box.x + f.box.width >= -o.x / DPR && f.box.x <= (mapLayer.width - o.x) / DPR &&
-    f.box.y + f.box.height >= -o.y / DPR && f.box.y <= (mapLayer.height - o.y) / DPR);
+  const fields = terrainFields.filter((f) => f.box.x + f.box.width >= -o.x / d && f.box.x <= (mapLayer.width - o.x) / d &&
+    f.box.y + f.box.height >= -o.y / d && f.box.y <= (mapLayer.height - o.y) / d);
   const met = new Set(fields.map((f) => f.id));
   const strips = exposedStrips(mapLayer.width, mapLayer.height, dx, dy);
   for (const r of strips) paintMapLayerRect(r, geo, zooming, fields, met);
@@ -1046,7 +1055,8 @@ function scrollMapLayer(to: LayerScroll, zooming: boolean): void {
   if (!mapLayerX.isContextLost?.()) mapLayerContent = content;
   // A strip may meet terrain the frame budget could not raster yet: sharpen it as after a
   // bake, then paint the strips that owe it once more, not the whole map. They are kept in
-  // the bake's own pixels, which a later move does not shift.
+  // the bake's own pixels, which a later move does not shift. A draft owes nothing (rule 8).
+  if (mapLayerDraft) return;
   if (terrainRaster.pending && terrainOwed) {
     for (const r of strips) terrainOwed.push({ ...r, x: r.x - o.x, y: r.y - o.y });
     if (terrainOwed.length > MAX_OWED_STRIPS) terrainOwed = null; // past this the bake is cheaper
@@ -1113,7 +1123,7 @@ function paintBakeBand(job: BakeJob, rows: number, flush: boolean, g = mapSpareX
   // of the frame, and the refinement makes them after the bake, in a budget of its own.
   terrainRaster.beginFrame(job.final ? Infinity : 0);
   paintMapLayerRect({ x: 0, y: job.done, width: job.width, height: rows }, job.geo, job.zooming, job.fields,
-    job.met, g, job.offset);
+    job.met, g, job.offset, game.dpr());
   job.pending ||= terrainRaster.pending;
   terrainRaster.pending = owed;
   if (flush) flushRaster(surface);
@@ -1184,6 +1194,8 @@ function swapBakeJob(job: BakeJob): void {
   mapLayerAt = job.geo.at;
   mapLayerMargin = job.margin;
   mapLayerScroll = NO_SCROLL;
+  mapLayerDensity = game.dpr();
+  mapLayerDraft = false;
   mapLayerBakes++;
   mapLayerContent = mapLayerX.isContextLost?.() ? '' : job.content;
   // Rule 8: its bands were rastered as they were painted, so they add up to a whole bake.
@@ -1263,19 +1275,21 @@ function underlayPlan(view: LayerTransform, here: MapProjection): UnderlayPlan |
   const DPR = game.dpr();
   const screen = { x: 0, y: 0, width: Math.round(game.vw() * DPR), height: Math.round(game.vh() * DPR) };
   const o = mapLayerOffset();
-  const framed = framedRect({ x: -o.x, y: -o.y, width: mapLayer.width, height: mapLayer.height }, view, DPR);
+  // The bake in the screen's pixels at its scale: a draft's are larger (rule 8).
+  const sc = DPR / mapLayerDensity;
+  const framed = framedRect({ x: -o.x * sc, y: -o.y * sc, width: mapLayer.width * sc, height: mapLayer.height * sc }, view, DPR);
   const bake = framed && intersectRect(framed, screen);
   const strips = uncoveredRects(screen, bake);
   return strips.length ? { view: onPixelGrid(layerTransform(underAt, here), DPR), bake, strips } : null;
 }
 
 /** Draw the device-pixel rect `r` of the screen from `source`, whose pixel `c` shows the point
- *  `(c − o) / DPR` of a space the screen shows under `tr`: a source rect, not a clip — a clip
+ *  `(c − o) / d` of a space the screen shows under `tr`: a source rect, not a clip — a clip
  *  around a scaled image costs the software raster as much again. */
 function drawPixels(g: CanvasRenderingContext2D, source: HTMLCanvasElement, o: { x: number; y: number },
-  tr: LayerTransform, r: PixelRect): void {
+  tr: LayerTransform, r: PixelRect, d = game.dpr()): void {
   const DPR = game.dpr();
-  const s = tr.k;
+  const s = (tr.k * DPR) / d;
   g.drawImage(source, (r.x - tr.tx * DPR) / s + o.x, (r.y - tr.ty * DPR) / s + o.y, r.width / s, r.height / s,
     r.x, r.y, r.width, r.height);
 }
@@ -1295,16 +1309,18 @@ function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform, plan: U
       const r = under && intersectRect(strip, under);
       if (r) drawPixels(g, mapUnder, underOffset, plan.view, r);
     }
-    if (plan.bake) drawPixels(g, mapLayer, { x: ox, y: oy }, view, plan.bake);
+    if (plan.bake) drawPixels(g, mapLayer, { x: ox, y: oy }, view, plan.bake, mapLayerDensity);
     return;
   }
-  const exact = exactOffset(view, DPR);
+  const sharp = mapLayerDensity === DPR;
+  const exact = sharp && exactOffset(view, DPR);
   // On its pixel grid the layer is a plain copy; otherwise it is resampled — for the
-  // frames of a gesture only, since a settled camera gets an exact bake (rule 4).
+  // frames of a gesture only, since a settled camera gets an exact bake (rules 4 and 8).
   if (exact) g.drawImage(mapLayer, exact.x - ox, exact.y - oy);
-  else
-    g.drawImage(mapLayer, view.tx * DPR - view.k * ox, view.ty * DPR - view.k * oy,
-      view.k * mapLayer.width, view.k * mapLayer.height);
+  else {
+    const k = (view.k * DPR) / mapLayerDensity;
+    g.drawImage(mapLayer, view.tx * DPR - k * ox, view.ty * DPR - k * oy, k * mapLayer.width, k * mapLayer.height);
+  }
 }
 
 /** One ring of the overview per radius and pixel density, drawn as a bake draws it. */
@@ -1420,6 +1436,8 @@ export function blitStaticLayer(now: number): void {
     settled,
     costly,
     underlay,
+    density: mapLayerDensity,
+    draft: mapLayerDraft,
   });
   const decide = (): MapLayerAction => mapLayerAction(frameNow());
   let action = decide();
@@ -1459,12 +1477,12 @@ export function blitStaticLayer(now: number): void {
   }
   if (action === 'rebake') {
     // A bake inside a gesture reuses terrain art at its last scale; a settled one
-    // sharpens it.
-    bakeMapLayer(content, !settled);
+    // sharpens it. A slow device bakes a draft mid-gesture (rule 8).
+    bakeMapLayer(content, !settled, false, costly && !settled);
     view = { k: 1, tx: 0, ty: 0 };
   } else {
     let refineMs = 0;
-    if (action === 'scroll') scrollMapLayer(recentredScroll(view, DPR), !settled);
+    if (action === 'scroll') scrollMapLayer(recentredScroll(view, mapLayerDensity), !settled);
     // Rule 7: a bake for sharpness alone goes to the background; without a spare, at once.
     if (action === 'refresh' && !bakeJob && !startBakeJob(content, !settled, false)) {
       bakeMapLayer(content, !settled);

@@ -190,6 +190,27 @@ describe('REFM-232 — слой живых границ', () => {
     expect(bl.blitBorderLayer(1, fake)).toBe(false);
   });
 
+  it('кадр обводит границы в пикселях экрана: растянутая выпечка линию не утолщает (правило 7)', async () => {
+    const { ml, bl, show, frame, camera } = await boot();
+    // Без выпечки нет и геометрии провинций: обводить нечего.
+    const fake = { ownedFront: new Map(), neutralEdge: [] } as unknown as Parameters<typeof bl.strokeLiveBorders>[1];
+    bl.strokeLiveBorders(1, fake);
+    expect(frame.calls).toEqual([]);
+    show(1000);
+    show(1000 + SETTLE_MS);
+    camera.zoomAt(800, 450, 1.5);
+    show(2000);
+    expect(ml.mapView.k).toBeCloseTo(1.5, 6);
+    frame.calls.length = 0;
+    bl.strokeLiveBorders(1, ml.livingBorders()!);
+    const first = frame.calls.findIndex((c) => c.name === 'stroke');
+    expect(first).toBeGreaterThan(0);
+    const placed = frame.calls.slice(0, first).filter((c) => c.name === 'setTransform');
+    // Стекло обрезает на растянутой выпечке, а линии ложатся пиксель в пиксель экрана.
+    expect(placed.at(-2)!.args.slice(0, 4)).toEqual([1.5, 0, 0, 1.5]);
+    expect(placed.at(-1)!.args).toEqual([1, 0, 0, 1, 0, 0]);
+  });
+
   it('в покое слой рисуется целиком, потом по полосе за кадр на часах голограммы', async () => {
     const { show, painted, blits, border, page, frame, env } = await boot();
     expect(show(1000)).toBe(true);
@@ -411,8 +432,10 @@ describe('REFM-232 — слой живых границ', () => {
     expect(dh! / sh!).toBeCloseTo(1.25, 6);
   });
 
-  it('медленное устройство: зум дальше MAX_STRETCH растягивает слой, а не рисует его заново', async () => {
-    const { ml, show, painted, blits, camera } = await boot();
+  it('медленное устройство: слой растягивается не дальше MAX_STRETCH, как и на быстром (правило 7)', async () => {
+    const { ml, show, painted, blits, camera, env } = await boot();
+    // Движение выключено, как у медленного телефона: слой держит и немногие границы (правило 5).
+    env.still = true;
     // Каждое чтение часов — 60 мс: целая выпечка карты дороже GESTURE_BAKE_MS.
     let clock = 0;
     vi.stubGlobal('performance', { now: () => (clock += 60) });
@@ -421,12 +444,27 @@ describe('REFM-232 — слой живых границ', () => {
     expect(ml.mapCostly).toBe(true);
     painted();
     blits();
-    camera.zoomAt(800, 450, 4);
+    camera.zoomAt(800, 450, 2);
     expect(show(2000)).toBe(true);
     expect(painted()).toEqual({ whole: 0, rects: 0 });
-    const [b] = blits();
-    const [, , , sw, , , , dw] = b!.args as number[];
-    expect(dw! / sw!).toBeCloseTo(4, 6);
+    let [b] = blits();
+    let [, , , sw, , , , dw] = b!.args as number[];
+    expect(dw! / sw!).toBeCloseTo(2, 6);
+    // Дальше линии слоя толще настоящих: в этом кадре карта перепеклась черновиком, и слой
+    // ждёт следующего растянутым, а в нём рисуется заново на текущей камере.
+    const geo = ml.provinceGeometry;
+    camera.zoomAt(800, 450, 1.25);
+    expect(show(2016)).toBe(true);
+    expect(ml.provinceGeometry).not.toBe(geo);
+    expect(painted()).toEqual({ whole: 0, rects: 0 });
+    [b] = blits();
+    [, , , sw, , , , dw] = b!.args as number[];
+    expect(dw! / sw!).toBeCloseTo(2.5, 6);
+    expect(show(2032)).toBe(true);
+    expect(painted().whole).toBe(1);
+    [b] = blits();
+    [, , , sw, , , , dw] = b!.args as number[];
+    expect(dw).toBe(sw);
   });
 
   it('в кадре новой выпечки слой не рисуется, а ждёт следующего (правило 4)', async () => {

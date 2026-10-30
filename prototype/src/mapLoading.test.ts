@@ -379,8 +379,8 @@ describe('REFM-241 — стык с main.ts', () => {
     for (const hook of [
       'entered: () => inMatch() && (!NET || netAdmitted),',
       'viewport: () => `${VW}:${VH}:${DPR}:${holographicMapOn()}`,',
-      // Рецепт и сброс выпечки — у слоя карты (`mapLayer.ts`, REFM-232).
-      'jobs: mapPreparationJobs,',
+      // Рецепт и сброс выпечки — у слоя карты (`mapLayer.ts`, REFM-232), сферы миров — у миров.
+      "jobs: () => [...mapPreparationJobs(), { label: t('map-loading.ready'), run: prepareWorldArt }],",
       'failed: forgetMapBake,',
       "leave: () => $('tomenu').click(),",
     ])

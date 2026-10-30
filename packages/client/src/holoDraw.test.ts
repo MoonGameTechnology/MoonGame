@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { blitGlow, blitSphere, clearHolographicSprites, rgba } from './holoDraw';
+import { blitGlow, blitSphere, clearHolographicSprites, prepareSphere, rgba } from './holoDraw';
 
 // The sprite/blit primitives need a canvas (verified end-to-end via the prototype render);
 // rgba is pure, so it's covered here.
@@ -175,4 +175,53 @@ describe('holographic sprite context recovery', () => {
       expect(surfaces).toHaveLength(4);
     },
   );
+});
+
+describe('sphere atlas made ahead of the frame', () => {
+  afterEach(() => {
+    clearHolographicSprites();
+    vi.unstubAllGlobals();
+  });
+  it('prepareSphere makes the atlas a later blitSphere reuses, and draws one pixel of it now', () => {
+    const noop = () => {};
+    const sprite = {
+      setTransform: noop,
+      beginPath: noop,
+      moveTo: noop,
+      lineTo: noop,
+      stroke: noop,
+      arc: noop,
+    };
+    const surfaces: object[] = [];
+    vi.stubGlobal('document', {
+      createElement: () => {
+        const surface = Object.assign(new EventTarget(), {
+          width: 0,
+          height: 0,
+          getContext: () => sprite,
+        });
+        surfaces.push(surface);
+        return surface;
+      },
+    });
+    const target = {
+      globalAlpha: 0.3,
+      globalCompositeOperation: 'screen',
+      save: vi.fn(),
+      restore: vi.fn(),
+      setTransform: vi.fn(),
+      drawImage: vi.fn(),
+    };
+    const ctx = target as unknown as CanvasRenderingContext2D;
+    prepareSphere(ctx, 2, '#35d6e6');
+    expect(surfaces).toHaveLength(1);
+    // One opaque pixel at the corner, under the target's own state, put back after.
+    expect(target.drawImage.mock.calls).toEqual([[surfaces[0], 0, 0, 1, 1, 0, 0, 1, 1]]);
+    expect(target.setTransform.mock.calls).toEqual([[1, 0, 0, 1, 0, 0]]);
+    expect(target.save).toHaveBeenCalledTimes(1);
+    expect(target.restore).toHaveBeenCalledTimes(1);
+    blitSphere(ctx, 2, '#35d6e6', 50, 50, 20, 1);
+    expect(surfaces).toHaveLength(1);
+    expect(target.drawImage.mock.lastCall?.[0]).toBe(surfaces[0]);
+  });
 });

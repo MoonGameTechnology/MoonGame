@@ -11,17 +11,16 @@
  * часы и вид голограммы живут в `main.ts` и приходят хуками {@link initMapSurface}: импорт
  * оттуда был бы циклом. Слой зовёт кадр `renderMap()`.
  */
-import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import type { MapLod } from '../../packages/client/src/mapLod';
 import { drawProvinceSelection, selectionPulse } from '../../packages/client/src/provinceSelection';
 import { visibleInBake } from '../../decisions/mapLayerView';
-import { blitBorderLayer } from './borderLayer';
+import { blitBorderLayer, strokeLiveBorders } from './borderLayer';
 import { glowOn, motionOn } from './graphicsPrefs';
 import { clipGlassSurface, drawGlassRim, drawGlassWave, drawTerrainField } from './holographicSurface';
 import { selPlanet } from './interaction';
 import { drawCaptureFlashes } from './mapEffects';
-import { holographicFrame, livingBorders, mapView, provinceGeometry, provincePolygon, terrainFields } from './mapLayer';
-import { LOCK, ownerColor } from './mapPalette';
+import { holographicFrame, livingBorders, mapView, provincePolygon, terrainFields } from './mapLayer';
+import { LOCK } from './mapPalette';
 
 /** Что поверхности карты нужно от игры. */
 export interface MapSurfaceHost {
@@ -83,13 +82,7 @@ export function drawMapSurface(now: number, lod: MapLod): void {
     const layered = borders !== null && blitBorderLayer(lod.provinceDetail, borders);
     cx.save();
     clipGlassSurface(cx, holographicFrame);
-    if (!layered && borders && provinceGeometry) {
-      drawLivingBorders(cx, borders, {
-        ownerColor,
-        hideOwnedInner: true,
-        provinceDetail: lod.provinceDetail,
-      }, holographicFrame, hologramTime, sight, provinceGeometry.place);
-    }
+    if (!layered && borders) strokeLiveBorders(lod.provinceDetail, borders);
     if (detail > 0) {
       cx.save(); cx.globalAlpha *= detail;
       // The bake holds fields beyond the screen too (its margin): glints only where seen.

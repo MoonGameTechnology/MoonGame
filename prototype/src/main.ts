@@ -172,7 +172,7 @@ import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, dr
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
-import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
+import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
 import { blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
@@ -1538,11 +1538,11 @@ function holographicMapOn(): boolean {
 }
 
 // Заставка входа в карту — `mapLoading.ts` (REFM-241); рецепт подготовки — фон, выпечка,
-// местность — у слоя карты в `mapLayer.ts` (REFM-232).
+// местность — у слоя карты в `mapLayer.ts` (REFM-232), сферы миров — у миров (`mapWorlds.ts`).
 initMapLoading({
   entered: () => inMatch() && (!NET || netAdmitted),
   viewport: () => `${VW}:${VH}:${DPR}:${holographicMapOn()}`,
-  jobs: mapPreparationJobs,
+  jobs: () => [...mapPreparationJobs(), { label: t('map-loading.ready'), run: prepareWorldArt }],
   failed: forgetMapBake,
   leave: () => $('tomenu').click(), // the same intentional leave/solo pause as the HUD button
 });
