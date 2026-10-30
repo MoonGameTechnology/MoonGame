@@ -2993,7 +2993,7 @@ export const en: Record<string, string> = {
   'end.duration': 'Duration',
   'end.fleets': 'Fleets',
   'end.lost': 'Lost',
-  'end.level-up': '★ Level up to {lvl} — a progression point awaits in the Progression menu',
+  'end.level-up': '★ Level up to {lvl}',
   'end.loss': '💀 Defeat',
   'end.new-match': '⟳ New match',
   'end.op.ally-done': 'Allied officer: “Mission accomplished, commander.”',

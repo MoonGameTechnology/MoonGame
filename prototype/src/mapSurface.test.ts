@@ -48,7 +48,6 @@ const VH = 900;
 const DPR = 2;
 const VIEW = { k: 2, tx: -100, ty: -60 };
 const FRAME = { kind: 'frame' };
-const PLACE = { kind: 'place' };
 const SIGHT = visibleInBake(VIEW, VW, VH);
 
 /** Детализация карты: по умолчанию — крупная карта во всей красе. */
@@ -63,7 +62,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const m of ['./mapLayer', './borderLayer', './holographicSurface', './mapEffects', '../../packages/client/src/livingBorder', '../../packages/client/src/provinceSelection'])
+  for (const m of ['./mapLayer', './borderLayer', './holographicSurface', './mapEffects', '../../packages/client/src/provinceSelection'])
     vi.doUnmock(m);
 });
 
@@ -75,7 +74,6 @@ function makeEnv() {
     still: false,
     borders: { kind: 'borders' } as object | null,
     layered: false,
-    geometry: { place: PLACE } as object | null,
     fields: [] as Array<ReturnType<typeof field>>,
     polys: { C0R1: { kind: 'poly' } } as Record<string, object>,
   };
@@ -99,15 +97,15 @@ async function boot() {
     mapView: VIEW,
     holographicFrame: FRAME,
     livingBorders: () => live.env.borders,
-    get provinceGeometry() {
-      return live.env.geometry;
-    },
     provincePolygon: (id: string) => live.env.polys[id],
     get terrainFields() {
       return live.env.fields;
     },
   }));
-  vi.doMock('./borderLayer', () => ({ blitBorderLayer: mark('blitBorderLayer', () => live.env.layered) }));
+  vi.doMock('./borderLayer', () => ({
+    blitBorderLayer: mark('blitBorderLayer', () => live.env.layered),
+    strokeLiveBorders: mark('strokeLiveBorders'),
+  }));
   vi.doMock('./holographicSurface', () => ({
     clipGlassSurface: mark('clipGlassSurface'),
     drawGlassRim: mark('drawGlassRim'),
@@ -115,7 +113,6 @@ async function boot() {
     drawTerrainField: mark('drawTerrainField'),
   }));
   vi.doMock('./mapEffects', () => ({ drawCaptureFlashes: mark('drawCaptureFlashes') }));
-  vi.doMock('../../packages/client/src/livingBorder', () => ({ drawLivingBorders: mark('drawLivingBorders') }));
   vi.doMock('../../packages/client/src/provinceSelection', () => ({
     drawProvinceSelection: mark('drawProvinceSelection'),
     selectionPulse: (ms: number, motion: boolean) => ({ ms, motion }),
@@ -146,7 +143,7 @@ describe('REFM-235 — поверхность карты', () => {
     surface.drawMapSurface(1000, LOD());
     expect(names()).toEqual([
       'save', 'setTransform', 'blitBorderLayer',
-      'save', 'clipGlassSurface', 'drawLivingBorders',
+      'save', 'clipGlassSurface', 'strokeLiveBorders',
       'save', 'drawTerrainField', 'restore',
       'drawGlassWave', 'drawProvinceSelection', 'drawCaptureFlashes',
       'restore', 'drawGlassRim', 'restore',
@@ -154,11 +151,8 @@ describe('REFM-235 — поверхность карты', () => {
     expect(find('setTransform')!.args).toEqual([DPR * VIEW.k, 0, 0, DPR * VIEW.k, DPR * VIEW.tx, DPR * VIEW.ty]);
     expect(find('blitBorderLayer')!.args).toEqual([0.7, env.borders]);
     expect(find('clipGlassSurface')!.args).toEqual([frame.ctx, FRAME]);
-    const living = find('drawLivingBorders')!.args;
-    expect(living[0]).toBe(frame.ctx);
-    expect(living[1]).toBe(env.borders);
-    expect(living[2]).toEqual({ ownerColor: palette.ownerColor, hideOwnedInner: true, provinceDetail: 0.7 });
-    expect(living.slice(3)).toEqual([FRAME, 777, SIGHT, PLACE]);
+    // Линии кадр обводит в пикселях экрана, их кладёт сам слой границ (правило 7).
+    expect(find('strokeLiveBorders')!.args).toEqual([0.7, env.borders]);
     expect(find('drawTerrainField')!.args).toEqual([frame.ctx, env.fields[0], 777, true]);
     expect(find('drawGlassWave')!.args).toEqual([frame.ctx, FRAME, VW, VH, 777, prefs.glowOn()]);
     expect(find('drawProvinceSelection')!.args).toEqual([frame.ctx, env.polys.C0R1, { ms: 0, motion: prefs.motionOn() }, palette.LOCK]);
@@ -180,30 +174,24 @@ describe('REFM-235 — поверхность карты', () => {
     surface.drawMapSurface(0, LOD());
     expect(names()).toEqual([
       'save', 'setTransform', 'blitBorderLayer',
-      'save', 'clipGlassSurface', 'drawLivingBorders',
+      'save', 'clipGlassSurface', 'strokeLiveBorders',
       'save', 'restore',
       'drawCaptureFlashes', 'restore', 'restore',
     ]);
   });
 
-  it('слой границ готов — живые границы не рисуются второй раз; без границ и без геометрии — тоже', async () => {
+  it('слой границ готов — живые границы не рисуются второй раз; без границ — тоже', async () => {
     const { surface, env, frame, names } = await boot();
     env.layered = true;
     surface.drawMapSurface(0, LOD());
     expect(names()).toContain('blitBorderLayer');
-    expect(names()).not.toContain('drawLivingBorders');
+    expect(names()).not.toContain('strokeLiveBorders');
     frame.calls.length = 0;
     env.layered = false;
     env.borders = null;
     surface.drawMapSurface(0, LOD());
     expect(names()).not.toContain('blitBorderLayer');
-    expect(names()).not.toContain('drawLivingBorders');
-    frame.calls.length = 0;
-    env.borders = { kind: 'borders' };
-    env.geometry = null;
-    surface.drawMapSurface(0, LOD());
-    expect(names()).toContain('blitBorderLayer');
-    expect(names()).not.toContain('drawLivingBorders');
+    expect(names()).not.toContain('strokeLiveBorders');
   });
 
   it('блики рельефа — только у видимых полей и с прозрачностью детализации; на схеме их нет', async () => {

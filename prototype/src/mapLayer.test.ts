@@ -83,7 +83,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
+async function boot(opts: { holo?: boolean; straight?: boolean; dpr?: number } = {}) {
   const made: FakeCanvas[] = [];
   vi.stubGlobal('__PLAYER_BUILD__', false); // туман читает профиль сборки
   const page = fakeCanvas(); // #map
@@ -103,7 +103,7 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
       { id: 'p2', name: 'B', faction: 'crimson', start: game.START_CANDIDATES[1]!, ai: false },
     ],
   });
-  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900, clock: 0, still: false };
+  const env = { world, holo: !!opts.holo, lost: 0, fps: 60, width: 1600, height: 900, clock: 0, still: false, dpr: opts.dpr ?? 1 };
   const nodes = (await import('./mapCatalog')).mapNodesFromState(world);
   const camera = await import('./mapCamera');
   camera.initMapCamera({
@@ -130,7 +130,7 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
     world: () => env.world,
     me: () => 'p1',
     ctx: () => frame.getContext() as CanvasRenderingContext2D,
-    dpr: () => 1,
+    dpr: () => env.dpr,
   } as never);
   const ml = await import('./mapLayer');
   ml.initMapLayer({
@@ -140,7 +140,7 @@ async function boot(opts: { holo?: boolean; straight?: boolean } = {}) {
     ctx: () => frame.getContext() as CanvasRenderingContext2D,
     vw: () => env.width,
     vh: () => env.height,
-    dpr: () => 1,
+    dpr: () => env.dpr,
     mobile: () => false,
     fps: () => env.fps,
     outline: () => [],
@@ -391,7 +391,7 @@ describe('REFM-232 — статический слой карты', () => {
     expect(spare.width).toBeGreaterThan(0);
   });
 
-  it('медленное устройство: приближение в жесте не перепекает карту, полосы ждут покоя', async () => {
+  it('медленное устройство: приближение в жесте растягивает выпечку, дальше печёт черновик, полосы ждут покоя', async () => {
     // Быстрое устройство: растянутую вчетверо выпечку жест перепекает сразу. Часы стоят:
     // цена выпечки не зависит от того, чем ещё занята машина с тестами.
     const fast = await boot();
@@ -404,35 +404,52 @@ describe('REFM-232 — статический слой карты', () => {
     fast.ml.blitStaticLayer(2000);
     expect(fast.ml.provinceGeometry).not.toBe(fastGeo);
     vi.resetModules();
-    const { ml, camera, spare } = await boot();
+    // Экран с плотностью 2: целая выпечка — два пикселя на точку, черновик — один.
+    const { ml, camera, layer, spare, bg, drawn } = await boot({ dpr: 2 });
     // Каждое чтение часов — 60 мс: целая выпечка дороже GESTURE_BAKE_MS.
     let clock = 0;
     vi.stubGlobal('performance', { now: () => (clock += 60) });
     ml.blitStaticLayer(1000);
     ml.blitStaticLayer(1000 + SETTLE_MS);
     expect(ml.mapCostly).toBe(true);
+    const sharp = layer.width;
+    expect(sharp).toBeGreaterThan(2 * 1600);
     const geo = ml.provinceGeometry;
+    // Вчетверо — полпикселя выпечки на точку экрана: она ещё растянута, а не перепечена.
     camera.zoomAt(800, 450, 4);
     ml.blitStaticLayer(2000);
     expect(ml.provinceGeometry).toBe(geo);
     expect(ml.mapView.k).toBeCloseTo(4, 6);
     expect(spare.width).toBe(0);
-    // Покой: чёткая выпечка печётся в фоне, на экране растянутая.
-    let now = 2000 + SETTLE_MS;
+    // Дальше — черновик в пиксель на точку, без новых растров рельефа и без цены выпечки.
+    camera.zoomAt(800, 450, 1.25);
+    ml.blitStaticLayer(2016);
+    const draft = ml.provinceGeometry;
+    expect(draft).not.toBe(geo);
+    expect(ml.mapView.k).toBe(1);
+    expect(layer.width).toBeLessThan(sharp);
+    expect(layer.width).toBeGreaterThanOrEqual(1600);
+    expect(spare.width).toBe(0);
+    // Покой: чёткая выпечка печётся в фоне, на экране черновик.
+    let now = 2016 + SETTLE_MS;
     ml.blitStaticLayer(now);
-    expect(spare.width).toBeGreaterThan(0);
-    expect(ml.provinceGeometry).toBe(geo);
+    expect(spare.width).toBe(sharp);
+    expect(ml.provinceGeometry).toBe(draft);
     // Новый жест: полоса не рисуется, пока камера не встанет.
     camera.zoomAt(800, 450, 1.1);
     const painted = spare.calls.length;
     ml.blitStaticLayer((now += 16));
     ml.blitStaticLayer((now += 16));
     expect(spare.calls.length).toBe(painted);
-    expect(ml.provinceGeometry).toBe(geo);
+    expect(ml.provinceGeometry).toBe(draft);
     now += SETTLE_MS;
+    bg.calls.length = 0;
     let frames = 0;
-    while (ml.provinceGeometry === geo && frames++ < 2000) ml.blitStaticLayer((now += 16));
-    expect(ml.provinceGeometry).not.toBe(geo);
+    while (ml.provinceGeometry === draft && frames++ < 2000) ml.blitStaticLayer((now += 16));
+    expect(ml.provinceGeometry).not.toBe(draft);
+    // Холсты поменялись ролями: в готовый кадр легла чёткая выпечка.
+    expect(drawn(bg).some((d) => d.src === spare)).toBe(true);
+    expect(spare.width).toBe(sharp);
   });
 
   it('медленное устройство: кольца обзора рисует кадр, а не растянутая выпечка', async () => {

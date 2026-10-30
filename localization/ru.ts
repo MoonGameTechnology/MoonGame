@@ -3000,7 +3000,7 @@ export const ru: Record<string, string> = {
   'end.duration': 'Длительность',
   'end.fleets': 'Флоты',
   'end.lost': 'Потеряно',
-  'end.level-up': '★ Новый уровень {lvl} — очко прокачки ждёт в меню «Прокачка»',
+  'end.level-up': '★ Новый уровень {lvl}',
   'end.loss': '💀 Поражение',
   'end.new-match': '⟳ Новый матч',
   'end.op.ally-done': 'Союзный офицер: «Задача выполнена, командир».',
