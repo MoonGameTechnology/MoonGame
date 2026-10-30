@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { defaultAppearance, type PlayerProfile } from '../../packages/protocol/src/playerProfile';
-import { profileSaveBarHtml, profileStudioHtml, type StudioState } from './profileStudio';
+import {
+  defaultAppearance,
+  PROFILE_MEDALS,
+  type PlayerProfile,
+} from '../../packages/protocol/src/playerProfile';
+import {
+  medalEmblem,
+  profileSaveBarHtml,
+  profileStudioHtml,
+  type StudioState,
+} from './profileStudio';
 import { setLocale } from '../../localization/runtime';
 import { TUTORIAL_MEDAL } from './profileArt';
 import { tutorialMedalHtml } from './tutorialMedal';
@@ -38,6 +47,17 @@ describe('profile editor and public portrait', () => {
     expect(publicView).not.toMatch(/data-portrait=|data-slot=|data-medal=|data-ps=/);
     expect(publicView).toContain('>II</i>');
     expect(publicView).not.toContain('>III</i>');
+  });
+  it('every medal tells the chest rack where its ribbon starts', () => {
+    for (const { id } of PROFILE_MEDALS) {
+      const style = /style="([^"]*)"/.exec(medalEmblem(id, 3))?.[1] ?? '';
+      const rx = Number(/--rx:([\d.]+)/.exec(style)?.[1]);
+      const ry = Number(/--ry:([\d.]+)/.exec(style)?.[1]);
+      expect(rx, id).toBeGreaterThan(0.4);
+      expect(rx, id).toBeLessThan(0.6);
+      expect(ry, id).toBeGreaterThan(0);
+      expect(ry, id).toBeLessThan(0.15);
+    }
   });
   it('English and Russian both localize the collection and grade guidance', () => {
     for (const locale of ['en', 'ru'] as const) {

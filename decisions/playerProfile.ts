@@ -147,22 +147,27 @@ export function placeProfileMedal(
   };
 }
 
-/** Artist-approved tunic placement, shared by owner and public view. */
-const FITS = [
-  [55.6, 59.2, 26, 1, 0.047, -0.033, 0.975, 0.92],
-  [56.3, 60.5, 25.2, 0.99, 0.025, -0.018, 0.97, 0.95],
-  [55.3, 60.3, 26.1, 0.985, 0.056, -0.025, 0.965, 0.9],
-  [55.7, 60, 25.4, 1, 0.018, -0.008, 0.98, 0.95],
-  [55.6, 60.3, 26, 0.99, 0.043, -0.03, 0.97, 0.9],
-  [53.7, 60.6, 20, 0.99, -0.018, -0.12, 0.97, 0.92],
-  [55.4, 60.1, 26, 0.995, 0.029, -0.018, 0.975, 0.94],
-  [55.8, 60.4, 25.7, 1, 0.025, -0.018, 0.97, 0.94],
-  [56, 59.4, 26, 0.99, 0.039, -0.023, 0.975, 0.92],
-  [54.5, 60.3, 23, 1, 0.028, -0.055, 0.975, 0.94],
-];
+/** Where the medal rack sits on each portrait, shared by owner and public view: left, top
+ *  and width in % of the portrait, then the artist's plane and light. The rack takes about
+ *  a third of the portrait so worn medals can be told apart (owner, 2026-10-30), and it
+ *  stays on the left breast: tunics that close in the middle (2, 4, 6, 9, 10, 29) start it
+ *  right of the closure. Portraits 11–40 share one tunic cut, except 29. */
+const FITS: Partial<Record<number, readonly number[]>> = {
+  1: [50, 57, 33, 1, 0.047, -0.033, 0.975, 0.92],
+  2: [52.5, 58, 30.5, 0.99, 0.025, -0.018, 0.97, 0.95],
+  3: [50, 58, 33, 0.985, 0.056, -0.025, 0.965, 0.9],
+  4: [52.5, 58, 30, 1, 0.018, -0.008, 0.98, 0.95],
+  5: [50.5, 58, 33, 0.99, 0.043, -0.03, 0.97, 0.9],
+  6: [53.5, 58.5, 29.5, 0.99, -0.018, -0.12, 0.97, 0.92],
+  7: [52, 58.5, 31, 0.995, 0.029, -0.018, 0.975, 0.94],
+  8: [50, 58, 32, 1, 0.025, -0.018, 0.97, 0.94],
+  9: [52.5, 57.5, 32, 0.99, 0.039, -0.023, 0.975, 0.92],
+  10: [52.5, 58, 30, 1, 0.028, -0.055, 0.975, 0.94],
+  29: [52.5, 58, 30, 1, 0.028, -0.025, 0.975, 0.94],
+};
 export function tunicFit(portrait: number): string {
-  const [left, top, width, a, b, c, d, light] = FITS[portrait - 1] ?? [
-    55.6, 60.2, 25.5, 1, 0.028, -0.025, 0.975, 0.94,
+  const [left, top, width, a, b, c, d, light] = FITS[portrait] ?? [
+    50, 57.5, 33, 1, 0.028, -0.025, 0.975, 0.94,
   ];
   return `left:${left}%;top:${top}%;width:${width}%;transform:matrix(${a},${b},${c},${d},0,0);filter:brightness(${light})`;
 }

@@ -233,17 +233,22 @@
   height: 100%;
   object-fit: contain;
 }
+/* The rack on the tunic: the same 5 × 3 as the slots, placed and sized by `tunicFit`. */
 #profile .ps-cloth {
   position: absolute;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0 1.5%;
+  gap: 0 1%;
   transform-origin: top left;
 }
+/* A pin is taller than its medal's 3 × 4 cell: the medal is drawn 1.2× its cell, which cuts
+   the picture's empty margins, and hangs from the pin's top edge by its ribbon. Neighbours
+   almost touch, rows do not overlap. */
 #profile .ps-pin {
   display: block;
-  aspect-ratio: 3/4;
+  aspect-ratio: 2/3;
   min-width: 0;
+  container-type: inline-size;
   transform: rotate(-0.5deg);
 }
 :is(#profile, #medal-rewards) .ps-medal {
@@ -273,14 +278,23 @@
   text-shadow: 0 0.5px 0.3px #18120a;
   box-shadow: 0 0.4px 0.5px #0008;
 }
+/* `--rx`/`--ry` (from `medalEmblem`): where this medal's ribbon starts in its picture. */
 #profile .ps-pin .ps-medal {
+  --k: 1.2;
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  transform-origin: 50% 0;
+  transform: translate(
+      calc((0.5 - var(--rx, 0.5)) * var(--k) * 100%),
+      calc(2% - var(--ry, 0.06) * var(--k) * 100%)
+    )
+    scale(var(--k));
   filter: drop-shadow(0.3px 0.55px 0.25px #01050ac9) drop-shadow(0.55px 1.1px 0.65px #050b12a6);
 }
+/* The numeral is part of the drawing: it keeps the drawing's proportion at any medal size. */
 #profile .ps-pin .ps-medal i {
-  font-size: clamp(2px, 0.45vw, 4px);
+  font-size: 20cqi;
 }
 /* A narrow card drops the count under the callsign instead of breaking the callsign. */
 #profile .ps-caption {
@@ -591,11 +605,12 @@
     grid-template-columns: 1fr;
     gap: 14px;
   }
-  /* On the phone the card scrolls away: the tabs need the screen more than the portrait. */
+  /* On the phone the card scrolls away: the tabs need the screen more than the portrait.
+     It takes the full width, up to the PC card's 380 px, so the medals on the chest read. */
   #profile .ps-card {
     position: relative;
     top: auto;
-    max-width: 300px;
+    max-width: 380px;
     width: 100%;
     margin: 0 auto;
   }
