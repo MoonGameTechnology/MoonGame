@@ -42,6 +42,7 @@ import { backgroundContextEvents, bgx, mapContextEvents } from './mapLayer';
 import { neutralColor, rivalPaletteId, setSideColors, youColor } from './mapPalette';
 import { setSweepOpacity, sweepOpacity } from './mapRadar';
 import { initPush } from './pushSetup';
+import { blackBoxSessions } from './renderBlackBox';
 import { initSettings } from './settingsOverlay';
 import { serverMatchId } from './netSession';
 import { COLOR } from './sideColors';
@@ -87,8 +88,9 @@ let settings: ReturnType<typeof initSettings>;
 export let push: ReturnType<typeof initPush> | null = null;
 
 /** On-demand diagnostics: no pixel readbacks (those alter canvas heuristics),
- * no match/account state, and no automatic upload. Attributes are requests, not
- * proof of which raster backend WebView actually selected.
+ * no world/account state (of a match only its map preset and size), and no automatic
+ * upload. Attributes are requests, not proof of which raster backend WebView actually
+ * selected.
  */
 function mapRenderingReport(): string {
   const { canvas, cx, vw, vh, dpr, frameErrors, fps } = game.probe();
@@ -125,6 +127,8 @@ function mapRenderingReport(): string {
       frameErrors,
       estimatedFps: Math.round(fps),
       cameraScale: cam.scale,
+      // Этот запуск и прошлые: остановки кадров, чьи они, последний снимок перед обрывом.
+      blackBox: blackBoxSessions(),
     },
     null,
     2,

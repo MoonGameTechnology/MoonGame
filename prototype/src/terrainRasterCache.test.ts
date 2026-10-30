@@ -196,15 +196,23 @@ describe('province raster cache', () => {
     expect(new TerrainRasterCache(100).owed(field(), 2)).toBe(0);
   });
 
-  it('keeps lazy and rebuilt terrain on the requested context policy', () => {
-    const f = surfaces();
-    const cache = new TerrainRasterCache(undefined, { willReadFrequently: true });
-    cache.prepare(field(), 2);
-    cache.clear();
-    cache.draw(f.target, field(1, 2), 2);
-    expect(f.getContext).toHaveBeenCalledTimes(2);
-    for (const args of f.getContext.mock.calls)
-      expect(args).toEqual(['2d', { willReadFrequently: true }]);
+  it('paints its vector on CPU canvases, and keeps the atlas on the map context policy', () => {
+    // A GPU canvas leaves its strokes to the GPU, unseen by the budgets of the frame.
+    const vector = ['2d', { willReadFrequently: true }];
+    for (const atlasOptions of [undefined, { willReadFrequently: true }]) {
+      const f = surfaces();
+      const cache = new TerrainRasterCache(undefined, atlasOptions);
+      cache.prepare(field(), 2); // a sharp raster
+      cache.prepareFloor(environmentField(0.1), 2); // the atlas, and the scratch of its floor
+      cache.clear();
+      cache.draw(f.target, field(1, 2), 2); // rebuilt after a recovery
+      expect(f.getContext.mock.calls).toEqual([
+        vector,
+        atlasOptions ? ['2d', atlasOptions] : ['2d'],
+        vector,
+        vector,
+      ]);
+    }
   });
   it('prepares art without painting the map and reuses it on first presentation', () => {
     const f = surfaces();
@@ -298,12 +306,14 @@ describe('province raster cache', () => {
     const cache = new TerrainRasterCache();
     cache.prepare(field(), 2);
     cache.prepare({ ...field(), id: 'second' }, 2);
+    cache.prepareFloor(environmentField(0.1), 2); // the atlas and the floors' scratch
     cache.clear();
+    expect(f.created).toHaveLength(4);
     expect(f.created.every((c) => c.width === 0 && c.height === 0)).toBe(true);
     f.strokes.mockClear();
     cache.draw(f.target, field(), 2);
     expect(f.strokes).toHaveBeenCalled();
-    expect(f.created).toHaveLength(3);
+    expect(f.created).toHaveLength(5);
   });
 
   it('draws an evicted tile from its floor in the atlas, never a hole', () => {
@@ -336,14 +346,16 @@ describe('province raster cache', () => {
     // The tile's world box at the floor density, and the stroke gutter: (120·0.4 + 8) × (90·0.4 + 8).
     expect(cache.owed(far(0), 2)).toBe(56 * 44);
     cache.draw(f.target, far(0), 2);
-    expect(f.created).toHaveLength(1);
+    // The atlas, and the scratch every floor is painted in before its blit.
+    expect(f.created).toHaveLength(2);
     expect(f.created[0]!.width).toBe(2048);
+    expect([f.created[1]!.width, f.created[1]!.height]).toEqual([56, 44]);
     expect(f.strokes).toHaveBeenCalled();
     expect(cache.owed(far(0), 2)).toBe(0);
     f.strokes.mockClear();
     cache.draw(f.target, far(31.4), 2);
     expect(f.strokes).not.toHaveBeenCalled();
-    expect(f.created).toHaveLength(1);
+    expect(f.created).toHaveLength(2);
     expect(f.drawImage.mock.calls.at(-1)).toHaveLength(9);
   });
 
@@ -362,6 +374,31 @@ describe('province raster cache', () => {
     expect(cache.pending).toBe(false);
     cache.setFloorDensity(0.2);
     expect(cache.hasFloor(tile, 2)).toBe(false);
+  });
+
+  it('paints a floor in a scratch of its cell size, then blits it into the cell 1:1', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    const shared = f.getContext() as unknown as { drawImage: (...args: unknown[]) => void };
+    const blits: unknown[][] = [];
+    shared.drawImage = (...args) => blits.push(args);
+    cache.beginFrame(Infinity);
+    const floor = cache.prepareFloor(environmentField(), 2)!;
+    const scratch = f.created[1]!;
+    expect([scratch.width, scratch.height]).toEqual([floor.width, floor.height]);
+    expect(blits).toEqual([
+      [
+        scratch,
+        0,
+        0,
+        floor.width,
+        floor.height,
+        floor.cell!.x,
+        floor.cell!.y,
+        floor.width,
+        floor.height,
+      ],
+    ]);
   });
 
   it('packs the floors of a whole map tightly once they are made', () => {

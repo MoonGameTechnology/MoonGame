@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import type { GameModule } from '../kernel/module';
 import { movementModule } from './movement';
+import { visibilityModule } from './visibility';
+import { diplomacyModule } from './diplomacy';
 import { economyModule } from './economy';
 import { combatModule } from './combat';
 import { createInitialState, type Fleet, type GameState, type Planet } from '../state/gameState';
@@ -352,7 +354,15 @@ describe('movement — fleet.stop parks the fleet ON the lane (Bytro continuous 
     st.tempLanes = [
       // Лейн БЕЗ heroId — legacy-форма, проходимая всеми (mayTraverse), но ребро
       // добавлено коридором: addedLink и есть признак «дорога временная».
-      { id: 'lane:1', owner: 'p1', from: 'A', to: 'B', speedBonus: 0, expiresAt: 99 * HOUR, addedLink: true },
+      {
+        id: 'lane:1',
+        owner: 'p1',
+        from: 'A',
+        to: 'B',
+        speedBonus: 0,
+        expiresAt: 99 * HOUR,
+        addedLink: true,
+      },
     ];
     const going = okApply(kernel.applyAction(st, move('F', 'B'), ctx(0)));
     const r = kernel.applyAction(going.state, stop('F'), ctx(HOUR));
@@ -370,7 +380,15 @@ describe('movement — fleet.stop parks the fleet ON the lane (Bytro continuous 
     const kernel = createKernel([movementModule]);
     const st = baseState(fieldAB(), [fleet('F', 'p1', 'A', ['scout'])]);
     st.tempLanes = [
-      { id: 'lane:1', owner: 'p1', from: 'A', to: 'B', speedBonus: 0, expiresAt: 99 * HOUR, addedLink: true },
+      {
+        id: 'lane:1',
+        owner: 'p1',
+        from: 'A',
+        to: 'B',
+        speedBonus: 0,
+        expiresAt: 99 * HOUR,
+        addedLink: true,
+      },
     ];
     const going = okApply(kernel.applyAction(st, move('F', 'B'), ctx(0)));
     const r = kernel.applyAction(going.state, move('F', 'A'), ctx(HOUR));
@@ -382,7 +400,10 @@ describe('movement — fleet.stop parks the fleet ON the lane (Bytro continuous 
 
   it('rejects stopping a fleet that is not under way', () => {
     const kernel = createKernel([movementModule]);
-    const st = baseState([{ ...planet('A', 'p1', 0, 0), links: [] }], [fleet('F', 'p1', 'A', ['scout'])]);
+    const st = baseState(
+      [{ ...planet('A', 'p1', 0, 0), links: [] }],
+      [fleet('F', 'p1', 'A', ['scout'])],
+    );
     const r = kernel.applyAction(st, stop('F'), ctx(0));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('E_FLEET_BUSY');
@@ -456,7 +477,9 @@ describe('movement — march to a point ON a lane (toEdge), and re-route from a 
     const kernel = createKernel([movementModule]);
     const st = baseState(lineABC(), [fleet('F', 'p1', 'A', ['scout'])]);
     // Aim at the midpoint of the B—C lane: route A→B (3h), then half of B→C (1.5h).
-    const ordered = okApply(kernel.applyAction(st, moveEdge('F', { from: 'B', to: 'C', t: 0.5 }), ctx(0)));
+    const ordered = okApply(
+      kernel.applyAction(st, moveEdge('F', { from: 'B', to: 'C', t: 0.5 }), ctx(0)),
+    );
     expect(ordered.state.fleets.F?.movement?.to).toBe('B'); // first hop is the node B
 
     const done = okAdvance(kernel.advanceTo(ordered.state, ctx(5 * HOUR)));
@@ -489,10 +512,15 @@ describe('movement — march to a point ON a lane (toEdge), and re-route from a 
 
   it('repositions directly along the lane it is already parked on (no detour)', () => {
     const kernel = createKernel([movementModule]);
-    const parkedFleet: Fleet = { ...fleet('F', 'p1', null, ['scout']), edge: { from: 'A', to: 'B', t: 0.3 } };
+    const parkedFleet: Fleet = {
+      ...fleet('F', 'p1', null, ['scout']),
+      edge: { from: 'A', to: 'B', t: 0.3 },
+    };
     const st = baseState(lineABC(), [parkedFleet]);
     // Slide forward to 0.7 along the SAME A—B lane: one short leg, 0.4 × 30 / 10 = 1.2h.
-    const ordered = okApply(kernel.applyAction(st, moveEdge('F', { from: 'A', to: 'B', t: 0.7 }), ctx(0)));
+    const ordered = okApply(
+      kernel.applyAction(st, moveEdge('F', { from: 'A', to: 'B', t: 0.7 }), ctx(0)),
+    );
     expect(ordered.state.fleets.F?.movement?.from).toBe('A');
     expect(ordered.state.fleets.F?.movement?.to).toBe('B');
     expect(ordered.state.fleets.F?.movement?.arrivesAt).toBeCloseTo(1.2 * HOUR, 0);
@@ -563,9 +591,9 @@ describe('movement — march to a point ON a lane (toEdge), and re-route from a 
     const kernel = createKernel([movementModule]);
     const st = baseState(lineABC(), [fleet('F', 'p1', 'A', ['scout'])]);
     // A and C are not directly lane-connected → not a valid lane point.
-    expect(errCode(kernel.applyAction(st, moveEdge('F', { from: 'A', to: 'C', t: 0.5 }), ctx(0)))).toBe(
-      'E_NOT_A_LANE',
-    );
+    expect(
+      errCode(kernel.applyAction(st, moveEdge('F', { from: 'A', to: 'C', t: 0.5 }), ctx(0))),
+    ).toBe('E_NOT_A_LANE');
   });
 });
 
@@ -591,7 +619,10 @@ describe('movement — дипломатический обход (D2)', () => {
 
   it('мирный узел на кратчайшем пути → флот идёт ОБХОДОМ, а не стоит', () => {
     const kernel = createKernel([movementModule]);
-    const st = { ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 };
+    const st = {
+      ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: peaceP2,
+    };
     const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
     const f = r.state.fleets.F!;
     expect(f.movement?.to).toBe('C'); // первый хоп обхода — не мирная B
@@ -601,13 +632,19 @@ describe('movement — дипломатический обход (D2)', () => {
 
   it('обхода нет (оба плеча мирные) → E_NO_RIGHT_OF_WAY, как и раньше', () => {
     const kernel = createKernel([movementModule]);
-    const st = { ...baseState(diamond('p2', 'p2'), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 };
+    const st = {
+      ...baseState(diamond('p2', 'p2'), [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: peaceP2,
+    };
     expect(errCode(kernel.applyAction(st, move('F', 'D'), ctx(0)))).toBe('E_NO_RIGHT_OF_WAY');
   });
 
   it('ЦЕЛЬ — мирный мир: по-прежнему E_NO_RIGHT_OF_WAY (война объявляется явно), не E_NO_ROUTE', () => {
     const kernel = createKernel([movementModule]);
-    const st = { ...baseState(diamond(null), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 };
+    const st = {
+      ...baseState(diamond(null), [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: peaceP2,
+    };
     st.planets.D!.owner = 'p2';
     expect(errCode(kernel.applyAction(st, move('F', 'D'), ctx(0)))).toBe('E_NO_RIGHT_OF_WAY');
   });
@@ -624,10 +661,15 @@ describe('movement — дипломатический обход (D2)', () => {
 
   it('детерминизм: два одинаковых вызова дают идентичный обход', () => {
     const kernel = createKernel([movementModule]);
-    const mk = () => ({ ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 });
+    const mk = () => ({
+      ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: peaceP2,
+    });
     const r1 = okApply(kernel.applyAction(mk(), move('F', 'D'), ctx(0)));
     const r2 = okApply(kernel.applyAction(mk(), move('F', 'D'), ctx(0)));
-    expect(JSON.stringify(r1.state.fleets.F!.movement)).toBe(JSON.stringify(r2.state.fleets.F!.movement));
+    expect(JSON.stringify(r1.state.fleets.F!.movement)).toBe(
+      JSON.stringify(r2.state.fleets.F!.movement),
+    );
   });
 });
 
@@ -650,9 +692,14 @@ describe('movement — граница, которой игрок не видит
   const peace = { 'p1|p2': 'peace' as const };
   /** Память тумана игрока p1: он видел только `seen` (снимки — с настоящими владельцами). */
   function fogged(seen: string[]): GameState {
-    const st: GameState = { ...baseState(line(), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peace };
-    const mem: Record<string, { owner: string | null; garrison: []; buildings: []; at: number }> = {};
-    for (const id of seen) mem[id] = { owner: st.planets[id]!.owner, garrison: [], buildings: [], at: 0 };
+    const st: GameState = {
+      ...baseState(line(), [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: peace,
+    };
+    const mem: Record<string, { owner: string | null; garrison: []; buildings: []; at: number }> =
+      {};
+    for (const id of seen)
+      mem[id] = { owner: st.planets[id]!.owner, garrison: [], buildings: [], at: 0 };
     return { ...st, fog: { p1: mem } };
   }
 
@@ -663,34 +710,37 @@ describe('movement — граница, которой игрок не видит
     );
   });
 
-  it('невидимая граница — приказ принят, флот долетает до неё и встаёт перед ней', () => {
-    const kernel = createKernel([movementModule]);
-    const r = okApply(kernel.applyAction(fogged(['M']), move('F', 'D'), ctx(0)));
-    expect(r.state.fleets.F!.movement?.to).toBe('M');
-    expect(r.events.some((e) => e.type === 'fleet.halted')).toBe(false);
-    const a = okAdvance(kernel.advanceTo(r.state, ctx(100 * HOUR)));
-    const f = a.state.fleets.F!;
-    expect(f.location).toBe('M'); // не вошёл в B
-    expect(f.movement).toBeNull();
-    const halted = a.events.find((e) => e.type === 'fleet.halted');
-    expect(halted?.payload).toEqual({ fleetId: 'F', owner: 'p1', at: 'M', blocked: 'B', blocker: 'p2' });
-    // остановка — конец пути: мир M — прибытие, а не транзит
-    expect(a.events.some((e) => e.type === 'fleet.arrived' && (e.payload as { at?: string }).at === 'M')).toBe(true);
-  });
-
-  it('невидимая граница прямо по курсу — приказ принят, флот стоит, хозяин назван', () => {
-    const kernel = createKernel([movementModule]);
-    const st = fogged([]);
+  it('unknown border starts flight; discovery in flight cancels the order and preserves the current point', () => {
+    const k = createKernel([movementModule, visibilityModule]);
+    const st = fogged(['M']);
     st.fleets.F!.location = 'M';
-    const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
-    expect(r.state.fleets.F!.location).toBe('M');
-    expect(r.state.fleets.F!.movement).toBeNull();
-    expect(r.events.some((e) => e.type === 'fleet.departed')).toBe(false);
-    expect(r.events.find((e) => e.type === 'fleet.halted')?.payload).toMatchObject({
-      at: 'M',
+    st.players.p1 = { id: 'p1', name: 'P1', faction: 'x', status: 'active', resources: {} };
+    st.sight = { world: 5, fleet: 5, radarScale: 1 };
+    const r = okApply(k.applyAction(st, move('F', 'D'), ctx(0)));
+    expect(r.state.fleets.F!.movement?.to).toBe('B');
+    expect(r.events.some((e) => e.type === 'fleet.halted')).toBe(false);
+    const before = okAdvance(k.advanceTo(r.state, ctx(2 * HOUR)));
+    expect(before.state.fleets.F!.movement).not.toBeNull();
+    expect(before.state.fog?.p1?.B).toBeUndefined();
+    const discovered = okAdvance(k.advanceTo(before.state, ctx(2.6 * HOUR)));
+    expect(discovered.state.fog?.p1?.B?.owner).toBe('p2');
+    expect(discovered.state.fleets.F!.movement).toBeNull();
+    expect(discovered.state.fleets.F!.edge?.t).toBeCloseTo(2.5 / 3);
+    expect(discovered.events.find((e) => e.type === 'fleet.halted')?.payload).toMatchObject({
       blocked: 'B',
       blocker: 'p2',
     });
+    // Repeating now offers a real right-of-way refusal; withdrawing remains legal.
+    expect(errCode(k.applyAction(discovered.state, move('F', 'D'), ctx(2.6 * HOUR)))).toBe(
+      'E_NO_RIGHT_OF_WAY',
+    );
+    expect(
+      okApply(k.applyAction(discovered.state, move('F', 'M'), ctx(2.6 * HOUR))).state.fleets.F!
+        .movement?.to,
+    ).toBe('M');
+    // The abandoned scheduled arrival must not move or capture the fleet later.
+    const later = okAdvance(k.advanceTo(discovered.state, ctx(100 * HOUR)));
+    expect(later.state.fleets.F!.edge).toEqual(discovered.state.fleets.F!.edge);
   });
 
   it('устаревшая память («там мирный», а мир уже ничей) не отбивает приказ', () => {
@@ -711,5 +761,128 @@ describe('movement — граница, которой игрок не видит
     mid.diplomacy = peace;
     const a = okAdvance(kernel.advanceTo(mid, ctx(100 * HOUR)));
     expect(a.state.fleets.F!.location).toBe('M');
+  });
+});
+
+describe('movement — diplomacy/recon consistency matrix', () => {
+  function scene(
+    stance: 'peace' | 'war' | 'pact' | 'alliance',
+    known: boolean,
+    owner: string | null = 'p2',
+  ): GameState {
+    const a = planet('A', 'p1', 0, 0),
+      b = planet('B', owner, 30, 0),
+      d = planet('D', null, 60, 0);
+    a.links = ['B'];
+    b.links = ['A', 'D'];
+    d.links = ['B'];
+    const st = {
+      ...baseState([a, b, d], [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: { 'p1|p2': stance },
+    };
+    st.players.p1 = { id: 'p1', name: 'P1', faction: 'x', status: 'active', resources: {} };
+    st.sight = { world: 5, fleet: 5, radarScale: 1 };
+    st.fog = { p1: known ? { B: { owner, garrison: [], buildings: [], at: 0 } } : {} };
+    return st;
+  }
+  for (const known of [false, true]) {
+    it.each(['peace', 'war', 'pact', 'alliance'] as const)(
+      `%s, known=${known}: only discovered peace blocks transit`,
+      (stance) => {
+        const k = createKernel([movementModule, visibilityModule]);
+        const r = k.applyAction(scene(stance, known), move('F', 'D'), ctx(0));
+        if (stance === 'peace' && known) {
+          expect(errCode(r)).toBe('E_NO_RIGHT_OF_WAY');
+          return;
+        }
+        const start = okApply(r);
+        expect(start.state.fleets.F!.movement).not.toBeNull();
+        const result = okAdvance(k.advanceTo(start.state, ctx(100 * HOUR)));
+        expect(result.events.some((e) => e.type === 'fleet.halted')).toBe(stance === 'peace');
+        if (stance !== 'peace') expect(result.state.fleets.F!.location).toBe('D');
+      },
+    );
+    it(`unowned territory is passable, known=${known}`, () => {
+      const k = createKernel([movementModule, visibilityModule]);
+      const r = okApply(k.applyAction(scene('peace', known, null), move('F', 'D'), ctx(0)));
+      const a = okAdvance(k.advanceTo(r.state, ctx(100 * HOUR)));
+      expect(a.state.fleets.F!.location).toBe('D');
+      expect(a.events.some((e) => e.type === 'fleet.halted')).toBe(false);
+    });
+  }
+  it('signing peace during flight stops at the discovered world, while war leaves the route open', () => {
+    const k = createKernel([movementModule, visibilityModule]);
+    const r = okApply(k.applyAction(scene('war', false), move('F', 'D'), ctx(0)));
+    const changed = { ...r.state, diplomacy: { 'p1|p2': 'peace' as const } };
+    const a = okAdvance(k.advanceTo(changed, ctx(2.6 * HOUR)));
+    expect(a.state.fleets.F!.movement).toBeNull();
+    expect(a.events.some((e) => e.type === 'fleet.halted')).toBe(true);
+  });
+  it('mutual peace cancels an already known hostile course immediately', () => {
+    const k = createKernel([movementModule, diplomacyModule, visibilityModule]);
+    const st = scene('war', true);
+    st.players.p2 = { id: 'p2', name: 'P2', faction: 'x', status: 'active', resources: {} };
+    let world = okApply(k.applyAction(st, move('F', 'D'), ctx(0))).state;
+    world = okAdvance(k.advanceTo(world, ctx(HOUR))).state;
+    for (const [actor, target] of [
+      ['p1', 'p2'],
+      ['p2', 'p1'],
+    ]) {
+      world = okApply(
+        k.applyAction(
+          world,
+          {
+            id: 'peace-' + actor,
+            type: 'diplomacy.declare',
+            playerId: actor!,
+            payload: { target, stance: 'peace' },
+            issuedAt: HOUR,
+          },
+          ctx(HOUR),
+        ),
+      ).state;
+    }
+    expect(world.fleets.F!.movement).toBeNull();
+    expect(world.fleets.F!.edge?.t).toBeCloseTo(1 / 3);
+  });
+  it('an unseen neutral world captured during flight stops the course only on discovery', () => {
+    const k = createKernel([movementModule, visibilityModule]);
+    const start = okApply(k.applyAction(scene('peace', false, null), move('F', 'D'), ctx(0))).state;
+    const changed = {
+      ...start,
+      planets: { ...start.planets, B: { ...start.planets.B!, owner: 'p2' } },
+    };
+    const before = okAdvance(k.advanceTo(changed, ctx(2 * HOUR)));
+    expect(before.state.fleets.F!.movement).not.toBeNull();
+    const after = okAdvance(k.advanceTo(before.state, ctx(100 * HOUR)));
+    expect(after.state.fleets.F!.edge?.t).toBeCloseTo(5 / 6);
+    expect(after.state.fog?.p1?.B?.owner).toBe('p2');
+  });
+  it('offline jump and live ticks stop at the same discovery point', () => {
+    const k = createKernel([movementModule, visibilityModule]);
+    const start = okApply(k.applyAction(scene('peace', false), move('F', 'D'), ctx(0))).state;
+    const offline = okAdvance(k.advanceTo(start, ctx(100 * HOUR)));
+    let live = start;
+    for (let n = 1; n <= 30; n++) live = okAdvance(k.advanceTo(live, ctx((n * HOUR) / 10))).state;
+    expect(offline.state.fleets.F!.edge?.t).toBeCloseTo(5 / 6);
+    expect(live.fleets.F!.edge).toEqual(offline.state.fleets.F!.edge);
+    expect(live.fleets.F!.movement).toBeNull();
+  });
+  it('a parked fleet chooses the legal endpoint before ranking diplomatic detours', () => {
+    const a = planet('A', 'p2', 0, 0),
+      b = planet('B', 'p1', 30, 0),
+      c = planet('C', 'p1', 30, 30),
+      d = planet('D', 'p1', 0, 30);
+    a.links = ['B', 'D'];
+    b.links = ['A', 'C'];
+    c.links = ['B', 'D'];
+    d.links = ['A', 'C'];
+    const f = fleet('F', 'p1', null, ['scout']);
+    f.edge = { from: 'A', to: 'B', t: 0.1 };
+    const st = { ...baseState([a, b, c, d], [f]), diplomacy: { 'p1|p2': 'peace' as const } };
+    const k = createKernel([movementModule]);
+    const r = okApply(k.applyAction(st, move('F', 'D'), ctx(0)));
+    expect(r.state.fleets.F!.movement?.to).toBe('B');
+    expect(r.state.fleets.F!.movement?.path).toEqual(['C', 'D']);
   });
 });

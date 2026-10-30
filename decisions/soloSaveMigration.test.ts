@@ -5,6 +5,7 @@ import {
   CORP_FORMATS_SOLO_MIGRATION as corpFormats,
   COMMANDER_CAREER_SOLO_MIGRATION as career,
   MINING_SOLO_MIGRATION as migration,
+  RECON_HALT_SOLO_MIGRATION as reconHalt,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -150,7 +151,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -228,5 +229,18 @@ describe('commander power retirement save migration (0.1.68 → 0.1.69)', () => 
     expect(
       parseCompatibleSoloSave(serializeSoloSave(before, career.fromRules), career.toRules),
     ).toBeNull();
+  });
+});
+
+describe('the rules-only recon pair (0.1.69 → 0.1.69)', () => {
+  it('reads a 0.1.69 save under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = {
+      data: reconHalt.fromData,
+      dataHash: reconHalt.fromDataHash,
+      manifest: '1',
+    };
+    const raw = serializeSoloSave(before, reconHalt.fromRules);
+    expect(parseCompatibleSoloSave(raw, reconHalt.toRules)).toEqual(before);
   });
 });
