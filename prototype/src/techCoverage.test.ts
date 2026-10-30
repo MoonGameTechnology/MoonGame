@@ -12,7 +12,6 @@
 // баланс). Пока они сливались в один ноль, нерф по отчёту бил не туда.
 import { describe, expect, it } from 'vitest';
 import { data } from './gameData';
-import { META_TREE } from './meta';
 import { isGrantOnlyTech, researchableTechIds, scientistGatedNodes } from './techCoverage';
 
 const LEADERS = { overseer: { branch: 'command' }, polymath: {} };
@@ -37,16 +36,15 @@ describe('BAL-12 — грант-узлы не входят в дерево се�
   it('на ЖИВЫХ данных каждый грант-узел и правда кем-то выдаётся', () => {
     // Сторож против узла-сироты: `grantOnly` выводит узел из дерева сессии, и если за
     // ним НИКТО не стоит, он молча выпадает из замера, а взять его нельзя вовсе —
-    // отчёт соврёт, а контент окажется мёртвым. Выдающих двое: мета-дерево командира
-    // (`META_TREE`) и пул усилений забега (`data.modes[*].pve.boons`, PVR-1.4).
+    // отчёт соврёт, а контент окажется мёртвым. После удаления дерева командующего
+    // выдающим остался пул усилений забега (`data.modes[*].pve.boons`, PVR-1.4).
     const granted = new Set([
-      ...META_TREE.flatMap((n) => n.tech ?? []),
       ...Object.values(data.modes).flatMap((mode) => mode.pve?.boons ?? []),
     ]);
     const grantOnly = Object.entries(data.technologies)
       .filter(([id, def]) => isGrantOnlyTech(id, def))
       .map(([id]) => id);
-    expect(grantOnly.length).toBeGreaterThan(0);
+    // The main catalog may have no grant-only entries after retiring commander perks.
     for (const id of grantOnly) expect(granted).toContain(id);
   });
 });
@@ -75,7 +73,11 @@ describe('BAL-12 — слой has_scientist в отчёте', () => {
   });
 
   it('достижимый узел несёт своё число исследований', () => {
-    expect(row('in_window')).toMatchObject({ hasLeader: true, outsideWindow: false, researched: 12 });
+    expect(row('in_window')).toMatchObject({
+      hasLeader: true,
+      outsideWindow: false,
+      researched: 12,
+    });
   });
 
   it('`dayGate` за концом окна помечается отдельно — ноль тут НЕ про баланс', () => {

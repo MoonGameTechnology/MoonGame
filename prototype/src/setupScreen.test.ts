@@ -15,7 +15,6 @@ import { t, tData } from '../../localization/runtime';
 import { entryOffer, type MatchSeat } from '../../decisions/entrySetup';
 import type { SetupConfig } from './game';
 import { mapPreset } from './mapCatalog';
-import { metaGrant, parseMetaState } from './meta';
 import { SOLO_SAVE_KEY } from './soloSaveLocal';
 
 interface El {
@@ -155,7 +154,6 @@ async function boot(net = false) {
   screen.initSetupScreen({
     seats: SEATS,
     nick: () => env.nick,
-    meta: () => parseMetaState(null),
     net: () => env.net,
     halt: () => void env.halts++,
     stopNetPoll: () => void env.polls++,
@@ -244,7 +242,7 @@ describe('REFM-212 — что уезжает в матч', () => {
     expect(screen.setupSlots.slice(0, 3)).toEqual(['human', 'ai-strong', 'ai-strong']);
     expect(setup.scientists).toEqual(['overseer', 'polymath']);
     expect(setup.heroes!.find((h) => h.grade === 'main')!.name).toBe('Орион');
-    expect(setup.meta).toEqual(metaGrant(parseMetaState(null)));
+    expect(setup).not.toHaveProperty('meta');
   });
 
   it('пустой позывной — герой со своим именем; дом — только из играбельных', async () => {

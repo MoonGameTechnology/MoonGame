@@ -22,7 +22,7 @@ const between = (from: string, to: string): string => {
   const start = BUILD.indexOf(from);
   return BUILD.slice(start, BUILD.indexOf(to, start));
 };
-const HOME = between('<div class="hub-panel" id="hp-home">', '<div class="hub-panel" id="hp-meta"');
+const HOME = between('<div class="hub-panel" id="hp-home">', '<div class="hub-panel" id="hp-arsenal"');
 const MORE = between('<div class="hub-panel" id="hp-more"', '<div class="hub-note"');
 const NAV = between('<nav class="hub-nav">', '</nav>');
 
@@ -73,7 +73,9 @@ describe('главный экран хаба (UIX-10.1)', () => {
     expect(HUB).toContain(
       "document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));",
     );
-    expect(HUB).toContain("new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community'])");
+    expect(MORE).not.toContain('id="hub-meta"');
+    expect(BUILD).not.toContain('id="hp-meta"');
+    expect(HUB).toContain("new Set(['auction', 'rank', 'friends', 'supply', 'shop', 'community'])");
     expect(HUB).toContain("const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;");
   });
 

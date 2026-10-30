@@ -1401,7 +1401,7 @@ export const ModePveSchema = z
     waveFixed: z.array(StartingStackSchema).min(1).optional(),
     /** Boons the run offers between waves (PVR-1.4) — ids from `data.technologies`.
      *
-     *  Reuses the seam `metaGrant` proved: a hidden session technology handed out as
+     *  A boon is a hidden session technology handed out as
      *  `completed`, whose bonuses ride the ordinary technology hooks. No engine code
      *  per boon, and a new one is a JSON entry. Absent ⇒ the run offers nothing, which
      *  is the pre-existing behaviour. */

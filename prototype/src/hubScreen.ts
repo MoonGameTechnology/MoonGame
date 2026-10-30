@@ -1,7 +1,7 @@
 import { connectToMatch } from './matchJoin';
 /**
- * Хозяин хаба (REFM-220): показ хаба и его вкладки, «Прокачка» с мета-хранилищем по
- * позывному, экраны вкладок (друзья, рейтинги, арсенал, аукцион, магазин, новости,
+ * Хозяин хаба (REFM-220): показ хаба и его вкладки, карьера по позывному,
+ * экраны вкладок (друзья, рейтинги, арсенал, аукцион, магазин, новости,
  * снабжение, кошелёк, профиль, корпорация), портрет и сверка опыта командира с сервером,
  * вход в хаб и его кнопки.
  *
@@ -24,25 +24,13 @@ import { initArsenal } from './arsenalScreen';
 import { syncCommanderXp } from './commanderSync';
 import { initCorp } from './corpScreen';
 import { detach } from './detach';
-import { esc } from './format';
 import { initFriends } from './friendsScreen';
 import { maybeIntro, openCodex } from './helpCenter';
 import { initHubWallet } from './hubWallet';
 import { inviteTargets, joinByNumber, refreshMyMatches } from './matchBrowser';
 import { avaMatchId } from '../../packages/protocol/src/ava';
 import { leaveMatch, startProvingGround } from './matchLifecycle';
-import {
-  canUnlock,
-  META_BRANCH_RU,
-  META_TREE,
-  type MetaBranch,
-  metaLevel,
-  metaLevelProgress,
-  metaPoints,
-  type MetaState,
-  parseMetaState,
-  unlockNode,
-} from './meta';
+import { type MetaState, parseMetaState } from './meta';
 import { initMetaEconomy } from './metaEconomyScreen';
 import { initMetaMarket } from './metaMarketScreen';
 import { initNews } from './newsScreen';
@@ -115,7 +103,6 @@ export function showHub(show: boolean): void {
 const HUB_PANELS: Record<string, string> = {
   home: 'hp-home',
   rank: 'hp-rank',
-  meta: 'hp-meta',
   friends: 'hp-friends',
   arsenal: 'hp-arsenal',
   auction: 'hp-auction',
@@ -129,7 +116,7 @@ const HUB_PANELS: Record<string, string> = {
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 /** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
 // prettier-ignore
-const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends', 'supply', 'shop', 'community']);
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['auction', 'rank', 'friends', 'supply', 'shop', 'community']);
 
 export function hubTab(tab: string): void {
   hubNote.textContent = '';
@@ -140,6 +127,8 @@ export function hubTab(tab: string): void {
     game.enterBrowse(); // hand off to the existing match browser
     return;
   }
+  // Retired tabs and stale links return to the home panel instead of a blank hub.
+  if (!Object.hasOwn(HUB_PANELS, tab)) tab = 'home';
   currentHubTab = tab;
   // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
@@ -150,7 +139,6 @@ export function hubTab(tab: string): void {
   if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
   if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());
   if (tab !== 'home') news?.close(); // the feed sheet lives over the home panel
-  if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
   if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
@@ -167,41 +155,6 @@ export function hubTab(tab: string): void {
   const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
     b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
-}
-
-// --- «Прокачка» — the commander's meta-progression trees (hub tab) -----------------
-// Three straight tracks (командование/экономика/наука); XP comes ONLY from finished
-// matches, a node costs its tier in points. Effects are session-start snapshots
-// (hidden techs / council level / starting treasury) — see prototype/src/meta.ts.
-export function renderMetaPanel(): void {
-  const el = $('hp-meta');
-  const st = loadMeta();
-  const lvl = metaLevel(st.xp);
-  const [got, need] = metaLevelProgress(st.xp);
-  const pts = metaPoints(st);
-  let h =
-    `<div class="mp-head"><b>${t('meta.level', { n: lvl })}</b>` +
-    `<span class="mp-xp">${t('meta.xp', { got, need })}</span>` +
-    `<span class="mp-pts">${t('meta.points', { n: pts })}</span></div>`;
-  h += `<div class="mp-track"><div class="mp-fill" style="width:${Math.round((got / need) * 100)}%"></div></div>`;
-  for (const branch of ['command', 'economy', 'science'] as MetaBranch[]) {
-    h += `<div class="mp-branch"><div class="mp-bt">${t(META_BRANCH_RU[branch])}</div>`;
-    for (const node of META_TREE.filter((x) => x.branch === branch)) {
-      const owned = st.spent.includes(node.id);
-      const can = canUnlock(st, node.id);
-      h +=
-        `<div class="mp-node ${owned ? 'own' : can ? 'can' : 'lock'}">` +
-        `<div class="mp-nm">${owned ? '✓ ' : ''}${esc(t(node.name))} <em>· ${t('meta.cost', { n: node.tier })}</em></div>` +
-        `<div class="mp-ds">${esc(t(node.desc))}</div>` +
-        (owned
-          ? ''
-          : `<button class="mp-buy" data-meta="${node.id}" ${can ? '' : 'disabled'}>${can ? t('hero.tree.unlock') : t('meta.locked')}</button>`) +
-        `</div>`;
-    }
-    h += `</div>`;
-  }
-  h += `<p class="mp-note">${t('meta.note')}</p>`;
-  el.innerHTML = h;
 }
 
 // --- «Друзья» — the account's roster (hub tab, FRIENDS-1) --------------------
@@ -351,10 +304,9 @@ export async function syncCommanderFromServer(): Promise<void> {
     // unreadable answer leaves the local figure alone, and only a real change repaints.
     const sync = syncCommanderXp(cur.xp, await res.json().catch(() => null));
     if (sync.changed) {
-      saveMeta({ ...cur, xp: sync.xp }); // local `spent` tree is kept
-      // repaint the open hub panel so the new level/points show without a manual switch
-      if (hubEl.style.display !== 'none' && (currentHubTab === 'home' || currentHubTab === 'meta'))
-        hubTab(currentHubTab);
+      saveMeta({ ...cur, xp: sync.xp });
+      // Repaint the home panel after reconciling the cosmetic career profile.
+      if (hubEl.style.display !== 'none' && currentHubTab === 'home') hubTab(currentHubTab);
     }
   } catch {
     // offline — the last mirrored total stays; a later login reconciles
@@ -389,9 +341,8 @@ export function openHub(note = ''): void {
   );
 }
 
-// --- meta-progression (прокачка командующего) --------------------------------
-// Per-callsign account state; v1 lives in localStorage next to the guest identity —
-// the server account (SE-1.x) takes this over when the meta-layer lands there.
+// --- Commander career mirror: XP, cosmetic rank and local statistics --------
+// Keep the existing storage key so old profiles retain their XP and career.
 function metaKey(): string {
   return 'vd.meta.' + (game.nick().trim() || 'guest');
 }
@@ -431,21 +382,12 @@ export let corp: ReturnType<typeof initCorp> | null = null;
 export let tutorialMedal: ReturnType<typeof initTutorialMedal> | null = null;
 let medalRewards: ReturnType<typeof initMedalRewards> | null = null;
 
-/** Поднять хаб: узлы, вкладки и их экраны, прокачку, профиль и награду за регистрацию.
+/** Поднять хаб: узлы, вкладки и их экраны, профиль и награду за регистрацию.
  *  Зовётся из `main.ts` один раз, на месте прежней проводки. */
 export function initHubScreen(host: HubScreenHost): void {
   game = host;
   hubEl = $('hub');
   hubNote = $('hub-note');
-  $('hp-meta').addEventListener('click', (ev) => {
-    const b = (ev.target as HTMLElement).closest('[data-meta]') as HTMLElement | null;
-    if (!b || (b as HTMLButtonElement).disabled) return;
-    const next = unlockNode(loadMeta(), b.dataset.meta!);
-    if (next) {
-      saveMeta(next);
-      renderMetaPanel();
-    }
-  });
   if (!__SECTOR_ZERO_ONLY__)
     friends = initFriends({
       root: () => $('hp-friends'),
@@ -728,9 +670,7 @@ export function initHubScreen(host: HubScreenHost): void {
   for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
     b.addEventListener('click', () => hubTab((b as HTMLElement).dataset.hub ?? 'home'));
   }
-  // «Прокачка», а с UIX-10.1 и «Рейтинг» с «Друзьями» уехали из нижней навигации (вкладок в ней
-  // пять) в «Ещё»: плитка открывает ТУ ЖЕ панель, а не свою копию экрана.
-  document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
+  // Дополнительные разделы открываются из «Ещё», сохраняя пять вкладок нижней навигации.
   document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
   document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
   document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
