@@ -175,7 +175,8 @@ import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinef
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { blackBoxError, blackBoxFrame, startBlackBox } from './renderBlackBox';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
@@ -3811,11 +3812,13 @@ let frameErrs = 0;
  */
 function frameLoop(nowReal: number) {
   frameAsked = false;
+  blackBoxFrame(nowReal, cam.scale, mapPreparation.active);
   let covered = false;
   try {
     frame(nowReal);
     covered = mapCovered();
   } catch (err) {
+    blackBoxError(err);
     if (frameErrs++ < FRAME_ERR_LOG_MAX) console.error('frame failed', err);
     else if (frameErrs === FRAME_ERR_LOG_MAX + 1) console.error('frame failing repeatedly — further errors muted');
   }
@@ -3950,6 +3953,21 @@ initChainComposer({
   invalidatePanel,
 });
 
+// Чёрный ящик отрисовки: остановки кадров и снимок состояния переживают перезапуск и видны в
+// отчёте об отрисовке следующего запуска (`decisions/renderBlackBox.ts`).
+startBlackBox({
+  build: () => BUILD_TAG,
+  snapshot: () => ({
+    map: inMatch() ? (s.mapId ?? '') : '',
+    nodes: inMatch() ? MAP.length : 0,
+    scale: Math.round(cam.scale * 100) / 100,
+    fps: Math.round(fpsEma),
+    preparing: mapPreparation.active,
+    mapCanvas: { ...mapContextEvents },
+    background: { ...backgroundContextEvents },
+    frameErrors: frameErrs,
+  }),
+});
 askFrame();
 // Касание, клавиша и смена экрана будят кадр сразу (правило 9 `simClock.ts`): за меню он ждёт
 // паузу, а вход в партию ставит заставку первым же кадром, и Back взводится к кадру после
