@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { withEdgeLogging } from './security/edge-logging.mjs';
 
 it.skipIf(!process.env.CADDY_BIN)('replaces upstream HSTS with one proxy policy, including proxy-generated responses', async () => {
   const upstream = createServer((_req, res) => {
@@ -21,9 +22,9 @@ it.skipIf(!process.env.CADDY_BIN)('replaces upstream HSTS with one proxy policy,
   const dir = mkdtempSync(join(tmpdir(), 'caddy-hsts-'));
   const file = join(dir, 'Caddyfile');
   const source = readFileSync(new URL('./Caddyfile', import.meta.url), 'utf8');
-  writeFileSync(file, source
+  writeFileSync(file, withEdgeLogging(source
     .replace('reverse_proxy server:8788', `reverse_proxy 127.0.0.1:${upstream.address().port}`)
-    .replace('log default {', 'admin off\n\tlog default {'));
+    .replace('log default {', 'admin off\n\tlog default {'), join(dir, 'access.log')));
   const child = spawn(process.env.CADDY_BIN, ['run', '--config', file], {
     env: { ...process.env, DOMAIN: `http://127.0.0.1:${port}` },
     stdio: 'ignore',

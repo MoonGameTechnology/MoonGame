@@ -30,6 +30,26 @@ export function projectSource(source, input) {
   } else if (source === 'metrics') {
     if (!count(input.matches) || !count(input.connections)) return null;
     for (const field of ['matches', 'connections']) add(`moongame_${field}`, input[field], 'gauge');
+    if (input.security !== undefined) {
+      const audit = input.security;
+      if (!object(audit) || audit.schema !== 2 ||
+        !['startedAt', 'at', 'sampled', 'failed', 'stableCorrelation'].every((key) => count(audit[key])) ||
+        !object(audit.counts) || !object(audit.journal) || ![0, 1].includes(audit.stableCorrelation) || audit.startedAt > audit.at) return null;
+      add('moongame_security_process_started_timestamp_seconds', audit.startedAt / 1000, 'gauge');
+      add('moongame_security_sample_timestamp_seconds', audit.at / 1000, 'gauge');
+      add('moongame_security_stable_correlation', Number(audit.stableCorrelation === 1), 'gauge');
+      for (const key of ['sampled', 'failed']) add(`moongame_security_${key}_total`, audit[key]);
+      for (const event of ['auth.reject', 'auth.success', 'auth.change', 'auth.logout', 'auth.delete',
+        'ws.reject', 'ws.accept', 'action.reject', 'rate.limit', 'http.reject', 'http.error',
+        'http.mutation', 'process.start', 'process.stop']) {
+        if (!count(audit.counts[event])) return null;
+        add('moongame_security_events_total', audit.counts[event], 'counter', { event });
+      }
+      for (const key of ['written', 'dropped', 'failed']) {
+        if (!count(audit.journal[key])) return null;
+        add(`moongame_security_journal_${key}_total`, audit.journal[key]);
+      }
+    }
   } else if (source === 'activity') {
     if(input.schema!==1 || !count(input.since) || !count(input.at) || input.since>input.at ||
       !count(input.online) || !Array.isArray(input.days) || input.days.length>30)return null;

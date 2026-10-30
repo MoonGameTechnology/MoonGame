@@ -44,6 +44,7 @@
 }
 
 {$DOMAIN} {
+	import /etc/caddy/security/edge.caddy
 	encode zstd gzip
 	# SE-7.1: HSTS ставит ТОТ, КТО ТЕРМИНИРУЕТ TLS. Приложение ставит его само, только
 	# когда доверяет прокси (TRUST_PROXY=1 + X-Forwarded-Proto), а здесь схема известна

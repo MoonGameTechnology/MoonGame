@@ -119,6 +119,9 @@ jobs:
       - name: Gate (lint + typecheck + test, incl. Postgres adapters)
         run: pnpm run check
 
+      - name: Security alert rules and missing-data scenarios
+        run: node deploy/security/check-alerts.mjs
+
       # SCA over the same lockfiles the security workflow scans. `pnpm audit` is
       # retired here: npm shut down both audit endpoints (HTTP 410, 2026-07) and
       # pnpm has no bulk-advisory client yet — OSV-Scanner queries osv.dev (which

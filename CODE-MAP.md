@@ -62,6 +62,17 @@ Recovery-письма обоих хостов форматирует `scripts/re
 
 ---
 
+## Security operations на хосте
+
+`deploy/security/records.mjs` и `edge-records.mjs` повторно проецируют bounded файлы;
+`monitor.mjs` — passive detector/incident journal → numeric textfile,
+`query.mjs`/`control.mjs` — root поиск/статус и аудит чтений (`moongame security`).
+`install.mjs`/systemd units устанавливают ограниченный worker и signed observer bind.
+`deploy/caddy/edge.caddy` едет в подписанном Caddy image, `edge-logging.mjs` применяет import.
+`deploy/observability/security.rules.yml` и dashboard `moongame-security` — panel-only
+представление, `check-alerts.mjs` запускает pinned promtool в CI.
+[Runbook](deploy/security/README.md) и [план](docs/security-operations-roadmap.md).
+
 ## prototype/ — играбельный клиент и хост плейтестов
 
 > Это не «прототип, который выкинут»: `prototype/` — то, во что играют игроки сегодня, и
@@ -467,7 +478,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `auth.ts` | `verifyJoinToken`, `signJoinToken`, сессионный JWT | join-токен и сессия (`AUTH_JWT_SECRET`), Origin allowlist |
 | `authApi.ts` | password auth, `pwFingerprint` | аутентификация |
 | `protocol.ts` | реэкспорт `@void/protocol` | сам провод объявлен в `packages/protocol` (NETA2-4) |
-| `wsServer.ts` | `WsServer` | WebSocket-сервер |
+| `wsServer.ts` | `WsServer` | WebSocket/HTTP, server requestId и audit context |
+| `securityAudit.ts` / `dailyJsonl.ts` | `SecurityAudit`, `DailyJsonl` | v2 auth/input/mutation/lifecycle, HMAC, bounded persistent journals/heartbeat/loss |
+| `accountErasureWorker.ts` | `eraseAccountLogs` | offline actor/target scrub, включая security incidents |
 | `serverWiring.ts` | wiring | сборка сервера: manifest check, dataHash |
 | `serverConfig.ts` | `ServerConfig`, `configFromEnv`, `checkProductionReadiness` | конфигурация из env (`GATE`, `ALLOWED_ORIGINS`…); `PROD=1` не стартует без секретов и TLS |
 | `rateLimit.ts` | `slidingWindowIpLimiter` | rate limiting |

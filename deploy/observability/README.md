@@ -7,8 +7,9 @@ Opt-in Grafana OSS, Prometheus, Loki и Alloy для одного VPS.
 Это bootstrap-реализация; первый VPS может включить отдельный
 [профиль HTTPS и host/Game wiring](VPS.md). По умолчанию Prometheus собирает
 себя, Alloy и пустой textfile target; provisioned обзор показывает «нет данных»,
-пока не включён host bridge. DB exporter, алерты и нагрузочная приёмка —
-следующие OBS-этапы. Alloy не читает файлы игры.
+пока не включён host bridge. [Security экран и правила](../security/README.md) добавляют локальный audit/detector
+и panel-only alerts. DB exporter, остальные алерты и нагрузочная приёмка —
+следующие OBS-этапы. Alloy читает только числовой textfile stream, не файлы игры.
 Loki datasource отсутствует до query-only границы OBS-2.1: `editable:false`
 само по себе не запрещает запись через datasource proxy.
 
@@ -95,7 +96,7 @@ Viewer не имеет административных операций; нас
 Только доверенный root CLI и фиксированный host timer из [профиля VPS](VPS.md)
 используют Docker; HTTP endpoint управления нет. С host/Game observer64MiB и
 container timer96MiB текущий общий RAM cap1952MiB. Grafana768MiB оставляет
-запас сверх Go heap target448MiB: прежние512MiB давали reclaim stalls при загрузке UI.
+запас сверх Go heap target448MiB: прежние 512MiB давали reclaim stalls при загрузке UI.
 
 Таймер каждые 60s измеряет `du -sb`/`statfs`: warning80%, stop90% бюджета,
 <12GiB free или неизвестное измерение. Общий state budget6GiB. Приватный numeric

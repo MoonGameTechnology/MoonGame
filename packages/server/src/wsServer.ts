@@ -398,15 +398,32 @@ export function createMultiplayerServer(
     ...(options.tls ? { https: { ...TLS_POLICY, ...options.tls } } : {}),
   });
 
+  app.addHook('onRequest', async (request, reply) => {
+    const context = options.securityAudit?.request(request, request.ip, request.method,
+      request.routeOptions.url ?? 'unmatched');
+    if (context?.requestId) {
+      reply.header('X-Request-Id', context.requestId);
+      reply.header('Access-Control-Expose-Headers', 'X-Request-Id');
+    }
+  });
   app.addHook('onResponse', async (request, reply) => {
     const audit = options.securityAudit;
     if (!audit) return;
-    if (reply.statusCode === 429) audit.record('rate.limit', 'E_RATE_LIMIT');
-    else if (reply.statusCode === 401 || reply.statusCode === 403) audit.record('auth.reject', 'E_AUTH');
-    else if ([200, 201].includes(reply.statusCode) && ['/auth/login', '/auth/register', '/auth/reset'].includes(request.routeOptions.url ?? '')) {
-      audit.record(request.routeOptions.url === '/auth/reset' ? 'auth.change' : 'auth.success');
-    }
+    if (request.routeOptions.url?.startsWith('/auth/') && request.body && typeof request.body === 'object')
+      audit.target(request, (request.body as { login?: unknown }).login);
+    audit.http(request, reply.statusCode);
   });
+  app.addHook('onSend', async (request, reply, payload) => {
+    // Only the bounded stable error code crosses into the audit context. No body
+    // or successful credential-bearing response is retained.
+    if (options.securityAudit && reply.statusCode >= 400 && typeof payload === 'string' && payload.length <= 1024) {
+      try { options.securityAudit.result(request, (JSON.parse(payload) as { error?: unknown }).error); }
+      catch { /* non-JSON responses have no structured error code */ }
+    }
+    return payload;
+  });
+  app.addHook('onListen', async () => { options.securityAudit?.start(); });
+  app.addHook('onClose', async () => { await options.securityAudit?.close(); });
 
   // Fail-secure (invariant #4): a route handler that throws/rejects (e.g. a store fault in
   // the match API) must return a stable code with NO internal detail — Fastify's default
@@ -526,7 +543,8 @@ export function createMultiplayerServer(
     const ids = registry.ids();
     let connections = 0;
     for (const id of ids) connections += registry.get(id)?.peerCount ?? 0;
-    return { matches: ids.length, connections };
+    return { matches: ids.length, connections,
+      ...(options.securityAudit ? { security: options.securityAudit.summary() } : {}) };
   });
   // Правило 9 политики: свой воркер разрешён, только если хост его отдаёт.
   const ownWorker =
@@ -624,9 +642,14 @@ export function createMultiplayerServer(
   const openPerIp = new Map<string, number>();
   const atSocketCap = (ip: string): boolean => (openPerIp.get(ip) ?? 0) >= maxSocketsPerIp;
   app.server.on('upgrade', (request, socket, head) => {
+    const clientIp = upgradeClientAddress(request, !!options.trustProxy);
+    options.securityAudit?.request(request, clientIp, 'WS', '/matches/:id');
     const refuseUpgrade = (status: number): void => {
-      if (status === 401 || status === 403) options.securityAudit?.record('ws.reject', 'E_AUTH');
-      else if (status === 429) options.securityAudit?.record('rate.limit', 'E_RATE_LIMIT');
+      const context = { ...options.securityAudit?.context(request), status };
+      options.securityAudit?.record(status === 429 ? 'rate.limit' : status >= 500 ? 'http.error' :
+        status === 401 || status === 403 ? 'ws.reject' : 'http.reject',
+        status === 429 ? 'E_RATE_LIMIT' : status >= 500 ? 'E_INTERNAL' :
+          status === 401 || status === 403 ? 'E_AUTH' : 'E_BAD_REQUEST', undefined, context);
       rejectUpgrade(socket, status);
     };
     // Node's http server takes its own 'error' listener off the socket before handing it
@@ -640,7 +663,6 @@ export function createMultiplayerServer(
     });
     // Лимиты адреса — до любой асинхронной работы рукопожатия. Попытка списывает бюджет
     // частоты, даже если её потом отобьёт что-то другое.
-    const clientIp = upgradeClientAddress(request, !!options.trustProxy);
     if (handshakeLimited(clientIp) || atSocketCap(clientIp)) {
       refuseUpgrade(429);
       return;
@@ -700,7 +722,7 @@ export function createMultiplayerServer(
         // not-currently-hosted match is a 404, same as before for the single-room case.
         const prefix = `${pathPrefix}/`;
         if (!url.pathname.startsWith(prefix)) {
-          rejectUpgrade(socket, 404);
+          refuseUpgrade(404);
           return;
         }
         let matchId: string;
@@ -709,11 +731,11 @@ export function createMultiplayerServer(
         } catch {
           // A malformed %-escape (e.g. `/matches/%zz`) is a bad request path, not a
           // server error — a 404 like any other unroutable path, not a 500.
-          rejectUpgrade(socket, 404);
+          refuseUpgrade(404);
           return;
         }
         if (matchId === '' || matchId.includes('/')) {
-          rejectUpgrade(socket, 404);
+          refuseUpgrade(404);
           return;
         }
         // Authenticate before loading/advancing a persisted match. Anonymous or
@@ -735,6 +757,7 @@ export function createMultiplayerServer(
             refuseUpgrade(403);
             return;
           }
+          if (joinClaim.accountId) options.securityAudit?.identify(request, joinClaim.accountId);
         }
         // Load-on-demand for a lazy registry (an evicted match reloads here); an eager
         // registry has no `resolve`, so fall back to the in-memory `get`.
@@ -742,7 +765,7 @@ export function createMultiplayerServer(
           ? await registry.resolve(matchId)
           : registry.get(matchId);
         if (!room) {
-          rejectUpgrade(socket, 404);
+          refuseUpgrade(404);
           return;
         }
         let playerId: string;
@@ -895,7 +918,7 @@ export function createMultiplayerServer(
           );
         });
       } catch {
-        rejectUpgrade(socket, 500);
+        refuseUpgrade(500);
       }
     })());
   });
@@ -925,6 +948,8 @@ export function createMultiplayerServer(
        *  перехватить занятое кресло. */
       verifiedIdentity = false,
     ) => {
+      options.securityAudit?.bind(ws, options.securityAudit.context(_request), _request);
+      options.securityAudit?.record('ws.accept', undefined, room.id, options.securityAudit.context(ws));
       sockets.add(ws);
       alive.set(ws, true);
       ws.on('pong', () => alive.set(ws, true));
@@ -934,9 +959,13 @@ export function createMultiplayerServer(
       // the hosts' fatal handler (`fatal.ts`) ends the process with every match in it: one
       // client could stop the server. The socket is closing already; the operator gets a line.
       ws.on('error', (err) => {
-        process.stderr.write(
-          `[ws] socket error for ${playerId} in match ${room.id}: ${String(err)}\n`,
-        );
+        const code = (err as { code?: unknown }).code;
+        if (typeof code === 'string' && /^WS_ERR_[A-Z_]+$/.test(code)) {
+          options.securityAudit?.record('action.reject',
+            ['WS_ERR_UNSUPPORTED_MESSAGE_LENGTH', 'WS_ERR_UNSUPPORTED_DATA_PAYLOAD_LENGTH'].includes(code)
+              ? 'E_PAYLOAD_TOO_LARGE' : 'E_BAD_MESSAGE', room.id, options.securityAudit.context(ws));
+        }
+        process.stderr.write('{"kind":"ws.transport_error","code":"E_WS_TRANSPORT"}\n');
       });
       // Only retain when the peer actually joined — addPeer rejects (and closes the socket)
       // for an unknown player or a duplicate on a single-seat slot, and a spurious retain
@@ -1008,7 +1037,7 @@ export function createMultiplayerServer(
         c.n += 1;
         inbound.set(ws, c);
         if (c.n > SOCKET_FLOOD_MAX) {
-          options.securityAudit?.record('rate.limit', 'E_RATE_LIMIT', room.id);
+          options.securityAudit?.record('rate.limit', 'E_RATE_LIMIT', room.id, options.securityAudit.context(ws));
           return;
         } // drop a raw flood before the parse (cheap)
         const raw = typeof data === 'string' ? data : data.toString('utf8');
