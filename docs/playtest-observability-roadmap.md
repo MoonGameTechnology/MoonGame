@@ -47,7 +47,8 @@ Grafana не заменяет служебные дела, модерацию и
 | `packages/server/src/wsServer.ts` | `/health` с версией, `/ready` с readiness; операторский `/metrics` возвращает JSON `{matches,connections}` | Это не Prometheus endpoint; readiness отдельно от liveness |
 | `prototype/netserver.ts` | `/metrics/summary`, `/metrics/health`, `/metrics/recent` | Агрегатор общий для процесса; per-match live API пока отсутствует |
 | `packages/server/src/metrics.ts` | Действия/отказы, desync/dead letter/overflow, count/total/max/avg таймингов и размеров, FPS/RTT | Нет histogram buckets; p95 из avg/max восстановить нельзя; counters сбрасываются при рестарте |
-| `packages/server/src/dailyJsonl.ts` | Bounded очередь, суточные `match-*.jsonl` и `client-*.jsonl`, written/dropped/failed | Есть ротация имени по UTC-дню; TTL и дисковая квота не реализованы |
+| `packages/server/src/dailyJsonl.ts` | Bounded очередь/дневной объём, суточные JSONL, written/dropped/failed и очистка своего префикса | Не filesystem quota; очистка при flush, общий lifecycle/все derived copies ещё требуют приёмки |
+| `packages/server/src/securityAudit.ts`, `deploy/security/` | Security v2, постоянный том, requestId/HMAC, host detector/CLI, heartbeat/loss, erasure | Локальная история изменяема Game/root; нет transactional outbox/off-host SIEM. [Runbook](../deploy/security/README.md) |
 | `prototype/netserver.ts` | Summary каждые 10 минут, `run` отделяет рестарты; частые timing/broadcast пишутся выборочно | Нельзя трактовать выборочный JSONL как полную гистограмму задержек |
 | `packages/server/src/telemetryApi.ts`, `packages/protocol/src/telemetry.ts` | `POST /telemetry`: словарь, лимиты, серверный actor, счётчики приёмника | Клиентские данные недоверенные; install не равен человеку; окно activeInstalls — 5 минут |
 | `prototype/analytics.mjs`, `prototype/analyticsReport.mjs`, `prototype/report.mjs` | Разбор воронки, связи, когорт и игровых журналов, дедуп клиентских событий | Сейчас CLI, а не постоянно работающая БД аналитики или веб-сервис |
@@ -270,8 +271,8 @@ observability services и возвращает предыдущую конфиг
 | node_exporter | 64 MiB | Host textfile маркеры атомарные, без истории в exporter |
 | DB exporter, если включён | 64 MiB | Ограниченный набор метрик, отдельная DB-роль |
 
-После первого VPS запуска caps уточнены: плановый always-on бюджет до1.69GiB
-(включая три отдельных exporter), вместе с прежними caps около4.19GiB.
+После первого VPS запуска caps уточнены: плановый always-on бюджет до 1.69GiB
+(включая три отдельных exporter), вместе с прежними caps около 4.19GiB.
 Текущий объединённый observer вместо трёх exporter даёт cap1.56GiB;
 остаток — ОС, page cache и пики. Report worker до 256 MiB с CPU/time limit,
 не параллелится сам с собой. Бюджет наблюдаемости на диске — до 6 GiB, исходных
@@ -363,7 +364,7 @@ digest pins и CI Trivy/KICS. Root CLI управляет только четы�
 disk guard timer; restart сохраняет состояние. Контейнерный smoke проверяет
 auth/header/proxy/write/snapshot/Viewer границы, persistence и неизменность Game
 Compose config. Первый VPS и Game/host wiring описаны отдельным
-[профилем](../deploy/observability/VPS.md); DB exporter, Loki ingest и24h/on-off
+[профилем](../deploy/observability/VPS.md); DB exporter, Loki ingest и 24h/on-off
 приёмка не включены.
 
 ### OBS-0.4 · Первый VPS и защищённый браузерный вход `[ops][sec]` ✅ — M
@@ -372,12 +373,12 @@ Compose config. Первый VPS и Game/host wiring описаны отдель
 через отдельный HTTPS site Caddy. Host-side observer переиспользует OBS-1.1,
 пишет только atomic numeric allowlist в readonly Alloy textfile mount; без
 сетевого bearer, Docker/DB credentials и Game volumes в monitoring containers.
-Provisioned RU обзор показывает host/Game метрики, источник и45s freshness.
+Provisioned RU обзор показывает host/Game метрики, источник и 45s freshness.
 [Runbook](../deploy/observability/VPS.md), [отчёт VPS](reviews/2026-10-18-obs-vps-bootstrap.md) фиксируют версии,
 проверки TLS/header/Viewer/write/stale/restart и оставшиеся ограничения.
 Этот bootstrap не закрывает отдельные критерии OBS-1.2/1.3/4.1.
 
-### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` ⏳ — M
+### OBS-0.3 · Lifecycle журналов и redaction `[srv][ops]` 🔶 — M
 
 Исполнить необходимые требования PTM-3.1: срок и byte budgets, безопасная
 суточная очистка, активный файл/очередь, удаление actor и derived copies,
@@ -385,6 +386,10 @@ allowlist проектируемого technical stream. **Готово, ког�
 секретами/pre-fog payload не покидают игровой том; очистка/удаление/rotation
 проверены, повторный ingest не возвращает удалённое. PTM-3.1 отмечается готовым
 только при выполнении его полного критерия, не за один Loki TTL.
+**Локальный security этап:** allowlist producer/consumer, ограниченные дневные файлы
+и очереди,14 UTC-дат, безопасный edge stream, erasure actor/target и incidents,
+общий maintenance lock. Полный lifecycle прежних игровых/клиентских данных, off-host
+ingest и долговременные копии остаются отдельной приёмкой.
 
 ### OBS-1.1 · Game exporter и процессные метрики `[srv][ops]` ✅ — M
 
@@ -410,20 +415,24 @@ backup/restore/контейнеров. **Готово, когда:** прове�
 allowlist семи контейнеров → atomic numeric textfile → существующий Alloy.
 Provisioned RU dashboard `moongame-containers`: state/health/present, restart,
 CPU quota/rate/throttling, RAM/limits/working set, OOM/limit hits,45s freshness.
-Нет socket/env/logs в monitoring containers. Grafana cap поднят до768MiB после
-реального UI reclaim stall при512MiB; Go heap target448MiB сохранён.
+Нет socket/env/logs в monitoring containers. Grafana cap поднят до 768MiB после
+реального UI reclaim stall при 512MiB; Go heap target448MiB сохранён.
 [Запуск, проверка и семантика](../deploy/observability/VPS.md).
 **Остаток:** отдельная DB monitoring role/exporter, backup/restore markers и
 полная on/off/24h приёмка. Уведомления этим шагом не включаются.
 
-### OBS-1.3 · Grafana и алерты первого выпуска `[ops][docs]` 🔒(OBS-1.2) — M
+### OBS-1.3 · Grafana и алерты первого выпуска `[ops][docs]` 🔶 — M
 
 Также требует OBS-0.2/1.2. Обзор/сервер/связь/ошибки, provenance, RU подписи,
 оконные rules/no-data, contact point, runbooks, dead-man. **Готово, когда:**
 дашборды восстановлены из Git, искусственный desync/ready failure/source timeout
 дают ожидаемый алерт и recovery, получатель подтвердил доставку. Метрики,
-которых ещё нет, показываются unavailable. Без действующего внешнего канала
-выпуск остаётся частичным с явным блокером.
+которых ещё нет, показываются unavailable.
+**Security этап 2026-10-30:** экран `moongame-security`,8 Prometheus rules, bounded
+числовой host stream, missing-data gates и настоящий promtool в CI. Выбор владельца —
+пока только панель, внешних receivers нет. Это не приёмка остальных desync/DB/backup
+алертов или независимого dead-man. Полный стек включать только при прохождении
+штатного guard и наличии RAM; иначе provisioning/тяжёлый поиск остаются роадмапом.
 
 ### OBS-2.1 · Alloy → Loki `[ops][sec]` 🔒(OBS-0.3) — M
 
@@ -451,7 +460,7 @@ p95 отображается с достаточным n, legacy JSON API не �
 
 ### OBS-2.4 · Активность аккаунтов по дням `[srv][proto][ops]` ✅ — M
 
-Авторизованные foreground-сигналы раз в30с; union интервалов нескольких вкладок/устройств,
+Авторизованные foreground-сигналы раз в 30с; union интервалов нескольких вкладок/устройств,
 UTC-midnight, offline/reorder, Postgres persistence и удаление. Отдельный Grafana экран:
 DAU аккаунтов, заходы/возвраты, игроко-часы, среднее и текущий онлайн. Только bounded
 суточные gauges без player labels; 30-дневные строки и erasure.

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import pg from 'pg';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createInitialState, createKernel, isValidActionPayload } from '@void/shared-core';
 import { ActionGate, createActionEnvelope } from '@void/action-layer';
 import { MemoryArsenalStore, MemoryDropStore, PostgresArsenalStore, migrate } from './store';
@@ -14,16 +14,46 @@ import { registerMetaMarketApi } from './metaMarketApi';
 import { registerMetaEconomyApi } from './metaEconomyApi';
 import { MatchRoom, type RoomPeer } from './matchRoom';
 
-// Isolated audit harness: real production adapters, fresh synthetic accounts only.
-const databaseUrl = process.env.DATABASE_URL;
+// Real production adapters and synthetic accounts in a file-local database: other
+// test files' migrations must not deadlock the final-write rollback assertions.
+const sourceUrl = process.env.DATABASE_URL;
+let databaseUrl = sourceUrl;
+const databaseName = `audit_economy_${randomUUID().replaceAll('-', '')}`;
+let admin: pg.Pool | undefined;
+let databaseCreated = false;
 const pools: pg.Pool[] = [];
 const apps: ReturnType<typeof Fastify>[] = [];
 const data = loadShippedData();
 const catalog = loadMetaEconomyCatalog(data);
 const at = catalog.seasons[0]!.startsAt + 86_400_000;
+beforeAll(async () => {
+  if (!sourceUrl) return;
+  admin = new pg.Pool({ connectionString: sourceUrl, max: 1 });
+  await admin.query(`CREATE DATABASE "${databaseName}"`);
+  databaseCreated = true;
+  // Match the existing audit fixtures, including pg's empty-host Unix-socket URLs.
+  const queryAt = sourceUrl.indexOf('?');
+  const connection = queryAt < 0 ? sourceUrl : sourceUrl.slice(0, queryAt);
+  const query = queryAt < 0 ? '' : sourceUrl.slice(queryAt);
+  databaseUrl = connection.replace(/\/[^/]*$/, `/${databaseName}`) + query;
+});
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
   await Promise.all(pools.splice(0).map((pool) => pool.end()));
+});
+afterAll(async () => {
+  if (!admin) return;
+  try {
+    if (databaseCreated) {
+      // pool.end() resolves before PostgreSQL necessarily observes every FIN.
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const { rows } = await admin.query('SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1', [databaseName]);
+        if (rows[0].n === 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await admin.query(`DROP DATABASE "${databaseName}"`);
+    }
+  } finally { await admin.end(); }
 });
 
 async function fixture(backend: 'memory' | 'postgres') {

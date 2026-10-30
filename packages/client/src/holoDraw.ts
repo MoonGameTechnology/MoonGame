@@ -149,6 +149,21 @@ function sphereSprite(dpr: number, color: string, willReadFrequently: boolean): 
   return cv;
 }
 
+/** Make the sphere atlas of `color` ahead of its first {@link blitSphere}, pixels included: an
+ *  atlas costs a slow phone more than a frame, and the first view close enough for spheres made
+ *  one per side colour at once — three on a map of 800 provinces, a frame of 0.3–0.55 s on a
+ *  CPU four times slower. One pixel of it lands at the corner of `ctx`, for the next frame to
+ *  cover: a canvas rasters its strokes when it is first drawn. */
+export function prepareSphere(ctx: CanvasRenderingContext2D, dpr: number, color: string): void {
+  const atlas = sphereSprite(dpr, color, frequentRead(ctx));
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(atlas, 0, 0, 1, 1, 0, 0, 1, 1);
+  ctx.restore();
+}
+
 /** A display-context loss may invalidate every offscreen surface in its GPU process. */
 export function clearHolographicSprites(): void {
   for (const cache of [glowCache, sphereCache]) {

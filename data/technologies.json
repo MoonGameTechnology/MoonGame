@@ -372,61 +372,6 @@
       }
     ]
   },
-  "meta_drill_speed": {
-    "grantOnly": true,
-    "name": "Commander Drill: Logistics",
-    "description": "tech.node.meta-drill-speed.desc",
-    "branch": "command",
-    "effects": {
-      "fleetSpeedBonus": 0.05
-    }
-  },
-  "meta_drill_combat": {
-    "grantOnly": true,
-    "name": "Commander Drill: Gunnery",
-    "description": "tech.node.meta-drill-combat.desc",
-    "branch": "command",
-    "effects": {
-      "combatDamageBonus": 0.05
-    }
-  },
-  "meta_drill_radar": {
-    "grantOnly": true,
-    "name": "Commander Drill: Recon",
-    "description": "tech.node.meta-drill-radar.desc",
-    "branch": "command",
-    "effects": {
-      "radarRangeBonus": 0.15
-    }
-  },
-  "meta_drill_veteran": {
-    "grantOnly": true,
-    "name": "Commander Drill: Veterancy",
-    "description": "tech.node.meta-drill-veteran.desc",
-    "branch": "command",
-    "effects": {
-      "fleetSpeedBonus": 0.05,
-      "combatDamageBonus": 0.05
-    }
-  },
-  "meta_industry": {
-    "grantOnly": true,
-    "name": "Commander Drill: Industry",
-    "description": "tech.node.meta-industry.desc",
-    "branch": "command",
-    "effects": {
-      "productionBonus": 0.05
-    }
-  },
-  "meta_industry_2": {
-    "grantOnly": true,
-    "name": "Commander Drill: Magnate",
-    "description": "tech.node.meta-industry-2.desc",
-    "branch": "command",
-    "effects": {
-      "productionBonus": 0.05
-    }
-  },
   "void_fortification": {
     "name": "Void Fortification",
     "description": "tech.node.void-fortification.desc",

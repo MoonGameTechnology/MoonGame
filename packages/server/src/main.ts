@@ -386,7 +386,9 @@ const identify: MatchApiDeps['identify'] = verifySession
       const verified = await verifySession(header.slice('Bearer '.length).trim());
       // Signature is not enough: re-check the session against the CURRENT password so a
       // password reset revokes older sessions at the seat gate (SE-1.x).
-      return verified.ok ? liveSession(verified.claim, stores.userStore) : null;
+      const identity = verified.ok ? await liveSession(verified.claim, stores.userStore) : null;
+      if (identity) securityAudit?.identify(request, identity.accountId);
+      return identity;
     }
   : undefined;
 
@@ -631,6 +633,7 @@ const server = createMultiplayerServer({
         registerMetaCommerce(scope, metaEconomy, stores.metaEconomy);
         await scope.register(rateLimit, { max: 100, timeWindow: '1 minute' });
         registerAuthApi(scope, {
+          securityAudit,
           users: stores.userStore,
           sendRecoveryMail,
           signSession,

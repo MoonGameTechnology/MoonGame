@@ -172,7 +172,7 @@ import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, dr
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
-import { drawSweepAfterglow, drawWorlds, initMapWorlds } from './mapWorlds';
+import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
 import { blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
@@ -510,7 +510,9 @@ import {
 } from './fleetEffects';
 import {
   advanceTarget,
-  fpsNext,
+  fpsAfter,
+  fpsCounts,
+  nextFrameDelay,
   saneGap,
   simRuns,
   spinRuns,
@@ -1538,11 +1540,11 @@ function holographicMapOn(): boolean {
 }
 
 // Заставка входа в карту — `mapLoading.ts` (REFM-241); рецепт подготовки — фон, выпечка,
-// местность — у слоя карты в `mapLayer.ts` (REFM-232).
+// местность — у слоя карты в `mapLayer.ts` (REFM-232), сферы миров — у миров (`mapWorlds.ts`).
 initMapLoading({
   entered: () => inMatch() && (!NET || netAdmitted),
   viewport: () => `${VW}:${VH}:${DPR}:${holographicMapOn()}`,
-  jobs: mapPreparationJobs,
+  jobs: () => [...mapPreparationJobs(), { label: t('map-loading.ready'), run: prepareWorldArt }],
   failed: forgetMapBake,
   leave: () => $('tomenu').click(), // the same intentional leave/solo pause as the HUD button
 });
@@ -2835,11 +2837,10 @@ if (bootReset) {
 
 // --- single-player setup overlay --------------------------------------------
 // Экран и его состояние — у владельца, `setupScreen.ts` (REFM-212). Отсюда — только то,
-// что принадлежит игре: места матча, позывной, прокачка, часы, опрос мест, экраны и старт.
+// что принадлежит игре: места матча, позывной, часы, опрос мест, экраны и старт.
 initSetupScreen({
   seats: SEAT_META,
   nick: () => nickInput.value,
-  meta: () => loadMeta(),
   net: () => NET,
   halt: () => {
     speed = 0;
@@ -2976,6 +2977,7 @@ let fpsEma = 60; // smoothed frames-per-second readout
 let lastFpsText = '';
 let lastTechAt = 0; // throttle for live re-rendering the tech window while it's open
 let lastReal = performance.now();
+let sinceMenu = 0; // frames since the last one behind a full-screen menu: the page opens on one
 // Build tag for the dev overlay so the RUNNING build is always visible in-game (not just
 // on the welcome screen) — makes "am I on the latest APK?" answerable at a glance. Empty
 // in the browser / dev build (no baked __BUILD__).
@@ -3011,6 +3013,25 @@ function inMatch(): boolean {
     hubEl.style.display === 'none' &&
     !sectorZeroMenu.isOpen() &&
     setupEl.style.display === 'none'
+  );
+}
+
+/** Карту закрывает полноэкранный экран: вход, хаб, меню Sector Zero или настройка партии на
+ *  телефоне. Под ним карта не рисуется, а кадр идёт редко (правило 9 `simClock.ts`). Настройка
+ *  на ПК — окно над картой, и карта под ней остаётся живым фоном. */
+function mapCovered(): boolean {
+  return connectShown() || hubEl.style.display !== 'none' || sectorZeroMenu.isOpen() || setupCoversMap();
+}
+
+/** Настройка партии во весь экран: окно (`.sbox`) не меньше самого экрана настройки. */
+function setupCoversMap(): boolean {
+  if (setupEl.style.display === 'none') return false;
+  const box = setupEl.firstElementChild as HTMLElement | null;
+  return (
+    setupEl.offsetWidth > 0 &&
+    !!box &&
+    box.offsetWidth >= setupEl.offsetWidth &&
+    box.offsetHeight >= setupEl.offsetHeight
   );
 }
 
@@ -3559,9 +3580,10 @@ function frame(nowReal: number) {
   lastReal = nowReal;
   easeCam(dt); // камера, отпущенная растянутой за край карты, плывёт обратно
   // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
-  // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
-  if (saneGap(dt)) {
-    fpsEma = fpsNext(fpsEma, dt);
+  // smooth FPS; ignore absurd gaps (tab backgrounded) and the menu's paused frames
+  sinceMenu = mapCovered() ? 0 : sinceMenu + 1;
+  if (fpsCounts(dt, sinceMenu)) {
+    fpsEma = fpsAfter(fpsEma, dt, sinceMenu);
     countNetFrame(dt);
   }
   judgeMapSharpness(nowReal, dt);
@@ -3570,7 +3592,7 @@ function frame(nowReal: number) {
   syncSim(nowReal);
   // `netWorld`, а не `NET`: на обрыве мир на экране всё ещё серверный, под туманом, и
   // локальный ход по нему выбил бы «безземельных» соперников и объявил ложную победу.
-  const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy() || !!activeTour?.holdsClock, !!endScreen);
+  const simRunning = simRuns(netWorld, speed, !!banner || comicQueue.isBusy() || !!activeTour?.holdsClock, !!endScreen, inMatch());
   if (simRunning && !stepSim(dt, speed, nowReal)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for
@@ -3626,12 +3648,11 @@ function frame(nowReal: number) {
   // Памятка клавиш ПК (UIX-9.1) ждёт конца подготовки карты: в кадре входа подготовка ещё
   // не началась, и памятка встала бы под заставку, отсчитывая свои секунды впустую.
   pcHotkeys.sync();
-  // Opaque entry screens and hidden tabs do not paint the covered map. Setup is
-  // translucent and keeps its backdrop; an admitted match waits for preparation.
+  // Full-screen menus and hidden tabs do not paint the covered map. Setup on a PC is a
+  // window over the map and keeps its backdrop; an admitted match waits for preparation.
   if (
     !document.hidden &&
-    !connectShown() &&
-    hubEl.style.display === 'none' &&
+    !mapCovered() &&
     !(NET && !netAdmitted) &&
     !preparingMap
   ) {
@@ -3789,12 +3810,30 @@ let frameErrs = 0;
  * Один плохой кадр — это пропущенная отрисовка, а не конец карты.
  */
 function frameLoop(nowReal: number) {
+  frameAsked = false;
+  let covered = false;
   try {
     frame(nowReal);
+    covered = mapCovered();
   } catch (err) {
     if (frameErrs++ < FRAME_ERR_LOG_MAX) console.error('frame failed', err);
     else if (frameErrs === FRAME_ERR_LOG_MAX + 1) console.error('frame failing repeatedly — further errors muted');
   }
+  // За полноэкранным меню следующий кадр ждёт паузу (правило 9 `simClock.ts`).
+  const wait = nextFrameDelay(covered);
+  if (wait > 0) menuPause = setTimeout(askFrame, wait);
+  else askFrame();
+}
+
+let frameAsked = false; // a frame is already requested from rAF
+let menuPause: ReturnType<typeof setTimeout> | undefined; // the menu's pause before the next one
+
+/** Заказать кадр к следующему кадру экрана: пауза меню, если ждала, снимается. */
+function askFrame(): void {
+  clearTimeout(menuPause);
+  menuPause = undefined;
+  if (frameAsked) return;
+  frameAsked = true;
   requestAnimationFrame(frameLoop);
 }
 
@@ -3911,7 +3950,15 @@ initChainComposer({
   invalidatePanel,
 });
 
-requestAnimationFrame(frameLoop);
+askFrame();
+// Касание, клавиша и смена экрана будят кадр сразу (правило 9 `simClock.ts`): за меню он ждёт
+// паузу, а вход в партию ставит заставку первым же кадром, и Back взводится к кадру после
+// нажатия, открывшего окно.
+for (const type of ['pointerdown', 'keydown'] as const)
+  addEventListener(type, askFrame, { capture: true, passive: true });
+const screenWatch = new MutationObserver(askFrame);
+for (const screen of [connectEl, hubEl, setupEl, $('sector-zero')])
+  screenWatch.observe(screen, { attributes: true, attributeFilter: ['style'] });
 
 // --- сохранение забега (PVR-0.3) --------------------------------------------
 // Страницу закрывают чаще, чем проходит такт записи, поэтому снимок берётся ещё и на

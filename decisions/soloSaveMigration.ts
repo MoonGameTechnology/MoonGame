@@ -36,11 +36,24 @@ export const CORP_FORMATS_SOLO_MIGRATION = {
   toDataHash: '1a42ba1318c5a5',
 } as const;
 
+/** Commander power trees and their six hidden technologies are retired. Existing
+ *  worlds keep their accepted orders, resources and council; no old profile grant
+ *  is reapplied. Removed technology definitions no longer contribute their bonuses. */
+export const COMMANDER_CAREER_SOLO_MIGRATION = {
+  fromRules: CORP_FORMATS_SOLO_MIGRATION.toRules,
+  fromData: CORP_FORMATS_SOLO_MIGRATION.toData,
+  fromDataHash: CORP_FORMATS_SOLO_MIGRATION.toDataHash,
+  toRules: '181a9f99b3928d',
+  toData: '0.1.69',
+  toDataHash: '0acb4059848b47',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   MINING_SOLO_MIGRATION,
   CORP_FORMATS_SOLO_MIGRATION,
+  COMMANDER_CAREER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

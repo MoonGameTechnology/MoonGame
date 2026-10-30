@@ -1,14 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  META_TREE,
   EMPTY_STATS,
   metaLevel,
   metaLevelProgress,
-  metaPoints,
-  canUnlock,
-  unlockNode,
   matchXp,
-  metaGrant,
   parseMetaState,
   recordMatch,
   winRate,
@@ -18,9 +13,9 @@ import {
 } from './meta';
 import { newGame, data } from './game';
 
-const fresh: MetaState = { xp: 0, spent: [], stats: { ...EMPTY_STATS } };
+const fresh: MetaState = { xp: 0, stats: { ...EMPTY_STATS } };
 
-describe('meta-progression — XP, levels and points', () => {
+describe('commander career — XP and cosmetic levels', () => {
   it('levels rise on growing thresholds (100, then +50 per level)', () => {
     expect(metaLevel(0)).toBe(1);
     expect(metaLevel(99)).toBe(1);
@@ -35,44 +30,39 @@ describe('meta-progression — XP, levels and points', () => {
     expect(matchXp({ won: false, score: 500 })).toBe(90);
     expect(matchXp({ won: true, score: 5000 })).toBe(40 + 100 + 160); // score capped
   });
-
-  it('points = levels earned minus tiers spent', () => {
-    const st: MetaState = { xp: 1000, spent: [], stats: { ...EMPTY_STATS } }; // 100+150+200+250+300 = 1000 → level 6 → 5 pts
-    expect(metaLevel(st.xp)).toBe(6);
-    expect(metaPoints(st)).toBe(5);
-    expect(metaPoints({ ...st, spent: ['cmd1', 'cmd2'] })).toBe(2); // 5 − (1+2)
-  });
 });
 
-describe('meta-progression — straight-track unlock rules', () => {
-  it('tier 1 unlocks with a point; tier 2 needs its predecessor', () => {
-    expect(canUnlock(fresh, 'cmd1')).toBe(false); // no points at level 1
-    const rich: MetaState = { xp: 1000, spent: [], stats: { ...EMPTY_STATS } };
-    expect(canUnlock(rich, 'cmd1')).toBe(true);
-    expect(canUnlock(rich, 'cmd2')).toBe(false); // cmd1 not owned yet
-    const next = unlockNode(rich, 'cmd1')!;
-    expect(next.spent).toEqual(['cmd1']);
-    expect(canUnlock(next, 'cmd2')).toBe(true);
-    expect(unlockNode(next, 'cmd1')).toBeNull(); // no double-buy
-  });
-
+describe('commander career — legacy profiles', () => {
   it('persisted garbage parses to a fresh account (fail-secure)', () => {
     expect(parseMetaState(null)).toEqual(fresh);
-    expect(parseMetaState('{"xp":-5,"spent":["cmd1","bogus",7]}')).toEqual({ xp: 0, spent: ['cmd1'], stats: { ...EMPTY_STATS } });
+    expect(parseMetaState('{"xp":-5,"spent":["cmd1","bogus",7]}')).toEqual(fresh);
     expect(parseMetaState('not json')).toEqual(fresh);
   });
 
-  it('unlocking a node keeps the career counters (they are a separate ledger)', () => {
-    const played = recordMatch({ xp: 1000, spent: [], stats: { ...EMPTY_STATS } }, { won: true, score: 900, place: 1 });
-    expect(unlockNode(played, 'cmd1')?.stats).toEqual(played.stats);
+  it('retires purchased nodes without resetting XP, rank or career statistics', () => {
+    const played = recordMatch({ ...fresh, xp: 1000 }, { won: true, score: 900, place: 1 });
+    const legacy = JSON.stringify({ ...played, spent: ['cmd1', 'cmd2', 'eco1', 'sci1'] });
+    const restored = parseMetaState(legacy);
+    expect(restored).toEqual(played);
+    expect(restored).not.toHaveProperty('spent');
+    expect(metaLevel(restored.xp)).toBe(6);
+    expect(leagueKey(metaLevel(restored.xp))).toBe('profile.league.patrol');
   });
 });
 
-describe('meta-progression — career counters (profile screen)', () => {
+describe('commander career — counters (profile screen)', () => {
   it('folds a match into the counters; a win extends the streak', () => {
     let st = recordMatch(fresh, { won: true, score: 900, place: 1 });
     st = recordMatch(st, { won: true, score: 700, place: 1 });
-    expect(st.stats).toEqual({ matches: 2, wins: 2, placeSum: 2, placed: 2, streak: 2, bestStreak: 2, score: 1600 });
+    expect(st.stats).toEqual({
+      matches: 2,
+      wins: 2,
+      placeSum: 2,
+      placed: 2,
+      streak: 2,
+      bestStreak: 2,
+      score: 1600,
+    });
     expect(winRate(st.stats)).toBe(100);
     expect(averagePlace(st.stats)).toBe(1);
   });
@@ -102,11 +92,16 @@ describe('meta-progression — career counters (profile screen)', () => {
   });
 
   it('a blob written before the profile screen reads as a fresh career, XP intact', () => {
-    expect(parseMetaState('{"xp":300,"spent":["cmd1"]}')).toEqual({ xp: 300, spent: ['cmd1'], stats: { ...EMPTY_STATS } });
+    expect(parseMetaState('{"xp":300,"spent":["cmd1"]}')).toEqual({
+      xp: 300,
+      stats: { ...EMPTY_STATS },
+    });
   });
 
   it('impossible counters are repaired, not trusted (no 140% win rate)', () => {
-    const st = parseMetaState('{"xp":0,"spent":[],"stats":{"matches":2,"wins":9,"placed":7,"placeSum":-3,"streak":5,"bestStreak":0,"score":-8}}');
+    const st = parseMetaState(
+      '{"xp":0,"spent":[],"stats":{"matches":2,"wins":9,"placed":7,"placeSum":-3,"streak":5,"bestStreak":0,"score":-8}}',
+    );
     expect(st.stats.wins).toBe(2); // wins ≤ matches
     expect(st.stats.placed).toBe(2); // placed ≤ matches
     expect(st.stats.placeSum).toBeGreaterThanOrEqual(st.stats.placed); // avg place ≥ 1
@@ -125,31 +120,36 @@ describe('meta-progression — career counters (profile screen)', () => {
   });
 });
 
-describe('meta-progression — the grant lands in a real match', () => {
-  it('every tech a node grants exists in the game data', () => {
-    for (const n of META_TREE) for (const id of n.tech ?? []) expect(data.technologies[id], id).toBeDefined();
-  });
-
-  it('metaGrant composes the unlocked nodes into one snapshot', () => {
-    const g = metaGrant({ xp: 0, spent: ['cmd1', 'eco1', 'sci1'], stats: { ...EMPTY_STATS } });
-    expect(g).toEqual({ tech: ['meta_drill_speed'], scientistLevel: 1, resourceMult: 0.1 });
-  });
-
-  it('newGame applies the meta grant to the human seat only', () => {
-    const g = metaGrant({ xp: 0, spent: ['cmd1', 'eco1', 'eco2', 'sci1'], stats: { ...EMPTY_STATS } });
-    const s = newGame({
+describe('commander career — no match power', () => {
+  it('legacy setup grants cannot change a new match, its resources or its council', () => {
+    const setup = {
       seats: [
         { id: 'p1', name: 'Me', faction: 'azure', start: 'C1R1', ai: false },
         { id: 'p2', name: 'Bot', faction: 'crimson', start: 'C5R5', ai: true },
       ],
-      meta: g,
-    });
-    expect(s.players.p1?.technologies?.completed).toEqual(expect.arrayContaining(['meta_drill_speed', 'meta_industry']));
-    expect(s.players.p2?.technologies?.completed ?? []).toHaveLength(0);
-    expect(s.players.p1?.scientists?.[0]?.level).toBe(2);
-    const plain = newGame();
-    const base = plain.players.p1?.resources.credits ?? 0;
-    expect(s.players.p1?.resources.credits).toBe(Math.round(base * 1.1));
-    expect(s.players.p2?.resources.credits).toBe(plain.players.p2?.resources.credits);
+    };
+    const legacy = {
+      ...setup,
+      meta: {
+        tech: ['meta_drill_speed', 'meta_industry', 'industrial_automation'],
+        scientistLevel: 2,
+        resourceMult: 0.3,
+      },
+    };
+    const state = newGame(legacy);
+    expect(state).toEqual(newGame(setup));
+    expect(state.players.p1?.scientists?.[0]?.level).toBe(1);
+  });
+
+  it('the shipped catalog cannot reactivate retired bonuses from an old completed-tech list', () => {
+    for (const id of [
+      'meta_drill_speed',
+      'meta_drill_combat',
+      'meta_drill_radar',
+      'meta_drill_veteran',
+      'meta_industry',
+      'meta_industry_2',
+    ])
+      expect(data.technologies[id], id).toBeUndefined();
   });
 });

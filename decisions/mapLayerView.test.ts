@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   FIRST_BAND_SHARE,
   CELL_WORK,
+  DRAFT_OVERSCAN_SHARE,
   EMPTY_WORK,
   LIVE_RING_BUDGET,
   MAX_BAKE_BUDGET_MS,
+  MIN_GESTURE_DENSITY,
   MAX_BAKE_PIXELS,
   MAX_STRETCH,
   MIN_BAKE_BUDGET_MS,
@@ -52,6 +54,8 @@ function frame(over: Partial<MapLayerFrame>): MapLayerFrame {
     settled: false,
     costly: false,
     underlay: false,
+    density: 1,
+    draft: false,
     ...over,
   };
 }
@@ -321,16 +325,31 @@ describe('mapLayerView', () => {
   describe('правило 8: медленное устройство жест перепечкой не останавливает', () => {
     const zoom = (k: number) => ({ k, tx: 800 * (1 - k), ty: 450 * (1 - k) });
     const slow = (over: Partial<MapLayerFrame>) => frame({ costly: true, ...over });
+    // Плотный экран: целая выпечка — два пикселя на точку, черновик — один.
+    const dense = (over: Partial<MapLayerFrame>) =>
+      slow({ dpr: 2, density: 2, margin: overscanFor(1600, 900, 2), ...over });
+    const draft = (over: Partial<MapLayerFrame>) => dense({ density: 1, draft: true, ...over });
 
-    it('приближение посреди жеста показывает выпечку растянутой сколько угодно', () => {
-      for (const k of [MAX_STRETCH * 1.01, 4, 7.5]) {
-        expect(mapLayerAction(frame({ transform: zoom(k) }))).toBe('rebake');
-        expect(mapLayerAction(slow({ transform: zoom(k) }))).toBe('show');
+    it('приближение посреди жеста растягивает выпечку, пока в ней не меньше MIN_GESTURE_DENSITY пикселей на точку', () => {
+      expect(MIN_GESTURE_DENSITY).toBe(0.5);
+      for (const k of [MAX_STRETCH * 1.01, 3, 4]) {
+        expect(mapLayerAction(frame({ dpr: 2, density: 2, transform: zoom(k) }))).toBe('rebake');
+        expect(mapLayerAction(dense({ transform: zoom(k) }))).toBe('show');
       }
+      // Реже — черновик: растянутая вчетверо выпечка в пиксель на точку была мозаикой.
+      expect(mapLayerAction(dense({ transform: zoom(4.01) }))).toBe('rebake');
+      expect(mapLayerAction(draft({ transform: zoom(2) }))).toBe('show');
+      expect(mapLayerAction(draft({ transform: zoom(2.01) }))).toBe('rebake');
+      // Экран с плотностью 1 печёт выпечку и черновик одной плотности.
+      expect(mapLayerAction(slow({ transform: zoom(2) }))).toBe('show');
+      expect(mapLayerAction(slow({ transform: zoom(2.01) }))).toBe('rebake');
     });
 
     it('в покое растянутая выпечка сменяется новой в фоне', () => {
       expect(mapLayerAction(frame({ settled: true, transform: zoom(4) }))).toBe('rebake');
+      // Плотность в покое не судится: новая печётся в фоне, а жест её уже не ждёт.
+      expect(mapLayerAction(dense({ settled: true, transform: zoom(7.5) }))).toBe('refresh');
+      expect(mapLayerAction(draft({ settled: true, transform: zoom(3) }))).toBe('refresh');
       const rest = slow({ settled: true, transform: zoom(4) });
       expect(mapLayerAction(rest)).toBe('refresh');
       // Фоновая на текущей камере ближе к ней, чем показанная: её допекают (правило 7).
@@ -341,6 +360,60 @@ describe('mapLayerView', () => {
         final: false,
       };
       expect(bakeJobFate(rest, 'refresh', job)).toBe('keep');
+    });
+
+    it('черновик в покое сменяет новая выпечка в фоне, и камера на его сетку не встаёт', () => {
+      expect(mapLayerAction(draft({ settled: true, transform: { k: 1, tx: 37, ty: -21 } }))).toBe(
+        'refresh',
+      );
+      expect(mapLayerAction(draft({ settled: true, transform: { k: 1, tx: 37.5, ty: -21 } }))).toBe(
+        'refresh',
+      );
+      // Целая выпечка на дробном сдвиге встаёт на сетку (правило 4).
+      expect(
+        mapLayerAction(dense({ settled: true, transform: { k: 1, tx: 37.25, ty: -21 } })),
+      ).toBe('snap');
+      expect(mapLayerAction(draft({ transform: { k: 1, tx: 37.25, ty: -21 } }))).toBe('show');
+    });
+
+    it('запас черновика — десятая доля стороны, и бюджет сжимает его, как любой', () => {
+      expect(DRAFT_OVERSCAN_SHARE).toBe(0.1);
+      expect(overscanFor(1600, 900, 1, MAX_BAKE_PIXELS, DRAFT_OVERSCAN_SHARE)).toEqual({
+        x: 160,
+        y: 90,
+      });
+      expect(overscanFor(2560, 1440, 2, MAX_BAKE_PIXELS, DRAFT_OVERSCAN_SHARE)).toEqual({
+        x: 0,
+        y: 0,
+      });
+    });
+
+    it('окно черновика ездит на целые пиксели черновика', () => {
+      const margin = overscanFor(1600, 900, 1, MAX_BAKE_PIXELS, DRAFT_OVERSCAN_SHARE);
+      const tr = { k: 1, tx: margin.x + 20.3, ty: 0 };
+      expect(mapLayerAction(draft({ margin, transform: tr }))).toBe('scroll');
+      expect(recentredScroll(tr, 1)).toEqual({ x: -180, y: 0 });
+      // За край запаса покоя тоже: окно едет, а уже сдвинутое сменяет новая выпечка.
+      expect(mapLayerAction(draft({ margin, settled: true, transform: tr }))).toBe('scroll');
+      const moved = draft({ margin, settled: true, scroll: { x: -180, y: 0 }, transform: tr });
+      expect(mapLayerAction(moved)).toBe('refresh');
+    });
+
+    it('посреди жеста фоновая не дописывается: перепечь сразу — значит испечь черновик', () => {
+      const layer = dense({ transform: zoom(4.5) });
+      expect(mapLayerAction(layer)).toBe('rebake');
+      const job = {
+        fresh: true,
+        transform: zoom(1.5),
+        margin: layer.margin,
+        final: false,
+      };
+      expect(bakeJobFate(layer, 'rebake', job)).toBe('drop');
+      // В покое дописать её оставшиеся полосы дешевле, чем печь всё заново (правило 7).
+      expect(bakeJobFate({ ...layer, settled: true }, 'rebake', job)).toBe('finish');
+      expect(bakeJobFate(frame({ dpr: 2, density: 2, transform: zoom(4.5) }), 'rebake', job)).toBe(
+        'finish',
+      );
     });
 
     it('впрок посреди жеста не печётся ничего', () => {
@@ -416,7 +489,7 @@ describe('mapLayerView', () => {
     it('покрытый экран — как без подложки', () => {
       expect(mapLayerAction(backed({ transform: zoom(0.79) }))).toBe('show');
       expect(mapLayerAction(backed({ settled: true, transform: zoom(0.79) }))).toBe('refresh');
-      expect(mapLayerAction(backed({ transform: zoom(4) }))).toBe('show');
+      expect(mapLayerAction(backed({ dpr: 2, density: 2, transform: zoom(4) }))).toBe('show');
       expect(mapLayerAction(backed({ transform: { k: 1, tx: 420, ty: 0 } }))).toBe('scroll');
     });
   });

@@ -1,0 +1,79 @@
+rule_files:
+  - security.rules.yml
+evaluation_interval: 15s
+tests:
+  - name: healthy quiet game is not an attack or missing telemetry
+    interval: 15s
+    input_series:
+      - series: 'up{job="observer",instance="game-1",environment="playtest"}'
+        values: '1+0x20'
+      - series: 'moongame_security_detector_up{instance="game-1",environment="playtest"}'
+        values: '1+0x20'
+      - series: 'moongame_security_edge_up{instance="game-1",environment="playtest"}'
+        values: '1+0x20'
+      - series: 'moongame_security_detector_sample_timestamp_seconds{instance="game-1",environment="playtest"}'
+        values: '0+15x20'
+      - series: 'moongame_security_detector_heartbeat_timestamp_seconds{instance="game-1",environment="playtest"}'
+        values: '0+15x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: MoonGameSecurityDetectorUnavailable
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: MoonGameSecurityAuditStale
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: MoonGameSecuritySuspiciousActivity
+        exp_alerts: []
+  - name: missing producer is detected even while detector keeps sampling
+    interval: 15s
+    input_series:
+      - series: 'up{job="observer",instance="game-1",environment="playtest"}'
+        values: '1+0x30'
+      - series: 'moongame_security_detector_up{instance="game-1",environment="playtest"}'
+        values: '1+0x30'
+      - series: 'moongame_security_detector_sample_timestamp_seconds{instance="game-1",environment="playtest"}'
+        values: '0+15x30'
+      - series: 'moongame_security_detector_heartbeat_timestamp_seconds{instance="game-1",environment="playtest"}'
+        values: '0+0x30'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: MoonGameSecurityAuditStale
+        exp_alerts:
+          - exp_labels:
+              instance: game-1
+              environment: playtest
+              severity: critical
+            exp_annotations:
+              summary: 'Нет свежего heartbeat журнала безопасности'
+              description: 'Проверьте Game, постоянный том и записи security-status. Возраст heartbeat измеряется независимо от посещений игроков.'
+  - name: observer absent is not represented as a healthy zero
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: MoonGameSecurityDetectorUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: observer
+              severity: critical
+            exp_annotations:
+              summary: 'Недоступен контур обнаружения инцидентов'
+              description: 'Проверьте timer/service security-monitor, свежесть security.prom и ошибки чтения. Отсутствие данных не означает отсутствие атак.'
+  - name: suspicious sequence is visible without sending notifications
+    interval: 15s
+    input_series:
+      - series: 'moongame_security_detector_sample_timestamp_seconds{instance="game-1",environment="playtest"}'
+        values: '0+15x10'
+      - series: 'moongame_security_incidents_active{rule="auth-burst",instance="game-1",environment="playtest"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: MoonGameSecuritySuspiciousActivity
+        exp_alerts:
+          - exp_labels:
+              instance: game-1
+              environment: playtest
+              rule: auth-burst
+              severity: warning
+            exp_annotations:
+              summary: 'Подозрительная последовательность: auth-burst'
+              description: 'Это основание для расследования, не доказательство атаки. Используйте moongame security incidents/events; автоматические санкции не выполняются.'

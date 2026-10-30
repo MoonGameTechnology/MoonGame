@@ -427,7 +427,7 @@ describe('createMultiplayerServer · один клиент не роняет с�
       p1.send('x'.repeat(40_000));
       expect((await closed)[0]).toBe(1009); // message too big
       expect(write).toHaveBeenCalledWith(
-        expect.stringContaining('[ws] socket error for p1 in match ws-room'),
+        expect.stringContaining('"kind":"ws.transport_error"'),
       );
       const p2 = new WebSocket(`${url}?player=p2`);
       expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
@@ -449,7 +449,7 @@ describe('createMultiplayerServer · один клиент не роняет с�
       p1.write(Buffer.from([0x81, 0x02, 0x68, 0x69])); // «hi» без маски, а кадр клиента обязан её нести
       await closed;
       expect(write).toHaveBeenCalledWith(
-        expect.stringContaining('[ws] socket error for p1 in match ws-room'),
+        expect.stringContaining('"kind":"ws.transport_error"'),
       );
       const p2 = new WebSocket(`${url}?player=p2`);
       expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
@@ -864,7 +864,9 @@ describe('socket compression (permessage-deflate)', () => {
       let frame = await next(); // the welcome first
       while (frame.opcode !== 0x8) frame = await next();
       expect(frame.payload.readUInt16BE(0)).toBe(1009); // message too big
-      expect(write).toHaveBeenCalledWith(expect.stringContaining('Max payload size exceeded'));
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining('"kind":"ws.transport_error"'),
+      );
       const p2 = new WebSocket(`${url}?player=p2`);
       expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
       p2.close();

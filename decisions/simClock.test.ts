@@ -3,9 +3,13 @@ import {
   ADOPT_EVERY_MS,
   ADOPT_MOVING_MS,
   FPS_GAP_MS,
+  MENU_FRAME_MS,
   adoptDue,
   advanceTarget,
+  fpsAfter,
+  fpsCounts,
   fpsNext,
+  nextFrameDelay,
   saneGap,
   simRuns,
   spinRuns,
@@ -32,23 +36,27 @@ describe('часы кадра — правдоподобие разрыва', ()
 
 describe('часы кадра — крутится ли симуляция', () => {
   it('соло на ходу — крутится', () => {
-    expect(simRuns(false, 1, false, false)).toBe(true);
+    expect(simRuns(false, 1, false, false, true)).toBe(true);
   });
 
   it('В СЕТИ ЧАСЫ У СЕРВЕРА: свой ход времени разъехался бы с авторитетным', () => {
-    expect(simRuns(true, 1, false, false)).toBe(false);
+    expect(simRuns(true, 1, false, false, true)).toBe(false);
   });
 
   it('пауза останавливает мир', () => {
-    expect(simRuns(false, 0, false, false)).toBe(false);
+    expect(simRuns(false, 0, false, false, true)).toBe(false);
   });
 
   it('баннер останавливает мир', () => {
-    expect(simRuns(false, 1, true, false)).toBe(false);
+    expect(simRuns(false, 1, true, false, true)).toBe(false);
   });
 
   it('РЕШЁННЫЙ МАТЧ НЕ ДОИГРЫВАЮТ: счёт уже объявлен', () => {
-    expect(simRuns(false, 1, false, true)).toBe(false);
+    expect(simRuns(false, 1, false, true, true)).toBe(false);
+  });
+
+  it('ЗА МЕНЮ МИР СТОИТ: его не видно, а шаг мира — самая дорогая часть кадра (правило 8)', () => {
+    expect(simRuns(false, 1, false, false, false)).toBe(false);
   });
 });
 
@@ -157,5 +165,44 @@ describe('часы кадра — сглаженный FPS', () => {
 
   it('устойчивый кадр держит среднее на месте', () => {
     expect(fpsNext(60, 1000 / 60)).toBeCloseTo(60, 6);
+  });
+});
+
+describe('часы кадра — кадр за полноэкранным меню (правило 9)', () => {
+  it('в партии следующий кадр — к следующему кадру экрана', () => {
+    expect(nextFrameDelay(false)).toBe(0);
+  });
+
+  it('ЗА МЕНЮ КАДР ЖДЁТ ПАУЗУ: кадр на каждый кадр экрана держал бы главный поток в работе', () => {
+    expect(nextFrameDelay(true)).toBe(MENU_FRAME_MS);
+    expect(MENU_FRAME_MS).toBeGreaterThan(0);
+  });
+
+  it('пауза меню сама проходит проверку на правдоподобие: иначе она считалась бы возвращением из фона', () => {
+    expect(saneGap(MENU_FRAME_MS + 50)).toBe(true);
+  });
+
+  it('КАДРЫ МЕНЮ НЕ ИДУТ В СРЕДНИЙ FPS: их разрыв — пауза, а не медленный кадр', () => {
+    expect(fpsCounts(MENU_FRAME_MS, 0)).toBe(false);
+    expect(fpsAfter(60, MENU_FRAME_MS, 0)).toBe(60);
+  });
+
+  it('первый кадр после меню — тоже: его разрыв начался ещё в паузе меню', () => {
+    expect(fpsCounts(MENU_FRAME_MS, 1)).toBe(false);
+    expect(fpsAfter(60, MENU_FRAME_MS, 1)).toBe(60);
+  });
+
+  it('ВТОРОЙ КАДР ПОСЛЕ МЕНЮ НАЧИНАЕТ СРЕДНЕЕ ЗАНОВО: прежнее осталось от прошлой партии', () => {
+    expect(fpsCounts(1000 / 12, 2)).toBe(true);
+    expect(fpsAfter(60, 1000 / 12, 2)).toBeCloseTo(12, 6);
+  });
+
+  it('дальше среднее сглаживается как обычно', () => {
+    expect(fpsAfter(12, 1000 / 30, 3)).toBeCloseTo(fpsNext(12, 1000 / 30), 6);
+  });
+
+  it('абсурдный разрыв не идёт в среднее и после меню (правило 4)', () => {
+    expect(fpsCounts(FPS_GAP_MS, 2)).toBe(false);
+    expect(fpsAfter(60, FPS_GAP_MS, 5)).toBe(60);
   });
 });

@@ -34,7 +34,7 @@ import { viewWidth, visible, world } from './mapCamera';
 import { fleetSeen, known, memory, seesDetails, surveyed } from './mapFog';
 import { roadDrawingOf } from './mapLayer';
 import { targetBrackets } from './mapOverlays';
-import { CARDINAL, TAU, blitGlow, blitSphere, ownerColor } from './mapPalette';
+import { CARDINAL, TAU, blitGlow, blitSphere, ownerColor, prepareSphere } from './mapPalette';
 import { planetRadar, sweepGlow, sweepOn } from './mapRadar';
 import { asteroidsFor, polyPoints } from './mapShapes';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
@@ -205,6 +205,18 @@ export function drawSweepAfterglow(lod: MapLod): void {
     }
     cx.restore();
   }
+}
+
+/**
+ * Сферы миров — за заставкой входа, а не в кадре первого приближения: атлас сферы на цвет
+ * стороны медленный телефон рисует дольше кадра, и первое приближение, где проступают миры,
+ * делало их все разом (`holoDraw.ts`, `prepareSphere`). Цвет сферы — цвет стороны владельца,
+ * поэтому атласы — по цвету каждой стороны на карте, ничьей и своей.
+ */
+export function prepareWorldArt(): void {
+  const colors = new Set([ownerColor(null), ownerColor(game.me())]);
+  for (const p of Object.values(game.world().planets)) colors.add(ownerColor(p.owner));
+  for (const color of colors) prepareSphere(color);
 }
 
 /**

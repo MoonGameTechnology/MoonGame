@@ -33,7 +33,7 @@
 | **Место дропа** ✅ | SES-2: `match.ended` несёт `rewards {place, xp}` на игрока — готовый крючок «шанс дропа растёт от места» (GDD §4.4 F2P-кэтчап) | `modules/victory.ts` |
 | **Сальваж-сигнал** ✅ | `battle.resolved` / `unit.died` эмитятся боем — источник осколков | `modules/combat.ts` |
 | **Стор-паттерн** ✅ | `CorpStore`/`AvaChallengeStore`: Memory+Postgres, атомарные инварианты в сторе, сервис-RBAC сверху, контракт-тесты обоих адаптеров | `server/store/*` |
-| **Мета-XP/уровень** ✅ | META-1: `matchXp`, уровень, очки; персист v1 — localStorage (сервер заберёт при аккаунтах) | `prototype/src/meta.ts` |
+| **Карьера командира** ✅ | XP аккаунта на сервере, локальное зеркало и карьерные счётчики; уровни и звания без силовых веток (PROG-2) | `prototype/src/meta.ts`, `CommanderStore` |
 | **Корп-валюта** ✅ | AVA-2 `influence` (атомарный spend/refund) — прототип механики «очков снабжения» для аренды | `server/store` |
 
 ## 1. Пробелы → кирпичи (карта)

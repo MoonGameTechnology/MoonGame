@@ -2,11 +2,11 @@
  * Хозяин хаба (REFM-220) — прямой тест модуля.
  *
  * Экраны вкладок проверены у своих владельцев (`friendsScreen`, `rankScreen`,
- * `arsenalScreen`, `shopScreen`, `newsScreen` и соседи), дерево прокачки — `meta.ts`, разметка
+ * `arsenalScreen`, `shopScreen`, `newsScreen` и соседи), карьера — `meta.ts`, разметка
  * хаба — сторожа `hubHome` и `rankScreen`, вход в хаб вживую — робот `smoke:startup`. Здесь —
  * то, что собирается только вместе: хаб показывает ровно одну панель, вкладки из «Ещё»
- * подсвечивают «Ещё», «Игры» уводят в обозреватель, покупка узла прокачки ложится в хранилище
- * по позывному, а вход в хаб ставит одиночную партию на паузу. Экраны вкладок подменены:
+ * подсвечивают «Ещё», «Игры» уводят в обозреватель, старая карьера сохраняет XP и статистику,
+ * а вход в хаб ставит одиночную партию на паузу. Экраны вкладок подменены:
  * тест подслушивает, что модуль у них спросил. Каждый тест — свежая загрузка модулей.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -158,19 +158,21 @@ describe('REFM-220 · вкладки хаба', () => {
   });
 });
 
-describe('REFM-220 · прокачка', () => {
-  it('купленный узел ложится в хранилище по позывному, панель перерисована', async () => {
+describe('REFM-220 · карьера без дерева усилений', () => {
+  it('старый профиль сохраняет карьеру, а упразднённая вкладка возвращает домой', async () => {
     const hub = await load();
-    hub.saveMeta({ ...hub.loadMeta(), xp: 100_000 });
+    const stats = { ...hub.loadMeta().stats, matches: 1, wins: 1, score: 900 };
+    env.store.set(
+      'vd.meta.Vega',
+      JSON.stringify({ xp: 100_000, stats, spent: ['cmd1', 'eco1', 'sci1'] }),
+    );
+    expect(hub.loadMeta()).toEqual({ xp: 100_000, stats });
+    hub.saveMeta(hub.loadMeta());
+    expect(JSON.parse(env.store.get('vd.meta.Vega')!)).toEqual({ xp: 100_000, stats });
     hub.hubTab('meta');
-    const panel = env.els.get('hp-meta')!;
-    const id = /data-meta="([^"]+)"(?![^>]*disabled)/.exec(panel.innerHTML)?.[1];
-    expect(id).toBeDefined();
-    panel.fire('click', {
-      target: { closest: () => ({ dataset: { meta: id }, disabled: false }) },
-    });
-    expect(JSON.parse(env.store.get('vd.meta.Vega')!).spent).toContain(id);
-    expect(panel.innerHTML).toContain('✓ ');
+    expect(shown('hp-home')).toBe(true);
+    expect(active()).toEqual(['home']);
+    expect(env.els.has('hp-meta')).toBe(false);
   });
 });
 

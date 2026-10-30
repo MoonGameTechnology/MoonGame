@@ -37,7 +37,7 @@ const SHEETS: Record<string, string> = {
 
 /** Цифра на плашке медали — часть рисунка медали 34 px, а не надпись для чтения. Тот же
  *  рисунок стоит в окне наград за медали (`#medal-rewards`). */
-const ART = [':is(#profile, #medal-rewards) .ps-medal i', '#profile .ps-pin .ps-medal i'];
+const ART = [':is(#profile, #medal-rewards) .ps-medal i'];
 
 /** Размеры мельче 12 px в листе: `font-size` (в том числе нижняя граница `clamp`) и размер
  *  в сокращении `font:` (до `/` высоты строки). Возвращает «селектор: размер». */

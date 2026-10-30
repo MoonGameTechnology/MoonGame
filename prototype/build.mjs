@@ -475,14 +475,21 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
    фишка стоит левее отступа и маской не задета. */
 #devline{-webkit-mask-image:linear-gradient(to left,transparent 14px,#000 14px);
   mask-image:linear-gradient(to left,transparent 14px,#000 14px);}
-:is(#devline,#hubwallet) .dl-donate{position:sticky;right:0;z-index:1;overflow:hidden;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;
+:is(#devline,#hubwallet) .dl-donate{position:sticky;right:0;z-index:1;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;
   gap:7px;height:26px;padding:0 3px 0 6px;border-radius:8px;cursor:pointer;
   font:800 var(--fs-body)/1 inherit;font-variant-numeric:tabular-nums;white-space:nowrap;
   background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
-  border:1px solid rgba(255,207,98,.75);
-  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 12px rgba(255,186,52,.3),inset 0 1px 0 rgba(255,238,176,.28),
+  border:1px solid rgba(255,207,98,.6);
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 8px rgba(255,186,52,.22),inset 0 1px 0 rgba(255,238,176,.28),
     inset 0 -6px 12px rgba(0,0,0,.35);
-  animation:donateBreath 3.2s ease-in-out infinite;transition:transform .12s,filter .2s;}
+  transition:transform .12s,filter .2s;}
+/* Дыхание — накладка с яркой кромкой и сиянием, у которой меняется только прозрачность; блик
+   ездит сдвигом. Прозрачность и сдвиг крутит композитор, а тень и цвет рамки главный поток
+   перерисовывал каждый кадр: на эмуляции телефона две такие кнопки (строка статуса под хабом
+   и кошелёк хаба) занимали четверть главного потока меню (замер 2026-10-30). */
+:is(#devline,#hubwallet) .dl-donate::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+  border:1px solid rgba(255,226,140,.95);box-shadow:0 0 16px rgba(255,196,70,.45);opacity:0;
+  animation:donateBreath 3.2s ease-in-out infinite;}
 :is(#devline,#hubwallet) .dl-donate:hover{transform:translateY(-1px);filter:brightness(1.15);}
 :is(#devline,#hubwallet) .dl-donate:active{transform:translateY(1px);filter:brightness(.95);}
 :is(#devline,#hubwallet) .dl-donate:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
@@ -499,19 +506,18 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
   font-style:normal;font-weight:900;font-size:15px;line-height:1;color:#3b2500;
   background:linear-gradient(180deg,#ffec9e 0%,#ffc93f 55%,#e59a17 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(120,70,0,.5),0 0 8px rgba(255,190,60,.5);}
-/* блик: узкая светлая полоса раз в несколько секунд */
-:is(#devline,#hubwallet) .dl-donate::after{content:"";position:absolute;top:-40%;left:-40%;width:22%;height:180%;
+/* блик: узкая светлая полоса раз в несколько секунд; рамка .dl-glint режет её по плашке —
+   сама кнопка не режет, иначе срезала бы и сияние дыхания */
+:is(#devline,#hubwallet) .dl-glint{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;}
+:is(#devline,#hubwallet) .dl-glint::after{content:"";position:absolute;top:-40%;left:-40%;width:22%;height:180%;
   background:linear-gradient(90deg,transparent,rgba(255,244,200,.45),transparent);transform:rotate(18deg);
-  animation:donateShine 5s ease-in-out infinite;pointer-events:none;}
-@keyframes donateBreath{
-  0%,100%{border-color:rgba(255,207,98,.6);
-    box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 8px rgba(255,186,52,.22),inset 0 1px 0 rgba(255,238,176,.28),inset 0 -6px 12px rgba(0,0,0,.35);}
-  50%{border-color:rgba(255,226,140,.95);
-    box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 16px rgba(255,196,70,.5),inset 0 1px 0 rgba(255,238,176,.28),inset 0 -6px 12px rgba(0,0,0,.35);}}
-@keyframes donateShine{0%,70%{left:-40%;}100%{left:130%;}}
+  animation:donateShine 5s ease-in-out infinite;}
+@keyframes donateBreath{0%,100%{opacity:0;}50%{opacity:1;}}
+/* 773% своей ширины (22% плашки) — те же 170% плашки, что проходил прежний left: −40% → 130% */
+@keyframes donateShine{0%,70%{transform:translateX(0) rotate(18deg);}100%{transform:translateX(773%) rotate(18deg);}}
 @media (prefers-reduced-motion:reduce){
-  :is(#devline,#hubwallet) .dl-donate,:is(#devline,#hubwallet) .dl-donate::after{animation:none;}
-  :is(#devline,#hubwallet) .dl-donate::after{display:none;}}
+  :is(#devline,#hubwallet) .dl-donate::before{animation:none;opacity:.45;}
+  :is(#devline,#hubwallet) .dl-glint{display:none;}}
 /* ремонт за Суверены в карточке флота (забег Sector Zero): та же золотая плашка в малом */
 .chip-sov{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-size:var(--fs-caption);cursor:pointer;
   color:#ffd978;border:1px solid rgba(255,207,98,.7);border-radius:6px;
@@ -3630,12 +3636,19 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    QR для телефона генерируется при сборке и открывается наведением мыши на ПК. */
 #hub .hub-apk{position:relative;flex:0 0 auto;display:flex;margin-left:6px;}
 #hub .hub-apk-btn{position:relative;display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 16px;
-  overflow:hidden;border:1px solid rgba(61,220,132,.8);border-radius:999px;color:#d4ffe6;text-decoration:none;
+  border:1px solid rgba(61,220,132,.8);border-radius:999px;color:#d4ffe6;text-decoration:none;
   background:linear-gradient(135deg,rgba(61,220,132,.26),rgba(53,214,230,.14));
   box-shadow:0 0 14px rgba(61,220,132,.3),inset 0 0 10px rgba(61,220,132,.16);
   font:600 var(--fs-body) var(--sf-font);white-space:nowrap;transition:background .2s,box-shadow .2s,color .2s;}
-#hub .hub-apk-btn::after{content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.42) 50%,transparent 62%) 160% 0/250% 100% no-repeat;}
+/* Вспышка свечения — накладка, у которой меняется только прозрачность, блик — сдвиг полосы:
+   их крутит композитор. Анимация самой тени и позиции фона перерисовывала кнопку главным
+   потоком каждый кадр — на эмуляции телефона это была треть главного потока хаба в покое
+   (замер 2026-10-30). Блик режет рамка .hub-apk-glint, а не кнопка: та срезала бы и свечение. */
+#hub .hub-apk-btn::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+  box-shadow:0 0 26px rgba(61,220,132,.5),inset 0 0 14px rgba(61,220,132,.18);opacity:0;}
+#hub .hub-apk-glint{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;}
+#hub .hub-apk-glint::after{content:"";position:absolute;top:0;bottom:0;left:0;width:250%;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.42) 50%,transparent 62%);transform:translateX(-96%);}
 #hub .hub-apk-ic{flex:none;width:18px;height:18px;}
 #hub .hub-apk-btn:hover{color:#fff;background:linear-gradient(135deg,rgba(61,220,132,.4),rgba(53,214,230,.22));
   box-shadow:0 0 22px rgba(61,220,132,.5),inset 0 0 12px rgba(61,220,132,.24);}
@@ -3643,13 +3656,14 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hub-apk-btn:focus-visible{outline:2px solid #d4ffe6;outline-offset:3px;}
 #hub .hub-apk-qr{display:none;}
 @media (prefers-reduced-motion:no-preference){
-  body:not(.holo-still) #hub .hub-apk-btn{animation:hub-apk-glow 5s ease-in-out infinite;}
-  body:not(.holo-still) #hub .hub-apk-btn::after{animation:hub-apk-shine 5s ease-in-out infinite;}
+  body:not(.holo-still) #hub .hub-apk-btn::before{animation:hub-apk-glow 5s ease-in-out infinite;}
+  body:not(.holo-still) #hub .hub-apk-glint::after{animation:hub-apk-shine 5s ease-in-out infinite;}
   body:not(.holo-still) #hub .hub-apk-ic{animation:hub-apk-nod 5s ease-in-out infinite;}
 }
-@keyframes hub-apk-glow{0%,100%{box-shadow:0 0 14px rgba(61,220,132,.3),inset 0 0 10px rgba(61,220,132,.16);}
-  12%{box-shadow:0 0 26px rgba(61,220,132,.62),inset 0 0 14px rgba(61,220,132,.3);}}
-@keyframes hub-apk-shine{0%{background-position:160% 0;}22%,100%{background-position:-60% 0;}}
+@keyframes hub-apk-glow{0%,100%{opacity:0;}12%{opacity:1;}}
+/* полоса шириной 250% кнопки проходит её слева направо: −96% и 36% своей ширины — те же
+   границы, что прежняя позиция фона 160% → −60% */
+@keyframes hub-apk-shine{0%{transform:translateX(-96%);}22%,100%{transform:translateX(36%);}}
 @keyframes hub-apk-nod{0%,24%,100%{transform:none;}8%{transform:translateY(3px);}16%{transform:translateY(-1px);}}
 /* Телефон: шапка — одна тонкая строка, кнопка ниже и плотнее. Совсем узкий экран оставляет
    только стрелку: имя кнопки остаётся подсказкой и для экранного диктора (aria-label). */
@@ -4293,26 +4307,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #hub .hub-note{flex:0 0 auto;min-height:0;text-align:center;color:var(--amber);font-size:var(--fs-body);
   padding:0 16px;}
 #hub .hub-note:not(:empty){padding:8px 16px;}
-/* «Прокачка» — meta-progression trees (hub tab) */
-#hp-meta{overflow-y:auto;gap:10px;}
-.mp-head{display:flex;align-items:baseline;gap:12px;color:#eafffb;}
-.mp-head b{font-size:16px;}
-.mp-xp{color:var(--dim);font-size:var(--fs-caption);}
-.mp-pts{margin-left:auto;color:var(--amber);font-weight:700;font-size:var(--fs-body);}
-.mp-track{height:5px;border-radius:3px;background:rgba(53,214,230,.12);overflow:hidden;}
-.mp-fill{height:100%;background:var(--cyan);box-shadow:0 0 8px rgba(53,214,230,.5);}
-.mp-branch{border:1px solid var(--line-hi);border-radius:10px;padding:10px 12px;}
-.mp-bt{font-size:var(--fs-caption);color:var(--dim);margin-bottom:8px;}
-.mp-node{padding:7px 0;border-top:1px dashed var(--line);}
-.mp-node:first-of-type{border-top:none;}
-.mp-nm{color:#eafffb;font-weight:700;font-size:var(--fs-body);}
-.mp-nm em{color:var(--dim);font-style:normal;font-weight:400;}
-.mp-ds{color:#74b0aa;font-size:var(--fs-caption);margin:2px 0 5px;}
-.mp-node.lock{opacity:.5;}
-.mp-node.own .mp-nm{color:var(--grn,#5ff0a8);}
-.mp-buy{padding:5px 12px;border:1px solid var(--cyan-dim);border-radius:7px;background:transparent;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.mp-buy:disabled{border-color:var(--line);color:var(--dim);cursor:default;}
-.mp-note{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 0;}
 /* --- Профиль командира: the career dossier (main-menu.md §4.2). One overlay, two
    entry points: the hub identity strip and the in-match player card, so the mount
    below is a full-screen sheet rather than a hub panel. In the hub palette (UIX-15.3):
@@ -5589,6 +5583,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <a id="hub-android-download" class="hub-apk-btn" href="${androidDownloadUrl}" data-i18n-aria="hub.android.download">
         <svg class="hub-apk-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
         <span class="hub-apk-lbl" data-i18n="hub.android.download"></span>
+        <span class="hub-apk-glint" aria-hidden="true"></span>
       </a>
       <a id="hub-android-qr" class="hub-apk-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr"><b data-i18n="hub.android.title"></b>${androidQr}<span data-i18n="hub.android.scan"></span></a>
     </div>`}
@@ -5633,7 +5628,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <aside class="nw-col" id="news-col" data-i18n-aria="news.title"></aside>
       </div>
     </div>
-    <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
     <div class="hub-panel" id="hp-shop" style="display:none"></div>
@@ -5648,7 +5642,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button class="hub-tile" id="hub-shop" type="button"><span class="ht-ic">◈</span><span data-i18n="hub.tile.shop"></span></button>
         <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
         <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
-        <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
         <button class="hub-tile" id="hub-supply" type="button"><span class="ht-ic">⚒</span><span data-i18n="hub.tile.supply"></span></button>
         <button class="hub-tile" id="hub-auction" type="button"><span class="ht-ic">⌖</span><span data-i18n="hub.tile.auction"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>

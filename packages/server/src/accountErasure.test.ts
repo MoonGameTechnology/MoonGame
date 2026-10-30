@@ -13,6 +13,7 @@ import { eraseAccountDatabase, scrubPersonalJson, type ErasureSubject } from './
 import { runAccountErasure, eraseAccountLogs, durableReplace, validateErasureConfiguration } from './accountErasureWorker';
 import { PostgresMetaEconomyStore } from './metaEconomyStore';
 import { analyticsActor } from './analyticsActor';
+import { securityTarget } from './securityAudit';
 
 const subject: ErasureSubject = {
   accountId: randomUUID(),
@@ -42,6 +43,20 @@ it('scrubs identity keys and display names without changing gameplay enums', () 
       subject,
     ),
   ).toEqual({ [subject.replacement]: { name: '[deleted]', status: 'active', text: '[deleted]' } });
+});
+
+it('erases security events, failed-login targets and derived incidents with the same identity policy', async () => {
+  const { logs } = await fixture();
+  const actor = analyticsActor(salt)(subject.accountId);
+  const other = { actor: 'unrelated', target: securityTarget(salt, 'OtherPilot') };
+  for (const prefix of ['security', 'security-auth', 'security-incidents']) {
+    const file = join(logs, `${prefix}-2026-10-18.jsonl`);
+    await writeFile(file, [{ actor }, { target: securityTarget(salt, subject.login.toUpperCase()) }, other]
+      .map((row) => JSON.stringify(row)).join('\n') + '\n', { mode: 0o600 });
+  }
+  await eraseAccountLogs(logs, subject, [salt]);
+  for (const name of await readdir(logs))
+    expect((await readFile(join(logs, name), 'utf8')).trim()).toBe(JSON.stringify(other));
 });
 
 it('removes linked anonymous events and retains other authenticated people on shared devices', async () => {

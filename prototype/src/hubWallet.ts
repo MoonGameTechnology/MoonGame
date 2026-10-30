@@ -24,7 +24,8 @@ export function hubWalletHtml(w: HubWallet): string {
   const war = kfmt(w.warrants);
   return (
     `<button type="button" class="dl-donate" data-hub-wallet="donate" title="${t('hub.sovereigns')}" aria-label="${sov === null ? t('donate.open') : t('donate.aria', { n: sov })}">` +
-    `<i aria-hidden="true">${SOV_SVG}</i>${sov === null ? '' : `<b>${sov}</b>`}<em aria-hidden="true">+</em></button>` +
+    `<i aria-hidden="true">${SOV_SVG}</i>${sov === null ? '' : `<b>${sov}</b>`}<em aria-hidden="true">+</em>` +
+    `<span class="dl-glint" aria-hidden="true"></span></button>` +
     `<button type="button" class="tw-cur tw-warrants" data-hub-wallet="auction" title="${t('hub.wallet.auction', { n: war })}" aria-label="${t('hub.wallet.auction', { n: war })}">` +
     `<i aria-hidden="true">⌖</i>${war}<span class="hw-go" aria-hidden="true">${t('hub.tile.auction')}</span></button>`
   );

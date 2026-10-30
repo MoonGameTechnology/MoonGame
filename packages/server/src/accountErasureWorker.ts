@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { analyticsActor } from './analyticsActor';
+import { securityTarget } from './securityAudit';
 import { backfillLegacyReceiptOwnership } from './legacyReceiptOwnership';
 import {
   eraseAccountDatabase,
@@ -78,6 +79,7 @@ export async function eraseAccountLogs(
   if (names.some((n) => !n.endsWith('.jsonl'))) throw Error('E_ERASURE_LOG_INVENTORY');
   const paths = names.map((n) => join(dir, n));
   const actors = new Set(salts.map((salt) => analyticsActor(salt)(subject.accountId)));
+  const targets = new Set(salts.map((salt) => securityTarget(salt, subject.login)));
   const installs = new Set<string>();
   const seats = new Set<string>();
   const ownActor = (r: Record<string, unknown>): boolean =>
@@ -107,6 +109,7 @@ export async function eraseAccountLogs(
         // authenticated OTHER user's events on a shared device, stripping linkage.
         if (
           ownActor(row) ||
+          (typeof row.target === 'string' && targets.has(row.target)) ||
           ownSeat ||
           raw.includes(subject.accountId) ||
           (subject.email && raw.toLowerCase().includes(subject.email.toLowerCase())) ||

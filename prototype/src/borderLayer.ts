@@ -31,7 +31,6 @@ import {
   backgroundContextEvents,
   holographicFrame,
   livingLevel,
-  mapCostly,
   mapSettled,
   mapView,
   provinceGeometry,
@@ -138,7 +137,7 @@ export function blitBorderLayer(detail: number, borders: ClassifiedBorders): boo
   // Rule 4: not in the frame that baked the map anew, unless it waited one already.
   const baked = geo !== borderBake && !borderWaited;
   borderBake = geo;
-  const judged = { fresh, transform: rel, dpr: DPR, settled: mapSettled, sharp: mapView.k === 1, costly: mapCostly };
+  const judged = { fresh, transform: rel, dpr: DPR, settled: mapSettled, sharp: mapView.k === 1 };
   let action = borderLayerAction({ ...judged, baked });
   borderWaited = baked && action !== borderLayerAction(judged);
   // Rule 5: a layer over few borders holds nothing — the frame strokes them, and the layer
@@ -213,7 +212,8 @@ export function blitBorderLayer(detail: number, borders: ClassifiedBorders): boo
     cx.restore();
   }
   const palette = { ownerColor, hideOwnedInner: true, provinceDetail: detail };
-  for (const strip of uncoveredRects(glassNow, inside)) strokeBordersIn(cx, borders, palette, geo, mapView, strip);
+  // As thick as the stretched layer they meet (rule 7).
+  for (const strip of uncoveredRects(glassNow, inside)) strokeBordersIn(cx, borders, palette, geo, mapView, strip, rel.k);
   return true;
 }
 
@@ -279,11 +279,21 @@ function paintBorderRect(borders: ClassifiedBorders, geo: MapLayerGeometry, rect
   g.clearRect(rect.x, rect.y, rect.width, rect.height);
   g.restore();
   const palette = { ownerColor, hideOwnedInner: true, provinceDetail: borderDetail };
-  strokeBordersIn(g, borders, palette, geo, layerTransform(geo.at, borderAt), rect);
+  strokeBordersIn(g, borders, palette, geo, layerTransform(geo.at, borderAt), rect, 1);
+}
+
+/** Rule 5: the living borders stroked straight into the frame, the layer holding none of them. */
+export function strokeLiveBorders(detail: number, borders: ClassifiedBorders): void {
+  const geo = provinceGeometry;
+  if (!geo) return;
+  const palette = { ownerColor, hideOwnedInner: true, provinceDetail: detail };
+  strokeBordersIn(game.ctx(), borders, palette, geo, mapView, { x: 0, y: 0, width: canvas.width, height: canvas.height }, 1);
 }
 
 /** Stroke the living borders inside `rect` (device px) of `g`, whose map stands at `tr` from the
- *  bake's space, at the hologram's time now: the same strokes, glass clip and cull as the frame. */
+ *  bake's space, at the hologram's time now: the same strokes, glass clip and cull as the frame.
+ *  Rule 7: their lines are as thick as on a screen `scale` times this one, however far `tr`
+ *  stretches the bake — 1 for a picture of its own, the layer's stretch for the strips around it. */
 function strokeBordersIn(
   g: CanvasRenderingContext2D,
   borders: ClassifiedBorders,
@@ -291,6 +301,7 @@ function strokeBordersIn(
   geo: MapLayerGeometry,
   tr: LayerTransform,
   rect: PixelRect,
+  scale: number,
 ): void {
   const DPR = game.dpr();
   const hologramTime = game.clock();
@@ -301,9 +312,16 @@ function strokeBordersIn(
   g.clip();
   g.setTransform(DPR * tr.k, 0, 0, DPR * tr.k, DPR * tr.tx, DPR * tr.ty);
   clipGlassSurface(g, holographicFrame);
-  // The rect in the bake's space: what the strokes are culled by.
-  const s = DPR * tr.k;
-  const box = { x: rect.x / s - tr.tx / tr.k, y: rect.y / s - tr.ty / tr.k, width: rect.width / s, height: rect.height / s };
-  drawLivingBorders(g, borders, palette, holographicFrame, hologramTime, box, geo.place);
+  // The strokes go in the space `scale` times the screen's: the borders, the glass that carries
+  // their wave and the rect that culls them are placed there, not drawn under the bake's stretch.
+  const s = DPR * scale;
+  const k = tr.k / scale;
+  g.setTransform(s, 0, 0, s, 0, 0);
+  const f = holographicFrame;
+  const frame = { x: (f.x * tr.k + tr.tx) / scale, y: (f.y * tr.k + tr.ty) / scale, width: f.width * k, height: f.height * k };
+  const p = geo.place;
+  const place = { scale: p.scale * k, x: (p.x * tr.k + tr.tx) / scale, y: (p.y * tr.k + tr.ty) / scale };
+  const box = { x: rect.x / s, y: rect.y / s, width: rect.width / s, height: rect.height / s };
+  drawLivingBorders(g, borders, palette, frame, hologramTime, box, place);
   g.restore();
 }
