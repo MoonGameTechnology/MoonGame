@@ -18,6 +18,7 @@ import { promisify } from 'node:util';
 import { randomBytes, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { isAbsolute, resolve, join, parse } from 'node:path';
+import { isMainModule } from './main-module.mjs';
 
 const exec = promisify(execFile);
 const DEPLOY = fileURLToPath(new URL('../', import.meta.url));
@@ -648,7 +649,7 @@ export async function runStack(args, run = command) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMainModule(import.meta.url)) {
   runStack(process.argv.slice(2))
     .then((result) => {
       process.stdout.write(JSON.stringify(result) + '\n');

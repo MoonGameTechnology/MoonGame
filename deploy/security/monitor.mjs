@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open, rename, unlink, lstat, opendir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMainModule } from '../observability/main-module.mjs';
 import { readRecords, privateDirectory, RULES, DAY, RETENTION_DAYS } from './records.mjs';
 import { readEdge } from './edge-records.mjs';
 
@@ -409,7 +409,7 @@ async function main() {
     maintenanceSuccess: process.env.SECURITY_MAINTENANCE_SUCCESS,
   });
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
+if (isMainModule(import.meta.url))
   main().catch(() => {
     process.stderr.write('E_SECURITY_MONITOR\n');
     process.exitCode = 1;

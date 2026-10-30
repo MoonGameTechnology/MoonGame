@@ -3,7 +3,7 @@
 import { readFile, writeFile, rename, unlink, statfs } from 'node:fs/promises';
 import { cpus, loadavg } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMainModule } from './main-module.mjs';
 import { randomBytes } from 'node:crypto';
 import { createExporter, readToken } from './game-exporter.mjs';
 
@@ -68,5 +68,5 @@ async function main() {
     if (!stopped) await new Promise((done) => { wake = done; timer = setTimeout(done, 15000); });
   }
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+if (isMainModule(import.meta.url))
   main().catch(() => { process.stderr.write('E_OBS_CONFIG\n'); process.exitCode = 1; });
