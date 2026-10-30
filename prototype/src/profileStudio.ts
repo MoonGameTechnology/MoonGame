@@ -24,12 +24,32 @@ const OWN_ART: Partial<Record<ProfileMedalId, string>> = {
   contribution: CONTRIBUTION_MEDAL,
   tutorial: TUTORIAL_MEDAL,
 };
+/** Where each medal's ribbon starts in its picture, as fractions of the cell: centre x, top
+ *  y. The atlas medals are not centred in their 4 × 3 cells, so the chest rack reads these
+ *  (`--rx`, `--ry` in profile.css) to hang every ribbon on one line. Atlas order. */
+const ATLAS_RIBBON: readonly (readonly [number, number])[] = [
+  [0.55, 0.089],
+  [0.497, 0.089],
+  [0.5, 0.099],
+  [0.459, 0.099],
+  [0.553, 0.065],
+  [0.506, 0.065],
+  [0.494, 0.065],
+  [0.466, 0.065],
+  [0.55, 0.019],
+  [0.5, 0.023],
+  [0.5, 0.028],
+  [0.459, 0.023],
+];
+/** Both own-art medals share one drawing grid (viewBox 180 × 240). */
+const OWN_RIBBON = [0.5, 0.055] as const;
 /** A medal's emblem at one degree; also drawn by the medal reward window. */
 export function medalEmblem(id: ProfileMedalId, grade: MedalGrade): string {
   const art = OWN_ART[id];
-  if (art) return `<span class="ps-medal" style="background-image:url('${art}');background-size:100% 100%" aria-hidden="true"></span>`;
+  if (art) return `<span class="ps-medal" style="background-image:url('${art}');background-size:100% 100%;--rx:${OWN_RIBBON[0]};--ry:${OWN_RIBBON[1]}" aria-hidden="true"></span>`;
   const index = PROFILE_MEDALS.findIndex((m) => m.id === id);
-  return `<span class="ps-medal" style="background-image:url('${MEDAL_ATLAS}');background-position:${((index % 4) * 100) / 3}% ${Math.floor(index / 4) * 50}%" aria-hidden="true"><i>${gradeRoman(grade)}</i></span>`;
+  const [rx, ry] = ATLAS_RIBBON[index] ?? OWN_RIBBON;
+  return `<span class="ps-medal" style="background-image:url('${MEDAL_ATLAS}');background-position:${((index % 4) * 100) / 3}% ${Math.floor(index / 4) * 50}%;--rx:${rx};--ry:${ry}" aria-hidden="true"><i>${gradeRoman(grade)}</i></span>`;
 }
 const emblem = (id: ProfileMedalId, profile: PlayerProfile): string =>
   medalEmblem(id, medalGrade(id, profile.progress) ?? 3);

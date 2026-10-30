@@ -47,6 +47,18 @@ describe('profile customization decisions', () => {
     expect(parsePlayerProfile({ ...raw, progress: { wins: -1 } })).toBeNull();
     expect(parseAppearance({ ...look, portrait: '../evil' })).toBeNull();
   });
+  it('hangs the medal rack on the left breast, about a third of the portrait wide', () => {
+    // Owner, 2026-10-30: the medals on the chest must be large enough to tell apart.
+    for (let portrait = 1; portrait <= 40; portrait++) {
+      const fit = /left:([\d.]+)%;top:([\d.]+)%;width:([\d.]+)%/.exec(tunicFit(portrait))!;
+      const [left, top, width] = [Number(fit[1]), Number(fit[2]), Number(fit[3])];
+      expect(width).toBeGreaterThanOrEqual(29.5);
+      expect(left).toBeGreaterThanOrEqual(50);
+      expect(left + width).toBeLessThanOrEqual(85);
+      expect(top).toBeGreaterThanOrEqual(57);
+      expect(top).toBeLessThanOrEqual(59);
+    }
+  });
   it('retains the bot marker and only public fields of completed-match history', () => {
     const match = {
       matchId: 'm-finished',
