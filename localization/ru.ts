@@ -1589,8 +1589,6 @@ export const ru: Record<string, string> = {
   'corp.hub.guest.sign-in': 'Войти',
   'corp.hub.guest.title': 'Корпорации',
   'corp.hub.key.build': 'Строится',
-  'corp.hub.key.built': 'Построено',
-  'corp.hub.key.locked': 'Закрыто',
   'corp.hub.key.open': 'Можно построить',
   'corp.hub.kick.confirm': 'Точно исключить {name}?',
   'corp.hub.last-level': 'Это последний уровень',

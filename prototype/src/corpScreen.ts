@@ -1150,17 +1150,13 @@ export function initCorp(host: CorpHost): {
   function renderHub(): void {
     if (!hubShown) return;
     const root = host.hub.root();
-    // Перерисовка сохраняет место на панораме; выбор эмблемы держит контроллер.
-    const scroll = root.querySelector<HTMLElement>('.cb-pano-scroll')?.scrollLeft ?? null;
+    // Выбор эмблемы держит контроллер.
     const tabsScroll = root.querySelector<HTMLElement>('.cb-battle-tabs')?.scrollLeft ?? 0;
     const active = root.ownerDocument?.activeElement;
     const focused = active && root.contains(active) ? active as HTMLElement : null;
     const focusAttrs = focused ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-')).map((a) => [a.name, a.value] as const) : [];
     const p = hubPaint();
     root.innerHTML = corpHubHtml(p);
-    // Панорама впервые на экране — штабом в середину: на телефоне она шире экрана.
-    const pano = root.querySelector<HTMLElement>('.cb-pano-scroll');
-    if (pano) pano.scrollLeft = scroll ?? (pano.scrollWidth - pano.clientWidth) / 2;
     const tabs = root.querySelector<HTMLElement>('.cb-battle-tabs');
     if (tabs) {
       tabs.scrollLeft = tabsScroll;

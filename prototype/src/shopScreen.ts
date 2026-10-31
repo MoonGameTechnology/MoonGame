@@ -200,7 +200,7 @@ function styleArtHtml(style: string, all: boolean): string {
 
 /** Фон базы — его панорамой без зданий. */
 function backdropArtHtml(backdrop: string): string {
-  return `<span class="sh-art sh-art-bd" aria-hidden="true">${corpPanoramaBg([], backdrop)}</span>`;
+  return `<span class="sh-art sh-art-bd" aria-hidden="true">${corpPanoramaBg(backdrop)}</span>`;
 }
 
 function artHtml(e: Entry, detail = false): string {

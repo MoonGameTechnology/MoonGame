@@ -3906,7 +3906,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    «Битвы», «Состав», «Казна», «Настройки» и шторка здания, уровней и участника. Раскладку решает ширина
    самой вкладки (контейнер corp), а не окна: на ПК хаб идёт колонкой под зумом. Здания —
    голограммы-заглушки до картинок (CORP-13). Разметка — corpHubView.ts. */
-#hp-corp{height:100%;overflow-y:auto;overscroll-behavior:contain;container:corp / inline-size;}
+#hp-corp{height:100%;overflow-y:auto;overscroll-behavior:contain;container:corp / size;}
 :is(#hp-corp,#corp-sheet){color:var(--sf-text);}
 :is(#hp-corp,#corp-sheet) :is(.btn-main,.btn-second,.btn-quiet){min-height:44px;padding:0 16px;border-radius:10px;
   font-size:var(--fs-body);display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;}
@@ -3933,8 +3933,12 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   border:1px solid var(--sf-edge-hi);background:var(--sf-inset);line-height:1.2;}
 .cb-infl b{font-size:18px;color:var(--sf-hi);}
 .cb-infl small{font-size:var(--fs-caption);color:var(--grn);}
+/* Вкладки и строка стройки «Базы» — один ряд: на ПК строка справа от вкладок, на узкой вкладке
+   переносится под них. */
+.cb-tabrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;}
+.cb-tabrow > .cb-hud{flex:1 1 320px;min-width:0;}
 .cb-tabs{display:flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);
-  align-self:flex-start;max-width:100%;overflow-x:auto;scrollbar-width:none;}
+  max-width:100%;overflow-x:auto;scrollbar-width:none;}
 .cb-tab{min-height:44px;padding:0 18px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 var(--fs-body) var(--sf-font);white-space:nowrap;}
 .cb-tab:hover{color:var(--sf-text);}
@@ -3943,37 +3947,75 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   font-size:var(--fs-caption);font-weight:700;background:var(--amber);color:#1c1200;}
 .cb-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 :is(.cb-tab,.cb-lvl,.cb-lot,.cb-bc):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
-/* База: панорама — мир 1200×540, участки зданий стоят в нём процентами (corpSprites.ts). Кнопка
-   участка сама нажатий не ловит: ловят силуэт, подпись и значок — участки перекрываются. */
+/* База: сцена — фон окружения и здания на палубе (corpSprites.ts). На ПК мир 1200×630, на узкой
+   вкладке 600×945: место участка — переменные --l* и --p*, кадр фона — высота картинки. Кнопка
+   участка сама нажатий не ловит: ловят силуэт, площадка и табличка — участки перекрываются. */
 .cb-base{display:flex;flex-direction:column;gap:16px;}
-.cb-pano-box{position:relative;}
-.cb-pano-scroll{border-radius:14px;border:1px solid var(--sf-edge);overflow:hidden;}
-.cb-pano{position:relative;width:100%;aspect-ratio:1200 / 540;background:#020a12;}
-.cb-pano > svg.bg{position:absolute;inset:0;width:100%;height:100%;display:block;}
-.cb-pano .pad{fill:color-mix(in srgb,var(--pad,#35d6e6) 5%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 35%,transparent);stroke-width:1.5;stroke-dasharray:7 6;}
-.cb-pano .pad.on{fill:color-mix(in srgb,var(--pad,#35d6e6) 10%,transparent);stroke:color-mix(in srgb,var(--pad,#35d6e6) 55%,transparent);stroke-dasharray:none;}
-.cb-lot{position:absolute;padding:0;margin:0;border:0;background:none;color:inherit;cursor:pointer;pointer-events:none;border-radius:8px;}
-.cb-lot .spr{width:100%;height:100%;pointer-events:none;}
-.cb-lot :is(.spr g,.cb-tagl,.cb-bdg,.cb-plus){pointer-events:auto;}
+/* Сцена вместе с разделами над ней помещается в высоту вкладки (100cqh), если прокрутить к ним:
+   на низком окне ПК она уже и стоит посередине, а не уходит низом под нижнюю панель. Но не уже
+   780 px: на узкой сцене таблички ближнего ряда наезжают друг на друга. */
+.cb-pano-box{position:relative;width:min(100%,max(780px,calc((100cqh - 96px) * 1200 / 630)));margin-inline:auto;}
+.cb-pano{position:relative;width:100%;aspect-ratio:1200 / 630;overflow:hidden;isolation:isolate;border-radius:14px;
+  border:1px solid var(--sf-edge);background:linear-gradient(180deg,var(--sky0),var(--sky1) 30%,var(--sky2) 39%,var(--deck0) 39%,var(--deck1));}
+/* Горизонт рисунка — на 60% его высоты. Картинка выше сцены и стоит на её нижней кромке: палубы
+   больше, горизонт сцены — на 39%, и дальний ряд стоит на палубе, а не в небе. */
+.cb-sky{position:absolute;left:50%;bottom:0;height:153.6%;width:auto;max-width:none;transform:translateX(-50%);
+  filter:saturate(.75) brightness(.8);pointer-events:none;user-select:none;}
+/* Небо притушено, чтобы фон не спорил со зданиями; низ — под таблички. */
+.cb-shade{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(2,8,14,.6),rgba(2,8,14,.2) 30%,transparent 39%,transparent 78%,rgba(2,8,14,.55)),
+    radial-gradient(130% 95% at 50% 60%,transparent 58%,rgba(2,8,14,.5));}
+.cb-lot{position:absolute;left:var(--lx);top:var(--ly);width:var(--lw);height:var(--lh);padding:0;margin:0;border:0;
+  background:none;color:inherit;cursor:pointer;pointer-events:none;border-radius:8px;}
+.cb-lot .spr{position:relative;width:100%;height:100%;pointer-events:none;}
+.cb-lot :is(.spr g,.cb-tagl,.cb-pad){pointer-events:auto;}
 .cb-lot .spr .hit{fill:transparent;stroke:none;}
-.cb-lot.built .spr{filter:drop-shadow(0 0 7px rgba(53,214,230,.35));}
-.cb-lot.locked .spr{opacity:.32;}
-.cb-lot:is(:hover,:focus-visible) .spr{filter:drop-shadow(0 0 12px rgba(53,214,230,.75));}
-.cb-plus{position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;
-  display:grid;place-items:center;border:1px dashed var(--sf-edge-hi);background:rgba(4,16,25,.8);color:var(--cyan);
-  font-size:20px;font-weight:600;}
-.cb-tagl{position:absolute;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-  padding:3px 9px;border-radius:999px;background:rgba(3,12,20,.86);border:1px solid var(--sf-edge);
-  font-size:var(--fs-caption);line-height:1.3;color:var(--sf-text);}
-.cb-lot.tag-top .cb-tagl{bottom:100%;margin-bottom:2px;}
-.cb-lot.tag-bottom .cb-tagl{top:100%;margin-top:2px;}
+.cb-lot:is(:hover,:focus-visible) .spr{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--cyan) 60%,transparent));}
+/* Площадка под зданием — основание из металла палубы фона (CORP_PAD, градиенты в разметке сцены):
+   середина её верха стоит на земле участка. Огни борта горят цветом огней палубы, у стройки —
+   янтарём, у закрытого здания погашены; у доступного к стройке огни и пунктир разметки дышат. */
+.cb-pad{position:absolute;left:var(--fx);bottom:0;width:calc(var(--fw) * 1.08);aspect-ratio:200 / 60;
+  transform:translate(-50%,66.67%);}
+.cb-defs{position:absolute;width:0;height:0;overflow:hidden;}
+.cb-pad svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.cb-pad .lt{fill:var(--pad);}
+.cb-pad .lg{fill:var(--pad);opacity:.3;}
+.cb-pad .mk{display:none;fill:none;stroke:var(--pad);stroke-width:1.3;stroke-dasharray:5 4;stroke-opacity:.85;}
+.cb-lot.open .cb-pad .mk{display:inline;}
+.cb-lot.build .cb-pad :is(.lt,.lg){fill:var(--amber);}
+.cb-lot.locked .cb-pad .cb-pad-m{filter:brightness(.72);}
+.cb-lot.locked .cb-pad .lt{fill:#2b333b;}
+.cb-lot.locked .cb-pad .lg{display:none;}
+.cb-lot:is(.open,.build) .cb-pad .lts{will-change:opacity;}
+.cb-lot.open .cb-pad .lts{animation:cbPadPulse 2.4s ease-in-out infinite;}
+.cb-lot.build .cb-pad .lts{animation:cbPadPulse 1.2s ease-in-out infinite;}
+@keyframes cbPadPulse{50%{opacity:.3;}}
+@media (prefers-reduced-motion:reduce){.cb-pad .lts{animation:none !important;}}
+/* Табличка под площадкой: имя и состояние словами и знаком — легенда не нужна. Отступ — глубина
+   площадки ниже земли (отступ в процентах считается от ширины участка, как и --fw). У соседей
+   штаба по дальнему ряду (.above) — над крышей. */
+.cb-tagl{position:absolute;left:var(--fx);top:100%;z-index:2;transform:translateX(-50%);margin-top:calc(var(--fw) * .14);
+  display:flex;flex-direction:column;align-items:center;gap:3px;width:max-content;max-width:max(100%,150px);
+  text-align:center;padding:4px 10px 5px;border-radius:9px;
+  background:rgba(3,12,20,.86);border:1px solid var(--sf-edge-hi);box-shadow:0 4px 12px rgba(0,0,0,.45);
+  font-size:var(--fs-caption);line-height:1.25;color:var(--sf-text);}
+.cb-lot.above .cb-tagl{top:auto;bottom:calc(100% - var(--ft));margin:0 0 6px;}
 .cb-tagl b{font-weight:600;color:var(--sf-hi);}
-.cb-tagl i{font-style:normal;font-weight:700;color:var(--cyan);}
+.cb-tag-s{display:flex;align-items:center;gap:6px;min-height:15px;white-space:nowrap;}
+.cb-tag-s > i{font-style:normal;font-weight:600;display:inline-flex;align-items:center;gap:5px;}
+.cb-tag-go{color:var(--cyan);}
+.cb-tag-up{color:var(--grn);}
+.cb-tagl .cb-pips i{width:7px;height:7px;}
+.cb-ico{width:12px;height:12px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.cb-tag-job{display:flex;align-items:center;gap:6px;color:var(--amber);font-weight:600;}
+.cb-tag-job > i{font-style:normal;}
+.cb-tag-job > span{display:flex;flex-direction:column;gap:3px;min-width:96px;}
+.cb-tag-job .cb-bar{height:4px;}
+.cb-tag-job small{font-size:var(--fs-caption);}
+.cb-lot.open .cb-tagl{border-color:color-mix(in srgb,var(--cyan) 60%,transparent);}
 .cb-lot.build .cb-tagl{border-color:color-mix(in srgb,var(--amber) 60%,transparent);}
-.cb-lot.build .cb-tagl i{color:var(--amber);}
-.cb-lot.open .cb-tagl{border-style:dashed;}
-.cb-lot.locked .cb-tagl,.cb-lot.locked .cb-tagl :is(b,i){color:var(--sf-dim);}
-.cb-bdg{display:none;}
+.cb-lot.locked .cb-tagl{border-color:var(--sf-edge);}
+.cb-lot.locked .cb-tagl :is(b,i){color:var(--sf-dim);}
 /* Нарисованные здания — картинки; голограммы их уровней красят фильтры #corpGhost и
    #corpScaf из разметки хаба. Здание без рисунка — корпус: крыша, бок, окна; закрытое —
    пунктир, строящееся — штриховка лесов (узор #corpHatch там же). */
@@ -3986,23 +4028,17 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 :is(#hp-corp,#corp-sheet) .spr .ghost :is(.f,.t,.s){fill:none;stroke:rgba(140,233,242,.6);stroke-dasharray:4 4;}
 :is(#hp-corp,#corp-sheet) .spr .ghost :is(.w,.wd){opacity:.18;}
 :is(#hp-corp,#corp-sheet) .spr .ghost.scaf :is(.f,.t,.s){fill:url(#corpHatch);stroke:#ffb43a;stroke-opacity:.85;}
-.cb-hud{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:12px;max-width:360px;padding:10px 14px;
+/* Очередь строек. */
+.cb-hud{display:flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;
   border-radius:12px;background:rgba(3,12,20,.86);border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);}
 .cb-hud.idle{border-color:var(--sf-edge);}
-.cb-hud-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;font-size:17px;
+.cb-hud-ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;font-size:16px;
   background:color-mix(in srgb,var(--amber) 16%,transparent);color:var(--amber);}
 .cb-hud.idle .cb-hud-ic{background:var(--sf-sel);color:var(--cyan);}
-.cb-hud-b{display:flex;flex-direction:column;gap:5px;min-width:180px;}
+.cb-hud-b{display:flex;align-items:center;gap:6px 12px;min-width:0;flex-wrap:wrap;}
+.cb-hud-b .cb-bar{width:120px;}
 .cb-hud b{font-size:var(--fs-caption);font-weight:600;color:var(--sf-hi);}
 .cb-hud small{font-size:var(--fs-caption);color:var(--sf-dim);}
-.cb-key{position:absolute;right:14px;top:14px;display:flex;flex-wrap:wrap;gap:6px 12px;max-width:300px;padding:8px 12px;
-  border-radius:12px;background:rgba(3,12,20,.8);border:1px solid var(--line);font-size:var(--fs-caption);color:var(--sf-dim);}
-.cb-key span{display:inline-flex;align-items:center;gap:6px;}
-.cb-key i{width:12px;height:12px;border-radius:3px;display:inline-block;}
-.cb-key .k-built{background:rgba(53,214,230,.35);border:1px solid var(--cyan);}
-.cb-key .k-build{background:repeating-linear-gradient(45deg,rgba(255,180,58,.6) 0 2px,transparent 2px 4px);border:1px solid var(--amber);}
-.cb-key .k-open{border:1px dashed var(--sf-edge-hi);}
-.cb-key .k-locked{border:1px solid var(--sf-edge);opacity:.5;}
 .cb-bar{display:block;height:6px;border-radius:3px;background:color-mix(in srgb,var(--amber) 16%,transparent);overflow:hidden;}
 .cb-bar i{display:block;height:100%;border-radius:3px;background:var(--amber);}
 /* База: карточка уровня корпорации и здания. */
@@ -4254,16 +4290,22 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   .cb-tab{flex:1;padding:0 4px;gap:5px;}
   .cb-tab-settings{flex:0 0 44px;padding:0;}
   .cb-settings-label{display:none;}
-  .cb-pano-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;}
-  .cb-pano{width:556px;height:250px;aspect-ratio:auto;}
-  .cb-tagl,.cb-lot .cb-plus{display:none;}
-  .cb-bdg{position:absolute;left:var(--bx,94%);top:var(--by,2%);transform:translate(-100%,-50%);display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:11px;
-    background:rgba(3,12,20,.92);border:1px solid var(--cyan);color:var(--sf-hi);font-size:var(--fs-caption);font-weight:700;}
-  .cb-lot.build .cb-bdg{border-color:var(--amber);color:var(--amber);}
-  .cb-lot.open .cb-bdg{border-style:dashed;color:var(--cyan);}
-  .cb-lot.locked .cb-bdg{border-color:var(--sf-edge);color:var(--sf-dim);}
-  .cb-hud{position:static;max-width:none;margin-top:10px;}
-  .cb-key{position:static;max-width:none;margin-top:8px;padding:0 2px;background:none;border:0;}
+  /* Вся база стоймя, без прокрутки вбок: горизонт — на 30%, ряды — 3, 2 и 2 здания. */
+  .cb-pano-box{width:100%;}
+  .cb-pano{aspect-ratio:600 / 945;}
+  .cb-sky{height:175.9%;}
+  .cb-shade{background:linear-gradient(180deg,rgba(2,8,14,.65),rgba(2,8,14,.25) 23%,transparent 31%,transparent 86%,rgba(2,8,14,.5)),
+    radial-gradient(140% 90% at 50% 58%,transparent 60%,rgba(2,8,14,.5));}
+  .cb-lot{left:var(--px);top:var(--py);width:var(--pw);height:var(--ph);}
+  /* Имя переносится в ширину участка: в дальнем ряду три здания на ширину телефона. */
+  .cb-tagl{padding:3px 8px 4px;max-width:115%;}
+  /* Остаток стройки на телефоне — в строке очереди; на табличке — полоса. */
+  .cb-tag-job small{display:none;}
+  .cb-tag-job > span{min-width:64px;}
+  .cb-hud{padding:10px 14px;gap:12px;}
+  .cb-hud-ic{width:34px;height:34px;font-size:17px;}
+  .cb-hud-b{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:5px;}
+  .cb-hud-b .cb-bar{width:auto;}
   .cb-base-grid,.cb-two,.cb-nc-hero{grid-template-columns:minmax(0,1fr);}
   .cb-bgrid{grid-template-columns:minmax(0,1fr);gap:8px;}
   .cb-bc{flex-direction:row;}
@@ -5679,7 +5721,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div id="news-sheet"></div>
   <div id="corp-sheet"></div>
   <!-- Штриховка «идёт стройка» для голограмм зданий корпорации: одна на документ, спрайты ссылаются по id -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><pattern id="corpHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(255,180,58,.07)"/><rect width="2.2" height="7" fill="rgba(255,180,58,.5)"/></pattern><filter id="corpGhost" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".09 .3 .03 0 .08 .2 .66 .07 0 .3 .2 .69 .07 0 .34 0 0 0 .6 0"/></filter><filter id="corpScaf" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".19 .64 .07 0 .35 .13 .44 .05 0 .22 .04 .14 .01 0 .05 0 0 0 .7 0"/></filter></defs></svg>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><pattern id="corpHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="rgba(255,180,58,.07)"/><rect width="2.2" height="7" fill="rgba(255,180,58,.5)"/></pattern><filter id="corpGhost" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".09 .3 .03 0 .08 .2 .66 .07 0 .3 .2 .69 .07 0 .34 0 0 0 .6 0"/></filter><filter id="corpScaf" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".19 .64 .07 0 .35 .13 .44 .05 0 .22 .04 .14 .01 0 .05 0 0 0 .7 0"/></filter><filter id="corpShade" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".06 .2 .02 0 .07 .07 .24 .03 0 .11 .08 .28 .04 0 .16 0 0 0 .85 0"/></filter></defs></svg>
 </div>
 <div id="emblempick">
   <div class="ep-box">

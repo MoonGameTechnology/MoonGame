@@ -47,11 +47,17 @@ import {
   CORP_BACKDROPS,
   CORP_DRAW_ORDER,
   CORP_LOTS,
+  CORP_LOTS_PHONE,
+  CORP_PAD,
   CORP_PANORAMA,
+  CORP_PANORAMA_PHONE,
+  CORP_TAG_ABOVE,
   corpBackdropName,
   corpPanoramaBg,
+  corpSceneBg,
   corpSprite,
-  corpSpriteRoof,
+  corpSpriteBox,
+  type CorpLot,
 } from './corpSprites';
 import { esc, nfmt } from './format';
 import { newsCalendar, newsTimeText } from './newsScreen';
@@ -84,14 +90,6 @@ const ROLE_LABEL: Readonly<Record<CorpRole, string>> = {
   officer: 'corp.role.officer',
   member: 'corp.role.member',
   recruit: 'corp.role.recruit',
-};
-
-/** Таблица, а не сборка ключа: гейт локализации ищет ключ литералом. */
-const LOT_KEY: Readonly<Record<CorpLotState, string>> = {
-  built: 'corp.hub.key.built',
-  build: 'corp.hub.key.build',
-  open: 'corp.hub.key.open',
-  locked: 'corp.hub.key.locked',
 };
 
 const MEMBER_ACTION: Readonly<Record<Exclude<CorpMemberAction, 'accept' | 'decline'>, string>> = {
@@ -290,31 +288,44 @@ function lotLabel(view: CorpInfrastructureView, b: CorpBuildingView, st: CorpLot
   return t('corp.buildings.requirement', { n: b.levels[0]?.headquarters ?? 1 });
 }
 
-function lotHtml(view: CorpInfrastructureView, b: CorpBuildingView, canBuild: boolean, style: string): string {
-  const lot = CORP_LOTS[b.id];
-  if (!lot) return '';
+/** Значки сцены — рисунком, а не эмодзи: цвет и толщину даёт тема. */
+const LOCK_ICON =
+  `<svg class="cb-ico" viewBox="0 0 12 14" aria-hidden="true"><path d="M3.5 6V4.2a2.5 2.5 0 0 1 5 0V6"/><rect x="1.5" y="6" width="9" height="7" rx="1.5"/></svg>`;
+const UP_ICON = `<svg class="cb-ico" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 7.5L6 4l3.5 3.5"/></svg>`;
+
+/** Строка таблички под зданием: уровень, стройка, «построить» или что нужно для участка. */
+function lotStatus(view: CorpInfrastructureView, b: CorpBuildingView, st: CorpLotState, elapsedMs: number): string {
+  if (st === 'build') return `<span class="cb-tag-job"><i aria-hidden="true">⚒</i><span>${jobBar(view, elapsedMs)}</span></span>`;
+  if (st === 'locked')
+    return `<i>${LOCK_ICON}${esc(t('corp.hub.lot.from', { n: b.levels[0]?.headquarters ?? 1 }))}</i>`;
+  const can = corpBuildingStatus(view, b).kind === 'can';
+  if (st === 'open') return can ? `<i class="cb-tag-go">+ ${esc(t('corp.buildings.build'))}</i>` : `<i>${esc(t('corp.hub.key.open'))}</i>`;
+  return pips(b.level, b.levels.length, false) + (can ? `<i class="cb-tag-up">${UP_ICON}</i>` : '');
+}
+
+/** Место участка в обеих сценах — переменными: какую взять, решает ширина вкладки (CSS). */
+function lotPlace(id: string): string | null {
+  const lot = CORP_LOTS[id];
+  const phone = CORP_LOTS_PHONE[id];
+  if (!lot || !phone) return null;
+  const at = (l: CorpLot, w: number, h: number, k: string): string =>
+    `--${k}x:${pct(l.x, w)};--${k}y:${pct(l.y, h)};--${k}w:${pct(l.w, w)};--${k}h:${pct(l.h, h)}`;
+  return `${at(lot, CORP_PANORAMA.w, CORP_PANORAMA.h, 'l')};${at(phone, CORP_PANORAMA_PHONE.w, CORP_PANORAMA_PHONE.h, 'p')}`;
+}
+
+function lotHtml(view: CorpInfrastructureView, b: CorpBuildingView, style: string, elapsedMs: number): string {
+  const place = lotPlace(b.id);
+  if (!place) return '';
   const st = corpLotState(view, b);
-  const max = b.levels.length;
-  const mark =
-    st === 'built'
-      ? { tag: `${b.level}/${max}`, badge: String(b.level) }
-      : st === 'build'
-        ? { tag: `⚒ ${view.construction?.level ?? b.level + 1}`, badge: '⚒' }
-        : st === 'open'
-          ? { tag: canBuild ? '+' : '', badge: '+' }
-          : { tag: t('corp.hub.lot.from', { n: b.levels[0]?.headquarters ?? 1 }), badge: '🔒' };
-  const pos =
-    `left:${pct(lot.x, CORP_PANORAMA.w)};top:${pct(lot.y, CORP_PANORAMA.h)};` +
-    `width:${pct(lot.w, CORP_PANORAMA.w)};height:${pct(lot.h, CORP_PANORAMA.h)}`;
-  const roof = corpSpriteRoof(b.id, b.level, st, style);
-  const at = roof ? ` style="--bx:${pct(roof.x, 1)};--by:${pct(roof.y, 1)}"` : '';
+  const box = corpSpriteBox(b.id, b.level, st, style);
+  const above = CORP_TAG_ABOVE.has(b.id) ? ' above' : '';
   return (
-    `<button type="button" class="cb-lot ${st} tag-${lot.tag}" style="${pos}" data-corpbld="${esc(b.id)}" ` +
+    `<button type="button" class="cb-lot ${st}${above}" style="${place};--fx:${pct(box.x, 1)};--fw:${pct(box.w, 1)};--ft:${pct(box.top, 1)}" data-corpbld="${esc(b.id)}" ` +
     `aria-label="${esc(`${t(b.nameKey)}: ${lotLabel(view, b, st)}`)}">` +
+    `<span class="cb-pad" aria-hidden="true">${CORP_PAD}</span>` +
     corpSprite(b.id, b.level, st, style, true) +
-    (st === 'open' && canBuild ? `<span class="cb-plus" aria-hidden="true">+</span>` : '') +
-    `<span class="cb-tagl" aria-hidden="true"><b>${esc(t(b.nameKey))}</b>${mark.tag ? `<i>${esc(mark.tag)}</i>` : ''}</span>` +
-    `<span class="cb-bdg"${at} aria-hidden="true">${esc(mark.badge)}</span></button>`
+    `<span class="cb-tagl" aria-hidden="true"><b>${esc(t(b.nameKey))}</b><span class="cb-tag-s">${lotStatus(view, b, st, elapsedMs)}</span></span>` +
+    `</button>`
   );
 }
 
@@ -332,16 +343,6 @@ function hudHtml(view: CorpInfrastructureView, elapsedMs: number): string {
     `<b>${esc(t('corp.buildings.queue', { name: buildingName(view, job.buildingId), n: job.level }))}</b>` +
     jobBar(view, elapsedMs) +
     `</div></div>`
-  );
-}
-
-function legendHtml(): string {
-  return (
-    `<div class="cb-key" aria-hidden="true">` +
-    (['built', 'build', 'open', 'locked'] as const)
-      .map((k) => `<span><i class="k-${k}"></i>${esc(t(LOT_KEY[k]))}</span>`)
-      .join('') +
-    `</div>`
   );
 }
 
@@ -435,16 +436,13 @@ function baseHtml(p: CorpHubPaint): string {
   const drawn = CORP_DRAW_ORDER.map((id) => view.buildings.find((b) => b.id === id)).filter(
     (b): b is CorpBuildingView => b !== undefined,
   );
-  const bg = corpPanoramaBg(
-    drawn.map((b) => ({ id: b.id, built: b.level > 0 })),
-    p.style?.backdrop,
-  );
+  const bg = corpSceneBg(p.style?.backdrop);
   const style = styleOf(p);
   return (
     `<div class="cb-base">` +
-    `<div class="cb-pano-box"><div class="cb-pano-scroll"><div class="cb-pano">${bg}` +
-    drawn.map((b) => lotHtml(view, b, view.canBuild, style)).join('') +
-    `</div></div>${hudHtml(view, p.elapsedMs)}${legendHtml()}</div>` +
+    `<div class="cb-pano-box"><div class="cb-pano" style="${bg.style}">${bg.html}` +
+    drawn.map((b) => lotHtml(view, b, style, p.elapsedMs)).join('') +
+    `</div></div>` +
     `<div class="cb-base-grid">${levelCardHtml(view, p.elapsedMs)}` +
     `<section class="cb-blds"><div class="cb-sec-h"><h3>${esc(t('corp.hub.buildings'))}</h3>` +
     `<small>${esc(t('corp.hub.buildings.rule'))}</small></div>` +
@@ -668,7 +666,9 @@ export function corpHubHtml(p: CorpHubPaint): string {
           : p.section === 'settings'
             ? settingsHtml(p, corp, me)
             : treasuryHtml(p, corp);
-  return `<div class="cb">${headHtml(p, corp)}${tabsHtml(p)}${section}</div>`;
+  // Строка стройки «Базы» стоит в ряду вкладок: на ПК там пусто, а небо над сценой занято табличками.
+  const hud = p.section === 'base' && p.view ? hudHtml(p.view, p.elapsedMs) : '';
+  return `<div class="cb">${headHtml(p, corp)}<div class="cb-tabrow">${tabsHtml(p)}${hud}</div>${section}</div>`;
 }
 
 // --- шторка ----------------------------------------------------------------------------
@@ -807,7 +807,7 @@ function styleSheetHtml(p: CorpHubPaint, view: MetaCorpStyleView): string {
   const backdrops = CORP_BACKDROPS.map((id) => {
     const card = corpStyleCard(view, id);
     return (
-      `<figure class="cb-sty cb-bd${card === 'applied' ? ' cur' : ''}"><div class="cb-bd-art">${corpPanoramaBg([], id)}</div>` +
+      `<figure class="cb-sty cb-bd${card === 'applied' ? ' cur' : ''}"><div class="cb-bd-art">${corpPanoramaBg(id)}</div>` +
       `<figcaption><b>${esc(t(corpBackdropName(id)))}</b>${lookActHtml(p, card, id)}</figcaption></figure>`
     );
   }).join('');

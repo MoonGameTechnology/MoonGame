@@ -1546,8 +1546,6 @@ export const de: Record<string, string> = {
   'corp.hub.guest.sign-in': 'Anmelden',
   'corp.hub.guest.title': 'Korporationen',
   'corp.hub.key.build': 'Im Bau',
-  'corp.hub.key.built': 'Gebaut',
-  'corp.hub.key.locked': 'Gesperrt',
   'corp.hub.key.open': 'Kann gebaut werden',
   'corp.hub.kick.confirm': '{name} wirklich ausschließen?',
   'corp.hub.last-level': 'Dies ist die höchste Stufe',

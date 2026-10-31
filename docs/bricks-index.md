@@ -68,6 +68,7 @@
 | CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
 | CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
 | CORP-16 | ✅ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
+| CORP-17 | ✅ | proto | `docs/backlog.md` | Сцена базы в хабе. |
 | SPY-12 | ✅ | core proto | `docs/backlog.md` | Разная цена операций. |
 | SPY-13 | ✅ | core srv proto | `docs/backlog.md` | Разведка, которая копится. |
 | SPY-14 | ✅ | core proto | `docs/backlog.md` | Саботаж очереди. |
