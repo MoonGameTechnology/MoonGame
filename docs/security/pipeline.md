@@ -854,6 +854,79 @@ APK).
 `npm install --package-lock-only`. Переехали ровно `sharp`, его платформенные бинарники
 `@img/sharp-*` и libvips 1.3.3 → 1.3.4. Вердикт — _true positive_, подавлять нечего.
 
+**Запись триажа (2026-10-31) — `minimatch` и `glob`: фикс есть только в новом мажоре,
+починено overrides, временные подавления сняты.** После очереди мержа #1896 (2026-10-30
+22:18 UTC, последний зелёный прогон) в фиде появились два advisory:
+
+- `GHSA-g3hv-75wg-m249` / `CVE-2026-118764` (MODERATE, CVSS 4 6.9): `minimatch` раздувает
+  `globParts` в `firstPhasePreProcess()` при `optimizationLevel` ≥ 2 на шаблоне с
+  `**/../`, это DoS по CPU и памяти. Задеты ВСЕ версии ниже 11.0.1; бэкпорта в 10.x, 8.x
+  и 3.x нет и не будет (README minimatch 11: новый сопоставитель «will not be backported»);
+- `GHSA-3g3m-2fjr-6pw4` / `CVE-2026-118773` (MODERATE, CVSS 4 6.3): `glob` продолжает
+  обход каталогов после срабатывания `AbortSignal`. Задеты 9.0.0–14.0.1, фикс 14.0.2.
+
+Упали `SCA — osv.dev (OSV-Scanner)`, шаг `Dependency audit (OSV-Scanner)` в `ci.yml` и
+`Vuln — built image base OS (Trivy image)` (`app/node_modules/.pnpm/minimatch@10.2.6`).
+Где жили уязвимые версии:
+
+- `pnpm-lock.yaml`: `minimatch` 10.2.6, его берут `eslint` 10.13 (сам и через
+  `@eslint/config-array`) и `@typescript-eslint/typescript-estree`. Свежий `eslint` 10.14.0
+  сам ещё просит `^10.2.6`, так что апдейт родителя не помогает;
+- `mobile/package-lock.json` (только dev): `minimatch` 10.2.5 и `glob` 13.0.6 под
+  `@capacitor/cli` 8 (через `rimraf` 6), `minimatch` 8.0.7 и `glob` 9.3.5 под `rimraf` 4
+  вложенного `@capacitor/cli` 5 из `@capacitor/assets`, `minimatch` 3.1.5 под `replace`
+  1.2.2 (его объявляет `@trapezedev/project`).
+
+Вердикт — _true positive_ по наличию, не эксплуатируемо по сути: все потребители —
+инструменты сборки, шаблоны им задаёт наш же конфиг, а не игрок. Тем не менее правило
+«сначала апдейт» выполнимо, поэтому починено им:
+
+- корень, `pnpm.overrides`: `"minimatch": "^11.0.3"`;
+- `mobile/package.json`, `overrides`: `"glob": "^14.0.3"` и `"minimatch": "^11.0.3"` на всё
+  дерево; прежний узкий `replace → minimatch ^3.1.4` снят, его покрывает общий.
+
+Что приехало нового: `@isaacs/nonrecursive-glob-match` 1.0.3 (новый сопоставитель того же
+автора, единственная новая зависимость `minimatch` 11), у `glob` 14 — `path-scurry` 3.0.0 и
+`lru-cache` 11.5.3. Все версии старше суточного карантина `minimumReleaseAge`.
+
+Проверено на совместимость. `minimatch` 11 экспортирует те же имена, что 10.2.6 (пропал
+только тип `MMRegExp`), `eslint` гоняется по всему репо в `pnpm run check`. У `glob` 14
+те же экспортируемые функции, что у 13, из опций ушла `debug` и появилась `normalize`;
+`rimraf` 4 и 6 грузятся с ним и через `import`, и через `require` (сам `rimraf` в дереве
+зовут только `cap migrate` и iOS-сборка). Конвейер APK до Gradle (`cap add android`,
+`cap sync android`, `capacitor-assets generate --android`, `patch-android.mjs`,
+`patch-updater.mjs`) локально проходит на новом дереве. Отдельно `replace`: он вызывает
+`minimatch(file, pattern)` как функцию, а `minimatch` 11 — модуль с именованными
+экспортами, то есть вызов упал бы `TypeError`. Но этот вызов — мёртвый код: ни один файл
+дерева `mobile` не делает `require`/`import` пакета `replace`, `@trapezedev/project` его
+только объявляет. Начни его кто-нибудь грузить — он упадёт громко на первом же шаблоне, а
+не сопоставит молча неверно.
+
+**Почему dev-пакет вообще оказался в прод-образе.** `Dockerfile` после полной установки
+делает `pnpm --filter '!@void/backup-repository' install --prod`, и комментарий над ним
+обещает, что это «removes the root's toolchain». Снимает он только ссылки: виртуальное
+хранилище `node_modules/.pnpm` остаётся целиком. Замерено на этом lockfile 2026-10-31:
+312 пакетов (190 МБ) до шага и столько же после; чистая установка `--prod` в пустую папку
+даёт 89 пакетов (28 МБ) без `eslint`, `typescript`, `vitest`, `esbuild` и `minimatch`. Тем
+же объясняется `nanoid` в образе из записи 2026-08-08 выше (его берёт `postcss` сборки
+клиента). Рантайм до этих пакетов не дотягивается — серверные импортёры на них не
+ссылаются, но в образ они едут и сканером читаются. Правка `Dockerfile` — отдельный кирпич
+со своим smoke-прогоном образа, здесь не делалась.
+
+**Подавления сняты.** На время между находкой и фиксом PR #1895 (коммит `a2453e8`) завёл
+`osv-scanner.toml`, `mobile/osv-scanner.toml` (`[[IgnoredVulns]]` до 2026-11-30) и
+`CVE-2026-118764` в `.trivyignore`, переписав заодно шапку последнего. После фикса
+подавлять нечего: оба `osv-scanner.toml` удалены, `.trivyignore` возвращён к тексту SEC-28
+(«Активных исключений нет»). Новая шапка требовала заносить в файл находки, у которых фикс
+апстримом не опубликован, хотя гейт с `--ignore-unfixed` такие и так не блокирует, а
+подавление прячет их из отчёта (SEC-27/28); сама запись этому правилу тоже не отвечала,
+фикс 11.0.1 опубликован.
+
+**Остаток.** `desktop/package-lock.json` по-прежнему держит `glob` 13.0.6 и `minimatch`
+10.2.6 (dev, через `@electron/asar`). Ни один блокирующий гейт его не читает: OSV получает
+только два lockfile'а, а `trivy fs` по умолчанию не считает dev-зависимости npm-lockfile'ов.
+Чинится тем же override в `desktop/package.json`, но с проверкой упаковки Electron.
+
 **Запись триажа (SEC-22, 2026-08-11) — две LOW в glibc закрыли очередь мержа целиком.**
 Между 2026-08-10 04:07 и 2026-08-11 09:09 UTC в фиде появились `CVE-2026-6368` и
 `CVE-2026-6791` — обе в `wordexp()` пакета `libc6` базового образа. Код репозитория при
