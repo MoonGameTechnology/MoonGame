@@ -249,6 +249,16 @@ try {
     } catch (e) {
       console.error(e);
       await page.screenshot({ path: `/tmp/gw-onboarding/${mode}-failure.png` }).catch(() => {});
+      // The same state in the job log too: the artifact is not always at hand.
+      const where = await page
+        .evaluate(() => ({
+          step: document.querySelector('#spotlight')?.dataset.step,
+          copy: document.querySelector('.sl-copy')?.textContent,
+          log: window.__guideTest?.facts().log,
+          side: document.querySelector('#side')?.innerText.slice(0, 1500),
+        }))
+        .catch(() => null);
+      console.error(`${mode} failure state:`, JSON.stringify(where, null, 2));
       writeFileSync(
         `/tmp/gw-onboarding/${mode}-failure.json`,
         JSON.stringify(
