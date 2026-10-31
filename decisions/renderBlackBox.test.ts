@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MENU_FRAME_MS } from './simClock';
 import {
   ERROR_CHARS,
+  FREEZE_MS,
   SESSIONS_KEPT,
   STALLS_KEPT,
   STALL_MS,
@@ -50,6 +51,24 @@ describe('чёрный ящик отрисовки', () => {
     expect(sessions.map((s) => s.build)).toEqual(['v5', 'v4', 'v3'].slice(0, SESSIONS_KEPT));
   });
 
+  it('запуск с зависанием переживает чистые перезапуски, пока не придёт новое зависание', () => {
+    let sessions = startSession([], 'v1', 1000);
+    sessions[0] = withStall(sessions[0]!, stall(10, FREEZE_MS, true));
+    for (let i = 2; i <= 5; i++) sessions = startSession(sessions, 'v' + i, i * 1000);
+    expect(sessions.map((s) => s.build)).toEqual(['v5', 'v4', 'v3', 'v1']);
+    // Секундная остановка зависанием не считается: такой запуск уходит как обычный.
+    sessions[0] = withStall(sessions[0]!, stall(10, FREEZE_MS - 1));
+    sessions = startSession(sessions, 'v6', 6000);
+    expect(sessions.map((s) => s.build)).toEqual(['v6', 'v5', 'v4', 'v1']);
+    // Новое зависание среди последних — старое больше не держится.
+    sessions[0] = withStall(sessions[0]!, stall(10, FREEZE_MS + 1));
+    sessions = startSession(sessions, 'v7', 7000);
+    expect(sessions.map((s) => s.build)).toEqual(['v7', 'v6', 'v5']);
+    for (let i = 8; i <= 9; i++) sessions = startSession(sessions, 'v' + i, i * 1000);
+    expect(sessions.map((s) => s.build)).toEqual(['v9', 'v8', 'v7', 'v6']);
+    expect(parseSessions(JSON.stringify(sessions))).toEqual(sessions);
+  });
+
   it('идущую остановку обновляет, новую добавляет, хранит последние', () => {
     let [session] = startSession([], '', 0);
     session = withStall(session!, stall(500, 1200, true));
@@ -94,6 +113,6 @@ describe('чёрный ящик отрисовки', () => {
     ])
       expect(parseSessions(raw)).toEqual([]);
     const many = Array.from({ length: SESSIONS_KEPT + 2 }, () => sessions[0]);
-    expect(parseSessions(JSON.stringify(many))).toHaveLength(SESSIONS_KEPT);
+    expect(parseSessions(JSON.stringify(many))).toHaveLength(SESSIONS_KEPT + 1);
   });
 });

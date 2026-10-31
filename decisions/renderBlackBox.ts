@@ -18,7 +18,10 @@
  *    может не кончиться до перезапуска: кадр, который бы её закрыл, тогда не придёт никогда.
  * 4. **Запусков хранится {@link SESSIONS_KEPT}, остановок в запуске — {@link STALLS_KEPT}
  *    последних.** Игрок открывает отчёт не сразу после зависания, а между ними бывает ещё
- *    перезапуск; ящик при этом не растёт без меры.
+ *    перезапуск; ящик при этом не растёт без меры. Последний запуск с зависанием — остановкой
+ *    не короче {@link FREEZE_MS} — держится сверх них, пока среди последних нет своего: после
+ *    зависания игру перезапускают и не раз, и три чистых запуска меню вытесняли его из отчёта
+ *    (отчёт владельца 2026-10-31).
  * 5. **Повреждённая запись — пустой ящик**, а не сбой загрузки страницы.
  */
 
@@ -29,6 +32,9 @@ export const PULSE_MS = 250;
 /** Снимок состояния пишется не чаще этого, мс: ящик знает, что было незадолго до обрыва. */
 export const SNAPSHOT_MS = 5000;
 export const SESSIONS_KEPT = 3;
+/** Остановка не короче этого — зависание: запуск с ним держится сверх последних (правило 4), мс.
+ *  Секунда-другая на старте бывает и у здорового запуска. */
+export const FREEZE_MS = 5000;
 export const STALLS_KEPT = 10;
 /** Начало первой ошибки кадра, символов: её текст, а не стек. */
 export const ERROR_CHARS = 160;
@@ -94,7 +100,8 @@ export function isStall(gapMs: number, visibleThroughout: boolean): boolean {
   return visibleThroughout && gapMs >= STALL_MS;
 }
 
-/** Новый запуск впереди прошлых: из них остаются последние (правило 4). */
+/** Новый запуск впереди прошлых: из них остаются последние и последний с зависанием
+ *  (правило 4). */
 export function startSession(
   previous: readonly BlackBoxSession[],
   build: string,
@@ -111,7 +118,10 @@ export function startSession(
     firstError: null,
     last: null,
   };
-  return [fresh, ...previous.slice(0, SESSIONS_KEPT - 1)];
+  const recent = previous.slice(0, SESSIONS_KEPT - 1);
+  const frozen = (s: BlackBoxSession): boolean => s.worstMs >= FREEZE_MS;
+  const older = recent.some(frozen) ? undefined : previous.slice(SESSIONS_KEPT - 1).find(frozen);
+  return older ? [fresh, ...recent, older] : [fresh, ...recent];
 }
 
 /** Остановка в запуске: идущая с тем же началом обновляется, новая встаёт в конец. */
@@ -163,7 +173,7 @@ export function parseSessions(raw: string | null): BlackBoxSession[] {
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(validSession).slice(0, SESSIONS_KEPT) : [];
+    return Array.isArray(parsed) ? parsed.filter(validSession).slice(0, SESSIONS_KEPT + 1) : [];
   } catch {
     return [];
   }
