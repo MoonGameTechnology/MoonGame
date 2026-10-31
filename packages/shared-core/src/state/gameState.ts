@@ -1165,6 +1165,10 @@ export interface GameState {
   /** Agents away from each spy's network (`espionageModule`, SPY-6). PRIVATE like
    *  `intel`: a viewer's projection carries only their own network. */
   spyAgents?: Record<PlayerId, AgentAway[]>;
+  /** Turned enemy agents serving each catcher (`espionageModule`, SPY-18): the game-time
+   *  each one leaves. Every live entry is one agent over the `espionage.agents` network.
+   *  PRIVATE like `spyAgents`. */
+  spyTurned?: Record<PlayerId, number[]>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];

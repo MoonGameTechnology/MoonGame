@@ -126,6 +126,18 @@ export const SPY_CREW_SOLO_MIGRATION = {
   toDataHash: SPY_EXPOSED_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Turned agents (SPY-18): catalogue 0.1.70 gives the counter-intelligence bureau's third
+ *  level `spyTurnChance` 0.3 and espionage 1.11.0 turns the agent such a bureau kills.
+ *  A saved world has no turned agents and no pending catch, so it reads as is. */
+export const SPY_TURN_SOLO_MIGRATION = {
+  fromRules: SPY_CREW_SOLO_MIGRATION.toRules,
+  fromData: SPY_CREW_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_CREW_SOLO_MIGRATION.toDataHash,
+  toRules: '0141cf0a3d8524',
+  toData: '0.1.70',
+  toDataHash: '0388c4d23f1e3f',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -139,6 +151,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_DISRUPT_SOLO_MIGRATION,
   SPY_EXPOSED_SOLO_MIGRATION,
   SPY_CREW_SOLO_MIGRATION,
+  SPY_TURN_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

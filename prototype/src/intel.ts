@@ -23,6 +23,7 @@ import {
   type GameState,
   type IntelGrant,
   type SpyOp,
+  turnedAgents,
 } from '../../packages/shared-core/src/index';
 import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
 
@@ -36,10 +37,11 @@ export function spyCostRange(): string {
   return `${Math.min(...all)}–${Math.max(...all)}`;
 }
 
-/** Сеть агентов игрока сейчас (SPY-6). Размер — база ядра `BASE_SPY_AGENTS`: как и
- *  `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */
+/** Сеть агентов игрока сейчас (SPY-6). Размер — база ядра `BASE_SPY_AGENTS` и
+ *  перевербованные агенты (SPY-18): как и `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно
+ *  отвергает попытку с `E_NO_AGENT`). */
 export function myAgents(s: GameState, me: string): SpyAgents {
-  return spyAgents(s.spyAgents?.[me], BASE_SPY_AGENTS, s.time);
+  return spyAgents(s.spyAgents?.[me], BASE_SPY_AGENTS + turnedAgents(s, me, s.time), s.time);
 }
 
 /** Сколько строк держит сессионный журнал шпионажа. */

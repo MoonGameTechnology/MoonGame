@@ -18,7 +18,7 @@ import type {
   GameState,
   StrikeBase,
 } from '../../packages/shared-core/src/index';
-import { engagementOf, flashBattles, inVisionBloc, MISSION_HOURS } from '../../packages/shared-core/src/index';
+import { engagementOf, flashBattles, inVisionBloc, MISSION_HOURS, TURNED_HOURS } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
@@ -311,9 +311,20 @@ export function handleEvents(events: DomainEvent[]) {
         if (p.owner !== ME) break;
         const what = t('log.spy.what.world', { at: game.placeName(String(p.planetId)) });
         // SPY-7: раскрытого агента могли убить — окно открыто, но агента нет.
+        // SPY-18: a turned agent is lost the same way, the line says how.
         const lostS = p.agentLost === true;
-        note(t(lostS ? 'log.spy.success.lost' : 'log.spy.success', { what }));
-        pushSpyLog(t(lostS ? 'log.spy.success.lost.short' : 'log.spy.success.short', { what }));
+        const turnedS = lostS && p.agentTurned === true;
+        note(t(turnedS ? 'log.spy.success.turned' : lostS ? 'log.spy.success.lost' : 'log.spy.success', { what }));
+        pushSpyLog(
+          t(
+            turnedS
+              ? 'log.spy.success.turned.short'
+              : lostS
+                ? 'log.spy.success.lost.short'
+                : 'log.spy.success.short',
+            { what },
+          ),
+        );
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
@@ -330,7 +341,13 @@ export function handleEvents(events: DomainEvent[]) {
       }
       case 'intel.lost': {
         if (p.owner !== ME) break;
-        const line = t(p.agentLost === true ? 'log.spy.intel-lost.killed' : 'log.spy.intel-lost', {
+        const line = t(
+          p.agentLost === true
+            ? p.agentTurned === true
+              ? 'log.spy.intel-lost.turned'
+              : 'log.spy.intel-lost.killed'
+            : 'log.spy.intel-lost',
+          {
           at: game.placeName(String(p.planetId)),
         });
         note(line);
@@ -351,7 +368,8 @@ export function handleEvents(events: DomainEvent[]) {
             : displayUnit(params.what);
         if (typeof params.tech === 'string')
           params.tech = tData(data.technologies[params.tech]?.name ?? params.tech);
-        const line = t(deed.key, params) + (deed.lost ? ` ${t('log.spy.agent-lost')}` : '');
+        const lostKey = p.agentTurned === true ? 'log.spy.agent-turned' : 'log.spy.agent-lost';
+        const line = t(deed.key, params) + (deed.lost ? ` ${t(lostKey)}` : '');
         note(line);
         pushSpyLog(line);
         break;
@@ -392,8 +410,13 @@ export function handleEvents(events: DomainEvent[]) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
           // SPY-6/7: убитый агент потерян — об этом владелец узнаёт сразу.
           const lost = p.agentLost === true;
-          note(t(lost ? 'log.spy.fail.lost' : 'log.spy.fail', { who: whoF }));
-          pushSpyLog(t(lost ? 'log.spy.fail.lost.short' : 'log.spy.fail.short', { who: whoF }));
+          const turnedF = lost && p.agentTurned === true;
+          note(t(turnedF ? 'log.spy.fail.turned' : lost ? 'log.spy.fail.lost' : 'log.spy.fail', { who: whoF }));
+          pushSpyLog(
+            t(turnedF ? 'log.spy.fail.turned.short' : lost ? 'log.spy.fail.lost.short' : 'log.spy.fail.short', {
+              who: whoF,
+            }),
+          );
         }
         break;
       case 'espionage.detected': {
@@ -401,9 +424,14 @@ export function handleEvents(events: DomainEvent[]) {
         if (p.owner !== ME) break;
         const what = t('log.spy.what.world', { at: game.placeName(String(p.planetId)) });
         const c = counterLine(p.spy as string | undefined, p.killed === true);
-        const line = c.named
-          ? t(c.key, { who: NAME[p.spy as string] ?? (p.spy as string), what })
-          : t(c.key, { what });
+        const who = NAME[p.spy as string] ?? (p.spy as string);
+        // SPY-18: the bureau turned the agent — one more of ours for a day.
+        const line =
+          p.turned === true
+            ? t('log.spy.turned', { who, what, n: TURNED_HOURS })
+            : c.named
+              ? t(c.key, { who, what })
+              : t(c.key, { what });
         note(line);
         pushSpyLog(line);
         break;

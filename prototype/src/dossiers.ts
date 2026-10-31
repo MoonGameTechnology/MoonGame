@@ -27,6 +27,7 @@ import {
   matchHours,
   thresholdRamp,
   signatureSize,
+  TURNED_HOURS,
   unitTier,
   type GameState,
 } from '../../packages/shared-core/src/index';
@@ -180,7 +181,12 @@ export function buildingDossier(id: string, level: number): Dossier | null {
       return {
         name,
         // SPY-7: прибавка к шансу раскрыть шпиона — то же поле, что исполняет ядро.
-        body: t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)), k: hl(pct(lv.spyKillBonus)) }),
+        body:
+          t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)), k: hl(pct(lv.spyKillBonus)) }) +
+          // SPY-18: the third level turns the spy it would kill.
+          (lv.spyTurnChance > 0
+            ? ` ${t('dossier.building.counterintel.turn', { c: hl(pct(lv.spyTurnChance)), n: TURNED_HOURS })}`
+            : ''),
       };
     case 'farm':
       return {

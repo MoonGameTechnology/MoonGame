@@ -2047,6 +2047,7 @@ export const en: Record<string, string> = {
     'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level.',
   'dossier.building.counterintel':
     'Raises the chance to expose an enemy spy by {b} and to kill an exposed one by {k}. Covers every attempt against you.',
+  'dossier.building.counterintel.turn': 'With a {c} chance turns the spy instead of killing it: +1 agent for {n} h.',
   'dossier.building.tax-office':
     "Raises the world's credit take by {b}.",
   'dossier.fleet.desc':
@@ -3891,6 +3892,13 @@ export const en: Record<string, string> = {
   'log.spy.theft': '🕵 Theft on {at}: {res} +{amount}',
   'log.spy.theft.none': '🕵 Theft on {at}: the treasury is empty',
   'log.spy.agent-lost': 'Agent killed, finding a new spy takes 24h',
+  'log.spy.agent-turned': 'Agent turned, finding a new spy takes 24h',
+  'log.spy.fail.turned': '🕵 Agent turned ({who}). Finding a new spy takes 24h',
+  'log.spy.fail.turned.short': '✖ Agent turned: {who}',
+  'log.spy.success.turned': '🕵 Agent got intel: {what} — a 24h window. The agent was turned, finding a new spy takes 24h',
+  'log.spy.success.turned.short': '🗝 Success: {what}. Agent turned',
+  'log.spy.intel-lost.turned': '🕵 Recon agent on {at} turned, intel closed. Finding a new spy takes 24h',
+  'log.spy.turned': '🛡 Counter-intel turned an agent of {who} ({what}): +1 agent for {n} h',
   'log.spy.research': '🕵 Research theft on {at}: gained the technology “{tech}”',
   'log.spy.research.none': '🕵 Research theft on {at}: nothing to take, this civilisation lags behind us',
   'log.spy.posted': '🛡 Counter-intelligence agent on post: {at}',
