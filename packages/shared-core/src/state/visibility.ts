@@ -657,6 +657,33 @@ function spiedPlanets(state: GameState, viewerId: PlayerId): Set<PlanetId> {
   );
 }
 
+/** What the viewer's live recon has dug up beyond the world itself (SPY-13): the owners
+ *  whose treasury (layer 2), the worlds whose build queue and the owners whose research
+ *  (layer 3), and the owners whose pending diplomatic offers (layer 4) it opens. The owner
+ *  is whoever holds the world NOW — the agent digs into the world, not into a past owner. */
+export interface IntelDepth {
+  treasury: Set<PlayerId>;
+  queues: Set<PlanetId>;
+  research: Set<PlayerId>;
+  offers: Set<PlayerId>;
+}
+
+export function intelDepth(state: GameState, viewerId: PlayerId): IntelDepth {
+  const depth: IntelDepth = { treasury: new Set(), queues: new Set(), research: new Set(), offers: new Set() };
+  for (const g of state.intel?.[viewerId] ?? []) {
+    const layer = g.layer ?? 1;
+    const owner = state.planets[g.target]?.owner;
+    if (g.until <= state.time || layer < 2 || !owner || owner === viewerId) continue;
+    depth.treasury.add(owner);
+    if (layer >= 3) {
+      depth.queues.add(g.target);
+      depth.research.add(owner);
+    }
+    if (layer >= 4) depth.offers.add(owner);
+  }
+  return depth;
+}
+
 /** The set of nodes `viewerId` currently identifies (full detail). Exported so
  *  `visibilityModule` snapshots exactly what the projection treats as live. */
 export function identifiedNodes(
@@ -1048,6 +1075,7 @@ function project(
   // is enforced HERE, at the security boundary, not only by the module's housekeeping.
   const spied = spiedPlanets(state, viewerId);
   const identify = spied.size ? new Set([...coverage.identify, ...spied]) : coverage.identify;
+  const depth = intelDepth(state, viewerId);
   const view = deepClone(state) as VisibleState;
   const ord = visibleOrdnance(state, viewerId);
   if (ord) view.ordnance = ord;
@@ -1120,11 +1148,12 @@ function project(
   }
 
   // Other players' private data: keep identity, drop treasury and research (incl. the
-  // chosen research leader — its branch focus / +slot is strategic, not public).
+  // chosen research leader — its branch focus / +slot is strategic, not public). A posted
+  // recon agent's deeper layers (SPY-13) keep the treasury and the research of its world's owner.
   for (const player of Object.values(view.players)) {
     if (player.id === viewerId) continue;
-    player.resources = {};
-    delete player.technologies;
+    if (!depth.treasury.has(player.id)) player.resources = {};
+    if (!depth.research.has(player.id)) delete player.technologies;
     delete player.scientist;
     delete player.scientists; // the council (branch focus / +slot) — same intel as the legacy field
     delete player.arrears; // unpaid bills read as treasury intel — owner-private
@@ -1178,8 +1207,11 @@ function project(
     if (Object.keys(view.mapShareOffers).length === 0) delete view.mapShareOffers;
   }
   if (view.diplomacyOffers) {
+    // SPY-13, layer 4: a posted recon agent reads its world's owner's offers too.
+    const spiedOffers = [...depth.offers];
     for (const key of Object.keys(view.diplomacyOffers)) {
-      if (!offerInvolves(key, viewerId)) delete view.diplomacyOffers[key];
+      if (offerInvolves(key, viewerId) || spiedOffers.some((o) => offerInvolves(key, o))) continue;
+      delete view.diplomacyOffers[key];
     }
     if (Object.keys(view.diplomacyOffers).length === 0) delete view.diplomacyOffers;
   }
@@ -1260,8 +1292,11 @@ function project(
     // `scheduled` и выше — цепочки приказов: «что он собирается построить» это разведка
     // планов, а не наблюдение мира. Поэтому режется РАНЬШЕ развилки видимости: чужой
     // мир не отдаёт очередь, даже когда ты смотришь на него в упор.
+    // SPY-13, layer 3: a posted recon agent reads the plans of its world — the queue and a
+    // paused site; the rest stays cut.
+    const queueSpied = depth.queues.has(planet.id);
     if (planet.owner !== viewerId) {
-      delete planet.buildQueue;
+      if (!queueSpied) delete planet.buildQueue;
       // SHU-6.6. «Держать патруль» — постоянный приказ эскадры, то же намерение, что
       // цепочки и авто-штурм: точка, где хозяин снова встанет кругом, — разведка планов.
       // Ангар опознанного мира виден, флаг удержания в нём — нет.
@@ -1271,7 +1306,7 @@ function project(
       // вложил. Резалось всё вокруг (`scheduled`, цепочки приказов, очередь), а это
       // поле — нет, поэтому опознанный чужой мир отдавал планы прежнего владельца
       // целиком. Режем там же и по той же причине.
-      delete planet.pausedConstruction;
+      if (!queueSpied) delete planet.pausedConstruction;
       // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
       // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
       delete planet.sortie;
@@ -1446,7 +1481,14 @@ function project(
     const battle = view.battles[id];
     if (battle && !identify.has(battle.location) && !engaged.battles.has(id)) delete view.battles[id];
   }
-  view.scheduled = view.scheduled.filter((e) => scheduledOwnedBy(e, viewerId, state));
+  // SPY-13, layer 3: the orders now under way on a spied world (`construction.complete`)
+  // are its build queue's head — the same plans the layer opens.
+  view.scheduled = view.scheduled.filter(
+    (e) =>
+      scheduledOwnedBy(e, viewerId, state) ||
+      (e.type === 'construction.complete' &&
+        depth.queues.has(String((e.payload as { planetId?: unknown } | null)?.planetId))),
+  );
 
   // Контракт операции (PVR-8.3): очаги, пороги и факты разгрома — правила главы, их видят
   // все. Флоты соединений — только те, что зритель видит и так: учёт идёт и за частями,

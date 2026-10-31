@@ -82,6 +82,17 @@ export const SPY_DELAY_SOLO_MIGRATION = {
   toDataHash: SPY_PRICES_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 1.7.0 makes recon accumulate layers on a posted agent
+ *  (SPY-13). Windows already open in a save stay plain windows of the first layer. */
+export const RECON_LAYERS_SOLO_MIGRATION = {
+  fromRules: SPY_DELAY_SOLO_MIGRATION.toRules,
+  fromData: SPY_DELAY_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_DELAY_SOLO_MIGRATION.toDataHash,
+  toRules: '1b9e0236a92655',
+  toData: SPY_DELAY_SOLO_MIGRATION.toData,
+  toDataHash: SPY_DELAY_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -91,6 +102,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RECON_HALT_SOLO_MIGRATION,
   SPY_PRICES_SOLO_MIGRATION,
   SPY_DELAY_SOLO_MIGRATION,
+  RECON_LAYERS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

@@ -317,6 +317,27 @@ export function handleEvents(events: DomainEvent[]) {
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
+      // SPY-13: a posted recon agent digs a layer deeper, or is caught on post.
+      case 'intel.deepened': {
+        if (p.owner !== ME) break;
+        const n = Number(p.layer);
+        const what = n === 2 ? t('spy.layer.2') : n === 3 ? t('spy.layer.3') : t('spy.layer.4');
+        const line = t('log.spy.layer', { at: game.placeName(String(p.planetId)), n, what });
+        note(line);
+        pushSpyLog(line);
+        if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
+        break;
+      }
+      case 'intel.lost': {
+        if (p.owner !== ME) break;
+        const line = t(p.agentLost === true ? 'log.spy.intel-lost.killed' : 'log.spy.intel-lost', {
+          at: game.placeName(String(p.planetId)),
+        });
+        note(line);
+        pushSpyLog(line);
+        if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
+        break;
+      }
       case 'espionage.succeeded': {
         // SPY-9: саботаж и кража — итог исполнителю (`decisions/spyDeed.ts`).
         const deed = p.owner === ME ? spyDeed(p) : null;
@@ -339,9 +360,13 @@ export function handleEvents(events: DomainEvent[]) {
       case 'espionage.posted':
       case 'espionage.recalled':
         if (p.owner === ME) {
-          const line = t(e.type === 'espionage.posted' ? 'log.spy.posted' : 'log.spy.recalled', {
-            at: game.placeName(String(p.planetId)),
-          });
+          const key =
+            e.type === 'espionage.posted'
+              ? 'log.spy.posted'
+              : p.kind === 'recon'
+                ? 'log.spy.recalled.recon'
+                : 'log.spy.recalled';
+          const line = t(key, { at: game.placeName(String(p.planetId)) });
           note(line);
           pushSpyLog(line);
         }

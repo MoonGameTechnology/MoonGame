@@ -420,6 +420,11 @@ function intelRowHtml(target: string): string {
   const bits: string[] = [];
   for (const g of game.myIntel()) {
     if (s.planets[g.target]?.owner !== target) continue;
+    // SPY-13: a posted agent holds its world until recalled — the layer, not a countdown.
+    if (g.layer !== undefined) {
+      bits.push(t('comms.intel.world.layer', { id: esc(game.placeName(g.target)), n: g.layer }));
+      continue;
+    }
     const left = fmtEta(grantLeftMs(g, s.time) / HOUR);
     bits.push(t('comms.intel.world', { id: esc(game.placeName(g.target)), left }));
   }

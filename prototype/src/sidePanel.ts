@@ -796,7 +796,7 @@ function onSideClick(ev: MouseEvent): void {
     )
       playerOrder(spyOn(ME, selPlanet!, arg));
   } else if (act === 'spyrecall') {
-    playerOrder(recallSpy(ME, selPlanet!));
+    playerOrder(recallSpy(ME, selPlanet!, arg === 'recon' ? 'recon' : undefined));
   } else if (act === 'capital') {
     playerOrder(designateCapital(ME, selPlanet!));
   } else if (act === 'holdpoint') {
