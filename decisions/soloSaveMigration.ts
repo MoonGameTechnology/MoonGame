@@ -71,6 +71,17 @@ export const SPY_PRICES_SOLO_MIGRATION = {
   toDataHash: RECON_HALT_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: construction 1.7.0 / espionage 1.6.0 add the queue sabotage
+ *  (SPY-14). The catalogue and the saved world are unchanged. */
+export const SPY_DELAY_SOLO_MIGRATION = {
+  fromRules: SPY_PRICES_SOLO_MIGRATION.toRules,
+  fromData: SPY_PRICES_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_PRICES_SOLO_MIGRATION.toDataHash,
+  toRules: '082413a8db2fa1',
+  toData: SPY_PRICES_SOLO_MIGRATION.toData,
+  toDataHash: SPY_PRICES_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -79,6 +90,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   COMMANDER_CAREER_SOLO_MIGRATION,
   RECON_HALT_SOLO_MIGRATION,
   SPY_PRICES_SOLO_MIGRATION,
+  SPY_DELAY_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

@@ -1,6 +1,6 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { BuildingDamage, BuildingHit } from './construction';
+import type { BuildingDamage, BuildingHit, ConstructionDelay, DelayedOrder } from './construction';
 import type { TechnologyGrant } from './technology';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
@@ -22,6 +22,9 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *   - `sabotage` (SPY-9) — 3–5 random buildings of the world lose 10–20% of their
  *     max HP each; one already worn down can be destroyed. The damage itself is the
  *     construction module's (`building.damage` capability) — without it nothing breaks.
+ *   - `delay` (SPY-14) — the world's order that finishes first is pushed back by
+ *     6–12 h (`construction.delay` capability); nothing is built — a success with
+ *     nothing delayed (`delayed: null`).
  *   - `theft` (SPY-9) — a random resource the owner holds: 5–15% of the stock, at
  *     most `THEFT_CAP`, moves from the owner's treasury to the spy's (a world has no
  *     stockpile of its own; owner's resolution 2026-10-22).
@@ -91,7 +94,7 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * `espionage.detected` says `killed: true`.
  */
 
-const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft', 'research', 'counter']);
+const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'delay', 'theft', 'research', 'counter']);
 
 /** Base price of one mission by operation (SPY-12): guarding is cheap, attacking is
  *  dear, as in the genre (SWW3 counter-ops $250 a day against $4000 for sabotage). The
@@ -100,6 +103,7 @@ export const SPY_OP_COST: Readonly<Record<SpyOp, number>> = {
   counter: 50,
   recon: 150,
   sabotage: 300,
+  delay: 300,
   theft: 300,
   research: 400,
 };
@@ -134,6 +138,10 @@ const SABOTAGE_MAX = 5;
 const SABOTAGE_SHARE_MIN = 0.1;
 const SABOTAGE_SHARE_MAX = 0.2;
 /** Theft: the share of the chosen stock taken, and the most one theft can carry. */
+/** Queue sabotage (SPY-14): the first order of the world slips by this many hours. */
+const DELAY_MIN_HOURS = 6;
+const DELAY_MAX_HOURS = 12;
+
 const THEFT_SHARE_MIN = 0.05;
 const THEFT_SHARE_MAX = 0.15;
 export const THEFT_CAP = 500;
@@ -209,6 +217,12 @@ function sabotage(h: HandlerContext, planetId: string): { building: string; dest
   return h.capability<BuildingDamage>('building.damage')?.(h, planetId, hits) ?? [];
 }
 
+/** Queue sabotage: roll 6–12 h and hand them to the `construction.delay` capability. */
+function delayQueue(h: HandlerContext, planetId: string): DelayedOrder | null {
+  const hours = h.rng.nextInt(DELAY_MIN_HOURS, DELAY_MAX_HOURS + 1);
+  return h.capability<ConstructionDelay>('construction.delay')?.(h, planetId, hours) ?? null;
+}
+
 /** Theft: a random resource the victim holds at least one whole unit of, 5–15% of it
  *  (rounded down, at most `THEFT_CAP`), moved to the spy. `null` — nothing to take. */
 function theft(h: HandlerContext, spy: string, victim: string): { resource: string; amount: number } | null {
@@ -270,7 +284,7 @@ export const espionageModule: GameModule = {
   id: 'espionage',
   // 1.1.0: саботаж и кража ресурсов (SPY-9). 1.2.0: кража исследований (SPY-10).
   // 1.4.0: coalition membership blocks hostile missions at launch and resolution.
-  version: '1.5.0',
+  version: '1.6.0',
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -455,9 +469,11 @@ export const espionageModule: GameModule = {
         const done =
           op === 'sabotage'
             ? { hits: sabotage(h, planetId) }
-            : op === 'theft'
-              ? { loot: theft(h, spy, victim) }
-              : { tech: stealResearch(h, spy, victim) };
+            : op === 'delay'
+              ? { delayed: delayQueue(h, planetId) }
+              : op === 'theft'
+                ? { loot: theft(h, spy, victim) }
+                : { tech: stealResearch(h, spy, victim) };
         reassign(h, spy, mission, killed ? recruit : comeHome);
         h.emit('espionage.succeeded', {
           owner: spy,

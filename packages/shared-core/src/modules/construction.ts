@@ -772,6 +772,44 @@ const damageChosenBuildings: BuildingDamage = (h, planetId, hits) => {
   return out;
 };
 
+/** What {@link ConstructionDelay} pushed back: the order and by how many hours. */
+export interface DelayedOrder {
+  kind: 'building' | 'unit' | 'upgrade';
+  building?: string;
+  unit?: string;
+  hours: number;
+}
+
+/**
+ * Capability `construction.delay` (SPY-14): push the active order of one world that
+ * finishes first back by `hours` — the spy picks how long, this module owns the order
+ * book. The order keeps its `seq` (cancel and paused-site ids stay valid) and the
+ * queue stays `(at, seq)`-sorted, so the kernel's loop fires it at the new time. Orders
+ * waiting in `buildQueue` start after it and slide with it. `null` — nothing is built.
+ */
+export type ConstructionDelay = (h: HandlerContext, planetId: string, hours: number) => DelayedOrder | null;
+
+const delayFirstOrder: ConstructionDelay = (h, planetId, hours) => {
+  if (!(hours > 0)) return null;
+  const active = h.state.scheduled.filter(
+    (e) => e.type === 'construction.complete' && (e.payload as CompletePayload).planetId === planetId,
+  );
+  const first = active.sort((a, b) => a.at - b.at || a.seq - b.seq)[0];
+  if (!first) return null;
+  const rest = h.state.scheduled.filter((e) => e !== first);
+  const moved = { ...first, at: first.at + hoursToMs(h.ctx, hours) };
+  const pos = rest.findIndex((e) => e.at > moved.at || (e.at === moved.at && e.seq > moved.seq));
+  rest.splice(pos < 0 ? rest.length : pos, 0, moved);
+  h.state.scheduled = rest;
+  const p = first.payload as CompletePayload;
+  return {
+    kind: p.kind ?? 'building',
+    ...(p.building ? { building: p.building } : {}),
+    ...(p.unit ? { unit: p.unit } : {}),
+    hours,
+  };
+};
+
 /**
  * Buildings — a base module (docs/modulesystem.md). It owns everything about
  * planet structures:
@@ -797,9 +835,11 @@ export const constructionModule: GameModule = {
   // 1.5.0: возможность `building.damage` — прицельный урон по выбранным постройкам (SPY-9).
   // 1.6.0: retired entries refuse new orders; accepted work remains valid. Ship
   // prices also honour the optional match-pinned hull multipliers.
-  version: '1.6.0',
+  // 1.7.0: возможность `construction.delay` — сдвиг ближайшего заказа мира (SPY-14).
+  version: '1.7.0',
   setup(api) {
     api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
+    api.provideCapability<ConstructionDelay>('construction.delay', delayFirstOrder);
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;
       if (typeof payload?.planetId !== 'string' || typeof payload?.building !== 'string') {

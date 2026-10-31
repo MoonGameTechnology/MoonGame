@@ -722,6 +722,7 @@ export const de: Record<string, string> = {
   'side.scan.recall': '↩ Spionageabwehr-Agenten abberufen',
   'side.scan.research': '🧪 Technologie stehlen · {c}¤',
   'side.scan.sabotage': '💣 Sabotage · {c}¤',
+  'side.scan.delay': '⏳ Bau stören · {c}¤',
   'side.scan.spy': '🕵 Welt ausspähen · {c}¤',
   'side.scan.stale': 'Außerhalb der Sensorreichweite — letzter Scan (kann veraltet sein).',
   'side.scan.theft': '💰 Ressourcen stehlen · {c}¤',

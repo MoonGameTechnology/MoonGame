@@ -420,6 +420,7 @@ export function unknownPlanetHtml(p: Planet): string {
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
         ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
           btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST.sabotage }), spyReady('sabotage')) +
+          btn('spyplanet', 'delay', t('side.scan.delay', { c: SPY_COST.delay }), spyReady('delay')) +
           btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST.theft }), spyReady('theft')) +
           `${btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST.research }), spyReady('research'))}</div>`
         : '';
@@ -553,6 +554,7 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     }
     if (spy !== 'none') {
       out.push(btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST.sabotage }), ready('sabotage')));
+      out.push(btn('spyplanet', 'delay', t('side.scan.delay', { c: SPY_COST.delay }), ready('delay')));
       out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST.theft }), ready('theft')));
       out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST.research }), ready('research')));
     }

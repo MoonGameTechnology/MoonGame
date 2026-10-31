@@ -13,6 +13,23 @@ describe('правило 1 — саботаж называет число', () =
   it('ломать нечего — своя строка', () => {
     expect(spyDeed({ kind: 'sabotage', hits: [] })?.key).toBe('log.spy.sabotage.none');
   });
+
+  it('саботаж очереди называет заказ и срок, пустая очередь — своя строка (SPY-14)', () => {
+    expect(spyDeed({ kind: 'delay', delayed: { kind: 'building', building: 'mine', hours: 9 } })).toEqual({
+      key: 'log.spy.delay',
+      params: { what: 'mine', h: 9 },
+      lost: false,
+    });
+    expect(spyDeed({ kind: 'delay', delayed: { kind: 'unit', unit: 'cruiser', hours: 6 } })?.params).toEqual({
+      what: 'cruiser',
+      h: 6,
+    });
+    expect(spyDeed({ kind: 'delay', delayed: null, agentLost: true })).toEqual({
+      key: 'log.spy.delay.none',
+      params: {},
+      lost: true,
+    });
+  });
 });
 
 describe('правило 2 — кража называет добычу', () => {

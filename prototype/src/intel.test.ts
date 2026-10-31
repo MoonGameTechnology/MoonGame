@@ -127,7 +127,7 @@ describe('разведка — подписи', () => {
   });
 
   it('цена на кнопке — та, что спишет ядро, своя у каждой операции (SPY-12)', () => {
-    expect(SPY_COST).toEqual({ counter: 50, recon: 150, sabotage: 300, theft: 300, research: 400 });
+    expect(SPY_COST).toEqual({ counter: 50, recon: 150, sabotage: 300, delay: 300, theft: 300, research: 400 });
     expect(spyCostRange()).toBe('50–400');
   });
 });

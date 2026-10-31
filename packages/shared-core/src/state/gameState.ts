@@ -329,7 +329,7 @@ export interface IntelGrant {
 }
 
 /** An espionage operation an agent is sent on (SPY-8). */
-export type SpyOp = 'recon' | 'sabotage' | 'theft' | 'research' | 'counter';
+export type SpyOp = 'recon' | 'sabotage' | 'delay' | 'theft' | 'research' | 'counter';
 
 /** An agent of the spy's network that is away (espionage, SPY-6): on a mission,
  *  busy working a stolen window, slipping home after a failure, or — `lost` —
