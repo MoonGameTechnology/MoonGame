@@ -104,6 +104,9 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
       st = out.state;
     }
     expect(st.spyAgents?.['p1']).toHaveLength(3);
-    expect(order(st, spyOn('p1', target, 'research'), st.time).error).toBe('E_NO_AGENT');
+    // SPY-17: a fourth agent on the SAME world is refused by the per-world cap first, so
+    // the network check is read with a guard for our own world.
+    expect(order(st, spyOn('p1', target, 'research'), st.time).error).toBe('E_BAD_TARGET');
+    expect(order(st, spyOn('p1', worldOf(st, 'p1'), 'counter'), st.time).error).toBe('E_NO_AGENT');
   });
 });
