@@ -5,6 +5,9 @@ describe('YAG-1.3 — язык площадки → наша локаль', () =
   it('язык, который у нас есть, берётся как есть', () => {
     expect(platformLocale('ru')).toBe('ru');
     expect(platformLocale('en')).toBe('en');
+    expect(platformLocale('de')).toBe('de');
+    expect(platformLocale('pl')).toBe('pl');
+    expect(platformLocale('es')).toBe('es');
   });
 
   it('регистр и региональный хвост не мешают: `RU`, `en-US`, `ru_RU`', () => {
@@ -25,7 +28,7 @@ describe('YAG-1.3 — язык площадки → наша локаль', () =
   it('незнакомый язык вне этой четвёрки даёт английский — резерв площадки для всех прочих', () => {
     // `tr` — из рекомендованного площадкой минимума языков для трафика (ru, tr, en), и
     // для него резерв площадки — английский, а не русский.
-    for (const lang of ['tr', 'de', 'es', 'ar', 'ja', 'hy']) {
+    for (const lang of ['tr', 'it', 'fr', 'ar', 'ja', 'hy']) {
       expect([lang, platformLocale(lang)]).toEqual([lang, 'en']);
     }
   });
