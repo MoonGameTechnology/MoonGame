@@ -978,12 +978,12 @@ describe('MetaEconomy medal rewards', () => {
       receipt: {
         kind: 'medal-reward',
         sovereignsGranted: grades[3].sovereigns + grades[2].sovereigns + grades[3].sovereigns,
-        warrants: grades[3].warrants + grades[2].warrants,
+        warrants: grades[3].warrants * 2 + grades[2].warrants,
         medals: [
           { medalId: 'first', grade: 3, ...grades[3] },
           { medalId: 'first', grade: 2, ...grades[2] },
-          // Earned without playing: Sovereigns only.
-          { medalId: 'tutorial', grade: 3, sovereigns: grades[3].sovereigns, warrants: 0, xp: 0 },
+          // Earned without playing, and paid in full since 2026-10-30.
+          { medalId: 'tutorial', grade: 3, ...grades[3] },
         ],
       },
     });
@@ -991,7 +991,7 @@ describe('MetaEconomy medal rewards', () => {
       grades[3].sovereigns * 2 + grades[2].sovereigns,
     );
     expect((await f.market.balance('alice')) - warrantsBefore).toBe(
-      grades[3].warrants + grades[2].warrants,
+      grades[3].warrants * 2 + grades[2].warrants,
     );
     expect(await f.service.unpaidMedals('alice', earned)).toEqual([]);
     // A new degree beside paid ones pays only the new one.

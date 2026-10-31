@@ -98,8 +98,8 @@ export const medalCounter = (ref: MedalGradeRef): string => `medal:${ref.medalId
  *  prefix keeps it apart from every player's record. */
 export const corpEconomyKey = (corpId: string): string => `corp:${corpId}`;
 
-/** What one medal degree pays under the catalog (`medals`): medals earned without playing
- *  pay their Sovereigns only. */
+/** What one medal degree pays under the catalog (`medals`): a medal listed in
+ *  `sovereignsOnly` pays its Sovereigns only. */
 export function medalReward(
   table: MetaEconomyCatalog['medals'],
   ref: MedalGradeRef,

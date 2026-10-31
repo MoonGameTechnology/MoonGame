@@ -117,6 +117,7 @@ describe('meta market material HTTP API', () => {
           ? { accountId: request.headers['x-user'], login: request.headers['x-user'] }
           : null,
       canTrade: async () => tradingAllowed,
+      minimumAccountXp: 700,
     });
     try {
       expect(
@@ -139,6 +140,7 @@ describe('meta market material HTTP API', () => {
       const marketView = await app.inject({ url: '/meta-market', headers: { 'x-user': 'seller' } });
       expect(marketView.json()).toMatchObject({
         canTrade: true,
+        minimumAccountXp: 700,
         materialListings: [{ id: listingId, mine: true, quantity: 10 }],
       });
       tradingAllowed = false;

@@ -10,6 +10,14 @@
  * soft for a moment instead of disappearing. Far out, where a sharp raster would be no larger
  * than the floor, the floor IS the raster: the whole map seen at once costs one canvas, not
  * one per tile.
+ *
+ * The vector work is done on the CPU: sharp rasters and the floors' scratch are
+ * {@link VECTOR_CONTEXT} canvases. A GPU canvas only records the strokes, and the GPU rasterizes
+ * them later, unseen by the budgets that pace the loading and the bakes: they measure the main
+ * thread. A phone's GPU got seconds of clipped strokes at once (one flush of the loading took
+ * 13 s on an emulated GPU), and the whole screen stood still until it drained. On the CPU the
+ * cost is paid where it is measured; the GPU gets finished pixels. The atlas keeps the map's
+ * own context policy: floors are blitted into it, and far out the map draws from it.
  */
 import { drawTerrainField, type TerrainField } from './holographicSurface';
 import { projectTerrainTile } from './terrainEnvironmentView';
@@ -40,6 +48,8 @@ const SHELF_HEIGHTS = [8, 12, 16, 20, 24, 28, 32, 38, 44, 52, 60, 70, 82, 96, 11
   316, 366, 424, 492, 570, 660, 766, 888, 1030, 1194, 1384, 1606, 1862, 2048];
 /** Free pixels between cells: a scaled draw may sample a pixel past its source rectangle. */
 const GUTTER = 1;
+/** The canvases the vector strokes are painted into: on the CPU, where the frame measures them. */
+export const VECTOR_CONTEXT: CanvasRenderingContext2DSettings = { willReadFrequently: true };
 interface Entry {
   key: string;
   surface: HTMLCanvasElement;
@@ -144,11 +154,15 @@ export class TerrainRasterCache {
   private packed = -1;
   /** Device pixels per world unit of the floors ({@link floorDensityFor}). */
   private density = FLOOR_DENSITY;
+  /** A floor is painted here from vector, then blitted into its cell of the atlas. */
+  private scratch: HTMLCanvasElement | null = null;
+  private scratchX: CanvasRenderingContext2D | null = null;
   /** Missing sharp bakes keep the stationary background invalid until completed. */
   pending = false;
+  /** `atlasOptions` — the atlas's context, as the map's own canvases request theirs. */
   constructor(
     private readonly maxPixels = MAX_PIXELS,
-    private readonly contextOptions?: CanvasRenderingContext2DSettings,
+    private readonly atlasOptions?: CanvasRenderingContext2DSettings,
   ) {}
 
   /** Loading can prewarm freely; interactive frames admit only a few new bakes. */
@@ -160,12 +174,15 @@ export class TerrainRasterCache {
   clear(): void {
     for (const id of this.entries.keys()) this.remove(id);
     this.resetAtlas();
-    if (this.atlas) {
-      this.atlas.width = 0;
-      this.atlas.height = 0;
+    for (const surface of [this.atlas, this.scratch]) {
+      if (!surface) continue;
+      surface.width = 0;
+      surface.height = 0;
     }
     this.atlas = null;
     this.atlasX = null;
+    this.scratch = null;
+    this.scratchX = null;
     this.pending = false;
   }
 
@@ -327,8 +344,8 @@ export class TerrainRasterCache {
     const surface = document.createElement('canvas');
     surface.width = ATLAS_WIDTH;
     surface.height = height;
-    const context = this.contextOptions
-      ? surface.getContext('2d', this.contextOptions)
+    const context = this.atlasOptions
+      ? surface.getContext('2d', this.atlasOptions)
       : surface.getContext('2d');
     if (!context) return;
     // A floor is often drawn from a sharp raster many times its size.
@@ -377,18 +394,43 @@ export class TerrainRasterCache {
     this.remaining--;
     const floor = this.floorCell(field, dpr);
     if (!floor) return;
+    const g = this.scratchFor(floor.width, floor.height);
+    if (!g) return;
     const scale = this.density / dpr;
     const drawn = projectTerrainTile(field.environment.tile, { scale, x: 0, y: 0 });
     const b = drawn.box;
-    const g = this.atlasX!;
-    g.save();
-    g.beginPath();
-    g.rect(floor.x, floor.y, floor.width, floor.height);
-    g.clip();
-    g.setTransform(dpr, 0, 0, dpr, floor.x + (PAD - b.x) * dpr, floor.y + (PAD - b.y) * dpr);
+    g.setTransform(dpr, 0, 0, dpr, (PAD - b.x) * dpr, (PAD - b.y) * dpr);
     drawTerrainField(g, drawn);
-    g.restore();
+    this.atlasX!.drawImage(
+      this.scratch!,
+      0,
+      0,
+      floor.width,
+      floor.height,
+      floor.x,
+      floor.y,
+      floor.width,
+      floor.height,
+    );
     return this.floorRaster(floor);
+  }
+
+  /** The scratch, blank and exactly `width × height`: the cell's own size keeps every stroke
+   *  inside the cell, as a clip would. */
+  private scratchFor(width: number, height: number): CanvasRenderingContext2D | null {
+    if (!this.scratch) {
+      this.scratch = document.createElement('canvas');
+      this.scratchX = this.scratch.getContext('2d', VECTOR_CONTEXT);
+    }
+    // A new size blanks the canvas and its state; the same size is blanked by hand.
+    if (this.scratch.width !== width || this.scratch.height !== height) {
+      this.scratch.width = width;
+      this.scratch.height = height;
+    } else if (this.scratchX) {
+      this.scratchX.setTransform(1, 0, 0, 1, 0, 0);
+      this.scratchX.clearRect(0, 0, width, height);
+    }
+    return this.scratchX;
   }
 
   /** The floor of `field` made from its new sharp raster: a scaled copy, no vector work. */
@@ -453,9 +495,7 @@ export class TerrainRasterCache {
       const surface = document.createElement('canvas');
       surface.width = width;
       surface.height = height;
-      const context = this.contextOptions
-        ? surface.getContext('2d', this.contextOptions)
-        : surface.getContext('2d');
+      const context = surface.getContext('2d', VECTOR_CONTEXT);
       if (!context) return;
       context.setTransform(dpr, 0, 0, dpr, (PAD - b.x) * dpr, (PAD - b.y) * dpr);
       drawTerrainField(context, field);

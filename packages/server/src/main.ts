@@ -733,7 +733,8 @@ const server = createMultiplayerServer({
           // лимитом (EC-0.3 wash-trading), фаусет по умолчанию выключен.
           registerMetaMarketApi(scope, { market: stores.metaMarket, identify,
             onChanged: refreshAccountArsenal,
-            canTrade: async (accountId) => (await stores.commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp });
+            canTrade: async (accountId) => (await stores.commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp,
+            minimumAccountXp: metaCatalog.market.minimumAccountXp });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
           // CORP-9 — the war of one side for the hub's «Битвы»: served here, where the

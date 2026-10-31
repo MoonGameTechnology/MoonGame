@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initMetaMarket, metaMarketHtml } from './metaMarketScreen';
+import { t } from '../../localization/runtime';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -90,6 +91,16 @@ describe('meta market screen', () => {
     );
     expect(html).toContain('data-mm-material-buy="buy" disabled');
     expect(html).toContain('data-mm-material-cancel="mine">');
+    expect(html).toContain(t('err.level-required'));
+  });
+
+  it('names the account level the auction opens at when the server sends the gate', () => {
+    const html = metaMarketHtml(
+      { balance: 0, feeRate: 0.08, listings: [], canTrade: false, minimumAccountXp: 700 },
+      [],
+    );
+    expect(html).toContain(t('auction.level-required', { n: 5 }));
+    expect(html).not.toContain(t('err.level-required'));
   });
 
   // «Продать» в арсенале прокручивает к форме этой копии после загрузки,

@@ -627,6 +627,7 @@ export const ru: Record<string, string> = {
   'auction.no-materials': 'Торгуемых материалов нет.',
   'auction.invalid-amount': 'Количество и цена должны быть целыми положительными числами.',
   'err.level-required': 'Торговля откроется после накопления опыта аккаунта.',
+  'auction.level-required': 'Аукцион откроется на {n} уровне аккаунта.',
   'auction.title': 'Аукцион',
   'auction.subtitle': 'Торговля заработанным снаряжением между матчами',
   'auction.browse': 'Открытые лоты',

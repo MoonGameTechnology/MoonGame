@@ -119,7 +119,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // espionage 1.4.0 refuses hostile missions within the same coalition.
 // 88: порядок тот же; orbital 1.4.0, shuttle 1.17.0 — огонь сверху делит урон по войскам поровну (ROS-1.6a).
 // 89: порядок тот же; orbital 1.5.0, shuttle 1.18.0 — огонь сверху бьёт пехоту и технику разной долей (ROS-1.6b).
-const PINNED_FOR_VERSION = '89';
+// 90: movement 1.6.0 and visibility 2.4.0 — discover before halting; legal edge detours.
+const PINNED_FOR_VERSION = '90';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

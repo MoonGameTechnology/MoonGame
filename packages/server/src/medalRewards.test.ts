@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { settleMedalRewards, type MedalRewardDeps } from './medalRewards';
-import { MetaEconomy } from './metaEconomy';
+import { MetaEconomy, medalReward } from './metaEconomy';
 import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { MemoryMetaMarket } from './metaMarket';
@@ -51,7 +51,7 @@ describe('medal rewards', () => {
     expect(news[0]).toMatchObject({ medalId: 'first', grade: 1, login: 'NewsPilot', corp: null });
     expect(JSON.stringify(news)).not.toContain(made.userId);
   });
-  it('pays every reached degree, lower classes included, once; medals earned without play pay Sovereigns only', async () => {
+  it('pays every reached degree, lower classes included, once; medals earned without play pay in full', async () => {
     const f = setup();
     // 10 wins reach «Первый рубеж» II, so class III pays too; registration and the
     // tutorial are the two medals earned without a match.
@@ -64,24 +64,41 @@ describe('medal rewards', () => {
     expect(granted).toEqual([
       { medalId: 'first', grade: 3, ...grades[3] },
       { medalId: 'first', grade: 2, ...grades[2] },
-      { medalId: 'contribution', grade: 3, sovereigns: grades[3].sovereigns, warrants: 0, xp: 0 },
-      { medalId: 'tutorial', grade: 3, sovereigns: grades[3].sovereigns, warrants: 0, xp: 0 },
+      { medalId: 'contribution', grade: 3, ...grades[3] },
+      { medalId: 'tutorial', grade: 3, ...grades[3] },
     ]);
-    expect(await f.commanders.xpOf('alice')).toBe(grades[3].xp + grades[2].xp);
+    expect(await f.commanders.xpOf('alice')).toBe(grades[3].xp * 3 + grades[2].xp);
     expect((await f.economy.readModel('alice')).sovereigns).toBe(
       grades[3].sovereigns * 3 + grades[2].sovereigns,
     );
     expect((await f.market.balance('alice')) - warrants).toBe(
-      grades[3].warrants + grades[2].warrants,
+      grades[3].warrants * 3 + grades[2].warrants,
     );
     // Nothing new reached — nothing paid, XP unchanged.
     expect(await settleMedalRewards(f.deps, 'alice')).toEqual([]);
-    expect(await f.commanders.xpOf('alice')).toBe(grades[3].xp + grades[2].xp);
+    expect(await f.commanders.xpOf('alice')).toBe(grades[3].xp * 3 + grades[2].xp);
     // The next degree pays alone.
     await f.profiles.credit('m2', [{ accountId: 'alice', progress: { wins: 40 } }]);
     expect(await settleMedalRewards(f.deps, 'alice')).toEqual([
       { medalId: 'first', grade: 1, ...grades[1] },
     ]);
+  });
+
+  it('a medal listed in medals.sovereignsOnly pays its Sovereigns only', () => {
+    const { grades } = setup().catalog.medals;
+    const table = { grades, sovereignsOnly: ['tutorial'] };
+    expect(medalReward(table, { medalId: 'tutorial', grade: 3 })).toEqual({
+      medalId: 'tutorial',
+      grade: 3,
+      sovereigns: grades[3].sovereigns,
+      warrants: 0,
+      xp: 0,
+    });
+    expect(medalReward(table, { medalId: 'first', grade: 3 })).toEqual({
+      medalId: 'first',
+      grade: 3,
+      ...grades[3],
+    });
   });
 
   it('a failed economy step leaves the degree unpaid, and the retry does not pay XP twice', async () => {

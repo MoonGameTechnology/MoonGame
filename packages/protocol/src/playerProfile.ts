@@ -17,8 +17,8 @@ export const PROFILE_MEDALS = [
   { id: 'explorer', metric: 'explored', goals: [100, 250, 500] },
   { id: 'contribution', metric: 'registered', goals: [1] },
   // The guided first match runs on the device: the claim carries no counter, only a fixed
-  // 1 per account (POST /profiles/rewards/tutorial). Like registration, its medal reward is
-  // Sovereigns only (`medals.sovereignsOnly` in data/metaEconomy.json).
+  // 1 per account (POST /profiles/rewards/tutorial). Like registration, it pays in full; the
+  // market gate (`market.minimumAccountXp`) stays above the XP both bring.
   { id: 'tutorial', metric: 'tutorial', goals: [1] },
 ] as const;
 export type ProfileMedalId = (typeof PROFILE_MEDALS)[number]['id'];

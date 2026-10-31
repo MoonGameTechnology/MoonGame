@@ -1,5 +1,12 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, FleetEdge, FleetResume, GameState, PlayerId, PlanetId } from '../state/gameState';
+import type {
+  Fleet,
+  FleetEdge,
+  FleetResume,
+  GameState,
+  PlayerId,
+  PlanetId,
+} from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { fleetTravelSpeed, planRoute, routeDistance } from '../state/route';
@@ -90,7 +97,9 @@ function trulyClosed(state: GameState, playerId: PlayerId, id: PlanetId): boolea
  * border the player cannot see is met in flight instead (`haltAtBorder`).
  */
 function knownClosed(state: GameState, playerId: PlayerId, id: PlanetId): boolean {
-  return trulyClosed(state, playerId, id) && closedTo(state, playerId, knownOwner(state, playerId, id));
+  return (
+    trulyClosed(state, playerId, id) && closedTo(state, playerId, knownOwner(state, playerId, id))
+  );
 }
 
 /** True when any hop enters a border closed to its mover that the mover can see
@@ -99,18 +108,15 @@ function crossesPeace(state: GameState, playerId: PlayerId, hops: readonly Plane
   return hops.some((hop) => knownClosed(state, playerId, hop));
 }
 
-/**
- * FOG-LEAK: the leg about to start runs into territory closed to the fleet — a border
- * the order could not refuse because the player did not see it, or one that closed
- * while the fleet was on its way (the world changed hands, peace was signed). The fleet
- * stops where it stands, BEFORE entering, and its owner hears whose border it is: at
- * the border that is no longer a secret. Returns true when it halted.
- *
- * Only the owner's name travels (`fleet.halted` is owner-only news on the wire, like a
- * cancelled lift); the world itself stays in the fog — no garrison, no buildings.
- */
-function haltAtBorder(h: HandlerContext, fleet: Fleet, at: PlanetId | null, next: PlanetId): boolean {
-  if (!trulyClosed(h.state, fleet.owner, next)) return false;
+/** Stop only at a discovered closed border. Unseen ownership cannot cancel a course;
+ * visibility reconciles the flight when real sensors identify the territory. */
+function haltAtBorder(
+  h: HandlerContext,
+  fleet: Fleet,
+  at: PlanetId | null,
+  next: PlanetId,
+): boolean {
+  if (!knownClosed(h.state, fleet.owner, next)) return false;
   h.emit('fleet.halted', {
     fleetId: fleet.id,
     owner: fleet.owner,
@@ -407,6 +413,9 @@ function planJourney(
         continue; // unreachable by lanes from this origin endpoint
       }
       const hops = [...o.lead, ...mid, ...t.final];
+      // The fleet has not reached its routing origin yet: its lead is a real leg.
+      // Dijkstra exempts its origin, so filter the complete candidate before ranking.
+      if (blocked && hops.some(blocked)) continue;
       if (hops.length === 0) {
         continue; // already there
       }
@@ -436,8 +445,8 @@ function planJourney(
  */
 export const movementModule: GameModule = {
   id: 'movement',
-  // 1.5.0 — право прохода по видимой границе, невидимую флот встречает в пути (FOG-LEAK).
-  version: '1.5.0',
+  // 1.6.0 — unknown territory is explored in flight; only discovered borders halt it.
+  version: '1.6.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -532,10 +541,8 @@ export const movementModule: GameModule = {
         plan = detour;
       }
       const origin = fleet.location ?? fleet.edge?.from ?? null;
-      // FOG-LEAK: the very first leg already runs into a border the player did not see.
-      // The order stands (refusing it would be the leak); the fleet simply stays put. A
-      // re-tasked fleet was just halted on its lane above and now RESTS there, so it
-      // announces the park a real stop would.
+      // A known border may have closed while a course was being retasked. Unknown
+      // territory is explored in flight; visibility owns that discovery.
       if (haltAtBorder(h, fleet, fleet.location, plan.hops[0]!)) {
         if (fleet.edge) h.emit('fleet.parked', { fleetId: fleet.id, edge: fleet.edge });
         return null;
@@ -543,6 +550,7 @@ export const movementModule: GameModule = {
       if (!beginLeg(h, fleet, plan.fromId, plan.hops, plan.startT, plan.parkT)) {
         return 'E_FLEET_IMMOBILE';
       }
+      if (!fleet.movement) return null; // discovery at departure may already cancel the order
       h.emit('fleet.departed', {
         fleetId: fleet.id,
         from: origin,
@@ -625,6 +633,29 @@ export const movementModule: GameModule = {
       }
     });
 
+    // Visibility owns discovery; movement reacts after its memory is committed. The
+    // position is the ship's current point, never its departure node or destination.
+    const reconcileVisibility = (h: HandlerContext): void => {
+      for (const fleet of Object.values(h.state.fleets)) {
+        const mv = fleet.movement;
+        if (
+          !mv ||
+          fleet.battleId ||
+          isCorridorEdge(h.state, mv.from, mv.to) ||
+          !knownClosed(h.state, fleet.owner, mv.to)
+        )
+          continue;
+        const t = Math.min(1 - EPS, Math.max(EPS, legT(mv, h.ctx.now)));
+        fleet.edge = { from: mv.from, to: mv.to, t };
+        fleet.location = null;
+        fleet.movement = null;
+        haltAtBorder(h, fleet, null, mv.to);
+        h.emit('fleet.parked', { fleetId: fleet.id, edge: fleet.edge });
+      }
+    };
+    api.provideCapability('fleet.reconcileVisibility', reconcileVisibility);
+    api.on('diplomacy.changed', (_event, h) => reconcileVisibility(h));
+
     api.on('fleet.arrival', (event, h) => {
       const { fleetId, departedAt, arrivesAt } = event.payload as {
         fleetId: string;
@@ -673,7 +704,10 @@ export const movementModule: GameModule = {
         if (fleet.battleId) return;
         const startT = forkTAtStart(h.state, at, next);
         // A closed border ahead stops the fleet at the fork, as a stop ordered there would.
-        if (haltAtBorder(h, fleet, null, next) || !beginLeg(h, fleet, at, remaining, startT, parkT)) {
+        if (
+          haltAtBorder(h, fleet, null, next) ||
+          !beginLeg(h, fleet, at, remaining, startT, parkT)
+        ) {
           // Nothing left to fly — the journey ends AT this fork (a stop ordered there,
           // ROADS-3) — or it cannot go on (speed 0 / a node gone): stop at the fork, on the
           // road ahead.

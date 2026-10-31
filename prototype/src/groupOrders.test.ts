@@ -422,3 +422,42 @@ describe('REFM-228 — стык с main.ts', () => {
     expect(GO).not.toMatch(/from '\.\/main'/);
   });
 });
+
+it('a discovered border at the parked routing origin opens war confirmation before resuming', async () => {
+  const { go, env, home, foe, fleet } = await boot();
+  const prompt = fakePrompt();
+  env.world = {
+    ...env.world,
+    fog: undefined,
+    planets: {
+      [home.id]: { ...home, roads: undefined, position: { x: 0, y: 0 }, links: [foe.id] },
+      [foe.id]: {
+        ...foe,
+        roads: undefined,
+        position: { x: 100, y: 0 },
+        links: [home.id, 'target'],
+      },
+      target: {
+        ...home,
+        id: 'target',
+        roads: undefined,
+        position: { x: 200, y: 0 },
+        links: [foe.id],
+      },
+    },
+    fleets: {
+      [fleet.id]: {
+        ...fleet,
+        location: null,
+        movement: null,
+        edge: { from: home.id, to: foe.id, t: 0.9 },
+      },
+    },
+  };
+  go.tryMoveGroup([fleet.id], 'target', false);
+  expect(go.warPrompt?.blockers).toEqual(['p2']);
+  expect(prompt.shown()).toBe(true);
+  go.confirmWarPrompt();
+  expect(getStance(env.world, 'p1', 'p2')).toBe('war');
+  expect(journeyDestination(env.world.fleets[fleet.id]!.movement!)).toBe('target');
+});
