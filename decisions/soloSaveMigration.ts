@@ -93,6 +93,17 @@ export const RECON_LAYERS_SOLO_MIGRATION = {
   toDataHash: SPY_DELAY_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 1.8.0 adds the economic sabotage (SPY-15). The catalogue
+ *  and the saved world are unchanged. */
+export const SPY_DISRUPT_SOLO_MIGRATION = {
+  fromRules: RECON_LAYERS_SOLO_MIGRATION.toRules,
+  fromData: RECON_LAYERS_SOLO_MIGRATION.toData,
+  fromDataHash: RECON_LAYERS_SOLO_MIGRATION.toDataHash,
+  toRules: '0d9d7ad0709aec',
+  toData: RECON_LAYERS_SOLO_MIGRATION.toData,
+  toDataHash: RECON_LAYERS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -103,6 +114,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_PRICES_SOLO_MIGRATION,
   SPY_DELAY_SOLO_MIGRATION,
   RECON_LAYERS_SOLO_MIGRATION,
+  SPY_DISRUPT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

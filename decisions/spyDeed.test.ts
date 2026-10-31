@@ -30,6 +30,10 @@ describe('правило 1 — саботаж называет число', () =
       lost: true,
     });
   });
+
+  it('подрыв экономики называет эффект (SPY-15)', () => {
+    expect(spyDeed({ kind: 'disrupt', disrupted: 99 })).toEqual({ key: 'log.spy.disrupt', params: {}, lost: false });
+  });
 });
 
 describe('правило 2 — кража называет добычу', () => {

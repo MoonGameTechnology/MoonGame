@@ -7,6 +7,7 @@
  *    ломать было нечего — отдельная строка, а не «повреждено 0».
  * 1а. **Саботаж очереди называет заказ и срок** (SPY-14): что встало и на сколько
  *    часов; строить было нечего — отдельная строка.
+ * 1б. **Подрыв экономики называет эффект** (SPY-15): −25% добычи на 24 ч.
  * 2. **Кража называет добычу.** Ресурс и сколько; пустая казна — отдельная строка.
  * 3. **Кража исследований называет технологию.** Красть нечего — цель отстаёт от нас,
  *    и строка говорит именно это.
@@ -19,6 +20,7 @@ export interface SpyDeedPayload {
   kind?: unknown;
   hits?: unknown;
   delayed?: unknown;
+  disrupted?: unknown;
   loot?: unknown;
   tech?: unknown;
   agentLost?: unknown;
@@ -46,6 +48,7 @@ export function spyDeed(p: SpyDeedPayload): SpyDeedLine | null {
     if (!what || typeof d?.hours !== 'number') return { key: 'log.spy.delay.none', params: {}, lost };
     return { key: 'log.spy.delay', params: { what, h: d.hours }, lost };
   }
+  if (p.kind === 'disrupt') return { key: 'log.spy.disrupt', params: {}, lost };
   if (p.kind === 'theft') {
     const loot = p.loot as { resource?: unknown; amount?: unknown } | null | undefined;
     if (!loot || typeof loot.resource !== 'string' || typeof loot.amount !== 'number') {

@@ -421,10 +421,8 @@ export function unknownPlanetHtml(p: Planet): string {
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
         ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
-          btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST.sabotage }), spyReady('sabotage')) +
-          btn('spyplanet', 'delay', t('side.scan.delay', { c: SPY_COST.delay }), spyReady('delay')) +
-          btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST.theft }), spyReady('theft')) +
-          `${btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST.research }), spyReady('research'))}</div>`
+          HOSTILE_OPS.map((op) => btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op))).join('') +
+          `</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -556,12 +554,11 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     } else if (spy !== 'none') {
       out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
     }
-    if (spy !== 'none') {
-      out.push(btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST.sabotage }), ready('sabotage')));
-      out.push(btn('spyplanet', 'delay', t('side.scan.delay', { c: SPY_COST.delay }), ready('delay')));
-      out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST.theft }), ready('theft')));
-      out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST.research }), ready('research')));
-    }
+    if (spy !== 'none')
+      for (const op of HOSTILE_OPS) out.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
+    // SPY-15: the owner sees its own world's economy sabotaged and for how long.
+    if (mine && (p.disruptedUntil ?? 0) > s.time)
+      out.push(`<span class="pfact">${t('side.world.disrupted', { left: fmtEta(windowLeftH(p.disruptedUntil!, s.time, HOUR)) })}</span>`);
     // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
     const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
     if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
@@ -569,6 +566,16 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }
+
+/** The aggressive operations after recon, in button order, and their button keys. */
+const HOSTILE_OPS = ['sabotage', 'delay', 'disrupt', 'theft', 'research'] as const;
+const SCAN_KEY = {
+  sabotage: 'side.scan.sabotage',
+  delay: 'side.scan.delay',
+  disrupt: 'side.scan.disrupt',
+  theft: 'side.scan.theft',
+  research: 'side.scan.research',
+} as const;
 
 const STANCE_KEY = {
   war: 'diplo.stance.war',

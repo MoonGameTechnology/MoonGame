@@ -790,6 +790,7 @@ function onSideClick(ev: MouseEvent): void {
       arg === 'recon' ||
       arg === 'sabotage' ||
       arg === 'delay' ||
+      arg === 'disrupt' ||
       arg === 'theft' ||
       arg === 'research' ||
       arg === 'counter'
