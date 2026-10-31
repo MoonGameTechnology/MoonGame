@@ -3913,6 +3913,7 @@ export const ru: Record<string, string> = {
   'log.spy.counter.lost': '🛡 Наш контрразведчик на {at} раскрыт и выдворен, вернётся через 6ч',
   'log.spy.counter.lost.killed': '🛡 Наш контрразведчик на {at} раскрыт и убит. Поиск нового шпиона займёт 24ч',
   'log.spy.war': '⚔ Раскрыт шпион: между {a} и {b} война',
+  'log.spy.exposed': '🕵 {a} поймал шпиона {b} на {at}',
   'log.spy.success': '🕵 Агент на посту: {what}. Новый слой разведки каждые 12ч',
   'log.spy.success.lost': '🕵 Агент добыл разведданные: {what} — окно 24ч. Агент убит, поиск нового шпиона займёт 24ч',
   'log.spy.success.lost.short': '🗝 Успех: {what}. Агент убит',

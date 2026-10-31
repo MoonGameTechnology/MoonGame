@@ -106,6 +106,10 @@ describe('SPY-13 — recon accumulates layers while the agent stays on post', ()
       { type: 'espionage.detected', payload: { owner: 'p2', kind: 'recon', planetId: 'B' } },
     ]);
     expect(r.state.scheduled.some((e) => e.type === 'espionage.deepen')).toBe(false);
+    // SPY-16: caught on post is public news too
+    expect(ofType(r.events, 'espionage.exposed')).toEqual([
+      { type: 'espionage.exposed', payload: { a: 'p2', b: 'p1', planetId: 'B' } },
+    ]);
   });
 
   it('a killed agent on post is lost for a day', () => {

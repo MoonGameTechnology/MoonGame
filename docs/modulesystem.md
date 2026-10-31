@@ -173,7 +173,8 @@ computeSpeed(флот):
 - **бой** — `battleId`: видно тому, кто видит этот бой в своей проекции (участник видит
   свой бой всегда — `engagementOf`), в том числе кадром раньше: `battle.resolved`
   приходит, когда боя в состоянии уже нет;
-- `time.advanced` и `match.*` — глобальные (видны всем); `hero.*` — строго owner-only;
+- `time.advanced`, `match.*` и публичные новости (`PUBLIC_EVENTS` в `matchRoom.ts`: сейчас
+  только `espionage.exposed`, раскрытый шпион) — глобальные (видны всем); `hero.*` — строго owner-only;
   разведданные (`OWNER_ONLY_EVENTS` в `matchRoom.ts`) — тоже только владельцу, даже на
   опознанном мире. Это стройка и производство (`building.constructed`, `building.upgraded`,
   `unit.built`, `army.load.cancelled`, `army.unload.cancelled`): результат наблюдатель видит

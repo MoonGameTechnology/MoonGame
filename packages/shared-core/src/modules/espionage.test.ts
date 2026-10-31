@@ -252,6 +252,13 @@ describe('espionage — counter-intelligence (SPY-2)', () => {
     ]);
   });
 
+  it('SPY-16: any exposure is public news naming both players and the world, not the operation', () => {
+    const news = { type: 'espionage.exposed', payload: { a: 'p2', b: 'p1', planetId: 'B' } };
+    expect(ofType(mission([dudShot, alwaysDetect, neverKill]).events, 'espionage.exposed')).toEqual([news]);
+    expect(ofType(mission([sureShot, alwaysDetect, neverKill]).events, 'espionage.exposed')).toEqual([news]);
+    expect(ofType(mission([dudShot, neverDetect]).events, 'espionage.exposed')).toEqual([]);
+  });
+
   it('a noticed SUCCESSFUL mission reveals the leak but not the thief', () => {
     const r = mission([sureShot, alwaysDetect, neverKill]);
     const det = ofType(r.events, 'espionage.detected');

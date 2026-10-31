@@ -1522,6 +1522,10 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         const { to } = action.payload as { to: string };
         h.emit('diplomacy.offered', { from: action.playerId, to, stance: 'peace' });
       });
+      // SPY-16: an exposed spy at a world nobody but its owner sees.
+      api.onAction('test.exposed', (action, h) => {
+        h.emit('espionage.exposed', { a: 'p2', b: action.playerId, planetId: 'nowhere' });
+      });
       api.onAction('test.hero', (action, h) => {
         const { at } = action.payload as { at: string };
         h.emit('hero.spawned', { owner: action.playerId, heroId: 'h1', fleetId: 'f1', at });
@@ -1670,6 +1674,12 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     expect(lastEvents(p1)).toContain('diplomacy.offered');
     expect(lastEvents(p2)).toContain('diplomacy.offered');
     expect(lastEvents(p3)).not.toContain('diplomacy.offered');
+  });
+
+  it('SPY-16: an exposed spy is news for every player, and carries no operation', () => {
+    const { r, p1, p2, p3 } = fogRoom();
+    r.submitAction('p1', { id: 'e16', type: 'test.exposed', playerId: 'p1', issuedAt: 1, payload: {} }, p1);
+    for (const peer of [p1, p2, p3]) expect(lastEvents(peer)).toContain('espionage.exposed');
   });
 
   it('a hero event is owner-only: an identified node must NOT reveal it to an enemy', () => {

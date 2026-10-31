@@ -538,6 +538,11 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['espionage.detected', 'owner'],
 ]);
 
+/** Events every player of the match receives, wherever they happen — public news. The
+ *  emitting module keeps the payload to what is public: `espionage.exposed` (SPY-16) names
+ *  the two players and the world, never the operation. */
+export const PUBLIC_EVENTS: ReadonlySet<string> = new Set(['espionage.exposed']);
+
 export class MatchRoom {
   readonly id: string;
 
@@ -2591,6 +2596,7 @@ export class MatchRoom {
   ): boolean {
     if (event.type === 'career.casualty') return false;
     if (event.type === 'time.advanced' || event.type.startsWith('match.')) return true;
+    if (PUBLIC_EVENTS.has(event.type)) return true;
     const p = (event.payload ?? {}) as Record<string, unknown>;
     // Hero events are strictly owner-only: their payloads carry the hero's node
     // (`at`) and fleet, which the fog projection deliberately hides from everyone

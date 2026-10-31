@@ -104,6 +104,17 @@ export const SPY_DISRUPT_SOLO_MIGRATION = {
   toDataHash: RECON_LAYERS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 1.9.0 makes an exposed spy public news (SPY-16). The
+ *  catalogue and the saved world are unchanged. */
+export const SPY_EXPOSED_SOLO_MIGRATION = {
+  fromRules: SPY_DISRUPT_SOLO_MIGRATION.toRules,
+  fromData: SPY_DISRUPT_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_DISRUPT_SOLO_MIGRATION.toDataHash,
+  toRules: '0782d8ad5af68e',
+  toData: SPY_DISRUPT_SOLO_MIGRATION.toData,
+  toDataHash: SPY_DISRUPT_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -115,6 +126,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_DELAY_SOLO_MIGRATION,
   RECON_LAYERS_SOLO_MIGRATION,
   SPY_DISRUPT_SOLO_MIGRATION,
+  SPY_EXPOSED_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
