@@ -103,6 +103,13 @@ function mapRenderingReport(): string {
       build: currentBuild(),
       userAgent: navigator.userAgent,
       compatibility: { active, requested, restartPending: active !== requested },
+      // Настройки «Графики» сейчас: цена кадра карты растёт с каждой из них.
+      graphics: {
+        sharp: mapSharpOn(),
+        glow: glowOn(),
+        starfield: starfieldOn(),
+        motion: motionOn(),
+      },
       viewport: {
         width: vw,
         height: vh,

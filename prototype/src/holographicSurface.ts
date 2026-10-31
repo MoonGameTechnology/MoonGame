@@ -523,7 +523,7 @@ function rimPoint(shape: RimShape, fraction: number): typeof RIM_POINT {
  * motion freeze it in place like the boil.
  *
  * With `box`, only where the rim can touch it: a strip of the map's bake far from the rim
- * draws none. */
+ * draws none, and one the rim crosses gets the stretches near it ({@link traceRim}). */
 export function drawGlassRim(
   g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true, box?: PaintBox,
 ): void {
@@ -532,17 +532,6 @@ export function drawGlassRim(
   const time = Math.max(0, clock) / 1000;
   const scale = Math.min(frame.width, frame.height);
   const shape = rimShape(frame);
-  g.save();
-  g.globalCompositeOperation = 'screen';
-  g.lineCap = 'round';
-  g.lineJoin = 'round';
-  const spectrum = g.createLinearGradient(frame.x, frame.y, frame.x + frame.width, frame.y + frame.height);
-  spectrum.addColorStop(0, '#80dce9');
-  spectrum.addColorStop(0.34, '#90a8e9');
-  spectrum.addColorStop(0.67, '#b1a2e8');
-  spectrum.addColorStop(1, '#82dce8');
-  g.strokeStyle = spectrum;
-  g.beginPath();
   for (let i = 0; i <= 320; i++) {
     // The final point exactly meets the first, without an animated seam.
     const fraction = (i % 320) / 320;
@@ -554,12 +543,24 @@ export function drawGlassRim(
     const normal = scale * (0.00035 * Math.sin(phase * 11 + time * 0.8) + 0.0017 * charge * boil);
     x += frame.x + nx * normal; y += frame.y + ny * normal;
     RIM_XY[i * 2] = x; RIM_XY[i * 2 + 1] = y;
-    if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
   }
-  g.closePath();
+  const halo = glow ? RIM_HALO : RIM_HALO_LITE;
+  // The widest stroke's half: no stroke of a segment reaches farther from it.
+  const near = box ? rimNear(box, scale * halo[0]![0] / 2 + 1) : null;
+  if (near && !near.includes(1)) return;
+  g.save();
+  g.globalCompositeOperation = 'screen';
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  const spectrum = g.createLinearGradient(frame.x, frame.y, frame.x + frame.width, frame.y + frame.height);
+  spectrum.addColorStop(0, '#80dce9');
+  spectrum.addColorStop(0.34, '#90a8e9');
+  spectrum.addColorStop(0.67, '#b1a2e8');
+  spectrum.addColorStop(1, '#82dce8');
+  g.strokeStyle = spectrum;
+  traceRim(g, near);
   // Reuse the path for a soft falloff on BOTH sides of the edge; no clipping at the map
   // boundary, no per-frame shadow filters. Glow off keeps the two inner passes only.
-  const halo = glow ? RIM_HALO : RIM_HALO_LITE;
   for (const [width, alpha] of halo) {
     g.lineWidth = scale * width;
     g.globalAlpha = alpha * (0.9 + 0.1 * Math.sin(time * 0.73));
@@ -568,8 +569,50 @@ export function drawGlassRim(
   g.globalAlpha = (glow ? 0.64 : 0.5) * (0.88 + 0.12 * Math.sin(time * 0.61));
   g.lineWidth = scale * 0.00115;
   g.stroke();
-  drawRimBurn(g, frame, scale, time);
+  drawRimBurn(g, frame, scale, time, near);
   g.restore();
+}
+
+/** Which of the rim's 320 segments can reach `box` with a stroke `reach` wide on each side:
+ * 1 where its own box, grown by `reach`, meets it. Reused, like {@link RIM_XY}. */
+function rimNear(box: PaintBox, reach: number): Uint8Array {
+  for (let s = 0; s < 320; s++) {
+    const ax = RIM_XY[s * 2]!, ay = RIM_XY[s * 2 + 1]!, bx = RIM_XY[s * 2 + 2]!, by = RIM_XY[s * 2 + 3]!;
+    RIM_NEAR[s] = Math.max(ax, bx) < box.x0 - reach || Math.min(ax, bx) > box.x1 + reach ||
+      Math.max(ay, by) < box.y0 - reach || Math.min(ay, by) > box.y1 + reach ? 0 : 1;
+  }
+  return RIM_NEAR;
+}
+
+/**
+ * The rim's line as one path: closed whole, or with `near` only its stretches near the box.
+ * A stroke costs the GPU its whole line, seen or not: zoomed in by the map's edge the rim
+ * stroked whole cost an emulated phone's GPU 1.4 to 4 times its few seen stretches. A
+ * stretch begins and ends at a point it shares with a segment out of reach, so its caps and
+ * the line left out stay out of the box: in the box the pixels are those of the whole line.
+ * The stretches start past a segment out of reach, never at the line's first point.
+ */
+function traceRim(g: CanvasRenderingContext2D, near: Uint8Array | null): void {
+  g.beginPath();
+  const from = near ? near.indexOf(0) : -1;
+  if (from < 0) {
+    for (let i = 0; i <= 320; i++) {
+      if (i === 0) g.moveTo(RIM_XY[0]!, RIM_XY[1]!); else g.lineTo(RIM_XY[i * 2]!, RIM_XY[i * 2 + 1]!);
+    }
+    g.closePath();
+    return;
+  }
+  let open = false;
+  for (let k = 1; k <= 320; k++) {
+    const s = (from + k) % 320;
+    if (!near![s]) {
+      open = false;
+      continue;
+    }
+    if (!open) g.moveTo(RIM_XY[s * 2]!, RIM_XY[s * 2 + 1]!);
+    g.lineTo(RIM_XY[s * 2 + 2]!, RIM_XY[s * 2 + 3]!);
+    open = true;
+  }
 }
 
 /** Could the rim touch `box`? Its strokes keep within the widest halo's half and the boil
@@ -594,6 +637,8 @@ const RIM_HALO_LITE: readonly (readonly [number, number])[] = [[0.012, 0.03], [0
 /** The rim's traced points of this frame, `[x0, y0, x1, y1, …]`: the burn re-strokes the
  * hot stretches of the same line instead of tracing it a second time. */
 const RIM_XY = new Float64Array(321 * 2);
+/** The rim's segments of this frame near the painted box ({@link rimNear}). */
+const RIM_NEAR = new Uint8Array(320);
 /** Stops of the burn's conic gradient round the frame: enough that the heat reads as
  * smooth patches, not facets. */
 const BURN_STOPS = 48;
@@ -624,9 +669,12 @@ function burnColor(heat: number): string {
 /** Paint the smoulder: the hot stretches of the rim's own line stroked once more with a
  * conic gradient whose alpha follows the heat round the frame. The gradient, not the
  * stretches, carries the brightness, so patches melt into each other without steps; cold
- * stretches are left out of the path entirely, so the burn costs only where it burns. A
- * browser without conic gradients simply keeps the plain rim. */
-function drawRimBurn(g: CanvasRenderingContext2D, frame: HoloRect, scale: number, time: number): void {
+ * stretches are left out of the path entirely, so the burn costs only where it burns. With
+ * `near`, so are the stretches out of the box's reach, as in the rim's line ({@link traceRim}).
+ * A browser without conic gradients simply keeps the plain rim. */
+function drawRimBurn(
+  g: CanvasRenderingContext2D, frame: HoloRect, scale: number, time: number, near: Uint8Array | null,
+): void {
   if (typeof g.createConicGradient !== 'function') return;
   const cx = frame.x + frame.width / 2;
   const cy = frame.y + frame.height / 2;
@@ -635,7 +683,8 @@ function drawRimBurn(g: CanvasRenderingContext2D, frame: HoloRect, scale: number
   g.beginPath();
   let open = false;
   for (let i = 0; i <= 320; i++) {
-    const hot = rimHeat(turn(i), time) > 0.01;
+    // A hot point opens the segment to the next one, which must be near the box as well.
+    const hot = rimHeat(turn(i), time) > 0.01 && (near === null || near[i % 320] === 1);
     if (hot && !open) g.moveTo(RIM_XY[i * 2]!, RIM_XY[i * 2 + 1]!);
     else if (hot || open) g.lineTo(RIM_XY[i * 2]!, RIM_XY[i * 2 + 1]!);
     open = hot;

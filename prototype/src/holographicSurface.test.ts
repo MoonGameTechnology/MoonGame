@@ -134,4 +134,71 @@ describe('the glass rim and wave keep to the strip of the bake they can touch', 
     expect(wave({ x0: 0, y0: 300, x1: 400, y1: 400 })).toBe(0);
     expect(wave({ x0: 450, y0: 0, x1: 500, y1: 800 })).toBe(0);
   });
+
+  /** A context that writes down the rim's paths: for each `beginPath`, the points of its
+   *  sub-paths, whether it closes, and how many strokes it gets. */
+  function tracing(): { g: CanvasRenderingContext2D; paths: { runs: [number, number][][]; closed: boolean; strokes: number }[] } {
+    const paths: { runs: [number, number][][]; closed: boolean; strokes: number }[] = [];
+    const last = () => paths[paths.length - 1]!;
+    const calls: Record<string, (...a: number[]) => void> = {
+      beginPath: () => { paths.push({ runs: [], closed: false, strokes: 0 }); },
+      moveTo: (x, y) => { last().runs.push([[x!, y!]]); },
+      lineTo: (x, y) => { last().runs[last().runs.length - 1]!.push([x!, y!]); },
+      closePath: () => { last().closed = true; },
+      stroke: () => { last().strokes++; },
+    };
+    const g = new Proxy({}, {
+      get: (_, name) => (typeof name === 'string' && name in calls ? calls[name]
+        : typeof name === 'string' && name.startsWith('create') ? () => ({ addColorStop() {} }) : () => undefined),
+      set: () => true,
+    }) as CanvasRenderingContext2D;
+    return { g, paths };
+  }
+  /** Does the segment a–b, grown by `pad`, meet `box`? */
+  const meets = (a: [number, number], b: [number, number], box: { x0: number; y0: number; x1: number; y1: number }, pad: number): boolean =>
+    Math.max(a[0], b[0]) >= box.x0 - pad && Math.min(a[0], b[0]) <= box.x1 + pad &&
+    Math.max(a[1], b[1]) >= box.y0 - pad && Math.min(a[1], b[1]) <= box.y1 + pad;
+
+  it('the rim: a box it crosses gets the stretches of the same line near it, burn included', () => {
+    const whole = tracing();
+    drawGlassRim(whole.g, frame, 0, false);
+    const [line, burn] = whole.paths;
+    // Without a box: one closed line of 321 points, stroked by the halo and the filament.
+    expect(line!.closed).toBe(true);
+    expect(line!.runs).toHaveLength(1);
+    expect(line!.runs[0]).toHaveLength(321);
+    expect(line!.strokes).toBe(3);
+    const points = line!.runs[0]!;
+    const box = { x0: -5, y0: 300, x1: 5, y1: 310 };
+    const near = tracing();
+    drawGlassRim(near.g, frame, 0, false, box);
+    const [stretch, nearBurn] = near.paths;
+    expect(stretch!.closed).toBe(false);
+    expect(stretch!.strokes).toBe(3);
+    // One stretch of the left side, a few points of the same line in a row.
+    expect(stretch!.runs).toHaveLength(1);
+    const run = stretch!.runs[0]!;
+    expect(run.length).toBeGreaterThan(2);
+    expect(run.length).toBeLessThan(20);
+    const at = points.findIndex((p) => p[0] === run[0]![0] && p[1] === run[0]![1]);
+    expect(run).toEqual(points.slice(at, at + run.length));
+    // It reaches past the box both ways: whatever is left out is farther than any stroke.
+    const ys = run.map((p) => p[1]);
+    expect(Math.min(...ys)).toBeLessThan(box.y0 - 2);
+    expect(Math.max(...ys)).toBeGreaterThan(box.y1 + 2);
+    for (let i = 0; i < 320; i++) {
+      const inRun = i >= at && i < at + run.length - 1;
+      if (!inRun) expect(meets(points[i]!, points[i + 1]!, box, 2)).toBe(false);
+    }
+    // The burn keeps to that stretch too: every segment of it lies on the stretch.
+    expect(burn!.strokes).toBe(1);
+    expect(nearBurn!.strokes).toBe(1);
+    for (const r of nearBurn!.runs) for (const p of r) expect(run).toContainEqual(p);
+  });
+
+  it('the rim: a box its rounded inset lets through but no stroke reaches draws nothing', () => {
+    const { g, paths } = tracing();
+    drawGlassRim(g, frame, 0, false, { x0: 10, y0: 300, x1: 20, y1: 310 });
+    expect(paths).toEqual([]);
+  });
 });

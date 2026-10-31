@@ -49,6 +49,8 @@ const DPR = 2;
 const VIEW = { k: 2, tx: -100, ty: -60 };
 const FRAME = { kind: 'frame' };
 const SIGHT = visibleInBake(VIEW, VW, VH);
+/** Экран в пространстве выпечки: за его пределами волну и рамку стекла кадр не рисует. */
+const SEEN = { x0: SIGHT.x, y0: SIGHT.y, x1: SIGHT.x + SIGHT.width, y1: SIGHT.y + SIGHT.height };
 
 /** Детализация карты: по умолчанию — крупная карта во всей красе. */
 const LOD = (over: Partial<MapLod> = {}): MapLod =>
@@ -154,10 +156,10 @@ describe('REFM-235 — поверхность карты', () => {
     // Линии кадр обводит в пикселях экрана, их кладёт сам слой границ (правило 7).
     expect(find('strokeLiveBorders')!.args).toEqual([0.7, env.borders]);
     expect(find('drawTerrainField')!.args).toEqual([frame.ctx, env.fields[0], 777, true]);
-    expect(find('drawGlassWave')!.args).toEqual([frame.ctx, FRAME, VW, VH, 777, prefs.glowOn()]);
+    expect(find('drawGlassWave')!.args).toEqual([frame.ctx, FRAME, VW, VH, 777, prefs.glowOn(), SEEN]);
     expect(find('drawProvinceSelection')!.args).toEqual([frame.ctx, env.polys.C0R1, { ms: 0, motion: prefs.motionOn() }, palette.LOCK]);
     expect(find('drawCaptureFlashes')!.args).toEqual([1000]);
-    expect(find('drawGlassRim')!.args).toEqual([frame.ctx, FRAME, 777, prefs.glowOn()]);
+    expect(find('drawGlassRim')!.args).toEqual([frame.ctx, FRAME, 777, prefs.glowOn(), SEEN]);
     // Свечение и движение выключены — стекло без свечения, пульс выделения без движения.
     frame.calls.length = 0;
     prefs.setGlowFx(false);

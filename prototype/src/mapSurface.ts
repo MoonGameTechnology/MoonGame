@@ -72,6 +72,9 @@ export function drawMapSurface(now: number, lod: MapLod): void {
   const hologramTime = game.clock();
   const detail = lod.detail;
   const sight = visibleInBake(mapView, VW, VH);
+  // The glass wave and rim span the whole map, and the GPU pays for a whole stroke, seen or
+  // not: drawn whole, the rim took two thirds of an emulated phone's GPU in a fast zoom.
+  const seen = { x0: sight.x, y0: sight.y, x1: sight.x + sight.width, y1: sight.y + sight.height };
   cx.save();
   cx.setTransform(DPR * mapView.k, 0, 0, DPR * mapView.k, DPR * mapView.tx, DPR * mapView.ty);
   if (holographicMapOn()) {
@@ -94,7 +97,7 @@ export function drawMapSurface(now: number, lod: MapLod): void {
       }
       cx.restore();
     }
-    if (!game.still()) drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
+    if (!game.still()) drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn(), seen);
   }
   if (paintedSelection !== selPlanet) {
     paintedSelection = selPlanet;
@@ -105,7 +108,7 @@ export function drawMapSurface(now: number, lod: MapLod): void {
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
   if (holographicMapOn()) {
     cx.restore();
-    if (!game.still()) drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
+    if (!game.still()) drawGlassRim(cx, holographicFrame, hologramTime, glowOn(), seen);
   }
   cx.restore(); // back to screen space
 }
