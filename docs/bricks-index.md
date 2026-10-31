@@ -68,6 +68,15 @@
 | CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
 | CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
 | CORP-16 | ✅ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
+| SPY-12 | ⏳ | core proto | `docs/backlog.md` | Разная цена операций. |
+| SPY-13 | ⏳ | core srv proto | `docs/backlog.md` | Разведка, которая копится. |
+| SPY-14 | ⏳ | core proto | `docs/backlog.md` | Саботаж очереди. |
+| SPY-15 | ⏳ | core proto | `docs/backlog.md` | Подрыв экономики. |
+| SPY-16 | ⏳ | srv proto | `docs/backlog.md` | Провал шпиона — новость для всех. |
+| SPY-17 | ⏳ | core proto | `docs/backlog.md` | До 3 агентов на одном мире. |
+| SPY-18 | ⏳ | core data | `docs/backlog.md` | Перевербовка. |
+| SPY-19 | ⏳ | proto | `docs/backlog.md` | Шанс на кнопке операции. |
+| SPY-20 | ⏳ | proto | `docs/backlog.md` | Архив докладов. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
