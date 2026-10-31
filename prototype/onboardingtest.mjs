@@ -8,7 +8,7 @@ import { instrumentedGame, launchBrowser, serve, waitForApp } from './harnessKit
 const host = await serve(
   await instrumentedGame(`
 // Счётчики гида — у обучения (REFM-221); \`main.ts\` их больше не видит.
-import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount } from '../../decisions/firstMatchGuide';
+import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount, guideHeroFleet as __guideHeroFleet } from '../../decisions/firstMatchGuide';
 window.__guideTest = {
   advanceHours: (hours) => apply(advance(s, s.time + hours * 3600000)),
   facts: () => ({ planets: Object.values(s.planets).filter(p => p.owner === ME).map(p => p.id),
@@ -16,7 +16,8 @@ window.__guideTest = {
     xp: loadMeta().xp, mine: __guideMineLevel(s, 'home_1'), tech: s.players[ME]?.technologies, selected: selFleet,
     hero: Object.values(s.heroes ?? {}).find(h => h.owner === ME && h.grade === 'main'),
     lots: (s.market ?? []).filter(o => o.owner === 'npc-guild').length,
-    log: logLines.slice(-6),
+    log: logLines.slice(-6), world: selPlanet,
+    heroFleet: (() => { const f = __guideHeroFleet(s, ME); return f && { id: f.id, at: f.location, mv: f.movement }; })(),
     medal: Object.keys(localStorage).filter(k => k.startsWith('vd.medal.tutorial.')).map(k => JSON.parse(localStorage.getItem(k))) }),
 };`),
 );
@@ -256,6 +257,9 @@ try {
           copy: document.querySelector('.sl-copy')?.textContent,
           log: window.__guideTest?.facts().log,
           side: document.querySelector('#side')?.innerText.slice(0, 1500),
+          picked: window.__guideTest?.facts().world,
+          selected: window.__guideTest?.facts().selected,
+          fleets: window.__guideTest?.facts().heroFleet,
         }))
         .catch(() => null);
       console.error(`${mode} failure state:`, JSON.stringify(where, null, 2));
