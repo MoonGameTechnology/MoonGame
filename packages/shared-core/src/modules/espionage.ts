@@ -93,8 +93,16 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
 
 const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'theft', 'research', 'counter']);
 
-/** Base price of one mission — overridden per-match via the `espionage.cost` hook. */
-const BASE_COST = { credits: 150 } as const;
+/** Base price of one mission by operation (SPY-12): guarding is cheap, attacking is
+ *  dear, as in the genre (SWW3 counter-ops $250 a day against $4000 for sabotage). The
+ *  `espionage.cost` hook may still bend it per match. */
+export const SPY_OP_COST: Readonly<Record<SpyOp, number>> = {
+  counter: 50,
+  recon: 150,
+  sabotage: 300,
+  theft: 300,
+  research: 400,
+};
 /** Base success chance — the `espionage.chance` pipeline may bend it; the result
  *  is clamped so no stack of modifiers makes spying a certainty or an impossibility. */
 const BASE_CHANCE = 0.6;
@@ -262,7 +270,7 @@ export const espionageModule: GameModule = {
   id: 'espionage',
   // 1.1.0: саботаж и кража ресурсов (SPY-9). 1.2.0: кража исследований (SPY-10).
   // 1.4.0: coalition membership blocks hostile missions at launch and resolution.
-  version: '1.4.0',
+  version: '1.5.0',
   setup(api) {
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -309,7 +317,7 @@ export const espionageModule: GameModule = {
         return h.reject('E_NO_AGENT');
       }
 
-      const fee = h.hook<Record<string, number>>('espionage.cost', { ...BASE_COST }, {
+      const fee = h.hook<Record<string, number>>('espionage.cost', { credits: SPY_OP_COST[p.op as SpyOp] }, {
         playerId: action.playerId,
         target: planet.owner,
         kind: p.op,

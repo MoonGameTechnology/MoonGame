@@ -19,14 +19,22 @@
  */
 import {
   BASE_SPY_AGENTS,
+  SPY_OP_COST,
   type GameState,
   type IntelGrant,
+  type SpyOp,
 } from '../../packages/shared-core/src/index';
 import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
 
-/** Базовая цена одной попытки — зеркало `BASE_COST` модуля ядра. Это ПОДПИСЬ на кнопке:
- *  авторитетно ядро, оно же отвергает попытку с `E_INSUFFICIENT`, когда денег мало. */
-export const SPY_COST = 150;
+/** Базовая цена операции (SPY-12) — та же таблица ядра `SPY_OP_COST`. Это ПОДПИСЬ на
+ *  кнопке: авторитетно ядро, оно же отвергает попытку с `E_INSUFFICIENT`, когда денег мало. */
+export const SPY_COST: Readonly<Record<SpyOp, number>> = SPY_OP_COST;
+
+/** Разброс цен для сводки во вкладке «Шпионаж»: «50–400». */
+export function spyCostRange(): string {
+  const all = Object.values(SPY_COST);
+  return `${Math.min(...all)}–${Math.max(...all)}`;
+}
 
 /** Сеть агентов игрока сейчас (SPY-6). Размер — база ядра `BASE_SPY_AGENTS`: как и
  *  `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */

@@ -6,6 +6,7 @@ import {
   COMMANDER_CAREER_SOLO_MIGRATION as career,
   MINING_SOLO_MIGRATION as migration,
   RECON_HALT_SOLO_MIGRATION as reconHalt,
+  SPY_PRICES_SOLO_MIGRATION as spyPrices,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -151,7 +152,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -242,5 +243,18 @@ describe('the rules-only recon pair (0.1.69 → 0.1.69)', () => {
     };
     const raw = serializeSoloSave(before, reconHalt.fromRules);
     expect(parseCompatibleSoloSave(raw, reconHalt.toRules)).toEqual(before);
+  });
+});
+
+describe('the rules-only spy prices pair (0.1.69 → 0.1.69)', () => {
+  it('reads a save of the recon-halt release under the new prices unchanged', () => {
+    const before = oldSave();
+    before.state.version = {
+      data: spyPrices.fromData,
+      dataHash: spyPrices.fromDataHash,
+      manifest: '1',
+    };
+    const raw = serializeSoloSave(before, spyPrices.fromRules);
+    expect(parseCompatibleSoloSave(raw, spyPrices.toRules)).toEqual(before);
   });
 });
