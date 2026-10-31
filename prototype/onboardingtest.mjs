@@ -9,6 +9,15 @@ const host = await serve(
   await instrumentedGame(`
 // Счётчики гида — у обучения (REFM-221); \`main.ts\` их больше не видит.
 import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount, guideHeroFleet as __guideHeroFleet } from '../../decisions/firstMatchGuide';
+window.__trail = [];
+{ let last = '';
+  setInterval(() => {
+    const now = String(selPlanet) + '|' + String(selFleet);
+    if (now !== last) window.__trail.push({ step: document.querySelector('#spotlight')?.dataset.step, sel: now, day: s.time });
+    last = now;
+    if (window.__trail.length > 12) window.__trail.shift();
+  }, 25);
+}
 window.__guideTest = {
   advanceHours: (hours) => apply(advance(s, s.time + hours * 3600000)),
   facts: () => ({ planets: Object.values(s.planets).filter(p => p.owner === ME).map(p => p.id),
@@ -109,6 +118,20 @@ try {
         : { viewport: { width: 1280, height: 800 } },
     );
     const errors = [];
+    await page.addInitScript(() => {
+      window.__clicks = [];
+      document.addEventListener(
+        'pointerdown',
+        (e) =>
+          window.__clicks.push({
+            x: e.clientX,
+            y: e.clientY,
+            step: document.querySelector('#spotlight')?.dataset.step,
+            tgt: e.target?.id || String(e.target?.className),
+          }),
+        true,
+      );
+    });
     page.on('pageerror', (e) => errors.push(e.message));
     page.setDefaultTimeout(30000);
     try {
@@ -260,6 +283,8 @@ try {
           picked: window.__guideTest?.facts().world,
           selected: window.__guideTest?.facts().selected,
           fleets: window.__guideTest?.facts().heroFleet,
+          clicks: window.__clicks?.slice(-6),
+          trail: window.__trail,
         }))
         .catch(() => null);
       console.error(`${mode} failure state:`, JSON.stringify(where, null, 2));
