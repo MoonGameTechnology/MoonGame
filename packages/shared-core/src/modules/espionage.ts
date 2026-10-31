@@ -134,9 +134,9 @@ export const SPY_OP_COST: Readonly<Record<SpyOp, number>> = {
 };
 /** Base success chance — the `espionage.chance` pipeline may bend it; the result
  *  is clamped so no stack of modifiers makes spying a certainty or an impossibility. */
-const BASE_CHANCE = 0.6;
-const CHANCE_MIN = 0.05;
-const CHANCE_MAX = 0.95;
+export const BASE_CHANCE = 0.6;
+export const CHANCE_MIN = 0.05;
+export const CHANCE_MAX = 0.95;
 /** How long every operation takes before it resolves, game-hours (owner, 2026-10-22). */
 export const MISSION_HOURS = 12;
 /** Base window length after a SUCCESS whose agent was killed, in game-hours
@@ -148,8 +148,8 @@ const RECON_LAYER_HOURS = 12;
 export const RECON_LAYERS = 4;
 /** Base odds the VICTIM notices the attempt (`espionage.detect` pipeline bends them;
  *  the result is clamped to [0,1] — hooks may legitimately push to never/always). */
-const BASE_DETECT_FAILED = 0.5; // a blown attempt leaves tracks
-const BASE_DETECT_SUCCESS = 0.25; // a clean theft is noticed rarer
+export const BASE_DETECT_FAILED = 0.5; // a blown attempt leaves tracks
+export const BASE_DETECT_SUCCESS = 0.25; // a clean theft is noticed rarer
 /** A beneficiary holds at most this many live grants — the oldest one is evicted
  *  first (fail-secure bound: state must not grow without limit). */
 const MAX_GRANTS = 8;
@@ -192,7 +192,7 @@ const COUNTER_CATCH = 0.2;
 /** SPY-17: at most this many of a player's agents on one world, and what each aggressive
  *  agent of a wave past the first adds to success and to detection. */
 export const MAX_AGENTS_PER_WORLD = 3;
-const CREW_BONUS = 0.1;
+export const CREW_BONUS = 0.1;
 
 /** The victim's counter-intelligence: the largest `field` bonus among the buildings
  *  on the worlds they own (SPY-7). 0 without such a building. */

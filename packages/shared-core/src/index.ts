@@ -782,6 +782,14 @@ export {
   MISSION_HOURS,
   RECON_LAYERS,
   SPY_OP_COST,
+  BASE_CHANCE as SPY_BASE_CHANCE,
+  CHANCE_MIN as SPY_CHANCE_MIN,
+  CHANCE_MAX as SPY_CHANCE_MAX,
+  BASE_DETECT_SUCCESS as SPY_DETECT_SUCCESS,
+  BASE_DETECT_FAILED as SPY_DETECT_FAILED,
+  CREW_BONUS as SPY_CREW_BONUS,
+  MAX_AGENTS_PER_WORLD,
+  counterIntelOf,
 } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 

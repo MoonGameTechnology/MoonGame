@@ -4751,6 +4751,8 @@ export const ru: Record<string, string> = {
   'side.scan.owner': 'Владелец',
   'side.scan.sabotage': '💣 Саботаж · {c}¤',
   'side.scan.delay': '⏳ Сорвать стройку · {c}¤',
+  'side.scan.odds': '🎲 Успех {s}% · риск раскрытия {r}%',
+  'side.scan.odds.hint': 'По тому, что вы знаете: чужой контрразведчик на посту не учтён',
   'side.scan.disrupt': '📉 Подорвать экономику · {c}¤',
   'side.scan.theft': '💰 Украсть ресурсы · {c}¤',
   'side.scan.research': '🧪 Украсть технологию · {c}¤',

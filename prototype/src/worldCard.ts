@@ -42,6 +42,7 @@ import { espionageShown, toolShown, victoryPointsShown } from '../../decisions/s
 import { medalBadges } from '../../decisions/unitMedals';
 import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { intelLayers } from '../../decisions/intelLayers';
+import { knownBureau, oddsPct, spyOdds } from '../../decisions/spyOdds';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { laneOf } from './buildOrders';
@@ -65,7 +66,7 @@ import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
 import { SECTOR_TYPES, type SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
-import { memory, myIntel, surveyed } from './mapFog';
+import { known, memory, myIntel, surveyed } from './mapFog';
 import { ownerColor, youColor } from './mapPalette';
 import {
   actionButton,
@@ -420,7 +421,7 @@ export function unknownPlanetHtml(p: Planet): string {
     const spyReady = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
+        ? `<div class="row">${spyOddsHtml(p.id, mem.owner)}${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
           HOSTILE_OPS.map((op) => btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op))).join('') +
           `</div>`
         : '';
@@ -554,6 +555,7 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     } else if (spy !== 'none') {
       out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
     }
+    if (spy !== 'none') out.push(spyOddsHtml(p.id, p.owner!));
     if (spy !== 'none')
       for (const op of HOSTILE_OPS) out.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
     // SPY-15: the owner sees its own world's economy sabotaged and for how long.
@@ -565,6 +567,24 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
+}
+
+/** SPY-19: the odds of an aggressive operation on this world, from what the player knows —
+ *  their own wave on the way there and the owner's bureaus they see or remember
+ *  (`decisions/spyOdds.ts`). */
+function spyOddsHtml(planetId: string, owner: string): string {
+  const s = game.world();
+  const ME = game.me();
+  const wave = myAgents(s, ME).away.filter(
+    (a) => a.planetId === planetId && !a.posted && a.op !== undefined && a.op !== 'counter',
+  ).length;
+  const seenBuildings = Object.values(s.planets).flatMap((w) => {
+    if (known(w.id)) return w.owner === owner ? w.buildings : [];
+    const mem = memory.get(w.id);
+    return mem && mem.owner === owner ? mem.buildings : [];
+  });
+  const o = spyOdds(wave + 1, knownBureau(seenBuildings, data));
+  return `<span class="pfact" title="${esc(t('side.scan.odds.hint'))}">${t('side.scan.odds', { s: oddsPct(o.success), r: oddsPct(o.risk) })}</span>`;
 }
 
 /** The aggressive operations after recon, in button order, and their button keys. */

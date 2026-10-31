@@ -724,6 +724,8 @@ export const de: Record<string, string> = {
   'side.scan.research': '🧪 Technologie stehlen · {c}¤',
   'side.scan.sabotage': '💣 Sabotage · {c}¤',
   'side.scan.delay': '⏳ Bau stören · {c}¤',
+  'side.scan.odds': '🎲 Erfolg {s}% · Enttarnungsrisiko {r}%',
+  'side.scan.odds.hint': 'Nach Ihrem Wissen: ein feindlicher Abwehragent auf Posten ist nicht eingerechnet',
   'side.scan.disrupt': '📉 Wirtschaft sabotieren · {c}¤',
   'side.scan.spy': '🕵 Welt ausspähen · {c}¤',
   'side.scan.stale': 'Außerhalb der Sensorreichweite — letzter Scan (kann veraltet sein).',
