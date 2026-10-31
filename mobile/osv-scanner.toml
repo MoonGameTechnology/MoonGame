@@ -1,0 +1,12 @@
+# mobile/osv-scanner.toml
+# Suppressions per SEC-1 ratchet (docs/security/pipeline.md).
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-30
+reason = "minimatch globParts amplification ReDoS. Tooling dependency, no runtime exposure."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-11-30
+reason = "glob AbortSignal cancellation bypass. Mobile dev dependency, no runtime exposure."

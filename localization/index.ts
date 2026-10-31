@@ -22,7 +22,7 @@
 /** Плоская карта одной локали: ключ → готовый текст. */
 export type Messages = Record<string, string>;
 
-export type LocaleId = 'ru' | 'en';
+export type LocaleId = 'ru' | 'en' | 'de' | 'pl' | 'es';
 
 /** Язык-источник: его текст показывается, когда в выбранной локали ключа нет. */
 export const DEFAULT_LOCALE: LocaleId = 'ru';
@@ -31,10 +31,16 @@ export const DEFAULT_LOCALE: LocaleId = 'ru';
  *  лёгким (его читает и клиент, который качает РОВНО ОДНУ локаль — LOC-6), поэтому
  *  импортировать отсюда `ru.ts`/`en.ts` нельзя. Синхронность с реальными файлами
  *  держит тест `bundles.test.ts`. */
-export const LOCALE_IDS: LocaleId[] = ['ru', 'en'];
+export const LOCALE_IDS: LocaleId[] = ['ru', 'en', 'de', 'pl', 'es'];
 
 /** Подпись языка в переключателе — на самом языке, не в переводе. */
-export const LOCALE_LABEL: Record<LocaleId, string> = { ru: 'Русский', en: 'English' };
+export const LOCALE_LABEL: Record<LocaleId, string> = {
+  ru: 'Русский',
+  en: 'English',
+  de: 'Deutsch',
+  pl: 'Polski',
+  es: 'Español',
+};
 
 export const isLocaleId = (v: unknown): v is LocaleId =>
   typeof v === 'string' && (LOCALE_IDS as string[]).includes(v);
