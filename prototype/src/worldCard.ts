@@ -48,9 +48,10 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { laneOf } from './buildOrders';
 import type { BuildLane } from './buildQueue';
 import type { UnitCatalogTab } from './buildScreen';
+import { bombardFall } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
-import { buildingName, cost, displayUnit, esc, fmtEta, resLine } from './format';
+import { buildingName, cost, countdownHMS, displayUnit, esc, fmtEta, resLine } from './format';
 import { data } from './gameData';
 import { pcUi } from './graphicsPrefs';
 import {
@@ -469,6 +470,13 @@ function worldFactHtml(f: WorldFact): string {
       return `<span class="pfact good" data-desc="fact:capital">★ ${t('side.world.capital')}</span>`;
     case 'blackout':
       return `<span class="pfact bad">⚡ ${t('side.world.blackout')}</span>`;
+    case 'bombard': {
+      // Знак и время на фишке, имя постройки — в подсказке: шапка узкая, а на телефоне
+      // фишка делит строку с действиями мира.
+      const left = countdownHMS(f.leftMs);
+      const tip = esc(t('side.world.bombard-fall', { b: buildingName(data.buildings[f.building]?.name, f.building), t: left }));
+      return `<span class="pfact bad" title="${tip}" aria-label="${tip}">⊗ ${left}</span>`;
+    }
     case 'type': {
       const parts: string[] = [];
       if (f.production !== undefined)
@@ -699,6 +707,8 @@ export function planetPanelHtml(p: Planet): string {
     capital: capitalOf(s, ME) === p.id,
     // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
+    // Таймер обстрела: когда рухнет следующая постройка (`decisions/bombardTimer.ts`).
+    bombard: bombardFall(s, p.id, ME),
     bonuses: sm.bonuses,
     mitigation: sm.mitigation,
     baseOutput: sm.baseOutput,

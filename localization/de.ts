@@ -4482,6 +4482,7 @@ export const de: Record<string, string> = {
   'side.wing.garrison.hint': 'Das Geschwader steht im Hangar des Raumhafens und erscheint nicht auf der Karte. „{b}“ startet einen Einsatz — Ziel per Kartentipp auswählen. Schiffe mit Frachtraum transportieren Geschwader mit sich: Frachtraum im Flottenpanel.',
   'side.world.blackout': 'Blackout: Radar und Raumabwehr −50%',
   'side.world.mitigation': 'Gebäudeschutz: −{n}% Schaden',
+  'side.world.bombard-fall': 'Beschuss: {b} fällt in {t}',
   'side.world.capital': 'Hauptstadt',
   'side.world.capital.note': 'Helden respawnen hier und tauschen Module aus',
   'side.world.defense': 'Verteidigung {p}',

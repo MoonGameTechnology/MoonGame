@@ -96,8 +96,11 @@ function nearOrbitHostiles(
  *  made to wreck buildings by making it a strong warship too.
  *
  *  The choice is per HULL, not per fleet, so a mixed fleet needs one firing line
- *  over both formulas — hence the formula form of `cappedUnitStat`. */
-function bombardPower(fleet: Fleet, data: GameData): number {
+ *  over both formulas — hence the formula form of `cappedUnitStat`.
+ *
+ *  Exported for the client's bombardment timer: it predicts the next building to fall
+ *  from this very number, run through the same damage hooks. */
+export function fleetBombardPower(fleet: Fleet, data: GameData): number {
   return cappedUnitStat(fleet.units, data, (stats) => {
     const siege = stats.siegeDamage ?? 0;
     return siege > 0 ? siege : (stats.attack ?? 0) * BOMBARD_FRACTION;
@@ -251,7 +254,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             defender: planet.owner,
             attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
           };
-          const power = bombardPower(f, data) * hours;
+          const power = fleetBombardPower(f, data) * hours;
           if (power > 0) {
             // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
             // on the bus — `construction` applies whatever arrives, so hooking here is

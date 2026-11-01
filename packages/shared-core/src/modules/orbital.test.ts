@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { combatModule } from './combat';
-import { orbitalModule } from './orbital';
+import { fleetBombardPower, orbitalModule } from './orbital';
+import { damageFromTraces, damageHookQueries } from '../util/combat';
+import { bombardersOf } from '../state/orbit';
 import { interceptModule } from './intercept';
 import { economyModule } from './economy';
 import { constructionModule } from './construction';
@@ -178,6 +180,53 @@ describe('orbital — bombardment toggle (fleet.bombard)', () => {
 });
 
 describe('orbital — bombardment effects (GDD §7.4)', () => {
+  // Таймер бомбардировки клиента (`decisions/bombardTimer.ts`) предсказывает снос по
+  // `fleetBombardPower` через `damageHookQueries` → `traceHooks` → `damageFromTraces`.
+  // Сторож: прогноз и настоящий обстрел — одно число, с прикрытием мира и двумя флотами.
+  it('прогноз таймера совпадает с обстрелом: постройка падает ровно в предсказанный миг', () => {
+    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
+    const st = stateWith({
+      players: [player('p2', { metal: 0 })],
+      planets: [planet('P', 'p2', { buildings: [['bastion', 1], ['mine', 1]] })], // 30 hp, доля 0.5
+      fleets: [
+        fleet('F', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true }),
+        fleet('G', 'p3', 'P', [['siege', 1]], { orbit: 'near', bombarding: true }),
+        fleet('H', 'p1', 'P', [['cruiser', 2]], { orbit: 'near' }), // стоит, но не обстреливает
+      ],
+    });
+    const shooters = bombardersOf(st, 'P', data);
+    expect(shooters.map((f) => f.id)).toEqual(['F', 'G']);
+    const queries = shooters.flatMap((f) =>
+      damageHookQueries(fleetBombardPower(f, data), {
+        phase: 'bombard',
+        location: 'P',
+        attacker: f.owner,
+        defender: 'p2',
+        attackerFleet: f.id,
+      }),
+    );
+    const traces = kernel.traceHooks(st, queries, ctx)!;
+    let rate = 0;
+    for (let i = 0; i < traces.length; i += 3) {
+      rate += damageFromTraces([traces[i]!.value, traces[i + 1]!.value, traces[i + 2]!.value]);
+    }
+    // Крейсер 5 + осада 30 в час; бастион прикрывает на 50%, рудник ещё на 5%.
+    expect(rate).toBeCloseTo((10 * 0.5 + 30) * 0.45, 9);
+    const fallAt = (30 / rate) * HOUR;
+    const before = okAdvance(kernel.advanceTo(st, at(Math.floor(fallAt) - 1000)));
+    expect(before.state.planets.P?.buildings.map((b) => b.type)).toEqual(['bastion', 'mine']);
+    const after = okAdvance(kernel.advanceTo(st, at(Math.ceil(fallAt) + 1000)));
+    expect(after.state.planets.P?.buildings.map((b) => b.type)).toEqual(['mine']);
+  });
+
+  it('прогноз урона: битый или нечисловой след читается как ноль', () => {
+    expect(damageFromTraces([10, 0, 0])).toBe(10);
+    expect(damageFromTraces([10, 0.5, 1])).toBe(7.5);
+    expect(damageFromTraces([10, 0, undefined])).toBe(0);
+    expect(damageFromTraces([Number.NaN, 0, 0])).toBe(0);
+    expect(damageFromTraces([])).toBe(0);
+  });
+
   it('freezes the production of the bombarded world and wears its structures', () => {
     const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
     const st = stateWith({

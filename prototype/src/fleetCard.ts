@@ -82,9 +82,10 @@ import {
   type VitalView,
 } from './fleetConsole';
 import { effectsShown, fleetEffects, pointDefenseTotal, type EffectTag } from './fleetEffects';
+import { bombardFall } from './bombardClock';
 import { fleetHoldsHtml } from './fleetHoldView';
 import { fleetSummary, hullPct, LIMP_PCT, stackPools } from './fleetSummary';
-import { countdownHMS, displayUnit, esc, kfmt, resLine } from './format';
+import { buildingName, countdownHMS, displayUnit, esc, kfmt, resLine } from './format';
 import {
   ctx,
   data,
@@ -720,8 +721,22 @@ function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
     s.players[ME]?.arrears ?? [],
   );
   if (!effectsShown(tags)) return '';
+  // Метка обстрела несёт таймер: когда рухнет следующая постройка мира под флотом
+  // (`decisions/bombardTimer.ts`). Имя постройки — в подсказке, как и в шапке мира.
+  const fall = f.bombarding && f.location ? bombardFall(s, f.location, ME) : null;
   let h = `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
-  for (const tag of tags) h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
+  for (const tag of tags) {
+    if (tag.kind === 'bombarding' && fall) {
+      const left = countdownHMS(fall.leftMs);
+      const tip = esc(
+        t('side.world.bombard-fall', {
+          b: buildingName(data.buildings[fall.building]?.name, fall.building),
+          t: left,
+        }),
+      );
+      h += `<span class="effect-tag" title="${tip}" aria-label="${tip}">${effectTagText(tag)} · ${left}</span>`;
+    } else h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
+  }
   return h + `</div>`;
 }
 

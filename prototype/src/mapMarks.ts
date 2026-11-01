@@ -1,7 +1,7 @@
 /**
  * Метки карты (REFM-234): то, что стоит на карте, пока верно в мире, — цели задач забега с
  * флажком, цель операции союзника и знак носителя, летящие ракеты, минные поля и установки,
- * осада «Поглощения мира» с отсчётом, булавки меток коалиции и линии отправленных цепочек
+ * осада «Поглощения мира» с отсчётом, таймер бомбардировки, булавки меток коалиции и линии отправленных цепочек
  * «Приказ» с черновиком открытого режима.
  *
  * Что метить, решают чистые модели (`missionRing.ts`, `allyPanel.ts`, `devourSiege.ts`,
@@ -29,6 +29,7 @@ import { ownInstallations } from '../../decisions/minefields';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import type { MissionRow } from '../../decisions/missionView';
 import { ALLY_EMBLEM } from './allyScreen';
+import { bombardFalls } from './bombardClock';
 import { BADGE_DY, badgeCount, badgePulse, groupByAnchor, shownOrders, type AnchoredOrder } from './chainBadges';
 import { chainAbilityHoldH, chainMenuAnchor, chainMode, chainRoute, chainStart, chainTravelH } from './chainComposer';
 import { capsuleAt, chainPathLegs, lastStepAtPoint, stackIndexes, type PathLeg } from './chainPathLayout';
@@ -249,6 +250,44 @@ export function drawMinefields(): void {
     cx.textAlign = 'left'; cx.fillText(m.label, 26, 15);
     cx.restore();
   }
+}
+
+/** Таймер бомбардировки: под миром, где обстреливает мой флот или обстреливают мой мир, —
+ *  плашка «⊗ Ч:ММ:СС» до сноса следующей постройки (`decisions/bombardTimer.ts`). Свой
+ *  обстрел — моим цветом, обстрел моего мира — цветом угрозы. Плашка стоит там же, где
+ *  отсчёт осады «Поглощения»; если над миром висят оба, таймер обстрела уходит под него.
+ *  Имя постройки — в окне мира и в метке флота: на карте только знак и время. */
+export function drawBombardTimers(): void {
+  const s = game.world();
+  const ME = game.me();
+  const marks = bombardFalls(s, ME);
+  if (marks.length === 0) return;
+  const cx = game.ctx();
+  const sieged = new Set(devourSieges(s, ME).map((m) => m.target));
+  const R = 31;
+  cx.save();
+  cx.textAlign = 'center';
+  cx.textBaseline = 'top';
+  cx.font = '700 12px ui-monospace, monospace';
+  for (const m of marks) {
+    const p = s.planets[m.planetId];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 60)) continue;
+    const tone = m.mine ? HOSTILE : ownerColor(ME);
+    const label = `⊗ ${countdownHMS(m.fall.leftMs)}`;
+    const w = Math.ceil(cx.measureText(label).width) + 12;
+    const top = Math.round(c.y + R + 5 + (sieged.has(m.planetId) ? 20 : 0));
+    const left = Math.round(c.x - w / 2);
+    cx.fillStyle = 'rgba(4,10,12,.9)';
+    cx.fillRect(left, top, w, 17);
+    cx.lineWidth = 1;
+    cx.strokeStyle = tone;
+    cx.strokeRect(left + 0.5, top + 0.5, w - 1, 16);
+    cx.fillStyle = tone;
+    cx.fillText(label, c.x, top + 3);
+  }
+  cx.restore();
 }
 
 /** Осада «Поглощения мира» над своим миром (PVR-4.7): красное кольцо-часы — дуга тает к

@@ -4814,6 +4814,7 @@ export const en: Record<string, string> = {
     'The squadron sits in the port hangar and never appears on the map. "{b}" sends a sortie out — pick the target by tapping the map. A ship with a hold takes a squadron along: the hold is in the fleet panel.',
   'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.mitigation': 'Structure cover: −{n}% damage',
+  'side.world.bombard-fall': 'Bombardment: {b} falls in {t}',
   'side.world.capital': 'Capital',
   'side.world.capital.note': 'Heroes respawn and re-fit modules here',
   'side.world.defense': 'defense {p}',

@@ -309,6 +309,47 @@ describe('REFM-234 — метки забега', () => {
   });
 });
 
+describe('таймер бомбардировки', () => {
+  it('под обстреливаемым миром — плашка «⊗ Ч:ММ:СС» до сноса постройки: мой мир — цветом угрозы, мой обстрел — моим; не стороне — ничего', async () => {
+    const { marks, palette, env, frame, home, next, own, at, put, patch } = await boot();
+    const { bombardFall } = await import('./bombardClock');
+    expect(home.buildings.length).toBeGreaterThan(0);
+    // Враг обстреливает мой мир: обстрел идёт только в войне.
+    patch({ diplomacy: { 'p1|p2': 'war' } });
+    put({ ...own, id: 'raider', owner: 'p2', orbit: 'near', bombarding: true, battleId: null } as Fleet);
+    const fall = bombardFall(env.world, home.id, 'p1')!;
+    expect(fall).not.toBeNull();
+    marks.drawBombardTimers();
+    const c = at(home.position);
+    const text = frame.named('fillText')[0]!;
+    expect(text.args).toEqual([`⊗ ${countdownHMS(fall.leftMs)}`, c.x, Math.round(c.y + 31 + 5) + 3]);
+    expect(text.fill).toBe(palette.HOSTILE);
+    // Над тем же миром и осада «Поглощения» — таймер обстрела уходит под её отсчёт.
+    frame.calls.length = 0;
+    patch({ heroes: { h: { archetype: 'devourer', alive: true, siege: { victim: 'p1', target: home.id, since: env.world.time, until: env.world.time + 3_600_000 } } } });
+    marks.drawBombardTimers();
+    expect(frame.named('fillText')[0]!.args[2]).toBe(Math.round(c.y + 31 + 5 + 20) + 3);
+    // Мой флот обстреливает чужой мир — плашка моим цветом.
+    frame.calls.length = 0;
+    patch({ heroes: {} });
+    const { raider: _gone, ...rest } = env.world.fleets;
+    env.world = {
+      ...env.world,
+      fleets: rest,
+      planets: { ...env.world.planets, [next.id]: { ...next, owner: 'p2', buildings: home.buildings } },
+    };
+    put({ ...own, id: 'mine-bomber', location: next.id, orbit: 'near', bombarding: true, battleId: null } as Fleet);
+    marks.drawBombardTimers();
+    expect(frame.named('fillText')).toHaveLength(1);
+    expect(frame.named('fillText')[0]!.fill).toBe(palette.ownerColor('p1'));
+    // Чужая война: не мой мир и не мой флот — метки нет.
+    frame.calls.length = 0;
+    put({ ...env.world.fleets['mine-bomber']!, owner: 'p3' } as Fleet);
+    marks.drawBombardTimers();
+    expect(frame.calls).toHaveLength(0);
+  });
+});
+
 describe('REFM-234 — ракеты и мины', () => {
   it('летящая ракета: пунктир от неё к точке цели цветом владельца; чужая подписана, пока карта крупна; без полёта и в тумане — нет', async () => {
     const { marks, palette, geo, camera, t, env, frame, home, next, at, put } = await boot();
@@ -504,7 +545,7 @@ describe('REFM-234 — стык меток с main.ts', () => {
 
   it('метки живут только в модуле; кадр зовёт их, тап ищет цель по их хитбоксам', () => {
     expect(MAIN).not.toMatch(
-      /\bfunction (drawMissionTargets|drawAllyMarks|drawMissiles|drawMinefields|drawDevourSieges|drawPings|drawChainPath|drawChainOverlay)\(/,
+      /\bfunction (drawMissionTargets|drawAllyMarks|drawMissiles|drawMinefields|drawDevourSieges|drawBombardTimers|drawPings|drawChainPath|drawChainOverlay)\(/,
     );
     expect(MAIN).not.toMatch(/\blet (pingHits|chainHits)\b/);
     for (const call of [
@@ -513,6 +554,7 @@ describe('REFM-234 — стык меток с main.ts', () => {
       'drawMissiles();',
       'drawMinefields();',
       'drawDevourSieges();',
+      'drawBombardTimers();',
     ])
       expect(MAIN, call).toContain(call);
     expect(MAIN).toMatch(/drawMissionTargets\(\);\s*drawAllyMarks\(\);/);

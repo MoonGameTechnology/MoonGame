@@ -82,6 +82,23 @@ export function bombardedPlanets(state: GameState, data: GameData): Set<PlanetId
 }
 
 /**
+ * The fleets bombarding one planet right now, sorted by id — the per-fleet rule is
+ * {@link isActivelyBombarding}, hostility the same `war`-stance read as
+ * {@link bombardedPlanets}. For the client's bombardment timer, which needs each
+ * shelling fleet (its power and owner), not just the yes/no of {@link isBombarded}.
+ */
+export function bombardersOf(state: GameState, planetId: PlanetId, data: GameData): Fleet[] {
+  const hostile = stanceHostile(state);
+  const out: Fleet[] = [];
+  for (const fleet of peekValues(state.fleets)) {
+    if (fleet.location === planetId && isActivelyBombarding(state, fleet, hostile, data)) {
+      out.push(fleet);
+    }
+  }
+  return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
  * Is a planet currently being bombarded? True when a hostile fleet sits on its
  * NEAR orbit with bombardment switched on (GDD §7.4). A pure query on state —
  * shared by economy (production is frozen) and construction (no new orders, and

@@ -4506,6 +4506,7 @@ export const es: Record<string, string> = {
   'side.wing.garrison.hint': 'El escuadrón está en el hangar del puerto y no aparece en el mapa. «{b}» lo envía a una misión: señala el objetivo tocando el mapa. Una nave con bodega puede transportar el escuadrón consigo: la bodega está en la ficha de la flota.',
   'side.world.blackout': 'apagón: radares y defensa planetaria −50%',
   'side.world.mitigation': 'Protección de estructuras: −{n}% de daño',
+  'side.world.bombard-fall': 'Bombardeo: {b} caerá en {t}',
   'side.world.capital': 'Capital',
   'side.world.capital.note': 'Los héroes reaparecen y reacondicionan módulos aquí',
   'side.world.defense': 'defensa {p}',

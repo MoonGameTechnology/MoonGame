@@ -4820,6 +4820,7 @@ export const ru: Record<string, string> = {
     'Эскадра стоит в ангаре порта, на карте её нет. «{b}» поднимает вылет — цель выберите тапом по карте. Корабль с трюмом возит эскадру с собой: трюм — в панели флота.',
   'side.world.blackout': 'блэкаут: радары и ПКО −50%',
   'side.world.mitigation': 'Защита построек: −{n}% урона',
+  'side.world.bombard-fall': 'Обстрел: {b} рухнет через {t}',
   'side.world.capital': 'Столица',
   'side.world.capital.note': 'Здесь возрождаются герои и меняют модули',
   'side.world.defense': 'оборона {p}',
