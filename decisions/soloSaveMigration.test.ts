@@ -11,6 +11,7 @@ import {
   RECON_LAYERS_SOLO_MIGRATION as reconLayers,
   SPY_DISRUPT_SOLO_MIGRATION as spyDisrupt,
   SPY_EXPOSED_SOLO_MIGRATION as spyExposed,
+  SPY_CREW_SOLO_MIGRATION as spyCrew,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -156,7 +157,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -296,5 +297,14 @@ describe('the rules-only public exposure pair (0.1.69 → 0.1.69)', () => {
     before.state.version = { data: spyExposed.fromData, dataHash: spyExposed.fromDataHash, manifest: '1' };
     const raw = serializeSoloSave(before, spyExposed.fromRules);
     expect(parseCompatibleSoloSave(raw, spyExposed.toRules)).toEqual(before);
+  });
+});
+
+describe('the rules-only agent wave pair (0.1.69 → 0.1.69)', () => {
+  it('reads a save of the public exposure release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: spyCrew.fromData, dataHash: spyCrew.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, spyCrew.fromRules);
+    expect(parseCompatibleSoloSave(raw, spyCrew.toRules)).toEqual(before);
   });
 });

@@ -60,6 +60,10 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * both sides are at war already, and a third party's world is not party to it.
  * The exposure is also public news (SPY-16): `espionage.exposed` names the world's owner
  * (`a`), the spy's owner (`b`) and the world, never the operation.
+ * Agents in numbers (SPY-17): a player may hold at most `MAX_AGENTS_PER_WORLD` agents on
+ * one world. Aggressive agents sent there while others are still on their way ride one
+ * wave (`crew` in each `espionage.resolve`): each crewmate past the first adds `CREW_BONUS` to the base
+ * success AND to the base detection — a crowd works faster and is noticed sooner.
  * Members of the same coalition cannot launch aggressive missions against each other;
  * a mission already in flight aborts if its target is a coalition member on arrival.
  * This protection lasts through the pending departure, without bypassing its timer.
@@ -185,6 +189,10 @@ const COUNTER_KILL_BONUS = 0.15;
  *  and its odds to catch one per sweep. */
 const COUNTER_SWEEP_HOURS = 12;
 const COUNTER_CATCH = 0.2;
+/** SPY-17: at most this many of a player's agents on one world, and what each aggressive
+ *  agent of a wave past the first adds to success and to detection. */
+export const MAX_AGENTS_PER_WORLD = 3;
+const CREW_BONUS = 0.1;
 
 /** The victim's counter-intelligence: the largest `field` bonus among the buildings
  *  on the worlds they own (SPY-7). 0 without such a building. */
@@ -216,6 +224,8 @@ interface ResolvePayload {
   planetId: string;
   op: SpyOp;
   mission: number;
+  /** SPY-17: the wave's size (absent = 1). */
+  crew?: number;
 }
 
 /** A hook result, or its base when the pipeline broke (non-finite) — a broken
@@ -344,7 +354,8 @@ export const espionageModule: GameModule = {
   // 1.5.0: своя цена у операции (SPY-12). 1.6.0: срыв стройки (SPY-14).
   // 1.7.0: разведка копится слоями, агент стоит до отзыва (SPY-13).
   // 1.8.0: подрыв экономики (SPY-15). 1.9.0: раскрытие — новость для всех (SPY-16).
-  version: '1.9.0',
+  // 1.10.0: до трёх агентов на мире, волна складывает шансы (SPY-17).
+  version: '1.10.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
@@ -396,6 +407,13 @@ export const espionageModule: GameModule = {
       if ((counter || p.op === 'recon') && mineHere) {
         return h.reject('E_BAD_TARGET');
       }
+      // SPY-17: no more than three of the player's agents on one world, whatever they do.
+      const onWorld = (h.state.spyAgents?.[action.playerId] ?? []).filter(
+        (a) => a.planetId === p.planetId && a.until > h.ctx.now,
+      );
+      if (onWorld.length >= MAX_AGENTS_PER_WORLD) {
+        return h.reject('E_BAD_TARGET');
+      }
 
       // SPY-6: a mission needs a free agent — checked before the fee, so a refusal
       // costs nothing.
@@ -425,6 +443,20 @@ export const espionageModule: GameModule = {
       const mission = Math.max(0, ...away.map((a) => a.mission ?? 0)) + 1;
       const resolvesAt = h.ctx.now + hoursToMs(h.ctx, MISSION_HOURS);
       const op = p.op as SpyOp;
+      // SPY-17: an aggressive agent joins the wave of the player's aggressive agents still
+      // on their way to this world; every one of them then rides with the whole crew.
+      // The crew rides in each mission's `espionage.resolve` payload: the agent's own record
+      // is already dropped by housekeeping at the instant the mission resolves.
+      const wave = counter
+        ? new Set<number>()
+        : new Set(away.filter((a) => a.planetId === p.planetId && !a.posted && a.op !== 'counter').map((a) => a.mission));
+      const crew = wave.size + 1;
+      if (crew > 1) {
+        for (const e of h.state.scheduled) {
+          const rp = e.payload as Partial<ResolvePayload>;
+          if (e.type === 'espionage.resolve' && rp.spy === action.playerId && wave.has(rp.mission)) rp.crew = crew;
+        }
+      }
       // A counter-intelligence agent is away until recalled, from the start: housekeeping
       // must not drop it on arrival, and a recall on the way must find it.
       away.push({ until: counter ? COUNTER_POSTED : resolvesAt, mission, op, planetId: p.planetId });
@@ -434,12 +466,13 @@ export const espionageModule: GameModule = {
         planetId: p.planetId,
         op,
         mission,
+        ...(crew > 1 ? { crew } : {}),
       } satisfies ResolvePayload);
       h.emit('espionage.sent', { owner: action.playerId, planetId: p.planetId, op, until: resolvesAt });
     });
 
     api.on('espionage.resolve', (event, h) => {
-      const { spy, planetId, op, mission } = event.payload as ResolvePayload;
+      const { spy, planetId, op, mission, crew = 1 } = event.payload as ResolvePayload;
       const now = h.ctx.now;
       const victim = h.state.planets[planetId]?.owner ?? null;
       const comeHome: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RETURN_HOURS) };
@@ -473,14 +506,16 @@ export const espionageModule: GameModule = {
         return;
       }
 
-      const rawChance = h.hook<number>('espionage.chance', BASE_CHANCE, {
+      // SPY-17: the wave this agent rode in — each crewmate past the first raises both odds.
+      const crewBonus = CREW_BONUS * (Math.min(MAX_AGENTS_PER_WORLD, crew) - 1);
+      const rawChance = h.hook<number>('espionage.chance', BASE_CHANCE + crewBonus, {
         playerId: spy,
         target: victim,
         kind: op,
       });
       const chance = Number.isFinite(rawChance)
         ? Math.min(CHANCE_MAX, Math.max(CHANCE_MIN, rawChance))
-        : BASE_CHANCE;
+        : BASE_CHANCE + crewBonus;
       const succeeded = h.rng.nextFloat() < chance;
 
       // Counter-intelligence (SPY-2): the detect roll is drawn for EVERY resolved
@@ -491,7 +526,8 @@ export const espionageModule: GameModule = {
       const baseDetect =
         (succeeded ? BASE_DETECT_SUCCESS : BASE_DETECT_FAILED) +
         counterIntelOf(h.ctx.data, h.state, victim, 'spyDetectBonus') +
-        (watched ? COUNTER_DETECT_BONUS : 0);
+        (watched ? COUNTER_DETECT_BONUS : 0) +
+        crewBonus;
       const rawDetect = h.hook<number>('espionage.detect', baseDetect, {
         playerId: spy,
         target: victim,
