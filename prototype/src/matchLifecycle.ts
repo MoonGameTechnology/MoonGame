@@ -245,10 +245,10 @@ export function installMatch(
   forgetChainRoutes(); // маршруты принадлежат карте СТАРОГО матча
   resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
-  resetScoutNews(); // названные разведкой цели принадлежат старому матчу
   forgetRadarContacts();
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();
+  resetScoutNews(); // названные разведкой цели принадлежат старому матчу
   forgetAway(); // reset the away-window baseline for the new match
   restoreSpyArchive(); // SPY-20: донесения старой партии — не о мирах этой
   // The match goal, written AFTER the wipe so it is the first line a player can read.
