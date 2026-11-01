@@ -1811,6 +1811,12 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #log{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:10px 14px;
   font:var(--fs-caption)/1.6 var(--sf-font);font-variant-numeric:tabular-nums;color:#73b6a2;scrollbar-width:thin;}
 #log div::before{content:"> ";color:var(--grn-dim);}
+/* запись журнала с местом: кнопка ⌖ ведёт камеру к нему с пингом */
+#log .lg-row{display:flex;align-items:flex-start;gap:6px;}
+#log .lg-row::before{flex:none;}
+#log .lg-row span{flex:1;min-width:0;}
+.lg-ping{flex:none;width:28px;height:24px;padding:0;border-radius:6px;border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);font-size:15px;line-height:1;cursor:pointer;}
+.lg-ping:active{background:rgba(53,214,230,.2);}
 /* UIX-4.2: «Ждёт решения» над журналом — бои и письма с кнопкой «Показать» */
 #log-pending:empty{display:none;}
 #log-pending{padding:10px 14px;border-bottom:1px solid var(--line-hi);display:flex;flex-direction:column;gap:6px;}

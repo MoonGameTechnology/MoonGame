@@ -13,12 +13,35 @@
  * получает их хуками {@link initEventFeed}: импорт оттуда был бы циклом.
  */
 import type {
+  Battle,
+  CombatantRef,
   DiplomaticStance,
   DomainEvent,
   GameState,
   StrikeBase,
 } from '../../packages/shared-core/src/index';
-import { engagementOf, flashBattles, inVisionBloc, MISSION_HOURS, TURNED_HOURS } from '../../packages/shared-core/src/index';
+import {
+  engagementOf,
+  flashBattles,
+  getStance,
+  inVisionBloc,
+  medalsOf,
+  MISSILE_TRAIT,
+  MISSION_HOURS,
+  TURNED_HOURS,
+  unitHasTrait,
+} from '../../packages/shared-core/src/index';
+import { earnsMerit, sideUnits } from '../../packages/shared-core/src/util/combat';
+import { combatantKey } from '../../packages/shared-core/src/state/battle';
+import {
+  battleTailParts,
+  foesPeak,
+  headcount,
+  hullLeft,
+  newMedals,
+  rewardParts,
+  type ReportPart,
+} from '../../decisions/battleReport';
 import { t, tData } from '../../localization/runtime';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
@@ -64,7 +87,7 @@ import { spyDeed } from '../../decisions/spyDeed';
 import { squadronCallsignOf } from './squadronPanel';
 import { stewardMine } from './stewardLog';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
-import { recordLoss, tallyDeath } from './warTally';
+import { deathCount, lossOwner, recordLoss, tallyDeath } from './warTally';
 import { timeLeft } from './worldQueries';
 
 /** Окно, которое событие перерисовывает, если оно открыто. */
@@ -106,8 +129,17 @@ export function initEventFeed(host: EventFeedHost): void {
   game = host;
 }
 
+/** Запись журнала: строка с игровой меткой и узел карты, к которому её кнопка ⌖ ведёт
+ *  камеру. Узла нет — нет и кнопки. */
+export interface LogEntry {
+  line: string;
+  at?: string;
+}
+
 /** Журнал матча — строки ленты с игровой меткой времени (предел — `noteLog.ts`). */
-export const logLines: string[] = [];
+export const logLines: LogEntry[] = [];
+/** Номер правки журнала: экран пересобирает его разметку, только когда номер сменился. */
+export let logVersion = 0;
 
 // Session war record (from `unit.died` events): enemy units you destroyed vs your own
 // units lost. Cumulative since the match started; reset on a new match. Only battles
@@ -120,21 +152,60 @@ const myBattleLocs = new Set<string>();
 // unit.died while a battle runs and paid out as a result note on battle.resolved.
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 
+// Рапорт о СВОЁМ бое (`decisions/battleReport.ts`, решение владельца 2026-11-01). Итог
+// приходит, когда боя в состоянии уже нет, поэтому всё, что для него нужно знать о ходе
+// боя, — мои стороны, враги и их пик, медали до боя — запоминается, пока бой идёт.
+interface BattleBookEntry {
+  loc: string;
+  phase: string;
+  /** Мои стороны боя: по ним после итога ищутся выжившие. */
+  mine: CombatantRef[];
+  /** Владельцы вражеских сторон — ключи ведомости потерь (`lossOwner`). */
+  foeOwners: Set<string>;
+  /** Пик врагов (правило 1). */
+  foes: number;
+  /** Медали моих сторон в начале учёта: «тип юнита|ключ медали». */
+  medals: string[];
+}
+const battleBook = new Map<string, BattleBookEntry>();
+/** Очки за бои (BAL-16) на конце прошлого пакета; `null` — ещё не сняты в этом матче. */
+let lastBattlePoints: number | null = null;
+
+// Потери и сбитые вне боя — ПКО, обстрел с орбиты, удар челноков: копятся по узлу и
+// стороне и пишутся одной строкой, когда огонь стих. Обстрел идёт непрерывно, и строка на
+// каждый отрезок времени засыпала бы журнал.
+interface StrayTally {
+  at: string;
+  mine: boolean;
+  units: Record<string, number>;
+  firstMs: number;
+  lastMs: number;
+}
+const strays = new Map<string, StrayTally>();
+/** Строка пишется, когда огонь по узлу молчит столько реального времени… */
+const STRAY_QUIET_MS = 3000;
+/** …или когда копится уже столько — непрерывный обстрел не молчит никогда. */
+const STRAY_MAX_MS = 30_000;
+
 // ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
 export const eventLog: RecapEvent[] = [];
 let lastNoteMsg = '';
 let lastNoteAtMs = 0;
-/** Append a line to the session log (bounded). Patches the feed if it's on screen. */
-export function note(msg: string, at?: string) {
+/** Append a line to the session log (bounded). Patches the feed if it's on screen.
+ *  `quiet` — только журнал, без всплывашки: разведка пишет строку на каждую новую цель,
+ *  и тосты поверх карты засыпали бы её как раз тогда, когда флот идёт в чужие земли. */
+export function note(msg: string, at?: string, opts?: { quiet?: boolean }) {
   // Защита от повторов и пределы лент — `noteLog.ts` (REFM-101): повтор глушится по
   // РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ — «День 3, 07:45» (`gameStamp`, UIX-5.3).
   const nowMs = Date.now();
   if (isRepeat(msg, lastNoteMsg, nowMs, lastNoteAtMs)) return;
   lastNoteMsg = msg;
   lastNoteAtMs = nowMs;
-  pushBounded(logLines, `${gameStamp(game.world().time)} · ${msg}`, LOG_LINES);
+  const line = `${gameStamp(game.world().time)} · ${msg}`;
+  pushBounded(logLines, at ? { line, at } : { line }, LOG_LINES);
+  logVersion++;
   pushBounded(eventLog, { at: game.world().time, text: msg, anchor: at }, EVENT_LOG_MAX);
-  toast(msg, at);
+  if (!opts?.quiet) toast(msg, at);
 }
 
 /** Transient event toast over the map — feedback must not live only in a hidden
@@ -180,6 +251,127 @@ function battleEngaged(battleId: unknown): boolean {
   );
 }
 
+/** Текст из частей рапорта: каждая часть — свой ключ локали. */
+function partsText(parts: readonly ReportPart[], sep = ''): string {
+  return parts.map((part) => t(part.key, part.params)).join(sep);
+}
+
+/** Враг ли мне владелец стороны: чужой и не союзник по договору. Ничейный гарнизон — враг. */
+function foeOwner(s: GameState, me: string, owner: string | null): boolean {
+  if (owner === me) return false;
+  if (owner === null) return true;
+  const stance = getStance(s, me, owner);
+  return stance !== 'alliance' && stance !== 'pact';
+}
+
+/** Сколько живых врагов в бою сейчас. */
+function aliveFoes(s: GameState, b: Battle, me: string): number {
+  let n = 0;
+  for (const side of b.sides)
+    if (foeOwner(s, me, side.owner)) n += headcount(sideUnits(s, side.ref) ?? []);
+  return n;
+}
+
+/** Медали стеков моих сторон: «тип юнита|ключ медали» на каждую медаль каждого стека. */
+function medalTags(s: GameState, refs: readonly CombatantRef[]): string[] {
+  const tags: string[] = [];
+  for (const ref of refs)
+    for (const stack of sideUnits(s, ref) ?? [])
+      if (stack.count > 0) for (const m of medalsOf(stack, data)) tags.push(`${stack.unit}|${m.key}`);
+  return tags;
+}
+
+/** Сколько врагов уже пало в бою на узле `loc` — по ведомости потерь. */
+function fallenFoes(loc: string, foeOwners: ReadonlySet<string>): number {
+  const ledger = battleLosses.get(loc);
+  if (!ledger) return 0;
+  let n = 0;
+  for (const [who, units] of Object.entries(ledger))
+    if (foeOwners.has(who)) for (const c of Object.values(units)) n += c;
+  return n;
+}
+
+/** Учесть мои идущие бои: завести запись, дописать новые стороны и обновить пик врагов.
+ *  Зовётся в конце пакета — когда ведомость уже приняла его потери. */
+function trackBattles(s: GameState, me: string): void {
+  for (const b of Object.values(s.battles)) {
+    const mine = b.sides.filter((side) => side.owner === me).map((side) => side.ref);
+    if (mine.length === 0) continue;
+    let entry = battleBook.get(b.id);
+    if (!entry) {
+      entry = { loc: b.location, phase: b.phase, mine: [], foeOwners: new Set(), foes: 0, medals: medalTags(s, mine) };
+      battleBook.set(b.id, entry);
+    }
+    const keys = new Set(entry.mine.map(combatantKey));
+    for (const ref of mine) if (!keys.has(combatantKey(ref))) entry.mine.push(ref);
+    for (const side of b.sides) if (foeOwner(s, me, side.owner)) entry.foeOwners.add(lossOwner(side.owner));
+    entry.foes = foesPeak(entry.foes, aliveFoes(s, b, me), fallenFoes(b.location, entry.foeOwners));
+  }
+}
+
+/** Выжившие моих сторон после итога. */
+function survivorsOf(s: GameState, refs: readonly CombatantRef[]) {
+  return refs.flatMap((ref) => (sideUnits(s, ref) ?? []).filter((st) => st.count > 0));
+}
+
+/** Хвост итога своего боя: враги, выбитые, корпус выживших кораблей. */
+function battleTail(s: GameState, entry: BattleBookEntry): string {
+  const destroyed = fallenFoes(entry.loc, entry.foeOwners);
+  const ships = entry.phase === 'ground' ? [] : survivorsOf(s, entry.mine.filter((r) => r.kind === 'fleet'));
+  const hull = ships.length > 0 ? hullLeft(ships, (u) => data.units[u]?.stats.hp ?? 0) : undefined;
+  const parts = battleTailParts({ foes: Math.max(entry.foes, destroyed), destroyed, ...(hull ? { hull } : {}) });
+  return partsText(parts);
+}
+
+/** Награды за свой бой без очков (очки сводятся на конце пакета): выслуга и медали. */
+function battleMerit(s: GameState, me: string, entry: BattleBookEntry): { veterans: number; medals: { medal: string; unit: string }[] } {
+  const veterans = earnsMerit(s, me, data) ? headcount(survivorsOf(s, entry.mine)) : 0;
+  const medals = newMedals(entry.medals, medalTags(s, entry.mine)).map((tag) => {
+    const [unit = '', key = ''] = tag.split('|');
+    return { medal: t(key), unit: displayUnit(unit) };
+  });
+  return { veterans, medals };
+}
+
+/** Записать потерю или сбитого вне боя (копится до тишины). */
+function strayDeath(at: string, mine: boolean, unit: string, count: number, nowMs: number): void {
+  const key = `${mine ? 'L' : 'K'}|${at}`;
+  const tally = strays.get(key) ?? { at, mine, units: {}, firstMs: nowMs, lastMs: nowMs };
+  tally.units[unit] = (tally.units[unit] ?? 0) + count;
+  tally.lastMs = nowMs;
+  strays.set(key, tally);
+}
+
+/** Выписать потери вне боя, по которым огонь стих (или копится слишком долго). Зовётся
+ *  каждым кадром: на паузе событий нет, а строка дописаться должна. */
+export function flushStrayLosses(nowMs: number = Date.now()): void {
+  if (strays.size === 0) return;
+  for (const [key, tally] of strays) {
+    if (nowMs - tally.lastMs < STRAY_QUIET_MS && nowMs - tally.firstMs < STRAY_MAX_MS) continue;
+    strays.delete(key);
+    const list = Object.entries(tally.units)
+      .map(([u, n]) => t('log.stray.unit', { n, u: displayUnit(u) }))
+      .join(', ');
+    note(t(tally.mine ? 'log.stray.lost' : 'log.stray.killed', { at: game.placeName(tally.at), list }), tally.at);
+  }
+}
+
+/** Хвост строки начала своего боя: сколько врагов (живы сейчас + пали этим же пакетом). */
+function startFoes(
+  s: GameState,
+  me: string,
+  battleId: unknown,
+  batchDeaths: ReadonlyMap<string, ReadonlyMap<string, number>>,
+): string {
+  const b = typeof battleId === 'string' ? s.battles[battleId] : undefined;
+  if (!b || !b.sides.some((side) => side.owner === me)) return '';
+  let fallen = 0;
+  for (const side of b.sides)
+    if (foeOwner(s, me, side.owner)) fallen += batchDeaths.get(b.id)?.get(lossOwner(side.owner)) ?? 0;
+  const n = aliveFoes(s, b, me) + fallen;
+  return n > 0 ? t('log.battle.start.foes', { n }) : '';
+}
+
 export function handleEvents(events: DomainEvent[]) {
   // Мир, своё место и имена — хуками игры, раз на пакет: ни одна ветка ниже их не меняет.
   const s = game.world();
@@ -191,6 +383,23 @@ export function handleEvents(events: DomainEvent[]) {
   const flash = flashBattles(events, s);
   const flashSeen = (id: unknown): boolean =>
     typeof id === 'string' && inVisionBloc(s, ME, flash.get(id) ?? []);
+  // Павшие этого пакета по бою и владельцу: строка начала боя пишется, когда первый залп
+  // (CMB-4: он на самой встрече) уже снял часть врагов из состояния, — их надо вернуть в
+  // счёт «сколько их было». Узлы мин: их срабатывание пишет свою строку с числом павших.
+  const batchDeaths = new Map<string, Map<string, number>>();
+  const mineLocs = new Set<string>();
+  for (const e of events) {
+    const p = e.payload as Record<string, unknown>;
+    if (e.type === 'unit.died' && typeof p.battleId === 'string') {
+      const per = batchDeaths.get(p.battleId) ?? new Map<string, number>();
+      const who = lossOwner(p.owner);
+      per.set(who, (per.get(who) ?? 0) + deathCount(p.count));
+      batchDeaths.set(p.battleId, per);
+    } else if (e.type === 'mines.triggered' && typeof p.at === 'string') mineLocs.add(p.at);
+  }
+  /** Свои бои, решённые в этом пакете: им строка наград с очками за бой. */
+  const rewarded: Array<{ loc: string; veterans: number; medals: { medal: string; unit: string }[] }> = [];
+  const nowMs = Date.now();
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
     if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
@@ -222,7 +431,7 @@ export function handleEvents(events: DomainEvent[]) {
             t('log.battle.start', {
               at: game.placeName(p.location as string),
               phase: t(battlePhaseKey(p.phase as string | undefined)),
-            }),
+            }) + startFoes(s, ME, p.battleId, batchDeaths),
             p.location as string,
           );
         // Свой бой запоминается: его исход обязан доехать до журнала, даже если узел
@@ -238,15 +447,23 @@ export function handleEvents(events: DomainEvent[]) {
         // 3–5 в `battleLog.ts`): пустой хвост «· потери:» — строка ни о чём.
         const tally = lossTally(battleLosses.get(loc), (who) => NAME[who] ?? who);
         const out = battleOutcome(p.winner as string | undefined);
+        // Свой бой, учтённый, пока шёл: рапорт о врагах и корпусе, а следом — награды.
+        const entry = typeof p.battleId === 'string' ? battleBook.get(p.battleId) : undefined;
         const endText =
           t('log.battle.end', {
             at: game.placeName(loc),
             res: out.named
               ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
               : t(out.key),
-          }) + (tally ? t('log.battle.losses', { tally }) : '');
-        if (seenTail(myBattleLocs.has(loc), known(loc) || battleEngaged(p.battleId)))
+          }) +
+          (tally ? t('log.battle.losses', { tally }) : '') +
+          (entry ? battleTail(s, entry) : '');
+        if (seenTail(myBattleLocs.has(loc) || !!entry, known(loc) || battleEngaged(p.battleId)))
           note(endText, loc);
+        if (entry) {
+          rewarded.push({ loc, ...battleMerit(s, ME, entry) });
+          battleBook.delete(p.battleId as string);
+        }
         // Окно на этом бою держит итог до закрытия (решение владельца 2026-09-25): бой у
         // планеты при осаде длится раунд-два, и окно пустело сразу после открытия.
         if (typeof p.battleId === 'string') game.battleWindow().ended(p.battleId, endText);
@@ -984,6 +1201,16 @@ export function handleEvents(events: DomainEvent[]) {
         // Бой блока зрения на неопознанном узле — и мгновенный — платит ведомость той же
         // видимостью, что его начало и итог, иначе строка итога выходит без потерь
         // (замечание Codex на #1418).
+        // Вне боя (ПКО, обстрел, челноки) — своя строка, когда огонь стихнет. Ракета не
+        // гибнет как юнит (её сбитие пишет `shuttle.missileDowned`), мины пишут своё.
+        if (
+          typeof p.battleId !== 'string' &&
+          typeof at === 'string' &&
+          (p.owner === ME || p.killedBy === ME) &&
+          !mineLocs.has(at) &&
+          !unitHasTrait(data, p.unit as string, MISSILE_TRAIT)
+        )
+          strayDeath(at, p.owner === ME, p.unit as string, deathCount(p.count), nowMs);
         const lossSeen = battleEngaged(p.battleId) || flashSeen(p.battleId);
         if (seenTail(myBattleLocs.has(at), known(at) || lossSeen)) {
           battleLosses.set(
@@ -995,6 +1222,18 @@ export function handleEvents(events: DomainEvent[]) {
       }
     }
   }
+  trackBattles(s, ME);
+  // Очки за бои (BAL-16) меняются только итогом боя: прирост пакета — награда последнего
+  // своего боя в нём. Первый пакет матча — отсчёт, а не награда.
+  const points = s.match.battlePoints?.[ME] ?? 0;
+  const gained = lastBattlePoints === null ? 0 : points - lastBattlePoints;
+  lastBattlePoints = points;
+  rewarded.forEach((r, i) => {
+    const parts = rewardParts({ points: i === rewarded.length - 1 ? gained : 0, veterans: r.veterans, medals: r.medals });
+    if (parts.length > 0)
+      note(t('log.battle.reward', { at: game.placeName(r.loc), what: partsText(parts, ', ') }), r.loc);
+  });
+  flushStrayLosses(nowMs);
   // COAL-1: предложения в открытой личке и окно коалиций читают состояние — раз на пакет.
   if (events.some((e) => e.type.startsWith('diplomacy.') || e.type.startsWith('coalition.'))) {
     refreshThreadDiplo();
@@ -1013,6 +1252,9 @@ export function resetEventFeed(): void {
   myBattleLocs.clear();
   engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
   battleLosses.clear();
+  battleBook.clear(); // рапорт о бое и очки — тоже старого матча
+  lastBattlePoints = null;
+  strays.clear();
   logLines.length = 0; // fresh log — drop notes from the menu-background match
   eventLog.length = 0; // ONB-5: the return digest belongs to THIS match only
 }

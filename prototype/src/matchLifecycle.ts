@@ -31,6 +31,7 @@ import { detach } from './detach';
 import { restoreSpyArchive } from './diploWindow';
 import type { EndAction } from './endScreen';
 import { note, resetEventFeed } from './eventFeed';
+import { resetScoutNews } from './scoutNews';
 import {
   advance,
   type AiProfile,
@@ -247,6 +248,7 @@ export function installMatch(
   forgetRadarContacts();
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();
+  resetScoutNews(); // названные разведкой цели принадлежат старому матчу
   forgetAway(); // reset the away-window baseline for the new match
   restoreSpyArchive(); // SPY-20: донесения старой партии — не о мирах этой
   // The match goal, written AFTER the wipe so it is the first line a player can read.

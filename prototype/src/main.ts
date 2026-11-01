@@ -417,7 +417,8 @@ import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
 import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct } from './worldQueries';
-import { handleEvents, initEventFeed, killStats, logLines, note, toast } from './eventFeed';
+import { flushStrayLosses, handleEvents, initEventFeed, killStats, logLines, logVersion, note, toast } from './eventFeed';
+import { tickScoutNews } from './scoutNews';
 import {
   PLAY_BASE,
   applyTimeSpeed,
@@ -857,7 +858,7 @@ initSimDriver({
 // SANDBOX — the home world of the local player (immortal-home target), captured at
 // launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
 let sandboxHomeId: string | null = null;
-let lastLogHtml = '';
+let lastLogVersion = -1;
 let lastPendHtml = '';
 // --- fog of war (renderer projection; always on) -----------------------------
 // Client-side projection just for the renderer — NOT the real security boundary
@@ -2293,6 +2294,13 @@ document.getElementById('rail-log')?.addEventListener('click', () => logWin?.cla
 logWin?.addEventListener('click', (e) => {
   const tg = e.target as HTMLElement;
   if (tg.id === 'logwin' || tg.classList.contains('lw-close')) logWin.classList.remove('show');
+  // ⌖ у записи журнала: окно уступает карту, камера летит к месту с пингом.
+  const ping = tg.closest<HTMLElement>('[data-ping]');
+  if (ping?.dataset.ping) {
+    logWin.classList.remove('show');
+    jumpToPing(ping.dataset.ping);
+    return;
+  }
   // UIX-4.2: «Показать» у пункта «Ждёт решения» — бой: окно боя и камера к его миру;
   // письма — вкладка сообщений (чтение гасит значок, как у кнопки ✉).
   const show = tg.closest<HTMLElement>('[data-pending]');
@@ -3753,10 +3761,25 @@ function frame(nowReal: number) {
     logPendEl.innerHTML = pendHtml;
     lastPendHtml = pendHtml;
   }
-  const logHtml = logLines.map((l) => `<div>${esc(l)}</div>`).join('');
-  if (logHtml !== lastLogHtml) {
-    logEl.innerHTML = logHtml;
-    lastLogHtml = logHtml;
+  // Журнал: разведка и потери вне боя дописываются по кадру, а не по событию. Разметка
+  // пересобирается по номеру правки — шестьдесят строк каждым кадром склеивать незачем.
+  // Свежие записи сверху; у записи с местом — кнопка ⌖, ведущая камеру туда.
+  tickScoutNews({ world: s, me: ME, names: NAME, placeName }, nowReal);
+  flushStrayLosses();
+  if (logVersion !== lastLogVersion) {
+    lastLogVersion = logVersion;
+    const pingTitle = esc(t('win.log.ping'));
+    logEl.innerHTML = logLines
+      .map(
+        (l) =>
+          `<div class="lg-row"><span>${esc(l.line)}</span>` +
+          (l.at
+            ? `<button type="button" class="lg-ping" data-ping="${esc(l.at)}" title="${pingTitle}" aria-label="${pingTitle}">⌖</button>`
+            : '') +
+          `</div>`,
+      )
+      .reverse()
+      .join('');
   }
   // Пути НАРУЖУ из матча — `matchExits.ts` (REFM-193): кнопка перезапуска в баннере только
   // на настоящем конце СОЛО-матча (на сетевом «переподключаюсь» она увела бы из живой
