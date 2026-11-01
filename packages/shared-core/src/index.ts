@@ -672,7 +672,13 @@ export {
   techRulesOf,
   techInMatch,
   DEFAULT_TECH_RULES,
+  MAX_RESEARCH_QUEUE,
+  researchQueueView,
+  researchQueueOrderOk,
+  researchQueueCascade,
+  queueableTechnology,
 } from './modules/technology';
+export type { ResearchQueueWait, ResearchQueueEntry } from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export {

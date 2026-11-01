@@ -34,6 +34,9 @@ const CLIENT_ACTION_TYPES = [
   'construction.resume',
   'technology.research',
   'technology.boost',
+  'technology.queue',
+  'technology.dequeue',
+  'technology.queue.move',
   'diplomacy.declare',
   'diplomacy.decline',
   'diplomacy.mapshare',
@@ -125,6 +128,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['construction.resume', { planetId: 'p1', id: 3 }],
       ['technology.research', { technology: 'railgun' }],
       ['technology.boost', { technology: 'railgun' }], // SES-3: premium research sink
+      ['technology.queue', { technology: 'railgun' }], // RQ-1: research queue
+      ['technology.dequeue', { technology: 'railgun' }],
+      ['technology.queue.move', { technology: 'railgun', to: 0 }],
       ['diplomacy.declare', { target: 'p2', stance: 'war' }],
       ['diplomacy.declare', { target: 'p2', stance: 'alliance' }], // friendly declare = an offer
       ['diplomacy.mapshare', { target: 'p2', on: true }], // MAPSHARE-1: предложить/принять
@@ -236,6 +242,12 @@ describe('SV-1.2 · action payload schemas', () => {
       ['army.load', { fleetId: 'f1' }], // missing unit
       ['technology.research', {}], // missing technology
       ['technology.boost', {}], // missing technology
+      ['technology.queue', {}], // missing technology
+      ['technology.dequeue', { technology: '' }], // empty id
+      ['technology.queue.move', { technology: 'railgun' }], // missing target place
+      ['technology.queue.move', { technology: 'railgun', to: -1 }], // negative place
+      ['technology.queue.move', { technology: 'railgun', to: 1.5 }], // place not an integer
+      ['technology.queue.move', { technology: 'railgun', to: 99 }], // beyond the queue cap
       ['station.deploy', { planetId: '' }], // empty id
       ['hero.ability', { heroId: 'hero:p1' }], // missing abilityId
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'corridor', target: 7 }], // target not an id

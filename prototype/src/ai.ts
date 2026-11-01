@@ -1592,7 +1592,10 @@ function baseAiOrders(
     const techState = pl.technologies;
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
-    if (!swarmInhabitant && (skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
+    // RQ-1: у места есть очередь исследований — это план игрока, и слоты кормит она (насос
+    // ядра). Бот, сидящий за игрока (Хранитель, подмена), её не обгоняет своим выбором.
+    const playerPlan = (techState?.queue?.length ?? 0) > 0;
+    if (!swarmInhabitant && !playerPlan && (skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
       const costOf = (id: string): Record<string, number> =>
         matchCost(state, data.technologies[id]?.cost) ?? {};
       /** Чего не хватает на узел — с запасом `ORDER_RESERVE`, как у заказов войск. Прежний

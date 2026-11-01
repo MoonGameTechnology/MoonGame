@@ -2160,6 +2160,56 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .tt-prog{position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
 .tt-prog i{position:absolute;left:0;top:0;bottom:0;background:var(--amber);}
 .tt-nowrow .tt-prog{left:0;right:0;bottom:0;}
+/* RQ-1: очередь исследований — под «исследуется сейчас», в том же закреплённом верху. Своя
+   прокрутка с потолком высоты и сворачивание в одну строку: восемь тем не должны выдавить
+   список узлов с экрана телефона. На ПК строка темы — одна линия: имя, чего ждёт, кнопки. */
+.tt-queue{flex:none;margin:0 12px 8px;padding:5px 7px 6px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.05);}
+.tt-qhead{display:flex;align-items:center;gap:8px;min-height:26px;padding:0 2px 4px;font:800 var(--fs-caption) var(--sf-font);color:var(--cyan);cursor:pointer;}
+.tt-queue.folded .tt-qhead{padding-bottom:0;}
+.tt-qhead>span:first-child{flex:none;}
+.tt-qpeek{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:var(--ink);}
+.tt-qfold{margin-left:auto;flex:none;padding:3px 10px;border-radius:7px;font-size:var(--fs-caption);}
+.tt-qfold i{font-style:normal;font-variant-numeric:tabular-nums;}
+.tt-qlist{display:flex;flex-direction:column;gap:4px;max-height:min(28vh,220px);overflow-y:auto;touch-action:pan-y;}
+.tt-qrow{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;column-gap:6px;row-gap:2px;padding:3px 5px;border:1px solid var(--line);border-radius:8px;background:rgba(8,20,24,.7);}
+.tt-qrow>em{font:800 var(--fs-caption) var(--sf-font);font-style:normal;font-variant-numeric:tabular-nums;color:var(--cyan);text-align:center;}
+.tt-qmain{min-width:0;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:1px;}
+.tt-qmain b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption);font-weight:700;color:var(--ink);}
+.tt-qwait{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0;font-size:var(--fs-caption);color:var(--dim);}
+/* Ждёт денег — янтарём, как нехватка в цене: это единственное ожидание, которое лечит игрок. */
+.tt-qrow.w-resources .tt-qwait{color:var(--amber);}
+.tt-qrow.w-starting{border-color:var(--cyan);}
+.tt-qbtns{display:flex;gap:4px;}
+/* Вид стрелок, крестика и сворачивания — классами (.btn-second, .btn-x, .btn-quiet); здесь
+   только размер. */
+.tt-qb,.tt-qx{width:28px;height:28px;display:grid;place-items:center;padding:0;border-radius:7px;font-size:12px;}
+.tt-qgo{padding:3px 9px;border-radius:7px;font-size:var(--fs-caption);}
+/* «＋ В очередь» — вторичная кнопка (.btn-second): это план, а не действие «сейчас». */
+.tt-qadd{align-self:flex-start;padding:5px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;}
+.tt-st.q{color:var(--cyan);font-weight:700;}
+.tt-item.st-queued{border-color:var(--cyan-dim,rgba(53,214,230,.45));border-style:dashed;}
+.tt-mq{margin-top:7px;width:100%;padding:9px;border-radius:10px;font-size:var(--fs-caption);}
+/* Отклик на приказ очереди — вспышка там, где тема оказалась. Живой ререндер пересоздаёт
+   узел, и techTree.ts продолжает вспышку отрицательной задержкой, а не играет её заново. */
+.tt-flash{animation:ttflash .7s ease-out both;}
+@keyframes ttflash{0%{box-shadow:0 0 0 2px var(--cyan),0 0 14px rgba(53,214,230,.55);transform:scale(1.02);}100%{box-shadow:0 0 0 0 rgba(53,214,230,0);transform:scale(1);}}
+/* Телефон: кнопки здесь не меньше 44 px (body.mobile-ui), и три таких кнопки в каждой
+   строке съели бы экран. Поэтому строка — две линии текста (имя, «чего ждёт» во всю
+   ширину), а ▲▼✕ появляются у строки, по которой тапнули (.sel); «⋯» подсказывает тап. */
+@media(max-width:700px){
+  .tt-qrow{grid-template-areas:"n name btns" "n wait wait";cursor:pointer;}
+  .tt-qrow>em{grid-area:n;}
+  .tt-qmain{display:contents;}
+  .tt-qmain b{grid-area:name;}
+  .tt-qwait{grid-area:wait;}
+  .tt-qwait:empty{display:none;}
+  .tt-qbtns{grid-area:btns;}
+  .tt-qrow:not(.sel) .tt-qbtns{display:none;}
+  .tt-qrow:not(.sel)::after{content:'⋯';grid-area:btns;padding:0 4px;color:var(--dim);}
+  .tt-qrow.sel{border-color:var(--line-hi);background:rgba(53,214,230,.08);}
+  .tt-qadd{padding:7px 12px;}
+}
+@media(prefers-reduced-motion:reduce){.tt-flash{animation:none;}}
 /* dossier modal over the tree (inside .twbox, so Esc/back close the whole window) */
 .tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
 .tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}

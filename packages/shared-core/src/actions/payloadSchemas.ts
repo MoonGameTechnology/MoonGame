@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRADER_MAX_UNITS } from '../modules/trader';
+import { MAX_RESEARCH_QUEUE } from '../modules/technology';
 import { COALITION_DESC_MAX } from '../state/coalition';
 
 /**
@@ -89,6 +90,13 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'technology.research': z.object({ technology: id }),
   // SES-3: sink the premium resource into one ACTIVE research (diminishing returns)
   'technology.boost': z.object({ technology: id }),
+  // RQ-1: research queue — append, remove (with dependants), move to index `to`
+  'technology.queue': z.object({ technology: id }),
+  'technology.dequeue': z.object({ technology: id }),
+  'technology.queue.move': z.object({
+    technology: id,
+    to: z.number().int().nonnegative().max(MAX_RESEARCH_QUEUE - 1),
+  }),
   // espionage.ts — send an agent on an operation against one world (SPY-8)
   'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'delay', 'disrupt', 'theft', 'research', 'counter']) }),
   // SPY-11: call a counter-intelligence agent off its post (or off its way there);

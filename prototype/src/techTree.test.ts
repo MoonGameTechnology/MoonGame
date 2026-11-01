@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
-import { newGame, data, DAY, HOUR, order, researchTech } from './game';
+import { newGame, data, DAY, HOUR, order, researchTech, advance } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { MAX_RESEARCH_QUEUE } from '../../packages/shared-core/src/index';
+import { queueTech } from '../../decisions/actions';
 import {
   TECH_BRANCHES,
   branchLabel,
@@ -672,3 +674,192 @@ describe('techTreeHtml — дерево забега (PVR-6.17)', () => {
   });
 });
 
+
+// RQ-1: очередь исследований в окне. Правила (кто стартует, чего ждёт тема, можно ли
+// поднять её выше) решает ядро — окно обязано показать ИМЕННО его ответ и отправить
+// ровно те приказы, которые ядро примет.
+describe('дерево технологий — очередь исследований (RQ-1)', () => {
+  /** Корень ветки космоса без замков и его прямой потомок без дня — из живых данных. */
+  const root = 'orbital_defense_grid';
+  const child = 'void_fortification';
+  const grandchild = 'void_shipworks';
+
+  function richGame(): GameState {
+    const st = newGame();
+    for (const r of data.resources) st.players.p1!.resources[r] = 1_000_000;
+    return st;
+  }
+  /** Заняты оба базовых слота — тем, что к очереди отношения не имеет. */
+  function busy(): GameState {
+    let st = richGame();
+    for (const id of ['industrial_automation', 'combined_arms']) {
+      const r = order(st, researchTech('p1', id), st.time);
+      if (r.error) throw new Error(`${id}: ${r.error}`);
+      st = r.state;
+    }
+    return st;
+  }
+  function queued(st: GameState, ...ids: string[]): GameState {
+    let cur = st;
+    for (const id of ids) {
+      const r = order(cur, queueTech('p1', id), cur.time);
+      if (r.error) throw new Error(`${id}: ${r.error}`);
+      cur = r.state;
+    }
+    return cur;
+  }
+
+  it('данные теста живые: корень без замков, потомок и внук идут цепочкой', () => {
+    expect(TECHS[root]?.prerequisites ?? []).toEqual([]);
+    expect(TECHS[child]?.prerequisites).toEqual([root]);
+    expect(TECHS[grandchild]?.prerequisites).toEqual([child]);
+  });
+
+  it('слоты заняты — в строке вместо «Исследовать» кнопка «В очередь»', () => {
+    const html = techTreeHtml(busy(), 'p1', 'space', null);
+    expect(html).toContain(`data-q="${root}"`);
+    expect(html).not.toMatch(new RegExp(`data-go="${root}">`));
+  });
+
+  it('свободный слот и казна — главная кнопка остаётся «Исследовать», без лишней очереди', () => {
+    const html = techTreeHtml(richGame(), 'p1', 'space', null);
+    expect(html).toMatch(new RegExp(`data-go="${root}">`));
+    expect(html).not.toContain(`data-q="${root}"`);
+  });
+
+  it('без казны строка честно гаснет И предлагает поставить тему в очередь', () => {
+    const st = newGame();
+    st.players.p1!.resources = {};
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    expect(html).toContain(`data-go="${root}" disabled`);
+    expect(html).toContain(`data-q="${root}"`);
+  });
+
+  it('очередь видна полосой: номер, имя и чего ждёт каждая тема', () => {
+    const st = queued(busy(), root, child);
+    const html = techTreeHtml(st, 'p1', 'ground', null); // полоса не зависит от вкладки
+    expect(html).toContain('tt-queue');
+    expect(html).toContain(`<i>2/${MAX_RESEARCH_QUEUE}</i>`);
+    const rootRow = html.slice(html.indexOf(`data-qitem="${root}"`));
+    expect(rootRow.slice(0, 300)).toContain('<em>1</em>');
+    expect(rootRow.slice(0, 400)).toContain(t('tech.queue.wait.slot'));
+    const childRow = html.slice(html.indexOf(`data-qitem="${child}"`));
+    expect(childRow.slice(0, 400)).toContain(
+      t('tech.queue.wait.prerequisite', { x: tData(TECHS[root]!.name) }),
+    );
+  });
+
+  it('стрелка, которая подняла бы тему над её предком, погашена заранее', () => {
+    const st = queued(busy(), root, child, 'orbital_logistics');
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    const btn = (id: string, to: number): string => {
+      const at = html.indexOf(`data-qmove="${id}" data-to="${to}"`);
+      expect(at, `${id}→${to}`).toBeGreaterThan(-1);
+      return html.slice(at, html.indexOf('>', at));
+    };
+    expect(btn(child, 0)).toContain('disabled'); // над своим предком — нельзя
+    expect(btn(root, 1)).toContain('disabled'); // предок под потомка — нельзя
+    expect(btn('orbital_logistics', 1)).not.toContain('disabled'); // независимая — можно
+    expect(btn(child, 2)).not.toContain('disabled');
+  });
+
+  it('крестик предупреждает, что снимет и зависящие темы', () => {
+    const st = queued(busy(), root, child, grandchild);
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    const at = html.indexOf(`data-dq="${root}"`);
+    const tag = html.slice(at, html.indexOf('>', at));
+    expect(tag).toContain(tData(TECHS[child]!.name));
+    expect(tag).toContain(tData(TECHS[grandchild]!.name));
+  });
+
+  it('тема в очереди: строка называет место, досье предлагает убрать', () => {
+    const st = queued(busy(), root, child);
+    const list = techTreeHtml(st, 'p1', 'space', null);
+    const row = list.slice(list.indexOf(`class="tt-item st-queued" data-tech="${child}"`));
+    expect(row.slice(0, 300)).toContain(t('tech.state.queued', { n: 2 }));
+    const dossier = techTreeHtml(st, 'p1', 'space', child);
+    expect(dossier).toContain(`tt-mq btn-second danger" data-dq="${child}"`);
+    expect(dossier).not.toContain(`data-q="${child}"`);
+  });
+
+  it('потомок темы из очереди предлагает «В очередь», не пряча причину замка', () => {
+    const st = queued(busy(), root);
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    const row = html.slice(html.indexOf(`data-tech="${child}"`));
+    expect(row.slice(0, 500)).toContain('tt-st lock');
+    expect(row.slice(0, 500)).toContain(`data-q="${child}"`);
+    // Внук — нет: его предка нет ни в работе, ни в очереди (ядро ответит E_PREREQUISITE).
+    const g = html.slice(html.indexOf(`data-tech="${grandchild}"`));
+    expect(g.slice(0, 500)).not.toContain(`data-q="${grandchild}"`);
+  });
+
+  it('кнопки очереди шлют приказы ядра от текущего игрока', () => {
+    const st = queued(busy(), root, child);
+    const { api, win, sent } = wire({}, st);
+    api.open();
+    win.fire(ttClick('[data-q]', { q: 'orbital_logistics' }));
+    win.fire(ttClick('[data-dq]', { dq: child }));
+    win.fire(ttClick('[data-qmove]', { qmove: root, to: '1' }));
+    expect(sent.map((a) => [a.type, a.playerId, a.payload])).toEqual([
+      ['technology.queue', 'p1', { technology: 'orbital_logistics' }],
+      ['technology.dequeue', 'p1', { technology: child }],
+      ['technology.queue.move', 'p1', { technology: root, to: 1 }],
+    ]);
+  });
+
+  it('полоса сворачивается в одну строку: первая тема и счётчик, без строк и кнопок', () => {
+    const st = queued(busy(), root, child);
+    const open = techTreeHtml(st, 'p1', 'space', null);
+    expect(open).toContain('aria-expanded="true"');
+    expect(open).toContain('tt-qlist');
+    const folded = techTreeHtml(st, 'p1', 'space', null, { queueFolded: true });
+    expect(folded).toContain('tt-queue folded');
+    expect(folded).toContain('aria-expanded="false"');
+    expect(folded).toContain(`<span class="tt-qpeek">1 · ${tData(TECHS[root]!.name)}</span>`);
+    expect(folded).toContain(`<i>2/${MAX_RESEARCH_QUEUE}</i>`);
+    expect(folded).not.toContain('tt-qlist');
+    expect(folded).not.toContain('data-qmove');
+  });
+
+  it('тап по заголовку очереди сворачивает и разворачивает её', () => {
+    const st = queued(busy(), root, child);
+    const { api, win, body, sent } = wire({}, st);
+    api.open();
+    expect(body.html()).toContain('tt-qlist');
+    win.fire(ttClick('[data-qfold]'));
+    expect(body.html()).toContain('tt-queue folded');
+    expect(body.html()).not.toContain('tt-qlist');
+    win.fire(ttClick('[data-qfold]'));
+    expect(body.html()).toContain('tt-qlist');
+    expect(sent).toEqual([]); // это вид окна, а не приказ
+  });
+
+  it('тап по строке очереди открывает её кнопки, второй тап прячет (телефон)', () => {
+    const st = queued(busy(), root, child);
+    const { api, win, body, sent } = wire({}, st);
+    api.open();
+    const row = (): string => {
+      const html = body.html();
+      const at = html.indexOf(`data-qitem="${child}"`);
+      return html.slice(html.lastIndexOf('<div', at), at);
+    };
+    expect(row()).not.toContain(' sel');
+    win.fire(ttClick('[data-qitem]', { qitem: child }));
+    expect(row()).toContain(' sel');
+    win.fire(ttClick('[data-qitem]', { qitem: child }));
+    expect(row()).not.toContain(' sel');
+    expect(sent).toEqual([]);
+  });
+
+  it('слот освободился — очередь в окне сдвигается так же, как в ядре', () => {
+    let st = queued(busy(), root);
+    expect(st.players.p1!.technologies!.queue).toEqual([root]);
+    // Первая тема в слоте завершается — ядро само запускает тему из очереди.
+    const first = st.players.p1!.technologies!.active![0]!;
+    st = advance(st, first.completesAt).state;
+    expect(st.players.p1!.technologies!.queue ?? []).toEqual([]);
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    expect(html).not.toContain('tt-queue');
+    expect(html).toContain(`data-now="${root}"`);
+  });
+});
