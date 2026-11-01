@@ -80,6 +80,8 @@
 | SPY-18 | ✅ | core data | `docs/backlog.md` | Перевербовка. |
 | SPY-19 | ✅ | proto | `docs/backlog.md` | Шанс на кнопке операции. |
 | SPY-20 | ✅ | proto | `docs/backlog.md` | Архив докладов. |
+| BLD-2.1 | ✅ | core | `docs/backlog.md` | Полоса юнита — его производственная постройка. |
+| BLD-2.2 | ✅ | proto | `docs/backlog.md` | Конвейер на каждую полосу. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

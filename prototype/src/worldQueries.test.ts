@@ -164,7 +164,7 @@ describe('REFM-242 — очередь стройки из ядра', () => {
     expect(coreQueue(pid, 'buildings').map((q) => [q.kind, q.building])).toEqual([
       ['upgrade', 'radar'],
     ]);
-    expect(coreQueue(pid, 'units')).toEqual([]);
+    expect(coreQueue(pid, 'ships')).toEqual([]);
     expect(coreQueue('нет-такого', 'buildings')).toEqual([]);
   });
 
@@ -184,7 +184,7 @@ describe('REFM-242 — очередь стройки из ядра', () => {
     host(s);
     const active = activeConstruction(pid, 'buildings');
     expect(active?.payload).toMatchObject({ kind: 'upgrade', building: 'mine' });
-    expect(activeConstruction(pid, 'units')).toBeNull();
+    expect(activeConstruction(pid, 'ships')).toBeNull();
   });
 
   it('остаток и процент стройки считаются по часам мира хоста', () => {

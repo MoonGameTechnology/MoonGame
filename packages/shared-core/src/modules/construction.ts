@@ -34,6 +34,7 @@ import {
 } from '../util/loadout';
 import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
 import { recordValues } from '../util/records';
+import { isBuildLane, orderLane, UNIT_LANES, type BuildLane } from '../state/buildLane';
 
 /** Share of the ground assault's round damage that also wears down the planet's
  *  structures (the rest is spent on the defending garrison). Tunable. */
@@ -278,8 +279,10 @@ function isQueued(
 // Правила, которые из этого следуют (решались здесь — их не было ни в дизайне, ни в
 // коде):
 //
-//  1. **Одна стройка на ПОЛОСУ на мире.** Полос две: `buildings` (здание и апгрейд —
-//     они спорят за одну стройплощадку) и `units` (верфь/казармы). Полосы независимы:
+//  1. **Одна стройка на ПОЛОСУ на мире.** Полоса `buildings` — здание и апгрейд (они
+//     спорят за одну стройплощадку); у юнитов полоса своя у каждой производственной
+//     постройки — `ships`, `shuttles`, `infantry`, `vehicles` (BLD-2.1, `state/buildLane.ts`;
+//     до него юниты стояли в одной `units`, и пехота ждала крейсер). Полосы независимы:
 //     долгий дом не должен морозить верфь. Ровно это правило ДО BLD-1 стояло в клиенте
 //     прототипа и утверждало, будто «ядро всё равно не примет второй». Не принимало
 //     только ОДИНАКОВЫЙ (`isQueued`); теперь утверждение стало правдой, и две очереди
@@ -304,12 +307,9 @@ function isQueued(
 // Туман: очередь видит только владелец мира (`visibleState`). Это будущее НАМЕРЕНИЕ —
 // ровно то, за что там режут `scheduled` и цепочки приказов.
 
-/** Полоса конвейера: за одну стройплощадку спорят здание и апгрейд, отдельно — юниты. */
-type BuildLane = 'buildings' | 'units';
-
-function laneOfKind(kind: CompletePayload['kind']): BuildLane {
-  return kind === 'unit' ? 'units' : 'buildings';
-}
+// Полосы (BLD-2.1): здания отдельно, и у КАЖДОЙ производственной постройки — своя
+// полоса юнитов (верфь, космопорт, казармы, завод). Правило и его словарь — в
+// `state/buildLane.ts`, его же читает клиент.
 
 /** Потолок ждущих заказов в одной полосе одного мира (правило 5). */
 const MAX_BUILD_QUEUE = 5;
@@ -323,7 +323,7 @@ function laneBusy(h: HandlerContext, planetId: string, lane: BuildLane): boolean
   return h.state.scheduled.some((e) => {
     if (e.type !== 'construction.complete') return false;
     const p = e.payload as CompletePayload;
-    return p.planetId === planetId && laneOfKind(p.kind) === lane;
+    return p.planetId === planetId && orderLane(h.ctx.data, p) === lane;
   });
 }
 
@@ -334,8 +334,8 @@ function enqueueOrder(
   order: Omit<QueuedConstruction, 'id'>,
 ): string | null {
   const queue = planet.buildQueue ?? [];
-  const lane = laneOfKind(order.kind);
-  if (queue.filter((q) => laneOfKind(q.kind) === lane).length >= MAX_BUILD_QUEUE) {
+  const lane = orderLane(h.ctx.data, order);
+  if (queue.filter((q) => orderLane(h.ctx.data, q) === lane).length >= MAX_BUILD_QUEUE) {
     return 'E_QUEUE_FULL';
   }
   // Личность из счётчика запланированных событий — чтобы `construction.cancel` брал
@@ -414,12 +414,12 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
     // Узел не работает — не старт, а пауза. Но пауза с повтором: без него голова очереди,
     // оставшаяся без события завершения (активную стройку отменили посреди боя), не
     // стартовала бы никогда — конец боя и обстрела очередь не будит (замечание Codex на #1416).
-    if ((planet.buildQueue ?? []).some((q) => laneOfKind(q.kind) === lane)) scheduleQueuePump(h, planet.id, lane);
+    if ((planet.buildQueue ?? []).some((q) => orderLane(h.ctx.data, q) === lane)) scheduleQueuePump(h, planet.id, lane);
     return;
   }
   for (;;) {
     const queue = planet.buildQueue ?? [];
-    const head = queue.find((q) => laneOfKind(q.kind) === lane);
+    const head = queue.find((q) => orderLane(h.ctx.data, q) === lane);
     if (!head) return;
     const drop = (): void => {
       planet.buildQueue = (planet.buildQueue ?? []).filter((q) => q.id !== head.id);
@@ -467,6 +467,21 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
     });
     return;
   }
+}
+
+/**
+ * Освободилась полоса — будим её. Освободилась полоса ЮНИТОВ — будим все полосы юнитов
+ * мира, в фиксированном порядке `UNIT_LANES`. Это мост с BLD-1 (одна общая полоса
+ * `units`): в сейве или живой партии того времени за идущей пехотой мог ждать корабль,
+ * а по новому правилу полоса кораблей свободна, и разбудить её больше некому. Будить
+ * свободную полосу безопасно: `startNextQueued` сам отвечает «занято» или «пусто».
+ */
+function startNextAfter(h: HandlerContext, planet: Planet, lane: BuildLane): void {
+  if (lane === 'buildings') {
+    startNextQueued(h, planet, lane);
+    return;
+  }
+  for (const l of UNIT_LANES) startNextQueued(h, planet, l);
 }
 
 /** Строительные способности здания — те, что гейтят `unit.build`. */
@@ -836,7 +851,8 @@ export const constructionModule: GameModule = {
   // 1.6.0: retired entries refuse new orders; accepted work remains valid. Ship
   // prices also honour the optional match-pinned hull multipliers.
   // 1.7.0: возможность `construction.delay` — сдвиг ближайшего заказа мира (SPY-14).
-  version: '1.7.0',
+  // 1.8.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
+  version: '1.8.0',
   setup(api) {
     api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.provideCapability<ConstructionDelay>('construction.delay', delayFirstOrder);
@@ -1127,7 +1143,7 @@ export const constructionModule: GameModule = {
         const valid = validateLoadout(payload.unit, hull, modules, h.ctx.data);
         if (!valid.ok) return h.reject(valid.code);
       }
-      if (laneBusy(h, planet.id, 'units')) {
+      if (laneBusy(h, planet.id, orderLane(h.ctx.data, { kind: 'unit', unit: payload.unit }))) {
         const code = enqueueOrder(h, planet, {
           kind: 'unit',
           playerId: action.playerId,
@@ -1248,7 +1264,7 @@ export const constructionModule: GameModule = {
       });
       // Полоса освободилась — её занимает следующий по очереди (BLD-1). Ровно это и
       // делает отмену осмысленной кнопкой: «убрать текущее» = «пустить следующее».
-      startNextQueued(h, planet, laneOfKind(p.kind));
+      startNextAfter(h, planet, orderLane(h.ctx.data, p));
     });
 
     // Resume a paused site: pays exactly what was refunded, re-schedules exactly the
@@ -1295,7 +1311,7 @@ export const constructionModule: GameModule = {
       // приостановленная стройка уже хранит свой прогресс и остаток цены отдельно
       // (`PausedConstructionSite`), и заводить ей второе место ожидания значило бы
       // держать одну сущность в двух списках. Игрок возобновит, когда полоса освободится.
-      if (laneBusy(h, planet.id, laneOfKind(site.kind))) {
+      if (laneBusy(h, planet.id, orderLane(h.ctx.data, site))) {
         return h.reject('E_LANE_BUSY');
       }
       if (!canAfford(player.resources, site.remainingCost)) {
@@ -1343,7 +1359,7 @@ export const constructionModule: GameModule = {
         return;
       }
       landCompletion(h, planet, p);
-      startNextQueued(h, planet, laneOfKind(p.kind));
+      startNextAfter(h, planet, orderLane(h.ctx.data, p));
     });
 
     // Повтор попытки для головы, упёршейся в деньги (правило 4). Сам себя не
@@ -1352,10 +1368,12 @@ export const constructionModule: GameModule = {
     api.on('construction.queue.pump', (event, h) => {
       const p = (event.payload ?? {}) as { planetId?: unknown; lane?: unknown };
       if (typeof p.planetId !== 'string') return;
-      const lane: BuildLane = p.lane === 'units' ? 'units' : 'buildings';
       const planet = h.state.planets[p.planetId];
       if (!planet) return;
-      startNextQueued(h, planet, lane);
+      // Повтор, назначенный до BLD-2.1, несёт старую общую полосу `units` — он будит
+      // все полосы юнитов. Неразборчивая полоса — стройка, как и раньше.
+      if (p.lane === 'units') startNextAfter(h, planet, 'ships');
+      else startNextQueued(h, planet, isBuildLane(p.lane) ? p.lane : 'buildings');
     });
 
     /**

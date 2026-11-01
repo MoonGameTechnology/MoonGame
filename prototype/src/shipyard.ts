@@ -36,6 +36,7 @@ import {
   matchCost,
   matchHours,
   moduleAllowed,
+  orderLane,
   unitBuildSiteBlocker,
   type Action,
   type ArsenalItem,
@@ -308,7 +309,11 @@ export function loadoutPaneHtml(
   // Звёзды и поднятая редкость места (снимок арсенала забега Сектора Зеро): с ними числа
   // карточек и характеристик — те, что получит построенный корабль. Слоты, купленные звёздами
   // корабля, — тоже отсеки: без них модуль под купленный слот было не поставить.
-  const boosts = { moduleStars: snap?.stars, moduleRarity: snap?.rarity, bonusSlots: snap?.slots?.[draft.hull] };
+  const boosts = {
+    moduleStars: snap?.stars,
+    moduleRarity: snap?.rarity,
+    bonusSlots: snap?.slots?.[draft.hull],
+  };
   const ed: LoadoutEditorResult = createLoadoutEditor(draft.hull, data, res, {
     modules: draft.modules,
     count: draft.count,
@@ -341,7 +346,9 @@ export function loadoutPaneHtml(
     .map((sl, i) => {
       const on = i === sel ? ' sel' : '';
       // Слот, купленный звездой корабля, помечен той же золотой звездой, что плитка на арте.
-      const bought = sl.bonus ? ` <span class="cn-bbuy" title="${esc(t('yard.slot.bonus'))}">★</span>` : '';
+      const bought = sl.bonus
+        ? ` <span class="cn-bbuy" title="${esc(t('yard.slot.bonus'))}">★</span>`
+        : '';
       if (sl.moduleId) {
         const md = data.modules[sl.moduleId];
         const own = m.palette.find((o) => o.id === sl.moduleId)?.effect ?? md?.effects.stats ?? {};
@@ -431,11 +438,15 @@ export function loadoutPaneHtml(
     const unfit = groups.flatMap((g) => g.ids).filter((id) => !option.get(id)!.installable);
     const fold = unfit.length
       ? `<button class="cn-unfit btn-quiet" data-cnunfit aria-expanded="${draft.unfit ? 'true' : 'false'}">${draft.unfit ? t('yard.modules.unfit-hide') : t('yard.modules.unfit', { n: unfit.length })}</button>` +
-        (draft.unfit ? `<div class="cn-pal">${unfit.map((id) => paletteCard(option.get(id)!)).join('')}</div>` : '')
+        (draft.unfit
+          ? `<div class="cn-pal">${unfit.map((id) => paletteCard(option.get(id)!)).join('')}</div>`
+          : '')
       : '';
     panel =
       `<div class="cn-sh"><div class="cn-ph"><span aria-hidden="true">${SLOT_ICON[bay.type] ?? '＋'}</span> ${t('yard.modules.for-slot', { s: t(SLOT_KEY[bay.type] ?? bay.type) })}</div>` +
-      (cur ? `<button class="cn-rm btn-second" data-cnrm="${cur}">${t('yard.module.take-off')}</button>` : '') +
+      (cur
+        ? `<button class="cn-rm btn-second" data-cnrm="${cur}">${t('yard.module.take-off')}</button>`
+        : '') +
       `</div><div class="cn-pal">${fitting || `<div class="cn-none">${t('yard.modules.none')}</div>`}</div>${fold}${liveNote}`;
   }
   // stats: live preview of the fitted hull
@@ -485,18 +496,28 @@ export function loadoutPaneHtml(
   return `<div class="cn-grid ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${hulls}</div>${card}${slotCol}${stats}</div>`;
 }
 
+/** Идущий и ждущие заказы той полосы мира, в которую встанет этот юнит (BLD-2.1). */
+function laneOrders(state: GameState, planetId: string, unit: string) {
+  const lane = orderLane(data, { kind: 'unit', unit });
+  return {
+    active: activeConstruction(state, planetId, lane, data),
+    queued: (state.planets[planetId]?.buildQueue ?? []).filter((q) => orderLane(data, q) === lane),
+  };
+}
+
 /**
- * Что ждёт заказ юнитов на этом мире (BLD-1): мир строит один заказ юнитов за раз, остальные
- * стоят в очереди ядра (`Planet.buildQueue`). `null` — полоса свободна, заказ начнётся сразу.
- * `nextInHours` — когда закончится идущая стройка; ноль — идущей нет, голова очереди ждёт денег.
+ * Что ждёт заказ этого юнита на этом мире (BLD-1): полоса строит один заказ за раз, остальные
+ * стоят в очереди ядра (`Planet.buildQueue`). Полоса — производственная постройка юнита
+ * (BLD-2.1, `orderLane` ядра): пехоте не впереди крейсер. `null` — полоса свободна, заказ
+ * начнётся сразу. `nextInHours` — когда закончится идущая стройка; ноль — идущей нет,
+ * голова очереди ждёт денег.
  */
 export function unitLaneAhead(
   state: GameState,
   planetId: string,
+  unit: string,
 ): { count: number; nextInHours: number } | null {
-  const active = activeConstruction(state, planetId, 'units');
-  // Полоса юнитов — заказы рода `unit`: то же правило полос, что у ядра и `laneOf`.
-  const queued = (state.planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit');
+  const { active, queued } = laneOrders(state, planetId, unit);
   const count = (active ? 1 : 0) + queued.length;
   if (count === 0) return null;
   return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
@@ -511,12 +532,12 @@ export function unitLaneAhead(
 export function yardQueueHtml(
   state: GameState,
   planetId: string,
+  unit: string,
   color: string,
   fresh = false,
 ): string {
   if (!planetId) return '';
-  const active = activeConstruction(state, planetId, 'units');
-  const queued = (state.planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit');
+  const { active, queued } = laneOrders(state, planetId, unit);
   const items: string[] = [];
   const chip = (unit: string, count: number, tail: string, extra = ''): string => {
     const label = `${displayUnit(unit)} ×${count}`;
@@ -539,7 +560,11 @@ export function yardQueueHtml(
   }
   for (const q of queued) if (q.unit) items.push(chip(q.unit, q.count ?? 1, ''));
   if (!items.length) return '';
-  if (fresh) items[items.length - 1] = items[items.length - 1]!.replace('class="cn-qi', 'class="cn-qi fresh');
+  if (fresh)
+    items[items.length - 1] = items[items.length - 1]!.replace(
+      'class="cn-qi',
+      'class="cn-qi fresh',
+    );
   return (
     `<div class="cn-queue" role="status"><span class="cn-qh">${t('yard.queue.title', { w: esc(worldName(state, planetId)) })}</span>` +
     `<div class="cn-qlist">${items.join('')}</div></div>`
@@ -594,7 +619,10 @@ export function slotLayerHtml(
         // то же самое — в подписи для диктора и подсказке.
         const rar = sl.rarity ?? 'simple';
         const star = sl.star ?? 0;
-        const grade = [t(`rarity.${rar}`), ...(star > 0 ? [t('shipcard.stars', { n: star })] : [])].join(', ');
+        const grade = [
+          t(`rarity.${rar}`),
+          ...(star > 0 ? [t('shipcard.stars', { n: star })] : []),
+        ].join(', ');
         const label = `${kind}: ${tData(sl.moduleName ?? sl.moduleId)} (${grade})`;
         const badge = star > 0 ? `<span class="cn-tst" aria-hidden="true">★${star}</span>` : '';
         return (
@@ -647,7 +675,7 @@ export function orderBarHtml(
   const affordable = Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n);
   const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
   const worlds = buildSites(state, me, draft.hull);
-  const ahead = draft.planet ? unitLaneAhead(state, draft.planet) : null;
+  const ahead = draft.planet ? unitLaneAhead(state, draft.planet, draft.hull) : null;
   const queue = !ahead
     ? t('yard.queue.now')
     : ahead.nextInHours > 0
@@ -735,7 +763,12 @@ export function templatesPaneHtml(
   const rows = list
     .map((tpl, i) => {
       const ok = fitTemplate(tpl, hullsOfTab(tpl.tab as YardTab), data, snap) !== null;
-      const mods = tpl.modules.map((m) => `<span class="cn-tpm" title="${esc(tData(data.modules[m]?.name ?? m))}">${moduleIcon(m)}</span>`).join('');
+      const mods = tpl.modules
+        .map(
+          (m) =>
+            `<span class="cn-tpm" title="${esc(tData(data.modules[m]?.name ?? m))}">${moduleIcon(m)}</span>`,
+        )
+        .join('');
       const name = `${esc(displayUnit(tpl.hull))} ×${tpl.count}`;
       const on = current !== null && sameTemplate(tpl, current);
       return (
@@ -845,9 +878,10 @@ export function initShipyard(host: YardHost): {
   let queueSig = { planet: '', n: 0 };
   /** Что сейчас стоит в полосе (своя строка: `innerHTML` браузер сериализует иначе). */
   let queuePainted = '';
-  const queueCount = (planetId: string): number =>
-    (activeConstruction(host.state(), planetId, 'units') ? 1 : 0) +
-    (host.state().planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit').length;
+  const queueCount = (planetId: string): number => {
+    const { active, queued } = laneOrders(host.state(), planetId, draft.hull);
+    return (active ? 1 : 0) + queued.length;
+  };
   /** Полоса очереди мира черновика; заказ, прибавившийся на том же мире, подсвечен. */
   function queueHtml(): string {
     if (tab === 'heroes') return '';
@@ -855,7 +889,7 @@ export function initShipyard(host: YardHost): {
     // Подсветка — один раз, на той отрисовке, где заказ впервые виден.
     const fresh = draft.planet === queueSig.planet && n > queueSig.n;
     queueSig = { planet: draft.planet, n };
-    queuePainted = yardQueueHtml(host.state(), draft.planet, host.youColor(), fresh);
+    queuePainted = yardQueueHtml(host.state(), draft.planet, draft.hull, host.youColor(), fresh);
     return queuePainted;
   }
 
@@ -897,7 +931,13 @@ export function initShipyard(host: YardHost): {
       paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
     const tplPane =
       tplOpen && tab !== 'heroes'
-        ? templatesPaneHtml(host.state(), host.me(), templates, templateOf(tab, draft), host.youColor())
+        ? templatesPaneHtml(
+            host.state(),
+            host.me(),
+            templates,
+            templateOf(tab, draft),
+            host.youColor(),
+          )
         : '';
     host.root().innerHTML = yardBoxHtml(
       tab,
@@ -933,7 +973,8 @@ export function initShipyard(host: YardHost): {
     const bay = ed.slots[selectedBay(ed.slots, draft.slot)];
     const cur = bay?.moduleId;
     const swap =
-      cur !== undefined && (bay!.type === 'universal' || data.modules[moduleId]?.slot === bay!.type);
+      cur !== undefined &&
+      (bay!.type === 'universal' || data.modules[moduleId]?.slot === bay!.type);
     const base = swap ? editorFor(draft.modules.filter((id) => id !== cur)) : ed;
     if (!base.ok) return;
     const r = applyLoadoutAction({ kind: 'equip', moduleId }, base, data, res);
@@ -1005,7 +1046,14 @@ export function initShipyard(host: YardHost): {
     const use = (tg.closest('[data-cntpluse]') as HTMLElement | null)?.dataset.cntpluse;
     if (use !== undefined) {
       const tpl = templates[Number(use)];
-      const fit = tpl && fitTemplate(tpl, hullsOfTab(tpl.tab as YardTab), data, host.state().players[host.me()]?.arsenal);
+      const fit =
+        tpl &&
+        fitTemplate(
+          tpl,
+          hullsOfTab(tpl.tab as YardTab),
+          data,
+          host.state().players[host.me()]?.arsenal,
+        );
       if (!fit) {
         host.note('✖ ' + t('yard.tpl.unavailable'));
         return;
@@ -1051,7 +1099,13 @@ export function initShipyard(host: YardHost): {
     }
     const hull = (tg.closest('.cn-hbtn') as HTMLElement | null)?.dataset.cnhull;
     if (hull) {
-      draft = { ...draft, hull, modules: host.preparedModules?.(hull) ?? [], slot: undefined, unfit: false };
+      draft = {
+        ...draft,
+        hull,
+        modules: host.preparedModules?.(hull) ?? [],
+        slot: undefined,
+        unfit: false,
+      };
       paint();
       return;
     }
@@ -1148,15 +1202,19 @@ export function initShipyard(host: YardHost): {
       if (host.heroPaneHtml() === renderedHeroBody) return;
       const scroll = host.root().querySelector('#constructorbody')?.scrollTop ?? 0;
       const focused = document.activeElement as HTMLElement | null;
-      const focusAttrs = focused && host.root().contains(focused)
-        ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-h'))
-          .map((a) => [a.name, a.value] as const) : [];
+      const focusAttrs =
+        focused && host.root().contains(focused)
+          ? Array.from(focused.attributes)
+              .filter((a) => a.name.startsWith('data-h'))
+              .map((a) => [a.name, a.value] as const)
+          : [];
       paint();
       const box = host.root().querySelector('#constructorbody');
       if (box) box.scrollTop = scroll;
       if (focusAttrs.length) {
-        Array.from(host.root().querySelectorAll<HTMLElement>('button')).find((el) =>
-          focusAttrs.every(([name, value]) => el.getAttribute(name) === value))?.focus({ preventScroll: true });
+        Array.from(host.root().querySelectorAll<HTMLElement>('button'))
+          .find((el) => focusAttrs.every(([name, value]) => el.getAttribute(name) === value))
+          ?.focus({ preventScroll: true });
       }
     },
     refreshQueue: () => {
