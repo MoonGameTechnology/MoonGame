@@ -15,7 +15,7 @@
  */
 import { t } from '../../localization/runtime';
 import { buildLabel, checkForUpdateDetailed, currentBuild, isRuStoreBuild, isTrustedApkUrl } from './updater';
-import type { UpdateCheck, UpdateInfo } from './updater';
+import type { UpdateCheck } from './updater';
 import { detach } from './detach';
 
 /** Минимальный зазор между молчаливыми проверками. */
@@ -57,6 +57,18 @@ export function installMessage(code: unknown): string {
       return t('upd.downloading');
     case 'installing':
       return t('upd.installing');
+    case 'E_UPDATE_TIMEOUT':
+      return t('upd.err-timeout');
+    case 'E_UPDATE_DNS':
+      return t('upd.err-dns');
+    case 'E_UPDATE_TLS':
+      return t('upd.err-tls');
+    case 'E_UPDATE_HTTP':
+      return t('upd.err-http');
+    case 'E_UPDATE_STALE':
+      return t('upd.err-stale');
+    case 'E_UPDATE_INSTALL':
+      return t('upd.err-install');
     case 'E_UPDATE_PERMISSION':
       return t('upd.err-permission');
     case 'E_UPDATE_DIGEST':
@@ -66,6 +78,22 @@ export function installMessage(code: unknown): string {
     default:
       return t('upd.err-download');
   }
+}
+
+/** Re-check the signed manifest at the moment of download: banners can outlive
+ * the host's bounded APK retention. Never reuse a captured, potentially removed URL. */
+export async function beginVerifiedUpdate(deps: {
+  check: () => Promise<UpdateCheck>;
+  install: (url: string, sha256: string) => void;
+  status: (text: string) => void;
+}): Promise<void> {
+  deps.status(t('upd.preparing'));
+  try {
+    const result = await deps.check();
+    if (result.kind !== 'update') { deps.status(updateMessage(result)); return; }
+    if (!isTrustedApkUrl(result.info.apkUrl)) { deps.status(installMessage(null)); return; }
+    deps.install(result.info.apkUrl, result.info.apkSha256);
+  } catch { deps.status(installMessage(null)); }
 }
 
 /**
@@ -94,13 +122,12 @@ export function initApkUpdater(): void {
   const cupd = el('cupd');
   if (cupd) cupd.style.display = '';
 
-  let offered: UpdateInfo | null = null;
+  let preparingDownload = false;
   const status = (text: string): void => {
     const line = el('ub-status');
     if (line) line.textContent = text;
   };
-  const showUpdate = (u: UpdateInfo): void => {
-    offered = u;
+  const showUpdate = (): void => {
     status('');
     const bar = el('updbar');
     if (bar) bar.style.display = 'block'; // override the stylesheet's display:none
@@ -112,7 +139,7 @@ export function initApkUpdater(): void {
     checking = true;
     try {
       const r = await checkForUpdateDetailed();
-      if (r.kind === 'update') showUpdate(r.info);
+      if (r.kind === 'update') showUpdate();
       if (manual && out) {
         const prev = out.textContent;
         out.textContent = t('upd.checking', { msg: updateMessage(r) });
@@ -133,11 +160,17 @@ export function initApkUpdater(): void {
   el('ub-go')?.addEventListener('click', (e) => {
     e.preventDefault();
     const native = (globalThis as { VoidNative?: { installVerified?: (url: string, sha256: string) => void } }).VoidNative;
-    if (!offered || !isTrustedApkUrl(offered.apkUrl) || !native?.installVerified) {
+    if (preparingDownload) return;
+    if (!native?.installVerified) {
       status(installMessage(null));
       return;
     }
-    native.installVerified(offered.apkUrl, offered.apkSha256);
+    preparingDownload = true;
+    detach('APK download', beginVerifiedUpdate({
+      check: checkForUpdateDetailed,
+      install: (url, hash) => native.installVerified!(url, hash),
+      status,
+    }).finally(() => { preparingDownload = false; }));
   });
   window.addEventListener('void-apk-update', (e) => status(installMessage((e as CustomEvent).detail)));
   el('ub-later')?.addEventListener('click', () => {

@@ -68,29 +68,29 @@ try {
     await iphone.close();await page.close();
   }
   for(const lane of ['alpha','player']) {
-    for(const scenario of ['newer','forged','equal','older','offline']) {
+    for(const scenario of ['newer','stale','forged','equal','older','offline']) {
       const page=await browser.newPage({viewport:{width:390,height:844},hasTouch:true,isMobile:true,locale:lane==='alpha'?'ru':'en'});page.on('pageerror',e=>errors.push(e.message));
-      const vc=scenario==='newer'||scenario==='forged'?43:scenario==='equal'?42:41;
+      const vc=scenario==='newer'||scenario==='stale'||scenario==='forged'?43:scenario==='equal'?42:41;
       const apkSha256='c'.repeat(64);
       const apkUrl=`${root}/${lane}/${vc}-deadbee/void-dominion-${lane}.apk`;
       let requests=0;
       await page.addInitScript(()=>{window.__BUILD__={versionCode:42,sha:'abc1234',versionName:'installed-42'};window.__installs=[];window.VoidNative={installVerified:(url,sha)=>{window.__installs.push([url,sha]);window.dispatchEvent(new CustomEvent('void-apk-update',{detail:'E_UPDATE_DIGEST'}));}};});
-      await page.route(root+`/${lane}/latest.json`,async route=>{requests++;if(scenario==='offline')return route.abort('failed');return route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(signed({versionCode:vc,versionName:`${lane}-deadbee`,sha:'deadbee',apkUrl,notes:hostileNotes,apkSha256,appId:lane==='alpha'?'com.voiddominion.prototype':'com.voiddominion.player',signerSha256:config.signerSha256},scenario==='forged'?strangerKey.privateKey:undefined))});});
+      await page.route(root+`/${lane}/latest.json`,async route=>{requests++;if(scenario==='offline')return route.abort('failed');const changed=scenario==='stale'&&requests>1;const versionCode=changed?44:vc;const currentUrl=changed?`${root}/${lane}/44-deadbee/void-dominion-${lane}.apk`:apkUrl;return route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(signed({versionCode,versionName:`${lane}-deadbee`,sha:'deadbee',apkUrl:currentUrl,notes:hostileNotes,apkSha256:changed?'d'.repeat(64):apkSha256,appId:lane==='alpha'?'com.voiddominion.prototype':'com.voiddominion.player',signerSha256:config.signerSha256},scenario==='forged'?strangerKey.privateKey:undefined))});});
       await page.goto(pages.url+(lane==='player'?'/player':'/'));await waitForApp(page);
       await page.waitForFunction(()=>document.getElementById('cver')?.textContent?.includes('installed-42'));
       assert.equal(await page.locator('#hub-android').count(),0,'APK must not advertise another installation');
-      if(scenario==='newer') {
+      if(scenario==='newer'||scenario==='stale') {
         await page.locator('#updbar').waitFor({state:'visible'});assert.notEqual(await page.locator('#ub-go').getAttribute('href'),apkUrl,'no unverified plain-link download');
         const copy=(await page.locator('#updbar').innerText()).replace(/\s+/g,' ').trim();
         assert.equal(copy,lane==='alpha'?'Доступно обновление Скачать обновление Позже':'An update is available Download update Later');
         assert.equal(await page.locator('#updbar img').count(),0);assert.equal(await page.evaluate(()=>window.__xss),undefined);
         await page.screenshot({path:`.playwright-mcp/android-update-prompt-${lane}.png`});
-        await page.locator('#ub-go').click();assert.deepEqual(await page.evaluate(()=>window.__installs),[[apkUrl,apkSha256]]);
+        await page.locator('#ub-go').click();await page.waitForFunction(()=>window.__installs.length===1);const expectedUrl=scenario==='stale'?`${root}/${lane}/44-deadbee/void-dominion-${lane}.apk`:apkUrl;assert.deepEqual(await page.evaluate(()=>window.__installs),[[expectedUrl,scenario==='stale'?'d'.repeat(64):apkSha256]]);
         assert.equal(await page.locator('#ub-status').textContent(),lane==='alpha'?'✗ файл не совпал с подписанной версией, установка отменена':"✗ the file doesn't match the signed version, install cancelled");
         await page.screenshot({path:`.playwright-mcp/android-update-${lane}.png`});
         await page.locator('#ub-later').click();assert.equal(await page.locator('#updbar').isVisible(),false);
       } else { await page.waitForTimeout(250);assert.equal(await page.locator('#updbar').isVisible(),false); }
-      assert.equal(requests,1);await page.close();
+      assert.equal(requests,scenario==='newer'||scenario==='stale'?2:1);await page.close();
     }
   }
   assert.deepEqual(errors,[]);console.log('APK site: header download on desktop (hover QR decoded) and Android phones 390/360/320, none on iPhone (dev/player), APK newer/forged/equal/older/offline, signed manifest, verified native install handoff, no release notes or build identity in prompt: passed');

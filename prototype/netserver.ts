@@ -1,3 +1,4 @@
+import { matchCreationAccess } from '../packages/server/src/matchCreationAccess';
 import { CorpMaterials } from '../packages/server/src/corpMaterials';
 import { registerCorpMaterialsApi } from '../packages/server/src/corpMaterialsApi';
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
@@ -1777,6 +1778,7 @@ const server = createMultiplayerServer({
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
       // place with the production host (NETA2-7).
       registerMatchApi(app, {
+        canCreate: matchCreationAccess(process.env),
         // ADDR-1: `POST /matches` поднимает НОВУЮ партию. Раньше этот хост его намеренно
         // не выставлял и жил только пачкой сессий из `MATCHES=N` — тогда «адрес партии»
         // физически не существовал: id был номером комнаты в процессе. Открытость

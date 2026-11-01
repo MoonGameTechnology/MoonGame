@@ -6,7 +6,7 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Тесты: 14183 зелёных** (218 skip; 1150 файлов прошли, 5 skip; локальный полный прогон без PostgreSQL, с реальными Caddy/promtool, 2026-10-30).
+**Тесты: 14304 зелёных** (218 skip; 1158 файлов прошли, 5 skip; локальный полный прогон без PostgreSQL, с реальными Caddy/promtool, 2026-11-01).
 Числа относятся к указанному полному прогону; CI с PostgreSQL и merge queue повторно проверяют текущую main вместе с PR. Репетиция сверяет точное сохранённое состояние и seq после восстановления.
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
@@ -409,6 +409,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 ## 7. Прототип (`prototype/`)
 
+Создание онлайн-сессий в production разрешено UUID из `MATCH_CREATOR_ACCOUNT_IDS`;
+живой аккаунт, квота и лимиты хоста проверяются сервером.
+
 Клиент, в который играют игроки (§1): соло, сетевая партия и Sector Zero — один код, сборки
 различают флаги `__PLAYER_BUILD__` и `__SECTOR_ZERO_ONLY__`.
 
@@ -755,7 +758,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - APK — Capacitor (`mobile/`), ленты `alpha` и `player` в `android.yml`; кнопка «Скачать APK» —
   в шапке хаба в любом браузере, кроме iPhone/iPad и самого APK (`decisions/apkOffer.ts`); обновления берёт с VPS
   по манифесту, подписанному в CI, и ставит только файл с подписанным SHA-256
-  (открытый ключ Ed25519 закреплён в `mobile/distribution.json` как `manifestPublicKey`)
+  (открытый ключ Ed25519 закреплён в `mobile/distribution.json` как `manifestPublicKey`).
+  Перед скачиванием заново проверяется подписанный манифест, чтобы баннер не держал
+  удалённую ссылку. DNS, TLS, тайм-аут и отказ установщика различаются
   ([runbook](../deploy/apk/README.md)); RuStore — `rustore.yml`,
   выпуск закрыт до решений оператора ([rustore-preparation.md](security/rustore-preparation.md)).
 - ПК — Electron (`desktop/`, [README](../desktop/README.md)): тот же архив `dist/yandex/` со схемы
