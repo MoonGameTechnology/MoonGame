@@ -5,7 +5,16 @@ import { updateCorpInfrastructure } from '../../packages/server/src/corpConstruc
 import type { CorpMembership, CorpRole } from './corp';
 import { corpArt } from './corpArt';
 import { corpHubHtml, corpHubSheetHtml, type CorpHubPaint } from './corpHubView';
-import { CORP_LOTS } from './corpSprites';
+import {
+  CORP_BACKDROPS,
+  CORP_DRAW_ORDER,
+  CORP_LOTS,
+  CORP_LOTS_PHONE,
+  CORP_PAD,
+  CORP_PANORAMA,
+  CORP_PANORAMA_PHONE,
+  corpSceneBg,
+} from './corpSprites';
 
 beforeAll(() => setLocale('ru'));
 
@@ -108,6 +117,62 @@ describe('вкладка «Корпорация»: база', () => {
     expect(cards).toEqual(p.view!.buildings.map((b) => b.id));
   });
 
+  it('сцена: участок одной формы на ПК и на телефоне, внутри сцены, ряды рисуются от дальнего к ближнему', () => {
+    for (const [lots, scene] of [[CORP_LOTS, CORP_PANORAMA], [CORP_LOTS_PHONE, CORP_PANORAMA_PHONE]] as const) {
+      expect(Object.keys(lots).sort()).toEqual([...CORP_DRAW_ORDER].sort());
+      const grounds = CORP_DRAW_ORDER.map((id) => lots[id]!.y + lots[id]!.h);
+      expect(grounds).toEqual([...grounds].sort((a, b) => a - b));
+      for (const id of CORP_DRAW_ORDER) {
+        const lot = lots[id]!;
+        expect(lot.x, id).toBeGreaterThanOrEqual(0);
+        expect(lot.x + lot.w, id).toBeLessThanOrEqual(scene.w);
+        expect(lot.y + lot.h, id).toBeLessThan(scene.h);
+        // Один рисунок участка годится обеим сценам, только если форма та же.
+        expect(lot.w / lot.h, id).toBeCloseTo(CORP_LOTS[id]!.w / CORP_LOTS[id]!.h, 9);
+      }
+    }
+  });
+
+  it('табличка под зданием говорит словами: уровень, стройка, «построить» или что нужно — без легенды и прокрутки вбок', () => {
+    const lot = (html: string, id: string): string =>
+      new RegExp(`<button type="button" class="cb-lot [^"]*"[^>]*data-corpbld="${id}"[\\s\\S]*?</button>`).exec(html)![0];
+    const html = corpHubHtml(paint());
+    expect(lot(html, 'headquarters')).toContain('class="cb-pips"');
+    expect(lot(html, 'supply_center')).toContain(`+ ${t('corp.buildings.build')}`);
+    expect(lot(html, 'operations_center')).toContain(t('corp.hub.lot.from', { n: 2 }));
+    expect(lot(html, 'operations_center')).toMatch(/style="--lx:[^"]*--px:/);
+    expect(html).not.toContain('cb-pano-scroll');
+    expect(html).not.toContain('cb-key');
+    // Участник не заказывает стройку: «можно построить» вместо призыва.
+    const asMember = corpHubHtml(paint({ me: member('a3', 'Лира', 'member'), view: base({ headquarters: 1 }, 500, 'member') }));
+    expect(lot(asMember, 'supply_center')).toContain(t('corp.hub.key.open'));
+    const job = { buildingId: 'supply_center', level: 1, startedAt: 0, completesAt: H, cost: 60 };
+    const building = corpHubHtml(paint({ view: base({ headquarters: 1 }, 500, 'head', job), elapsedMs: H / 2 }));
+    expect(lot(building, 'supply_center')).toContain('data-corp-bar');
+  });
+
+  it('площадка под каждым зданием — из металла палубы своего фона, с огнями отдельным слоем', () => {
+    const html = corpHubHtml(paint());
+    const pads = html.split(`<span class="cb-pad" aria-hidden="true">${CORP_PAD}</span>`).length - 1;
+    expect(pads).toBe(html.split('class="cb-lot ').length - 1);
+    expect(CORP_PAD).toContain('<svg class="lts"');
+    expect(CORP_PAD).toContain('class="mk"');
+    // Металл — градиенты сцены: у каждого фона свои цвета, незнакомый фон — бесплатный.
+    for (const id of ['cbPadTop', 'cbPadWall', 'cbPadRim', 'cbPadSide', 'cbPadShadow']) {
+      expect(CORP_PAD).toContain(`url(#${id})`);
+      expect(html).toContain(`id="${id}"`);
+    }
+    const defs = CORP_BACKDROPS.map((id) => /<svg class="cb-defs"[\s\S]*?<\/svg>/.exec(corpSceneBg(id).html)![0]);
+    expect(new Set(defs).size).toBe(CORP_BACKDROPS.length);
+    expect(corpSceneBg('__proto__')).toEqual(corpSceneBg('orbit'));
+  });
+
+  it('строка стройки — в ряду вкладок и только на «Базе»', () => {
+    expect(corpHubHtml(paint())).toMatch(/<div class="cb-tabrow"><div class="cb-tabs"[\s\S]*?<\/div><div class="cb-hud/);
+    expect(corpHubHtml(paint({ section: 'members' }))).not.toContain('cb-hud');
+    expect(corpHubHtml(paint({ view: null }))).not.toContain('cb-hud');
+  });
+
   it('шапка несёт уровень корпорации, казну и место; ярлык «Состава» — число заявок', () => {
     const html = corpHubHtml(paint());
     expect(html).toContain(t('corp.hub.level', { n: 1 }));
@@ -121,7 +186,7 @@ describe('вкладка «Корпорация»: база', () => {
     const html = corpHubHtml(paint({ view: base({ headquarters: 1 }, 500, 'head', job), elapsedMs: H / 2 }));
     expect(html).toContain('data-corp-bar');
     expect(html).toContain('data-corp-left');
-    expect(html).toMatch(/class="cb-lot build /);
+    expect(html).toMatch(/class="cb-lot build[ "]/);
   });
 
   it('нет базы — «не удалось прочитать» с кнопкой «Обновить», а не пустая панорама', () => {
@@ -313,8 +378,8 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
   it('фон базы: панорама в применённом фоне, в шторке фоны рядом со стилями (CORP-15)', () => {
     const view = styles(true, 'high_tech', ['high_tech', 'nebula'], 'nebula');
     const html = corpHubHtml(paint({ style: view }));
-    expect(html).toContain('<image data-corp-backdrop="nebula"');
-    expect(html).not.toContain('<image data-corp-backdrop="orbit"');
+    expect(html).toContain('<img class="cb-sky" data-corp-backdrop="nebula"');
+    expect(html).not.toContain('data-corp-backdrop="orbit"');
     const sheet = corpHubSheetHtml(paint({ style: view }), { kind: 'style' }, '');
     expect(sheet).toContain(t('corp.backdrop.title'));
     expect(sheet).toContain('data-corpstyle="orbit"');
@@ -322,7 +387,7 @@ describe('вкладка «Корпорация»: стиль базы (CORP-14)
     expect(sheet).toContain('data-corpshop="ice_moon"');
     expect(sheet).toContain('data-corpshop="gas_giant"');
     // Без прочитанного стиля панорама — в бесплатном фоне.
-    expect(corpHubHtml(paint())).toContain('<image data-corp-backdrop="orbit"');
+    expect(corpHubHtml(paint())).toContain('<img class="cb-sky" data-corp-backdrop="orbit"');
   });
 });
 

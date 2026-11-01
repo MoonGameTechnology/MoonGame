@@ -1581,8 +1581,6 @@ export const en: Record<string, string> = {
   'corp.hub.guest.sign-in': 'Sign in',
   'corp.hub.guest.title': 'Corporations',
   'corp.hub.key.build': 'Under construction',
-  'corp.hub.key.built': 'Built',
-  'corp.hub.key.locked': 'Locked',
   'corp.hub.key.open': 'Can be built',
   'corp.hub.kick.confirm': 'Remove {name} for sure?',
   'corp.hub.last-level': 'This is the final level',

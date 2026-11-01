@@ -83,12 +83,12 @@ describe('здание на панораме (corpSprite)', () => {
     expect(images(corpSprite('supply_center', 0, 'build'))).toHaveLength(1);
   });
 
-  it('закрытое и доступное к стройке — голограмма первого уровня', () => {
-    for (const mode of ['open', 'locked'] as const) {
-      const [ghost, ...rest] = images(corpSprite('engineering_complex', 0, mode));
+  it('доступное к стройке — голограмма первого уровня, закрытое — его тёмный силуэт', () => {
+    for (const [mode, filter] of [['open', 'corpGhost'], ['locked', 'corpShade']] as const) {
+      const [first, ...rest] = images(corpSprite('engineering_complex', 0, mode));
       expect(rest).toEqual([]);
-      expect(ghost).toContain(`href="${corpArt('engineering_complex', 1)!.src}"`);
-      expect(ghost).toContain('filter="url(#corpGhost)"');
+      expect(first).toContain(`href="${corpArt('engineering_complex', 1)!.src}"`);
+      expect(first).toContain(`filter="url(#${filter})"`);
     }
   });
 
