@@ -1525,8 +1525,7 @@ describe('combat — штурм: ничейный гарнизон и бой н�
     p.links = ['Q'];
     q.links = ['P'];
     const started = okApply(k.applyAction(baseState([a], [p, q]), assault('A'), ctx(0)));
-    // Пока идёт высадка, флот стоит: курс отбит, повторный штурм тоже.
-    expect(rej(k.applyAction(started.state, move('A', 'Q'), ctx(0)))).toBe('E_FLEET_BUSY');
+    // Пока идёт высадка, повторный штурм отбит (курс её отменяет — тест ниже).
     expect(rej(k.applyAction(started.state, assault('A'), ctx(0)))).toBe('E_FLEET_BUSY');
     const landed = okAdvance(k.advanceTo(started.state, ctx(LANDED)));
     const groundId = Object.values(landed.state.battles).find((b) => b.phase === 'ground')!.id;
@@ -1534,6 +1533,40 @@ describe('combat — штурм: ничейный гарнизон и бой н�
     expect(left.state.fleets.A?.movement).not.toBeNull();
     expect(left.state.battles[groundId]).toBeDefined();
     expect(left.state.planets.P?.beachheads?.some((b) => b.owner === 'p1')).toBe(true);
+  });
+
+  // Заказ владельца 2026-11-01: «отмена высадки — так же, как с погрузкой». Вылет снимает
+  // высадку сразу: десант не сходил и улетает в трюме, а срок по старому таймеру ничего не
+  // делает. Отмена называет себя событием, иначе игрок узнал бы о ней по пустому берегу.
+  it('вылет отменяет высадку: десант на борту, срок по старому таймеру ничего не делает', () => {
+    const k = createKernel([movementModule, ...combatFamily, arrivalModule]);
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    const p = planet('P', HOLD, 0, 0, [['militia', 5]]);
+    const q = planet('Q', 'p1', 10, 0);
+    p.links = ['Q'];
+    q.links = ['P'];
+    const started = okApply(k.applyAction(baseState([a], [p, q]), assault('A'), ctx(0)));
+    expect(started.state.fleets.A?.assaultLanding?.planetId).toBe('P');
+    const left = okApply(k.applyAction(started.state, move('A', 'Q'), ctx(0)));
+    expect(left.state.fleets.A?.assaultLanding).toBeUndefined();
+    expect(left.state.fleets.A?.movement).not.toBeNull();
+    expect(left.state.fleets.A?.landing?.[0]?.count).toBe(1);
+    const cancelled = left.events.find((e) => e.type === 'assault.cancelled');
+    expect(cancelled?.payload).toEqual({ fleetId: 'A', planetId: 'P', owner: 'p1' });
+    const later = okAdvance(k.advanceTo(left.state, ctx(LANDED)));
+    expect(later.state.planets.P?.beachheads).toBeUndefined();
+    expect(types(later.events)).not.toContain('assault.ashore');
+  });
+
+  it('курс, который не увёл флот (та же точка), высадку не трогает', () => {
+    const k = createKernel([movementModule, ...combatFamily, arrivalModule]);
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    const p = planet('P', HOLD, 0, 0, [['militia', 5]]);
+    const started = okApply(k.applyAction(baseState([a], [p]), assault('A'), ctx(0)));
+    expect(rej(k.applyAction(started.state, move('A', 'P'), ctx(0)))).toBe('E_SAME_LOCATION');
+    expect(started.state.fleets.A?.assaultLanding?.planetId).toBe('P');
   });
 });
 

@@ -278,6 +278,55 @@ describe('REFM-226 — что ряд показывает выделению', (
     expect(buttons().find((b) => b.cmd === 'attack')).toMatchObject({ off: false });
   });
 
+  // Правило 3г `cmdPresence` (заказ владельца 2026-11-01): бомбардировка и штурм с места
+  // стоят в ряду, а не разделом «Удар» листа, и видны, только когда ядро их пропустит.
+  it('удар по миру под флотом — в ряду и только когда ядро его пропустит', async () => {
+    const { cb, env, page, fleet, foe, select, patch, buttons, cmds } = await boot();
+    const game = await import('./game');
+    const war = game.order(env.world, game.declareWar('p1', 'p2'), env.world.time);
+    if (!war.error) env.world = war.state;
+    // Орбиту чужого мира никто не держит — иначе ядро ответит `E_ORBIT_CONTESTED`.
+    env.world = {
+      ...env.world,
+      fleets: Object.fromEntries(
+        Object.entries(env.world.fleets).filter(([, f]) => f.owner === 'p1'),
+      ),
+    };
+    select(fleet.id);
+    cb.renderCmdBar();
+    // Свой мир под флотом — ни бомбардировать, ни штурмовать нечего.
+    expect(cmds()).not.toContain('bombard');
+    expect(cmds()).not.toContain('attack');
+    // Чужой мир с гарнизоном, корабли есть, десанта нет: бомбардировка — да, штурм — нет.
+    patch(fleet.id, { location: foe.id, orbit: 'near', landing: [] });
+    cb.renderCmdBar();
+    expect(buttons().find((b) => b.cmd === 'bombard')).toMatchObject({ on: false, off: false });
+    expect(cmds()).not.toContain('attack');
+    // Бомбардирует — переключатель горит, нажатие её прекратит.
+    patch(fleet.id, { bombarding: true });
+    cb.renderCmdBar();
+    expect(buttons().find((b) => b.cmd === 'bombard')?.on).toBe(true);
+    expect(page.bar.innerHTML).toContain(t('cmd.bombard.stop.hint'));
+    // Десант на борту — штурм мира под флотом, и телефон не прячет его под «Ещё».
+    patch(fleet.id, { bombarding: false, landing: [{ unit: 'militia', count: 2 }] });
+    cb.renderCmdBar();
+    expect(page.bar.innerHTML).toContain('data-cmd="attack" class="btn-second ctx"');
+    expect(page.bar.innerHTML).toContain(t('cmd.assault.here.hint'));
+    // Пустой чужой мир флот без десанта занимает — штурм с места есть и без войск.
+    const here = env.world.planets[foe.id]!;
+    env.world = {
+      ...env.world,
+      planets: { ...env.world.planets, [foe.id]: { ...here, garrison: [] } },
+    };
+    patch(fleet.id, { landing: [] });
+    cb.renderCmdBar();
+    expect(cmds()).toContain('attack');
+    // Транспорт без кораблей: бомбардировать нечем — кнопки нет.
+    patch(fleet.id, { units: [], landing: [{ unit: 'militia', count: 1 }] });
+    cb.renderCmdBar();
+    expect(cmds()).not.toContain('bombard');
+  });
+
   it('☰ раскрывает стоячие приказы; подсвечено то, что стоит на всей группе', async () => {
     const { cb, go, inter, env, fleet, select, cmds, buttons } = await boot();
     const { RETREAT_THRESHOLDS } = await import('./game');

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  assaultEnabled,
   attackOffered,
-  bombardEnabled,
   docked,
   forecastShown,
   groundSummaryShown,
@@ -47,52 +45,6 @@ describe('strikeOffered — правило 2', () => {
   it('незахватываемая точка — пустое пространство проходное, брать там нечего', () => {
     expect(strikeOffered('p2', ME, false)).toBe(false);
     expect(strikeOffered(null, ME, false)).toBe(false);
-  });
-});
-
-describe('обстрел и штурм — правила 3 и 4', () => {
-  it('обстрел требует И орбиты, И кораблей', () => {
-    expect(bombardEnabled(true, 3, true)).toBe(true);
-    expect(bombardEnabled(true, 0, true)).toBe(false);
-    expect(bombardEnabled(false, 3, true)).toBe(false);
-    expect(bombardEnabled(false, 0, true)).toBe(false);
-  });
-
-  // ORB-1: у астероида/туманности орбитального слоя нет — ядро ответит
-  // `E_WRONG_SECTOR`, и кнопка обязана быть мёртвой ДО отправки приказа.
-  it('УЗЕЛ БЕЗ ОРБИТАЛЬНОГО СЛОЯ ГАСИТ ОБСТРЕЛ, даже когда флот на месте и полон', () => {
-    expect(bombardEnabled(true, 3, false)).toBe(false);
-  });
-
-  it('штурм не спрашивает КОРАБЛИ: высаживается десант, а не корпуса', () => {
-    // Транспорт без единого боевого корабля обязан сохранить своё единственное дело:
-    // корабли не при чём — важен десант (и то лишь там, где мир защищён).
-    expect(assaultEnabled(true, true, true, false)).toBe(true);
-    expect(assaultEnabled(false, true, true, false)).toBe(false); // без ближней орбиты — никак
-  });
-
-  it('на ЗАЩИЩЁННОМ мире пустой трюм гасит кнопку: ядро ответит E_NO_TROOPS', () => {
-    // Ровно та тихая ошибка, ради которой заведён модуль: кнопка выглядит доступной,
-    // игрок жмёт, ядро отказывает, а снаружи это «ничего не произошло».
-    expect(assaultEnabled(true, false, true, false)).toBe(false);
-  });
-
-  it('на НЕзащищённом мире десант не нужен: пустой мир занимают, а не штурмуют', () => {
-    // Прятать кнопку тут значило бы отнять законный приказ — ядро такой штурм примет
-    // и просто займёт мир (`capturePlanet`, ветка «undefended → occupy»).
-    expect(assaultEnabled(true, false, false, false)).toBe(true);
-    expect(assaultEnabled(true, true, false, false)).toBe(true);
-  });
-
-  it('флоту из одних разведчиков десант нужен и на пустом мире: ядро ответит E_RECON_NO_CAPTURE', () => {
-    // Разведчик мир не занимает (решение владельца 2026-10-16); десант с него — занимает.
-    expect(assaultEnabled(true, false, false, true)).toBe(false);
-    expect(assaultEnabled(true, true, false, true)).toBe(true);
-  });
-
-  it('там, где обстрел запрещён пустым составом, штурм всё равно разрешён', () => {
-    expect(bombardEnabled(true, 0, true)).toBe(false);
-    expect(assaultEnabled(true, true, true, false)).toBe(true);
   });
 });
 

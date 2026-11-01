@@ -446,7 +446,8 @@ function planJourney(
 export const movementModule: GameModule = {
   id: 'movement',
   // 1.6.0 — unknown territory is explored in flight; only discovered borders halt it.
-  version: '1.6.0',
+  // 1.7.0 — a fleet mid-landing may take a course; leaving cancels the landing.
+  version: '1.7.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -471,9 +472,11 @@ export const movementModule: GameModule = {
       payload: MovePayload,
       playerId: PlayerId,
     ): string | null => {
-      // In battle, or mid-landing (the fleet holds orbit until its troops are down).
-      if (fleet.battleId || fleet.assaultLanding) {
-        return 'E_FLEET_BUSY'; // not free to re-task
+      // In battle → not free to re-task. A landing does NOT hold the fleet any more (owner,
+      // 2026-11-01: «отмена высадки — так же, как с погрузкой»): departure is the cancel
+      // button, and `combat` drops the landing on `fleet.departed`, troops still aboard.
+      if (fleet.battleId) {
+        return 'E_FLEET_BUSY';
       }
       if (fleet.movement) {
         // RETASK: a NEW course to a fleet already under way is legal — halt it at its

@@ -255,6 +255,15 @@ describe('serverChainActions — the pure driver core', () => {
     expect(done[0]?.actions.map((a) => a.type)).toEqual(['fleet.move']);
   });
 
+  // Вылет отменяет и высадку штурмом (заказ владельца 2026-11-01). План [курс, штурм, курс]
+  // ждёт, пока десант сойдёт, — иначе второй курс отменил бы штурм, только что начатый первым.
+  it('a fleet mid-assault landing waits too — the next move would call the landing off', () => {
+    const storming = fleet('F', {
+      assaultLanding: { planetId: 'A', startAt: 0, doneAt: 1.5 * HOUR, troops: { marine: 1 } },
+    });
+    expect(serverChainActions(chained(storming, [{ kind: 'move', to: 'B' }]), 0)).toEqual([]);
+  });
+
   it('iterates fleets in sorted id order (JSONB scrambles key order between hosts)', () => {
     const s = stateWith([fleet('Z'), fleet('Q')]) as ChState;
     s.orders = { Z: { steps: [{ kind: 'assault' }] }, Q: { steps: [{ kind: 'assault' }] } };

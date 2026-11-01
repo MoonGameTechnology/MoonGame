@@ -132,7 +132,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `coalition.create`, `diplomacy.decline`, `coalition.clock.rebase`, `coalition.leave`, `coalition.kick`, `coalition.edit`, `diplomacy.mapshare` | `coalition.departure.due`, `player.eliminated` | — | `diplomacy` | `diplomacy.changed`, `coalition.left`, `coalition.departure.scheduled`, `coalition.joined`, `diplomacy.offered`, `diplomacy.declined`, `coalition.updated`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered` · sched: `coalition.departure.due` |
 | 9 | `espionage` | `espionage.ts` | `espionage.spy`, `espionage.recall` | `espionage.resolve`, `espionage.sweep`, `time.advanced` | — | — | `espionage.sent`, `espionage.aborted`, `espionage.posted`, `espionage.failed`, `espionage.detected`, `espionage.succeeded`, `intel.stolen`, `espionage.counter.caught`, `espionage.counter.lost`, `espionage.recalled` · sched: `espionage.resolve` |
 | 10 | `orbital` | `orbital.ts` | `fleet.orbit`, `fleet.bombard` | `fleet.arrived`, `time.advanced` | — | — | `aa.fired`, `planet.bombarded`, `fleet.orbit`, `fleet.bombard` |
-| 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `beachhead.landed`, `combat.tick` | `fleet.speed` | `battle.pullIn` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `assault.landed` |
+| 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `fleet.departed`, `beachhead.landed`, `combat.tick` | `fleet.speed` | `battle.pullIn` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.cancelled`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `assault.landed` |
 | 12 | `veteran` | `veteran.ts` | — | — | `combat.damage`, `combat.mitigation` | — | — |
 | 13 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
 | 14 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | — | `planet.captured` |
@@ -147,7 +147,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 23 | `sprawl` | `sprawl.ts` | — | — | `economy.production` | — | — |
 | 24 | `market` | `market.ts` | `market.list`, `market.take`, `market.cancel` | — | — | — | `market.listed`, `market.traded`, `market.cancelled` |
 | 25 | `army` | `army.ts` | `army.load`, `army.unload` | `army.load.done`, `fleet.departed`, `army.unload.done` | — | — | `army.loading`, `army.loaded`, `army.load.cancelled`, `army.unload.cancelled`, `army.unloading`, `army.unloaded` · sched: `army.load.done`, `army.unload.done` |
-| 26 | `fleet-ops` | `fleetOps.ts` | `fleet.launch`, `fleet.merge`, `fleet.split`, `fleet.engage` | `fleet.arrived`, `assault.landed`, `assault.interrupted`, `battle.resolved` | — | — | `fleet.launched`, `fleet.merge.pending`, `fleet.leg`, `fleet.split`, `mine.contact`, `battle.started` · sched: `fleet.arrival`, `combat.tick` |
+| 26 | `fleet-ops` | `fleetOps.ts` | `fleet.launch`, `fleet.merge`, `fleet.split`, `fleet.engage` | `fleet.arrived`, `assault.landed`, `assault.interrupted`, `assault.cancelled`, `battle.resolved` | — | — | `fleet.launched`, `fleet.merge.pending`, `fleet.leg`, `fleet.split`, `mine.contact`, `battle.started` · sched: `fleet.arrival`, `combat.tick` |
 | 27 | `promotion` | `promotion.ts` | — | `unit.built` | `combat.damage` | — | — |
 | 28 | `auto-rally` | `autoRally.ts` | `rally.point` | `planet.captured`, `unit.built` | — | — | — |
 | 29 | `shuttle` | `shuttle.ts` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
@@ -221,6 +221,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `army.unloaded` | `army` | — |
 | `army.unloading` | `army` | — |
 | `assault.ashore` | `combat` | — |
+| `assault.cancelled` | `combat` | `fleet-ops` |
 | `assault.interrupted` | `combat` | `fleet-ops` |
 | `assault.landed` | `combat`* | `combat`, `fleet-ops` |
 | `assault.landing` | `combat` | — |
@@ -277,7 +278,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `fleet.bombard` | `orbital` | `hero` |
 | `fleet.brood.cycle` | — | `fleetBrood` |
 | `fleet.brood.grown` | `fleetBrood` | — |
-| `fleet.departed` | `movement` | `hero`, `army`, `swarmNet` |
+| `fleet.departed` | `movement` | `hero`, `combat`, `army`, `swarmNet` |
 | `fleet.destroyed` | `combat`, `shuttle`, `minefield`, `rocketMines` | `hero`, `station`, `swarmNet`, `swarmAdapt`, `victory`, `rocketMines`, `rendezvous`, `extraction`, `operation`, `captive` |
 | `fleet.fork` | `movement` | `hero` |
 | `fleet.halted` | `movement` | — |

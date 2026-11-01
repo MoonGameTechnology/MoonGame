@@ -38,6 +38,7 @@ import { assaultPlan } from './assaultDispatch';
 import { esc } from './format';
 import {
   assaultFleet,
+  bombardFleet,
   canOrder,
   canOrderAll,
   canTraverse,
@@ -123,6 +124,8 @@ interface LoadPrompt {
   busy: string[];
   order: DeferredOrder | { kind: 'edge'; edge: { from: string; to: string; t: number } };
   minutesLeft: number;
+  /** Кто-то из занятых высаживает десант штурмом — окно говорит о высадке. */
+  landing: boolean;
 }
 // Приказ флоту, который ещё грузит десант: вылет снял бы погрузку, поэтому сперва окно —
 // поставить приказ в план после погрузки или сбросить её и лететь. Живёт в том же слое
@@ -378,6 +381,45 @@ function assaultVerdict(fleetId: string, f: Fleet): string | null {
   );
 }
 /**
+ * Удар по миру под выбором — правило 3г `cmdPresence.ts` (заказ владельца 2026-11-01):
+ * штурм и бомбардировка стоят в ряду команд и видны, только когда ядро их пропустит.
+ *
+ * Мир, который выбор может штурмовать С МЕСТА прямо сейчас, или `null`. Все флоты выбора
+ * стоят над одним миром (не в пути, не в бою), и хоть одному ядро разрешает штурм. Ряд
+ * спрашивает это каждый кадр, поэтому флоту на орбите — проба с памятью (`canOrder`), а
+ * связка с переводом на орбиту (`assaultVerdict`, без памяти) — только тому, кто не на ней.
+ */
+export function assaultHereTarget(fleetIds: readonly string[]): string | null {
+  const fleets = livingFleets(fleetIds);
+  const at = fleets[0]?.location ?? null;
+  if (!at || fleets.some((f) => f.location !== at || f.movement || f.battleId)) return null;
+  const ME = game.me();
+  const ok = fleets.some((f) =>
+    f.orbit === 'near'
+      ? canOrder(game.world(), assaultFleet(ME, f.id)) === null
+      : assaultVerdict(f.id, f) === null,
+  );
+  return ok ? at : null;
+}
+
+/** Флоты выбора, которым ядро сейчас разрешит включить (`on`) или выключить бомбардировку.
+ *  Переключают только тех, у кого она в другом положении: включённую не включают дважды. */
+export function bombardFleetsFor(fleetIds: readonly string[], on: boolean): string[] {
+  const s = game.world();
+  const ME = game.me();
+  return livingFleets(fleetIds)
+    .filter(
+      (f) =>
+        !!f.bombarding !== on &&
+        !!f.location &&
+        !f.movement &&
+        !f.battleId &&
+        canOrder(s, bombardFleet(ME, f.id, on)) === null,
+    )
+    .map((f) => f.id);
+}
+
+/**
  * Издать связку приказов штурма для флота, стоящего у цели (`assaultOrder.ts`, REFM-141):
  * штурмуют с БЛИЖНЕЙ орбиты, поэтому перевод на неё идёт в паре со штурмом и только если
  * флот не там. Годность самого штурма к этому моменту уже подтвердило ядро (правило 1).
@@ -498,11 +540,22 @@ export function cancelWarPrompt(): void {
   hideWarPrompt();
 }
 
-/** Есть ли в выборе флот с идущей погрузкой — тогда приказ ждёт ответа окна. */
+/** Есть ли в выборе флот с идущей погрузкой или высадкой — тогда приказ ждёт ответа окна.
+ *  Спрашивают только УЛЕТАЮЩИХ: стоящий над целью штурма никуда не летит, и его высадку
+ *  этот приказ не отменит. */
 function stageLoadPrompt(fleetIds: string[], order: LoadPrompt['order']): boolean {
-  const split = splitByLoading(livingFleets(fleetIds), game.world().time);
+  const leaving = livingFleets(fleetIds).filter(
+    (f) => order.kind !== 'assault' || f.location !== order.to || !!f.movement,
+  );
+  const split = splitByLoading(leaving, game.world().time);
   if (!split.busy.length) return false;
-  loadPrompt = { fleetIds: [...fleetIds], busy: split.busy, order, minutesLeft: split.minutesLeft };
+  loadPrompt = {
+    fleetIds: [...fleetIds],
+    busy: split.busy,
+    order,
+    minutesLeft: split.minutesLeft,
+    landing: split.landing,
+  };
   renderLoadPrompt();
   return true;
 }
@@ -536,15 +589,28 @@ function renderLoadPrompt(): void {
   const el = document.getElementById('warprompt');
   if (!el || !loadPrompt) return;
   // Точку на лейне в план не поставить — шаг плана умеет только мир (`loadingOrders.ts`).
+  // Высадка — свои слова окна: отменяется она так же, как погрузка.
+  const vars = { n: loadPrompt.busy.length, m: loadPrompt.minutesLeft };
+  const txt = loadPrompt.landing
+    ? {
+        title: t('loadprompt.landing.title'),
+        body: t('loadprompt.landing.body', vars),
+        after: t('loadprompt.landing.after'),
+        now: t('loadprompt.landing.now'),
+      }
+    : {
+        title: t('loadprompt.title'),
+        body: t('loadprompt.body', vars),
+        after: t('loadprompt.after'),
+        now: t('loadprompt.now'),
+      };
   const after =
-    loadPrompt.order.kind === 'edge'
-      ? ''
-      : `<button class="lp-after">${t('loadprompt.after')}</button>`;
+    loadPrompt.order.kind === 'edge' ? '' : `<button class="lp-after">${txt.after}</button>`;
   el.innerHTML =
     `<div class="wpbox">` +
-    `<div class="wp-head">⏳ ${t('loadprompt.title')}</div>` +
-    `<div class="wp-body">${t('loadprompt.body', { n: loadPrompt.busy.length, m: loadPrompt.minutesLeft })}</div>` +
-    `<div class="wp-actions">${after}<button class="lp-now">${t('loadprompt.now')}</button>` +
+    `<div class="wp-head">⏳ ${txt.title}</div>` +
+    `<div class="wp-body">${txt.body}</div>` +
+    `<div class="wp-actions">${after}<button class="lp-now">${txt.now}</button>` +
     `<button class="wp-no">${t('loadprompt.cancel')}</button></div>` +
     `</div>`;
   el.classList.add('show', 'calm');

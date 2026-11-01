@@ -25,6 +25,7 @@ const COMMAND_ICONS: Record<string, HoloIcon> = {
   pick: 'plus-circle',
   boost: 'lightning',
   qauto: 'sword',
+  qretr: 'sign-out',
   stop: 'square',
 };
 

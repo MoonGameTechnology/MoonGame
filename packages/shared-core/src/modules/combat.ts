@@ -66,8 +66,9 @@ const roundIntervalMs = (ctx: Context): number => hoursToMs(ctx, 1);
 /**
  * Сколько идёт высадка штурмом на чужой мир (решение владельца 2026-09-26: «высадка
  * занимает чуть больше времени, чем погрузка»; погрузка — `LOAD_HOURS`, час). Всё это время
- * флот стоит на орбите и приказов не берёт; по сроку десант ступает на землю плацдармом, и
- * флот свободен. Прилёт вражеского флота высадку прерывает — десант остаётся на борту.
+ * флот стоит на орбите и других приказов не берёт; по сроку десант ступает на землю
+ * плацдармом, и флот свободен. Прилёт вражеского флота высадку прерывает, а вылет самого флота
+ * отменяет (заказ владельца 2026-11-01: «так же, как с погрузкой») — десант остаётся на борту.
  */
 export const ASSAULT_LANDING_HOURS = 1.5;
 
@@ -1161,7 +1162,8 @@ export const combatModule: GameModule = {
   // 3.6.0: бой «Атаки» втягивает ждавших у мира — возможность `battle.pullIn` (ATK-3).
   // 3.7.0: `battle.resolved` называет проигравших — `losers` (BAL-16).
   // 3.8.0: флот из одних разведчиков пустой мир с орбиты не занимает — только высадкой.
-  version: '3.8.0',
+  // 3.9.0: вылет флота отменяет его высадку — `assault.cancelled`, десант на борту.
+  version: '3.9.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
 
@@ -1368,6 +1370,24 @@ export const combatModule: GameModule = {
       if (typeof fleetId !== 'string') return; // malformed → no-op (fail-secure)
       const fleet = h.state.fleets[fleetId];
       if (fleet) landAssault(h, fleet);
+    });
+
+    /**
+     * Вылет отменяет высадку — так же, как погрузку (`army.ts`, заказ владельца
+     * 2026-11-01). Десант не сходил, он всё это время в трюме и улетает с флотом. Снимается
+     * сразу, а не по сроку: иначе флот, уже ушедший к другому миру, числился бы
+     * высаживающимся на прежний. Отложенный `assault.landed` по старому сроку потом найдёт
+     * флот без заявки и ничего не сделает (`landAssault`). Отмена не молчит:
+     * `assault.cancelled` попадает в журнал игрока.
+     */
+    api.on('fleet.departed', (event, h) => {
+      const { fleetId } = event.payload as { fleetId?: unknown };
+      if (typeof fleetId !== 'string') return;
+      const fleet = h.state.fleets[fleetId];
+      const claim = fleet?.assaultLanding;
+      if (!fleet || !claim) return;
+      delete fleet.assaultLanding;
+      h.emit('assault.cancelled', { fleetId, planetId: claim.planetId, owner: fleet.owner });
     });
 
     api.on('beachhead.landed', (event, h) => {

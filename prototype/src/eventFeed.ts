@@ -644,6 +644,13 @@ export function handleEvents(events: DomainEvent[]) {
           p.planetId as string,
         );
         break;
+      case 'assault.cancelled':
+        if (!admits('assault.cancelled', p)) break;
+        note(
+          t('log.assault.cancelled', { at: game.placeName(p.planetId as string) }),
+          p.planetId as string,
+        );
+        break;
       // UIX-4.1: свой флот дошёл — малая вспышка на месте (скилл `mobile-game-feel`). Стоянка
       // в точке дороги (`fleet.parked`) — тот же приход, только не в мир. Чужой приход —
       // не моя новость: его видно по самому флоту.

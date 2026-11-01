@@ -357,7 +357,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     ),
     // The phone keeps the landing button in the open sheet; the cast collapsed it.
     ...details('assault', 'land-details'),
-    step('assault', 'land', '[data-act="assault"]', () => guideAssaultStarted(w(), me)),
+    step('assault', 'land', '[data-cmd="attack"]', () => guideAssaultStarted(w(), me)),
     step('assault', 'capture', null, owned, { reveal: () => ui.show(GUIDE_ASSAULT) }),
   ];
 }

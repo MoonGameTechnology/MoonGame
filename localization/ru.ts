@@ -1175,10 +1175,14 @@ export const ru: Record<string, string> = {
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
+  'cmd.assault.here.hint': 'высадить десант на мир под флотом, пустой — занять',
   'cmd.auto-retreat': 'Авто-отход',
   'cmd.auto-retreat.hint': 'флот сам выходит из боя, когда корпус просядет до порога',
   'cmd.auto-assault': 'Авто-штурм',
   'cmd.auto-assault.hint': 'флот сам штурмует вражеский мир по прибытии',
+  'cmd.bombard': 'Бомбар\u00ADдировка',
+  'cmd.bombard.hint': 'с орбиты: износ построек и их выпуска, урон войскам кроме последнего; ПКО отвечает',
+  'cmd.bombard.stop.hint': 'прекратить бомбардировку мира под флотом',
   'cmd.cast': 'Способность',
   'cmd.cast.cooldown': 'КД {h}',
   'cmd.cast.hint': 'применить способность героя из состава флота',
@@ -2159,9 +2163,9 @@ export const ru: Record<string, string> = {
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ выберите цель — камера двигается двумя пальцами',
   'hint.assault-target': '⚔ свой мир и пустой космос не штурмуют',
-  'hint.auto-retreat': '⮐ авто-отход при {n}% корпуса → {at}',
-  'hint.auto-retreat.off': '⮐ авто-отход снят',
-  'hint.auto-retreat.nowhere': '⮐ некуда отходить: выбери свой мир или назначь столицу',
+  'hint.auto-retreat': '⤺ авто-отход при {n}% корпуса → {at}',
+  'hint.auto-retreat.off': '⤺ авто-отход снят',
+  'hint.auto-retreat.nowhere': '⤺ некуда отходить: выбери свой мир или назначь столицу',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
   'hint.cast-cancelled': '✖ способность отменена',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
@@ -3860,12 +3864,17 @@ export const ru: Record<string, string> = {
   'loadprompt.after': 'После погрузки',
   'loadprompt.now': 'Сбросить и лететь',
   'loadprompt.cancel': 'Отмена',
+  'loadprompt.landing.after': 'После высадки',
+  'loadprompt.landing.body': 'Высадка идёт у {n} {n|флота|флотов|флотов}, осталось ≈{m} мин. Вылет её отменит, десант останется на борту.',
+  'loadprompt.landing.now': 'Отменить и лететь',
+  'loadprompt.landing.title': 'Идёт высадка десанта',
   'log.fleet.halted': '⛔ {f} встал у границы: {to} принадлежит {who}, прохода нет',
   'log.army.load-cancelled': '⚠ погрузка отменена: флот ушёл, {n}× {u} остались · {at}',
   // MSB-9: выгрузка идёт по таймеру, и вылет её снимает — десант остался на борту.
   'log.army.unload-cancelled': '⚠ выгрузка отменена: флот ушёл, {n}× {u} остались на борту · {at}',
   // MSB-9: высадка штурмом идёт полтора часа; прилёт врага на орбиту её срывает.
   'log.assault.landing': '⤓ высадка на {at}: десант на земле через {t}',
+  'log.assault.cancelled': '⚠ высадка на {at} отменена: флот ушёл, десант на борту',
   'log.assault.interrupted': '⚠ высадка на {at} сорвана: враг на орбите, десант на борту',
   'log.market.buy': 'покупка',
   'log.market.sell': 'продажа',
@@ -4772,9 +4781,6 @@ export const ru: Record<string, string> = {
   'side.stat.atk': 'АТК',
   'side.stat.def': 'ЗАЩ',
   'side.stat.spd': 'СКР',
-  'side.strike.assault': '⚔ Штурм',
-  'side.strike.bombard': '⊗ Бомбардировать',
-  'side.strike.bombard.stop': '⊗ Прекратить бомбардировку',
   'side.strike.forecast':
     'Прогноз штурма: {v} · ~{r} р. · потери {a} дес. ({pa}%) / {d} гарн. ({pd}%)',
   // UIX-6.1: прогноз у цели «Атаки» (флот против флота). Слово-итог и строка цифр.
@@ -4787,9 +4793,6 @@ export const ru: Record<string, string> = {
   'side.strike.forecast.draw': 'затяжной пат',
   'side.strike.forecast.hint':
     'Прогноз по видимым составам, без бонусов местности, укреплений и технологий — реальный бой может отличаться.',
-  'side.strike.hint':
-    'С орбиты можно бомбардировать (изнашивает здания, замораживает их выпуск и слабо бьёт войска, кроме последнего бойца), но ПКО гарнизона достаёт до вас. Штурм высаживает десант против гарнизона.',
-  'side.strike.title': 'Удар',
   'side.summary.attack': 'Атака',
   'side.summary.back': '‹ Назад к карточке',
   'side.summary.cargo': 'Трюм',

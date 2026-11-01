@@ -32,6 +32,8 @@ export const RECAP_POLICY: Readonly<Record<string, RecapPolicy>> = {
   // MSB-9: высадка на мир — событие КАРТЫ: защитнику это повод привести флот и сорвать её.
   'assault.landing': 'seen',
   'assault.interrupted': 'seen',
+  // Отмена вылетом — тоже событие карты: защитник видел начало высадки и должен узнать конец.
+  'assault.cancelled': 'seen',
 };
 
 /**

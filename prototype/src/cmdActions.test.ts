@@ -313,6 +313,36 @@ describe('REFM-227 — нажатия ряда', () => {
     expect(sent).toHaveLength(1);
   });
 
+  // Правило 3г `cmdPresence` (заказ владельца 2026-11-01): над миром, который можно взять
+  // прямо сейчас, «Штурм» берёт его сразу — и на телефоне, без прицела; «Бомбардировка» —
+  // переключатель того, что прежде жило кнопками раздела «Удар».
+  it('над чужим миром «Штурм» штурмует его сразу, «Бомбардировка» включается и снимается', async () => {
+    const { inter, game, env, fleet, foe, select, put, press } = await boot();
+    const war = game.order(env.world, game.declareWar('p1', 'p2'), env.world.time);
+    if (!war.error) env.world = war.state;
+    env.world = {
+      ...env.world,
+      fleets: Object.fromEntries(
+        Object.entries(env.world.fleets).filter(([, f]) => f.owner === 'p1'),
+      ),
+    };
+    const at = { ...env.world.fleets[fleet.id]!, location: foe.id, orbit: 'near' as const };
+    put({ ...at, landing: [{ unit: 'militia', count: 2 }] });
+    select(fleet.id);
+    env.mobile = true;
+    press('attack');
+    expect(orders()).toEqual([game.assaultFleet('p1', fleet.id)].map(bare));
+    expect(inter.assaultAim).toBe(false);
+    sent.length = 0;
+    put({ ...at, landing: [] });
+    press('bombard');
+    expect(orders()).toEqual([game.bombardFleet('p1', fleet.id, true)].map(bare));
+    sent.length = 0;
+    put({ ...at, landing: [], bombarding: true });
+    press('bombard');
+    expect(orders()).toEqual([game.bombardFleet('p1', fleet.id, false)].map(bare));
+  });
+
   it('«Деление» открывает и закрывает окно; мины заградителя открываются для флота', async () => {
     const { inter, env, fleet, select, press } = await boot();
     select(fleet.id);

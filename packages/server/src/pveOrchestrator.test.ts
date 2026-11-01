@@ -107,7 +107,7 @@ describe('pveOrchestrator — тактика волн (PVE-5.1)', () => {
     expect(orders(state)).toEqual([]);
   });
 
-  it('занятые флоты не трогаются: в пути, в бою, между узлами', () => {
+  it('занятые флоты не трогаются: в пути, в бою, между узлами, на высадке', () => {
     const state = world({
       fleets: {
         moving: fleet('moving', 'swarm', 'hive', {
@@ -115,6 +115,10 @@ describe('pveOrchestrator — тактика волн (PVE-5.1)', () => {
         }),
         fighting: fleet('fighting', 'swarm', 'hive', { battleId: 'b1' }),
         adrift: fleet('adrift', 'swarm', null),
+        // Вылет отменяет высадку (2026-11-01): курс высаживающемуся сорвал бы штурм Роя.
+        storming: fleet('storming', 'swarm', 'hive', {
+          assaultLanding: { planetId: 'hive', startAt: 0, doneAt: 10, troops: {} },
+        }),
       },
     });
     // Приказ на занятый флот редьюсер всё равно отклонит — тратить на него
