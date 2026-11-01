@@ -164,7 +164,7 @@ export {
   journeyDestination,
   journeyEtaMs,
 } from './state/route';
-export { isBombarded, bombardedPlanets, isActivelyBombarding } from './state/orbit';
+export { isBombarded, bombardedPlanets, isActivelyBombarding, bombardersOf } from './state/orbit';
 export { sidesOf, attackerOf, defenderOf, shipsEngaged, landingBattleOf } from './state/battle';
 // MSB-2: правило деления залпа между врагами — одно на живой бой и на прогноз.
 export { volleyShare, splitVolley, type VolleyShare, type VolleyTarget } from './util/volley';
@@ -525,6 +525,8 @@ export {
   MITIGATION_CAP,
   TIER_ORDER,
   mitigationFromPool,
+  damageHookQueries,
+  damageFromTraces,
   type Tier,
 } from './util/combat';
 export {
@@ -595,7 +597,7 @@ export {
 export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
-export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
+export { orbitalModule, BOMBARD_FRACTION, fleetBombardPower } from './modules/orbital';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';

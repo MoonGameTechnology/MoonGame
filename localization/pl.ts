@@ -4506,6 +4506,7 @@ export const pl: Record<string, string> = {
   'side.wing.garrison.hint': 'Eskadra stacjonuje w hangarze portowym i nie pojawia się na mapie. «{b}» wysyła ją na misję — wskaż cel, dotykając mapy. Okręt z ładownią może przewozić eskadrę ze sobą: ładownia znajduje się w panelu floty.',
   'side.world.blackout': 'Zaciemnienie radiowe',
   'side.world.mitigation': 'Osłona struktur: −{n}% obrażeń',
+  'side.world.bombard-fall': 'Ostrzał: {b} upadnie za {t}',
   'side.world.capital': '★ Stolica',
   'side.world.capital.note': 'Główny ośrodek administracyjny mocarstwa',
   'side.world.defense': 'obrona {p}',

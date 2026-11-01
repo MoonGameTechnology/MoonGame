@@ -19,6 +19,9 @@ export type WorldFact =
   | { kind: 'capital' }
   /** Неоплаченная энергия глушит радары и ПКО владельца (ECON-2). */
   | { kind: 'blackout' }
+  /** Мир под обстрелом: какая постройка рухнет следующей и через сколько, мс мира
+   *  (`bombardTimer.ts`). Видят только стороны обстрела — это решает хост. */
+  | { kind: 'bombard'; building: string; leftMs: number }
   /** Бонусы типа планеты долями (0.15 = +15%); нулевой бонус сюда не попадает. */
   | { kind: 'type'; production?: number; defense?: number }
   /** Постройки срезают урон по миру (FORT-5.15), доля 0..0.9. */
@@ -31,20 +34,23 @@ export interface WorldFactsInput {
   mine: boolean;
   capital: boolean;
   blackout: boolean;
+  /** Таймер обстрела (`nextBuildingFall`) или `null`, если его нет. */
+  bombard?: { building: string; leftMs: number } | null;
   bonuses: { production?: number; defense?: number };
   mitigation: number;
   baseOutput: Readonly<Record<string, number>>;
 }
 
 /**
- * Факты шапки по порядку: сначала СОСТОЯНИЕ (о нём надо узнать первым — столица, блэкаут),
- * потом СВОЙСТВА мира (что даёт захват или оборона), в конце — выход.
+ * Факты шапки по порядку: сначала СОСТОЯНИЕ (о нём надо узнать первым — столица, блэкаут,
+ * обстрел), потом СВОЙСТВА мира (что даёт захват или оборона), в конце — выход.
  * Пустое не показывается: фишка «0» — такой же шум, каким были старые счётчики.
  */
 export function worldFacts(i: WorldFactsInput): WorldFact[] {
   const out: WorldFact[] = [];
   if (i.mine && i.capital) out.push({ kind: 'capital' });
   if (i.mine && i.blackout) out.push({ kind: 'blackout' });
+  if (i.bombard) out.push({ kind: 'bombard', building: i.bombard.building, leftMs: i.bombard.leftMs });
   const { production, defense } = i.bonuses;
   if ((production ?? 0) !== 0 || (defense ?? 0) !== 0) {
     out.push({

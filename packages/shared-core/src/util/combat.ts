@@ -1,5 +1,5 @@
 import { captureCasualtyCost, partitionCasualtyCost } from './casualtyCost';
-import type { HandlerContext } from '../kernel/module';
+import type { HandlerContext, HookQuery } from '../kernel/module';
 import type {
   CombatantRef,
   Fleet,
@@ -647,6 +647,30 @@ export function hookedDamage(
   const sequential = h.hook<number>('combat.damage', amount, args);
   const parallel = h.hook<number>('combat.damage.parallel', 0, args);
   return (sequential * (1 + parallel) * mitigationFactor(h, args)) as HookedDamage;
+}
+
+/** The three pipelines {@link hookedDamage} runs, as `Kernel.traceHooks` queries — in
+ *  the order {@link damageFromTraces} reads them back. For a reader OUTSIDE a step that
+ *  must predict a channel's damage (the client's bombardment timer): it asks the same
+ *  pipelines with the same arguments instead of keeping its own table of bonuses. */
+export function damageHookQueries(amount: number, args: DamageHookArgs): HookQuery[] {
+  return [
+    { name: 'combat.damage', base: amount, args },
+    { name: 'combat.damage.parallel', base: 0, args },
+    { name: 'combat.mitigation', base: 0, args },
+  ];
+}
+
+/** {@link hookedDamage}'s formula over traced values (see {@link damageHookQueries}).
+ *  A plain number, NOT {@link HookedDamage}: it is a forecast for the screen, and no
+ *  damage sink may take it. A missing or non-numeric trace reads as zero damage. */
+export function damageFromTraces(values: readonly unknown[]): number {
+  const [sequential, parallel, pool] = values;
+  if (typeof sequential !== 'number' || typeof parallel !== 'number' || typeof pool !== 'number') {
+    return 0;
+  }
+  const out = sequential * (1 + parallel) * mitigationFromPool(pool);
+  return Number.isFinite(out) && out > 0 ? out : 0;
 }
 
 /** What fraction of the incoming damage survives the defender's pooled mitigation.

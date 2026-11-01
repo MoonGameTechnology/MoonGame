@@ -173,7 +173,7 @@ import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
-import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
+import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
@@ -1622,6 +1622,7 @@ function renderMap(now: number) {
   drawMineFlashes(now); // SM-3.5: вспышка срабатывания мин
   drawMinefields(); // SM-3.5: свои минные поля «💣 ×заряд» и установки
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
+  drawBombardTimers(); // таймер обстрела: до сноса следующей постройки мира
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
