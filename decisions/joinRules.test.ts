@@ -35,6 +35,15 @@ describe('вход в матч — что делать с сессией', () =>
   });
 });
 
+describe('отказ выбранного дома', () => {
+  it('отличает изменившийся дом от других ошибок и сохраняет сессию', () => {
+    expect(joinOutcome(400, 'E_UNKNOWN_FACTION')).toBe('house-unavailable');
+    expect(dropsSession(joinOutcome(400, 'E_UNKNOWN_FACTION'))).toBe(false);
+    expect(joinOutcome(400, 'E_BAD_REQUEST')).toBe('failed');
+    expect(joinOutcome(401, 'E_UNKNOWN_FACTION')).toBe('session-expired');
+  });
+});
+
 describe('вход в матч — строка запроса', () => {
   it('без пожеланий — пустая строка, а не голый вопросительный знак', () => {
     expect(joinQuery()).toBe('');

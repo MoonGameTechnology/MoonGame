@@ -396,6 +396,50 @@ describe('REFM-212 — двери гида и сети', () => {
     expect([env.polls, el('setupgo').disabled]).toEqual([polls + 1, true]);
   });
 
+  it('сетевой выбор предлагает только дома сессии и не переносит недоступный дом из соло', async () => {
+    const { screen, env } = await boot();
+    screen.openSetup('hub');
+    tap('setupfactions', { 'data-fpick': 'amber' });
+    screen.enterNetSetup('m1', 'nexus', entryOffer([seat('p1', NEXUS[0]!, false)]));
+    expect(el('setupfactions').innerHTML).toContain('data-fpick="azure"');
+    for (const id of ['crimson', 'amber', 'violet', 'swarm'])
+      expect(el('setupfactions').innerHTML).not.toContain(`data-fpick="${id}"`);
+    tap('setupfactions', { 'data-fpick': 'crimson' });
+    tap('setupmap', { 'data-cand': NEXUS[0]! });
+    el('setupgo').click();
+    expect(env.joined[0]?.slice(0, 3)).toEqual(['m1', 'p1', undefined]);
+  });
+
+  it('исчезнувший дом очищается при опросе, а свободный выбранный мир сохраняется', async () => {
+    const { screen, env } = await boot();
+    screen.openSetup('hub');
+    screen.enterNetSetup('m1', 'nexus', entryOffer([
+      seat('p1', NEXUS[0]!, false),
+      { ...seat('p2', NEXUS[1]!, false), faction: 'crimson' },
+    ]));
+    tap('setupfactions', { 'data-fpick': 'crimson' });
+    tap('setupmap', { 'data-cand': NEXUS[0]! });
+    screen.updateNetOffer('m1', entryOffer([
+      seat('p1', NEXUS[0]!, false), seat('p2', NEXUS[1]!, true),
+    ]));
+    expect(el('setuphint').textContent).toBe(t('acc.house-unavailable'));
+    expect(el('setupgo').disabled).toBe(false);
+    expect(el('setupfactions').innerHTML).not.toContain('data-fpick="crimson"');
+    el('setupgo').click();
+    expect(env.joined[0]?.slice(0, 3)).toEqual(['m1', 'p1', undefined]);
+  });
+
+  it('ответ опроса другой сессии не заменяет текущий выбор', async () => {
+    const { screen, env } = await boot();
+    screen.openSetup('hub');
+    screen.enterNetSetup('m2', 'nexus', entryOffer([seat('p1', NEXUS[0]!, false)]));
+    tap('setupmap', { 'data-cand': NEXUS[0]! });
+    screen.updateNetOffer('m1', entryOffer([seat('p2', NEXUS[1]!, true)]));
+    expect(screen.netSetup?.matchId).toBe('m2');
+    el('setupgo').click();
+    expect(env.joined[0]?.slice(0, 3)).toEqual(['m2', 'p1', 'azure']);
+  });
+
   it('опрос: занятый выбранный мир сбрасывает выбор; опоздавший ответ отбрасывается', async () => {
     const { screen } = await boot();
     screen.openSetup('hub');

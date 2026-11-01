@@ -1,5 +1,6 @@
 """Circuit-breaker policy and action tests; no Docker or production disk mutation."""
 import importlib.util
+import json
 from pathlib import Path
 import stat
 import subprocess
@@ -86,6 +87,42 @@ class ActionTests(unittest.TestCase):
                 guard.enforce()
             stop.assert_called_once_with(guard.TARGETS)
             self.assertTrue(save.call_args.args[1]['measurement_error'])
+
+    def test_measurement_failure_records_safe_cause_and_preserves_stop(self):
+        error = subprocess.TimeoutExpired(
+            ['docker', '--host=unix:///var/run/docker.sock', 'info', 'secret-argument'],
+            30, output='secret-output', stderr='secret-stderr')
+        with patch.object(guard, 'measure', side_effect=error), \
+             patch.object(guard, 'save') as save, patch.object(guard, 'stop') as stop:
+            with self.assertRaisesRegex(RuntimeError, 'E_RESOURCE_MEASURE'):
+                guard.enforce()
+            stop.assert_called_once_with(guard.TARGETS)
+            marker, status = [call.args[1] for call in save.call_args_list]
+            expected = {'kind': 'timeout', 'operation': 'docker-root', 'returncode': None}
+            self.assertEqual(marker['measurement_failure'], expected)
+            self.assertEqual(status['measurement_failure'], expected)
+            self.assertNotIn('secret-', json.dumps([marker, status]))
+
+    def test_measurement_command_failure_exposes_only_bounded_returncode(self):
+        error = subprocess.CalledProcessError(137, ['du', '/private/path'], stderr='private-token')
+        self.assertEqual(guard.measurement_failure(error), {
+            'kind': 'command', 'operation': 'volume-size', 'returncode': 137})
+        self.assertEqual(guard.measurement_failure(ValueError('private-token')), {
+            'kind': 'validation', 'operation': 'unknown', 'returncode': None})
+
+    def test_healthy_measurement_retains_the_original_blocking_cause(self):
+        details = {'kind': 'timeout', 'operation': 'volume-list', 'returncode': None}
+        previous = {'at': 1, 'reasons': ['measurement_failed'],
+                    'targets': guard.TARGETS, 'measurement_failure': details}
+        with patch.object(guard, 'measure', return_value=healthy()), \
+             patch.object(guard, 'read_pressure', return_value=previous), \
+             patch.object(guard, 'save') as save, patch.object(guard, 'stop') as stop:
+            status = guard.enforce()
+            self.assertEqual(status['measurement_failure'], details)
+            self.assertFalse(status['measurement_error'])
+            self.assertEqual(status['level'], 2)
+            stop.assert_called_once_with(sorted(guard.TARGETS))
+            self.assertEqual(save.call_args_list[0].args[1]['measurement_failure'], details)
 
     def test_marker_write_failure_still_attempts_to_stop_writers(self):
         sample = healthy()

@@ -178,20 +178,46 @@ def stop(targets):
         raise RuntimeError('E_RESOURCE_STOP')
 
 
+def measurement_failure(error):
+    """Bounded cause metadata only: never persist command arguments or stderr."""
+    kind = 'timeout' if isinstance(error, subprocess.TimeoutExpired) else \
+        'command' if isinstance(error, subprocess.CalledProcessError) else \
+        'os' if isinstance(error, OSError) else 'validation' if isinstance(error, ValueError) else 'other'
+    command = getattr(error, 'cmd', None)
+    operation = 'unknown'
+    if isinstance(command, (list, tuple)) and command:
+        if command[0] == 'du':
+            operation = 'volume-size'
+        elif command[0] == 'docker':
+            if 'info' in command:
+                operation = 'docker-root'
+            elif 'volume' in command and 'inspect' in command:
+                operation = 'volume-path'
+            elif 'volume' in command and 'ls' in command:
+                operation = 'volume-list'
+    code = getattr(error, 'returncode', None)
+    return {'kind': kind, 'operation': operation,
+            'returncode': code if type(code) is int and -255 <= code <= 255 else None}
+
+
 def enforce():
-    sample, error = None, False
+    sample, error, failure = None, False, None
     try:
         sample = measure()
         result = decision(sample)
         previous = read_pressure()
-    except Exception:
+    except Exception as exception:
         error, previous = True, None
+        failure = measurement_failure(exception)
         result = {'level': 2, 'reasons': ['measurement_failed'], 'targets': TARGETS[:]}
     if previous:
         result['targets'] = sorted(set(result['targets']) | set(previous['targets']))
         result['level'] = 2
+        failure = previous.get('measurement_failure')
     if result['targets']:
         marker = {'at': int(time.time()), **result}
+        if failure is not None:
+            marker['measurement_failure'] = failure
         if previous:
             marker['first_detected_at'] = previous.get('first_detected_at', previous['at'])
             marker['reasons'] = sorted(set(marker['reasons']) | set(previous['reasons']))
@@ -201,7 +227,8 @@ def enforce():
             stop(result['targets'])
             raise
         stop(result['targets'])
-    status = {'at': int(time.time()), **result, 'measurement_error': error, 'sample': sample}
+    status = {'at': int(time.time()), **result, 'measurement_error': error,
+              'measurement_failure': failure, 'sample': sample}
     save(STATE / 'status.json', status)
     if error:
         raise RuntimeError('E_RESOURCE_MEASURE')
