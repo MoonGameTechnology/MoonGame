@@ -466,6 +466,8 @@ export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   // сразу после этого вызова. Иначе брошенный сетевой заход утёк бы в следующую
   // одиночную схватку — тот же довод, что у чистого выбора в `seatJoin.ts`.
   netSetup = null;
+  // A cleared network choice must not seed a solo player without a house.
+  if (!PLAYABLE_FACTIONS.includes(setupFaction)) setupFaction = 'azure';
   game.stopNetPoll();
   if (!isCurrentMap(setupMapId)) setupMapId = DEFAULT_MAP_ID;
   setupSlots = freshSetupSlots();

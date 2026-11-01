@@ -410,6 +410,18 @@ describe('REFM-212 — двери гида и сети', () => {
     expect(env.joined[0]?.slice(0, 3)).toEqual(['m1', 'p1', undefined]);
   });
 
+  it('отмена сетевого входа восстанавливает допустимый дом перед стартом соло', async () => {
+    const { screen, env } = await boot();
+    screen.openSetup('hub');
+    tap('setupfactions', { 'data-fpick': 'amber' });
+    screen.enterNetSetup('m1', 'nexus', entryOffer([seat('p1', NEXUS[0]!, false)]));
+    screen.openSetup('hub');
+    expect(el('setupgo').disabled).toBe(false);
+    el('setupgo').click();
+    expect(env.started[0]?.seats[0]?.faction).toBe('azure');
+    expect(el('setupfactions').innerHTML).toContain('fchip on');
+  });
+
   it('исчезнувший дом очищается при опросе, а свободный выбранный мир сохраняется', async () => {
     const { screen, env } = await boot();
     screen.openSetup('hub');
