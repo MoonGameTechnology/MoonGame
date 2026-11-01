@@ -62,12 +62,21 @@ describe('чёткость карты — кто решает (правила 2�
 
   it('кадры судят, только пока вердикту есть что поменять, его нет и сеанс ещё не решил', () => {
     const both = { sharp: true, motion: true };
-    expect(judgingFrames(both, false, false)).toBe(true);
-    expect(judgingFrames({ sharp: true, motion: false }, false, false)).toBe(true);
-    expect(judgingFrames({ sharp: false, motion: true }, false, false)).toBe(true);
-    expect(judgingFrames({ sharp: false, motion: false }, false, false)).toBe(false);
-    expect(judgingFrames(both, true, false)).toBe(false);
-    expect(judgingFrames(both, false, true)).toBe(false);
+    const open = { all: false, gesture: false };
+    expect(judgingFrames(both, false, open)).toBe(true);
+    expect(judgingFrames({ sharp: true, motion: false }, false, open)).toBe(true);
+    expect(judgingFrames({ sharp: false, motion: true }, false, open)).toBe(true);
+    expect(judgingFrames({ sharp: false, motion: false }, false, open)).toBe(false);
+    expect(judgingFrames(both, true, open)).toBe(false);
+    expect(judgingFrames(both, false, { all: true, gesture: true })).toBe(false);
+  });
+
+  it('УСТРОЙСТВО, КОТОРОЕ ДЕРЖИТ КАРТУ В ПОКОЕ, ЕЩЁ СУДИТ ЩИПОК: сеанс решён, когда сказали оба суда', () => {
+    const both = { sharp: true, motion: true };
+    expect(judgingFrames(both, false, { all: true, gesture: false })).toBe(true);
+    expect(judgingFrames(both, false, { all: false, gesture: true })).toBe(true);
+    // Кадры жеста судят тем же порогом: щипок по 14 кадров в секунду — слабое.
+    expect(slowFrames(frames(1000 / 14))).toBe(true);
   });
 
   it('вердикт меняет чёткость, пока её не выбрали, и движение, пока его не выбрали', () => {
@@ -110,7 +119,9 @@ describe('чёткость карты — плотность холста (пр�
     expect(sharpnessMatters(0.75)).toBe(false);
     expect(mapDpr(0.75, false)).toBe(0.75);
     expect(slowVerdictReach(1, null, null, false)).toEqual({ sharp: false, motion: true });
-    expect(judgingFrames(slowVerdictReach(1, null, false, false), false, false)).toBe(false);
+    expect(
+      judgingFrames(slowVerdictReach(1, null, false, false), false, { all: false, gesture: false }),
+    ).toBe(false);
     expect(sharpnessMatters(1.25)).toBe(true);
   });
 });
