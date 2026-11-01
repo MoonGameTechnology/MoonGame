@@ -920,6 +920,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Гейт `pnpm run check` = `lint` + `typecheck` (пакеты, затем `tsc -p prototype`) + `test` +
 `docs-check`; его же гоняет хук `.githooks/pre-push`. Счётчик тестов — в шапке.
 
+**Сторож размеров** (`scripts/codeSize.test.ts`, SLIM-1): файл длиннее 1 000 строк и функция
+длиннее 300 проходят гейт только по бюджету `scripts/code-size-budget.json`; потолок не растёт
+без явной правки бюджета и опускается вслед за кодом (тесты, `.d.ts` и локали не считаются).
+
 ```bash
 pnpm test               # Vitest; test:watch, test:coverage
 pnpm run prototype      # prototype/dist: dev/player HTML, Sector Zero, served/, yandex/, админка
