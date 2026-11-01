@@ -437,6 +437,15 @@ export function handleEvents(events: DomainEvent[]) {
         // всё равно сдвигает счёт держав, и ростер обязан сходиться с состоянием.
         if (gainRepaint('capture').roster && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
+      // SPY-16: a spy caught anywhere is news for the whole match; its two sides have
+      // their own, fuller lines already.
+      case 'espionage.exposed': {
+        const a = String(p.a);
+        const b = String(p.b);
+        if (a === ME || b === ME) break;
+        note(t('log.spy.exposed', { a: NAME[a] ?? a, b: NAME[b] ?? b, at: game.placeName(String(p.planetId)) }));
+        break;
+      }
       case 'diplomacy.changed': {
         const a = p.a as string;
         const b = p.b as string;

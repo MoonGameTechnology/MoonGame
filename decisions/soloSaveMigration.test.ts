@@ -10,6 +10,7 @@ import {
   SPY_DELAY_SOLO_MIGRATION as spyDelay,
   RECON_LAYERS_SOLO_MIGRATION as reconLayers,
   SPY_DISRUPT_SOLO_MIGRATION as spyDisrupt,
+  SPY_EXPOSED_SOLO_MIGRATION as spyExposed,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -155,7 +156,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -286,5 +287,14 @@ describe('the rules-only economic sabotage pair (0.1.69 → 0.1.69)', () => {
     before.state.version = { data: spyDisrupt.fromData, dataHash: spyDisrupt.fromDataHash, manifest: '1' };
     const raw = serializeSoloSave(before, spyDisrupt.fromRules);
     expect(parseCompatibleSoloSave(raw, spyDisrupt.toRules)).toEqual(before);
+  });
+});
+
+describe('the rules-only public exposure pair (0.1.69 → 0.1.69)', () => {
+  it('reads a save of the economic sabotage release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: spyExposed.fromData, dataHash: spyExposed.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, spyExposed.fromRules);
+    expect(parseCompatibleSoloSave(raw, spyExposed.toRules)).toEqual(before);
   });
 });

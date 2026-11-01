@@ -3904,6 +3904,7 @@ export const en: Record<string, string> = {
   'log.spy.counter.lost': '🛡 Our counter-intelligence agent on {at} was exposed and expelled, back in 6h',
   'log.spy.counter.lost.killed': '🛡 Our counter-intelligence agent on {at} was exposed and killed. Finding a new spy takes 24h',
   'log.spy.war': '⚔ A spy was exposed: {a} and {b} are at war',
+  'log.spy.exposed': '🕵 {a} caught a spy of {b} on {at}',
   'log.spy.success': '🕵 Agent on post: {what}. A new intel layer every 12h',
   'log.spy.success.lost': '🕵 Agent got intel: {what} — a 24h window. The agent was killed, finding a new spy takes 24h',
   'log.spy.success.lost.short': '🗝 Success: {what}. Agent killed',

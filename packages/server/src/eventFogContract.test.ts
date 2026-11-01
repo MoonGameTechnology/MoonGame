@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { OWNER_ONLY_EVENTS } from './matchRoom';
+import { OWNER_ONLY_EVENTS, PUBLIC_EVENTS } from './matchRoom';
 
 /**
  * AUD-2 — the fog-routing contract, enforced.
@@ -39,7 +39,7 @@ const ROUTABLE = new Set<string>([...AUDIENCE, ...PLACE, ...OWNERSHIP, ...BATTLE
 
 /** Events `eventVisibleTo` shows to everybody before it ever looks at the payload. */
 const isBroadcast = (type: string): boolean =>
-  type === 'time.advanced' || type.startsWith('match.');
+  type === 'time.advanced' || type.startsWith('match.') || PUBLIC_EVENTS.has(type);
 
 /** `hero.*` and intel (`OWNER_ONLY_EVENTS`, imported so the filter and this check cannot
  *  drift) short-circuit to one key — `owner` for heroes, the key the list names for intel —

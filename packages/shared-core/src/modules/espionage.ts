@@ -58,6 +58,8 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * owner and the spy's owner — through the `diplomacy` capability's `declareWar`, so an
  * alliance or a pact breaks too. A caught counter-intelligence agent declares nothing:
  * both sides are at war already, and a third party's world is not party to it.
+ * The exposure is also public news (SPY-16): `espionage.exposed` names the world's owner
+ * (`a`), the spy's owner (`b`) and the world, never the operation.
  * Members of the same coalition cannot launch aggressive missions against each other;
  * a mission already in flight aborts if its target is a coalition member on arrival.
  * This protection lasts through the pending departure, without bypassing its timer.
@@ -312,6 +314,12 @@ function guarded(state: GameState, planetId: string, spy: string): boolean {
   );
 }
 
+/** SPY-16: an exposed aggressive mission is public news — who caught whose spy and where,
+ *  nothing about the operation (`espionage.exposed`; the server broadcasts it to all). */
+function exposed(h: HandlerContext, victim: string, spy: string, planetId: string): void {
+  h.emit('espionage.exposed', { a: victim, b: spy, planetId });
+}
+
 /** Close the intel a posted recon agent of `mission` held open (SPY-13). */
 function closeIntel(h: HandlerContext, spy: string, mission: number): void {
   const intel = h.state.intel;
@@ -335,8 +343,8 @@ export const espionageModule: GameModule = {
   // 1.4.0: coalition membership blocks hostile missions at launch and resolution.
   // 1.5.0: своя цена у операции (SPY-12). 1.6.0: срыв стройки (SPY-14).
   // 1.7.0: разведка копится слоями, агент стоит до отзыва (SPY-13).
-  // 1.8.0: подрыв экономики (SPY-15).
-  version: '1.8.0',
+  // 1.8.0: подрыв экономики (SPY-15). 1.9.0: раскрытие — новость для всех (SPY-16).
+  version: '1.9.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
@@ -510,6 +518,7 @@ export const espionageModule: GameModule = {
       // War on exposure (SPY-11): even an ally or a pact partner caught spying is an enemy now.
       if (detected) {
         h.capability<DiplomacyCapability>('diplomacy')?.declareWar?.(h, victim, spy, 'espionage');
+        exposed(h, victim, spy, planetId);
       }
 
       if (!succeeded) {
@@ -665,6 +674,7 @@ export const espionageModule: GameModule = {
       const killed = h.rng.nextFloat() < Math.min(1, Math.max(0, finiteOr(rawKill, baseKill))) && detected;
       if (detected) {
         h.capability<DiplomacyCapability>('diplomacy')?.declareWar?.(h, victim, spy, 'espionage');
+        exposed(h, victim, spy, planetId);
         closeIntel(h, spy, mission);
         reassign(
           h,
