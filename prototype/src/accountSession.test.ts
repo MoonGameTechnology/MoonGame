@@ -213,6 +213,16 @@ describe('REFM-215 — вход или регистрация', () => {
 });
 
 describe('REFM-215 — билет на место', () => {
+  it('отказ дома называет отдельно и не стирает действующую сессию', async () => {
+    const { acc, env } = await boot();
+    const rec = JSON.stringify({ login: 'Ivan', token: 'S' });
+    cell.set(sessionKey(BASE), rec);
+    server = () => reply(400, { error: 'E_UNKNOWN_FACTION' });
+    expect(await acc.fetchJoinToken(BASE, 'm1', 'S', 'p1', 'crimson')).toBeNull();
+    expect(env.status).toEqual([t('acc.house-unavailable')]);
+    expect(cell.get(sessionKey(BASE))).toBe(rec);
+  });
+
   it('просит место с выбором и пропуском сессии, отдаёт оба поля', async () => {
     const { acc, env } = await boot();
     server = () => reply(200, { token: 'J', playerId: 'p3' });
@@ -375,6 +385,20 @@ describe('account changes while joining or deleting', () => {
     const pending = acc.fetchJoinToken(BASE, 'm1', 'old-session');
     remember('Petr', 'new-session');
     finish(reply(status, { token: 'old-join-pass', playerId: 'p1' }));
+    expect(await pending).toBeNull();
+    expect(acc.sessionToken(BASE)).toBe('new-session');
+    expect(env.status).toEqual([]);
+  });
+
+  it.each([400, 401])('a delayed error body %s cannot report for or clear a newer account', async status => {
+    const { acc, env } = await boot();
+    remember('Ivan', 'old-session');
+    let finish!: (body: unknown) => void;
+    server = () => ({ ...reply(status), json: () => new Promise(resolve => { finish = resolve; }) });
+    const pending = acc.fetchJoinToken(BASE, 'm1', 'old-session');
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    remember('Petr', 'new-session');
+    finish({ error: status === 401 ? 'E_AUTH' : 'E_UNKNOWN_FACTION' });
     expect(await pending).toBeNull();
     expect(acc.sessionToken(BASE)).toBe('new-session');
     expect(env.status).toEqual([]);

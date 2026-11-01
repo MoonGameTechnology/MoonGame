@@ -78,6 +78,7 @@ const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
   'session-expired': 'acc.session-expired',
   'entry-closed': 'acc.join-closed',
   'seats-full': 'acc.seats-full',
+  'house-unavailable': 'acc.house-unavailable',
   failed: 'acc.join-failed',
 };
 
@@ -313,7 +314,9 @@ export async function fetchJoinToken(
       },
     );
     if (!current()) return null;
-    const outcome = joinOutcome(res.status);
+    const body = await res.json().catch(() => null) as { error?: unknown } | null;
+    if (!current()) return null;
+    const outcome = joinOutcome(res.status, body?.error);
     if (outcome !== 'ok') {
       if (dropsSession(outcome)) {
         clearSession(localStorage, base);
@@ -322,7 +325,6 @@ export async function fetchJoinToken(
       game.status(t(JOIN_REASON[outcome]));
       return null;
     }
-    const body = await res.json().catch(() => null);
     return current() ? parseJoinPass(body) : null;
   } catch {
     if (current()) game.status(t('acc.server-down'));

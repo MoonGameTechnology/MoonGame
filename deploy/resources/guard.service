@@ -10,11 +10,12 @@ UMask=0077
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/usr/bin/python3 /opt/moongame-ops/deploy/resources/guard.py enforce
 TimeoutStartSec=420
-MemoryMax=128M
-CPUQuota=10%
-TasksMax=32
-Nice=15
-IOSchedulingClass=idle
+MemoryMax=256M
+CPUQuota=50%
+TasksMax=64
+Nice=0
+IOSchedulingClass=best-effort
+IOSchedulingPriority=4
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

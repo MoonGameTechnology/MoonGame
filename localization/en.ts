@@ -469,6 +469,7 @@ export const en: Record<string, string> = {
   'acc.register-refused': 'Registration refused',
   'acc.seats-full': 'all seats taken',
   'acc.server-down': 'server unreachable',
+  'acc.house-unavailable': 'The selected house is no longer available. Open the match selection again.',
   'acc.session-expired': 'Session expired — enter the password again',
   'browser.archive': 'Archive',
   'browser.archive-until': 'Map available until {date}',

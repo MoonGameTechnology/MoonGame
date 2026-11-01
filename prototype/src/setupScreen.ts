@@ -180,6 +180,11 @@ const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
  *  скорость времени скрыты (класс экрана `net`): в сетевом матче это не твои решения. */
 export let netSetup: { matchId: string; offer: EntryOffer } | null = null;
 
+/** Network choices come from this session, intersected with playable houses. */
+function setupHouseIds(): string[] {
+  return PLAYABLE_FACTIONS.filter((id) => !netSetup || netSetup.offer.houses.includes(id));
+}
+
 /** Стартовые миры, которые сейчас предлагает экран. */
 function setupCandidateIds(): string[] {
   if (!netSetup) return [...setupPreset().starts];
@@ -313,7 +318,7 @@ function renderSetupSlots(): void {
   let f2 = `<div class="fph">${t('setup.faction.note')}</div><div class="fpick">`;
   // Только ДОМА: каталог фракций несёт ещё Рой и легаси-`vanguard`, и перебор каталога
   // давал сыграть за Улей в обычной партии (баг, замечен владельцем 2026-09-23).
-  for (const fid of PLAYABLE_FACTIONS) {
+  for (const fid of setupHouseIds()) {
     const f = data.factions[fid];
     if (!f) continue;
     const on = fid === setupFaction;
@@ -461,6 +466,8 @@ export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   // сразу после этого вызова. Иначе брошенный сетевой заход утёк бы в следующую
   // одиночную схватку — тот же довод, что у чистого выбора в `seatJoin.ts`.
   netSetup = null;
+  // A cleared network choice must not seed a solo player without a house.
+  if (!PLAYABLE_FACTIONS.includes(setupFaction)) setupFaction = 'azure';
   game.stopNetPoll();
   if (!isCurrentMap(setupMapId)) setupMapId = DEFAULT_MAP_ID;
   setupSlots = freshSetupSlots();
@@ -545,6 +552,7 @@ export function prepareGuidedSetup(): void {
 export function enterNetSetup(matchId: string, mapId: MapId | undefined, offer: EntryOffer): void {
   setupMapId = mapPreset(mapId).id;
   netSetup = { matchId, offer };
+  if (!setupHouseIds().includes(setupFaction)) setupFaction = '';
   // Стартовый мир не подставляем: правило 4 `entrySetup.ts` — кнопка заперта, пока
   // игрок сам не ткнул в свободный мир. Иначе выбор превратился бы в пожелание.
   setupStart = '';
@@ -555,8 +563,10 @@ export function enterNetSetup(matchId: string, mapId: MapId | undefined, offer: 
  *  на соседний (`reconcileSelection`). Если экран уже не сетевой, ответ опоздал — его
  *  отбрасывают. */
 export function updateNetOffer(matchId: string, offer: EntryOffer): void {
-  if (!netSetup) return;
+  if (!netSetup || netSetup.matchId !== matchId) return;
   netSetup = { matchId, offer };
+  const houseLost = !!setupFaction && !setupHouseIds().includes(setupFaction);
+  if (houseLost) setupFaction = '';
   const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
   if (fate.kind === 'lost') {
     setupStart = '';
@@ -565,6 +575,7 @@ export function updateNetOffer(matchId: string, offer: EntryOffer): void {
     return;
   }
   renderSetup();
+  if (houseLost) setupHintEl.textContent = t('acc.house-unavailable');
 }
 
 /** Выбрать стартовый мир тапом, щелчком или с клавиатуры. */
@@ -681,7 +692,7 @@ export function initSetupScreen(host: SetupScreenHost): void {
     const fp = (ev.target as Element).closest('[data-fpick]');
     if (!fp) return;
     const pick = fp.getAttribute('data-fpick');
-    if (pick && PLAYABLE_FACTIONS.includes(pick)) setupFaction = pick;
+    if (pick && setupHouseIds().includes(pick)) setupFaction = pick;
     renderSetup();
   });
   setupSlotsEl.addEventListener('click', (ev) => {

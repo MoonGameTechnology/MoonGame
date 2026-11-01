@@ -23,10 +23,12 @@ export type JoinOutcome =
   | 'session-expired' // 401: сессию надо забыть и попросить пароль заново
   | 'entry-closed' // 403: окно входа в этот матч закрыто (SES-2.3)
   | 'seats-full' // 409: свободных мест нет
+  | 'house-unavailable' // 400: the offered house changed before admission
   | 'failed'; // прочее
 
 /** Разобрать код ответа сервера в причину. */
-export function joinOutcome(status: number): JoinOutcome {
+export function joinOutcome(status: number, error?: unknown): JoinOutcome {
+  if (status === 400 && error === 'E_UNKNOWN_FACTION') return 'house-unavailable';
   if (status === 401) return 'session-expired';
   if (status === 403) return 'entry-closed';
   if (status === 409) return 'seats-full';

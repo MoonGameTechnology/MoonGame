@@ -473,6 +473,7 @@ export const ru: Record<string, string> = {
   'acc.register-refused': 'Регистрация отклонена',
   'acc.seats-full': 'все места заняты',
   'acc.server-down': 'сервер недоступен',
+  'acc.house-unavailable': 'Выбранный дом больше недоступен. Откройте выбор матча заново.',
   'acc.session-expired': 'Сессия истекла — введите пароль ещё раз',
   'browser.archive': 'В архив',
   'browser.archive-until': 'Карта доступна до {date}',

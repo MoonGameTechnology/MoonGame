@@ -75,6 +75,10 @@ Recovery-письма обоих хостов форматирует `scripts/re
 представление, `check-alerts.mjs` запускает pinned promtool в CI.
 [Runbook](deploy/security/README.md) и [план](docs/security-operations-roadmap.md).
 
+`deploy/resources/guard.py` — остановка писателей при ресурсном давлении; безопасная причина
+ошибки измерения сохраняется в pressure marker и status. `guard.service` выделяет ресурсы
+самой проверке; пороги диска и правила восстановления описаны в [ранбуке](deploy/resources/README.md).
+
 ## prototype/ — играбельный клиент и хост плейтестов
 
 > Это не «прототип, который выкинут»: `prototype/` — то, во что играют игроки сегодня, и
@@ -86,6 +90,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `netserver.ts` | хост плейтеста: HTTP+WS, комнаты, гейт действий, persist, метрики (`/metrics/summary`), офлайн-пробуждение. Собирается в прод-бандл |
 | `bundle-netserver.mjs` | ОДНА конфигурация сборки бандла на дев и прод — чтобы они не разъехались |
 | `src/main.ts` | клиент целиком: карта, HUD, панели, ввод. Большой (см. блок `REFM` в бэклоге) |
+| `src/setupScreen.ts` · `src/matchJoin.ts` · `src/accountSession.ts` | выбор домов и мест из предложения сетевой сессии, опрос списка, вход и разбор отказов; поздний ответ сохраняет новый аккаунт |
 | `src/protoKernel.ts` | сборка ядра прототипа: список модулей (порядок = контракт детерминизма) + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
 | `src/rocketMinesUi.ts` · `minestest.mjs` | карточка ракетной мины и браузерный smoke; `packages/client/src/ordnanceView.ts` рисует отфильтрованные мины и ракеты |
 | `build.mjs` | сборка клиента в самодостаточный HTML; `data-i18n` подставляется из `/localization` |
