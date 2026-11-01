@@ -4,10 +4,10 @@ import { matchCreationAccess } from './matchCreationAccess';
 import { registerMatchApi } from './matchApi';
 
 describe('account-scoped session creation', () => {
-  it('production denies by default while development retains its existing API', () => {
+  it.each(['1', 'true'])('production %s denies by default while development retains its existing API', production => {
     expect(matchCreationAccess({})).toBeUndefined();
     expect(matchCreationAccess({ PROD: '0', MATCH_CREATOR_ACCOUNT_IDS: '' })).toBeUndefined();
-    expect(matchCreationAccess({ PROD: '1' })!({ accountId: 'owner', login: 'Owner' })).toBe(false);
+    expect(matchCreationAccess({ PROD: production })!({ accountId: 'owner', login: 'Owner' })).toBe(false);
   });
   it('checks live account IDs, not a reused name or caller-supplied account ID', async () => {
     const app = Fastify();

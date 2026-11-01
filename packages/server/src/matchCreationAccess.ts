@@ -4,7 +4,8 @@ import type { Identity } from './matchApi';
  * A deleted account's name can never transfer this authority to its next owner. */
 export function matchCreationAccess(env: Record<string, string | undefined>):
   ((identity: Identity) => boolean) | undefined {
-  if (env.PROD !== '1' && !env.MATCH_CREATOR_ACCOUNT_IDS) return undefined;
+  const production = env.PROD === '1' || env.PROD === 'true';
+  if (!production && !env.MATCH_CREATOR_ACCOUNT_IDS) return undefined;
   const allowed = new Set((env.MATCH_CREATOR_ACCOUNT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean));
   return identity => allowed.has(identity.accountId);
 }

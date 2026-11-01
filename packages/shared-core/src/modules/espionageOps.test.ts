@@ -390,3 +390,73 @@ describe('SPY-10 — research theft', () => {
     expect(state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
   });
 });
+
+describe('SPY-17 — up to three agents on one world', () => {
+  /** Record the base each pipeline receives, pass it on unchanged. */
+  function probe(seen: { chance: number[]; detect: number[] }): GameModule {
+    return {
+      id: 'probe',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('espionage.chance', (cur) => (seen.chance.push(cur), cur));
+        api.hook<number>('espionage.detect', (cur) => (seen.detect.push(cur), 0));
+      },
+    };
+  }
+  function wave(ops: string[]) {
+    const seen = { chance: [] as number[], detect: [] as number[] };
+    const k = createKernel([constructionModule, technologyModule, espionageModule, probe(seen)]);
+    let s = baseState();
+    s.players.p1!.resources.credits = 10_000;
+    for (const op of ops) {
+      const r = k.applyAction(s, spy(op), ctx(0));
+      if (!r.ok) throw new Error(`${op}: ${r.code}`);
+      s = r.state;
+    }
+    const done = k.advanceTo(s, ctx(END));
+    if (!done.ok) throw new Error(done.code);
+    return { seen, sent: s };
+  }
+
+  it('a lone agent gets the bare odds', () => {
+    const { seen } = wave(['sabotage']);
+    expect(seen.chance).toEqual([0.6]);
+  });
+
+  it('two agents: +0.1 to success and to detection for each', () => {
+    const { seen, sent } = wave(['sabotage', 'theft']);
+    expect(sent.scheduled.map((e) => (e.payload as { crew?: number }).crew)).toEqual([2, 2]);
+    for (const c of seen.chance) expect(c).toBeCloseTo(0.7, 9);
+    // detection base after a success (0.25) or a failure (0.5), plus the crew bonus
+    for (const d of seen.detect) expect([0.35, 0.6].some((x) => Math.abs(x - d) < 1e-9)).toBe(true);
+  });
+
+  it('three agents: +0.2 to both', () => {
+    const { seen } = wave(['sabotage', 'theft', 'delay']);
+    expect(seen.chance).toHaveLength(3);
+    for (const c of seen.chance) expect(c).toBeCloseTo(0.8, 9);
+    for (const d of seen.detect) expect([0.45, 0.7].some((x) => Math.abs(x - d) < 1e-9)).toBe(true);
+  });
+
+  it('a fourth agent on the same world is refused, free of charge', () => {
+    const k = createKernel([constructionModule, technologyModule, espionageModule]);
+    let s = baseState();
+    s.players.p1!.resources.credits = 10_000;
+    const four: GameModule = {
+      id: 'four',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('espionage.agents', () => 4);
+      },
+    };
+    const k4 = createKernel([constructionModule, technologyModule, espionageModule, four]);
+    for (const op of ['sabotage', 'theft', 'delay']) {
+      const r = k4.applyAction(s, spy(op), ctx(0));
+      if (!r.ok) throw new Error(r.code);
+      s = r.state;
+    }
+    const r = k4.applyAction(s, spy('research'), ctx(0));
+    expect(r.ok ? null : r.code).toBe('E_BAD_TARGET');
+    expect(k.applyAction(s, spy('research'), ctx(0)).ok).toBe(false);
+  });
+});
