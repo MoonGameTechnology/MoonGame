@@ -31,6 +31,7 @@ import { detach } from './detach';
 import { restoreSpyArchive } from './diploWindow';
 import type { EndAction } from './endScreen';
 import { note, resetEventFeed } from './eventFeed';
+import { resetScoutNews } from './scoutNews';
 import {
   advance,
   type AiProfile,
@@ -244,6 +245,7 @@ export function installMatch(
   forgetChainRoutes(); // маршруты принадлежат карте СТАРОГО матча
   resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
+  resetScoutNews(); // названные разведкой цели принадлежат старому матчу
   forgetRadarContacts();
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();

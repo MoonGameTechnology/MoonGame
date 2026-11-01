@@ -183,7 +183,7 @@ async function boot(opts: { fog?: boolean } = {}) {
   });
   const format = await import('./format');
   /** Тексты ленты без метки времени. */
-  const lines = () => feed.logLines.map((l) => l.split(' · ').slice(1).join(' · '));
+  const lines = () => feed.logLines.map((l) => l.line.split(' · ').slice(1).join(' · '));
   return { feed, fog, env, format, lines };
 }
 
@@ -237,7 +237,7 @@ describe('REFM-230 — строка ленты', () => {
   it('пишет игровую метку в журнал и событие — в сводку возвращения', async () => {
     const { feed, env, format } = await boot();
     feed.note('взрыв', 'A');
-    expect(feed.logLines).toEqual([`${format.gameStamp(env.s.time)} · взрыв`]);
+    expect(feed.logLines).toEqual([{ line: `${format.gameStamp(env.s.time)} · взрыв`, at: 'A' }]);
     expect(feed.eventLog).toEqual([{ at: env.s.time, text: 'взрыв', anchor: 'A' }]);
   });
 
@@ -260,7 +260,7 @@ describe('REFM-230 — строка ленты', () => {
     const total = log.EVENT_LOG_MAX + 5;
     for (let i = 0; i < total; i++) feed.note(`n${i}`);
     expect(feed.logLines).toHaveLength(log.LOG_LINES);
-    expect(feed.logLines.at(-1)).toMatch(/ · n84$/);
+    expect(feed.logLines.at(-1)!.line).toMatch(/ · n84$/);
     expect(feed.eventLog).toHaveLength(log.EVENT_LOG_MAX);
     expect(feed.eventLog[0]!.text).toBe('n5');
   });
@@ -366,6 +366,155 @@ describe('REFM-230 — бои', () => {
     expect(feed.logLines).toEqual([]);
     expect(feed.killStats).toEqual({ destroyed: 0, lost: 0 });
     expect(env.ended.map(([id]) => id)).toEqual(['b1']);
+  });
+});
+
+describe('рапорт о своём бое и потери вне боя (решение владельца 2026-11-01)', () => {
+  /** Орбитальный бой у N: мой F1 против четырёх фрегатов F2. */
+  function battleAtN(env: { s: GameState }, foes: number): void {
+    env.s.fleets.F2 = { ...fleet('F2', 'p2', 'N'), units: [{ unit: 'frigate', count: foes }] } as Fleet;
+    env.s.fleets.F1 = { ...env.s.fleets.F1!, location: 'N', battleId: 'b1' } as Fleet;
+    env.s.battles = {
+      b1: {
+        id: 'b1',
+        location: 'N',
+        phase: 'orbital',
+        round: 0,
+        sides: [
+          { ref: { kind: 'fleet', fleetId: 'F1' }, owner: 'p1', role: 'attacker' },
+          { ref: { kind: 'fleet', fleetId: 'F2' }, owner: 'p2', role: 'defender' },
+        ],
+      },
+    } as unknown as GameState['battles'];
+  }
+
+  it('начало называет врагов, итог — сколько их было, выбито и корпус, следом награды', async () => {
+    const { feed, env, lines } = await boot();
+    battleAtN(env, 4);
+    feed.handleEvents([ev('battle.started', { battleId: 'b1', location: 'N', attacker: 'p1', defender: 'p2' })]);
+    expect(lines()).toEqual([
+      t('log.battle.start', { at: '«N»', phase: t('log.battle.phase.orbit') }) + t('log.battle.start.foes', { n: 4 }),
+    ]);
+    // Раунд: трое пали, мой фрегат ранен.
+    env.s.fleets.F2!.units = [{ unit: 'frigate', count: 1 }];
+    env.s.fleets.F1!.units = [{ unit: 'frigate', count: 1, hp: 20 }];
+    feed.handleEvents([ev('unit.died', { battleId: 'b1', at: 'N', owner: 'p2', unit: 'frigate', count: 3 })]);
+    // Итог: последний пал, бой удалён, выжившему — выслуга и «Искра», мне — очки.
+    delete env.s.fleets.F2;
+    env.s.battles = {};
+    env.s.fleets.F1!.units = [{ unit: 'frigate', count: 1, hp: 20, battles: 1, damageDealt: 30 }];
+    env.s.match = { ...env.s.match, battlePoints: { p1: 20 } };
+    feed.handleEvents([
+      ev('unit.died', { battleId: 'b1', at: 'N', owner: 'p2', unit: 'frigate', count: 1 }),
+      ev('battle.resolved', { battleId: 'b1', location: 'N', winner: 'p1', winners: ['p1'], losers: ['p2'] }),
+    ]);
+    expect(lines().slice(1)).toEqual([
+      t('log.battle.end', { at: '«N»', res: t('log.battle.win', { who: 'Орион' }) }) +
+        t('log.battle.losses', { tally: 'Багровые −4' }) +
+        t('log.battle.foes', { n: 4, k: 4 }) +
+        t('log.battle.hull', { cur: 20, max: 30, pct: 67 }),
+      t('log.battle.reward', {
+        at: '«N»',
+        what: [
+          t('log.battle.reward.points', { sign: '+', n: 20 }),
+          t('log.battle.reward.service', { n: 1 }),
+          t('log.battle.reward.medal', { medal: t('medal.valour.1'), unit: tData('Frigate') }),
+          t('log.battle.reward.medal', { medal: t('medal.service.1'), unit: tData('Frigate') }),
+        ].join(', '),
+      }),
+    ]);
+    expect(feed.logLines.every((l) => l.at === 'N')).toBe(true);
+  });
+
+  it('подкрепление поднимает число врагов, гибель — нет', async () => {
+    const { feed, env, lines } = await boot();
+    battleAtN(env, 2);
+    feed.handleEvents([ev('battle.started', { battleId: 'b1', location: 'N', attacker: 'p1', defender: 'p2' })]);
+    env.s.fleets.F2!.units = [{ unit: 'frigate', count: 5 }]; // вступили ещё трое
+    feed.handleEvents([ev('battle.joined', { battleId: 'b1', location: 'N', owner: 'p2' })]);
+    delete env.s.fleets.F1;
+    env.s.battles = {};
+    feed.handleEvents([
+      ev('unit.died', { battleId: 'b1', at: 'N', owner: 'p1', unit: 'frigate', count: 1 }),
+      ev('battle.resolved', { battleId: 'b1', location: 'N', winner: 'p2', winners: ['p2'], losers: ['p1'] }),
+    ]);
+    // Флота нет — корпуса не называем, наград нет — строки наград нет.
+    expect(lines().at(-1)).toBe(
+      t('log.battle.end', { at: '«N»', res: t('log.battle.win', { who: 'Багровые' }) }) +
+        t('log.battle.losses', { tally: 'Орион −1' }) +
+        t('log.battle.foes', { n: 5, k: 0 }),
+    );
+  });
+
+  it('потери вне боя копятся до тишины и пишутся одной строкой; мины пишут своё', async () => {
+    const { feed, env, lines } = await boot();
+    feed.handleEvents([ev('unit.died', { at: 'A', owner: 'p1', unit: 'militia', count: 2 })]);
+    env.clock += 1000;
+    feed.handleEvents([ev('unit.died', { at: 'A', owner: 'p1', unit: 'militia', count: 1 })]);
+    feed.handleEvents([ev('unit.died', { at: 'N', owner: 'p2', unit: 'frigate', count: 1, killedBy: 'p1' })]);
+    feed.handleEvents([ev('unit.died', { at: 'N', owner: 'p2', unit: 'frigate', count: 9, killedBy: 'p3' })]);
+    expect(lines()).toEqual([]);
+    env.clock += 3000;
+    feed.flushStrayLosses();
+    expect(lines()).toEqual([
+      t('log.stray.lost', { at: '«A»', list: t('log.stray.unit', { n: 3, u: tData('Militia') }) }),
+      t('log.stray.killed', { at: '«N»', list: t('log.stray.unit', { n: 1, u: tData('Frigate') }) }),
+    ]);
+    feed.handleEvents([
+      ev('unit.died', { at: 'A', owner: 'p1', unit: 'frigate', count: 1, killedBy: 'p2' }),
+      ev('mines.triggered', { at: 'A', owner: 'p1', by: ['p2'], lost: 1 }),
+    ]);
+    env.clock += 5000;
+    feed.flushStrayLosses();
+    expect(lines().at(-1)).toBe(t('log.mines.hit', { n: 1 }));
+  });
+});
+
+describe('разведка в журнале (`scoutNews.ts`)', () => {
+  it('первый взгляд — отсчёт; новый чужой мир — строка со всем видимым, без тоста', async () => {
+    const { feed, fog, env, lines } = await boot();
+    const scout = await import('./scoutNews');
+    const host = () => ({ world: env.s, me: 'p1', names: env.names, placeName: (id: string) => `«${id}»` });
+    scout.tickScoutNews(host(), 0);
+    expect(lines()).toEqual([]); // N виден с первого кадра — не новость
+    // Рядом появился чужой мир с гарнизоном, постройкой и флотом на орбите.
+    env.s = {
+      ...env.s,
+      planets: {
+        ...env.s.planets,
+        Q: {
+          ...planet('Q', 40, 'p3'),
+          garrison: [{ unit: 'militia', count: 6 }],
+          buildings: [{ type: 'mine_t1', level: 2 }],
+        } as Planet,
+      },
+      fleets: { ...env.s.fleets, F3: { ...fleet('F3', 'p3', 'Q'), units: [{ unit: 'frigate', count: 3 }] } as Fleet },
+    };
+    fog.refreshVision();
+    scout.tickScoutNews(host(), 500);
+    expect(lines()).toEqual([]); // не чаще раза в секунду
+    scout.tickScoutNews(host(), 1500);
+    expect(lines()).toEqual([
+      t('log.scout.world', {
+        at: '«Q»',
+        who: 'Вега',
+        what: [
+          t('log.scout.garrison', { n: 6 }),
+          t('log.scout.buildings', { list: `${tData('Metal Extractor I')} 2` }),
+          t('log.scout.orbit', { n: 1, k: 3 }),
+        ].join(', '),
+      }),
+    ]);
+    expect(feed.logLines.at(-1)!.at).toBe('Q');
+    // Тот же мир снова — молчание.
+    env.s = { ...env.s };
+    fog.refreshVision();
+    scout.tickScoutNews(host(), 3000);
+    expect(lines()).toHaveLength(1);
+    // Смена матча забывает названное.
+    scout.resetScoutNews();
+    scout.tickScoutNews(host(), 5000);
+    expect(lines()).toHaveLength(1);
   });
 });
 
