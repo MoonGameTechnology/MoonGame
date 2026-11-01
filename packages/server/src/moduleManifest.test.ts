@@ -121,7 +121,10 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 89: порядок тот же; orbital 1.5.0, shuttle 1.18.0 — огонь сверху бьёт пехоту и технику разной долей (ROS-1.6b).
 // 90: movement 1.6.0 and visibility 2.4.0 — discover before halting; legal edge detours.
 // 91: порядок тот же; technology 1.5.0 — очередь исследований (RQ-1), новое поле игрока.
-const PINNED_FOR_VERSION = '91';
+// 92: ЧЛЕНСТВО — снят `fleet-repair` (ремонт за металл у дока, заказ владельца 2026-11-01);
+// combat 3.10.0 — наземные выжившие уходят из боя с ранами; construction 1.8.0 —
+// залеченный госпиталем стек сливается с целыми.
+const PINNED_FOR_VERSION = '92';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -167,7 +170,6 @@ const PINNED_MODULE_IDS = [
   'capital',
   'standing-orders',
   'instant-repair',
-  'fleet-repair',
   'forced-march',
   'pve',
   'fleetBrood',

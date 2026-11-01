@@ -77,7 +77,6 @@ import {
   loadShuttle,
   mergeSquadron,
   premiumRepairFleet,
-  repairFleet,
   resumeConstruction,
   setHoldPoint,
   setRallyPoint,
@@ -837,9 +836,6 @@ function onSideClick(ev: MouseEvent): void {
       return;
     }
     if (playerOrder(premiumRepairFleet(ME, f.id))) saveSectorProgress(paid);
-  } else if (act === 'dockrepair') {
-    // ECON-3а: экспресс-ремонт за metal — кнопка видна только у своего дока.
-    playerOrder(repairFleet(ME, arg || selFleet!));
   } else if (act === 'fleetinfo') {
     // Осматриваемый чужой флот живёт вне selFleet — действие относится к карточке.
     const id = panelFleet();

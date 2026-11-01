@@ -444,7 +444,7 @@ for (const [kind, id] of Object.entries(mod.exports.cards())) {
   assert.equal(backButton(), null, `${kind}: title must close its summary`);
   if (kind === 'foreign') {
     assert.deepEqual(mod.exports.selected().orders, [], 'inspected fleet must never enter orders');
-    assert.doesNotMatch(sideEl.innerHTML, /data-act="(?:bombard|assault|retreat|instantrepair|dockrepair)"/);
+    assert.doesNotMatch(sideEl.innerHTML, /data-act="(?:bombard|assault|retreat|instantrepair)"/);
   }
 }
 const battleScene = mod.exports.battleFixture();

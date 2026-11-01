@@ -150,6 +150,55 @@ describe('hospital heal mechanic', () => {
   });
 });
 
+// --- wounds outlive the battle; only a hospital heals them (owner 2026-11-01) ------
+// A battle no longer sends wounded troops home whole (combat 3.10.0). Owner's decision:
+// no self-healing — without a hospital a wounded stack stays wounded, like a hull with no
+// dock. A stack the hospital heals fully merges back into the whole stack of its kind, so
+// a garrison does not fall apart into tiles after every repelled assault.
+describe('wounded troops — only a hospital heals them', () => {
+  const bare = (garrison: UnitStack[], buildings: Planet['buildings'] = []): GameState => {
+    const s = makeState();
+    s.planets.home!.buildings = buildings;
+    s.planets.home!.garrison = garrison;
+    return s;
+  };
+
+  it('a wounded garrison on its own world without a hospital stays wounded', () => {
+    const day = okAdvance(kernel.advanceTo(bare([{ unit: 'marine', count: 4, hp: 40 }]), ctx(24 * HOUR)));
+    expect(day.planets.home?.garrison).toEqual([{ unit: 'marine', count: 4, hp: 40 }]);
+  });
+
+  it('wounded troops aboard a fleet parked there without a hospital stay wounded', () => {
+    const s = bare([]);
+    s.fleets = {
+      F: {
+        id: 'F',
+        owner: 'p1',
+        location: 'home',
+        movement: null,
+        units: [],
+        landing: [{ unit: 'marine', count: 4, hp: 40 }],
+        traits: [],
+        battleId: null,
+      },
+    };
+    const state = okAdvance(kernel.advanceTo(s, ctx(24 * HOUR)));
+    expect(state.fleets.F?.landing?.[0]?.hp).toBe(40);
+  });
+
+  it('a stack the hospital heals fully merges back into the whole stack of its kind', () => {
+    const s = bare(
+      [
+        { unit: 'marine', count: 2 },
+        { unit: 'marine', count: 2, hp: 39 }, // 1 hp short of whole
+      ],
+      [{ type: 'hospital', level: 1, hp: 20 }],
+    );
+    const healed = okAdvance(kernel.advanceTo(s, ctx(HOUR)));
+    expect(healed.planets.home?.garrison).toEqual([{ unit: 'marine', count: 4 }]);
+  });
+});
+
 // --- ship hull repair + shield recharge --------------------------------------
 // A cruiser: max hull 100 + ablative shield 30 (two separate pools). SHIELD (shieldHp)
 // recharges for free anywhere out of combat at 0.06×full/hour, after a post-damage

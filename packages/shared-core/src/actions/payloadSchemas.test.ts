@@ -81,7 +81,6 @@ const CLIENT_ACTION_TYPES = [
   'order.chain',
   'fleet.forcemarch',
   'fleet.instantRepair',
-  'fleet.repair',
 ];
 
 describe('SV-1.2 · action payload schemas', () => {
@@ -159,7 +158,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['order.auto', { fleetId: 'f1', on: true }],
       ['fleet.forcemarch', { fleetId: 'f1', on: true }],
       ['fleet.instantRepair', { fleetId: 'f1' }],
-      ['fleet.repair', { fleetId: 'f1' }],
       ['order.chain', { fleetId: 'f1', steps: [] }], // [] = cancel the plan
       [
         'order.chain',
@@ -216,7 +214,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['battle.attack', { battleId: 'b1', side: 2 }],
       ['battle.retreat', { battleId: 'b1' }],
       ['fleet.retreat', {}], // missing fleetId
-      ['fleet.repair', {}], // missing fleetId
       ['order.chain', { fleetId: 'f1' }], // missing steps
       ['order.chain', { fleetId: 'f1', steps: [{ kind: 'warp' }] }], // unknown step kind
       ['order.chain', { fleetId: 'f1', steps: [{ kind: 'wait', hours: 0 }] }], // no zero waits
@@ -301,6 +298,9 @@ describe('SV-1.2 · action payload schemas', () => {
     // Ремонт за Суверены: валюта — на счёте, вне матча; действие выпускает ХОСТ после
     // списания. Прими его гейт от клиента — корпус чинился бы бесплатно.
     expect(isValidActionPayload('fleet.premiumRepair', { fleetId: 'f1' })).toBe(false);
+    // Ремонт за металл у дока снят (заказ владельца 2026-11-01): у дока корпус чинится
+    // только постепенно, и гейт старый приказ больше не принимает.
+    expect(isValidActionPayload('fleet.repair', { fleetId: 'f1' })).toBe(false);
     // Снабжение забега — по той же причине: платят Сувернами на счёте, пакет выдаётся
     // только после списания. Прими его гейт — пакеты шли бы бесплатно (2026-09-24).
     expect(isValidActionPayload('pve.supply', {})).toBe(false);

@@ -1,6 +1,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   BuildingInstance,
+  Fleet,
   GameState,
   Planet,
   PausedConstructionSite,
@@ -23,7 +24,7 @@ import { matchCost, matchUnitCost, matchHours } from '../util/pricing';
 import { buildProgress } from '../util/construction';
 import { isAllied, mitigationFactor, type DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
-import { addUnits } from '../util/stacks';
+import { addUnits, mergeStacks } from '../util/stacks';
 import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
 import {
   bestFleetStat,
@@ -836,7 +837,9 @@ export const constructionModule: GameModule = {
   // 1.6.0: retired entries refuse new orders; accepted work remains valid. Ship
   // prices also honour the optional match-pinned hull multipliers.
   // 1.7.0: возможность `construction.delay` — сдвиг ближайшего заказа мира (SPY-14).
-  version: '1.7.0',
+  // 1.8.0: залеченный госпиталем стек сливается с целыми того же вида (раны теперь
+  // переживают бой, `combat` 3.10.0).
+  version: '1.8.0',
   setup(api) {
     api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.provideCapability<ConstructionDelay>('construction.delay', delayFirstOrder);
@@ -1578,8 +1581,9 @@ export const constructionModule: GameModule = {
       damageBuildings(h, planet, p.power, p.owner ?? planet.owner, covered);
     });
 
-    // Hospital healing: regenerate garrison HP each tick proportional to the
-    // planet's total `healRate` from standing buildings.
+    // Лечение наземных войск — только госпиталем (решение владельца 2026-11-01): бой больше
+    // не возвращает выживших целыми (`combat` 3.10.0), раны затягивает здесь `healRate` живых
+    // построек мира. Нет госпиталя — раненый остаётся раненым, как корабль без дока.
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
       const span = to - from;
@@ -1593,38 +1597,46 @@ export const constructionModule: GameModule = {
       // режется с крепостью на орбите, а её госпиталь спокойно штопает гарнизон.
       const fighting = battleLocations(h.state);
 
-      /** Подлечить один стек наземных войск — доля от полного HP за час, как и было. */
-      const mend = (stack: UnitStack, rate: number): void => {
+      const wounded = (stack: UnitStack): boolean => stack.count > 0 && stack.hp !== undefined;
+
+      /** Подлечить один стек — доля от полного HP за час, как и было. Возвращает true,
+       *  если стек стал целым: его тогда можно слить с целыми того же вида. */
+      const mend = (stack: UnitStack, rate: number): boolean => {
         const unitDef = data.units[stack.unit];
-        if (!unitDef) return;
+        if (!unitDef || stack.hp === undefined) return false;
         const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
-        const currentHp = stack.hp ?? fullHp;
-        if (currentHp >= fullHp) return;
-        const newHp = Math.min(fullHp, currentHp + rate * hours * fullHp);
-        stack.hp = newHp >= fullHp ? undefined : newHp;
+        const newHp = Math.min(fullHp, stack.hp + rate * hours * fullHp);
+        if (newHp < fullHp) {
+          stack.hp = newHp;
+          return false;
+        }
+        delete stack.hp;
+        return true;
       };
 
       // Кого лечит госпиталь, стоящий на узле: гарнизон САМОГО узла и десант в трюме
       // припаркованных рядом флотов — своих и СОЮЗНЫХ (FORT-5.9, из описания построек
       // крепости: «когда флот игрока или союзника рядом, лечатся наземные войска в трюме»).
-      // Прежде трюм не лечил никто и нигде: раненый десант оставался раненым навсегда,
-      // если его не высадить.
-      const landingsAt = new Map<string, UnitStack[]>();
+      // Прежде трюм не лечил никто и нигде: раненый десант оставался раненым навсегда, если
+      // его не высадить. Только флоты, где есть кого лечить: на большой карте целых трюмов —
+      // подавляющее большинство.
+      const holdsAt = new Map<string, Fleet[]>();
       for (const fleet of recordValues(h.state.fleets)) {
         if (fleet.movement || fleet.battleId || !fleet.location) continue;
+        if (!(fleet.landing ?? []).some(wounded)) continue;
         const host = h.state.planets[fleet.location];
         if (!host || host.owner === null) continue;
         if (host.owner !== fleet.owner && !isAllied(h, fleet.owner, host.owner)) continue;
-        const bucket = landingsAt.get(fleet.location) ?? [];
-        for (const stack of fleet.landing ?? []) bucket.push(stack);
-        if (bucket.length > 0) landingsAt.set(fleet.location, bucket);
+        const bucket = holdsAt.get(fleet.location) ?? [];
+        bucket.push(fleet);
+        holdsAt.set(fleet.location, bucket);
       }
 
       for (const planet of recordValues(h.state.planets)) {
         if (planet.owner === null) continue;
         if (fighting.has(planet.id)) continue;
-        const landings = landingsAt.get(planet.id) ?? [];
-        if (planet.garrison.length === 0 && landings.length === 0) continue;
+        const holds = holdsAt.get(planet.id) ?? [];
+        if (!planet.garrison.some(wounded) && holds.length === 0) continue;
         let totalHealRate = 0;
         for (const b of planet.buildings) {
           if (b.hp <= 0) continue; // destroyed building contributes nothing
@@ -1632,8 +1644,18 @@ export const constructionModule: GameModule = {
           if (def) totalHealRate += buildingLevel(def, b.level).healRate;
         }
         if (totalHealRate <= 0) continue;
-        for (const stack of planet.garrison) mend(stack, totalHealRate);
-        for (const stack of landings) mend(stack, totalHealRate);
+        let healed = false;
+        for (const stack of planet.garrison) if (mend(stack, totalHealRate)) healed = true;
+        // Залеченный стек снова целый — и сливается с целыми того же вида, лоадаута и
+        // выслуги (`mergeStacks`, правило `findHealthyStack`). Иначе гарнизон после каждого
+        // отбитого штурма распадался бы на плитки «×3» и «×2» одного юнита, а погрузка
+        // видела бы только первую из них.
+        if (healed) planet.garrison = mergeStacks([], planet.garrison);
+        for (const fleet of holds) {
+          let mended = false;
+          for (const stack of fleet.landing ?? []) if (mend(stack, totalHealRate)) mended = true;
+          if (mended) fleet.landing = mergeStacks([], fleet.landing ?? []);
+        }
       }
 
       // Зачистка органов Роя (решение владельца 2026-09-24: «при захвате не-роем наземные
@@ -1668,7 +1690,7 @@ export const constructionModule: GameModule = {
 
         // Корпус чинится у ДРУЖЕСТВЕННОГО мира с верфью или космопортом
         // (`shipRepair`, shields-roadmap SH-2.1); без дока — только свой `repair_bay` (SHU-5.4). «Дружественный»
-        // с FORT-5.8 значит свой ИЛИ союзный: правило одно на все три пути ремонта, и
+        // с FORT-5.8 значит свой ИЛИ союзный: правило одно на все пути ремонта у дока, и
         // живёт оно в `fleetAtOwnDock`. Частичный эффект здесь был бы необъяснимым —
         // ровно так разъезжались два хука наземной защиты форта.
         let hullRate = 0;

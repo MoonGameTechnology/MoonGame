@@ -279,14 +279,12 @@ export function previewSides(
       }
     }
     if (stalemate) break;
-    // Наземный бой отпускает выживших «в покое» (`finishBattle`): частичный корпус и щит
-    // стеков сбрасываются, и новое звено они начинают целыми.
+    // Наземный бой отпускает выживших С РАНАМИ (`finishBattle`, combat 3.10.0): щит стеков
+    // сбрасывается, а корпус — нет. Следующее звено заводится в тот же миг, лечиться
+    // некогда, поэтому новое звено выжившие начинают такими, какими вышли из прошлого.
     if (ground) {
       for (const i of link) {
-        for (const st of live[i]!) {
-          delete st.hp;
-          delete st.shieldHp;
-        }
+        for (const st of live[i]!) delete st.shieldHp;
       }
     }
     const next = relink(link);

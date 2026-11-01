@@ -342,9 +342,6 @@ export const instantRepairFleet = (playerId: string, fleetId: string) =>
  *  списания; гейт его от клиента не принимает — схемы у типа нет намеренно. */
 export const premiumRepairFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.premiumRepair', { fleetId });
-/** ECON-3а: экспресс-ремонт за metal у своего дока (цена — `dockRepairCost`). */
-export const repairFleet = (playerId: string, fleetId: string) =>
-  act(playerId, 'fleet.repair', { fleetId });
 /** The chain driver's runtime stamp: consumed head / armed wait deadline. */
 export const chainStamp = (
   playerId: string,

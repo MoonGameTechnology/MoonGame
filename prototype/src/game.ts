@@ -95,12 +95,6 @@ export {
   type MarketOrder,
 } from '../../packages/shared-core/src/index';
 export {
-  REPAIR_HP_PER_METAL,
-  dockRepairCost,
-  fleetAtOwnDock,
-  fleetRepairModule,
-} from '../../packages/shared-core/src/index';
-export {
   INSTANT_REPAIR_CREDITS_PER_HP,
   missingHull,
   instantRepairCost,
@@ -221,7 +215,6 @@ export {
   premiumRepairFleet,
   buySupply,
   abandonRun,
-  repairFleet,
   chainStamp,
   marketList,
   marketTake,

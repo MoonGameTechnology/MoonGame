@@ -897,13 +897,13 @@ describe('REFM-225 — нажатия по листу', () => {
     put(ship('A', home.id));
     select('A');
     show(
-      '<div data-stat="hp"><span class="v">5</span><button data-act="dockrepair" data-arg=""></button></div>' +
+      '<div data-stat="hp"><span class="v">5</span><button data-act="instantrepair" data-arg=""></button></div>' +
         '<button data-stat="atk" class="atk"></button>',
     );
     press('.v');
     expect(env.toggles).toEqual(['hp']);
-    press('[data-act="dockrepair"]');
-    expect(orders()).toEqual([bare(game.repairFleet('p1', 'A'))]);
+    press('[data-act="instantrepair"]');
+    expect(orders()).toEqual([bare(game.instantRepairFleet('p1', 'A'))]);
     press('.atk');
     expect(env.toggles).toEqual(['hp', 'atk']);
   });
@@ -970,8 +970,6 @@ describe('REFM-225 — нажатия по листу', () => {
       ['rmdisarm', '', 'fleet', decide.disarmRocketMine('p1', 'A')],
       ['instantrepair', '', 'fleet', game.instantRepairFleet('p1', 'A')],
       ['instantrepair', 'G', 'fleet', game.instantRepairFleet('p1', 'G')],
-      ['dockrepair', '', 'fleet', game.repairFleet('p1', 'A')],
-      ['dockrepair', 'G', 'fleet', game.repairFleet('p1', 'G')],
       ['wingrecall', 'S1', 'fleet', decide.recallPatrol('p1', 'S1')],
     ];
     for (const [act, arg, on, want] of cases) {

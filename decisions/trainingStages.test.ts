@@ -4,8 +4,10 @@ import { shippedGameData } from '../data/bundle';
 import { trainingState } from '../packages/client/src/gameData';
 import type { GameState } from '../packages/shared-core/src/index';
 import {
+  TRAINING_MEND_STEP,
   TRAINING_STAGES,
   fleetGone,
+  hullMending,
   fortified,
   garrisoned,
   inOrbit,
@@ -87,5 +89,13 @@ describe('этапы учебного полигона: засчёт по рез
     expect(trainingWon(s, ME)).toBe(false);
     s.match = { ...s.match, winner: ME };
     expect(trainingWon(s, ME)).toBe(true);
+  });
+
+  it('ремонт у дока засчитан, когда корпус подрос на шаг или уже целый', () => {
+    // Ремонта за металл больше нет (заказ владельца 2026-11-01): корпус чинится сам.
+    expect(hullMending(0.5, 0.5)).toBe(false);
+    expect(hullMending(0.5 + TRAINING_MEND_STEP / 2, 0.5)).toBe(false);
+    expect(hullMending(0.5 + TRAINING_MEND_STEP, 0.5)).toBe(true);
+    expect(hullMending(1, 0.99)).toBe(true); // целый — чинить нечего, шаг не держит тур
   });
 });

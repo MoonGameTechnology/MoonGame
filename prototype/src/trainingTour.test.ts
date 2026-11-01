@@ -70,6 +70,7 @@ describe('пошаговый полигон Sector Zero', () => {
       'assault.load',
       'finale.load',
       'retreat.battle',
+      'retreat.repair', // корпус у дока чинится со временем — часы должны идти
     ];
     for (const id of waits) expect(steps().find((s) => s.id === id)?.holdClock, id).toBe(false);
   });
@@ -90,6 +91,16 @@ describe('пошаговый полигон Sector Zero', () => {
     expect(wait.advance.when()).toBe(false);
     s.planets.target!.buildings = s.planets.target!.buildings.filter((b) => b !== fort);
     expect(wait.advance.when()).toBe(true);
+  });
+  it('ремонт у дока: шаг смотрит на полосу корпуса и ждёт её роста, а не кнопку за металл', () => {
+    // Ремонта за металл больше нет (заказ владельца 2026-11-01): кнопки `dockrepair` нет
+    // ни на ПК, ни на телефоне, а приказ `fleet.repair` гейт не принимает.
+    for (const mobile of [false, true]) {
+      const repair = steps(mobile).find((s) => s.id === 'retreat.repair')!;
+      expect(repair.target).toBe('[data-stat="hull"]');
+      expect(repair.advance.on).toBe('state');
+      expect(steps(mobile).some((s) => s.target?.includes('dockrepair'))).toBe(false);
+    }
   });
   it('неверный приказ не завершает разделение флота', () => {
     const split = steps().find((s) => s.id === 'fleet.split')!;

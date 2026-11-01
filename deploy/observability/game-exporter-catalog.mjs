@@ -38,7 +38,6 @@ export const ACTION_TYPES = new Set([
   'fleet.move',
   'fleet.orbit',
   'fleet.premiumRepair',
-  'fleet.repair',
   'fleet.retreat',
   'fleet.split',
   'fleet.stop',

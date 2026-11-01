@@ -385,12 +385,13 @@ describe('свой флот', () => {
     expect(html).toContain('<span class="pt-mods">');
   });
 
-  it('ремонт: у своей верфи — за металл, повреждённый вне дока — за кредиты', async () => {
+  it('ремонт: только за кредиты — и у своей верфи, и вне дока (за металл снят)', async () => {
     const { card, put } = await boot();
     put(fleet('F3', 'p1', 'A', [{ unit: 'cruiser', count: 2, hp: 100 }]));
     put(fleet('F4', 'p1', 'Z', [{ unit: 'cruiser', count: 2, hp: 100 }]));
-    expect(card('F3')).toContain(act('dockrepair'));
-    expect(card('F4')).not.toContain(act('dockrepair'));
+    // У своей верфи корпус чинится сам, постепенно; ремонта за металл больше нет.
+    expect(card('F3')).not.toContain('dockrepair');
+    expect(card('F3')).toContain(act('instantrepair'));
     expect(card('F4')).toContain(act('instantrepair'));
     // Целому флоту чинить нечего.
     expect(card('F1')).not.toContain(act('instantrepair'));

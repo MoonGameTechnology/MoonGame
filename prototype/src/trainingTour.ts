@@ -10,6 +10,7 @@ import {
 } from '../../decisions/trainingGuide';
 import {
   fleetGone,
+  hullMending,
   owns,
   productionGrew,
   shipBuilt,
@@ -18,7 +19,12 @@ import {
   type TrainingBaseline,
   type TrainingStage,
 } from '../../decisions/trainingStages';
-import type { GameData, GameState, PlayerId } from '../../packages/shared-core/src/index';
+import {
+  hullFraction,
+  type GameData,
+  type GameState,
+  type PlayerId,
+} from '../../packages/shared-core/src/index';
 import type { Rect, SpotlightStep, StepAdvance } from './spotlight';
 
 export interface TrainingTourUi {
@@ -130,6 +136,16 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     );
   const at = (role: TrainingFleetRole, planet: string) =>
     !!f(role) && f(role)!.location === planet && !f(role)!.movement && !f(role)!.battleId;
+  // Доля корпуса героя на входе в шаг «Ремонт»: проверку зовут только у текущего шага,
+  // поэтому первый вызов и есть вход. Флота нет — шаг не держит тур.
+  let mendFrom: number | null = null;
+  const mending = (): boolean => {
+    const hero = f('hero');
+    if (!hero) return true;
+    const share = hullFraction(hero, data);
+    mendFrom ??= share;
+    return hullMending(share, mendFrom);
+  };
   const route = (
     stage: TrainingStage,
     id: string,
@@ -429,7 +445,9 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ),
     ...route('retreat', 'base', 'hero', 'base', () => at('hero', 'base')),
     ...details('retreat', 'repair-details'),
-    step('retreat', 'repair', '[data-act="dockrepair"]', action('fleet.repair')),
+    // Ремонта за металл больше нет (заказ владельца 2026-11-01): у дока корпус чинится сам.
+    // Шаг подсвечивает полосу корпуса и ждёт, пока она подрастёт, — часы идут.
+    step('retreat', 'repair', '[data-stat="hull"]', state(mending), { holdClock: false }),
     fleet('carrier', 'select', 'carrier'),
     step(
       'carrier',

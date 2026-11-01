@@ -41,7 +41,6 @@ import {
   orderChain,
   forceMarchFleet,
   instantRepairFleet,
-  repairFleet,
 } from './game';
 import { holdPatrol, patrolShuttle, releaseHold } from '../../decisions/actions';
 
@@ -94,7 +93,6 @@ const CLIENT_ACTIONS: Action[] = [
   forceMarchFleet(P, 'f1', true),
   forceMarchFleet(P, 'f1', false),
   instantRepairFleet(P, 'f1'),
-  repairFleet(P, 'f1'), // CONV-2, та же причина
   castHeroAbility(P, 'hero:p1:1', 'scan', 'B2'),
   spawnHero(P, 'hero:p1:2', 'C1R1'),
   unlockHeroSkill(P, 'hero:p1:1', 'neural_lace'),
