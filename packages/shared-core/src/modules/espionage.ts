@@ -4,7 +4,7 @@ import type { BuildingDamage, BuildingHit, ConstructionDelay, DelayedOrder } fro
 import type { TechnologyGrant } from './technology';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
-import { buildingLevel, type GameData } from '../data/schemas';
+import { buildingLevel, type GameData, type ResourceBag } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
 import { canAfford, payCost, refundCost } from '../util/treasury';
@@ -32,6 +32,9 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *   - `delay` (SPY-14) — the world's order that finishes first is pushed back by
  *     6–12 h (`construction.delay` capability); nothing is built — a success with
  *     nothing delayed (`delayed: null`).
+ *   - `disrupt` (SPY-15) — the world produces `DISRUPT_FACTOR` of its output for
+ *     `DISRUPT_HOURS` (`Planet.disruptedUntil`, applied in `economy.production`; the
+ *     treasury itself is untouched). A repeat extends the term, never deepens the cut.
  *   - `theft` (SPY-9) — a random resource the owner holds: 5–15% of the stock, at
  *     most `THEFT_CAP`, moves from the owner's treasury to the spy's (a world has no
  *     stockpile of its own; owner's resolution 2026-10-22).
@@ -101,7 +104,15 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * `espionage.detected` says `killed: true`.
  */
 
-const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>(['recon', 'sabotage', 'delay', 'theft', 'research', 'counter']);
+const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>([
+  'recon',
+  'sabotage',
+  'delay',
+  'disrupt',
+  'theft',
+  'research',
+  'counter',
+]);
 
 /** Base price of one mission by operation (SPY-12): guarding is cheap, attacking is
  *  dear, as in the genre (SWW3 counter-ops $250 a day against $4000 for sabotage). The
@@ -111,6 +122,7 @@ export const SPY_OP_COST: Readonly<Record<SpyOp, number>> = {
   recon: 150,
   sabotage: 300,
   delay: 300,
+  disrupt: 300,
   theft: 300,
   research: 400,
 };
@@ -153,6 +165,9 @@ const SABOTAGE_SHARE_MAX = 0.2;
 /** Queue sabotage (SPY-14): the first order of the world slips by this many hours. */
 const DELAY_MIN_HOURS = 6;
 const DELAY_MAX_HOURS = 12;
+/** Economic sabotage (SPY-15): how long the world produces how much of its output. */
+const DISRUPT_HOURS = 24;
+const DISRUPT_FACTOR = 0.75;
 
 const THEFT_SHARE_MIN = 0.05;
 const THEFT_SHARE_MAX = 0.15;
@@ -235,6 +250,17 @@ function delayQueue(h: HandlerContext, planetId: string): DelayedOrder | null {
   return h.capability<ConstructionDelay>('construction.delay')?.(h, planetId, hours) ?? null;
 }
 
+/** Economic sabotage: the world's output is cut until `disruptedUntil`; a repeat moves the
+ *  end later, never earlier. The end is a scheduled event so that no production span runs
+ *  across it — the cut covers exactly its term. Returns the end. */
+function disrupt(h: HandlerContext, planetId: string): number {
+  const planet = h.state.planets[planetId]!;
+  const until = Math.max(planet.disruptedUntil ?? 0, h.ctx.now + hoursToMs(h.ctx, DISRUPT_HOURS));
+  planet.disruptedUntil = until;
+  h.schedule(until, 'espionage.disrupt.end', { planetId });
+  return until;
+}
+
 /** Theft: a random resource the victim holds at least one whole unit of, 5–15% of it
  *  (rounded down, at most `THEFT_CAP`), moved to the spy. `null` — nothing to take. */
 function theft(h: HandlerContext, spy: string, victim: string): { resource: string; amount: number } | null {
@@ -309,8 +335,27 @@ export const espionageModule: GameModule = {
   // 1.4.0: coalition membership blocks hostile missions at launch and resolution.
   // 1.5.0: своя цена у операции (SPY-12). 1.6.0: срыв стройки (SPY-14).
   // 1.7.0: разведка копится слоями, агент стоит до отзыва (SPY-13).
-  version: '1.7.0',
+  // 1.8.0: подрыв экономики (SPY-15).
+  version: '1.8.0',
   setup(api) {
+    // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
+    // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
+    // means the whole span was disrupted.
+    api.hook<ResourceBag>('economy.production', (bag, args, h) => {
+      const planetId = (args as { planetId?: string } | undefined)?.planetId;
+      const until = planetId ? h.state.planets[planetId]?.disruptedUntil : undefined;
+      if (until === undefined || until < h.ctx.now) return bag;
+      const out: Record<string, number> = {};
+      for (const res of Object.keys(bag)) out[res] = (bag[res] ?? 0) * DISRUPT_FACTOR;
+      return out;
+    });
+
+    api.on('espionage.disrupt.end', (event, h) => {
+      const planet = h.state.planets[(event.payload as { planetId: string }).planetId];
+      // An extended term leaves this end early: the cut stays until its own end fires.
+      if (planet?.disruptedUntil !== undefined && planet.disruptedUntil <= h.ctx.now) delete planet.disruptedUntil;
+    });
+
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
       if (typeof p?.op !== 'string' || !SPY_OPS.has(p.op) || typeof p.planetId !== 'string') {
@@ -497,7 +542,9 @@ export const espionageModule: GameModule = {
             ? { hits: sabotage(h, planetId) }
             : op === 'delay'
               ? { delayed: delayQueue(h, planetId) }
-              : op === 'theft'
+              : op === 'disrupt'
+                ? { disrupted: disrupt(h, planetId) }
+                : op === 'theft'
                 ? { loot: theft(h, spy, victim) }
                 : { tech: stealResearch(h, spy, victim) };
         reassign(h, spy, mission, killed ? recruit : comeHome);

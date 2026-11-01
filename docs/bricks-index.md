@@ -71,7 +71,7 @@
 | SPY-12 | ✅ | core proto | `docs/backlog.md` | Разная цена операций. |
 | SPY-13 | ✅ | core srv proto | `docs/backlog.md` | Разведка, которая копится. |
 | SPY-14 | ✅ | core proto | `docs/backlog.md` | Саботаж очереди. |
-| SPY-15 | ⏳ | core proto | `docs/backlog.md` | Подрыв экономики. |
+| SPY-15 | ✅ | core proto | `docs/backlog.md` | Подрыв экономики. |
 | SPY-16 | ⏳ | srv proto | `docs/backlog.md` | Провал шпиона — новость для всех. |
 | SPY-17 | ⏳ | core proto | `docs/backlog.md` | До 3 агентов на одном мире. |
 | SPY-18 | ⏳ | core data | `docs/backlog.md` | Перевербовка. |

@@ -3,6 +3,8 @@ import { createKernel } from '../kernel/kernel';
 import { espionageModule, MISSION_HOURS, SPY_OP_COST, THEFT_CAP } from './espionage';
 import { constructionModule } from './construction';
 import { technologyModule } from './technology';
+import { economyModule } from './economy';
+import { visibleState } from '../state/visibility';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context, DomainEvent } from '../action/types';
@@ -18,7 +20,7 @@ const data: GameData = parseGameData({
   units: { cruiser: { faction: 'x', stats: { attack: 4, defense: 4, speed: 6, hp: 20 } } },
   factions: {},
   buildings: {
-    mine: { name: 'Mine', cost: {}, hp: 100 },
+    mine: { name: 'Mine', cost: {}, hp: 100, produces: { metal: 10 } },
     farm: { name: 'Farm', cost: {}, hp: 200 },
     beacon: { name: 'Beacon', cost: {} }, // no modelled HP — sabotage can't touch it
   },
@@ -86,8 +88,16 @@ describe('SPY-12 — each operation has its own price', () => {
   const k = createKernel([constructionModule, technologyModule, espionageModule]);
 
   it('guarding is the cheapest, stealing research the dearest', () => {
-    expect(SPY_OP_COST).toEqual({ counter: 50, recon: 150, sabotage: 300, delay: 300, theft: 300, research: 400 });
-    for (const op of ['counter', 'recon', 'sabotage', 'delay', 'theft', 'research'] as const) {
+    expect(SPY_OP_COST).toEqual({
+      counter: 50,
+      recon: 150,
+      sabotage: 300,
+      delay: 300,
+      disrupt: 300,
+      theft: 300,
+      research: 400,
+    });
+    for (const op of ['counter', 'recon', 'sabotage', 'delay', 'disrupt', 'theft', 'research'] as const) {
       const r = k.applyAction(baseState(), spy(op), ctx(0));
       if (!r.ok) throw new Error(`${op}: ${r.code}`);
       expect(r.state.players.p1!.resources.credits).toBe(500 - SPY_OP_COST[op]);
@@ -238,6 +248,63 @@ describe('SPY-14 — queue sabotage', () => {
     if (!done.ok) throw new Error(done.code);
     expect(delayed(done.events)).toBeNull();
     expect(done.state.scheduled.find((e) => e.seq === 900)!.at).toBe(20 * HOUR);
+  });
+});
+
+describe('SPY-15 — economic sabotage', () => {
+  const k = createKernel([economyModule, constructionModule, technologyModule, espionageModule, sure, unseen]);
+  /** p2's metal over [from, to] of a world disrupted at the end of a mission sent at 0. */
+  function metalOver(from: number, to: number, s = baseState()): number {
+    const sent = k.applyAction(s, spy('disrupt'), ctx(0));
+    if (!sent.ok) throw new Error(sent.code);
+    const a = k.advanceTo(sent.state, ctx(from));
+    if (!a.ok) throw new Error(a.code);
+    const b2 = k.advanceTo(a.state, ctx(to));
+    if (!b2.ok) throw new Error(b2.code);
+    return b2.state.players.p2!.resources.metal! - a.state.players.p2!.resources.metal!;
+  }
+  /** The same span without any sabotage — the world's full output. */
+  function plainOver(from: number, to: number): number {
+    const a = k.advanceTo(baseState(), ctx(from));
+    if (!a.ok) throw new Error(a.code);
+    const b2 = k.advanceTo(a.state, ctx(to));
+    if (!b2.ok) throw new Error(b2.code);
+    return b2.state.players.p2!.resources.metal! - a.state.players.p2!.resources.metal!;
+  }
+
+  it('the world produces 75% for 24 h, then its full output again', () => {
+    const full = plainOver(END, END + 24 * HOUR);
+    expect(full).toBeGreaterThan(0);
+    expect(metalOver(END, END + 24 * HOUR)).toBeCloseTo(full * 0.75, 6);
+    expect(metalOver(END + 24 * HOUR, END + 48 * HOUR)).toBeCloseTo(plainOver(END + 24 * HOUR, END + 48 * HOUR), 6);
+  });
+
+  it('the success reports the end, and the cut leaves the treasury itself alone', () => {
+    const sent = k.applyAction(baseState(), spy('disrupt'), ctx(0));
+    if (!sent.ok) throw new Error(sent.code);
+    const done = k.advanceTo(sent.state, ctx(END));
+    if (!done.ok) throw new Error(done.code);
+    expect(done.state.planets.B!.disruptedUntil).toBe(END + 24 * HOUR);
+    expect(done.events.find((e) => e.type === 'espionage.succeeded')?.payload).toMatchObject({
+      kind: 'disrupt',
+      disrupted: END + 24 * HOUR,
+    });
+    expect(done.state.players.p2!.resources.credits).toBe(10_000);
+  });
+
+  it('a repeat extends the term but never cuts below 75%', () => {
+    const s = baseState();
+    s.planets.B!.disruptedUntil = END + 6 * HOUR; // an earlier sabotage still running
+    s.scheduled.push({ id: 'evt:old', at: END + 6 * HOUR, seq: 0, type: 'espionage.disrupt.end', payload: { planetId: 'B' } });
+    const full = plainOver(END, END + 24 * HOUR);
+    expect(metalOver(END, END + 24 * HOUR, s)).toBeCloseTo(full * 0.75, 6);
+  });
+
+  it('only the world owner sees the term', () => {
+    const s = baseState();
+    s.planets.B!.disruptedUntil = 9 * HOUR;
+    expect(visibleState(s, 'p2', data).planets.B?.disruptedUntil).toBe(9 * HOUR);
+    expect(visibleState(s, 'p1', data).planets.B).not.toHaveProperty('disruptedUntil');
   });
 });
 

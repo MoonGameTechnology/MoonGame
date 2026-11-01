@@ -340,7 +340,7 @@ export interface IntelGrant {
 }
 
 /** An espionage operation an agent is sent on (SPY-8). */
-export type SpyOp = 'recon' | 'sabotage' | 'delay' | 'theft' | 'research' | 'counter';
+export type SpyOp = 'recon' | 'sabotage' | 'delay' | 'disrupt' | 'theft' | 'research' | 'counter';
 
 /** An agent of the spy's network that is away (espionage, SPY-6): on a mission,
  *  busy working a stolen window, slipping home after a failure, or — `lost` —
@@ -567,6 +567,10 @@ export interface Planet {
    *  заново, когда вид уже перезаписан. Присутствует только у стоящей крепости и
    *  снимается вместе с ней; отсутствует у всех остальных узлов. */
   priorKind?: string;
+  /** Подрыв экономики (SPY-15): до этого мига мира (мс) мир добывает на 25% меньше
+   *  (`espionageModule`, хук `economy.production`). Повторный подрыв продлевает срок.
+   *  Видит только владелец мира. Нет подрыва — поля нет. */
+  disruptedUntil?: number;
   /** ПЛОЩАДКА КРЕПОСТИ НА РАЗВИЛКЕ (FORT-6.1): развилка какой тропы какой провинции.
    *  Узел с этим полем — не провинция, а место, где стоит (или стояла) космическая
    *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
