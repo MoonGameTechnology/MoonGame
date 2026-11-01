@@ -786,7 +786,14 @@ function onSideClick(ev: MouseEvent): void {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
     }
   } else if (act === 'spyplanet') {
-    if (arg === 'recon' || arg === 'sabotage' || arg === 'theft' || arg === 'research' || arg === 'counter')
+    if (
+      arg === 'recon' ||
+      arg === 'sabotage' ||
+      arg === 'delay' ||
+      arg === 'theft' ||
+      arg === 'research' ||
+      arg === 'counter'
+    )
       playerOrder(spyOn(ME, selPlanet!, arg));
   } else if (act === 'spyrecall') {
     playerOrder(recallSpy(ME, selPlanet!));

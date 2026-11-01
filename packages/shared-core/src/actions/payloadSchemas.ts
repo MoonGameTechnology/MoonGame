@@ -90,7 +90,7 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // SES-3: sink the premium resource into one ACTIVE research (diminishing returns)
   'technology.boost': z.object({ technology: id }),
   // espionage.ts — send an agent on an operation against one world (SPY-8)
-  'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'theft', 'research', 'counter']) }),
+  'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'delay', 'theft', 'research', 'counter']) }),
   // SPY-11: call a counter-intelligence agent off its post (or off its way there)
   'espionage.recall': z.object({ planetId: id }),
   // market.ts — amounts are plain positive numbers (resources accrue continuously,

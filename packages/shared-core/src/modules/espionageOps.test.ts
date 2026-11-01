@@ -86,8 +86,8 @@ describe('SPY-12 — each operation has its own price', () => {
   const k = createKernel([constructionModule, technologyModule, espionageModule]);
 
   it('guarding is the cheapest, stealing research the dearest', () => {
-    expect(SPY_OP_COST).toEqual({ counter: 50, recon: 150, sabotage: 300, theft: 300, research: 400 });
-    for (const op of ['counter', 'recon', 'sabotage', 'theft', 'research'] as const) {
+    expect(SPY_OP_COST).toEqual({ counter: 50, recon: 150, sabotage: 300, delay: 300, theft: 300, research: 400 });
+    for (const op of ['counter', 'recon', 'sabotage', 'delay', 'theft', 'research'] as const) {
       const r = k.applyAction(baseState(), spy(op), ctx(0));
       if (!r.ok) throw new Error(`${op}: ${r.code}`);
       expect(r.state.players.p1!.resources.credits).toBe(500 - SPY_OP_COST[op]);
@@ -176,6 +176,68 @@ describe('SPY-9 — sabotage', () => {
     const { state } = run('sabotage', [sure, unseen, spared]);
     expect(state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
     expect(state.intel?.p1 ?? []).toEqual([]);
+  });
+});
+
+describe('SPY-14 — queue sabotage', () => {
+  /** p2's mine on B finishes at `at` (seq 900), a farm on another world at 15h. */
+  const building = (at: number): GameState => {
+    const s = baseState();
+    const order = (seq: number, when: number, planetId: string, b: string) => ({
+      id: `evt:${seq}`,
+      at: when,
+      seq,
+      type: 'construction.complete',
+      payload: { kind: 'building', planetId, playerId: 'p2', building: b, seq },
+    });
+    s.scheduled = [order(900, at, 'B', 'mine'), order(901, 15 * HOUR, 'H', 'farm')];
+    return s;
+  };
+  const delayed = (events: DomainEvent[]) =>
+    (ofType(events, 'espionage.succeeded')[0]!.payload as { delayed: unknown }).delayed;
+
+  it('pushes the world\'s first order back by 6–12 h and keeps its seq', () => {
+    const { state, events } = run('delay', [sure, unseen, spared], building(20 * HOUR));
+    const d = delayed(events) as { kind: string; building: string; hours: number };
+    expect(d).toMatchObject({ kind: 'building', building: 'mine' });
+    expect(d.hours).toBeGreaterThanOrEqual(6);
+    expect(d.hours).toBeLessThanOrEqual(12);
+    const mine = state.scheduled.find((e) => e.seq === 900)!;
+    expect(mine.at).toBe(20 * HOUR + d.hours * HOUR);
+    // Another world's order is untouched, and the queue stays (at, seq)-sorted.
+    expect(state.scheduled.find((e) => e.seq === 901)!.at).toBe(15 * HOUR);
+    const ats = state.scheduled.map((e) => e.at);
+    expect(ats).toEqual([...ats].sort((a, b) => a - b));
+  });
+
+  it('the delayed order completes at its new time, not the old one', () => {
+    const k = createKernel([constructionModule, technologyModule, espionageModule, sure, unseen, spared]);
+    const sent = k.applyAction(building(20 * HOUR), spy('delay'), ctx(0));
+    if (!sent.ok) throw new Error(sent.code);
+    const mid = k.advanceTo(sent.state, ctx(END));
+    if (!mid.ok) throw new Error(mid.code);
+    const hours = (delayed(mid.events) as { hours: number }).hours;
+    const before = k.advanceTo(mid.state, ctx(20 * HOUR + hours * HOUR - 1));
+    if (!before.ok) throw new Error(before.code);
+    expect(before.state.scheduled.some((e) => e.seq === 900)).toBe(true); // the old 20h passed
+    const after = k.advanceTo(before.state, ctx(20 * HOUR + hours * HOUR));
+    if (!after.ok) throw new Error(after.code);
+    expect(after.state.scheduled.some((e) => e.seq === 900)).toBe(false);
+  });
+
+  it('an idle world is a success with nothing delayed', () => {
+    const { events } = run('delay', [sure, unseen, spared]);
+    expect(delayed(events)).toBeNull();
+  });
+
+  it('without the construction module the delay is a no-op, not a crash', () => {
+    const k = createKernel([espionageModule, sure, unseen, spared]);
+    const sent = k.applyAction(building(20 * HOUR), spy('delay'), ctx(0));
+    if (!sent.ok) throw new Error(sent.code);
+    const done = k.advanceTo(sent.state, ctx(END));
+    if (!done.ok) throw new Error(done.code);
+    expect(delayed(done.events)).toBeNull();
+    expect(done.state.scheduled.find((e) => e.seq === 900)!.at).toBe(20 * HOUR);
   });
 });
 
