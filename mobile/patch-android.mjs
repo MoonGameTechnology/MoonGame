@@ -12,6 +12,7 @@
 // so a single post-add patch sticks through the rest of the build.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { darkSystemBars, dropViewportCover, nightWindowBackground } from './system-bars.mjs';
 
 const manifest = fileURLToPath(
   new URL('./android/app/src/main/AndroidManifest.xml', import.meta.url),
@@ -45,3 +46,17 @@ if (xml.includes('android:screenOrientation')) {
     `patch-android: set screenOrientation=fullUser${hasConfigChanges ? ' (configChanges already present)' : ' + in-place config changes'}`,
   );
 }
+
+// Keep the WebView between the system bars instead of under them (system-bars.mjs). The
+// page copy, the runtime config and the theme are the ones `cap sync` already put into the
+// generated project, so every lane (dev, player, RuStore) gets the same fix.
+const generated = (path) => fileURLToPath(new URL(`./android/app/src/main/${path}`, import.meta.url));
+for (const [path, patch] of [
+  ['assets/public/index.html', dropViewportCover],
+  ['assets/capacitor.config.json', darkSystemBars],
+  ['res/values/styles.xml', nightWindowBackground],
+]) {
+  const file = generated(path);
+  writeFileSync(file, patch(readFileSync(file, 'utf8')));
+}
+console.log('patch-android: WebView sits between the system bars (no viewport-fit=cover, dark bars)');
