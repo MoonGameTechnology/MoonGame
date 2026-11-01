@@ -44,6 +44,12 @@
 .cn-tile.filled.sel{box-shadow:0 0 0 2px #071018,0 0 0 4px var(--cyan),0 0 14px color-mix(in srgb,var(--rar,var(--cyan)) 45%,transparent);}
 .cn-tile:focus-visible{outline:2px solid var(--cyan);outline-offset:6px;}
 /* Upgrade level of the fitted module: «★2» in the tile's corner, in its rarity colour. */
+/* «Снять» the open bay's module: a small ✕ on the selected tile's top-right corner. It shares the tile's centre and shifts to the corner, so it pokes out 8px at most — inside the hull card's 10px padding. The hit area grows past the 22px glyph for a finger; the overlap only covers the already open tile. */
+.cn-tx{position:absolute;z-index:1;width:22px;height:22px;padding:0;transform:translate(calc(-50% + 20px),calc(-50% - 20px));display:flex;align-items:center;justify-content:center;border-radius:50%;background:#071018;font-size:12px;line-height:1;}
+.cn-tx::after{content:'';position:absolute;inset:-8px;}
+/* Phone: the window's 44px button floor would swallow the tile; a 26px glyph with a 44px hit area instead. */
+body.mobile-ui #constructor .cn-tx{min-width:0;min-height:0;width:26px;height:26px;font-size:14px;transform:translate(calc(-50% + 21px),calc(-50% - 21px));}
+body.mobile-ui #constructor .cn-tx::after{inset:-9px;}
 .cn-tst{position:absolute;right:-8px;bottom:-8px;padding:0 4px;border-radius:7px;border:1px solid var(--rar,var(--cyan));background:#071018;color:var(--rar,var(--cyan));font:700 var(--fs-caption)/16px var(--sf-font);font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;}
 /* PC window: the hull list is a column of rows, a small picture beside the name. */
 @container (min-width:820px){
