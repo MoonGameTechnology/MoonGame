@@ -175,7 +175,7 @@ import { chainHits, drawAllyMarks, drawChainOverlay, drawDevourSieges, drawMinef
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { blackBoxError, blackBoxFrame, startBlackBox } from './renderBlackBox';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
@@ -524,6 +524,7 @@ import {
   mapDpr,
   slowFrames,
   slowVerdictReach,
+  type FramePool,
 } from '../../decisions/mapSharpness';
 import {
   netViewFollow,
@@ -3525,11 +3526,23 @@ const trainingScenarioHost: TrainingScenarioHost = {
 };
 
 // Слабое устройство (`decisions/mapSharpness.ts`): кадры матча судят его, пока вердикту есть что
-// поменять — чёткость или движение, которых игрок не выбирал, — а вердикта нет. Слабое — карта
-// сразу переходит на пиксель на точку, голограмма замирает, и это запоминается.
-const sharpGaps: number[] = []; // the frame gaps judged so far
+// поменять — чёткость или движение, которых игрок не выбирал, — а вердикта нет. Судов два: все
+// кадры и отдельно кадры жеста (правило 1). Слабое — карта сразу переходит на пиксель на точку,
+// голограмма замирает, и это запоминается.
+const sharpGaps: Record<FramePool, number[]> = { all: [], gesture: [] }; // the gaps judged so far
 let sharpFrom = -1; // when the gaps start counting, after the warm-up; -1 — the map is not shown
-let sharpJudged = false; // this session's frames found the device fine
+const sharpFine = { all: false, gesture: false }; // the courts that found the device fine
+/** One court takes a gap: `true` — slow, `false` — fine, `null` — no verdict (yet, or any more). */
+function judgeGap(pool: FramePool, dt: number): boolean | null {
+  if (sharpFine[pool]) return null;
+  const gaps = sharpGaps[pool];
+  gaps.push(dt);
+  const slow = slowFrames(gaps);
+  if (slow === null) return null;
+  gaps.length = 0;
+  if (!slow) sharpFine[pool] = true;
+  return slow;
+}
 function judgeMapSharpness(nowReal: number, dt: number): void {
   const reach = slowVerdictReach(
     SCREEN_DPR,
@@ -3537,22 +3550,19 @@ function judgeMapSharpness(nowReal: number, dt: number): void {
     motionChosen(),
     reducedMotionAsked(),
   );
-  if (!judgingFrames(reach, mapSlowSeen(), sharpJudged)) return;
+  if (!judgingFrames(reach, mapSlowSeen(), sharpFine)) return;
   if (!inMatch() || mapPreparation.active) {
     sharpFrom = -1;
-    sharpGaps.length = 0;
+    sharpGaps.all.length = 0;
+    sharpGaps.gesture.length = 0;
     return;
   }
   if (sharpFrom < 0) sharpFrom = nowReal + JUDGE_WARMUP_MS;
   if (nowReal < sharpFrom || !saneGap(dt)) return;
-  sharpGaps.push(dt);
-  const slow = slowFrames(sharpGaps);
-  if (slow === null) return;
-  sharpGaps.length = 0;
-  if (!slow) {
-    sharpJudged = true;
-    return;
-  }
+  const all = judgeGap('all', dt);
+  // The gap is the frame that has just ended: it moved the camera, or a pinch is open.
+  const gesture = mapMoving(nowReal - dt) ? judgeGap('gesture', dt) : null;
+  if (all !== true && gesture !== true) return;
   markMapSlow();
   if (reach.sharp) resize();
   if (!reach.motion) toast(t('settings.gfx.map-sharp.auto'));
