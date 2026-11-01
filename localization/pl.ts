@@ -4327,7 +4327,7 @@ export const pl: Record<string, string> = {
   'settings.gfx.motion.auto': 'Hologram mapy został unieruchomiony dla zachowania płynności. Włącz ruch: Ustawienia → Grafika',
   'settings.gfx.motion.hint': 'pulsowanie znaczników, poświaty i silników; wyłączenie zamraża animacje bez ich ukrywania; słabsze urządzenie wyłącza to samoczynnie',
   'settings.gfx.render-compat': 'Zgodność renderowania',
-  'settings.gfx.render-compat.hint': 'wymusza programowe renderowanie mapy; może obniżyć liczbę klatek; wymaga ponownego uruchomienia',
+  'settings.gfx.render-compat.hint': 'wymusza programowe renderowanie mapy; może obniżyć liczbę klatek; wymaga ponownego uruchomienia; słabsze urządzenie włącza to samoczynnie',
   'settings.gfx.render-compat.pending': 'Zmiana wymaga ponownego uruchomienia',
   'settings.gfx.render-report': 'Raport renderowania',
   'settings.gfx.render-report.hint': 'szczegóły techniczne do diagnozy problemów — zaznacz i skopiuj treść raportu',

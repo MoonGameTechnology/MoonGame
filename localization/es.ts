@@ -4320,7 +4320,7 @@ export const es: Record<string, string> = {
   'settings.gfx.motion.auto': 'El holograma del mapa se detuvo para mantener la fluidez. Activa el movimiento en: Ajustes → Gráficos',
   'settings.gfx.motion.hint': 'pulsación de marcas, resplandor y motores; desactivarlo congela las animaciones sin ocultarlas; un dispositivo débil lo apaga solo',
   'settings.gfx.render-compat': 'Compatibilidad de renderizado',
-  'settings.gfx.render-compat.hint': 'fuerza el renderizado por software del mapa; puede reducir los FPS; requiere reiniciar',
+  'settings.gfx.render-compat.hint': 'fuerza el renderizado por software del mapa; puede reducir los FPS; requiere reiniciar; un dispositivo débil lo activa solo',
   'settings.gfx.render-compat.pending': 'El cambio requiere reiniciar',
   'settings.gfx.render-report': 'Informe de renderizado',
   'settings.gfx.render-report.hint': 'datos técnicos para diagnóstico de fallos: selecciona y copia el contenido del informe',

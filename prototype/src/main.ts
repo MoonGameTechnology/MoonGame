@@ -347,17 +347,8 @@ import {
   startPvEMatch,
   startTraining,
 } from './matchLifecycle';
-import {
-  pcUi,
-  showFpsOn,
-  motionChosen,
-  motionOn,
-  reducedMotionAsked,
-  mapSharpChosen,
-  mapSharpOn,
-  mapSlowSeen,
-  markMapSlow,
-} from './graphicsPrefs';
+import { pcUi, showFpsOn, motionOn, mapSharpOn, mapSlowSeen, markMapSlow } from './graphicsPrefs';
+import { slowVerdictReachNow } from './slowVerdictReachNow';
 import { initSettingsView, openSettings, push } from './settingsView';
 import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { initHolographicUi } from './holographicUi';
@@ -526,7 +517,7 @@ import {
   judgingFrames,
   mapDpr,
   slowFrames,
-  slowVerdictReach,
+  slowVerdictNotice,
   type FramePool,
 } from '../../decisions/mapSharpness';
 import {
@@ -3539,9 +3530,10 @@ const trainingScenarioHost: TrainingScenarioHost = {
 };
 
 // Слабое устройство (`decisions/mapSharpness.ts`): кадры матча судят его, пока вердикту есть что
-// поменять — чёткость или движение, которых игрок не выбирал, — а вердикта нет. Судов два: все
-// кадры и отдельно кадры жеста (правило 1). Слабое — карта сразу переходит на пиксель на точку,
-// голограмма замирает, и это запоминается.
+// поменять — чёткость, движение или режим отрисовки, которых игрок не выбирал, — а вердикта нет.
+// Судов два: все кадры и отдельно кадры жеста (правило 1). Слабое — карта сразу переходит на
+// пиксель на точку, голограмма замирает, режим отрисовки ждёт следующего запуска (правило 6), и
+// это запоминается.
 const sharpGaps: Record<FramePool, number[]> = { all: [], gesture: [] }; // the gaps judged so far
 let sharpFrom = -1; // when the gaps start counting, after the warm-up; -1 — the map is not shown
 const sharpFine = { all: false, gesture: false }; // the courts that found the device fine
@@ -3557,12 +3549,7 @@ function judgeGap(pool: FramePool, dt: number): boolean | null {
   return slow;
 }
 function judgeMapSharpness(nowReal: number, dt: number): void {
-  const reach = slowVerdictReach(
-    SCREEN_DPR,
-    mapSharpChosen(),
-    motionChosen(),
-    reducedMotionAsked(),
-  );
+  const reach = slowVerdictReachNow(SCREEN_DPR);
   if (!judgingFrames(reach, mapSlowSeen(), sharpFine)) return;
   if (!inMatch() || mapPreparation.active) {
     sharpFrom = -1;
@@ -3578,8 +3565,8 @@ function judgeMapSharpness(nowReal: number, dt: number): void {
   if (all !== true && gesture !== true) return;
   markMapSlow();
   if (reach.sharp) resize();
-  if (!reach.motion) toast(t('settings.gfx.map-sharp.auto'));
-  else toast(reach.sharp ? t('settings.gfx.slow.auto') : t('settings.gfx.motion.auto'));
+  const notice = slowVerdictNotice(reach);
+  if (notice) toast(t(notice));
 }
 
 function frame(nowReal: number) {

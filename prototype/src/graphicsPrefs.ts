@@ -15,14 +15,8 @@
  * изменились — переехало только объявление.
  */
 import { mapSharp, motionLive } from '../../decisions/mapSharpness';
-import { readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
+import { readBool, readChoice, readNum, readRaw, writeBool, writeRaw } from './prefs';
 import { breath, type Breath } from './pulseFx';
-
-/** Выбор игрока из хранилища: `null` — ключа нет, не выбирал. */
-const readChoice = (key: string): boolean | null => {
-  const raw = readRaw(key);
-  return raw === '1' ? true : raw === '0' ? false : null;
-};
 
 /**
  * Свечение и ореолы: мягкие диски вокруг миров, флотов и границ, широкие полосы рамки и
@@ -117,11 +111,14 @@ export function setStarfield(v: boolean): void {
  * и помнит это. Явный тумблер игрока перекрывает вердикт в обе стороны — как у свечения.
  */
 let mapSharpChoice = readChoice('void.mapSharp');
-let mapSlow = readBool('void.mapSlow', false);
+const MAP_SLOW_KEY = 'void.mapSlow';
+let mapSlow = readBool(MAP_SLOW_KEY, false);
 /** Выбор игрока; `null` — не выбирал, решают кадры. */
 export const mapSharpChosen = (): boolean | null => mapSharpChoice;
 /** Кадры однажды сказали, что устройство слабое (правило 2). */
 export const mapSlowSeen = (): boolean => mapSlow;
+/** Вердикт «слабое», каким его прочтёт следующий запуск: хранилище могло не принять запись. */
+export const mapSlowStored = (): boolean => readBool(MAP_SLOW_KEY, false);
 export const mapSharpOn = (): boolean => mapSharp(mapSharpChoice, mapSlow);
 export function setMapSharp(v: boolean): void {
   mapSharpChoice = v;
@@ -130,7 +127,7 @@ export function setMapSharp(v: boolean): void {
 /** Запомнить вердикт кадров «устройство слабое». */
 export function markMapSlow(): void {
   mapSlow = true;
-  writeBool('void.mapSlow', true);
+  writeBool(MAP_SLOW_KEY, true);
 }
 
 /** Счётчик кадров в углу. По умолчанию ВЫКЛ (dev-режим и рассинхрон включают его сами). */

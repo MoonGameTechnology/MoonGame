@@ -4308,7 +4308,7 @@ export const de: Record<string, string> = {
   'settings.gfx.motion.auto': 'Kartenhologramm für flüssigere Darstellung angehalten. Bewegung wiederherstellen: Einstellungen → Grafik',
   'settings.gfx.motion.hint': 'Pulsieren von Markierungen, Leuchten und Triebwerken; Aus friert sie ein, ohne sie zu verbergen; schwache Geräte schalten dies automatisch ab',
   'settings.gfx.render-compat': 'Rendering-Kompatibilität',
-  'settings.gfx.render-compat.hint': 'fordert Software-Rendering der Karte an; kann FPS senken; wird nach Neustart aktiv',
+  'settings.gfx.render-compat.hint': 'fordert Software-Rendering der Karte an; kann FPS senken; wird nach Neustart aktiv; schwache Geräte schalten dies automatisch ein',
   'settings.gfx.render-compat.pending': 'Änderung erfordert Neustart',
   'settings.gfx.render-report': 'Rendering-Bericht',
   'settings.gfx.render-report.hint': 'technische Daten zur Fehlersuche — Berichttext markieren und kopieren',

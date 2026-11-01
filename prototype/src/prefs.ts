@@ -70,6 +70,15 @@ export function readBool(
   return raw === '1' ? true : raw === '0' ? false : fallback;
 }
 
+/**
+ * Выбор игрока: `true`/`false`, а `null` — ключа нет, игрок не выбирал, и решает умолчание
+ * (система, вердикт кадров). Значимые значения те же, что у {@link readBool}.
+ */
+export function readChoice(key: string, store: PrefStore | null = prefStore()): boolean | null {
+  const raw = readRaw(key, store);
+  return raw === '1' ? true : raw === '0' ? false : null;
+}
+
 /** Записать переключатель в той же форме, в какой его читает {@link readBool}. */
 export function writeBool(
   key: string,

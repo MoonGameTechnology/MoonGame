@@ -3,12 +3,14 @@ import {
   JUDGE_FRAMES,
   SLOW_FRAME_MS,
   SOFT_MAP_DPR,
+  canvasCompatible,
   judgingFrames,
   mapDpr,
   mapSharp,
   motionLive,
   sharpnessMatters,
   slowFrames,
+  slowVerdictNotice,
   slowVerdictReach,
 } from './mapSharpness';
 
@@ -61,18 +63,18 @@ describe('чёткость карты — кто решает (правила 2�
   });
 
   it('кадры судят, только пока вердикту есть что поменять, его нет и сеанс ещё не решил', () => {
-    const both = { sharp: true, motion: true };
+    const both = { sharp: true, motion: true, compat: false };
     const open = { all: false, gesture: false };
     expect(judgingFrames(both, false, open)).toBe(true);
-    expect(judgingFrames({ sharp: true, motion: false }, false, open)).toBe(true);
-    expect(judgingFrames({ sharp: false, motion: true }, false, open)).toBe(true);
-    expect(judgingFrames({ sharp: false, motion: false }, false, open)).toBe(false);
+    expect(judgingFrames({ sharp: true, motion: false, compat: false }, false, open)).toBe(true);
+    expect(judgingFrames({ sharp: false, motion: true, compat: false }, false, open)).toBe(true);
+    expect(judgingFrames({ sharp: false, motion: false, compat: false }, false, open)).toBe(false);
     expect(judgingFrames(both, true, open)).toBe(false);
     expect(judgingFrames(both, false, { all: true, gesture: true })).toBe(false);
   });
 
   it('УСТРОЙСТВО, КОТОРОЕ ДЕРЖИТ КАРТУ В ПОКОЕ, ЕЩЁ СУДИТ ЩИПОК: сеанс решён, когда сказали оба суда', () => {
-    const both = { sharp: true, motion: true };
+    const both = { sharp: true, motion: true, compat: false };
     expect(judgingFrames(both, false, { all: true, gesture: false })).toBe(true);
     expect(judgingFrames(both, false, { all: false, gesture: true })).toBe(true);
     // Кадры жеста судят тем же порогом: щипок по 14 кадров в секунду — слабое.
@@ -80,11 +82,31 @@ describe('чёткость карты — кто решает (правила 2�
   });
 
   it('вердикт меняет чёткость, пока её не выбрали, и движение, пока его не выбрали', () => {
-    expect(slowVerdictReach(2, null, null, false)).toEqual({ sharp: true, motion: true });
-    expect(slowVerdictReach(2, true, null, false)).toEqual({ sharp: false, motion: true });
-    expect(slowVerdictReach(2, false, null, false)).toEqual({ sharp: false, motion: true });
-    expect(slowVerdictReach(2, null, true, false)).toEqual({ sharp: true, motion: false });
-    expect(slowVerdictReach(2, null, false, false)).toEqual({ sharp: true, motion: false });
+    expect(slowVerdictReach(2, null, null, false, null, false)).toEqual({
+      sharp: true,
+      motion: true,
+      compat: false,
+    });
+    expect(slowVerdictReach(2, true, null, false, null, false)).toEqual({
+      sharp: false,
+      motion: true,
+      compat: false,
+    });
+    expect(slowVerdictReach(2, false, null, false, null, false)).toEqual({
+      sharp: false,
+      motion: true,
+      compat: false,
+    });
+    expect(slowVerdictReach(2, null, true, false, null, false)).toEqual({
+      sharp: true,
+      motion: false,
+      compat: false,
+    });
+    expect(slowVerdictReach(2, null, false, false, null, false)).toEqual({
+      sharp: true,
+      motion: false,
+      compat: false,
+    });
   });
 });
 
@@ -101,8 +123,16 @@ describe('движение слоёв на слабом устройстве (п
   });
 
   it('система уже просит меньше движения — вердикту в движении менять нечего', () => {
-    expect(slowVerdictReach(2, null, null, true)).toEqual({ sharp: true, motion: false });
-    expect(slowVerdictReach(1, null, null, true)).toEqual({ sharp: false, motion: false });
+    expect(slowVerdictReach(2, null, null, true, null, false)).toEqual({
+      sharp: true,
+      motion: false,
+      compat: false,
+    });
+    expect(slowVerdictReach(1, null, null, true, null, false)).toEqual({
+      sharp: false,
+      motion: false,
+      compat: false,
+    });
   });
 });
 
@@ -118,10 +148,61 @@ describe('чёткость карты — плотность холста (пр�
     expect(sharpnessMatters(1)).toBe(false);
     expect(sharpnessMatters(0.75)).toBe(false);
     expect(mapDpr(0.75, false)).toBe(0.75);
-    expect(slowVerdictReach(1, null, null, false)).toEqual({ sharp: false, motion: true });
+    expect(slowVerdictReach(1, null, null, false, null, false)).toEqual({
+      sharp: false,
+      motion: true,
+      compat: false,
+    });
     expect(
-      judgingFrames(slowVerdictReach(1, null, false, false), false, { all: false, gesture: false }),
+      judgingFrames(slowVerdictReach(1, null, false, false, null, false), false, {
+        all: false,
+        gesture: false,
+      }),
     ).toBe(false);
     expect(sharpnessMatters(1.25)).toBe(true);
+  });
+});
+
+describe('совместимость отрисовки на слабом устройстве (правило 6)', () => {
+  it('без выбора игрока: слабое устройство с тумблером режима просит программную отрисовку', () => {
+    expect(canvasCompatible(null, false, true)).toBe(false);
+    expect(canvasCompatible(null, true, true)).toBe(true);
+    // Нет тумблера (ПК, iPhone) — вердикт режим не включает: выключить его игроку было бы негде.
+    expect(canvasCompatible(null, true, false)).toBe(false);
+  });
+
+  it('ВЫБОР ИГРОКА СИЛЬНЕЕ ВЕРДИКТА в обе стороны', () => {
+    expect(canvasCompatible(false, true, true)).toBe(false);
+    expect(canvasCompatible(true, false, true)).toBe(true);
+  });
+
+  it('вердикту достаётся режим, у которого есть тумблер и которого игрок не трогал', () => {
+    expect(slowVerdictReach(2, null, null, false, null, true)).toEqual({
+      sharp: true,
+      motion: true,
+      compat: true,
+    });
+    expect(slowVerdictReach(2, null, null, false, null, false).compat).toBe(false);
+    expect(slowVerdictReach(2, null, null, false, true, true).compat).toBe(false);
+    expect(slowVerdictReach(2, null, null, false, false, true).compat).toBe(false);
+  });
+
+  it('игрок выбрал чёткость и движение — кадры всё равно судят устройство ради режима', () => {
+    const open = { all: false, gesture: false };
+    const reach = slowVerdictReach(2, true, true, false, null, true);
+    expect(reach).toEqual({ sharp: false, motion: false, compat: true });
+    expect(judgingFrames(reach, false, open)).toBe(true);
+    expect(judgingFrames(reach, true, open)).toBe(false);
+    expect(judgingFrames(slowVerdictReach(2, true, true, false, null, false), false, open)).toBe(
+      false,
+    );
+  });
+
+  it('сообщение называет то, что поменялось на экране; один режим отрисовки молчит до перезапуска', () => {
+    const reach = (sharp: boolean, motion: boolean, compat: boolean) => ({ sharp, motion, compat });
+    expect(slowVerdictNotice(reach(true, true, true))).toBe('settings.gfx.slow.auto');
+    expect(slowVerdictNotice(reach(true, false, false))).toBe('settings.gfx.map-sharp.auto');
+    expect(slowVerdictNotice(reach(false, true, true))).toBe('settings.gfx.motion.auto');
+    expect(slowVerdictNotice(reach(false, false, true))).toBeNull();
   });
 });
