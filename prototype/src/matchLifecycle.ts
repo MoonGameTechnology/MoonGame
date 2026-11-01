@@ -244,11 +244,11 @@ export function installMatch(
   forgetChainRoutes(); // маршруты принадлежат карте СТАРОГО матча
   resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
-  restoreSpyArchive(); // SPY-20: донесения старой партии — не о мирах этой
   forgetRadarContacts();
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();
   forgetAway(); // reset the away-window baseline for the new match
+  restoreSpyArchive(); // SPY-20: донесения старой партии — не о мирах этой
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
