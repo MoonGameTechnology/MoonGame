@@ -274,13 +274,16 @@ describe('верфь — панель конструктора', () => {
     expect(bar).toContain('data-cnbuild');
   });
 
-  it('поставленный модуль занимает отсек, а снимается кнопкой в открытом отсеке', () => {
+  it('поставленный модуль занимает отсек, а снимается крестиком у открытой плитки', () => {
     const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     expect(worn(html)).toEqual([tData(data.modules.ion_engine!.name)]);
     expect(html).not.toContain('data-cnrm'); // открыт первый пустой отсек — оружие
     const open = loadoutPaneHtml(s, 'p1', { ...d, slot: 2 }, YARD_HULLS, view);
-    expect(open).toContain(`data-cnrm="ion_engine">${t('yard.module.take-off')}<`);
+    // Один крестик — у плитки открытого отсека; текстовой кнопки над модулями при плитках нет.
+    expect(open.match(/data-cnrm=/g)).toHaveLength(1);
+    expect(open).toMatch(/<button class="cn-tx btn-x" data-cnrm="ion_engine"[^>]*>✕<\/button>/);
+    expect(open).not.toContain('cn-rm');
   });
 
   // Радар — роль ОДНОГО корпуса. Правило живёт в данных (`allowed.units`), а верфь

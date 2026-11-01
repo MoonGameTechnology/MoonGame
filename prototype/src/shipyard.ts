@@ -331,12 +331,13 @@ export function loadoutPaneHtml(
   // Нет точек у этого арта — отсеки остаются только списком под карточкой.
   const callouts = portrait ? slotCallouts(portraitArt('u', draft.hull, data)?.key, m.slots) : null;
   const art = callouts
-    ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts, sel)}</div>`
+    ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts, sel, undefined, (sl) => `data-cnrm="${sl.moduleId}"`)}</div>`
     : portrait;
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
     `<div class="cn-hm">${slotCountText(m.slots)}</div></div></div></div>`;
-  // Строка отсека открывает его, как плитка на арте; снять модуль — кнопкой над его модулями.
+  // Строка отсека открывает его, как плитка на арте; снять модуль — крестиком у открытой
+  // плитки, а у корпуса без арта с плитками — кнопкой над модулями отсека.
   const bays = m.slots
     .map((sl, i) => {
       const on = i === sel ? ' sel' : '';
@@ -435,7 +436,7 @@ export function loadoutPaneHtml(
       : '';
     panel =
       `<div class="cn-sh"><div class="cn-ph"><span aria-hidden="true">${SLOT_ICON[bay.type] ?? '＋'}</span> ${t('yard.modules.for-slot', { s: t(SLOT_KEY[bay.type] ?? bay.type) })}</div>` +
-      (cur ? `<button class="cn-rm btn-second" data-cnrm="${cur}">${t('yard.module.take-off')}</button>` : '') +
+      (cur && !callouts ? `<button class="cn-rm btn-second" data-cnrm="${cur}">${t('yard.module.take-off')}</button>` : '') +
       `</div><div class="cn-pal">${fitting || `<div class="cn-none">${t('yard.modules.none')}</div>`}</div>${fold}${liveNote}`;
   }
   // stats: live preview of the fitted hull
@@ -571,6 +572,9 @@ export function slotLayerHtml(
   // Чем плитка сообщает о себе по клику: верфь ловит `data-cnsel`, подготовка Сектора Зеро —
   // свои `data-prep`.
   attr: (i: number, sl: LoadoutModel['slots'][number]) => string = (i) => `data-cnsel="${i}"`,
+  // Крестик «снять» в углу открытой занятой плитки (заказ владельца 2026-11-01): атрибуты,
+  // по которым хозяин ловит клик. Не задан — крестика нет.
+  remove?: (sl: LoadoutModel['slots'][number]) => string,
 ): string {
   // Плитка не вылезает за картинку: центр не ближе половины плитки к краю.
   const at = ([x, y]: readonly [number, number]): string =>
@@ -597,9 +601,16 @@ export function slotLayerHtml(
         const grade = [t(`rarity.${rar}`), ...(star > 0 ? [t('shipcard.stars', { n: star })] : [])].join(', ');
         const label = `${kind}: ${tData(sl.moduleName ?? sl.moduleId)} (${grade})`;
         const badge = star > 0 ? `<span class="cn-tst" aria-hidden="true">★${star}</span>` : '';
+        // Крестик — соседний узел, а не часть плитки: кнопка внутри кнопки недопустима.
+        const off = `${t('yard.module.take-off')}: ${tData(sl.moduleName ?? sl.moduleId)}`;
+        const x =
+          on && remove
+            ? `<button class="cn-tx btn-x" ${remove(sl)} style="${at(c.t)}" aria-label="${esc(off)}" title="${esc(off)}">✕</button>`
+            : '';
         return (
           `<span class="cn-dot full" style="${dot}"></span>` +
-          `<button class="cn-tile filled${on ? ' sel' : ''}${mark}" ${attr(i, sl)}${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}${bought}</button>`
+          `<button class="cn-tile filled${on ? ' sel' : ''}${mark}" ${attr(i, sl)}${pressed} style="${at(c.t)};--rar:var(--rar-${rar})" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}${badge}${bought}</button>` +
+          x
         );
       }
       const label = `${kind}: ${t('yard.slot.empty')}`;
