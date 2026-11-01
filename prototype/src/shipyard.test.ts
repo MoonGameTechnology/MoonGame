@@ -600,10 +600,10 @@ describe('верфь — окно', () => {
   it('полоса очереди — чистая разметка: пустой мир ничего не рисует', () => {
     const s = rich();
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
-    expect(yardQueueHtml(s, home, '#0ff')).toBe('');
-    expect(yardQueueHtml(s, '', '#0ff')).toBe('');
+    expect(yardQueueHtml(s, home, 'cruiser', '#0ff')).toBe('');
+    expect(yardQueueHtml(s, '', 'cruiser', '#0ff')).toBe('');
     const after = applyOrder(s, buildShip('p1', home, 'cruiser', 3, []), s.time).state;
-    const html = yardQueueHtml(after, home, '#0ff');
+    const html = yardQueueHtml(after, home, 'cruiser', '#0ff');
     expect(html).toContain(t('yard.queue.title', { w: worldName(after, home) }));
     expect(html).toContain(fmtEta(data.units.cruiser!.buildTimeHours));
   });
@@ -956,10 +956,10 @@ describe('производство — корпус без отсеков и о�
   it('очередь мира: свободно — null; идёт стройка и ждёт заказ — двое впереди и срок идущей', () => {
     let s = rich();
     const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
-    expect(unitLaneAhead(s, home)).toBeNull();
+    expect(unitLaneAhead(s, home, 'cruiser')).toBeNull();
     s = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
     s = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
-    const ahead = unitLaneAhead(s, home)!;
+    const ahead = unitLaneAhead(s, home, 'cruiser')!;
     expect(ahead.count).toBe(2);
     expect(ahead.nextInHours).toBeCloseTo(
       (s.scheduled.find((e) => e.type === 'construction.complete')!.at - s.time) / HOUR,
@@ -972,7 +972,7 @@ describe('производство — корпус без отсеков и о�
     const s = rich();
     const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
     s.planets[home]!.buildQueue = [{ id: 99, kind: 'unit', playerId: 'p1', unit: 'cruiser', count: 1 }];
-    expect(unitLaneAhead(s, home)).toEqual({ count: 1, nextInHours: 0 });
+    expect(unitLaneAhead(s, home, 'cruiser')).toEqual({ count: 1, nextInHours: 0 });
     const bar = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
     expect(bar).toContain(t('yard.queue.waiting', { n: 1 }));
   });
@@ -981,7 +981,16 @@ describe('производство — корпус без отсеков и о�
     const s = rich();
     const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
     s.planets[home]!.buildQueue = [{ id: 98, kind: 'building', playerId: 'p1', building: 'barracks' }];
-    expect(unitLaneAhead(s, home)).toBeNull();
+    expect(unitLaneAhead(s, home, 'cruiser')).toBeNull();
+  });
+
+  it('пехота в очереди не впереди крейсера: у казарм своя полоса (BLD-2.1)', () => {
+    const s = rich();
+    const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
+    const trooper = Object.keys(data.units).find((u) => data.units[u]!.domain === 'ground')!;
+    s.planets[home]!.buildQueue = [{ id: 97, kind: 'unit', playerId: 'p1', unit: trooper, count: 1 }];
+    expect(unitLaneAhead(s, home, 'cruiser')).toBeNull();
+    expect(unitLaneAhead(s, home, trooper)).toEqual({ count: 1, nextInHours: 0 });
   });
 });
 

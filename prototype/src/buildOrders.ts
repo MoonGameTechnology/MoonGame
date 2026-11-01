@@ -22,13 +22,9 @@
 import type { Action, GameData, GameState } from '../../packages/shared-core/src/index';
 import { matchCost, matchUnitCost } from '../../packages/shared-core/src/index';
 import { buildBuilding, buildUnit, upgradeBuilding } from './game';
-import type { BuildKind, BuildLane, QueuedBuild } from './buildQueue';
+import type { QueuedBuild } from './buildQueue';
 import { landerCost } from '../../decisions/landerTroops';
 
-/** Полоса очереди, в которую попадает заказ: юниты отдельно, здания и апгрейды вместе. */
-export function laneOf(kind: BuildKind): BuildLane {
-  return kind === 'unit' ? 'units' : 'buildings';
-}
 
 
 /** Хватает ли казны на мешок цен. Пустой мешок — хватает (платить нечего). */

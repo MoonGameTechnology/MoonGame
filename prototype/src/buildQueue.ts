@@ -1,8 +1,8 @@
 /**
  * The client-side build-queue vocabulary (REFM-4).
  *
- * These types describe how the PROTOTYPE talks about construction orders: the two
- * lanes a world builds in parallel (buildings / units), the queued orders waiting
+ * These types describe how the PROTOTYPE talks about construction orders: the
+ * lanes a world builds in parallel (buildings / one per production building), the queued orders waiting
  * behind the active one, and the shape `main.ts` reads back off a scheduled
  * `construction.complete` event. They lived inside `main.ts` until the dossier
  * module needed the same words; a shared home keeps one truth instead of two
@@ -11,8 +11,9 @@
  * Types only — the queue itself (`buildQueues`) stays the host's live state.
  */
 
-/** A world builds in two parallel lanes; each has its own active order + queue. */
-export type BuildLane = 'buildings' | 'units';
+/** A world builds in parallel lanes — buildings, plus one per production building
+ *  (BLD-2.1); each has its own active order + queue. The vocabulary is the core's. */
+export type { BuildLane } from '../../packages/shared-core/src/index';
 
 /** What an order does: raise a new building, level an existing one, or train units. */
 export type BuildKind = 'building' | 'upgrade' | 'unit';

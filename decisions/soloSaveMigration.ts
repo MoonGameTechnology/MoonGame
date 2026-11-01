@@ -175,6 +175,18 @@ export const RESEARCH_QUEUE_SOLO_MIGRATION = {
   toDataHash: SLOW_AVIATION_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: construction 1.8.0 gives every production building its own queue
+ *  (BLD-2.1). A saved world keeps its shape: its one shared unit queue is split by the
+ *  unit's building the next time one of those queues wakes, so it reads as is. */
+export const PRODUCTION_LANES_SOLO_MIGRATION = {
+  fromRules: RESEARCH_QUEUE_SOLO_MIGRATION.toRules,
+  fromData: RESEARCH_QUEUE_SOLO_MIGRATION.toData,
+  fromDataHash: RESEARCH_QUEUE_SOLO_MIGRATION.toDataHash,
+  toRules: '1b7b37eb225c28',
+  toData: RESEARCH_QUEUE_SOLO_MIGRATION.toData,
+  toDataHash: RESEARCH_QUEUE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -192,6 +204,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   LANDING_CANCEL_SOLO_MIGRATION,
   SLOW_AVIATION_SOLO_MIGRATION,
   RESEARCH_QUEUE_SOLO_MIGRATION,
+  PRODUCTION_LANES_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

@@ -24,6 +24,7 @@ import type {
 import {
   buildingLevel,
   capitalOf,
+  orderLane,
   forkSiteId,
   hasShipyard,
   isForkSite,
@@ -45,8 +46,8 @@ import { intelLayers } from '../../decisions/intelLayers';
 import { knownBureau, oddsPct, spyOdds } from '../../decisions/spyOdds';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
-import { laneOf } from './buildOrders';
 import type { BuildLane } from './buildQueue';
+import { shownProductionLanes } from '../../decisions/productionLanes';
 import type { UnitCatalogTab } from './buildScreen';
 import { bombardFall } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
@@ -335,6 +336,29 @@ export function unitRows(stacks: Array<UnitStack>): string {
 function pausedLabel(site: PausedConstructionSite): string {
   return constructionLabel(site);
 }
+/** Заголовок конвейера полосы юнитов: очередь названа по тому, что в ней строится. */
+const LANE_TITLE: Record<Exclude<BuildLane, 'buildings'>, string> = {
+  ships: 'side.conveyor.lane.ships',
+  shuttles: 'side.conveyor.lane.shuttles',
+  infantry: 'side.conveyor.lane.infantry',
+  vehicles: 'side.conveyor.lane.vehicles',
+};
+
+/** Конвейеры полос вкладки — те, что мир может вести или уже ведёт
+ *  (`decisions/productionLanes.ts`), каждый под своим заголовком. */
+function laneConveyors(
+  planetId: string,
+  lanes: ReadonlyArray<Exclude<BuildLane, 'buildings'>>,
+): string {
+  return shownProductionLanes(game.world(), planetId, lanes, data)
+    .map(
+      (l) =>
+        `<div class="sec">${t(LANE_TITLE[l as keyof typeof LANE_TITLE])}</div>` +
+        conveyorHtml(planetId, l),
+    )
+    .join('');
+}
+
 function conveyorHtml(planetId: string, lane: BuildLane): string {
   const s = game.world();
   // Разметку собирает `conveyorView.ts` (REFM-36) — там же правило «живые числа не
@@ -356,7 +380,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
         : null,
       queued: queued.map((q) => ({ label: esc(constructionLabel(q)), id: q.id })),
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
-        .filter((p) => laneOf(p.kind) === lane)
+        .filter((p) => orderLane(data, p) === lane)
         .map((p) => ({ id: p.id, label: esc(pausedLabel(p)), progress: p.progress })),
       // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
       // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
@@ -423,7 +447,9 @@ export function unknownPlanetHtml(p: Planet): string {
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
         ? `<div class="row">${spyOddsHtml(p.id, mem.owner)}${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
-          HOSTILE_OPS.map((op) => btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op))).join('') +
+          HOSTILE_OPS.map((op) =>
+            btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op)),
+          ).join('') +
           `</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
@@ -432,7 +458,7 @@ export function unknownPlanetHtml(p: Planet): string {
       cardHeader(ownerColor(mem.owner), placeName(p.id), t('side.scan.title')) +
       `<div class="pscan">` +
       `<div class="row dim">${t('side.scan.stale')}</div>` +
-      `<div class="row">${t('side.scan.owner')}: <b>${esc(mem.owner ? NAME[mem.owner] ?? mem.owner : t('side.neutral'))}</b></div>` +
+      `<div class="row">${t('side.scan.owner')}: <b>${esc(mem.owner ? (NAME[mem.owner] ?? mem.owner) : t('side.neutral'))}</b></div>` +
       `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
       `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
       spyRow +
@@ -474,7 +500,12 @@ function worldFactHtml(f: WorldFact): string {
       // Знак и время на фишке, имя постройки — в подсказке: шапка узкая, а на телефоне
       // фишка делит строку с действиями мира.
       const left = countdownHMS(f.leftMs);
-      const tip = esc(t('side.world.bombard-fall', { b: buildingName(data.buildings[f.building]?.name, f.building), t: left }));
+      const tip = esc(
+        t('side.world.bombard-fall', {
+          b: buildingName(data.buildings[f.building]?.name, f.building),
+          t: left,
+        }),
+      );
       return `<span class="pfact bad" title="${tip}" aria-label="${tip}">⊗ ${left}</span>`;
     }
     case 'type': {
@@ -565,14 +596,25 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     }
     if (spy !== 'none') out.push(spyOddsHtml(p.id, p.owner!));
     if (spy !== 'none')
-      for (const op of HOSTILE_OPS) out.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
+      for (const op of HOSTILE_OPS)
+        out.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
     // SPY-15: the owner sees its own world's economy sabotaged and for how long.
     if (mine && (p.disruptedUntil ?? 0) > s.time)
-      out.push(`<span class="pfact">${t('side.world.disrupted', { left: fmtEta(windowLeftH(p.disruptedUntil!, s.time, HOUR)) })}</span>`);
+      out.push(
+        `<span class="pfact">${t('side.world.disrupted', { left: fmtEta(windowLeftH(p.disruptedUntil!, s.time, HOUR)) })}</span>`,
+      );
     // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
     const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
     if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
-    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
+    else if (p.owner)
+      out.push(
+        btn(
+          'spyplanet',
+          'counter',
+          t('side.scan.counter', { c: SPY_COST.counter }),
+          ready('counter'),
+        ),
+      );
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }
@@ -619,9 +661,17 @@ function intelRowsHtml(grant: IntelGrant): string[] {
   const NAME = game.names();
   const list = (items: string[]) => (items.length ? items.join(', ') : t('side.world.intel.none'));
   const row = (text: string) => `<span class="pfact">${text}</span>`;
-  const rows: string[] = [`<span class="pfact cyan">${t('side.world.spy-layer', { n: v.layer })}</span>`];
+  const rows: string[] = [
+    `<span class="pfact cyan">${t('side.world.spy-layer', { n: v.layer })}</span>`,
+  ];
   if (v.treasury)
-    rows.push(row(t('side.world.intel.treasury', { list: resLine(Object.fromEntries(v.treasury)) || t('side.world.intel.none') })));
+    rows.push(
+      row(
+        t('side.world.intel.treasury', {
+          list: resLine(Object.fromEntries(v.treasury)) || t('side.world.intel.none'),
+        }),
+      ),
+    );
   if (v.building) {
     const names = v.building.map((id) =>
       esc(data.buildings[id] ? buildingName(data.buildings[id]!.name, id) : displayUnit(id)),
@@ -634,7 +684,8 @@ function intelRowsHtml(grant: IntelGrant): string[] {
   }
   if (v.offers) {
     const names = v.offers.map(
-      (o) => `${esc(NAME[o.from] ?? o.from)} → ${esc(NAME[o.to] ?? o.to)}: ${t(STANCE_KEY[o.stance])}`,
+      (o) =>
+        `${esc(NAME[o.from] ?? o.from)} → ${esc(NAME[o.to] ?? o.to)}: ${t(STANCE_KEY[o.stance])}`,
     );
     rows.push(row(t('side.world.intel.offers', { list: list(names) })));
   }
@@ -741,14 +792,9 @@ export function planetPanelHtml(p: Planet): string {
         game.garrisonTiles(p.owner, ground),
     );
     if (mine) {
-      // Очередь юнитов у мира ОДНА на три вкладки (полоса `units`): прежде она звалась
-      // «наземным конвейером», «конвейером кораблей» и «конвейером шаттлов», и корабль в
-      // очереди стоял во «наземном». Имя теперь одно — какая есть очередь, такая и названа.
-      cols.push(
-        `<div class="sec">${t('side.units.conveyor')}</div>` +
-          conveyorHtml(p.id, 'units') +
-          unitCatalogButton('ground'),
-      );
+      // У каждой производственной постройки своя очередь (BLD-2.1): на земле это казармы
+      // и завод, и у каждой — свой конвейер под своим именем.
+      cols.push(laneConveyors(p.id, ['infantry', 'vehicles']) + unitCatalogButton('ground'));
     }
     if (!pcUi()) {
       cols.push(`<div class="hint">${t('dossier.tab.ground.desc')}</div>`);
@@ -778,11 +824,7 @@ export function planetPanelHtml(p: Planet): string {
     const rally = rallyOffer(mine, hasShipyard(p, data), rallyPointOf(s, ME, p.id) !== null);
     if (rally !== 'none') cols.push(rallySectionHtml(p.id, rally));
     if (mine) {
-      cols.push(
-        `<div class="sec">${t('side.units.conveyor')}</div>` +
-          conveyorHtml(p.id, 'units') +
-          unitCatalogButton('ships'),
-      );
+      cols.push(laneConveyors(p.id, ['ships']) + unitCatalogButton('ships'));
     }
     if (!pcUi()) {
       // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships') — TXT-3 свёл
@@ -823,11 +865,7 @@ export function planetPanelHtml(p: Planet): string {
       );
     }
     if (mine) {
-      cols.push(
-        `<div class="sec">${t('side.units.conveyor')}</div>` +
-          conveyorHtml(p.id, 'units') +
-          unitCatalogButton('shuttle'),
-      );
+      cols.push(laneConveyors(p.id, ['shuttles']) + unitCatalogButton('shuttle'));
     }
     if (!pcUi()) {
       // PC carries this in the ЭСКАДРА tab's hover dossier ('tab:shuttle').

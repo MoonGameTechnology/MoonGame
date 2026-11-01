@@ -325,6 +325,14 @@ export {
   squadronFerryRange,
   type SortieState,
 } from './state/shuttle';
+export {
+  BUILD_LANES,
+  UNIT_LANES,
+  isBuildLane,
+  orderLane,
+  unitLane,
+  type BuildLane,
+} from './state/buildLane';
 export { chaseRadius, chaseStep, type ChasePoint, type ChaseStep } from './state/chase';
 // SHU-6.2: по кому бьёт тик патруля — ближайший контакт в круге, правило перехвата.
 export { patrolTarget, type PatrolContact, type PatrolPoint } from './state/patrol';

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { GameData, GameState } from '../../packages/shared-core/src/index';
 import type { QueuedBuild } from './buildQueue';
-import { afford, laneOf, queuedAction, queuedCost } from './buildOrders';
+import { afford, queuedAction, queuedCost } from './buildOrders';
 
 const data = {
   units: {
@@ -24,14 +24,6 @@ const worldWith = (level: number): GameState =>
 
 const q = (over: Partial<QueuedBuild> = {}): QueuedBuild =>
   ({ kind: 'building', id: 'mine', count: 1, ...over }) as QueuedBuild;
-
-describe('очередь — полосы', () => {
-  it('юниты идут своей полосой, здания и апгрейды — общей', () => {
-    expect(laneOf('unit')).toBe('units');
-    expect(laneOf('building')).toBe('buildings');
-    expect(laneOf('upgrade')).toBe('buildings');
-  });
-});
 
 describe('очередь — хватает ли казны', () => {
   const res = { credits: 100, alloy: 10 };
