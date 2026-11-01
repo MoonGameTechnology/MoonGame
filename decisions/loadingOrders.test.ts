@@ -18,7 +18,21 @@ describe('loadingOrders — приказ флоту с идущей погруз
       ],
       0,
     );
-    expect(r).toEqual({ busy: ['a', 'c'], free: ['b'], minutesLeft: 31 });
+    expect(r).toEqual({ busy: ['a', 'c'], free: ['b'], minutesLeft: 31, landing: false });
+  });
+
+  it('высадка штурмом — тоже заявка: окно спросит и скажет о высадке (правило 7)', () => {
+    expect(isLoadingBusy({ id: 'a', assaultLanding: { doneAt: 5 } })).toBe(true);
+    const r = splitByLoading(
+      [
+        { id: 'a', loading: [{ doneAt: 10 * 60_000 }] },
+        { id: 'b', assaultLanding: { doneAt: 90 * 60_000 } },
+        { id: 'c' },
+      ],
+      0,
+    );
+    expect(r).toEqual({ busy: ['a', 'b'], free: ['c'], minutesLeft: 90, landing: true });
+    expect(splitByLoading([{ id: 'a', loading: [{ doneAt: 5 }] }], 0).landing).toBe(false);
   });
 
   it('окно не обещает «0 мин», пока заявка не снята', () => {

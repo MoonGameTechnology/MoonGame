@@ -40,7 +40,13 @@ import { fleetCallsign } from './fleetName';
 import { displayUnit, esc, fmtEta, fmtHrs } from './format';
 import { MAX_CHAIN_STEPS, RETREAT_THRESHOLDS, canOrder, data, stopFleet } from './game';
 import { pcUi } from './graphicsPrefs';
-import { autoRetreatAt, isAutoAssault, troopsInputFor } from './groupOrders';
+import {
+  assaultHereTarget,
+  autoRetreatAt,
+  bombardFleetsFor,
+  isAutoAssault,
+  troopsInputFor,
+} from './groupOrders';
 import { heroAboard } from './heroCasts';
 import { commandIcon } from './holographicIcons';
 import { commandWindowHtml } from './holographicUi';
@@ -368,6 +374,12 @@ export function renderCmdBar(): void {
   // останавливать, нет флагмана, нет артиллерии), гашением — то, что есть, но сейчас
   // не складывается. Кнопка набора видна и при свёрнутом ☰, пока набор включён:
   // иначе из режима нечем выйти.
+  // Удар по миру под выбором (правило 3г `cmdPresence`): штурм с места и бомбардировка —
+  // по ответу ядра, без серых кнопок. Штурм с места снимает и серость прицельной кнопки:
+  // цель у неё уже есть — мир под флотом.
+  const hereTarget = assaultHereTarget(ids);
+  const bombardOn = bombardFleetsFor(ids, false).length > 0;
+  const bombardReady = !bombardOn && bombardFleetsFor(ids, true).length > 0;
   const shown = cmdShown({
     stoppable: anyStoppable,
     castHero: !!castHero,
@@ -375,6 +387,9 @@ export function renderCmdBar(): void {
     // штурмовать некем, и кнопки не бывает вовсе. Пригодность ЦЕЛИ её по-прежнему гасит.
     troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? []))),
     assaultArmed: assaultAim,
+    assaultHere: hereTarget !== null,
+    bombardReady,
+    bombarding: bombardOn,
     // «Слить» и «Десант» — по составу (правило 3б): нет напарника или некого грузить —
     // нет и кнопки.
     mergeable: mergeOk,
@@ -403,9 +418,21 @@ export function renderCmdBar(): void {
           'attack',
           '⚔',
           t('cmd.assault'),
-          assaultAim ? 'on' : '',
-          !canAssault,
-          t('cmd.assault.hint'),
+          // `ctx` — приказ по месту, где флот стоит: телефон не прячет его под «Ещё».
+          [assaultAim ? 'on' : '', hereTarget !== null ? 'ctx' : ''].filter(Boolean).join(' '),
+          !canAssault && hereTarget === null,
+          hereTarget !== null && !assaultAim ? t('cmd.assault.here.hint') : t('cmd.assault.hint'),
+        )
+      : '') +
+    // Переключатель: горит, пока бомбардирует; нажатие при горящем её прекращает.
+    (shown.bombard
+      ? cmdBtn(
+          'bombard',
+          '⊗',
+          t('cmd.bombard'),
+          bombardOn ? 'on ctx' : 'ctx',
+          false,
+          bombardOn ? t('cmd.bombard.stop.hint') : t('cmd.bombard.hint'),
         )
       : '') +
     cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
@@ -479,7 +506,7 @@ export function renderCmdBar(): void {
         // RETR-2: авто-отход — соседний стоячий приказ, и живёт он там же.
         cmdBtn(
           'qretr',
-          '⮐',
+          '⤺',
           t('cmd.auto-retreat'),
           allOn(ids, (id) => autoRetreatAt(id) !== null) ? 'on' : '',
           ids.length === 0,

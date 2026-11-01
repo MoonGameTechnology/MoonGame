@@ -150,7 +150,10 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   const answering = beaconSentinels(state, npc); // дозорный на маяке не уходит
   for (const id of [...net.held, ...muster.held, ...counter.held]) answering.add(id);
   const musterMoves = muster.moves.filter((m) => !counter.held.has(m.fleetId));
+  // Флот, который высаживает десант, курса не получает: вылет отменил бы его высадку.
+  const landing = (fleetId: string): boolean => !!state.fleets[fleetId]?.assaultLanding;
   for (const move of [...musterMoves, ...net.moves, ...counter.moves]) {
+    if (landing(move.fleetId)) continue;
     out.push({
       id: `${opts.session}:${npc}:${seq++}`,
       type: 'fleet.move',
@@ -180,6 +183,7 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   }
   for (const call of beaconCallouts(state, npc, new Set([...net.held, ...counter.held]))) {
     answering.add(call.fleetId);
+    if (landing(call.fleetId)) continue;
     out.push({
       id: `${opts.session}:${npc}:${seq++}`,
       type: 'fleet.move',
@@ -193,8 +197,10 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
     if (answering.has(fleet.id)) continue;
     // Busy fleets are left alone: one already under way is committed to its leg, and
     // one locked in a battle cannot take a move order anyway (the reducer would reject
-    // it — better not to spend an action id on a certain refusal).
-    if (fleet.location == null || fleet.movement || fleet.battleId) continue;
+    // it — better not to spend an action id on a certain refusal). One landing troops is
+    // busy too: a course would call its landing off (departure cancels it).
+    if (fleet.location == null || fleet.movement || fleet.battleId || fleet.assaultLanding)
+      continue;
     const here = state.planets[fleet.location];
     if (!here) continue;
     const target =

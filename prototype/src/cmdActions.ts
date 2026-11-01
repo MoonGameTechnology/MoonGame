@@ -37,6 +37,7 @@ import {
   MAX_CHAIN_STEPS,
   RETREAT_THRESHOLDS,
   assaultFleet,
+  bombardFleet,
   canOrder,
   capitalOf,
   castHeroAbility,
@@ -52,6 +53,8 @@ import {
 } from './game';
 import { pcUi } from './graphicsPrefs';
 import {
+  assaultHereTarget,
+  bombardFleetsFor,
   isAutoAssault,
   mergeGroup,
   orderMerge,
@@ -278,7 +281,12 @@ export function onCommandClick(ev: MouseEvent): void {
     for (const id of ids)
       if (canOrder(game.world(), stopFleet(ME, id)) === null) playerOrder(stopFleet(ME, id));
   } else if (cmd === 'attack') {
-    if (pcUi() || MOBILE) {
+    // Правило 3г `cmdPresence`: выбор стоит над миром, который можно взять прямо сейчас, —
+    // ШТУРМ берёт его сразу, без прицела, как прежняя кнопка раздела «Удар». Взведённый
+    // прицел та же кнопка по-прежнему снимает.
+    const here = assaultAim ? null : assaultHereTarget(ids);
+    if (here) tryAssaultGroup(ids, here);
+    else if (pcUi() || MOBILE) {
       // PC: ШТУРМ aims like «Курс» — the next click on someone else's world sends
       // the fleet there and it storms on arrival (valid targets ring up on the map).
       toggle('assaultAim');
@@ -287,6 +295,11 @@ export function onCommandClick(ev: MouseEvent): void {
       for (const id of ids)
         if (game.world().fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
     }
+  } else if (cmd === 'bombard') {
+    // Переключатель: кто бомбардирует — прекращает, иначе начинают все, кому ядро разрешит.
+    const stop = bombardFleetsFor(ids, false);
+    const ids2 = stop.length ? stop : bombardFleetsFor(ids, true);
+    for (const id of ids2) playerOrder(bombardFleet(ME, id, stop.length === 0));
   } else if (cmd === 'split') {
     const id = ids[0];
     if (id) {

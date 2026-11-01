@@ -468,7 +468,7 @@ describe('свой флот', () => {
     expect(card('F3')).toContain('25');
   });
 
-  it('у своего мира — сводка десанта без кнопок, удара нет', async () => {
+  it('у своего мира — сводка десанта без кнопок, прогноза штурма нет', async () => {
     const { card, put } = await boot();
     put(
       fleet('F3', 'p1', 'A', [{ unit: 'cruiser', count: 1 }], {
@@ -478,10 +478,12 @@ describe('свой флот', () => {
     const html = card('F3');
     expect(html).toContain(t('side.ground.title'));
     expect(html).toContain('3 ▸ 2');
-    expect(html).not.toContain(t('side.strike.title'));
+    expect(html).not.toContain(t('side.strike.forecast.hint'));
   });
 
-  it('у чужого мира — удар: бомбардировка, штурм и прогноз', async () => {
+  // Заказ владельца 2026-11-01: бомбардировка и штурм — в ряду приказов (правило 3г
+  // `cmdPresence`), а не отдельным разделом листа. Лист оставляет себе только прогноз.
+  it('у чужого мира — прогноз штурма, но кнопок удара в листе нет', async () => {
     const { card, put } = await boot({ types: { N: { capturable: true, orbit: true } } });
     put(
       fleet('F3', 'p1', 'N', [{ unit: 'cruiser', count: 3 }], {
@@ -490,10 +492,9 @@ describe('свой флот', () => {
       } as Partial<Fleet>),
     );
     const html = card('F3');
-    expect(html).toContain(t('side.strike.title'));
-    expect(html).toContain(`${act('bombard')} data-arg="on"`);
-    expect(html).toContain(act('assault'));
     expect(html).toContain(t('side.strike.forecast.hint'));
+    expect(html).not.toContain(act('bombard'));
+    expect(html).not.toContain(act('assault'));
     expect(html).not.toContain(t('side.ground.title'));
   });
 
@@ -563,7 +564,7 @@ describe('консоль ПК', () => {
     );
     const html = card('F3');
     expect(html).toContain('<section class="fc-land">');
-    expect(html).toContain(t('side.strike.title'));
+    expect(html).toContain(t('side.strike.forecast.hint'));
   });
 
   it('кнопка погрузки — когда игра предлагает выбор войск', async () => {
@@ -639,13 +640,14 @@ describe('плитки и надбавки', () => {
     expect(m.shownFire(10, { fire: { factor: 1.26 } } as never)).toBe(13);
   });
 
-  it('колонка «Десант» видна при ударе по миру, который можно взять', async () => {
+  // Удар переехал в «Приказы» (правило 3г `cmdPresence`): ради него пустой трюм колонку
+  // больше не держит — в ней не осталось бы ничего, кроме «0 / N».
+  it('колонку «Десант» удар по миру больше не держит: пустой трюм — колонки нет', async () => {
     const { env, m, put } = await boot();
     expect(m.fleetLandShown(env.s.fleets.F1!)).toBe(false);
     put(fleet('F3', 'p1', 'N', [{ unit: 'cruiser', count: 1 }]));
-    expect(m.fleetLandShown(env.s.fleets.F3!)).toBe(false);
     env.types.N = { capturable: true } as SectorType;
-    expect(m.fleetLandShown(env.s.fleets.F3!)).toBe(true);
+    expect(m.fleetLandShown(env.s.fleets.F3!)).toBe(false);
   });
 });
 

@@ -226,7 +226,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
             step(
               stage,
               `${id}-bombard`,
-              '[data-act="bombard"][data-arg="on"]',
+              '[data-cmd="bombard"]:not(.on)',
               state(() => {
                 return !!f('hero')?.bombarding || has(planet);
               }),
@@ -246,7 +246,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
             step(
               stage,
               `${id}-bombard-stop`,
-              '[data-act="bombard"][data-arg="off"]',
+              '[data-cmd="bombard"].on',
               state(() => !f('hero')?.bombarding),
               { copy: 'training.guide.assault.bombard-stop' },
             ),
@@ -259,7 +259,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       step(
         stage,
         `${id}-land`,
-        '[data-act="assault"]',
+        '[data-cmd="attack"]',
         state(() => has(planet) || ui.intent(`assault:${planet}`)),
         { copy: 'training.guide.assault.land' },
       ),

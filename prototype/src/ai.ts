@@ -546,6 +546,31 @@ export function aiOrders(
   posture: StewardPosture | 'expand' = 'expand',
   profile: AiProfile = 'weak',
 ): Action[] {
+  return keepLandings(full, decideOrders(full, ai, posture, profile));
+}
+
+/**
+ * Курс флоту, который высаживает десант, бот не даёт. Вылет отменяет высадку (заказ
+ * владельца 2026-11-01: «так же, как с погрузкой»), а «свободный» флот многие правила бота
+ * узнают только по `movement`/`battleId`: стоящий над миром высаживающийся флот для них
+ * свободен, и первый же такой приказ отменил бы штурм, который бот сам начал. Раньше ядро
+ * отбивало этот курс, теперь он прошёл бы — поэтому фильтр стоит здесь, одним местом на все
+ * ветки бота, а не в каждом правиле.
+ */
+function keepLandings(state: GameState, orders: Action[]): Action[] {
+  return orders.filter((a) => {
+    if (a.type !== 'fleet.move') return true;
+    const id = (a.payload as { fleetId?: unknown } | undefined)?.fleetId;
+    return typeof id !== 'string' || !state.fleets[id]?.assaultLanding;
+  });
+}
+
+function decideOrders(
+  full: GameState,
+  ai: string,
+  posture: StewardPosture | 'expand',
+  profile: AiProfile,
+): Action[] {
   const state = provincesOnly(full);
   if (state.players[ai]?.npc === 'neutral') return allySeatOrders(state, ai, posture, profile);
   if (isPirateClan(state, ai) && !state.pve)

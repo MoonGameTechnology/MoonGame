@@ -31,6 +31,7 @@ describe('RECAP-FOG — чужая экономика в мою сводку н�
       'fleet.launched',
       'assault.landing',
       'assault.interrupted',
+      'assault.cancelled',
     ]) {
       expect(recapAdmits(type, FOE, ME, true), type).toBe(true);
       expect(recapAdmits(type, FOE, ME, false), type).toBe(false);

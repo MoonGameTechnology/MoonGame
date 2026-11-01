@@ -138,6 +138,18 @@ export const SPY_TURN_SOLO_MIGRATION = {
   toDataHash: '0388c4d23f1e3f',
 } as const;
 
+/** Rules-only pair: combat 3.9.0 / movement 1.7.0 / fleet-ops 1.14.0 let a fleet mid-landing
+ *  take a course, which cancels the landing with its troops still aboard (CMD-VIS-4). The
+ *  catalogue is unchanged and a saved landing keeps its shape, so a saved world reads as is. */
+export const LANDING_CANCEL_SOLO_MIGRATION = {
+  fromRules: SPY_TURN_SOLO_MIGRATION.toRules,
+  fromData: SPY_TURN_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_TURN_SOLO_MIGRATION.toDataHash,
+  toRules: '0b1362eaffe70f',
+  toData: SPY_TURN_SOLO_MIGRATION.toData,
+  toDataHash: SPY_TURN_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -152,6 +164,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_EXPOSED_SOLO_MIGRATION,
   SPY_CREW_SOLO_MIGRATION,
   SPY_TURN_SOLO_MIGRATION,
+  LANDING_CANCEL_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

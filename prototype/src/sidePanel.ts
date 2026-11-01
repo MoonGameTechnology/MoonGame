@@ -66,8 +66,6 @@ import { fleetAnchor } from './fleetGeometry';
 import { fleetCallsign } from './fleetName';
 import { displayUnit, esc, fmtEta, hl } from './format';
 import {
-  assaultFleet,
-  bombardFleet,
   cancelConstruction,
   data,
   deployStation,
@@ -811,10 +809,6 @@ function onSideClick(ev: MouseEvent): void {
     }
   } else if (act === 'ping') {
     game.pings()?.openMenu();
-  } else if (act === 'bombard') {
-    playerOrder(bombardFleet(ME, selFleet!, arg === 'on'));
-  } else if (act === 'assault') {
-    playerOrder(assaultFleet(ME, selFleet!));
   } else if (act === 'openbattle') {
     if (arg) game.battleWindow().open(arg);
   } else if (act === 'retreat') {

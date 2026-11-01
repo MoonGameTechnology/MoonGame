@@ -34,7 +34,6 @@ import {
   type UnitStack,
 } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
-import { isReconFleet } from '../../packages/shared-core/src/state/recon';
 import { isMissileFleet, isRocketMineFleet } from '../../packages/shared-core/src/state/ordnance';
 import { t, tData } from '../../localization/runtime';
 import { aloftCard, type AloftCard } from '../../decisions/aloftCard';
@@ -62,8 +61,6 @@ import { veteranMark } from '../../decisions/veteranMark';
 import { showsStarving } from './arrearsWarnings';
 import { marchFlagged } from './chainComposer';
 import {
-  assaultEnabled,
-  bombardEnabled,
   docked as fleetDocked,
   forecastShown,
   groundSummaryShown,
@@ -470,7 +467,6 @@ export function fleetPanelHtml(f: Fleet): string {
   if (consoleFleet() === f) return fleetConsoleHtml(f);
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
-  const inOrbit = f.orbit === 'near';
   // Пулы, залп и ход считает `fleetSummary.ts` — та же арифметика, что в сводке
   // армии (REFM-37/40): корпус и щит по ЭФФЕКТИВНОМУ hp (фитинг учтён), корабли и
   // десант вместе, остаток зажат по максимуму. Порог хромоты `LIMP_PCT` — то же
@@ -583,8 +579,8 @@ export function fleetPanelHtml(f: Fleet): string {
   if (f.battleId) h += fleetBattleRowHtml(f.battleId);
   if (docked) {
     const cols: string[] = [];
-    const strike = fleetStrikeHtml(f, here!, inOrbit, nShips);
-    if (strike) cols.push(strike);
+    const forecast = fleetForecastHtml(f, here!);
+    if (forecast) cols.push(forecast);
     // Ground army at your own world — СВОДКА, без кнопок: сама погрузка/выгрузка
     // переехала в ⇅-меню ряда команд (GRND-1), где есть выбор «кого и сколько».
     // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
@@ -775,15 +771,10 @@ function fleetWingOffer(f: Fleet, hold: HangarView | null): TransferOffer {
 export function fleetLandShown(f: Fleet): boolean {
   const s = game.world();
   const ME = game.me();
-  const here = planet(f.location);
   const hold = f.owner === ME ? fleetHangar(f, data, s) : null;
   const wing = hasHangar(hold) ? fleetWingOffer(f, hold) : null;
   return landColumnShown({
     holds: fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)),
-    strike:
-      !!here &&
-      fleetDocked(true, !!f.movement, !!f.battleId) &&
-      strikeOffered(here.owner, f.owner, sectorTypeOf(here.id)?.capturable ?? false),
     wingTransfer: !!wing && (wing.load || wing.unload),
   });
 }
@@ -835,36 +826,14 @@ function fleetBattleRowHtml(battleId: string): string {
   return `<div class="row">${btn('openbattle', battleId, t('battle.win.open'), true)}</div>`;
 }
 
-/** Удар по миру под флотом: бомбардировка, штурм и прогноз. Пусто, если мир не чужой. */
-function fleetStrikeHtml(f: Fleet, here: Planet, inOrbit: boolean, nShips: number): string {
+/** Прогноз штурма мира под флотом. Пусто, если мир не чужой или биться некому. Кнопки
+ *  удара — бомбардировка и штурм с места — живут в ряду команд (правило 3г `cmdPresence`,
+ *  заказ владельца 2026-11-01): раньше они стояли здесь отдельным разделом «Удар» ниже
+ *  ангара, вдали от остальных приказов. */
+function fleetForecastHtml(f: Fleet, here: Planet): string {
   // enemy/neutral world you can act on — empty space is pass-through only
   // Нейтральная точка считается чужой: она не моя, и взять её можно.
-  const hostile = strikeOffered(here.owner, f.owner, sectorTypeOf(here.id)?.capturable ?? false);
-  if (!hostile) return '';
-  let at = `<div class="sec">${t('side.strike.title')}</div><div class="row">`;
-  at += btn(
-    'bombard',
-    f.bombarding ? 'off' : 'on',
-    f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
-    bombardEnabled(inOrbit, nShips, sectorTypeOf(here.id)?.orbit ?? true),
-  );
-  // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
-  // спрашивает — там, где его требует ядро: на защищённом мире без него ответ
-  // `E_NO_TROOPS`, у флота из одних разведчиков — `E_RECON_NO_CAPTURE`, и живая кнопка
-  // обещала бы заведомый отказ (правило 4).
-  at += btn(
-    'assault',
-    '',
-    t('side.strike.assault'),
-    assaultEnabled(
-      inOrbit,
-      sumUnits(f.landing ?? []) > 0,
-      sumUnits(here.garrison) > 0,
-      isReconFleet(f, data),
-    ),
-  );
-  at += `</div>`;
-  at += `<div class="hint">${t('side.strike.hint')}</div>`;
+  if (!strikeOffered(here.owner, f.owner, sectorTypeOf(here.id)?.capturable ?? false)) return '';
   // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
   // sim over the landing force vs the garrison the viewer SEES (the fleet is
   // docked here, so the world is identified — no fog leak). A forecast, not an
@@ -872,25 +841,24 @@ function fleetStrikeHtml(f: Fleet, here: Planet, inOrbit: boolean, nShips: numbe
   // in — the hedge in the copy says so.
   const landing = f.landing ?? [];
   const garrison = here.garrison;
-  if (forecastShown(landing, garrison)) {
-    const pv = previewBattle(landing, garrison, data);
-    const verdict =
-      pv.outcome === 'attacker'
-        ? t('side.strike.forecast.attacker')
-        : pv.outcome === 'defender'
-          ? t('side.strike.forecast.defender')
-          : t('side.strike.forecast.draw');
-    at += `<div class="row dim">${t('side.strike.forecast', {
+  if (!forecastShown(landing, garrison)) return '';
+  const pv = previewBattle(landing, garrison, data);
+  const verdict =
+    pv.outcome === 'attacker'
+      ? t('side.strike.forecast.attacker')
+      : pv.outcome === 'defender'
+        ? t('side.strike.forecast.defender')
+        : t('side.strike.forecast.draw');
+  return (
+    `<div class="row dim">${t('side.strike.forecast', {
       v: `<b>${verdict}</b>`,
       r: pv.roundsEst,
       a: previewLossCount(pv.attacker),
       pa: Math.round(pv.attacker.damageFraction * 100),
       d: previewLossCount(pv.defender),
       pd: Math.round(pv.defender.damageFraction * 100),
-    })}</div>`;
-    at += `<div class="hint">${t('side.strike.forecast.hint')}</div>`;
-  }
-  return at;
+    })}</div>` + `<div class="hint">${t('side.strike.forecast.hint')}</div>`
+  );
 }
 
 /** Наземные части: тип, сколько в гарнизоне мира и сколько в трюме флота. */
@@ -946,7 +914,6 @@ function fleetConsoleHtml(f: Fleet): string {
   const ME = game.me();
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
-  const inOrbit = f.orbit === 'near';
   const sm = fleetSummary(f, data, s.time);
   const mods = fleetStatModsOf(f);
   const boosted = marchFlagged(f.id);
@@ -1057,7 +1024,7 @@ function fleetConsoleHtml(f: Fleet): string {
     (troopsIn
       ? `<button type="button" class="fc-load${troopsPlan?.fleetId === f.id ? ' on' : ''}" data-cmd="troops" title="${esc(t('cmd.troops.hint'))}">${holoIcon('arrows-down-up')}<span>${esc(t('fleet.console.load'))}</span></button>`
       : '');
-  if (here && docked) land += fleetStrikeHtml(f, here, inOrbit, nShips);
+  if (here && docked) land += fleetForecastHtml(f, here);
   // Пустой трюм колонку не рисует (`fleetLandShown`): ⇅ тогда стоит в «Приказах».
   if (land && fleetLandShown(f)) body += `<section class="fc-land">${land}</section>`;
 

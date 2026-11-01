@@ -209,12 +209,14 @@ body.mobile-ui #mobile-sheet #cmdbar > button .cl {
 body.mobile-ui #mobile-sheet #cmdbar > button .ci {
   font-size: 19px;
 }
+/* Удар по миру под флотом (`.ctx`: бомбардировка, штурм с места) под «Ещё» не прячется:
+   он виден, только когда его можно применить здесь и сейчас (правило 3г `cmdPresence`). */
 body.mobile-ui
   #mobile-sheet:not(.more-open):not(.order-mode)
   #cmdbar
   > button:not([data-cmd='move']):not([data-cmd='engage']):not([data-cmd='stop']):not(
     [data-cmd='more']
-  ) {
+  ):not(.ctx) {
   display: none;
 }
 body.mobile-ui #mobile-sheet #cmdbar > button[data-cmd='more'] {

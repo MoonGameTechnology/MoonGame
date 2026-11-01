@@ -45,6 +45,7 @@
 | REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
+| CMD-VIS-4 | ✅ | core proto | `docs/backlog.md` | Штурм и бомбардировка в ряду приказов, отмена |
 | TXT-8 | 🔒 | proto docs | `docs/backlog.md` | (LORE-1) Досье кораблей и зданий: описание о роли, числа в |
 | TXT-9 | 🔒 | proto | `docs/backlog.md` | (LORE-1) Лорный оборот там, где после чистки остались одни числа: |
 | LORE-1 | ⏳ | docs | `docs/backlog.md` | Документ сеттинга: опора для лорных строк. |

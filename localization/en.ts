@@ -1169,10 +1169,14 @@ export const en: Record<string, string> = {
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
+  'cmd.assault.here.hint': 'land troops on the world below; an empty one is simply taken',
   'cmd.auto-retreat': 'Auto-retreat',
   'cmd.auto-retreat.hint': 'the fleet leaves a battle by itself once its hull drops to the threshold',
   'cmd.auto-assault': 'Auto-storm',
   'cmd.auto-assault.hint': 'the fleet storms an enemy world by itself on arrival',
+  'cmd.bombard': 'Bombard',
+  'cmd.bombard.hint': 'from orbit: wears buildings and their output, hits troops except the last; AA fires back',
+  'cmd.bombard.stop.hint': 'stop bombarding the world below',
   'cmd.cast': 'Ability',
   'cmd.cast.cooldown': 'CD {h}',
   'cmd.cast.hint': "use a hero ability from the fleet's roster",
@@ -2152,9 +2156,9 @@ export const en: Record<string, string> = {
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ pick a target — two fingers move the camera',
   'hint.assault-target': "⚔ your own worlds and empty space can't be stormed",
-  'hint.auto-retreat': '⮐ auto-retreat at {n}% hull → {at}',
-  'hint.auto-retreat.off': '⮐ auto-retreat cleared',
-  'hint.auto-retreat.nowhere': '⮐ nowhere to fall back to: select your own world or set a capital',
+  'hint.auto-retreat': '⤺ auto-retreat at {n}% hull → {at}',
+  'hint.auto-retreat.off': '⤺ auto-retreat cleared',
+  'hint.auto-retreat.nowhere': '⤺ nowhere to fall back to: select your own world or set a capital',
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
   'hint.cast-cancelled': '✖ ability cancelled',
@@ -3851,12 +3855,17 @@ export const en: Record<string, string> = {
   'loadprompt.after': 'After loading',
   'loadprompt.now': 'Cancel it and go',
   'loadprompt.cancel': 'Cancel',
+  'loadprompt.landing.after': 'After landing',
+  'loadprompt.landing.body': 'A landing is under way on {n} {n|fleet|fleets}, ≈{m} min left. Departing calls it off; the troops stay aboard.',
+  'loadprompt.landing.now': 'Call it off and go',
+  'loadprompt.landing.title': 'Troops are landing',
   'log.fleet.halted': '⛔ {f} stopped at the border: {to} belongs to {who}, no right of way',
   'log.army.load-cancelled': '⚠ loading cancelled: the fleet left, {n}× {u} stayed at {at}',
   // MSB-9: unloading runs on a timer, and departure cancels it — the troops stay aboard.
   'log.army.unload-cancelled': '⚠ unloading cancelled: the fleet left, {n}× {u} stayed aboard at {at}',
   // MSB-9: an assault landing takes an hour and a half; an enemy fleet in orbit breaks it off.
   'log.assault.landing': '⤓ landing on {at}: troops ashore in {t}',
+  'log.assault.cancelled': '⚠ landing on {at} called off: the fleet left, troops stay aboard',
   'log.assault.interrupted': '⚠ landing on {at} broken off: enemy in orbit, troops stay aboard',
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
@@ -4766,9 +4775,6 @@ export const en: Record<string, string> = {
   'side.stat.atk': 'ATK',
   'side.stat.def': 'DEF',
   'side.stat.spd': 'SPD',
-  'side.strike.assault': '⚔ Assault',
-  'side.strike.bombard': '⊗ Bombard',
-  'side.strike.bombard.stop': '⊗ Stop bombard',
   'side.strike.forecast':
     'Assault forecast: {v} · ~{r} rounds · losses {a} landing ({pa}%) / {d} garrison ({pd}%)',
   // UIX-6.1: forecast at the «Attack» target (fleet vs fleet). Verdict word and a numbers line.
@@ -4781,9 +4787,6 @@ export const en: Record<string, string> = {
   'side.strike.forecast.draw': 'a drawn-out stalemate',
   'side.strike.forecast.hint':
     'Forecast from visible compositions only — terrain, fortification and technology bonuses are not included; the real battle may differ.',
-  'side.strike.hint':
-    "In orbit you can bombard (wears buildings, freezes their output and lightly hits troops except the last one), but the garrison's interdiction reaches you. Assault lands your troops against the garrison.",
-  'side.strike.title': 'Strike',
   'side.summary.attack': 'Attack',
   'side.summary.back': '‹ Back to the card',
   'side.summary.cargo': 'Cargo hold',

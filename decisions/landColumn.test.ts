@@ -4,7 +4,6 @@ import { landColumnShown, type LandColumnInput } from './landColumn';
 const empty = { used: 0, reserved: 0 };
 const input = (over: Partial<LandColumnInput> = {}): LandColumnInput => ({
   holds: [],
-  strike: false,
   wingTransfer: false,
   ...over,
 });
@@ -24,7 +23,6 @@ describe('колонка «Десант» окна флота', () => {
   });
 
   it('при пустом трюме колонку держат команды, которых больше нигде нет', () => {
-    expect(landColumnShown(input({ holds: [empty], strike: true }))).toBe(true);
-    expect(landColumnShown(input({ wingTransfer: true }))).toBe(true);
+    expect(landColumnShown(input({ holds: [empty], wingTransfer: true }))).toBe(true);
   });
 });

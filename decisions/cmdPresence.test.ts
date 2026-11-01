@@ -6,6 +6,9 @@ const пусто: CmdSelection = {
   castHero: false,
   troops: false,
   assaultArmed: false,
+  assaultHere: false,
+  bombardReady: false,
+  bombarding: false,
   mergeable: false,
   merging: false,
   troopsMenu: false,
@@ -38,6 +41,21 @@ describe('cmdPresence — что показывается отсутствием
   // и кнопка унесла бы с собой единственную подпись о том, что он ещё взведён.
   it('ВЗВЕДЁННЫЙ штурм остаётся в ряду, даже когда штурмовать уже некем', () => {
     expect(cmdShown(с({ assaultArmed: true })).assault).toBe(true);
+  });
+});
+
+// Правило 3г (заказ владельца 2026-11-01): удар по миру под флотом переехал из раздела
+// «Удар» листа в ряд и виден, только когда ядро его пропустит.
+describe('cmdPresence — удар по миру под флотом (правило 3г)', () => {
+  it('ШТУРМ есть и без десанта, когда мир под флотом берётся прямо сейчас', () => {
+    expect(cmdShown(с({ assaultHere: true })).assault).toBe(true);
+    expect(cmdShown(с({ assaultHere: false, troops: false })).assault).toBe(false);
+  });
+
+  it('«Бомбардировка» есть, пока её можно включить или выключить, и не иначе', () => {
+    expect(cmdShown(пусто).bombard).toBe(false);
+    expect(cmdShown(с({ bombardReady: true })).bombard).toBe(true);
+    expect(cmdShown(с({ bombarding: true })).bombard).toBe(true);
   });
 });
 
