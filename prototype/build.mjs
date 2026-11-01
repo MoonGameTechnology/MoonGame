@@ -1387,6 +1387,8 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .in-row .dp-spy + .dp-spy{margin-left:0;}
 .in-empty{padding:6px 2px;font-size:var(--fs-caption);color:var(--dim);}
 .in-log{padding:4px 2px;font-size:var(--fs-caption);color:var(--dim);line-height:1.45;border-bottom:1px dashed rgba(29,107,112,.25);}
+.in-log[data-iw]{cursor:pointer;}
+.in-log[data-iw]:active{background:rgba(53,214,230,.12);}
 .dp-intel em{font-style:normal;color:var(--dim);font-size:var(--fs-caption);}
 .dp-msg{margin-left:auto;padding:6px 11px;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font-size:var(--fs-body);cursor:pointer;}

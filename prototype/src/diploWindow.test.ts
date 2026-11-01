@@ -401,6 +401,25 @@ describe('REFM-214 — журнал разведки', () => {
     expect(html.indexOf('вторая')).toBeLessThan(html.indexOf('первая'));
     expect(html).not.toContain(t('spy.log.empty'));
   });
+
+  it('SPY-20: запись с миром ведёт к нему, архив ставится из сейва и чистится новой партией', async () => {
+    const { win } = await boot();
+    win.restoreSpyArchive();
+    win.openDiplo('intel');
+    win.pushSpyLog('кража', 'espionage.succeeded', { planetId: 'n7', kind: 'theft' });
+    win.pushSpyLog('провал', 'espionage.failed', { target: 'p3', kind: 'theft' });
+    expect(win.spyArchive()).toEqual([
+      expect.objectContaining({ text: 'провал', op: 'theft' }),
+      expect.objectContaining({ text: 'кража', planetId: 'n7', op: 'theft' }),
+    ]);
+    expect(el('diplo').innerHTML).toContain('data-iw="n7"');
+    const saved = win.spyArchive();
+    win.restoreSpyArchive();
+    expect(win.spyArchive()).toEqual([]);
+    win.restoreSpyArchive(saved);
+    win.openDiplo('intel');
+    expect(el('diplo').innerHTML).toContain('кража');
+  });
 });
 
 describe('REFM-214 — реплика и метка', () => {
@@ -497,7 +516,7 @@ describe('REFM-214 — проводка в main.ts', () => {
     expect(MAIN).not.toMatch(/\b(diploOpen|diploTab|diploSort|diploExpanded)\s*=[^=]/);
     expect(MAIN).not.toMatch(/\bdiplo(Stance|Type)Filter\b/);
     expect(MAIN).not.toMatch(/\bspyLog\s*[:=]/);
-    expect(MAIN).not.toContain('pushSpyEntry(');
+    expect(MAIN).not.toContain('pushSpyRecord(');
     expect(MAIN).not.toMatch(
       /\bfunction (renderDiplo|openDiplo|closeDiplo|proposeStance|toggleMapShare|playerCardHtml|seatCardHtml|intelTabHtml|diffNetDiplomacy|sendDiploMsg|pingSelected|pushSpyLog)\b/,
     );

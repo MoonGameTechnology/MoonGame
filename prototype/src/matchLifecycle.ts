@@ -28,6 +28,7 @@ import {
 import { type GameState, shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { chainMode, exitChainMode, forgetChainRoutes } from './chainComposer';
 import { detach } from './detach';
+import { restoreSpyArchive } from './diploWindow';
 import type { EndAction } from './endScreen';
 import { note, resetEventFeed } from './eventFeed';
 import {
@@ -243,6 +244,7 @@ export function installMatch(
   forgetChainRoutes(); // маршруты принадлежат карте СТАРОГО матча
   resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
+  restoreSpyArchive(); // SPY-20: донесения старой партии — не о мирах этой
   forgetRadarContacts();
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();

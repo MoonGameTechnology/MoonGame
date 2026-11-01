@@ -7,8 +7,9 @@
  * Всё это жило в `main.ts` пятью кусками. Состояние окна (открыто ли, вкладка, сортировка,
  * раскрытая строка, фильтры) теперь пишут только функции модуля: `main.ts` читает
  * {@link diploOpen} и {@link diploTab} живыми привязками (`export let`), а открывает и
- * закрывает окно дверями {@link openDiplo} и {@link closeDiplo}. Журнал разведки пишет
- * одна дверь {@link pushSpyLog}.
+ * закрывает окно дверями {@link openDiplo} и {@link closeDiplo}. Архив донесений пишет
+ * одна дверь {@link pushSpyLog}, сейв читает и ставит его {@link spyArchive} и
+ * {@link restoreSpyArchive}.
  *
  * Ленту сообщений модуль не держит: ею владеет `messageLog.ts` (первый PR кирпича), окно
  * её только читает и пишет через двери владельца.
@@ -22,6 +23,7 @@
  * импорт оттуда был бы циклом.
  */
 import { coalitionInviteBlock, coalitionTreatyLocked } from '../../decisions/coalitionCreation';
+import { pushSpyRecord, spyOpGlyph, spyRecordOf, type SpyRecord } from '../../decisions/spyArchive';
 import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { t, tData } from '../../localization/runtime';
 import {
@@ -53,7 +55,7 @@ import {
   shareMap,
   STANCE_RANK,
 } from './game';
-import { grantLeftMs, myAgents, pushSpyEntry, spyCostRange, type SpyEntry } from './intel';
+import { grantLeftMs, myAgents, spyCostRange } from './intel';
 import { selPlanet } from './interaction';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
@@ -131,12 +133,21 @@ let diploExpanded: string | null = null; // participant row showing its action b
 const diploStanceFilter = new Set<DiplomaticStance>();
 const diploTypeFilter = new Set<'human' | 'ai'>();
 
-// SPY-UX: сессионный журнал исходов шпионажа (моих и контрразведки по мне) — питает
-// вкладку «Шпионаж» в дипломатии. Хранит уже локализованную строку.
-const spyLog: SpyEntry[] = [];
-export function pushSpyLog(text: string): void {
-  pushSpyEntry(spyLog, { at: game.state().time, text });
+// SPY-20: архив донесений шпионажа (моих и контрразведки по мне) — питает вкладку
+// «Шпионаж» в дипломатии; новые сверху, правила — `decisions/spyArchive.ts`. Событие
+// `type`/`payload` даёт записи мир и вид операции.
+let spyLog: SpyRecord[] = [];
+export function pushSpyLog(text: string, type = '', payload: Record<string, unknown> = {}): void {
+  spyLog = pushSpyRecord(spyLog, spyRecordOf(type, payload, game.state().time, text));
   if (diploOpen && diploTab === 'intel') renderDiplo();
+}
+/** Архив для сейва схватки. */
+export function spyArchive(): SpyRecord[] {
+  return [...spyLog];
+}
+/** Поставить архив: из сейва — его записи, в новой партии — пустой. */
+export function restoreSpyArchive(records: readonly SpyRecord[] = []): void {
+  spyLog = [...records];
 }
 
 // --- player card (tap the top-left crest) ------------------------------------
@@ -675,9 +686,14 @@ function intelTabHtml(): string {
       return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : guard ? '🛡' : '🕵'}</span><b>${esc(what)}</b><span class="in-t">${left}</span></div>`;
     })
     .join('');
-  const log = [...spyLog]
-    .reverse()
-    .map((e) => `<div class="in-log">${gameStamp(e.at)} · ${esc(e.text)}</div>`)
+  // SPY-20: запись с миром ведёт к нему тем же переходом, что и окно разведки.
+  const log = spyLog
+    .map(
+      (e) =>
+        `<div class="in-log"${e.planetId ? ` data-iw="${esc(e.planetId)}"` : ''}>` +
+        `<span class="in-k">${spyOpGlyph(e.op)}</span> ${gameStamp(e.at)} · ${esc(e.text)}` +
+        `${e.planetId ? ' <span class="in-go">↪</span>' : ''}</div>`,
+    )
     .join('');
   return (
     `<div class="dp-list in-list">` +

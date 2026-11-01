@@ -44,15 +44,6 @@ export function myAgents(s: GameState, me: string): SpyAgents {
   return spyAgents(s.spyAgents?.[me], BASE_SPY_AGENTS + turnedAgents(s, me, s.time), s.time);
 }
 
-/** Сколько строк держит сессионный журнал шпионажа. */
-export const SPY_LOG_MAX = 30;
-
-/** Строка журнала: игровое время и уже локализованный текст. */
-export interface SpyEntry {
-  at: number;
-  text: string;
-}
-
 /** ЖИВЫЕ окна на момент `now`. Просроченное окно не показывает ничего — даже если ядро
  *  ещё не успело его вычистить. */
 export function liveGrants(grants: readonly IntelGrant[] | undefined, now: number): IntelGrant[] {
@@ -82,14 +73,6 @@ export function grantVision(
     vision.identify.add(id);
     vision.radar.add(id);
   }
-}
-
-/** Дописать строку в журнал, срезав всё сверх потолка. Возвращает тот же массив —
- *  журнал живёт у хозяина, модуль только держит его в границах. */
-export function pushSpyEntry(log: SpyEntry[], entry: SpyEntry, max = SPY_LOG_MAX): SpyEntry[] {
-  log.push(entry);
-  while (log.length > max) log.shift();
-  return log;
 }
 
 /** Осталось ли жить окну (в игровых миллисекундах) — для подписи «ещё N ч». */

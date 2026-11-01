@@ -1,6 +1,7 @@
 /** Local single-player checkpoint. The world stays JSON; host-only policies travel
  * alongside it. No wall-clock catch-up and no dependency on a particular client. */
 import { hashJson, hasFixedSides, type GameState } from '../packages/shared-core/src/index';
+import { parseSpyArchive, type SpyRecord } from './spyArchive';
 
 export interface SoloIntel {
   owner: string | null;
@@ -16,6 +17,8 @@ export interface SoloSave {
   fastSpeed: number;
   autoAssault: string[];
   memory: Array<[string, SoloIntel]>;
+  /** Архив донесений шпионажа (SPY-20); нет в сейвах до него. */
+  spyArchive?: SpyRecord[];
 }
 
 export function serializeSoloSave(save: SoloSave, rules: string): string {
@@ -98,6 +101,7 @@ export function parseSoloSave(raw: string | null, rules: string): SoloSave | nul
       )
     )
       return null;
+    if (parseSpyArchive(p.spyArchive) === null) return null;
     return p as unknown as SoloSave;
   } catch {
     return null;
