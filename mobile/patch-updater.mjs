@@ -63,10 +63,13 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLException;
 
 /**
  * Capacitor host activity + the verified in-app updater bridge (see patch-updater.mjs).
@@ -140,7 +143,8 @@ public class MainActivity extends BridgeActivity {
                 connection.setUseCaches(false);
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(30000);
-                if (connection.getResponseCode() != 200) return "E_UPDATE_DOWNLOAD";
+                int responseCode = connection.getResponseCode();
+                if (responseCode != 200) return responseCode == 404 ? "E_UPDATE_STALE" : "E_UPDATE_HTTP";
                 if (connection.getContentLengthLong() > MAX_APK) return "E_UPDATE_DOWNLOAD";
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 long total = 0;
@@ -173,6 +177,12 @@ public class MainActivity extends BridgeActivity {
                     }
                 });
                 return null;
+            } catch (SocketTimeoutException e) {
+                return "E_UPDATE_TIMEOUT";
+            } catch (UnknownHostException e) {
+                return "E_UPDATE_DNS";
+            } catch (SSLException e) {
+                return "E_UPDATE_TLS";
             } catch (Exception e) {
                 return "E_UPDATE_DOWNLOAD";
             } finally {

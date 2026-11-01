@@ -87,6 +87,8 @@ export interface MatchApiDeps {
    *  the `POST /matches` route is not registered — a host that only seeds matches out of band
    *  (e.g. the playtest netserver) exposes join without a public create. */
   createMatch?(request?: { mapId?: string; modeId?: string }): Promise<CreatedMatch>;
+  /** Optional host policy, evaluated only against a live authenticated identity. */
+  canCreate?(identity: Identity): boolean | Promise<boolean>;
   /** Explicit allowlist for user-selected maps; absent = default only. */
   mapIds?: readonly string[];
   /** Explicit allowlist for user-selected game modes (`data.modes`); absent = the host
@@ -182,6 +184,9 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
       if (identify && !who) {
         void reply.code(401);
         return { error: 'E_AUTH' as const };
+      }
+      if (deps.canCreate && (!who || !(await deps.canCreate(who)))) {
+        return reply.code(403).send({ error: 'E_FORBIDDEN' });
       }
       const body = request.body;
       if (body !== undefined && (body === null || typeof body !== 'object' || Array.isArray(body))) {

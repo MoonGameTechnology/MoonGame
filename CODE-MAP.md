@@ -469,6 +469,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `roomRegistry.ts` | `LazyRoomRegistry`, `InMemoryRoomRegistry` | маршрутизация, hibernation и истечение срока уже загруженных архивов |
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |
+| `matchCreationAccess.ts` | `matchCreationAccess` | production allowlist UUID для создания сессий |
 | `operatorMatchApi.ts` | `POST /metrics/matches` | создание сессии с картой и скоростью; полный операторский ключ |
 | `sessionSpeed.ts` | `sessionSpeed` | скорость из сохранённых часов либо настройка новой сессии |
 | `clockDriver.ts` | `clockDriver` | v1 offline scheduler (`msUntilNextEvent` → tick) |

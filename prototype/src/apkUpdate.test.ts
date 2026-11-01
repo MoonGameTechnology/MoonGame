@@ -49,7 +49,7 @@ describe('диагностика проверки', () => {
 
 describe('статус проверенной установки', () => {
   it('подмена файла и отказ в разрешении читаются по-разному', () => {
-    const codes = ['downloading', 'installing', 'E_UPDATE_PERMISSION', 'E_UPDATE_DIGEST', 'E_UPDATE_PACKAGE', 'E_UPDATE_DOWNLOAD'];
+    const codes = ['downloading', 'installing', 'E_UPDATE_PERMISSION', 'E_UPDATE_DIGEST', 'E_UPDATE_PACKAGE', 'E_UPDATE_DOWNLOAD', 'E_UPDATE_INSTALL', 'E_UPDATE_TIMEOUT', 'E_UPDATE_DNS', 'E_UPDATE_TLS', 'E_UPDATE_HTTP', 'E_UPDATE_STALE'];
     const said = codes.map(installMessage);
     expect(new Set(said).size).toBe(codes.length);
     for (const line of said) expect(line).not.toMatch(/^upd\./);
@@ -78,5 +78,31 @@ describe('порог молчаливых проверок', () => {
     expect(shouldCheck(NOW, NOW - 1, true)).toBe(false);
     expect(shouldCheck(NOW, NOW - CHECK_GAP_MS + 1, true)).toBe(false);
     expect(shouldCheck(NOW, NOW - CHECK_GAP_MS, true)).toBe(true);
+  });
+});
+
+// A banner can stay open longer than the host retains its immutable APK URL.
+describe('download uses a fresh signed release', () => {
+  it('uses the release checked at click time and its matching digest', async () => {
+    const { beginVerifiedUpdate } = await import('./apkUpdate');
+    const latest = { ...info, versionCode: 43, apkUrl: 'https://77-221-140-87.sslip.io/downloads/android/alpha/43-deadbee/void-dominion-alpha.apk', apkSha256: 'b'.repeat(64) };
+    const installed: string[][] = [];
+    let checks = 0;
+    await beginVerifiedUpdate({ check: async () => { checks++; return { kind: 'update', local: 41, info: latest }; }, install: (url, hash) => { installed.push([url, hash]); }, status: () => {} });
+    expect(checks).toBe(1);
+    expect(installed).toEqual([[latest.apkUrl, latest.apkSha256]]);
+  });
+  it.each(OUTCOMES.filter(x => x.kind !== 'update'))('refuses unavailable or unverified release: $kind', async outcome => {
+    const { beginVerifiedUpdate } = await import('./apkUpdate');
+    const installed: string[] = [], statuses: string[] = [];
+    await beginVerifiedUpdate({ check: async () => outcome, install: url => { installed.push(url); }, status: text => { statuses.push(text); } });
+    expect(installed).toEqual([]);
+    expect(statuses.at(-1)).toBe(updateMessage(outcome));
+  });
+  it('refuses a URL outside the trusted distribution origin', async () => {
+    const { beginVerifiedUpdate } = await import('./apkUpdate');
+    let installed = false;
+    await beginVerifiedUpdate({ check: async () => ({ kind: 'update', local: 41, info }), install: () => { installed = true; }, status: () => {} });
+    expect(installed).toBe(false);
   });
 });

@@ -105,6 +105,7 @@ services:
       # only to a direct loopback peer or to `Authorization: Bearer $METRICS_TOKEN`; from
       # the host a curl arrives via the Docker bridge, not loopback, so prod needs the
       # token (≥32 chars, e.g. `openssl rand -hex 32`). Unset ⇒ the routes 404 for everyone.
+      MATCH_CREATOR_ACCOUNT_IDS: ${MATCH_CREATOR_ACCOUNT_IDS:-}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       # Aggregate-only credential for the host observer; never use METRICS_TOKEN there.
       METRICS_READER_TOKEN: ${METRICS_READER_TOKEN:-}

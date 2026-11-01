@@ -1,3 +1,4 @@
+import { matchCreationAccess } from './matchCreationAccess';
 import { CorpMaterials } from './corpMaterials';
 import { registerCorpMaterialsApi } from './corpMaterialsApi';
 import {
@@ -673,7 +674,7 @@ const server = createMultiplayerServer({
             }
           },
         });
-        registerMatchApi(scope, matchApi);
+        registerMatchApi(scope, { ...matchApi, canCreate: matchCreationAccess(process.env) });
         // Corporations (CORP-0) — session-gated on every route: the acting identity
         // comes from the session, so the API only exists where sessions do.
         if (identify) {

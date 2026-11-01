@@ -1137,3 +1137,11 @@ sudo bash deploy/install-ubuntu.sh
 После restore runtime требует replay внешнего реестра удалений. Порядок настройки
 обработчика, таймера, обслуживания и восстановления: [подготовка RuStore](../docs/security/rustore-preparation.md).
 Не обходить `account_erasure_guard`; сначала миграция и replay на обеих БД.
+
+### Создание сессий отдельными аккаунтами
+
+В production `POST /matches` разрешён только живым аккаунтам с UUID, указанными
+через запятую в `MATCH_CREATOR_ACCOUNT_IDS`. Пустой список запрещает создание.
+Имена аккаунтов прав не передают; операторский `/metrics/matches` сохраняет свой ключ.
+После настройки backend авторизации удаляется прежний общий запрет POST /matches
+из локального Caddyfile production; запрет на стенде ботов сохраняется.
